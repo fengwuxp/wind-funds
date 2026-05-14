@@ -58,11 +58,15 @@ public class RouteSubjectSupport {
         if (Objects.equals(accountId.type(), FundsSubjectType.BUDGET_GROUP.name())) {
             return LedgerProfileCode.BUDGET_BASIC;
         }
+        if (isMerchantFundingAccountType(accountId.type())) {
+            return LedgerProfileCode.FUNDING_MERCHANT;
+        }
         return LedgerProfileCode.FUNDING_BASIC;
     }
 
     public boolean isFundingAccount(@NonNull FundsAccountId accountId) {
-        return Objects.equals(accountId.type(), FundsSubjectType.FUNDING_ACCOUNT.name());
+        return Objects.equals(accountId.type(), FundsSubjectType.FUNDING_ACCOUNT.name())
+                || isMerchantFundingAccountType(accountId.type());
     }
 
     public boolean isCreditAccount(@NonNull FundsAccountId accountId) {
@@ -75,5 +79,9 @@ public class RouteSubjectSupport {
 
     private boolean isExternalAccountType(String accountType) {
         return DefaultFundsAccountType.isExternalAccount(accountType);
+    }
+
+    private boolean isMerchantFundingAccountType(String accountType) {
+        return Objects.equals(accountType, DefaultFundsAccountType.PLATFORM_MERCHANT.name());
     }
 }
