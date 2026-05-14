@@ -1,10 +1,15 @@
 package com.capte.funds.ledger;
 
+import com.capte.funds.ledger.dto.LedgerDTO;
 import com.capte.funds.ledger.dto.LedgerEntryDTO;
 import com.capte.funds.ledger.dto.LedgerTransactionDTO;
 import com.capte.funds.ledger.query.LedgerEntryQuery;
+import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.query.LedgerTransactionQuery;
+import com.capte.funds.ledger.request.CreateLedgerRequest;
+import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.request.UpdateLedgerTransactionRequest;
+import com.capte.funds.ledger.service.LedgerService;
 import com.capte.funds.ledger.service.LedgerTransactionService;
 import com.capte.funds.transaction.FundsTransactionTestSupport;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
@@ -37,6 +42,8 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -50,7 +57,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         LedgerTransactionSpec transaction = transaction();
 
         service.post(transaction);
@@ -65,7 +72,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
 
         assertThatThrownBy(() -> service.post(null))
                 .isInstanceOf(BaseException.class)
@@ -79,7 +86,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         LedgerTransactionSpec transaction = uncheckedTransaction("LE_000000000009", List.of());
 
         assertThatThrownBy(() -> service.post(transaction))
@@ -95,7 +102,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(false);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         LedgerTransactionSpec transaction = transaction();
 
         assertThatThrownBy(() -> service.post(transaction))
@@ -111,7 +118,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingProjectionService firstProjectionService = new RecordingProjectionService(true);
         RecordingProjectionService secondProjectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(firstProjectionService, secondProjectionService));
+                transactionService, defaultLedgerService(), List.of(firstProjectionService, secondProjectionService));
         LedgerTransactionSpec transaction = transaction();
 
         assertThatThrownBy(() -> service.post(transaction))
@@ -127,7 +134,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         String ledgerTransactionSn = "LE_000000000002";
         LedgerPostingPlanSpec debitHeavyPlan = uncheckedPostingPlan(ledgerTransactionSn, "DEBIT_HEAVY", List.of(
                 entry(EntrySide.DEBIT, ledgerTransactionSn, 100L),
@@ -155,7 +162,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         String ledgerTransactionSn = "LE_000000000007";
         LedgerPostingPlanSpec mixedCurrencyPlan = uncheckedPostingPlan(ledgerTransactionSn, "MIXED_CURRENCY", List.of(
                 entry(EntrySide.DEBIT, ledgerTransactionSn, 100L, CurrencyIsoCode.USD),
@@ -178,7 +185,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         String ledgerTransactionSn = "LE_000000000008";
         LedgerPostingPlanSpec zeroAmountPlan = uncheckedPostingPlan(ledgerTransactionSn, "ZERO_AMOUNT", List.of(
                 entry(EntrySide.DEBIT, ledgerTransactionSn, 0L),
@@ -203,7 +210,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         String ledgerTransactionSn = "LE_000000000003";
         FundsTransactionTestSupport.MutableLedgerEntrySpec entryWithoutLedgerId = entry(
                 EntrySide.DEBIT, ledgerTransactionSn);
@@ -225,11 +232,39 @@ class DefaultLedgerTransactionPostingServiceImplTests {
     }
 
     @Test
+    void testPostShouldRejectLedgerBindingMismatchBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        RecordingLedgerService ledgerService = defaultLedgerService();
+        ledgerService.addLedger(ledger(2L, "funding_002", FundsSubjectType.FUNDING_ACCOUNT.name(),
+                LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.ASSET, CurrencyIsoCode.USD));
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, ledgerService, List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000010";
+        FundsTransactionTestSupport.MutableLedgerEntrySpec mismatchedEntry = entry(
+                EntrySide.DEBIT, ledgerTransactionSn);
+        mismatchedEntry.setLedgerId(2L);
+        LedgerPostingPlanSpec plan = postingPlan(ledgerTransactionSn, List.of(
+                mismatchedEntry,
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = transaction(ledgerTransactionSn, List.of(plan));
+
+        assertThat(transaction.isBalanced()).isTrue();
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本分录主体与账本主体不一致")
+                .hasMessageContaining("ledgerId = 2");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    @Test
     void testPostShouldRejectExternalAccountEntryBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         String ledgerTransactionSn = "LE_000000000004";
         FundsTransactionTestSupport.MutableLedgerEntrySpec externalEntry = entry(
                 EntrySide.DEBIT, ledgerTransactionSn);
@@ -256,7 +291,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         String ledgerTransactionSn = "LE_000000000005";
         FundsTransactionTestSupport.MutableLedgerEntrySpec entryWithoutSubjectType = entry(
                 EntrySide.DEBIT, ledgerTransactionSn);
@@ -282,7 +317,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
         DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
-                transactionService, List.of(projectionService));
+                transactionService, defaultLedgerService(), List.of(projectionService));
         String ledgerTransactionSn = "LE_000000000006";
         FundsTransactionTestSupport.MutableLedgerEntrySpec unknownSubjectTypeEntry = entry(
                 EntrySide.DEBIT, ledgerTransactionSn);
@@ -366,6 +401,32 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         return LedgerTransactionSpecFactory.postingPlan(LedgerPostingIntentType.TRANSFER,
                 ledgerTransactionSn, List.of(LedgerTransactionSpecFactory.postingPhase(
                         LedgerPhaseCode.TRANSFER, entries)));
+    }
+
+    private RecordingLedgerService defaultLedgerService() {
+        RecordingLedgerService ledgerService = new RecordingLedgerService();
+        ledgerService.addLedger(ledger(1L, "funding_001", FundsSubjectType.FUNDING_ACCOUNT.name(),
+                LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.ASSET, CurrencyIsoCode.USD));
+        return ledgerService;
+    }
+
+    private LedgerDTO ledger(Long id,
+                             String subjectId,
+                             String subjectType,
+                             LedgerSubjectCode ledgerSubjectCode,
+                             LedgerSubjectCategory ledgerSubjectCategory,
+                             CurrencyIsoCode currency) {
+        return new LedgerDTO()
+                .setId(id)
+                .setSubjectId(subjectId)
+                .setSubjectType(subjectType)
+                .setLedgerSubjectCode(ledgerSubjectCode)
+                .setLedgerSubjectCategory(ledgerSubjectCategory)
+                .setNormalBalanceSide(EntrySide.DEBIT)
+                .setAllowNegative(false)
+                .setDebitAmount(0L)
+                .setCreditAmount(0L)
+                .setCurrency(currency);
     }
 
     private LedgerPostingPlanSpec uncheckedPostingPlan(String ledgerTransactionSn,
@@ -510,6 +571,52 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         @Override
         public boolean support(@NonNull FundsAccountId accountId) {
             return supported;
+        }
+    }
+
+    private static final class RecordingLedgerService implements LedgerService {
+
+        private final Map<Long, LedgerDTO> ledgers = new LinkedHashMap<>();
+
+        private void addLedger(LedgerDTO ledger) {
+            ledgers.put(ledger.getId(), ledger);
+        }
+
+        @Override
+        public @NonNull Long createLedger(@NonNull CreateLedgerRequest request) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void updateLedgerBalance(@NonNull UpdateLedgerBalanceRequest request) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void deleteLedgerByIds(@NonNull Long... ids) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public @NonNull LedgerDTO getLedgerById(@NonNull Long id) {
+            LedgerDTO ledger = ledgers.get(id);
+            if (ledger == null) {
+                throw new BaseException("账户账本不存在");
+            }
+            return ledger;
+        }
+
+        @Override
+        public @NonNull List<LedgerDTO> getLedgerByIds(@NonNull Collection<Long> ids) {
+            return ids.stream()
+                    .map(this::getLedgerById)
+                    .toList();
+        }
+
+        @Override
+        public @NonNull WindPagination<LedgerDTO> queryLedgers(@NonNull LedgerQuery query,
+                                                               @NonNull WindQuery<? extends QueryOrderField> options) {
+            throw new UnsupportedOperationException();
         }
     }
 

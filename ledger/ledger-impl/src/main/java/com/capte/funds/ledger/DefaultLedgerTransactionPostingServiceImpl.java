@@ -1,5 +1,7 @@
 package com.capte.funds.ledger;
 
+import com.capte.funds.ledger.dto.LedgerDTO;
+import com.capte.funds.ledger.service.LedgerService;
 import com.capte.funds.ledger.service.LedgerTransactionService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
@@ -22,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -44,6 +47,8 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
 
     private final LedgerTransactionService ledgerTransactionService;
 
+    private final LedgerService ledgerService;
+
     private final List<LedgerBalanceProjectionService> ledgerBalanceProjectionServices;
 
     @Override
@@ -56,6 +61,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         assertAllPostingPlansBalanced(transaction);
         assertAllEntriesUsePostableSubjects(transaction);
         assertAllEntriesBoundToLedgers(transaction);
+        assertAllEntriesMatchBoundLedgers(transaction);
 
         // 按照账务主体分组更新余额
         Map<@NotNull FundsAccountId, List<LedgerEntrySpec>> groups = transaction.getPostingPlans()
@@ -149,6 +155,36 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                         entry.getSubjectId(),
                         entry.getSubjectType(),
                         entry.getLedgerSubjectCode()));
+    }
+
+    private void assertAllEntriesMatchBoundLedgers(LedgerTransactionSpec transaction) {
+        List<LedgerEntrySpec> entries = transaction.getPostingPlans()
+                .stream()
+                .map(LedgerPostingPlanSpec::getEntries)
+                .flatMap(List::stream)
+                .toList();
+        Set<Long> ledgerIds = entries.stream()
+                .map(LedgerEntrySpec::getLedgerId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<Long, LedgerDTO> ledgers = ledgerService.getLedgerByIds(ledgerIds)
+                .stream()
+                .collect(Collectors.toMap(LedgerDTO::getId, ledger -> ledger));
+        entries.forEach(entry -> {
+            LedgerDTO ledger = ledgers.get(entry.getLedgerId());
+            AssertUtils.notNull(ledger, "账户账本不存在，ledgerId = {}", entry.getLedgerId());
+            assertEntryMatchesLedger(entry, ledger);
+        });
+    }
+
+    private void assertEntryMatchesLedger(LedgerEntrySpec entry, LedgerDTO ledger) {
+        AssertUtils.isTrue(Objects.equals(ledger.getSubjectId(), entry.getSubjectId())
+                        && Objects.equals(ledger.getSubjectType(), entry.getSubjectType()),
+                "账本分录主体与账本主体不一致，ledgerId = {}", ledger.getId());
+        AssertUtils.isTrue(ledger.getLedgerSubjectCode() == entry.getLedgerSubjectCode()
+                        && ledger.getLedgerSubjectCategory() == entry.getLedgerSubjectCategory(),
+                "账本分录科目与账本科目不一致，ledgerId = {}", ledger.getId());
+        AssertUtils.isTrue(ledger.getCurrency() == entry.getCurrency(),
+                "账本分录币种与账本币种不一致，ledgerId = {}", ledger.getId());
     }
 
     private Map<FundsAccountId, LedgerBalanceProjectionService> resolveProjectionServices(
