@@ -1,0 +1,248 @@
+{
+  "caseId": "DSL-AUTHORIZATION-APPROVE-MULTI-SUBJECT-001",
+  "serviceAbility": "AUTHORIZATION_TRANSACTION",
+  "scenarioCode": "AUTHORIZATION_APPROVE_MULTI_SUBJECT",
+  "description": "资金账户、信用账户、预算组组合授权占用",
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "AUTHORIZATION",
+    "eventType": "AUTHORIZE",
+    "transactionType": "PAY",
+    "businessScene": "CARD_AUTHORIZATION",
+    "businessSn": "AUTH_202605140001",
+    "amount": {
+      "currency": "USD",
+      "minorValue": 12000
+    },
+    "originalAmount": {
+      "currency": "USD",
+      "minorValue": 12000
+    },
+    "exchangeRate": "1",
+    "eventTime": "2026-05-14T10:03:00",
+    "operator": {
+      "actorType": "SYSTEM",
+      "actorId": "authorization-engine"
+    },
+    "contextVariables": {
+      "authorizationSubjects": [
+        "fa_user_10001_usd",
+        "ca_user_10001_usd",
+        "bg_team_90001_usd"
+      ],
+      "authCode": "AUTH_CODE_202605140001"
+    }
+  },
+  "expectedRoute": {
+    "routeCode": "AUTHORIZATION_STANDARD",
+    "routeVersion": "v4",
+    "snapshotSchemaVersion": "route.snapshot.v4",
+    "participants": [
+      {
+        "participantRole": "AUTH_HOLDER",
+        "subjectRef": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "currency": "USD",
+          "ledgerProfileCode": "FUNDING_BASIC"
+        }
+      },
+      {
+        "participantRole": "AUTH_HOLDER",
+        "subjectRef": {
+          "subjectType": "CREDIT_ACCOUNT",
+          "subjectId": "ca_user_10001_usd",
+          "currency": "USD",
+          "ledgerProfileCode": "CREDIT_BASIC"
+        }
+      },
+      {
+        "participantRole": "BUDGET_CONTROLLER",
+        "subjectRef": {
+          "subjectType": "BUDGET_GROUP",
+          "subjectId": "bg_team_90001_usd",
+          "currency": "USD",
+          "ledgerProfileCode": "BUDGET_BASIC"
+        }
+      }
+    ],
+    "legs": [
+      {
+        "legId": "AUTHORIZATION_1",
+        "legType": "HOLD",
+        "sourceNode": {
+          "nodeRole": "SOURCE",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "targetNode": {
+          "nodeRole": "TARGET",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "AUTHORIZATION"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 4000
+        },
+        "balanceEffectType": "HOLD",
+        "phaseCode": "AUTHORIZATION",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      },
+      {
+        "legId": "AUTHORIZATION_2",
+        "legType": "HOLD",
+        "sourceNode": {
+          "nodeRole": "SOURCE",
+          "subjectType": "CREDIT_ACCOUNT",
+          "subjectId": "ca_user_10001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "targetNode": {
+          "nodeRole": "TARGET",
+          "subjectType": "CREDIT_ACCOUNT",
+          "subjectId": "ca_user_10001_usd",
+          "ledgerSubjectCode": "AUTHORIZATION"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 5000
+        },
+        "balanceEffectType": "HOLD",
+        "phaseCode": "AUTHORIZATION",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      },
+      {
+        "legId": "AUTHORIZATION_3",
+        "legType": "HOLD",
+        "sourceNode": {
+          "nodeRole": "SOURCE",
+          "subjectType": "BUDGET_GROUP",
+          "subjectId": "bg_team_90001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "targetNode": {
+          "nodeRole": "TARGET",
+          "subjectType": "BUDGET_GROUP",
+          "subjectId": "bg_team_90001_usd",
+          "ledgerSubjectCode": "AUTHORIZATION"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 3000
+        },
+        "balanceEffectType": "HOLD",
+        "phaseCode": "AUTHORIZATION",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      }
+    ]
+  },
+  "expectedPosting": {
+    "ledgerTransactionKey": "1:CARD_AUTHORIZATION:AUTH_202605140001:AUTHORIZE",
+    "postingPlans": [
+      {
+        "planKey": "AUTHORIZATION_LEDGER_TXN_0001_1",
+        "routeLegId": "AUTHORIZATION_1",
+        "intent": "AUTHORIZATION",
+        "postingScope": "CONTROL_HOLD",
+        "balanceEffectType": "HOLD",
+        "phaseCode": "AUTHORIZATION",
+        "entries": [
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 4000
+            }
+          },
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AUTHORIZATION",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 4000
+            }
+          }
+        ]
+      },
+      {
+        "planKey": "AUTHORIZATION_LEDGER_TXN_0001_2",
+        "routeLegId": "AUTHORIZATION_2",
+        "intent": "AUTHORIZATION",
+        "postingScope": "CONTROL_HOLD",
+        "balanceEffectType": "HOLD",
+        "phaseCode": "AUTHORIZATION",
+        "entries": [
+          {
+            "subjectId": "ca_user_10001_usd",
+            "subjectType": "CREDIT_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 5000
+            }
+          },
+          {
+            "subjectId": "ca_user_10001_usd",
+            "subjectType": "CREDIT_ACCOUNT",
+            "ledgerSubjectCode": "AUTHORIZATION",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 5000
+            }
+          }
+        ]
+      },
+      {
+        "planKey": "AUTHORIZATION_LEDGER_TXN_0001_3",
+        "routeLegId": "AUTHORIZATION_3",
+        "intent": "AUTHORIZATION",
+        "postingScope": "CONTROL_HOLD",
+        "balanceEffectType": "HOLD",
+        "phaseCode": "AUTHORIZATION",
+        "entries": [
+          {
+            "subjectId": "bg_team_90001_usd",
+            "subjectType": "BUDGET_GROUP",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 3000
+            }
+          },
+          {
+            "subjectId": "bg_team_90001_usd",
+            "subjectType": "BUDGET_GROUP",
+            "ledgerSubjectCode": "AUTHORIZATION",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 3000
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "mustPass": [
+      "多主体授权整体成功或整体失败",
+      "资金账户、信用账户、预算组均使用 AVAILABLE -> AUTHORIZATION",
+      "每个 route leg 均生成平衡 posting plan"
+    ],
+    "mustFail": [
+      "任一主体授权余额不足且不允许负余额",
+      "授权主体币种不一致",
+      "只部分写入授权分录"
+    ]
+  }
+}

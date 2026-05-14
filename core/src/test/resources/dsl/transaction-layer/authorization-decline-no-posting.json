@@ -1,0 +1,47 @@
+{
+  "caseId": "DSL-AUTHORIZATION-DECLINE-NO-POSTING-001",
+  "serviceAbility": "AUTHORIZATION_TRANSACTION",
+  "scenarioCode": "AUTHORIZATION_DECLINE",
+  "description": "授权拒绝只保留拒绝事实，不生成 route 或 entry",
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "AUTHORIZATION",
+    "eventType": "AUTHORIZE",
+    "transactionType": "PAY",
+    "businessScene": "CARD_AUTHORIZATION",
+    "businessSn": "AUTH_DECLINE_202605140001",
+    "amount": {
+      "currency": "USD",
+      "minorValue": 12000
+    },
+    "originalAmount": {
+      "currency": "USD",
+      "minorValue": 12000
+    },
+    "exchangeRate": "1",
+    "eventTime": "2026-05-14T10:04:00",
+    "operator": {
+      "actorType": "SYSTEM",
+      "actorId": "authorization-engine"
+    },
+    "contextVariables": {
+      "declineReasonCode": "INSUFFICIENT_FUNDS",
+      "authCode": "AUTH_DECLINED_202605140001"
+    }
+  },
+  "expectedRoute": null,
+  "expectedPosting": null,
+  "validation": {
+    "mustPass": [
+      "授权拒绝可进入交易视图和审计",
+      "授权拒绝无 route leg",
+      "授权拒绝无 ledger entry",
+      "授权拒绝不累计 chargebackAmount"
+    ],
+    "mustFail": [
+      "将授权拒绝当成争议拒付",
+      "拒绝场景生成资金分录",
+      "拒绝场景占用 AUTHORIZATION 余额桶"
+    ]
+  }
+}

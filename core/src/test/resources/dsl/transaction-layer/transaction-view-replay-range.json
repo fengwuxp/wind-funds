@@ -1,0 +1,35 @@
+{
+  "caseId": "DSL-QUERY-TRANSACTION-VIEW-REPLAY-RANGE-001",
+  "serviceAbility": "QUERY_AND_REPLAY",
+  "scenarioCode": "TRANSACTION_VIEW_REPLAY_RANGE",
+  "description": "按时间范围重放交易视图读模型",
+  "instruction": null,
+  "expectedRoute": null,
+  "expectedPosting": null,
+  "replayRequest": {
+    "viewName": "USER_TRANSACTION_VIEW",
+    "tenantId": 1,
+    "rangeStart": "2026-05-14T00:00:00",
+    "rangeEnd": "2026-05-15T00:00:00",
+    "subjectType": "FUNDING_ACCOUNT",
+    "subjectId": "fa_user_10001_usd",
+    "sourceFacts": [
+      "FundsTransaction",
+      "FundsTransactionDetail",
+      "LedgerTransaction"
+    ],
+    "writeTarget": "READ_MODEL_ONLY"
+  },
+  "validation": {
+    "mustPass": [
+      "必须限定租户、时间范围和主体范围",
+      "只写交易视图读模型和差异报告",
+      "不得从交易视图反推余额"
+    ],
+    "mustFail": [
+      "缺 rangeStart 或 rangeEnd",
+      "重放写入 ledger entry",
+      "用 transaction view 作为事实来源"
+    ]
+  }
+}

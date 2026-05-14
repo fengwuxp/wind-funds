@@ -1,0 +1,124 @@
+{
+  "caseId": "DSL-REVERSE-REFUND-ORIGINAL-ROUTE-001",
+  "serviceAbility": "REVERSE_TRANSACTION",
+  "scenarioCode": "DIRECT_REFUND",
+  "description": "基于原 route snapshot 退款",
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "TRANSFER",
+    "eventType": "REFUND",
+    "transactionType": "REFUND",
+    "businessScene": "DIRECT_REFUND",
+    "businessSn": "RF_202605140001",
+    "amount": {
+      "currency": "USD",
+      "minorValue": 4000
+    },
+    "originalAmount": {
+      "currency": "USD",
+      "minorValue": 4000
+    },
+    "exchangeRate": "1",
+    "eventTime": "2026-05-14T10:02:00",
+    "operator": {
+      "actorType": "SYSTEM",
+      "actorId": "refund-engine"
+    },
+    "reference": {
+      "referenceType": "ORIGINAL_TRANSACTION",
+      "referenceSn": "FT_PAY_202605130001",
+      "referenceBusinessSn": "PAY_202605130001",
+      "referenceLedgerTransactionSn": "LEDGER_TXN_PAY_202605130001",
+      "contextVariables": {
+        "referenceSnapshotId": "RS_PAY_202605130001"
+      }
+    },
+    "contextVariables": {
+      "payerId": "fa_merchant_20001_usd",
+      "payerLedgerSubjectCode": "CLEARING",
+      "accountId": "fa_user_10001_usd",
+      "refundReasonCode": "CUSTOMER_REQUEST"
+    }
+  },
+  "expectedRoute": {
+    "routeCode": "DIRECT_REFUND_REPLAY",
+    "routeVersion": "v4",
+    "snapshotSchemaVersion": "route.snapshot.v4",
+    "replayType": "REFUND",
+    "referenceSnapshotId": "RS_PAY_202605130001",
+    "legs": [
+      {
+        "legId": "REFUND",
+        "legType": "RESTORE",
+        "replayRefLegId": "PAY",
+        "sourceNode": {
+          "nodeRole": "SOURCE",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_merchant_20001_usd",
+          "ledgerSubjectCode": "CLEARING"
+        },
+        "targetNode": {
+          "nodeRole": "TARGET",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 4000
+        },
+        "balanceEffectType": "RESTORE",
+        "phaseCode": "REFUND",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      }
+    ]
+  },
+  "expectedPosting": {
+    "ledgerTransactionKey": "1:DIRECT_REFUND:RF_202605140001:REFUND",
+    "referenceLedgerTransactionSn": "LEDGER_TXN_PAY_202605130001",
+    "postingPlans": [
+      {
+        "planKey": "REFUND_LEDGER_TXN_0002_REFUND",
+        "routeLegId": "REFUND",
+        "intent": "REFUND",
+        "postingScope": "BETWEEN_SUBJECTS",
+        "balanceEffectType": "RESTORE",
+        "phaseCode": "REFUND",
+        "entries": [
+          {
+            "subjectId": "fa_merchant_20001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "CLEARING",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 4000
+            }
+          },
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 4000
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "mustPass": [
+      "引用原 route snapshot",
+      "退款金额不超过原交易可退余额",
+      "新增反向账本交易，不修改原分录"
+    ],
+    "mustFail": [
+      "缺 referenceSnapshotId",
+      "累计退款超过可退金额",
+      "将授权拒绝当成退款"
+    ]
+  }
+}

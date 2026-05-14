@@ -1,0 +1,131 @@
+{
+  "caseId": "DSL-DIRECT-PLATFORM-TRANSFER-001",
+  "serviceAbility": "DIRECT_TRANSACTION",
+  "scenarioCode": "PLATFORM_INTERNAL_TRANSFER",
+  "description": "平台内部补偿付款",
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "TRANSFER",
+    "eventType": "TRANSFER",
+    "transactionType": "TRANSFER",
+    "businessScene": "PLATFORM_COMPENSATION",
+    "businessSn": "COMP_202605140001",
+    "amount": {
+      "currency": "USD",
+      "minorValue": 2500
+    },
+    "originalAmount": {
+      "currency": "USD",
+      "minorValue": 2500
+    },
+    "exchangeRate": "1",
+    "eventTime": "2026-05-14T10:00:01",
+    "operator": {
+      "actorType": "SYSTEM",
+      "actorId": "platform-rule-engine"
+    },
+    "contextVariables": {
+      "payerAccountId": "fa_platform_adjust_usd",
+      "payeeAccountId": "fa_user_10001_usd",
+      "reasonCode": "SERVICE_COMPENSATION",
+      "approvalRef": "APR_202605140001"
+    }
+  },
+  "expectedRoute": {
+    "routeCode": "INTERNAL_TRANSFER_STANDARD",
+    "routeVersion": "v4",
+    "snapshotSchemaVersion": "route.snapshot.v4",
+    "participants": [
+      {
+        "participantRole": "PAYER",
+        "subjectRef": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_platform_adjust_usd",
+          "currency": "USD",
+          "ledgerProfileCode": "FUNDING_PLATFORM"
+        }
+      },
+      {
+        "participantRole": "PAYEE",
+        "subjectRef": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "currency": "USD",
+          "ledgerProfileCode": "FUNDING_BASIC"
+        }
+      }
+    ],
+    "legs": [
+      {
+        "legId": "TRANSFER",
+        "legType": "INTERNAL_TRANSFER",
+        "sourceNode": {
+          "nodeRole": "SOURCE",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_platform_adjust_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "targetNode": {
+          "nodeRole": "TARGET",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 2500
+        },
+        "balanceEffectType": "CONSUME",
+        "phaseCode": "TRANSFER",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      }
+    ]
+  },
+  "expectedPosting": {
+    "ledgerTransactionKey": "1:PLATFORM_COMPENSATION:COMP_202605140001:TRANSFER",
+    "postingPlans": [
+      {
+        "planKey": "TRANSFER_LEDGER_TXN_0001_TRANSFER",
+        "routeLegId": "TRANSFER",
+        "intent": "TRANSFER",
+        "postingScope": "BETWEEN_SUBJECTS",
+        "balanceEffectType": "CONSUME",
+        "phaseCode": "TRANSFER",
+        "entries": [
+          {
+            "subjectId": "fa_platform_adjust_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 2500
+            }
+          },
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 2500
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "mustPass": [
+      "route snapshot 固化付款方和收款方",
+      "posting plan 同币种借贷平衡",
+      "收款方 AVAILABLE 增加"
+    ],
+    "mustFail": [
+      "付款方和收款方相同",
+      "付款方和收款方币种不一致",
+      "业务侧直接指定 LedgerEntry"
+    ]
+  }
+}

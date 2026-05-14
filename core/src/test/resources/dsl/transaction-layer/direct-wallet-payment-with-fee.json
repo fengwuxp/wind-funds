@@ -1,0 +1,202 @@
+{
+  "caseId": "DSL-DIRECT-WALLET-PAYMENT-WITH-FEE-001",
+  "serviceAbility": "DIRECT_TRANSACTION",
+  "scenarioCode": "WALLET_PAYMENT_WITH_FEE",
+  "description": "钱包付款并收取平台手续费",
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "TRANSFER",
+    "eventType": "PAY",
+    "transactionType": "PAY",
+    "businessScene": "MERCHANT_ORDER_PAY",
+    "businessSn": "PAY_202605140001",
+    "amount": {
+      "currency": "USD",
+      "minorValue": 10000
+    },
+    "originalAmount": {
+      "currency": "USD",
+      "minorValue": 10000
+    },
+    "exchangeRate": "1",
+    "eventTime": "2026-05-14T10:01:00",
+    "operator": {
+      "actorType": "USER",
+      "actorId": "user_10001"
+    },
+    "contextVariables": {
+      "accountId": "fa_user_10001_usd",
+      "payeeId": "fa_merchant_20001_usd",
+      "payeeLedgerSubjectCode": "CLEARING",
+      "feeRuleCode": "MERCHANT_STANDARD_001",
+      "feeRuleVersion": "2026-05"
+    }
+  },
+  "expectedRoute": {
+    "routeCode": "DIRECT_PAY_STANDARD",
+    "routeVersion": "v4",
+    "snapshotSchemaVersion": "route.snapshot.v4",
+    "platformAccounts": {
+      "feeFundingAccount": {
+        "subjectType": "FUNDING_ACCOUNT",
+        "subjectId": "fa_platform_fee_usd",
+        "currency": "USD",
+        "ledgerProfileCode": "FUNDING_PLATFORM"
+      }
+    },
+    "participants": [
+      {
+        "participantRole": "PAYER",
+        "subjectRef": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "currency": "USD",
+          "ledgerProfileCode": "FUNDING_BASIC"
+        }
+      },
+      {
+        "participantRole": "PAYEE",
+        "subjectRef": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_merchant_20001_usd",
+          "currency": "USD",
+          "ledgerProfileCode": "FUNDING_MERCHANT"
+        }
+      },
+      {
+        "participantRole": "FEE_RECEIVER",
+        "subjectRef": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_platform_fee_usd",
+          "currency": "USD",
+          "ledgerProfileCode": "FUNDING_PLATFORM"
+        }
+      }
+    ],
+    "legs": [
+      {
+        "legId": "PAY",
+        "legType": "INTERNAL_TRANSFER",
+        "sourceNode": {
+          "nodeRole": "SOURCE",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "targetNode": {
+          "nodeRole": "TARGET",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_merchant_20001_usd",
+          "ledgerSubjectCode": "CLEARING"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 10000
+        },
+        "balanceEffectType": "CONSUME",
+        "phaseCode": "SETTLEMENT",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      },
+      {
+        "legId": "FEE",
+        "legType": "INTERNAL_TRANSFER",
+        "sourceNode": {
+          "nodeRole": "SOURCE",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "targetNode": {
+          "nodeRole": "TARGET",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_platform_fee_usd",
+          "ledgerSubjectCode": "FEE"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 150
+        },
+        "balanceEffectType": "CONSUME",
+        "phaseCode": "FEE",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      }
+    ]
+  },
+  "expectedPosting": {
+    "ledgerTransactionKey": "1:MERCHANT_ORDER_PAY:PAY_202605140001:PAY",
+    "postingPlans": [
+      {
+        "planKey": "PAY_LEDGER_TXN_0001_PAY",
+        "routeLegId": "PAY",
+        "intent": "TRANSFER",
+        "postingScope": "BETWEEN_SUBJECTS",
+        "balanceEffectType": "CONSUME",
+        "phaseCode": "SETTLEMENT",
+        "entries": [
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 10000
+            }
+          },
+          {
+            "subjectId": "fa_merchant_20001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "CLEARING",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 10000
+            }
+          }
+        ]
+      },
+      {
+        "planKey": "FEE_LEDGER_TXN_0001_FEE",
+        "routeLegId": "FEE",
+        "intent": "FEE",
+        "postingScope": "FEE",
+        "balanceEffectType": "CONSUME",
+        "phaseCode": "FEE",
+        "entries": [
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 150
+            }
+          },
+          {
+            "subjectId": "fa_platform_fee_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "FEE",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 150
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "mustPass": [
+      "本金和费用使用独立 route leg",
+      "费用账户来自平台账户角色快照",
+      "费用规则版本进入 contextVariables"
+    ],
+    "mustFail": [
+      "费用和本金混入同一金额口径",
+      "缺 feeRuleVersion",
+      "平台费用账户未初始化"
+    ]
+  }
+}

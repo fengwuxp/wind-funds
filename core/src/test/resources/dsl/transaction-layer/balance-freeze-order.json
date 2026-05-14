@@ -1,0 +1,128 @@
+{
+  "caseId": "DSL-BALANCE-FREEZE-ORDER-001",
+  "serviceAbility": "BALANCE_CONTROL",
+  "scenarioCode": "RISK_FREEZE",
+  "description": "风控冻结资金账户可用余额",
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "BALANCE_CONTROL",
+    "eventType": "FREEZE",
+    "transactionType": "ADJUSTMENT",
+    "businessScene": "RISK_FREEZE",
+    "businessSn": "FRZ_202605140001",
+    "amount": {
+      "currency": "USD",
+      "minorValue": 3000
+    },
+    "originalAmount": {
+      "currency": "USD",
+      "minorValue": 3000
+    },
+    "exchangeRate": "1",
+    "eventTime": "2026-05-14T10:05:00",
+    "operator": {
+      "actorType": "RISK",
+      "actorId": "risk-rule-engine"
+    },
+    "reference": {
+      "referenceType": "FREEZE_ORDER",
+      "referenceSn": "FO_202605140001",
+      "referenceBusinessSn": "RISK_CASE_202605140001",
+      "contextVariables": {
+        "freezeReasonCode": "RISK_REVIEW"
+      }
+    },
+    "contextVariables": {
+      "accountId": "fa_user_10001_usd",
+      "freezeOrderSn": "FO_202605140001"
+    }
+  },
+  "expectedRoute": {
+    "routeCode": "BALANCE_FREEZE_STANDARD",
+    "routeVersion": "v4",
+    "snapshotSchemaVersion": "route.snapshot.v4",
+    "participants": [
+      {
+        "participantRole": "PAYER",
+        "subjectRef": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "currency": "USD",
+          "ledgerProfileCode": "FUNDING_BASIC"
+        }
+      }
+    ],
+    "legs": [
+      {
+        "legId": "FREEZE",
+        "legType": "HOLD",
+        "sourceNode": {
+          "nodeRole": "SOURCE",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "targetNode": {
+          "nodeRole": "TARGET",
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "FROZEN"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 3000
+        },
+        "balanceEffectType": "HOLD",
+        "phaseCode": "FREEZE",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      }
+    ]
+  },
+  "expectedPosting": {
+    "ledgerTransactionKey": "1:RISK_FREEZE:FRZ_202605140001:FREEZE",
+    "postingPlans": [
+      {
+        "planKey": "FREEZE_LEDGER_TXN_0001_FREEZE",
+        "routeLegId": "FREEZE",
+        "intent": "HOLD",
+        "postingScope": "CONTROL_HOLD",
+        "balanceEffectType": "HOLD",
+        "phaseCode": "FREEZE",
+        "entries": [
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 3000
+            }
+          },
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "FROZEN",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 3000
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "mustPass": [
+      "来源事实为 FrozenOrder",
+      "只发生 AVAILABLE -> FROZEN",
+      "解冻前冻结单余额可追踪"
+    ],
+    "mustFail": [
+      "冻结生成出金或收款路径",
+      "冻结金额超过可冻结余额且不允许负余额",
+      "缺 freezeOrderSn"
+    ]
+  }
+}
