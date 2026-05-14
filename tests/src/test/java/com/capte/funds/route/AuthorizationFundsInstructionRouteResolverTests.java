@@ -136,7 +136,7 @@ class AuthorizationFundsInstructionRouteResolverTests {
         String businessSn = eventType.name() + "_0001";
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.AUTHORIZATION)
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(eventType)
                 .transactionType(eventType == FundsTransactionEventType.AUTH_REFUND
                         ? DefaultFundsTransactionType.REFUND

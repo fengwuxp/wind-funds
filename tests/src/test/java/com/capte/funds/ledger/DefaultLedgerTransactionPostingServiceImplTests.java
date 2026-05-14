@@ -262,7 +262,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         return LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec.builder()
                 .sn(ledgerTransactionSn)
                 .tenantId(1L)
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TRANSFER)
                 .transactionType(DefaultFundsTransactionType.TRANSFER)
                 .status(LedgerTransactionStatus.POSTED)

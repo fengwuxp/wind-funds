@@ -5,7 +5,7 @@
   "description": "平台内部补偿付款",
   "instruction": {
     "tenantId": 1,
-    "instructionType": "TRANSFER",
+    "instructionType": "DIRECT_TRANSACTION",
     "eventType": "TRANSFER",
     "transactionType": "TRANSFER",
     "businessScene": "PLATFORM_COMPENSATION",

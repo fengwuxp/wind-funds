@@ -68,7 +68,7 @@ public class FundsDirectTransactionInstructionConverter {
         extraContext.put(FundsInstructionContextKeys.EXTERNAL_TRANSACTION_ID, request.getChannelTransactionSn());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TOPUP)
                 .transactionType(DefaultFundsTransactionType.TOPUP)
                 .amount(amount.amount())
@@ -90,7 +90,7 @@ public class FundsDirectTransactionInstructionConverter {
         ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getPayerAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TRANSFER)
                 .transactionType(DefaultFundsTransactionType.TRANSFER)
                 .amount(amount.amount())
@@ -112,7 +112,7 @@ public class FundsDirectTransactionInstructionConverter {
         ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.PAY)
                 .transactionType(DefaultFundsTransactionType.PAY)
                 .amount(amount.amount())
@@ -145,7 +145,7 @@ public class FundsDirectTransactionInstructionConverter {
         }
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.REFUND)
                 .transactionType(DefaultFundsTransactionType.REFUND)
                 .amount(amount.amount())
@@ -170,7 +170,7 @@ public class FundsDirectTransactionInstructionConverter {
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.RESERVE_FUND);
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.WITHDRAW)
                 .transactionType(DefaultFundsTransactionType.WITHDRAW)
                 .amount(amount.amount())
@@ -194,7 +194,7 @@ public class FundsDirectTransactionInstructionConverter {
         ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.FEE_CHARGE)
                 .transactionType(DefaultFundsTransactionType.FEE)
                 .amount(amount.amount())

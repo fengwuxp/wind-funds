@@ -428,7 +428,7 @@ class DefaultLedgerPostingAssemblerTests {
 
         @Override
         public @NonNull FundsInstructionType getInstructionType() {
-            return FundsInstructionType.TRANSFER;
+            return FundsInstructionType.DIRECT_TRANSACTION;
         }
 
         @Override
@@ -471,7 +471,7 @@ class DefaultLedgerPostingAssemblerTests {
 
         @Override
         public @NonNull FundsInstructionType getInstructionType() {
-            return FundsInstructionType.TRANSFER;
+            return FundsInstructionType.DIRECT_TRANSACTION;
         }
 
         @Override

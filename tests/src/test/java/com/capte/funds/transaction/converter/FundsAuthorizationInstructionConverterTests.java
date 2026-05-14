@@ -53,7 +53,7 @@ class FundsAuthorizationInstructionConverterTests {
                         .setBusinessScene("CARD_AUTH")
                         .setBusinessSn("AUTH_0001"), WindOperator.system());
 
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
         assertThat(instruction.getContextVariables())
@@ -91,7 +91,7 @@ class FundsAuthorizationInstructionConverterTests {
                         .setBusinessSn("REVERSAL_0001")
                         .setAuthorizationTransactionSn("AUTH_TX_0001"), WindOperator.system());
 
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.REVERSAL);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
         assertThat(instruction.getReference()).isNotNull();
@@ -111,7 +111,7 @@ class FundsAuthorizationInstructionConverterTests {
                         .setBusinessSn("AUTH_REFUND_0001")
                         .setAuthorizationTransactionSn("AUTH_TX_0001"), WindOperator.system());
 
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.AUTH_REFUND);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
         assertThat(instruction.getReference()).isNotNull();
@@ -131,7 +131,7 @@ class FundsAuthorizationInstructionConverterTests {
                         .setBusinessSn("CHARGEBACK_0001")
                         .setAuthorizationTransactionSn("AUTH_TX_0001"), WindOperator.system());
 
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.CHARGEBACK);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
         assertThat(instruction.getBusinessScene()).isEqualTo("CARD_POST_SETTLEMENT_DISPUTE");

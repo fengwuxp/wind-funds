@@ -5,7 +5,7 @@
   "description": "基于原 route snapshot 退款",
   "instruction": {
     "tenantId": 1,
-    "instructionType": "TRANSFER",
+    "instructionType": "DIRECT_TRANSACTION",
     "eventType": "REFUND",
     "transactionType": "REFUND",
     "businessScene": "DIRECT_REFUND",

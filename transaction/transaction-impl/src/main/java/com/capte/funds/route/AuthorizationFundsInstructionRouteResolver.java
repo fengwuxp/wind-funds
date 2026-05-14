@@ -86,7 +86,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
 
     @Override
     public boolean support(@NonNull FundsInstructionSpec instruction) {
-        return instruction.getInstructionType() == FundsInstructionType.AUTHORIZATION;
+        return instruction.getInstructionType() == FundsInstructionType.AUTHORIZATION_TRANSACTION;
     }
 
     @Override

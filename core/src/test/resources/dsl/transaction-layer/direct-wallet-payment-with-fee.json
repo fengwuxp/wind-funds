@@ -5,7 +5,7 @@
   "description": "钱包付款并收取平台手续费",
   "instruction": {
     "tenantId": 1,
-    "instructionType": "TRANSFER",
+    "instructionType": "DIRECT_TRANSACTION",
     "eventType": "PAY",
     "transactionType": "PAY",
     "businessScene": "MERCHANT_ORDER_PAY",

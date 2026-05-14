@@ -631,7 +631,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
 
         @Override
         public @NonNull FundsInstructionType getInstructionType() {
-            return FundsInstructionType.TRANSFER;
+            return FundsInstructionType.DIRECT_TRANSACTION;
         }
 
         @Override
@@ -819,7 +819,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
 
         @Override
         public @NonNull FundsInstructionType getInstructionType() {
-            return FundsInstructionType.TRANSFER;
+            return FundsInstructionType.DIRECT_TRANSACTION;
         }
 
         @Override

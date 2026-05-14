@@ -63,7 +63,7 @@ public class FundsAuthorizationInstructionConverter {
         }
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.AUTHORIZATION)
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(FundsTransactionEventType.AUTHORIZE)
                 .transactionType(DefaultFundsTransactionType.PAY)
                 .amount(amount.amount())
@@ -84,7 +84,7 @@ public class FundsAuthorizationInstructionConverter {
         ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.AUTHORIZATION)
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(FundsTransactionEventType.REVERSAL)
                 .transactionType(DefaultFundsTransactionType.PAY)
                 .amount(amount.amount())
@@ -110,7 +110,7 @@ public class FundsAuthorizationInstructionConverter {
         ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.AUTHORIZATION)
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(FundsTransactionEventType.SETTLE)
                 .transactionType(DefaultFundsTransactionType.PAY)
                 .amount(amount.amount())
@@ -136,7 +136,7 @@ public class FundsAuthorizationInstructionConverter {
         ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.AUTHORIZATION)
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(FundsTransactionEventType.AUTH_REFUND)
                 .transactionType(DefaultFundsTransactionType.REFUND)
                 .amount(amount.amount())
@@ -165,7 +165,7 @@ public class FundsAuthorizationInstructionConverter {
         ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
-                .instructionType(FundsInstructionType.AUTHORIZATION)
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(FundsTransactionEventType.CHARGEBACK)
                 .transactionType(DefaultFundsTransactionType.REFUND)
                 .amount(amount.amount())

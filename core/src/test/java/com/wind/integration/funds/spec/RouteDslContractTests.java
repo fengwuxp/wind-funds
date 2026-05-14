@@ -399,7 +399,7 @@ class RouteDslContractTests {
                 .routeVersion("route-v4")
                 .businessScene("TRANSFER")
                 .businessSn("TRANSFER_001")
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TRANSFER)
                 .transactionType(DefaultFundsTransactionType.TRANSFER)
                 .participants(List.of(routeParticipant("PARTICIPANT_PAYER", RouteParticipantRole.PAYER),

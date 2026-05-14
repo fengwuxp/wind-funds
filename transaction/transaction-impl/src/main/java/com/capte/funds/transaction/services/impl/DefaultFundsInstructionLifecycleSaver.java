@@ -442,8 +442,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private FundsTransactionMode resolveTransactionMode(FundsInstructionType instructionType) {
         return switch (instructionType) {
-            case TRANSFER -> FundsTransactionMode.DIRECT;
-            case AUTHORIZATION -> FundsTransactionMode.AUTHORIZATION;
+            case DIRECT_TRANSACTION -> FundsTransactionMode.DIRECT;
+            case AUTHORIZATION_TRANSACTION -> FundsTransactionMode.AUTHORIZATION;
             case BALANCE_CONTROL -> FundsTransactionMode.BALANCE_CONTROL;
         };
     }

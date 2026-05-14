@@ -103,7 +103,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     @Override
     public boolean support(@NonNull FundsInstructionSpec instruction) {
-        return instruction.getInstructionType() == FundsInstructionType.TRANSFER;
+        return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION;
     }
 
     @Override

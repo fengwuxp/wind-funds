@@ -53,7 +53,7 @@ class FundsDirectTransactionInstructionConverterTests {
                 .setBusinessSn("TOPUP_0001")
                 .setDescription("topup"), WindOperator.system());
 
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.TRANSFER);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.DIRECT_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.TOPUP);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.TOPUP);
         assertThat(instruction.getContextVariables())
@@ -77,7 +77,7 @@ class FundsDirectTransactionInstructionConverterTests {
                 .setBusinessSn("TRANSFER_0001")
                 .setDescription("transfer"), WindOperator.system());
 
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.TRANSFER);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.DIRECT_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.TRANSFER);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.TRANSFER);
         assertThat(instruction.getContextVariables())
@@ -98,7 +98,7 @@ class FundsDirectTransactionInstructionConverterTests {
                 .setBusinessSn("PAY_0001")
                 .setDescription("pay"), WindOperator.system());
 
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.TRANSFER);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.DIRECT_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.PAY);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
         assertThat(instruction.getContextVariables())
@@ -159,7 +159,7 @@ class FundsDirectTransactionInstructionConverterTests {
                 .setBusinessSn("FEE_0001")
                 .setDescription("fee"), WindOperator.system());
 
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.TRANSFER);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.DIRECT_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.FEE_CHARGE);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.FEE);
         assertThat(instruction.getContextVariables())

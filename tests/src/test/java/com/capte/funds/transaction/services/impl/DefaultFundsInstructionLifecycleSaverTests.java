@@ -1188,7 +1188,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
 
         @Override
         public @NonNull FundsInstructionType getInstructionType() {
-            return FundsInstructionType.AUTHORIZATION;
+            return FundsInstructionType.AUTHORIZATION_TRANSACTION;
         }
 
         @Override
@@ -1379,7 +1379,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
 
         @Override
         public @NonNull FundsInstructionType getInstructionType() {
-            return FundsInstructionType.AUTHORIZATION;
+            return FundsInstructionType.AUTHORIZATION_TRANSACTION;
         }
 
         @Override
@@ -1451,7 +1451,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
 
         @Override
         public @NonNull FundsInstructionType getInstructionType() {
-            return FundsInstructionType.AUTHORIZATION;
+            return FundsInstructionType.AUTHORIZATION_TRANSACTION;
         }
 
         @Override

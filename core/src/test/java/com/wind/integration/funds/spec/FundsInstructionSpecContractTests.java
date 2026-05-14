@@ -58,6 +58,17 @@ class FundsInstructionSpecContractTests {
     }
 
     @Test
+    void testFundsInstructionTypeShouldUseTransactionLayerAbilityNames() {
+        Set<String> names = Arrays.stream(FundsInstructionType.values())
+                .map(Enum::name)
+                .collect(Collectors.toSet());
+
+        assertEquals(Set.of("DIRECT_TRANSACTION", "AUTHORIZATION_TRANSACTION", "BALANCE_CONTROL"), names);
+        assertFalse(names.contains("TRANSFER"));
+        assertFalse(names.contains("AUTHORIZATION"));
+    }
+
+    @Test
     void testFundsInstructionShouldUseBookAmountAsPrimaryAmount() {
         Money bookAmount = Money.immutable(1_100L, CurrencyIsoCode.USD);
         Money originalAmount = Money.immutable(1_000L, CurrencyIsoCode.EUR);
@@ -130,7 +141,7 @@ class FundsInstructionSpecContractTests {
                 .exchangeRate(null)
                 .build();
 
-        assertEquals(FundsInstructionType.TRANSFER, instruction.getInstructionType());
+        assertEquals(FundsInstructionType.DIRECT_TRANSACTION, instruction.getInstructionType());
         assertEquals(FundsTransactionEventType.TOPUP, instruction.getEventType());
         assertEquals(DefaultFundsTransactionType.TOPUP, instruction.getTransactionType());
         assertEquals("WALLET_TOPUP", instruction.getBusinessScene());
@@ -182,7 +193,7 @@ class FundsInstructionSpecContractTests {
     private static ImmutableFundsInstructionSpec.ImmutableFundsInstructionSpecBuilder validTopupBuilder() {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TOPUP)
                 .transactionType(DefaultFundsTransactionType.TOPUP)
                 .amount(Money.immutable(1_000L, CurrencyIsoCode.USD))

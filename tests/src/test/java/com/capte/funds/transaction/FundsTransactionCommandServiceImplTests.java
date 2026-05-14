@@ -133,7 +133,7 @@ class FundsTransactionCommandServiceImplTests {
         FundsInstructionSpec instruction = instruction();
         ResolvedRouteSpec route = route();
         assertThat(transactionSn).isEqualTo("FT_CAPTURED");
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.TRANSFER);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.DIRECT_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.TOPUP);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.TOPUP);
         assertThat(instruction.getTenantId()).isEqualTo(TENANT_ID);
@@ -351,7 +351,7 @@ class FundsTransactionCommandServiceImplTests {
 
         FundsInstructionSpec instruction = instruction();
         RouteLegSpec leg = route().getLegs().getFirst();
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
         assertThat(route().getParticipants())
                 .extracting(participant -> participant.getParticipantRole().name())
@@ -463,7 +463,7 @@ class FundsTransactionCommandServiceImplTests {
 
         FundsInstructionSpec instruction = instruction();
         assertThat(transactionSn).isEqualTo("FT_CAPTURED");
-        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION);
+        assertThat(instruction.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION_TRANSACTION);
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.CHARGEBACK);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
         assertThat(instruction.getBusinessScene()).isEqualTo("CARD_POST_SETTLEMENT_DISPUTE");

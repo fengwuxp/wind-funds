@@ -5,7 +5,7 @@
   "description": "资金账户、信用账户、预算组组合授权占用",
   "instruction": {
     "tenantId": 1,
-    "instructionType": "AUTHORIZATION",
+    "instructionType": "AUTHORIZATION_TRANSACTION",
     "eventType": "AUTHORIZE",
     "transactionType": "PAY",
     "businessScene": "CARD_AUTHORIZATION",

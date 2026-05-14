@@ -43,7 +43,7 @@ class CompositeRouteResolverTests {
 
         ResolvedRouteSpec route = resolver.resolve(ImmutableFundsInstructionSpec.builder()
                 .tenantId(FundsRouteTestSupport.TENANT_ID)
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TOPUP)
                 .transactionType(DefaultFundsTransactionType.TRANSFER)
                 .amount(FundsRouteTestSupport.amount(100L))
@@ -72,7 +72,7 @@ class CompositeRouteResolverTests {
 
         assertThatThrownBy(() -> resolver.resolve(ImmutableFundsInstructionSpec.builder()
                 .tenantId(FundsRouteTestSupport.TENANT_ID)
-                .instructionType(FundsInstructionType.TRANSFER)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TOPUP)
                 .transactionType(DefaultFundsTransactionType.TRANSFER)
                 .amount(FundsRouteTestSupport.amount(100L))

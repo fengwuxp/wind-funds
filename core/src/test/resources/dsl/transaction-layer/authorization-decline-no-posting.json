@@ -5,7 +5,7 @@
   "description": "授权拒绝只保留拒绝事实，不生成 route 或 entry",
   "instruction": {
     "tenantId": 1,
-    "instructionType": "AUTHORIZATION",
+    "instructionType": "AUTHORIZATION_TRANSACTION",
     "eventType": "AUTHORIZE",
     "transactionType": "PAY",
     "businessScene": "CARD_AUTHORIZATION",

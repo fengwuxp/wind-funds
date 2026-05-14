@@ -473,7 +473,7 @@ class DefaultRouteReplayServiceTests {
                 FundsRouteTestSupport.budgetGroup("budget_001"));
         context.put(FundsInstructionContextKeys.LINKED_FUNDING_ACCOUNT_ID,
                 FundsRouteTestSupport.fundingAccount("funding_001"));
-        return instruction(FundsInstructionType.AUTHORIZATION, eventType,
+        return instruction(FundsInstructionType.AUTHORIZATION_TRANSACTION, eventType,
                 eventType == FundsTransactionEventType.AUTH_REFUND
                         ? DefaultFundsTransactionType.REFUND
                         : DefaultFundsTransactionType.PAY,

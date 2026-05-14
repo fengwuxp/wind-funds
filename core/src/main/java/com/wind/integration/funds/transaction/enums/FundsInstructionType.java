@@ -14,9 +14,9 @@ import lombok.Getter;
 @Getter
 public enum FundsInstructionType implements DescriptiveEnum {
 
-    TRANSFER("直接资金交易"),
+    DIRECT_TRANSACTION("直接资金交易"),
 
-    AUTHORIZATION("授权交易"),
+    AUTHORIZATION_TRANSACTION("授权交易"),
 
     BALANCE_CONTROL("余额控制");
 
