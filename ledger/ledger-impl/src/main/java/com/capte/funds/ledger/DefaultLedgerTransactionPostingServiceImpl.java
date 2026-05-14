@@ -49,6 +49,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void post(@NonNull LedgerTransactionSpec transaction) {
+        assertTransactionPostable(transaction);
         assertAllEntriesUsePositiveAmounts(transaction);
         assertAllPostingPlansUseSingleCurrency(transaction);
         AssertUtils.isTrue(transaction.isBalanced(), "账本交易借记、贷记金额不一致");
@@ -72,6 +73,12 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
             List<LedgerEntrySpec> entries = entry.getValue();
             projectionServices.get(accountId).project(entries);
         }
+    }
+
+    private void assertTransactionPostable(LedgerTransactionSpec transaction) {
+        AssertUtils.notNull(transaction, "账本交易不能为空");
+        AssertUtils.isTrue(transaction.getPostingPlans() != null && !transaction.getPostingPlans().isEmpty(),
+                "账本交易 postingPlans 不能为空，ledgerTransactionSn = {}", transaction.getSn());
     }
 
     private void assertAllPostingPlansUseSingleCurrency(LedgerTransactionSpec transaction) {

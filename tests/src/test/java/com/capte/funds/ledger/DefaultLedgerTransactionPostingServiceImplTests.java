@@ -61,6 +61,36 @@ class DefaultLedgerTransactionPostingServiceImplTests {
     }
 
     @Test
+    void testPostShouldRejectNullLedgerTransactionBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, List.of(projectionService));
+
+        assertThatThrownBy(() -> service.post(null))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易不能为空");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    @Test
+    void testPostShouldRejectEmptyPostingPlansBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, List.of(projectionService));
+        LedgerTransactionSpec transaction = uncheckedTransaction("LE_000000000009", List.of());
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易 postingPlans 不能为空")
+                .hasMessageContaining("LE_000000000009");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    @Test
     void testPostShouldFailWhenNoProjectionServiceSupportsAccount() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(false);
