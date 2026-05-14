@@ -66,7 +66,7 @@ class TransferFundsInstructionRouteResolverTests {
         assertThat(route.getLegs().get(1).getTargetNode().getSubjectRef().getSubjectId())
                 .isEqualTo(fundingAccountId.id());
         assertThat(route.getPlatformAccounts()).isNotNull();
-        assertThat(route.getPlatformAccounts().getReserveFundingAccount()).isNotNull();
+        assertThat(route.getPlatformAccounts().getCashFundingAccount()).isNotNull();
         assertThat(route.getPlatformAccounts().getPrepaymentFundingAccount()).isNotNull();
         assertThat(route.getExternalAccountRef()).isNotNull();
         assertThat(route.getExternalAccountRef().getExternalAccountId()).isEqualTo("external_bank_001");
@@ -96,7 +96,7 @@ class TransferFundsInstructionRouteResolverTests {
                 LedgerSubjectCode.CASH, LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.FUND_OUT);
         assertMustNotBeNegative(route.getLegs().get(0), accountId, LedgerSubjectCode.FROZEN);
         assertThat(route.getPlatformAccounts()).isNotNull();
-        assertThat(route.getPlatformAccounts().getReserveFundingAccount()).isNotNull();
+        assertThat(route.getPlatformAccounts().getCashFundingAccount()).isNotNull();
         assertThat(route.getPlatformAccounts().getPrepaymentFundingAccount()).isNotNull();
         assertThat(route.getExternalAccountRef()).isNotNull();
         assertThat(route.getExternalAccountRef().getExternalAccountId()).isEqualTo("external_bank_001");

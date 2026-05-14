@@ -702,7 +702,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("policyCode", routingDecision.getPolicyCode());
         values.put("matchedRules", routingDecision.getMatchedRules());
         values.put("selectedProcessor", routingDecision.getSelectedProcessor());
-        values.put("selectedReserveFund", routingDecision.getSelectedReserveFund());
+        values.put("selectedCashFundingAccount", routingDecision.getSelectedCashFundingAccount());
         values.put("selectedPlatformAccount", routingDecision.getSelectedPlatformAccount());
         values.put("fundingAllocations", routingDecision.getFundingAllocations()
                 .stream()
@@ -729,11 +729,12 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (platformAccounts == null) {
             return values;
         }
-        values.put("reserveFundingAccount", subjectSummary(platformAccounts.getReserveFundingAccount()));
+        values.put("cashFundingAccount", subjectSummary(platformAccounts.getCashFundingAccount()));
         values.put("prepaymentFundingAccount", subjectSummary(platformAccounts.getPrepaymentFundingAccount()));
         values.put("clearingFundingAccount", subjectSummary(platformAccounts.getClearingFundingAccount()));
         values.put("settlementFundingAccount", subjectSummary(platformAccounts.getSettlementFundingAccount()));
         values.put("feeFundingAccount", subjectSummary(platformAccounts.getFeeFundingAccount()));
+        values.put("adjustmentFundingAccount", subjectSummary(platformAccounts.getAdjustmentFundingAccount()));
         return values;
     }
 

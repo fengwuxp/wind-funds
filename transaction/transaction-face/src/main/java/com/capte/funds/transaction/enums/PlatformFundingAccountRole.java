@@ -15,9 +15,9 @@ import lombok.Getter;
 public enum PlatformFundingAccountRole implements DescriptiveEnum {
 
     /**
-     * 备付金。
+     * 现金映射。
      */
-    RESERVE_FUND(LedgerProfileCode.FUNDING_PLATFORM, "备付金"),
+    CASH_MAPPING(LedgerProfileCode.FUNDING_PLATFORM, "现金映射"),
 
     /**
      * 预收款。
@@ -37,7 +37,12 @@ public enum PlatformFundingAccountRole implements DescriptiveEnum {
     /**
      * 手续费归集。
      */
-    FEE(LedgerProfileCode.FUNDING_PLATFORM, "手续费归集");
+    FEE(LedgerProfileCode.FUNDING_PLATFORM, "手续费归集"),
+
+    /**
+     * 调整挂账。
+     */
+    ADJUSTMENT(LedgerProfileCode.FUNDING_PLATFORM, "调整挂账");
 
     private final LedgerProfileCode ledgerProfileCode;
 

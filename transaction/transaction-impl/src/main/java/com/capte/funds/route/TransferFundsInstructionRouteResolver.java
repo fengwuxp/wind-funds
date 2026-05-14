@@ -122,16 +122,16 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     private ResolvedRouteSpec resolveTopup(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionContextKeys.ACCOUNT_ID);
-        FundsAccountId reserveAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
-                PlatformFundingAccountRole.RESERVE_FUND);
+        FundsAccountId cashMappingAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
+                PlatformFundingAccountRole.CASH_MAPPING);
         FundsAccountId prepaymentAccount = platformAccountRouteSupport.requireAccount(
                 instruction.getAmount().getCurrency(), PlatformFundingAccountRole.PREPAYMENT);
-        SubjectRef reserveSubject = platformAccountRouteSupport.createSubjectRef(reserveAccount);
+        SubjectRef cashMappingSubject = platformAccountRouteSupport.createSubjectRef(cashMappingAccount);
         SubjectRef prepaymentSubject = platformAccountRouteSupport.createSubjectRef(prepaymentAccount);
         SubjectRef accountSubject = routeSubjectSupport.createSubjectRef(accountId);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(LEG_FUND_IN, 1, RouteLegType.EXTERNAL_IN, instruction)
-                .sourceNode(sourceNode(reserveSubject, LedgerSubjectCode.CASH))
+                .sourceNode(sourceNode(cashMappingSubject, LedgerSubjectCode.CASH))
                 .targetNode(targetNode(prepaymentSubject, LedgerSubjectCode.PREPAYMENT))
                 .balanceEffectType(LedgerBalanceEffectType.INCREASE)
                 .phaseCode(LedgerPhaseCode.FUND_IN)
@@ -143,16 +143,16 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
-        participants.add(platformParticipant(RouteParticipantRole.PLATFORM_RESERVE, reserveAccount,
-                PlatformFundingAccountRole.RESERVE_FUND, instruction.getAmount(), instruction.getDescription()));
-        participants.add(platformParticipant(RouteParticipantRole.PLATFORM_RESERVE, prepaymentAccount,
+        participants.add(platformParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, cashMappingAccount,
+                PlatformFundingAccountRole.CASH_MAPPING, instruction.getAmount(), instruction.getDescription()));
+        participants.add(platformParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, prepaymentAccount,
                 PlatformFundingAccountRole.PREPAYMENT, instruction.getAmount(), instruction.getDescription()));
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, false), accountId,
                 instruction.getAmount(), instruction.getDescription()));
         FundsAccountId feeAccount = appendFeeLeg(participants, legs, accountId, instruction, legs.size());
         return route(instruction, FundsRouteCodes.TOPUP_STANDARD, participants, legs,
                 instruction.getExternalAccountRef(),
-                platformAccountRouteSupport.createExternalFundMovementSnapshot(reserveAccount, prepaymentAccount,
+                platformAccountRouteSupport.createExternalFundMovementSnapshot(cashMappingAccount, prepaymentAccount,
                         feeAccount));
     }
 
@@ -234,12 +234,12 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     private ResolvedRouteSpec resolveWithdraw(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionContextKeys.ACCOUNT_ID);
-        FundsAccountId reserveAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
-                PlatformFundingAccountRole.RESERVE_FUND);
+        FundsAccountId cashMappingAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
+                PlatformFundingAccountRole.CASH_MAPPING);
         FundsAccountId prepaymentAccount = platformAccountRouteSupport.requireAccount(
                 instruction.getAmount().getCurrency(), PlatformFundingAccountRole.PREPAYMENT);
         SubjectRef accountSubject = routeSubjectSupport.createSubjectRef(accountId);
-        SubjectRef reserveSubject = platformAccountRouteSupport.createSubjectRef(reserveAccount);
+        SubjectRef cashMappingSubject = platformAccountRouteSupport.createSubjectRef(cashMappingAccount);
         SubjectRef prepaymentSubject = platformAccountRouteSupport.createSubjectRef(prepaymentAccount);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(LEG_WITHDRAW_SETTLEMENT, 1, RouteLegType.CONSUME, instruction)
@@ -251,21 +251,21 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .build());
         legs.add(routeLeg(LEG_FUND_OUT, 2, RouteLegType.EXTERNAL_OUT, instruction)
                 .sourceNode(sourceNode(prepaymentSubject, LedgerSubjectCode.PREPAYMENT))
-                .targetNode(targetNode(reserveSubject, LedgerSubjectCode.CASH))
+                .targetNode(targetNode(cashMappingSubject, LedgerSubjectCode.CASH))
                 .balanceEffectType(LedgerBalanceEffectType.DECREASE)
                 .phaseCode(LedgerPhaseCode.FUND_OUT)
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
                 instruction.getAmount(), instruction.getDescription()));
-        participants.add(platformParticipant(RouteParticipantRole.PLATFORM_RESERVE, prepaymentAccount,
+        participants.add(platformParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, prepaymentAccount,
                 PlatformFundingAccountRole.PREPAYMENT, instruction.getAmount(), instruction.getDescription()));
-        participants.add(platformParticipant(RouteParticipantRole.PLATFORM_RESERVE, reserveAccount,
-                PlatformFundingAccountRole.RESERVE_FUND, instruction.getAmount(), instruction.getDescription()));
+        participants.add(platformParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, cashMappingAccount,
+                PlatformFundingAccountRole.CASH_MAPPING, instruction.getAmount(), instruction.getDescription()));
         FundsAccountId feeAccount = appendFeeLeg(participants, legs, accountId, instruction, legs.size());
         return route(instruction, FundsRouteCodes.WITHDRAW_STANDARD, participants, legs,
                 instruction.getExternalAccountRef(),
-                platformAccountRouteSupport.createExternalFundMovementSnapshot(reserveAccount, prepaymentAccount,
+                platformAccountRouteSupport.createExternalFundMovementSnapshot(cashMappingAccount, prepaymentAccount,
                         feeAccount));
     }
 

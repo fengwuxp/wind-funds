@@ -34,6 +34,7 @@ import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.integration.funds.route.ref.SubjectRef;
+import com.wind.integration.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
@@ -152,7 +153,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
                 .containsOnly(FundsTransactionDetailStatus.PROCESSING);
         assertThat(insertedDetails)
                 .extracting(FundsTransactionDetail::getParticipantRole)
-                .containsExactlyInAnyOrder(RouteParticipantRole.AUTH_HOLDER, RouteParticipantRole.PLATFORM_RESERVE);
+                .containsExactlyInAnyOrder(RouteParticipantRole.AUTH_HOLDER, RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
     }
 
     /**
@@ -312,7 +313,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void markSucceededShouldUpdateDetailsAndTransactionSummary() {
         FundsTransaction transaction = transaction();
         FundsTransactionDetail detail = detail("FTD_001", RouteParticipantRole.AUTH_HOLDER);
-        FundsTransactionDetail platformDetail = detail("FTD_002", RouteParticipantRole.PLATFORM_RESERVE);
+        FundsTransactionDetail platformDetail = detail("FTD_002", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
         AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> updatedDetails = new ArrayList<>();
         AtomicInteger detailQueryIndex = new AtomicInteger();
@@ -868,6 +869,8 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(snapshot.getLegs().getFirst().getLegId()).isEqualTo("LEG_001");
         assertThat(snapshot.getSnapshotSchemaVersion()).isEqualTo("v4");
         assertThat(snapshot.getRoutingDecision().getPolicyCode()).isEqualTo("LOWEST_COST");
+        assertThat(snapshot.getRoutingDecision().getSelectedCashFundingAccount()).isEqualTo("PF_CASH_USD");
+        assertThat(snapshot.getRoutingDecision().getSelectedPlatformAccount()).isEqualTo("PF_SETTLEMENT_USD");
         assertThat(snapshot.getRoutingDecision().getFundingAllocations()).singleElement()
                 .satisfies(allocation -> {
                     assertThat(allocation.getAllocationId()).isEqualTo("ALLOC_001");
@@ -879,6 +882,10 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(snapshot.getExternalAccountRef().getDescription()).isEqualTo("bank account");
         assertThat(snapshot.getExternalAccountRef().getContextVariables())
                 .containsEntry("externalTransactionId", "EXT_001");
+        assertThat(snapshot.getPlatformAccounts().getCashFundingAccount().getSubjectId())
+                .isEqualTo("platform_cash_usd");
+        assertThat(snapshot.getPlatformAccounts().getAdjustmentFundingAccount().getSubjectId())
+                .isEqualTo("platform_adjustment_usd");
         assertThat(snapshot.getParticipants().getFirst().getSubjectRef().getLedgerProfileCode()).isEqualTo("CREDIT_BASIC");
     }
 
@@ -892,7 +899,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void testFundsTransactionQueryServiceShouldReuseFactsForReplayAndProjection() {
         FundsTransaction transaction = transaction();
         FundsTransactionDetail firstDetail = detail("FTD_001", RouteParticipantRole.AUTH_HOLDER);
-        FundsTransactionDetail secondDetail = detail("FTD_002", RouteParticipantRole.PLATFORM_RESERVE);
+        FundsTransactionDetail secondDetail = detail("FTD_002", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
         secondDetail.setId(403L);
         secondDetail.setSubjectId("platform_revenue_001");
         secondDetail.setSubjectType("FUNDING_ACCOUNT");
@@ -937,7 +944,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
                 .extracting("sn", "participantRole", "fundsEffectType")
                 .containsExactly(
                         tuple("FTD_001", RouteParticipantRole.AUTH_HOLDER, FundsEffectType.HOLD),
-                        tuple("FTD_002", RouteParticipantRole.PLATFORM_RESERVE, FundsEffectType.DIRECT)
+                        tuple("FTD_002", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, FundsEffectType.DIRECT)
                 );
     }
 
@@ -1396,7 +1403,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         public @NonNull List<RouteParticipantSpec> getParticipants() {
             return List.of(
                     new SimpleParticipant(RouteParticipantRole.AUTH_HOLDER, new SimpleSubjectRef("credit_001", FundsSubjectType.CREDIT_ACCOUNT), amount),
-                    new SimpleParticipant(RouteParticipantRole.PLATFORM_RESERVE, new SimpleSubjectRef("platform_revenue_001", FundsSubjectType.FUNDING_ACCOUNT), amount)
+                    new SimpleParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, new SimpleSubjectRef("platform_revenue_001", FundsSubjectType.FUNDING_ACCOUNT), amount)
             );
         }
 
@@ -1504,7 +1511,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
                     .policyCode("LOWEST_COST")
                     .matchedRules(List.of("USD_ONLY"))
                     .selectedProcessor("VISA_A")
-                    .selectedReserveFund("RF_US_1")
+                    .selectedCashFundingAccount("PF_CASH_USD")
                     .selectedPlatformAccount("PF_SETTLEMENT_USD")
                     .fundingAllocations(List.of(ImmutableFundingAllocationDecisionSpec.builder()
                             .allocationId("ALLOC_001")
@@ -1552,14 +1559,24 @@ class DefaultFundsInstructionLifecycleSaverTests {
         }
 
         @Override
+        public @Nullable PlatformAccountsSnapshotSpec getPlatformAccounts() {
+            return com.wind.integration.funds.model.route.ImmutablePlatformAccountsSnapshotSpec.builder()
+                    .cashFundingAccount(new MetadataSubjectRef("platform_cash_usd", FundsSubjectType.FUNDING_ACCOUNT,
+                            "cash mapping", "FUNDING_PLATFORM"))
+                    .adjustmentFundingAccount(new MetadataSubjectRef("platform_adjustment_usd",
+                            FundsSubjectType.FUNDING_ACCOUNT, "adjustment", "FUNDING_PLATFORM"))
+                    .build();
+        }
+
+        @Override
         public @NonNull List<RouteParticipantSpec> getParticipants() {
             return List.of(
                     new SimpleParticipant(RouteParticipantRole.AUTH_HOLDER,
                             new MetadataSubjectRef("credit_001", FundsSubjectType.CREDIT_ACCOUNT, "credit",
                                     "CREDIT_BASIC"), 1_000L),
-                    new SimpleParticipant(RouteParticipantRole.PLATFORM_RESERVE,
+                    new SimpleParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT,
                             new MetadataSubjectRef("platform_revenue_001", FundsSubjectType.FUNDING_ACCOUNT,
-                                    "reserve", "FUNDING_PLATFORM"), 1_000L)
+                                    "cash-mapping", "FUNDING_PLATFORM"), 1_000L)
             );
         }
     }

@@ -214,7 +214,7 @@ final class RouteSnapshotJsonSupport {
                 .policyCode(value.getString("policyCode"))
                 .matchedRules(parseStringList(value.getJSONArray("matchedRules")))
                 .selectedProcessor(value.getString("selectedProcessor"))
-                .selectedReserveFund(value.getString("selectedReserveFund"))
+                .selectedCashFundingAccount(value.getString("selectedCashFundingAccount"))
                 .selectedPlatformAccount(value.getString("selectedPlatformAccount"))
                 .fundingAllocations(parseFundingAllocations(value.getJSONArray("fundingAllocations")))
                 .decisionReason(value.getString("decisionReason"))
@@ -261,11 +261,12 @@ final class RouteSnapshotJsonSupport {
             return null;
         }
         return ImmutablePlatformAccountsSnapshotSpec.builder()
-                .reserveFundingAccount(parseSubjectRef(value.getJSONObject("reserveFundingAccount")))
+                .cashFundingAccount(parseSubjectRef(value.getJSONObject("cashFundingAccount")))
                 .prepaymentFundingAccount(parseSubjectRef(value.getJSONObject("prepaymentFundingAccount")))
                 .clearingFundingAccount(parseSubjectRef(value.getJSONObject("clearingFundingAccount")))
                 .settlementFundingAccount(parseSubjectRef(value.getJSONObject("settlementFundingAccount")))
                 .feeFundingAccount(parseSubjectRef(value.getJSONObject("feeFundingAccount")))
+                .adjustmentFundingAccount(parseSubjectRef(value.getJSONObject("adjustmentFundingAccount")))
                 .build();
     }
 

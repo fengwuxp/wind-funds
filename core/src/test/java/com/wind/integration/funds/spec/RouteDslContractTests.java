@@ -285,21 +285,24 @@ class RouteDslContractTests {
     void testSnapshotShouldPreservePlatformAccountsForReplay() {
         RouteSnapshotSpec snapshot = routeSnapshotBuilder()
                 .platformAccounts(ImmutablePlatformAccountsSnapshotSpec.builder()
-                        .reserveFundingAccount(subjectRef("PLATFORM_RESERVE_USD"))
+                        .cashFundingAccount(subjectRef("PLATFORM_CASH_USD"))
                         .prepaymentFundingAccount(subjectRef("PLATFORM_PREPAYMENT_USD"))
                         .settlementFundingAccount(subjectRef("PLATFORM_SETTLEMENT_USD"))
                         .feeFundingAccount(subjectRef("PLATFORM_FEE_USD"))
+                        .adjustmentFundingAccount(subjectRef("PLATFORM_ADJUSTMENT_USD"))
                         .build())
                 .build();
 
-        assertEquals("PLATFORM_RESERVE_USD",
-                snapshot.getPlatformAccounts().getReserveFundingAccount().getSubjectId());
+        assertEquals("PLATFORM_CASH_USD",
+                snapshot.getPlatformAccounts().getCashFundingAccount().getSubjectId());
         assertEquals("PLATFORM_PREPAYMENT_USD",
                 snapshot.getPlatformAccounts().getPrepaymentFundingAccount().getSubjectId());
         assertEquals("PLATFORM_SETTLEMENT_USD",
                 snapshot.getPlatformAccounts().getSettlementFundingAccount().getSubjectId());
         assertEquals("PLATFORM_FEE_USD",
                 snapshot.getPlatformAccounts().getFeeFundingAccount().getSubjectId());
+        assertEquals("PLATFORM_ADJUSTMENT_USD",
+                snapshot.getPlatformAccounts().getAdjustmentFundingAccount().getSubjectId());
     }
 
     @Test

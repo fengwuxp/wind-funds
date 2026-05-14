@@ -9,16 +9,17 @@ import org.jspecify.annotations.Nullable;
  * 不可变平台账户快照实现。
  */
 @Builder
-public record ImmutablePlatformAccountsSnapshotSpec(@Nullable SubjectRef reserveFundingAccount,
+public record ImmutablePlatformAccountsSnapshotSpec(@Nullable SubjectRef cashFundingAccount,
                                                     @Nullable SubjectRef prepaymentFundingAccount,
                                                     @Nullable SubjectRef clearingFundingAccount,
                                                     @Nullable SubjectRef settlementFundingAccount,
-                                                    @Nullable SubjectRef feeFundingAccount)
+                                                    @Nullable SubjectRef feeFundingAccount,
+                                                    @Nullable SubjectRef adjustmentFundingAccount)
         implements PlatformAccountsSnapshotSpec {
 
     @Override
-    public @Nullable SubjectRef getReserveFundingAccount() {
-        return reserveFundingAccount;
+    public @Nullable SubjectRef getCashFundingAccount() {
+        return cashFundingAccount;
     }
 
     @Override
@@ -39,5 +40,10 @@ public record ImmutablePlatformAccountsSnapshotSpec(@Nullable SubjectRef reserve
     @Override
     public @Nullable SubjectRef getFeeFundingAccount() {
         return feeFundingAccount;
+    }
+
+    @Override
+    public @Nullable SubjectRef getAdjustmentFundingAccount() {
+        return adjustmentFundingAccount;
     }
 }

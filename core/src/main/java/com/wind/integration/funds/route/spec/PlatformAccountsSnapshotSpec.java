@@ -12,10 +12,10 @@ import org.jspecify.annotations.Nullable;
 public interface PlatformAccountsSnapshotSpec {
 
     /**
-     * 平台备付金账户，用于外部入金、提现出款等平台资金承接场景。
+     * 平台现金映射账户，用于外部入金、提现出款等平台资金承接场景。
      */
     @Nullable
-    default SubjectRef getReserveFundingAccount() {
+    default SubjectRef getCashFundingAccount() {
         return null;
     }
 
@@ -48,6 +48,14 @@ public interface PlatformAccountsSnapshotSpec {
      */
     @Nullable
     default SubjectRef getFeeFundingAccount() {
+        return null;
+    }
+
+    /**
+     * 平台调整挂账账户，用于差错、调账、长短款核销等过渡场景。
+     */
+    @Nullable
+    default SubjectRef getAdjustmentFundingAccount() {
         return null;
     }
 }

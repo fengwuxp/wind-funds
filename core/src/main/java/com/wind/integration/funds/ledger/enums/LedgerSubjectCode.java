@@ -17,9 +17,9 @@ import lombok.Getter;
 public enum LedgerSubjectCode implements DescriptiveEnum {
 
     /**
-     * 真实现金池/备付金。
+     * 现金或外部资金池的内部映射。
      */
-    CASH("现金/备付金"),
+    CASH("现金/外部资金映射"),
 
     /**
      * 可用余额或可用额度。

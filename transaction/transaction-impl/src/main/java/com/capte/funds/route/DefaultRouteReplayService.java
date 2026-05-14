@@ -346,7 +346,7 @@ public class DefaultRouteReplayService implements RouteReplayService {
 
     private RouteParticipantRole resolveParticipantRole(RouteNodeSpec node, RouteParticipantRole fallbackRole) {
         if (node.getNodeType() == RouteNodeType.PLATFORM_FUNDING_ACCOUNT) {
-            return RouteParticipantRole.PLATFORM_RESERVE;
+            return RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT;
         }
         FundsSubjectType subjectType = node.getSubjectRef().getSubjectType();
         if (subjectType == FundsSubjectType.CREDIT_ACCOUNT) {

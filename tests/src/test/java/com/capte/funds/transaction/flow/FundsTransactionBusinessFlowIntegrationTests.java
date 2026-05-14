@@ -156,17 +156,17 @@ class FundsTransactionBusinessFlowIntegrationTests {
     void testTopupPayRefundShouldKeepLedgerBalances() {
         FundsAccountId user = fundingAccount("funding_user");
         FundsAccountId merchant = fundingAccount("merchant_001");
-        BalanceSnapshot before = snapshot(balances(user, merchant, reserveAccount(), prepaymentAccount()));
+        BalanceSnapshot before = snapshot(balances(user, merchant, cashMappingAccount(), prepaymentAccount()));
 
         topup(user, 100L, "TOPUP_PAY_REFUND_TOPUP");
         pay(user, merchant, 40L, "TOPUP_PAY_REFUND_PAY");
         refund(user, merchant, 20L, "TOPUP_PAY_REFUND_REFUND");
 
-        BalanceSnapshot after = snapshot(balances(user, merchant, reserveAccount(), prepaymentAccount()));
+        BalanceSnapshot after = snapshot(balances(user, merchant, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, after,
                 delta(user, LedgerSubjectCode.AVAILABLE, 80L, CURRENCY),
                 delta(merchant, LedgerSubjectCode.SETTLEMENT, 20L, CURRENCY),
-                delta(reserveAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertBucket(ledgerBook.balance(user), LedgerSubjectCode.AVAILABLE, 80L, CURRENCY);
         assertBucket(ledgerBook.balance(merchant), LedgerSubjectCode.SETTLEMENT, 20L, CURRENCY);
@@ -182,17 +182,17 @@ class FundsTransactionBusinessFlowIntegrationTests {
     @Test
     void testTopupFreezeWithdrawShouldKeepLedgerBalances() {
         FundsAccountId user = fundingAccount("funding_user");
-        BalanceSnapshot before = snapshot(balances(user, reserveAccount(), prepaymentAccount()));
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
 
         topup(user, 100L, "TOPUP_FREEZE_WITHDRAW_TOPUP");
         freeze(user, 60L, "TOPUP_FREEZE_WITHDRAW_FREEZE");
         withdraw(user, 60L, "TOPUP_FREEZE_WITHDRAW_WITHDRAW");
 
-        BalanceSnapshot after = snapshot(balances(user, reserveAccount(), prepaymentAccount()));
+        BalanceSnapshot after = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, after,
                 delta(user, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(reserveAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertBucket(ledgerBook.balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(ledgerBook.balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
@@ -210,7 +210,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
         FundsAccountId userA = fundingAccount("funding_user_a");
         FundsAccountId userB = fundingAccount("funding_user_b");
         FundsAccountId merchant = fundingAccount("merchant_001");
-        BalanceSnapshot before = snapshot(balances(userA, userB, merchant, reserveAccount(), prepaymentAccount()));
+        BalanceSnapshot before = snapshot(balances(userA, userB, merchant, cashMappingAccount(), prepaymentAccount()));
 
         topup(userA, 150L, "TOPUP_TRANSFER_PAY_WITHDRAW_TOPUP");
         transfer(userA, userB, 100L, "TOPUP_TRANSFER_PAY_WITHDRAW_TRANSFER");
@@ -218,13 +218,13 @@ class FundsTransactionBusinessFlowIntegrationTests {
         freeze(userB, 60L, "TOPUP_TRANSFER_PAY_WITHDRAW_FREEZE");
         withdraw(userB, 60L, "TOPUP_TRANSFER_PAY_WITHDRAW_WITHDRAW");
 
-        BalanceSnapshot after = snapshot(balances(userA, userB, merchant, reserveAccount(), prepaymentAccount()));
+        BalanceSnapshot after = snapshot(balances(userA, userB, merchant, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, after,
                 delta(userA, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(userB, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(userB, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(merchant, LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY),
-                delta(reserveAccount(), LedgerSubjectCode.CASH, -90L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -90L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertBucket(ledgerBook.balance(userA), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(ledgerBook.balance(userB), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
@@ -244,7 +244,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
             ledgerBook.ensureLedger(accountId, LedgerSubjectCode.FROZEN, 0L);
             ledgerBook.ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT, 0L);
         });
-        ledgerBook.ensureLedger(reserveAccount(), LedgerSubjectCode.CASH, 10_000L);
+        ledgerBook.ensureLedger(cashMappingAccount(), LedgerSubjectCode.CASH, 10_000L);
         ledgerBook.ensureLedger(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L);
         ledgerBook.ensureLedger(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L);
         ledgerBook.ensureLedger(feeAccount(), LedgerSubjectCode.FEE, 0L);
@@ -334,8 +334,8 @@ class FundsTransactionBusinessFlowIntegrationTests {
         return FundsAccountId.immutable(accountId, FundsSubjectType.FUNDING_ACCOUNT.name());
     }
 
-    private static FundsAccountId reserveAccount() {
-        return platformAccount(PlatformFundingAccountRole.RESERVE_FUND);
+    private static FundsAccountId cashMappingAccount() {
+        return platformAccount(PlatformFundingAccountRole.CASH_MAPPING);
     }
 
     private static FundsAccountId prepaymentAccount() {

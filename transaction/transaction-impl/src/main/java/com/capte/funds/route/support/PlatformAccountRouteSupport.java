@@ -43,42 +43,49 @@ public class PlatformAccountRouteSupport {
     }
 
     public @NonNull PlatformAccountsSnapshotSpec createExternalFundMovementSnapshot(
-            @NonNull FundsAccountId reserveAccount,
+            @NonNull FundsAccountId cashMappingAccount,
             @NonNull FundsAccountId prepaymentAccount,
             @Nullable FundsAccountId feeAccount) {
-        return createSnapshot(reserveAccount, prepaymentAccount, null, null, feeAccount);
+        return createSnapshot(cashMappingAccount, prepaymentAccount, null, null, feeAccount, null);
     }
 
     public @NonNull PlatformAccountsSnapshotSpec createSettlementSnapshot(@NonNull FundsAccountId settlementAccount) {
-        return createSnapshot(null, null, null, settlementAccount, null);
+        return createSnapshot(null, null, null, settlementAccount, null, null);
     }
 
     public @Nullable PlatformAccountsSnapshotSpec createFeeSnapshot(@Nullable FundsAccountId feeAccount) {
-        return feeAccount == null ? null : createSnapshot(null, null, null, null, feeAccount);
+        return feeAccount == null ? null : createSnapshot(null, null, null, null, feeAccount, null);
     }
 
     public @NonNull PlatformAccountsSnapshotSpec createPrepaymentSnapshot(@NonNull FundsAccountId prepaymentAccount) {
-        return createSnapshot(null, prepaymentAccount, null, null, null);
+        return createSnapshot(null, prepaymentAccount, null, null, null, null);
     }
 
-    private @NonNull PlatformAccountsSnapshotSpec createSnapshot(@Nullable FundsAccountId reserveAccount,
+    public @NonNull PlatformAccountsSnapshotSpec createAdjustmentSnapshot(@NonNull FundsAccountId adjustmentAccount) {
+        return createSnapshot(null, null, null, null, null, adjustmentAccount);
+    }
+
+    private @NonNull PlatformAccountsSnapshotSpec createSnapshot(@Nullable FundsAccountId cashMappingAccount,
                                                                  @Nullable FundsAccountId prepaymentAccount,
                                                                  @Nullable FundsAccountId clearingAccount,
                                                                  @Nullable FundsAccountId settlementAccount,
-                                                                 @Nullable FundsAccountId feeAccount) {
-        if (reserveAccount == null
+                                                                 @Nullable FundsAccountId feeAccount,
+                                                                 @Nullable FundsAccountId adjustmentAccount) {
+        if (cashMappingAccount == null
                 && prepaymentAccount == null
                 && clearingAccount == null
                 && settlementAccount == null
-                && feeAccount == null) {
+                && feeAccount == null
+                && adjustmentAccount == null) {
             throw new IllegalArgumentException("platform account snapshot must contain at least one account");
         }
         return ImmutablePlatformAccountsSnapshotSpec.builder()
-                .reserveFundingAccount(reserveAccount == null ? null : createSubjectRef(reserveAccount))
+                .cashFundingAccount(cashMappingAccount == null ? null : createSubjectRef(cashMappingAccount))
                 .prepaymentFundingAccount(prepaymentAccount == null ? null : createSubjectRef(prepaymentAccount))
                 .clearingFundingAccount(clearingAccount == null ? null : createSubjectRef(clearingAccount))
                 .settlementFundingAccount(settlementAccount == null ? null : createSubjectRef(settlementAccount))
                 .feeFundingAccount(feeAccount == null ? null : createSubjectRef(feeAccount))
+                .adjustmentFundingAccount(adjustmentAccount == null ? null : createSubjectRef(adjustmentAccount))
                 .build();
     }
 }

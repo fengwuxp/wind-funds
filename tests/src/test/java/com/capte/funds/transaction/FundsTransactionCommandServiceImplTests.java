@@ -140,8 +140,8 @@ class FundsTransactionCommandServiceImplTests {
         assertThat(route.getLegs()).hasSize(2);
         assertThat(route.getParticipants())
                 .extracting(participant -> participant.getParticipantRole().name())
-                .containsExactlyInAnyOrder(RouteParticipantRole.PLATFORM_RESERVE.name(),
-                        RouteParticipantRole.PLATFORM_RESERVE.name(),
+                .containsExactlyInAnyOrder(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT.name(),
+                        RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT.name(),
                         RouteParticipantRole.PAYEE.name());
         assertLeg(route.getLegs().get(0), RouteLegType.EXTERNAL_IN, LedgerSubjectCode.CASH,
                 LedgerSubjectCode.PREPAYMENT, LedgerBalanceEffectType.INCREASE, LedgerPhaseCode.FUND_IN);
@@ -223,8 +223,8 @@ class FundsTransactionCommandServiceImplTests {
         assertThat(route.getParticipants())
                 .extracting(participant -> participant.getParticipantRole().name())
                 .containsExactlyInAnyOrder(RouteParticipantRole.PAYER.name(),
-                        RouteParticipantRole.PLATFORM_RESERVE.name(),
-                        RouteParticipantRole.PLATFORM_RESERVE.name());
+                        RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT.name(),
+                        RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT.name());
         assertLeg(route.getLegs().get(0), RouteLegType.CONSUME, LedgerSubjectCode.FROZEN,
                 LedgerSubjectCode.PREPAYMENT, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.SETTLEMENT);
         assertLeg(route.getLegs().get(1), RouteLegType.EXTERNAL_OUT, LedgerSubjectCode.PREPAYMENT,

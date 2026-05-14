@@ -24,9 +24,9 @@ public enum DefaultFundsAccountType implements DescriptiveEnum {
     /* ===== 资金基础设施 ===== */
 
     /**
-     * 备付金账户（平台在银行/PSP的资金）
+     * 现金映射账户（平台外部资金的内部映射）。
      */
-    RESERVE_FUND(LedgerSubjectCategory.ASSET, "备付金账户"),
+    CASH_MAPPING(LedgerSubjectCategory.ASSET, "现金映射账户"),
 
     /**
      * 清算中间账户（过渡态，允许正负）

@@ -21,7 +21,7 @@ public enum RouteParticipantRole implements DescriptiveEnum {
 
     BUDGET_CONTROLLER("预算控制主体"),
 
-    PLATFORM_RESERVE("平台资金主体"),
+    PLATFORM_FUNDING_ACCOUNT("平台资金主体"),
 
     EXTERNAL_COUNTERPARTY("外部对手方"),
 

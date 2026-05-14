@@ -16,7 +16,7 @@ import java.util.Map;
 public record ImmutableRoutingDecisionSpec(@Nullable String policyCode,
                                            List<String> matchedRules,
                                            @Nullable String selectedProcessor,
-                                           @Nullable String selectedReserveFund,
+                                           @Nullable String selectedCashFundingAccount,
                                            @Nullable String selectedPlatformAccount,
                                            List<FundingAllocationDecisionSpec> fundingAllocations,
                                            @Nullable String decisionReason,
@@ -45,8 +45,8 @@ public record ImmutableRoutingDecisionSpec(@Nullable String policyCode,
     }
 
     @Override
-    public @Nullable String getSelectedReserveFund() {
-        return selectedReserveFund;
+    public @Nullable String getSelectedCashFundingAccount() {
+        return selectedCashFundingAccount;
     }
 
     @Override

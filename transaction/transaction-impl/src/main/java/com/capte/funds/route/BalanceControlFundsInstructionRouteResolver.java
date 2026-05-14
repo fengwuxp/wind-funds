@@ -146,12 +146,12 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private ResolvedRouteSpec resolveFundingBalanceAdjust(FundsInstructionSpec instruction, FundsAccountId accountId) {
         boolean increase = FundsInstructionContextReader.requireBoolean(instruction, FundsInstructionContextKeys.INCREASE);
-        FundsAccountId prepaymentAccount = platformAccountRouteSupport.requireAccount(
-                instruction.getAmount().getCurrency(), PlatformFundingAccountRole.PREPAYMENT);
+        FundsAccountId adjustmentAccount = platformAccountRouteSupport.requireAccount(
+                instruction.getAmount().getCurrency(), PlatformFundingAccountRole.ADJUSTMENT);
         RouteLegSpec leg = increase
                 ? routeLeg(LEG_FUNDING_BALANCE_ADJUST, 1, RouteLegType.ADJUST, instruction)
-                .sourceNode(sourceNode(platformAccountRouteSupport.createSubjectRef(prepaymentAccount),
-                        LedgerSubjectCode.PREPAYMENT))
+                .sourceNode(sourceNode(platformAccountRouteSupport.createSubjectRef(adjustmentAccount),
+                        LedgerSubjectCode.ADJUSTMENT))
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .balanceEffectType(LedgerBalanceEffectType.INCREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
@@ -159,8 +159,8 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 .build()
                 : routeLeg(LEG_FUNDING_BALANCE_ADJUST, 1, RouteLegType.ADJUST, instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(prepaymentAccount),
-                        LedgerSubjectCode.PREPAYMENT))
+                .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(adjustmentAccount),
+                        LedgerSubjectCode.ADJUSTMENT))
                 .balanceEffectType(LedgerBalanceEffectType.DECREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
                 .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
@@ -168,12 +168,12 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
         List<RouteParticipantSpec> participants = routeParticipantFactory.distinct(List.of(
                 subjectParticipant(accountId, instruction),
                 routeParticipantFactory.createParticipant(
-                        RouteParticipantRole.PLATFORM_RESERVE,
-                        platformAccountRouteSupport.createSubjectRef(prepaymentAccount),
-                        platformAccountRouteSupport.resolveLedgerProfileCode(PlatformFundingAccountRole.PREPAYMENT).name(),
+                        RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT,
+                        platformAccountRouteSupport.createSubjectRef(adjustmentAccount),
+                        platformAccountRouteSupport.resolveLedgerProfileCode(PlatformFundingAccountRole.ADJUSTMENT).name(),
                         instruction.getAmount(), instruction.getDescription(), Map.of())
         ));
-        PlatformAccountsSnapshotSpec snapshot = platformAccountRouteSupport.createPrepaymentSnapshot(prepaymentAccount);
+        PlatformAccountsSnapshotSpec snapshot = platformAccountRouteSupport.createAdjustmentSnapshot(adjustmentAccount);
         return route(instruction, FundsRouteCodes.FUNDING_BALANCE_ADJUST_STANDARD, participants, List.of(leg),
                 snapshot);
     }

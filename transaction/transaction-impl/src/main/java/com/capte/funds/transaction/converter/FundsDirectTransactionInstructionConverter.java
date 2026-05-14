@@ -61,7 +61,7 @@ public class FundsDirectTransactionInstructionConverter {
     public @NonNull FundsInstructionSpec convertToTopupInstruction(@NonNull FundsTransactionTopupRequest request,
                                                                    @NonNull WindOperator operator) {
         ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
-        requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.RESERVE_FUND);
+        requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         extraContext.put(FundsInstructionContextKeys.CHANNEL_CODE, request.getChannel().name());
@@ -167,7 +167,7 @@ public class FundsDirectTransactionInstructionConverter {
     public @NonNull FundsInstructionSpec convertToWithdrawInstruction(@NonNull FundsTransactionWithdrawRequest request,
                                                                       @NonNull WindOperator operator) {
         ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
-        requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.RESERVE_FUND);
+        requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)

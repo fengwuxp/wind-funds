@@ -27,7 +27,7 @@ public interface RoutingDecisionSpec {
     }
 
     @Nullable
-    default String getSelectedReserveFund() {
+    default String getSelectedCashFundingAccount() {
         return null;
     }
 

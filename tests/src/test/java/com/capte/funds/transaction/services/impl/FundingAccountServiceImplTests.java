@@ -44,9 +44,9 @@ class FundingAccountServiceImplTests {
                 .setTenantId(1L)
                 .setOwnerId("tenant_001")
                 .setOwnerType(FundsAccountOwnerType.TENANT)
-                .setAccountType(DefaultFundsAccountType.RESERVE_FUND.name())
+                .setAccountType(DefaultFundsAccountType.CASH_MAPPING.name())
                 .setPlatform(true)
-                .setAccountRoleCode(PlatformFundingAccountRole.RESERVE_FUND)
+                .setAccountRoleCode(PlatformFundingAccountRole.CASH_MAPPING)
                 .setCurrency(CurrencyIsoCode.USD));
 
         assertThat(id).isEqualTo(101L);

@@ -23,7 +23,7 @@ class PlatformFundingAccountServiceImplTests {
 
     @Test
     void requireAccountIdShouldReturnConfiguredPlatformFundingAccount() {
-        FundingAccount account = fundingAccount("reserve_fund_usd", DefaultFundsAccountType.RESERVE_FUND.name());
+        FundingAccount account = fundingAccount("cash_mapping_usd", DefaultFundsAccountType.CASH_MAPPING.name());
         AtomicInteger queryCount = new AtomicInteger();
         FundingAccountMapper mapper = FundsAccountServiceTestSupport.mapper(
                 FundingAccountMapper.class,
@@ -38,10 +38,24 @@ class PlatformFundingAccountServiceImplTests {
         PlatformFundingAccountServiceImpl service = new PlatformFundingAccountServiceImpl(mapper);
 
         FundsAccountId result = service.requireAccountId(1L, CurrencyIsoCode.USD,
-                PlatformFundingAccountRole.RESERVE_FUND);
+                PlatformFundingAccountRole.CASH_MAPPING);
 
-        assertThat(result).isEqualTo(FundsAccountId.immutable("reserve_fund_usd", "RESERVE_FUND"));
+        assertThat(result).isEqualTo(FundsAccountId.immutable("cash_mapping_usd", "CASH_MAPPING"));
         assertThat(queryCount).hasValue(1);
+    }
+
+    @Test
+    void platformFundingAccountRolesShouldUseTargetProductSemantics() {
+        assertThat(PlatformFundingAccountRole.values())
+                .extracting(PlatformFundingAccountRole::name)
+                .containsExactly(
+                        "CASH_MAPPING",
+                        "PREPAYMENT",
+                        "CLEARING",
+                        "SETTLEMENT",
+                        "FEE",
+                        "ADJUSTMENT"
+                );
     }
 
     @Test

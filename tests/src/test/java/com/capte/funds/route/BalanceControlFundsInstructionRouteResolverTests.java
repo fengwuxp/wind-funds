@@ -39,7 +39,7 @@ class BalanceControlFundsInstructionRouteResolverTests {
     }
 
     @Test
-    void testResolveFundingBalanceAdjustShouldUsePlatformPrepayment() {
+    void testResolveFundingBalanceAdjustShouldUsePlatformAdjustment() {
         FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
         FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
                 .setAccountId(accountId)
@@ -53,13 +53,13 @@ class BalanceControlFundsInstructionRouteResolverTests {
         assertThat(route.getRouteCode()).isEqualTo("FUNDING_BALANCE_ADJUST_STANDARD");
         assertThat(route.getLegs()).singleElement().satisfies(leg -> {
             assertThat(leg.getLegType()).isEqualTo(RouteLegType.ADJUST);
-            assertThat(leg.getSourceNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.PREPAYMENT);
+            assertThat(leg.getSourceNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.ADJUSTMENT);
             assertThat(leg.getTargetNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AVAILABLE);
             assertThat(leg.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.INCREASE);
             assertThat(leg.getPhaseCode()).isEqualTo(LedgerPhaseCode.ADJUSTMENT);
         });
         assertThat(route.getPlatformAccounts()).isNotNull();
-        assertThat(route.getPlatformAccounts().getPrepaymentFundingAccount()).isNotNull();
+        assertThat(route.getPlatformAccounts().getAdjustmentFundingAccount()).isNotNull();
     }
 
     @Test
@@ -76,12 +76,12 @@ class BalanceControlFundsInstructionRouteResolverTests {
 
         assertThat(route.getRouteCode()).isEqualTo("FUNDING_BALANCE_ADJUST_STANDARD");
         assertThat(route.getLegs()).singleElement().satisfies(leg -> {
-            assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.PREPAYMENT,
+            assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.ADJUSTMENT,
                     LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.ADJUSTMENT);
             assertMustNotBeNegative(leg, accountId, LedgerSubjectCode.AVAILABLE);
         });
         assertThat(route.getPlatformAccounts()).isNotNull();
-        assertThat(route.getPlatformAccounts().getPrepaymentFundingAccount()).isNotNull();
+        assertThat(route.getPlatformAccounts().getAdjustmentFundingAccount()).isNotNull();
     }
 
     @Test
