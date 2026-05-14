@@ -59,6 +59,14 @@ public class DefaultLedgerProfileServiceImpl implements LedgerProfileService {
                         item(LedgerSubjectCode.FROZEN, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
                         item(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false)
                 )),
+                LedgerProfileCode.FUNDING_MERCHANT,
+                profile(LedgerProfileCode.FUNDING_MERCHANT, FundsSubjectType.FUNDING_ACCOUNT, List.of(
+                        item(LedgerSubjectCode.CLEARING, LedgerSubjectCategory.CLEARING, EntrySide.CREDIT, false),
+                        item(LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, true),
+                        item(LedgerSubjectCode.SETTLEMENT, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
+                        item(LedgerSubjectCode.FROZEN, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
+                        item(LedgerSubjectCode.ADJUSTMENT, LedgerSubjectCategory.SUSPENSE, EntrySide.CREDIT, false)
+                )),
                 LedgerProfileCode.CREDIT_BASIC,
                 profile(LedgerProfileCode.CREDIT_BASIC, FundsSubjectType.CREDIT_ACCOUNT, List.of(
                         item(LedgerSubjectCode.LIMIT, LedgerSubjectCategory.CONTROL, EntrySide.DEBIT, false),

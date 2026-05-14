@@ -63,4 +63,47 @@ class FundingAccountServiceImplTests {
         assertThat(initRequest.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.FUNDING_PLATFORM);
         assertThat(initRequest.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
     }
+
+    @Test
+    void testCreateMerchantFundingAccountShouldUseMerchantProfileByDefault() {
+        AtomicReference<FundingAccount> inserted = new AtomicReference<>();
+        FundingAccountMapper fundingAccountMapper = FundsAccountServiceTestSupport.mapper(
+                FundingAccountMapper.class,
+                entityObject -> {
+                    FundingAccount entity = (FundingAccount) entityObject;
+                    entity.setId(102L);
+                    inserted.set(entity);
+                },
+                query -> null
+        );
+        FundsAccountServiceTestSupport.RecordingSubjectLedgerInitializer initializer =
+                new FundsAccountServiceTestSupport.RecordingSubjectLedgerInitializer();
+        FundingAccountServiceImpl service = new FundingAccountServiceImpl(
+                fundingAccountMapper,
+                initializer,
+                FundsAccountServiceTestSupport.unsupportedLedgerService()
+        );
+
+        Long id = service.createFundingAccount(new CreateFundingAccountRequest()
+                .setSn("merchant_funding_001")
+                .setTenantId(1L)
+                .setOwnerId("merchant_001")
+                .setOwnerType(FundsAccountOwnerType.MERCHANT)
+                .setAccountType(DefaultFundsAccountType.PLATFORM_MERCHANT.name())
+                .setCurrency(CurrencyIsoCode.USD));
+
+        assertThat(id).isEqualTo(102L);
+        FundingAccount entity = inserted.get();
+        assertThat(entity).isNotNull();
+        assertThat(entity.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.FUNDING_MERCHANT);
+        assertThat(entity.getLedgerProfileVersion()).isEqualTo(1);
+        assertThat(entity.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(entity.getPlatform()).isFalse();
+
+        InitializeSubjectLedgerRequest initRequest = initializer.getRequest();
+        assertThat(initRequest.getSubjectId()).isEqualTo("merchant_funding_001");
+        assertThat(initRequest.getSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT);
+        assertThat(initRequest.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.FUNDING_MERCHANT);
+        assertThat(initRequest.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+    }
 }

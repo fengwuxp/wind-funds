@@ -4,6 +4,7 @@ import com.capte.funds.transaction.dal.entities.FundingAccount;
 import com.capte.funds.transaction.enums.LedgerProfileCode;
 import com.capte.funds.transaction.model.dto.FundingAccountDTO;
 import com.capte.funds.transaction.model.request.CreateFundingAccountRequest;
+import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
@@ -66,6 +67,9 @@ public interface FundingAccountConverter {
         }
         if (request.getAccountRoleCode() != null) {
             return request.getAccountRoleCode().getLedgerProfileCode();
+        }
+        if (request.getOwnerType() == FundsAccountOwnerType.MERCHANT) {
+            return LedgerProfileCode.FUNDING_MERCHANT;
         }
         return LedgerProfileCode.FUNDING_BASIC;
     }

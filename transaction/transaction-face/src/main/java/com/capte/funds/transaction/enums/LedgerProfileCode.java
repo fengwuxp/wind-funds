@@ -20,6 +20,11 @@ public enum LedgerProfileCode implements DescriptiveEnum {
     FUNDING_BASIC("普通资金账户"),
 
     /**
+     * 商户资金账户。
+     */
+    FUNDING_MERCHANT("商户资金账户"),
+
+    /**
      * 平台资金账户。
      */
     FUNDING_PLATFORM("平台资金账户"),
