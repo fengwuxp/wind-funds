@@ -21,6 +21,7 @@ import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.integration.funds.ledger.enums.EntrySide;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
@@ -270,6 +271,32 @@ class DefaultLedgerTransactionPostingServiceImplTests {
                 .isInstanceOf(BaseException.class)
                 .hasMessageContaining("账本分录主体与账本主体不一致")
                 .hasMessageContaining("ledgerId = 2");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    @Test
+    void testPostShouldRejectAllowNegativeWhenLedgerProfileDisallowsNegativeBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000011";
+        FundsTransactionTestSupport.MutableLedgerEntrySpec allowNegativeEntry = entry(
+                EntrySide.DEBIT, ledgerTransactionSn);
+        allowNegativeEntry.setBalanceConstraintType(LedgerBalanceConstraintType.ALLOW_NEGATIVE);
+        LedgerPostingPlanSpec plan = postingPlan(ledgerTransactionSn, List.of(
+                allowNegativeEntry,
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = transaction(ledgerTransactionSn, List.of(plan));
+
+        assertThat(transaction.isBalanced()).isTrue();
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本 profile 不允许负余额")
+                .hasMessageContaining("ledgerId = 1")
+                .hasMessageContaining(LedgerSubjectCode.AVAILABLE.name());
         assertThat(transactionService.createdTransactions).isEmpty();
         assertThat(projectionService.projectedEntries).isEmpty();
     }

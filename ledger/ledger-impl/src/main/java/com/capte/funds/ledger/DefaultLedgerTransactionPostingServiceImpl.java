@@ -7,6 +7,7 @@ import com.capte.funds.ledger.service.LedgerTransactionService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.integration.funds.ledger.LedgerTransactionPostingService;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
@@ -189,6 +190,11 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                 "账本分录科目与账本科目不一致，ledgerId = {}", ledger.getId());
         AssertUtils.isTrue(ledger.getCurrency() == entry.getCurrency(),
                 "账本分录币种与账本币种不一致，ledgerId = {}", ledger.getId());
+        AssertUtils.isTrue(entry.getBalanceConstraintType() != LedgerBalanceConstraintType.ALLOW_NEGATIVE
+                        || Boolean.TRUE.equals(ledger.getAllowNegative()),
+                "账本 profile 不允许负余额，ledgerId = {}, ledgerSubjectCode = {}",
+                ledger.getId(),
+                ledger.getLedgerSubjectCode());
     }
 
     private Map<FundsAccountId, LedgerBalanceProjectionService> resolveProjectionServices(

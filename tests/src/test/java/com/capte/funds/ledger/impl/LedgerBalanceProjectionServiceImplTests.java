@@ -137,6 +137,26 @@ class LedgerBalanceProjectionServiceImplTests {
     }
 
     @Test
+    void testProjectShouldRejectAllowNegativeWhenLedgerProfileDisallowsNegative() {
+        FundsAccountId accountId = FundsAccountId.immutable("funding_001", FundsSubjectType.FUNDING_ACCOUNT.name());
+        RecordingLedgerService ledgerService = new RecordingLedgerService(ledger(99L, EntrySide.CREDIT, false)
+                .setSubjectId(accountId.id())
+                .setSubjectType(accountId.type()));
+        LedgerBalanceProjectionServiceImpl service = new LedgerBalanceProjectionServiceImpl(
+                newFundsAccountQueryService(accountId),
+                ledgerService
+        );
+
+        assertThatThrownBy(() -> service.project(List.of(entry(accountId, 99L, EntrySide.DEBIT, 1_200L)
+                .setBalanceConstraintType(LedgerBalanceConstraintType.ALLOW_NEGATIVE))))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本 profile 不允许负余额")
+                .hasMessageContaining("ledgerId = 99")
+                .hasMessageContaining(LedgerSubjectCode.AVAILABLE.name());
+        assertThat(ledgerService.updateRequests).isEmpty();
+    }
+
+    @Test
     void projectShouldKeepMustNotBeNegativeConstraintWhenProfileAllowsNegative() throws Exception {
         FundsAccountId accountId = FundsAccountId.immutable("credit_001", FundsSubjectType.CREDIT_ACCOUNT.name());
         RecordingLedgerService ledgerService = new RecordingLedgerService(ledger(99L, EntrySide.CREDIT, true)

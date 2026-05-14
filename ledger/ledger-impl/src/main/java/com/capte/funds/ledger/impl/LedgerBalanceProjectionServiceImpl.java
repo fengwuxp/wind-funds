@@ -97,6 +97,11 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
                     "账本分录科目与账本科目不一致，ledgerId = {}", ledger.getId());
             AssertUtils.isTrue(ledger.getCurrency() == entry.getCurrency(),
                     "账本分录币种与账本币种不一致，ledgerId = {}", ledger.getId());
+            AssertUtils.isTrue(entry.getBalanceConstraintType() != LedgerBalanceConstraintType.ALLOW_NEGATIVE
+                            || Boolean.TRUE.equals(ledger.getAllowNegative()),
+                    "账本 profile 不允许负余额，ledgerId = {}, ledgerSubjectCode = {}",
+                    ledger.getId(),
+                    ledger.getLedgerSubjectCode());
         });
     }
 
