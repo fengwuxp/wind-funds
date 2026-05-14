@@ -109,7 +109,10 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsFrozenOrderLi
         entity.setCurrency(instruction.getAmount().getCurrency());
         entity.setStatus(FundsFrozenOrderStatus.CREATED);
         entity.setDescription(instruction.getDescription());
-        entity.setContextVariables(toLifecycleContext(instruction, Map.of()));
+        entity.setContextVariables(toLifecycleContext(instruction, Map.of(
+                FundsInstructionContextKeys.ROUTE_SNAPSHOT,
+                RouteSnapshotJsonSupport.toRouteSnapshotJson(routeSnapshot)
+        )));
         fundsFrozenOrderMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建资金冻结单生命周期记录失败");
         return entity;

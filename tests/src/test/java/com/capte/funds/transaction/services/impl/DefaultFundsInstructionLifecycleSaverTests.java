@@ -1,5 +1,6 @@
 package com.capte.funds.transaction.services.impl;
 
+import com.alibaba.fastjson2.JSON;
 import com.capte.funds.route.DefaultRouteSnapshotFactory;
 import com.wind.integration.funds.model.route.ImmutableExternalAccountRefSpec;
 import com.wind.integration.funds.model.route.ImmutableFundingAllocationDecisionSpec;
@@ -988,6 +989,54 @@ class DefaultFundsInstructionLifecycleSaverTests {
                             throw new UnsupportedOperationException("insertSelective");
                         },
                         query -> transaction
+                ),
+                FundsAccountServiceTestSupport.mapper(
+                        FundsTransactionDetailMapper.class,
+                        entity -> {
+                            throw new UnsupportedOperationException("insertSelective");
+                        },
+                        query -> null
+                ),
+                FundsAccountServiceTestSupport.mapper(
+                        com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper.class,
+                        entity -> {
+                            throw new UnsupportedOperationException("insertSelective");
+                        },
+                        query -> frozenOrder
+                )
+        );
+
+        RouteSnapshotSpec snapshot = queryService.findRouteSnapshotByFreezeOrderSn("FO_001").orElseThrow();
+
+        assertThat(snapshot.getRouteCode()).isEqualTo("CARD_AUTH");
+        assertThat(snapshot.getLegs()).hasSize(1);
+        assertThat(snapshot.getLegs().getFirst().getLegId()).isEqualTo("LEG_001");
+    }
+
+    /**
+     * 场景：冻结单自身已经保存 RouteSnapshot，且不再绑定标准资金交易号。
+     * 输入：冻结单 contextVariables 中带有原冻结 RouteSnapshot。
+     * 输出：按冻结单号解析得到的 RouteSnapshotSpec。
+     * 预期：查询服务优先从冻结单事实自身读取快照，不再依赖 FundsTransaction。
+     */
+    @Test
+    void testFundsTransactionQueryServiceShouldReadFreezeOrderOwnSnapshotForReplay() {
+        ResolvedRouteSpec route = new SnapshotMetadataResolvedRoute(1_000L);
+        RouteSnapshotSpec routeSnapshot = new DefaultRouteSnapshotFactory().createSnapshot(route);
+        FundsFrozenOrder frozenOrder = new FundsFrozenOrder();
+        frozenOrder.setSn("FO_001");
+        frozenOrder.setContextVariables(JSON.toJSONString(Map.of(
+                FundsInstructionContextKeys.ROUTE_SNAPSHOT, RouteSnapshotJsonSupport.toRouteSnapshotJson(routeSnapshot)
+        )));
+        DefaultFundsTransactionQueryService queryService = new DefaultFundsTransactionQueryService(
+                FundsAccountServiceTestSupport.mapper(
+                        FundsTransactionMapper.class,
+                        entity -> {
+                            throw new UnsupportedOperationException("insertSelective");
+                        },
+                        query -> {
+                            throw new AssertionError("冻结单自身有 RouteSnapshot 时不应查询 FundsTransaction");
+                        }
                 ),
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionDetailMapper.class,

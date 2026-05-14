@@ -56,7 +56,8 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
             assertThat(order.getSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT);
             assertThat(order.getFreezeType()).isEqualTo("WITHDRAW");
             assertThat(order.getContextVariables())
-                    .contains("\"" + FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE + "\":\"FREEZE\"");
+                    .contains("\"" + FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE + "\":\"FREEZE\"")
+                    .contains("\"" + FundsInstructionContextKeys.ROUTE_SNAPSHOT + "\":");
             assertThat(order.getBusinessScene()).isEqualTo("RISK_FREEZE");
             assertThat(order.getBusinessSn()).isEqualTo("FREEZE_0001");
             assertThat(order.getAmount()).isEqualTo(100L);
@@ -64,6 +65,12 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
             assertThat(order.getConsumedAmount()).isZero();
             assertThat(order.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
             assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.CREATED);
+            RouteSnapshotSpec snapshot = RouteSnapshotJsonSupport.parseRouteSnapshot(
+                    com.alibaba.fastjson2.JSON.parseObject(order.getContextVariables())
+                            .getString(FundsInstructionContextKeys.ROUTE_SNAPSHOT),
+                    null);
+            assertThat(snapshot.getRouteCode()).isEqualTo("BALANCE_FREEZE");
+            assertThat(snapshot.getParticipants()).hasSize(1);
         });
         assertThat(result.getTransactionSn()).isEqualTo(savedOrder.get().getSn());
         assertThat(result.getTransactionDetailSns()).isEmpty();

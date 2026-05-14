@@ -41,6 +41,8 @@ public final class FundsInstructionContextKeys {
 
     public static final String FROZEN_ORDER_EVENT_TYPE = "frozenOrderEventType";
 
+    public static final String ROUTE_SNAPSHOT = "routeSnapshot";
+
     public static final String ADJUST_REASON = "adjustReason";
 
     public static final String CHANNEL_CODE = "channelCode";

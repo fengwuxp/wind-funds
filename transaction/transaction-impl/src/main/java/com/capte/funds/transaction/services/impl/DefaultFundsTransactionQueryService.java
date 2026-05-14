@@ -101,10 +101,16 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(@NonNull String freezeOrderSn) {
         AssertUtils.hasText(freezeOrderSn, "冻结单号不能为空");
         FundsFrozenOrder order = findFreezeOrderBySnNullable(freezeOrderSn);
-        if (order == null || !hasText(order.getTransactionSn())) {
+        if (order == null) {
             return Optional.empty();
         }
-        return findRouteSnapshotByTransactionSn(order.getTransactionSn());
+        Optional<RouteSnapshotSpec> frozenOrderSnapshot = findRouteSnapshotInFreezeOrder(order);
+        if (frozenOrderSnapshot.isPresent()) {
+            return frozenOrderSnapshot;
+        }
+        return hasText(order.getTransactionSn())
+                ? findRouteSnapshotByTransactionSn(order.getTransactionSn())
+                : Optional.empty();
     }
 
     private FundsTransaction findTransactionBySnNullable(String sn) {
@@ -126,6 +132,18 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         JSONObject values = JSON.parseObject(detail.getContextVariables());
         JSONArray replayConsumedLegIds = values.getJSONArray(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_IDS);
         return replayConsumedLegIds != null && replayConsumedLegIds.contains(replayRefLegId);
+    }
+
+    private Optional<RouteSnapshotSpec> findRouteSnapshotInFreezeOrder(FundsFrozenOrder order) {
+        if (!hasText(order.getContextVariables())) {
+            return Optional.empty();
+        }
+        JSONObject values = JSON.parseObject(order.getContextVariables());
+        String routeSnapshot = values.getString(FundsInstructionContextKeys.ROUTE_SNAPSHOT);
+        if (!hasText(routeSnapshot)) {
+            return Optional.empty();
+        }
+        return Optional.of(RouteSnapshotJsonSupport.parseRouteSnapshot(routeSnapshot, order.getGmtCreate()));
     }
 
     private boolean hasText(String value) {

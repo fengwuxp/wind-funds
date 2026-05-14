@@ -19,17 +19,11 @@ import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
-import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.integration.funds.route.spec.PlatformAccountsSnapshotSpec;
-import com.wind.integration.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
-import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
-import com.wind.integration.funds.route.spec.RoutingDecisionSpec;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
@@ -174,7 +168,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         entity.setTransactionMode(resolveTransactionMode(instruction.getInstructionType()));
         entity.setBusinessSn(businessSn);
         entity.setReferenceTransactionSn(resolveReferenceSn(instruction.getReference()));
-        entity.setRouteSnapshot(toJson(routeSummary(routeSnapshot)));
+        entity.setRouteSnapshot(RouteSnapshotJsonSupport.toRouteSnapshotJson(routeSnapshot));
         fundsTransactionMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建资金交易聚合记录失败");
         return entity;
@@ -510,7 +504,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     }
 
     private Map<String, Object> routeRequestHashSummary(RouteSnapshotSpec routeSnapshot) {
-        Map<String, Object> values = new TreeMap<>(routeSummary(routeSnapshot));
+        Map<String, Object> values = new TreeMap<>(RouteSnapshotJsonSupport.routeSummary(routeSnapshot));
         values.remove("snapshotId");
         values.remove("resolvedAt");
         values.remove("expiresAt");
@@ -529,58 +523,6 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("externalTransactionId", reference.getExternalTransactionId());
         values.put("authCode", reference.getAuthCode());
         values.put("contextVariables", sortedMap(reference.getContextVariables()));
-        return values;
-    }
-
-    private Map<String, Object> routeSummary(RouteSnapshotSpec routeSnapshot) {
-        Map<String, Object> values = new TreeMap<>();
-        values.put("tenantId", routeSnapshot.getTenantId());
-        values.put("snapshotId", routeSnapshot.getSnapshotId());
-        values.put("snapshotSchemaVersion", routeSnapshot.getSnapshotSchemaVersion());
-        values.put("businessScene", routeSnapshot.getBusinessScene());
-        values.put("businessSn", routeSnapshot.getBusinessSn());
-        values.put("instructionType", routeSnapshot.getInstructionType().name());
-        values.put("eventType", routeSnapshot.getEventType().name());
-        values.put("transactionType", routeSnapshot.getTransactionType().name());
-        values.put("routeCode", routeSnapshot.getRouteCode());
-        values.put("routeVersion", routeSnapshot.getRouteVersion());
-        values.put("resolvedAt", routeSnapshot.getResolvedAt().toString());
-        values.put("expiresAt", routeSnapshot.getExpiresAt() == null ? null : routeSnapshot.getExpiresAt().toString());
-        values.put("description", routeSnapshot.getDescription());
-        values.put("routingDecision", routeSnapshot.getRoutingDecision() == null ? Map.of() : sortedMap(routeDecisionSummary(routeSnapshot.getRoutingDecision())));
-        values.put("paymentInstrumentRef", instrumentSummary(routeSnapshot.getPaymentInstrumentRef()));
-        values.put("externalAccountRef", externalAccountSummary(routeSnapshot.getExternalAccountRef()));
-        values.put("participants", routeSnapshot.getParticipants()
-                .stream()
-                .map(this::participantSummary)
-                .toList());
-        values.put("legs", routeSnapshot.getLegs()
-                .stream()
-                .map(this::legSummary)
-                .toList());
-        values.put("platformAccounts", platformAccountsSummary(routeSnapshot.getPlatformAccounts()));
-        values.put("contextVariables", sortedMap(routeSnapshot.getContextVariables()));
-        return values;
-    }
-
-    private Map<String, Object> legSummary(RouteLegSpec leg) {
-        Map<String, Object> values = new TreeMap<>();
-        values.put("legId", leg.getLegId());
-        values.put("legType", leg.getLegType().name());
-        values.put("sourceNode", routeNodeSummary(leg.getSourceNode()));
-        values.put("targetNode", routeNodeSummary(leg.getTargetNode()));
-        values.put("amount", moneySummary(leg.getAmount()));
-        values.put("originalAmount", moneySummary(leg.getOriginalAmount()));
-        values.put("exchangeRate", leg.getExchangeRate());
-        values.put("balanceEffectType", leg.getBalanceEffectType().name());
-        values.put("phaseCode", leg.getPhaseCode().name());
-        values.put("periodType", leg.getPeriodType().name());
-        values.put("periodId", leg.getPeriodId());
-        values.put("constraintOverrides", sortedEnumMap(leg.getConstraintOverrides()));
-        values.put("replayPolicy", leg.getReplayPolicy().name());
-        values.put("replayRefLegId", leg.getReplayRefLegId());
-        values.put("description", leg.getDescription());
-        values.put("contextVariables", sortedMap(leg.getContextVariables()));
         return values;
     }
 
@@ -663,95 +605,6 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 + subjectRef.getSubjectId();
     }
 
-    private Map<String, Object> externalAccountSummary(ExternalAccountRefSpec externalAccountRef) {
-        Map<String, Object> values = new TreeMap<>();
-        if (externalAccountRef == null) {
-            return values;
-        }
-        values.put("externalAccountId", externalAccountRef.getExternalAccountId());
-        values.put("externalAccountType", externalAccountRef.getExternalAccountType());
-        values.put("externalAccountNo", externalAccountRef.getExternalAccountNo());
-        values.put("providerCode", externalAccountRef.getProviderCode());
-        values.put("channelCode", externalAccountRef.getChannelCode());
-        values.put("currency", externalAccountRef.getCurrency());
-        values.put("countryCode", externalAccountRef.getCountryCode());
-        values.put("description", externalAccountRef.getDescription());
-        values.put("contextVariables", sortedMap(externalAccountRef.getContextVariables()));
-        return values;
-    }
-
-    private Map<String, Object> instrumentSummary(PaymentInstrumentRefSpec instrumentRef) {
-        Map<String, Object> values = new TreeMap<>();
-        if (instrumentRef == null) {
-            return values;
-        }
-        values.put("instrumentId", instrumentRef.getInstrumentId());
-        values.put("instrumentType", instrumentRef.getInstrumentType());
-        values.put("instrumentNo", instrumentRef.getInstrumentNo());
-        values.put("ownerId", instrumentRef.getOwnerId());
-        values.put("ownerType", instrumentRef.getOwnerType());
-        values.put("tenantId", instrumentRef.getTenantId());
-        values.put("currency", instrumentRef.getCurrency());
-        values.put("status", instrumentRef.getStatus());
-        values.put("bindingSnapshot", sortedMap(instrumentRef.getBindingSnapshot()));
-        values.put("description", instrumentRef.getDescription());
-        return values;
-    }
-
-
-    private Map<String, Object> routeDecisionSummary(RoutingDecisionSpec routingDecision) {
-        Map<String, Object> values = new TreeMap<>();
-        values.put("policyCode", routingDecision.getPolicyCode());
-        values.put("matchedRules", routingDecision.getMatchedRules());
-        values.put("selectedProcessor", routingDecision.getSelectedProcessor());
-        values.put("selectedCashFundingAccount", routingDecision.getSelectedCashFundingAccount());
-        values.put("selectedPlatformAccount", routingDecision.getSelectedPlatformAccount());
-        values.put("fundingAllocations", routingDecision.getFundingAllocations()
-                .stream()
-                .map(this::fundingAllocationSummary)
-                .toList());
-        values.put("decisionReason", routingDecision.getDecisionReason());
-        values.put("contextVariables", sortedMap(routingDecision.getContextVariables()));
-        return values;
-    }
-
-    private Map<String, Object> fundingAllocationSummary(FundingAllocationDecisionSpec fundingAllocation) {
-        Map<String, Object> values = new TreeMap<>();
-        values.put("allocationId", fundingAllocation.getAllocationId());
-        values.put("subjectRef", subjectSummary(fundingAllocation.getSubjectRef()));
-        values.put("ledgerSubjectCode", enumName(fundingAllocation.getLedgerSubjectCode()));
-        values.put("amount", moneySummary(fundingAllocation.getAmount()));
-        values.put("priority", fundingAllocation.getPriority());
-        values.put("reason", fundingAllocation.getReason());
-        return values;
-    }
-
-    private Map<String, Object> platformAccountsSummary(PlatformAccountsSnapshotSpec platformAccounts) {
-        Map<String, Object> values = new TreeMap<>();
-        if (platformAccounts == null) {
-            return values;
-        }
-        values.put("cashFundingAccount", subjectSummary(platformAccounts.getCashFundingAccount()));
-        values.put("prepaymentFundingAccount", subjectSummary(platformAccounts.getPrepaymentFundingAccount()));
-        values.put("clearingFundingAccount", subjectSummary(platformAccounts.getClearingFundingAccount()));
-        values.put("settlementFundingAccount", subjectSummary(platformAccounts.getSettlementFundingAccount()));
-        values.put("feeFundingAccount", subjectSummary(platformAccounts.getFeeFundingAccount()));
-        values.put("adjustmentFundingAccount", subjectSummary(platformAccounts.getAdjustmentFundingAccount()));
-        return values;
-    }
-
-    private Map<String, Object> routeNodeSummary(RouteNodeSpec node) {
-        Map<String, Object> values = new TreeMap<>();
-        if (node == null) {
-            return values;
-        }
-        values.put("nodeType", node.getNodeType().name());
-        values.put("subjectRef", subjectSummary(node.getSubjectRef()));
-        values.put("ledgerSubjectCode", enumName(node.getLedgerSubjectCode()));
-        values.put("nodeRole", node.getNodeRole().name());
-        return values;
-    }
-
     private Map<String, Object> subjectSummary(SubjectRef subjectRef) {
         Map<String, Object> values = new TreeMap<>();
         if (subjectRef == null) {
@@ -777,18 +630,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         return values;
     }
 
-    private Map<String, Object> sortedEnumMap(Map<String, ? extends Enum<?>> values) {
-        Map<String, Object> result = new TreeMap<>();
-        values.forEach((key, value) -> result.put(key, enumName(value)));
-        return result;
-    }
-
     private Map<String, Object> sortedMap(Map<String, Object> values) {
         return new TreeMap<>(values);
-    }
-
-    private String enumName(Enum<?> value) {
-        return value == null ? null : value.name();
     }
 
     private String sha256(String text) {
