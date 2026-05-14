@@ -16,6 +16,7 @@ import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
@@ -87,6 +88,33 @@ class DefaultLedgerPostingAssemblerTests {
         assertThat(sourceEntry.getEntryType()).isEqualTo(EntrySide.DEBIT);
         assertThat(targetEntry.getLedgerId()).isEqualTo(102L);
         assertThat(targetEntry.getEntryType()).isEqualTo(EntrySide.CREDIT);
+    }
+
+    @Test
+    void assembleShouldResolvePostingScopeBeforeLedgerPersistence() {
+        DefaultLedgerPostingAssembler directAssembler = new DefaultLedgerPostingAssembler(ledgerService(Map.ofEntries(
+                ledger(101L, "funding_001", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT),
+                ledger(102L, "funding_002", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT)
+        )));
+        DefaultLedgerPostingAssembler authorizationAssembler = new DefaultLedgerPostingAssembler(ledgerService(Map.ofEntries(
+                ledger(101L, "credit_001", FundsSubjectType.CREDIT_ACCOUNT, LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT),
+                ledger(102L, "credit_001", FundsSubjectType.CREDIT_ACCOUNT, LedgerSubjectCode.AUTHORIZATION, EntrySide.CREDIT),
+                ledger(201L, "budget_001", FundsSubjectType.BUDGET_GROUP, LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT),
+                ledger(202L, "budget_001", FundsSubjectType.BUDGET_GROUP, LedgerSubjectCode.AUTHORIZATION, EntrySide.CREDIT),
+                ledger(301L, "funding_001", FundsSubjectType.FUNDING_ACCOUNT, LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT),
+                ledger(302L, "funding_001", FundsSubjectType.FUNDING_ACCOUNT, LedgerSubjectCode.AUTHORIZATION, EntrySide.CREDIT)
+        )));
+        DefaultLedgerPostingAssembler feeAssembler = new DefaultLedgerPostingAssembler(ledgerService(Map.ofEntries(
+                ledger(101L, "funding_001", LedgerSubjectCode.FEE, EntrySide.CREDIT),
+                ledger(102L, "funding_002", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT)
+        )));
+
+        assertPostingScope(directAssembler.assemble(instruction(), "FT_001", route(Map.of())),
+                LedgerPostingScope.BETWEEN_SUBJECTS);
+        assertPostingScope(authorizationAssembler.assemble(instruction(), "FT_002", sharedCardRoute()),
+                LedgerPostingScope.CONTROL_HOLD);
+        assertPostingScope(feeAssembler.assemble(instruction(), "FT_003", feeRefundRoute()),
+                LedgerPostingScope.FEE);
     }
 
     @Test
@@ -227,6 +255,17 @@ class DefaultLedgerPostingAssemblerTests {
         return new SimpleInstruction();
     }
 
+    private static void assertPostingScope(LedgerTransactionSpec transaction, LedgerPostingScope expectedScope) {
+        assertThat(transaction.getPostingPlans()).isNotEmpty();
+        assertThat(transaction.getPostingPlans())
+                .allSatisfy(plan -> {
+                    assertThat(plan.getPostingScope()).isEqualTo(expectedScope);
+                    assertThat(plan.getEntries())
+                            .extracting(LedgerEntrySpec::getPostingScope)
+                            .containsOnly(expectedScope);
+                });
+    }
+
     private static ResolvedRouteSpec route(Map<String, LedgerBalanceConstraintType> overrides) {
         return new SimpleResolvedRoute(List.of(new SimpleRouteLeg(overrides)));
     }
@@ -236,7 +275,7 @@ class DefaultLedgerPostingAssemblerTests {
     }
 
     private static ResolvedRouteSpec sharedCardRoute() {
-        return new SimpleResolvedRoute(List.of(
+        return new SimpleResolvedRoute(FundsTransactionEventType.AUTHORIZE, DefaultFundsTransactionType.PAY, List.of(
                 new SharedCardRouteLeg("AUTHORIZATION_1", "credit_001", FundsSubjectType.CREDIT_ACCOUNT),
                 new SharedCardRouteLeg("AUTHORIZATION_2", "budget_001", FundsSubjectType.BUDGET_GROUP),
                 new SharedCardRouteLeg("AUTHORIZATION_3", "funding_001", FundsSubjectType.FUNDING_ACCOUNT)

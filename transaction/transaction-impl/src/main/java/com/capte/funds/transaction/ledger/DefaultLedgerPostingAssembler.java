@@ -113,17 +113,21 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
     private LedgerPostingPlanSpec assembleLeg(String ledgerTransactionSn,
                                               ResolvedRouteSpec resolvedRoute,
                                               RouteLegSpec leg) {
+        LedgerPostingIntentType intent = resolveIntent(resolvedRoute);
+        LedgerPostingScope postingScope = resolvePostingScope(intent, leg.getPhaseCode());
         List<LedgerEntrySpec> entries = List.of(
-                toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getSourceNode(), MovementDirection.DECREASE),
-                toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getTargetNode(), MovementDirection.INCREASE)
+                toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getSourceNode(), MovementDirection.DECREASE,
+                        intent, postingScope),
+                toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getTargetNode(), MovementDirection.INCREASE,
+                        intent, postingScope)
         );
         LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(leg.getPhaseCode(), entries);
         return DefaultLedgerPostingPlanSpec.builder()
-                .planId(buildPlanId(resolveIntent(resolvedRoute), ledgerTransactionSn, leg))
+                .planId(buildPlanId(intent, ledgerTransactionSn, leg))
                 .ledgerTransactionSn(ledgerTransactionSn)
                 .routeLegId(leg.getLegId())
-                .intent(resolveIntent(resolvedRoute))
-                .postingScope(null)
+                .intent(intent)
+                .postingScope(postingScope)
                 .balanceEffectType(leg.getBalanceEffectType())
                 .postingPhases(List.of(phase))
                 .description(leg.getDescription())
@@ -135,7 +139,9 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                                     ResolvedRouteSpec resolvedRoute,
                                     RouteLegSpec leg,
                                     RouteNodeSpec node,
-                                    MovementDirection direction) {
+                                    MovementDirection direction,
+                                    LedgerPostingIntentType intent,
+                                    LedgerPostingScope postingScope) {
         LedgerDTO ledger = requireLedger(resolvedRoute, leg, node);
         EntrySide entrySide = resolveEntrySide(ledger.getNormalBalanceSide(), direction);
         SubjectRef subjectRef = node.getSubjectRef();
@@ -156,7 +162,8 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                 .settlementStatus(LedgerSettlementStatus.SETTLED)
                 .description(leg.getDescription())
                 .balanceConstraintType(resolveBalanceConstraintType(leg, node))
-                .intent(resolveIntent(resolvedRoute))
+                .intent(intent)
+                .postingScope(postingScope)
                 .balanceEffectType(leg.getBalanceEffectType())
                 .phaseCode(leg.getPhaseCode())
                 .contextVariables(mergedContext(resolvedRoute, leg))
@@ -254,6 +261,25 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case FEE -> LedgerPostingIntentType.FEE;
             case REFUND -> LedgerPostingIntentType.REFUND;
             case ADJUSTMENT -> LedgerPostingIntentType.ADJUSTMENT;
+        };
+    }
+
+    private LedgerPostingScope resolvePostingScope(LedgerPostingIntentType intent, LedgerPhaseCode phaseCode) {
+        return switch (intent) {
+            case TOPUP, WITHDRAWAL -> LedgerPostingScope.PLATFORM_EXTERNAL;
+            case FEE, FEE_REFUND, FEE_REVERSAL -> LedgerPostingScope.FEE;
+            case ADJUSTMENT -> LedgerPostingScope.ADJUSTMENT;
+            case HOLD -> resolveHoldPostingScope(phaseCode);
+            case AUTHORIZATION, AUTHORIZATION_REVERSAL -> LedgerPostingScope.CONTROL_HOLD;
+            case AUTHORIZATION_SETTLEMENT -> LedgerPostingScope.CONTROL_CONSUME;
+            default -> LedgerPostingScope.BETWEEN_SUBJECTS;
+        };
+    }
+
+    private LedgerPostingScope resolveHoldPostingScope(LedgerPhaseCode phaseCode) {
+        return switch (phaseCode) {
+            case FREEZE, UNFREEZE -> LedgerPostingScope.WITHIN_SUBJECT;
+            default -> LedgerPostingScope.CONTROL_HOLD;
         };
     }
 
