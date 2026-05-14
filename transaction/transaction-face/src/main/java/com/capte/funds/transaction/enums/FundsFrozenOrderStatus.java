@@ -14,6 +14,7 @@ import lombok.Getter;
 @Getter
 public enum FundsFrozenOrderStatus implements DescriptiveEnum {
 
+    CREATED("已创建"),
     FROZEN("已冻结"),
     PARTIALLY_RELEASED("部分释放"),
     RELEASED("已释放"),

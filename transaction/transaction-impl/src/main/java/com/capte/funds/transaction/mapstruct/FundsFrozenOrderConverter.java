@@ -47,6 +47,18 @@ public interface FundsFrozenOrderConverter {
     default void fillCreateDefaults(CreateFundsFrozenOrderRequest request, @MappingTarget FundsFrozenOrder entity) {
         entity.setReleasedAmount(0L);
         entity.setConsumedAmount(0L);
-        entity.setStatus(request.getStatus() == null ? FundsFrozenOrderStatus.FROZEN : request.getStatus());
+        entity.setStatus(request.getStatus() == null
+                ? resolveInitialStatus(request)
+                : request.getStatus());
+    }
+
+    private FundsFrozenOrderStatus resolveInitialStatus(CreateFundsFrozenOrderRequest request) {
+        return hasText(request.getFreezeLedgerTransactionSn())
+                ? FundsFrozenOrderStatus.FROZEN
+                : FundsFrozenOrderStatus.CREATED;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

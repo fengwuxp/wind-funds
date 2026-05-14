@@ -62,7 +62,6 @@ public class FundsFrozenOrder implements Serializable, TenantIsolationObject<Lon
 
     private String freezeDetailSn;
 
-    @NotNull
     private String freezeLedgerTransactionSn;
 
     @NotNull

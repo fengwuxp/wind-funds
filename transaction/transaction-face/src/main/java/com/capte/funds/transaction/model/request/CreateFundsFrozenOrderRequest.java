@@ -62,7 +62,6 @@ public class CreateFundsFrozenOrderRequest {
     private String freezeDetailSn;
 
     @Schema(description = "冻结账本交易号")
-    @NotBlank
     private String freezeLedgerTransactionSn;
 
     @Schema(description = "原冻结金额")
