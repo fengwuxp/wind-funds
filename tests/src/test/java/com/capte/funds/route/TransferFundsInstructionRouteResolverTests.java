@@ -1,0 +1,215 @@
+package com.capte.funds.route;
+
+import com.capte.domain.core.operator.WindOperator;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
+import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
+import com.capte.funds.transaction.enums.FundsTransactionChannel;
+import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
+import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.route.enums.RouteLegType;
+import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
+import com.wind.integration.funds.route.spec.RouteLegSpec;
+import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.integration.funds.transaction.enums.DefaultFeeType;
+import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class TransferFundsInstructionRouteResolverTests {
+
+    private FundsDirectTransactionInstructionConverter converter;
+
+    @BeforeEach
+    void testSetUp() {
+        FundsRouteTestSupport.bindTenant();
+        converter = FundsRouteTestSupport.transactionInstructionConverter();
+    }
+
+    @AfterEach
+    void testTearDown() {
+        FundsRouteTestSupport.clearTenant();
+    }
+
+    @Test
+    void testResolveTopupShouldBuildExternalInAndInternalTransferLegs() {
+        FundsAccountId fundingAccountId = FundsRouteTestSupport.fundingAccount("funding_001");
+        FundsInstructionSpec instruction = converter.convertToTopupInstruction(new FundsTransactionTopupRequest()
+                .setAccountId(fundingAccountId)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_001",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("bank_txn_001")
+                .setAmount(FundsRouteTestSupport.amount(1_000L))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("TOPUP_0001"), WindOperator.system());
+
+        ResolvedRouteSpec route = FundsRouteTestSupport.transferRouteResolver(FundsRouteTestSupport.noFeeProvider())
+                .resolve(instruction);
+
+        assertThat(route.getRouteCode()).isEqualTo("TOPUP_STANDARD");
+        assertThat(route.getLegs()).hasSize(2);
+        assertLeg(route.getLegs().get(0), RouteLegType.EXTERNAL_IN, LedgerSubjectCode.CASH,
+                LedgerSubjectCode.PREPAYMENT, LedgerBalanceEffectType.INCREASE, LedgerPhaseCode.FUND_IN);
+        assertLeg(route.getLegs().get(1), RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.PREPAYMENT,
+                LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.INCREASE, LedgerPhaseCode.SETTLEMENT);
+        assertThat(route.getLegs().get(1).getTargetNode().getSubjectRef().getSubjectId())
+                .isEqualTo(fundingAccountId.id());
+        assertThat(route.getPlatformAccounts()).isNotNull();
+        assertThat(route.getPlatformAccounts().getReserveFundingAccount()).isNotNull();
+        assertThat(route.getPlatformAccounts().getPrepaymentFundingAccount()).isNotNull();
+        assertThat(route.getExternalAccountRef()).isNotNull();
+        assertThat(route.getExternalAccountRef().getExternalAccountId()).isEqualTo("external_bank_001");
+        assertThat(route.getExternalAccountRef().getContextVariables())
+                .containsEntry("externalTransactionId", "bank_txn_001");
+    }
+
+    @Test
+    void testResolveWithdrawShouldBuildConsumeAndExternalOutLegs() {
+        FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
+        FundsInstructionSpec instruction = converter.convertToWithdrawInstruction(new FundsTransactionWithdrawRequest()
+                .setAccountId(accountId)
+                .setPayeeId(FundsAccountId.immutable("external_bank_001", DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn("FREEZE_0001")
+                .setAmount(FundsRouteTestSupport.amount(800L))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_0001"), WindOperator.system());
+
+        ResolvedRouteSpec route = FundsRouteTestSupport.transferRouteResolver(FundsRouteTestSupport.noFeeProvider())
+                .resolve(instruction);
+
+        assertThat(route.getRouteCode()).isEqualTo("WITHDRAW_STANDARD");
+        assertThat(route.getLegs()).hasSize(2);
+        assertLeg(route.getLegs().get(0), RouteLegType.CONSUME, LedgerSubjectCode.FROZEN,
+                LedgerSubjectCode.PREPAYMENT, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.SETTLEMENT);
+        assertLeg(route.getLegs().get(1), RouteLegType.EXTERNAL_OUT, LedgerSubjectCode.PREPAYMENT,
+                LedgerSubjectCode.CASH, LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.FUND_OUT);
+        assertMustNotBeNegative(route.getLegs().get(0), accountId, LedgerSubjectCode.FROZEN);
+        assertThat(route.getPlatformAccounts()).isNotNull();
+        assertThat(route.getPlatformAccounts().getReserveFundingAccount()).isNotNull();
+        assertThat(route.getPlatformAccounts().getPrepaymentFundingAccount()).isNotNull();
+        assertThat(route.getExternalAccountRef()).isNotNull();
+        assertThat(route.getExternalAccountRef().getExternalAccountId()).isEqualTo("external_bank_001");
+    }
+
+    @Test
+    void testResolvePayShouldUseProvidedPayeeLedgerSubjectCode() {
+        FundsInstructionSpec instruction = converter.convertToPayInstruction(new FundsTransactionPayRequest()
+                .setAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
+                .setPayeeId(FundsRouteTestSupport.fundingAccount("merchant_001"))
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(FundsRouteTestSupport.amount(500L))
+                .setBusinessScene("PAY")
+                .setBusinessSn("PAY_0001"), WindOperator.system());
+
+        ResolvedRouteSpec route = FundsRouteTestSupport.transferRouteResolver(FundsRouteTestSupport.noFeeProvider())
+                .resolve(instruction);
+
+        assertThat(route.getRouteCode()).isEqualTo("DIRECT_PAY_STANDARD");
+        assertThat(route.getLegs()).singleElement().satisfies(leg -> {
+            assertThat(leg.getLegType()).isEqualTo(RouteLegType.INTERNAL_TRANSFER);
+            assertThat(leg.getSourceNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AVAILABLE);
+            assertThat(leg.getTargetNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.SETTLEMENT);
+            assertThat(leg.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME);
+            assertThat(leg.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT);
+        });
+    }
+
+    @Test
+    void testResolveTransferShouldBuildSingleInternalTransferLeg() {
+        FundsAccountId payerAccountId = FundsRouteTestSupport.fundingAccount("funding_001");
+        FundsInstructionSpec instruction = converter.convertToTransferInstruction(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payerAccountId)
+                .setPayeeAccountId(FundsRouteTestSupport.fundingAccount("funding_002"))
+                .setAmount(FundsRouteTestSupport.amount(700L))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("TRANSFER_0001"), WindOperator.system());
+
+        ResolvedRouteSpec route = FundsRouteTestSupport.transferRouteResolver(FundsRouteTestSupport.noFeeProvider())
+                .resolve(instruction);
+
+        assertThat(route.getRouteCode()).isEqualTo("INTERNAL_TRANSFER_STANDARD");
+        assertThat(route.getLegs()).singleElement().satisfies(leg -> {
+            assertLeg(leg, RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.AVAILABLE,
+                    LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.TRANSFER);
+            assertMustNotBeNegative(leg, payerAccountId, LedgerSubjectCode.AVAILABLE);
+        });
+    }
+
+    @Test
+    void testResolveTransferShouldAppendFeeLegWhenFeeProviderEnabled() {
+        FundsInstructionSpec instruction = converter.convertToTransferInstruction(new FundsTransactionTransferRequest()
+                .setPayerAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
+                .setPayeeAccountId(FundsRouteTestSupport.fundingAccount("funding_002"))
+                .setAmount(FundsRouteTestSupport.amount(700L))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("TRANSFER_0001"), WindOperator.system());
+
+        ResolvedRouteSpec route = FundsRouteTestSupport.transferRouteResolver(FundsRouteTestSupport.fixedFeeProvider(30L))
+                .resolve(instruction);
+
+        assertThat(route.getRouteCode()).isEqualTo("INTERNAL_TRANSFER_STANDARD");
+        assertThat(route.getLegs()).hasSize(2);
+        assertThat(route.getLegs().get(1).getLegId()).isEqualTo("FEE");
+        assertThat(route.getLegs().get(1).getLegType()).isEqualTo(RouteLegType.INTERNAL_TRANSFER);
+        assertThat(route.getLegs().get(1).getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME);
+        assertThat(route.getLegs().get(1).getPhaseCode()).isEqualTo(LedgerPhaseCode.FEE);
+        assertThat(route.getPlatformAccounts()).isNotNull();
+        assertThat(route.getPlatformAccounts().getFeeFundingAccount()).isNotNull();
+        assertThat(route.getTransactionType()).isEqualTo(DefaultFundsTransactionType.TRANSFER);
+    }
+
+    @Test
+    void testResolveFeeShouldBuildIndependentInternalTransferLeg() {
+        FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
+        FundsInstructionSpec instruction = converter.convertToFeeInstruction(new FundsTransactionFeeRequest()
+                .setAccountId(accountId)
+                .setAmount(FundsRouteTestSupport.amount(30L))
+                .setFeeType(DefaultFeeType.FEE)
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_0001"), WindOperator.system());
+
+        ResolvedRouteSpec route = FundsRouteTestSupport.transferRouteResolver(FundsRouteTestSupport.noFeeProvider())
+                .resolve(instruction);
+
+        assertThat(route.getRouteCode()).isEqualTo("FEE_STANDARD");
+        assertThat(route.getLegs()).singleElement().satisfies(leg -> {
+            assertLeg(leg, RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.AVAILABLE,
+                    LedgerSubjectCode.FEE, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.FEE);
+            assertMustNotBeNegative(leg, accountId, LedgerSubjectCode.AVAILABLE);
+        });
+        assertThat(route.getPlatformAccounts()).isNotNull();
+        assertThat(route.getPlatformAccounts().getFeeFundingAccount()).isNotNull();
+    }
+
+    private static void assertLeg(RouteLegSpec leg,
+                                  RouteLegType legType,
+                                  LedgerSubjectCode sourceLedgerSubjectCode,
+                                  LedgerSubjectCode targetLedgerSubjectCode,
+                                  LedgerBalanceEffectType balanceEffectType,
+                                  LedgerPhaseCode phaseCode) {
+        assertThat(leg.getLegType()).isEqualTo(legType);
+        assertThat(leg.getSourceNode().getLedgerSubjectCode()).isEqualTo(sourceLedgerSubjectCode);
+        assertThat(leg.getTargetNode().getLedgerSubjectCode()).isEqualTo(targetLedgerSubjectCode);
+        assertThat(leg.getBalanceEffectType()).isEqualTo(balanceEffectType);
+        assertThat(leg.getPhaseCode()).isEqualTo(phaseCode);
+    }
+
+    private static void assertMustNotBeNegative(RouteLegSpec leg,
+                                                FundsAccountId accountId,
+                                                LedgerSubjectCode ledgerSubjectCode) {
+        assertThat(leg.getConstraintOverrides())
+                .containsEntry(accountId.type() + ":" + accountId.id() + ":" + ledgerSubjectCode.name(),
+                        LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
+    }
+}

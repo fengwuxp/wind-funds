@@ -1,0 +1,29 @@
+package com.wind.integration.funds.route.enums;
+
+import com.wind.common.enums.DescriptiveEnum;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+/**
+ * 路径回放类型。
+ */
+@AllArgsConstructor
+@Getter
+public enum RouteReplayType implements DescriptiveEnum {
+
+    RELEASE_HOLD("释放占用"),
+
+    AUTHORIZATION_SETTLEMENT("授权结算"),
+
+    AUTHORIZATION_REFUND("授权退款"),
+
+    REFUND("退款"),
+
+    FEE_REFUND("费用退款"),
+
+    CHARGEBACK("拒付"),
+
+    UNFREEZE("解冻");
+
+    private final String desc;
+}
