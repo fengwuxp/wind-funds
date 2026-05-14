@@ -2,6 +2,7 @@ package com.capte.funds.ledger;
 
 import com.capte.funds.ledger.dto.LedgerDTO;
 import com.capte.funds.ledger.dto.LedgerEntryDTO;
+import com.capte.funds.ledger.dto.LedgerTransactionCreateResult;
 import com.capte.funds.ledger.dto.LedgerTransactionDTO;
 import com.capte.funds.ledger.query.LedgerEntryQuery;
 import com.capte.funds.ledger.query.LedgerQuery;
@@ -65,6 +66,20 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(transactionService.createdTransactions).containsExactly(transaction);
         assertThat(projectionService.projectedEntries).hasSize(1);
         assertThat(projectionService.projectedEntries.getFirst()).hasSize(2);
+    }
+
+    @Test
+    void testPostShouldSkipProjectionWhenLedgerTransactionAlreadyExists() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService(false);
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        LedgerTransactionSpec transaction = transaction();
+
+        service.post(transaction);
+
+        assertThat(transactionService.createdTransactions).containsExactly(transaction);
+        assertThat(projectionService.projectedEntries).isEmpty();
     }
 
     @Test
@@ -624,10 +639,22 @@ class DefaultLedgerTransactionPostingServiceImplTests {
 
         private final List<LedgerTransactionSpec> createdTransactions = new ArrayList<>();
 
+        private final boolean createResultCreated;
+
+        private RecordingLedgerTransactionService() {
+            this(true);
+        }
+
+        private RecordingLedgerTransactionService(boolean createResultCreated) {
+            this.createResultCreated = createResultCreated;
+        }
+
         @Override
-        public @NonNull Long createLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
+        public @NonNull LedgerTransactionCreateResult createLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
             createdTransactions.add(transaction);
-            return 1L;
+            return new LedgerTransactionCreateResult()
+                    .setLedgerTransactionId(1L)
+                    .setCreated(createResultCreated);
         }
 
         @Override

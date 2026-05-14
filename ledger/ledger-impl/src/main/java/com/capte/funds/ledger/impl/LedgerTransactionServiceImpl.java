@@ -10,6 +10,7 @@ import com.capte.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.capte.funds.ledger.dto.LedgerEntryDTO;
+import com.capte.funds.ledger.dto.LedgerTransactionCreateResult;
 import com.capte.funds.ledger.dto.LedgerTransactionDTO;
 import com.capte.funds.ledger.mapstruct.LedgerConverter;
 import com.capte.funds.ledger.query.LedgerEntryQuery;
@@ -47,6 +48,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -122,13 +124,17 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull Long createLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
+    public @NonNull LedgerTransactionCreateResult createLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
         LedgerTransaction entity = LedgerConverter.INSTANCE.convertToLedgerTransaction(transaction);
         entity.setDebitAmount(transaction.getTotalDebitAmount().getAmount());
         entity.setCreditAmount(transaction.getTotalCreditAmount().getAmount());
         entity.setBalanced(transaction.isBalanced());
         entity.setContextVariables(JSON.toJSONString(transaction.getContextVariables()));
         entity.setSha256(WindObjectDigestUtils.sha256WithNames(entity, LEDGER_TRANSACTION_SHA256_FIELDS));
+        LedgerTransactionCreateResult existingResult = resolveExistingLedgerTransaction(entity);
+        if (existingResult != null) {
+            return existingResult;
+        }
         ledgerTransactionMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建账户账本交易失败");
         for (LedgerPostingPlanSpec plan : transaction.getPostingPlans()) {
@@ -139,7 +145,25 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
                 }
             }
         }
-        return entity.getId();
+        return toCreateResult(entity.getId(), true);
+    }
+
+    private LedgerTransactionCreateResult resolveExistingLedgerTransaction(LedgerTransaction entity) {
+        LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(entity.getSn()));
+        LedgerTransaction existing = ledgerTransactionMapper.selectOneByQuery(wrapper);
+        if (existing == null) {
+            return null;
+        }
+        AssertUtils.isTrue(Objects.equals(existing.getSha256(), entity.getSha256()),
+                "账本交易已存在但摘要不一致，ledgerTransactionSn = {}", entity.getSn());
+        return toCreateResult(existing.getId(), false);
+    }
+
+    private LedgerTransactionCreateResult toCreateResult(Long ledgerTransactionId, boolean created) {
+        return new LedgerTransactionCreateResult()
+                .setLedgerTransactionId(ledgerTransactionId)
+                .setCreated(created);
     }
 
     private String createPostingPlan(LedgerTransaction transaction,

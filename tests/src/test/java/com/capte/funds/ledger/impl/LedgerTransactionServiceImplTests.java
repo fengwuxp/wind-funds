@@ -3,6 +3,7 @@ package com.capte.funds.ledger.impl;
 import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
+import com.capte.funds.ledger.dto.LedgerTransactionCreateResult;
 import com.capte.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerTransactionMapper;
@@ -10,6 +11,7 @@ import com.capte.funds.transaction.FundsTransactionTestSupport;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
 import com.mybatisflex.core.BaseMapper;
+import com.wind.common.exception.BaseException;
 import com.wind.common.util.WindObjectDigestUtils;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
@@ -41,10 +43,117 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LedgerTransactionServiceImplTests {
+
+    @Test
+    void createLedgerTransactionShouldReturnExistingIdWhenSameSnAndSha256() {
+        AtomicReference<LedgerTransaction> existingTransaction = new AtomicReference<>();
+        List<LedgerTransaction> insertedTransactions = new ArrayList<>();
+        List<LedgerPostingPlan> insertedPlans = new ArrayList<>();
+        List<LedgerEntry> insertedEntries = new ArrayList<>();
+        AtomicLong idSequence = new AtomicLong(100L);
+        LedgerTransactionServiceImpl service = new LedgerTransactionServiceImpl(
+                mapper(LedgerTransactionMapper.class, entity -> {
+                    LedgerTransaction transaction = (LedgerTransaction) entity;
+                    transaction.setId(idSequence.incrementAndGet());
+                    existingTransaction.set(transaction);
+                    insertedTransactions.add(transaction);
+                }, existingTransaction::get),
+                mapper(LedgerPostingPlanMapper.class, entity -> {
+                    LedgerPostingPlan plan = (LedgerPostingPlan) entity;
+                    plan.setId(idSequence.incrementAndGet());
+                    insertedPlans.add(plan);
+                }),
+                mapper(LedgerEntryMapper.class, entity -> {
+                    LedgerEntry entry = (LedgerEntry) entity;
+                    entry.setId(idSequence.incrementAndGet());
+                    insertedEntries.add(entry);
+                })
+        );
+        LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(LedgerPhaseCode.TRANSFER,
+                List.of(entry("user_001", EntrySide.DEBIT), entry("user_002", EntrySide.CREDIT)));
+        LedgerTransactionSpec transaction = LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec.builder()
+                .sn("LEDGER_TXN_DUPLICATE")
+                .tenantId(1L)
+                .eventType(FundsTransactionEventType.TOPUP)
+                .status(LedgerTransactionStatus.POSTED)
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .businessScene("TRANSFER_TEST")
+                .businessSn("BUSINESS_SN_0001")
+                .transactionTime(LocalDateTime.of(2026, 5, 7, 10, 0))
+                .postingPlans(List.of(postingPlanWithContext(phase, Map.of())))
+                .contextVariables(Map.of())
+                .build();
+
+        LedgerTransactionCreateResult firstResult = service.createLedgerTransaction(transaction);
+        insertedTransactions.clear();
+        insertedPlans.clear();
+        insertedEntries.clear();
+        LedgerTransactionCreateResult replayResult = service.createLedgerTransaction(transaction);
+
+        assertThat(firstResult.isCreated()).isTrue();
+        assertThat(replayResult.getLedgerTransactionId()).isEqualTo(firstResult.getLedgerTransactionId());
+        assertThat(replayResult.isCreated()).isFalse();
+        assertThat(insertedTransactions).isEmpty();
+        assertThat(insertedPlans).isEmpty();
+        assertThat(insertedEntries).isEmpty();
+    }
+
+    @Test
+    void createLedgerTransactionShouldRejectDuplicateSnWhenSha256Conflicts() {
+        LedgerTransaction existingTransaction = new LedgerTransaction();
+        existingTransaction.setId(101L);
+        existingTransaction.setSn("LEDGER_TXN_DUPLICATE");
+        existingTransaction.setSha256("different-ledger-transaction-sha256");
+        List<LedgerTransaction> insertedTransactions = new ArrayList<>();
+        List<LedgerPostingPlan> insertedPlans = new ArrayList<>();
+        List<LedgerEntry> insertedEntries = new ArrayList<>();
+        AtomicLong idSequence = new AtomicLong(100L);
+        LedgerTransactionServiceImpl service = new LedgerTransactionServiceImpl(
+                mapper(LedgerTransactionMapper.class, entity -> {
+                    LedgerTransaction transaction = (LedgerTransaction) entity;
+                    transaction.setId(idSequence.incrementAndGet());
+                    insertedTransactions.add(transaction);
+                }, () -> existingTransaction),
+                mapper(LedgerPostingPlanMapper.class, entity -> {
+                    LedgerPostingPlan plan = (LedgerPostingPlan) entity;
+                    plan.setId(idSequence.incrementAndGet());
+                    insertedPlans.add(plan);
+                }),
+                mapper(LedgerEntryMapper.class, entity -> {
+                    LedgerEntry entry = (LedgerEntry) entity;
+                    entry.setId(idSequence.incrementAndGet());
+                    insertedEntries.add(entry);
+                })
+        );
+        LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(LedgerPhaseCode.TRANSFER,
+                List.of(entry("user_001", EntrySide.DEBIT), entry("user_002", EntrySide.CREDIT)));
+        LedgerTransactionSpec transaction = LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec.builder()
+                .sn("LEDGER_TXN_DUPLICATE")
+                .tenantId(1L)
+                .eventType(FundsTransactionEventType.TOPUP)
+                .status(LedgerTransactionStatus.POSTED)
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .businessScene("TRANSFER_TEST")
+                .businessSn("BUSINESS_SN_0001")
+                .transactionTime(LocalDateTime.of(2026, 5, 7, 10, 0))
+                .postingPlans(List.of(postingPlanWithContext(phase, Map.of())))
+                .contextVariables(Map.of())
+                .build();
+
+        assertThatThrownBy(() -> service.createLedgerTransaction(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易已存在但摘要不一致")
+                .hasMessageContaining("LEDGER_TXN_DUPLICATE");
+        assertThat(insertedTransactions).isEmpty();
+        assertThat(insertedPlans).isEmpty();
+        assertThat(insertedEntries).isEmpty();
+    }
 
     @Test
     void createLedgerTransactionShouldPersistPostingPlanAndEntryMetadata() {
@@ -92,9 +201,10 @@ class LedgerTransactionServiceImplTests {
                 ))
                 .build();
 
-        Long id = service.createLedgerTransaction(transaction);
+        LedgerTransactionCreateResult result = service.createLedgerTransaction(transaction);
 
-        assertThat(id).isEqualTo(insertedTransaction.get().getId());
+        assertThat(result.getLedgerTransactionId()).isEqualTo(insertedTransaction.get().getId());
+        assertThat(result.isCreated()).isTrue();
         assertThat(insertedTransaction.get().getEventType()).isEqualTo(FundsTransactionEventType.TOPUP.name());
         assertThat(insertedPlan.get().getSn()).isEqualTo(plan.getPlanId());
         assertThat(insertedPlan.get().getTenantId()).isEqualTo(1L);
@@ -585,6 +695,13 @@ class LedgerTransactionServiceImplTests {
 
     @SuppressWarnings("unchecked")
     private static <T extends BaseMapper<?>> T mapper(Class<T> mapperType, Consumer<Object> insertHandler) {
+        return mapper(mapperType, insertHandler, () -> null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T extends BaseMapper<?>> T mapper(Class<T> mapperType,
+                                                      Consumer<Object> insertHandler,
+                                                      Supplier<Object> selectOneHandler) {
         return (T) Proxy.newProxyInstance(
                 mapperType.getClassLoader(),
                 new Class<?>[]{mapperType},
@@ -595,6 +712,9 @@ class LedgerTransactionServiceImplTests {
                     if ("insertSelective".equals(method.getName())) {
                         insertHandler.accept(args[0]);
                         return 1;
+                    }
+                    if ("selectOneByQuery".equals(method.getName())) {
+                        return selectOneHandler.get();
                     }
                     throw new UnsupportedOperationException(method.getName());
                 }

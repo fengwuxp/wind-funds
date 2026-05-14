@@ -1,6 +1,7 @@
 package com.capte.funds.ledger.service;
 
 import com.capte.funds.ledger.dto.LedgerEntryDTO;
+import com.capte.funds.ledger.dto.LedgerTransactionCreateResult;
 import com.capte.funds.ledger.dto.LedgerTransactionDTO;
 import com.capte.funds.ledger.query.LedgerEntryQuery;
 import com.capte.funds.ledger.query.LedgerTransactionQuery;
@@ -23,9 +24,9 @@ public interface LedgerTransactionService {
      * 创建 账户账本交易
      *
      * @param transaction 创建请求对象
-     * @return 账户账本交易 ID
+     * @return 账户账本交易创建结果
      */
-    @NonNull Long createLedgerTransaction(@NonNull LedgerTransactionSpec transaction);
+    @NonNull LedgerTransactionCreateResult createLedgerTransaction(@NonNull LedgerTransactionSpec transaction);
 
     /**
      * 更新 账户账本交易
