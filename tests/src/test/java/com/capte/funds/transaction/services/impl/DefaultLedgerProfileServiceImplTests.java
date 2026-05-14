@@ -34,9 +34,14 @@ class DefaultLedgerProfileServiceImplTests {
                 .allSatisfy(item -> {
                     assertThat(item.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.LIABILITY);
                     assertThat(item.getNormalBalanceSide()).isEqualTo(EntrySide.CREDIT);
-                    assertThat(item.getAllowNegative()).isFalse();
                     assertThat(item.getRequired()).isTrue();
                 });
+        assertThat(service.getRequiredItem(LedgerProfileCode.FUNDING_BASIC, LedgerSubjectCode.AVAILABLE)
+                .getAllowNegative()).isTrue();
+        assertThat(service.getRequiredItem(LedgerProfileCode.FUNDING_BASIC, LedgerSubjectCode.FROZEN)
+                .getAllowNegative()).isFalse();
+        assertThat(service.getRequiredItem(LedgerProfileCode.FUNDING_BASIC, LedgerSubjectCode.AUTHORIZATION)
+                .getAllowNegative()).isFalse();
     }
 
     @Test
@@ -52,6 +57,16 @@ class DefaultLedgerProfileServiceImplTests {
         assertThat(available.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.CONTROL);
         assertThat(available.getNormalBalanceSide()).isEqualTo(EntrySide.CREDIT);
         assertThat(available.getAllowNegative()).isTrue();
+    }
+
+    @Test
+    void availableBucketShouldAllowControlledNegativeForFundingCreditAndBudgetSubjects() {
+        assertThat(service.getRequiredItem(LedgerProfileCode.FUNDING_BASIC, LedgerSubjectCode.AVAILABLE)
+                .getAllowNegative()).isTrue();
+        assertThat(service.getRequiredItem(LedgerProfileCode.CREDIT_BASIC, LedgerSubjectCode.AVAILABLE)
+                .getAllowNegative()).isTrue();
+        assertThat(service.getRequiredItem(LedgerProfileCode.BUDGET_BASIC, LedgerSubjectCode.AVAILABLE)
+                .getAllowNegative()).isTrue();
     }
 
     @Test

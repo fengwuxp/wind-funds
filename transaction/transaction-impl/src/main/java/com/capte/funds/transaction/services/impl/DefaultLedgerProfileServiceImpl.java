@@ -55,7 +55,7 @@ public class DefaultLedgerProfileServiceImpl implements LedgerProfileService {
         return Map.of(
                 LedgerProfileCode.FUNDING_BASIC,
                 profile(LedgerProfileCode.FUNDING_BASIC, FundsSubjectType.FUNDING_ACCOUNT, List.of(
-                        item(LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
+                        item(LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, true),
                         item(LedgerSubjectCode.FROZEN, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
                         item(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false)
                 )),
@@ -68,7 +68,7 @@ public class DefaultLedgerProfileServiceImpl implements LedgerProfileService {
                 LedgerProfileCode.BUDGET_BASIC,
                 profile(LedgerProfileCode.BUDGET_BASIC, FundsSubjectType.BUDGET_GROUP, List.of(
                         item(LedgerSubjectCode.LIMIT, LedgerSubjectCategory.CONTROL, EntrySide.DEBIT, false),
-                        item(LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, false),
+                        item(LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, true),
                         item(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, false)
                 )),
                 LedgerProfileCode.FUNDING_PLATFORM,
