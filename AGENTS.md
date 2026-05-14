@@ -203,6 +203,7 @@ Assisted-by: [Model Name] via [Tool Name]
 ```
 
 `type` 可选：`feat`、`fix`、`docs`、`style`、`refactor`、`test`、`chore`。
+- 提交信息优先使用中文描述，保留 `type(scope): subject` 结构和 `Assisted-by` 标识。
 
 ## 10. 一句话总结
 
