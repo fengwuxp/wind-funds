@@ -20,6 +20,7 @@ import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.capte.funds.transaction.services.FundsFrozenOrderLifecycleSaver;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.capte.funds.transaction.services.PlatformFundingAccountService;
@@ -124,6 +125,7 @@ class FundsTransactionOrchestrationFlowTests {
                 new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
+                lifecycleSaver,
                 lifecycleSaver,
                 transactionQueryService
         );
@@ -575,7 +577,8 @@ class FundsTransactionOrchestrationFlowTests {
         }
     }
 
-    private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleSaver {
+    private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleSaver,
+            FundsFrozenOrderLifecycleSaver {
 
         private final AtomicReference<ResolvedRouteSpec> beforePostingRoute = new AtomicReference<>();
 

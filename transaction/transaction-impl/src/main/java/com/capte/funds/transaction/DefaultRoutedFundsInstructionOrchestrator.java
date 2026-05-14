@@ -2,6 +2,7 @@ package com.capte.funds.transaction;
 
 import com.wind.integration.funds.model.route.ImmutableReplayRequestSpec;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
+import com.capte.funds.transaction.services.FundsFrozenOrderLifecycleSaver;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.common.exception.AssertUtils;
@@ -62,13 +63,15 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
 
     private final FundsInstructionLifecycleSaver fundsInstructionLifecycleSaver;
 
+    private final FundsFrozenOrderLifecycleSaver fundsFrozenOrderLifecycleSaver;
+
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
     /**
      * 执行资金指令主流程。
      *
      * <p>能力范围：解析 Route、创建 RouteSnapshot、保存业务生命周期、组装账本交易并提交入账。
-     * 返回值是资金交易流水号，不是账本交易流水号。</p>
+     * 返回值是本次生命周期事实流水号，不是账本交易流水号。</p>
      *
      * @param instruction 资金指令
      * @return 资金交易流水号
@@ -78,23 +81,24 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
     public @NonNull String execute(@NonNull FundsInstructionSpec instruction) {
         ResolvedRouteSpec resolvedRoute = resolveRoute(instruction);
         RouteSnapshotSpec routeSnapshot = routeSnapshotFactory.createSnapshot(resolvedRoute);
-        FundsInstructionLifecycleResult lifecycleResult = fundsInstructionLifecycleSaver.beforePosting(
-                instruction, resolvedRoute, routeSnapshot);
+        FundsInstructionLifecycleSaver lifecycleSaver = resolveLifecycleSaver(instruction);
+        FundsInstructionLifecycleResult lifecycleResult = lifecycleSaver.beforePosting(instruction, resolvedRoute,
+                routeSnapshot);
         if (lifecycleResult.isCompleted()) {
             return lifecycleResult.getTransactionSn();
         }
         if (resolvedRoute.getLegs().isEmpty()) {
-            fundsInstructionLifecycleSaver.markSucceeded(lifecycleResult, null);
+            lifecycleSaver.markSucceeded(lifecycleResult, null);
             return lifecycleResult.getTransactionSn();
         }
         LedgerTransactionSpec transaction = postingAssembler.assemble(instruction, lifecycleResult.getTransactionSn(),
                 resolvedRoute);
         try {
             ledgerTransactionPostingService.post(transaction);
-            fundsInstructionLifecycleSaver.markSucceeded(lifecycleResult, transaction.getSn());
+            lifecycleSaver.markSucceeded(lifecycleResult, transaction.getSn());
             return lifecycleResult.getTransactionSn();
         } catch (Throwable throwable) {
-            fundsInstructionLifecycleSaver.markFailed(lifecycleResult, throwable);
+            lifecycleSaver.markFailed(lifecycleResult, throwable);
             throw throwable;
         }
     }
@@ -132,6 +136,13 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
                     .build());
         }
         return routeResolver.resolve(instruction);
+    }
+
+    private FundsInstructionLifecycleSaver resolveLifecycleSaver(FundsInstructionSpec instruction) {
+        return switch (instruction.getEventType()) {
+            case FREEZE, UNFREEZE -> fundsFrozenOrderLifecycleSaver;
+            default -> fundsInstructionLifecycleSaver;
+        };
     }
 
     private boolean shouldReplay(FundsInstructionSpec instruction) {

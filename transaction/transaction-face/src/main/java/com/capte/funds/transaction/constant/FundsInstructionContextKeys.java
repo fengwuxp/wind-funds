@@ -37,6 +37,10 @@ public final class FundsInstructionContextKeys {
 
     public static final String REFERENCE_FREEZE_SN = "referenceFreezeSn";
 
+    public static final String FREEZE_TYPE = "freezeType";
+
+    public static final String FROZEN_ORDER_EVENT_TYPE = "frozenOrderEventType";
+
     public static final String ADJUST_REASON = "adjustReason";
 
     public static final String CHANNEL_CODE = "channelCode";

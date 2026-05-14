@@ -8,6 +8,7 @@ import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
+import com.capte.funds.transaction.services.FundsFrozenOrderLifecycleSaver;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.common.exception.BaseException;
@@ -79,6 +80,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 postingAssembler,
                 postingService,
                 lifecycleSaver,
+                lifecycleSaver,
                 new RecordingTransactionQueryService()
         );
         FundsInstructionSpec instruction = new SimpleInstruction();
@@ -107,6 +109,36 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
     }
 
     @Test
+    void testExecuteShouldUseFrozenOrderLifecycleForFreezeEvent() {
+        RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
+        RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
+        RecordingPostingService postingService = new RecordingPostingService(false);
+        RecordingLifecycleSaver fundsLifecycleSaver = new RecordingLifecycleSaver(false, "FT_001");
+        RecordingLifecycleSaver frozenOrderLifecycleSaver = new RecordingLifecycleSaver(false, "FO_001");
+        DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
+                routeResolver,
+                new DefaultRouteSnapshotFactory(),
+                new DefaultRouteReplayService(),
+                postingAssembler,
+                postingService,
+                fundsLifecycleSaver,
+                frozenOrderLifecycleSaver,
+                new RecordingTransactionQueryService()
+        );
+        FundsInstructionSpec instruction = new BalanceControlInstruction(FundsTransactionEventType.FREEZE);
+
+        String lifecycleSn = orchestrator.execute(instruction);
+
+        assertThat(lifecycleSn).isEqualTo("FO_001");
+        assertThat(fundsLifecycleSaver.beforePostingInstruction.get()).isNull();
+        assertThat(frozenOrderLifecycleSaver.beforePostingInstruction.get()).isSameAs(instruction);
+        assertThat(postingAssembler.fundsTransactionSn.get()).isEqualTo("FO_001");
+        assertThat(postingService.transaction.get().getFundsTransactionSn()).isEqualTo("FO_001");
+        assertThat(frozenOrderLifecycleSaver.succeededLedgerTransactionSn.get())
+                .isEqualTo(postingService.transaction.get().getSn());
+    }
+
+    @Test
     void executeShouldShortCircuitWhenLifecycleAlreadyCompleted() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
@@ -118,6 +150,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
+                lifecycleSaver,
                 lifecycleSaver,
                 new RecordingTransactionQueryService()
         );
@@ -143,6 +176,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 postingAssembler,
                 postingService,
                 lifecycleSaver,
+                lifecycleSaver,
                 new RecordingTransactionQueryService()
         );
 
@@ -167,6 +201,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 postingAssembler,
                 postingService,
                 lifecycleSaver,
+                lifecycleSaver,
                 new RecordingTransactionQueryService()
         );
 
@@ -190,6 +225,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
+                lifecycleSaver,
                 lifecycleSaver,
                 transactionQueryService
         );
@@ -217,6 +253,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 postingAssembler,
                 postingService,
                 lifecycleSaver,
+                lifecycleSaver,
                 transactionQueryService
         );
 
@@ -242,6 +279,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
+                lifecycleSaver,
                 lifecycleSaver,
                 transactionQueryService
         );
@@ -278,6 +316,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 postingAssembler,
                 postingService,
                 lifecycleSaver,
+                lifecycleSaver,
                 transactionQueryService
         );
 
@@ -310,6 +349,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 postingAssembler,
                 postingService,
                 lifecycleSaver,
+                lifecycleSaver,
                 transactionQueryService
         );
 
@@ -335,6 +375,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
+                lifecycleSaver,
                 lifecycleSaver,
                 new RecordingTransactionQueryService()
         );
@@ -368,6 +409,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 postingAssembler,
                 postingService,
                 lifecycleSaver,
+                lifecycleSaver,
                 transactionQueryService
         );
         FundsInstructionSpec instruction = new FreezeOrderReferencedInstruction(FundsTransactionEventType.UNFREEZE);
@@ -396,6 +438,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 postingAssembler,
                 postingService,
                 lifecycleSaver,
+                lifecycleSaver,
                 new RecordingTransactionQueryService()
         );
         FundsInstructionSpec instruction = new DirectRefundInstruction();
@@ -415,6 +458,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 new DefaultRouteReplayService(),
                 new RecordingLedgerPostingAssembler(false),
                 new RecordingPostingService(false),
+                new RecordingLifecycleSaver(false),
                 new RecordingLifecycleSaver(false),
                 new RecordingTransactionQueryService()
         );
@@ -524,7 +568,8 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 .setContextVariables(Map.of());
     }
 
-    private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleSaver {
+    private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleSaver,
+            FundsFrozenOrderLifecycleSaver {
 
         private final AtomicReference<FundsInstructionSpec> beforePostingInstruction = new AtomicReference<>();
 
@@ -539,7 +584,14 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         private final boolean completed;
 
         private RecordingLifecycleSaver(boolean completed) {
+            this(completed, "FT_001");
+        }
+
+        private final String lifecycleSn;
+
+        private RecordingLifecycleSaver(boolean completed, String lifecycleSn) {
             this.completed = completed;
+            this.lifecycleSn = lifecycleSn;
         }
 
         @Override
@@ -550,7 +602,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
             beforePostingRoute.set(resolvedRoute);
             beforePostingSnapshot.set(routeSnapshot);
             return new FundsInstructionLifecycleResult()
-                    .setTransactionSn("FT_001")
+                    .setTransactionSn(lifecycleSn)
                     .setTransactionDetailSns(List.of("FTD_001", "FTD_002"))
                     .setCompleted(completed);
         }
@@ -768,6 +820,30 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                     .referenceSn("FO_001")
                     .contextVariables(Map.of())
                     .build();
+        }
+    }
+
+    private static final class BalanceControlInstruction extends SimpleInstruction {
+
+        private final FundsTransactionEventType eventType;
+
+        private BalanceControlInstruction(FundsTransactionEventType eventType) {
+            this.eventType = eventType;
+        }
+
+        @Override
+        public @NonNull FundsInstructionType getInstructionType() {
+            return FundsInstructionType.BALANCE_CONTROL;
+        }
+
+        @Override
+        public @NonNull FundsTransactionEventType getEventType() {
+            return eventType;
+        }
+
+        @Override
+        public @NonNull DefaultFundsTransactionType getTransactionType() {
+            return DefaultFundsTransactionType.ADJUSTMENT;
         }
     }
 

@@ -42,6 +42,7 @@ import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -62,6 +63,7 @@ import java.util.TreeMap;
  * @date 2026-05-07
  */
 @Service
+@Primary
 @AllArgsConstructor
 public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLifecycleSaver {
 

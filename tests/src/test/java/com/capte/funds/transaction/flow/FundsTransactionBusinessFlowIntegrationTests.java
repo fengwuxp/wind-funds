@@ -27,6 +27,7 @@ import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.model.dto.FundsSubjectBalanceDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.capte.funds.transaction.services.FundsFrozenOrderLifecycleSaver;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.capte.funds.transaction.services.PlatformFundingAccountService;
@@ -127,6 +128,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 new DefaultRouteReplayService(),
                 new DefaultLedgerPostingAssembler(ledgerBook),
                 ledgerBook,
+                lifecycleSaver,
                 lifecycleSaver,
                 lifecycleSaver
         );
@@ -529,6 +531,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
     }
 
     private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleSaver,
+            FundsFrozenOrderLifecycleSaver,
             FundsTransactionQueryService {
 
         private final AtomicInteger transactionSequence = new AtomicInteger();
