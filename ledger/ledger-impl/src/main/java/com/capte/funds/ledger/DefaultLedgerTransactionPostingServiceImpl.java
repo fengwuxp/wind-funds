@@ -49,6 +49,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void post(@NonNull LedgerTransactionSpec transaction) {
+        assertAllEntriesUsePositiveAmounts(transaction);
         assertAllPostingPlansUseSingleCurrency(transaction);
         AssertUtils.isTrue(transaction.isBalanced(), "账本交易借记、贷记金额不一致");
         assertAllPostingPlansBalanced(transaction);
@@ -87,6 +88,26 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     private void assertAllPostingPlansBalanced(LedgerTransactionSpec transaction) {
         transaction.getPostingPlans().forEach(plan -> AssertUtils.isTrue(
                 plan.isBalanced(), "账务计划不平衡，planId = {}", plan.getPlanId()));
+    }
+
+    private void assertAllEntriesUsePositiveAmounts(LedgerTransactionSpec transaction) {
+        transaction.getPostingPlans().forEach(plan -> plan.getEntries().forEach(entry -> {
+            AssertUtils.notNull(entry.getAmount(),
+                    "账本分录金额不能为空，planId = {}, ledgerTransactionSn = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}",
+                    plan.getPlanId(),
+                    entry.getLedgerTransactionSn(),
+                    entry.getSubjectId(),
+                    entry.getSubjectType(),
+                    entry.getLedgerSubjectCode());
+            AssertUtils.isTrue(entry.getAmount().getAmount() > 0,
+                    "账本分录金额必须大于 0，planId = {}, ledgerTransactionSn = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, amount = {}",
+                    plan.getPlanId(),
+                    entry.getLedgerTransactionSn(),
+                    entry.getSubjectId(),
+                    entry.getSubjectType(),
+                    entry.getLedgerSubjectCode(),
+                    entry.getAmount().getAmount());
+        }));
     }
 
     private void assertAllEntriesUsePostableSubjects(LedgerTransactionSpec transaction) {

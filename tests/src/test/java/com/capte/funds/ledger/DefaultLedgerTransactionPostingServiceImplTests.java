@@ -144,6 +144,31 @@ class DefaultLedgerTransactionPostingServiceImplTests {
     }
 
     @Test
+    void testPostShouldRejectNonPositiveEntryAmountBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000008";
+        LedgerPostingPlanSpec zeroAmountPlan = uncheckedPostingPlan(ledgerTransactionSn, "ZERO_AMOUNT", List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn, 0L),
+                entry(EntrySide.CREDIT, ledgerTransactionSn, 0L)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, List.of(zeroAmountPlan));
+
+        assertThat(transaction.isBalanced()).isTrue();
+        assertThat(zeroAmountPlan.isBalanced()).isTrue();
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本分录金额必须大于 0")
+                .hasMessageContaining("ZERO_AMOUNT")
+                .hasMessageContaining("funding_001")
+                .hasMessageContaining(LedgerSubjectCode.AVAILABLE.name());
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    @Test
     void testPostShouldRejectEntryWithoutLedgerIdBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
         RecordingProjectionService projectionService = new RecordingProjectionService(true);
