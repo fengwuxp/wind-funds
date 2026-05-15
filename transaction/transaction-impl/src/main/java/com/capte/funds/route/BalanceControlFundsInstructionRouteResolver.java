@@ -3,7 +3,7 @@ package com.capte.funds.route;
 import com.capte.funds.route.support.PlatformAccountRouteSupport;
 import com.capte.funds.route.support.RouteParticipantFactory;
 import com.capte.funds.route.support.RouteSubjectSupport;
-import com.capte.funds.transaction.enums.PlatformFundingAccountRole;
+import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.capte.funds.transaction.support.FundsRouteCodes;

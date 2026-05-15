@@ -29,8 +29,8 @@ import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionCo
 import com.capte.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
-import com.capte.funds.transaction.enums.PlatformFundingAccountRole;
-import com.capte.funds.transaction.services.PlatformFundingAccountService;
+import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
+import com.capte.funds.wallet.service.PlatformFundingAccountService;
 import com.wind.integration.funds.fx.FxRequest;
 import com.wind.integration.funds.fx.FxResult;
 import com.wind.integration.funds.fx.FxService;

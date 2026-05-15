@@ -1,6 +1,6 @@
 package com.capte.funds.transaction.model.query;
 
-import com.capte.funds.transaction.enums.PlatformFundingAccountRole;
+import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;

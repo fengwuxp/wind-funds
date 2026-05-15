@@ -8,8 +8,8 @@ import com.capte.funds.transaction.converter.FundsAuthorizationInstructionConver
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.capte.funds.transaction.enums.PlatformFundingAccountRole;
-import com.capte.funds.transaction.services.PlatformFundingAccountService;
+import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
+import com.capte.funds.wallet.service.PlatformFundingAccountService;
 import com.wind.integration.funds.fx.FxRequest;
 import com.wind.integration.funds.fx.FxResult;
 import com.wind.integration.funds.fx.FxService;

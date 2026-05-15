@@ -3,7 +3,7 @@ package com.capte.funds.transaction.services.impl;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.funds.transaction.dal.entities.FundingAccount;
 import com.capte.funds.transaction.dal.mapper.FundingAccountMapper;
-import com.capte.funds.transaction.enums.PlatformFundingAccountRole;
+import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;

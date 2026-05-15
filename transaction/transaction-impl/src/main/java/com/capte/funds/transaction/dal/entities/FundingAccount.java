@@ -1,7 +1,7 @@
 package com.capte.funds.transaction.dal.entities;
 
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
-import com.capte.funds.transaction.enums.PlatformFundingAccountRole;
+import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;

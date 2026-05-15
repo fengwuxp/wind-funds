@@ -41,6 +41,18 @@ class WalletLayerBoundaryTests {
             Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/request/InitializeSubjectLedgerRequest.java")
     );
 
+    private static final Path WALLET_PLATFORM_FUNDING_ACCOUNT_SERVICE = Path.of(
+            "wallet/wallet-face/src/main/java/com/capte/funds/wallet/service/PlatformFundingAccountService.java");
+
+    private static final Path CORE_PLATFORM_FUNDING_ACCOUNT_ROLE = Path.of(
+            "core/src/main/java/com/wind/integration/funds/wallet/enums/PlatformFundingAccountRole.java");
+
+    private static final Path TRANSACTION_PLATFORM_FUNDING_ACCOUNT_SERVICE = Path.of(
+            "transaction/transaction-face/src/main/java/com/capte/funds/transaction/services/PlatformFundingAccountService.java");
+
+    private static final Path TRANSACTION_PLATFORM_FUNDING_ACCOUNT_ROLE = Path.of(
+            "transaction/transaction-face/src/main/java/com/capte/funds/transaction/enums/PlatformFundingAccountRole.java");
+
     private static final List<String> FORBIDDEN_REFERENCES = List.of(
             "com.capte.funds.ledger.dal.",
             "com.capte.funds.ledger.impl.",
@@ -111,6 +123,30 @@ class WalletLayerBoundaryTests {
                 .allSatisfy(contract -> assertThat(projectRoot.resolve(contract))
                         .as("transaction-face should not own " + contract.getFileName())
                         .doesNotExist());
+    }
+
+    /**
+     * 场景：平台资金账户是平台账户配置与解析能力，交易路由只消费解析结果。
+     * 输入：扫描 wallet-face、core 与 transaction-face 的平台资金账户契约。
+     * 输出：服务契约和角色枚举所在模块。
+     * 预期：wallet-face 暴露平台资金账户解析服务，core 承载共享角色枚举，transaction-face 不再拥有该账户能力契约。
+     */
+    @Test
+    void testWalletFaceShouldOwnPlatformFundingAccountContract() {
+        Path projectRoot = projectRoot();
+
+        assertThat(projectRoot.resolve(WALLET_PLATFORM_FUNDING_ACCOUNT_SERVICE))
+                .as("wallet-face should expose platform funding account service")
+                .exists();
+        assertThat(projectRoot.resolve(CORE_PLATFORM_FUNDING_ACCOUNT_ROLE))
+                .as("core should expose shared platform funding account role")
+                .exists();
+        assertThat(projectRoot.resolve(TRANSACTION_PLATFORM_FUNDING_ACCOUNT_SERVICE))
+                .as("transaction-face should not own platform funding account service")
+                .doesNotExist();
+        assertThat(projectRoot.resolve(TRANSACTION_PLATFORM_FUNDING_ACCOUNT_ROLE))
+                .as("transaction-face should not own platform funding account role")
+                .doesNotExist();
     }
 
     private static List<String> findForbiddenReferences(Path sourceRoot) throws IOException {
