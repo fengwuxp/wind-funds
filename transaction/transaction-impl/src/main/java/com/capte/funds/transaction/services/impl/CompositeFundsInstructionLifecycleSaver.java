@@ -1,6 +1,7 @@
 package com.capte.funds.transaction.services.impl;
 
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
+import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
@@ -24,7 +25,7 @@ import java.util.List;
 @AllArgsConstructor
 public class CompositeFundsInstructionLifecycleSaver implements FundsInstructionLifecycleSaver {
 
-    private final List<FundsInstructionLifecycleSaver> delegates;
+    private final List<FundsInstructionLifecycleRecorder> delegates;
 
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
@@ -52,8 +53,8 @@ public class CompositeFundsInstructionLifecycleSaver implements FundsInstruction
         requireDelegate(instruction).markFailed(instruction, result, cause);
     }
 
-    private FundsInstructionLifecycleSaver requireDelegate(FundsInstructionSpec instruction) {
-        List<FundsInstructionLifecycleSaver> candidates = supportedDelegates(instruction);
+    private FundsInstructionLifecycleRecorder requireDelegate(FundsInstructionSpec instruction) {
+        List<FundsInstructionLifecycleRecorder> candidates = supportedDelegates(instruction);
         AssertUtils.isFalse(candidates.isEmpty(),
                 "未找到支持的资金指令生命周期保存器，instructionType = {}，eventType = {}",
                 instruction.getInstructionType(), instruction.getEventType());
@@ -63,7 +64,7 @@ public class CompositeFundsInstructionLifecycleSaver implements FundsInstruction
         return candidates.getFirst();
     }
 
-    private List<FundsInstructionLifecycleSaver> supportedDelegates(FundsInstructionSpec instruction) {
+    private List<FundsInstructionLifecycleRecorder> supportedDelegates(FundsInstructionSpec instruction) {
         return delegates.stream()
                 .filter(delegate -> delegate != this)
                 .filter(delegate -> delegate.supports(instruction))

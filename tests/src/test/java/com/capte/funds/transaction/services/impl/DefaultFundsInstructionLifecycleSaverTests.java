@@ -20,6 +20,7 @@ import com.capte.funds.transaction.enums.FundsTransactionMode;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
+import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.wind.common.exception.BaseException;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
@@ -78,14 +79,14 @@ import static org.assertj.core.api.Assertions.tuple;
 class DefaultFundsInstructionLifecycleSaverTests {
 
     /**
-     * 场景：生命周期保存器作为写侧端口，防止交易事实查询能力重新混入 saver。
-     * 输入：反射读取 FundsInstructionLifecycleSaver 声明的方法。
+     * 场景：生命周期记录器作为写侧端口，防止交易事实查询能力重新混入 recorder。
+     * 输入：反射读取 FundsInstructionLifecycleRecorder 声明的方法。
      * 输出：方法名称集合和返回类型集合。
      * 预期：契约只保留 beforePosting、markSucceeded、markFailed，不出现 query/find/get/list 等查询职责。
      */
     @Test
-    void testLifecycleSaverShouldNotContainQueryResponsibilities() {
-        Method[] methods = FundsInstructionLifecycleSaver.class.getDeclaredMethods();
+    void testLifecycleRecorderShouldNotContainQueryResponsibilities() {
+        Method[] methods = FundsInstructionLifecycleRecorder.class.getDeclaredMethods();
         List<String> methodNames = Arrays.stream(methods)
                 .map(Method::getName)
                 .toList();
@@ -96,6 +97,20 @@ class DefaultFundsInstructionLifecycleSaverTests {
                 .noneMatch(DefaultFundsInstructionLifecycleSaverTests::isQueryMethodName);
         assertThat(Arrays.stream(methods).map(Method::getReturnType).toList())
                 .containsExactlyInAnyOrder(Boolean.TYPE, FundsInstructionLifecycleResult.class, Void.TYPE, Void.TYPE);
+    }
+
+    /**
+     * 场景：P0-G 命名治理中，旧 Saver 契约作为兼容别名继续保留。
+     * 输入：反射读取 FundsInstructionLifecycleSaver 和 FundsInstructionLifecycleRecorder 类型关系。
+     * 输出：旧接口的废弃标记与父接口。
+     * 预期：新代码可依赖 Recorder；旧调用方仍可通过 Saver 编译。
+     */
+    @Test
+    void testLifecycleSaverShouldBeDeprecatedCompatibilityAliasOfRecorder() {
+        assertThat(FundsInstructionLifecycleSaver.class)
+                .isAssignableTo(FundsInstructionLifecycleRecorder.class)
+                .hasAnnotation(Deprecated.class);
+        assertThat(FundsInstructionLifecycleSaver.class.getDeclaredMethods()).isEmpty();
     }
 
     @Test

@@ -2,7 +2,7 @@ package com.capte.funds.transaction;
 
 import com.wind.integration.funds.model.route.ImmutableReplayRequestSpec;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
-import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
+import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.LedgerPostingAssembler;
@@ -60,7 +60,7 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
 
     private final LedgerTransactionPostingService ledgerTransactionPostingService;
 
-    private final FundsInstructionLifecycleSaver fundsInstructionLifecycleSaver;
+    private final FundsInstructionLifecycleRecorder fundsInstructionLifecycleRecorder;
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
@@ -78,23 +78,23 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
     public @NonNull String execute(@NonNull FundsInstructionSpec instruction) {
         ResolvedRouteSpec resolvedRoute = resolveRoute(instruction);
         RouteSnapshotSpec routeSnapshot = routeSnapshotFactory.createSnapshot(resolvedRoute);
-        FundsInstructionLifecycleResult lifecycleResult = fundsInstructionLifecycleSaver.beforePosting(instruction,
+        FundsInstructionLifecycleResult lifecycleResult = fundsInstructionLifecycleRecorder.beforePosting(instruction,
                 resolvedRoute, routeSnapshot);
         if (lifecycleResult.isCompleted()) {
             return lifecycleResult.getTransactionSn();
         }
         if (resolvedRoute.getLegs().isEmpty()) {
-            fundsInstructionLifecycleSaver.markSucceeded(instruction, lifecycleResult, null);
+            fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, null);
             return lifecycleResult.getTransactionSn();
         }
         LedgerTransactionSpec transaction = postingAssembler.assemble(instruction, lifecycleResult.getTransactionSn(),
                 resolvedRoute);
         try {
             ledgerTransactionPostingService.post(transaction);
-            fundsInstructionLifecycleSaver.markSucceeded(instruction, lifecycleResult, transaction.getSn());
+            fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, transaction.getSn());
             return lifecycleResult.getTransactionSn();
         } catch (Throwable throwable) {
-            fundsInstructionLifecycleSaver.markFailed(instruction, lifecycleResult, throwable);
+            fundsInstructionLifecycleRecorder.markFailed(instruction, lifecycleResult, throwable);
             throw throwable;
         }
     }

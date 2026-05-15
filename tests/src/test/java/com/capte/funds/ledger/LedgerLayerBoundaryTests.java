@@ -21,6 +21,7 @@ class LedgerLayerBoundaryTests {
 
     private static final List<String> FORBIDDEN_REFERENCES = List.of(
             "com.capte.funds.transaction.dal.",
+            "com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder",
             "com.capte.funds.transaction.services.FundsInstructionLifecycleSaver",
             "com.capte.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver",
             "com.capte.funds.transaction.enums.FundsTransactionStatus",

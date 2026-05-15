@@ -216,6 +216,7 @@ class WalletLayerBoundaryTests {
             "com.capte.funds.ledger.impl.",
             "com.capte.funds.ledger.DefaultLedgerTransactionPostingServiceImpl",
             "com.capte.funds.transaction.dal.",
+            "com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder",
             "com.capte.funds.transaction.services.FundsInstructionLifecycleSaver",
             "com.capte.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver",
             "com.wind.integration.funds.ledger.LedgerBalanceProjectionService",
