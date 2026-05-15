@@ -8,7 +8,7 @@ import com.capte.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
-import com.capte.funds.transaction.services.FundsFrozenOrderLifecycleSaver;
+import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.ref.SubjectRef;
@@ -38,7 +38,7 @@ import java.util.Map;
  */
 @Service
 @AllArgsConstructor
-public class DefaultFundsFrozenOrderLifecycleSaver implements FundsFrozenOrderLifecycleSaver {
+public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLifecycleSaver {
 
     private static final WindSequenceType FUNDS_FROZEN_ORDER_SEQUENCE_TYPE = WindSequenceType.immutable(
             "FUNDS_FROZEN_ORDER", "FO", 6);
