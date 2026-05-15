@@ -1,6 +1,7 @@
 package com.capte.funds.transaction.services.impl;
 
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
+import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.wind.common.exception.BaseException;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
@@ -29,15 +30,40 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class CompositeFundsInstructionLifecycleSaverTests {
+class DelegatingFundsInstructionLifecycleRecorderTests {
 
+    /**
+     * 场景：P0-G 命名治理中，组合分发实现从 Saver 正名为 Delegating Recorder。
+     * 输入：新的 DelegatingFundsInstructionLifecycleRecorder 与旧 CompositeFundsInstructionLifecycleSaver。
+     * 输出：旧类作为废弃兼容别名继承新主类。
+     * 预期：Spring 主 Bean 和新调用方依赖 Recorder 命名，旧源码调用方仍可编译。
+     * 红线：不得注册两个组合生命周期分发 Bean，也不得破坏每个指令只命中一个记录器的约束。
+     */
+    @Test
+    void testCompositeSaverShouldRemainDeprecatedCompatibilityAlias() {
+        assertThat(DelegatingFundsInstructionLifecycleRecorder.class)
+                .isAssignableTo(FundsInstructionLifecycleRecorder.class)
+                .isAssignableTo(FundsInstructionLifecycleSaver.class);
+        assertThat(CompositeFundsInstructionLifecycleSaver.class)
+                .isAssignableTo(DelegatingFundsInstructionLifecycleRecorder.class);
+        assertThat(CompositeFundsInstructionLifecycleSaver.class.isAnnotationPresent(Deprecated.class))
+                .isTrue();
+    }
+
+    /**
+     * 场景：余额控制冻结指令需要进入冻结单生命周期记录器，而不是标准交易记录器。
+     * 输入：一个支持 TOPUP 的交易记录器、一个支持 FREEZE/UNFREEZE 的冻结单记录器。
+     * 输出：委托记录器只调用冻结单记录器，并继续把成功或失败结果委托给同一记录器。
+     * 预期：组合分发按事实载体唯一命中，冻结/解冻不创建标准 FundsTransaction。
+     * 红线：不得因为多个记录器存在而双写生命周期事实。
+     */
     @Test
     void testBeforePostingShouldDelegateToOnlySupportedSaver() {
         RecordingLifecycleSaver transactionSaver = new RecordingLifecycleSaver("FT_001",
                 FundsTransactionEventType.TOPUP);
         RecordingLifecycleSaver frozenOrderSaver = new RecordingLifecycleSaver("FO_001",
                 FundsTransactionEventType.FREEZE, FundsTransactionEventType.UNFREEZE);
-        CompositeFundsInstructionLifecycleSaver composite = new CompositeFundsInstructionLifecycleSaver(
+        DelegatingFundsInstructionLifecycleRecorder composite = new DelegatingFundsInstructionLifecycleRecorder(
                 List.of(transactionSaver, frozenOrderSaver));
         FundsInstructionSpec instruction = instruction(FundsInstructionType.BALANCE_CONTROL,
                 FundsTransactionEventType.FREEZE);
@@ -57,11 +83,18 @@ class CompositeFundsInstructionLifecycleSaverTests {
         assertThat(frozenOrderSaver.failedCause.get()).isSameAs(failure);
     }
 
+    /**
+     * 场景：余额控制指令没有任何生命周期记录器支持。
+     * 输入：只有 TOPUP 交易记录器，传入 FREEZE 指令。
+     * 输出：委托记录器拒绝处理。
+     * 预期：编排器不会在事实载体缺失时继续入账。
+     * 红线：不得静默跳过生命周期事实记录。
+     */
     @Test
     void testBeforePostingShouldRejectWhenNoSaverSupported() {
         RecordingLifecycleSaver transactionSaver = new RecordingLifecycleSaver("FT_001",
                 FundsTransactionEventType.TOPUP);
-        CompositeFundsInstructionLifecycleSaver composite = new CompositeFundsInstructionLifecycleSaver(
+        DelegatingFundsInstructionLifecycleRecorder composite = new DelegatingFundsInstructionLifecycleRecorder(
                 List.of(transactionSaver));
         FundsInstructionSpec instruction = instruction(FundsInstructionType.BALANCE_CONTROL,
                 FundsTransactionEventType.FREEZE);
@@ -70,14 +103,21 @@ class CompositeFundsInstructionLifecycleSaverTests {
         assertThatThrownBy(() -> composite.beforePosting(instruction, route(FundsTransactionEventType.FREEZE),
                 snapshot(FundsTransactionEventType.FREEZE)))
                 .isInstanceOf(BaseException.class)
-                .hasMessageContaining("未找到支持的资金指令生命周期保存器");
+                .hasMessageContaining("未找到支持的资金指令生命周期记录器");
     }
 
+    /**
+     * 场景：同一个资金指令被多个生命周期记录器声明支持。
+     * 输入：两个都支持 TOPUP 的记录器。
+     * 输出：委托记录器拒绝处理，且不调用任意一个记录器。
+     * 预期：每个资金指令必须且只能命中一个生命周期事实载体。
+     * 红线：不得出现重复创建 FundsTransaction 或 FrozenOrder 的双写路径。
+     */
     @Test
     void testBeforePostingShouldRejectWhenMultipleSaversSupported() {
         RecordingLifecycleSaver first = new RecordingLifecycleSaver("FT_001", FundsTransactionEventType.TOPUP);
         RecordingLifecycleSaver second = new RecordingLifecycleSaver("FT_002", FundsTransactionEventType.TOPUP);
-        CompositeFundsInstructionLifecycleSaver composite = new CompositeFundsInstructionLifecycleSaver(
+        DelegatingFundsInstructionLifecycleRecorder composite = new DelegatingFundsInstructionLifecycleRecorder(
                 List.of(first, second));
         FundsInstructionSpec instruction = instruction(FundsInstructionType.DIRECT_TRANSACTION,
                 FundsTransactionEventType.TOPUP);
@@ -86,7 +126,7 @@ class CompositeFundsInstructionLifecycleSaverTests {
         assertThatThrownBy(() -> composite.beforePosting(instruction, route(FundsTransactionEventType.TOPUP),
                 snapshot(FundsTransactionEventType.TOPUP)))
                 .isInstanceOf(BaseException.class)
-                .hasMessageContaining("资金指令生命周期保存器不唯一");
+                .hasMessageContaining("资金指令生命周期记录器不唯一");
         assertThat(first.beforePostingCalls).hasValue(0);
         assertThat(second.beforePostingCalls).hasValue(0);
     }
@@ -151,7 +191,7 @@ class CompositeFundsInstructionLifecycleSaverTests {
                 .build();
     }
 
-    private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleSaver {
+    private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleRecorder {
 
         private final String transactionSn;
 
