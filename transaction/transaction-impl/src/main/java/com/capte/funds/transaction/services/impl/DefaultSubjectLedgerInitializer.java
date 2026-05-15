@@ -7,6 +7,7 @@ import com.capte.funds.transaction.model.dto.LedgerProfileItemDTO;
 import com.capte.funds.transaction.model.request.InitializeSubjectLedgerRequest;
 import com.capte.funds.transaction.services.LedgerProfileService;
 import com.capte.funds.transaction.services.SubjectLedgerInitializer;
+import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import lombok.AllArgsConstructor;
@@ -34,6 +35,11 @@ public class DefaultSubjectLedgerInitializer implements SubjectLedgerInitializer
     public @NonNull Map<LedgerSubjectCode, Long> initializeRequiredLedgers(
             @NonNull InitializeSubjectLedgerRequest request) {
         LedgerProfileDTO profile = ledgerProfileService.getProfile(request.getLedgerProfileCode());
+        AssertUtils.isTrue(profile.getSubjectType() == request.getSubjectType(),
+                "LedgerProfile 主体类型不匹配，profileCode = {}, profileSubjectType = {}, subjectType = {}",
+                profile.getCode(),
+                profile.getSubjectType(),
+                request.getSubjectType());
         Map<LedgerSubjectCode, Long> result = new EnumMap<>(LedgerSubjectCode.class);
         for (LedgerProfileItemDTO item : profile.getItems()) {
             if (!Boolean.TRUE.equals(item.getRequired())) {

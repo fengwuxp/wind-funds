@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DefaultSubjectLedgerInitializerTests {
 
@@ -69,6 +70,34 @@ class DefaultSubjectLedgerInitializerTests {
         assertThat(first.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         assertThat(first.getSettlementPolicy()).isEqualTo(SettlementPolicySpec.RT.getRaw());
         assertThat(first.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
+    }
+
+    @Test
+    void testInitializeRequiredLedgersShouldRejectProfileSubjectTypeMismatch() {
+        LedgerProfileDTO profile = new LedgerProfileDTO()
+                .setCode(LedgerProfileCode.FUNDING_BASIC)
+                .setVersion(1)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setItems(List.of(item(LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT, true, true)));
+        List<CreateLedgerRequest> requests = new ArrayList<>();
+        DefaultSubjectLedgerInitializer initializer = new DefaultSubjectLedgerInitializer(
+                ledgerProfileService(profile),
+                FundsAccountServiceTestSupport.ledgerServiceWithCreateRecorder(requests)
+        );
+
+        assertThatThrownBy(() -> initializer.initializeRequiredLedgers(
+                new InitializeSubjectLedgerRequest()
+                        .setTenantId(1L)
+                        .setSubjectId("credit_001")
+                        .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
+                        .setPeriodType(AccountBalancePeriodType.LIFETIME)))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("LedgerProfile 主体类型不匹配")
+                .hasMessageContaining("profileCode = FUNDING_BASIC")
+                .hasMessageContaining("subjectType = CREDIT_ACCOUNT");
+        assertThat(requests).isEmpty();
     }
 
     private static LedgerProfileItemDTO item(LedgerSubjectCode code,
