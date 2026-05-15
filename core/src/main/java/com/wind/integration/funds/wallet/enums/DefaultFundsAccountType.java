@@ -3,13 +3,9 @@ package com.wind.integration.funds.wallet.enums;
 import com.wind.common.enums.DescriptiveEnum;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.wind.integration.funds.route.enums.RouteNodeType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
-
-import java.util.Set;
 
 /**
  * 账户类型枚举
@@ -156,44 +152,16 @@ public enum DefaultFundsAccountType implements DescriptiveEnum {
     private final String desc;
 
 
-    private static final Set<DefaultFundsAccountType> USER_WALLET_TYPES = Set.of(
-            USER_WALLET,
-            GLOBAL_ACCOUNT
-    );
-
-    private static final Set<DefaultFundsAccountType> CREDIT_CARD_TYPES = Set.of(
-            PREPAID_VCC,
-            SHARE_VCC,
-            CREDIT_CARD
-    );
-
-
-    private static final Set<DefaultFundsAccountType> EXTERNAL_ACCOUNT_TYPES = Set.of(
-            EXTERNAL_BANK,
-            EXTERNAL_VA,
-            EXTERNAL_WALLET,
-            EXTERNAL_MERCHANT
-    );
-
-    private static final Set<String> NON_EXTERNAL_ACCOUNT_TYPE_NAMES = Set.of(
-            FundsSubjectType.FUNDING_ACCOUNT.name(),
-            FundsSubjectType.CREDIT_ACCOUNT.name(),
-            FundsSubjectType.BUDGET_GROUP.name(),
-            RouteNodeType.SUBJECT.name(),
-            RouteNodeType.PAYMENT_INSTRUMENT.name(),
-            RouteNodeType.PLATFORM_FUNDING_ACCOUNT.name()
-    );
-
     public static boolean isCreditCard(@NonNull FundsAccountId accountId) {
         return isCreditCard(accountId.type());
     }
 
     public static boolean isCreditCard(@NonNull String accountType) {
-        return isCreditCard(DefaultFundsAccountType.valueOf(accountType));
+        return CreditFundsAccountType.isCreditAccountType(accountType);
     }
 
     public static boolean isCreditCard(@NonNull DefaultFundsAccountType accountType) {
-        return CREDIT_CARD_TYPES.contains(accountType);
+        return CreditFundsAccountType.isCreditAccountType(accountType);
     }
 
     public static boolean isUserWalletType(@NonNull FundsAccountId accountId) {
@@ -201,11 +169,11 @@ public enum DefaultFundsAccountType implements DescriptiveEnum {
     }
 
     public static boolean isUserWalletType(@NonNull String accountType) {
-        return isUserWalletType(DefaultFundsAccountType.valueOf(accountType));
+        return UserWalletFundsAccountType.isUserWalletType(accountType);
     }
 
     public static boolean isUserWalletType(@NonNull DefaultFundsAccountType accountType) {
-        return USER_WALLET_TYPES.contains(accountType);
+        return UserWalletFundsAccountType.isUserWalletType(accountType);
     }
 
 
@@ -214,16 +182,10 @@ public enum DefaultFundsAccountType implements DescriptiveEnum {
     }
 
     public static boolean isExternalAccount(@NonNull String accountType) {
-        if (RouteNodeType.EXTERNAL_ACCOUNT.name().equals(accountType)) {
-            return true;
-        }
-        if (NON_EXTERNAL_ACCOUNT_TYPE_NAMES.contains(accountType)) {
-            return false;
-        }
-        return isExternalAccount(DefaultFundsAccountType.valueOf(accountType));
+        return ExternalFundsAccountType.isExternalAccount(accountType);
     }
 
     public static boolean isExternalAccount(@NonNull DefaultFundsAccountType accountType) {
-        return EXTERNAL_ACCOUNT_TYPES.contains(accountType);
+        return ExternalFundsAccountType.isExternalAccount(accountType);
     }
 }
