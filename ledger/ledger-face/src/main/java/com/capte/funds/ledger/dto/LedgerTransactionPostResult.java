@@ -11,27 +11,24 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * 账本交易创建结果。
- *
- * @deprecated use {@link LedgerTransactionPostResult}. 账本交易保存具有幂等入账语义，命名应优先表达 posting 结果。
+ * 账本交易入账结果。
  *
  * @author Codex
- * @date 2026-05-14
+ * @date 2026-05-15
  */
-@Deprecated(since = "1.0.1", forRemoval = false)
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class LedgerTransactionCreateResult implements Serializable {
+public class LedgerTransactionPostResult implements Serializable {
 
     @Serial
-    private static final long serialVersionUID = 6904108229096954074L;
+    private static final long serialVersionUID = 5079292095101210626L;
 
     @Schema(description = "账本交易 ID")
     private Long ledgerTransactionId;
 
-    @Schema(description = "本次调用是否新建账本交易")
-    private boolean created;
+    @Schema(description = "本次调用是否新入账账本交易")
+    private boolean newlyPosted;
 }

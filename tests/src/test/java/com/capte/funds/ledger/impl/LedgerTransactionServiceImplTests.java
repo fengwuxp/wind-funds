@@ -4,6 +4,7 @@ import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.ledger.dto.LedgerTransactionCreateResult;
+import com.capte.funds.ledger.dto.LedgerTransactionPostResult;
 import com.capte.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerTransactionMapper;
@@ -51,14 +52,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class LedgerTransactionServiceImplTests {
 
     /**
-     * 场景：账本交易保存后收到同一业务事实的幂等重放。
+     * 场景：账本交易入账后收到同一业务事实的幂等重放。
      * 输入：相同 ledger transaction sn、相同稳定摘要和相同 posting plan。
-     * 输出：已有账本交易 ID 和 created=false。
+     * 输出：已有账本交易 ID 和 newlyPosted=false。
      * 预期：不重复写入账本交易、posting plan 或 entry。
      * 红线：幂等重放不得制造重复账本事实或重复余额影响。
      */
     @Test
-    void testCreateLedgerTransactionShouldReturnExistingIdWhenSameSnAndSha256() {
+    void testPostLedgerTransactionShouldReturnExistingIdWhenSameSnAndSha256() {
         AtomicReference<LedgerTransaction> existingTransaction = new AtomicReference<>();
         List<LedgerTransaction> insertedTransactions = new ArrayList<>();
         List<LedgerPostingPlan> insertedPlans = new ArrayList<>();
@@ -97,15 +98,15 @@ class LedgerTransactionServiceImplTests {
                 .contextVariables(Map.of())
                 .build();
 
-        LedgerTransactionCreateResult firstResult = service.createLedgerTransaction(transaction);
+        LedgerTransactionPostResult firstResult = service.postLedgerTransaction(transaction);
         insertedTransactions.clear();
         insertedPlans.clear();
         insertedEntries.clear();
-        LedgerTransactionCreateResult replayResult = service.createLedgerTransaction(transaction);
+        LedgerTransactionPostResult replayResult = service.postLedgerTransaction(transaction);
 
-        assertThat(firstResult.isCreated()).isTrue();
+        assertThat(firstResult.isNewlyPosted()).isTrue();
         assertThat(replayResult.getLedgerTransactionId()).isEqualTo(firstResult.getLedgerTransactionId());
-        assertThat(replayResult.isCreated()).isFalse();
+        assertThat(replayResult.isNewlyPosted()).isFalse();
         assertThat(insertedTransactions).isEmpty();
         assertThat(insertedPlans).isEmpty();
         assertThat(insertedEntries).isEmpty();

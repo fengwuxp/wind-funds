@@ -12,6 +12,7 @@ import com.capte.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.capte.funds.ledger.dto.LedgerEntryDTO;
 import com.capte.funds.ledger.dto.LedgerTransactionCreateResult;
 import com.capte.funds.ledger.dto.LedgerTransactionDTO;
+import com.capte.funds.ledger.dto.LedgerTransactionPostResult;
 import com.capte.funds.ledger.mapstruct.LedgerConverter;
 import com.capte.funds.ledger.query.LedgerEntryQuery;
 import com.capte.funds.ledger.query.LedgerTransactionQuery;
@@ -125,14 +126,14 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull LedgerTransactionCreateResult createLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
+    public @NonNull LedgerTransactionPostResult postLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
         LedgerTransaction entity = LedgerConverter.INSTANCE.convertToLedgerTransaction(transaction);
         entity.setDebitAmount(transaction.getTotalDebitAmount().getAmount());
         entity.setCreditAmount(transaction.getTotalCreditAmount().getAmount());
         entity.setBalanced(transaction.isBalanced());
         entity.setContextVariables(JSON.toJSONString(transaction.getContextVariables()));
         entity.setSha256(WindObjectDigestUtils.sha256WithNames(entity, LEDGER_TRANSACTION_SHA256_FIELDS));
-        LedgerTransactionCreateResult existingResult = resolveExistingLedgerTransaction(entity);
+        LedgerTransactionPostResult existingResult = resolveExistingLedgerTransaction(entity);
         if (existingResult != null) {
             return existingResult;
         }
@@ -146,10 +147,19 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
                 }
             }
         }
-        return toCreateResult(entity.getId(), true);
+        return toPostResult(entity.getId(), true);
     }
 
-    private LedgerTransactionCreateResult resolveExistingLedgerTransaction(LedgerTransaction entity) {
+    @Override
+    @Deprecated(since = "1.0.1", forRemoval = false)
+    public @NonNull LedgerTransactionCreateResult createLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
+        LedgerTransactionPostResult result = postLedgerTransaction(transaction);
+        return new LedgerTransactionCreateResult()
+                .setLedgerTransactionId(result.getLedgerTransactionId())
+                .setCreated(result.isNewlyPosted());
+    }
+
+    private LedgerTransactionPostResult resolveExistingLedgerTransaction(LedgerTransaction entity) {
         LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
         QueryWrapper wrapper = QueryWrapper.create().from(ref).where(ref.sn.eq(entity.getSn()));
         LedgerTransaction existing = ledgerTransactionMapper.selectOneByQuery(wrapper);
@@ -158,13 +168,13 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         }
         AssertUtils.isTrue(Objects.equals(existing.getSha256(), entity.getSha256()),
                 "账本交易已存在但摘要不一致，ledgerTransactionSn = {}", entity.getSn());
-        return toCreateResult(existing.getId(), false);
+        return toPostResult(existing.getId(), false);
     }
 
-    private LedgerTransactionCreateResult toCreateResult(Long ledgerTransactionId, boolean created) {
-        return new LedgerTransactionCreateResult()
+    private LedgerTransactionPostResult toPostResult(Long ledgerTransactionId, boolean newlyPosted) {
+        return new LedgerTransactionPostResult()
                 .setLedgerTransactionId(ledgerTransactionId)
-                .setCreated(created);
+                .setNewlyPosted(newlyPosted);
     }
 
     private String createPostingPlan(LedgerTransaction transaction,

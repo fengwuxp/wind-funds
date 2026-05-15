@@ -1,7 +1,7 @@
 package com.capte.funds.ledger;
 
 import com.capte.funds.ledger.dto.LedgerDTO;
-import com.capte.funds.ledger.dto.LedgerTransactionCreateResult;
+import com.capte.funds.ledger.dto.LedgerTransactionPostResult;
 import com.capte.funds.ledger.service.LedgerService;
 import com.capte.funds.ledger.service.LedgerTransactionService;
 import com.wind.common.exception.AssertUtils;
@@ -79,8 +79,8 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                         entry.getSubjectType()
                 )));
         Map<FundsAccountId, LedgerBalanceProjectionService> projectionServices = resolveProjectionServices(groups);
-        LedgerTransactionCreateResult createResult = ledgerTransactionService.createLedgerTransaction(transaction);
-        if (!createResult.isCreated()) {
+        LedgerTransactionPostResult postResult = ledgerTransactionService.postLedgerTransaction(transaction);
+        if (!postResult.isNewlyPosted()) {
             return;
         }
         for (Map.Entry<FundsAccountId, List<LedgerEntrySpec>> entry : groups.entrySet()) {
