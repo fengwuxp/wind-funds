@@ -4,6 +4,7 @@ import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.funds.wallet.dal.entities.FundingAccount;
 import com.capte.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
+import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.wallet.service.PlatformFundingAccountService;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -13,6 +14,8 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * 平台资金账户查询服务实现。
@@ -41,9 +44,19 @@ public class PlatformFundingAccountServiceImpl implements PlatformFundingAccount
                 .from(ref)
                 .where(ref.tenantId.eq(tenantId))
                 .and(ref.currency.eq(currency))
-                .and(ref.accountRoleCode.eq(role));
-        FundingAccount result = fundingAccountMapper.selectOneByQuery(wrapper);
-        AssertUtils.notNull(result, "平台资金账户不存在，tenantId = {}, currency = {}, role = {}", tenantId, currency, role);
+                .and(ref.accountRoleCode.eq(role))
+                .and(ref.platform.eq(Boolean.TRUE))
+                .and(ref.status.eq(FundsAccountStatus.ACTIVE));
+        List<FundingAccount> results = fundingAccountMapper.selectListByQuery(wrapper);
+        AssertUtils.isTrue(results != null && !results.isEmpty(),
+                "平台资金账户不存在，tenantId = {}, currency = {}, role = {}", tenantId, currency, role);
+        AssertUtils.isTrue(results.size() == 1,
+                "平台资金账户配置不唯一，tenantId = {}, currency = {}, role = {}, count = {}",
+                tenantId, currency, role, results.size());
+        FundingAccount result = results.getFirst();
+        AssertUtils.isTrue(Boolean.TRUE.equals(result.getPlatform()) && result.getStatus() == FundsAccountStatus.ACTIVE,
+                "平台资金账户状态不可用，tenantId = {}, currency = {}, role = {}, accountId = {}, platform = {}, status = {}",
+                tenantId, currency, role, result.getSn(), result.getPlatform(), result.getStatus());
         return FundsAccountId.immutable(result.getSn(), result.getAccountType());
     }
 }

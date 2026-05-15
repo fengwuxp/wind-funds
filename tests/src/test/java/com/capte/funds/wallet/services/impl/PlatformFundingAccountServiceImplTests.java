@@ -7,11 +7,13 @@ import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.common.exception.BaseException;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,16 +38,7 @@ class PlatformFundingAccountServiceImplTests {
         FundingAccount account = fundingAccount("cash_mapping_usd", DefaultFundsAccountType.CASH_MAPPING.name());
         AtomicInteger queryCount = new AtomicInteger();
         AtomicInteger insertCount = new AtomicInteger();
-        FundingAccountMapper mapper = FundsAccountServiceTestSupport.mapper(
-                FundingAccountMapper.class,
-                entity -> {
-                    insertCount.incrementAndGet();
-                },
-                query -> {
-                    queryCount.incrementAndGet();
-                    return account;
-                }
-        );
+        FundingAccountMapper mapper = mapper(queryCount, insertCount, account);
         PlatformFundingAccountServiceImpl service = new PlatformFundingAccountServiceImpl(mapper);
 
         FundsAccountId result = service.requireAccountId(1L, CurrencyIsoCode.USD,
@@ -67,16 +60,7 @@ class PlatformFundingAccountServiceImplTests {
     void testRequireAccountIdShouldRejectMissingPlatformFundingAccountRole() {
         AtomicInteger queryCount = new AtomicInteger();
         AtomicInteger insertCount = new AtomicInteger();
-        FundingAccountMapper mapper = FundsAccountServiceTestSupport.mapper(
-                FundingAccountMapper.class,
-                entity -> {
-                    insertCount.incrementAndGet();
-                },
-                query -> {
-                    queryCount.incrementAndGet();
-                    return null;
-                }
-        );
+        FundingAccountMapper mapper = mapper(queryCount, insertCount);
         PlatformFundingAccountServiceImpl service = new PlatformFundingAccountServiceImpl(mapper);
 
         assertThatThrownBy(() -> service.requireAccountId(1L, CurrencyIsoCode.USD,
@@ -86,6 +70,58 @@ class PlatformFundingAccountServiceImplTests {
                 .hasMessageContaining("tenantId = 1")
                 .hasMessageContaining("currency = USD")
                 .hasMessageContaining("role = ADJUSTMENT");
+
+        assertThat(queryCount).hasValue(1);
+        assertThat(insertCount).hasValue(0);
+    }
+
+    /**
+     * 场景：平台账户配置存在，但账户已停用或未标记为平台账户。
+     * 输入：tenantId=1、USD、CLEARING，数据库返回非平台或 SUSPENDED 的 FundingAccount。
+     * 输出：拒绝返回该资金账户。
+     * 预期：错误信息暴露账户状态/平台标记问题，不触发自动创建。
+     * 红线：route 不得把停用账户或普通 FundingAccount 当作平台资金账户入账。
+     */
+    @Test
+    void testRequireAccountIdShouldRejectInactiveOrNonPlatformFundingAccount() {
+        FundingAccount account = fundingAccount("clearing_usd", DefaultFundsAccountType.CLEARING.name());
+        account.setPlatform(false);
+        account.setStatus(FundsAccountStatus.SUSPENDED);
+        AtomicInteger queryCount = new AtomicInteger();
+        AtomicInteger insertCount = new AtomicInteger();
+        FundingAccountMapper mapper = mapper(queryCount, insertCount, account);
+        PlatformFundingAccountServiceImpl service = new PlatformFundingAccountServiceImpl(mapper);
+
+        assertThatThrownBy(() -> service.requireAccountId(1L, CurrencyIsoCode.USD,
+                PlatformFundingAccountRole.CLEARING))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("平台资金账户状态不可用");
+
+        assertThat(queryCount).hasValue(1);
+        assertThat(insertCount).hasValue(0);
+    }
+
+    /**
+     * 场景：同一租户、币种、角色配置了多个平台 FundingAccount。
+     * 输入：tenantId=1、USD、FEE，数据库返回两个 ACTIVE 平台 FundingAccount。
+     * 输出：拒绝解析平台资金账户。
+     * 预期：错误信息暴露配置不唯一，不触发自动创建。
+     * 红线：route 不得在多账户歧义下随机选择一个平台资金账户入账。
+     */
+    @Test
+    void testRequireAccountIdShouldRejectDuplicatedPlatformFundingAccountRole() {
+        FundingAccount first = fundingAccount("fee_usd_001", DefaultFundsAccountType.PLATFORM_REVENUE.name());
+        FundingAccount second = fundingAccount("fee_usd_002", DefaultFundsAccountType.PLATFORM_REVENUE.name());
+        AtomicInteger queryCount = new AtomicInteger();
+        AtomicInteger insertCount = new AtomicInteger();
+        FundingAccountMapper mapper = mapper(queryCount, insertCount, first, second);
+        PlatformFundingAccountServiceImpl service = new PlatformFundingAccountServiceImpl(mapper);
+
+        assertThatThrownBy(() -> service.requireAccountId(1L, CurrencyIsoCode.USD,
+                PlatformFundingAccountRole.FEE))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("平台资金账户配置不唯一")
+                .hasMessageContaining("role = FEE");
 
         assertThat(queryCount).hasValue(1);
         assertThat(insertCount).hasValue(0);
@@ -104,16 +140,7 @@ class PlatformFundingAccountServiceImplTests {
         FundingAccount account = fundingAccount("prepayment_usd", DefaultFundsAccountType.PLATFORM_LIABILITY.name());
         AtomicInteger queryCount = new AtomicInteger();
         AtomicInteger insertCount = new AtomicInteger();
-        FundingAccountMapper mapper = FundsAccountServiceTestSupport.mapper(
-                FundingAccountMapper.class,
-                entity -> {
-                    insertCount.incrementAndGet();
-                },
-                query -> {
-                    queryCount.incrementAndGet();
-                    return account;
-                }
-        );
+        FundingAccountMapper mapper = mapper(queryCount, insertCount, account);
         PlatformFundingAccountServiceImpl service = new PlatformFundingAccountServiceImpl(mapper);
 
         FundsAccountId result = service.requireAccountId(CurrencyIsoCode.USD, PlatformFundingAccountRole.PREPAYMENT);
@@ -128,6 +155,30 @@ class PlatformFundingAccountServiceImplTests {
         FundingAccount result = new FundingAccount();
         result.setSn(sn);
         result.setAccountType(accountType);
+        result.setPlatform(true);
+        result.setStatus(FundsAccountStatus.ACTIVE);
         return result;
+    }
+
+    private static FundingAccountMapper mapper(AtomicInteger queryCount,
+                                               AtomicInteger insertCount,
+                                               FundingAccount... accounts) {
+        return FundsAccountServiceTestSupport.mapper(
+                FundingAccountMapper.class,
+                entity -> {
+                    insertCount.incrementAndGet();
+                },
+                query -> {
+                    queryCount.incrementAndGet();
+                    return List.of(accounts).stream().findFirst().orElse(null);
+                },
+                query -> {
+                    queryCount.incrementAndGet();
+                    return List.of(accounts);
+                },
+                entity -> {
+                    throw new UnsupportedOperationException("update");
+                }
+        );
     }
 }
