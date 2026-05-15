@@ -35,14 +35,14 @@
 ### 1.3 构建环境要求
 
 - 编译运行使用的 JDK 版本必须以项目 `pom.xml` 或父 POM 中配置的 Java/JDK 版本为准。若出现 `无效的目标发行版`，说明当前 `JAVA_HOME`、Maven 或 IDEA 使用的 Java 版本与 POM 要求不一致。
-- 默认使用 IDEA 自带或 IDEA 项目配置的 JDK 执行编译、测试、代码生成和静态检查；执行命令前应确保该 JDK 与 POM 配置的版本一致。
+- 默认使用 IDEA 提供的 JDK，包括 IDEA 自带 JDK 或 IDEA 项目 SDK 中配置的 JDK，执行编译、测试、代码生成和静态检查；Agent 不应自行猜测系统默认 JDK。执行命令前应确保该 JDK 与 POM 配置的版本一致。
 - Maven 版本以项目和团队环境为准，执行前先用 `mvn -version` 确认 Java runtime。
 - 构建依赖会访问私有 Maven 仓库，执行编译和测试前需确保本地 Maven 配置、仓库权限、网络与凭据可用。
 
 ### 1.4 Agent 快速入口
 
 - 仓库常用命令固化在根目录 `Justfile`。AI Agent 和开发者优先使用 `just` 命令，减少临时拼 Maven 参数；若本机未安装 `just`，按本文件中对应 Maven 命令回退执行。
-- 如需指定 JDK，优先设置 `WIND_FUNDS_JAVA_HOME`；未设置时使用当前 `JAVA_HOME`；两者都未设置时使用 shell 当前 Java runtime，但必须通过 `just mvn-version` 或 `mvn -version` 确认。
+- 命令行执行应尽量复用 IDEA 提供的 JDK；如需显式指定 JDK，优先把 IDEA JDK 路径设置到 `WIND_FUNDS_JAVA_HOME`；未设置时使用当前 `JAVA_HOME`；两者都未设置时使用 shell 当前 Java runtime，但必须通过 `just mvn-version` 或 `mvn -version` 确认。
 - 修改代码、测试、构建配置、数据库脚本或运行时配置前，先执行 `just mvn-version` 和 `just compile`；不涉及代码的文档、产品设计、系统分析设计、方案讨论、需求澄清、流程图或说明性材料，不要求编译。
 - 相关测试优先使用 `Justfile` 中按能力分组的命令：`just test-core`、`just test-ledger`、`just test-transaction`、`just test-balance-control`、`just test-business-flow`、`just test-boundary`；单个测试使用 `just test-one <TestClass>`。
 - 提交前优先执行 `just pmd`。若 `pmd:check` 失败原因是私有仓库、snapshot、本地 Maven 缓存或依赖解析问题，应在交付说明中按环境依赖问题记录；不得把依赖解析失败等同于代码规约违规。
