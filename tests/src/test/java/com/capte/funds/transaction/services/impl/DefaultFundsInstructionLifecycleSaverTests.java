@@ -11,9 +11,11 @@ import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSp
 import com.capte.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.capte.funds.transaction.dal.entities.FundsTransaction;
 import com.capte.funds.transaction.dal.entities.FundsTransactionDetail;
+import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
 import com.capte.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.capte.funds.transaction.enums.FundsEffectType;
+import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionMode;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
@@ -117,7 +119,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void testLifecycleSaverShouldCreateOneTransactionAndManyParticipantDetails() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -177,7 +179,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void testFundsTransactionShouldBeUniqueByTenantSceneBusinessSn() {
         FundsTransaction existingTransaction = transaction();
         AtomicReference<QueryWrapper> transactionQuery = new AtomicReference<>();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -218,7 +220,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void testReplayOnceDetailShouldRecordConsumedReplayLegIds() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -258,7 +260,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void testTransactionAmountShouldNotSumParticipantDetails() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -328,7 +330,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> updatedDetails = new ArrayList<>();
         AtomicInteger detailQueryIndex = new AtomicInteger();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -379,7 +381,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> updatedDetails = new ArrayList<>();
         AtomicInteger detailQueryIndex = new AtomicInteger();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -427,7 +429,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         List<FundsTransactionDetail> details = List.of(payerDetail, payeeDetail, feeDetail);
         AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
         AtomicInteger detailQueryIndex = new AtomicInteger();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -472,7 +474,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         List<FundsTransactionDetail> details = List.of(payerDetail, feeDetail);
         AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
         AtomicInteger detailQueryIndex = new AtomicInteger();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -501,6 +503,87 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction.get().getSettledAmount()).isZero();
         assertThat(updatedTransaction.get().getFeeAmount()).isEqualTo(30L);
         assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+    }
+
+    @Test
+    void markSucceededShouldPartiallyConsumeReferencedFrozenOrderForWithdraw() {
+        FundsTransaction transaction = directTransaction(DefaultFundsTransactionType.WITHDRAW);
+        FundsTransactionDetail withdrawDetail = withdrawDetail("FTD_001", 60L);
+        FundsFrozenOrder frozenOrder = frozenOrder(20L, 0L, FundsFrozenOrderStatus.PARTIALLY_RELEASED);
+        AtomicReference<FundsFrozenOrder> updatedFrozenOrder = new AtomicReference<>();
+        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, withdrawDetail,
+                new AtomicReference<>(), new AtomicReference<>(), frozenOrder, updatedFrozenOrder);
+
+        saver.markSucceeded(new FreezeOrderReferencedWithdrawInstruction("FO_001", 60L),
+                new FundsInstructionLifecycleResult()
+                        .setTransactionSn("FT_001")
+                        .setTransactionDetailSns(List.of("FTD_001")), "LE_001");
+
+        assertThat(updatedFrozenOrder.get().getReleasedAmount()).isEqualTo(20L);
+        assertThat(updatedFrozenOrder.get().getConsumedAmount()).isEqualTo(60L);
+        assertThat(updatedFrozenOrder.get().getStatus()).isEqualTo(FundsFrozenOrderStatus.PARTIALLY_CONSUMED);
+        assertThat(updatedFrozenOrder.get().getConsumeTime()).isNull();
+    }
+
+    @Test
+    void markSucceededShouldCloseReferencedFrozenOrderWhenFullyConsumed() {
+        FundsTransaction transaction = directTransaction(DefaultFundsTransactionType.WITHDRAW);
+        FundsTransactionDetail withdrawDetail = withdrawDetail("FTD_001", 60L);
+        FundsFrozenOrder frozenOrder = frozenOrder(20L, 20L, FundsFrozenOrderStatus.PARTIALLY_CONSUMED);
+        AtomicReference<FundsFrozenOrder> updatedFrozenOrder = new AtomicReference<>();
+        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, withdrawDetail,
+                new AtomicReference<>(), new AtomicReference<>(), frozenOrder, updatedFrozenOrder);
+
+        saver.markSucceeded(new FreezeOrderReferencedWithdrawInstruction("FO_001", 60L),
+                new FundsInstructionLifecycleResult()
+                        .setTransactionSn("FT_001")
+                        .setTransactionDetailSns(List.of("FTD_001")), "LE_001");
+
+        assertThat(updatedFrozenOrder.get().getConsumedAmount()).isEqualTo(80L);
+        assertThat(updatedFrozenOrder.get().getStatus()).isEqualTo(FundsFrozenOrderStatus.CONSUMED);
+        assertThat(updatedFrozenOrder.get().getConsumeTime()).isNotNull();
+    }
+
+    @Test
+    void markSucceededShouldRejectFrozenOrderConsumeWhenRemainingAmountInsufficient() {
+        FundsTransaction transaction = directTransaction(DefaultFundsTransactionType.WITHDRAW);
+        FundsTransactionDetail withdrawDetail = withdrawDetail("FTD_001", 40L);
+        FundsFrozenOrder frozenOrder = frozenOrder(20L, 50L, FundsFrozenOrderStatus.PARTIALLY_CONSUMED);
+        AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
+        AtomicReference<FundsTransactionDetail> updatedDetail = new AtomicReference<>();
+        AtomicReference<FundsFrozenOrder> updatedFrozenOrder = new AtomicReference<>();
+        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, withdrawDetail,
+                updatedTransaction, updatedDetail, frozenOrder, updatedFrozenOrder);
+
+        assertThatThrownBy(() -> saver.markSucceeded(new FreezeOrderReferencedWithdrawInstruction("FO_001", 40L),
+                new FundsInstructionLifecycleResult()
+                        .setTransactionSn("FT_001")
+                        .setTransactionDetailSns(List.of("FTD_001")), "LE_001"))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("冻结单剩余可消费金额不足")
+                .hasMessageContaining("remainingAmount = 30")
+                .hasMessageContaining("amount = 40");
+        assertThat(updatedTransaction).hasValue(null);
+        assertThat(updatedDetail).hasValue(null);
+        assertThat(updatedFrozenOrder).hasValue(null);
+    }
+
+    @Test
+    void markSucceededShouldRejectFrozenOrderConsumeWhenOrderAlreadyReleased() {
+        FundsTransaction transaction = directTransaction(DefaultFundsTransactionType.WITHDRAW);
+        FundsTransactionDetail withdrawDetail = withdrawDetail("FTD_001", 10L);
+        FundsFrozenOrder frozenOrder = frozenOrder(90L, 0L, FundsFrozenOrderStatus.RELEASED);
+        AtomicReference<FundsFrozenOrder> updatedFrozenOrder = new AtomicReference<>();
+        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, withdrawDetail,
+                new AtomicReference<>(), new AtomicReference<>(), frozenOrder, updatedFrozenOrder);
+
+        assertThatThrownBy(() -> saver.markSucceeded(new FreezeOrderReferencedWithdrawInstruction("FO_001", 10L),
+                new FundsInstructionLifecycleResult()
+                        .setTransactionSn("FT_001")
+                        .setTransactionDetailSns(List.of("FTD_001")), "LE_001"))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("冻结单当前状态不允许消费");
+        assertThat(updatedFrozenOrder).hasValue(null);
     }
 
     @Test
@@ -589,7 +672,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void beforePostingShouldReuseCompletedDetails() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
-        DefaultFundsInstructionLifecycleSaver createSaver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -617,7 +700,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
             detail.setLedgerTransactionSn("LE_001");
         });
         AtomicInteger detailQueryIndex = new AtomicInteger();
-        DefaultFundsInstructionLifecycleSaver reuseSaver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver reuseSaver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -647,7 +730,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void beforePostingShouldRejectChangedRouteForSameBusinessEvent() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
-        DefaultFundsInstructionLifecycleSaver createSaver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -671,7 +754,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         RouteSnapshotSpec snapshot = new DefaultRouteSnapshotFactory().createSnapshot(route);
         createSaver.beforePosting(new SimpleInstruction(), route, snapshot);
         AtomicInteger detailQueryIndex = new AtomicInteger();
-        DefaultFundsInstructionLifecycleSaver reuseSaver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver reuseSaver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -705,7 +788,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void beforePostingShouldIgnoreRouteSnapshotMetadataWhenComparingRequestHash() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
-        DefaultFundsInstructionLifecycleSaver createSaver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -729,7 +812,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         RouteSnapshotSpec snapshot = new DefaultRouteSnapshotFactory().createSnapshot(route);
         createSaver.beforePosting(new SimpleInstruction(), route, snapshot);
         AtomicInteger detailQueryIndex = new AtomicInteger();
-        DefaultFundsInstructionLifecycleSaver reuseSaver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver reuseSaver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -760,7 +843,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void beforePostingShouldReuseReferencedFundsTransactionOnlyForSnapshotReference() {
         FundsTransaction referencedTransaction = transaction();
         AtomicInteger transactionQueryIndex = new AtomicInteger();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -788,7 +871,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     void beforePostingShouldNotReuseFundsTransactionForFreezeOrderReference() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         AtomicInteger transactionQueryIndex = new AtomicInteger();
-        DefaultFundsInstructionLifecycleSaver saver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -829,7 +912,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         FundsTransaction transaction = transaction();
         transaction.setRouteSnapshot(null);
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
-        DefaultFundsInstructionLifecycleSaver createSaver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -970,7 +1053,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         FundsTransaction transaction = transaction();
         transaction.setRouteSnapshot(null);
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
-        DefaultFundsInstructionLifecycleSaver createSaver = new DefaultFundsInstructionLifecycleSaver(
+        DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
                         entity -> {
@@ -1210,6 +1293,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
                                                                         FundsTransactionDetail detail,
                                                                         AtomicReference<FundsTransaction> updated,
                                                                         AtomicReference<FundsTransactionDetail> updatedDetail) {
+        return lifecycleSaver(transaction, detail, updated, updatedDetail, null, new AtomicReference<>());
+    }
+
+    private static DefaultFundsInstructionLifecycleSaver lifecycleSaver(FundsTransaction transaction,
+                                                                        FundsTransactionDetail detail,
+                                                                        AtomicReference<FundsTransaction> updated,
+                                                                        AtomicReference<FundsTransactionDetail> updatedDetail,
+                                                                        FundsFrozenOrder frozenOrder,
+                                                                        AtomicReference<FundsFrozenOrder> updatedFrozenOrder) {
         return new DefaultFundsInstructionLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
@@ -1232,8 +1324,48 @@ class DefaultFundsInstructionLifecycleSaverTests {
                             updatedDetail.set((FundsTransactionDetail) entity);
                             return 1;
                         }
+                ),
+                FundsAccountServiceTestSupport.mapper(
+                        FundsFrozenOrderMapper.class,
+                        entity -> {
+                            throw new UnsupportedOperationException("insertSelective");
+                        },
+                        query -> frozenOrder,
+                        entity -> {
+                            updatedFrozenOrder.set((FundsFrozenOrder) entity);
+                            return 1;
+                        }
                 )
         );
+    }
+
+    private static DefaultFundsInstructionLifecycleSaver newLifecycleSaver(
+            FundsTransactionMapper fundsTransactionMapper,
+            FundsTransactionDetailMapper fundsTransactionDetailMapper) {
+        return new DefaultFundsInstructionLifecycleSaver(fundsTransactionMapper, fundsTransactionDetailMapper,
+                unsupportedFrozenOrderMapper());
+    }
+
+    private static FundsFrozenOrderMapper unsupportedFrozenOrderMapper() {
+        return FundsAccountServiceTestSupport.mapper(
+                FundsFrozenOrderMapper.class,
+                entity -> {
+                    throw new UnsupportedOperationException("insertSelective");
+                },
+                query -> {
+                    throw new AssertionError("unexpected frozen order query");
+                },
+                entity -> {
+                    throw new AssertionError("unexpected frozen order update");
+                }
+        );
+    }
+
+    private static FundsTransaction directTransaction(DefaultFundsTransactionType transactionType) {
+        FundsTransaction transaction = transaction();
+        transaction.setTransactionMode(FundsTransactionMode.DIRECT);
+        transaction.setTransactionType(transactionType);
+        return transaction;
     }
 
     private static FundsTransactionDetail directDetail(String sn, RouteParticipantRole participantRole, long amount) {
@@ -1243,6 +1375,29 @@ class DefaultFundsInstructionLifecycleSaverTests {
         detail.setFundsEffectType(FundsEffectType.DIRECT);
         detail.setAmount(amount);
         return detail;
+    }
+
+    private static FundsTransactionDetail withdrawDetail(String sn, long amount) {
+        FundsTransactionDetail detail = directDetail(sn, RouteParticipantRole.PAYER, amount);
+        detail.setTransactionType(DefaultFundsTransactionType.WITHDRAW);
+        detail.setEventType(FundsTransactionEventType.WITHDRAW);
+        detail.setFundsEffectType(FundsEffectType.CONSUME);
+        return detail;
+    }
+
+    private static FundsFrozenOrder frozenOrder(long releasedAmount,
+                                                long consumedAmount,
+                                                FundsFrozenOrderStatus status) {
+        FundsFrozenOrder order = new FundsFrozenOrder();
+        order.setId(901L);
+        order.setSn("FO_001");
+        order.setTenantId(1L);
+        order.setAmount(100L);
+        order.setReleasedAmount(releasedAmount);
+        order.setConsumedAmount(consumedAmount);
+        order.setCurrency(CurrencyIsoCode.USD);
+        order.setStatus(status);
+        return order;
     }
 
     private static class SimpleInstruction implements FundsInstructionSpec {
@@ -1375,6 +1530,87 @@ class DefaultFundsInstructionLifecycleSaverTests {
         @Override
         public @Nullable FundsInstructionReferenceSpec getReference() {
             return new SimpleReference(referenceType);
+        }
+    }
+
+    private static final class FreezeOrderReferencedWithdrawInstruction extends SimpleInstruction {
+
+        private final String freezeOrderSn;
+
+        private final long amount;
+
+        private FreezeOrderReferencedWithdrawInstruction(String freezeOrderSn, long amount) {
+            this.freezeOrderSn = freezeOrderSn;
+            this.amount = amount;
+        }
+
+        @Override
+        public @NonNull FundsInstructionType getInstructionType() {
+            return FundsInstructionType.DIRECT_TRANSACTION;
+        }
+
+        @Override
+        public @NonNull FundsTransactionEventType getEventType() {
+            return FundsTransactionEventType.WITHDRAW;
+        }
+
+        @Override
+        public @NonNull DefaultFundsTransactionType getTransactionType() {
+            return DefaultFundsTransactionType.WITHDRAW;
+        }
+
+        @Override
+        public @NonNull Money getAmount() {
+            return Money.immutable(amount, CurrencyIsoCode.USD);
+        }
+
+        @Override
+        public @Nullable FundsInstructionReferenceSpec getReference() {
+            return new FreezeOrderReference(freezeOrderSn);
+        }
+    }
+
+    private static final class FreezeOrderReference implements FundsInstructionReferenceSpec {
+
+        private final String freezeOrderSn;
+
+        private FreezeOrderReference(String freezeOrderSn) {
+            this.freezeOrderSn = freezeOrderSn;
+        }
+
+        @Override
+        public @NonNull FundsInstructionReferenceType getReferenceType() {
+            return FundsInstructionReferenceType.FREEZE_ORDER;
+        }
+
+        @Override
+        public @Nullable String getReferenceSn() {
+            return freezeOrderSn;
+        }
+
+        @Override
+        public @Nullable String getReferenceBusinessSn() {
+            return null;
+        }
+
+        @Override
+        public @Nullable String getReferenceLedgerTransactionSn() {
+            return null;
+        }
+
+        @Override
+        public @Nullable String getExternalTransactionId() {
+            return null;
+        }
+
+        @Override
+        public @Nullable String getAuthCode() {
+            return null;
+        }
+
+        @Override
+        public @NonNull Map<String, Object> getContextVariables() {
+            return Map.of();
         }
     }
 

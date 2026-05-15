@@ -2,13 +2,17 @@ package com.capte.funds.transaction.services.impl;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.capte.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.capte.funds.transaction.dal.entities.FundsTransaction;
 import com.capte.funds.transaction.dal.entities.FundsTransactionDetail;
+import com.capte.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.capte.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
 import com.capte.funds.transaction.dal.entities.table.FundsTransactionNameRefs;
+import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
 import com.capte.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.capte.funds.transaction.enums.FundsEffectType;
+import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionMode;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
@@ -30,6 +34,7 @@ import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
+import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import com.wind.transaction.core.Money;
@@ -41,6 +46,7 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -73,6 +79,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private final FundsTransactionDetailMapper fundsTransactionDetailMapper;
 
+    private final FundsFrozenOrderMapper fundsFrozenOrderMapper;
+
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return switch (instruction.getEventType()) {
@@ -104,6 +112,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         }
         FundsTransaction transaction = findTransactionBySn(result.getTransactionSn());
         assertSucceededSummaryAllowed(transaction, details);
+        FundsFrozenOrder consumedFrozenOrder = prepareFrozenOrderConsumption(instruction, details);
         for (FundsTransactionDetail detail : details) {
             detail.setStatus(resolveCompletedDetailStatus(detail));
             detail.setLedgerTransactionSn(ledgerTransactionSn);
@@ -116,6 +125,10 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         applySucceededSummary(transaction, details);
         AssertUtils.isTrue(fundsTransactionMapper.update(transaction) == 1,
                 "更新资金交易聚合状态失败，sn = {}", transaction.getSn());
+        if (consumedFrozenOrder != null) {
+            AssertUtils.isTrue(fundsFrozenOrderMapper.update(consumedFrozenOrder) == 1,
+                    "更新冻结单消费状态失败，sn = {}", consumedFrozenOrder.getSn());
+        }
     }
 
     @Override
@@ -326,6 +339,59 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             default -> {
             }
         }
+    }
+
+    private @Nullable FundsFrozenOrder prepareFrozenOrderConsumption(FundsInstructionSpec instruction,
+                                                                     List<FundsTransactionDetail> details) {
+        FundsInstructionReferenceSpec reference = instruction.getReference();
+        if (reference == null
+                || reference.getReferenceType() != FundsInstructionReferenceType.FREEZE_ORDER
+                || instruction.getEventType() != FundsTransactionEventType.WITHDRAW) {
+            return null;
+        }
+        AssertUtils.hasText(reference.getReferenceSn(), "冻结单消费事件必须引用冻结单");
+        FundsFrozenOrder order = findFrozenOrderBySn(instruction.getTenantId(), reference.getReferenceSn());
+        assertFrozenOrderConsumable(order);
+        long consumeAmount = resolvePrimaryAmount(details);
+        long remainingAmount = remainingConsumableAmount(order);
+        AssertUtils.isTrue(consumeAmount <= remainingAmount,
+                "冻结单剩余可消费金额不足，sn = {}，remainingAmount = {}，amount = {}",
+                order.getSn(), remainingAmount, consumeAmount);
+
+        long consumedAmount = defaultAmount(order.getConsumedAmount()) + consumeAmount;
+        order.setConsumedAmount(consumedAmount);
+        if (defaultAmount(order.getReleasedAmount()) + consumedAmount >= order.getAmount()) {
+            order.setStatus(FundsFrozenOrderStatus.CONSUMED);
+            order.setConsumeTime(LocalDateTime.now());
+        } else {
+            order.setStatus(FundsFrozenOrderStatus.PARTIALLY_CONSUMED);
+        }
+        return order;
+    }
+
+    private FundsFrozenOrder findFrozenOrderBySn(Long tenantId, String sn) {
+        FundsFrozenOrderNameRefs ref = FundsFrozenOrderNameRefs.fundsFrozenOrder;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(sn));
+        FundsFrozenOrder result = fundsFrozenOrderMapper.selectOneByQuery(wrapper);
+        AssertUtils.notNull(result, "冻结单不存在，sn = {}", sn);
+        return result;
+    }
+
+    private void assertFrozenOrderConsumable(FundsFrozenOrder order) {
+        AssertUtils.isTrue(order.getStatus() == FundsFrozenOrderStatus.FROZEN
+                        || order.getStatus() == FundsFrozenOrderStatus.PARTIALLY_RELEASED
+                        || order.getStatus() == FundsFrozenOrderStatus.PARTIALLY_CONSUMED,
+                "冻结单当前状态不允许消费，sn = {}，status = {}", order.getSn(), order.getStatus());
+    }
+
+    private long remainingConsumableAmount(FundsFrozenOrder order) {
+        return order.getAmount() - defaultAmount(order.getReleasedAmount()) - defaultAmount(order.getConsumedAmount());
+    }
+
+    private long defaultAmount(Long amount) {
+        return amount == null ? 0L : amount;
     }
 
     private long resolvePrimaryAmount(List<FundsTransactionDetail> details) {
