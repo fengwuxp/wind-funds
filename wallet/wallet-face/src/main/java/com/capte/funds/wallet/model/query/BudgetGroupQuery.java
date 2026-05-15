@@ -1,4 +1,4 @@
-package com.capte.funds.transaction.model.query;
+package com.capte.funds.wallet.model.query;
 
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
@@ -11,7 +11,7 @@ import lombok.ToString;
 import lombok.experimental.Accessors;
 
 /**
- * 信用账户查询条件。
+ * 预算组查询条件。
  *
  * @author Codex
  * @date 2026-05-07
@@ -21,9 +21,9 @@ import lombok.experimental.Accessors;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class CreditAccountQuery {
+public class BudgetGroupQuery {
 
-    @Schema(description = "信用账户号")
+    @Schema(description = "预算组号")
     private String sn;
 
     @Schema(description = "租户 ID")
@@ -35,8 +35,8 @@ public class CreditAccountQuery {
     @Schema(description = "归属主体类型")
     private FundsAccountOwnerType ownerType;
 
-    @Schema(description = "信用账户类型")
-    private String accountType;
+    @Schema(description = "预算类型")
+    private String budgetType;
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;

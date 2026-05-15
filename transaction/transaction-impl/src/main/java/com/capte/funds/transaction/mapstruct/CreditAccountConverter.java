@@ -2,8 +2,8 @@ package com.capte.funds.transaction.mapstruct;
 
 import com.capte.funds.transaction.dal.entities.CreditAccount;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
-import com.capte.funds.transaction.model.dto.CreditAccountDTO;
-import com.capte.funds.transaction.model.request.CreateCreditAccountRequest;
+import com.capte.funds.wallet.model.dto.CreditAccountDTO;
+import com.capte.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import org.mapstruct.AfterMapping;

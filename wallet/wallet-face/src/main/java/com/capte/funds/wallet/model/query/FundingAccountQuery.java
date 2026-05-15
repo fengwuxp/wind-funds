@@ -1,4 +1,4 @@
-package com.capte.funds.transaction.model.query;
+package com.capte.funds.wallet.model.query;
 
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;

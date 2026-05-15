@@ -1,8 +1,8 @@
-package com.capte.funds.transaction.services;
+package com.capte.funds.wallet.service;
 
-import com.capte.funds.transaction.model.dto.BudgetGroupDTO;
-import com.capte.funds.transaction.model.query.BudgetGroupQuery;
-import com.capte.funds.transaction.model.request.CreateBudgetGroupRequest;
+import com.capte.funds.wallet.model.dto.BudgetGroupDTO;
+import com.capte.funds.wallet.model.query.BudgetGroupQuery;
+import com.capte.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;

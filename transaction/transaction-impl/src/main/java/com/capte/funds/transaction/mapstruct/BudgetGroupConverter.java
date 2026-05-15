@@ -2,8 +2,8 @@ package com.capte.funds.transaction.mapstruct;
 
 import com.capte.funds.transaction.dal.entities.BudgetGroup;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
-import com.capte.funds.transaction.model.dto.BudgetGroupDTO;
-import com.capte.funds.transaction.model.request.CreateBudgetGroupRequest;
+import com.capte.funds.wallet.model.dto.BudgetGroupDTO;
+import com.capte.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import org.mapstruct.AfterMapping;

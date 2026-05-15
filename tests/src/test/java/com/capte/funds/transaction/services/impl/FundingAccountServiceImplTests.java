@@ -5,7 +5,7 @@ import com.capte.funds.transaction.dal.mapper.FundingAccountMapper;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
-import com.capte.funds.transaction.model.request.CreateFundingAccountRequest;
+import com.capte.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.capte.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;

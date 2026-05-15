@@ -1,4 +1,4 @@
-package com.capte.funds.transaction.model.dto;
+package com.capte.funds.wallet.model.dto;
 
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * 信用账户 DTO。
+ * 预算组 DTO。
  *
  * @author Codex
  * @date 2026-05-07
@@ -29,10 +29,10 @@ import java.util.Map;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class CreditAccountDTO implements Serializable {
+public class BudgetGroupDTO implements Serializable {
 
     @Serial
-    private static final long serialVersionUID = 3482792313801711717L;
+    private static final long serialVersionUID = 5222298784204923649L;
 
     @Schema(description = "主键")
     private Long id;
@@ -43,7 +43,7 @@ public class CreditAccountDTO implements Serializable {
     @Schema(description = "修改时间")
     private LocalDateTime gmtModified;
 
-    @Schema(description = "信用账户号")
+    @Schema(description = "预算组号")
     private String sn;
 
     @Schema(description = "租户 ID")
@@ -55,14 +55,17 @@ public class CreditAccountDTO implements Serializable {
     @Schema(description = "归属主体类型")
     private FundsAccountOwnerType ownerType;
 
-    @Schema(description = "信用账户类型")
-    private String accountType;
+    @Schema(description = "预算类型")
+    private String budgetType;
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;
 
-    @Schema(description = "账本周期类型")
+    @Schema(description = "周期类型")
     private AccountBalancePeriodType periodType;
+
+    @Schema(description = "周期策略")
+    private String periodPolicy;
 
     @Schema(description = "ledger profile 编码")
     private LedgerProfileCode ledgerProfileCode;

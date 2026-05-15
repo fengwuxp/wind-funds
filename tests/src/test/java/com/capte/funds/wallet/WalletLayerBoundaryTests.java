@@ -53,6 +53,12 @@ class WalletLayerBoundaryTests {
     private static final Path TRANSACTION_PLATFORM_FUNDING_ACCOUNT_ROLE = Path.of(
             "transaction/transaction-face/src/main/java/com/capte/funds/transaction/enums/PlatformFundingAccountRole.java");
 
+    private static final List<String> ACCOUNT_CONTRACT_SIMPLE_NAMES = List.of(
+            "FundingAccount",
+            "CreditAccount",
+            "BudgetGroup"
+    );
+
     private static final List<String> FORBIDDEN_REFERENCES = List.of(
             "com.capte.funds.ledger.dal.",
             "com.capte.funds.ledger.impl.",
@@ -149,6 +155,45 @@ class WalletLayerBoundaryTests {
                 .doesNotExist();
     }
 
+    /**
+     * 场景：FundingAccount、CreditAccount、BudgetGroup 是钱包主体账户管理能力。
+     * 输入：扫描 wallet-face 与 transaction-face 的账户服务、DTO、Query、Request 契约。
+     * 输出：三类账户契约所在模块。
+     * 预期：wallet-face 拥有账户主体管理契约，transaction-face 不再承载这些账户能力契约。
+     */
+    @Test
+    void testWalletFaceShouldOwnAccountSubjectManagementContracts() {
+        Path projectRoot = projectRoot();
+
+        for (String contractName : ACCOUNT_CONTRACT_SIMPLE_NAMES) {
+            assertThat(projectRoot.resolve(walletService(contractName)))
+                    .as("wallet-face should expose " + contractName + "Service")
+                    .exists();
+            assertThat(projectRoot.resolve(walletDto(contractName)))
+                    .as("wallet-face should expose " + contractName + "DTO")
+                    .exists();
+            assertThat(projectRoot.resolve(walletQuery(contractName)))
+                    .as("wallet-face should expose " + contractName + "Query")
+                    .exists();
+            assertThat(projectRoot.resolve(walletRequest(contractName)))
+                    .as("wallet-face should expose Create" + contractName + "Request")
+                    .exists();
+
+            assertThat(projectRoot.resolve(transactionService(contractName)))
+                    .as("transaction-face should not own " + contractName + "Service")
+                    .doesNotExist();
+            assertThat(projectRoot.resolve(transactionDto(contractName)))
+                    .as("transaction-face should not own " + contractName + "DTO")
+                    .doesNotExist();
+            assertThat(projectRoot.resolve(transactionQuery(contractName)))
+                    .as("transaction-face should not own " + contractName + "Query")
+                    .doesNotExist();
+            assertThat(projectRoot.resolve(transactionRequest(contractName)))
+                    .as("transaction-face should not own Create" + contractName + "Request")
+                    .doesNotExist();
+        }
+    }
+
     private static List<String> findForbiddenReferences(Path sourceRoot) throws IOException {
         List<String> violations = new ArrayList<>();
         for (Path sourceFile : listJavaSources(sourceRoot)) {
@@ -173,6 +218,46 @@ class WalletLayerBoundaryTests {
 
     private static boolean containsForbiddenReference(String line) {
         return FORBIDDEN_REFERENCES.stream().anyMatch(line::contains);
+    }
+
+    private static Path walletService(String contractName) {
+        return Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/service/" + contractName
+                + "Service.java");
+    }
+
+    private static Path walletDto(String contractName) {
+        return Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/dto/" + contractName
+                + "DTO.java");
+    }
+
+    private static Path walletQuery(String contractName) {
+        return Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/query/" + contractName
+                + "Query.java");
+    }
+
+    private static Path walletRequest(String contractName) {
+        return Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/request/Create" + contractName
+                + "Request.java");
+    }
+
+    private static Path transactionService(String contractName) {
+        return Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/services/" + contractName
+                + "Service.java");
+    }
+
+    private static Path transactionDto(String contractName) {
+        return Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/dto/" + contractName
+                + "DTO.java");
+    }
+
+    private static Path transactionQuery(String contractName) {
+        return Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/query/"
+                + contractName + "Query.java");
+    }
+
+    private static Path transactionRequest(String contractName) {
+        return Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/request/Create"
+                + contractName + "Request.java");
     }
 
     private static Path projectRoot() {

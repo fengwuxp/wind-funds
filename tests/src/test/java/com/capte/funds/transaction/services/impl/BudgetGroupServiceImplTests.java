@@ -4,7 +4,7 @@ import com.capte.funds.transaction.dal.entities.BudgetGroup;
 import com.capte.funds.transaction.dal.mapper.BudgetGroupMapper;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
-import com.capte.funds.transaction.model.request.CreateBudgetGroupRequest;
+import com.capte.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.capte.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;

@@ -1,4 +1,4 @@
-package com.capte.funds.transaction.model.request;
+package com.capte.funds.wallet.model.request;
 
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
