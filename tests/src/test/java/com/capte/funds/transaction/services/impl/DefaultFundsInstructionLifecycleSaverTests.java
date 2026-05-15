@@ -90,11 +90,21 @@ class DefaultFundsInstructionLifecycleSaverTests {
                 .toList();
 
         assertThat(methodNames)
-                .containsExactlyInAnyOrder("beforePosting", "markSucceeded", "markFailed");
+                .containsExactlyInAnyOrder("supports", "beforePosting", "markSucceeded", "markFailed");
         assertThat(methodNames)
                 .noneMatch(DefaultFundsInstructionLifecycleSaverTests::isQueryMethodName);
         assertThat(Arrays.stream(methods).map(Method::getReturnType).toList())
-                .containsExactlyInAnyOrder(FundsInstructionLifecycleResult.class, Void.TYPE, Void.TYPE);
+                .containsExactlyInAnyOrder(Boolean.TYPE, FundsInstructionLifecycleResult.class, Void.TYPE, Void.TYPE);
+    }
+
+    @Test
+    void testLifecycleSaverShouldSupportFundsTransactionEventsOnly() {
+        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction(), detail("FTD_001",
+                RouteParticipantRole.AUTH_HOLDER), new AtomicReference<>());
+
+        assertThat(saver.supports(new SimpleInstruction())).isTrue();
+        assertThat(saver.supports(new BalanceControlInstruction(FundsTransactionEventType.FREEZE))).isFalse();
+        assertThat(saver.supports(new BalanceControlInstruction(FundsTransactionEventType.UNFREEZE))).isFalse();
     }
 
     /**
@@ -300,7 +310,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, detail, updatedTransaction,
                 updatedDetail);
 
-        saver.markSucceeded(new FundsInstructionLifecycleResult()
+        saver.markSucceeded(new SimpleInstruction(), new FundsInstructionLifecycleResult()
                 .setTransactionSn("FT_001")
                 .setTransactionDetailSns(List.of("FTD_001")), null);
 
@@ -343,7 +353,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
                 )
         );
 
-        saver.markSucceeded(new FundsInstructionLifecycleResult()
+        saver.markSucceeded(new SimpleInstruction(), new FundsInstructionLifecycleResult()
                 .setTransactionSn("FT_001")
                 .setTransactionDetailSns(List.of("FTD_001", "FTD_002")), "LE_001");
 
@@ -394,7 +404,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
                 )
         );
 
-        saver.markSucceeded(new FundsInstructionLifecycleResult()
+        saver.markSucceeded(new SimpleInstruction(), new FundsInstructionLifecycleResult()
                 .setTransactionSn("FT_001")
                 .setTransactionDetailSns(List.of("FTD_001", "FTD_002", "FTD_003")), "LE_001");
 
@@ -439,7 +449,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
                 )
         );
 
-        saver.markSucceeded(new FundsInstructionLifecycleResult()
+        saver.markSucceeded(new SimpleInstruction(), new FundsInstructionLifecycleResult()
                 .setTransactionSn("FT_001")
                 .setTransactionDetailSns(List.of("FTD_001", "FTD_002", "FTD_003")), "LE_001");
 
@@ -484,7 +494,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
                 )
         );
 
-        saver.markSucceeded(new FundsInstructionLifecycleResult()
+        saver.markSucceeded(new SimpleInstruction(), new FundsInstructionLifecycleResult()
                 .setTransactionSn("FT_001")
                 .setTransactionDetailSns(List.of("FTD_001", "FTD_002")), "LE_001");
 
@@ -504,7 +514,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
         DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, refundDetail, updatedTransaction);
 
-        saver.markSucceeded(new FundsInstructionLifecycleResult()
+        saver.markSucceeded(new SimpleInstruction(), new FundsInstructionLifecycleResult()
                 .setTransactionSn("FT_001")
                 .setTransactionDetailSns(List.of("FTD_001")), "LE_001");
 
@@ -526,7 +536,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, chargebackDetail,
                 updatedTransaction);
 
-        saver.markSucceeded(new FundsInstructionLifecycleResult()
+        saver.markSucceeded(new SimpleInstruction(), new FundsInstructionLifecycleResult()
                 .setTransactionSn("FT_001")
                 .setTransactionDetailSns(List.of("FTD_001")), "LE_001");
 
@@ -546,7 +556,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
         DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, refundDetail, updatedTransaction);
 
-        assertThatThrownBy(() -> saver.markSucceeded(new FundsInstructionLifecycleResult()
+        assertThatThrownBy(() -> saver.markSucceeded(new SimpleInstruction(), new FundsInstructionLifecycleResult()
                 .setTransactionSn("FT_001")
                 .setTransactionDetailSns(List.of("FTD_001")), "LE_001"))
                 .isInstanceOf(BaseException.class)
@@ -567,7 +577,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
         DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, chargebackDetail,
                 updatedTransaction);
 
-        assertThatThrownBy(() -> saver.markSucceeded(new FundsInstructionLifecycleResult()
+        assertThatThrownBy(() -> saver.markSucceeded(new SimpleInstruction(), new FundsInstructionLifecycleResult()
                 .setTransactionSn("FT_001")
                 .setTransactionDetailSns(List.of("FTD_001")), "LE_001"))
                 .isInstanceOf(BaseException.class)
@@ -1315,6 +1325,25 @@ class DefaultFundsInstructionLifecycleSaverTests {
         @Override
         public @NonNull Map<String, Object> getContextVariables() {
             return Map.of();
+        }
+    }
+
+    private static final class BalanceControlInstruction extends SimpleInstruction {
+
+        private final FundsTransactionEventType eventType;
+
+        private BalanceControlInstruction(FundsTransactionEventType eventType) {
+            this.eventType = eventType;
+        }
+
+        @Override
+        public @NonNull FundsInstructionType getInstructionType() {
+            return FundsInstructionType.BALANCE_CONTROL;
+        }
+
+        @Override
+        public @NonNull FundsTransactionEventType getEventType() {
+            return eventType;
         }
     }
 

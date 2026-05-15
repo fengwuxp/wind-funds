@@ -40,6 +40,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DefaultFundsFrozenOrderLifecycleSaverTests {
 
     @Test
+    void testLifecycleSaverShouldOnlySupportFreezeEvents() {
+        DefaultFundsFrozenOrderLifecycleSaver saver = new DefaultFundsFrozenOrderLifecycleSaver(
+                mapper(new AtomicReference<>(), queryCount -> null));
+
+        assertThat(saver.supports(instruction(FundsTransactionEventType.FREEZE, null,
+                "RISK_FREEZE", "FREEZE_0001", 100L))).isTrue();
+        assertThat(saver.supports(instruction(FundsTransactionEventType.UNFREEZE,
+                reference("FO_0001"), "RISK_UNFREEZE", "UNFREEZE_0001", 30L))).isTrue();
+        assertThat(saver.supports(instruction(FundsTransactionEventType.BALANCE_ADJUST, null,
+                "BALANCE_ADJUST", "ADJUST_0001", 30L))).isFalse();
+    }
+
+    @Test
     void testFreezeShouldCreateFrozenOrderAndReturnFrozenOrderLifecycle() {
         AtomicReference<FundsFrozenOrder> savedOrder = new AtomicReference<>();
         DefaultFundsFrozenOrderLifecycleSaver saver = new DefaultFundsFrozenOrderLifecycleSaver(
@@ -76,7 +89,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
         assertThat(result.getTransactionDetailSns()).isEmpty();
         assertThat(result.isCompleted()).isFalse();
 
-        saver.markSucceeded(result, "LT_FREEZE_0001");
+        saver.markSucceeded(instruction, result, "LT_FREEZE_0001");
 
         assertThat(savedOrder.get().getFreezeLedgerTransactionSn()).isEqualTo("LT_FREEZE_0001");
         assertThat(savedOrder.get().getStatus()).isEqualTo(FundsFrozenOrderStatus.FROZEN);
@@ -104,7 +117,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
         assertThat(releaseRecord.get().getAmount()).isEqualTo(30L);
         assertThat(result.isCompleted()).isFalse();
 
-        saver.markSucceeded(result, "LT_UNFREEZE_0001");
+        saver.markSucceeded(instruction, result, "LT_UNFREEZE_0001");
 
         assertThat(releaseRecord.get().getFreezeLedgerTransactionSn()).isEqualTo("LT_UNFREEZE_0001");
         assertThat(releaseRecord.get().getStatus()).isEqualTo(FundsFrozenOrderStatus.RELEASED);

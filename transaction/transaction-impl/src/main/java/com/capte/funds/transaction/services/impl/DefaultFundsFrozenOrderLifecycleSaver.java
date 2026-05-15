@@ -46,6 +46,12 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsFrozenOrderLi
     private final FundsFrozenOrderMapper fundsFrozenOrderMapper;
 
     @Override
+    public boolean supports(@NonNull FundsInstructionSpec instruction) {
+        return instruction.getEventType() == FundsTransactionEventType.FREEZE
+                || instruction.getEventType() == FundsTransactionEventType.UNFREEZE;
+    }
+
+    @Override
     public @NonNull FundsInstructionLifecycleResult beforePosting(@NonNull FundsInstructionSpec instruction,
                                                                   @NonNull ResolvedRouteSpec resolvedRoute,
                                                                   @NonNull RouteSnapshotSpec routeSnapshot) {
@@ -58,7 +64,9 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsFrozenOrderLi
     }
 
     @Override
-    public void markSucceeded(@NonNull FundsInstructionLifecycleResult result, @Nullable String ledgerTransactionSn) {
+    public void markSucceeded(@NonNull FundsInstructionSpec instruction,
+                              @NonNull FundsInstructionLifecycleResult result,
+                              @Nullable String ledgerTransactionSn) {
         FundsFrozenOrder order = findFrozenOrderBySn(result.getTransactionSn());
         FundsTransactionEventType eventType = resolveEventType(order);
         if (isCompleted(order, eventType)) {
@@ -75,7 +83,9 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsFrozenOrderLi
     }
 
     @Override
-    public void markFailed(@NonNull FundsInstructionLifecycleResult result, @NonNull Throwable cause) {
+    public void markFailed(@NonNull FundsInstructionSpec instruction,
+                           @NonNull FundsInstructionLifecycleResult result,
+                           @NonNull Throwable cause) {
         findFrozenOrderBySn(result.getTransactionSn());
     }
 

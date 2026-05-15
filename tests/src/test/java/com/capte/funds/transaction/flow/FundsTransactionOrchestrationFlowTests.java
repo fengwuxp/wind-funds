@@ -20,7 +20,6 @@ import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
-import com.capte.funds.transaction.services.FundsFrozenOrderLifecycleSaver;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.capte.funds.transaction.services.PlatformFundingAccountService;
@@ -124,7 +123,6 @@ class FundsTransactionOrchestrationFlowTests {
                 new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
                 lifecycleSaver,
                 transactionQueryService
         );
@@ -576,12 +574,16 @@ class FundsTransactionOrchestrationFlowTests {
         }
     }
 
-    private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleSaver,
-            FundsFrozenOrderLifecycleSaver {
+    private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleSaver {
 
         private final AtomicReference<ResolvedRouteSpec> beforePostingRoute = new AtomicReference<>();
 
         private final AtomicReference<String> succeededLedgerTransactionSn = new AtomicReference<>();
+
+        @Override
+        public boolean supports(@NonNull FundsInstructionSpec instruction) {
+            return true;
+        }
 
         @Override
         public @NonNull FundsInstructionLifecycleResult beforePosting(@NonNull FundsInstructionSpec instruction,
@@ -595,12 +597,16 @@ class FundsTransactionOrchestrationFlowTests {
         }
 
         @Override
-        public void markSucceeded(@NonNull FundsInstructionLifecycleResult result, @Nullable String ledgerTransactionSn) {
+        public void markSucceeded(@NonNull FundsInstructionSpec instruction,
+                                  @NonNull FundsInstructionLifecycleResult result,
+                                  @Nullable String ledgerTransactionSn) {
             succeededLedgerTransactionSn.set(ledgerTransactionSn);
         }
 
         @Override
-        public void markFailed(@NonNull FundsInstructionLifecycleResult result, @NonNull Throwable cause) {
+        public void markFailed(@NonNull FundsInstructionSpec instruction,
+                               @NonNull FundsInstructionLifecycleResult result,
+                               @NonNull Throwable cause) {
             throw new AssertionError("unexpected failure", cause);
         }
     }

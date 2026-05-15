@@ -36,7 +36,6 @@ import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -57,7 +56,6 @@ import java.util.TreeMap;
  * @date 2026-05-07
  */
 @Service
-@Primary
 @AllArgsConstructor
 public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLifecycleSaver {
 
@@ -76,6 +74,14 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     private final FundsTransactionDetailMapper fundsTransactionDetailMapper;
 
     @Override
+    public boolean supports(@NonNull FundsInstructionSpec instruction) {
+        return switch (instruction.getEventType()) {
+            case FREEZE, UNFREEZE -> false;
+            default -> true;
+        };
+    }
+
+    @Override
     public @NonNull FundsInstructionLifecycleResult beforePosting(@NonNull FundsInstructionSpec instruction,
                                                                   @NonNull ResolvedRouteSpec resolvedRoute,
                                                                   @NonNull RouteSnapshotSpec routeSnapshot) {
@@ -89,7 +95,9 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     }
 
     @Override
-    public void markSucceeded(@NonNull FundsInstructionLifecycleResult result, @Nullable String ledgerTransactionSn) {
+    public void markSucceeded(@NonNull FundsInstructionSpec instruction,
+                              @NonNull FundsInstructionLifecycleResult result,
+                              @Nullable String ledgerTransactionSn) {
         List<FundsTransactionDetail> details = findDetailsBySn(result.getTransactionDetailSns());
         if (details.stream().allMatch(this::isCompletedDetail)) {
             return;
@@ -111,7 +119,9 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     }
 
     @Override
-    public void markFailed(@NonNull FundsInstructionLifecycleResult result, @NonNull Throwable cause) {
+    public void markFailed(@NonNull FundsInstructionSpec instruction,
+                           @NonNull FundsInstructionLifecycleResult result,
+                           @NonNull Throwable cause) {
         List<FundsTransactionDetail> details = findDetailsBySn(result.getTransactionDetailSns());
         if (details.stream().allMatch(this::isCompletedDetail)) {
             return;

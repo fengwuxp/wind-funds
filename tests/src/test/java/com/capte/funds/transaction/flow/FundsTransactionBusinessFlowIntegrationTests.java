@@ -27,7 +27,6 @@ import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.model.dto.FundsSubjectBalanceDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
-import com.capte.funds.transaction.services.FundsFrozenOrderLifecycleSaver;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.capte.funds.transaction.services.PlatformFundingAccountService;
@@ -128,7 +127,6 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 new DefaultRouteReplayService(),
                 new DefaultLedgerPostingAssembler(ledgerBook),
                 ledgerBook,
-                lifecycleSaver,
                 lifecycleSaver,
                 lifecycleSaver
         );
@@ -531,7 +529,6 @@ class FundsTransactionBusinessFlowIntegrationTests {
     }
 
     private static final class RecordingLifecycleSaver implements FundsInstructionLifecycleSaver,
-            FundsFrozenOrderLifecycleSaver,
             FundsTransactionQueryService {
 
         private final AtomicInteger transactionSequence = new AtomicInteger();
@@ -539,6 +536,11 @@ class FundsTransactionBusinessFlowIntegrationTests {
         private final List<String> succeededLedgerTransactionSns = new ArrayList<>();
 
         private final Map<String, RouteSnapshotSpec> routeSnapshots = new LinkedHashMap<>();
+
+        @Override
+        public boolean supports(@NonNull FundsInstructionSpec instruction) {
+            return true;
+        }
 
         @Override
         public @NonNull FundsInstructionLifecycleResult beforePosting(@NonNull FundsInstructionSpec instruction,
@@ -553,7 +555,8 @@ class FundsTransactionBusinessFlowIntegrationTests {
         }
 
         @Override
-        public void markSucceeded(@NonNull FundsInstructionLifecycleResult result,
+        public void markSucceeded(@NonNull FundsInstructionSpec instruction,
+                                  @NonNull FundsInstructionLifecycleResult result,
                                   @Nullable String ledgerTransactionSn) {
             if (ledgerTransactionSn != null) {
                 succeededLedgerTransactionSns.add(ledgerTransactionSn);
@@ -561,7 +564,9 @@ class FundsTransactionBusinessFlowIntegrationTests {
         }
 
         @Override
-        public void markFailed(@NonNull FundsInstructionLifecycleResult result, @NonNull Throwable cause) {
+        public void markFailed(@NonNull FundsInstructionSpec instruction,
+                               @NonNull FundsInstructionLifecycleResult result,
+                               @NonNull Throwable cause) {
             throw new AssertionError("unexpected lifecycle failure", cause);
         }
 
