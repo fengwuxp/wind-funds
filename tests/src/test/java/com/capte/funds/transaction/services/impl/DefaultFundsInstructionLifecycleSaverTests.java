@@ -321,8 +321,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
     }
 
+    /**
+     * 场景：授权类资金交易成功后更新参与方明细和主交易汇总。
+     * 输入：持卡主体明细、平台资金主体明细和账本交易号。
+     * 输出：明细状态、明细账本交易号、主交易授权金额和状态。
+     * 预期：所有明细成功并绑定同一账本交易号，主交易累计授权金额后保持 OPEN。
+     * 红线：授权成功只更新交易生命周期汇总，不得伪造冻结单消费语义。
+     */
     @Test
-    void markSucceededShouldUpdateDetailsAndTransactionSummary() {
+    void testMarkSucceededShouldUpdateDetailsAndTransactionSummary() {
         FundsTransaction transaction = transaction();
         FundsTransactionDetail detail = detail("FTD_001", RouteParticipantRole.AUTH_HOLDER);
         FundsTransactionDetail platformDetail = detail("FTD_002", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
@@ -369,8 +376,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
     }
 
+    /**
+     * 场景：共享卡授权包含持卡人、预算控制方和真实出资方三类主体视角。
+     * 输入：三条同金额 HOLD 明细和一个账本交易号。
+     * 输出：三条成功明细和主交易授权金额。
+     * 预期：主交易授权金额只汇总一次，不因主体视角增多而重复累计。
+     * 红线：多参与方明细不得放大真实交易金额。
+     */
     @Test
-    void markSucceededShouldSummarizeSharedCardTransactionOnce() {
+    void testMarkSucceededShouldSummarizeSharedCardTransactionOnce() {
         FundsTransaction transaction = transaction();
         List<FundsTransactionDetail> details = List.of(
                 detail("FTD_001", RouteParticipantRole.AUTH_HOLDER),
@@ -417,8 +431,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
     }
 
+    /**
+     * 场景：直接转账同时包含本金和手续费明细。
+     * 输入：付款方、收款方本金明细和手续费接收方明细。
+     * 输出：主交易 settledAmount、feeAmount 和终态。
+     * 预期：本金进入 settledAmount，手续费进入 feeAmount，交易关闭。
+     * 红线：手续费不得混入本金结算金额。
+     */
     @Test
-    void markSucceededShouldSummarizeDirectTransactionAndFeeSeparately() {
+    void testMarkSucceededShouldSummarizeDirectTransactionAndFeeSeparately() {
         FundsTransaction transaction = transaction();
         transaction.setTransactionMode(FundsTransactionMode.DIRECT);
         transaction.setTransactionType(DefaultFundsTransactionType.TRANSFER);
@@ -459,8 +480,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
     }
 
+    /**
+     * 场景：独立收费交易只有手续费语义。
+     * 输入：FEE 类型交易和两条 FEE_CHARGE 明细。
+     * 输出：主交易 settledAmount、feeAmount 和终态。
+     * 预期：settledAmount 保持 0，feeAmount 汇总收费金额，交易关闭。
+     * 红线：独立费用不得被记作本金结算。
+     */
     @Test
-    void markSucceededShouldSummarizeStandaloneFeeAsFeeAmount() {
+    void testMarkSucceededShouldSummarizeStandaloneFeeAsFeeAmount() {
         FundsTransaction transaction = transaction();
         transaction.setTransactionMode(FundsTransactionMode.DIRECT);
         transaction.setTransactionType(DefaultFundsTransactionType.FEE);
@@ -504,8 +532,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
     }
 
+    /**
+     * 场景：提现出款成功时指令携带冻结单引用。
+     * 输入：WITHDRAW 交易、提现明细和 referenceType=FREEZE_ORDER 的指令。
+     * 输出：提现明细状态、账本交易号、主交易结算金额和终态。
+     * 预期：提现作为独立资金事实完成结算，不在生命周期汇总中改写冻结单。
+     * 红线：冻结单引用只定位前置余额控制，不表达消费、扣划或跨主体转移。
+     */
     @Test
-    void markSucceededShouldNotMutateReferencedFrozenOrderForWithdraw() {
+    void testMarkSucceededShouldNotMutateReferencedFrozenOrderForWithdraw() {
         FundsTransaction transaction = directTransaction(DefaultFundsTransactionType.WITHDRAW);
         FundsTransactionDetail withdrawDetail = withdrawDetail("FTD_001", 60L);
         AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
@@ -524,8 +559,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
     }
 
+    /**
+     * 场景：退款消耗最后一段已结算可回退金额。
+     * 输入：已结算 1000、已退款 600、已拒付 200，再退款 200。
+     * 输出：主交易 refundedAmount、declinedAmount 和状态。
+     * 预期：退款金额累计到 800，交易可回退金额归零后关闭。
+     * 红线：退款不得超过已结算且尚未退款/拒付的可回退余额。
+     */
     @Test
-    void markSucceededShouldCloseWhenRefundConsumesRemainingSettledReversibleAmount() {
+    void testMarkSucceededShouldCloseWhenRefundConsumesRemainingSettledReversibleAmount() {
         FundsTransaction transaction = transaction();
         transaction.setStatus(FundsTransactionStatus.OPEN);
         transaction.setSettledAmount(1_000L);
@@ -544,8 +586,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
     }
 
+    /**
+     * 场景：拒付消耗最后一段已结算可回退金额。
+     * 输入：已结算 1000、已退款 600、已拒付 200，再拒付 200。
+     * 输出：主交易 refundedAmount、declinedAmount 和状态。
+     * 预期：拒付金额累计到 400，交易可回退金额归零后关闭。
+     * 红线：拒付不得直接修改账本事实，只能通过独立逆向资金事实累计交易视图。
+     */
     @Test
-    void markSucceededShouldCloseWhenChargebackConsumesRemainingSettledReversibleAmount() {
+    void testMarkSucceededShouldCloseWhenChargebackConsumesRemainingSettledReversibleAmount() {
         FundsTransaction transaction = transaction();
         transaction.setStatus(FundsTransactionStatus.OPEN);
         transaction.setSettledAmount(1_000L);
@@ -566,8 +615,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
     }
 
+    /**
+     * 场景：退款金额超过已结算可回退余额。
+     * 输入：已结算 1000、已退款 700、已拒付 200，再退款 200。
+     * 输出：余额不足异常。
+     * 预期：拒绝更新主交易汇总。
+     * 红线：退款不得透支已结算可回退金额。
+     */
     @Test
-    void markSucceededShouldRejectRefundWhenSettledReversibleAmountInsufficient() {
+    void testMarkSucceededShouldRejectRefundWhenSettledReversibleAmountInsufficient() {
         FundsTransaction transaction = transaction();
         transaction.setStatus(FundsTransactionStatus.OPEN);
         transaction.setSettledAmount(1_000L);
@@ -585,8 +641,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction).hasValue(null);
     }
 
+    /**
+     * 场景：拒付金额超过已结算可回退余额。
+     * 输入：已结算 1000、已退款 700、已拒付 200，再拒付 200。
+     * 输出：余额不足异常。
+     * 预期：拒绝更新主交易汇总。
+     * 红线：拒付不得透支已结算可回退金额。
+     */
     @Test
-    void markSucceededShouldRejectChargebackWhenSettledReversibleAmountInsufficient() {
+    void testMarkSucceededShouldRejectChargebackWhenSettledReversibleAmountInsufficient() {
         FundsTransaction transaction = transaction();
         transaction.setStatus(FundsTransactionStatus.OPEN);
         transaction.setSettledAmount(1_000L);
@@ -606,8 +669,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(updatedTransaction).hasValue(null);
     }
 
+    /**
+     * 场景：同一业务事件重复进入 beforePosting，历史明细已成功入账。
+     * 输入：首次创建的交易与明细，明细状态均为 SUCCEEDED 且绑定账本交易号。
+     * 输出：生命周期保存结果。
+     * 预期：复用既有交易和明细，并返回 completed=true。
+     * 红线：已完成事件不得再次创建交易明细或重复入账。
+     */
     @Test
-    void beforePostingShouldReuseCompletedDetails() {
+    void testBeforePostingShouldReuseCompletedDetails() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
         DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
@@ -664,8 +734,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(result.isCompleted()).isTrue();
     }
 
+    /**
+     * 场景：同一业务事件重放时路由语义发生变化。
+     * 输入：首次保存 1000 金额路径，第二次用 2000 金额路径重试。
+     * 输出：请求参数不一致异常。
+     * 预期：拒绝复用或覆盖既有交易明细。
+     * 红线：同一业务流水不得静默切换历史资金路径。
+     */
     @Test
-    void beforePostingShouldRejectChangedRouteForSameBusinessEvent() {
+    void testBeforePostingShouldRejectChangedRouteForSameBusinessEvent() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
         DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
@@ -721,9 +798,10 @@ class DefaultFundsInstructionLifecycleSaverTests {
      * 输入：同一 FundsInstruction 和同一路由语义，第二次仅替换 snapshotId、resolvedAt、expiresAt。
      * 输出：生命周期保存结果。
      * 预期：requestHash 只绑定稳定业务事实和路由语义，忽略快照流水与审计时间后幂等复用既有明细。
+     * 红线：幂等摘要不得绑定 route snapshot 临时流水或审计时间。
      */
     @Test
-    void beforePostingShouldIgnoreRouteSnapshotMetadataWhenComparingRequestHash() {
+    void testBeforePostingShouldIgnoreRouteSnapshotMetadataWhenComparingRequestHash() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
         DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
@@ -777,8 +855,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
                 .containsExactly(insertedDetails.get(0).getSn(), insertedDetails.get(1).getSn());
     }
 
+    /**
+     * 场景：授权后续事件通过原交易快照引用复用主交易。
+     * 输入：referenceType=AUTHORIZATION 的指令和已存在的原资金交易。
+     * 输出：生命周期保存结果。
+     * 预期：复用原主交易号，不创建新的主交易。
+     * 红线：只有交易快照类引用可复用原资金交易，不能把所有 reference 都当作交易引用。
+     */
     @Test
-    void beforePostingShouldReuseReferencedFundsTransactionOnlyForSnapshotReference() {
+    void testBeforePostingShouldReuseReferencedFundsTransactionOnlyForSnapshotReference() {
         FundsTransaction referencedTransaction = transaction();
         AtomicInteger transactionQueryIndex = new AtomicInteger();
         DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
@@ -805,8 +890,15 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(transactionQueryIndex).hasValue(1);
     }
 
+    /**
+     * 场景：解冻或提现等指令携带冻结单引用进入 beforePosting。
+     * 输入：referenceType=FREEZE_ORDER 的指令和新的 route snapshot。
+     * 输出：新创建的资金交易号和 referenceTransactionSn。
+     * 预期：冻结单引用不复用原资金交易，只在新交易上保存引用关系。
+     * 红线：冻结单不是消费交易，不能把 FREEZE_ORDER 引用当作 AUTHORIZATION 交易复用。
+     */
     @Test
-    void beforePostingShouldNotReuseFundsTransactionForFreezeOrderReference() {
+    void testBeforePostingShouldNotReuseFundsTransactionForFreezeOrderReference() {
         AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
         AtomicInteger transactionQueryIndex = new AtomicInteger();
         DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(

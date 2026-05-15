@@ -180,6 +180,74 @@ mvn pmd:check
 - 外部依赖使用 fake、stub、mock、WireMock 或 Testcontainers，测试不得连接真实外部服务。
 - 架构边界测试用于保护 `ledger`、`route`、`wallet` 的职责边界，不得为绕过测试而删除约束。
 
+### 7.1 测试驱动设计
+
+- 任何有业务含义的设计、重构或代码变更，必须先从实际使用场景、用户用例、测试用例、边界条件、异常路径和验收标准出发，再抽象模型、接口、模块和扩展点。
+- 涉及支付资金底座目标态、DSL、API、清结算、对账、归档、Harness 门禁或能力规格时，必须先对照 `docs/v5/产品设计/v5 产品层 TDD 验收矩阵.md`、`docs/v5/v5 DSL 契约复审矩阵.md`、`docs/v5/系分设计/API 契约测试与编码实施计划.md` 和相关 OpenSpec requirements，确认本次变更对应哪些测试项。
+- 新增能力不得只写 happy path；必须同时考虑正常路径、异常路径、边界路径、幂等重放、权限审计、余额约束、账务平衡和红线失败用例。
+- 修复缺陷必须先补能复现问题的回归测试，再改实现；无法先补测试时，交付说明必须解释原因和替代验证。
+
+### 7.2 测试分层
+
+| 层级 | 默认落地方式 | 适用场景 |
+|------|--------------|----------|
+| L1 契约/纯单元测试 | `core/src/test` 或 `tests/src/test`，不启动 Spring。 | DSL、枚举、route、posting、摘要、金额、状态机、helper 和纯业务规则。 |
+| L2 应用服务测试 | 直接构造 service，使用 fake/stub/mock 协作者。 | 幂等、生命周期、编排、失败路径、余额控制、授权和逆向交易。 |
+| L3 H2/集成测试 | `tests` 模块，H2 MySQL Mode 或最小 Spring 上下文。 | Mapper、DDL、唯一约束、本地事务、投影持久化和 schema 兼容。 |
+| L4 架构/红线测试 | ArchUnit、Maven 依赖检查、边界测试或显式失败测试。 | 模块依赖、禁止入账主体、只读投影、不可绕过账本和外部账户入账。 |
+
+- `@SpringBootTest` 是最后选项，不是默认选项；能直接构造对象就不启动容器。
+- 数据库测试必须说明为什么需要数据库行为；纯业务规则不得因为方便注入而启动 Spring。
+- 高风险 SQL、锁、索引、数据库方言或性能问题，H2 无法证明时应补 Testcontainers 或专门集成测试方案。
+
+### 7.3 测试命名与结构
+
+- 新增测试方法统一以 `test` 开头，推荐 `test<UseCase>Should<Expected>` 风格，例如 `testFreezeAvailableFundsShouldCreateFrozenOrderOnly`。
+- 测试类以被测能力或业务边界命名，避免把无关能力塞进同一个巨型测试类；巨型测试类应按交易生命周期、冻结生命周期、余额断言、route replay、边界测试等职责分批拆分。
+- 关键资金测试的方法上方必须写方法级注释，至少包含“场景、输入、输出、预期、红线”；不要把场景说明塞进方法体内部。
+- 测试方法内部优先使用 Given / When / Then 或 Arrange / Act / Assert 结构；一个测试聚焦一个业务行为，可以有多个必要断言，但断言必须服务同一场景。
+- 测试数据必须有业务语义，避免 `foo`、`test1`、无含义金额和无含义流水；金额、币种、主体、状态、时间和流水都应能解释测试意图。
+
+示例：
+
+```java
+/**
+ * 场景：用户提现前冻结可用余额。
+ * 输入：用户资金账户 AVAILABLE=1000，本次冻结 800，冻结原因为提现风控。
+ * 输出：生成冻结单，账本余额从 AVAILABLE 迁移到 FROZEN。
+ * 预期：不创建 FundsTransaction，posting plan 平衡，重复请求不重复冻结。
+ * 红线：冻结不得表达消费或跨主体资金转移。
+ */
+@Test
+void testFreezeAvailableFundsShouldCreateFrozenOrderOnly() {
+    // Given / When / Then
+}
+```
+
+### 7.4 资金测试断言要求
+
+- 有资金变化的测试不得只断言交易状态、route、entry 数量或“不报错”；必须同时断言相关主体的账本余额桶、posting plan 平衡、ledger transaction 可追溯和幂等行为。
+- 资金变化测试优先复用 `tests/src/test/java/com/capte/funds/support/FundsBalanceAssertionSupport.java` 或等价领域断言，不得在每个测试里手写不可复用的余额推导。
+- 业务组合测试必须每一步都断言余额变化，不能只断言最终余额。典型组合包括：充值 -> 付款 -> 退款；充值 -> 冻结 -> 提现；A 充值 -> 转给 B -> B 付款 -> B 提现。
+- 冻结/解冻测试必须证明冻结只做同主体 `AVAILABLE <-> FROZEN` 控制，不表达消费、扣划或跨主体价值转移；提现出款、追偿、退款、调账等后续动作必须作为独立资金事实测试。
+- 授权测试必须区分授权批准、授权拒绝、授权撤销、授权结算、授权链退款和争议拒付；授权拒绝不得生成 route/entry，不得写入 `chargebackAmount`。
+- 清结算、对账、归档和报表测试必须证明来源事实、批次、规则版本、审计、重跑幂等和只读投影边界；对账差异、交易视图或报表不得直接修改账本事实。
+
+### 7.5 测试清单与验证命令
+
+- `docs/v5/系分设计/API 契约测试与编码实施计划.md` 的“全量测试清单”是当前测试 backlog 的权威入口；新增产品用例、DSL 契约或系分能力时必须同步更新该清单。
+- 每个实现任务必须在交付说明中列出：覆盖的测试清单项、执行的测试类、验证命令、是否通过、未覆盖风险。
+- 变更范围对应的推荐验证命令：
+
+```bash
+mvn -pl core -am test -Dtest=FundsInstructionSpecContractTests,RouteDslContractTests,TransactionServiceAbilityDslJsonContractTests
+mvn -pl tests -am test -Dtest=DefaultLedgerPostingAssemblerTests,DefaultLedgerTransactionPostingServiceImplTests,LedgerBalanceProjectionServiceImplTests
+mvn -pl tests -am test -Dtest=FundsTransactionCommandServiceImplTests,DefaultRoutedFundsInstructionOrchestratorTests,DefaultFundsInstructionLifecycleSaverTests
+mvn -pl tests -am test -Dtest=FundsFrozenOrderServiceImplTests,DefaultFundsFrozenOrderLifecycleSaverTests,BalanceControlFundsInstructionRouteResolverTests
+mvn -pl tests -am test -Dtest=FundsTransactionLedgerBalanceAssertionsTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionOrchestrationFlowTests
+mvn -pl tests -am test -Dtest=LedgerLayerBoundaryTests,RouteLayerBoundaryTests,WalletLayerBoundaryTests
+```
+
 ## 8. AI Agent 工作原则
 
 - 默认情况下，凡涉及编码、编码设计、架构设计、技术方案、代码评审、重构评估、测试设计和工程治理，必须使用 `资深架构师` Skill 的原则与工作方式执行。

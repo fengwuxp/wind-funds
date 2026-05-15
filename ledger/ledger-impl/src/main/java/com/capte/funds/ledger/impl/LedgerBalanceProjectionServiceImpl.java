@@ -8,6 +8,7 @@ import com.wind.common.spring.SpringEventPublishUtils;
 import com.wind.integration.funds.wallet.FundsAccountBalanceView;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.FundsAccountQueryService;
+import com.wind.integration.funds.ledger.LedgerBalanceBucket;
 import com.wind.integration.funds.ledger.LedgerBalanceChangedEvent;
 import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.integration.funds.ledger.enums.EntrySide;
@@ -55,10 +56,18 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
         for (Map.Entry<Long, List<LedgerEntrySpec>> entry : groups.entrySet()) {
             Long ledgerId = entry.getKey();
             LedgerDTO ledger = ledgerService.getLedgerById(ledgerId);
+            AssertUtils.notNull(ledger, "账本不存在，ledgerId = {}", ledgerId);
             assertEntriesMatchLedger(ledger, entry.getValue());
             LedgerSubjectCode ledgerCode = ledger.getLedgerSubjectCode();
             ProjectionDelta delta = computeProjectionDelta(entry.getValue(), ledger.getNormalBalanceSide());
-            Money beforeBalanceAmount = beforeBalance.getBalance(ledgerCode);
+            LedgerBalanceBucket beforeBalanceBucket = beforeBalance.getBalanceBucketNullable(ledgerCode);
+            AssertUtils.notNull(beforeBalanceBucket,
+                    "资金账户余额桶未初始化，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, ledgerId = {}",
+                    accountId.id(),
+                    accountId.type(),
+                    ledgerCode,
+                    ledgerId);
+            Money beforeBalanceAmount = beforeBalanceBucket.balance();
             assertMustNotBeNegativeBalance(ledger, entry.getValue(), beforeBalanceAmount, delta);
             UpdateLedgerBalanceRequest balanceRequest = new UpdateLedgerBalanceRequest()
                     .setId(ledgerId)

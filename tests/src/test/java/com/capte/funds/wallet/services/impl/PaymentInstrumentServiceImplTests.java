@@ -21,8 +21,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PaymentInstrumentServiceImplTests {
 
+    /**
+     * 场景：创建支付工具。
+     * 输入：用户共享虚拟卡支付工具，方向为 PAYMENT，币种 USD。
+     * 输出：写入支付工具记录。
+     * 预期：默认状态为 ACTIVE，并保留支付方向和脱敏工具号。
+     * 红线：支付工具只是支付媒介，不得被当作账本主体或资金余额来源。
+     */
     @Test
-    void createPaymentInstrumentShouldUseActiveStatusByDefault() {
+    void testCreatePaymentInstrumentShouldUseActiveStatusByDefault() {
         AtomicReference<PaymentInstrument> inserted = new AtomicReference<>();
         PaymentInstrumentMapper instrumentMapper = FundsAccountServiceTestSupport.mapper(
                 PaymentInstrumentMapper.class,
@@ -55,8 +62,15 @@ class PaymentInstrumentServiceImplTests {
         assertThat(entity.getInstrumentNo()).isEqualTo("CARD_****9876");
     }
 
+    /**
+     * 场景：绑定支付工具与资金主体。
+     * 输入：卡工具绑定到 CREDIT_ACCOUNT 主体，绑定角色为 CREDIT_SUBJECT。
+     * 输出：写入支付工具绑定记录。
+     * 预期：默认优先级为 0、非默认绑定、状态为 ACTIVE。
+     * 红线：绑定关系只服务 route 解析，不得直接改写账户、交易事实或账本事实。
+     */
     @Test
-    void createPaymentInstrumentBindingShouldSetRouteDefaults() {
+    void testCreatePaymentInstrumentBindingShouldSetRouteDefaults() {
         AtomicReference<PaymentInstrumentBinding> inserted = new AtomicReference<>();
         PaymentInstrumentBindingMapper bindingMapper = FundsAccountServiceTestSupport.mapper(
                 PaymentInstrumentBindingMapper.class,

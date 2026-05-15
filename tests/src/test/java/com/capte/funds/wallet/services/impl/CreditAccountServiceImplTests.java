@@ -20,8 +20,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CreditAccountServiceImplTests {
 
+    /**
+     * 场景：创建信用账户资金主体。
+     * 输入：用户 SHARE_VCC 信用账户，币种 USD，未显式指定账本 profile 和周期。
+     * 输出：写入信用账户，并初始化 CREDIT_BASIC profile 下的生命周期账本。
+     * 预期：信用账户为 ACTIVE，periodType=LIFETIME，账本初始化请求使用 CREDIT_ACCOUNT 主体。
+     * 红线：信用额度主体不得误用资金账户或预算组 profile，授权/消费控制必须落在信用账本边界内。
+     */
     @Test
-    void createCreditAccountShouldApplyDefaultProfileAndPeriod() {
+    void testCreateCreditAccountShouldApplyDefaultProfileAndPeriod() {
         AtomicReference<CreditAccount> inserted = new AtomicReference<>();
         CreditAccountMapper creditAccountMapper = FundsAccountServiceTestSupport.mapper(
                 CreditAccountMapper.class,

@@ -26,8 +26,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DefaultSubjectLedgerInitializerTests {
 
+    /**
+     * 场景：按账本 profile 初始化主体必需账本。
+     * 输入：信用账户主体、CREDIT_BASIC profile，LIMIT/AVAILABLE 为必需账本，FROZEN 为非必需账本。
+     * 输出：只创建必需账本，并返回必需科目到账本 ID 的映射。
+     * 预期：创建请求继承主体、币种、profile、周期和结算策略信息。
+     * 红线：初始化不得为非必需科目建账，也不得改变主体类型或账本 profile 语义。
+     */
     @Test
-    void initializeRequiredLedgersShouldCreateOnlyRequiredLedgers() {
+    void testInitializeRequiredLedgersShouldCreateOnlyRequiredLedgers() {
         LedgerProfileDTO profile = new LedgerProfileDTO()
                 .setCode(LedgerProfileCode.CREDIT_BASIC)
                 .setVersion(1)
@@ -73,6 +80,13 @@ class DefaultSubjectLedgerInitializerTests {
         assertThat(first.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
     }
 
+    /**
+     * 场景：账本 profile 与请求主体类型不一致。
+     * 输入：FUNDING_BASIC profile 绑定 FUNDING_ACCOUNT，请求却声明 CREDIT_ACCOUNT。
+     * 输出：初始化失败且不创建任何账本。
+     * 预期：错误信息带出 profileCode 和 subjectType，便于定位配置问题。
+     * 红线：不得用不匹配的 profile 给主体建账，避免账本主体边界被污染。
+     */
     @Test
     void testInitializeRequiredLedgersShouldRejectProfileSubjectTypeMismatch() {
         LedgerProfileDTO profile = new LedgerProfileDTO()

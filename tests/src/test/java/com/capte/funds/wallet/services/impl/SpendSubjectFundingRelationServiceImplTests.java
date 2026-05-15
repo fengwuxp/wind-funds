@@ -16,8 +16,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SpendSubjectFundingRelationServiceImplTests {
 
+    /**
+     * 场景：创建支出主体与真实资金来源关系。
+     * 输入：预算组 spend subject 绑定 funding account，关系类型为 FUNDING_SOURCE。
+     * 输出：写入支出主体供资关系。
+     * 预期：默认优先级为 0，defaultRelation=true，状态为 ACTIVE。
+     * 红线：供资关系只描述路由候选关系，不得直接表达资金转移或账本入账。
+     */
     @Test
-    void createSpendSubjectFundingRelationShouldSetDefaults() {
+    void testCreateSpendSubjectFundingRelationShouldSetDefaults() {
         AtomicReference<SpendSubjectFundingRel> inserted = new AtomicReference<>();
         SpendSubjectFundingRelMapper mapper = FundsAccountServiceTestSupport.mapper(
                 SpendSubjectFundingRelMapper.class,

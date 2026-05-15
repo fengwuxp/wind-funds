@@ -1,6 +1,5 @@
 package com.capte.funds.wallet.services.impl;
 
-import com.capte.funds.support.FundsAccountServiceTestSupport;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.capte.funds.wallet.model.dto.LedgerProfileDTO;
@@ -17,8 +16,15 @@ class DefaultLedgerProfileServiceImplTests {
 
     private final DefaultLedgerProfileServiceImpl service = new DefaultLedgerProfileServiceImpl();
 
+    /**
+     * 场景：普通 FundingAccount 开户时初始化基础余额桶。
+     * 输入：FUNDING_BASIC profile。
+     * 输出：AVAILABLE、FROZEN、AUTHORIZATION 三个 required 账目。
+     * 预期：普通资金账户采用 FUNDING_ACCOUNT 主体类型，负债类贷方余额，可用余额允许受控负数。
+     * 红线：冻结和授权占用不得允许静默负数。
+     */
     @Test
-    void getProfileShouldExposeFundingAccountRequiredSubjects() {
+    void testGetProfileShouldExposeFundingAccountRequiredSubjects() {
         LedgerProfileDTO profile = service.getProfile(LedgerProfileCode.FUNDING_BASIC);
 
         assertThat(profile.getCode()).isEqualTo(LedgerProfileCode.FUNDING_BASIC);
@@ -45,6 +51,13 @@ class DefaultLedgerProfileServiceImplTests {
                 .getAllowNegative()).isFalse();
     }
 
+    /**
+     * 场景：商户 FundingAccount 需要表达清算、可用、结算、冻结和调整挂账。
+     * 输入：FUNDING_MERCHANT profile。
+     * 输出：CLEARING、AVAILABLE、SETTLEMENT、FROZEN、ADJUSTMENT 五个 required 账目。
+     * 预期：清算和挂账使用专门类别，结算和冻结不允许负数，可用余额允许受控负数。
+     * 红线：商户清结算资金不得混入平台费用或平台挂账账户。
+     */
     @Test
     void testGetProfileShouldExposeMerchantFundingAccountRequiredSubjects() {
         LedgerProfileDTO profile = service.getProfile(LedgerProfileCode.FUNDING_MERCHANT);
@@ -90,8 +103,73 @@ class DefaultLedgerProfileServiceImplTests {
         assertThat(adjustment.getAllowNegative()).isFalse();
     }
 
+    /**
+     * 场景：平台 FundingAccount 按角色解析后需要落到对应平台 profile 账目。
+     * 输入：FUNDING_PLATFORM profile。
+     * 输出：CASH、PREPAYMENT、CLEARING、SETTLEMENT、FEE、ADJUSTMENT 六个 required 账目。
+     * 预期：现金映射为资产借方，预收待付和结算应付为负债贷方，费用为收入贷方，清算和调整允许受控负数。
+     * 红线：平台角色不得缺少 ADJUSTMENT，也不得混入 FROZEN、AUTHORIZATION 等交易状态账目。
+     */
     @Test
-    void getRequiredItemShouldExposeCreditLimitAndAvailableRules() {
+    void testGetProfileShouldExposePlatformFundingAccountRequiredSubjects() {
+        LedgerProfileDTO profile = service.getProfile(LedgerProfileCode.FUNDING_PLATFORM);
+
+        assertThat(profile.getCode()).isEqualTo(LedgerProfileCode.FUNDING_PLATFORM);
+        assertThat(profile.getVersion()).isEqualTo(1);
+        assertThat(profile.getSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT);
+        assertThat(profile.getItems())
+                .extracting(LedgerProfileItemDTO::getLedgerSubjectCode)
+                .containsExactly(
+                        LedgerSubjectCode.CASH,
+                        LedgerSubjectCode.PREPAYMENT,
+                        LedgerSubjectCode.CLEARING,
+                        LedgerSubjectCode.SETTLEMENT,
+                        LedgerSubjectCode.FEE,
+                        LedgerSubjectCode.ADJUSTMENT
+                );
+
+        LedgerProfileItemDTO cash =
+                service.getRequiredItem(LedgerProfileCode.FUNDING_PLATFORM, LedgerSubjectCode.CASH);
+        LedgerProfileItemDTO prepayment =
+                service.getRequiredItem(LedgerProfileCode.FUNDING_PLATFORM, LedgerSubjectCode.PREPAYMENT);
+        LedgerProfileItemDTO clearing =
+                service.getRequiredItem(LedgerProfileCode.FUNDING_PLATFORM, LedgerSubjectCode.CLEARING);
+        LedgerProfileItemDTO settlement =
+                service.getRequiredItem(LedgerProfileCode.FUNDING_PLATFORM, LedgerSubjectCode.SETTLEMENT);
+        LedgerProfileItemDTO fee =
+                service.getRequiredItem(LedgerProfileCode.FUNDING_PLATFORM, LedgerSubjectCode.FEE);
+        LedgerProfileItemDTO adjustment =
+                service.getRequiredItem(LedgerProfileCode.FUNDING_PLATFORM, LedgerSubjectCode.ADJUSTMENT);
+
+        assertThat(cash.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.ASSET);
+        assertThat(cash.getNormalBalanceSide()).isEqualTo(EntrySide.DEBIT);
+        assertThat(cash.getAllowNegative()).isFalse();
+        assertThat(prepayment.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.LIABILITY);
+        assertThat(prepayment.getNormalBalanceSide()).isEqualTo(EntrySide.CREDIT);
+        assertThat(prepayment.getAllowNegative()).isFalse();
+        assertThat(clearing.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.CLEARING);
+        assertThat(clearing.getNormalBalanceSide()).isEqualTo(EntrySide.DEBIT);
+        assertThat(clearing.getAllowNegative()).isTrue();
+        assertThat(settlement.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.LIABILITY);
+        assertThat(settlement.getNormalBalanceSide()).isEqualTo(EntrySide.CREDIT);
+        assertThat(settlement.getAllowNegative()).isFalse();
+        assertThat(fee.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.REVENUE);
+        assertThat(fee.getNormalBalanceSide()).isEqualTo(EntrySide.CREDIT);
+        assertThat(fee.getAllowNegative()).isFalse();
+        assertThat(adjustment.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.SUSPENSE);
+        assertThat(adjustment.getNormalBalanceSide()).isEqualTo(EntrySide.DEBIT);
+        assertThat(adjustment.getAllowNegative()).isTrue();
+    }
+
+    /**
+     * 场景：信用账户 profile 用于额度、可用额度和授权占用。
+     * 输入：CREDIT_BASIC profile 的 LIMIT 与 AVAILABLE 账目。
+     * 输出：额度控制类借方余额、可用额度控制类贷方余额。
+     * 预期：额度不允许负数，可用额度允许受控负数。
+     * 红线：信用额度账户不是真实资金账户，不得按资金本金入账。
+     */
+    @Test
+    void testGetRequiredItemShouldExposeCreditLimitAndAvailableRules() {
         LedgerProfileItemDTO limit =
                 service.getRequiredItem(LedgerProfileCode.CREDIT_BASIC, LedgerSubjectCode.LIMIT);
         LedgerProfileItemDTO available =
@@ -105,8 +183,15 @@ class DefaultLedgerProfileServiceImplTests {
         assertThat(available.getAllowNegative()).isTrue();
     }
 
+    /**
+     * 场景：可用余额或可用额度可通过业务规则受控透支。
+     * 输入：资金账户、商户资金账户、信用账户和预算组的 AVAILABLE 账目。
+     * 输出：四类 AVAILABLE 均声明允许负数。
+     * 预期：是否可用由上层限额、授信、预算和余额控制共同约束。
+     * 红线：允许负数不等于静默透支，冻结、授权、结算等约束桶不得继承该规则。
+     */
     @Test
-    void availableBucketShouldAllowControlledNegativeForFundingCreditAndBudgetSubjects() {
+    void testAvailableBucketShouldAllowControlledNegativeForFundingCreditAndBudgetSubjects() {
         assertThat(service.getRequiredItem(LedgerProfileCode.FUNDING_BASIC, LedgerSubjectCode.AVAILABLE)
                 .getAllowNegative()).isTrue();
         assertThat(service.getRequiredItem(LedgerProfileCode.FUNDING_MERCHANT, LedgerSubjectCode.AVAILABLE)
@@ -117,8 +202,15 @@ class DefaultLedgerProfileServiceImplTests {
                 .getAllowNegative()).isTrue();
     }
 
+    /**
+     * 场景：调用方请求 profile 中不存在的账目。
+     * 输入：CREDIT_BASIC profile 请求 PREPAYMENT 账目。
+     * 输出：抛出异常。
+     * 预期：错误路径阻止交易按错误账目继续组装 route 或 posting。
+     * 红线：缺失账目不得自动补齐，也不得回退到其他 profile。
+     */
     @Test
-    void getRequiredItemShouldRejectMissingSubject() {
+    void testGetRequiredItemShouldRejectMissingSubject() {
         assertThatThrownBy(() -> service.getRequiredItem(
                 LedgerProfileCode.CREDIT_BASIC,
                 LedgerSubjectCode.PREPAYMENT

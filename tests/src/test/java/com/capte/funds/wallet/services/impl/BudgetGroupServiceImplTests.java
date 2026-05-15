@@ -19,8 +19,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class BudgetGroupServiceImplTests {
 
+    /**
+     * 场景：创建预算组资金主体。
+     * 输入：商户团队预算组，币种 USD，未显式指定账本 profile 和周期。
+     * 输出：写入预算组账户，并初始化 BUDGET_BASIC profile 下的月度主体账本。
+     * 预期：预算组为 ACTIVE，periodType=MONTHLY，账本初始化请求使用 BUDGET_GROUP 主体。
+     * 红线：预算组不得落到信用账户或资金账户 profile，也不得绕过预算控制账本初始化。
+     */
     @Test
-    void createBudgetGroupShouldApplyDefaultProfileAndMonthlyPeriod() {
+    void testCreateBudgetGroupShouldApplyDefaultProfileAndMonthlyPeriod() {
         AtomicReference<BudgetGroup> inserted = new AtomicReference<>();
         BudgetGroupMapper budgetGroupMapper = FundsAccountServiceTestSupport.mapper(
                 BudgetGroupMapper.class,

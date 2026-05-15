@@ -74,6 +74,11 @@ public class LedgerPostingPlan implements Serializable, TenantIsolationObject<Lo
     private String fundsTransactionSn;
 
     /**
+     * 来源 route leg
+     */
+    private String routeLegId;
+
+    /**
      * 记账意图
      */
     @NotNull

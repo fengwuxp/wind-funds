@@ -66,8 +66,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DefaultRoutedFundsInstructionOrchestratorTests {
 
+    /**
+     * 场景：普通资金指令进入路由编排器并完成入账。
+     * 输入：可解析出账本 leg 的资金指令。
+     * 输出：资金交易流水、route snapshot、posting plan 和 ledger transaction。
+     * 预期：先保存生命周期快照，再装配并提交账本交易，交易核心字段来自原指令。
+     * 红线：编排器不得绕过 route snapshot 或直接写账本事实。
+     */
     @Test
-    void executeShouldResolveSnapshotAssembleAndPostLedgerTransaction() {
+    void testExecuteShouldResolveSnapshotAssembleAndPostLedgerTransaction() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -106,8 +113,15 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         assertThat(posted.isBalanced()).isTrue();
     }
 
+    /**
+     * 场景：同一资金指令重复执行且生命周期已完成。
+     * 输入：lifecycle saver 返回 completed=true。
+     * 输出：已有资金交易流水。
+     * 预期：短路返回，不再次装配 posting plan，也不再次提交 ledger transaction。
+     * 红线：幂等重放不得产生第二次账务影响。
+     */
     @Test
-    void executeShouldShortCircuitWhenLifecycleAlreadyCompleted() {
+    void testExecuteShouldShortCircuitWhenLifecycleAlreadyCompleted() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -130,8 +144,15 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         assertThat(lifecycleSaver.succeededLedgerTransactionSn.get()).isNull();
     }
 
+    /**
+     * 场景：指令解析成功但没有需要入账的 route leg。
+     * 输入：空 legs 的 resolved route。
+     * 输出：资金交易流水。
+     * 预期：生命周期可标记成功，但不生成 posting plan 或 ledger transaction。
+     * 红线：无账务路径的事件不得伪造空分录入账。
+     */
     @Test
-    void executeShouldMarkSucceededWithoutPostingWhenRouteHasNoLegs() {
+    void testExecuteShouldMarkSucceededWithoutPostingWhenRouteHasNoLegs() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -154,8 +175,15 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         assertThat(lifecycleSaver.succeededLedgerTransactionSn.get()).isNull();
     }
 
+    /**
+     * 场景：账本提交阶段抛出异常。
+     * 输入：可解析 route 和会失败的 posting service。
+     * 输出：原始异常和失败生命周期记录。
+     * 预期：编排器记录失败 cause 后向上抛出，调用方可感知交易未完成。
+     * 红线：账本提交失败不得被吞掉或标记为成功。
+     */
     @Test
-    void executeShouldMarkFailedWhenPostingThrows() {
+    void testExecuteShouldMarkFailedWhenPostingThrows() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(true);
@@ -176,8 +204,15 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         assertThat(lifecycleSaver.failedCause.get()).isInstanceOf(IllegalStateException.class);
     }
 
+    /**
+     * 场景：退款等逆向事件基于原资金交易快照回放路径。
+     * 输入：带引用交易号的退款指令和可查询的原 route snapshot。
+     * 输出：回放 route code、leg 和 replayRefLegId。
+     * 预期：不重新解析普通 RouteResolver，按原路径快照生成逆向账务路径。
+     * 红线：逆向交易不得基于当前实时路由重新决定历史资金路径。
+     */
     @Test
-    void executeShouldReplaySavedRouteSnapshotForLifecycleEvent() {
+    void testExecuteShouldReplaySavedRouteSnapshotForLifecycleEvent() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -202,8 +237,15 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         assertThat(postingAssembler.route.get().getLegs().getFirst().getReplayRefLegId()).isEqualTo("LEG_001");
     }
 
+    /**
+     * 场景：授权链路退款需要保留授权事件语义。
+     * 输入：`AUTH_REFUND` 指令和原授权 route snapshot。
+     * 输出：`AUTHORIZATION_REFUND_REPLAY` 路径。
+     * 预期：回放路径事件类型保持为 `AUTH_REFUND`，不落入普通退款语义。
+     * 红线：授权退款不得与普通消费退款混同。
+     */
     @Test
-    void executeShouldReplayAuthorizationRefundAsAuthorizationReplayType() {
+    void testExecuteShouldReplayAuthorizationRefundAsAuthorizationReplayType() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -228,8 +270,15 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         assertThat(postingAssembler.route.get().getLegs()).hasSize(1);
     }
 
+    /**
+     * 场景：费用退款按原费用 leg 回放。
+     * 输入：`FEE_REFUND` 指令和原费用 route snapshot。
+     * 输出：费用退款回放路径和原 leg 引用。
+     * 预期：事件类型保持为 `FEE_REFUND`，回放 leg 指向原费用 leg。
+     * 红线：费用退款不得错误冲销主交易本金 leg。
+     */
     @Test
-    void executeShouldReplayFeeRefundAsFeeReplayType() {
+    void testExecuteShouldReplayFeeRefundAsFeeReplayType() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -260,9 +309,10 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      * 输入：带引用交易号的退款指令、原快照中存在 `REPLAY_ONCE` leg，且查询服务返回已消费。
      * 输出：编排异常和普通 RouteResolver 调用记录。
      * 预期：编排器在 replay 前拒绝第二次消费，不重新解析 Route，不创建生命周期或账本交易。
+     * 红线：`REPLAY_ONCE` 的原路径 leg 不得被重复消费。
      */
     @Test
-    void executeShouldRejectSecondReplayOnceConsumption() {
+    void testExecuteShouldRejectSecondReplayOnceConsumption() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -294,9 +344,10 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      * 输入：带引用交易号的 `CHARGEBACK` 指令，且原路径快照可查询。
      * 输出：回放路径编码、事件类型和 replayRefLegId。
      * 预期：编排器直接回放原快照，生成 `CHARGEBACK_REPLAY` 路径，不再调用普通 RouteResolver。
+     * 红线：拒付不得按当前实时路由重算，也不得修改原账本事实。
      */
     @Test
-    void executeShouldReplaySavedRouteSnapshotForChargebackEvent() {
+    void testExecuteShouldReplaySavedRouteSnapshotForChargebackEvent() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -323,8 +374,15 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 .containsOnly("LEG_001");
     }
 
+    /**
+     * 场景：逆向事件引用原交易但原 route snapshot 缺失。
+     * 输入：带引用交易号的退款指令，查询服务未返回原快照。
+     * 输出：缺失快照异常。
+     * 预期：拒绝继续编排，不调用普通 RouteResolver，不提交账本交易。
+     * 红线：没有原路径快照时不得猜测逆向资金路径。
+     */
     @Test
-    void executeShouldFailWhenReplaySnapshotMissing() {
+    void testExecuteShouldFailWhenReplaySnapshotMissing() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -352,9 +410,10 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      * 输入：`referenceType=FREEZE_ORDER` 的 `UNFREEZE` 指令，且可通过冻结单号定位原冻结快照。
      * 输出：回放路径编码、事件类型和普通 RouteResolver 调用记录。
      * 预期：编排器不再走普通 RouteResolver，而是基于原冻结快照生成 `BALANCE_UNFREEZE_REPLAY` 路径。
+     * 红线：解冻只回放同主体 `AVAILABLE <-> FROZEN` 控制，不表达消费、扣划或跨主体转移。
      */
     @Test
-    void executeShouldReplayFreezeSnapshotForUnfreezeWithFreezeOrderReference() {
+    void testExecuteShouldReplayFreezeSnapshotForUnfreezeWithFreezeOrderReference() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -383,8 +442,15 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         assertThat(postingService.transaction.get()).isNotNull();
     }
 
+    /**
+     * 场景：无原交易引用的直接退款进入普通路由。
+     * 输入：没有 reference 的 direct refund 指令。
+     * 输出：普通 RouteResolver 解析出的 route 和 ledger transaction。
+     * 预期：按当前指令路由编排，生成独立资金事实。
+     * 红线：无引用退款不得伪造原交易回放关系。
+     */
     @Test
-    void executeShouldResolveDirectRefundWhenNoReferenceProvided() {
+    void testExecuteShouldResolveDirectRefundWhenNoReferenceProvided() {
         RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
@@ -407,8 +473,15 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         assertThat(postingService.transaction.get()).isNotNull();
     }
 
+    /**
+     * 场景：编排器能力匹配资金指令契约。
+     * 输入：`FundsInstructionSpec.class`。
+     * 输出：supports 判断结果。
+     * 预期：编排器声明支持资金指令契约。
+     * 红线：能力匹配不得扩大到非资金指令类型。
+     */
     @Test
-    void supportsShouldMatchFundsInstructionType() {
+    void testSupportsShouldMatchFundsInstructionType() {
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
                 new RecordingRouteResolver(route(true)),
                 new DefaultRouteSnapshotFactory(),

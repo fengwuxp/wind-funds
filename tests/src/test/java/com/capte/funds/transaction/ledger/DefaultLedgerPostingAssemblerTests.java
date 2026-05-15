@@ -63,8 +63,15 @@ class DefaultLedgerPostingAssemblerTests {
 
     private static final CurrencyIsoCode CURRENCY = CurrencyIsoCode.USD;
 
+    /**
+     * 场景：直接交易路径翻译为账务计划。
+     * 输入：funding_001 向 funding_002 转账的单 leg 路径。
+     * 输出：一个绑定 routeLegId 的 posting plan 和两条账本分录。
+     * 预期：计划独立平衡，源账户按正常余额方向减少，目标账户增加。
+     * 红线：Route -> Posting 翻译不得丢失 route leg 追溯或生成不平衡计划。
+     */
     @Test
-    void assembleShouldCreateBalancedPlan() {
+    void testAssembleShouldCreateBalancedPlan() {
         DefaultLedgerPostingAssembler assembler = new DefaultLedgerPostingAssembler(ledgerService(Map.ofEntries(
                 ledger(101L, "funding_001", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT),
                 ledger(102L, "funding_002", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT)
@@ -90,8 +97,15 @@ class DefaultLedgerPostingAssemblerTests {
         assertThat(targetEntry.getEntryType()).isEqualTo(EntrySide.CREDIT);
     }
 
+    /**
+     * 场景：不同交易事件翻译为不同账务作用域。
+     * 输入：直接交易、授权占用和费用退款三类路径。
+     * 输出：posting plan 与 entry 上的 postingScope。
+     * 预期：直接交易为主体间转移，授权为控制占用，费用退款为费用作用域。
+     * 红线：账务作用域必须在持久化前确定，不能依赖后置数据库状态补语义。
+     */
     @Test
-    void assembleShouldResolvePostingScopeBeforeLedgerPersistence() {
+    void testAssembleShouldResolvePostingScopeBeforeLedgerPersistence() {
         DefaultLedgerPostingAssembler directAssembler = new DefaultLedgerPostingAssembler(ledgerService(Map.ofEntries(
                 ledger(101L, "funding_001", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT),
                 ledger(102L, "funding_002", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT)
@@ -117,8 +131,15 @@ class DefaultLedgerPostingAssemblerTests {
                 LedgerPostingScope.FEE);
     }
 
+    /**
+     * 场景：RouteLeg 对余额约束提供多层覆盖。
+     * 输入：同时存在主体+科目级和科目级 constraint override。
+     * 输出：源、目标分录上的 balanceConstraintType。
+     * 预期：优先使用最精确的主体+科目级约束，未命中时回落到科目级默认。
+     * 红线：余额约束不得因 Map 顺序或宽泛 key 覆盖精确主体规则。
+     */
     @Test
-    void assembleShouldUseMostSpecificConstraintOverride() {
+    void testAssembleShouldUseMostSpecificConstraintOverride() {
         DefaultLedgerPostingAssembler assembler = new DefaultLedgerPostingAssembler(ledgerService(Map.ofEntries(
                 ledger(101L, "funding_001", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT),
                 ledger(102L, "funding_002", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT)
@@ -137,8 +158,15 @@ class DefaultLedgerPostingAssemblerTests {
                 .isEqualTo(LedgerBalanceConstraintType.PROFILE_DEFAULT);
     }
 
+    /**
+     * 场景：交易路径引用的主体账本尚未初始化。
+     * 输入：无法查询到账本 bucket 的转账路径。
+     * 输出：Assembler 在生成分录前失败。
+     * 预期：写流程缺账本直接拒绝，不自动建账。
+     * 红线：Route -> Posting 不得在交易路径中隐式创建账本或降级为空入账。
+     */
     @Test
-    void assembleShouldRejectMissingLedger() {
+    void testAssembleShouldRejectMissingLedger() {
         DefaultLedgerPostingAssembler assembler = new DefaultLedgerPostingAssembler(ledgerService(Map.of()));
 
         assertThatThrownBy(() -> assembler.assemble(instruction(), "FT_001", route(Map.of())))
@@ -146,6 +174,13 @@ class DefaultLedgerPostingAssemblerTests {
                 .hasMessageContaining("账本不存在或不唯一");
     }
 
+    /**
+     * 场景：交易路径金额币种与账本币种不一致。
+     * 输入：路径金额为 USD，但目标主体账本为 EUR。
+     * 输出：Assembler 在生成分录前拒绝。
+     * 预期：账本 bucket 币种必须和 route leg 金额币种一致。
+     * 红线：不得把未经过换汇建模的多币种资金变化写入同一条 route leg。
+     */
     @Test
     void testAssembleShouldRejectLedgerCurrencyMismatch() {
         DefaultLedgerPostingAssembler assembler = new DefaultLedgerPostingAssembler(ledgerService(Map.ofEntries(
@@ -163,6 +198,7 @@ class DefaultLedgerPostingAssemblerTests {
      * 输入：`periodType=LIFETIME` 且 `periodId=null` 的路径。
      * 输出：组装得到的账本分录 ledgerId 列表。
      * 预期：Assembler 自动补齐 `LIFETIME` 账期标识，并正确命中生命周期账本。
+     * 红线：默认生命周期账期不得因为 periodId 缺省而错配到账期 bucket。
      */
     @Test
     void testAssembleShouldDefaultLifetimePeriodIdWhenLegDoesNotProvideIt() {
@@ -185,6 +221,7 @@ class DefaultLedgerPostingAssemblerTests {
      * 输入：月账期路径，目标 periodId 为 `2026-05`。
      * 输出：组装得到的账本分录 ledgerId 列表。
      * 预期：Assembler 只能命中同周期账本，不得串到 `2026-04` 等其他 period bucket。
+     * 红线：同主体同科目不同账期的资金余额不得相互污染。
      */
     @Test
     void testAssembleShouldUsePeriodKeyForLedgerLookup() {
@@ -209,8 +246,15 @@ class DefaultLedgerPostingAssemblerTests {
                 .doesNotContain(201L, 202L);
     }
 
+    /**
+     * 场景：共享卡授权同时占用信用账户、预算组和资金账户。
+     * 输入：三个主体各自的 AVAILABLE -> AUTHORIZATION 控制路径。
+     * 输出：三个独立 posting plan，每个 plan 两条分录。
+     * 预期：每个主体的余额控制独立平衡，并保留各自 ledgerId。
+     * 红线：多主体授权不得合并成一笔跨主体不透明入账。
+     */
     @Test
-    void assembleShouldCreateIndependentPlansForSharedCardSubjects() {
+    void testAssembleShouldCreateIndependentPlansForSharedCardSubjects() {
         DefaultLedgerPostingAssembler assembler = new DefaultLedgerPostingAssembler(ledgerService(Map.ofEntries(
                 ledger(101L, "credit_001", FundsSubjectType.CREDIT_ACCOUNT, LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT),
                 ledger(102L, "credit_001", FundsSubjectType.CREDIT_ACCOUNT, LedgerSubjectCode.AUTHORIZATION, EntrySide.CREDIT),
@@ -235,8 +279,15 @@ class DefaultLedgerPostingAssemblerTests {
                 .containsExactly(101L, 102L, 201L, 202L, 301L, 302L);
     }
 
+    /**
+     * 场景：费用退款路径翻译为独立费用退款账务意图。
+     * 输入：`FEE_REFUND` 事件和费用退款 route leg。
+     * 输出：posting plan 与 entry 上的 intent。
+     * 预期：全部标记为 `FEE_REFUND`，不混入普通退款。
+     * 红线：费用退款不得回退为普通退款，否则后续费用对账和报表口径会漂移。
+     */
     @Test
-    void assembleShouldUseFeeRefundIntentForFeeRefundEvent() {
+    void testAssembleShouldUseFeeRefundIntentForFeeRefundEvent() {
         DefaultLedgerPostingAssembler assembler = new DefaultLedgerPostingAssembler(ledgerService(Map.ofEntries(
                 ledger(101L, "funding_001", LedgerSubjectCode.FEE, EntrySide.CREDIT),
                 ledger(102L, "funding_002", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT)

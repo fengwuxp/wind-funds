@@ -17,8 +17,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CompositeLedgerPostingAssemblerTests {
 
+    /**
+     * 场景：组合 posting assembler 自身出现在 delegate 列表中。
+     * 输入：delegates 包含 composite 自身和一个真正支持 route 的 assembler。
+     * 输出：supports=true，assemble 委托给真实 assembler。
+     * 预期：组合器跳过自身，避免递归调用。
+     * 红线：账本入账组装不得因循环委托重复组装 posting plan 或造成递归失败。
+     */
     @Test
-    void supportsAndAssembleShouldSkipCompositeItselfFromDelegates() {
+    void testSupportsAndAssembleShouldSkipCompositeItselfFromDelegates() {
         AtomicInteger supportCalls = new AtomicInteger();
         AtomicInteger assembleCalls = new AtomicInteger();
         List<LedgerPostingAssembler<? extends ResolvedRouteSpec>> delegates = new ArrayList<>();

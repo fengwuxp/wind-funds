@@ -88,6 +88,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
 
     private static final List<String> LEDGER_POSTING_PLAN_SHA256_FIELDS = List.of(
             LedgerPostingPlan.Fields.tenantId,
+            LedgerPostingPlan.Fields.routeLegId,
             LedgerPostingPlan.Fields.intent,
             LedgerPostingPlan.Fields.postingScope,
             LedgerPostingPlan.Fields.balanceEffectType,
@@ -177,6 +178,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         entity.setTenantId(transaction.getTenantId());
         entity.setLedgerTransactionSn(transaction.getSn());
         entity.setFundsTransactionSn(transaction.getFundsTransactionSn());
+        entity.setRouteLegId(plan.getRouteLegId());
         entity.setIntent(plan.getIntent().name());
         entity.setPostingScope(resolvePostingScope(plan, phaseCode).name());
         entity.setBalanceEffectType(resolveBalanceEffectType(plan, phaseCode).name());

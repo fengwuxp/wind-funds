@@ -17,8 +17,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LedgerServiceImplTests {
 
+    /**
+     * 场景：更新账本余额会突破最低正常余额约束。
+     * 输入：贷方正常余额账本当前正常余额 1000，本次借方增加 1200，最低正常余额为 0。
+     * 输出：更新失败且不写库。
+     * 预期：服务在执行 update 前拒绝会导致余额跌破下限的请求。
+     * 红线：账本余额约束不得依赖数据库更新后补偿，不能先写入再发现透支。
+     */
     @Test
-    void updateLedgerBalanceShouldRejectBrokenMinimumNormalBalanceBeforeUpdate() {
+    void testUpdateLedgerBalanceShouldRejectBrokenMinimumNormalBalanceBeforeUpdate() {
         AtomicInteger updateCount = new AtomicInteger();
         LedgerServiceImpl service = new LedgerServiceImpl(mapper(creditNormalLedger(), updateCount, 1));
 
@@ -32,8 +39,15 @@ class LedgerServiceImplTests {
         assertThat(updateCount).hasValue(0);
     }
 
+    /**
+     * 场景：更新账本余额后仍满足最低正常余额约束。
+     * 输入：贷方正常余额账本当前正常余额 1000，本次借方增加 300，最低正常余额为 0。
+     * 输出：执行一次余额更新。
+     * 预期：正常余额仍为正时允许持久化增量。
+     * 红线：余额控制只拦截破坏不变量的更新，不得误伤合法账务变动。
+     */
     @Test
-    void updateLedgerBalanceShouldAllowSatisfiedMinimumNormalBalance() {
+    void testUpdateLedgerBalanceShouldAllowSatisfiedMinimumNormalBalance() {
         AtomicInteger updateCount = new AtomicInteger();
         LedgerServiceImpl service = new LedgerServiceImpl(mapper(creditNormalLedger(), updateCount, 1));
 
@@ -46,6 +60,13 @@ class LedgerServiceImplTests {
         assertThat(updateCount).hasValue(1);
     }
 
+    /**
+     * 场景：账本实体字段保护。
+     * 输入：Ledger 实体字段集合。
+     * 输出：确认只持久化借方、贷方和正常余额方向，不持久化派生正常余额。
+     * 预期：normalBalance 作为派生口径不进入 Entity 字段。
+     * 红线：不得把可推导余额快照误作为账本事实字段持久化。
+     */
     @Test
     void testNormalBalanceShouldNotBePersisted() {
         assertThat(Arrays.stream(Ledger.class.getDeclaredFields())

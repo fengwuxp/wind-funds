@@ -22,8 +22,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FundsFrozenOrderServiceImplTests {
 
+    /**
+     * 场景：创建已完成冻结入账的冻结单。
+     * 输入：提现冻结请求包含 freezeLedgerTransactionSn。
+     * 输出：冻结单落库，状态为 FROZEN，释放金额和消费金额初始化为 0。
+     * 预期：冻结单只表达同主体 AVAILABLE -> FROZEN 控制事实。
+     * 红线：冻结创建不得隐式表达消费、扣划或跨主体价值转移。
+     */
     @Test
-    void createFundsFrozenOrderShouldInitializeReleasedAndConsumedAmounts() {
+    void testCreateFundsFrozenOrderShouldInitializeReleasedAndConsumedAmounts() {
         AtomicReference<FundsFrozenOrder> inserted = new AtomicReference<>();
         FundsFrozenOrderMapper mapper = FundsAccountServiceTestSupport.mapper(
                 FundsFrozenOrderMapper.class,
@@ -55,6 +62,13 @@ class FundsFrozenOrderServiceImplTests {
         assertThat(entity.getConsumedAmount()).isZero();
     }
 
+    /**
+     * 场景：创建冻结单时冻结入账流水尚未生成。
+     * 输入：提现冻结请求不包含 freezeLedgerTransactionSn。
+     * 输出：冻结单落库，状态保持 CREATED。
+     * 预期：冻结单允许先登记业务事实，再由后续链路补齐冻结入账流水。
+     * 红线：不得要求调用方伪造或提前传入未生成的账本交易流水。
+     */
     @Test
     void testCreateFundsFrozenOrderShouldStayCreatedWhenLedgerTransactionGeneratedLater() {
         AtomicReference<FundsFrozenOrder> inserted = new AtomicReference<>();
@@ -88,6 +102,13 @@ class FundsFrozenOrderServiceImplTests {
         assertThat(entity.getConsumedAmount()).isZero();
     }
 
+    /**
+     * 场景：冻结入账流水由后续链路生成。
+     * 输入：检查请求模型和实体模型上的 freezeLedgerTransactionSn 字段约束。
+     * 输出：字段不带 NotBlank/NotNull 强约束。
+     * 预期：调用方创建冻结单时无需传入冻结账本交易流水。
+     * 红线：不得把异步生成的账本流水变成创建冻结单的强制入参。
+     */
     @Test
     void testFreezeLedgerTransactionSnShouldNotBeCallerRequired() throws NoSuchFieldException {
         Field requestField = CreateFundsFrozenOrderRequest.class.getDeclaredField("freezeLedgerTransactionSn");
@@ -97,6 +118,13 @@ class FundsFrozenOrderServiceImplTests {
         assertThat(entityField.isAnnotationPresent(NotNull.class)).isFalse();
     }
 
+    /**
+     * 场景：外部调用创建冻结单时基础冻结事实不完整。
+     * 输入：冻结单号为空、金额为 0、币种为空三类请求。
+     * 输出：服务层在写库前拒绝请求。
+     * 预期：冻结单必须具备可追溯单号、正向金额和明确币种。
+     * 红线：不得持久化无法解释金额口径或审计流水的冻结单。
+     */
     @Test
     void testCreateFundsFrozenOrderShouldRejectInvalidFrozenFactBeforeInsert() {
         AtomicReference<FundsFrozenOrder> inserted = new AtomicReference<>();
@@ -117,6 +145,40 @@ class FundsFrozenOrderServiceImplTests {
         assertThat(inserted).hasValue(null);
     }
 
+    /**
+     * 场景：外部调用创建冻结单时传入历史消费状态。
+     * 输入：`status=PARTIALLY_CONSUMED/CONSUMED` 的冻结单创建请求。
+     * 输出：服务层在写库前拒绝请求。
+     * 预期：冻结单创建只允许表达冻结事实，不接受消费状态。
+     * 红线：冻结单不得承载消费、扣划或跨主体价值转移语义。
+     */
+    @Test
+    void testCreateFundsFrozenOrderShouldRejectConsumptionStatusBeforeInsert() {
+        AtomicReference<FundsFrozenOrder> inserted = new AtomicReference<>();
+        FundsFrozenOrderMapper mapper = FundsAccountServiceTestSupport.mapper(
+                FundsFrozenOrderMapper.class,
+                entityObject -> inserted.set((FundsFrozenOrder) entityObject),
+                query -> null
+        );
+        FundsFrozenOrderServiceImpl service = new FundsFrozenOrderServiceImpl(mapper);
+
+        assertThatThrownBy(() -> service.createFundsFrozenOrder(validCreateRequest()
+                .setStatus(FundsFrozenOrderStatus.PARTIALLY_CONSUMED)))
+                .hasMessageContaining("冻结单状态不允许表达消费");
+        assertThatThrownBy(() -> service.createFundsFrozenOrder(validCreateRequest()
+                .setStatus(FundsFrozenOrderStatus.CONSUMED)))
+                .hasMessageContaining("冻结单状态不允许表达消费");
+
+        assertThat(inserted).hasValue(null);
+    }
+
+    /**
+     * 场景：测试库表结构允许先登记冻结单再生成冻结入账流水。
+     * 输入：H2/MySQL Mode 测试 schema 中的冻结单表定义。
+     * 输出：freeze_ledger_transaction_sn 默认为 NULL，status 默认为 CREATED。
+     * 预期：测试 schema 与冻结生命周期设计保持一致。
+     * 红线：测试 DDL 不得重新把冻结账本流水变成创建冻结单的硬前置条件。
+     */
     @Test
     void testJdbcSchemaShouldAllowPendingFreezeLedgerTransactionSn() throws IOException {
         String schema = new String(Objects.requireNonNull(getClass().getClassLoader()

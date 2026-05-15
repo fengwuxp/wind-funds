@@ -49,8 +49,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DefaultFundsAccountQueryServiceImplTests {
 
+    /**
+     * 场景：按资金账户 ID 查询账户与当前余额视图。
+     * 输入：funding account 已存在 AVAILABLE 与 FROZEN 账本，币种 USD。
+     * 输出：FundsAccount 与 FundsAccountBalanceView。
+     * 预期：账户返回账本 ID 映射，余额视图分别展示可用、冻结和待处理余额。
+     * 红线：余额查询只能读取账本投影，不得创建账本、修改余额或绕过主体类型解析。
+     */
     @Test
-    void getAccountAndBalanceShouldResolveFundingAccountFromLedger() {
+    void testGetAccountAndBalanceShouldResolveFundingAccountFromLedger() {
         FundingAccount fundingAccount = fundingAccount();
         DefaultFundsAccountQueryServiceImpl service = newService(
                 fundingAccount,
@@ -78,8 +85,15 @@ class DefaultFundsAccountQueryServiceImplTests {
         assertThat(balance.getPendingBalance()).isEqualTo(Money.immutable(0L, CurrencyIsoCode.USD));
     }
 
+    /**
+     * 场景：查询服务识别预算组主体。
+     * 输入：资金账户和信用账户均不存在，预算组主体存在。
+     * 输出：supports=true，并返回预算组账户信息。
+     * 预期：账户 owner 与币种来自预算组记录。
+     * 红线：查询 fallback 只能在只读账户类型解析内完成，不得把预算组误当 funding account。
+     */
     @Test
-    void supportsShouldFallbackToBudgetGroup() {
+    void testSupportsShouldFallbackToBudgetGroup() {
         BudgetGroup budgetGroup = budgetGroup();
         DefaultFundsAccountQueryServiceImpl service = newService(
                 null,
@@ -96,8 +110,15 @@ class DefaultFundsAccountQueryServiceImplTests {
         assertThat(account.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
     }
 
+    /**
+     * 场景：按 ledger subject type 查询 funding account。
+     * 输入：accountId 的 accountType 使用 FUNDING_ACCOUNT 主体类型。
+     * 输出：FundsAccount 及 AVAILABLE 账本映射。
+     * 预期：服务支持该主体类型，并正确定位 funding account。
+     * 红线：主体类型解析不得依赖外部账户类型枚举，也不得丢失账本主体边界。
+     */
     @Test
-    void getAccountShouldResolveFundingAccountByLedgerSubjectType() {
+    void testGetAccountShouldResolveFundingAccountByLedgerSubjectType() {
         FundingAccount fundingAccount = fundingAccount();
         DefaultFundsAccountQueryServiceImpl service = newService(
                 fundingAccount,
@@ -114,8 +135,15 @@ class DefaultFundsAccountQueryServiceImplTests {
         assertThat(account.getAccountLedgerIds()).containsEntry(LedgerSubjectCode.AVAILABLE, 11L);
     }
 
+    /**
+     * 场景：查询不存在的资金主体。
+     * 输入：不存在的 USER_WALLET accountId。
+     * 输出：supports=false，getAccount 抛出异常。
+     * 预期：未知主体不会被构造为空账户。
+     * 红线：不得用空对象掩盖资金主体缺失，避免后续余额查询误判为真实账户。
+     */
     @Test
-    void getAccountShouldRejectUnknownSubject() {
+    void testGetAccountShouldRejectUnknownSubject() {
         DefaultFundsAccountQueryServiceImpl service = newService(null, null, null, List.of());
         FundsAccountId accountId = FundsAccountId.immutable("missing_001",
                 DefaultFundsAccountType.USER_WALLET.name());
@@ -125,8 +153,15 @@ class DefaultFundsAccountQueryServiceImplTests {
                 .isInstanceOf(RuntimeException.class);
     }
 
+    /**
+     * 场景：批量查询多个资金主体的当前余额。
+     * 输入：预算组与 funding account，并只请求 AVAILABLE 余额桶。
+     * 输出：按请求顺序返回两个 FundsSubjectBalanceDTO。
+     * 预期：结果保持 subjectRefs 顺序，只返回请求的 ledgerSubjectCodes。
+     * 红线：批量展示查询不得串主体、串账本桶或带出未请求的余额科目。
+     */
     @Test
-    void queryCurrentBalancesShouldKeepSubjectOrderAndFilterLedgerCodes() {
+    void testQueryCurrentBalancesShouldKeepSubjectOrderAndFilterLedgerCodes() {
         FundingAccount fundingAccount = fundingAccount();
         BudgetGroup budgetGroup = budgetGroup();
         DefaultFundsAccountQueryServiceImpl service = newServiceWithFundingAccounts(
@@ -163,8 +198,15 @@ class DefaultFundsAccountQueryServiceImplTests {
                 .isEqualTo(Money.immutable(2_500L, CurrencyIsoCode.USD));
     }
 
+    /**
+     * 场景：按指定周期查询资金主体余额。
+     * 输入：同一 funding account 同时存在 lifetime 与多个 monthly AVAILABLE 账本。
+     * 输出：2026-05 月度 AVAILABLE 余额桶。
+     * 预期：余额来自请求周期，periodType 和 periodId 原样返回。
+     * 红线：周期化余额查询不得混用 lifetime 或其他月份账本。
+     */
     @Test
-    void queryCurrentBalancesShouldUseRequestedPeriodAsLedgerBucketKey() {
+    void testQueryCurrentBalancesShouldUseRequestedPeriodAsLedgerBucketKey() {
         DefaultFundsAccountQueryServiceImpl service = newService(
                 fundingAccount(),
                 null,
@@ -201,8 +243,15 @@ class DefaultFundsAccountQueryServiceImplTests {
                 .isEqualTo("2026-05");
     }
 
+    /**
+     * 场景：跨租户查询资金主体余额。
+     * 输入：请求租户为 1，资金主体所属租户为 2。
+     * 输出：查询失败。
+     * 预期：错误信息提示资金主体租户不匹配。
+     * 红线：余额查询不得跨租户读取客户资金视图。
+     */
     @Test
-    void queryCurrentBalancesShouldRejectSubjectFromAnotherTenant() {
+    void testQueryCurrentBalancesShouldRejectSubjectFromAnotherTenant() {
         DefaultFundsAccountQueryServiceImpl service = newService(
                 fundingAccount(3L, "funding_other_tenant", 2L, CurrencyIsoCode.USD),
                 null,
@@ -220,8 +269,15 @@ class DefaultFundsAccountQueryServiceImplTests {
                 .hasMessageContaining("资金主体租户不匹配");
     }
 
+    /**
+     * 场景：查询币种与资金主体币种不一致。
+     * 输入：主体币种 EUR，请求币种 USD。
+     * 输出：查询失败。
+     * 预期：错误信息提示资金主体币种不匹配。
+     * 红线：余额展示不得跨币种汇总或静默换汇。
+     */
     @Test
-    void queryCurrentBalancesShouldRejectSubjectCurrencyMismatch() {
+    void testQueryCurrentBalancesShouldRejectSubjectCurrencyMismatch() {
         DefaultFundsAccountQueryServiceImpl service = newService(
                 fundingAccount(4L, "funding_eur", 1L, CurrencyIsoCode.EUR),
                 null,
@@ -239,8 +295,15 @@ class DefaultFundsAccountQueryServiceImplTests {
                 .hasMessageContaining("资金主体币种不匹配");
     }
 
+    /**
+     * 场景：批量余额查询包含重复主体引用。
+     * 输入：subjectRefs 两次传入同一个 funding account。
+     * 输出：查询失败。
+     * 预期：错误信息提示 subjectRefs 不能重复。
+     * 红线：不得允许重复主体导致展示层重复计数或汇总口径失真。
+     */
     @Test
-    void queryCurrentBalancesShouldRejectDuplicateSubjectRefs() {
+    void testQueryCurrentBalancesShouldRejectDuplicateSubjectRefs() {
         DefaultFundsAccountQueryServiceImpl service = newService(fundingAccount(), null, null, List.of());
         FundsAccountId fundingRef = FundsAccountId.immutable("funding_001", FundsSubjectType.FUNDING_ACCOUNT.name());
 
@@ -252,8 +315,15 @@ class DefaultFundsAccountQueryServiceImplTests {
                 .hasMessageContaining("subjectRefs 不能重复");
     }
 
+    /**
+     * 场景：资金主体存在但尚未初始化任何账本。
+     * 输入：存在 funding account，但没有关联 ledger。
+     * 输出：initialized=false，余额桶为空。
+     * 预期：查询返回未初始化状态而非异常。
+     * 红线：展示查询不得自动补建账本，也不得把缺失账本伪装成 0 余额。
+     */
     @Test
-    void queryCurrentBalancesShouldReturnUninitializedBalanceWhenLedgerMissing() {
+    void testQueryCurrentBalancesShouldReturnUninitializedBalanceWhenLedgerMissing() {
         DefaultFundsAccountQueryServiceImpl service = newService(fundingAccount(), null, null, List.of());
         FundsAccountId fundingRef = FundsAccountId.immutable("funding_001", FundsSubjectType.FUNDING_ACCOUNT.name());
 
@@ -272,9 +342,10 @@ class DefaultFundsAccountQueryServiceImplTests {
      * 输入：一个已有 AVAILABLE 账本且 normalBalance 为 0 的主体，以及一个无任何账本的主体。
      * 输出：FundsSubjectBalanceDTO#isInitialized 和 AVAILABLE 余额 bucket。
      * 预期：已有 0 余额账本返回 true；未建账主体返回 false。
+     * 红线：不得把真实 0 余额和未初始化状态混为一谈。
      */
     @Test
-    void queryCurrentBalancesShouldDistinguishInitializedZeroBalanceFromMissingLedger() {
+    void testQueryCurrentBalancesShouldDistinguishInitializedZeroBalanceFromMissingLedger() {
         DefaultFundsAccountQueryServiceImpl initializedService = newService(
                 fundingAccount(),
                 null,
@@ -298,8 +369,42 @@ class DefaultFundsAccountQueryServiceImplTests {
         assertThat(missingLedgerBalance.getBalanceBuckets()).isEmpty();
     }
 
+    /**
+     * 场景：展示查询只请求一个尚未初始化的余额桶，但该主体已有其他账本。
+     * 输入：主体已有 AVAILABLE 账本，请求 FROZEN 余额桶。
+     * 输出：FundsSubjectBalanceDTO#isInitialized 和余额桶集合。
+     * 预期：主体仍标记为已初始化，缺失的展示 bucket 返回空集合。
+     * 红线：展示查询不得把“局部 bucket 未建”误判为“主体未建账”，也不得自动补建账本。
+     */
     @Test
-    void getRequiredCurrentBalanceShouldRejectMissingRequiredLedger() {
+    void testQueryCurrentBalancesShouldKeepInitializedWhenRequestedBucketMissing() {
+        DefaultFundsAccountQueryServiceImpl service = newService(
+                fundingAccount(),
+                null,
+                null,
+                List.of(ledger(11L, LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT, 0L, 2_500L))
+        );
+        FundsAccountId fundingRef = FundsAccountId.immutable("funding_001", FundsSubjectType.FUNDING_ACCOUNT.name());
+
+        FundsSubjectBalanceDTO balance = service.queryCurrentBalances(new FundsSubjectBalanceQuery()
+                .setTenantId(1L)
+                .setSubjectRefs(List.of(fundingRef))
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerSubjectCodes(List.of(LedgerSubjectCode.FROZEN))).getFirst();
+
+        assertThat(balance.isInitialized()).isTrue();
+        assertThat(balance.getBalanceBuckets()).isEmpty();
+    }
+
+    /**
+     * 场景：强一致余额读取要求必需账本存在。
+     * 输入：funding account 只有 AVAILABLE 账本，请求必需 FROZEN 账本。
+     * 输出：查询失败。
+     * 预期：错误信息提示资金主体账本不完整。
+     * 红线：强制余额读取不得用空 bucket 掩盖必需账本缺失。
+     */
+    @Test
+    void testGetRequiredCurrentBalanceShouldRejectMissingRequiredLedger() {
         DefaultFundsAccountQueryServiceImpl service = newService(
                 fundingAccount(),
                 null,
@@ -317,8 +422,15 @@ class DefaultFundsAccountQueryServiceImplTests {
                 .hasMessageContaining("资金主体账本不完整");
     }
 
+    /**
+     * 场景：强一致余额读取按查询契约过滤账本桶。
+     * 输入：funding account 有 AVAILABLE 与 FROZEN 账本，请求 FROZEN。
+     * 输出：只包含 FROZEN 的余额 DTO。
+     * 预期：subjectRef 保持请求值，余额来自 FROZEN bucket。
+     * 红线：必需余额读取不得返回未请求科目，也不得忽略 ledgerSubjectCodes 过滤。
+     */
     @Test
-    void getRequiredCurrentBalanceShouldUseQueryContractAndLedgerFilters() {
+    void testGetRequiredCurrentBalanceShouldUseQueryContractAndLedgerFilters() {
         DefaultFundsAccountQueryServiceImpl service = newService(
                 fundingAccount(),
                 null,
@@ -343,8 +455,15 @@ class DefaultFundsAccountQueryServiceImplTests {
                 .isEqualTo(Money.immutable(400L, CurrencyIsoCode.USD));
     }
 
+    /**
+     * 场景：强一致余额读取传入多个主体引用。
+     * 输入：funding account 与 budget group 两个 subjectRefs。
+     * 输出：查询失败。
+     * 预期：错误信息提示 subjectRefs 只能包含一个主体。
+     * 红线：单主体强制余额读取不得暗中聚合多个主体余额。
+     */
     @Test
-    void getRequiredCurrentBalanceShouldRejectMultipleSubjectRefs() {
+    void testGetRequiredCurrentBalanceShouldRejectMultipleSubjectRefs() {
         DefaultFundsAccountQueryServiceImpl service = newService(fundingAccount(), null, budgetGroup(), List.of());
         FundsAccountId fundingRef = FundsAccountId.immutable("funding_001",
                 FundsSubjectType.FUNDING_ACCOUNT.name());

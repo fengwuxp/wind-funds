@@ -399,6 +399,7 @@ CREATE TABLE `t_ledger_posting_plan`
     `tenant_id`                   BIGINT(20)   NOT NULL COMMENT '租户 ID',
     `ledger_transaction_sn`       VARCHAR(64)  NOT NULL COMMENT '账本交易号',
     `funds_transaction_sn`        VARCHAR(64)           DEFAULT NULL COMMENT '业务交易号',
+    `route_leg_id`                VARCHAR(64)           DEFAULT NULL COMMENT '来源 route leg',
     `intent`                      VARCHAR(50)  NOT NULL COMMENT '记账意图',
     `posting_scope`               VARCHAR(50)  NOT NULL COMMENT '记账范围',
     `balance_effect_type`         VARCHAR(50)  NOT NULL COMMENT '余额影响语义',
@@ -415,6 +416,7 @@ CREATE TABLE `t_ledger_posting_plan`
     UNIQUE KEY `uk_ledger_posting_plan_sn` (`sn`),
     KEY `idx_ledger_posting_plan_transaction` (`ledger_transaction_sn`),
     KEY `idx_ledger_posting_plan_funds_transaction` (`funds_transaction_sn`),
+    KEY `idx_ledger_posting_plan_route_leg` (`route_leg_id`),
     KEY `idx_ledger_posting_plan_phase` (`phase_code`),
     KEY `idx_ledger_posting_plan_intent` (`intent`)
 ) ENGINE = InnoDB

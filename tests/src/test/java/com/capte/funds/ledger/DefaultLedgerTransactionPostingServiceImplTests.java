@@ -54,6 +54,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DefaultLedgerTransactionPostingServiceImplTests {
 
+    /**
+     * 场景：已确认账本交易完成入账。
+     * 输入：一笔 POSTED 转账交易，包含平衡的 AVAILABLE 借贷分录。
+     * 输出：创建账本交易，并把分录交给余额投影服务。
+     * 预期：账本交易可追溯，posting plan 平衡，余额投影收到完整分录。
+     * 红线：不得绕过账本交易事实直接更新余额投影。
+     */
     @Test
     void testPostShouldCreateLedgerTransactionAndProjectEntries() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -69,6 +76,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries.getFirst()).hasSize(2);
     }
 
+    /**
+     * 场景：重复入账请求命中账本交易幂等。
+     * 输入：账本交易创建服务返回未新建，表示交易事实已存在。
+     * 输出：入账服务跳过余额投影。
+     * 预期：幂等重放不重复写余额投影，已存在交易只保留一次资金影响。
+     * 红线：不得因为重复请求导致同一 ledgerTransactionSn 被重复投影。
+     */
     @Test
     void testPostShouldSkipProjectionWhenLedgerTransactionAlreadyExists() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService(false);
@@ -83,6 +97,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：入账请求缺少账本交易对象。
+     * 输入：LedgerTransactionSpec 为 null。
+     * 输出：入账服务在任何持久化动作前拒绝。
+     * 预期：错误明确提示账本交易不能为空，且不创建交易、不投影余额。
+     * 红线：不得用 NPE 或半写入状态暴露空交易输入。
+     */
     @Test
     void testPostShouldRejectNullLedgerTransactionBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -97,6 +118,196 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：账本交易缺少交易流水号。
+     * 输入：LedgerTransactionSpec.sn 为空白字符串，posting plan 和 entry 均完整。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：账本交易必须先具备可追溯流水号，再进入状态、金额和账务计划校验。
+     * 红线：不得生成缺少账本交易流水的账本事实、posting plan 或余额投影。
+     */
+    @Test
+    void testPostShouldRejectBlankLedgerTransactionSnBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        LedgerPostingPlanSpec plan = postingPlan("LE_000000000021", List.of(
+                entry(EntrySide.DEBIT, "LE_000000000021"),
+                entry(EntrySide.CREDIT, "LE_000000000021")
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(" ", List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易流水号不能为空");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本交易缺少交易级金额。
+     * 输入：LedgerTransactionSpec.amount 为 null，但 posting plan 分录完整。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：错误信息能定位到 ledgerTransactionSn，且不读取后续币种或落库。
+     * 红线：账本交易不得在缺少交易级金额时进入入账和余额投影链路。
+     */
+    @Test
+    void testPostShouldRejectTransactionWithoutAmountBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000017";
+        LedgerPostingPlanSpec plan = postingPlan(ledgerTransactionSn, List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, null, List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易金额不能为空")
+                .hasMessageContaining("LE_000000000017");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本交易金额为 0。
+     * 输入：LedgerTransactionSpec.amount 为 USD 0，posting plan 分录完整且金额为正。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：交易级金额必须大于 0，不能只依赖 entry 金额校验。
+     * 红线：不得产生零金额账本交易事实污染审计和幂等链路。
+     */
+    @Test
+    void testPostShouldRejectNonPositiveTransactionAmountBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000025";
+        LedgerPostingPlanSpec plan = postingPlan(ledgerTransactionSn, List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(
+                ledgerTransactionSn,
+                Money.immutable(0L, CurrencyIsoCode.USD),
+                Money.immutable(100L, CurrencyIsoCode.USD),
+                BigDecimal.ONE,
+                List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易金额必须大于 0")
+                .hasMessageContaining("LE_000000000025");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本交易原始金额为 0。
+     * 输入：LedgerTransactionSpec.originalAmount 为 USD 0，交易金额和分录金额均为正。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：原始金额必须大于 0，保证换汇和原币追溯字段可解释。
+     * 红线：不得让缺少有效原币金额的账本交易进入持久化。
+     */
+    @Test
+    void testPostShouldRejectNonPositiveOriginalAmountBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000026";
+        LedgerPostingPlanSpec plan = postingPlan(ledgerTransactionSn, List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(
+                ledgerTransactionSn,
+                Money.immutable(100L, CurrencyIsoCode.USD),
+                Money.immutable(0L, CurrencyIsoCode.USD),
+                BigDecimal.ONE,
+                List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易原始金额必须大于 0")
+                .hasMessageContaining("LE_000000000026");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本交易汇率为 0。
+     * 输入：LedgerTransactionSpec.exchangeRate 为 0，交易金额和分录金额均为正。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：汇率必须大于 0，避免后续原币和账本币推导失真。
+     * 红线：不得让零汇率或负汇率的账本交易进入持久化。
+     */
+    @Test
+    void testPostShouldRejectNonPositiveExchangeRateBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000027";
+        LedgerPostingPlanSpec plan = postingPlan(ledgerTransactionSn, List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(
+                ledgerTransactionSn,
+                Money.immutable(100L, CurrencyIsoCode.USD),
+                Money.immutable(100L, CurrencyIsoCode.USD),
+                BigDecimal.ZERO,
+                List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易汇率必须大于 0")
+                .hasMessageContaining("LE_000000000027");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本交易仍处于待处理状态。
+     * 输入：LedgerTransactionSpec.status 为 PENDING，posting plan 和 entry 均完整。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：只有已确认可入账的 POSTED 交易才能进入账本写入口。
+     * 红线：不得把待处理、失败、撤销或结算后状态的交易再次作为原始入账事实写入。
+     */
+    @Test
+    void testPostShouldRejectNonPostedTransactionBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000018";
+        LedgerPostingPlanSpec plan = postingPlan(ledgerTransactionSn, List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = transaction(
+                ledgerTransactionSn, List.of(plan), CurrencyIsoCode.USD, LedgerTransactionStatus.PENDING);
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易状态不允许入账")
+                .hasMessageContaining("LE_000000000018")
+                .hasMessageContaining(LedgerTransactionStatus.PENDING.name());
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本交易缺少账务计划。
+     * 输入：LedgerTransactionSpec.postingPlans 为空集合。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：每笔账本交易必须带有可解释的 posting plan。
+     * 红线：不得持久化没有账务计划和资金影响明细的账本事实。
+     */
     @Test
     void testPostShouldRejectEmptyPostingPlansBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -113,6 +324,243 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：账本交易 postingPlans 集合中混入空计划。
+     * 输入：postingPlans 非空，但第一项 posting plan 为 null。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：错误信息能定位到 ledgerTransactionSn，且不创建账本交易、不投影余额。
+     * 红线：账本交易不得持久化结构不完整、无法追溯到具体账务计划的入账请求。
+     */
+    @Test
+    void testPostShouldRejectNullPostingPlanBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000015";
+        List<LedgerPostingPlanSpec> plans = new ArrayList<>();
+        plans.add(null);
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, plans);
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账务计划不能为空")
+                .hasMessageContaining("LE_000000000015");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账务计划缺少计划流水号。
+     * 输入：posting plan.planId 为空白字符串，交易流水和分录流水均完整。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：每个 posting plan 必须有稳定 planId 作为落库、摘要和审计锚点。
+     * 红线：不得让不可追溯的账务计划进入账本持久化。
+     */
+    @Test
+    void testPostShouldRejectBlankPostingPlanIdBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000022";
+        LedgerPostingPlanSpec plan = uncheckedPostingPlan(ledgerTransactionSn, " ", List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账务计划流水号不能为空")
+                .hasMessageContaining("LE_000000000022");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账务计划绑定到另一个账本交易流水。
+     * 输入：LedgerTransactionSpec.sn 为 LE_000000000019，但 posting plan.ledgerTransactionSn 为 LE_WRONG_PLAN。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：每个 posting plan 必须属于当前账本交易，错误信息能定位到 planId。
+     * 红线：不得让同一笔账本交易持有其他交易的账务计划，避免审计和幂等链路断裂。
+     */
+    @Test
+    void testPostShouldRejectPostingPlanLedgerTransactionSnMismatchBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000019";
+        LedgerPostingPlanSpec plan = uncheckedPostingPlan("LE_WRONG_PLAN", "WRONG_PLAN_SN", List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账务计划交易流水与账本交易流水不一致")
+                .hasMessageContaining("WRONG_PLAN_SN")
+                .hasMessageContaining("LE_000000000019")
+                .hasMessageContaining("LE_WRONG_PLAN");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账务计划缺少绑定的账本交易流水。
+     * 输入：posting plan.ledgerTransactionSn 为空白字符串，交易流水和分录流水均完整。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：posting plan 必须显式绑定所属账本交易流水。
+     * 红线：不得让账务计划脱离所属账本交易独立落库。
+     */
+    @Test
+    void testPostShouldRejectBlankPostingPlanLedgerTransactionSnBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000023";
+        LedgerPostingPlanSpec plan = uncheckedPostingPlan(" ", "BLANK_PLAN_TRANSACTION_SN", List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账务计划交易流水不能为空")
+                .hasMessageContaining("BLANK_PLAN_TRANSACTION_SN")
+                .hasMessageContaining("LE_000000000023");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本交易包含空的 posting plan。
+     * 输入：postingPlans 非空，但其中一个 plan 没有任何 ledger entry。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：每个 posting plan 至少包含一组可解释的借贷分录。
+     * 红线：不得持久化没有资金影响明细的账本交易计划。
+     */
+    @Test
+    void testPostShouldRejectPostingPlanWithoutEntriesBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000013";
+        LedgerPostingPlanSpec emptyPlan = uncheckedPostingPlan(ledgerTransactionSn, "EMPTY_PLAN", List.of());
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, List.of(emptyPlan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账务计划 entries 不能为空")
+                .hasMessageContaining("EMPTY_PLAN")
+                .hasMessageContaining("LE_000000000013");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账务计划分录集合中混入空分录。
+     * 输入：posting plan 内第一条 entry 为 null，第二条为正常分录。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：错误信息能定位到 planId 和 ledgerTransactionSn。
+     * 红线：账本入账前置校验不得让空分录以 NPE 或后置持久化错误暴露。
+     */
+    @Test
+    void testPostShouldRejectNullLedgerEntryBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000014";
+        List<LedgerEntrySpec> entries = new ArrayList<>();
+        entries.add(null);
+        entries.add(entry(EntrySide.CREDIT, ledgerTransactionSn));
+        LedgerPostingPlanSpec plan = uncheckedPostingPlan(ledgerTransactionSn, "NULL_ENTRY", entries);
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本分录不能为空")
+                .hasMessageContaining("NULL_ENTRY")
+                .hasMessageContaining("LE_000000000014");
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账务计划内的账本分录缺少交易流水。
+     * 输入：posting plan 属于 LE_000000000024，但第一条 entry.ledgerTransactionSn 为空白字符串。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：每条 entry 必须显式绑定所属账本交易流水。
+     * 红线：不得让账本分录脱离交易流水进入余额投影或持久化链路。
+     */
+    @Test
+    void testPostShouldRejectBlankEntryLedgerTransactionSnBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000024";
+        LedgerPostingPlanSpec plan = uncheckedPostingPlan(ledgerTransactionSn, "BLANK_ENTRY_TRANSACTION_SN", List.of(
+                entry(EntrySide.DEBIT, " "),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本分录交易流水不能为空")
+                .hasMessageContaining("BLANK_ENTRY_TRANSACTION_SN")
+                .hasMessageContaining("funding_001")
+                .hasMessageContaining(LedgerSubjectCode.AVAILABLE.name());
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账务计划内的账本分录绑定到另一个账本交易流水。
+     * 输入：posting plan 属于 LE_000000000020，但第一条 entry.ledgerTransactionSn 为 LE_WRONG_ENTRY。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：每条 entry 必须属于当前账本交易和当前 plan，错误信息能定位到主体和账目。
+     * 红线：不得让账本分录脱离当前交易流水写入，否则交易、计划、分录无法稳定追溯。
+     */
+    @Test
+    void testPostShouldRejectEntryLedgerTransactionSnMismatchBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000020";
+        LedgerPostingPlanSpec plan = uncheckedPostingPlan(ledgerTransactionSn, "WRONG_ENTRY_SN", List.of(
+                entry(EntrySide.DEBIT, "LE_WRONG_ENTRY"),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本分录交易流水与账本交易流水不一致")
+                .hasMessageContaining("WRONG_ENTRY_SN")
+                .hasMessageContaining("LE_000000000020")
+                .hasMessageContaining("LE_WRONG_ENTRY")
+                .hasMessageContaining("funding_001")
+                .hasMessageContaining(LedgerSubjectCode.AVAILABLE.name());
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本入账找不到支持账户的余额投影服务。
+     * 输入：posting plan 分录完整，但所有 LedgerBalanceProjectionService 均不支持该账户。
+     * 输出：入账服务拒绝继续执行。
+     * 预期：不创建账本交易，不产生无法落到余额桶的投影动作。
+     * 红线：不得在余额投影职责缺失时只写账本交易事实，造成账实链路断裂。
+     */
     @Test
     void testPostShouldFailWhenNoProjectionServiceSupportsAccount() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -128,6 +576,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：同一账户被多个余额投影服务同时支持。
+     * 输入：posting plan 分录完整，两个投影服务都声明支持。
+     * 输出：入账服务拒绝继续执行。
+     * 预期：投影服务路由必须唯一，避免同一分录被重复或分叉处理。
+     * 红线：不得让余额投影服务选择存在歧义的账本交易落库。
+     */
     @Test
     void testPostShouldFailWhenMultipleProjectionServicesSupportAccount() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -145,6 +600,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(secondProjectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：交易总借贷平衡，但单个账务计划不平衡。
+     * 输入：两个 posting plan 相互抵消，交易整体平衡，但每个 plan 内部不平衡。
+     * 输出：入账服务拒绝第一个不平衡 plan。
+     * 预期：平衡校验必须落到每个 posting plan，而不是只看交易总额。
+     * 红线：不得用跨计划抵消掩盖单个资金事件的账务不平衡。
+     */
     @Test
     void testPostShouldRejectUnbalancedPostingPlanEvenWhenTransactionIsBalanced() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -173,6 +635,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：同一账务计划内出现多币种分录。
+     * 输入：posting plan 借方为 USD，贷方为 EUR。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：单个 posting plan 的借贷分录必须使用同一币种。
+     * 红线：不得在未定义换汇事件和汇率规则时把多币种分录记入同一账务计划。
+     */
     @Test
     void testPostShouldRejectCurrencyMismatchInsidePostingPlanBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -196,6 +665,78 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：账本交易金额币种和实际记账分录币种不一致。
+     * 输入：交易金额为 EUR，posting plan 内分录均为 USD。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：交易级金额币种必须和所有 posting plan 币种一致。
+     * 红线：不得产生交易事实币种与账本事实币种不一致的入账记录。
+     */
+    @Test
+    void testPostShouldRejectTransactionCurrencyMismatchBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000012";
+        LedgerPostingPlanSpec plan = postingPlan(ledgerTransactionSn, List.of(
+                entry(EntrySide.DEBIT, ledgerTransactionSn),
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = transaction(ledgerTransactionSn, List.of(plan), CurrencyIsoCode.EUR);
+
+        assertThat(transaction.isBalanced()).isTrue();
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本交易币种与记账计划币种不一致")
+                .hasMessageContaining("LE_000000000012")
+                .hasMessageContaining(CurrencyIsoCode.EUR.name())
+                .hasMessageContaining(CurrencyIsoCode.USD.name());
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本分录缺少金额。
+     * 输入：posting plan 内借方分录 amount 为 null，贷方分录正常。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：错误信息能定位到 planId、ledgerTransactionSn、主体和账目。
+     * 红线：不得让缺少金额的分录进入币种、平衡或持久化阶段。
+     */
+    @Test
+    void testPostShouldRejectEntryWithoutAmountBeforeCreatingLedgerTransaction() {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_000000000016";
+        FundsTransactionTestSupport.MutableLedgerEntrySpec entryWithoutAmount = entry(
+                EntrySide.DEBIT, ledgerTransactionSn);
+        entryWithoutAmount.setAmount(null);
+        LedgerPostingPlanSpec plan = uncheckedPostingPlan(ledgerTransactionSn, "MISSING_AMOUNT", List.of(
+                entryWithoutAmount,
+                entry(EntrySide.CREDIT, ledgerTransactionSn)
+        ));
+        LedgerTransactionSpec transaction = uncheckedTransaction(ledgerTransactionSn, List.of(plan));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本分录金额不能为空")
+                .hasMessageContaining("MISSING_AMOUNT")
+                .hasMessageContaining("LE_000000000016")
+                .hasMessageContaining("funding_001")
+                .hasMessageContaining(LedgerSubjectCode.AVAILABLE.name());
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：账本分录金额为 0。
+     * 输入：posting plan 借贷分录金额均为 0，形式上仍然平衡。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：账本分录金额必须大于 0，平衡不等于有效资金事实。
+     * 红线：不得产生零金额账本事实污染交易追踪和余额投影。
+     */
     @Test
     void testPostShouldRejectNonPositiveEntryAmountBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -221,6 +762,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：账本分录缺少 ledgerId。
+     * 输入：posting plan 借方分录未绑定账本 ID，贷方分录正常。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：每条分录必须绑定具体账本，才能校验主体、账目和 profile。
+     * 红线：不得把没有 ledgerId 的分录交给余额投影或账本持久化。
+     */
     @Test
     void testPostShouldRejectEntryWithoutLedgerIdBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -247,6 +795,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：账本分录绑定的 ledgerId 与分录主体不一致。
+     * 输入：分录 subjectId 为 funding_001，但 ledgerId 指向 funding_002 的账本。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：ledgerId、subjectId、subjectType、ledgerSubjectCode 必须共同指向同一账本。
+     * 红线：不得让主体 A 的资金变化记入主体 B 的账本。
+     */
     @Test
     void testPostShouldRejectLedgerBindingMismatchBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -275,6 +830,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：分录要求允许负余额，但账本 profile 不允许。
+     * 输入：AVAILABLE 分录设置 ALLOW_NEGATIVE，账本 profile 为不可负。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：分录级余额约束不得突破账本 profile 的余额控制红线。
+     * 红线：不得通过 posting plan 参数绕过账本账户余额约束。
+     */
     @Test
     void testPostShouldRejectAllowNegativeWhenLedgerProfileDisallowsNegativeBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -301,6 +863,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：外部账户被作为账本分录主体入账。
+     * 输入：分录 subjectType 为 EXTERNAL_ACCOUNT，subjectId 为 external_bank_001。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：账本只记录受管资金主体，外部账户只能作为 route/通道语义存在。
+     * 红线：不得为外部银行账户直接创建内部账本事实。
+     */
     @Test
     void testPostShouldRejectExternalAccountEntryBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -328,6 +897,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：账本分录缺少主体类型。
+     * 输入：分录 subjectId 存在，但 subjectType 为 null。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：主体类型必须明确，才能判断是否允许入账及如何投影余额。
+     * 红线：不得把主体语义不完整的分录写入账本。
+     */
     @Test
     void testPostShouldRejectEntryWithoutSubjectTypeBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -354,6 +930,13 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         assertThat(projectionService.projectedEntries).isEmpty();
     }
 
+    /**
+     * 场景：账本分录主体类型未知。
+     * 输入：分录 subjectType 为 UNKNOWN_ACCOUNT。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：只有资金底座明确允许的主体类型才能进入账本写入口。
+     * 红线：不得把未知主体类型作为内部资金主体入账。
+     */
     @Test
     void testPostShouldRejectUnknownSubjectTypeBeforeCreatingLedgerTransaction() {
         RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
@@ -391,15 +974,28 @@ class DefaultLedgerTransactionPostingServiceImplTests {
     }
 
     private LedgerTransactionSpec transaction(String ledgerTransactionSn, List<LedgerPostingPlanSpec> plans) {
+        return transaction(ledgerTransactionSn, plans, CurrencyIsoCode.USD);
+    }
+
+    private LedgerTransactionSpec transaction(String ledgerTransactionSn,
+                                              List<LedgerPostingPlanSpec> plans,
+                                              CurrencyIsoCode currency) {
+        return transaction(ledgerTransactionSn, plans, currency, LedgerTransactionStatus.POSTED);
+    }
+
+    private LedgerTransactionSpec transaction(String ledgerTransactionSn,
+                                              List<LedgerPostingPlanSpec> plans,
+                                              CurrencyIsoCode currency,
+                                              LedgerTransactionStatus status) {
         return LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec.builder()
                 .sn(ledgerTransactionSn)
                 .tenantId(1L)
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TRANSFER)
                 .transactionType(DefaultFundsTransactionType.TRANSFER)
-                .status(LedgerTransactionStatus.POSTED)
-                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
-                .originalAmount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .status(status)
+                .amount(Money.immutable(100L, currency))
+                .originalAmount(Money.immutable(100L, currency))
                 .exchangeRate(BigDecimal.ONE)
                 .businessSn("TRANSFER_000000000001")
                 .businessScene("TRANSFER")
@@ -478,7 +1074,22 @@ class DefaultLedgerTransactionPostingServiceImplTests {
     }
 
     private LedgerTransactionSpec uncheckedTransaction(String ledgerTransactionSn, List<LedgerPostingPlanSpec> plans) {
-        return new UncheckedLedgerTransactionSpec(ledgerTransactionSn, plans);
+        return uncheckedTransaction(ledgerTransactionSn, Money.immutable(100L, CurrencyIsoCode.USD), plans);
+    }
+
+    private LedgerTransactionSpec uncheckedTransaction(String ledgerTransactionSn,
+                                                       Money amount,
+                                                       List<LedgerPostingPlanSpec> plans) {
+        Money originalAmount = amount == null ? null : Money.immutable(amount.getAmount(), amount.getCurrency());
+        return uncheckedTransaction(ledgerTransactionSn, amount, originalAmount, BigDecimal.ONE, plans);
+    }
+
+    private LedgerTransactionSpec uncheckedTransaction(String ledgerTransactionSn,
+                                                       Money amount,
+                                                       Money originalAmount,
+                                                       BigDecimal exchangeRate,
+                                                       List<LedgerPostingPlanSpec> plans) {
+        return new UncheckedLedgerTransactionSpec(ledgerTransactionSn, amount, originalAmount, exchangeRate, plans);
     }
 
     private static final class UncheckedLedgerPostingPlanSpec implements LedgerPostingPlanSpec {
@@ -527,10 +1138,23 @@ class DefaultLedgerTransactionPostingServiceImplTests {
 
         private final String ledgerTransactionSn;
 
+        private final Money amount;
+
+        private final Money originalAmount;
+
+        private final BigDecimal exchangeRate;
+
         private final List<LedgerPostingPlanSpec> plans;
 
-        private UncheckedLedgerTransactionSpec(String ledgerTransactionSn, List<LedgerPostingPlanSpec> plans) {
+        private UncheckedLedgerTransactionSpec(String ledgerTransactionSn,
+                                               Money amount,
+                                               Money originalAmount,
+                                               BigDecimal exchangeRate,
+                                               List<LedgerPostingPlanSpec> plans) {
             this.ledgerTransactionSn = ledgerTransactionSn;
+            this.amount = amount;
+            this.originalAmount = originalAmount;
+            this.exchangeRate = exchangeRate;
             this.plans = plans;
         }
 
@@ -556,7 +1180,17 @@ class DefaultLedgerTransactionPostingServiceImplTests {
 
         @Override
         public @NonNull Money getAmount() {
-            return Money.immutable(100L, CurrencyIsoCode.USD);
+            return amount;
+        }
+
+        @Override
+        public @NonNull Money getOriginalAmount() {
+            return originalAmount;
+        }
+
+        @Override
+        public @NonNull BigDecimal getExchangeRate() {
+            return exchangeRate;
         }
 
         @Override

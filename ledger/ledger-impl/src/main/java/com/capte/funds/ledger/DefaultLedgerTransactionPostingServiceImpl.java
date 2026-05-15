@@ -8,6 +8,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.integration.funds.ledger.LedgerTransactionPostingService;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
+import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
@@ -21,6 +22,7 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -57,8 +59,10 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     @Transactional(rollbackFor = Exception.class)
     public void post(@NonNull LedgerTransactionSpec transaction) {
         assertTransactionPostable(transaction);
+        assertAllPostingPlansHaveEntries(transaction);
         assertAllEntriesUsePositiveAmounts(transaction);
         assertAllPostingPlansUseSingleCurrency(transaction);
+        assertTransactionCurrencyMatchesPostingPlans(transaction);
         AssertUtils.isTrue(transaction.isBalanced(), "账本交易借记、贷记金额不一致");
         assertAllPostingPlansBalanced(transaction);
         assertAllEntriesUsePostableSubjects(transaction);
@@ -88,8 +92,72 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
 
     private void assertTransactionPostable(LedgerTransactionSpec transaction) {
         AssertUtils.notNull(transaction, "账本交易不能为空");
+        AssertUtils.hasText(transaction.getSn(), "账本交易流水号不能为空");
+        AssertUtils.notNull(transaction.getAmount(),
+                "账本交易金额不能为空，ledgerTransactionSn = {}", transaction.getSn());
+        AssertUtils.isTrue(transaction.getAmount().getAmount() > 0,
+                "账本交易金额必须大于 0，ledgerTransactionSn = {}, amount = {}",
+                transaction.getSn(),
+                transaction.getAmount().getAmount());
+        AssertUtils.notNull(transaction.getOriginalAmount(),
+                "账本交易原始金额不能为空，ledgerTransactionSn = {}", transaction.getSn());
+        AssertUtils.isTrue(transaction.getOriginalAmount().getAmount() > 0,
+                "账本交易原始金额必须大于 0，ledgerTransactionSn = {}, originalAmount = {}",
+                transaction.getSn(),
+                transaction.getOriginalAmount().getAmount());
+        AssertUtils.notNull(transaction.getExchangeRate(),
+                "账本交易汇率不能为空，ledgerTransactionSn = {}", transaction.getSn());
+        AssertUtils.isTrue(transaction.getExchangeRate().compareTo(BigDecimal.ZERO) > 0,
+                "账本交易汇率必须大于 0，ledgerTransactionSn = {}, exchangeRate = {}",
+                transaction.getSn(),
+                transaction.getExchangeRate());
+        AssertUtils.isTrue(transaction.getStatus() == LedgerTransactionStatus.POSTED,
+                "账本交易状态不允许入账，ledgerTransactionSn = {}, status = {}",
+                transaction.getSn(),
+                transaction.getStatus());
         AssertUtils.isTrue(transaction.getPostingPlans() != null && !transaction.getPostingPlans().isEmpty(),
                 "账本交易 postingPlans 不能为空，ledgerTransactionSn = {}", transaction.getSn());
+    }
+
+    private void assertAllPostingPlansHaveEntries(LedgerTransactionSpec transaction) {
+        transaction.getPostingPlans().forEach(plan -> {
+            AssertUtils.notNull(plan, "账务计划不能为空，ledgerTransactionSn = {}", transaction.getSn());
+            AssertUtils.hasText(plan.getPlanId(),
+                    "账务计划流水号不能为空，ledgerTransactionSn = {}", transaction.getSn());
+            AssertUtils.hasText(plan.getLedgerTransactionSn(),
+                    "账务计划交易流水不能为空，planId = {}, ledgerTransactionSn = {}",
+                    plan.getPlanId(),
+                    transaction.getSn());
+            AssertUtils.isTrue(Objects.equals(transaction.getSn(), plan.getLedgerTransactionSn()),
+                    "账务计划交易流水与账本交易流水不一致，planId = {}, ledgerTransactionSn = {}, planLedgerTransactionSn = {}",
+                    plan.getPlanId(),
+                    transaction.getSn(),
+                    plan.getLedgerTransactionSn());
+            AssertUtils.isTrue(plan.getEntries() != null && !plan.getEntries().isEmpty(),
+                    "账务计划 entries 不能为空，planId = {}, ledgerTransactionSn = {}",
+                    plan.getPlanId(),
+                    plan.getLedgerTransactionSn());
+            plan.getEntries().forEach(entry -> {
+                AssertUtils.notNull(entry,
+                        "账本分录不能为空，planId = {}, ledgerTransactionSn = {}",
+                        plan.getPlanId(),
+                        plan.getLedgerTransactionSn());
+                AssertUtils.hasText(entry.getLedgerTransactionSn(),
+                        "账本分录交易流水不能为空，planId = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}",
+                        plan.getPlanId(),
+                        entry.getSubjectId(),
+                        entry.getSubjectType(),
+                        entry.getLedgerSubjectCode());
+                AssertUtils.isTrue(Objects.equals(transaction.getSn(), entry.getLedgerTransactionSn()),
+                        "账本分录交易流水与账本交易流水不一致，planId = {}, ledgerTransactionSn = {}, entryLedgerTransactionSn = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}",
+                        plan.getPlanId(),
+                        transaction.getSn(),
+                        entry.getLedgerTransactionSn(),
+                        entry.getSubjectId(),
+                        entry.getSubjectType(),
+                        entry.getLedgerSubjectCode());
+            });
+        });
     }
 
     private void assertAllPostingPlansUseSingleCurrency(LedgerTransactionSpec transaction) {
@@ -101,6 +169,20 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
             AssertUtils.isTrue(currencies.size() == 1,
                     "记账计划币种不一致，planId = {}, currencies = {}", plan.getPlanId(), currencies);
         });
+    }
+
+    private void assertTransactionCurrencyMatchesPostingPlans(LedgerTransactionSpec transaction) {
+        Set<CurrencyIsoCode> currencies = transaction.getPostingPlans()
+                .stream()
+                .map(LedgerPostingPlanSpec::getEntries)
+                .flatMap(List::stream)
+                .map(LedgerEntrySpec::getCurrency)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        AssertUtils.isTrue(currencies.size() == 1 && currencies.contains(transaction.getCurrency()),
+                "账本交易币种与记账计划币种不一致，ledgerTransactionSn = {}, transactionCurrency = {}, postingPlanCurrencies = {}",
+                transaction.getSn(),
+                transaction.getCurrency(),
+                currencies);
     }
 
     private void assertAllPostingPlansBalanced(LedgerTransactionSpec transaction) {

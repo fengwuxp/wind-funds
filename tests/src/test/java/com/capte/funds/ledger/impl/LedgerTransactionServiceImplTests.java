@@ -50,8 +50,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class LedgerTransactionServiceImplTests {
 
+    /**
+     * 场景：账本交易保存后收到同一业务事实的幂等重放。
+     * 输入：相同 ledger transaction sn、相同稳定摘要和相同 posting plan。
+     * 输出：已有账本交易 ID 和 created=false。
+     * 预期：不重复写入账本交易、posting plan 或 entry。
+     * 红线：幂等重放不得制造重复账本事实或重复余额影响。
+     */
     @Test
-    void createLedgerTransactionShouldReturnExistingIdWhenSameSnAndSha256() {
+    void testCreateLedgerTransactionShouldReturnExistingIdWhenSameSnAndSha256() {
         AtomicReference<LedgerTransaction> existingTransaction = new AtomicReference<>();
         List<LedgerTransaction> insertedTransactions = new ArrayList<>();
         List<LedgerPostingPlan> insertedPlans = new ArrayList<>();
@@ -104,8 +111,15 @@ class LedgerTransactionServiceImplTests {
         assertThat(insertedEntries).isEmpty();
     }
 
+    /**
+     * 场景：相同账本交易流水号被不同业务事实复用。
+     * 输入：数据库已有 ledger transaction sn，但新请求稳定摘要不同。
+     * 输出：摘要冲突异常。
+     * 预期：拒绝本次创建，且不写入 transaction、posting plan 或 entry。
+     * 红线：同一账本交易流水号不得指向两份不同资金事实。
+     */
     @Test
-    void createLedgerTransactionShouldRejectDuplicateSnWhenSha256Conflicts() {
+    void testCreateLedgerTransactionShouldRejectDuplicateSnWhenSha256Conflicts() {
         LedgerTransaction existingTransaction = new LedgerTransaction();
         existingTransaction.setId(101L);
         existingTransaction.setSn("LEDGER_TXN_DUPLICATE");
@@ -155,8 +169,15 @@ class LedgerTransactionServiceImplTests {
         assertThat(insertedEntries).isEmpty();
     }
 
+    /**
+     * 场景：账本交易落库时需要保存 route leg 级追踪信息。
+     * 输入：posting plan 携带 routeLegId、replayRefLegId 和 replayPolicy。
+     * 输出：账本交易、posting plan 和 entry 持久化模型。
+     * 预期：plan 级上下文覆盖 transaction 级同名上下文，entry 继承核心账务元数据。
+     * 红线：route leg 追踪信息不得丢失，也不得被 transaction 级默认值误覆盖。
+     */
     @Test
-    void createLedgerTransactionShouldPersistPostingPlanAndEntryMetadata() {
+    void testCreateLedgerTransactionShouldPersistPostingPlanAndEntryMetadata() {
         AtomicReference<LedgerTransaction> insertedTransaction = new AtomicReference<>();
         AtomicReference<LedgerPostingPlan> insertedPlan = new AtomicReference<>();
         List<LedgerEntry> insertedEntries = new ArrayList<>();
@@ -180,7 +201,7 @@ class LedgerTransactionServiceImplTests {
         );
         LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(LedgerPhaseCode.TRANSFER,
                 List.of(entry("user_001", EntrySide.DEBIT), entry("user_002", EntrySide.CREDIT)));
-        LedgerPostingPlanSpec plan = postingPlanWithContext(phase, Map.of(
+        LedgerPostingPlanSpec plan = postingPlanWithRouteLeg(phase, "LEG_001", Map.of(
                 "routeLegId", "LEG_001",
                 "replayRefLegId", "SOURCE_LEG_001",
                 "replayPolicy", "REPLAY_ONCE"
@@ -209,6 +230,7 @@ class LedgerTransactionServiceImplTests {
         assertThat(insertedPlan.get().getSn()).isEqualTo(plan.getPlanId());
         assertThat(insertedPlan.get().getTenantId()).isEqualTo(1L);
         assertThat(insertedPlan.get().getIntent()).isEqualTo(LedgerPostingIntentType.TRANSFER.name());
+        assertThat(insertedPlan.get().getRouteLegId()).isEqualTo("LEG_001");
         assertThat(insertedPlan.get().getPhaseCode()).isEqualTo(LedgerPhaseCode.TRANSFER.name());
         assertThat(insertedPlan.get().getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS.name());
         assertThat(insertedPlan.get().getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME.name());
@@ -244,6 +266,7 @@ class LedgerTransactionServiceImplTests {
      * 输入：保存账本交易后修改 transactionSn、fundsTransactionSn 和审计时间。
      * 输出：交易级 sha256 摘要。
      * 预期：摘要只绑定稳定业务事实字段，不随本次持久化流水或审计字段变化。
+     * 红线：摘要不得绑定数据库自增 ID、审计时间或临时流水。
      */
     @Test
     void testTransactionSha256ShouldUseStableFields() {
@@ -382,6 +405,53 @@ class LedgerTransactionServiceImplTests {
         plan.setGmtModified(LocalDateTime.of(2026, 5, 8, 11, 30));
 
         assertThat(stablePostingPlanHash(plan)).isEqualTo(originalHash);
+    }
+
+    /**
+     * 场景：同一账务计划语义来自不同 route leg。
+     * 输入：保存带 routeLegId 的 PostingPlan 后修改 routeLegId。
+     * 输出：记账计划级 sha256 摘要。
+     * 预期：routeLegId 作为稳定来源 leg 引用，变化会改变摘要。
+     * 红线：PostingPlan 摘要不得只依赖 JSON 上下文，导致来源 leg 被篡改后不可发现。
+     */
+    @Test
+    void testPostingPlanSha256ShouldIncludeRouteLegId() {
+        AtomicReference<LedgerPostingPlan> insertedPlan = new AtomicReference<>();
+        AtomicLong idSequence = new AtomicLong(100L);
+        LedgerTransactionServiceImpl service = new LedgerTransactionServiceImpl(
+                mapper(LedgerTransactionMapper.class, entity -> ((LedgerTransaction) entity)
+                        .setId(idSequence.incrementAndGet())),
+                mapper(LedgerPostingPlanMapper.class, entity -> {
+                    LedgerPostingPlan plan = (LedgerPostingPlan) entity;
+                    plan.setId(idSequence.incrementAndGet());
+                    insertedPlan.set(plan);
+                }),
+                mapper(LedgerEntryMapper.class, entity -> ((LedgerEntry) entity)
+                        .setId(idSequence.incrementAndGet()))
+        );
+        LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(LedgerPhaseCode.TRANSFER,
+                List.of(entry("user_001", EntrySide.DEBIT), entry("user_002", EntrySide.CREDIT)));
+        LedgerTransactionSpec transaction = LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec.builder()
+                .sn("LEDGER_TXN_0001")
+                .tenantId(1L)
+                .fundsTransactionSn("FUNDS_TXN_0001")
+                .eventType(FundsTransactionEventType.TOPUP)
+                .status(LedgerTransactionStatus.POSTED)
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .businessScene("TRANSFER_TEST")
+                .businessSn("BUSINESS_SN_0001")
+                .transactionTime(LocalDateTime.of(2026, 5, 7, 10, 0))
+                .postingPlans(List.of(postingPlanWithRouteLeg(phase, "LEG_001", Map.of())))
+                .contextVariables(Map.of())
+                .build();
+
+        service.createLedgerTransaction(transaction);
+
+        LedgerPostingPlan plan = insertedPlan.get();
+        String originalHash = plan.getSha256();
+        plan.setRouteLegId("LEG_002");
+
+        assertThat(stablePostingPlanHash(plan)).isNotEqualTo(originalHash);
     }
 
     @Test
@@ -575,6 +645,12 @@ class LedgerTransactionServiceImplTests {
 
     private static LedgerPostingPlanSpec postingPlanWithContext(LedgerPostingPhaseSpec phase,
                                                                 Map<String, Object> contextVariables) {
+        return postingPlanWithRouteLeg(phase, null, contextVariables);
+    }
+
+    private static LedgerPostingPlanSpec postingPlanWithRouteLeg(LedgerPostingPhaseSpec phase,
+                                                                 String routeLegId,
+                                                                 Map<String, Object> contextVariables) {
         LedgerPostingPlanSpec delegate = LedgerTransactionSpecFactory.postingPlan(
                 LedgerPostingIntentType.TRANSFER, "LEDGER_TXN_0001", List.of(phase));
         return new LedgerPostingPlanSpec() {
@@ -587,6 +663,11 @@ class LedgerTransactionServiceImplTests {
             @Override
             public String getLedgerTransactionSn() {
                 return delegate.getLedgerTransactionSn();
+            }
+
+            @Override
+            public String getRouteLegId() {
+                return routeLegId;
             }
 
             @Override
@@ -662,6 +743,7 @@ class LedgerTransactionServiceImplTests {
     private static String stablePostingPlanHash(LedgerPostingPlan plan) {
         return WindObjectDigestUtils.sha256WithNames(plan, List.of(
                 LedgerPostingPlan.Fields.tenantId,
+                LedgerPostingPlan.Fields.routeLegId,
                 LedgerPostingPlan.Fields.intent,
                 LedgerPostingPlan.Fields.postingScope,
                 LedgerPostingPlan.Fields.balanceEffectType,
