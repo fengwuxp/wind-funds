@@ -38,6 +38,16 @@
 - 默认使用 IDEA 自带或 IDEA 项目配置的 JDK 执行编译、测试、代码生成和静态检查；执行命令前应确保该 JDK 与 POM 配置的版本一致。
 - Maven 版本以项目和团队环境为准，执行前先用 `mvn -version` 确认 Java runtime。
 - 构建依赖会访问私有 Maven 仓库，执行编译和测试前需确保本地 Maven 配置、仓库权限、网络与凭据可用。
+
+### 1.4 Agent 快速入口
+
+- 仓库常用命令固化在根目录 `Justfile`。AI Agent 和开发者优先使用 `just` 命令，减少临时拼 Maven 参数；若本机未安装 `just`，按本文件中对应 Maven 命令回退执行。
+- 如需指定 JDK，优先设置 `WIND_FUNDS_JAVA_HOME`；未设置时使用当前 `JAVA_HOME`；两者都未设置时使用 shell 当前 Java runtime，但必须通过 `just mvn-version` 或 `mvn -version` 确认。
+- 修改代码、测试、构建配置、数据库脚本或运行时配置前，先执行 `just mvn-version` 和 `just compile`；不涉及代码的文档、产品设计、系统分析设计、方案讨论、需求澄清、流程图或说明性材料，不要求编译。
+- 相关测试优先使用 `Justfile` 中按能力分组的命令：`just test-core`、`just test-ledger`、`just test-transaction`、`just test-balance-control`、`just test-business-flow`、`just test-boundary`；单个测试使用 `just test-one <TestClass>`。
+- 提交前优先执行 `just pmd`。若 `pmd:check` 失败原因是私有仓库、snapshot、本地 Maven 缓存或依赖解析问题，应在交付说明中按环境依赖问题记录；不得把依赖解析失败等同于代码规约违规。
+- 新增或调整高频验证命令时，同步更新 `Justfile` 和本文件中的命令说明，避免团队规则与 Agent 执行入口漂移。
+
 ## 2. Maven 模块说明
 
 | 模块 | 类型 | 职责 |
@@ -125,11 +135,14 @@ tests
 ### 6.1 修改前
 
 1. 阅读本文件和相关模块现有代码。
-2. 涉及代码、测试、构建配置、数据库脚本或运行时配置变更时，运行：
+2. 涉及代码、测试、构建配置、数据库脚本或运行时配置变更时，优先运行：
 
 ```bash
-mvn compile
+just mvn-version
+just compile
 ```
+
+若本机未安装 `just`，回退执行 `mvn -version` 和 `mvn compile`。
 
 3. 不涉及代码的文档、产品设计、系统分析设计、方案讨论、需求澄清、流程图或说明性材料，不运行编译命令。
 4. 若编译失败，先判断是否为环境问题、依赖问题或既有代码问题，并在交付说明中如实记录。
@@ -148,22 +161,26 @@ mvn compile
 涉及代码、测试、构建配置、数据库脚本或运行时配置变更时，至少执行：
 
 ```bash
-mvn compile
+just compile
 ```
+
+若本机未安装 `just`，回退执行 `mvn compile`。
 
 根据变更范围执行相关测试，例如：
 
 ```bash
-mvn -pl core test -Dtest=FundsInstructionSpecContractTests
-mvn -pl tests -am test -Dtest=LedgerServiceImplTests
-mvn -pl tests -am test -Dtest=DefaultFundsInstructionLifecycleSaverTests
+just test-one FundsInstructionSpecContractTests core
+just test-one LedgerServiceImplTests
+just test-one DefaultFundsInstructionLifecycleSaverTests
 ```
 
 提交前执行团队认可的规约检查：
 
 ```bash
-mvn pmd:check
+just pmd
 ```
+
+若本机未安装 `just`，回退执行 `mvn pmd:check`。
 
 交付时必须说明：
 
@@ -240,12 +257,12 @@ void testFreezeAvailableFundsShouldCreateFrozenOrderOnly() {
 - 变更范围对应的推荐验证命令：
 
 ```bash
-mvn -pl core -am test -Dtest=FundsInstructionSpecContractTests,RouteDslContractTests,TransactionServiceAbilityDslJsonContractTests
-mvn -pl tests -am test -Dtest=DefaultLedgerPostingAssemblerTests,DefaultLedgerTransactionPostingServiceImplTests,LedgerBalanceProjectionServiceImplTests
-mvn -pl tests -am test -Dtest=FundsTransactionCommandServiceImplTests,DefaultRoutedFundsInstructionOrchestratorTests,DefaultFundsInstructionLifecycleSaverTests
-mvn -pl tests -am test -Dtest=FundsFrozenOrderServiceImplTests,DefaultFundsFrozenOrderLifecycleSaverTests,BalanceControlFundsInstructionRouteResolverTests
-mvn -pl tests -am test -Dtest=FundsTransactionLedgerBalanceAssertionsTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionOrchestrationFlowTests
-mvn -pl tests -am test -Dtest=LedgerLayerBoundaryTests,RouteLayerBoundaryTests,WalletLayerBoundaryTests
+just test-core
+just test-ledger
+just test-transaction
+just test-balance-control
+just test-business-flow
+just test-boundary
 ```
 
 ## 8. AI Agent 工作原则
