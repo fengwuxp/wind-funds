@@ -1,15 +1,9 @@
 package com.capte.funds.transaction.services.impl;
 
 import com.capte.funds.support.FundsAccountServiceTestSupport;
-import com.alibaba.fastjson2.JSON;
 import com.capte.funds.route.DefaultRouteSnapshotFactory;
-import com.wind.integration.funds.model.route.ImmutableExternalAccountRefSpec;
-import com.wind.integration.funds.model.route.ImmutableFundingAllocationDecisionSpec;
-import com.wind.integration.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteSnapshotSpec;
-import com.wind.integration.funds.model.route.ImmutableRoutingDecisionSpec;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
-import com.capte.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.capte.funds.transaction.dal.entities.FundsTransaction;
 import com.capte.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.capte.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
@@ -35,13 +29,11 @@ import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.integration.funds.route.ref.SubjectRef;
-import com.wind.integration.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
-import com.wind.integration.funds.route.spec.RoutingDecisionSpec;
 import com.wind.integration.funds.operation.FundsOperationActorSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
@@ -70,7 +62,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
 
 class DefaultFundsInstructionLifecycleSaverTests {
 
@@ -907,259 +898,6 @@ class DefaultFundsInstructionLifecycleSaverTests {
         assertThat(transactionQueryIndex).hasValue(1);
     }
 
-    /**
-     * 场景：后续撤销、结算、退款或拒付需要沿首次保存的 RouteSnapshot 回放。
-     * 输入：生命周期保存器写入带参与方、路径和路由决策的快照，再通过查询服务按交易号读取。
-     * 输出：解析后的 RouteSnapshotSpec。
-     * 预期：快照保留 routeCode、schemaVersion、participants、legs、routingDecision 和账户引用信息。
-     */
-    @Test
-    void testFundsTransactionQueryServiceShouldReadSavedRouteSnapshotForReplay() {
-        FundsTransaction transaction = transaction();
-        transaction.setRouteSnapshot(null);
-        AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
-        DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionMapper.class,
-                        entity -> {
-                            FundsTransaction inserted = (FundsTransaction) entity;
-                            inserted.setId(501L);
-                            insertedTransaction.set(inserted);
-                        },
-                        query -> null
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionDetailMapper.class,
-                        entity -> ((FundsTransactionDetail) entity).setId(502L),
-                        query -> null
-                )
-        );
-        ResolvedRouteSpec route = new SnapshotMetadataResolvedRoute(1_000L);
-        createSaver.beforePosting(new SimpleInstruction(), route, new DefaultRouteSnapshotFactory().createSnapshot(route));
-        transaction.setRouteSnapshot(insertedTransaction.get().getRouteSnapshot());
-        DefaultFundsTransactionQueryService queryService = new DefaultFundsTransactionQueryService(
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> transaction
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionDetailMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> null
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> null
-                )
-        );
-
-        RouteSnapshotSpec snapshot = queryService.findRouteSnapshotByTransactionSn("FT_001").orElseThrow();
-
-        assertThat(snapshot.getRouteCode()).isEqualTo("CARD_AUTH");
-        assertThat(snapshot.getParticipants()).hasSize(2);
-        assertThat(snapshot.getLegs()).hasSize(1);
-        assertThat(snapshot.getLegs().getFirst().getLegId()).isEqualTo("LEG_001");
-        assertThat(snapshot.getSnapshotSchemaVersion()).isEqualTo("v4");
-        assertThat(snapshot.getRoutingDecision().getPolicyCode()).isEqualTo("LOWEST_COST");
-        assertThat(snapshot.getRoutingDecision().getSelectedCashFundingAccount()).isEqualTo("PF_CASH_USD");
-        assertThat(snapshot.getRoutingDecision().getSelectedPlatformAccount()).isEqualTo("PF_SETTLEMENT_USD");
-        assertThat(snapshot.getRoutingDecision().getFundingAllocations()).singleElement()
-                .satisfies(allocation -> {
-                    assertThat(allocation.getAllocationId()).isEqualTo("ALLOC_001");
-                    assertThat(allocation.getPriority()).isEqualTo(1);
-                    assertThat(allocation.getReason()).isEqualTo("default source");
-                });
-        assertThat(snapshot.getPaymentInstrumentRef().getTenantId()).isEqualTo(1L);
-        assertThat(snapshot.getPaymentInstrumentRef().getDescription()).isEqualTo("primary card");
-        assertThat(snapshot.getExternalAccountRef().getDescription()).isEqualTo("bank account");
-        assertThat(snapshot.getExternalAccountRef().getContextVariables())
-                .containsEntry("externalTransactionId", "EXT_001");
-        assertThat(snapshot.getPlatformAccounts().getCashFundingAccount().getSubjectId())
-                .isEqualTo("platform_cash_usd");
-        assertThat(snapshot.getPlatformAccounts().getAdjustmentFundingAccount().getSubjectId())
-                .isEqualTo("platform_adjustment_usd");
-        assertThat(snapshot.getParticipants().getFirst().getSubjectRef().getLedgerProfileCode()).isEqualTo("CREDIT_BASIC");
-    }
-
-    /**
-     * 场景：replay、运营查询和后续展示投影都应复用已保存的交易事实。
-     * 输入：构造一条主交易和两条主体视角明细，通过 FundsTransactionQueryService 查询。
-     * 输出：主交易 DTO 与按 id 排序的 FundsTransactionDetailDTO 列表。
-     * 预期：查询服务只读交易事实，完整返回交易类型、金额、参与方角色和资金效果。
-     */
-    @Test
-    void testFundsTransactionQueryServiceShouldReuseFactsForReplayAndProjection() {
-        FundsTransaction transaction = transaction();
-        FundsTransactionDetail firstDetail = detail("FTD_001", RouteParticipantRole.AUTH_HOLDER);
-        FundsTransactionDetail secondDetail = detail("FTD_002", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
-        secondDetail.setId(403L);
-        secondDetail.setSubjectId("platform_revenue_001");
-        secondDetail.setSubjectType("FUNDING_ACCOUNT");
-        secondDetail.setFundsEffectType(FundsEffectType.DIRECT);
-        DefaultFundsTransactionQueryService queryService = new DefaultFundsTransactionQueryService(
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> transaction
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionDetailMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> {
-                            throw new UnsupportedOperationException("selectOneByQuery");
-                        },
-                        query -> List.of(firstDetail, secondDetail),
-                        entity -> {
-                            throw new UnsupportedOperationException("update");
-                        }
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> null
-                )
-        );
-
-        assertThat(queryService.queryFundsTransaction("FT_001")).hasValueSatisfying(result -> {
-            assertThat(result.getSn()).isEqualTo("FT_001");
-            assertThat(result.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
-            assertThat(result.getAmount()).isEqualTo(1_000L);
-            assertThat(result.getAuthorizedAmount()).isZero();
-        });
-        assertThat(queryService.queryFundsTransactionDetails("FT_001"))
-                .extracting("sn", "participantRole", "fundsEffectType")
-                .containsExactly(
-                        tuple("FTD_001", RouteParticipantRole.AUTH_HOLDER, FundsEffectType.HOLD),
-                        tuple("FTD_002", RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, FundsEffectType.DIRECT)
-                );
-    }
-
-    /**
-     * 场景：解冻请求以冻结单号作为引用时，需要定位原冻结交易并回放原冻结路径。
-     * 输入：冻结单号绑定原资金交易号，原资金交易保存 RouteSnapshot。
-     * 输出：按冻结单号解析得到的 RouteSnapshotSpec。
-     * 预期：查询服务返回原冻结路径快照，不在解冻链路重新解析路径。
-     */
-    @Test
-    void testFundsTransactionQueryServiceShouldReadFreezeOrderSnapshotForReplay() {
-        FundsTransaction transaction = transaction();
-        transaction.setRouteSnapshot(null);
-        AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
-        DefaultFundsInstructionLifecycleSaver createSaver = newLifecycleSaver(
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionMapper.class,
-                        entity -> {
-                            FundsTransaction inserted = (FundsTransaction) entity;
-                            inserted.setId(501L);
-                            insertedTransaction.set(inserted);
-                        },
-                        query -> null
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionDetailMapper.class,
-                        entity -> ((FundsTransactionDetail) entity).setId(502L),
-                        query -> null
-                )
-        );
-        ResolvedRouteSpec route = new SnapshotMetadataResolvedRoute(1_000L);
-        createSaver.beforePosting(new SimpleInstruction(), route, new DefaultRouteSnapshotFactory().createSnapshot(route));
-        transaction.setRouteSnapshot(insertedTransaction.get().getRouteSnapshot());
-        FundsFrozenOrder frozenOrder = new FundsFrozenOrder();
-        frozenOrder.setSn("FO_001");
-        frozenOrder.setTransactionSn("FT_001");
-        DefaultFundsTransactionQueryService queryService = new DefaultFundsTransactionQueryService(
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> transaction
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionDetailMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> null
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> frozenOrder
-                )
-        );
-
-        RouteSnapshotSpec snapshot = queryService.findRouteSnapshotByFreezeOrderSn("FO_001").orElseThrow();
-
-        assertThat(snapshot.getRouteCode()).isEqualTo("CARD_AUTH");
-        assertThat(snapshot.getLegs()).hasSize(1);
-        assertThat(snapshot.getLegs().getFirst().getLegId()).isEqualTo("LEG_001");
-    }
-
-    /**
-     * 场景：冻结单自身已经保存 RouteSnapshot，且不再绑定标准资金交易号。
-     * 输入：冻结单 contextVariables 中带有原冻结 RouteSnapshot。
-     * 输出：按冻结单号解析得到的 RouteSnapshotSpec。
-     * 预期：查询服务优先从冻结单事实自身读取快照，不再依赖 FundsTransaction。
-     */
-    @Test
-    void testFundsTransactionQueryServiceShouldReadFreezeOrderOwnSnapshotForReplay() {
-        ResolvedRouteSpec route = new SnapshotMetadataResolvedRoute(1_000L);
-        RouteSnapshotSpec routeSnapshot = new DefaultRouteSnapshotFactory().createSnapshot(route);
-        FundsFrozenOrder frozenOrder = new FundsFrozenOrder();
-        frozenOrder.setSn("FO_001");
-        frozenOrder.setContextVariables(JSON.toJSONString(Map.of(
-                FundsInstructionContextKeys.ROUTE_SNAPSHOT, RouteSnapshotJsonSupport.toRouteSnapshotJson(routeSnapshot)
-        )));
-        DefaultFundsTransactionQueryService queryService = new DefaultFundsTransactionQueryService(
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> {
-                            throw new AssertionError("冻结单自身有 RouteSnapshot 时不应查询 FundsTransaction");
-                        }
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionDetailMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> null
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> frozenOrder
-                )
-        );
-
-        RouteSnapshotSpec snapshot = queryService.findRouteSnapshotByFreezeOrderSn("FO_001").orElseThrow();
-
-        assertThat(snapshot.getRouteCode()).isEqualTo("CARD_AUTH");
-        assertThat(snapshot.getLegs()).hasSize(1);
-        assertThat(snapshot.getLegs().getFirst().getLegId()).isEqualTo("LEG_001");
-    }
-
     private static FundsTransaction transaction() {
         FundsTransaction transaction = new FundsTransaction();
         transaction.setId(401L);
@@ -1759,88 +1497,6 @@ class DefaultFundsInstructionLifecycleSaverTests {
         }
     }
 
-    private static final class SnapshotMetadataResolvedRoute extends SimpleResolvedRoute {
-
-        private SnapshotMetadataResolvedRoute(long amount) {
-            super(amount);
-        }
-
-        @Override
-        public @Nullable RoutingDecisionSpec getRoutingDecision() {
-            return ImmutableRoutingDecisionSpec.builder()
-                    .policyCode("LOWEST_COST")
-                    .matchedRules(List.of("USD_ONLY"))
-                    .selectedProcessor("VISA_A")
-                    .selectedCashFundingAccount("PF_CASH_USD")
-                    .selectedPlatformAccount("PF_SETTLEMENT_USD")
-                    .fundingAllocations(List.of(ImmutableFundingAllocationDecisionSpec.builder()
-                            .allocationId("ALLOC_001")
-                            .subjectRef(new MetadataSubjectRef("funding_001", FundsSubjectType.FUNDING_ACCOUNT,
-                                    "funding", "FUNDING_BASIC"))
-                            .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
-                            .amount(Money.immutable(1_000L, CurrencyIsoCode.USD))
-                            .priority(1)
-                            .reason("default source")
-                            .build()))
-                    .decisionReason("default routing")
-                    .contextVariables(Map.of("riskLevel", "LOW"))
-                    .build();
-        }
-
-        @Override
-        public @Nullable PaymentInstrumentRefSpec getPaymentInstrumentRef() {
-            return ImmutablePaymentInstrumentRefSpec.builder()
-                    .tenantId(1L)
-                    .instrumentId("PI_001")
-                    .instrumentType("SHARE_VCC")
-                    .instrumentNo("411111******1111")
-                    .ownerId("credit_001")
-                    .ownerType("CREDIT_ACCOUNT")
-                    .currency(CurrencyIsoCode.USD.name())
-                    .status("ACTIVE")
-                    .bindingSnapshot(Map.of("bindingId", "BIND_001"))
-                    .description("primary card")
-                    .build();
-        }
-
-        @Override
-        public @Nullable ExternalAccountRefSpec getExternalAccountRef() {
-            return ImmutableExternalAccountRefSpec.builder()
-                    .externalAccountId("BANK_001")
-                    .externalAccountType("BANK")
-                    .externalAccountNo("1234")
-                    .providerCode("BANK_A")
-                    .channelCode("ACH")
-                    .currency(CurrencyIsoCode.USD.name())
-                    .countryCode("US")
-                    .description("bank account")
-                    .contextVariables(Map.of("externalTransactionId", "EXT_001"))
-                    .build();
-        }
-
-        @Override
-        public @Nullable PlatformAccountsSnapshotSpec getPlatformAccounts() {
-            return com.wind.integration.funds.model.route.ImmutablePlatformAccountsSnapshotSpec.builder()
-                    .cashFundingAccount(new MetadataSubjectRef("platform_cash_usd", FundsSubjectType.FUNDING_ACCOUNT,
-                            "cash mapping", "FUNDING_PLATFORM"))
-                    .adjustmentFundingAccount(new MetadataSubjectRef("platform_adjustment_usd",
-                            FundsSubjectType.FUNDING_ACCOUNT, "adjustment", "FUNDING_PLATFORM"))
-                    .build();
-        }
-
-        @Override
-        public @NonNull List<RouteParticipantSpec> getParticipants() {
-            return List.of(
-                    new SimpleParticipant(RouteParticipantRole.AUTH_HOLDER,
-                            new MetadataSubjectRef("credit_001", FundsSubjectType.CREDIT_ACCOUNT, "credit",
-                                    "CREDIT_BASIC"), 1_000L),
-                    new SimpleParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT,
-                            new MetadataSubjectRef("platform_revenue_001", FundsSubjectType.FUNDING_ACCOUNT,
-                                    "cash-mapping", "FUNDING_PLATFORM"), 1_000L)
-            );
-        }
-    }
-
     private static final class SimpleParticipant implements RouteParticipantSpec {
 
         private final RouteParticipantRole role;
@@ -2016,37 +1672,4 @@ class DefaultFundsInstructionLifecycleSaverTests {
         }
     }
 
-    private static final class MetadataSubjectRef extends SimpleSubjectRef {
-
-        private final String subjectName;
-
-        private final String ledgerProfileCode;
-
-        private MetadataSubjectRef(String subjectId, FundsSubjectType subjectType, String subjectName,
-                                   String ledgerProfileCode) {
-            super(subjectId, subjectType);
-            this.subjectName = subjectName;
-            this.ledgerProfileCode = ledgerProfileCode;
-        }
-
-        @Override
-        public @Nullable String getSubjectName() {
-            return subjectName;
-        }
-
-        @Override
-        public @Nullable String getCurrency() {
-            return CurrencyIsoCode.USD.name();
-        }
-
-        @Override
-        public @Nullable String getLedgerProfileCode() {
-            return ledgerProfileCode;
-        }
-
-        @Override
-        public @Nullable String getDescription() {
-            return subjectName + " subject";
-        }
-    }
 }
