@@ -4,6 +4,7 @@ import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.capte.funds.wallet.model.dto.LedgerProfileDTO;
 import com.capte.funds.wallet.model.dto.LedgerProfileItemDTO;
+import com.capte.funds.wallet.model.dto.NegativeAvailablePolicyDTO;
 import com.capte.funds.wallet.service.LedgerProfileService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
@@ -58,7 +59,7 @@ public class DefaultLedgerProfileServiceImpl implements LedgerProfileService {
                         item(LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, true),
                         item(LedgerSubjectCode.FROZEN, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
                         item(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false)
-                )),
+                ), fundingNegativePolicy()),
                 LedgerProfileCode.FUNDING_MERCHANT,
                 profile(LedgerProfileCode.FUNDING_MERCHANT, FundsSubjectType.FUNDING_ACCOUNT, List.of(
                         item(LedgerSubjectCode.CLEARING, LedgerSubjectCategory.CLEARING, EntrySide.CREDIT, false),
@@ -66,27 +67,29 @@ public class DefaultLedgerProfileServiceImpl implements LedgerProfileService {
                         item(LedgerSubjectCode.SETTLEMENT, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
                         item(LedgerSubjectCode.FROZEN, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
                         item(LedgerSubjectCode.ADJUSTMENT, LedgerSubjectCategory.SUSPENSE, EntrySide.CREDIT, false)
-                )),
+                ), fundingNegativePolicy()),
                 LedgerProfileCode.CREDIT_BASIC,
                 profile(LedgerProfileCode.CREDIT_BASIC, FundsSubjectType.CREDIT_ACCOUNT, List.of(
                         item(LedgerSubjectCode.LIMIT, LedgerSubjectCategory.CONTROL, EntrySide.DEBIT, false),
                         item(LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, true),
                         item(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, false)
-                )),
+                ), creditNegativePolicy()),
                 LedgerProfileCode.BUDGET_BASIC,
                 profile(LedgerProfileCode.BUDGET_BASIC, FundsSubjectType.BUDGET_GROUP, List.of(
                         item(LedgerSubjectCode.LIMIT, LedgerSubjectCategory.CONTROL, EntrySide.DEBIT, false),
                         item(LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, true),
                         item(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, false)
-                )),
+                ), budgetNegativePolicy()),
                 LedgerProfileCode.FUNDING_PLATFORM,
                 profile(LedgerProfileCode.FUNDING_PLATFORM, FundsSubjectType.FUNDING_ACCOUNT, List.of(
                         item(LedgerSubjectCode.CASH, LedgerSubjectCategory.ASSET, EntrySide.DEBIT, false),
                         item(LedgerSubjectCode.PREPAYMENT, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
-                        item(LedgerSubjectCode.CLEARING, LedgerSubjectCategory.CLEARING, EntrySide.DEBIT, true),
+                        item(LedgerSubjectCode.CLEARING, LedgerSubjectCategory.CLEARING, EntrySide.DEBIT, true)
+                                .setNegativeAvailablePolicy(platformClearingNegativePolicy()),
                         item(LedgerSubjectCode.SETTLEMENT, LedgerSubjectCategory.LIABILITY, EntrySide.CREDIT, false),
                         item(LedgerSubjectCode.FEE, LedgerSubjectCategory.REVENUE, EntrySide.CREDIT, false),
                         item(LedgerSubjectCode.ADJUSTMENT, LedgerSubjectCategory.SUSPENSE, EntrySide.DEBIT, true)
+                                .setNegativeAvailablePolicy(platformAdjustmentNegativePolicy())
                 ))
         );
     }
@@ -99,6 +102,15 @@ public class DefaultLedgerProfileServiceImpl implements LedgerProfileService {
                 .setVersion(PROFILE_VERSION)
                 .setSubjectType(subjectType)
                 .setItems(items);
+    }
+
+    private static LedgerProfileDTO profile(LedgerProfileCode code,
+                                            FundsSubjectType subjectType,
+                                            List<LedgerProfileItemDTO> items,
+                                            NegativeAvailablePolicyDTO availableNegativePolicy) {
+        return profile(code, subjectType, items.stream()
+                .map(item -> attachAvailableNegativePolicy(item, availableNegativePolicy))
+                .toList());
     }
 
     private static LedgerProfileItemDTO item(LedgerSubjectCode code,
@@ -115,5 +127,64 @@ public class DefaultLedgerProfileServiceImpl implements LedgerProfileService {
                 .setSettlementPolicy(SettlementPolicySpec.RT.getRaw())
                 .setCutOffTime(LocalTime.MIDNIGHT)
                 .setDescription(code.getDesc());
+    }
+
+    private static LedgerProfileItemDTO attachAvailableNegativePolicy(LedgerProfileItemDTO item,
+                                                                      NegativeAvailablePolicyDTO policy) {
+        if (item.getLedgerSubjectCode() == LedgerSubjectCode.AVAILABLE
+                && Boolean.TRUE.equals(item.getAllowNegative())) {
+            return item.setNegativeAvailablePolicy(policy);
+        }
+        return item;
+    }
+
+    private static NegativeAvailablePolicyDTO fundingNegativePolicy() {
+        return policy(
+                "FUNDING_AVAILABLE_CONTROLLED_NEGATIVE",
+                "风控、对账、追偿、结算抵扣、后续入金抵扣、人工处理"
+        );
+    }
+
+    private static NegativeAvailablePolicyDTO creditNegativePolicy() {
+        return policy(
+                "CREDIT_AVAILABLE_CONTROLLED_NEGATIVE",
+                "新授权策略、额度治理、账龄、报表"
+        );
+    }
+
+    private static NegativeAvailablePolicyDTO budgetNegativePolicy() {
+        return policy(
+                "BUDGET_AVAILABLE_CONTROLLED_NEGATIVE",
+                "新授权策略、预算治理、周期报表"
+        );
+    }
+
+    private static NegativeAvailablePolicyDTO platformClearingNegativePolicy() {
+        return policy(
+                "PLATFORM_CLEARING_CONTROLLED_NEGATIVE",
+                "对账、差错核销、人工处理"
+        );
+    }
+
+    private static NegativeAvailablePolicyDTO platformAdjustmentNegativePolicy() {
+        return policy(
+                "PLATFORM_ADJUSTMENT_CONTROLLED_NEGATIVE",
+                "调账审批、差错核销、人工处理"
+        );
+    }
+
+    private static NegativeAvailablePolicyDTO policy(String code, String governancePath) {
+        return new NegativeAvailablePolicyDTO()
+                .setPolicyCode(code)
+                .setPolicyVersion(PROFILE_VERSION)
+                .setRequireSourceFact(Boolean.TRUE)
+                .setRequireReason(Boolean.TRUE)
+                .setRequireApprovalOrRiskRule(Boolean.TRUE)
+                .setRequireRiskStatus(Boolean.TRUE)
+                .setRequireSingleLimit(Boolean.TRUE)
+                .setRequireCumulativeLimit(Boolean.TRUE)
+                .setRequireAgingTracking(Boolean.TRUE)
+                .setRecheckFutureTransaction(Boolean.TRUE)
+                .setGovernancePath(governancePath);
     }
 }
