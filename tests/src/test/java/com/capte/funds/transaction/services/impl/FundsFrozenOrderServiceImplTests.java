@@ -4,6 +4,7 @@ import com.capte.funds.support.FundsAccountServiceTestSupport;
 import com.capte.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.capte.funds.transaction.model.dto.FundsFrozenOrderDTO;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.capte.funds.transaction.model.request.CreateFundsFrozenOrderRequest;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -170,6 +171,29 @@ class FundsFrozenOrderServiceImplTests {
                 .hasMessageContaining("冻结单状态不允许表达消费");
 
         assertThat(inserted).hasValue(null);
+    }
+
+    /**
+     * 场景：冻结单历史消费字段仍存在于兼容模型中。
+     * 输入：冻结单状态枚举、Entity 和 DTO 的历史消费字段。
+     * 输出：消费状态、consumedAmount、consumeTime 均标记为 Deprecated。
+     * 预期：新代码不得继续把冻结单当作消费、扣划或跨主体价值转移载体。
+     * 红线：兼容字段不得被误读为 P0 目标态冻结消费能力。
+     */
+    @Test
+    void testFrozenOrderConsumptionCompatibilityFieldsShouldBeDeprecated() throws NoSuchFieldException {
+        assertThat(FundsFrozenOrderStatus.class.getField("PARTIALLY_CONSUMED")
+                .isAnnotationPresent(Deprecated.class)).isTrue();
+        assertThat(FundsFrozenOrderStatus.class.getField("CONSUMED")
+                .isAnnotationPresent(Deprecated.class)).isTrue();
+        assertThat(FundsFrozenOrder.class.getDeclaredField("consumedAmount")
+                .isAnnotationPresent(Deprecated.class)).isTrue();
+        assertThat(FundsFrozenOrder.class.getDeclaredField("consumeTime")
+                .isAnnotationPresent(Deprecated.class)).isTrue();
+        assertThat(FundsFrozenOrderDTO.class.getDeclaredField("consumedAmount")
+                .isAnnotationPresent(Deprecated.class)).isTrue();
+        assertThat(FundsFrozenOrderDTO.class.getDeclaredField("consumeTime")
+                .isAnnotationPresent(Deprecated.class)).isTrue();
     }
 
     /**
