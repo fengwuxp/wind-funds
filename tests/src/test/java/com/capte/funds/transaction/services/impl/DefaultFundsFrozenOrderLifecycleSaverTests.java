@@ -127,6 +127,23 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
                 .hasMessageContaining("解冻事件必须引用冻结单");
     }
 
+    @Test
+    void testUnfreezeShouldRejectWhenReleasedAndConsumedAmountExceedsFrozenAmount() {
+        AtomicReference<FundsFrozenOrder> originalOrder = new AtomicReference<>(frozenOrder(20L, 60L));
+        AtomicReference<FundsFrozenOrder> releaseRecord = new AtomicReference<>();
+        DefaultFundsFrozenOrderLifecycleSaver saver = new DefaultFundsFrozenOrderLifecycleSaver(
+                unfreezeMapper(originalOrder, releaseRecord));
+
+        FundsInstructionSpec instruction = instruction(FundsTransactionEventType.UNFREEZE,
+                reference("FO_0001"), "RISK_UNFREEZE", "UNFREEZE_OVER_AMOUNT", 30L);
+
+        assertThatThrownBy(() -> saver.beforePosting(instruction, resolvedRoute(), routeSnapshot()))
+                .hasMessageContaining("冻结单剩余可释放金额不足")
+                .hasMessageContaining("remainingAmount = 20")
+                .hasMessageContaining("amount = 30");
+        assertThat(releaseRecord.get()).isNull();
+    }
+
     private static FundsFrozenOrderMapper mapper(AtomicReference<FundsFrozenOrder> savedOrder,
                                                  java.util.function.Function<Integer, FundsFrozenOrder> selectHandler) {
         AtomicInteger selectCount = new AtomicInteger();
@@ -174,6 +191,10 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
     }
 
     private static FundsFrozenOrder frozenOrder(long releasedAmount) {
+        return frozenOrder(releasedAmount, 0L);
+    }
+
+    private static FundsFrozenOrder frozenOrder(long releasedAmount, long consumedAmount) {
         FundsFrozenOrder order = new FundsFrozenOrder();
         order.setId(1L);
         order.setSn("FO_0001");
@@ -186,7 +207,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
         order.setFreezeLedgerTransactionSn("LT_FREEZE_0001");
         order.setAmount(100L);
         order.setReleasedAmount(releasedAmount);
-        order.setConsumedAmount(0L);
+        order.setConsumedAmount(consumedAmount);
         order.setCurrency(CurrencyIsoCode.USD);
         order.setStatus(FundsFrozenOrderStatus.FROZEN);
         return order;

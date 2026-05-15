@@ -120,6 +120,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsFrozenOrderLi
 
     private FundsFrozenOrder createUnfreezeRecord(FundsInstructionSpec instruction) {
         FundsFrozenOrder originalOrder = findReferencedFrozenOrder(instruction.getReference());
+        assertEnoughReleasableAmount(originalOrder, instruction.getAmount().getAmount());
         FundsFrozenOrder entity = new FundsFrozenOrder();
         entity.setSn(TemporalSequenceFactory.hourNext(FUNDS_FROZEN_ORDER_SEQUENCE_TYPE));
         entity.setTenantId(instruction.getTenantId());
@@ -195,11 +196,8 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsFrozenOrderLi
                 "更新资金解冻生命周期状态失败，sn = {}", releaseRecord.getSn());
 
         FundsFrozenOrder originalOrder = findReferencedFrozenOrder(releaseRecord.getContextVariables());
+        assertEnoughReleasableAmount(originalOrder, releaseRecord.getAmount());
         Long releasedAmount = originalOrder.getReleasedAmount() + releaseRecord.getAmount();
-        AssertUtils.isTrue(releasedAmount <= originalOrder.getAmount(),
-                "冻结单剩余可释放金额不足，sn = {}，remainingAmount = {}，amount = {}",
-                originalOrder.getSn(), originalOrder.getAmount() - originalOrder.getReleasedAmount(),
-                releaseRecord.getAmount());
         originalOrder.setReleasedAmount(releasedAmount);
         originalOrder.setReleaseTime(releaseRecord.getReleaseTime());
         originalOrder.setStatus(releasedAmount >= originalOrder.getAmount()
@@ -215,6 +213,21 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsFrozenOrderLi
         String referenceFreezeSn = values.getString(FundsInstructionContextKeys.REFERENCE_FREEZE_SN);
         AssertUtils.hasText(referenceFreezeSn, "解冻生命周期记录缺少原冻结单引用");
         return findFrozenOrderBySn(referenceFreezeSn);
+    }
+
+    private void assertEnoughReleasableAmount(FundsFrozenOrder originalOrder, Long releaseAmount) {
+        long remainingAmount = remainingReleasableAmount(originalOrder);
+        AssertUtils.isTrue(releaseAmount != null && releaseAmount <= remainingAmount,
+                "冻结单剩余可释放金额不足，sn = {}，remainingAmount = {}，amount = {}",
+                originalOrder.getSn(), remainingAmount, releaseAmount);
+    }
+
+    private long remainingReleasableAmount(FundsFrozenOrder order) {
+        return order.getAmount() - defaultAmount(order.getReleasedAmount()) - defaultAmount(order.getConsumedAmount());
+    }
+
+    private long defaultAmount(Long amount) {
+        return amount == null ? 0L : amount;
     }
 
     private FundsTransactionEventType resolveEventType(FundsFrozenOrder order) {
