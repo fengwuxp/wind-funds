@@ -49,7 +49,7 @@ public class CompositeLedgerPostingAssembler implements LedgerPostingAssembler<R
                                                    @NonNull String fundsTransactionSn,
                                                    @NonNull ResolvedRouteSpec resolvedRoute) {
         for (LedgerPostingAssembler delegate : availableDelegates()) {
-            if (delegate.support(resolvedRoute)) {
+            if (delegate.supports(resolvedRoute)) {
                 return delegate.assemble(instruction, fundsTransactionSn, resolvedRoute);
             }
         }
@@ -65,9 +65,9 @@ public class CompositeLedgerPostingAssembler implements LedgerPostingAssembler<R
      * @return true 表示存在可用委托
      */
     @Override
-    public boolean support(@NonNull ResolvedRouteSpec resolvedRoute) {
-        // support 仅用于组合器判断是否存在可委托实现。
-        return availableDelegates().stream().anyMatch(delegate -> delegate.support(resolvedRoute));
+    public boolean supports(@NonNull ResolvedRouteSpec resolvedRoute) {
+        // supports 仅用于组合器判断是否存在可委托实现。
+        return availableDelegates().stream().anyMatch(delegate -> delegate.supports(resolvedRoute));
     }
 
     private List<LedgerPostingAssembler<? extends ResolvedRouteSpec>> availableDelegates() {

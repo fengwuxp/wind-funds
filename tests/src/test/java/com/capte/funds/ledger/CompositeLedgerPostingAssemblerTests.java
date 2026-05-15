@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CompositeLedgerPostingAssemblerTests {
 
     @Test
-    void supportAndAssembleShouldSkipCompositeItselfFromDelegates() {
+    void supportsAndAssembleShouldSkipCompositeItselfFromDelegates() {
         AtomicInteger supportCalls = new AtomicInteger();
         AtomicInteger assembleCalls = new AtomicInteger();
         List<LedgerPostingAssembler<? extends ResolvedRouteSpec>> delegates = new ArrayList<>();
@@ -34,7 +34,7 @@ class CompositeLedgerPostingAssemblerTests {
             }
 
             @Override
-            public boolean support(@NonNull ResolvedRouteSpec resolvedRoute) {
+            public boolean supports(@NonNull ResolvedRouteSpec resolvedRoute) {
                 supportCalls.incrementAndGet();
                 return true;
             }
@@ -42,7 +42,7 @@ class CompositeLedgerPostingAssemblerTests {
 
         ResolvedRouteSpec route = route();
 
-        assertThat(composite.support(route)).isTrue();
+        assertThat(composite.supports(route)).isTrue();
         assertThat(composite.assemble(instruction(), "FT_0001", route)).isSameAs(transaction());
         assertThat(supportCalls.get()).isEqualTo(2);
         assertThat(assembleCalls.get()).isEqualTo(1);

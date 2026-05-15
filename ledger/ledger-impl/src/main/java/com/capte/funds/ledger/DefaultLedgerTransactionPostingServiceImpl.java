@@ -202,7 +202,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         Map<FundsAccountId, LedgerBalanceProjectionService> result = new LinkedHashMap<>();
         for (FundsAccountId accountId : groups.keySet()) {
             List<LedgerBalanceProjectionService> supported = ledgerBalanceProjectionServices.stream()
-                    .filter(delegate -> delegate.support(accountId))
+                    .filter(delegate -> delegate.supports(accountId))
                     .toList();
             AssertUtils.isFalse(supported.isEmpty(), "未找到支持的账本余额投影服务，accountId = {}", accountId);
             AssertUtils.isTrue(supported.size() == 1, "账本余额投影服务不唯一，accountId = {}", accountId);

@@ -86,7 +86,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
     private final PlatformAccountRouteSupport platformAccountRouteSupport;
 
     @Override
-    public boolean support(@NonNull FundsInstructionSpec instruction) {
+    public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return instruction.getInstructionType() == FundsInstructionType.BALANCE_CONTROL;
     }
 

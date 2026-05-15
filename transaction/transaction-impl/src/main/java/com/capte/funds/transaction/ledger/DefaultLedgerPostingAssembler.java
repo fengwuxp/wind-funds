@@ -94,7 +94,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
      * @return true 表示该路径存在可翻译的账务步骤
      */
     @Override
-    public boolean support(@NonNull ResolvedRouteSpec resolvedRoute) {
+    public boolean supports(@NonNull ResolvedRouteSpec resolvedRoute) {
         return !resolvedRoute.getLegs().isEmpty();
     }
 

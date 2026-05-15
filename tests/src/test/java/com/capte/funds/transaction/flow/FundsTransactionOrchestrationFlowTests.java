@@ -57,7 +57,6 @@ import com.wind.integration.funds.spec.ledger.LedgerPostingPhaseSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.FundsAccountTransactionFeeProvider;
-import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import org.jspecify.annotations.NonNull;
@@ -549,7 +548,7 @@ class FundsTransactionOrchestrationFlowTests {
             }
 
             @Override
-            public boolean support(FundsAccountId accountId) {
+            public boolean supports(FundsAccountId accountId) {
                 return false;
             }
         };
@@ -566,8 +565,8 @@ class FundsTransactionOrchestrationFlowTests {
         }
 
         @Override
-        public boolean support(@NonNull FundsInstructionSpec instruction) {
-            return delegate.support(instruction);
+        public boolean supports(@NonNull FundsInstructionSpec instruction) {
+            return delegate.supports(instruction);
         }
 
         @Override
@@ -633,7 +632,7 @@ class FundsTransactionOrchestrationFlowTests {
         }
 
         @Override
-        public boolean support(@NonNull ResolvedRouteSpec resolvedRoute) {
+        public boolean supports(@NonNull ResolvedRouteSpec resolvedRoute) {
             return true;
         }
     }

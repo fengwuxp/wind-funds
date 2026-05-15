@@ -612,7 +612,7 @@ class FundsTransactionCommandServiceImplTests {
             }
 
             @Override
-            public boolean support(FundsAccountId accountId) {
+            public boolean supports(FundsAccountId accountId) {
                 return false;
             }
         };

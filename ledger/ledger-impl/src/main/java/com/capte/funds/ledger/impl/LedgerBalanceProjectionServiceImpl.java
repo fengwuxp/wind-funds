@@ -183,7 +183,7 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
 
 
     @Override
-    public boolean support(@NonNull FundsAccountId accountId) {
+    public boolean supports(@NonNull FundsAccountId accountId) {
         return fundsAccountQueryService.supports(accountId);
     }
 

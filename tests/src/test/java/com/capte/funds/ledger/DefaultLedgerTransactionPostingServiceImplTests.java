@@ -611,7 +611,7 @@ class DefaultLedgerTransactionPostingServiceImplTests {
         }
 
         @Override
-        public boolean support(@NonNull FundsAccountId accountId) {
+        public boolean supports(@NonNull FundsAccountId accountId) {
             return supported;
         }
     }

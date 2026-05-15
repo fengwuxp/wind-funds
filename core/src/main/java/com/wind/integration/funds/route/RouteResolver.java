@@ -31,7 +31,7 @@ public interface RouteResolver {
      * @param instruction 资金指令
      * @return true 表示可处理该指令
      */
-    boolean support(@NonNull FundsInstructionSpec instruction);
+    boolean supports(@NonNull FundsInstructionSpec instruction);
 
     /**
      * 解析资金路径。

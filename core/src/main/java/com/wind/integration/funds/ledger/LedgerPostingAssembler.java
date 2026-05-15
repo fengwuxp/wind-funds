@@ -49,7 +49,7 @@ public interface LedgerPostingAssembler<R extends ResolvedRouteSpec> extends Ord
      * @param resolvedRoute 已解析资金路径
      * @return true 表示可处理该路径
      */
-    boolean support(@NonNull ResolvedRouteSpec resolvedRoute);
+    boolean supports(@NonNull ResolvedRouteSpec resolvedRoute);
 
     @Override
     default int getOrder() {

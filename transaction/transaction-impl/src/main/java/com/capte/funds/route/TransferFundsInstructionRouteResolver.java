@@ -102,7 +102,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     private final FundsAccountTransactionFeeProvider fundsAccountTransactionFeeProvider;
 
     @Override
-    public boolean support(@NonNull FundsInstructionSpec instruction) {
+    public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION;
     }
 
@@ -426,7 +426,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     }
 
     private Money calculateFee(FundsAccountId accountId, String businessScene, Money transactionAmount) {
-        if (!fundsAccountTransactionFeeProvider.support(accountId)) {
+        if (!fundsAccountTransactionFeeProvider.supports(accountId)) {
             return Money.immutable(0L, transactionAmount.getCurrency());
         }
         FeeSpec fee = fundsAccountTransactionFeeProvider.apply(accountId, businessScene);

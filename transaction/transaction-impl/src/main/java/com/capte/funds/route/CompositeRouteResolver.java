@@ -26,7 +26,7 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
     private final List<RouteResolver> delegates;
 
     @Override
-    public boolean support(@NonNull FundsInstructionSpec instruction) {
+    public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return true;
     }
 
@@ -35,7 +35,7 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
         List<RouteResolver> candidates = delegates.stream()
                 .filter(delegate -> delegate != this)
                 .sorted(Comparator.comparingInt(this::orderOf))
-                .filter(delegate -> delegate.support(instruction))
+                .filter(delegate -> delegate.supports(instruction))
                 .toList();
         AssertUtils.isTrue(!candidates.isEmpty(),
                 "未找到匹配的 RouteResolver，instructionType = {}, eventType = {}, transactionType = {}",

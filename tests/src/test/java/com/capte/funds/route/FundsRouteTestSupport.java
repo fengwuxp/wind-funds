@@ -129,7 +129,7 @@ public final class FundsRouteTestSupport {
             }
 
             @Override
-            public boolean support(FundsAccountId accountId) {
+            public boolean supports(FundsAccountId accountId) {
                 return false;
             }
         };
@@ -146,7 +146,7 @@ public final class FundsRouteTestSupport {
             }
 
             @Override
-            public boolean support(FundsAccountId accountId) {
+            public boolean supports(FundsAccountId accountId) {
                 return true;
             }
         };

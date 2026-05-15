@@ -491,7 +491,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         }
 
         @Override
-        public boolean support(@NonNull FundsInstructionSpec instruction) {
+        public boolean supports(@NonNull FundsInstructionSpec instruction) {
             return true;
         }
 
@@ -544,7 +544,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         }
 
         @Override
-        public boolean support(@NonNull ResolvedRouteSpec resolvedRoute) {
+        public boolean supports(@NonNull ResolvedRouteSpec resolvedRoute) {
             return !unsupported;
         }
     }

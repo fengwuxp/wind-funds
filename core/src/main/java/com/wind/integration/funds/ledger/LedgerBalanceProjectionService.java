@@ -27,5 +27,5 @@ public interface LedgerBalanceProjectionService {
      * @param accountId 账户ID
      * @return true:支持
      */
-    boolean support(@NonNull FundsAccountId accountId);
+    boolean supports(@NonNull FundsAccountId accountId);
 }

@@ -30,6 +30,6 @@ public interface FundsAccountTransactionFeeProvider {
      * @param accountId 账户ID
      * @return true:支持
      */
-    boolean support(FundsAccountId accountId);
+    boolean supports(FundsAccountId accountId);
 }
 

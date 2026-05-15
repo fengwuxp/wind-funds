@@ -100,7 +100,7 @@ class CompositeRouteResolverTests {
     private static final class AlwaysSupportRouteResolver implements RouteResolver {
 
         @Override
-        public boolean support(FundsInstructionSpec instruction) {
+        public boolean supports(FundsInstructionSpec instruction) {
             return true;
         }
 

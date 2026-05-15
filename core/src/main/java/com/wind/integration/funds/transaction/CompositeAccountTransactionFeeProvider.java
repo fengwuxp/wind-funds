@@ -29,7 +29,7 @@ public class CompositeAccountTransactionFeeProvider implements FundsAccountTrans
     @Override
     public @Nullable FeeSpec apply(FundsAccountId accountId, String businessScene) {
         for (FundsAccountTransactionFeeProvider delegate : delegates) {
-            if (delegate.support(accountId)) {
+            if (delegate.supports(accountId)) {
                 return delegate.apply(accountId, businessScene);
             }
         }
@@ -37,7 +37,7 @@ public class CompositeAccountTransactionFeeProvider implements FundsAccountTrans
     }
 
     @Override
-    public boolean support(FundsAccountId accountId) {
+    public boolean supports(FundsAccountId accountId) {
         return true;
     }
 }
