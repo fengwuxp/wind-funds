@@ -20,9 +20,9 @@ public enum PlatformFundingAccountRole implements DescriptiveEnum {
     CASH_MAPPING(LedgerProfileCode.FUNDING_PLATFORM, "现金映射"),
 
     /**
-     * 预收款。
+     * 预收待付。
      */
-    PREPAYMENT(LedgerProfileCode.FUNDING_PLATFORM, "预收款"),
+    PREPAYMENT(LedgerProfileCode.FUNDING_PLATFORM, "预收待付"),
 
     /**
      * 清算过渡。
@@ -30,14 +30,14 @@ public enum PlatformFundingAccountRole implements DescriptiveEnum {
     CLEARING(LedgerProfileCode.FUNDING_PLATFORM, "清算过渡"),
 
     /**
-     * 结算归集。
+     * 结算应付。
      */
-    SETTLEMENT(LedgerProfileCode.FUNDING_PLATFORM, "结算归集"),
+    SETTLEMENT(LedgerProfileCode.FUNDING_PLATFORM, "结算应付"),
 
     /**
-     * 手续费归集。
+     * 费用归集。
      */
-    FEE(LedgerProfileCode.FUNDING_PLATFORM, "手续费归集"),
+    FEE(LedgerProfileCode.FUNDING_PLATFORM, "费用归集"),
 
     /**
      * 调整挂账。

@@ -56,6 +56,12 @@ class PlatformFundingAccountServiceImplTests {
                         "FEE",
                         "ADJUSTMENT"
                 );
+        assertThat(PlatformFundingAccountRole.CASH_MAPPING.getDesc()).isEqualTo("现金映射");
+        assertThat(PlatformFundingAccountRole.PREPAYMENT.getDesc()).isEqualTo("预收待付");
+        assertThat(PlatformFundingAccountRole.CLEARING.getDesc()).isEqualTo("清算过渡");
+        assertThat(PlatformFundingAccountRole.SETTLEMENT.getDesc()).isEqualTo("结算应付");
+        assertThat(PlatformFundingAccountRole.FEE.getDesc()).isEqualTo("费用归集");
+        assertThat(PlatformFundingAccountRole.ADJUSTMENT.getDesc()).isEqualTo("调整挂账");
     }
 
     @Test
