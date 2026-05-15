@@ -58,13 +58,14 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
             assertEntriesMatchLedger(ledger, entry.getValue());
             LedgerSubjectCode ledgerCode = ledger.getLedgerSubjectCode();
             ProjectionDelta delta = computeProjectionDelta(entry.getValue(), ledger.getNormalBalanceSide());
+            Money beforeBalanceAmount = beforeBalance.getBalance(ledgerCode);
+            assertMustNotBeNegativeBalance(ledger, entry.getValue(), beforeBalanceAmount, delta);
             UpdateLedgerBalanceRequest balanceRequest = new UpdateLedgerBalanceRequest()
                     .setId(ledgerId)
                     .setDebitAmountDelta(delta.debitAmountDelta())
                     .setCreditAmountDelta(delta.creditAmountDelta())
                     .setMinimumNormalBalance(resolveMinimumNormalBalance(ledger, entry.getValue()));
             ledgerService.updateLedgerBalance(balanceRequest);
-            Money beforeBalanceAmount = beforeBalance.getBalance(ledgerCode);
             // 发送余额变更事件
             SpringEventPublishUtils.publishWithTransactionCommitOrImmediately(LedgerBalanceChangedEvent.builder()
                     .subjectId(accountId.id())
@@ -137,6 +138,39 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
                 .map(this::resolveConstraintType)
                 .anyMatch(LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE::equals);
         return mustNotBeNegative ? 0L : null;
+    }
+
+    private void assertMustNotBeNegativeBalance(LedgerDTO ledger,
+                                                List<LedgerEntrySpec> entries,
+                                                Money beforeBalanceAmount,
+                                                ProjectionDelta delta) {
+        if (!containsMustNotBeNegativeConstraint(entries)) {
+            return;
+        }
+        long beforeAmount = beforeBalanceAmount.getAmount();
+        AssertUtils.isTrue(beforeAmount >= 0,
+                "账本余额不允许为负，ledgerId = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, beforeBalance = {}",
+                ledger.getId(),
+                ledger.getSubjectId(),
+                ledger.getSubjectType(),
+                ledger.getLedgerSubjectCode(),
+                beforeAmount);
+        long afterAmount = beforeAmount + delta.balanceDelta();
+        AssertUtils.isTrue(afterAmount >= 0,
+                "账本余额不足，ledgerId = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, beforeBalance = {}, balanceDelta = {}, afterBalance = {}",
+                ledger.getId(),
+                ledger.getSubjectId(),
+                ledger.getSubjectType(),
+                ledger.getLedgerSubjectCode(),
+                beforeAmount,
+                delta.balanceDelta(),
+                afterAmount);
+    }
+
+    private boolean containsMustNotBeNegativeConstraint(List<LedgerEntrySpec> entries) {
+        return entries.stream()
+                .map(this::resolveConstraintType)
+                .anyMatch(LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE::equals);
     }
 
     private LedgerBalanceConstraintType resolveConstraintType(LedgerEntrySpec entry) {

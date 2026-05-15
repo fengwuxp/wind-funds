@@ -178,6 +178,47 @@ class LedgerBalanceProjectionServiceImplTests {
     }
 
     @Test
+    void testProjectShouldRejectMustNotBeNegativeWhenCurrentBalanceAlreadyNegative() {
+        FundsAccountId accountId = FundsAccountId.immutable("credit_001", FundsSubjectType.CREDIT_ACCOUNT.name());
+        RecordingLedgerService ledgerService = new RecordingLedgerService(ledger(99L, EntrySide.CREDIT, true)
+                .setSubjectId(accountId.id())
+                .setSubjectType(accountId.type()));
+        LedgerBalanceProjectionServiceImpl service = new LedgerBalanceProjectionServiceImpl(
+                newFundsAccountQueryService(accountId, LedgerSubjectCode.AVAILABLE, 99L, -100L),
+                ledgerService
+        );
+
+        assertThatThrownBy(() -> service.project(List.of(entry(accountId, 99L, EntrySide.DEBIT, 300L)
+                .setBalanceConstraintType(LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE))))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本余额不允许为负")
+                .hasMessageContaining("ledgerId = 99")
+                .hasMessageContaining("beforeBalance = -100");
+        assertThat(ledgerService.updateRequests).isEmpty();
+    }
+
+    @Test
+    void testProjectShouldRejectMustNotBeNegativeWhenProjectionWouldBreakBalanceFloor() {
+        FundsAccountId accountId = FundsAccountId.immutable("credit_001", FundsSubjectType.CREDIT_ACCOUNT.name());
+        RecordingLedgerService ledgerService = new RecordingLedgerService(ledger(99L, EntrySide.CREDIT, true)
+                .setSubjectId(accountId.id())
+                .setSubjectType(accountId.type()));
+        LedgerBalanceProjectionServiceImpl service = new LedgerBalanceProjectionServiceImpl(
+                newFundsAccountQueryService(accountId, LedgerSubjectCode.AVAILABLE, 99L, 100L),
+                ledgerService
+        );
+
+        assertThatThrownBy(() -> service.project(List.of(entry(accountId, 99L, EntrySide.DEBIT, 300L)
+                .setBalanceConstraintType(LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE))))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本余额不足")
+                .hasMessageContaining("ledgerId = 99")
+                .hasMessageContaining("beforeBalance = 100")
+                .hasMessageContaining("afterBalance = -200");
+        assertThat(ledgerService.updateRequests).isEmpty();
+    }
+
+    @Test
     void testProjectShouldRejectEntriesFromDifferentFundsAccounts() {
         FundsAccountId firstAccountId = FundsAccountId.immutable("funding_001", FundsSubjectType.FUNDING_ACCOUNT.name());
         FundsAccountId secondAccountId = FundsAccountId.immutable("funding_002", FundsSubjectType.FUNDING_ACCOUNT.name());
@@ -254,6 +295,13 @@ class LedgerBalanceProjectionServiceImplTests {
     private static FundsAccountQueryService newFundsAccountQueryService(FundsAccountId accountId,
                                                                         LedgerSubjectCode ledgerSubjectCode,
                                                                         Long ledgerId) {
+        return newFundsAccountQueryService(accountId, ledgerSubjectCode, ledgerId, 1_000L);
+    }
+
+    private static FundsAccountQueryService newFundsAccountQueryService(FundsAccountId accountId,
+                                                                        LedgerSubjectCode ledgerSubjectCode,
+                                                                        Long ledgerId,
+                                                                        long balance) {
         return new FundsAccountQueryService() {
 
             @Override
@@ -274,7 +322,7 @@ class LedgerBalanceProjectionServiceImplTests {
             public @NonNull FundsAccountBalanceView getBalance(@NonNull FundsAccountId ignored) {
                 LedgerBalanceBucket bucket = LedgerBalanceBucket.builder()
                         .accountCode(ledgerSubjectCode)
-                        .balance(Money.immutable(1_000L, CurrencyIsoCode.USD))
+                        .balance(Money.immutable(balance, CurrencyIsoCode.USD))
                         .periodType(AccountBalancePeriodType.LIFETIME)
                         .periodId(AccountBalancePeriodType.LIFETIME.name())
                         .activeTime(LocalDateTime.of(2026, 5, 7, 12, 0))
