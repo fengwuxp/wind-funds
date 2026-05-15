@@ -102,10 +102,18 @@ class TransferFundsInstructionRouteResolverTests {
         assertThat(route.getExternalAccountRef().getExternalAccountId()).isEqualTo("external_bank_001");
     }
 
+    /**
+     * 场景：付款方直接支付给收款方结算账目。
+     * 输入：付款方资金账户发起 PAY，收款方指定 SETTLEMENT 账目。
+     * 输出：付款方 AVAILABLE 消费到收款方 SETTLEMENT。
+     * 预期：付款方 source AVAILABLE 携带 MUST_NOT_BE_NEGATIVE 约束。
+     * 红线：负 AVAILABLE 不得被当作可继续消费余额。
+     */
     @Test
     void testResolvePayShouldUseProvidedPayeeLedgerSubjectCode() {
+        FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
         FundsInstructionSpec instruction = converter.convertToPayInstruction(new FundsTransactionPayRequest()
-                .setAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
+                .setAccountId(accountId)
                 .setPayeeId(FundsRouteTestSupport.fundingAccount("merchant_001"))
                 .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
                 .setAmount(FundsRouteTestSupport.amount(500L))
@@ -122,6 +130,7 @@ class TransferFundsInstructionRouteResolverTests {
             assertThat(leg.getTargetNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.SETTLEMENT);
             assertThat(leg.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME);
             assertThat(leg.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT);
+            assertMustNotBeNegative(leg, accountId, LedgerSubjectCode.AVAILABLE);
         });
     }
 

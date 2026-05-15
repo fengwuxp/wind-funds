@@ -8,12 +8,15 @@ import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAu
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.RouteLegType;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
+import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
@@ -63,11 +66,19 @@ class AuthorizationFundsInstructionRouteResolverTests {
                 .containsExactly(RouteParticipantRole.AUTH_HOLDER);
     }
 
+    /**
+     * 场景：单主体授权结算。
+     * 输入：信用账户原授权存在，本次结算 400。
+     * 输出：从 AUTHORIZATION 消费到平台结算账户。
+     * 预期：source AUTHORIZATION 携带 MUST_NOT_BE_NEGATIVE 约束。
+     * 红线：不能把不存在或不足的授权占用继续当作可结算余额。
+     */
     @Test
     void testResolveSettleShouldMoveAuthorizationToServiceRevenue() {
+        FundsAccountId accountId = FundsRouteTestSupport.creditAccount("credit_001");
         FundsInstructionSpec instruction = converter.convertToSettleInstruction(
                 new FundsAuthorizationTransactionSettleRequest()
-                        .setAccountId(FundsRouteTestSupport.creditAccount("credit_001"))
+                        .setAccountId(accountId)
                         .setAmount(FundsRouteTestSupport.amount(400L))
                         .setBusinessScene("SETTLE")
                         .setBusinessSn("SETTLE_0001")
@@ -82,10 +93,18 @@ class AuthorizationFundsInstructionRouteResolverTests {
             assertThat(leg.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME);
             assertThat(leg.getLegType()).isEqualTo(RouteLegType.CONSUME);
             assertThat(leg.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT);
+            assertMustNotBeNegative(leg, accountId, LedgerSubjectCode.AUTHORIZATION);
         });
         assertThat(route.getPlatformAccounts()).isNotNull();
     }
 
+    /**
+     * 场景：共享卡授权成功。
+     * 输入：信用账户、预算组和真实资金账户共同参与授权。
+     * 输出：三个主体都从 AVAILABLE 占用到 AUTHORIZATION。
+     * 预期：每个 source AVAILABLE 携带 MUST_NOT_BE_NEGATIVE 约束。
+     * 红线：负 AVAILABLE 不能无策略继续授权。
+     */
     @Test
     void testResolveAuthorizeShouldHoldSharedCardLinkedSubjects() {
         FundsInstructionSpec instruction = sharedCardInstruction(FundsTransactionEventType.AUTHORIZE);
@@ -105,9 +124,22 @@ class AuthorizationFundsInstructionRouteResolverTests {
         assertThat(route.getLegs())
                 .extracting(leg -> leg.getTargetNode().getLedgerSubjectCode())
                 .containsOnly(LedgerSubjectCode.AUTHORIZATION);
+        assertMustNotBeNegative(route.getLegs().get(0), FundsRouteTestSupport.creditAccount("credit_001"),
+                LedgerSubjectCode.AVAILABLE);
+        assertMustNotBeNegative(route.getLegs().get(1), FundsRouteTestSupport.budgetGroup("budget_001"),
+                LedgerSubjectCode.AVAILABLE);
+        assertMustNotBeNegative(route.getLegs().get(2), FundsRouteTestSupport.fundingAccount("funding_001"),
+                LedgerSubjectCode.AVAILABLE);
         assertThat(route.getPlatformAccounts()).isNotNull();
     }
 
+    /**
+     * 场景：共享卡授权结算。
+     * 输入：信用账户、预算组和真实资金账户都有授权占用。
+     * 输出：三个主体都关闭或减少 AUTHORIZATION。
+     * 预期：每个 source AUTHORIZATION 携带 MUST_NOT_BE_NEGATIVE 约束。
+     * 红线：授权余额不足不能继续结算消费。
+     */
     @Test
     void testResolveSettleShouldConsumeSharedCardControlAndFundingSubjects() {
         FundsInstructionSpec instruction = sharedCardInstruction(FundsTransactionEventType.SETTLE);
@@ -122,6 +154,12 @@ class AuthorizationFundsInstructionRouteResolverTests {
         assertThat(route.getLegs())
                 .extracting(leg -> leg.getTargetNode().getLedgerSubjectCode())
                 .containsExactly(LedgerSubjectCode.LIMIT, LedgerSubjectCode.LIMIT, LedgerSubjectCode.SETTLEMENT);
+        assertMustNotBeNegative(route.getLegs().get(0), FundsRouteTestSupport.creditAccount("credit_001"),
+                LedgerSubjectCode.AUTHORIZATION);
+        assertMustNotBeNegative(route.getLegs().get(1), FundsRouteTestSupport.budgetGroup("budget_001"),
+                LedgerSubjectCode.AUTHORIZATION);
+        assertMustNotBeNegative(route.getLegs().get(2), FundsRouteTestSupport.fundingAccount("funding_001"),
+                LedgerSubjectCode.AUTHORIZATION);
     }
 
     private FundsInstructionSpec sharedCardInstruction(FundsTransactionEventType eventType) {
@@ -157,5 +195,13 @@ class AuthorizationFundsInstructionRouteResolverTests {
                         .build())
                 .contextVariables(Map.copyOf(context))
                 .build();
+    }
+
+    private static void assertMustNotBeNegative(RouteLegSpec leg,
+                                                FundsAccountId accountId,
+                                                LedgerSubjectCode ledgerSubjectCode) {
+        assertThat(leg.getConstraintOverrides())
+                .containsEntry(accountId.type() + ":" + accountId.id() + ":" + ledgerSubjectCode.name(),
+                        LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
     }
 }
