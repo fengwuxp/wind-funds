@@ -1,7 +1,7 @@
 package com.capte.funds.transaction.mapstruct;
 
 import com.capte.funds.transaction.dal.entities.FundingAccount;
-import com.capte.funds.transaction.enums.LedgerProfileCode;
+import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.capte.funds.transaction.model.dto.FundingAccountDTO;
 import com.capte.funds.transaction.model.request.CreateFundingAccountRequest;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;

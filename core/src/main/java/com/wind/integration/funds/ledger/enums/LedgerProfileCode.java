@@ -1,4 +1,4 @@
-package com.capte.funds.transaction.enums;
+package com.wind.integration.funds.ledger.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
 import lombok.AllArgsConstructor;
@@ -8,7 +8,7 @@ import lombok.Getter;
  * 内置账务 Profile 编码。
  *
  * @author Codex
- * @date 2026-05-07
+ * @date 2026-05-15
  */
 @AllArgsConstructor
 @Getter

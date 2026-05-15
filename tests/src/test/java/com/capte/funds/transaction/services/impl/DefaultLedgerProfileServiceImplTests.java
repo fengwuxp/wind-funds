@@ -1,9 +1,9 @@
 package com.capte.funds.transaction.services.impl;
 
 import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.capte.funds.transaction.enums.LedgerProfileCode;
-import com.capte.funds.transaction.model.dto.LedgerProfileDTO;
-import com.capte.funds.transaction.model.dto.LedgerProfileItemDTO;
+import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
+import com.capte.funds.wallet.model.dto.LedgerProfileDTO;
+import com.capte.funds.wallet.model.dto.LedgerProfileItemDTO;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;

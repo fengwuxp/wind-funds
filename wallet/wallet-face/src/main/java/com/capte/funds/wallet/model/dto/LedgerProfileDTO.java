@@ -1,7 +1,7 @@
-package com.capte.funds.transaction.model.dto;
+package com.capte.funds.wallet.model.dto;
 
+import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.capte.funds.transaction.enums.LedgerProfileCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

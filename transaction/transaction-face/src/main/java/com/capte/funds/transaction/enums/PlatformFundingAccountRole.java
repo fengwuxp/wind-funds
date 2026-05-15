@@ -1,6 +1,7 @@
 package com.capte.funds.transaction.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
+import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 

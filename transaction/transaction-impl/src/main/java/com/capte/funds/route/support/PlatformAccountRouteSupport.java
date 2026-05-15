@@ -3,7 +3,7 @@ package com.capte.funds.route.support;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.integration.funds.model.route.ImmutablePlatformAccountsSnapshotSpec;
 import com.wind.integration.funds.model.route.ImmutableSubjectRef;
-import com.capte.funds.transaction.enums.LedgerProfileCode;
+import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.capte.funds.transaction.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.services.PlatformFundingAccountService;
 import com.wind.integration.funds.wallet.FundsAccountId;

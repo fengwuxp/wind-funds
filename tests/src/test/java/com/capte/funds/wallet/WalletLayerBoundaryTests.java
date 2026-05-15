@@ -25,6 +25,22 @@ class WalletLayerBoundaryTests {
     private static final Path TRANSACTION_BALANCE_QUERY_SERVICE = Path.of(
             "transaction/transaction-face/src/main/java/com/capte/funds/transaction/services/FundsSubjectBalanceQueryService.java");
 
+    private static final List<Path> WALLET_LEDGER_PROFILE_CONTRACTS = List.of(
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/service/LedgerProfileService.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/service/SubjectLedgerInitializer.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/dto/LedgerProfileDTO.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/dto/LedgerProfileItemDTO.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/request/InitializeSubjectLedgerRequest.java")
+    );
+
+    private static final List<Path> TRANSACTION_LEDGER_PROFILE_CONTRACTS = List.of(
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/services/LedgerProfileService.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/services/SubjectLedgerInitializer.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/dto/LedgerProfileDTO.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/dto/LedgerProfileItemDTO.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/request/InitializeSubjectLedgerRequest.java")
+    );
+
     private static final List<String> FORBIDDEN_REFERENCES = List.of(
             "com.capte.funds.ledger.dal.",
             "com.capte.funds.ledger.impl.",
@@ -74,6 +90,27 @@ class WalletLayerBoundaryTests {
         assertThat(projectRoot.resolve(TRANSACTION_BALANCE_QUERY_SERVICE))
                 .as("transaction-face should not own account balance query contract")
                 .doesNotExist();
+    }
+
+    /**
+     * 场景：主体开户时按 LedgerProfile 创建 required ledger，这是 wallet/account 产品开户能力。
+     * 输入：扫描 wallet-face 与 transaction-face 的 LedgerProfile/SubjectLedgerInitializer 契约文件。
+     * 输出：对应契约文件是否存在。
+     * 预期：wallet-face 暴露账本 Profile 与主体开户初始化契约，transaction-face 不再承载该账户能力契约。
+     * 红线：交易执行路径不得通过该接口隐式创建账本。
+     */
+    @Test
+    void testWalletFaceShouldOwnLedgerProfileAndSubjectLedgerInitializationContracts() {
+        Path projectRoot = projectRoot();
+
+        assertThat(WALLET_LEDGER_PROFILE_CONTRACTS)
+                .allSatisfy(contract -> assertThat(projectRoot.resolve(contract))
+                        .as("wallet-face should expose " + contract.getFileName())
+                        .exists());
+        assertThat(TRANSACTION_LEDGER_PROFILE_CONTRACTS)
+                .allSatisfy(contract -> assertThat(projectRoot.resolve(contract))
+                        .as("transaction-face should not own " + contract.getFileName())
+                        .doesNotExist());
     }
 
     private static List<String> findForbiddenReferences(Path sourceRoot) throws IOException {

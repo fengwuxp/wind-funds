@@ -1,7 +1,7 @@
 package com.capte.funds.route;
 
 import com.capte.funds.route.support.RouteSubjectSupport;
-import com.capte.funds.transaction.enums.LedgerProfileCode;
+import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
