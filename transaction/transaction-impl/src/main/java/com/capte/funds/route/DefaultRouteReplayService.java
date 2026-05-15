@@ -71,7 +71,7 @@ public class DefaultRouteReplayService implements RouteReplayService {
                 .businessScene(replayRequest.getBusinessScene())
                 .businessSn(replayRequest.getBusinessSn())
                 .instructionType(resolveInstructionType(snapshot, replayRequest))
-                .eventType(resolveEventType(snapshot, replayRequest))
+                .eventType(resolveEventType(replayRequest))
                 .transactionType(resolveTransactionType(snapshot, replayRequest))
                 .participants(resolveParticipants(snapshot, replayLegs))
                 .legs(replayLegs)
@@ -388,7 +388,7 @@ public class DefaultRouteReplayService implements RouteReplayService {
                 ? FundsInstructionType.BALANCE_CONTROL : snapshot.getInstructionType();
     }
 
-    private FundsTransactionEventType resolveEventType(RouteSnapshotSpec snapshot, ReplayRequestSpec replayRequest) {
+    private FundsTransactionEventType resolveEventType(ReplayRequestSpec replayRequest) {
         FundsTransactionEventType eventType = replayRequest.getEventType();
         if (eventType != null) {
             return eventType;

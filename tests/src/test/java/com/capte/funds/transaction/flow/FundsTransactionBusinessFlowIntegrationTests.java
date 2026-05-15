@@ -174,10 +174,10 @@ class FundsTransactionBusinessFlowIntegrationTests {
     }
 
     /**
-     * 场景：用户充值后先冻结余额，再从冻结余额发起提现。
+     * 场景：用户充值后先冻结余额，再确认提现出款。
      * 输入：充值 100、冻结 60、提现 60。
      * 输出：用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 余额快照。
-     * 预期：提现只能消费 FROZEN，完成后用户可用余额保留 40，冻结余额归零。
+     * 预期：提现成功扣减已冻结的 FROZEN，完成后用户可用余额保留 40，冻结余额归零。
      */
     @Test
     void testTopupFreezeWithdrawShouldKeepLedgerBalances() {

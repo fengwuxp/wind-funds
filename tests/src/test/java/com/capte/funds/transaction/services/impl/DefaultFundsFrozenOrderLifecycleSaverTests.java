@@ -1,5 +1,6 @@
 package com.capte.funds.transaction.services.impl;
 
+import com.capte.funds.support.FundsAccountServiceTestSupport;
 import com.capte.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
@@ -141,7 +142,7 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
     }
 
     @Test
-    void testUnfreezeShouldRejectWhenReleasedAndConsumedAmountExceedsFrozenAmount() {
+    void testUnfreezeShouldUseReleasedAmountOnlyForReleasableBalance() {
         AtomicReference<FundsFrozenOrder> originalOrder = new AtomicReference<>(frozenOrder(20L, 60L));
         AtomicReference<FundsFrozenOrder> releaseRecord = new AtomicReference<>();
         DefaultFundsFrozenOrderLifecycleSaver saver = new DefaultFundsFrozenOrderLifecycleSaver(
@@ -150,11 +151,13 @@ class DefaultFundsFrozenOrderLifecycleSaverTests {
         FundsInstructionSpec instruction = instruction(FundsTransactionEventType.UNFREEZE,
                 reference("FO_0001"), "RISK_UNFREEZE", "UNFREEZE_OVER_AMOUNT", 30L);
 
-        assertThatThrownBy(() -> saver.beforePosting(instruction, resolvedRoute(), routeSnapshot()))
-                .hasMessageContaining("冻结单剩余可释放金额不足")
-                .hasMessageContaining("remainingAmount = 20")
-                .hasMessageContaining("amount = 30");
-        assertThat(releaseRecord.get()).isNull();
+        FundsInstructionLifecycleResult result = saver.beforePosting(instruction, resolvedRoute(), routeSnapshot());
+        saver.markSucceeded(instruction, result, "LT_UNFREEZE_0002");
+
+        assertThat(releaseRecord.get().getStatus()).isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertThat(originalOrder.get().getReleasedAmount()).isEqualTo(50L);
+        assertThat(originalOrder.get().getConsumedAmount()).isEqualTo(60L);
+        assertThat(originalOrder.get().getStatus()).isEqualTo(FundsFrozenOrderStatus.PARTIALLY_RELEASED);
     }
 
     private static FundsFrozenOrderMapper mapper(AtomicReference<FundsFrozenOrder> savedOrder,

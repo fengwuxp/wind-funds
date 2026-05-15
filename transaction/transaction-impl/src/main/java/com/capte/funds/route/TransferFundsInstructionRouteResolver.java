@@ -131,13 +131,16 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         SubjectRef accountSubject = routeSubjectSupport.createSubjectRef(accountId);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(LEG_FUND_IN, 1, RouteLegType.EXTERNAL_IN, instruction)
-                .sourceNode(sourceNode(cashMappingSubject, LedgerSubjectCode.CASH))
-                .targetNode(targetNode(prepaymentSubject, LedgerSubjectCode.PREPAYMENT))
+                .sourceNode(sourceNode(cashMappingSubject,
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.CASH_MAPPING)))
+                .targetNode(targetNode(prepaymentSubject,
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
                 .balanceEffectType(LedgerBalanceEffectType.INCREASE)
                 .phaseCode(LedgerPhaseCode.FUND_IN)
                 .build());
         legs.add(routeLeg(LEG_TOPUP_SETTLEMENT, 2, RouteLegType.INTERNAL_TRANSFER, instruction)
-                .sourceNode(sourceNode(prepaymentSubject, LedgerSubjectCode.PREPAYMENT))
+                .sourceNode(sourceNode(prepaymentSubject,
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
                 .targetNode(targetNode(accountSubject, LedgerSubjectCode.AVAILABLE))
                 .balanceEffectType(LedgerBalanceEffectType.INCREASE)
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
@@ -244,14 +247,17 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(LEG_WITHDRAW_SETTLEMENT, 1, RouteLegType.CONSUME, instruction)
                 .sourceNode(sourceNode(accountSubject, LedgerSubjectCode.FROZEN))
-                .targetNode(targetNode(prepaymentSubject, LedgerSubjectCode.PREPAYMENT))
+                .targetNode(targetNode(prepaymentSubject,
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
                 .balanceEffectType(LedgerBalanceEffectType.CONSUME)
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.FROZEN))
                 .build());
         legs.add(routeLeg(LEG_FUND_OUT, 2, RouteLegType.EXTERNAL_OUT, instruction)
-                .sourceNode(sourceNode(prepaymentSubject, LedgerSubjectCode.PREPAYMENT))
-                .targetNode(targetNode(cashMappingSubject, LedgerSubjectCode.CASH))
+                .sourceNode(sourceNode(prepaymentSubject,
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
+                .targetNode(targetNode(cashMappingSubject,
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.CASH_MAPPING)))
                 .balanceEffectType(LedgerBalanceEffectType.DECREASE)
                 .phaseCode(LedgerPhaseCode.FUND_OUT)
                 .build());
@@ -277,7 +283,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         List<RouteLegSpec> legs = List.of(routeLeg(LEG_FEE, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(feeAccount),
-                        LedgerSubjectCode.FEE))
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.FEE)))
                 .balanceEffectType(LedgerBalanceEffectType.CONSUME)
                 .phaseCode(LedgerPhaseCode.FEE)
                 .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
@@ -308,7 +314,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerAccountId),
                         LedgerSubjectCode.AVAILABLE))
                 .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(feeAccount),
-                        LedgerSubjectCode.FEE))
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.FEE)))
                 .balanceEffectType(LedgerBalanceEffectType.CONSUME)
                 .phaseCode(LedgerPhaseCode.FEE)
                 .constraintOverrides(mustNotBeNegative(payerAccountId, LedgerSubjectCode.AVAILABLE))

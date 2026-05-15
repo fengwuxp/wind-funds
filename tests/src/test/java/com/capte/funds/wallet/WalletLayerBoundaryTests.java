@@ -123,6 +123,94 @@ class WalletLayerBoundaryTests {
                     + "SpendSubjectFundingRelationType.java")
     );
 
+    private static final List<Path> WALLET_ACCOUNT_CAPABILITY_IMPLEMENTATIONS = List.of(
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/services/impl/"
+                    + "FundingAccountServiceImpl.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/services/impl/"
+                    + "CreditAccountServiceImpl.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/services/impl/"
+                    + "BudgetGroupServiceImpl.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/services/impl/"
+                    + "DefaultFundsAccountQueryServiceImpl.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/services/impl/"
+                    + "DefaultLedgerProfileServiceImpl.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/services/impl/"
+                    + "DefaultSubjectLedgerInitializer.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/services/impl/"
+                    + "PlatformFundingAccountServiceImpl.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/services/impl/"
+                    + "PaymentInstrumentServiceImpl.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/services/impl/"
+                    + "SpendSubjectFundingRelationServiceImpl.java")
+    );
+
+    private static final List<Path> WALLET_ACCOUNT_CAPABILITY_DAL = List.of(
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/entities/FundingAccount.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/entities/CreditAccount.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/entities/BudgetGroup.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/entities/PaymentInstrument.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/entities/"
+                    + "PaymentInstrumentBinding.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/entities/"
+                    + "SpendSubjectFundingRel.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/mapper/FundingAccountMapper.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/mapper/CreditAccountMapper.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/mapper/BudgetGroupMapper.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/mapper/PaymentInstrumentMapper.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/mapper/"
+                    + "PaymentInstrumentBindingMapper.java"),
+            Path.of("wallet/wallet-impl/src/main/java/com/capte/funds/wallet/dal/mapper/"
+                    + "SpendSubjectFundingRelMapper.java")
+    );
+
+    private static final List<Path> TRANSACTION_ACCOUNT_CAPABILITY_IMPLEMENTATIONS = List.of(
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/services/impl/"
+                    + "FundingAccountServiceImpl.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/services/impl/"
+                    + "CreditAccountServiceImpl.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/services/impl/"
+                    + "BudgetGroupServiceImpl.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/services/impl/"
+                    + "DefaultFundsAccountQueryServiceImpl.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/services/impl/"
+                    + "DefaultLedgerProfileServiceImpl.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/services/impl/"
+                    + "DefaultSubjectLedgerInitializer.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/services/impl/"
+                    + "PlatformFundingAccountServiceImpl.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/services/impl/"
+                    + "PaymentInstrumentServiceImpl.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/services/impl/"
+                    + "SpendSubjectFundingRelationServiceImpl.java")
+    );
+
+    private static final List<Path> TRANSACTION_ACCOUNT_CAPABILITY_DAL = List.of(
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/entities/"
+                    + "FundingAccount.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/entities/"
+                    + "CreditAccount.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/entities/"
+                    + "BudgetGroup.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/entities/"
+                    + "PaymentInstrument.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/entities/"
+                    + "PaymentInstrumentBinding.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/entities/"
+                    + "SpendSubjectFundingRel.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/mapper/"
+                    + "FundingAccountMapper.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/mapper/"
+                    + "CreditAccountMapper.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/mapper/"
+                    + "BudgetGroupMapper.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/mapper/"
+                    + "PaymentInstrumentMapper.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/mapper/"
+                    + "PaymentInstrumentBindingMapper.java"),
+            Path.of("transaction/transaction-impl/src/main/java/com/capte/funds/transaction/dal/mapper/"
+                    + "SpendSubjectFundingRelMapper.java")
+    );
+
     private static final List<String> FORBIDDEN_REFERENCES = List.of(
             "com.capte.funds.ledger.dal.",
             "com.capte.funds.ledger.impl.",
@@ -293,6 +381,28 @@ class WalletLayerBoundaryTests {
                 .exists();
         assertPathsDoNotExist(projectRoot, TRANSACTION_SPEND_SUBJECT_FUNDING_RELATION_CONTRACTS,
                 "transaction-face should not own spend subject funding relation contract");
+    }
+
+    /**
+     * 场景：wallet-impl 是账户能力实现层，transaction-impl 只保留交易事实、路由和入账编排。
+     * 输入：扫描 wallet-impl 与 transaction-impl 的账户能力实现、账户配置 Entity 和 Mapper。
+     * 输出：实现类和 DAL 类所在模块。
+     * 预期：账户、账本配置、平台账户、支付工具和支出主体资金关系实现归属 wallet-impl；
+     *      transaction-impl 不再长期拥有这些账户能力实现和账户配置 DAL。
+     * 红线：FundsTransaction、FundsFrozenOrder 等交易事实实体不在本轮迁移范围。
+     */
+    @Test
+    void testWalletImplShouldOwnAccountCapabilityImplementationsAndDal() {
+        Path projectRoot = projectRoot();
+
+        assertPathsExist(projectRoot, WALLET_ACCOUNT_CAPABILITY_IMPLEMENTATIONS,
+                "wallet-impl should own account capability implementation");
+        assertPathsExist(projectRoot, WALLET_ACCOUNT_CAPABILITY_DAL,
+                "wallet-impl should own account capability dal");
+        assertPathsDoNotExist(projectRoot, TRANSACTION_ACCOUNT_CAPABILITY_IMPLEMENTATIONS,
+                "transaction-impl should not own account capability implementation");
+        assertPathsDoNotExist(projectRoot, TRANSACTION_ACCOUNT_CAPABILITY_DAL,
+                "transaction-impl should not own account capability dal");
     }
 
     private static List<String> findForbiddenReferences(Path sourceRoot) throws IOException {

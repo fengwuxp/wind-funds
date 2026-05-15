@@ -1,5 +1,7 @@
 package com.capte.funds.transaction;
 
+import com.capte.funds.wallet.ImmutableFundsAccount;
+import com.capte.funds.wallet.ImmutableFundsBalanceView;
 import com.wind.integration.funds.wallet.FundsAccount;
 import com.wind.integration.funds.wallet.FundsAccountOwner;
 import com.wind.integration.funds.wallet.FundsAccountBalanceView;

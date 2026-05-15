@@ -184,13 +184,11 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     private boolean isCompleted(FundsFrozenOrder order, FundsTransactionEventType eventType) {
         if (eventType == FundsTransactionEventType.UNFREEZE) {
             return order.getStatus() == FundsFrozenOrderStatus.RELEASED
-                    || order.getStatus() == FundsFrozenOrderStatus.CLOSED
-                    || order.getStatus() == FundsFrozenOrderStatus.CONSUMED;
+                    || order.getStatus() == FundsFrozenOrderStatus.CLOSED;
         }
         return order.getStatus() == FundsFrozenOrderStatus.FROZEN
                 || order.getStatus() == FundsFrozenOrderStatus.RELEASED
-                || order.getStatus() == FundsFrozenOrderStatus.CLOSED
-                || order.getStatus() == FundsFrozenOrderStatus.CONSUMED;
+                || order.getStatus() == FundsFrozenOrderStatus.CLOSED;
     }
 
     private boolean hasText(String value) {
@@ -233,7 +231,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     }
 
     private long remainingReleasableAmount(FundsFrozenOrder order) {
-        return order.getAmount() - defaultAmount(order.getReleasedAmount()) - defaultAmount(order.getConsumedAmount());
+        return order.getAmount() - defaultAmount(order.getReleasedAmount());
     }
 
     private long defaultAmount(Long amount) {

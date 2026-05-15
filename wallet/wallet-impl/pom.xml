@@ -14,6 +14,14 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.capte.domain</groupId>
+            <artifactId>catep-infrastructure-dal</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.funds</groupId>
+            <artifactId>wind-funds-ledger-face</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.wind.funds</groupId>
             <artifactId>wind-funds-wallet-face</artifactId>
         </dependency>

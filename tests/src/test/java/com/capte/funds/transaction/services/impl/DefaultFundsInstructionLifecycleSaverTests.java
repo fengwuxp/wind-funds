@@ -1,5 +1,6 @@
 package com.capte.funds.transaction.services.impl;
 
+import com.capte.funds.support.FundsAccountServiceTestSupport;
 import com.alibaba.fastjson2.JSON;
 import com.capte.funds.route.DefaultRouteSnapshotFactory;
 import com.wind.integration.funds.model.route.ImmutableExternalAccountRefSpec;
@@ -11,11 +12,9 @@ import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSp
 import com.capte.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.capte.funds.transaction.dal.entities.FundsTransaction;
 import com.capte.funds.transaction.dal.entities.FundsTransactionDetail;
-import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
 import com.capte.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.capte.funds.transaction.enums.FundsEffectType;
-import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionMode;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
@@ -506,84 +505,23 @@ class DefaultFundsInstructionLifecycleSaverTests {
     }
 
     @Test
-    void markSucceededShouldPartiallyConsumeReferencedFrozenOrderForWithdraw() {
+    void markSucceededShouldNotMutateReferencedFrozenOrderForWithdraw() {
         FundsTransaction transaction = directTransaction(DefaultFundsTransactionType.WITHDRAW);
         FundsTransactionDetail withdrawDetail = withdrawDetail("FTD_001", 60L);
-        FundsFrozenOrder frozenOrder = frozenOrder(20L, 0L, FundsFrozenOrderStatus.PARTIALLY_RELEASED);
-        AtomicReference<FundsFrozenOrder> updatedFrozenOrder = new AtomicReference<>();
-        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, withdrawDetail,
-                new AtomicReference<>(), new AtomicReference<>(), frozenOrder, updatedFrozenOrder);
-
-        saver.markSucceeded(new FreezeOrderReferencedWithdrawInstruction("FO_001", 60L),
-                new FundsInstructionLifecycleResult()
-                        .setTransactionSn("FT_001")
-                        .setTransactionDetailSns(List.of("FTD_001")), "LE_001");
-
-        assertThat(updatedFrozenOrder.get().getReleasedAmount()).isEqualTo(20L);
-        assertThat(updatedFrozenOrder.get().getConsumedAmount()).isEqualTo(60L);
-        assertThat(updatedFrozenOrder.get().getStatus()).isEqualTo(FundsFrozenOrderStatus.PARTIALLY_CONSUMED);
-        assertThat(updatedFrozenOrder.get().getConsumeTime()).isNull();
-    }
-
-    @Test
-    void markSucceededShouldCloseReferencedFrozenOrderWhenFullyConsumed() {
-        FundsTransaction transaction = directTransaction(DefaultFundsTransactionType.WITHDRAW);
-        FundsTransactionDetail withdrawDetail = withdrawDetail("FTD_001", 60L);
-        FundsFrozenOrder frozenOrder = frozenOrder(20L, 20L, FundsFrozenOrderStatus.PARTIALLY_CONSUMED);
-        AtomicReference<FundsFrozenOrder> updatedFrozenOrder = new AtomicReference<>();
-        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, withdrawDetail,
-                new AtomicReference<>(), new AtomicReference<>(), frozenOrder, updatedFrozenOrder);
-
-        saver.markSucceeded(new FreezeOrderReferencedWithdrawInstruction("FO_001", 60L),
-                new FundsInstructionLifecycleResult()
-                        .setTransactionSn("FT_001")
-                        .setTransactionDetailSns(List.of("FTD_001")), "LE_001");
-
-        assertThat(updatedFrozenOrder.get().getConsumedAmount()).isEqualTo(80L);
-        assertThat(updatedFrozenOrder.get().getStatus()).isEqualTo(FundsFrozenOrderStatus.CONSUMED);
-        assertThat(updatedFrozenOrder.get().getConsumeTime()).isNotNull();
-    }
-
-    @Test
-    void markSucceededShouldRejectFrozenOrderConsumeWhenRemainingAmountInsufficient() {
-        FundsTransaction transaction = directTransaction(DefaultFundsTransactionType.WITHDRAW);
-        FundsTransactionDetail withdrawDetail = withdrawDetail("FTD_001", 40L);
-        FundsFrozenOrder frozenOrder = frozenOrder(20L, 50L, FundsFrozenOrderStatus.PARTIALLY_CONSUMED);
         AtomicReference<FundsTransaction> updatedTransaction = new AtomicReference<>();
         AtomicReference<FundsTransactionDetail> updatedDetail = new AtomicReference<>();
-        AtomicReference<FundsFrozenOrder> updatedFrozenOrder = new AtomicReference<>();
-        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, withdrawDetail,
-                updatedTransaction, updatedDetail, frozenOrder, updatedFrozenOrder);
+        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, withdrawDetail, updatedTransaction,
+                updatedDetail);
 
-        assertThatThrownBy(() -> saver.markSucceeded(new FreezeOrderReferencedWithdrawInstruction("FO_001", 40L),
+        saver.markSucceeded(new FreezeOrderReferencedWithdrawInstruction("FO_001", 60L),
                 new FundsInstructionLifecycleResult()
                         .setTransactionSn("FT_001")
-                        .setTransactionDetailSns(List.of("FTD_001")), "LE_001"))
-                .isInstanceOf(BaseException.class)
-                .hasMessageContaining("冻结单剩余可消费金额不足")
-                .hasMessageContaining("remainingAmount = 30")
-                .hasMessageContaining("amount = 40");
-        assertThat(updatedTransaction).hasValue(null);
-        assertThat(updatedDetail).hasValue(null);
-        assertThat(updatedFrozenOrder).hasValue(null);
-    }
+                        .setTransactionDetailSns(List.of("FTD_001")), "LE_001");
 
-    @Test
-    void markSucceededShouldRejectFrozenOrderConsumeWhenOrderAlreadyReleased() {
-        FundsTransaction transaction = directTransaction(DefaultFundsTransactionType.WITHDRAW);
-        FundsTransactionDetail withdrawDetail = withdrawDetail("FTD_001", 10L);
-        FundsFrozenOrder frozenOrder = frozenOrder(90L, 0L, FundsFrozenOrderStatus.RELEASED);
-        AtomicReference<FundsFrozenOrder> updatedFrozenOrder = new AtomicReference<>();
-        DefaultFundsInstructionLifecycleSaver saver = lifecycleSaver(transaction, withdrawDetail,
-                new AtomicReference<>(), new AtomicReference<>(), frozenOrder, updatedFrozenOrder);
-
-        assertThatThrownBy(() -> saver.markSucceeded(new FreezeOrderReferencedWithdrawInstruction("FO_001", 10L),
-                new FundsInstructionLifecycleResult()
-                        .setTransactionSn("FT_001")
-                        .setTransactionDetailSns(List.of("FTD_001")), "LE_001"))
-                .isInstanceOf(BaseException.class)
-                .hasMessageContaining("冻结单当前状态不允许消费");
-        assertThat(updatedFrozenOrder).hasValue(null);
+        assertThat(updatedDetail.get().getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
+        assertThat(updatedDetail.get().getLedgerTransactionSn()).isEqualTo("LE_001");
+        assertThat(updatedTransaction.get().getSettledAmount()).isEqualTo(60L);
+        assertThat(updatedTransaction.get().getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
     }
 
     @Test
@@ -1293,15 +1231,6 @@ class DefaultFundsInstructionLifecycleSaverTests {
                                                                         FundsTransactionDetail detail,
                                                                         AtomicReference<FundsTransaction> updated,
                                                                         AtomicReference<FundsTransactionDetail> updatedDetail) {
-        return lifecycleSaver(transaction, detail, updated, updatedDetail, null, new AtomicReference<>());
-    }
-
-    private static DefaultFundsInstructionLifecycleSaver lifecycleSaver(FundsTransaction transaction,
-                                                                        FundsTransactionDetail detail,
-                                                                        AtomicReference<FundsTransaction> updated,
-                                                                        AtomicReference<FundsTransactionDetail> updatedDetail,
-                                                                        FundsFrozenOrder frozenOrder,
-                                                                        AtomicReference<FundsFrozenOrder> updatedFrozenOrder) {
         return new DefaultFundsInstructionLifecycleSaver(
                 FundsAccountServiceTestSupport.mapper(
                         FundsTransactionMapper.class,
@@ -1324,17 +1253,6 @@ class DefaultFundsInstructionLifecycleSaverTests {
                             updatedDetail.set((FundsTransactionDetail) entity);
                             return 1;
                         }
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsFrozenOrderMapper.class,
-                        entity -> {
-                            throw new UnsupportedOperationException("insertSelective");
-                        },
-                        query -> frozenOrder,
-                        entity -> {
-                            updatedFrozenOrder.set((FundsFrozenOrder) entity);
-                            return 1;
-                        }
                 )
         );
     }
@@ -1342,23 +1260,7 @@ class DefaultFundsInstructionLifecycleSaverTests {
     private static DefaultFundsInstructionLifecycleSaver newLifecycleSaver(
             FundsTransactionMapper fundsTransactionMapper,
             FundsTransactionDetailMapper fundsTransactionDetailMapper) {
-        return new DefaultFundsInstructionLifecycleSaver(fundsTransactionMapper, fundsTransactionDetailMapper,
-                unsupportedFrozenOrderMapper());
-    }
-
-    private static FundsFrozenOrderMapper unsupportedFrozenOrderMapper() {
-        return FundsAccountServiceTestSupport.mapper(
-                FundsFrozenOrderMapper.class,
-                entity -> {
-                    throw new UnsupportedOperationException("insertSelective");
-                },
-                query -> {
-                    throw new AssertionError("unexpected frozen order query");
-                },
-                entity -> {
-                    throw new AssertionError("unexpected frozen order update");
-                }
-        );
+        return new DefaultFundsInstructionLifecycleSaver(fundsTransactionMapper, fundsTransactionDetailMapper);
     }
 
     private static FundsTransaction directTransaction(DefaultFundsTransactionType transactionType) {
@@ -1383,21 +1285,6 @@ class DefaultFundsInstructionLifecycleSaverTests {
         detail.setEventType(FundsTransactionEventType.WITHDRAW);
         detail.setFundsEffectType(FundsEffectType.CONSUME);
         return detail;
-    }
-
-    private static FundsFrozenOrder frozenOrder(long releasedAmount,
-                                                long consumedAmount,
-                                                FundsFrozenOrderStatus status) {
-        FundsFrozenOrder order = new FundsFrozenOrder();
-        order.setId(901L);
-        order.setSn("FO_001");
-        order.setTenantId(1L);
-        order.setAmount(100L);
-        order.setReleasedAmount(releasedAmount);
-        order.setConsumedAmount(consumedAmount);
-        order.setCurrency(CurrencyIsoCode.USD);
-        order.setStatus(status);
-        return order;
     }
 
     private static class SimpleInstruction implements FundsInstructionSpec {

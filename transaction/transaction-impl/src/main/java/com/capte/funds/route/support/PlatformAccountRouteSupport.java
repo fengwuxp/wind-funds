@@ -4,6 +4,7 @@ import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.integration.funds.model.route.ImmutablePlatformAccountsSnapshotSpec;
 import com.wind.integration.funds.model.route.ImmutableSubjectRef;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
+import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.wallet.service.PlatformFundingAccountService;
 import com.wind.integration.funds.wallet.FundsAccountId;
@@ -40,6 +41,10 @@ public class PlatformAccountRouteSupport {
 
     public @NonNull LedgerProfileCode resolveLedgerProfileCode(@NonNull PlatformFundingAccountRole role) {
         return role.getLedgerProfileCode();
+    }
+
+    public @NonNull LedgerSubjectCode resolveLedgerSubjectCode(@NonNull PlatformFundingAccountRole role) {
+        return role.getLedgerSubjectCode();
     }
 
     public @NonNull PlatformAccountsSnapshotSpec createExternalFundMovementSnapshot(

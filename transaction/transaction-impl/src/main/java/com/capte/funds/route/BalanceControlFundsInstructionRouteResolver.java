@@ -151,7 +151,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
         RouteLegSpec leg = increase
                 ? routeLeg(LEG_FUNDING_BALANCE_ADJUST, 1, RouteLegType.ADJUST, instruction)
                 .sourceNode(sourceNode(platformAccountRouteSupport.createSubjectRef(adjustmentAccount),
-                        LedgerSubjectCode.ADJUSTMENT))
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.ADJUSTMENT)))
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .balanceEffectType(LedgerBalanceEffectType.INCREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
@@ -160,7 +160,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 : routeLeg(LEG_FUNDING_BALANCE_ADJUST, 1, RouteLegType.ADJUST, instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(adjustmentAccount),
-                        LedgerSubjectCode.ADJUSTMENT))
+                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.ADJUSTMENT)))
                 .balanceEffectType(LedgerBalanceEffectType.DECREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
                 .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))

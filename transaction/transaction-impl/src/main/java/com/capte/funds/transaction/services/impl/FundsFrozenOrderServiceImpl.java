@@ -34,6 +34,7 @@ public class FundsFrozenOrderServiceImpl implements FundsFrozenOrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createFundsFrozenOrder(@NonNull CreateFundsFrozenOrderRequest request) {
+        validateCreateRequest(request);
         FundsFrozenOrder entity = FundsFrozenOrderConverter.INSTANCE.convertToFundsFrozenOrder(request);
         fundsFrozenOrderMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建资金冻结订单失败");
@@ -73,5 +74,18 @@ public class FundsFrozenOrderServiceImpl implements FundsFrozenOrderService {
 
     private FundsFrozenOrderDTO toDTO(FundsFrozenOrder entity) {
         return FundsFrozenOrderConverter.INSTANCE.convertToFundsFrozenOrderDTO(entity);
+    }
+
+    private void validateCreateRequest(CreateFundsFrozenOrderRequest request) {
+        AssertUtils.hasText(request.getSn(), "冻结单号不能为空");
+        AssertUtils.notNull(request.getTenantId(), "冻结单租户不能为空");
+        AssertUtils.hasText(request.getSubjectId(), "冻结主体不能为空");
+        AssertUtils.notNull(request.getSubjectType(), "冻结主体类型不能为空");
+        AssertUtils.hasText(request.getFreezeType(), "冻结类型不能为空");
+        AssertUtils.hasText(request.getBusinessScene(), "冻结业务场景不能为空");
+        AssertUtils.hasText(request.getBusinessSn(), "冻结业务号不能为空");
+        AssertUtils.notNull(request.getAmount(), "冻结金额不能为空");
+        AssertUtils.isTrue(request.getAmount() > 0L, "冻结金额必须大于 0");
+        AssertUtils.notNull(request.getCurrency(), "冻结币种不能为空");
     }
 }

@@ -224,10 +224,13 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         List<RouteLegSpec> result = new ArrayList<>(authorizationSubjects.size());
         int sequence = 1;
         boolean multiSubject = authorizationSubjects.size() > 1;
+        LedgerSubjectCode settlementLedgerSubjectCode = platformAccountRouteSupport.resolveLedgerSubjectCode(
+                PlatformFundingAccountRole.SETTLEMENT);
         for (FundsAccountId subject : authorizationSubjects) {
             LedgerSubjectCode targetCode = multiSubject && !routeSubjectSupport.isFundingAccount(subject)
-                    ? LedgerSubjectCode.LIMIT : LedgerSubjectCode.SETTLEMENT;
-            SubjectRef targetSubject = targetCode == LedgerSubjectCode.SETTLEMENT
+                    ? LedgerSubjectCode.LIMIT
+                    : settlementLedgerSubjectCode;
+            SubjectRef targetSubject = targetCode == settlementLedgerSubjectCode
                     ? platformAccountRouteSupport.createSubjectRef(settlementAccount)
                     : routeSubjectSupport.createSubjectRef(subject);
             result.add(routeLeg(LEG_AUTHORIZATION_SETTLEMENT_PREFIX + sequence, sequence, RouteLegType.CONSUME,
@@ -251,10 +254,13 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         List<RouteLegSpec> result = new ArrayList<>(authorizationSubjects.size());
         int sequence = 1;
         boolean multiSubject = authorizationSubjects.size() > 1;
+        LedgerSubjectCode settlementLedgerSubjectCode = platformAccountRouteSupport.resolveLedgerSubjectCode(
+                PlatformFundingAccountRole.SETTLEMENT);
         for (FundsAccountId subject : authorizationSubjects) {
             LedgerSubjectCode sourceCode = multiSubject && !routeSubjectSupport.isFundingAccount(subject)
-                    ? LedgerSubjectCode.LIMIT : LedgerSubjectCode.SETTLEMENT;
-            SubjectRef sourceSubject = sourceCode == LedgerSubjectCode.SETTLEMENT
+                    ? LedgerSubjectCode.LIMIT
+                    : settlementLedgerSubjectCode;
+            SubjectRef sourceSubject = sourceCode == settlementLedgerSubjectCode
                     ? platformAccountRouteSupport.createSubjectRef(settlementAccount)
                     : routeSubjectSupport.createSubjectRef(subject);
             result.add(routeLeg(LEG_SETTLE_REFUND_PREFIX + sequence, sequence, RouteLegType.RESTORE,
