@@ -1,6 +1,6 @@
 package com.capte.funds.support;
 
-import com.capte.funds.transaction.model.dto.FundsSubjectBalanceDTO;
+import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.integration.funds.ledger.LedgerBalanceBucket;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;

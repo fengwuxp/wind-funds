@@ -24,7 +24,7 @@ import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.ledger.DefaultLedgerPostingAssembler;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
-import com.capte.funds.transaction.model.dto.FundsSubjectBalanceDTO;
+import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;

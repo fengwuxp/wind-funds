@@ -1,4 +1,4 @@
-package com.capte.funds.transaction.model.query;
+package com.capte.funds.wallet.model.query;
 
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;

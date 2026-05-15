@@ -4,7 +4,7 @@ import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.transaction.FundsTransactionTestSupport;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
-import com.capte.funds.transaction.model.dto.FundsSubjectBalanceDTO;
+import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.integration.funds.ledger.LedgerBalanceBucket;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;

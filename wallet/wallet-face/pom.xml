@@ -21,10 +21,6 @@
             <groupId>com.capte.domain</groupId>
             <artifactId>capte-domain-core</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-transaction-face</artifactId>
-        </dependency>
     </dependencies>
 
 </project>

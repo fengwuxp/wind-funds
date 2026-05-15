@@ -19,6 +19,12 @@ class WalletLayerBoundaryTests {
             Path.of("wallet/wallet-impl/src/main/java")
     );
 
+    private static final Path WALLET_BALANCE_QUERY_SERVICE = Path.of(
+            "wallet/wallet-face/src/main/java/com/capte/funds/wallet/service/FundsSubjectBalanceQueryService.java");
+
+    private static final Path TRANSACTION_BALANCE_QUERY_SERVICE = Path.of(
+            "transaction/transaction-face/src/main/java/com/capte/funds/transaction/services/FundsSubjectBalanceQueryService.java");
+
     private static final List<String> FORBIDDEN_REFERENCES = List.of(
             "com.capte.funds.ledger.dal.",
             "com.capte.funds.ledger.impl.",
@@ -49,6 +55,25 @@ class WalletLayerBoundaryTests {
         assertThat(violations)
                 .as("wallet layer should delegate facts and ledger writes to FundsInstructionOrchestrator")
                 .isEmpty();
+    }
+
+    /**
+     * 场景：余额查询是 wallet/account 能力，不是 transaction 交易命令能力。
+     * 输入：扫描 wallet-face 与 transaction-face 的余额查询服务文件。
+     * 输出：对应服务文件是否存在。
+     * 预期：wallet-face 暴露余额查询契约，transaction-face 不再承载该账户能力契约。
+     * 红线：不得为了让 wallet 不为空而把付款、退款、提现、转账等交易命令迁回 wallet。
+     */
+    @Test
+    void testWalletFaceShouldOwnSubjectBalanceQueryContract() {
+        Path projectRoot = projectRoot();
+
+        assertThat(projectRoot.resolve(WALLET_BALANCE_QUERY_SERVICE))
+                .as("wallet-face should expose account balance query contract")
+                .exists();
+        assertThat(projectRoot.resolve(TRANSACTION_BALANCE_QUERY_SERVICE))
+                .as("transaction-face should not own account balance query contract")
+                .doesNotExist();
     }
 
     private static List<String> findForbiddenReferences(Path sourceRoot) throws IOException {

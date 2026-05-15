@@ -1,7 +1,7 @@
-package com.capte.funds.transaction.services;
+package com.capte.funds.wallet.service;
 
-import com.capte.funds.transaction.model.dto.FundsSubjectBalanceDTO;
-import com.capte.funds.transaction.model.query.FundsSubjectBalanceQuery;
+import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.capte.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
