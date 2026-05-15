@@ -1,11 +1,11 @@
-package com.capte.funds.transaction.services;
+package com.capte.funds.wallet.service;
 
-import com.capte.funds.transaction.model.dto.PaymentInstrumentBindingDTO;
-import com.capte.funds.transaction.model.dto.PaymentInstrumentDTO;
-import com.capte.funds.transaction.model.query.PaymentInstrumentBindingQuery;
-import com.capte.funds.transaction.model.query.PaymentInstrumentQuery;
-import com.capte.funds.transaction.model.request.CreatePaymentInstrumentBindingRequest;
-import com.capte.funds.transaction.model.request.CreatePaymentInstrumentRequest;
+import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
+import com.capte.funds.wallet.model.dto.PaymentInstrumentDTO;
+import com.capte.funds.wallet.model.query.PaymentInstrumentBindingQuery;
+import com.capte.funds.wallet.model.query.PaymentInstrumentQuery;
+import com.capte.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
+import com.capte.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;

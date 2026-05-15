@@ -1,8 +1,8 @@
 package com.capte.funds.transaction.mapstruct;
 
 import com.capte.funds.transaction.dal.entities.SpendSubjectFundingRel;
-import com.capte.funds.transaction.model.dto.SpendSubjectFundingRelationDTO;
-import com.capte.funds.transaction.model.request.CreateSpendSubjectFundingRelationRequest;
+import com.capte.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
+import com.capte.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;

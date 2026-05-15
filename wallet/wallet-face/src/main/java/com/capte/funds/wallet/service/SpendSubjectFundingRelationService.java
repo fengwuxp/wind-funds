@@ -1,8 +1,8 @@
-package com.capte.funds.transaction.services;
+package com.capte.funds.wallet.service;
 
-import com.capte.funds.transaction.model.dto.SpendSubjectFundingRelationDTO;
-import com.capte.funds.transaction.model.query.SpendSubjectFundingRelationQuery;
-import com.capte.funds.transaction.model.request.CreateSpendSubjectFundingRelationRequest;
+import com.capte.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
+import com.capte.funds.wallet.model.query.SpendSubjectFundingRelationQuery;
+import com.capte.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;

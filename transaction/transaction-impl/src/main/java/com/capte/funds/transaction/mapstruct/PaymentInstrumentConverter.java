@@ -2,10 +2,10 @@ package com.capte.funds.transaction.mapstruct;
 
 import com.capte.funds.transaction.dal.entities.PaymentInstrument;
 import com.capte.funds.transaction.dal.entities.PaymentInstrumentBinding;
-import com.capte.funds.transaction.model.dto.PaymentInstrumentBindingDTO;
-import com.capte.funds.transaction.model.dto.PaymentInstrumentDTO;
-import com.capte.funds.transaction.model.request.CreatePaymentInstrumentBindingRequest;
-import com.capte.funds.transaction.model.request.CreatePaymentInstrumentRequest;
+import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
+import com.capte.funds.wallet.model.dto.PaymentInstrumentDTO;
+import com.capte.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
+import com.capte.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;

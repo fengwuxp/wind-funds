@@ -1,7 +1,7 @@
-package com.capte.funds.transaction.model.dto;
+package com.capte.funds.wallet.model.dto;
 
 import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.capte.funds.transaction.enums.SpendSubjectFundingRelationType;
+import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,7 +16,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 支出主体和真实资金账户关系 DTO。
+ * 支付工具绑定 DTO。
  *
  * @author Codex
  * @date 2026-05-07
@@ -26,10 +26,10 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class SpendSubjectFundingRelationDTO implements Serializable {
+public class PaymentInstrumentBindingDTO implements Serializable {
 
     @Serial
-    private static final long serialVersionUID = -1643737927933489069L;
+    private static final long serialVersionUID = -8129489273791104747L;
 
     @Schema(description = "主键")
     private Long id;
@@ -40,32 +40,32 @@ public class SpendSubjectFundingRelationDTO implements Serializable {
     @Schema(description = "修改时间")
     private LocalDateTime gmtModified;
 
-    @Schema(description = "关系号")
+    @Schema(description = "绑定号")
     private String sn;
 
     @Schema(description = "租户 ID")
     private Long tenantId;
 
-    @Schema(description = "支出控制主体 ID")
-    private String spendSubjectId;
+    @Schema(description = "工具号")
+    private String instrumentSn;
 
-    @Schema(description = "支出控制主体类型")
-    private FundsSubjectType spendSubjectType;
+    @Schema(description = "绑定角色")
+    private PaymentInstrumentBindingRole bindingRole;
 
-    @Schema(description = "真实资金账户 ID")
-    private String fundingAccountId;
+    @Schema(description = "内部主体 ID")
+    private String subjectId;
+
+    @Schema(description = "内部主体类型")
+    private FundsSubjectType subjectType;
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;
 
-    @Schema(description = "关系类型")
-    private SpendSubjectFundingRelationType relationType;
-
     @Schema(description = "路由优先级")
     private Integer priority;
 
-    @Schema(description = "是否默认关系")
-    private Boolean defaultRelation;
+    @Schema(description = "是否默认绑定")
+    private Boolean defaultBinding;
 
     @Schema(description = "状态")
     private FundsAccountStatus status;

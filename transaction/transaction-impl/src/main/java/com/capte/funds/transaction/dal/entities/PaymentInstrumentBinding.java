@@ -1,7 +1,7 @@
 package com.capte.funds.transaction.dal.entities;
 
 import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.capte.funds.transaction.enums.PaymentInstrumentBindingRole;
+import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;

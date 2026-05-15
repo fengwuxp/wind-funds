@@ -1,6 +1,6 @@
 package com.capte.funds.transaction.dal.entities;
 
-import com.capte.funds.transaction.enums.PaymentInstrumentDirection;
+import com.wind.integration.funds.wallet.enums.PaymentInstrumentDirection;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;

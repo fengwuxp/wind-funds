@@ -1,7 +1,7 @@
-package com.capte.funds.transaction.model.request;
+package com.capte.funds.wallet.model.request;
 
-import com.capte.funds.transaction.enums.PaymentInstrumentDirection;
-import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,7 +16,7 @@ import lombok.experimental.Accessors;
 import java.time.LocalDateTime;
 
 /**
- * 创建支付工具请求。
+ * 创建支出主体资金关系请求。
  *
  * @author Codex
  * @date 2026-05-07
@@ -26,9 +26,9 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class CreatePaymentInstrumentRequest {
+public class CreateSpendSubjectFundingRelationRequest {
 
-    @Schema(description = "工具号")
+    @Schema(description = "关系号")
     @NotBlank
     private String sn;
 
@@ -36,35 +36,31 @@ public class CreatePaymentInstrumentRequest {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "工具归属主体 ID")
+    @Schema(description = "支出控制主体 ID")
     @NotBlank
-    private String ownerId;
+    private String spendSubjectId;
 
-    @Schema(description = "工具归属主体类型")
+    @Schema(description = "支出控制主体类型")
     @NotNull
-    private FundsAccountOwnerType ownerType;
+    private FundsSubjectType spendSubjectType;
 
-    @Schema(description = "工具类型")
+    @Schema(description = "真实资金账户 ID")
     @NotBlank
-    private String instrumentType;
-
-    @Schema(description = "工具方向")
-    @NotNull
-    private PaymentInstrumentDirection instrumentDirection;
-
-    @Schema(description = "工具展示号或稳定识别号")
-    @NotBlank
-    private String instrumentNo;
-
-    @Schema(description = "通道编码")
-    private String channelCode;
-
-    @Schema(description = "外部工具 ID")
-    private String externalInstrumentId;
+    private String fundingAccountId;
 
     @Schema(description = "币种")
     @NotNull
     private CurrencyIsoCode currency;
+
+    @Schema(description = "关系类型")
+    @NotNull
+    private SpendSubjectFundingRelationType relationType;
+
+    @Schema(description = "路由优先级")
+    private Integer priority;
+
+    @Schema(description = "是否默认关系")
+    private Boolean defaultRelation;
 
     @Schema(description = "状态")
     private FundsAccountStatus status;

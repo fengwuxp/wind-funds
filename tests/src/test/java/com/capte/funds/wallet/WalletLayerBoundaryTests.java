@@ -59,6 +59,70 @@ class WalletLayerBoundaryTests {
             "BudgetGroup"
     );
 
+    private static final List<Path> WALLET_PAYMENT_INSTRUMENT_CONTRACTS = List.of(
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/service/PaymentInstrumentService.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/dto/PaymentInstrumentDTO.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/dto/PaymentInstrumentBindingDTO.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/query/PaymentInstrumentQuery.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/query/PaymentInstrumentBindingQuery.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/request/CreatePaymentInstrumentRequest.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/request/"
+                    + "CreatePaymentInstrumentBindingRequest.java")
+    );
+
+    private static final List<Path> CORE_PAYMENT_INSTRUMENT_ENUMS = List.of(
+            Path.of("core/src/main/java/com/wind/integration/funds/wallet/enums/PaymentInstrumentDirection.java"),
+            Path.of("core/src/main/java/com/wind/integration/funds/wallet/enums/PaymentInstrumentBindingRole.java")
+    );
+
+    private static final List<Path> TRANSACTION_PAYMENT_INSTRUMENT_CONTRACTS = List.of(
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/services/"
+                    + "PaymentInstrumentService.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/dto/"
+                    + "PaymentInstrumentDTO.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/dto/"
+                    + "PaymentInstrumentBindingDTO.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/query/"
+                    + "PaymentInstrumentQuery.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/query/"
+                    + "PaymentInstrumentBindingQuery.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/request/"
+                    + "CreatePaymentInstrumentRequest.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/request/"
+                    + "CreatePaymentInstrumentBindingRequest.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/enums/"
+                    + "PaymentInstrumentDirection.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/enums/"
+                    + "PaymentInstrumentBindingRole.java")
+    );
+
+    private static final List<Path> WALLET_SPEND_SUBJECT_FUNDING_RELATION_CONTRACTS = List.of(
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/service/"
+                    + "SpendSubjectFundingRelationService.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/dto/"
+                    + "SpendSubjectFundingRelationDTO.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/query/"
+                    + "SpendSubjectFundingRelationQuery.java"),
+            Path.of("wallet/wallet-face/src/main/java/com/capte/funds/wallet/model/request/"
+                    + "CreateSpendSubjectFundingRelationRequest.java")
+    );
+
+    private static final Path CORE_SPEND_SUBJECT_FUNDING_RELATION_TYPE = Path.of(
+            "core/src/main/java/com/wind/integration/funds/wallet/enums/SpendSubjectFundingRelationType.java");
+
+    private static final List<Path> TRANSACTION_SPEND_SUBJECT_FUNDING_RELATION_CONTRACTS = List.of(
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/services/"
+                    + "SpendSubjectFundingRelationService.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/dto/"
+                    + "SpendSubjectFundingRelationDTO.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/query/"
+                    + "SpendSubjectFundingRelationQuery.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/request/"
+                    + "CreateSpendSubjectFundingRelationRequest.java"),
+            Path.of("transaction/transaction-face/src/main/java/com/capte/funds/transaction/enums/"
+                    + "SpendSubjectFundingRelationType.java")
+    );
+
     private static final List<String> FORBIDDEN_REFERENCES = List.of(
             "com.capte.funds.ledger.dal.",
             "com.capte.funds.ledger.impl.",
@@ -194,6 +258,43 @@ class WalletLayerBoundaryTests {
         }
     }
 
+    /**
+     * 场景：PaymentInstrument 是钱包侧支付/收款工具配置能力。
+     * 输入：扫描 wallet-face、core 与 transaction-face 的支付工具契约。
+     * 输出：服务、DTO、Query、Request 和枚举所在模块。
+     * 预期：wallet-face 拥有支付工具配置契约，core 承载共享枚举，transaction-face 不再承载该账户配置能力。
+     */
+    @Test
+    void testWalletFaceShouldOwnPaymentInstrumentContracts() {
+        Path projectRoot = projectRoot();
+
+        assertPathsExist(projectRoot, WALLET_PAYMENT_INSTRUMENT_CONTRACTS,
+                "wallet-face should expose payment instrument contract");
+        assertPathsExist(projectRoot, CORE_PAYMENT_INSTRUMENT_ENUMS,
+                "core should expose shared payment instrument enum");
+        assertPathsDoNotExist(projectRoot, TRANSACTION_PAYMENT_INSTRUMENT_CONTRACTS,
+                "transaction-face should not own payment instrument contract");
+    }
+
+    /**
+     * 场景：支出主体到真实 FundingAccount 的资金来源关系是钱包账户配置能力。
+     * 输入：扫描 wallet-face、core 与 transaction-face 的支出主体资金关系契约。
+     * 输出：服务、DTO、Query、Request 和枚举所在模块。
+     * 预期：wallet-face 拥有关联配置契约，core 承载共享枚举，transaction-face 不再承载该账户配置能力。
+     */
+    @Test
+    void testWalletFaceShouldOwnSpendSubjectFundingRelationContracts() {
+        Path projectRoot = projectRoot();
+
+        assertPathsExist(projectRoot, WALLET_SPEND_SUBJECT_FUNDING_RELATION_CONTRACTS,
+                "wallet-face should expose spend subject funding relation contract");
+        assertThat(projectRoot.resolve(CORE_SPEND_SUBJECT_FUNDING_RELATION_TYPE))
+                .as("core should expose shared spend subject funding relation type")
+                .exists();
+        assertPathsDoNotExist(projectRoot, TRANSACTION_SPEND_SUBJECT_FUNDING_RELATION_CONTRACTS,
+                "transaction-face should not own spend subject funding relation contract");
+    }
+
     private static List<String> findForbiddenReferences(Path sourceRoot) throws IOException {
         List<String> violations = new ArrayList<>();
         for (Path sourceFile : listJavaSources(sourceRoot)) {
@@ -218,6 +319,20 @@ class WalletLayerBoundaryTests {
 
     private static boolean containsForbiddenReference(String line) {
         return FORBIDDEN_REFERENCES.stream().anyMatch(line::contains);
+    }
+
+    private static void assertPathsExist(Path projectRoot, List<Path> contracts, String message) {
+        assertThat(contracts)
+                .allSatisfy(contract -> assertThat(projectRoot.resolve(contract))
+                        .as(message + ": " + contract.getFileName())
+                        .exists());
+    }
+
+    private static void assertPathsDoNotExist(Path projectRoot, List<Path> contracts, String message) {
+        assertThat(contracts)
+                .allSatisfy(contract -> assertThat(projectRoot.resolve(contract))
+                        .as(message + ": " + contract.getFileName())
+                        .doesNotExist());
     }
 
     private static Path walletService(String contractName) {

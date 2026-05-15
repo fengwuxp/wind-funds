@@ -1,7 +1,7 @@
-package com.capte.funds.transaction.model.request;
+package com.capte.funds.wallet.model.request;
 
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.capte.funds.transaction.enums.PaymentInstrumentBindingRole;
+import com.wind.integration.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -16,7 +16,7 @@ import lombok.experimental.Accessors;
 import java.time.LocalDateTime;
 
 /**
- * 创建支付工具绑定请求。
+ * 创建支付工具请求。
  *
  * @author Codex
  * @date 2026-05-07
@@ -26,9 +26,9 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class CreatePaymentInstrumentBindingRequest {
+public class CreatePaymentInstrumentRequest {
 
-    @Schema(description = "绑定号")
+    @Schema(description = "工具号")
     @NotBlank
     private String sn;
 
@@ -36,31 +36,35 @@ public class CreatePaymentInstrumentBindingRequest {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "工具号")
+    @Schema(description = "工具归属主体 ID")
     @NotBlank
-    private String instrumentSn;
+    private String ownerId;
 
-    @Schema(description = "绑定角色")
+    @Schema(description = "工具归属主体类型")
     @NotNull
-    private PaymentInstrumentBindingRole bindingRole;
+    private FundsAccountOwnerType ownerType;
 
-    @Schema(description = "内部主体 ID")
+    @Schema(description = "工具类型")
     @NotBlank
-    private String subjectId;
+    private String instrumentType;
 
-    @Schema(description = "内部主体类型")
+    @Schema(description = "工具方向")
     @NotNull
-    private FundsSubjectType subjectType;
+    private PaymentInstrumentDirection instrumentDirection;
+
+    @Schema(description = "工具展示号或稳定识别号")
+    @NotBlank
+    private String instrumentNo;
+
+    @Schema(description = "通道编码")
+    private String channelCode;
+
+    @Schema(description = "外部工具 ID")
+    private String externalInstrumentId;
 
     @Schema(description = "币种")
     @NotNull
     private CurrencyIsoCode currency;
-
-    @Schema(description = "路由优先级")
-    private Integer priority;
-
-    @Schema(description = "是否默认绑定")
-    private Boolean defaultBinding;
 
     @Schema(description = "状态")
     private FundsAccountStatus status;

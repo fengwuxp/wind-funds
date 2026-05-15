@@ -1,4 +1,4 @@
-package com.capte.funds.transaction.enums;
+package com.wind.integration.funds.wallet.enums;
 
 import com.wind.common.enums.DescriptiveEnum;
 import lombok.AllArgsConstructor;
