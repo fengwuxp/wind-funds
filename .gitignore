@@ -37,3 +37,4 @@ build/
 **/dependency-reduced-pom.xml
 docs
 openspec
+.serena
