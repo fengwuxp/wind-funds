@@ -54,12 +54,8 @@ class BalanceControlFundsInstructionRouteResolverTests {
     @Test
     void testResolveFundingBalanceAdjustShouldUsePlatformAdjustment() {
         FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(accountId)
-                .setAmount(FundsRouteTestSupport.amount(1_000L))
-                .setIncrease(Boolean.TRUE)
-                .setBusinessScene("ADJUST")
-                .setBusinessSn("ADJUST_0001"), WindOperator.system());
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 1_000L, Boolean.TRUE, "ADJUST", "ADJUST_0001"), WindOperator.system());
 
         ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
 
@@ -85,12 +81,8 @@ class BalanceControlFundsInstructionRouteResolverTests {
     @Test
     void testResolveFundingBalanceDecreaseShouldConstrainAvailableBalance() {
         FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(accountId)
-                .setAmount(FundsRouteTestSupport.amount(1_000L))
-                .setIncrease(Boolean.FALSE)
-                .setBusinessScene("ADJUST")
-                .setBusinessSn("ADJUST_0002"), WindOperator.system());
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 1_000L, Boolean.FALSE, "ADJUST", "ADJUST_0002"), WindOperator.system());
 
         ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
 
@@ -114,12 +106,8 @@ class BalanceControlFundsInstructionRouteResolverTests {
     @Test
     void testResolveFundingBalanceDecreaseShouldAllowControlledNegativeWhenContextExplicit() {
         FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(accountId)
-                .setAmount(FundsRouteTestSupport.amount(1_000L))
-                .setIncrease(Boolean.FALSE)
-                .setBusinessScene("ADJUST")
-                .setBusinessSn("ADJUST_0003")
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 1_000L, Boolean.FALSE, "ADJUST", "ADJUST_0003")
                 .setContextVariables(allowNegativeContext("FUNDING_AVAILABLE_CONTROLLED_NEGATIVE")),
                 WindOperator.system());
 
@@ -142,12 +130,8 @@ class BalanceControlFundsInstructionRouteResolverTests {
     @Test
     void testResolveFundingBalanceDecreaseShouldRejectAllowNegativeWithoutPolicyEvidence() {
         FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(accountId)
-                .setAmount(FundsRouteTestSupport.amount(1_000L))
-                .setIncrease(Boolean.FALSE)
-                .setBusinessScene("ADJUST")
-                .setBusinessSn("ADJUST_0004")
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 1_000L, Boolean.FALSE, "ADJUST", "ADJUST_0004")
                 .setContextVariables(context(FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE, Boolean.TRUE)),
                 WindOperator.system());
 
@@ -192,12 +176,9 @@ class BalanceControlFundsInstructionRouteResolverTests {
      */
     @Test
     void testResolveCreditLimitAdjustShouldMoveLimitToAvailable() {
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(FundsRouteTestSupport.creditAccount("credit_001"))
-                .setAmount(FundsRouteTestSupport.amount(2_000L))
-                .setIncrease(Boolean.TRUE)
-                .setBusinessScene("LIMIT")
-                .setBusinessSn("LIMIT_0001"), WindOperator.system());
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                FundsRouteTestSupport.creditAccount("credit_001"), 2_000L, Boolean.TRUE, "LIMIT", "LIMIT_0001"),
+                WindOperator.system());
 
         ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
 
@@ -221,12 +202,8 @@ class BalanceControlFundsInstructionRouteResolverTests {
     @Test
     void testResolveCreditLimitDecreaseShouldConstrainAvailableBalance() {
         FundsAccountId accountId = FundsRouteTestSupport.creditAccount("credit_001");
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(accountId)
-                .setAmount(FundsRouteTestSupport.amount(900L))
-                .setIncrease(Boolean.FALSE)
-                .setBusinessScene("LIMIT")
-                .setBusinessSn("LIMIT_0002"), WindOperator.system());
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 900L, Boolean.FALSE, "LIMIT", "LIMIT_0002"), WindOperator.system());
 
         ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
 
@@ -248,12 +225,8 @@ class BalanceControlFundsInstructionRouteResolverTests {
     @Test
     void testResolveCreditLimitDecreaseShouldAllowControlledNegativeWhenContextExplicit() {
         FundsAccountId accountId = FundsRouteTestSupport.creditAccount("credit_001");
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(accountId)
-                .setAmount(FundsRouteTestSupport.amount(900L))
-                .setIncrease(Boolean.FALSE)
-                .setBusinessScene("LIMIT")
-                .setBusinessSn("LIMIT_0003")
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 900L, Boolean.FALSE, "LIMIT", "LIMIT_0003")
                 .setContextVariables(allowNegativeContext("CREDIT_AVAILABLE_CONTROLLED_NEGATIVE")),
                 WindOperator.system());
 
@@ -275,12 +248,9 @@ class BalanceControlFundsInstructionRouteResolverTests {
      */
     @Test
     void testResolveBudgetLimitIncreaseShouldMoveLimitToAvailable() {
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(FundsRouteTestSupport.budgetGroup("budget_001"))
-                .setAmount(FundsRouteTestSupport.amount(1_500L))
-                .setIncrease(Boolean.TRUE)
-                .setBusinessScene("BUDGET")
-                .setBusinessSn("BUDGET_0002"), WindOperator.system());
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                FundsRouteTestSupport.budgetGroup("budget_001"), 1_500L, Boolean.TRUE, "BUDGET", "BUDGET_0002"),
+                WindOperator.system());
 
         ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
 
@@ -304,12 +274,8 @@ class BalanceControlFundsInstructionRouteResolverTests {
     @Test
     void testResolveBudgetLimitAdjustShouldMoveAvailableToLimitOnDecrease() {
         FundsAccountId accountId = FundsRouteTestSupport.budgetGroup("budget_001");
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(accountId)
-                .setAmount(FundsRouteTestSupport.amount(1_500L))
-                .setIncrease(Boolean.FALSE)
-                .setBusinessScene("BUDGET")
-                .setBusinessSn("BUDGET_0001"), WindOperator.system());
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 1_500L, Boolean.FALSE, "BUDGET", "BUDGET_0001"), WindOperator.system());
 
         ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
 
@@ -331,12 +297,8 @@ class BalanceControlFundsInstructionRouteResolverTests {
     @Test
     void testResolveBudgetLimitAdjustShouldAllowControlledNegativeWhenContextExplicit() {
         FundsAccountId accountId = FundsRouteTestSupport.budgetGroup("budget_001");
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(accountId)
-                .setAmount(FundsRouteTestSupport.amount(1_500L))
-                .setIncrease(Boolean.FALSE)
-                .setBusinessScene("BUDGET")
-                .setBusinessSn("BUDGET_0003")
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 1_500L, Boolean.FALSE, "BUDGET", "BUDGET_0003")
                 .setContextVariables(allowNegativeContext("BUDGET_AVAILABLE_CONTROLLED_NEGATIVE")),
                 WindOperator.system());
 
@@ -472,12 +434,8 @@ class BalanceControlFundsInstructionRouteResolverTests {
                                                              String expectedMessage,
                                                              String businessSn) {
         FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
-        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
-                .setAccountId(accountId)
-                .setAmount(FundsRouteTestSupport.amount(1_000L))
-                .setIncrease(Boolean.FALSE)
-                .setBusinessScene("ADJUST")
-                .setBusinessSn(businessSn)
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 1_000L, Boolean.FALSE, "ADJUST", businessSn)
                 .setContextVariables(allowNegativeContext("FUNDING_AVAILABLE_CONTROLLED_NEGATIVE")
                         .removeVariable(missingKey)),
                 WindOperator.system());
@@ -485,6 +443,22 @@ class BalanceControlFundsInstructionRouteResolverTests {
         assertThatThrownBy(() -> FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining(expectedMessage);
+    }
+
+    private static FundsBalanceAdjustRequest adjustRequest(FundsAccountId accountId,
+                                                           long amount,
+                                                           Boolean increase,
+                                                           String businessScene,
+                                                           String businessSn) {
+        return new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(FundsRouteTestSupport.amount(amount))
+                .setIncrease(increase)
+                .setBusinessScene(businessScene)
+                .setBusinessSn(businessSn)
+                .setAdjustReason("adjust reason")
+                .setAdjustEvidenceRef("EVIDENCE_" + businessSn)
+                .setApprovalRef("APPROVAL_" + businessSn);
     }
 
     private static final class TestContextVariables implements WritableContextVariables {

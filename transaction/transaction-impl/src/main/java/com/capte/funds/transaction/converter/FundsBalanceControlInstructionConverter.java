@@ -7,6 +7,7 @@ import com.capte.funds.transaction.converter.FundsInstructionAmountSupport.Conve
 import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
+import com.wind.common.exception.AssertUtils;
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
@@ -34,6 +35,12 @@ import java.util.Map;
  */
 @Component
 public class FundsBalanceControlInstructionConverter {
+
+    private static final String ADJUST_REASON_REQUIRED_MESSAGE = "余额调账缺少调账原因";
+
+    private static final String ADJUST_EVIDENCE_REF_REQUIRED_MESSAGE = "余额调账缺少调账凭证";
+
+    private static final String ADJUST_APPROVAL_REF_REQUIRED_MESSAGE = "余额调账缺少审批引用";
 
     private final FundsInstructionAmountSupport amountSupport;
 
@@ -90,6 +97,7 @@ public class FundsBalanceControlInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToAdjustInstruction(@NonNull FundsBalanceAdjustRequest request,
                                                                     @NonNull WindOperator operator) {
+        requireAdjustAuditContext(request);
         FundsTransactionEventType eventType = isLimitAdjust(request)
                 ? FundsTransactionEventType.LIMIT_ADJUST
                 : FundsTransactionEventType.BALANCE_ADJUST;
@@ -107,10 +115,28 @@ public class FundsBalanceControlInstructionConverter {
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
                 .operator(operationActor(operator))
-                .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
-                        FundsInstructionContextKeys.INCREASE, request.getIncrease())))
+                .contextVariables(mergeContext(request.getContextVariables(), adjustContext(request)))
                 .build();
+    }
+
+    private void requireAdjustAuditContext(@NonNull FundsBalanceAdjustRequest request) {
+        AssertUtils.hasText(request.getAdjustReason(), ADJUST_REASON_REQUIRED_MESSAGE);
+        AssertUtils.hasText(request.getAdjustEvidenceRef(), ADJUST_EVIDENCE_REF_REQUIRED_MESSAGE);
+        AssertUtils.hasText(request.getApprovalRef(), ADJUST_APPROVAL_REF_REQUIRED_MESSAGE);
+    }
+
+    private @NonNull Map<String, Object> adjustContext(@NonNull FundsBalanceAdjustRequest request) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
+        result.put(FundsInstructionContextKeys.INCREASE, request.getIncrease());
+        result.put(FundsInstructionContextKeys.ADJUST_REASON, request.getAdjustReason());
+        result.put(FundsInstructionContextKeys.ADJUST_EVIDENCE_REF, request.getAdjustEvidenceRef());
+        result.put(FundsInstructionContextKeys.APPROVAL_REF, request.getApprovalRef());
+        if (request.getReconciliationExceptionRef() != null) {
+            result.put(FundsInstructionContextKeys.RECONCILIATION_EXCEPTION_REF,
+                    request.getReconciliationExceptionRef());
+        }
+        return result;
     }
 
     private boolean isLimitAdjust(@NonNull FundsBalanceAdjustRequest request) {

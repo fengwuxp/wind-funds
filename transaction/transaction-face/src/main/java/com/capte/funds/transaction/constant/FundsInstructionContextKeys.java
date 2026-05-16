@@ -45,11 +45,15 @@ public final class FundsInstructionContextKeys {
 
     public static final String ADJUST_REASON = "adjustReason";
 
+    public static final String ADJUST_EVIDENCE_REF = "adjustEvidenceRef";
+
     public static final String ALLOW_NEGATIVE_BALANCE = "allowNegativeBalance";
 
     public static final String NEGATIVE_AVAILABLE_POLICY_CODE = "negativeAvailablePolicyCode";
 
     public static final String APPROVAL_REF = "approvalRef";
+
+    public static final String RECONCILIATION_EXCEPTION_REF = "reconciliationExceptionRef";
 
     public static final String NEGATIVE_AVAILABLE_RISK_STATUS = "negativeAvailableRiskStatus";
 

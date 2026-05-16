@@ -2,6 +2,7 @@ package com.capte.funds.transaction;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
+import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
@@ -505,18 +506,17 @@ class FundsTransactionCommandServiceImplTests {
     void testAdjustCreditAccountShouldBuildLimitAdjustmentRoute() {
         FundsAccountId credit = creditAccount("credit_001");
 
-        service.adjust(new FundsBalanceAdjustRequest()
-                .setAccountId(credit)
-                .setAmount(amount(5_000L))
-                .setIncrease(Boolean.TRUE)
-                .setBusinessScene("LIMIT")
-                .setBusinessSn("LIMIT_00000001")
+        service.adjust(adjustRequest(credit, 5_000L, Boolean.TRUE, "LIMIT", "LIMIT_00000001")
                 .setDescription("increase limit"), WindOperator.system());
 
         RouteLegSpec leg = route().getLegs().getFirst();
         assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.LIMIT, LedgerSubjectCode.AVAILABLE,
                 LedgerBalanceEffectType.INCREASE, LedgerPhaseCode.ADJUSTMENT);
         assertThat(instruction().getEventType()).isEqualTo(FundsTransactionEventType.LIMIT_ADJUST);
+        assertThat(instruction().getContextVariables())
+                .containsEntry(FundsInstructionContextKeys.ADJUST_REASON, "adjust reason")
+                .containsEntry(FundsInstructionContextKeys.ADJUST_EVIDENCE_REF, "EVIDENCE_LIMIT_00000001")
+                .containsEntry(FundsInstructionContextKeys.APPROVAL_REF, "APPROVAL_LIMIT_00000001");
     }
 
 
@@ -524,17 +524,21 @@ class FundsTransactionCommandServiceImplTests {
     void testAdjustBudgetGroupShouldBuildBudgetLimitAdjustmentRoute() {
         FundsAccountId budgetGroup = FundsAccountId.immutable("budget_001", FundsSubjectType.BUDGET_GROUP);
 
-        service.adjust(new FundsBalanceAdjustRequest()
-                .setAccountId(budgetGroup)
-                .setAmount(amount(2_000L))
-                .setIncrease(Boolean.FALSE)
-                .setBusinessScene("BUDGET")
-                .setBusinessSn("BUDGET_00000001")
+        service.adjust(adjustRequest(budgetGroup, 2_000L, Boolean.FALSE, "BUDGET", "BUDGET_00000001")
                 .setDescription("decrease budget"), WindOperator.system());
 
         RouteLegSpec leg = route().getLegs().getFirst();
         assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.LIMIT,
                 LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.ADJUSTMENT);
+    }
+
+    @Test
+    void testAdjustShouldRejectMissingApprovalEvidenceBeforeOrchestrator() {
+        assertThatThrownBy(() -> service.adjust(adjustRequest(creditAccount("credit_001"), 5_000L, Boolean.TRUE,
+                "LIMIT", "LIMIT_MISSING_EVIDENCE").setAdjustEvidenceRef(null), WindOperator.system()))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("余额调账缺少调账凭证");
+        assertThat(instruction()).isNull();
     }
 
     @Test
@@ -587,6 +591,22 @@ class FundsTransactionCommandServiceImplTests {
 
     private static Money amount(long value) {
         return Money.immutable(value, CURRENCY);
+    }
+
+    private static FundsBalanceAdjustRequest adjustRequest(FundsAccountId accountId,
+                                                           long amount,
+                                                           Boolean increase,
+                                                           String businessScene,
+                                                           String businessSn) {
+        return new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setIncrease(increase)
+                .setBusinessScene(businessScene)
+                .setBusinessSn(businessSn)
+                .setAdjustReason("adjust reason")
+                .setAdjustEvidenceRef("EVIDENCE_" + businessSn)
+                .setApprovalRef("APPROVAL_" + businessSn);
     }
 
     private static String constraintKey(FundsAccountId accountId, LedgerSubjectCode subjectCode) {
