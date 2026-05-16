@@ -45,6 +45,12 @@ public final class FundsInstructionContextKeys {
 
     public static final String ADJUST_REASON = "adjustReason";
 
+    public static final String ALLOW_NEGATIVE_BALANCE = "allowNegativeBalance";
+
+    public static final String NEGATIVE_AVAILABLE_POLICY_CODE = "negativeAvailablePolicyCode";
+
+    public static final String APPROVAL_REF = "approvalRef";
+
     public static final String CHANNEL_CODE = "channelCode";
 
     public static final String EXTERNAL_TRANSACTION_ID = "externalTransactionId";

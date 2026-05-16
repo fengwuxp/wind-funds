@@ -79,6 +79,15 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private static final String RESOLVED_AT_REQUIRED_MESSAGE = "ResolvedRoute resolvedAt 不能为空";
 
+    private static final String ALLOW_NEGATIVE_BALANCE_POLICY_REQUIRED_MESSAGE =
+            "受控负余额调账缺少策略编码";
+
+    private static final String ALLOW_NEGATIVE_BALANCE_APPROVAL_REQUIRED_MESSAGE =
+            "受控负余额调账缺少审批或风控依据";
+
+    private static final String ALLOW_NEGATIVE_BALANCE_REASON_REQUIRED_MESSAGE =
+            "受控负余额调账缺少原因";
+
     private final RouteParticipantFactory routeParticipantFactory;
 
     private final RouteSubjectSupport routeSubjectSupport;
@@ -163,7 +172,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                         platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.ADJUSTMENT)))
                 .balanceEffectType(LedgerBalanceEffectType.DECREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
+                .constraintOverrides(adjustAvailableBalanceConstraint(instruction, accountId))
                 .build();
         List<RouteParticipantSpec> participants = routeParticipantFactory.distinct(List.of(
                 subjectParticipant(accountId, instruction),
@@ -203,7 +212,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.LIMIT))
                 .balanceEffectType(LedgerBalanceEffectType.DECREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
+                .constraintOverrides(adjustAvailableBalanceConstraint(instruction, accountId))
                 .build();
         List<RouteParticipantSpec> participants = List.of(subjectParticipant(accountId, instruction));
         return route(instruction, routeCode, participants, List.of(leg));
@@ -301,10 +310,45 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private Map<String, LedgerBalanceConstraintType> mustNotBeNegative(FundsAccountId accountId,
                                                                        LedgerSubjectCode subjectCode) {
+        return balanceConstraint(accountId, subjectCode, LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
+    }
+
+    private Map<String, LedgerBalanceConstraintType> adjustAvailableBalanceConstraint(FundsInstructionSpec instruction,
+                                                                                      FundsAccountId accountId) {
+        if (!Boolean.TRUE.equals(FundsInstructionContextReader.getValue(
+                instruction,
+                FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE,
+                Boolean.class))) {
+            return balanceConstraint(
+                    accountId,
+                    LedgerSubjectCode.AVAILABLE,
+                    LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
+        }
+        AssertUtils.hasText(FundsInstructionContextReader.getValue(
+                        instruction,
+                        FundsInstructionContextKeys.NEGATIVE_AVAILABLE_POLICY_CODE,
+                        String.class),
+                ALLOW_NEGATIVE_BALANCE_POLICY_REQUIRED_MESSAGE);
+        AssertUtils.hasText(FundsInstructionContextReader.getValue(
+                        instruction,
+                        FundsInstructionContextKeys.APPROVAL_REF,
+                        String.class),
+                ALLOW_NEGATIVE_BALANCE_APPROVAL_REQUIRED_MESSAGE);
+        AssertUtils.hasText(FundsInstructionContextReader.getValue(
+                        instruction,
+                        FundsInstructionContextKeys.ADJUST_REASON,
+                        String.class),
+                ALLOW_NEGATIVE_BALANCE_REASON_REQUIRED_MESSAGE);
+        return balanceConstraint(accountId, LedgerSubjectCode.AVAILABLE, LedgerBalanceConstraintType.ALLOW_NEGATIVE);
+    }
+
+    private Map<String, LedgerBalanceConstraintType> balanceConstraint(FundsAccountId accountId,
+                                                                       LedgerSubjectCode subjectCode,
+                                                                       LedgerBalanceConstraintType constraintType) {
         return Map.of(accountId.type() + CONSTRAINT_KEY_SEPARATOR
                         + accountId.id() + CONSTRAINT_KEY_SEPARATOR
                         + subjectCode.name(),
-                LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
+                constraintType);
     }
 
     @Override

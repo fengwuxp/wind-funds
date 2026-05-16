@@ -1,10 +1,12 @@
 package com.capte.funds.route;
 
 import com.capte.domain.core.operator.WindOperator;
+import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
+import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
@@ -20,8 +22,11 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class BalanceControlFundsInstructionRouteResolverTests {
 
@@ -99,6 +104,58 @@ class BalanceControlFundsInstructionRouteResolverTests {
     }
 
     /**
+     * 场景：运营对普通资金账户做受控负余额调减。
+     * 输入：FUNDING_ACCOUNT，减少 1000，请求上下文显式允许受控负余额。
+     * 输出：用户 AVAILABLE 到平台 ADJUSTMENT 账户的调账 route。
+     * 预期：用户 AVAILABLE 作为 source，并声明本次可按 profile 受控为负。
+     * 红线：负 AVAILABLE 必须有显式业务决策开关，不得静默放开。
+     */
+    @Test
+    void testResolveFundingBalanceDecreaseShouldAllowControlledNegativeWhenContextExplicit() {
+        FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(FundsRouteTestSupport.amount(1_000L))
+                .setIncrease(Boolean.FALSE)
+                .setBusinessScene("ADJUST")
+                .setBusinessSn("ADJUST_0003")
+                .setContextVariables(allowNegativeContext("FUNDING_AVAILABLE_CONTROLLED_NEGATIVE")),
+                WindOperator.system());
+
+        ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
+
+        assertThat(route.getLegs()).singleElement().satisfies(leg -> {
+            assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.ADJUSTMENT,
+                    LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.ADJUSTMENT);
+            assertConstraint(leg, accountId, LedgerSubjectCode.AVAILABLE, LedgerBalanceConstraintType.ALLOW_NEGATIVE);
+        });
+    }
+
+    /**
+     * 场景：运营尝试只用布尔开关放开普通资金账户负余额。
+     * 输入：FUNDING_ACCOUNT，减少 1000，只有 allowNegativeBalance=true。
+     * 输出：route 解析拒绝。
+     * 预期：缺少策略编码、审批依据或原因时，不生成 ALLOW_NEGATIVE route。
+     * 红线：受控负余额不能退化成单个布尔后门。
+     */
+    @Test
+    void testResolveFundingBalanceDecreaseShouldRejectAllowNegativeWithoutPolicyEvidence() {
+        FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(FundsRouteTestSupport.amount(1_000L))
+                .setIncrease(Boolean.FALSE)
+                .setBusinessScene("ADJUST")
+                .setBusinessSn("ADJUST_0004")
+                .setContextVariables(context(FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE, Boolean.TRUE)),
+                WindOperator.system());
+
+        assertThatThrownBy(() -> FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("受控负余额调账缺少策略编码");
+    }
+
+    /**
      * 场景：信用账户额度调增，释放可用额度。
      * 输入：CREDIT_ACCOUNT，增加 2000，业务场景 LIMIT。
      * 输出：LIMIT 到 AVAILABLE 的额度调整 route。
@@ -154,6 +211,34 @@ class BalanceControlFundsInstructionRouteResolverTests {
     }
 
     /**
+     * 场景：信用账户额度调减允许受控负 AVAILABLE。
+     * 输入：CREDIT_ACCOUNT，减少 900，请求上下文显式允许受控负余额。
+     * 输出：AVAILABLE 到 LIMIT 的额度调整 route。
+     * 预期：source AVAILABLE 声明 ALLOW_NEGATIVE，由账本 profile 再做最终授权。
+     * 红线：profile 允许负余额不代表每笔额度调减都自动放开。
+     */
+    @Test
+    void testResolveCreditLimitDecreaseShouldAllowControlledNegativeWhenContextExplicit() {
+        FundsAccountId accountId = FundsRouteTestSupport.creditAccount("credit_001");
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(FundsRouteTestSupport.amount(900L))
+                .setIncrease(Boolean.FALSE)
+                .setBusinessScene("LIMIT")
+                .setBusinessSn("LIMIT_0003")
+                .setContextVariables(allowNegativeContext("CREDIT_AVAILABLE_CONTROLLED_NEGATIVE")),
+                WindOperator.system());
+
+        ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
+
+        assertThat(route.getLegs()).singleElement().satisfies(leg -> {
+            assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.LIMIT,
+                    LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.ADJUSTMENT);
+            assertConstraint(leg, accountId, LedgerSubjectCode.AVAILABLE, LedgerBalanceConstraintType.ALLOW_NEGATIVE);
+        });
+    }
+
+    /**
      * 场景：预算组额度调增，释放可用预算。
      * 输入：BUDGET_GROUP，增加 1500，业务场景 BUDGET。
      * 输出：LIMIT 到 AVAILABLE 的额度调整 route。
@@ -205,6 +290,34 @@ class BalanceControlFundsInstructionRouteResolverTests {
             assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.LIMIT,
                     LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.ADJUSTMENT);
             assertMustNotBeNegative(leg, accountId, LedgerSubjectCode.AVAILABLE);
+        });
+    }
+
+    /**
+     * 场景：预算组额度调减允许受控负 AVAILABLE。
+     * 输入：BUDGET_GROUP，减少 1500，请求上下文显式允许受控负余额。
+     * 输出：AVAILABLE 到 LIMIT 的预算调整 route。
+     * 预期：source AVAILABLE 声明 ALLOW_NEGATIVE，由账本 profile 再做最终授权。
+     * 红线：预算超用必须由业务策略显式决策，不得被普通调减静默触发。
+     */
+    @Test
+    void testResolveBudgetLimitAdjustShouldAllowControlledNegativeWhenContextExplicit() {
+        FundsAccountId accountId = FundsRouteTestSupport.budgetGroup("budget_001");
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(FundsRouteTestSupport.amount(1_500L))
+                .setIncrease(Boolean.FALSE)
+                .setBusinessScene("BUDGET")
+                .setBusinessSn("BUDGET_0003")
+                .setContextVariables(allowNegativeContext("BUDGET_AVAILABLE_CONTROLLED_NEGATIVE")),
+                WindOperator.system());
+
+        ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
+
+        assertThat(route.getLegs()).singleElement().satisfies(leg -> {
+            assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.LIMIT,
+                    LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.ADJUSTMENT);
+            assertConstraint(leg, accountId, LedgerSubjectCode.AVAILABLE, LedgerBalanceConstraintType.ALLOW_NEGATIVE);
         });
     }
 
@@ -296,8 +409,49 @@ class BalanceControlFundsInstructionRouteResolverTests {
     private static void assertMustNotBeNegative(RouteLegSpec leg,
                                                 FundsAccountId accountId,
                                                 LedgerSubjectCode ledgerSubjectCode) {
+        assertConstraint(leg, accountId, ledgerSubjectCode, LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
+    }
+
+    private static void assertConstraint(RouteLegSpec leg,
+                                         FundsAccountId accountId,
+                                         LedgerSubjectCode ledgerSubjectCode,
+                                         LedgerBalanceConstraintType constraintType) {
         assertThat(leg.getConstraintOverrides())
                 .containsEntry(accountId.type() + ":" + accountId.id() + ":" + ledgerSubjectCode.name(),
-                        LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
+                        constraintType);
+    }
+
+    private static WritableContextVariables context(String name, Object value) {
+        return new TestContextVariables().putVariable(name, value);
+    }
+
+    private static WritableContextVariables allowNegativeContext(String policyCode) {
+        return new TestContextVariables()
+                .putVariable(FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE, Boolean.TRUE)
+                .putVariable(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_POLICY_CODE, policyCode)
+                .putVariable(FundsInstructionContextKeys.APPROVAL_REF, "APPROVAL_0001")
+                .putVariable(FundsInstructionContextKeys.ADJUST_REASON, "controlled negative balance test");
+    }
+
+    private static final class TestContextVariables implements WritableContextVariables {
+
+        private final Map<String, Object> variables = new HashMap<>();
+
+        @Override
+        public WritableContextVariables putVariable(String name, Object val) {
+            variables.put(name, val);
+            return this;
+        }
+
+        @Override
+        public WritableContextVariables removeVariable(String name) {
+            variables.remove(name);
+            return this;
+        }
+
+        @Override
+        public Map<String, Object> getContextVariables() {
+            return Map.copyOf(variables);
+        }
     }
 }
