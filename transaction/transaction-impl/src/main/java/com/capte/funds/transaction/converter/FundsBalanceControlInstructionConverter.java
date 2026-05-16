@@ -3,13 +3,11 @@ package com.capte.funds.transaction.converter;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.capte.funds.transaction.converter.FundsInstructionFxSupport.ConvertedAmount;
+import com.capte.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
 import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.wind.core.WritableContextVariables;
-import com.wind.integration.funds.fx.FxService;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
@@ -20,6 +18,7 @@ import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -36,17 +35,16 @@ import java.util.Map;
 @Component
 public class FundsBalanceControlInstructionConverter {
 
-    private final FundsInstructionFxSupport fxSupport;
+    private final FundsInstructionAmountSupport amountSupport;
 
     @Autowired
-    public FundsBalanceControlInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService,
-                                                    @NonNull FxService fxService) {
-        this.fxSupport = new FundsInstructionFxSupport(fundsAccountQueryService, fxService);
+    public FundsBalanceControlInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService) {
+        this.amountSupport = new FundsInstructionAmountSupport(fundsAccountQueryService);
     }
 
     public @NonNull FundsInstructionSpec convertToFreezeInstruction(@NonNull FundsBalanceFreezeRequest request,
                                                                     @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)
@@ -67,7 +65,7 @@ public class FundsBalanceControlInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToUnfreezeInstruction(@NonNull FundsBalanceUnfreezeRequest request,
                                                                       @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)
@@ -95,7 +93,7 @@ public class FundsBalanceControlInstructionConverter {
         FundsTransactionEventType eventType = isLimitAdjust(request)
                 ? FundsTransactionEventType.LIMIT_ADJUST
                 : FundsTransactionEventType.BALANCE_ADJUST;
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)

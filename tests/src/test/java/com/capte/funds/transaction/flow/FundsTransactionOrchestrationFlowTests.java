@@ -38,6 +38,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
+import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.integration.funds.ledger.LedgerPostingAssembler;
 import com.wind.integration.funds.ledger.LedgerTransactionPostingService;
@@ -99,7 +100,7 @@ class FundsTransactionOrchestrationFlowTests {
         ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
         PlatformFundingAccountService platformFundingAccountService = platformFundingAccountService();
         authorizationInstructionConverter = new FundsAuthorizationInstructionConverter(
-                FundsRouteTestSupport.accountQueryService(CURRENCY), FundsRouteTestSupport.sameCurrencyFxService());
+                FundsRouteTestSupport.accountQueryService(CURRENCY));
         RouteSubjectSupport routeSubjectSupport = new RouteSubjectSupport();
         PlatformAccountRouteSupport platformAccountRouteSupport = new PlatformAccountRouteSupport(
                 platformFundingAccountService);
@@ -128,9 +129,8 @@ class FundsTransactionOrchestrationFlowTests {
         );
         service = new FundsTransactionCommandServiceImpl(
                 new FundsDirectTransactionInstructionConverter(platformFundingAccountService,
-                        FundsRouteTestSupport.accountQueryService(CURRENCY), FundsRouteTestSupport.sameCurrencyFxService()),
-                new FundsBalanceControlInstructionConverter(FundsRouteTestSupport.accountQueryService(CURRENCY),
-                        FundsRouteTestSupport.sameCurrencyFxService()),
+                        FundsRouteTestSupport.accountQueryService(CURRENCY)),
+                new FundsBalanceControlInstructionConverter(FundsRouteTestSupport.accountQueryService(CURRENCY)),
                 authorizationInstructionConverter,
                 orchestrator
         );
@@ -151,7 +151,7 @@ class FundsTransactionOrchestrationFlowTests {
     void testAuthorizeDeclinedShouldCompleteWithoutPostingLedger() {
         String transactionSn = service.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
                 .setAccountId(creditAccount("credit_001"))
-                .setAmount(amount(600L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(600L)))
                 .setApproved(Boolean.FALSE)
                 .setDeclineReason("insufficient_funds")
                 .setBusinessScene("CARD_AUTH")
@@ -212,7 +212,7 @@ class FundsTransactionOrchestrationFlowTests {
 
         String transactionSn = service.settle(new FundsAuthorizationTransactionSettleRequest()
                 .setAccountId(creditAccount("credit_001"))
-                .setAmount(amount(100L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(100L)))
                 .setAuthorizationTransactionSn("AUTH_TX_ORIGINAL")
                 .setBusinessScene("CARD_SETTLE")
                 .setBusinessSn("SETTLE_0001")
@@ -247,7 +247,7 @@ class FundsTransactionOrchestrationFlowTests {
                         com.wind.integration.funds.wallet.enums.DefaultFundsAccountType.EXTERNAL_BANK))
                 .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
                 .setChannelTransactionSn("BANK_TXN_0001")
-                .setAmount(amount(100L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(100L)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("TOPUP_0001")
                 .setDescription("topup"), WindOperator.system());
@@ -277,7 +277,7 @@ class FundsTransactionOrchestrationFlowTests {
                 .setPayeeId(FundsAccountId.immutable("external_bank_001",
                         com.wind.integration.funds.wallet.enums.DefaultFundsAccountType.EXTERNAL_BANK))
                 .setReferenceFreezeSn("FREEZE_0001")
-                .setAmount(amount(100L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(100L)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_0001")
                 .setDescription("withdraw"), WindOperator.system());
@@ -334,7 +334,7 @@ class FundsTransactionOrchestrationFlowTests {
         String transactionSn = service.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(FundsAccountId.immutable("funding_001", FundsSubjectType.FUNDING_ACCOUNT))
                 .setPayeeAccountId(FundsAccountId.immutable("funding_002", FundsSubjectType.FUNDING_ACCOUNT))
-                .setAmount(amount(100L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(100L)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("TRANSFER_0001")
                 .setDescription("transfer"), WindOperator.system());
@@ -391,7 +391,7 @@ class FundsTransactionOrchestrationFlowTests {
                 .setAccountId(FundsAccountId.immutable("funding_001", FundsSubjectType.FUNDING_ACCOUNT))
                 .setPayeeId(FundsAccountId.immutable("merchant_001", FundsSubjectType.FUNDING_ACCOUNT))
                 .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(amount(100L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(100L)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("PAY_0001")
                 .setDescription("pay"), WindOperator.system());
@@ -474,7 +474,7 @@ class FundsTransactionOrchestrationFlowTests {
         FundsInstructionSpec settleInstruction = authorizationInstructionConverter.convertToSettleInstruction(
                 new FundsAuthorizationTransactionSettleRequest()
                         .setAccountId(creditAccount("credit_001"))
-                        .setAmount(amount(100L))
+                        .setTransactionAmount(TransactionAmount.sameCurrency(amount(100L)))
                         .setAuthorizationTransactionSn("AUTH_TX_ORIGINAL")
                         .setBusinessScene("CARD_SETTLE")
                         .setBusinessSn("SETTLE_0001")
@@ -486,7 +486,7 @@ class FundsTransactionOrchestrationFlowTests {
 
     private RouteSnapshotSpec originalFreezeSnapshot() {
         FundsInstructionSpec freezeInstruction = new FundsBalanceControlInstructionConverter(
-                FundsRouteTestSupport.accountQueryService(CURRENCY), FundsRouteTestSupport.sameCurrencyFxService())
+                FundsRouteTestSupport.accountQueryService(CURRENCY))
                 .convertToFreezeInstruction(new com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest()
                         .setAccountId(FundsAccountId.immutable("funding_001", FundsSubjectType.FUNDING_ACCOUNT))
                         .setAmount(amount(100L))
@@ -501,7 +501,7 @@ class FundsTransactionOrchestrationFlowTests {
         FundsInstructionSpec authorizeInstruction = authorizationInstructionConverter.convertToAuthorizeInstruction(
                 new FundsAuthorizationTransactionAuthorizeRequest()
                         .setAccountId(creditAccount("credit_001"))
-                        .setAmount(amount(100L))
+                        .setTransactionAmount(TransactionAmount.sameCurrency(amount(100L)))
                         .setApproved(Boolean.TRUE)
                         .setBusinessScene("CARD_AUTH")
                         .setBusinessSn("AUTH_0001")

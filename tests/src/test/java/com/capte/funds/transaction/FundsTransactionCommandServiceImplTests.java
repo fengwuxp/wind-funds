@@ -14,6 +14,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
+import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.capte.funds.route.AuthorizationFundsInstructionRouteResolver;
@@ -31,9 +32,6 @@ import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.wallet.service.PlatformFundingAccountService;
-import com.wind.integration.funds.fx.FxRequest;
-import com.wind.integration.funds.fx.FxResult;
-import com.wind.integration.funds.fx.FxService;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.FundsAccount;
 import com.wind.integration.funds.wallet.FundsAccountBalanceView;
@@ -66,7 +64,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -94,10 +91,9 @@ class FundsTransactionCommandServiceImplTests {
         RouteSubjectSupport routeSubjectSupport = new RouteSubjectSupport();
         PlatformAccountRouteSupport platformAccountRouteSupport = new PlatformAccountRouteSupport(platformFundingAccountService);
         service = new FundsTransactionCommandServiceImpl(
-                new FundsDirectTransactionInstructionConverter(platformFundingAccountService, accountQueryService(CURRENCY),
-                        sameCurrencyFxService()),
-                new FundsBalanceControlInstructionConverter(accountQueryService(CURRENCY), sameCurrencyFxService()),
-                new FundsAuthorizationInstructionConverter(accountQueryService(CURRENCY), sameCurrencyFxService()),
+                new FundsDirectTransactionInstructionConverter(platformFundingAccountService, accountQueryService(CURRENCY)),
+                new FundsBalanceControlInstructionConverter(accountQueryService(CURRENCY)),
+                new FundsAuthorizationInstructionConverter(accountQueryService(CURRENCY)),
                 orchestrator);
         RouteParticipantFactory routeParticipantFactory = new RouteParticipantFactory();
         routeResolver = new CompositeRouteResolver(List.of(
@@ -125,7 +121,7 @@ class FundsTransactionCommandServiceImplTests {
                         DefaultFundsAccountType.EXTERNAL_BANK))
                 .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
                 .setChannelTransactionSn("bank_txn_001")
-                .setAmount(amount(1_000L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(1_000L)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("TOPUP_00000001")
                 .setDescription("topup"), WindOperator.system());
@@ -160,7 +156,7 @@ class FundsTransactionCommandServiceImplTests {
                 .setFundsSourceAccountId(fundingAccount("funding_002"))
                 .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
                 .setChannelTransactionSn("bank_txn_001")
-                .setAmount(amount(1_000L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(1_000L)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("TOPUP_INVALID_SOURCE")
                 .setDescription("topup"), WindOperator.system()))
@@ -170,20 +166,13 @@ class FundsTransactionCommandServiceImplTests {
     }
 
     @Test
-    void testPayShouldConvertWrongCurrencyAndPropagateFxSnapshotToRouteLeg() {
-        FundsTransactionCommandServiceImpl fxAwareService = new FundsTransactionCommandServiceImpl(
-                new FundsDirectTransactionInstructionConverter(platformFundingAccountService(),
-                        accountQueryService(CurrencyIsoCode.USD),
-                        fixedFxService(Money.immutable(1_100L, CurrencyIsoCode.USD), new BigDecimal("1.100000"))),
-                new FundsBalanceControlInstructionConverter(accountQueryService(CURRENCY), sameCurrencyFxService()),
-                new FundsAuthorizationInstructionConverter(accountQueryService(CURRENCY), sameCurrencyFxService()),
-                orchestrator);
-
-        fxAwareService.pay(new FundsTransactionPayRequest()
+    void testPayShouldUseExplicitTransactionAmountAndPropagateFxFactsToRouteLeg() {
+        service.pay(new FundsTransactionPayRequest()
                 .setAccountId(fundingAccount("funding_001"))
                 .setPayeeId(fundingAccount("merchant_001"))
                 .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(1_000L, CurrencyIsoCode.EUR))
+                .setTransactionAmount(TransactionAmount.converted(Money.immutable(1_100L, CurrencyIsoCode.USD),
+                        Money.immutable(1_000L, CurrencyIsoCode.EUR)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("PAY_FX_0001")
                 .setDescription("pay with fx"), WindOperator.system());
@@ -193,11 +182,11 @@ class FundsTransactionCommandServiceImplTests {
 
         assertThat(instruction.getAmount()).isEqualTo(Money.immutable(1_100L, CurrencyIsoCode.USD));
         assertThat(instruction.getOriginalAmount()).isEqualTo(Money.immutable(1_000L, CurrencyIsoCode.EUR));
-        assertThat(instruction.getExchangeRate()).isEqualByComparingTo("1.100000");
+        assertThat(instruction.getExchangeRate()).isEqualByComparingTo("1.1");
         assertThat(route.getLegs()).singleElement().satisfies(leg -> {
             assertThat(leg.getAmount()).isEqualTo(Money.immutable(1_100L, CurrencyIsoCode.USD));
             assertThat(leg.getOriginalAmount()).isEqualTo(Money.immutable(1_000L, CurrencyIsoCode.EUR));
-            assertThat(leg.getExchangeRate()).isEqualByComparingTo("1.100000");
+            assertThat(leg.getExchangeRate()).isEqualByComparingTo("1.1");
         });
     }
 
@@ -209,7 +198,7 @@ class FundsTransactionCommandServiceImplTests {
                 .setAccountId(payer)
                 .setPayeeId(FundsAccountId.immutable("external_bank_001", DefaultFundsAccountType.EXTERNAL_BANK))
                 .setReferenceFreezeSn("FREEZE_00000001")
-                .setAmount(amount(800L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(800L)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_00000001")
                 .setDescription("withdraw"), WindOperator.system());
@@ -239,7 +228,7 @@ class FundsTransactionCommandServiceImplTests {
                 .setAccountId(payer)
                 .setPayeeId(fundingAccount("funding_002"))
                 .setReferenceFreezeSn("FREEZE_00000001")
-                .setAmount(amount(800L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(800L)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_INVALID_PAYEE")
                 .setDescription("withdraw"), WindOperator.system()))
@@ -256,7 +245,7 @@ class FundsTransactionCommandServiceImplTests {
         service.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payer)
                 .setPayeeAccountId(payee)
-                .setAmount(amount(500L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(500L)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("TRANSFER_00000001")
                 .setDescription("transfer"), WindOperator.system());
@@ -280,7 +269,7 @@ class FundsTransactionCommandServiceImplTests {
         assertThatThrownBy(() -> service.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(account)
                 .setPayeeAccountId(account)
-                .setAmount(amount(500L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(500L)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("TRANSFER_SAME_ACCOUNT")
                 .setDescription("transfer"), WindOperator.system()))
@@ -298,7 +287,7 @@ class FundsTransactionCommandServiceImplTests {
                 .setAccountId(payer)
                 .setPayeeId(merchant)
                 .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(amount(700L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(700L)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("PAY_00000001")
                 .setDescription("pay"), WindOperator.system());
@@ -343,7 +332,7 @@ class FundsTransactionCommandServiceImplTests {
 
         service.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
                 .setAccountId(credit)
-                .setAmount(amount(600L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(600L)))
                 .setApproved(Boolean.TRUE)
                 .setBusinessScene("CARD_AUTH")
                 .setBusinessSn("AUTH_00000001")
@@ -367,7 +356,7 @@ class FundsTransactionCommandServiceImplTests {
     void testAuthorizeShouldNotBuildLedgerLegWhenDeclined() {
         service.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
                 .setAccountId(creditAccount("credit_001"))
-                .setAmount(amount(600L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(600L)))
                 .setApproved(Boolean.FALSE)
                 .setDeclineReason("insufficient_funds")
                 .setBusinessScene("CARD_AUTH")
@@ -410,7 +399,7 @@ class FundsTransactionCommandServiceImplTests {
 
         service.settle(new FundsAuthorizationTransactionSettleRequest()
                 .setAccountId(credit)
-                .setAmount(amount(500L))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(500L)))
                 .setAuthorizationTransactionSn("AUTH_TX_00000001")
                 .setBusinessScene("CARD_SETTLE")
                 .setBusinessSn("SETTLE_00000001")
@@ -651,40 +640,6 @@ class FundsTransactionCommandServiceImplTests {
             @Override
             public boolean supports(@org.jspecify.annotations.NonNull FundsAccountId accountId) {
                 return true;
-            }
-        };
-    }
-
-    private static FxService fixedFxService(Money targetAmount, BigDecimal rate) {
-        return new FxService() {
-            @Override
-            public @org.jspecify.annotations.NonNull FxResult convert(
-                    @org.jspecify.annotations.NonNull FxRequest request) {
-                return FxResult.builder()
-                        .sourceAmount(request.getSourceAmount())
-                        .targetAmount(targetAmount)
-                        .rate(rate)
-                        .currencyPair(targetAmount.getCurrency() + "/" + request.getSourceAmount().getCurrency())
-                        .rateType(request.getRateType())
-                        .rawResult(BigDecimal.valueOf(targetAmount.getAmount()))
-                        .build();
-            }
-        };
-    }
-
-    private static FxService sameCurrencyFxService() {
-        return new FxService() {
-            @Override
-            public @org.jspecify.annotations.NonNull FxResult convert(
-                    @org.jspecify.annotations.NonNull FxRequest request) {
-                return FxResult.builder()
-                        .sourceAmount(request.getSourceAmount())
-                        .targetAmount(request.getSourceAmount())
-                        .rate(BigDecimal.ONE)
-                        .currencyPair(request.getTargetCurrency() + "/" + request.getSourceAmount().getCurrency())
-                        .rateType(request.getRateType())
-                        .rawResult(BigDecimal.valueOf(request.getSourceAmount().getAmount()))
-                        .build();
             }
         };
     }

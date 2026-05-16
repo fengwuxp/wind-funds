@@ -40,6 +40,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
+import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
@@ -132,11 +133,9 @@ class FundsTransactionBusinessFlowIntegrationTests {
         );
         service = new FundsTransactionCommandServiceImpl(
                 new FundsDirectTransactionInstructionConverter(platformFundingAccountService,
-                        FundsRouteTestSupport.accountQueryService(CURRENCY), FundsRouteTestSupport.sameCurrencyFxService()),
-                new FundsBalanceControlInstructionConverter(FundsRouteTestSupport.accountQueryService(CURRENCY),
-                        FundsRouteTestSupport.sameCurrencyFxService()),
-                new FundsAuthorizationInstructionConverter(FundsRouteTestSupport.accountQueryService(CURRENCY),
-                        FundsRouteTestSupport.sameCurrencyFxService()),
+                        FundsRouteTestSupport.accountQueryService(CURRENCY)),
+                new FundsBalanceControlInstructionConverter(FundsRouteTestSupport.accountQueryService(CURRENCY)),
+                new FundsAuthorizationInstructionConverter(FundsRouteTestSupport.accountQueryService(CURRENCY)),
                 orchestrator
         );
     }
@@ -257,7 +256,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
                         DefaultFundsAccountType.EXTERNAL_BANK))
                 .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
                 .setChannelTransactionSn(businessSn + "_CHANNEL")
-                .setAmount(amount(amount))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn(businessSn)
                 .setDescription("topup"), WindOperator.system());
@@ -268,7 +267,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setAccountId(payer)
                 .setPayeeId(merchant)
                 .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(amount(amount))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("PAY")
                 .setBusinessSn(businessSn)
                 .setDescription("pay"), WindOperator.system());
@@ -289,7 +288,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
         service.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payer)
                 .setPayeeAccountId(payee)
-                .setAmount(amount(amount))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn(businessSn)
                 .setDescription("transfer"), WindOperator.system());
@@ -309,7 +308,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setAccountId(accountId)
                 .setPayeeId(FundsAccountId.immutable("external_bank_001", DefaultFundsAccountType.EXTERNAL_BANK))
                 .setReferenceFreezeSn(businessSn + "_FREEZE")
-                .setAmount(amount(amount))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn(businessSn)
                 .setDescription("withdraw"), WindOperator.system());

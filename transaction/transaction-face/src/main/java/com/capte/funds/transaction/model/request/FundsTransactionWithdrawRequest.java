@@ -2,7 +2,6 @@ package com.capte.funds.transaction.model.request;
 
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -30,9 +29,9 @@ public class FundsTransactionWithdrawRequest {
     @NotNull
     private String referenceFreezeSn;
 
-    @Schema(description = "提现金额")
+    @Schema(description = "提现交易金额")
     @NotNull
-    private Money amount;
+    private TransactionAmount transactionAmount;
 
     @Schema(description = "业务流水号，提现凭证，例如：提现申请单流水号")
     @NotNull

@@ -52,7 +52,7 @@ class AuthorizationFundsInstructionRouteResolverTests {
         FundsInstructionSpec instruction = converter.convertToAuthorizeInstruction(
                 new FundsAuthorizationTransactionAuthorizeRequest()
                         .setAccountId(FundsRouteTestSupport.creditAccount("credit_001"))
-                        .setAmount(FundsRouteTestSupport.amount(600L))
+                        .setTransactionAmount(FundsRouteTestSupport.transactionAmount(600L))
                         .setApproved(Boolean.FALSE)
                         .setBusinessScene("AUTH")
                         .setBusinessSn("AUTH_0001"), WindOperator.system());
@@ -79,7 +79,7 @@ class AuthorizationFundsInstructionRouteResolverTests {
         FundsInstructionSpec instruction = converter.convertToSettleInstruction(
                 new FundsAuthorizationTransactionSettleRequest()
                         .setAccountId(accountId)
-                        .setAmount(FundsRouteTestSupport.amount(400L))
+                        .setTransactionAmount(FundsRouteTestSupport.transactionAmount(400L))
                         .setBusinessScene("SETTLE")
                         .setBusinessSn("SETTLE_0001")
                         .setAuthorizationTransactionSn("AUTH_TX_0001"), WindOperator.system());

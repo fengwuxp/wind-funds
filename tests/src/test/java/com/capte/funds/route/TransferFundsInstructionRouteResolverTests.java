@@ -50,7 +50,7 @@ class TransferFundsInstructionRouteResolverTests {
                         DefaultFundsAccountType.EXTERNAL_BANK))
                 .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
                 .setChannelTransactionSn("bank_txn_001")
-                .setAmount(FundsRouteTestSupport.amount(1_000L))
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(1_000L))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("TOPUP_0001"), WindOperator.system());
 
@@ -81,7 +81,7 @@ class TransferFundsInstructionRouteResolverTests {
                 .setAccountId(accountId)
                 .setPayeeId(FundsAccountId.immutable("external_bank_001", DefaultFundsAccountType.EXTERNAL_BANK))
                 .setReferenceFreezeSn("FREEZE_0001")
-                .setAmount(FundsRouteTestSupport.amount(800L))
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(800L))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_0001"), WindOperator.system());
 
@@ -116,7 +116,7 @@ class TransferFundsInstructionRouteResolverTests {
                 .setAccountId(accountId)
                 .setPayeeId(FundsRouteTestSupport.fundingAccount("merchant_001"))
                 .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(FundsRouteTestSupport.amount(500L))
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(500L))
                 .setBusinessScene("PAY")
                 .setBusinessSn("PAY_0001"), WindOperator.system());
 
@@ -140,7 +140,7 @@ class TransferFundsInstructionRouteResolverTests {
         FundsInstructionSpec instruction = converter.convertToTransferInstruction(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payerAccountId)
                 .setPayeeAccountId(FundsRouteTestSupport.fundingAccount("funding_002"))
-                .setAmount(FundsRouteTestSupport.amount(700L))
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(700L))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("TRANSFER_0001"), WindOperator.system());
 
@@ -160,7 +160,7 @@ class TransferFundsInstructionRouteResolverTests {
         FundsInstructionSpec instruction = converter.convertToTransferInstruction(new FundsTransactionTransferRequest()
                 .setPayerAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
                 .setPayeeAccountId(FundsRouteTestSupport.fundingAccount("funding_002"))
-                .setAmount(FundsRouteTestSupport.amount(700L))
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(700L))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("TRANSFER_0001"), WindOperator.system());
 

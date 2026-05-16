@@ -3,7 +3,6 @@ package com.capte.funds.transaction.model.request;
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -25,9 +24,9 @@ public class FundsTransactionPayRequest {
     @NonNull
     private FundsAccountId accountId;
 
-    @Schema(description = "付款金额")
+    @Schema(description = "付款交易金额")
     @NonNull
-    private Money amount;
+    private TransactionAmount transactionAmount;
 
     @Schema(description = "收款账户")
     @NonNull

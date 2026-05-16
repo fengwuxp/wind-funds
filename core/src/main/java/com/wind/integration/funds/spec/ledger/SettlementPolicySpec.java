@@ -28,6 +28,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *     <li>自定义账期（跨月账期）</li>
  * </ul>
  *
+ * <p>不支持的表达式必须显式失败，不能静默降级为实时结算。</p>
+ *
  * <h2>表达式规范（DSL）</h2>
  *
  * <pre>
@@ -142,6 +144,11 @@ public final class SettlementPolicySpec {
         SettlementPolicySpec predefined = CONSTANTS.get(expression);
         if (predefined != null) {
             return predefined;
+        }
+
+        // 自定义账期 C@DD-DD 不使用 + 语法，需在通用周期表达式前解析。
+        if (expression.startsWith("C@")) {
+            return parseCustomCycle(expression);
         }
 
         // 延迟结算 T+N

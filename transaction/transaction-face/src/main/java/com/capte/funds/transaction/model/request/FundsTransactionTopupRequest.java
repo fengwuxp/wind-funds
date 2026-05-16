@@ -4,7 +4,6 @@ package com.capte.funds.transaction.model.request;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -41,9 +40,9 @@ public class FundsTransactionTopupRequest {
     @Schema(description = "渠道方标识")
     private String channelId;
 
-    @Schema(description = "充值金额")
+    @Schema(description = "充值交易金额")
     @NotNull
-    private Money amount;
+    private TransactionAmount transactionAmount;
 
     @Schema(description = "业务流水号，入账凭证，例如：在线充值流水号，人工入账单流水号、退款单交易流水号")
     @NotNull

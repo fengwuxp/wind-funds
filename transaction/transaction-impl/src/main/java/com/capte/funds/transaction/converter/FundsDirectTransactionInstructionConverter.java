@@ -3,16 +3,14 @@ package com.capte.funds.transaction.converter;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
-import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.wallet.service.PlatformFundingAccountService;
-import com.capte.funds.transaction.converter.FundsInstructionFxSupport.ConvertedAmount;
+import com.capte.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
-import com.wind.integration.funds.fx.FxService;
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.route.ImmutableExternalAccountRefSpec;
@@ -28,6 +26,7 @@ import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -48,19 +47,18 @@ public class FundsDirectTransactionInstructionConverter {
 
     private final PlatformFundingAccountService platformFundingAccountService;
 
-    private final FundsInstructionFxSupport fxSupport;
+    private final FundsInstructionAmountSupport amountSupport;
 
     @Autowired
     public FundsDirectTransactionInstructionConverter(@NonNull PlatformFundingAccountService platformFundingAccountService,
-                                                 @NonNull FundsAccountQueryService fundsAccountQueryService,
-                                                 @NonNull FxService fxService) {
+                                                     @NonNull FundsAccountQueryService fundsAccountQueryService) {
         this.platformFundingAccountService = platformFundingAccountService;
-        this.fxSupport = new FundsInstructionFxSupport(fundsAccountQueryService, fxService);
+        this.amountSupport = new FundsInstructionAmountSupport(fundsAccountQueryService);
     }
 
     public @NonNull FundsInstructionSpec convertToTopupInstruction(@NonNull FundsTransactionTopupRequest request,
                                                                    @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
@@ -87,7 +85,7 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToTransferInstruction(@NonNull FundsTransactionTransferRequest request,
                                                                       @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getPayerAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getPayerAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -109,7 +107,7 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToPayInstruction(@NonNull FundsTransactionPayRequest request,
                                                                  @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -132,7 +130,7 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToRefundInstruction(@NonNull FundsTransactionRefundRequest request,
                                                                     @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.PAYER_ID, request.getPayerId());
         extraContext.put(FundsInstructionContextKeys.PAYER_LEDGER_SUBJECT_CODE, request.getPayerLedgerCode());
@@ -166,7 +164,7 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToWithdrawInstruction(@NonNull FundsTransactionWithdrawRequest request,
                                                                       @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
@@ -191,7 +189,7 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToFeeInstruction(@NonNull FundsTransactionFeeRequest request,
                                                                  @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)

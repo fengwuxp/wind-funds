@@ -3,14 +3,13 @@ package com.capte.funds.transaction.converter;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
-import com.capte.funds.transaction.converter.FundsInstructionFxSupport.ConvertedAmount;
+import com.capte.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.wind.core.WritableContextVariables;
-import com.wind.integration.funds.fx.FxService;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
@@ -37,18 +36,17 @@ import java.util.Map;
 @Component
 public class FundsAuthorizationInstructionConverter {
 
-    private final FundsInstructionFxSupport fxSupport;
+    private final FundsInstructionAmountSupport amountSupport;
 
     @Autowired
-    public FundsAuthorizationInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService,
-                                                   @NonNull FxService fxService) {
-        this.fxSupport = new FundsInstructionFxSupport(fundsAccountQueryService, fxService);
+    public FundsAuthorizationInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService) {
+        this.amountSupport = new FundsInstructionAmountSupport(fundsAccountQueryService);
     }
 
     public @NonNull FundsInstructionSpec convertToAuthorizeInstruction(
             @NonNull FundsAuthorizationTransactionAuthorizeRequest request,
             @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         context.put(FundsInstructionContextKeys.APPROVED, request.getApproved());
@@ -81,7 +79,7 @@ public class FundsAuthorizationInstructionConverter {
     public @NonNull FundsInstructionSpec convertToReversalInstruction(
             @NonNull FundsAuthorizationTransactionReversalRequest request,
             @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
@@ -107,7 +105,7 @@ public class FundsAuthorizationInstructionConverter {
     public @NonNull FundsInstructionSpec convertToSettleInstruction(
             @NonNull FundsAuthorizationTransactionSettleRequest request,
             @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
@@ -133,7 +131,7 @@ public class FundsAuthorizationInstructionConverter {
     public @NonNull FundsInstructionSpec convertToSettleRefundInstruction(
             @NonNull FundsAuthorizationTransactionRefundRequest request,
             @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
@@ -162,7 +160,7 @@ public class FundsAuthorizationInstructionConverter {
     public @NonNull FundsInstructionSpec convertToChargebackInstruction(
             @NonNull FundsAuthorizationTransactionChargebackRequest request,
             @NonNull WindOperator operator) {
-        ConvertedAmount amount = fxSupport.convert(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)

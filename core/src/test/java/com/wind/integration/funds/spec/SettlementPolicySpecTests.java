@@ -106,6 +106,15 @@ class SettlementPolicySpecTests {
         assertEquals(LocalDateTime.of(2026, 5, 4, 0, 0), cycle.nextSettlementTime(now));
     }
 
+    @Test
+    void testParseNonPredefinedCustomCycle() {
+        SettlementPolicySpec cycle = SettlementPolicySpec.parse("C@10-09");
+        LocalDateTime now = LocalDateTime.of(2026, 4, 9, 10, 0);
+        assertEquals("C@10-09", cycle.getRaw());
+        assertEquals(SettlementPolicySpec.SettlementMode.CUSTOM_CYCLE, cycle.getSettlementMode());
+        assertEquals(LocalDateTime.of(2026, 5, 9, 0, 0), cycle.nextSettlementTime(now));
+    }
+
     // ========================= 校验测试 =========================
 
     @Test
@@ -170,6 +179,13 @@ class SettlementPolicySpecTests {
         assertThrows(IllegalArgumentException.class, () -> SettlementPolicySpec.parse("M+1@-3"));
         assertThrows(IllegalArgumentException.class, () -> SettlementPolicySpec.parse("C@-05-04"));
         assertThrows(IllegalArgumentException.class, () -> SettlementPolicySpec.parse("C@05--04"));
+    }
+
+    @Test
+    void testUnsupportedExpressionShouldNotFallbackToRealtime() {
+        assertThrows(IllegalArgumentException.class, () -> SettlementPolicySpec.parse("UNKNOWN"));
+        assertThrows(IllegalArgumentException.class, () -> SettlementPolicySpec.parse("D+1"));
+        assertThrows(IllegalArgumentException.class, () -> SettlementPolicySpec.parse("T+ABC"));
     }
 
     @Test

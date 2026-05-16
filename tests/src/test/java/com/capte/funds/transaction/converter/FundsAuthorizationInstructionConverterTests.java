@@ -45,7 +45,7 @@ class FundsAuthorizationInstructionConverterTests {
         FundsInstructionSpec instruction = converter.convertToAuthorizeInstruction(
                 new FundsAuthorizationTransactionAuthorizeRequest()
                         .setAccountId(FundsRouteTestSupport.creditAccount("credit_001"))
-                        .setAmount(FundsRouteTestSupport.amount(600L))
+                        .setTransactionAmount(FundsRouteTestSupport.transactionAmount(600L))
                         .setApproved(Boolean.FALSE)
                         .setDeclineReason("risk_denied")
                         .setTransactionCountry(InternationalRegionCode.US)
@@ -68,7 +68,7 @@ class FundsAuthorizationInstructionConverterTests {
         FundsInstructionSpec instruction = converter.convertToSettleInstruction(
                 new FundsAuthorizationTransactionSettleRequest()
                         .setAccountId(FundsRouteTestSupport.creditAccount("credit_001"))
-                        .setAmount(FundsRouteTestSupport.amount(500L))
+                        .setTransactionAmount(FundsRouteTestSupport.transactionAmount(500L))
                         .setBusinessScene("CARD_SETTLE")
                         .setBusinessSn("SETTLE_0001")
                         .setAuthorizationTransactionSn("AUTH_TX_0001"), WindOperator.system());

@@ -384,7 +384,7 @@ class DefaultRouteReplayServiceTests {
                 .convertToTransferInstruction(new FundsTransactionTransferRequest()
                         .setPayerAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
                         .setPayeeAccountId(FundsRouteTestSupport.fundingAccount("funding_002"))
-                        .setAmount(FundsRouteTestSupport.amount(500L))
+                        .setTransactionAmount(FundsRouteTestSupport.transactionAmount(500L))
                         .setBusinessScene("TRANSFER")
                         .setBusinessSn("TRANSFER_0001"), WindOperator.system());
         ResolvedRouteSpec route = FundsRouteTestSupport.transferRouteResolver(

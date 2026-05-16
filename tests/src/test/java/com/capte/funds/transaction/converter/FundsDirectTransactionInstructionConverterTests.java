@@ -7,6 +7,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
+import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.route.FundsRouteTestSupport;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
@@ -19,11 +20,14 @@ import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FundsDirectTransactionInstructionConverterTests {
 
@@ -48,7 +52,7 @@ class FundsDirectTransactionInstructionConverterTests {
                         DefaultFundsAccountType.EXTERNAL_BANK))
                 .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
                 .setChannelTransactionSn("bank_txn_001")
-                .setAmount(FundsRouteTestSupport.amount(1_000L))
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(1_000L))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("TOPUP_0001")
                 .setDescription("topup"), WindOperator.system());
@@ -72,7 +76,7 @@ class FundsDirectTransactionInstructionConverterTests {
         FundsInstructionSpec instruction = converter.convertToTransferInstruction(new FundsTransactionTransferRequest()
                 .setPayerAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
                 .setPayeeAccountId(FundsRouteTestSupport.fundingAccount("funding_002"))
-                .setAmount(FundsRouteTestSupport.amount(500L))
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(500L))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("TRANSFER_0001")
                 .setDescription("transfer"), WindOperator.system());
@@ -93,7 +97,7 @@ class FundsDirectTransactionInstructionConverterTests {
                 .setAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
                 .setPayeeId(FundsRouteTestSupport.fundingAccount("merchant_001"))
                 .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(FundsRouteTestSupport.amount(700L))
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(700L))
                 .setBusinessScene("PAY")
                 .setBusinessSn("PAY_0001")
                 .setDescription("pay"), WindOperator.system());
@@ -110,12 +114,25 @@ class FundsDirectTransactionInstructionConverterTests {
     }
 
     @Test
+    void testConvertToPayInstructionShouldRejectWrongCurrencyWithoutFxDecision() {
+        assertThatThrownBy(() -> converter.convertToPayInstruction(new FundsTransactionPayRequest()
+                .setAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
+                .setPayeeId(FundsRouteTestSupport.fundingAccount("merchant_001"))
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(700L, CurrencyIsoCode.EUR)))
+                .setBusinessScene("PAY")
+                .setBusinessSn("PAY_WRONG_CURRENCY"), WindOperator.system()))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("transactionAmount.amount currency must equal account currency");
+    }
+
+    @Test
     void testConvertToWithdrawInstructionShouldPopulateFreezeReference() {
         FundsInstructionSpec instruction = converter.convertToWithdrawInstruction(new FundsTransactionWithdrawRequest()
                 .setAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
                 .setPayeeId(FundsAccountId.immutable("external_bank_001", DefaultFundsAccountType.EXTERNAL_BANK))
                 .setReferenceFreezeSn("FREEZE_0001")
-                .setAmount(FundsRouteTestSupport.amount(800L))
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(800L))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_0001")
                 .setDescription("withdraw"), WindOperator.system());

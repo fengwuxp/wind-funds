@@ -11,11 +11,14 @@ import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FundsBalanceControlInstructionConverterTests {
 
@@ -48,6 +51,17 @@ class FundsBalanceControlInstructionConverterTests {
                 .containsEntry(FundsInstructionContextKeys.ACCOUNT_ID,
                         FundsRouteTestSupport.fundingAccount("funding_001"));
         assertThat(instruction.getReference()).isNull();
+    }
+
+    @Test
+    void testConvertToFreezeInstructionShouldRejectWrongCurrencyWithoutFx() {
+        assertThatThrownBy(() -> converter.convertToFreezeInstruction(new FundsBalanceFreezeRequest()
+                .setAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
+                .setAmount(Money.immutable(400L, CurrencyIsoCode.EUR))
+                .setBusinessScene("FREEZE")
+                .setBusinessSn("FREEZE_WRONG_CURRENCY"), WindOperator.system()))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("amount currency must equal account currency");
     }
 
     @Test

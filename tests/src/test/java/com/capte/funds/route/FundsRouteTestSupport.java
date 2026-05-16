@@ -7,12 +7,10 @@ import com.capte.funds.route.support.RouteSubjectSupport;
 import com.capte.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
+import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.wallet.service.PlatformFundingAccountService;
-import com.wind.integration.funds.fx.FxRequest;
-import com.wind.integration.funds.fx.FxResult;
-import com.wind.integration.funds.fx.FxService;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.FundsAccount;
 import com.wind.integration.funds.wallet.FundsAccountBalanceView;
@@ -27,7 +25,6 @@ import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 
-import java.math.BigDecimal;
 import java.util.Map;
 
 /**
@@ -64,6 +61,10 @@ public final class FundsRouteTestSupport {
 
     public static Money amount(long value) {
         return Money.immutable(value, CURRENCY);
+    }
+
+    public static TransactionAmount transactionAmount(long value) {
+        return TransactionAmount.sameCurrency(amount(value));
     }
 
     public static PlatformFundingAccountService platformFundingAccountService() {
@@ -105,22 +106,6 @@ public final class FundsRouteTestSupport {
         };
     }
 
-    public static FxService sameCurrencyFxService() {
-        return new FxService() {
-            @Override
-            public FxResult convert(FxRequest request) {
-                return FxResult.builder()
-                        .sourceAmount(request.getSourceAmount())
-                        .targetAmount(request.getSourceAmount())
-                        .rate(BigDecimal.ONE)
-                        .currencyPair(request.getTargetCurrency() + "/" + request.getSourceAmount().getCurrency())
-                        .rateType(request.getRateType())
-                        .rawResult(BigDecimal.valueOf(request.getSourceAmount().getAmount()))
-                        .build();
-            }
-        };
-    }
-
     public static FundsAccountTransactionFeeProvider noFeeProvider() {
         return new FundsAccountTransactionFeeProvider() {
             @Override
@@ -153,16 +138,15 @@ public final class FundsRouteTestSupport {
     }
 
     public static FundsDirectTransactionInstructionConverter transactionInstructionConverter() {
-        return new FundsDirectTransactionInstructionConverter(platformFundingAccountService(), accountQueryService(),
-                sameCurrencyFxService());
+        return new FundsDirectTransactionInstructionConverter(platformFundingAccountService(), accountQueryService());
     }
 
     public static FundsBalanceControlInstructionConverter balanceControlInstructionConverter() {
-        return new FundsBalanceControlInstructionConverter(accountQueryService(), sameCurrencyFxService());
+        return new FundsBalanceControlInstructionConverter(accountQueryService());
     }
 
     public static FundsAuthorizationInstructionConverter authorizationInstructionConverter() {
-        return new FundsAuthorizationInstructionConverter(accountQueryService(), sameCurrencyFxService());
+        return new FundsAuthorizationInstructionConverter(accountQueryService());
     }
 
     public static TransferFundsInstructionRouteResolver transferRouteResolver(FundsAccountTransactionFeeProvider feeProvider) {

@@ -19,6 +19,7 @@ import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,15 +76,59 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
                     .setCreditAmountDelta(delta.creditAmountDelta())
                     .setMinimumNormalBalance(resolveMinimumNormalBalance(ledger, entry.getValue()));
             ledgerService.updateLedgerBalance(balanceRequest);
-            // 发送余额变更事件
+            publishBalanceChangedEvents(accountId, ledger, entry.getValue(), beforeBalanceAmount, delta);
+        }
+    }
+
+    private void publishBalanceChangedEvents(FundsAccountId accountId,
+                                             LedgerDTO ledger,
+                                             List<LedgerEntrySpec> entries,
+                                             Money beforeBalance,
+                                             ProjectionDelta delta) {
+        long previousBalance = beforeBalance.getAmount();
+        for (LedgerEntrySpec entry : entries) {
+            long entryBalanceDelta = balanceDelta(entry, ledger.getNormalBalanceSide());
+            long currentBalance = previousBalance + entryBalanceDelta;
+            publishBalanceChangedEvent(accountId, ledger, entry, previousBalance, currentBalance, entryBalanceDelta);
+            previousBalance = currentBalance;
+        }
+        AssertUtils.isTrue(previousBalance == beforeBalance.getAmount() + delta.balanceDelta(),
+                "余额变更事件累计值与余额投影变更不一致，ledgerId = {}", ledger.getId());
+    }
+
+    private void publishBalanceChangedEvent(FundsAccountId accountId,
+                                            LedgerDTO ledger,
+                                            LedgerEntrySpec entry,
+                                            long beforeBalance,
+                                            long currentBalance,
+                                            long balanceDelta) {
+        try {
             SpringEventPublishUtils.publishWithTransactionCommitOrImmediately(LedgerBalanceChangedEvent.builder()
                     .subjectId(accountId.id())
                     .subjectType(accountId.type())
-                    .ledgerSubjectCode(ledgerCode)
-                    .currency(beforeBalance.getCurrency())
-                    .beforeBalance(beforeBalanceAmount.getAmount())
-                    .balance(beforeBalanceAmount.getAmount() + delta.balanceDelta())
+                    .ledgerId(ledger.getId())
+                    .ledgerSubjectCode(ledger.getLedgerSubjectCode())
+                    .currency(entry.getCurrency())
+                    .beforeBalance(beforeBalance)
+                    .balance(currentBalance)
+                    .balanceDelta(balanceDelta)
+                    .ledgerTransactionSn(entry.getLedgerTransactionSn())
+                    .ledgerEntrySn(resolveLedgerEntrySn(entry))
+                    .ledgerEntryDigest(entry.getSha256())
+                    .businessScene(entry.getBusinessScene())
+                    .businessSn(entry.getBusinessSn())
+                    .transactionTime(entry.getTransactionTime())
+                    .contextVariables(Map.copyOf(entry.getContextVariables()))
                     .build());
+        } catch (RuntimeException ex) {
+            Throwable cause = NestedExceptionUtils.getMostSpecificCause(ex);
+            log.warn("发布账本余额变更观察事件失败，ledgerTransactionSn = {}, ledgerId = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, cause = {}",
+                    entry.getLedgerTransactionSn(),
+                    ledger.getId(),
+                    accountId.id(),
+                    accountId.type(),
+                    ledger.getLedgerSubjectCode(),
+                    cause.toString());
         }
     }
 
@@ -137,6 +182,21 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
         long rawDelta = debitAmountDelta - creditAmountDelta;
         long balanceDelta = normalBalanceSide == EntrySide.DEBIT ? rawDelta : -rawDelta;
         return new ProjectionDelta(balanceDelta, debitAmountDelta, creditAmountDelta);
+    }
+
+    private long balanceDelta(LedgerEntrySpec entry, EntrySide normalBalanceSide) {
+        long signedAmount = entry.getEntryType() == EntrySide.DEBIT
+                ? entry.getAmount().getAmount()
+                : -entry.getAmount().getAmount();
+        return normalBalanceSide == EntrySide.DEBIT ? signedAmount : -signedAmount;
+    }
+
+    private String resolveLedgerEntrySn(LedgerEntrySpec entry) {
+        Object value = entry.getContextVariables().get("ledgerEntrySn");
+        if (value == null) {
+            return null;
+        }
+        return String.valueOf(value);
     }
 
     private Long resolveMinimumNormalBalance(LedgerDTO ledger, List<LedgerEntrySpec> entries) {

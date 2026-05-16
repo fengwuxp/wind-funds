@@ -2,7 +2,6 @@ package com.capte.funds.transaction.model.request;
 
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.InternationalRegionCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -30,10 +29,10 @@ public class FundsAuthorizationTransactionAuthorizeRequest {
     @NotNull
     private FundsAccountId accountId;
 
-    @Schema(description = "授权金额")
+    @Schema(description = "授权交易金额")
     @NonNull
     @NotNull
-    private Money amount;
+    private TransactionAmount transactionAmount;
 
     @Schema(description = "业务流水号（如果是卡交易则为授权交易流水号）")
     @NonNull
