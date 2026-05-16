@@ -63,6 +63,12 @@ public final class FundsInstructionContextKeys {
 
     public static final String NEGATIVE_AVAILABLE_AGING_STARTED_AT = "negativeAvailableAgingStartedAt";
 
+    public static final String BUDGET_PERIOD_ID = "budgetPeriodId";
+
+    public static final String BUDGET_GOVERNANCE_POLICY_CODE = "budgetGovernancePolicyCode";
+
+    public static final String BUDGET_REPORT_MARKER = "budgetReportMarker";
+
     public static final String CHANNEL_CODE = "channelCode";
 
     public static final String EXTERNAL_TRANSACTION_ID = "externalTransactionId";

@@ -18,6 +18,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
+import com.wind.core.WritableContextVariables;
 import com.capte.funds.route.AuthorizationFundsInstructionRouteResolver;
 import com.capte.funds.route.BalanceControlFundsInstructionRouteResolver;
 import com.capte.funds.route.CompositeRouteResolver;
@@ -70,6 +71,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -431,9 +433,11 @@ class FundsTransactionCommandServiceImplTests {
         assertThat(route.getRouteCode()).isEqualTo("AUTHORIZATION_SETTLE_REPLAY");
         assertThat(route.getParticipants())
                 .extracting(participant -> participant.getParticipantRole().name())
-                .containsExactly(RouteParticipantRole.AUTH_HOLDER.name());
+                .containsExactly(RouteParticipantRole.AUTH_HOLDER.name(),
+                        RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT.name());
         assertLeg(route.getLegs().getFirst(), RouteLegType.CONSUME, LedgerSubjectCode.AUTHORIZATION,
-                LedgerSubjectCode.LIMIT, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.SETTLEMENT);
+                LedgerSubjectCode.SETTLEMENT, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.SETTLEMENT);
+        assertNoLimitNodes(route);
     }
 
     @Test
@@ -456,9 +460,11 @@ class FundsTransactionCommandServiceImplTests {
         assertThat(route.getRouteCode()).isEqualTo("AUTHORIZATION_REFUND_REPLAY");
         assertThat(route.getParticipants())
                 .extracting(participant -> participant.getParticipantRole().name())
-                .containsExactly(RouteParticipantRole.AUTH_HOLDER.name());
-        assertLeg(route.getLegs().getFirst(), RouteLegType.RESTORE, LedgerSubjectCode.LIMIT,
+                .containsExactly(RouteParticipantRole.AUTH_HOLDER.name(),
+                        RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT.name());
+        assertLeg(route.getLegs().getFirst(), RouteLegType.RESTORE, LedgerSubjectCode.SETTLEMENT,
                 LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.RESTORE, LedgerPhaseCode.REFUND);
+        assertNoLimitNodes(route);
     }
 
     @Test
@@ -556,6 +562,22 @@ class FundsTransactionCommandServiceImplTests {
     }
 
     @Test
+    void testAdjustBudgetGroupShouldPreserveBudgetGovernanceContext() {
+        FundsAccountId budgetGroup = FundsAccountId.immutable("budget_001", FundsSubjectType.BUDGET_GROUP);
+
+        service.adjust(adjustRequest(budgetGroup, 2_000L, Boolean.FALSE, "BUDGET", "BUDGET_00000002")
+                .setContextVariables(budgetGovernanceContext()), WindOperator.system());
+
+        FundsInstructionSpec instruction = instruction();
+        assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.LIMIT_ADJUST);
+        assertThat(instruction.getContextVariables())
+                .containsEntry(FundsInstructionContextKeys.BUDGET_PERIOD_ID, "BUDGET_2026_M05")
+                .containsEntry(FundsInstructionContextKeys.BUDGET_GOVERNANCE_POLICY_CODE,
+                        "BUDGET_OVERUSE_GOVERNANCE")
+                .containsEntry(FundsInstructionContextKeys.BUDGET_REPORT_MARKER, "BUDGET_REPORT_2026_M05");
+    }
+
+    @Test
     void testAdjustShouldRejectMissingApprovalEvidenceBeforeOrchestrator() {
         assertThatThrownBy(() -> service.adjust(adjustRequest(creditAccount("credit_001"), 5_000L, Boolean.TRUE,
                 "LIMIT", "LIMIT_MISSING_EVIDENCE").setAdjustEvidenceRef(null), WindOperator.system()))
@@ -643,6 +665,13 @@ class FundsTransactionCommandServiceImplTests {
         assertThat(leg.getPhaseCode()).isEqualTo(phaseCode);
     }
 
+    private static void assertNoLimitNodes(ResolvedRouteSpec route) {
+        assertThat(route.getLegs())
+                .allSatisfy(leg -> assertThat(LedgerSubjectCode.LIMIT)
+                        .isNotIn(leg.getSourceNode().getLedgerSubjectCode(),
+                                leg.getTargetNode().getLedgerSubjectCode()));
+    }
+
     private static FundsAccountId fundingAccount(String accountId) {
         return FundsAccountId.immutable(accountId, FundsSubjectType.FUNDING_ACCOUNT);
     }
@@ -669,6 +698,14 @@ class FundsTransactionCommandServiceImplTests {
                 .setAdjustReason("adjust reason")
                 .setAdjustEvidenceRef("EVIDENCE_" + businessSn)
                 .setApprovalRef("APPROVAL_" + businessSn);
+    }
+
+    private static WritableContextVariables budgetGovernanceContext() {
+        return new SimpleContextVariables()
+                .putVariable(FundsInstructionContextKeys.BUDGET_PERIOD_ID, "BUDGET_2026_M05")
+                .putVariable(FundsInstructionContextKeys.BUDGET_GOVERNANCE_POLICY_CODE,
+                        "BUDGET_OVERUSE_GOVERNANCE")
+                .putVariable(FundsInstructionContextKeys.BUDGET_REPORT_MARKER, "BUDGET_REPORT_2026_M05");
     }
 
     private static String constraintKey(FundsAccountId accountId, LedgerSubjectCode subjectCode) {
@@ -758,6 +795,28 @@ class FundsTransactionCommandServiceImplTests {
         @Override
         public Long getTenantId() {
             return TENANT_ID;
+        }
+    }
+
+    private static final class SimpleContextVariables implements WritableContextVariables {
+
+        private final Map<String, Object> variables = new HashMap<>();
+
+        @Override
+        public WritableContextVariables putVariable(String name, Object val) {
+            variables.put(name, val);
+            return this;
+        }
+
+        @Override
+        public WritableContextVariables removeVariable(String name) {
+            variables.remove(name);
+            return this;
+        }
+
+        @Override
+        public Map<String, Object> getContextVariables() {
+            return Map.copyOf(variables);
         }
     }
 

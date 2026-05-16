@@ -299,7 +299,7 @@ class BalanceControlFundsInstructionRouteResolverTests {
         FundsAccountId accountId = FundsRouteTestSupport.budgetGroup("budget_001");
         FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
                 accountId, 1_500L, Boolean.FALSE, "BUDGET", "BUDGET_0003")
-                .setContextVariables(allowNegativeContext("BUDGET_AVAILABLE_CONTROLLED_NEGATIVE")),
+                .setContextVariables(budgetAllowNegativeContext()),
                 WindOperator.system());
 
         ResolvedRouteSpec route = FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction);
@@ -309,6 +309,29 @@ class BalanceControlFundsInstructionRouteResolverTests {
                     LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.ADJUSTMENT);
             assertConstraint(leg, accountId, LedgerSubjectCode.AVAILABLE, LedgerBalanceConstraintType.ALLOW_NEGATIVE);
         });
+    }
+
+    /**
+     * 场景：预算组额度调减允许受控负数但缺预算治理上下文。
+     * 输入：BUDGET_GROUP，减少 1500，分别缺预算周期、治理策略或报表标记。
+     * 输出：route 解析拒绝。
+     * 预期：不生成 ALLOW_NEGATIVE route。
+     * 红线：预算超用必须能落到周期、治理策略和报表口径，不能只复用普通资金负余额证据。
+     */
+    @Test
+    void testResolveBudgetLimitAdjustShouldRejectControlledNegativeWithoutBudgetGovernance() {
+        assertBudgetAllowNegativeContextMissingShouldFail(
+                FundsInstructionContextKeys.BUDGET_PERIOD_ID,
+                "预算受控负余额调账缺少预算周期",
+                "BUDGET_0004");
+        assertBudgetAllowNegativeContextMissingShouldFail(
+                FundsInstructionContextKeys.BUDGET_GOVERNANCE_POLICY_CODE,
+                "预算受控负余额调账缺少治理策略",
+                "BUDGET_0005");
+        assertBudgetAllowNegativeContextMissingShouldFail(
+                FundsInstructionContextKeys.BUDGET_REPORT_MARKER,
+                "预算受控负余额调账缺少报表标记",
+                "BUDGET_0006");
     }
 
     /**
@@ -430,6 +453,14 @@ class BalanceControlFundsInstructionRouteResolverTests {
                         LocalDateTime.of(2026, 5, 16, 10, 0));
     }
 
+    private static WritableContextVariables budgetAllowNegativeContext() {
+        return allowNegativeContext("BUDGET_AVAILABLE_CONTROLLED_NEGATIVE")
+                .putVariable(FundsInstructionContextKeys.BUDGET_PERIOD_ID, "BUDGET_2026_M05")
+                .putVariable(FundsInstructionContextKeys.BUDGET_GOVERNANCE_POLICY_CODE,
+                        "BUDGET_OVERUSE_GOVERNANCE")
+                .putVariable(FundsInstructionContextKeys.BUDGET_REPORT_MARKER, "BUDGET_REPORT_2026_M05");
+    }
+
     private void assertAllowNegativeContextMissingShouldFail(String missingKey,
                                                              String expectedMessage,
                                                              String businessSn) {
@@ -437,6 +468,21 @@ class BalanceControlFundsInstructionRouteResolverTests {
         FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
                 accountId, 1_000L, Boolean.FALSE, "ADJUST", businessSn)
                 .setContextVariables(allowNegativeContext("FUNDING_AVAILABLE_CONTROLLED_NEGATIVE")
+                        .removeVariable(missingKey)),
+                WindOperator.system());
+
+        assertThatThrownBy(() -> FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining(expectedMessage);
+    }
+
+    private void assertBudgetAllowNegativeContextMissingShouldFail(String missingKey,
+                                                                   String expectedMessage,
+                                                                   String businessSn) {
+        FundsAccountId accountId = FundsRouteTestSupport.budgetGroup("budget_001");
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(adjustRequest(
+                accountId, 1_500L, Boolean.FALSE, "BUDGET", businessSn)
+                .setContextVariables(budgetAllowNegativeContext()
                         .removeVariable(missingKey)),
                 WindOperator.system());
 

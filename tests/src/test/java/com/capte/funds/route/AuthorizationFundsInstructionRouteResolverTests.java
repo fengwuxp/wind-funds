@@ -137,8 +137,8 @@ class AuthorizationFundsInstructionRouteResolverTests {
      * 场景：共享卡授权结算。
      * 输入：信用账户、预算组和真实资金账户都有授权占用。
      * 输出：三个主体都关闭或减少 AUTHORIZATION。
-     * 预期：每个 source AUTHORIZATION 携带 MUST_NOT_BE_NEGATIVE 约束。
-     * 红线：授权余额不足不能继续结算消费。
+     * 预期：所有授权占用都进入平台 SETTLEMENT，以关闭 AUTHORIZATION 占用。
+     * 红线：授权结算不得把 LIMIT 当 source 或 target。
      */
     @Test
     void testResolveSettleShouldConsumeSharedCardControlAndFundingSubjects() {
@@ -153,13 +153,21 @@ class AuthorizationFundsInstructionRouteResolverTests {
                 .containsOnly(LedgerSubjectCode.AUTHORIZATION);
         assertThat(route.getLegs())
                 .extracting(leg -> leg.getTargetNode().getLedgerSubjectCode())
-                .containsExactly(LedgerSubjectCode.LIMIT, LedgerSubjectCode.LIMIT, LedgerSubjectCode.SETTLEMENT);
+                .containsOnly(LedgerSubjectCode.SETTLEMENT);
+        assertNoLimitNodes(route);
         assertMustNotBeNegative(route.getLegs().get(0), FundsRouteTestSupport.creditAccount("credit_001"),
                 LedgerSubjectCode.AUTHORIZATION);
         assertMustNotBeNegative(route.getLegs().get(1), FundsRouteTestSupport.budgetGroup("budget_001"),
                 LedgerSubjectCode.AUTHORIZATION);
         assertMustNotBeNegative(route.getLegs().get(2), FundsRouteTestSupport.fundingAccount("funding_001"),
                 LedgerSubjectCode.AUTHORIZATION);
+    }
+
+    private static void assertNoLimitNodes(ResolvedRouteSpec route) {
+        assertThat(route.getLegs())
+                .allSatisfy(leg -> assertThat(LedgerSubjectCode.LIMIT)
+                        .isNotIn(leg.getSourceNode().getLedgerSubjectCode(),
+                                leg.getTargetNode().getLedgerSubjectCode()));
     }
 
     private FundsInstructionSpec sharedCardInstruction(FundsTransactionEventType eventType) {

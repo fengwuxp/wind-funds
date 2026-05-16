@@ -262,11 +262,6 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     }
 
     private RouteNodeSpec resolveCaptureTargetNode(RouteSnapshotSpec snapshot, RouteLegSpec sourceLeg) {
-        SubjectRef targetSubject = sourceLeg.getTargetNode().getSubjectRef();
-        FundsSubjectType subjectType = targetSubject.getSubjectType();
-        if (subjectType == FundsSubjectType.CREDIT_ACCOUNT || subjectType == FundsSubjectType.BUDGET_GROUP) {
-            return copyNode(sourceLeg.getTargetNode(), RouteNodeRole.TARGET, LedgerSubjectCode.LIMIT);
-        }
         SubjectRef settlementAccount = resolveSettlementAccount(snapshot.getPlatformAccounts());
         if (settlementAccount != null) {
             return ImmutableRouteNodeSpec.builder()

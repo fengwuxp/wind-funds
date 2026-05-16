@@ -90,7 +90,8 @@ class DefaultRouteReplayServiceTests {
         assertThat(route.getLegs()).hasSize(3);
         assertThat(route.getLegs())
                 .extracting(leg -> leg.getTargetNode().getLedgerSubjectCode())
-                .containsExactly(LedgerSubjectCode.LIMIT, LedgerSubjectCode.LIMIT, LedgerSubjectCode.SETTLEMENT);
+                .containsOnly(LedgerSubjectCode.SETTLEMENT);
+        assertNoLimitNodes(route);
         assertThat(route.getLegs())
                 .extracting(leg -> leg.getPhaseCode())
                 .containsOnly(LedgerPhaseCode.SETTLEMENT);
@@ -124,6 +125,7 @@ class DefaultRouteReplayServiceTests {
         assertThat(route.getLegs())
                 .extracting(leg -> leg.getLegType())
                 .containsOnly(RouteLegType.RESTORE);
+        assertNoLimitNodes(route);
         assertThat(route.getLegs())
                 .extracting(leg -> leg.getTargetNode().getLedgerSubjectCode())
                 .containsOnly(LedgerSubjectCode.AVAILABLE);
@@ -145,6 +147,7 @@ class DefaultRouteReplayServiceTests {
         assertThat(route.getLegs())
                 .extracting(leg -> leg.getLegType())
                 .containsOnly(RouteLegType.RESTORE);
+        assertNoLimitNodes(route);
         assertThat(route.getLegs())
                 .extracting(leg -> leg.getPhaseCode())
                 .containsOnly(LedgerPhaseCode.CHARGEBACK);
@@ -328,6 +331,13 @@ class DefaultRouteReplayServiceTests {
         ResolvedRouteSpec route = FundsRouteTestSupport.authorizationRouteResolver().resolve(sharedCardInstruction(
                 FundsTransactionEventType.AUTHORIZE));
         return new DefaultRouteSnapshotFactory().createSnapshot(route);
+    }
+
+    private static void assertNoLimitNodes(ResolvedRouteSpec route) {
+        assertThat(route.getLegs())
+                .allSatisfy(leg -> assertThat(LedgerSubjectCode.LIMIT)
+                        .isNotIn(leg.getSourceNode().getLedgerSubjectCode(),
+                                leg.getTargetNode().getLedgerSubjectCode()));
     }
 
     private RouteSnapshotSpec fullOnlySnapshot() {

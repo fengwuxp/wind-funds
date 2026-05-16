@@ -102,6 +102,15 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
     private static final String ALLOW_NEGATIVE_BALANCE_AGING_REQUIRED_MESSAGE =
             "受控负余额调账缺少账龄起点";
 
+    private static final String BUDGET_PERIOD_REQUIRED_MESSAGE =
+            "预算受控负余额调账缺少预算周期";
+
+    private static final String BUDGET_GOVERNANCE_POLICY_REQUIRED_MESSAGE =
+            "预算受控负余额调账缺少治理策略";
+
+    private static final String BUDGET_REPORT_MARKER_REQUIRED_MESSAGE =
+            "预算受控负余额调账缺少报表标记";
+
     private static final String ALLOW_NEGATIVE_BALANCE_LIMIT_CURRENCY_MESSAGE =
             "受控负余额调账上限币种必须与本次金额币种一致";
 
@@ -372,7 +381,29 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                         FundsInstructionContextKeys.NEGATIVE_AVAILABLE_AGING_STARTED_AT,
                         LocalDateTime.class),
                 ALLOW_NEGATIVE_BALANCE_AGING_REQUIRED_MESSAGE);
+        requireBudgetGovernance(instruction, accountId);
         return balanceConstraint(accountId, LedgerSubjectCode.AVAILABLE, LedgerBalanceConstraintType.ALLOW_NEGATIVE);
+    }
+
+    private void requireBudgetGovernance(FundsInstructionSpec instruction, FundsAccountId accountId) {
+        if (!routeSubjectSupport.isBudgetGroup(accountId)) {
+            return;
+        }
+        AssertUtils.hasText(FundsInstructionContextReader.getValue(
+                        instruction,
+                        FundsInstructionContextKeys.BUDGET_PERIOD_ID,
+                        String.class),
+                BUDGET_PERIOD_REQUIRED_MESSAGE);
+        AssertUtils.hasText(FundsInstructionContextReader.getValue(
+                        instruction,
+                        FundsInstructionContextKeys.BUDGET_GOVERNANCE_POLICY_CODE,
+                        String.class),
+                BUDGET_GOVERNANCE_POLICY_REQUIRED_MESSAGE);
+        AssertUtils.hasText(FundsInstructionContextReader.getValue(
+                        instruction,
+                        FundsInstructionContextKeys.BUDGET_REPORT_MARKER,
+                        String.class),
+                BUDGET_REPORT_MARKER_REQUIRED_MESSAGE);
     }
 
     private void requireLimitEvidence(FundsInstructionSpec instruction, String key) {
