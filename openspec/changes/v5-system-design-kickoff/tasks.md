@@ -112,6 +112,7 @@
   - [x] Add budget increase/decrease service facade tests.
   - [x] Add `LIMIT` redline tests for ordinary transactions, authorization settlement, refund, chargeback and fee scenarios.
   - [x] Apply minimal request validation, converter, resolver or context changes only after failing tests expose the gap.
-- [ ] Resume P0-E Wallets account and balance-control follow-up after P0-CTRL.
+- [x] Resume P0-E Wallets account and balance-control follow-up after P0-CTRL.
+  - [x] Add `ControlAccountLedgerRulesTests` for CREDIT/BUDGET control buckets and no ledger `CONSUMED` bucket.
 - [ ] Resume P0-G naming governance and P0-H test asset governance after P0-E.
 - [ ] Keep P1 clearing/reconciliation, FX operations and archive governance behind separate OpenSpec changes and Harness manual approval gates when they introduce new objects, DDL or high-risk behavior.
