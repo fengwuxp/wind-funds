@@ -31,12 +31,14 @@ import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
+import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -87,6 +89,24 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private static final String ALLOW_NEGATIVE_BALANCE_REASON_REQUIRED_MESSAGE =
             "受控负余额调账缺少原因";
+
+    private static final String ALLOW_NEGATIVE_BALANCE_RISK_STATUS_REQUIRED_MESSAGE =
+            "受控负余额调账缺少风险状态";
+
+    private static final String ALLOW_NEGATIVE_BALANCE_SINGLE_LIMIT_REQUIRED_MESSAGE =
+            "受控负余额调账缺少单笔上限";
+
+    private static final String ALLOW_NEGATIVE_BALANCE_CUMULATIVE_LIMIT_REQUIRED_MESSAGE =
+            "受控负余额调账缺少累计上限";
+
+    private static final String ALLOW_NEGATIVE_BALANCE_AGING_REQUIRED_MESSAGE =
+            "受控负余额调账缺少账龄起点";
+
+    private static final String ALLOW_NEGATIVE_BALANCE_LIMIT_CURRENCY_MESSAGE =
+            "受控负余额调账上限币种必须与本次金额币种一致";
+
+    private static final String ALLOW_NEGATIVE_BALANCE_LIMIT_AMOUNT_MESSAGE =
+            "受控负余额调账上限必须大于 0";
 
     private final RouteParticipantFactory routeParticipantFactory;
 
@@ -339,7 +359,35 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                         FundsInstructionContextKeys.ADJUST_REASON,
                         String.class),
                 ALLOW_NEGATIVE_BALANCE_REASON_REQUIRED_MESSAGE);
+        AssertUtils.hasText(FundsInstructionContextReader.getValue(
+                        instruction,
+                        FundsInstructionContextKeys.NEGATIVE_AVAILABLE_RISK_STATUS,
+                        String.class),
+                ALLOW_NEGATIVE_BALANCE_RISK_STATUS_REQUIRED_MESSAGE);
+        requireLimitEvidence(instruction, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT);
+        requireLimitEvidence(instruction, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT);
+        AssertUtils.notNull(FundsInstructionContextReader.getValue(
+                        instruction,
+                        FundsInstructionContextKeys.NEGATIVE_AVAILABLE_AGING_STARTED_AT,
+                        LocalDateTime.class),
+                ALLOW_NEGATIVE_BALANCE_AGING_REQUIRED_MESSAGE);
         return balanceConstraint(accountId, LedgerSubjectCode.AVAILABLE, LedgerBalanceConstraintType.ALLOW_NEGATIVE);
+    }
+
+    private void requireLimitEvidence(FundsInstructionSpec instruction, String key) {
+        Money limit = FundsInstructionContextReader.getValue(instruction, key, Money.class);
+        AssertUtils.notNull(limit, limitRequiredMessage(key));
+        AssertUtils.isTrue(limit.getAmount() > 0,
+                ALLOW_NEGATIVE_BALANCE_LIMIT_AMOUNT_MESSAGE + "，key = {}", key);
+        AssertUtils.isTrue(limit.getCurrency() == instruction.getAmount().getCurrency(),
+                ALLOW_NEGATIVE_BALANCE_LIMIT_CURRENCY_MESSAGE + "，key = {}", key);
+    }
+
+    private String limitRequiredMessage(String key) {
+        if (FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT.equals(key)) {
+            return ALLOW_NEGATIVE_BALANCE_SINGLE_LIMIT_REQUIRED_MESSAGE;
+        }
+        return ALLOW_NEGATIVE_BALANCE_CUMULATIVE_LIMIT_REQUIRED_MESSAGE;
     }
 
     private Map<String, LedgerBalanceConstraintType> balanceConstraint(FundsAccountId accountId,

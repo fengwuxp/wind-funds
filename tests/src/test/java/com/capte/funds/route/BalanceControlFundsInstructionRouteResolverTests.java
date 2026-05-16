@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Constructor;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -153,6 +154,33 @@ class BalanceControlFundsInstructionRouteResolverTests {
         assertThatThrownBy(() -> FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("受控负余额调账缺少策略编码");
+    }
+
+    /**
+     * 场景：运营尝试放开受控负余额但治理证据不完整。
+     * 输入：FUNDING_ACCOUNT，减少 1000，分别缺少风险状态、单笔上限、累计上限或账龄起点。
+     * 输出：route 解析拒绝。
+     * 预期：治理证据缺失时，不生成 ALLOW_NEGATIVE route。
+     * 红线：受控负余额必须有上限、风险状态和账龄治理，不能只靠审批文本放开。
+     */
+    @Test
+    void testResolveFundingBalanceDecreaseShouldRejectAllowNegativeWithoutGovernanceEvidence() {
+        assertAllowNegativeContextMissingShouldFail(
+                FundsInstructionContextKeys.NEGATIVE_AVAILABLE_RISK_STATUS,
+                "受控负余额调账缺少风险状态",
+                "ADJUST_0005");
+        assertAllowNegativeContextMissingShouldFail(
+                FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT,
+                "受控负余额调账缺少单笔上限",
+                "ADJUST_0006");
+        assertAllowNegativeContextMissingShouldFail(
+                FundsInstructionContextKeys.NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT,
+                "受控负余额调账缺少累计上限",
+                "ADJUST_0007");
+        assertAllowNegativeContextMissingShouldFail(
+                FundsInstructionContextKeys.NEGATIVE_AVAILABLE_AGING_STARTED_AT,
+                "受控负余额调账缺少账龄起点",
+                "ADJUST_0008");
     }
 
     /**
@@ -430,7 +458,33 @@ class BalanceControlFundsInstructionRouteResolverTests {
                 .putVariable(FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE, Boolean.TRUE)
                 .putVariable(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_POLICY_CODE, policyCode)
                 .putVariable(FundsInstructionContextKeys.APPROVAL_REF, "APPROVAL_0001")
-                .putVariable(FundsInstructionContextKeys.ADJUST_REASON, "controlled negative balance test");
+                .putVariable(FundsInstructionContextKeys.ADJUST_REASON, "controlled negative balance test")
+                .putVariable(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_RISK_STATUS, "IN_GOVERNANCE")
+                .putVariable(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT,
+                        FundsRouteTestSupport.amount(5_000L))
+                .putVariable(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT,
+                        FundsRouteTestSupport.amount(20_000L))
+                .putVariable(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_AGING_STARTED_AT,
+                        LocalDateTime.of(2026, 5, 16, 10, 0));
+    }
+
+    private void assertAllowNegativeContextMissingShouldFail(String missingKey,
+                                                             String expectedMessage,
+                                                             String businessSn) {
+        FundsAccountId accountId = FundsRouteTestSupport.fundingAccount("funding_001");
+        FundsInstructionSpec instruction = converter.convertToAdjustInstruction(new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(FundsRouteTestSupport.amount(1_000L))
+                .setIncrease(Boolean.FALSE)
+                .setBusinessScene("ADJUST")
+                .setBusinessSn(businessSn)
+                .setContextVariables(allowNegativeContext("FUNDING_AVAILABLE_CONTROLLED_NEGATIVE")
+                        .removeVariable(missingKey)),
+                WindOperator.system());
+
+        assertThatThrownBy(() -> FundsRouteTestSupport.balanceControlRouteResolver().resolve(instruction))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining(expectedMessage);
     }
 
     private static final class TestContextVariables implements WritableContextVariables {

@@ -51,6 +51,14 @@ public final class FundsInstructionContextKeys {
 
     public static final String APPROVAL_REF = "approvalRef";
 
+    public static final String NEGATIVE_AVAILABLE_RISK_STATUS = "negativeAvailableRiskStatus";
+
+    public static final String NEGATIVE_AVAILABLE_SINGLE_LIMIT = "negativeAvailableSingleLimit";
+
+    public static final String NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT = "negativeAvailableCumulativeLimit";
+
+    public static final String NEGATIVE_AVAILABLE_AGING_STARTED_AT = "negativeAvailableAgingStartedAt";
+
     public static final String CHANNEL_CODE = "channelCode";
 
     public static final String EXTERNAL_TRANSACTION_ID = "externalTransactionId";
