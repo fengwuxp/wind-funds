@@ -9,14 +9,24 @@ import com.capte.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.wind.common.exception.BaseException;
+import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.route.enums.RouteParticipantRole;
+import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
+import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -213,6 +223,49 @@ class DefaultFundsInstructionLifecycleSaverIdempotencyTests {
     }
 
     /**
+     * 场景：同一资金事件重放时持久化流水、展示文案和 traceId 重新生成。
+     * 输入：同一 FundsInstruction 和同一路由语义，第二次仅替换 transactionSn、route/participant/subject 展示文案与 traceId。
+     * 输出：交易明细 requestHash。
+     * 预期：幂等摘要保持稳定；金额等核心资金事实变化时摘要变化。
+     * 红线：幂等摘要不得绑定数据库 ID、持久化流水、审计时间、展示文案或调用链 traceId。
+     */
+    @Test
+    void testDetailRequestHashShouldUseStableBusinessFactsOnly() throws ReflectiveOperationException {
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
+                FundsAccountServiceTestSupport.mapper(
+                        FundsTransactionMapper.class,
+                        entity -> {
+                            throw new UnsupportedOperationException("insertSelective");
+                        },
+                        query -> null
+                ),
+                FundsAccountServiceTestSupport.mapper(
+                        FundsTransactionDetailMapper.class,
+                        entity -> {
+                            throw new UnsupportedOperationException("insertSelective");
+                        },
+                        query -> null
+                )
+        );
+        RouteSnapshotSpec snapshot = new DefaultRouteSnapshotFactory().createSnapshot(
+                new DescribedResolvedRoute(1_000L, "initial route", "first detail", "holder", "TRACE_001"));
+        RouteSnapshotSpec replaySnapshot = new DefaultRouteSnapshotFactory().createSnapshot(
+                new DescribedResolvedRoute(1_000L, "replayed route", "retry detail", "renamed holder", "TRACE_002"));
+        RouteSnapshotSpec changedSnapshot = new DefaultRouteSnapshotFactory().createSnapshot(
+                new DescribedResolvedRoute(2_000L, "replayed route", "retry detail", "renamed holder", "TRACE_002"));
+
+        String originalHash = computeDetailRequestHash(saver, new SimpleInstruction(), snapshot,
+                snapshot.getParticipants().getFirst());
+        String replayHash = computeDetailRequestHash(saver, new SimpleInstruction(), replaySnapshot,
+                replaySnapshot.getParticipants().getFirst());
+        String changedHash = computeDetailRequestHash(saver, new SimpleInstruction(), changedSnapshot,
+                changedSnapshot.getParticipants().getFirst());
+
+        assertThat(replayHash).isEqualTo(originalHash);
+        assertThat(changedHash).isNotEqualTo(originalHash);
+    }
+
+    /**
      * 场景：授权后续事件通过原交易快照引用复用主交易。
      * 输入：referenceType=AUTHORIZATION 的指令和已存在的原资金交易。
      * 输出：生命周期保存结果。
@@ -286,5 +339,128 @@ class DefaultFundsInstructionLifecycleSaverIdempotencyTests {
         assertThat(result.getTransactionSn()).isEqualTo(insertedTransaction.get().getSn());
         assertThat(insertedTransaction.get().getReferenceTransactionSn()).isEqualTo("FT_001");
         assertThat(transactionQueryIndex).hasValue(1);
+    }
+
+    private static String computeDetailRequestHash(DefaultFundsInstructionLifecycleSaver saver,
+                                                   SimpleInstruction instruction,
+                                                   RouteSnapshotSpec snapshot,
+                                                   RouteParticipantSpec participant)
+            throws ReflectiveOperationException {
+        Method method = DefaultFundsInstructionLifecycleSaver.class.getDeclaredMethod("computeDetailRequestHash",
+                com.wind.integration.funds.spec.transaction.FundsInstructionSpec.class,
+                RouteSnapshotSpec.class,
+                RouteParticipantSpec.class);
+        method.setAccessible(true);
+        return (String) method.invoke(saver, instruction, snapshot, participant);
+    }
+
+    private static final class DescribedResolvedRoute extends SimpleResolvedRoute {
+
+        private final String routeDescription;
+
+        private final String participantDescription;
+
+        private final String subjectName;
+
+        private final String traceId;
+
+        private DescribedResolvedRoute(long amount,
+                                       String routeDescription,
+                                       String participantDescription,
+                                       String subjectName,
+                                       String traceId) {
+            super(amount);
+            this.routeDescription = routeDescription;
+            this.participantDescription = participantDescription;
+            this.subjectName = subjectName;
+            this.traceId = traceId;
+        }
+
+        @Override
+        public @NonNull List<RouteParticipantSpec> getParticipants() {
+            return List.of(new DescribedParticipant(getAmount(), participantDescription, subjectName, traceId));
+        }
+
+        @Override
+        public @Nullable String getDescription() {
+            return routeDescription;
+        }
+
+        @Override
+        public @NonNull Map<String, Object> getContextVariables() {
+            return Map.of("traceId", traceId);
+        }
+
+        private long getAmount() {
+            return getLegs().getFirst().getAmount().getAmount();
+        }
+    }
+
+    private static final class DescribedParticipant implements RouteParticipantSpec {
+
+        private final long amount;
+
+        private final String description;
+
+        private final String subjectName;
+
+        private final String traceId;
+
+        private DescribedParticipant(long amount, String description, String subjectName, String traceId) {
+            this.amount = amount;
+            this.description = description;
+            this.subjectName = subjectName;
+            this.traceId = traceId;
+        }
+
+        @Override
+        public @NonNull RouteParticipantRole getParticipantRole() {
+            return RouteParticipantRole.AUTH_HOLDER;
+        }
+
+        @Override
+        public @NonNull SubjectRef getSubjectRef() {
+            return new DescribedSubjectRef(subjectName);
+        }
+
+        @Override
+        public @Nullable String getLedgerProfileCode() {
+            return "CREDIT_BASIC";
+        }
+
+        @Override
+        public @Nullable String getCurrency() {
+            return CurrencyIsoCode.USD.name();
+        }
+
+        @Override
+        public @Nullable Money getAmount() {
+            return Money.immutable(amount, CurrencyIsoCode.USD);
+        }
+
+        @Override
+        public @Nullable String getDescription() {
+            return description;
+        }
+
+        @Override
+        public @NonNull Map<String, Object> getContextVariables() {
+            return Map.of("traceId", traceId);
+        }
+    }
+
+    private static final class DescribedSubjectRef extends SimpleSubjectRef {
+
+        private final String subjectName;
+
+        private DescribedSubjectRef(String subjectName) {
+            super("credit_001", FundsSubjectType.CREDIT_ACCOUNT);
+            this.subjectName = subjectName;
+        }
+
+        @Override
+        public @Nullable String getSubjectName() {
+            return subjectName;
+        }
     }
 }

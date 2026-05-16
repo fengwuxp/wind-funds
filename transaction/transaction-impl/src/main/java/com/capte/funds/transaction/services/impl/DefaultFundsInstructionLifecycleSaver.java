@@ -192,7 +192,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 "RouteSnapshot participants 不能为空");
         List<FundsTransactionDetail> result = new ArrayList<>(participants.size());
         for (RouteParticipantSpec participant : participants) {
-            String requestHash = computeDetailRequestHash(instruction, routeSnapshot, transactionSn, participant);
+            String requestHash = computeDetailRequestHash(instruction, routeSnapshot, participant);
             FundsTransactionDetail detail = findDetailByBusinessEventAndParticipant(instruction, transactionSn,
                     participant);
             if (detail == null) {
@@ -492,11 +492,9 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private String computeDetailRequestHash(FundsInstructionSpec instruction,
                                             RouteSnapshotSpec routeSnapshot,
-                                            String transactionSn,
                                             RouteParticipantSpec participant) {
         Map<String, Object> values = new TreeMap<>();
         values.put("tenantId", instruction.getTenantId());
-        values.put("transactionSn", transactionSn);
         values.put("instructionType", instruction.getInstructionType().name());
         values.put("eventType", instruction.getEventType().name());
         values.put("transactionType", instruction.getTransactionType().name());
@@ -518,7 +516,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.remove("snapshotId");
         values.remove("resolvedAt");
         values.remove("expiresAt");
-        return values;
+        return stableRequestHashMap(values);
     }
 
     private Map<String, Object> referenceSummary(FundsInstructionReferenceSpec reference) {
@@ -532,7 +530,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("referenceLedgerTransactionSn", reference.getReferenceLedgerTransactionSn());
         values.put("externalTransactionId", reference.getExternalTransactionId());
         values.put("authCode", reference.getAuthCode());
-        values.put("contextVariables", sortedMap(reference.getContextVariables()));
+        values.put("contextVariables", stableRequestHashMap(reference.getContextVariables()));
         return values;
     }
 
@@ -543,8 +541,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("ledgerProfileCode", participant.getLedgerProfileCode());
         values.put("currency", participant.getCurrency());
         values.put("amount", moneySummary(participant.getAmount()));
-        values.put("description", participant.getDescription());
-        values.put("contextVariables", sortedMap(participant.getContextVariables()));
+        values.put("contextVariables", stableRequestHashMap(participant.getContextVariables()));
         return values;
     }
 
@@ -623,10 +620,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("subjectId", subjectRef.getSubjectId());
         values.put("subjectType", subjectRef.getSubjectType().name());
         values.put("tenantId", subjectRef.getTenantId());
-        values.put("subjectName", subjectRef.getSubjectName());
         values.put("currency", subjectRef.getCurrency());
         values.put("ledgerProfileCode", subjectRef.getLedgerProfileCode());
-        values.put("description", subjectRef.getDescription());
         return values;
     }
 
@@ -640,8 +635,39 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         return values;
     }
 
-    private Map<String, Object> sortedMap(Map<String, Object> values) {
-        return new TreeMap<>(values);
+    private Map<String, Object> stableRequestHashMap(Map<?, ?> values) {
+        Map<String, Object> result = new TreeMap<>();
+        if (values == null || values.isEmpty()) {
+            return result;
+        }
+        for (Map.Entry<?, ?> entry : values.entrySet()) {
+            String key = String.valueOf(entry.getKey());
+            if (isVolatileRequestHashField(key)) {
+                continue;
+            }
+            result.put(key, stableRequestHashValue(entry.getValue()));
+        }
+        return result;
+    }
+
+    private Object stableRequestHashValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            return stableRequestHashMap(map);
+        }
+        if (value instanceof List<?> list) {
+            return list.stream()
+                    .map(this::stableRequestHashValue)
+                    .toList();
+        }
+        return value;
+    }
+
+    private boolean isVolatileRequestHashField(String key) {
+        return "description".equals(key)
+                || "subjectName".equals(key)
+                || "traceId".equals(key)
+                || "traceID".equals(key)
+                || "trace_id".equals(key);
     }
 
     private String sha256(String text) {
