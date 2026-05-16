@@ -21,6 +21,8 @@ import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest
 import com.capte.funds.route.AuthorizationFundsInstructionRouteResolver;
 import com.capte.funds.route.BalanceControlFundsInstructionRouteResolver;
 import com.capte.funds.route.CompositeRouteResolver;
+import com.capte.funds.route.DefaultRouteReplayService;
+import com.capte.funds.route.DefaultRouteSnapshotFactory;
 import com.capte.funds.route.TransferFundsInstructionRouteResolver;
 import com.capte.funds.route.support.PlatformAccountRouteSupport;
 import com.capte.funds.route.support.RouteParticipantFactory;
@@ -29,6 +31,9 @@ import com.capte.funds.transaction.converter.FundsAuthorizationInstructionConver
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.capte.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
+import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
+import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
+import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
@@ -50,9 +55,8 @@ import com.wind.integration.funds.route.enums.RouteLegType;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
+import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
-import com.wind.integration.funds.spec.transaction.FeeSpec;
-import com.wind.integration.funds.transaction.FundsAccountTransactionFeeProvider;
 import com.wind.integration.funds.transaction.FundsInstructionOrchestrator;
 import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
@@ -61,12 +65,15 @@ import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -84,6 +91,12 @@ class FundsTransactionCommandServiceImplTests {
 
     private RouteResolver routeResolver;
 
+    private RecordingTransactionQueryService transactionQueryService;
+
+    private FundsAuthorizationInstructionConverter authorizationInstructionConverter;
+
+    private FundsBalanceControlInstructionConverter balanceControlInstructionConverter;
+
     @BeforeEach
     void setUp() {
         ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
@@ -91,15 +104,19 @@ class FundsTransactionCommandServiceImplTests {
         PlatformFundingAccountService platformFundingAccountService = platformFundingAccountService();
         RouteSubjectSupport routeSubjectSupport = new RouteSubjectSupport();
         PlatformAccountRouteSupport platformAccountRouteSupport = new PlatformAccountRouteSupport(platformFundingAccountService);
+        transactionQueryService = new RecordingTransactionQueryService();
+        authorizationInstructionConverter = new FundsAuthorizationInstructionConverter(accountQueryService(CURRENCY));
+        balanceControlInstructionConverter = new FundsBalanceControlInstructionConverter(accountQueryService(CURRENCY));
         service = new FundsTransactionCommandServiceImpl(
                 new FundsDirectTransactionInstructionConverter(platformFundingAccountService, accountQueryService(CURRENCY)),
-                new FundsBalanceControlInstructionConverter(accountQueryService(CURRENCY)),
-                new FundsAuthorizationInstructionConverter(accountQueryService(CURRENCY)),
+                balanceControlInstructionConverter,
+                authorizationInstructionConverter,
                 orchestrator);
         RouteParticipantFactory routeParticipantFactory = new RouteParticipantFactory();
         routeResolver = new CompositeRouteResolver(List.of(
+                new DefaultRouteReplayService(transactionQueryService),
                 new TransferFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
-                        platformAccountRouteSupport, noFeeProvider()),
+                        platformAccountRouteSupport),
                 new BalanceControlFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
                         platformAccountRouteSupport),
                 new AuthorizationFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
@@ -376,6 +393,7 @@ class FundsTransactionCommandServiceImplTests {
     @Test
     void testReversalShouldBuildAuthorizationReleaseRoute() {
         FundsAccountId credit = creditAccount("credit_001");
+        transactionQueryService.routeSnapshots.put("AUTH_TX_00000001", originalAuthorizationSnapshot());
 
         service.reversal(new FundsAuthorizationTransactionReversalRequest()
                 .setAccountId(credit)
@@ -397,6 +415,7 @@ class FundsTransactionCommandServiceImplTests {
     @Test
     void testSettleShouldBuildAuthorizationCaptureRoute() {
         FundsAccountId credit = creditAccount("credit_001");
+        transactionQueryService.routeSnapshots.put("AUTH_TX_00000001", originalAuthorizationSnapshot());
 
         service.settle(new FundsAuthorizationTransactionSettleRequest()
                 .setAccountId(credit)
@@ -409,16 +428,18 @@ class FundsTransactionCommandServiceImplTests {
         FundsInstructionSpec instruction = instruction();
         ResolvedRouteSpec route = route();
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.SETTLE);
+        assertThat(route.getRouteCode()).isEqualTo("AUTHORIZATION_SETTLE_REPLAY");
         assertThat(route.getParticipants())
                 .extracting(participant -> participant.getParticipantRole().name())
-                .containsExactlyInAnyOrder(RouteParticipantRole.AUTH_HOLDER.name(), RouteParticipantRole.PAYEE.name());
+                .containsExactly(RouteParticipantRole.AUTH_HOLDER.name());
         assertLeg(route.getLegs().getFirst(), RouteLegType.CONSUME, LedgerSubjectCode.AUTHORIZATION,
-                LedgerSubjectCode.SETTLEMENT, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.SETTLEMENT);
+                LedgerSubjectCode.LIMIT, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.SETTLEMENT);
     }
 
     @Test
     void testSettleRefundShouldBuildAuthorizationRefundRoute() {
         FundsAccountId credit = creditAccount("credit_001");
+        transactionQueryService.routeSnapshots.put("AUTH_TX_00000001", originalSettlementSnapshot());
 
         service.settleRefund(new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(credit)
@@ -432,10 +453,11 @@ class FundsTransactionCommandServiceImplTests {
         ResolvedRouteSpec route = route();
         assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.AUTH_REFUND);
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
+        assertThat(route.getRouteCode()).isEqualTo("AUTHORIZATION_REFUND_REPLAY");
         assertThat(route.getParticipants())
                 .extracting(participant -> participant.getParticipantRole().name())
-                .containsExactlyInAnyOrder(RouteParticipantRole.PAYER.name(), RouteParticipantRole.AUTH_HOLDER.name());
-        assertLeg(route.getLegs().getFirst(), RouteLegType.RESTORE, LedgerSubjectCode.SETTLEMENT,
+                .containsExactly(RouteParticipantRole.AUTH_HOLDER.name());
+        assertLeg(route.getLegs().getFirst(), RouteLegType.RESTORE, LedgerSubjectCode.LIMIT,
                 LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.RESTORE, LedgerPhaseCode.REFUND);
     }
 
@@ -484,6 +506,7 @@ class FundsTransactionCommandServiceImplTests {
     @Test
     void testUnfreezeShouldBuildReleaseRouteWithReference() {
         FundsAccountId payer = fundingAccount("funding_001");
+        transactionQueryService.freezeOrderSnapshots.put("FREEZE_00000001", originalFreezeSnapshot());
 
         service.unfreeze(new FundsBalanceUnfreezeRequest()
                 .setAccountId(payer)
@@ -548,7 +571,7 @@ class FundsTransactionCommandServiceImplTests {
         service.fee(new FundsTransactionFeeRequest()
                 .setAccountId(payer)
                 .setAmount(amount(30L))
-                .setFeeType(DefaultFeeType.FEE)
+                .setFeeType(DefaultFeeType.FEE.getCode())
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_00000001")
                 .setDescription("fee"), WindOperator.system());
@@ -566,6 +589,45 @@ class FundsTransactionCommandServiceImplTests {
 
     private ResolvedRouteSpec route() {
         return routeResolver.resolve(instruction());
+    }
+
+    private RouteSnapshotSpec originalAuthorizationSnapshot() {
+        FundsInstructionSpec authorizeInstruction = authorizationInstructionConverter.convertToAuthorizeInstruction(
+                new FundsAuthorizationTransactionAuthorizeRequest()
+                        .setAccountId(creditAccount("credit_001"))
+                        .setTransactionAmount(TransactionAmount.sameCurrency(amount(600L)))
+                        .setApproved(Boolean.TRUE)
+                        .setBusinessScene("CARD_AUTH")
+                        .setBusinessSn("AUTH_00000001")
+                        .setDescription("auth"),
+                WindOperator.system());
+        return new DefaultRouteSnapshotFactory().createSnapshot(routeResolver.resolve(authorizeInstruction));
+    }
+
+    private RouteSnapshotSpec originalSettlementSnapshot() {
+        transactionQueryService.routeSnapshots.put("AUTH_TX_00000001", originalAuthorizationSnapshot());
+        FundsInstructionSpec settleInstruction = authorizationInstructionConverter.convertToSettleInstruction(
+                new FundsAuthorizationTransactionSettleRequest()
+                        .setAccountId(creditAccount("credit_001"))
+                        .setTransactionAmount(TransactionAmount.sameCurrency(amount(200L)))
+                        .setAuthorizationTransactionSn("AUTH_TX_00000001")
+                        .setBusinessScene("CARD_SETTLE")
+                        .setBusinessSn("SETTLE_00000001")
+                        .setDescription("settle"),
+                WindOperator.system());
+        return new DefaultRouteSnapshotFactory().createSnapshot(routeResolver.resolve(settleInstruction));
+    }
+
+    private RouteSnapshotSpec originalFreezeSnapshot() {
+        FundsInstructionSpec freezeInstruction = balanceControlInstructionConverter.convertToFreezeInstruction(
+                new FundsBalanceFreezeRequest()
+                        .setAccountId(fundingAccount("funding_001"))
+                        .setAmount(amount(200L))
+                        .setBusinessScene("FREEZE")
+                        .setBusinessSn("FREEZE_00000001")
+                        .setDescription("freeze"),
+                WindOperator.system());
+        return new DefaultRouteSnapshotFactory().createSnapshot(routeResolver.resolve(freezeInstruction));
     }
 
     private static void assertLeg(RouteLegSpec leg,
@@ -611,20 +673,6 @@ class FundsTransactionCommandServiceImplTests {
 
     private static String constraintKey(FundsAccountId accountId, LedgerSubjectCode subjectCode) {
         return accountId.type() + ":" + accountId.id() + ":" + subjectCode.name();
-    }
-
-    private static FundsAccountTransactionFeeProvider noFeeProvider() {
-        return new FundsAccountTransactionFeeProvider() {
-            @Override
-            public FeeSpec apply(FundsAccountId accountId, String businessScene) {
-                return null;
-            }
-
-            @Override
-            public boolean supports(FundsAccountId accountId) {
-                return false;
-            }
-        };
     }
 
     private static PlatformFundingAccountService platformFundingAccountService() {
@@ -710,6 +758,40 @@ class FundsTransactionCommandServiceImplTests {
         @Override
         public Long getTenantId() {
             return TENANT_ID;
+        }
+    }
+
+    private static final class RecordingTransactionQueryService implements FundsTransactionQueryService {
+
+        private final Map<String, RouteSnapshotSpec> routeSnapshots = new ConcurrentHashMap<>();
+
+        private final Map<String, RouteSnapshotSpec> freezeOrderSnapshots = new ConcurrentHashMap<>();
+
+        @Override
+        public @NonNull Optional<FundsTransactionDTO> queryFundsTransaction(@NonNull String transactionSn) {
+            return Optional.empty();
+        }
+
+        @Override
+        public @NonNull List<FundsTransactionDetailDTO> queryFundsTransactionDetails(@NonNull String transactionSn) {
+            return List.of();
+        }
+
+        @Override
+        public boolean hasConsumedReplayLeg(@NonNull String referenceTransactionSn,
+                                            @NonNull FundsTransactionEventType eventType,
+                                            @NonNull String replayRefLegId) {
+            return false;
+        }
+
+        @Override
+        public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(@NonNull String transactionSn) {
+            return Optional.ofNullable(routeSnapshots.get(transactionSn));
+        }
+
+        @Override
+        public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(@NonNull String freezeOrderSn) {
+            return Optional.ofNullable(freezeOrderSnapshots.get(freezeOrderSn));
         }
     }
 

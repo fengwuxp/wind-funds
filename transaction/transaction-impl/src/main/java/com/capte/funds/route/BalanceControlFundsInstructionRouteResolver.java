@@ -116,7 +116,8 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
-        return instruction.getInstructionType() == FundsInstructionType.BALANCE_CONTROL;
+        return instruction.getInstructionType() == FundsInstructionType.BALANCE_CONTROL
+                && !RouteReplaySupport.isReplayInstruction(instruction);
     }
 
     @Override

@@ -431,6 +431,14 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 5. 余额投影提交后提供 `ledger.balance.changed` 或等价观察口子，业务余额变更日志只能从 `LedgerEntry` 和 `BalanceProjection` 派生。
 6. `SettlementPolicySpec` 补非 RT 表达式契约和不支持表达式失败测试，不得把解析失败静默降级为 `RT`。
 
+## 9.1B P0：Route replay 与手续费 CR 闸口
+
+1. 路由回放保留为资金路径能力，但不再暴露独立 `RouteReplayService` 契约；回放实现归入 `RouteResolver`，由 `supports(FundsInstructionSpec)` 命中退款、撤销、授权结算、授权退款、拒付、手续费退回和解冻等带原事实引用的场景。
+2. 交易编排器只依赖统一 `RouteResolver`；原快照查询、`ReplayRequest` 构造、`REPLAY_ONCE` 消费校验和回放路径派生由 replay resolver 内聚处理。缺原 `RouteSnapshot` 时必须失败，不允许 fallback 到普通 route resolver 重新选路。
+3. 手续费是否收取、按什么规则收取，由业务层或交易应用层决策后显式传入交易请求；route resolver 不再通过 `FundsAccountTransactionFeeProvider` 按账户自动查费率，避免把计费策略侵入资金路径解析。
+4. `FeeSpec#feeType` 使用字符串 code 表达费用类型；`DefaultFeeType` 只作为默认 code 集暴露给上层使用，业务可扩展 `SMALL_AMOUNT_FEE`、`AUTH_DECLINE_FEE`、`CROSS_BORDER_FEE` 等费用类型。
+5. 直接交易附带手续费和独立手续费交易都必须支持资金账户、信用账户和预算组。信用账户或预算组手续费优先消耗其 `AVAILABLE` 控制桶，并继续受受控负余额、限额、审批或风控策略约束；手续费不得混入本金 route leg、商户本金或通道成本。
+
 当前验证：`mvn -pl tests -am test -Dtest=FundsDirectTransactionInstructionConverterTests,FundsAuthorizationInstructionConverterTests,FundsBalanceControlInstructionConverterTests,FundsTransactionCommandServiceImplTests,TransferFundsInstructionRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,DefaultRouteReplayServiceTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionOrchestrationFlowTests`。
 
 退出条件：`PTDD-RAIL-FX-003`、`PTDD-CTRL-006`、`PTDD-LEDGER-001`、`AT-BASE-038`、`AT-BASE-039`、`RED-014A`、`RED-014B`、`RED-019`、`RED-020` 对应测试或明确测试计划已经落入 7.2/7.6 清单。

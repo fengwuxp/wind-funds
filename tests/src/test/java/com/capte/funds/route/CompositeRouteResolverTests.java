@@ -37,8 +37,7 @@ class CompositeRouteResolverTests {
 
     @Test
     void testResolveShouldDispatchToSingleMatchedResolver() {
-        TransferFundsInstructionRouteResolver transferResolver = FundsRouteTestSupport.transferRouteResolver(
-                FundsRouteTestSupport.noFeeProvider());
+        TransferFundsInstructionRouteResolver transferResolver = FundsRouteTestSupport.transferRouteResolver();
         CompositeRouteResolver resolver = new CompositeRouteResolver(List.of(transferResolver));
 
         ResolvedRouteSpec route = resolver.resolve(ImmutableFundsInstructionSpec.builder()

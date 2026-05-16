@@ -82,11 +82,9 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
                 routeResolver,
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                new RecordingTransactionQueryService()
+                lifecycleSaver
         );
         FundsInstructionSpec instruction = new SimpleInstruction();
 
@@ -129,11 +127,9 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
                 routeResolver,
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                new RecordingTransactionQueryService()
+                lifecycleSaver
         );
 
         String transactionSn = orchestrator.execute(new SimpleInstruction());
@@ -160,11 +156,9 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
                 routeResolver,
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                new RecordingTransactionQueryService()
+                lifecycleSaver
         );
 
         String transactionSn = orchestrator.execute(new SimpleInstruction());
@@ -191,11 +185,9 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
                 routeResolver,
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                new RecordingTransactionQueryService()
+                lifecycleSaver
         );
 
         assertThatThrownBy(() -> orchestrator.execute(new SimpleInstruction()))
@@ -213,25 +205,23 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      */
     @Test
     void testExecuteShouldReplaySavedRouteSnapshotForLifecycleEvent() {
-        RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
+        RecordingRouteResolver fallbackRouteResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
         RecordingLifecycleSaver lifecycleSaver = new RecordingLifecycleSaver(false);
         RecordingTransactionQueryService transactionQueryService = new RecordingTransactionQueryService();
         transactionQueryService.routeSnapshot.set(new DefaultRouteSnapshotFactory().createSnapshot(route(true)));
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
-                routeResolver,
+                replayRouteResolver(transactionQueryService, fallbackRouteResolver),
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                transactionQueryService
+                lifecycleSaver
         );
 
         orchestrator.execute(new ReferencedInstruction(FundsTransactionEventType.REFUND));
 
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(fallbackRouteResolver.instruction.get()).isNull();
         assertThat(postingAssembler.route.get().getRouteCode()).isEqualTo("DIRECT_REFUND_REPLAY");
         assertThat(postingAssembler.route.get().getLegs()).hasSize(1);
         assertThat(postingAssembler.route.get().getLegs().getFirst().getReplayRefLegId()).isEqualTo("LEG_001");
@@ -246,25 +236,23 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      */
     @Test
     void testExecuteShouldReplayAuthorizationRefundAsAuthorizationReplayType() {
-        RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
+        RecordingRouteResolver fallbackRouteResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
         RecordingLifecycleSaver lifecycleSaver = new RecordingLifecycleSaver(false);
         RecordingTransactionQueryService transactionQueryService = new RecordingTransactionQueryService();
         transactionQueryService.routeSnapshot.set(new DefaultRouteSnapshotFactory().createSnapshot(route(true)));
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
-                routeResolver,
+                replayRouteResolver(transactionQueryService, fallbackRouteResolver),
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                transactionQueryService
+                lifecycleSaver
         );
 
         orchestrator.execute(new ReferencedInstruction(FundsTransactionEventType.AUTH_REFUND));
 
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(fallbackRouteResolver.instruction.get()).isNull();
         assertThat(postingAssembler.route.get().getRouteCode()).isEqualTo("AUTHORIZATION_REFUND_REPLAY");
         assertThat(postingAssembler.route.get().getEventType()).isEqualTo(FundsTransactionEventType.AUTH_REFUND);
         assertThat(postingAssembler.route.get().getLegs()).hasSize(1);
@@ -279,25 +267,23 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      */
     @Test
     void testExecuteShouldReplayFeeRefundAsFeeReplayType() {
-        RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
+        RecordingRouteResolver fallbackRouteResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
         RecordingLifecycleSaver lifecycleSaver = new RecordingLifecycleSaver(false);
         RecordingTransactionQueryService transactionQueryService = new RecordingTransactionQueryService();
         transactionQueryService.routeSnapshot.set(new DefaultRouteSnapshotFactory().createSnapshot(feeRoute()));
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
-                routeResolver,
+                replayRouteResolver(transactionQueryService, fallbackRouteResolver),
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                transactionQueryService
+                lifecycleSaver
         );
 
         orchestrator.execute(new ReferencedInstruction(FundsTransactionEventType.FEE_REFUND));
 
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(fallbackRouteResolver.instruction.get()).isNull();
         assertThat(postingAssembler.route.get().getRouteCode()).isEqualTo("DIRECT_REFUND_REPLAY");
         assertThat(postingAssembler.route.get().getEventType()).isEqualTo(FundsTransactionEventType.FEE_REFUND);
         assertThat(postingAssembler.route.get().getLegs()).singleElement()
@@ -313,7 +299,7 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      */
     @Test
     void testExecuteShouldRejectSecondReplayOnceConsumption() {
-        RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
+        RecordingRouteResolver fallbackRouteResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
         RecordingLifecycleSaver lifecycleSaver = new RecordingLifecycleSaver(false);
@@ -322,19 +308,17 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
                 RouteReplayPolicy.REPLAY_ONCE)));
         transactionQueryService.consumedReplayLegId.set("LEG_001");
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
-                routeResolver,
+                replayRouteResolver(transactionQueryService, fallbackRouteResolver),
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                transactionQueryService
+                lifecycleSaver
         );
 
         assertThatThrownBy(() -> orchestrator.execute(new ReferencedInstruction(FundsTransactionEventType.REFUND)))
                 .isInstanceOf(BaseException.class)
                 .hasMessageContaining("仅允许成功回放一次");
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(fallbackRouteResolver.instruction.get()).isNull();
         assertThat(lifecycleSaver.beforePostingInstruction.get()).isNull();
         assertThat(postingService.transaction.get()).isNull();
     }
@@ -348,25 +332,23 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      */
     @Test
     void testExecuteShouldReplaySavedRouteSnapshotForChargebackEvent() {
-        RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(false));
+        RecordingRouteResolver fallbackRouteResolver = new RecordingRouteResolver(route(false));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
         RecordingLifecycleSaver lifecycleSaver = new RecordingLifecycleSaver(false);
         RecordingTransactionQueryService transactionQueryService = new RecordingTransactionQueryService();
         transactionQueryService.routeSnapshot.set(new DefaultRouteSnapshotFactory().createSnapshot(route(true)));
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
-                routeResolver,
+                replayRouteResolver(transactionQueryService, fallbackRouteResolver),
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                transactionQueryService
+                lifecycleSaver
         );
 
         orchestrator.execute(new ReferencedInstruction(FundsTransactionEventType.CHARGEBACK));
 
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(fallbackRouteResolver.instruction.get()).isNull();
         assertThat(postingAssembler.route.get().getRouteCode()).isEqualTo("CHARGEBACK_REPLAY");
         assertThat(postingAssembler.route.get().getEventType()).isEqualTo(FundsTransactionEventType.CHARGEBACK);
         assertThat(postingAssembler.route.get().getLegs())
@@ -383,24 +365,22 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      */
     @Test
     void testExecuteShouldFailWhenReplaySnapshotMissing() {
-        RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
+        RecordingRouteResolver fallbackRouteResolver = new RecordingRouteResolver(route(true));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
         RecordingLifecycleSaver lifecycleSaver = new RecordingLifecycleSaver(false);
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
-                routeResolver,
+                replayRouteResolver(new RecordingTransactionQueryService(), fallbackRouteResolver),
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                new RecordingTransactionQueryService()
+                lifecycleSaver
         );
 
         assertThatThrownBy(() -> orchestrator.execute(new ReferencedInstruction(FundsTransactionEventType.REFUND)))
                 .isInstanceOf(BaseException.class)
                 .hasMessageContaining("未找到原路径快照");
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(fallbackRouteResolver.instruction.get()).isNull();
         assertThat(postingAssembler.route.get()).isNull();
         assertThat(postingService.transaction.get()).isNull();
     }
@@ -414,26 +394,24 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
      */
     @Test
     void testExecuteShouldReplayFreezeSnapshotForUnfreezeWithFreezeOrderReference() {
-        RecordingRouteResolver routeResolver = new RecordingRouteResolver(route(true));
+        RecordingRouteResolver fallbackRouteResolver = new RecordingRouteResolver(route(true));
         RecordingLedgerPostingAssembler postingAssembler = new RecordingLedgerPostingAssembler(false);
         RecordingPostingService postingService = new RecordingPostingService(false);
         RecordingLifecycleSaver lifecycleSaver = new RecordingLifecycleSaver(false);
         RecordingTransactionQueryService transactionQueryService = new RecordingTransactionQueryService();
         transactionQueryService.freezeOrderRouteSnapshot.set(new DefaultRouteSnapshotFactory().createSnapshot(route(true)));
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
-                routeResolver,
+                replayRouteResolver(transactionQueryService, fallbackRouteResolver),
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                transactionQueryService
+                lifecycleSaver
         );
         FundsInstructionSpec instruction = new FreezeOrderReferencedInstruction(FundsTransactionEventType.UNFREEZE);
 
         orchestrator.execute(instruction);
 
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(fallbackRouteResolver.instruction.get()).isNull();
         assertThat(postingAssembler.route.get().getRouteCode()).isEqualTo("BALANCE_UNFREEZE_REPLAY");
         assertThat(postingAssembler.route.get().getEventType()).isEqualTo(FundsTransactionEventType.UNFREEZE);
         assertThat(postingAssembler.route.get().getLegs())
@@ -458,11 +436,9 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
                 routeResolver,
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                new RecordingTransactionQueryService()
+                lifecycleSaver
         );
         FundsInstructionSpec instruction = new DirectRefundInstruction();
 
@@ -485,11 +461,9 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
                 new RecordingRouteResolver(route(true)),
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 new RecordingLedgerPostingAssembler(false),
                 new RecordingPostingService(false),
-                new RecordingLifecycleSaver(false),
-                new RecordingTransactionQueryService()
+                new RecordingLifecycleSaver(false)
         );
 
         assertThat(orchestrator.supports(FundsInstructionSpec.class)).isTrue();
@@ -507,6 +481,14 @@ class DefaultRoutedFundsInstructionOrchestratorTests {
     private static ResolvedRouteSpec feeRoute() {
         return new SimpleResolvedRoute(List.of(new SimpleRouteLeg(RouteReplayPolicy.FULL_ONLY,
                 LedgerPhaseCode.FEE)));
+    }
+
+    private static RouteResolver replayRouteResolver(RecordingTransactionQueryService transactionQueryService,
+                                                     RecordingRouteResolver fallbackRouteResolver) {
+        return new com.capte.funds.route.CompositeRouteResolver(List.of(
+                new DefaultRouteReplayService(transactionQueryService),
+                fallbackRouteResolver
+        ));
     }
 
     private static final class RecordingRouteResolver implements RouteResolver {

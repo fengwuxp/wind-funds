@@ -1,6 +1,7 @@
 package com.capte.funds.transaction.model.request;
 
 import com.wind.core.WritableContextVariables;
+import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,6 +28,9 @@ public class FundsTransactionPayRequest {
     @Schema(description = "付款交易金额")
     @NonNull
     private TransactionAmount transactionAmount;
+
+    @Schema(description = "本次交易显式手续费规则")
+    private FeeSpec feeSpec;
 
     @Schema(description = "收款账户")
     @NonNull

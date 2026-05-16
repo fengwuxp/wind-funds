@@ -170,7 +170,7 @@ class FundsDirectTransactionInstructionConverterTests {
     void testConvertToFeeInstructionShouldPopulateFeeContext() {
         FundsInstructionSpec instruction = converter.convertToFeeInstruction(new FundsTransactionFeeRequest()
                 .setAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
-                .setFeeType(DefaultFeeType.FEE)
+                .setFeeType(DefaultFeeType.FEE.getCode())
                 .setAmount(FundsRouteTestSupport.amount(30L))
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_0001")
@@ -182,6 +182,6 @@ class FundsDirectTransactionInstructionConverterTests {
         assertThat(instruction.getContextVariables())
                 .containsEntry(FundsInstructionContextKeys.ACCOUNT_ID,
                         FundsRouteTestSupport.fundingAccount("funding_001"))
-                .containsEntry(FundsInstructionContextKeys.FEE_TYPE, DefaultFeeType.FEE);
+                .containsEntry(FundsInstructionContextKeys.FEE_TYPE, DefaultFeeType.FEE.getCode());
     }
 }

@@ -1,6 +1,5 @@
 package com.wind.integration.funds.spec.transaction;
 
-import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +20,7 @@ public final class FeeSpec {
     /**
      * 手续费类型
      */
-    private final DefaultFeeType feeType;
+    private final String feeType;
 
     /**
      * 固定手续费

@@ -2,7 +2,6 @@ package com.capte.funds.transaction.model.request;
 
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -37,7 +36,7 @@ public class FundsTransactionFeeRequest {
 
     @Schema(description = "手续费类型")
     @NotNull
-    private DefaultFeeType feeType;
+    private String feeType;
 
     @Schema(description = "交易描述")
     private String description;

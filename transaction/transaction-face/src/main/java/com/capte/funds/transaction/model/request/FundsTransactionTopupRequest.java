@@ -3,6 +3,7 @@ package com.capte.funds.transaction.model.request;
 
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.core.WritableContextVariables;
+import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -43,6 +44,9 @@ public class FundsTransactionTopupRequest {
     @Schema(description = "充值交易金额")
     @NotNull
     private TransactionAmount transactionAmount;
+
+    @Schema(description = "本次交易显式手续费规则")
+    private FeeSpec feeSpec;
 
     @Schema(description = "业务流水号，入账凭证，例如：在线充值流水号，人工入账单流水号、退款单交易流水号")
     @NotNull

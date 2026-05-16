@@ -32,7 +32,6 @@ import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
-import com.wind.integration.funds.transaction.FundsAccountTransactionFeeProvider;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
@@ -99,11 +98,10 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     private final PlatformAccountRouteSupport platformAccountRouteSupport;
 
-    private final FundsAccountTransactionFeeProvider fundsAccountTransactionFeeProvider;
-
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
-        return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION;
+        return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION
+                && !RouteReplaySupport.isReplayInstruction(instruction);
     }
 
     @Override
@@ -303,7 +301,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                                         FundsAccountId payerAccountId,
                                         FundsInstructionSpec instruction,
                                         int currentSize) {
-        Money feeAmount = calculateFee(payerAccountId, instruction.getBusinessScene(), instruction.getAmount());
+        Money feeAmount = calculateFee(instruction, instruction.getAmount());
         if (feeAmount.getAmount() <= 0L) {
             return null;
         }
@@ -431,11 +429,9 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .build();
     }
 
-    private Money calculateFee(FundsAccountId accountId, String businessScene, Money transactionAmount) {
-        if (!fundsAccountTransactionFeeProvider.supports(accountId)) {
-            return Money.immutable(0L, transactionAmount.getCurrency());
-        }
-        FeeSpec fee = fundsAccountTransactionFeeProvider.apply(accountId, businessScene);
+    private Money calculateFee(FundsInstructionSpec instruction, Money transactionAmount) {
+        FeeSpec fee = FundsInstructionContextReader.getValue(instruction, FundsInstructionContextKeys.FEE_SPEC,
+                FeeSpec.class);
         return fee == null ? Money.immutable(0L, transactionAmount.getCurrency()) : fee.calculateFee(transactionAmount);
     }
 

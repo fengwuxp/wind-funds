@@ -56,4 +56,8 @@ public enum DefaultFeeType implements DescriptiveEnum {
     ADJUSTMENT_FEE("调账费用");
 
     private final String desc;
+
+    public String getCode() {
+        return name();
+    }
 }

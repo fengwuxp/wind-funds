@@ -18,6 +18,7 @@ import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionRef
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.integration.funds.operation.FundsOperationActorSpec;
 import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
+import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
@@ -64,6 +65,7 @@ public class FundsDirectTransactionInstructionConverter {
         extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         extraContext.put(FundsInstructionContextKeys.CHANNEL_CODE, request.getChannel().name());
         extraContext.put(FundsInstructionContextKeys.EXTERNAL_TRANSACTION_ID, request.getChannelTransactionSn());
+        putFeeSpec(extraContext, request.getFeeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -86,6 +88,10 @@ public class FundsDirectTransactionInstructionConverter {
     public @NonNull FundsInstructionSpec convertToTransferInstruction(@NonNull FundsTransactionTransferRequest request,
                                                                       @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getPayerAccountId());
+        Map<String, Object> extraContext = new LinkedHashMap<>();
+        extraContext.put(FundsInstructionContextKeys.PAYER_ACCOUNT_ID, request.getPayerAccountId());
+        extraContext.put(FundsInstructionContextKeys.PAYEE_ACCOUNT_ID, request.getPayeeAccountId());
+        putFeeSpec(extraContext, request.getFeeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -99,15 +105,18 @@ public class FundsDirectTransactionInstructionConverter {
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
                 .operator(operationActor(operator))
-                .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.PAYER_ACCOUNT_ID, request.getPayerAccountId(),
-                        FundsInstructionContextKeys.PAYEE_ACCOUNT_ID, request.getPayeeAccountId())))
+                .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
     }
 
     public @NonNull FundsInstructionSpec convertToPayInstruction(@NonNull FundsTransactionPayRequest request,
                                                                  @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
+        Map<String, Object> extraContext = new LinkedHashMap<>();
+        extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
+        extraContext.put(FundsInstructionContextKeys.PAYEE_ID, request.getPayeeId());
+        extraContext.put(FundsInstructionContextKeys.PAYEE_LEDGER_SUBJECT_CODE, request.getPayeeLedgerCode());
+        putFeeSpec(extraContext, request.getFeeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -121,10 +130,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
                 .operator(operationActor(operator))
-                .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
-                        FundsInstructionContextKeys.PAYEE_ID, request.getPayeeId(),
-                        FundsInstructionContextKeys.PAYEE_LEDGER_SUBJECT_CODE, request.getPayeeLedgerCode())))
+                .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
     }
 
@@ -135,6 +141,7 @@ public class FundsDirectTransactionInstructionConverter {
         extraContext.put(FundsInstructionContextKeys.PAYER_ID, request.getPayerId());
         extraContext.put(FundsInstructionContextKeys.PAYER_LEDGER_SUBJECT_CODE, request.getPayerLedgerCode());
         extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
+        putFeeSpec(extraContext, request.getFeeSpec());
         if (request.getChannel() != null) {
             extraContext.put(FundsInstructionContextKeys.CHANNEL_CODE, request.getChannel().name());
         }
@@ -166,6 +173,10 @@ public class FundsDirectTransactionInstructionConverter {
                                                                       @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
+        Map<String, Object> extraContext = new LinkedHashMap<>();
+        extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
+        extraContext.put(FundsInstructionContextKeys.REFERENCE_FREEZE_SN, request.getReferenceFreezeSn());
+        putFeeSpec(extraContext, request.getFeeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -181,9 +192,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
                 .operator(operationActor(operator))
-                .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
-                        FundsInstructionContextKeys.REFERENCE_FREEZE_SN, request.getReferenceFreezeSn())))
+                .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
     }
 
@@ -250,6 +259,12 @@ public class FundsDirectTransactionInstructionConverter {
         }
         result.putAll(extraContext);
         return Map.copyOf(result);
+    }
+
+    private void putFeeSpec(@NonNull Map<String, Object> context, @Nullable FeeSpec feeSpec) {
+        if (feeSpec != null) {
+            context.put(FundsInstructionContextKeys.FEE_SPEC, feeSpec);
+        }
     }
 
     private @NonNull FundsOperationActorSpec operationActor(@NonNull WindOperator operator) {

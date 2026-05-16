@@ -18,10 +18,9 @@ import com.wind.integration.funds.wallet.FundsAccountOwner;
 import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
-import com.wind.integration.funds.spec.transaction.FeeSpec;
-import com.wind.integration.funds.transaction.FundsAccountTransactionFeeProvider;
-import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.spec.transaction.FeeSpec;
+import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 
@@ -106,35 +105,11 @@ public final class FundsRouteTestSupport {
         };
     }
 
-    public static FundsAccountTransactionFeeProvider noFeeProvider() {
-        return new FundsAccountTransactionFeeProvider() {
-            @Override
-            public FeeSpec apply(FundsAccountId accountId, String businessScene) {
-                return null;
-            }
-
-            @Override
-            public boolean supports(FundsAccountId accountId) {
-                return false;
-            }
-        };
-    }
-
-    public static FundsAccountTransactionFeeProvider fixedFeeProvider(long feeAmount) {
-        return new FundsAccountTransactionFeeProvider() {
-            @Override
-            public FeeSpec apply(FundsAccountId accountId, String businessScene) {
-                return FeeSpec.builder()
-                        .feeType(DefaultFeeType.FEE)
-                        .fixedFee(Math.toIntExact(feeAmount))
-                        .build();
-            }
-
-            @Override
-            public boolean supports(FundsAccountId accountId) {
-                return true;
-            }
-        };
+    public static FeeSpec fixedFeeSpec(long feeAmount) {
+        return FeeSpec.builder()
+                .feeType(DefaultFeeType.FEE.getCode())
+                .fixedFee(Math.toIntExact(feeAmount))
+                .build();
     }
 
     public static FundsDirectTransactionInstructionConverter transactionInstructionConverter() {
@@ -149,9 +124,9 @@ public final class FundsRouteTestSupport {
         return new FundsAuthorizationInstructionConverter(accountQueryService());
     }
 
-    public static TransferFundsInstructionRouteResolver transferRouteResolver(FundsAccountTransactionFeeProvider feeProvider) {
+    public static TransferFundsInstructionRouteResolver transferRouteResolver() {
         return new TransferFundsInstructionRouteResolver(new RouteParticipantFactory(), new RouteSubjectSupport(),
-                new PlatformAccountRouteSupport(platformFundingAccountService()), feeProvider);
+                new PlatformAccountRouteSupport(platformFundingAccountService()));
     }
 
     public static BalanceControlFundsInstructionRouteResolver balanceControlRouteResolver() {

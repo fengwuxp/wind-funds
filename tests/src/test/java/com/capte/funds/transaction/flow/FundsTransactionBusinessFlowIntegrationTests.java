@@ -56,9 +56,7 @@ import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
-import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
-import com.wind.integration.funds.transaction.FundsAccountTransactionFeeProvider;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
@@ -113,22 +111,21 @@ class FundsTransactionBusinessFlowIntegrationTests {
         PlatformAccountRouteSupport platformAccountRouteSupport = new PlatformAccountRouteSupport(
                 platformFundingAccountService);
         RouteParticipantFactory routeParticipantFactory = new RouteParticipantFactory();
+        lifecycleSaver = new RecordingLifecycleSaver();
         RouteResolver routeResolver = new CompositeRouteResolver(List.of(
+                new DefaultRouteReplayService(lifecycleSaver),
                 new TransferFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
-                        platformAccountRouteSupport, noFeeProvider()),
+                        platformAccountRouteSupport),
                 new BalanceControlFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
                         platformAccountRouteSupport),
                 new AuthorizationFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
                         platformAccountRouteSupport)
         ));
-        lifecycleSaver = new RecordingLifecycleSaver();
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
                 routeResolver,
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 new DefaultLedgerPostingAssembler(ledgerBook),
                 ledgerBook,
-                lifecycleSaver,
                 lifecycleSaver
         );
         service = new FundsTransactionCommandServiceImpl(
@@ -368,20 +365,6 @@ class FundsTransactionBusinessFlowIntegrationTests {
             public FundsAccountId requireAccountId(Long tenantId, CurrencyIsoCode currency,
                                                    PlatformFundingAccountRole role) {
                 return platformAccount(role);
-            }
-        };
-    }
-
-    private static FundsAccountTransactionFeeProvider noFeeProvider() {
-        return new FundsAccountTransactionFeeProvider() {
-            @Override
-            public @Nullable FeeSpec apply(FundsAccountId accountId, String businessScene) {
-                return null;
-            }
-
-            @Override
-            public boolean supports(FundsAccountId accountId) {
-                return false;
             }
         };
     }

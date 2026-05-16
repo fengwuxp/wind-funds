@@ -56,7 +56,6 @@ import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPhaseSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
-import com.wind.integration.funds.transaction.FundsAccountTransactionFeeProvider;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import org.jspecify.annotations.NonNull;
@@ -105,9 +104,11 @@ class FundsTransactionOrchestrationFlowTests {
         PlatformAccountRouteSupport platformAccountRouteSupport = new PlatformAccountRouteSupport(
                 platformFundingAccountService);
         RouteParticipantFactory routeParticipantFactory = new RouteParticipantFactory();
+        transactionQueryService = new RecordingTransactionQueryService();
         RouteResolver delegate = new CompositeRouteResolver(List.of(
+                new DefaultRouteReplayService(transactionQueryService),
                 new TransferFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
-                        platformAccountRouteSupport, noFeeProvider()),
+                        platformAccountRouteSupport),
                 new BalanceControlFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
                         platformAccountRouteSupport),
                 new AuthorizationFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
@@ -117,15 +118,12 @@ class FundsTransactionOrchestrationFlowTests {
         lifecycleSaver = new RecordingLifecycleSaver();
         postingAssembler = new RecordingLedgerPostingAssembler();
         postingService = new RecordingPostingService();
-        transactionQueryService = new RecordingTransactionQueryService();
         DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
                 routeResolver,
                 new DefaultRouteSnapshotFactory(),
-                new DefaultRouteReplayService(),
                 postingAssembler,
                 postingService,
-                lifecycleSaver,
-                transactionQueryService
+                lifecycleSaver
         );
         service = new FundsTransactionCommandServiceImpl(
                 new FundsDirectTransactionInstructionConverter(platformFundingAccountService,
@@ -171,7 +169,8 @@ class FundsTransactionOrchestrationFlowTests {
      * 场景：已授权金额在后续被撤销释放。
      * 输入：带原授权交易号的 reversal 请求，且能查询到原授权快照。
      * 输出：回放路径编码、事件类型、账本阶段和成功回填的账本交易号。
-     * 预期：编排器绕过 direct resolve，基于原授权快照生成 `AUTHORIZATION_REVERSAL_REPLAY` 路径并完成入账。
+     * 预期：编排器通过统一 RouteResolver 分发到 replay resolver，基于原授权快照生成
+     * `AUTHORIZATION_REVERSAL_REPLAY` 路径并完成入账。
      */
     @Test
     void testReversalShouldReplayOriginalAuthorizationPathThroughOrchestrator() {
@@ -186,7 +185,7 @@ class FundsTransactionOrchestrationFlowTests {
                 .setDescription("reversal"), WindOperator.system());
 
         assertThat(transactionSn).isEqualTo("FT_001");
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(routeResolver.instruction.get()).isNotNull();
         assertThat(lifecycleSaver.beforePostingRoute.get().getRouteCode()).isEqualTo("AUTHORIZATION_REVERSAL_REPLAY");
         assertThat(lifecycleSaver.beforePostingRoute.get().getEventType()).isEqualTo(FundsTransactionEventType.REVERSAL);
         assertThat(postingAssembler.route.get().getLegs())
@@ -204,7 +203,8 @@ class FundsTransactionOrchestrationFlowTests {
      * 场景：已授权金额在后续进入结算扣款。
      * 输入：带原授权交易号的 settle 请求，且能查询到原授权快照。
      * 输出：回放路径编码、事件类型、账本阶段和成功回填的账本交易号。
-     * 预期：编排器绕过 direct resolve，基于原授权快照生成 `AUTHORIZATION_SETTLE_REPLAY` 路径并完成入账。
+     * 预期：编排器通过统一 RouteResolver 分发到 replay resolver，基于原授权快照生成
+     * `AUTHORIZATION_SETTLE_REPLAY` 路径并完成入账。
      */
     @Test
     void testSettleShouldReplayOriginalAuthorizationPathThroughOrchestrator() {
@@ -219,7 +219,7 @@ class FundsTransactionOrchestrationFlowTests {
                 .setDescription("settle"), WindOperator.system());
 
         assertThat(transactionSn).isEqualTo("FT_001");
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(routeResolver.instruction.get()).isNotNull();
         assertThat(lifecycleSaver.beforePostingRoute.get().getRouteCode()).isEqualTo("AUTHORIZATION_SETTLE_REPLAY");
         assertThat(lifecycleSaver.beforePostingRoute.get().getEventType()).isEqualTo(FundsTransactionEventType.SETTLE);
         assertThat(postingAssembler.route.get().getLegs())
@@ -362,7 +362,7 @@ class FundsTransactionOrchestrationFlowTests {
         String transactionSn = service.fee(new FundsTransactionFeeRequest()
                 .setAccountId(FundsAccountId.immutable("funding_001", FundsSubjectType.FUNDING_ACCOUNT))
                 .setAmount(amount(30L))
-                .setFeeType(com.wind.integration.funds.transaction.enums.DefaultFeeType.FEE)
+                .setFeeType(com.wind.integration.funds.transaction.enums.DefaultFeeType.FEE.getCode())
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_0001")
                 .setDescription("fee"), WindOperator.system());
@@ -412,7 +412,8 @@ class FundsTransactionOrchestrationFlowTests {
      * 场景：已结算授权交易发生拒付/争议。
      * 输入：带原授权交易号的 chargeback 请求，且能查询到原结算快照。
      * 输出：回放路径编码、事件类型、账本阶段和成功回填的账本交易号。
-     * 预期：编排器绕过 direct resolve，基于原快照生成 `CHARGEBACK_REPLAY` 路径并完成入账。
+     * 预期：编排器通过统一 RouteResolver 分发到 replay resolver，基于原快照生成
+     * `CHARGEBACK_REPLAY` 路径并完成入账。
      */
     @Test
     void testChargebackShouldReplayOriginalSettlementPathThroughOrchestrator() {
@@ -427,7 +428,7 @@ class FundsTransactionOrchestrationFlowTests {
                 .setDescription("chargeback"), WindOperator.system());
 
         assertThat(transactionSn).isEqualTo("FT_001");
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(routeResolver.instruction.get()).isNotNull();
         assertThat(lifecycleSaver.beforePostingRoute.get().getRouteCode()).isEqualTo("CHARGEBACK_REPLAY");
         assertThat(lifecycleSaver.beforePostingRoute.get().getEventType()).isEqualTo(FundsTransactionEventType.CHARGEBACK);
         assertThat(postingAssembler.route.get().getLegs())
@@ -460,7 +461,7 @@ class FundsTransactionOrchestrationFlowTests {
                 .setDescription("unfreeze"), WindOperator.system());
 
         assertThat(transactionSn).isEqualTo("FT_001");
-        assertThat(routeResolver.instruction.get()).isNull();
+        assertThat(routeResolver.instruction.get()).isNotNull();
         assertThat(lifecycleSaver.beforePostingRoute.get().getRouteCode()).isEqualTo("BALANCE_UNFREEZE_REPLAY");
         assertThat(lifecycleSaver.beforePostingRoute.get().getEventType()).isEqualTo(FundsTransactionEventType.UNFREEZE);
         assertThat(lifecycleSaver.beforePostingRoute.get().getLegs())
@@ -471,6 +472,7 @@ class FundsTransactionOrchestrationFlowTests {
     }
 
     private RouteSnapshotSpec originalSettlementSnapshot() {
+        transactionQueryService.routeSnapshots.put("AUTH_TX_ORIGINAL", originalAuthorizationSnapshot());
         FundsInstructionSpec settleInstruction = authorizationInstructionConverter.convertToSettleInstruction(
                 new FundsAuthorizationTransactionSettleRequest()
                         .setAccountId(creditAccount("credit_001"))
@@ -533,21 +535,6 @@ class FundsTransactionOrchestrationFlowTests {
                                                    PlatformFundingAccountRole role) {
                 return FundsAccountId.immutable("platform_" + role.name().toLowerCase(),
                         FundsSubjectType.FUNDING_ACCOUNT);
-            }
-        };
-    }
-
-    private static FundsAccountTransactionFeeProvider noFeeProvider() {
-        return new FundsAccountTransactionFeeProvider() {
-            @Override
-            public com.wind.integration.funds.spec.transaction.FeeSpec apply(FundsAccountId accountId,
-                                                                              String businessScene) {
-                return null;
-            }
-
-            @Override
-            public boolean supports(FundsAccountId accountId) {
-                return false;
             }
         };
     }

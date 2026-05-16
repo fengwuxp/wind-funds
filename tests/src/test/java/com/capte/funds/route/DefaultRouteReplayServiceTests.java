@@ -385,10 +385,10 @@ class DefaultRouteReplayServiceTests {
                         .setPayerAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
                         .setPayeeAccountId(FundsRouteTestSupport.fundingAccount("funding_002"))
                         .setTransactionAmount(FundsRouteTestSupport.transactionAmount(500L))
+                        .setFeeSpec(FundsRouteTestSupport.fixedFeeSpec(30L))
                         .setBusinessScene("TRANSFER")
                         .setBusinessSn("TRANSFER_0001"), WindOperator.system());
-        ResolvedRouteSpec route = FundsRouteTestSupport.transferRouteResolver(
-                FundsRouteTestSupport.fixedFeeProvider(30L)).resolve(instruction);
+        ResolvedRouteSpec route = FundsRouteTestSupport.transferRouteResolver().resolve(instruction);
         return new DefaultRouteSnapshotFactory().createSnapshot(route);
     }
 

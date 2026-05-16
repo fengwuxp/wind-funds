@@ -1,17 +1,19 @@
 package com.capte.funds.route;
 
+import com.wind.integration.funds.model.route.ImmutableReplayRequestSpec;
 import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
 import com.capte.funds.transaction.support.FundsRouteCodes;
+import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.route.RouteResolver;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.wind.integration.funds.route.RouteReplayService;
 import com.wind.integration.funds.route.enums.RouteLegType;
 import com.wind.integration.funds.route.enums.RouteNodeType;
 import com.wind.integration.funds.route.enums.RouteNodeRole;
@@ -26,12 +28,16 @@ import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
+import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
+import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -39,22 +45,58 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
- * 默认 RouteSnapshot 回放服务。
+ * 默认 RouteSnapshot 回放解析器。
  *
  * <p>职责：基于已保存的 RouteSnapshot 派生撤销、结算、退款、拒付等后续路径。
  * 回放只复用原路径中的主体、平台账户和节点，不重新执行路由选择。</p>
  */
 @Component
-public class DefaultRouteReplayService implements RouteReplayService {
+public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private static final String CONSTRAINT_KEY_SEPARATOR = ":";
 
     private static final String REPLAY_LEG_ID_SEPARATOR = "_";
 
+    private final FundsTransactionQueryService fundsTransactionQueryService;
+
+    @Autowired
+    public DefaultRouteReplayService(@NonNull FundsTransactionQueryService fundsTransactionQueryService) {
+        this.fundsTransactionQueryService = fundsTransactionQueryService;
+    }
+
+    public DefaultRouteReplayService() {
+        this.fundsTransactionQueryService = null;
+    }
+
     @Override
+    public boolean supports(@NonNull FundsInstructionSpec instruction) {
+        return RouteReplaySupport.isReplayInstruction(instruction);
+    }
+
+    @Override
+    public @NonNull ResolvedRouteSpec resolve(@NonNull FundsInstructionSpec instruction) {
+        RouteSnapshotSpec snapshot = requireReplaySnapshot(instruction);
+        return replay(snapshot, ImmutableReplayRequestSpec.builder()
+                .replayType(resolveReplayType(instruction.getEventType()))
+                .eventType(instruction.getEventType())
+                .businessScene(instruction.getBusinessScene())
+                .businessSn(instruction.getBusinessSn())
+                .referenceBusinessSn(resolveReferenceBusinessSn(instruction.getReference()))
+                .referenceSnapshotId(snapshot.getSnapshotId())
+                .amount(instruction.getAmount())
+                .originalAmount(instruction.getOriginalAmount())
+                .exchangeRate(instruction.getExchangeRate())
+                .eventTime(instruction.getEventTime())
+                .description(instruction.getDescription())
+                .operator(instruction.getOperator())
+                .contextVariables(instruction.getContextVariables())
+                .build());
+    }
+
     public @NonNull ResolvedRouteSpec replay(@NonNull RouteSnapshotSpec snapshot,
                                              @NonNull ReplayRequestSpec replayRequest) {
         assertSupportedSnapshotSchemaVersion(snapshot);
@@ -83,6 +125,51 @@ public class DefaultRouteReplayService implements RouteReplayService {
                 .description(replayRequest.getDescription())
                 .contextVariables(replayRequest.getContextVariables())
                 .build();
+    }
+
+    private RouteSnapshotSpec requireReplaySnapshot(FundsInstructionSpec instruction) {
+        AssertUtils.notNull(fundsTransactionQueryService, "Route replay resolver requires FundsTransactionQueryService");
+        FundsInstructionReferenceSpec reference = instruction.getReference();
+        Optional<RouteSnapshotSpec> routeSnapshot = switch (reference.getReferenceType()) {
+            case FREEZE_ORDER -> fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(reference.getReferenceSn());
+            default -> fundsTransactionQueryService.findRouteSnapshotByTransactionSn(reference.getReferenceSn());
+        };
+        AssertUtils.isTrue(routeSnapshot.isPresent(), "RouteSnapshot 回放事件未找到原路径快照，referenceSn = {}",
+                reference.getReferenceSn());
+        RouteSnapshotSpec result = routeSnapshot.get();
+        assertReplayOnceNotConsumed(instruction, reference, result);
+        return result;
+    }
+
+    private void assertReplayOnceNotConsumed(FundsInstructionSpec instruction,
+                                             FundsInstructionReferenceSpec reference,
+                                             RouteSnapshotSpec routeSnapshot) {
+        for (RouteLegSpec leg : routeSnapshot.getLegs()) {
+            if (leg.getReplayPolicy() != RouteReplayPolicy.REPLAY_ONCE) {
+                continue;
+            }
+            AssertUtils.isFalse(fundsTransactionQueryService.hasConsumedReplayLeg(
+                            reference.getReferenceSn(), instruction.getEventType(), leg.getLegId()),
+                    "RouteSnapshot leg 仅允许成功回放一次，referenceSn = {}，eventType = {}，legId = {}",
+                    reference.getReferenceSn(), instruction.getEventType(), leg.getLegId());
+        }
+    }
+
+    private RouteReplayType resolveReplayType(FundsTransactionEventType eventType) {
+        return switch (eventType) {
+            case REVERSAL -> RouteReplayType.RELEASE_HOLD;
+            case SETTLE -> RouteReplayType.AUTHORIZATION_SETTLEMENT;
+            case AUTH_REFUND -> RouteReplayType.AUTHORIZATION_REFUND;
+            case REFUND -> RouteReplayType.REFUND;
+            case FEE_REFUND -> RouteReplayType.FEE_REFUND;
+            case CHARGEBACK -> RouteReplayType.CHARGEBACK;
+            case UNFREEZE -> RouteReplayType.UNFREEZE;
+            default -> throw new IllegalArgumentException("unsupported replay eventType: " + eventType);
+        };
+    }
+
+    private @Nullable String resolveReferenceBusinessSn(@Nullable FundsInstructionReferenceSpec reference) {
+        return reference == null ? null : reference.getReferenceBusinessSn();
     }
 
     private List<RouteLegSpec> selectReplayLegs(RouteSnapshotSpec snapshot, ReplayRequestSpec replayRequest) {
@@ -410,5 +497,10 @@ public class DefaultRouteReplayService implements RouteReplayService {
             case AUTHORIZATION_REFUND, REFUND, FEE_REFUND, CHARGEBACK -> DefaultFundsTransactionType.REFUND;
             default -> snapshot.getTransactionType();
         };
+    }
+
+    @Override
+    public int getOrder() {
+        return HIGHEST_PRECEDENCE + 100;
     }
 }

@@ -2,6 +2,7 @@ package com.capte.funds.transaction.model.request;
 
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.core.WritableContextVariables;
+import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.Money;
@@ -29,6 +30,9 @@ public class FundsTransactionRefundRequest {
     @Schema(description = "退款金额")
     @NotNull
     private Money amount;
+
+    @Schema(description = "本次交易显式手续费规则")
+    private FeeSpec feeSpec;
 
     @Schema(description = "退款出资（原收款方）账户")
     @NotNull

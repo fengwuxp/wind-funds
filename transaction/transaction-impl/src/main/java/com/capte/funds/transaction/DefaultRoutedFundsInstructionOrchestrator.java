@@ -1,33 +1,20 @@
 package com.capte.funds.transaction;
 
-import com.wind.integration.funds.model.route.ImmutableReplayRequestSpec;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
-import com.capte.funds.transaction.services.FundsTransactionQueryService;
-import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.LedgerPostingAssembler;
 import com.wind.integration.funds.ledger.LedgerTransactionPostingService;
-import com.wind.integration.funds.route.RouteReplayService;
 import com.wind.integration.funds.route.RouteResolver;
 import com.wind.integration.funds.route.RouteSnapshotFactory;
-import com.wind.integration.funds.route.enums.RouteReplayPolicy;
-import com.wind.integration.funds.route.enums.RouteReplayType;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
-import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
-import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.FundsInstructionOrchestrator;
-import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
-import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 /**
  * 默认资金指令编排器。
@@ -54,15 +41,11 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
 
     private final RouteSnapshotFactory routeSnapshotFactory;
 
-    private final RouteReplayService routeReplayService;
-
     private final LedgerPostingAssembler<ResolvedRouteSpec> postingAssembler;
 
     private final LedgerTransactionPostingService ledgerTransactionPostingService;
 
     private final FundsInstructionLifecycleRecorder fundsInstructionLifecycleRecorder;
-
-    private final FundsTransactionQueryService fundsTransactionQueryService;
 
     /**
      * 执行资金指令主流程。
@@ -76,7 +59,7 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String execute(@NonNull FundsInstructionSpec instruction) {
-        ResolvedRouteSpec resolvedRoute = resolveRoute(instruction);
+        ResolvedRouteSpec resolvedRoute = routeResolver.resolve(instruction);
         RouteSnapshotSpec routeSnapshot = routeSnapshotFactory.createSnapshot(resolvedRoute);
         FundsInstructionLifecycleResult lifecycleResult = fundsInstructionLifecycleRecorder.beforePosting(instruction,
                 resolvedRoute, routeSnapshot);
@@ -110,99 +93,5 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
     @Override
     public boolean supports(@NonNull Class<FundsInstructionSpec> specType) {
         return FundsInstructionSpec.class.isAssignableFrom(specType);
-    }
-
-    private ResolvedRouteSpec resolveRoute(FundsInstructionSpec instruction) {
-        if (shouldReplay(instruction)) {
-            RouteSnapshotSpec routeSnapshot = requireReplaySnapshot(instruction);
-            return routeReplayService.replay(routeSnapshot, ImmutableReplayRequestSpec.builder()
-                    .replayType(resolveReplayType(instruction.getEventType()))
-                    .eventType(instruction.getEventType())
-                    .businessScene(instruction.getBusinessScene())
-                    .businessSn(instruction.getBusinessSn())
-                    .referenceBusinessSn(resolveReferenceBusinessSn(instruction.getReference()))
-                    .referenceSnapshotId(routeSnapshot.getSnapshotId())
-                    .amount(instruction.getAmount())
-                    .originalAmount(instruction.getOriginalAmount())
-                    .exchangeRate(instruction.getExchangeRate())
-                    .eventTime(instruction.getEventTime())
-                    .description(instruction.getDescription())
-                    .operator(instruction.getOperator())
-                    .contextVariables(instruction.getContextVariables())
-                    .build());
-        }
-        return routeResolver.resolve(instruction);
-    }
-
-    private boolean shouldReplay(FundsInstructionSpec instruction) {
-        if (!isReplayEvent(instruction.getEventType())) {
-            return false;
-        }
-        FundsInstructionReferenceSpec reference = instruction.getReference();
-        return reference != null
-                && hasText(reference.getReferenceSn())
-                && isRouteSnapshotReference(reference.getReferenceType());
-    }
-
-    private boolean isRouteSnapshotReference(FundsInstructionReferenceType referenceType) {
-        return switch (referenceType) {
-            case ORIGINAL_TRANSACTION, AUTHORIZATION, REFUND, FEE, FREEZE_ORDER -> true;
-            case EXTERNAL_TRANSACTION -> false;
-        };
-    }
-
-    private RouteSnapshotSpec requireReplaySnapshot(FundsInstructionSpec instruction) {
-        FundsInstructionReferenceSpec reference = instruction.getReference();
-        Optional<RouteSnapshotSpec> routeSnapshot = switch (reference.getReferenceType()) {
-            case FREEZE_ORDER -> fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(reference.getReferenceSn());
-            default -> fundsTransactionQueryService.findRouteSnapshotByTransactionSn(reference.getReferenceSn());
-        };
-        AssertUtils.isTrue(routeSnapshot.isPresent(), "RouteSnapshot 回放事件未找到原路径快照，referenceSn = {}",
-                reference.getReferenceSn());
-        RouteSnapshotSpec result = routeSnapshot.get();
-        assertReplayOnceNotConsumed(instruction, reference, result);
-        return result;
-    }
-
-    private void assertReplayOnceNotConsumed(FundsInstructionSpec instruction,
-                                             FundsInstructionReferenceSpec reference,
-                                             RouteSnapshotSpec routeSnapshot) {
-        for (RouteLegSpec leg : routeSnapshot.getLegs()) {
-            if (leg.getReplayPolicy() != RouteReplayPolicy.REPLAY_ONCE) {
-                continue;
-            }
-            AssertUtils.isFalse(fundsTransactionQueryService.hasConsumedReplayLeg(
-                            reference.getReferenceSn(), instruction.getEventType(), leg.getLegId()),
-                    "RouteSnapshot leg 仅允许成功回放一次，referenceSn = {}，eventType = {}，legId = {}",
-                    reference.getReferenceSn(), instruction.getEventType(), leg.getLegId());
-        }
-    }
-
-    private boolean isReplayEvent(FundsTransactionEventType eventType) {
-        return switch (eventType) {
-            case REVERSAL, SETTLE, AUTH_REFUND, CHARGEBACK, REFUND, FEE_REFUND, UNFREEZE -> true;
-            default -> false;
-        };
-    }
-
-    private RouteReplayType resolveReplayType(FundsTransactionEventType eventType) {
-        return switch (eventType) {
-            case REVERSAL -> RouteReplayType.RELEASE_HOLD;
-            case SETTLE -> RouteReplayType.AUTHORIZATION_SETTLEMENT;
-            case AUTH_REFUND -> RouteReplayType.AUTHORIZATION_REFUND;
-            case REFUND -> RouteReplayType.REFUND;
-            case FEE_REFUND -> RouteReplayType.FEE_REFUND;
-            case CHARGEBACK -> RouteReplayType.CHARGEBACK;
-            case UNFREEZE -> RouteReplayType.UNFREEZE;
-            default -> throw new IllegalArgumentException("unsupported replay eventType: " + eventType);
-        };
-    }
-
-    private @Nullable String resolveReferenceBusinessSn(@Nullable FundsInstructionReferenceSpec reference) {
-        return reference == null ? null : reference.getReferenceBusinessSn();
-    }
-
-    private boolean hasText(@Nullable String value) {
-        return value != null && !value.isBlank();
     }
 }
