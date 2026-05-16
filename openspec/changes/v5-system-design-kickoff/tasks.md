@@ -107,11 +107,11 @@
 - [x] Align control-account adjustment design across PRD, ADR, DSL and API plan.
   - [x] `FundsBalanceControlService#adjust` covers funding balance adjustment, credit limit adjustment and budget limit adjustment.
   - [x] `LIMIT` is allowed only in `BALANCE_CONTROL / LIMIT_ADJUST`, not as a normal source or target in ordinary transactions.
-- [ ] Execute P0-CTRL control-account adjustment implementation.
-  - [ ] Add credit limit increase/decrease service facade tests.
-  - [ ] Add budget increase/decrease service facade tests.
-  - [ ] Add `LIMIT` redline tests for ordinary transactions, authorization settlement, refund, chargeback and fee scenarios.
-  - [ ] Apply minimal request validation, converter, resolver or context changes only after failing tests expose the gap.
+- [x] Execute P0-CTRL control-account adjustment implementation.
+  - [x] Add credit limit increase/decrease service facade tests.
+  - [x] Add budget increase/decrease service facade tests.
+  - [x] Add `LIMIT` redline tests for ordinary transactions, authorization settlement, refund, chargeback and fee scenarios.
+  - [x] Apply minimal request validation, converter, resolver or context changes only after failing tests expose the gap.
 - [ ] Resume P0-E Wallets account and balance-control follow-up after P0-CTRL.
 - [ ] Resume P0-G naming governance and P0-H test asset governance after P0-E.
 - [ ] Keep P1 clearing/reconciliation, FX operations and archive governance behind separate OpenSpec changes and Harness manual approval gates when they introduce new objects, DDL or high-risk behavior.

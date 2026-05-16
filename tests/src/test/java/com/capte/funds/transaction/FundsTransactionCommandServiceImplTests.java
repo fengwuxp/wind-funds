@@ -470,6 +470,7 @@ class FundsTransactionCommandServiceImplTests {
     @Test
     void testChargebackShouldBuildPostSettlementDisputeReplayInstruction() {
         FundsAccountId credit = creditAccount("credit_001");
+        transactionQueryService.routeSnapshots.put("AUTH_TX_00000001", originalSettlementSnapshot());
 
         String transactionSn = service.chargeback(new FundsAuthorizationTransactionChargebackRequest()
                 .setAccountId(credit)
@@ -488,6 +489,7 @@ class FundsTransactionCommandServiceImplTests {
         assertThat(instruction.getBusinessSn()).isEqualTo("CHARGEBACK_00000001");
         assertThat(instruction.getReference().getReferenceType()).isEqualTo(FundsInstructionReferenceType.AUTHORIZATION);
         assertThat(instruction.getReference().getReferenceSn()).isEqualTo("AUTH_TX_00000001");
+        assertNoLimitNodes(route());
     }
 
     @Test
@@ -603,6 +605,7 @@ class FundsTransactionCommandServiceImplTests {
         assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.FEE);
         assertLeg(leg, RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCode.FEE, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.FEE);
+        assertNoLimitNodes(route());
     }
 
     private FundsInstructionSpec instruction() {
