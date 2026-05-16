@@ -255,7 +255,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 授权链退款和争议拒付上限 | `PTDD-AUTH-005` | `DefaultFundsInstructionLifecycleSaverTests` | L2 | `refundedAmount + chargebackAmount <= settledAmount`；争议拒付不是授权拒付。 | 已有 |
 | 冻结与解冻 | `PTDD-CTRL-001` | `DefaultFundsFrozenOrderLifecycleSaverTests`、`FundsFrozenOrderBoundaryTests` | L2/L4 | 冻结只做 `AVAILABLE <-> FROZEN`；不创建 `FundsTransaction`；超额解冻失败。 | 已有 |
 | 资金余额调账 | `PTDD-CTRL-002` | `FundsBalanceControlInstructionConverterTests`、`FundsTransactionCommandServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、后续 `ReconciliationExceptionAdjustmentTests` | L1/L2 | 请求显式携带原因、凭证、审批和可选差错引用；缺原因、凭证或审批时交易编排前失败；通过平台 `ADJUSTMENT` 账户形成平衡分录。 | 已落地基础调账红线，差错调账状态机 P1 |
-| 信用/预算额度调整 | `PTDD-CTRL-003` | `DefaultLedgerProfileServiceImplTests`、`ControlAccountLedgerRulesTests` | L1/L2 | `LIMIT` 不作为普通迁移桶；不新增 `CONSUMED`；负数策略明确。 | 部分已有 |
+| 信用/预算额度调整 | `PTDD-CTRL-003`、`AT-BASE-040`、`AT-BASE-041` | `DefaultLedgerProfileServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、`FundsTransactionCommandServiceImplTests`、后续 `ControlAccountLedgerRulesTests` | L1/L2 | `FundsBalanceControlService#adjust` 支持信用账户额度调整和预算组预算调整；生成 `LIMIT_ADJUST` 受控调额事实；`LIMIT` 不开放给普通交易迁移；不新增 `CONSUMED`；预算调减受控负数必须有预算周期、审批、上限、账龄和治理路径。 | 已有基础 route 测试，待补服务门面和红线测试 |
 | 受控负余额 | `PTDD-CTRL-004`、`PTDD-CTRL-005` | `LedgerBalanceProjectionServiceImplTests`、`ControlledNegativeAvailableTests` | L1/L2 | 有来源、策略、上限、账龄、审批或风控标记；负余额不能当作可继续消费余额。 | 部分已有 |
 | 余额控制无 FX | `PTDD-CTRL-006`、`AT-BASE-039` | `FundsBalanceControlInstructionConverterTests` | L1/L2 | freeze/unfreeze/adjust 金额币种必须等于账户或账本币种；不调用 `FxService`、不接收 FX 快照；错币种直接失败，不挂账、不生成 route/entry。 | 已落地 |
 | 交易层门面归属 | `PTDD-ARCH-001` | `WalletLayerBoundaryTests`、`FundsTransactionServiceApiContractTests` | L4/L2 | 交易命令归 transaction；wallet 不直接写交易事实或账本事实。 | 已有 |
@@ -442,6 +442,27 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 当前验证：`mvn -pl tests -am test -Dtest=FundsDirectTransactionInstructionConverterTests,FundsAuthorizationInstructionConverterTests,FundsBalanceControlInstructionConverterTests,FundsTransactionCommandServiceImplTests,TransferFundsInstructionRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,DefaultRouteReplayServiceTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionOrchestrationFlowTests`。
 
 退出条件：`PTDD-RAIL-FX-003`、`PTDD-CTRL-006`、`PTDD-LEDGER-001`、`AT-BASE-038`、`AT-BASE-039`、`RED-014A`、`RED-014B`、`RED-019`、`RED-020` 对应测试或明确测试计划已经落入 7.2/7.6 清单。
+
+## 9.1C P0：控制账户调额 CR 闸口
+
+1. `FundsBalanceControlService#adjust` 是交易层余额控制入口，可承接三类语义：资金账户余额调账、信用账户额度调整、预算组预算调整。
+2. 资金账户仍走 `BALANCE_ADJUST`，通过平台 `ADJUSTMENT` 账户形成平衡调账分录；信用账户和预算组走 `LIMIT_ADJUST`，不表达真实现金流，也不引入平台资金账户平衡。
+3. 信用账户额度调增同步增加 `AVAILABLE`；额度调减同步减少 `AVAILABLE`。调减导致受控负 `AVAILABLE` 时必须有授信策略、上限、审批、原因和审计。
+4. 预算组预算调增同步增加 `AVAILABLE`；预算调减同步减少 `AVAILABLE`。调减导致受控负 `AVAILABLE` 时必须有预算周期、治理策略、审批、原因、上限、账龄和报表标记；新授权必须重新经过预算策略。
+5. `LIMIT` 只允许在 `BALANCE_CONTROL / LIMIT_ADJUST` 受控调额路径中表达额度或预算总量调整；普通支付、授权结算、退款、争议拒付、手续费或直接交易不得把 `LIMIT` 当 source/target。
+6. 本轮不新增公共 `ControlAdjustmentSpec`，也不新增账务 `CONSUMED`；已消费继续由授权结算、退款、争议拒付、调额和预算周期规则进入产品报表或交易视图投影。
+
+任务计划：
+
+| 顺序 | 任务 | 产出 | 验证 |
+| --- | --- | --- | --- |
+| 1 | 补齐控制账户调额文档一致性 | PRD、控制账户 ADR、DSL 规范和契约矩阵统一口径。 | `rg "LIMIT_ADJUST\|预算调减\|FundsBalanceControlService#adjust"` 人工复审。 |
+| 2 | 补信用账户调额服务门面测试 | `FundsTransactionCommandServiceImplTests` 覆盖调增、调减、受控负数和缺审批失败。 | `just test-one FundsTransactionCommandServiceImplTests tests`。 |
+| 3 | 补预算组调额服务门面测试 | 覆盖预算调增、调减、受控负数、缺预算治理上下文失败。 | `just test-one FundsTransactionCommandServiceImplTests tests`。 |
+| 4 | 补 `LIMIT` 红线测试 | 普通交易、授权结算、退款不得把 `LIMIT` 当普通 source/target。 | `just test-one BalanceControlFundsInstructionRouteResolverTests tests` 和相关 route replay 测试。 |
+| 5 | 最小实现收口 | 若测试暴露缺口，只在 converter/resolver/context 校验内补齐，不新增公共 DSL。 | `just compile`、相关测试、`just pmd`。 |
+
+退出条件：`PTDD-CTRL-003`、`AT-BASE-040`、`AT-BASE-041` 对应测试落地；PRD、ADR、DSL 和 API 计划不再出现“`LIMIT` 完全不可作为任何 route 节点”与“`LIMIT_ADJUST` 调额 route”互相冲突的表述。
 
 ## 9.2 P0：wind-funds 与 Ledger Posting
 
