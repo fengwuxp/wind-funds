@@ -410,6 +410,28 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 4. 依赖解析失败不能视为规约通过；交付说明必须记录失败模块、失败依赖和与本次变更的关系。
 5. 长期应调整父 POM 或 PMD 插件配置，确保多模块 reactor 下静态扫描优先使用当前 reactor 产物。
 
+## 8.1 OpenSpec / Superpowers / Harness 再审查结论
+
+本轮把当前规划重新按 `OpenSpec 定规格`、`Superpowers 定执行纪律`、`Harness 定验证门禁` 三层审查，结论如下：
+
+1. OpenSpec 层：已完成的 P0-R、Route replay 与手续费 CR、控制账户调额设计均能追溯到 `transaction-layer`、`wallets`、`payment-ledger` 和 `clearing-reconciliation` 规格域；后续任何新增公共契约、状态机、余额桶语义、清结算对象或 FX 运营对象，必须先补 OpenSpec change 的 `proposal / design / tasks / spec delta`，不得只在代码里隐式新增规则。
+2. Superpowers 层：后续编码任务继续使用“用例和红线先行”的节奏，每个工作包先补失败用例、契约测试或验收矩阵，再做最小实现；每完成一个工作包就做代码 Review 和任务状态回写，不把命名治理、业务逻辑、DDL 和测试大迁移混成一轮。
+3. Harness 层：当前仍只使用本地 Harness 等价门禁，不创建真实 pipeline；每个工作包必须明确写入范围、聚焦测试、是否需要 `just compile`、是否需要人工审批。涉及资损、出款、清结算、对账差错、归档、数据修复或 DDL 的任务进入 Manual Approval 阶段。
+
+当前规划的状态重新整理为：
+
+| 顺序 | 工作包 | OpenSpec 检查 | Superpowers 执行纪律 | Harness 门禁 | 当前状态 |
+| --- | --- | --- | --- | --- | --- |
+| 0 | P0-R 产品口径回归 | `transaction-layer`、`payment-ledger`、`clearing-reconciliation` 已覆盖 FX 外置、余额日志和结算策略红线。 | 已按红线用例驱动完成。 | `SettlementPolicySpecTests`、FX converter、余额控制和余额投影事件测试。 | 已闭合，后续只保留回归保护。 |
+| 1 | P0-CTRL 控制账户调额 | `wallets` 规格承接信用额度和预算组控制语义；`transaction-layer` 规格承接 `FundsBalanceControlService#adjust` 入口。 | 先补信用额度调增/调减、预算调增/调减、受控负数和 `LIMIT` 红线测试，再做最小实现。 | `just test-one FundsTransactionCommandServiceImplTests tests`、`just test-one BalanceControlFundsInstructionRouteResolverTests tests`、必要时 `just compile`。 | 下一批优先。 |
+| 2 | P0-E Wallets 账户与余额控制 | `wallets` 规格继续保护账户 profile、平台角色、冻结事实、受控负余额和预算治理。 | 保持 wallet 是账户能力层，不承载交易命令；新增资金变化必须先补余额断言。 | `DefaultLedgerProfileServiceImplTests`、`PlatformFundingAccountServiceImplTests`、`WalletLayerBoundaryTests`。 | 第二顺位。 |
+| 3 | P0-G 命名治理残余 | OpenSpec 不直接驱动纯命名，但公共契约名称变化必须同步 spec delta。 | 单轮只做一个命名轴，不夹带业务逻辑；旧契约需要兼容别名时先写迁移说明。 | `just compile`、边界测试和受影响契约测试。 | 第三顺位。 |
+| 4 | P0-H 测试资产治理残余 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 巨型测试类拆分、余额断言覆盖复核和场景注释补强分批推进。 | 受影响测试类聚焦回归，必要时补业务组合测试。 | 第四顺位。 |
+| 5 | P1-CLR 清结算与对账 | `clearing-reconciliation` 需要补产品层 `SettlementPolicy`、候选、批次、结算单、出款单、差错单 spec delta。 | 先做模型和契约测试，不直接上完整批处理。 | 进入清结算集成测试、对账差错测试和 Manual Approval。 | P1，等待 P0 稳定。 |
+| 6 | P1-FX / P1-ARC 外汇运营与归档治理 | FX 报价、锁价、审批、费用、汇损益以及 archive/checkpoint/watermark 需要独立 change。 | 先隔离领域对象和只读投影边界，避免交易层重新自动换汇或报表反写账本。 | 需要 DDL 或数据修复时进入 Manual Approval。 | P1，暂不进入当前编码批次。 |
+
+本轮之后的 CAD 自动推进顺序固定为：先执行 P0-CTRL，再执行 P0-E，再按 P0-G/P0-H 做治理，最后再进入 P1 清结算、FX 运营和归档治理。若 P0-CTRL 编码中发现 OpenSpec 规格缺口，先补最小 spec delta 和测试计划，再改代码。
+
 # 九、编码落地顺序
 
 ## 9.1 P0：契约和测试骨架
@@ -418,11 +440,11 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 2. 补齐 JSON 契约样例和 ContractTests。
 3. 建立幂等键、请求摘要、来源事实引用和审计字段的公共约束；来源事实引用先以 `businessScene/businessSn/reference` 为基线，独立事实成熟后再引入 `sourceFactRef`。
 4. 已完成有资金变化用例的账本余额断言和业务组合集成测试；后续作为回归保护。
-5. 下一批先执行 P0-R 回归闸口：交易层 FX 决策外置、余额控制无 FX、余额变更日志观察口子、非 RT `SettlementPolicySpec` 红线；这些测试通过后再继续 wallet/命名/测试治理。
+5. P0-R 回归闸口已闭合；下一批先执行 P0-CTRL 控制账户调额，再继续 P0-E wallet 账户能力、P0-G 命名治理和 P0-H 测试资产治理。
 
 退出条件：契约测试能覆盖 DSL 矩阵的 P0 场景，且不需要启动 Spring 即可验证 DSL 和 posting 基础规则。
 
-## 9.1A P0：产品口径回归闸口
+## 9.1A P0：产品口径回归闸口（已闭合）
 
 1. 已撤回交易 converter 对 `FxService` 的隐式调用，交易请求改为携带业务或外汇域显式 FX 决策事实。
 2. 错币种且缺 FX 决策事实时，交易层当前按请求失败处理，不生成 route/entry；挂账或错币种差错对象进入后续 P1/P2 运营模型。
@@ -431,7 +453,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 5. 余额投影提交后提供 `ledger.balance.changed` 或等价观察口子，业务余额变更日志只能从 `LedgerEntry` 和 `BalanceProjection` 派生。
 6. `SettlementPolicySpec` 补非 RT 表达式契约和不支持表达式失败测试，不得把解析失败静默降级为 `RT`。
 
-## 9.1B P0：Route replay 与手续费 CR 闸口
+## 9.1B P0：Route replay 与手续费 CR 闸口（已闭合主链路）
 
 1. 路由回放保留为资金路径能力，但不再暴露独立 `RouteReplayService` 契约；回放实现归入 `RouteResolver`，由 `supports(FundsInstructionSpec)` 命中退款、撤销、授权结算、授权退款、拒付、手续费退回和解冻等带原事实引用的场景。
 2. 交易编排器只依赖统一 `RouteResolver`；原快照查询、`ReplayRequest` 构造、`REPLAY_ONCE` 消费校验和回放路径派生由 replay resolver 内聚处理。缺原 `RouteSnapshot` 时必须失败，不允许 fallback 到普通 route resolver 重新选路。
@@ -452,15 +474,15 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 5. `LIMIT` 只允许在 `BALANCE_CONTROL / LIMIT_ADJUST` 受控调额路径中表达额度或预算总量调整；普通支付、授权结算、退款、争议拒付、手续费或直接交易不得把 `LIMIT` 当 source/target。
 6. 本轮不新增公共 `ControlAdjustmentSpec`，也不新增账务 `CONSUMED`；已消费继续由授权结算、退款、争议拒付、调额和预算周期规则进入产品报表或交易视图投影。
 
-任务计划：
+任务计划按 OpenSpec / Superpowers / Harness 重新整理如下：
 
-| 顺序 | 任务 | 产出 | 验证 |
-| --- | --- | --- | --- |
-| 1 | 补齐控制账户调额文档一致性 | PRD、控制账户 ADR、DSL 规范和契约矩阵统一口径。 | `rg "LIMIT_ADJUST\|预算调减\|FundsBalanceControlService#adjust"` 人工复审。 |
-| 2 | 补信用账户调额服务门面测试 | `FundsTransactionCommandServiceImplTests` 覆盖调增、调减、受控负数和缺审批失败。 | `just test-one FundsTransactionCommandServiceImplTests tests`。 |
-| 3 | 补预算组调额服务门面测试 | 覆盖预算调增、调减、受控负数、缺预算治理上下文失败。 | `just test-one FundsTransactionCommandServiceImplTests tests`。 |
-| 4 | 补 `LIMIT` 红线测试 | 普通交易、授权结算、退款不得把 `LIMIT` 当普通 source/target。 | `just test-one BalanceControlFundsInstructionRouteResolverTests tests` 和相关 route replay 测试。 |
-| 5 | 最小实现收口 | 若测试暴露缺口，只在 converter/resolver/context 校验内补齐，不新增公共 DSL。 | `just compile`、相关测试、`just pmd`。 |
+| 顺序 | 任务 | OpenSpec 输入 | Superpowers 执行 | Harness 验证 |
+| --- | --- | --- | --- | --- |
+| 1 | 补齐控制账户调额文档一致性 | `wallets`、`transaction-layer` 规格与 PRD/ADR/DSL 的 `LIMIT_ADJUST` 口径一致。 | 只改文档，不改代码；先确认没有 `LIMIT` 普通迁移和 `LIMIT_ADJUST` 调额互相冲突。 | `rg "LIMIT_ADJUST\|预算调减\|FundsBalanceControlService#adjust"` 人工复审。 |
+| 2 | 补信用账户调额服务门面测试 | `FundsBalanceControlService#adjust` 承接信用额度调增、调减和受控负数。 | 先写调增、调减、缺审批失败、超过策略失败测试，再做最小实现。 | `just test-one FundsTransactionCommandServiceImplTests tests`。 |
+| 3 | 补预算组调额服务门面测试 | 预算组调额必须保留预算周期、治理策略、审批、原因、上限、账龄和报表标记。 | 先写预算调增、调减、受控负数、缺预算治理上下文失败测试。 | `just test-one FundsTransactionCommandServiceImplTests tests`。 |
+| 4 | 补 `LIMIT` 红线测试 | `LIMIT` 仅允许在 `BALANCE_CONTROL / LIMIT_ADJUST` 受控路径出现。 | 先写普通交易、授权结算、退款、手续费不得把 `LIMIT` 当 source/target 的失败用例。 | `just test-one BalanceControlFundsInstructionRouteResolverTests tests` 和相关 route replay 测试。 |
+| 5 | 最小实现收口 | 若测试暴露规格缺口，先补 OpenSpec spec delta，再改代码。 | 只在 request 校验、converter、resolver 或 context 内补齐，不新增公共 `ControlAdjustmentSpec`，不新增账务 `CONSUMED`。 | `just compile`、相关测试；`just pmd` 若依赖解析可用则执行，不可用则按环境问题记录。 |
 
 退出条件：`PTDD-CTRL-003`、`AT-BASE-040`、`AT-BASE-041` 对应测试落地；PRD、ADR、DSL 和 API 计划不再出现“`LIMIT` 完全不可作为任何 route 节点”与“`LIMIT_ADJUST` 调额 route”互相冲突的表述。
 
@@ -514,13 +536,13 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 事项 | 建议默认值 | 原因 |
 | --- | --- | --- |
 | 交易门面归属 | 放入 `transaction/transaction-face`，wallet 对外交易服务逐步收敛或迁移。 | 符合“交易层对业务侧提供统一能力”的目标。 |
-| 第一批代码范围 | 先做 P0-R 产品口径回归闸口，再继续 Wallets 余额控制、命名治理和测试资产治理。 | 先锁住 FX 决策外置、余额控制无 FX、余额日志观察和结算策略降级红线，再扩展账户治理和清结算。 |
+| 第一批代码范围 | P0-R 已闭合；下一批先做 P0-CTRL 控制账户调额，再做 P0-E、P0-G、P0-H。 | 当前最容易产生语义漂移的是 `LIMIT_ADJUST`、信用额度、预算调额和 `LIMIT` 红线；这些闭合后再扩展账户治理和清结算。 |
 | 清结算代码范围 | 本轮先完成模型和契约，核心交易稳定后再实现完整批处理。 | 清结算依赖账本、交易、对账和运营策略，过早实现容易反复返工。 |
 | DDL 和迁移 | 单独出数据库变更方案和回滚方案后再执行。 | 涉及资金事实、余额投影、归档和分表，必须有评审和验证。 |
 | Harness 接入 | 先用本地命令和测试矩阵跑通，再创建真实 pipeline。 | 避免在规范未固化前引入 CI 凭据和远程环境变量。 |
 
 # 十一、当前结论
 
-从设计完整性看，本轮已经具备进入编码任务拆分的条件：产品目标、DSL、OpenSpec、核心系分、API 契约、测试矩阵和验证门禁都已经形成闭环。
+从设计完整性看，产品目标、DSL、OpenSpec、核心系分、API 契约、测试矩阵和 Harness 本地门禁已经形成编码输入闭环；但执行顺序需要以 8.1 的再审查结果为准。
 
-进入代码前建议先确认 `P0 编码任务拆分.md` 中的当前工作包状态。P0-A 测试保护、P0-D 交易门面、P0-C 账本主链路首轮和 P0-F helper/route 主链路已经完成主体落地；下一批按“P0-R 产品口径回归闸口、P0-E 钱包账户与余额控制、P0-G/P0-H 治理”的顺序小步落地。
+进入代码前建议先确认 `P0 编码任务拆分.md` 中的当前工作包状态。P0-A 测试保护、P0-D 交易门面、P0-C 账本主链路首轮、P0-F helper/route 主链路和 P0-R 产品口径回归已经完成主体落地；下一批按“P0-CTRL 控制账户调额、P0-E 钱包账户与余额控制、P0-G/P0-H 治理”的顺序小步落地。
