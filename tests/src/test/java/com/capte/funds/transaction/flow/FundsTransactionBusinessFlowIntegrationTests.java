@@ -461,6 +461,51 @@ class FundsTransactionBusinessFlowIntegrationTests {
     }
 
     /**
+     * 场景：外部授权问询通过后直接按原授权全额结算。
+     * 输入：信用账户初始可用 500，授权 100，结算 100。
+     * 输出：信用账户 AVAILABLE/AUTHORIZATION、平台 SETTLEMENT 余额快照。
+     * 预期：授权占用后直接消费 AUTHORIZATION，结算目标入平台 SETTLEMENT。
+     * 红线：授权直接结算必须回放原授权路径，不得重新占用 AVAILABLE，也不得触碰 LIMIT。
+     */
+    @Test
+    void testAuthorizationDirectSettleShouldReplayOriginalRouteWithoutLimit() {
+        FundsAccountId credit = creditAccount("credit_auth_001");
+        FundsAccountId settlement = settlementAccount();
+        BalanceSnapshot before = snapshot(balances(credit, settlement));
+
+        String authorizationSn = authorize(credit, 100L, "AUTH_DIRECT_SETTLE_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(credit, settlement));
+        assertOnlyBalanceDeltas(before, afterAuthorize,
+                delta(credit, LedgerSubjectCode.AVAILABLE, -100L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, 100L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(settlement, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        LedgerTransactionSpec authorizationTransaction = ledgerBook.postedTransactions.getFirst();
+        assertEntriesForSubject(authorizationTransaction, credit, LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCode.AUTHORIZATION);
+        assertNoLedgerSubject(authorizationTransaction, LedgerSubjectCode.LIMIT);
+
+        String settlementSn = settle(credit, 100L, authorizationSn, "AUTH_DIRECT_SETTLE_SETTLE");
+        BalanceSnapshot afterSettlement = snapshot(balances(credit, settlement));
+        assertThat(settlementSn).isNotBlank();
+        assertOnlyBalanceDeltas(afterAuthorize, afterSettlement,
+                delta(credit, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, -100L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(settlement, LedgerSubjectCode.SETTLEMENT, 100L, CURRENCY));
+        LedgerTransactionSpec settlementTransaction = ledgerBook.postedTransactions.get(1);
+        assertEntriesForSubject(settlementTransaction, credit, LedgerSubjectCode.AUTHORIZATION);
+        assertEntriesForSubject(settlementTransaction, settlement, LedgerSubjectCode.SETTLEMENT);
+        assertNoLedgerSubject(settlementTransaction, LedgerSubjectCode.LIMIT);
+
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.AVAILABLE, 400L, CURRENCY);
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.LIMIT, 100L, CURRENCY);
+        assertBucket(ledgerBook.balance(settlement), LedgerSubjectCode.SETTLEMENT, 100L, CURRENCY);
+        assertPostedTransactions(2);
+    }
+
+    /**
      * 场景：共享卡授权同时占用信用账户、预算组和真实资金账户。
      * 输入：信用账户、预算组、真实资金账户各自初始可用余额充足，授权 60。
      * 输出：三个主体的 AVAILABLE/AUTHORIZATION 余额快照。
