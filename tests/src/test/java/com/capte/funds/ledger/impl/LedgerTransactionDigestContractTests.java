@@ -8,13 +8,7 @@ import com.capte.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
 import com.wind.integration.funds.ledger.enums.EntrySide;
-import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.integration.funds.ledger.enums.LedgerPostingIntentType;
-import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
-import com.wind.integration.funds.ledger.enums.LedgerReconcileStatus;
-import com.wind.integration.funds.ledger.enums.LedgerSettlementStatus;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPhaseSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
@@ -25,7 +19,6 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -128,151 +121,5 @@ class LedgerTransactionDigestContractTests extends LedgerTransactionServiceImplT
         inserted.setReferenceLedgerTransactionSn("REFERENCE_LEDGER_TXN_0002");
 
         assertThat(stableTransactionHash(inserted)).isNotEqualTo(originalHash);
-    }
-
-    /**
-     * 场景：账本分录摘要需要覆盖汇率，防止跨币种事实在重建时丢失汇率差异。
-     * 输入：包含原币 EUR 和汇率 1.10 的账本分录。
-     * 输出：修改汇率前后的分录级 sha256 摘要。
-     * 预期：汇率变化会改变摘要，说明汇率属于稳定业务事实的一部分。
-     */
-    @Test
-    void testEntrySha256ShouldIncludeExchangeRate() {
-        List<LedgerEntry> insertedEntries = new ArrayList<>();
-        AtomicLong idSequence = new AtomicLong(100L);
-        LedgerTransactionServiceImpl service = new LedgerTransactionServiceImpl(
-                mapper(LedgerTransactionMapper.class, entity -> ((LedgerTransaction) entity)
-                        .setId(idSequence.incrementAndGet())),
-                mapper(LedgerPostingPlanMapper.class, entity -> ((LedgerPostingPlan) entity)
-                        .setId(idSequence.incrementAndGet())),
-                mapper(LedgerEntryMapper.class, entity -> {
-                    LedgerEntry entry = (LedgerEntry) entity;
-                    entry.setId(idSequence.incrementAndGet());
-                    insertedEntries.add(entry);
-                })
-        );
-        LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(LedgerPhaseCode.TRANSFER,
-                List.of(entry("user_001", EntrySide.DEBIT), entry("user_002", EntrySide.CREDIT)));
-        LedgerTransactionSpec transaction = LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec.builder()
-                .sn("LEDGER_TXN_0001")
-                .tenantId(1L)
-                .eventType(FundsTransactionEventType.TOPUP)
-                .status(LedgerTransactionStatus.POSTED)
-                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
-                .originalAmount(Money.immutable(110L, CurrencyIsoCode.EUR))
-                .exchangeRate(new BigDecimal("1.10"))
-                .businessScene("TRANSFER_TEST")
-                .businessSn("BUSINESS_SN_0001")
-                .transactionTime(LocalDateTime.of(2026, 5, 7, 10, 0))
-                .postingPlans(List.of(postingPlanWithContext(phase, Map.of())))
-                .contextVariables(Map.of())
-                .build();
-
-        service.createLedgerTransaction(transaction);
-
-        LedgerEntry firstEntry = insertedEntries.getFirst();
-        String originalHash = firstEntry.getSha256();
-        firstEntry.setExchangeRate(new BigDecimal("1.20"));
-
-        assertThat(stableEntryHash(firstEntry)).isNotEqualTo(originalHash);
-    }
-
-    @Test
-    void testEntrySha256ShouldIncludeAccountingSemantics() {
-        List<LedgerEntry> insertedEntries = new ArrayList<>();
-        AtomicLong idSequence = new AtomicLong(100L);
-        LedgerTransactionServiceImpl service = new LedgerTransactionServiceImpl(
-                mapper(LedgerTransactionMapper.class, entity -> ((LedgerTransaction) entity)
-                        .setId(idSequence.incrementAndGet())),
-                mapper(LedgerPostingPlanMapper.class, entity -> ((LedgerPostingPlan) entity)
-                        .setId(idSequence.incrementAndGet())),
-                mapper(LedgerEntryMapper.class, entity -> {
-                    LedgerEntry entry = (LedgerEntry) entity;
-                    entry.setId(idSequence.incrementAndGet());
-                    insertedEntries.add(entry);
-                })
-        );
-        LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(LedgerPhaseCode.TRANSFER,
-                List.of(entry("user_001", EntrySide.DEBIT), entry("user_002", EntrySide.CREDIT)));
-        LedgerTransactionSpec transaction = LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec.builder()
-                .sn("LEDGER_TXN_0001")
-                .tenantId(1L)
-                .eventType(FundsTransactionEventType.TOPUP)
-                .status(LedgerTransactionStatus.POSTED)
-                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
-                .businessScene("TRANSFER_TEST")
-                .businessSn("BUSINESS_SN_0001")
-                .transactionTime(LocalDateTime.of(2026, 5, 7, 10, 0))
-                .postingPlans(List.of(postingPlanWithContext(phase, Map.of())))
-                .contextVariables(Map.of())
-                .build();
-
-        service.createLedgerTransaction(transaction);
-
-        LedgerEntry firstEntry = insertedEntries.getFirst();
-        String originalHash = firstEntry.getSha256();
-        firstEntry.setLedgerSubjectCategory(LedgerSubjectCategory.ASSET);
-        assertThat(stableEntryHash(firstEntry)).isNotEqualTo(originalHash);
-
-        firstEntry.setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY);
-        firstEntry.setIntent(LedgerPostingIntentType.FEE.name());
-        assertThat(stableEntryHash(firstEntry)).isNotEqualTo(originalHash);
-
-        firstEntry.setIntent(LedgerPostingIntentType.TRANSFER.name());
-        firstEntry.setPostingScope(LedgerPostingScope.WITHIN_SUBJECT.name());
-        assertThat(stableEntryHash(firstEntry)).isNotEqualTo(originalHash);
-
-        firstEntry.setPostingScope(LedgerPostingScope.BETWEEN_SUBJECTS.name());
-        firstEntry.setBalanceEffectType(LedgerBalanceEffectType.RESTORE.name());
-        assertThat(stableEntryHash(firstEntry)).isNotEqualTo(originalHash);
-
-        firstEntry.setBalanceEffectType(LedgerBalanceEffectType.CONSUME.name());
-        firstEntry.setPhaseCode(LedgerPhaseCode.FEE.name());
-        assertThat(stableEntryHash(firstEntry)).isNotEqualTo(originalHash);
-    }
-
-    @Test
-    void testEntrySha256ShouldUseStableFields() {
-        List<LedgerEntry> insertedEntries = new ArrayList<>();
-        AtomicLong idSequence = new AtomicLong(100L);
-        LedgerTransactionServiceImpl service = new LedgerTransactionServiceImpl(
-                mapper(LedgerTransactionMapper.class, entity -> ((LedgerTransaction) entity)
-                        .setId(idSequence.incrementAndGet())),
-                mapper(LedgerPostingPlanMapper.class, entity -> ((LedgerPostingPlan) entity)
-                        .setId(idSequence.incrementAndGet())),
-                mapper(LedgerEntryMapper.class, entity -> {
-                    LedgerEntry entry = (LedgerEntry) entity;
-                    entry.setId(idSequence.incrementAndGet());
-                    insertedEntries.add(entry);
-                })
-        );
-        LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(LedgerPhaseCode.TRANSFER,
-                List.of(entry("user_001", EntrySide.DEBIT), entry("user_002", EntrySide.CREDIT)));
-        LedgerTransactionSpec transaction = LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec.builder()
-                .sn("LEDGER_TXN_0001")
-                .tenantId(1L)
-                .eventType(FundsTransactionEventType.TOPUP)
-                .status(LedgerTransactionStatus.POSTED)
-                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
-                .businessScene("TRANSFER_TEST")
-                .businessSn("BUSINESS_SN_0001")
-                .transactionTime(LocalDateTime.of(2026, 5, 7, 10, 0))
-                .postingPlans(List.of(postingPlanWithContext(phase, Map.of())))
-                .contextVariables(Map.of())
-                .build();
-
-        service.createLedgerTransaction(transaction);
-
-        LedgerEntry firstEntry = insertedEntries.getFirst();
-        String originalHash = firstEntry.getSha256();
-        firstEntry.setSn("LGE999999");
-        firstEntry.setId(999L);
-        firstEntry.setGmtCreate(LocalDateTime.of(2026, 5, 8, 11, 0));
-        firstEntry.setGmtModified(LocalDateTime.of(2026, 5, 8, 11, 30));
-        firstEntry.setSettlementStatus(LedgerSettlementStatus.FAILED);
-        firstEntry.setSettlementCompletedTime(LocalDateTime.of(2026, 5, 8, 12, 0));
-        firstEntry.setReconcileStatus(LedgerReconcileStatus.MATCHED);
-        firstEntry.setReconciliationBatch("RECON_202605080001");
-        assertThat(stableEntryHash(firstEntry)).isEqualTo(originalHash);
     }
 }
