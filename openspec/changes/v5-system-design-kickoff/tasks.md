@@ -109,6 +109,7 @@
   - [x] Split route replay orchestration scenarios from `DefaultRoutedFundsInstructionOrchestratorTests` into `DefaultRoutedFundsInstructionOrchestratorReplayTests` with shared `DefaultRoutedFundsInstructionOrchestratorTestSupport`.
   - [x] Split authorization and balance-control command scenarios from `FundsTransactionCommandServiceImplTests` into dedicated command service tests with shared `FundsTransactionCommandServiceImplTestSupport`.
   - [x] Split ledger transaction digest contract scenarios from `LedgerTransactionServiceImplTests` into `LedgerTransactionDigestContractTests` with shared `LedgerTransactionServiceImplTestSupport`.
+  - [x] Split posting plan digest contract scenarios from `LedgerTransactionDigestContractTests` into `LedgerPostingPlanDigestContractTests`.
   - [x] Split funds account balance-query scenarios from `DefaultFundsAccountQueryServiceImplTests` into dedicated query tests with shared `DefaultFundsAccountQueryServiceImplTestSupport`.
   - [x] Split ledger balance projection event, negative-constraint and validation scenarios from `LedgerBalanceProjectionServiceImplTests` into dedicated tests with shared `LedgerBalanceProjectionServiceImplTestSupport`.
   - [x] Split funds transaction route snapshot query scenarios from `DefaultFundsTransactionQueryServiceTests` into `DefaultFundsTransactionRouteSnapshotQueryTests` with shared `DefaultFundsTransactionQueryServiceTestSupport`.

@@ -308,6 +308,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | Tool/external ref 只作快照 | DSL 四、OpenSpec ledger | `LedgerPostableSubjectContractTests` 或现有边界测试 | L1/L4 | 银行卡、VA、VCC、PSP、外部账户不得成为 `LedgerEntry.subjectType`。 | 部分已有 |
 | Replay 使用原路径 | DSL 七 | `DefaultRouteReplayServiceTests` | L1/L2 | 原绑定关系变化后仍使用原 snapshot；未知 schema version 失败。 | 已有 |
 | Posting plan 独立平衡 | DSL 五、OpenSpec ledger | `DefaultLedgerPostingAssemblerTests`、`DefaultLedgerTransactionPostingServiceImplTests` | L1/L2 | 每个 plan 同币种借贷相等；空 plan、混币种、不平衡失败。 | 已有 |
+| Posting plan 摘要 | DSL 五、OpenSpec ledger | `LedgerPostingPlanDigestContractTests` | L1 | 相同账务计划语义重算一致；`routeLegId`、`postingScope` 和 `balanceEffectType` 变化会改变摘要。 | 已有 |
 | Ledger entry 摘要 | DSL 五、OpenSpec ledger | `LedgerEntryDigestContractTests` | L1 | 相同业务事实重算一致；排除 entry sn、ID、ledger transaction sn、plan sn、审计时间。 | 已有 |
 | Entry 展示语义隔离 | DSL 五 | `TransactionViewProjectionBoundaryTests` | L4 | Entry 不出现账单标题、展示原因、国际化文案。 | 部分已有 |
 | Profile 和余额桶 | DSL 六、OpenSpec wallets | `DefaultLedgerProfileServiceImplTests`、`LedgerBalanceProjectionServiceImplTests` | L1/L2 | 账目规则由 profile 决定；`CONSUMED` 不入账；平台 profile 包含 `CASH/PREPAYMENT/CLEARING/SETTLEMENT/FEE/ADJUSTMENT`。 | 已有 |

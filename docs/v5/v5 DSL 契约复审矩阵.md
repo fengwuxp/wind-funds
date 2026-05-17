@@ -217,7 +217,8 @@ JSON 样例必须通过以下机械校验：
 | `FundsTransactionServiceApiContractTests` | 交易层 Request、Query、DTO、错误码、幂等键和审计字段。 |
 | `RouteDslContractTests` | route、snapshot、platform accounts、tool/external refs、replay policy。 |
 | `LedgerPostingPlanContractTests` | 每组 plan 平衡、币种一致、entry 绑定 ledger。 |
-| `LedgerEntryDigestContractTests` | 摘要稳定字段和排除字段。 |
+| `LedgerPostingPlanDigestContractTests` | Posting plan 摘要稳定字段、`routeLegId`、scope/effect 语义。 |
+| `LedgerEntryDigestContractTests` | Entry 摘要稳定字段和排除字段。 |
 | `RouteReplayContractTests` | 缺快照失败、未知 schema 失败、binding 漂移不影响 replay。 |
 | `BalanceProjectionArchiveContractTests` | watermark、checkpoint、archive manifest、冷热拼接。 |
 | `SettlementPolicySpecTests` | 结算策略表达式解析和边界日期。 |
