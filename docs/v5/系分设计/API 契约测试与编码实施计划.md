@@ -401,9 +401,9 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 钱包账户能力测试 | `com.capte.funds.wallet` / `com.capte.funds.wallet.services.impl` | wallet 边界、profile、账户、支付工具、平台账户角色和查询服务。 |
 | Ledger 测试 | `com.capte.funds.ledger` / `com.capte.funds.ledger.impl` | posting、entry digest、transaction service、balance projection。 |
 
-现有 `com.capte.funds.transaction` 和 `com.capte.funds.transaction.flow` 作为迁移期包名保留；新增测试优先使用上表包名，迁移旧类时必须同步文件路径、`package` 声明、聚焦验证命令和文档引用。
+现有 `com.capte.funds.transaction` 根包作为迁移期包名保留；历史 `com.capte.funds.transaction.flow` 已迁移到 `com.capte.funds.transaction.application.flow`。新增测试优先使用上表包名，迁移旧类时必须同步文件路径、`package` 声明、聚焦验证命令和文档引用。
 
-迁移进度：三类交易门面服务测试和共享 support 已迁移到 `com.capte.funds.transaction.application`；交易业务组合集成测试仍保留在迁移期 `com.capte.funds.transaction.flow`，后续按小批次迁移到 `com.capte.funds.transaction.application.flow`。
+迁移进度：三类交易门面服务测试和共享 support 已迁移到 `com.capte.funds.transaction.application`；交易业务组合集成测试已迁移到 `com.capte.funds.transaction.application.flow`。其余 `com.capte.funds.transaction` 根包测试仍按路由、账本断言、边界契约等能力归属后续小批次治理。
 
 ## 7.8 推荐验证命令
 
@@ -459,7 +459,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 2 | P0-E Wallets 账户与余额控制 | `wallets` 规格继续保护账户 profile、平台角色、冻结事实、受控负余额和预算治理。 | 保持 wallet 是账户能力层，不承载交易命令；新增资金变化必须先补余额断言。 | `DefaultLedgerProfileServiceImplTests`、`PlatformFundingAccountServiceImplTests`、`WalletLayerBoundaryTests`、`ControlAccountLedgerRulesTests`。 | 已闭合，后续只保留回归保护。 |
 | 3 | P0-G 命名治理残余 | OpenSpec 不直接驱动纯命名，但公共契约名称变化必须同步 spec delta。 | 已按账本入账结果、生命周期记录器、余额控制服务和账户类型语义轴分批治理；包名统一保留为独立重构轮次。 | `WalletLayerBoundaryTests`、`FundsTransactionServiceApiContractTests`、`DefaultFundsAccountTypeTests`、`PlatformFundingAccountRoleTests`。 | 已闭合，后续只保留回归保护。 |
 | 4 | P0-H-API 三类服务测试矩阵 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 先补 `FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单测和业务组合集成测试矩阵，再做缺口实现。 | `FundsTransactionCommandServiceImplTests`、`FundsAuthorizationTransactionCommandServiceImplTests`、`FundsBalanceControlCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests`。 | 当前版本下一批优先。 |
-| 5 | P0-H-PKG 测试包名对齐 | OpenSpec 不直接约束测试包名，但包名必须反映能力归属，避免 wallet/transaction 历史语义漂移。 | 小批次迁移 `com.capte.funds.transaction`、`com.capte.funds.transaction.flow` 到 application/application.flow 等目标包名，不夹带业务逻辑。 | 聚焦执行被迁移测试类，必要时补 `rg "package com.capte.funds.transaction"` 人工复核。 | 进行中：已迁移三类交易门面服务测试和共享 support；`flow` 包后续小批次。 |
+| 5 | P0-H-PKG 测试包名对齐 | OpenSpec 不直接约束测试包名，但包名必须反映能力归属，避免 wallet/transaction 历史语义漂移。 | 小批次迁移 `com.capte.funds.transaction`、`com.capte.funds.transaction.flow` 到 application/application.flow 等目标包名，不夹带业务逻辑。 | 聚焦执行被迁移测试类，必要时补 `rg "package com.capte.funds.transaction"` 人工复核。 | 进行中：已迁移交易门面服务测试、共享 support 和业务组合 flow 测试；其余根包测试按能力归属后续治理。 |
 | 6 | P1-CLR 清结算与对账 | `clearing-reconciliation` 需要补产品层 `SettlementPolicy`、候选、批次、结算单、出款单、差错单 spec delta。 | 下版本再做模型、契约测试和批处理实现，不直接进入当前 CAD 批次。 | 进入清结算集成测试、对账差错测试和 Manual Approval。 | 下版本。 |
 | 7 | P1-FX / P1-ARC 外汇运营与归档治理 | FX 报价、锁价、审批、费用、汇损益以及 archive/checkpoint/watermark 需要独立 change。 | 下版本隔离领域对象、余额快照、归档账目和只读投影边界，避免交易层重新自动换汇或报表反写账本。 | 需要 DDL 或数据修复时进入 Manual Approval。 | 下版本。 |
 

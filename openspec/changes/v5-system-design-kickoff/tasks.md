@@ -85,7 +85,7 @@
   - [x] Reclassify `PREPAID_CARD` as a funding account product and `REBATE_ACCOUNT` as a rebate-liability funding account; keep only `SHARED_CARD` and `CREDIT_CARD` in the credit account axis.
 - [ ] Execute P0-H test asset governance tasks.
   - [x] Align transaction service facade tests and shared support to `com.capte.funds.transaction.application`.
-  - [ ] Align remaining transaction flow tests to `com.capte.funds.transaction.application.flow` without business logic changes.
+  - [x] Align remaining transaction flow tests to `com.capte.funds.transaction.application.flow` without business logic changes.
 
 ## 8. 2026-05-15 CR Calibration
 
