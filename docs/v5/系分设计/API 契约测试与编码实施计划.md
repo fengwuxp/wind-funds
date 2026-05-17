@@ -307,7 +307,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | --- | --- | --- | --- | --- | --- |
 | Instruction 业务身份 | DSL 三 | `FundsInstructionSpecContractTests` | L1 | `tenantId/businessScene/businessSn` 必填；金额、原币、汇率、operator、reference 语义完整。 | 已有 |
 | Instruction 引用边界 | DSL 三、OpenSpec transaction-layer | `FundsInstructionSpecContractTests`、`RouteReplayContractTests` | L1 | 退款、撤销、结算、拒付、费用退回、解冻缺引用必须失败。 | 部分已有 |
-| 幂等摘要稳定 | DSL 三、API 5.2 | `FundsIdempotencyDigestContractTests` | L1 | 摘要排除数据库 ID、持久化流水、审计时间、展示文案、traceId。 | 待补 |
+| 幂等摘要稳定 | DSL 三、API 5.2 | `FundsIdempotencyDigestContractTests`、`FundsIdempotencyCoreFundsDigestContractTests` | L1 | 摘要排除数据库 ID、持久化流水、审计时间、展示文案、traceId；金额、币种、主体和 route 语义变化必须改变摘要并拒绝幂等复用。 | 已落地 |
 | Route 只表达资金路径 | DSL 四 | `RouteDslContractTests`、`RouteLayerBoundaryTests` | L1/L4 | route leg 不承载通道处理、审批、证据提交或页面流程。 | 已有 |
 | Snapshot 版本和平台账户 | DSL 四 | `RouteDslContractTests`、`PlatformFundingAccountServiceImplTests` | L1/L2 | `snapshotSchemaVersion/routeVersion` 分离；平台角色解析到具体 funding account。 | 已有 |
 | Tool/external ref 只作快照 | DSL 四、OpenSpec ledger | `LedgerPostableSubjectContractTests` 或现有边界测试 | L1/L4 | 银行卡、VA、VCC、PSP、外部账户不得成为 `LedgerEntry.subjectType`。 | 部分已有 |
