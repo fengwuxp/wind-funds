@@ -185,4 +185,12 @@
 - [x] Implement missing current-version service facade unit tests for the three transaction services.
 - [x] Implement missing current-version business-combination integration tests for direct transaction, authorization and balance-control flows.
 - [x] Migrate test package names in small batches without mixing business-logic changes.
+- [ ] Execute P0-ROUTE route-layer CR and scenario-coverage tasks.
+  - [ ] Add `CompositeRouteResolver` tests for single match, multiple-match priority, no match, `Ordered` sorting, self-exclusion and replay resolver priority.
+  - [ ] Add route replay support tests for direct refund, fee refund, authorization reversal, authorization settlement, authorization refund, chargeback, unfreeze, missing reference, missing original route snapshot, empty legs, partial missing leg ids and external transaction non-replay.
+  - [ ] Pin the authorization follow-up default rule: reversal, settlement and authorization refund require `reference` and must use replay; missing reference must not fall back to a normal authorization route.
+  - [ ] Add direct, balance-control and authorization route scenario coverage for platform-account gaps, wrong-currency platform accounts, controlled negative balance, credit limit adjustment, budget limit adjustment, shared-card and multi-subject authorization paths.
+  - [ ] Refactor route leg construction, route constraint keys and subject-node construction to reduce duplicated private logic and overlong method parameters without changing face-layer contracts.
+  - [ ] Clean obsolete route constants, private methods and legacy compatibility branches only after focused route tests pass.
+  - [ ] Keep route-layer boundary tests proving route code does not write transaction facts, frozen-order facts, ledger facts, DAL mapper state or balance projections.
 - [ ] Keep P1 clearing/reconciliation, FX operations and archive governance behind separate OpenSpec changes and Harness manual approval gates when they introduce new objects, DDL or high-risk behavior.
