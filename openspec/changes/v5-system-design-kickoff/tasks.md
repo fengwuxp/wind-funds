@@ -146,6 +146,7 @@
   - [x] Split frozen-order compatibility and schema contract scenarios from `FundsFrozenOrderServiceImplTests` into `FundsFrozenOrderCompatibilityContractTests`.
   - [x] Extract a shared before-posting lifecycle fixture from `DefaultFundsInstructionLifecycleBeforePostingTests` into `FundsInstructionLifecycleSaverTestSupport`.
   - [x] Split ledger posting amount and exchange-rate validation scenarios from `DefaultLedgerTransactionPostingValidationTests` into `DefaultLedgerTransactionPostingAmountValidationTests`.
+  - [x] Split ledger posting currency validation scenarios from `DefaultLedgerTransactionPostingServiceImplTests` into `DefaultLedgerTransactionPostingCurrencyValidationTests`.
   - [x] Extract shared delegating lifecycle-recorder fixtures from `DelegatingFundsInstructionLifecycleRecorderTests` into `DelegatingFundsInstructionLifecycleRecorderTestSupport`.
   - [x] Split topup and withdraw orchestration scenarios from `FundsTransactionOrchestrationFlowTests` into `FundsFundingOrchestrationFlowTests`.
   - [x] Split authorization replay command scenarios from `FundsAuthorizationTransactionCommandServiceImplTests` into `FundsAuthorizationReplayCommandServiceImplTests`.

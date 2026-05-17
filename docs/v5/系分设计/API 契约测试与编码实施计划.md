@@ -214,7 +214,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | `TransactionServiceAbilityDslJsonContractTests` | L1 | 交易层 JSON 样例可解析、能力覆盖、posting 平衡、无入账场景边界。 | 已有 |
 | `SettlementPolicySpecTests` | L1 | 结算策略表达式、周期和边界日期。 | 已有 |
 | `DefaultLedgerPostingAssemblerTests` | L1/L2 | route leg 到 posting plan、稳定引用、借贷方向、金额和币种。 | 已有 |
-| `DefaultLedgerTransactionPostingServiceImplTests` | L2 | 成功入账、不平衡失败、外部主体失败、账本缺失失败。 | 已有 |
+| `DefaultLedgerTransactionPostingServiceImplTests`、`DefaultLedgerTransactionPostingCurrencyValidationTests` | L2 | 成功入账、不平衡失败、外部主体失败、账本缺失失败、posting plan 与交易级币种红线。 | 已有 |
 | `LedgerBalanceProjectionServiceImplTests` | L1/L2 | normal balance、禁止负数、受控负数、投影失败路径。 | 已有 |
 | `FundsTransactionLedgerBalanceAssertionsTests` | L1/L2 | 核心资金变化的余额桶 delta 和 posting 平衡。 | 已有 |
 | `FundsTransactionBusinessFlowIntegrationTests` | L2 | 充值 -> 付款 -> 退款，充值 -> 冻结 -> 提现，A -> B -> 商户 -> 提现。 | 已有 |
@@ -422,7 +422,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 变更范围 | 建议命令 |
 | --- | --- |
 | DSL / core 契约 | `mvn -pl core -am test -Dtest=FundsInstructionSpecContractTests,RouteDslContractTests,TransactionServiceAbilityDslJsonContractTests` |
-| Ledger posting / 投影 | `mvn -pl tests -am test -Dtest=DefaultLedgerPostingAssemblerTests,DefaultLedgerTransactionPostingServiceImplTests,LedgerBalanceProjectionServiceImplTests` |
+| Ledger posting / 投影 | `mvn -pl tests -am test -Dtest=DefaultLedgerPostingAssemblerTests,DefaultLedgerTransactionPostingServiceImplTests,DefaultLedgerTransactionPostingCurrencyValidationTests,LedgerBalanceProjectionServiceImplTests` |
 | Transaction layer | `mvn -pl tests -am test -Dtest=FundsTransactionCommandServiceImplTests,DefaultRoutedFundsInstructionOrchestratorTests,DefaultFundsInstructionLifecycleSaverTests` |
 | Transaction service facade | `mvn -pl tests -am test -Dtest=FundsTransactionCommandServiceImplTests,FundsAuthorizationTransactionCommandServiceImplTests,FundsBalanceControlCommandServiceImplTests` |
 | Frozen order / balance control | `mvn -pl tests -am test -Dtest=FundsFrozenOrderServiceImplTests,DefaultFundsFrozenOrderLifecycleSaverTests,BalanceControlFundsInstructionRouteResolverTests` |
@@ -466,7 +466,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 
 | 顺序 | 工作包 | OpenSpec 检查 | Superpowers 执行纪律 | Harness 门禁 | 当前状态 |
 | --- | --- | --- | --- | --- | --- |
-| 0 | P0-C Ledger Posting 主链路 | `payment-ledger` 与 `transaction-layer` 已覆盖 posting plan、entry、balance projection 和幂等入账结果主契约。 | 已按账本入账正向、写前失败、投影缺省语义和命名兼容测试驱动完成。 | `DefaultLedgerTransactionPostingServiceImplTests`、`DefaultLedgerTransactionPostingValidationTests`、`LedgerBalanceProjectionServiceImplTests`、`DefaultFundsAccountQueryServiceImplTests`。 | 已闭合，后续只保留回归保护。 |
+| 0 | P0-C Ledger Posting 主链路 | `payment-ledger` 与 `transaction-layer` 已覆盖 posting plan、entry、balance projection 和幂等入账结果主契约。 | 已按账本入账正向、写前失败、投影缺省语义和命名兼容测试驱动完成。 | `DefaultLedgerTransactionPostingServiceImplTests`、`DefaultLedgerTransactionPostingCurrencyValidationTests`、`DefaultLedgerTransactionPostingValidationTests`、`LedgerBalanceProjectionServiceImplTests`、`DefaultFundsAccountQueryServiceImplTests`。 | 已闭合，后续只保留回归保护。 |
 | 1 | P0-R 产品口径回归 | `transaction-layer`、`payment-ledger`、`clearing-reconciliation` 已覆盖 FX 外置、余额日志和结算策略红线。 | 已按红线用例驱动完成。 | `SettlementPolicySpecTests`、FX converter、余额控制和余额投影事件测试。 | 已闭合，后续只保留回归保护。 |
 | 2 | P0-CTRL 控制账户调额 | `wallets` 规格承接信用额度和预算组控制语义；`transaction-layer` 规格承接 `FundsBalanceControlService#adjust` 入口。 | 已按信用额度调增/调减、预算调增/调减、受控负数和 `LIMIT` 红线测试驱动完成。 | `FundsTransactionCommandServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、`just compile`。 | 已闭合，后续只保留回归保护。 |
 | 3 | P0-E Wallets 账户与余额控制 | `wallets` 规格继续保护账户 profile、平台角色、冻结事实、受控负余额和预算治理。 | 保持 wallet 是账户能力层，不承载交易命令；新增资金变化必须先补余额断言。 | `DefaultLedgerProfileFundingAccountTests`、`DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests`、`PlatformFundingAccountServiceImplTests`、`WalletLayerBoundaryTests`、`ControlAccountLedgerRulesTests`。 | 已闭合，后续只保留回归保护。 |
