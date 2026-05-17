@@ -105,6 +105,7 @@
   - [x] Split funds transaction route snapshot query scenarios from `DefaultFundsTransactionQueryServiceTests` into `DefaultFundsTransactionRouteSnapshotQueryTests` with shared `DefaultFundsTransactionQueryServiceTestSupport`.
   - [x] Split wallet layer boundary contract, instrument and implementation ownership scenarios from `WalletLayerBoundaryTests` into dedicated boundary tests with shared `WalletLayerBoundaryTestSupport`.
   - [x] Split funds instruction lifecycle before-posting and success-summary scenarios from `DefaultFundsInstructionLifecycleSaverTests` into dedicated lifecycle saver tests.
+  - [x] Split route replay authorization, direct refund and replay-policy scenarios from `DefaultRouteReplayServiceTests` into dedicated route replay tests.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
