@@ -27,7 +27,6 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FundsTransactionCommandServiceImplTests extends FundsTransactionCommandServiceImplTestSupport {
 
@@ -65,24 +64,6 @@ class FundsTransactionCommandServiceImplTests extends FundsTransactionCommandSer
                 LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.INCREASE, LedgerPhaseCode.SETTLEMENT);
         assertThat(route.getExternalAccountRef()).isNotNull();
         assertThat(route.getExternalAccountRef().getExternalAccountId()).isEqualTo("external_bank_001");
-    }
-
-    @Test
-    void testTopupShouldRejectNonExternalSourceBeforeOrchestrator() {
-        FundsAccountId target = fundingAccount("funding_001");
-
-        assertThatThrownBy(() -> service.topup(new FundsTransactionTopupRequest()
-                .setAccountId(target)
-                .setFundsSourceAccountId(fundingAccount("funding_002"))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
-                .setChannelTransactionSn("bank_txn_001")
-                .setTransactionAmount(TransactionAmount.sameCurrency(amount(1_000L)))
-                .setBusinessScene("TOPUP")
-                .setBusinessSn("TOPUP_INVALID_SOURCE")
-                .setDescription("topup"), WindOperator.system()))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("top-up funds source must external account");
-        assertThat(instruction()).isNull();
     }
 
     @Test
@@ -141,23 +122,6 @@ class FundsTransactionCommandServiceImplTests extends FundsTransactionCommandSer
     }
 
     @Test
-    void testWithdrawShouldRejectNonExternalPayeeBeforeOrchestrator() {
-        FundsAccountId payer = fundingAccount("funding_001");
-
-        assertThatThrownBy(() -> service.withdraw(new FundsTransactionWithdrawRequest()
-                .setAccountId(payer)
-                .setPayeeId(fundingAccount("funding_002"))
-                .setReferenceFreezeSn("FREEZE_00000001")
-                .setTransactionAmount(TransactionAmount.sameCurrency(amount(800L)))
-                .setBusinessScene("WITHDRAW")
-                .setBusinessSn("WITHDRAW_INVALID_PAYEE")
-                .setDescription("withdraw"), WindOperator.system()))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("withdraw payee must external account");
-        assertThat(instruction()).isNull();
-    }
-
-    @Test
     void testTransferShouldBuildSingleInternalTransferRoute() {
         FundsAccountId payer = fundingAccount("funding_001");
         FundsAccountId payee = fundingAccount("funding_002");
@@ -180,22 +144,6 @@ class FundsTransactionCommandServiceImplTests extends FundsTransactionCommandSer
                 .containsExactlyInAnyOrder(RouteParticipantRole.PAYER.name(), RouteParticipantRole.PAYEE.name());
         assertLeg(route.getLegs().getFirst(), RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.TRANSFER);
-    }
-
-    @Test
-    void testTransferShouldRejectSamePayerAndPayeeBeforeOrchestrator() {
-        FundsAccountId account = fundingAccount("funding_001");
-
-        assertThatThrownBy(() -> service.transfer(new FundsTransactionTransferRequest()
-                .setPayerAccountId(account)
-                .setPayeeAccountId(account)
-                .setTransactionAmount(TransactionAmount.sameCurrency(amount(500L)))
-                .setBusinessScene("TRANSFER")
-                .setBusinessSn("TRANSFER_SAME_ACCOUNT")
-                .setDescription("transfer"), WindOperator.system()))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("不能一致");
-        assertThat(instruction()).isNull();
     }
 
     @Test
