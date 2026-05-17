@@ -125,6 +125,7 @@
   - [x] Split fee business-flow scenarios from `FundsTransactionBusinessFlowIntegrationTests` into `FundsTransactionFeeBusinessFlowTests` with shared `FundsTransactionBusinessFlowTestSupport`.
   - [x] Split authorization business-flow scenarios from `FundsTransactionBusinessFlowIntegrationTests` into `FundsAuthorizationBusinessFlowTests` with shared `FundsTransactionBusinessFlowTestSupport`.
   - [x] Split shared-card authorization business-flow scenarios from `FundsAuthorizationBusinessFlowTests` into `FundsSharedCardAuthorizationBusinessFlowTests`.
+  - [x] Split balance-control business-flow scenarios from `FundsTransactionBusinessFlowIntegrationTests` into `FundsBalanceControlBusinessFlowTests`.
   - [x] Split replay orchestration-flow scenarios from `FundsTransactionOrchestrationFlowTests` into `FundsTransactionOrchestrationReplayFlowTests` with shared `FundsTransactionOrchestrationFlowTestSupport`.
   - [x] Split credit-account and budget-group `LIMIT_ADJUST` route scenarios from `BalanceControlFundsInstructionRouteResolverTests` into `BalanceControlLimitAdjustRouteResolverTests` with shared `BalanceControlFundsInstructionRouteResolverTestSupport`.
   - [x] Split subject ledger initializer validation scenarios from `DefaultSubjectLedgerInitializerTests` into `DefaultSubjectLedgerInitializerValidationTests` with shared `DefaultSubjectLedgerInitializerTestSupport`.
