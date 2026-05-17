@@ -97,6 +97,7 @@
 - [ ] Review balance assertions and split large test classes according to P0-H follow-up.
   - [x] Split ledger posting validation scenarios from `DefaultLedgerTransactionPostingServiceImplTests` into `DefaultLedgerTransactionPostingValidationTests` with shared `LedgerTransactionPostingTestSupport`.
   - [x] Split ledger posting assembler period lookup scenarios from `DefaultLedgerPostingAssemblerTests` into `DefaultLedgerPostingAssemblerPeriodTests` with shared `DefaultLedgerPostingAssemblerTestSupport`.
+  - [x] Split route replay orchestration scenarios from `DefaultRoutedFundsInstructionOrchestratorTests` into `DefaultRoutedFundsInstructionOrchestratorReplayTests` with shared `DefaultRoutedFundsInstructionOrchestratorTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
