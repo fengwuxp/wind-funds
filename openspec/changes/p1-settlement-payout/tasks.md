@@ -1,35 +1,26 @@
 # Tasks: P1 Settlement and Payout
 
+> 2026-05-18 作废说明：本 change 已从当前 CAD 任务队列移除。结算、出款和相关清结算内容仅作为历史设计草稿保留，不作为下一轮实现、测试、外部集成或 DDL 的有效依据；如后续重新启动，必须重新设计并创建新的 OpenSpec change。
+
 ## 1. Change Scaffolding
 
 - [x] Create `p1-settlement-payout` OpenSpec change.
 - [x] Define proposal, design and task boundaries.
 - [x] Keep this change documentation-only: no Java code, no DDL, no real Harness pipeline, no external payout.
 
-## 2. Product and System Boundary
+## 2. Voided Historical Draft Scope
 
-- [x] Define `SettlementOrder`, `SettlementLine`, `PayoutOrder` and `PayoutReceipt` semantics.
-- [x] Define settlement order and payout order state machines.
-- [x] Define net settlement amount formula, settlement idempotency key and traceability fields.
-- [x] Define settlement lock, payout success and payout failure restore transaction boundaries.
-- [x] Clarify external acceptance is not payout success and receipt mismatch enters review or later exception handling.
+- [x] Mark the previous `SettlementOrder`, `SettlementLine`, `PayoutOrder`, `PayoutReceipt`, state machine, net settlement and traceability notes as historical draft only.
+- [x] Remove the previous `clearing-reconciliation` and `transaction-layer` spec delta work from the effective task queue.
+- [x] Keep clearing candidates, clearing batch, reconciliation exception, report, FX and archive work out of this voided change.
 
-## 3. Spec Delta
+## 3. Voided Implementation Tasks
 
-- [x] Add `clearing-reconciliation` requirements for settlement locking, payout success, payout failure restore and receipt mismatch.
-- [x] Add `transaction-layer` requirement for `SETTLEMENT_ORDER` and `PAYOUT_ORDER` source fact references.
-- [x] Keep clearing candidates, clearing batch, reconciliation exception, report, FX and archive work out of this change.
+- [x] Void the previous implementation queue for `p1-settlement-payout`.
+- [x] Remove `SettlementOrderServiceTests`, `PayoutResultServiceTests`, settlement/payout DDL, payout integration and receipt handling from the current effective backlog.
+- [x] Require a fresh product/system design review before any future settlement, payout or external-funds task is reintroduced.
 
-## 4. Future Implementation Tasks
-
-- [ ] Before coding, confirm Execution Grant for `p1-settlement-payout` implementation.
-- [ ] Before coding, create failing `SettlementOrderServiceTests` covering net formula, lock success, insufficient balance, idempotency and duplicate lock rejection.
-- [ ] Before coding, create failing `PayoutResultServiceTests` covering external acceptance, success receipt, receipt mismatch, failure restore and duplicate restore.
-- [ ] Before DDL, provide table design, unique constraints, migration and rollback plan for manual approval.
-- [ ] Before payout integration, provide channel/bank boundary, credential strategy, receipt verification and retry/failure semantics for manual approval.
-- [ ] After implementation, run focused settlement and payout tests, transaction tests, compile and PMD according to the final write scope.
-
-## 5. Validation
+## 4. Validation
 
 - [x] Run `git diff --check` after this documentation-only change.
 - [x] Run `openspec validate p1-settlement-payout --strict` after this OpenSpec change.

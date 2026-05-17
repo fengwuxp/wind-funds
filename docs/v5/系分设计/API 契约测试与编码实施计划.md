@@ -22,8 +22,8 @@
 | `Ledger DSL Posting 系分设计.md` | 账本、路由到过账、摘要、余额投影和归档水位。 |
 | `Wallets 账户与余额控制系分设计.md` | 账户主体、余额桶、平台账户角色、冻结、授权占用和受控负余额。 |
 | `交易层服务能力系分设计.md` | 直接交易、逆向交易、授权交易、余额控制和查询重放。 |
-| `清结算与对账系分设计.md` | 清算候选、结算单、出款单、对账差错和阻断规则。 |
-| `归档投影与指标治理系分设计.md` | 检查点、水位、归档清单、交易视图重放和指标治理。 |
+| `清结算与对账系分设计.md` | 历史参考。清算、清结算、结算出款、对账差错和报表任务已从当前有效 backlog 作废，下一轮如需继续必须重新设计。 |
+| `归档投影与指标治理系分设计.md` | 历史参考。当前只保留余额投影和交易投影的设计、流程、红线再查验；归档移动、指标治理和报表任务已作废待重设。 |
 | `v4 代码 CR 遗留待办.md` | v4 代码评审中已确认未闭合的实现、命名、换汇、字面量和测试问题。 |
 | `P0 编码任务拆分.md` | P0 代码工作包、模块范围、测试资产、验收标准和验证命令。 |
 
@@ -32,18 +32,18 @@
 1. face 层只定义稳定契约，不暴露 Entity、Mapper、内部 route/assembler 实现。
 2. transaction 层对业务侧提供统一交易能力，通过 ledger 和 wallets 能力实现。
 3. wallets 层保留账户、余额查询、账本配置、平台账户角色和支付工具领域能力；冻结订单生命周期、余额控制命令和对外交易门面收敛到 transaction 层。
-4. 清结算、对账、归档治理可以先完成模型和契约，代码落地顺序排在核心交易和账本稳定之后。
+4. 清结算、结算出款、对账、报表、归档移动和指标治理不进入当前有效任务队列；下一轮如需继续，必须重新做产品/系分设计和 OpenSpec change。
 5. 不做历史兼容设计；但真实代码落地要小步提交、可编译、可测试。
 
 # 三、目标模块归属
 
 | 能力域 | 目标 face 边界 | 目标 impl 边界 | 不允许事项 |
 | --- | --- | --- | --- |
-| Ledger / Posting | `ledger-face` 暴露账本交易、分录、余额查询和重建契约；`wind-funds` 承载 DSL Spec。 | `ledger-impl` 实现 route 到 posting、分录持久化、余额投影、checkpoint 和 watermark。 | 业务侧直接传 `LedgerEntry` 或直接改余额。 |
+| Ledger / Posting | `ledger-face` 暴露账本交易、分录和余额查询契约；余额重建契约待投影再查验后再定。 | `ledger-impl` 实现 route 到 posting、分录持久化和余额投影主链路；checkpoint 和 watermark 待重新设计。 | 业务侧直接传 `LedgerEntry` 或直接改余额。 |
 | Wallets / Account | `wallet-face` 暴露资金账户、信用账户、预算组、账本配置、平台账户角色、支付工具和余额查询契约。 | `wallet-impl` 实现账户初始化、余额桶策略、账本 profile、平台角色解析和受控负余额策略。 | 把付款、退款、提现、转账等交易命令放回 wallet，或把信用/预算账户当真实资金账户。 |
-| Transaction Layer | `transaction-face` 暴露直接交易、逆向交易、授权交易、余额控制、交易视图和重放契约。 | `transaction-impl` 实现幂等、生命周期、source fact、route snapshot、ledger 调用和事件。 | Web/API 直接调用 ledger 组装分录；授权拒绝写入争议拒付。 |
-| Clearing / Reconciliation | `transaction-face` 或清结算子契约暴露清算批次、结算单、出款单、对账批次和差错处理能力。 | 实现候选生成、批次版本、结算锁定、出款结果、对账匹配、差错阻断和调账。 | 把清结算流程状态塞进 `FundsTransactionStatus` 或 DSL phase。 |
-| Projection / Metrics | face 层暴露重建、重放、指标查询和治理任务契约。 | 实现水位推进、归档清单、视图重放、账户类型分表查询和指标快照。 | 用交易视图反推余额，或用归档保留周期当冷热计算边界。 |
+| Transaction Layer | `transaction-face` 暴露直接交易、逆向交易、授权交易和余额控制契约；交易视图与正式重放契约待投影再查验后再定。 | `transaction-impl` 实现幂等、生命周期、source fact、route snapshot、ledger 调用和事件。 | Web/API 直接调用 ledger 组装分录；授权拒绝写入争议拒付。 |
+| Clearing / Reconciliation | 当前不作为有效 face 边界推进；历史草稿仅保留问题空间。 | 当前不实现候选生成、批次版本、结算锁定、出款结果、对账匹配、差错阻断或调账。 | 在未重新设计前恢复清结算/对账公共契约、DDL 或测试任务。 |
+| Projection | face 层暂不新增重建、重放或治理任务契约；先完成余额投影和交易投影的设计再查验。 | 当前只确认账本余额投影主链路和交易视图只读边界；水位、归档清单、正式重放和 DDL 待重新设计。 | 用交易视图反推余额，或把报表/指标口径混入余额投影与交易投影事实链。 |
 
 # 四、face 层服务契约设计
 
@@ -58,18 +58,18 @@
 | 授权交易 | 授权交易服务能力 | `AuthorizationTransactionRequest` | `FundsAuthorizationTransactionDTO` | 授权批准、拒绝、撤销、结算、授权退款、争议拒付口径分离。 |
 | 余额控制 | 余额控制服务能力 | `BalanceControlRequest` | `BalanceControlDTO` | 冻结/解冻不创建 `FundsTransaction`；冻结单是来源事实，账本交易是余额变化事实。 |
 | 交易视图查询 | 交易视图查询能力 | `TransactionViewQuery` | `TransactionViewDTO` / page | 只读投影；支持按账户主体类型分表后的聚合查询。 |
-| 重放重建 | 重放重建能力 | `ReplayRequest` | `ReplayResultDTO` | 余额重建使用 checkpoint + watermark；交易视图重放必须限定范围。 |
+| 重放重建 | 待查验能力 | 重新查验后再定 | 重新查验后再定 | 余额重建、交易视图正式重放和相关 DDL 暂不进入当前有效任务。 |
 
 ## 4.2 请求公共字段
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | `tenantId` | 是 | 租户边界，所有写操作必须参与幂等和权限判断。 |
-| `businessScene` | 是 | 业务场景，例如平台内部付款、VCC 授权、出入金、清算确认。 |
+| `businessScene` | 是 | 业务场景，例如平台内部付款、VCC 授权、出入金、风险冻结。 |
 | `businessSn` | 是 | 业务侧稳定流水，不使用数据库 ID。 |
 | `eventType` | 是 | 资金事件类型，参考 PRD 事件主轴和 DSL 事件类型。 |
 | `reference` | 条件必填 | 后续事件引用原资金事实，例如原交易、原授权、原冻结单、原账本交易或外部交易。当前执行链路优先使用该字段表达“本次动作依附哪个既有事实”。 |
-| `sourceFactRef` | 延后设计 | 来源事实引用值对象，不作为当前 P0 必填公共字段。只有冻结单、清结算单、争议单、对账差错单等独立资金事实先于交易指令成立，并且这些事实已有稳定类型、流水、版本、明细和审计模型时，才引入独立 `sourceFactRef`；不恢复 `sourceObjectType/sourceObjectSn` 两个散字段。 |
+| `sourceFactRef` | 延后设计 | 来源事实引用值对象，不作为当前 P0 必填公共字段。只有冻结单、争议单等独立资金事实先于交易指令成立，并且这些事实已有稳定类型、流水、版本、明细和审计模型时，才引入独立 `sourceFactRef`；清结算和对账差错如未来恢复，必须重新设计后再纳入该值对象；不恢复 `sourceObjectType/sourceObjectSn` 两个散字段。 |
 | `idempotencyKey` | 是 | 调用方传入或系统按稳定字段生成。 |
 | `requestHash` | 系统生成 | 摘要不包含数据库 ID、持久化流水、审计时间、展示文案等易变字段。 |
 | `amount` / `currency` | 条件必填 | 金额类请求必填，金额精度和舍入规则由币种配置决定。 |
@@ -88,7 +88,7 @@
 | `BalanceControlRequest` | 控制动作、主体、账目、冻结单、解冻引用、额度/预算调整、审批引用。 | 冻结创建 `FundsTransaction`；解冻超过剩余冻结；负余额无策略。 |
 | `SubjectBalanceQuery` | 主体、币种、账本 profile、查询时间、缺账本策略。 | 写流程用返回空余额绕过账本初始化；跨租户查询。 |
 | `TransactionViewQuery` | 视图主体类型、主体流水、交易时间范围、账户类型分表路由、分页游标。 | 无时间范围全量扫表；用视图修正账本余额。 |
-| `ReplayRequest` | replay 类型、范围、时间窗口、游标、dry run、原因、审批引用。 | 余额重建使用交易视图；交易视图重放生成 route 或 entry。 |
+| `ReplayRequest` | 待重新查验。未来若保留，应包含 replay 类型、范围、时间窗口、游标、dry run、原因和审批引用。 | 余额重建使用交易视图；交易视图重放生成 route 或 entry。 |
 
 `SubjectBalanceQuery` 不建议继续使用 `failIfMissingLedger` 这种布尔字段。目标态应使用 `missingLedgerPolicy` 表达语义：`FAIL` 用于写流程和强一致查询，`RETURN_EMPTY` 用于展示型查询，`INIT_REQUIRED` 用于账户初始化流程。
 
@@ -107,10 +107,10 @@ v5 编码时还必须处理 v4 CR 遗留问题：避免为简单 builder 包装�
 
 设计原则：
 
-1. `businessScene/businessSn` 可以覆盖“冻结、清结算、争议、对账差错等场景发起了一次资金动作”，但不应覆盖“该动作来源于哪个已存在的资金域事实”。
-2. `businessSn` 不得伪装成冻结单、清算单、争议单或对账差错单流水；如果这些事实尚未先建模，则本次请求只表达业务身份和必要 `reference`。
+1. `businessScene/businessSn` 可以覆盖“冻结、争议等场景发起了一次资金动作”，但不应覆盖“该动作来源于哪个已存在的资金域事实”。
+2. `businessSn` 不得伪装成冻结单、争议单或未来重新设计的清算单、对账差错单流水；如果这些事实尚未先建模，则本次请求只表达业务身份和必要 `reference`。
 3. `sourceFactRef` 的价值是把“事实类型、事实流水、事实版本、明细流水、外部凭证、审计上下文”封成一个可演进值对象，避免长期依赖散落字符串字段。
-4. P0 阶段不新增泛化 `sourceFactRef` 代码；先把冻结单通过 `reference=FREEZE_ORDER` 闭环，清结算、争议、对账差错进入 P1 独立事实设计后再引入。
+4. P0 阶段不新增泛化 `sourceFactRef` 代码；先把冻结单通过 `reference=FREEZE_ORDER` 闭环，争议等独立事实成熟后再引入。清结算和对账差错已作废待重设，不能作为当前引入 `sourceFactRef` 的理由。
 5. 未来若引入 `sourceFactRef`，请求摘要必须纳入其稳定字段，但不得纳入数据库自增 ID、创建时间、展示文案和临时审批状态。
 
 # 五、错误码、幂等与审计
@@ -132,8 +132,8 @@ v5 编码时还必须处理 v4 CR 遗留问题：避免为简单 builder 包装�
 | 授权拒绝 | `FUNDS_AUTHORIZATION_DECLINED` | 授权阶段业务拒绝；无 route、无 entry。 |
 | 争议上限 | `FUNDS_CHARGEBACK_LIMIT_EXCEEDED` | 争议扣减和退款累计超过已结算金额。 |
 | 冻结约束 | `FUNDS_FREEZE_AMOUNT_EXCEEDED` | 冻结或解冻超过可用/剩余冻结。 |
-| 归档水位 | `FUNDS_ARCHIVE_WATERMARK_GAP` | 归档 cutoff 晚于水位或检查点缺失。 |
-| 重放范围 | `FUNDS_REPLAY_RANGE_REQUIRED` | 交易视图重放缺时间窗口或主体范围。 |
+| 归档水位 | 重新查验后再定 | checkpoint、watermark 和归档移动暂不进入当前有效任务。 |
+| 重放范围 | 重新查验后再定 | 交易视图正式重放暂不进入当前有效任务；未来如恢复必须限定时间窗口和主体范围。 |
 | 权限审计 | `FUNDS_PERMISSION_DENIED` | 越权、缺审批、缺高危操作权限。 |
 
 ## 5.2 幂等键规则
@@ -144,10 +144,10 @@ v5 编码时还必须处理 v4 CR 遗留问题：避免为简单 builder 包装�
 | 授权批准/拒绝 | `tenantId + authorizationRequestSn + action + idempotencyKey` |
 | 授权结算/撤销/退款/争议 | `tenantId + originalAuthorizationSn + action + businessSn + idempotencyKey` |
 | 冻结/解冻 | `tenantId + frozenOrderSn + action + idempotencyKey` |
-| 清算确认 | `tenantId + clearingBatchSn + version + idempotencyKey` |
-| 结算锁定/出款结果 | `tenantId + settlementOrderSn/payoutOrderSn + action + idempotencyKey` |
-| 对账差错调账 | `tenantId + reconciliationExceptionSn + adjustmentSn + idempotencyKey` |
-| 余额重建/视图重放 | `tenantId + replayType + scopeHash + window + idempotencyKey` |
+| 清算确认 | 已作废待重设；下一轮重新设计后再确定幂等键。 |
+| 结算锁定/出款结果 | 已作废待重设；下一轮重新设计后再确定幂等键。 |
+| 对账差错调账 | 已作废待重设；下一轮重新设计后再确定幂等键。 |
+| 余额重建/视图重放 | 待重新查验；下一轮确认 replay 类型、scopeHash、window 和审批维度后再定。 |
 
 请求摘要必须包含决定资金和账务结果的稳定字段，排除 `id`、`sn`、`gmtCreate`、`gmtModified`、展示文案、操作者名称、运行时 message 和 traceId。
 
@@ -176,16 +176,18 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | `authorization-chargeback-dispute.json` | 争议拒付 | 争议拒付独立事实，累计上限正确。 |
 | `balance-freeze-order.json` | 余额控制 | 冻结单为来源事实，`AVAILABLE -> FROZEN`。 |
 | `balance-unfreeze-replay.json` | 余额控制 | 解冻引用冻结单，金额不超过剩余冻结。 |
-| `clearing-settlement-payout.json` | 清结算 | 清算确认、结算锁定、出款成功的账目变化。 |
-| `reconciliation-exception-adjustment.json` | 对账差错 | 差错阻断、调账来源和审计引用。 |
-| `archive-balance-rebuild-watermark.json` | 余额重建 | checkpoint + watermark 无 gap、无 overlap。 |
-| `transaction-view-replay-range.json` | 交易视图重放 | 时间范围、主体范围和只读投影边界。 |
+| `clearing-settlement-payout.json` | 已作废待重设 | 不进入当前契约样例任务；下一轮重新设计清结算后再定。 |
+| `reconciliation-exception-adjustment.json` | 已作废待重设 | 不进入当前契约样例任务；下一轮重新设计对账差错后再定。 |
+| `archive-balance-rebuild-watermark.json` | 待重新查验 | 不进入当前契约样例任务；下一轮确认余额投影 checkpoint/watermark 后再定。 |
+| `transaction-view-replay-range.json` | 待重新查验 | 不进入当前契约样例任务；下一轮确认交易投影视图域和重放边界后再定。 |
 
 # 七、全量测试清单
 
 本节是进入编码前的统一测试 backlog，承接产品设计、DSL 契约矩阵、OpenSpec 和各系分设计。后续新增、修改或删除测试时，必须能追溯到本节或对应上游设计；如果上游设计新增能力，也必须同步补充本节测试项。
 
 2026-05-17 CR 再校准：当前版本只继续推进交易、钱包和 ledger 层的测试与实现闭环；`FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单元测试、业务组合集成测试和测试包名对齐已完成。清分、清算、对账、账本账目归档、余额快照、完整外汇运营对象和相关运营工作台统一排入下一版本，不进入当前 CAD 自动提交批次。
+
+2026-05-18 再校准：清算、清结算、结算出款、对账差错和报表相关测试任务从当前有效 backlog 作废或移除；已有历史设计和测试建议仅作为参考，不再作为下一轮 CAD 自动推进依据。余额投影和交易投影需要单独重新查验设计、流程、红线和任务边界后，再决定是否创建新的 OpenSpec change。
 
 测试状态口径：
 
@@ -240,18 +242,18 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | --- | --- | --- | --- | --- | --- |
 | 入金成功 | `PTDD-IN-001` | `FundsTransactionLedgerBalanceAssertionsTests`、`FundsTransactionOrchestrationFlowTests` | L1/L2 | 用户 `AVAILABLE` 增加；平台现金/预收路径可解释；外部账户不入账；posting 平衡。 | 已有 |
 | 入金幂等 | `PTDD-IN-002` | `FundsTransactionCommandServiceImplTests` | L2 | 同 business key + request hash 重复不生成重复交易、snapshot、entry 或投影。 | 已有 |
-| 入金异常挂账 | `PTDD-IN-003` | `ReconciliationExceptionAdjustmentTests` 或后续对账差错服务测试 | L2/L3 | 外部已成功但内部不可入账时不直接增余额，生成挂账/差错/补入账任务。 | 下版本 |
+| 入金异常挂账 | `PTDD-IN-003` | 重新设计后再定 | L2/L3 | 外部已成功但内部不可入账时不直接增余额，生成挂账/差错/补入账任务。 | 已作废，下一轮重设 |
 | 用户提现申请 | `PTDD-OUT-001` | `BalanceControlFundsInstructionRouteResolverTests`、`DefaultFundsFrozenOrderLifecycleSaverTests` | L1/L2 | 余额充足才冻结；`AVAILABLE -> FROZEN`；冻结单含原因、引用、操作者和审计。 | 已有 |
 | 用户提现确认成功 | `PTDD-OUT-002` | `FundsTransactionBusinessFlowIntegrationTests`、`DefaultFundsInstructionLifecycleSaverTests` | L2 | 提现作为独立直接交易事实引用冻结单；消耗 `FROZEN`；不回写冻结单消费状态；重复成功不重复扣。 | 已有 |
 | 用户提现失败回退 | `PTDD-OUT-003` | `DefaultFundsFrozenOrderLifecycleSaverTests`、后续出款结果服务测试 | L2 | `FROZEN -> AVAILABLE` 只释放一次；成功/失败不能双终态；保留失败原因。 | 部分已有 |
 | 系统内转账 | `PTDD-PAY-001` | `TransferFundsInstructionRouteResolverTests`、`FundsTransactionBusinessFlowIntegrationTests` | L1/L2 | 付款方 `AVAILABLE` 减少，收款方 `AVAILABLE` 增加；同主体和币种不一致失败。 | 已有 |
 | 普通支付 | `PTDD-PAY-002` | `FundsTransactionLedgerBalanceAssertionsTests` | L1/L2 | 付款方减少，收款方按命令指定桶增加；普通支付不默认进入商户清结算桶。 | 已有 |
 | 商户订单收款 | `PTDD-MER-001` | `TransactionServiceAbilityDslJsonContractTests`、`FundsTransactionLedgerBalanceAssertionsTests` | L1/L2 | 用户 `AVAILABLE -> 商户 CLEARING`；不得直入 `AVAILABLE/SETTLEMENT`。 | 部分已有 |
-| 商户清算批次完成 | `PTDD-MER-002` | `MerchantClearingBatchServiceTests`、`ClearingSettlementFlowIntegrationTests` | L2/L3 | `CLEARING -> AVAILABLE`；批次可追溯明细；重跑不重复清算；退款并发不超额。 | 下版本 |
-| 商户结算锁定 | `PTDD-MER-003` | `SettlementOrderServiceTests` | L2/L3 | `AVAILABLE -> SETTLEMENT`；出款中不可再次结算；保留审批、规则版本和金额组成。 | 下版本 |
-| 商户出款失败回退 | `PTDD-MER-004` | `PayoutResultServiceTests` | L2/L3 | `SETTLEMENT -> AVAILABLE` 只回退一次；失败原因、通道引用和处理人可审计。 | 下版本 |
+| 商户清算批次完成 | `PTDD-MER-002` | 重新设计后再定 | L2/L3 | `CLEARING -> AVAILABLE`；批次可追溯明细；重跑不重复清算；退款并发不超额。 | 已作废，下一轮重设 |
+| 商户结算锁定 | `PTDD-MER-003` | 重新设计后再定 | L2/L3 | `AVAILABLE -> SETTLEMENT`；出款中不可再次结算；保留审批、规则版本和金额组成。 | 已作废，下一轮重设 |
+| 商户出款失败回退 | `PTDD-MER-004` | 重新设计后再定 | L2/L3 | `SETTLEMENT -> AVAILABLE` 只回退一次；失败原因、通道引用和处理人可审计。 | 已作废，下一轮重设 |
 | 原交易退款 | `PTDD-REF-001` | `DefaultRouteReplayServiceTests`、`DefaultFundsInstructionLifecycleSaverTests` | L1/L2 | 基于原 `RouteSnapshot`；不重新选路；累计退款不超过剩余可退金额。 | 已有 |
-| 清算前退款 | `PTDD-REF-002` | `FundsTransactionLedgerBalanceAssertionsTests`、后续清算候选测试 | L2 | 商户 `CLEARING` 减少，用户 `AVAILABLE` 增加；清算批次排除已退款金额。 | 部分已有，清算候选下版本 |
+| 清算前退款 | `PTDD-REF-002` | `FundsTransactionLedgerBalanceAssertionsTests` | L2 | 商户 `CLEARING` 减少，用户 `AVAILABLE` 增加；清算候选、批次排除和结算影响下一轮重新设计后再定。 | 部分已有，清算候选已作废待重设 |
 | 清算后退款 | `PTDD-REF-003` | `FundsTransactionLedgerBalanceAssertionsTests` | L2 | 商户 `AVAILABLE` 减少，用户 `AVAILABLE` 增加；商户不足进入人工/负余额/追偿策略。 | 部分已有 |
 | 出款中或已出款后退款 | `PTDD-REF-004` | 后续退款/追偿服务测试 | L2/L3 | 不直接做 `SETTLEMENT -> 用户 AVAILABLE`；必须进入人工或追偿流程。 | 下版本 |
 | 手工直接退款 | `PTDD-REF-005` | `ManualRefundServiceTests` | L2 | 权限、审批、原因、凭证、额度缺失均失败；不得冒充原交易退款。 | 待补 |
@@ -262,13 +264,13 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 授权结算 | `PTDD-AUTH-004` | `DefaultRouteReplayServiceTests`、`FundsTransactionLedgerBalanceAssertionsTests` | L1/L2 | 结算金额不超过剩余授权；控制主体减少授权占用；不得 `AUTHORIZATION -> LIMIT`。 | 部分已有 |
 | 授权链退款和争议拒付上限 | `PTDD-AUTH-005` | `DefaultFundsInstructionLifecycleSaverTests` | L2 | `refundedAmount + chargebackAmount <= settledAmount`；争议拒付不是授权拒付。 | 已有 |
 | 冻结与解冻 | `PTDD-CTRL-001` | `DefaultFundsFrozenOrderLifecycleSaverTests`、`FundsFrozenOrderBoundaryTests` | L2/L4 | 冻结只做 `AVAILABLE <-> FROZEN`；不创建 `FundsTransaction`；超额解冻失败。 | 已有 |
-| 资金余额调账 | `PTDD-CTRL-002` | `FundsBalanceControlInstructionConverterTests`、`FundsTransactionCommandServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、后续 `ReconciliationExceptionAdjustmentTests` | L1/L2 | 请求显式携带原因、凭证、审批和可选差错引用；缺原因、凭证或审批时交易编排前失败；通过平台 `ADJUSTMENT` 账户形成平衡分录。 | 已落地基础调账红线，差错调账状态机 P1 |
+| 资金余额调账 | `PTDD-CTRL-002` | `FundsBalanceControlInstructionConverterTests`、`FundsTransactionCommandServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests` | L1/L2 | 请求显式携带原因、凭证、审批和可选业务引用；缺原因、凭证或审批时交易编排前失败；通过平台 `ADJUSTMENT` 账户形成平衡分录。 | 已落地基础调账红线；对账差错调账已作废待重设 |
 | 信用/预算额度调整 | `PTDD-CTRL-003`、`AT-BASE-040`、`AT-BASE-041` | `DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests`、`BalanceControlFundsInstructionRouteResolverTests`、`FundsBalanceControlCommandServiceImplTests`、后续 `ControlAccountLedgerRulesTests` | L1/L2 | `FundsBalanceControlService#adjust` 支持资金账户余额调账、信用账户额度调整和预算组预算调整；资金账户生成 `BALANCE_ADJUST`，信用/预算生成 `LIMIT_ADJUST`；`LIMIT` 不开放给普通交易迁移；不新增 `CONSUMED`；预算调减受控负数必须有预算周期、审批、上限、账龄和治理路径。 | 已补服务门面和 route 红线测试，后续只保留回归保护 |
 | 受控负余额 | `PTDD-CTRL-004`、`PTDD-CTRL-005` | `LedgerBalanceProjectionServiceImplTests`、`ControlledNegativeAvailableTests` | L1/L2 | 有来源、策略、上限、账龄、审批或风控标记；负余额不能当作可继续消费余额。 | 部分已有 |
 | 余额控制无 FX | `PTDD-CTRL-006`、`AT-BASE-039` | `FundsBalanceControlInstructionConverterTests` | L1/L2 | freeze/unfreeze/adjust 金额币种必须等于账户或账本币种；不调用 `FxService`、不接收 FX 快照；错币种直接失败，不挂账、不生成 route/entry。 | 已落地 |
 | 交易层门面归属 | `PTDD-ARCH-001` | `WalletLayerBoundaryTests`、`FundsTransactionServiceApiContractTests` | L4/L2 | 交易命令归 transaction；wallet 不直接写交易事实或账本事实。 | 已有 |
-| 交易/资金对账差异 | `PTDD-REC-001` | `ReconciliationMatchingServiceTests` | L2/L3 | 创建对账差错单，不直接改账；数据源、批次、差异类型和处理状态完整。 | 下版本 |
-| 账务一致性核对 | `PTDD-REC-002` | `LedgerConsistencyInspectionTests` | L2/L3 | 检出缺分录、重复分录、投影不平；不靠汇总数掩盖明细差异。 | 下版本 |
+| 交易/资金对账差异 | `PTDD-REC-001` | 重新设计后再定 | L2/L3 | 创建对账差错单，不直接改账；数据源、批次、差异类型和处理状态完整。 | 已作废，下一轮重设 |
+| 账务一致性核对 | `PTDD-REC-002` | 重新设计后再定 | L2/L3 | 检出缺分录、重复分录、投影不平；不靠汇总数掩盖明细差异。 | 已作废，下一轮重设 |
 | 余额变更日志观察 | `PTDD-LEDGER-001`、`AT-BASE-036` | `LedgerBalanceProjectionServiceImplTests` | L2/L3 | 已扩展 `LedgerBalanceChangedEvent`，余额变化观察包含主体、账本、账目、币种、变更前余额、变更后余额、变更额、`ledgerTransactionSn`、`ledgerEntrySn`、分录摘要和业务引用；事件发布失败不回滚余额投影。 | 已落地 |
 | 争议拒付入账 | `PTDD-DSP-001` | `DisputeChargebackServiceTests`、`DefaultFundsInstructionLifecycleSaverTests` | L2 | 原因码、证据、时限、责任可追踪；拒付上限正确。 | 部分已有 |
 | 持牌能力和备付金口径 | `PTDD-NBFX-001` | `ComplianceCapabilityBoundaryTests` | L4 | 未确认许可证范围不得启用；普通平台不得把待结算资金称为客户备付金。 | 设计保留 |
@@ -291,11 +293,11 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 手续费与通道成本分离 | `PTDD-FEE-001` | `FeeAndChannelCostAccountingTests` | L2 | 商户实收、平台费用、通道成本分别可解释；费率版本可追溯。 | 待补 |
 | 争议证据提交和结果处理 | `PTDD-DSP-002` | 后续争议证据服务测试 | L2 | 证据最小必要、脱敏、版本留痕；资金结果和责任一致。 | 设计保留 |
 | 商户负余额追偿 | `PTDD-DSP-003` | 后续商户追偿服务测试 | L2/L3 | 形成负余额、准备金扣减、追偿单或后续抵扣，不制造不平账。 | 待补 |
-| 用户和商户账单展示 | `PTDD-VIEW-001` | `TransactionViewProjectionBoundaryTests` | L2/L4 | 展示来自事实和投影规则；商户账单区分 `CLEARING/AVAILABLE/SETTLEMENT`。 | 部分已有 |
-| 运营时间线和财务报表 | `PTDD-VIEW-002` | `TransactionTimelineReportProjectionTests`、后续报表边界测试 | L2/L4 | 报表不依赖不可解释汇总；时间线不反向改写事实。 | 待补 |
-| 交易视图有界重放 | `PTDD-VIEW-003` | `TransactionViewReplayRangeTests` | L1/L2 | 必须限定租户、视图域、时间窗口、主体、批次或单笔来源。 | 部分已有 |
-| 归档后余额重建 | `PTDD-ARCH-002` | `BalanceProjectionArchiveContractTests` | L2/L3 | checkpoint/cold summary + watermark 后增量分录；不从视图反推余额。 | 部分已有 |
-| 水位推进顺序 | `PTDD-ARCH-003` | `BalanceWatermarkAdvanceTests` | L2/L3 | 先计算、写入、校验，再推进水位；失败时水位停留原值。 | 已有 |
+| 用户和商户账单展示 | `PTDD-VIEW-001` | 重新查验交易投影设计后再定 | L2/L4 | 展示来自事实和投影规则；商户清结算展示口径下一轮重新设计后再定。 | 待重新查验 |
+| 运营时间线 | `PTDD-VIEW-002` | 重新查验交易投影设计后再定 | L2/L4 | 时间线来自事实和投影规则，不反向改写事实。 | 待重新查验 |
+| 交易视图有界重放 | `PTDD-VIEW-003` | 重新查验后再定 | L1/L2 | 必须限定租户、视图域、时间窗口、主体、批次或单笔来源。 | 待重新查验 |
+| 归档后余额重建 | `PTDD-ARCH-002` | 重新查验余额投影设计后再定 | L2/L3 | checkpoint/cold summary + watermark 后增量分录；不从视图反推余额。 | 待重新查验 |
+| 水位推进顺序 | `PTDD-ARCH-003` | 重新查验余额投影设计后再定 | L2/L3 | 先计算、写入、校验，再推进水位；失败时水位停留原值。 | 待重新查验 |
 | 外汇报价和换汇执行 | `PTDD-NBFX-005` | `FxQuoteExecutionTests` | L2 | 过期报价不得换汇；原币、目标币、汇率、费用和差额可解释。 | 设计保留 |
 | 监管或机构报送失败重试 | `PTDD-NBFX-006` | `RegulatoryReportingRetryTests` | L2/L3 | 不修改原交易事实；保留源批次、回执和失败原因。 | 设计保留 |
 
@@ -317,7 +319,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | Profile 和余额桶 | DSL 六、OpenSpec wallets | `DefaultLedgerProfileFundingAccountTests`、`DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests`、`LedgerBalanceProjectionServiceImplTests` | L1/L2 | 账目规则由 profile 决定；`CONSUMED` 不入账；平台 profile 包含 `CASH/PREPAYMENT/CLEARING/SETTLEMENT/FEE/ADJUSTMENT`。 | 已有 |
 | 冻结只迁移同主体余额 | DSL 六、OpenSpec wallets | `FundsFrozenOrderBoundaryTests`、`DefaultFundsFrozenOrderLifecycleSaverTests` | L2/L4 | 冻结不改变资金归属，不跨主体转移，不创建 `FundsTransaction`。 | 已有 |
 | JSON 样例机械校验 | DSL 8.0 | `TransactionServiceAbilityDslJsonContractTests` | L1 | JSON 可解析；posting plan 平衡；平台角色不直接入账；query/replay 样例无 posting。 | 已有 |
-| 归档和视图重放 | DSL 十 | `BalanceProjectionArchiveContractTests`、`TransactionViewReplayRangeTests` | L2/L3 | watermark 边界、checkpoint、manifest、有界重放、禁止视图反推余额。 | 部分已有 |
+| 归档和视图重放 | DSL 十 | 重新查验余额投影和交易投影设计后再定 | L2/L3 | watermark 边界、checkpoint、manifest、有界重放、禁止视图反推余额。 | 待重新查验 |
 
 ## 7.5 系分服务测试清单
 
@@ -334,13 +336,13 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 直接交易服务 | `交易层服务能力系分设计.md` | `FundsTransactionCommandServiceImplTests`、`DefaultRoutedFundsInstructionOrchestratorTests` | L2 | 成功入账、重复请求、摘要冲突、失败回滚、ledger posting 幂等命中。 | 已有 |
 | 逆向交易服务 | `交易层服务能力系分设计.md` | `DefaultRouteReplayServiceTests`、`DefaultFundsInstructionLifecycleSaverTests` | L2 | 原快照回放、累计上限、状态冲突、费用退回规则。 | 部分已有 |
 | 余额控制服务 | `交易层服务能力系分设计.md` | `DelegatingFundsInstructionLifecycleRecorderTests`、`BalanceControlFundsInstructionRouteResolverTests` | L1/L2 | lifecycle recorder 只能命中一个；冻结和解冻进入 FrozenOrder recorder；调账进入标准交易 recorder。 | 已有 |
-| 清算批次 | `清结算与对账系分设计.md` | `MerchantClearingBatchServiceTests` | L2/L3 | 候选生成、批次版本、重跑幂等、退款/争议阻断、审批留痕。 | 下版本 |
-| 结算与出款 | `清结算与对账系分设计.md` | `SettlementOrderServiceTests`、`PayoutResultServiceTests` | L2/L3 | 结算锁定、重复出款阻断、成功出款、失败回退、外部回单引用。 | 下版本 |
-| 对账差错 | `清结算与对账系分设计.md` | `ReconciliationMatchingServiceTests`、`ReconciliationExceptionAdjustmentTests` | L2/L3 | 匹配、差错创建、阻断、放行、调账、核销、审计。 | 下版本 |
-| 报表边界 | `清结算与对账系分设计.md` | 后续报表边界测试 | L4 | 报表从事实和明细派生，不反写账本或钱包事实。 | 下版本 |
-| 余额归档 | `归档投影与指标治理系分设计.md` | `BalanceProjectionArchiveContractTests`、`BalanceWatermarkAdvanceTests` | L2/L3 | 预检查、checkpoint、manifest、水位推进、冷热拼接无 gap/overlap。 | 下版本 |
-| 交易视图重放 | `归档投影与指标治理系分设计.md` | `TransactionViewReplayRangeTests` | L2/L4 | 必须限定范围；只写读模型或差异报告；不生成 route/entry。 | 下版本 |
-| 指标治理 | `归档投影与指标治理系分设计.md` | `MetricWatermarkTests` | L2 | 指标水位独立，不复用归档时间边界；失败可重跑。 | 下版本 |
+| 清算批次 | `清结算与对账系分设计.md` | 重新设计后再定 | L2/L3 | 候选生成、批次版本、重跑幂等、退款/争议阻断、审批留痕。 | 已作废，下一轮重设 |
+| 结算与出款 | `清结算与对账系分设计.md` | 重新设计后再定 | L2/L3 | 结算锁定、重复出款阻断、成功出款、失败回退、外部回单引用。 | 已作废，下一轮重设 |
+| 对账差错 | `清结算与对账系分设计.md` | 重新设计后再定 | L2/L3 | 匹配、差错创建、阻断、放行、调账、核销、审计。 | 已作废，下一轮重设 |
+| 报表边界 | `清结算与对账系分设计.md` | 重新设计后再定 | L4 | 报表从事实和明细派生，不反写账本或钱包事实。 | 已作废，下一轮重设 |
+| 余额投影治理 | `归档投影与指标治理系分设计.md` | 重新查验后再定 | L2/L3 | checkpoint、watermark、水位推进、冷热拼接无 gap/overlap；不从交易视图反推余额。 | 待重新查验 |
+| 交易视图重放 | `归档投影与指标治理系分设计.md` | 重新查验后再定 | L2/L4 | 必须限定范围；只写读模型或差异报告；不生成 route/entry。 | 待重新查验 |
+| 指标治理 | `归档投影与指标治理系分设计.md` | 重新设计后再定 | L2 | 指标水位独立，不复用归档时间边界；失败可重跑。 | 已作废，下一轮重设 |
 | 架构边界 | 全部系分 | `LedgerLayerBoundaryTests`、`RouteLayerBoundaryTests`、`WalletLayerBoundaryTests` | L4 | face 不依赖 impl/Entity/Mapper；wallet 不写交易事实；route 不写账本事实。 | 已有 |
 
 ## 7.5A 当前版本三类服务测试矩阵
@@ -355,6 +357,34 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 
 组合测试统一要求：每一步都断言相关主体余额桶 delta、posting plan 平衡、ledger transaction 可追溯和幂等行为；不得只断言最终余额或交易状态。
 
+## 7.5B 余额投影与交易投影再查验结论
+
+2026-05-18 再查验后，余额投影和交易投影保留为独立设计入口，但不与清结算、对账、报表、归档移动或指标治理绑定推进。
+
+余额投影确认口径：
+
+1. 余额投影的事实源只能是 `LedgerTransaction`、`LedgerEntry`、账本 profile 和受控负余额策略；业务余额日志、用户账单、商户账单、交易视图或报表不能反向修正余额。
+2. 当前已落地的 `LedgerBalanceChangedEvent` 只作为观察口子，用于业务侧记录余额变更日志；事件发布失败不得回滚账本入账和余额投影。
+3. `BalanceCheckpoint`、`BalanceProjectionWatermark`、冷热拼接、正式重建和差异报告暂不进入当前有效任务；如下一轮继续，必须先明确 checkpoint 粒度、watermark 推进顺序、重建窗口、差异处置和 DDL/回滚方案。
+4. 余额投影测试下一轮只围绕账本事实链、normal balance、受控负余额、水位推进和禁止视图反推余额展开，不承接报表或指标统计口径。
+
+交易投影确认口径：
+
+1. 交易投影是只读视图，用于用户账单、商户账单、运营时间线或运营 case view；它不得生成 route、ledger transaction、ledger entry，也不得回写交易生命周期事实。
+2. 交易投影的来源必须是交易事实、授权/冻结等资金事实、route snapshot、ledger transaction 和 entry 的稳定引用；不得恢复 `sourceObjectType/sourceObjectSn` 两个散字段。
+3. 交易视图重放不等同于路由回放。路由回放解决“按原资金路径生成逆向或后续资金动作”，交易视图重放只用于补齐或校验读模型，必须限定租户、视图域、主体、时间窗口和批次。
+4. 清算、结算、对账和报表字段不得提前塞入交易投影模型；商户清结算展示、差错展示和财务报表视图下一轮重新设计后再决定。
+
+当前任务边界：
+
+| 事项 | 当前结论 | 后续进入条件 |
+| --- | --- | --- |
+| 余额投影主链路 | 保留并继续作为 ledger 事实链回归保护。 | 新增余额桶、受控负余额或账本 profile 时补余额断言。 |
+| 余额 checkpoint / watermark / rebuild | 仅保留历史设计草稿，当前不实现。 | 重新设计 checkpoint 粒度、水位推进、DDL、回滚和 Harness manual approval。 |
+| 交易视图只读边界 | 保留设计红线，当前不扩展模型。 | 重新确认视图域、来源事实、字段最小集、重放策略和测试矩阵。 |
+| 交易视图正式重放 | 当前不实现。 | 新建 OpenSpec change，先补 range、dry-run、shadow/apply、差异报告和权限审批设计。 |
+| 报表/指标投影 | 已作废待重设。 | 下一轮重新做产品指标口径、事实来源、审计和只读边界。 |
+
 ## 7.6 红线失败测试清单
 
 源产品 TDD 文档存在一个重复编号 `RED-013`。本文用 `RED-013A` 表示“未确认真实性执行跨境外汇”，用 `RED-013B` 表示“轨道状态混用”，后续修订源文档时应同步去重。
@@ -368,8 +398,8 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | `RED-005` | `TransactionServiceAbilityDslJsonContractTests`、`MerchantCollectionRouteTests` | L1/L2 | 商户订单款直入 `AVAILABLE` 或 `SETTLEMENT`。 | 部分已有 |
 | `RED-006` | 后续退款/追偿红线测试 | L2 | 出款中资金被系统自动反向给用户退款。 | 待补 |
 | `RED-007` | `DefaultLedgerPostingAssemblerTests` | L1 | 任一 posting plan 借贷不平仍保存。 | 已有 |
-| `RED-008` | `FundsBalanceControlInstructionConverterTests`、`FundsTransactionCommandServiceImplTests` | L1/L2 | 无原因、凭证或审批的资金调账成功；差错引用作为对账差错调账的可选来源引用。 | 已落地基础调账红线，完整对账差错调账 P1 |
-| `RED-009` | 后续对账差错边界测试 | L2/L4 | 对账差异直接修改历史 entry 或余额。 | 待补 |
+| `RED-008` | `FundsBalanceControlInstructionConverterTests`、`FundsTransactionCommandServiceImplTests` | L1/L2 | 无原因、凭证或审批的资金调账成功；对账差错调账不进入当前有效任务。 | 已落地基础调账红线；对账差错调账已作废待重设 |
+| `RED-009` | 重新设计后再定 | L2/L4 | 对账差异直接修改历史 entry 或余额。 | 已作废，下一轮重设 |
 | `RED-010` | `TransactionViewProjectionBoundaryTests` | L4 | 展示投影写回 ledger 事实。 | 部分已有 |
 | `RED-011` | `ControlledNegativeAvailableTests` | L2 | 负 `AVAILABLE` 被当作可继续消费、授权或出款余额。 | 部分已有 |
 | `RED-012` | `ComplianceCapabilityBoundaryTests` | L4 | 未确认资质启用支付账户、备付金、跨境或外汇能力。 | 设计保留 |
@@ -378,10 +408,10 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | `RED-014` | `FundsInstructionFxContractTests` | L1/L2 | 错币种交易静默按目标币种入账，无汇率、审批和差错记录。 | 部分已有 |
 | `RED-014A` | `FundsDirectTransactionInstructionConverterTests`、`FundsAuthorizationInstructionConverterTests`、`FundsTransactionCommandServiceImplTests` | L1/L2 | converter、交易层或资金底座自动调用 `FxService` 并生成目标币种入账。 | 已落地 |
 | `RED-014B` | `FundsBalanceControlInstructionConverterTests` | L1/L2 | `FundsBalanceControlService` 对冻结、解冻、余额调账或额度/预算调整自动调用 `FxService`，或接收 FX 快照后生成目标币种余额控制。 | 已落地 |
-| `RED-015` | `TransactionViewReplayRangeTests` | L2/L4 | 交易视图无范围全量在线重放。 | 部分已有 |
-| `RED-016` | `BalanceProjectionArchiveContractTests` | L2/L4 | 余额重建依赖用户账单、商户账单或报表投影。 | 已有 |
-| `RED-017` | `BalanceProjectionArchiveContractTests` | L2/L3 | 用 180 天、自然日或归档日期作为冷热计算边界。 | 已有 |
-| `RED-018` | `BalanceWatermarkAdvanceTests` | L2/L3 | 先推进水位再计算区间分录。 | 已有 |
+| `RED-015` | 重新查验后再定 | L2/L4 | 交易视图无范围全量在线重放。 | 待重新查验 |
+| `RED-016` | 重新查验后再定 | L2/L4 | 余额重建依赖用户账单、商户账单或报表投影。 | 待重新查验 |
+| `RED-017` | 重新查验后再定 | L2/L3 | 用 180 天、自然日或归档日期作为冷热计算边界。 | 待重新查验 |
+| `RED-018` | 重新查验后再定 | L2/L3 | 先推进水位再计算区间分录。 | 待重新查验 |
 | `RED-019` | `LedgerBalanceProjectionServiceImplTests` | L2/L3 | 业务余额变更日志被当作余额事实源，或反向修改分录、余额投影。 | 已落地 |
 | `RED-020` | `SettlementPolicySpecTests` | L1/L2 | `SettlementPolicySpec` 表达式不支持或解析失败时仍按实时结算生成候选。 | 已落地 |
 
@@ -453,10 +483,10 @@ Route 层 CR 后补测矩阵：
 | Compile | `mvn compile` | 任一模块编译失败。 |
 | Focused Unit Tests | `mvn -pl <module> -am test -Dtest=<TestClass>` | 相关模块单测失败。 |
 | Contract Tests | `mvn -pl core -am test -Dtest=*ContractTests` | DSL JSON、枚举、route、posting 契约失败。 |
-| Integration Tests | `mvn -pl tests -am test -Dtest=<IntegrationTest>` | 本地事务、投影、清结算、对账集成失败。 |
+| Integration Tests | `mvn -pl tests -am test -Dtest=<IntegrationTest>` | 本地事务、余额投影、交易投影或资金域集成失败；清结算和对账集成任务已作废待重设。 |
 | Architecture Tests | 待代码落地后补 ArchUnit 或等价测试命令 | face/impl 依赖方向、禁止依赖规则失败。 |
 | Static Scan | `mvn pmd:check` 或团队等价规约检查 | 当前阶段非阻塞；恢复后 PMD 或团队等价规约失败才阻断。 |
-| Manual Approval | Harness 人工审批 | 资损、出款、归档、对账、数据修复、高危后台操作缺审批材料。 |
+| Manual Approval | Harness 人工审批 | 资损、出款、数据修复、高危后台操作缺审批材料；清结算、对账、报表、归档移动或投影 DDL 如被重新引入也必须进入审批。 |
 
 当前阶段只设计门禁，不配置真实 Harness org/project/pipeline，不写入凭据，不触发远程构建。
 
@@ -473,8 +503,8 @@ Route 层 CR 后补测矩阵：
 本轮把当前规划重新按 `OpenSpec 定规格`、`Superpowers 定执行纪律`、`Harness 定验证门禁` 三层审查，结论如下：
 
 1. OpenSpec 层：已完成的 P0-R、Route replay 与手续费 CR、控制账户调额设计均能追溯到 `transaction-layer`、`wallets`、`payment-ledger` 和 `clearing-reconciliation` 规格域；后续任何新增公共契约、状态机、余额桶语义、清结算对象或 FX 运营对象，必须先补 OpenSpec change 的 `proposal / design / tasks / spec delta`，不得只在代码里隐式新增规则。
-2. Superpowers 层：后续编码任务继续使用“用例和红线先行”的节奏，每个工作包先补失败用例、契约测试或验收矩阵，再做最小实现；每完成一个工作包就做代码 Review 和任务状态回写，不把命名治理、业务逻辑、DDL 和测试大迁移混成一轮。本轮 CR 后，当前版本继续推进交易、钱包、ledger 和 route 层；清分、清算、对账、账本账目归档、余额快照和完整外汇运营对象全部排入下版本。
-3. Harness 层：当前仍只使用本地 Harness 等价门禁，不创建真实 pipeline；每个工作包必须明确写入范围、聚焦测试、是否需要 `just compile`、是否需要人工审批。涉及资损、出款、清结算、对账差错、归档、数据修复或 DDL 的任务进入 Manual Approval 阶段，不进入当前 CAD 自动提交批次。
+2. Superpowers 层：后续编码任务继续使用“用例和红线先行”的节奏，每个工作包先补失败用例、契约测试或验收矩阵，再做最小实现；每完成一个工作包就做代码 Review 和任务状态回写，不把命名治理、业务逻辑、DDL 和测试大迁移混成一轮。本轮 CR 后，当前版本继续推进交易、钱包、ledger、route 与投影设计再查验；清分、清算、清结算、结算出款、对账、报表、归档移动、指标治理和完整外汇运营对象已从当前有效 backlog 作废或移除。
+3. Harness 层：当前仍只使用本地 Harness 等价门禁，不创建真实 pipeline；每个工作包必须明确写入范围、聚焦测试、是否需要 `just compile`、是否需要人工审批。涉及资损、出款、清结算、对账差错、报表、归档移动、数据修复或 DDL 的任务需要重新设计和 Manual Approval 后才能重新进入队列。
 
 当前规划的状态重新整理为：
 
@@ -488,10 +518,11 @@ Route 层 CR 后补测矩阵：
 | 5 | P0-H-API 三类服务测试矩阵 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 已补 `FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单测和业务组合集成测试矩阵。 | `FundsTransactionCommandServiceImplTests`、`FundsAuthorizationTransactionCommandServiceImplTests`、`FundsBalanceControlCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests`、`FundsBalanceControlBusinessFlowTests`、`FundsTransactionFeeBusinessFlowTests`、`FundsAuthorizationBusinessFlowTests`、`FundsSharedCardAuthorizationBusinessFlowTests`。 | 已完成：三类服务门面与业务组合矩阵均已有回归测试。 |
 | 6 | P0-H-PKG 测试包名对齐 | OpenSpec 不直接约束测试包名，但包名必须反映能力归属，避免 wallet/transaction 历史语义漂移。 | 小批次迁移 `com.capte.funds.transaction`、`com.capte.funds.transaction.flow` 到 `application`、`application.flow`、`contract`、`boundary`、`accounting`、`ledger`、`support` 等目标包名，不夹带业务逻辑。 | 聚焦执行被迁移测试类，必要时补 `rg "package com.capte.funds.transaction"` 人工复核。 | 已完成：交易根包测试已清空，门面服务、指令编排、契约、边界、账务口径、账本断言、共享 support 和业务组合 flow 测试均按能力归属迁移。 |
 | 7 | P0-ROUTE 路由层 CR 与场景覆盖 | `transaction-layer` 规格已承接 route replay、`RouteResolver#supports` 和资金路径边界；本轮未新增 face 契约。 | 已补 Composite、direct、balance、authorization、replay policy 和 route boundary 测试，并完成 replay 收敛、重复逻辑抽取和过时入口清理。 | `CompositeRouteResolverTests`、各类 `*RouteResolverTests`、`DefaultRouteReplay*Tests`、`RouteLayerBoundaryTests`、`mvn compile`。 | 已闭合，后续只保留回归保护。 |
-| 8 | P1-CLR 清结算与对账 | `clearing-reconciliation` 需要补产品层 `SettlementPolicy`、候选、批次、结算单、出款单、差错单 spec delta。 | 下版本再做模型、契约测试和批处理实现，不直接进入当前 CAD 批次。 | 进入清结算集成测试、对账差错测试和 Manual Approval。 | 下版本。 |
-| 9 | P1-FX / P1-ARC 外汇运营与归档治理 | FX 报价、锁价、审批、费用、汇损益以及 archive/checkpoint/watermark 需要独立 change。 | 下版本隔离领域对象、余额快照、归档账目和只读投影边界，避免交易层重新自动换汇或报表反写账本。 | 需要 DDL 或数据修复时进入 Manual Approval。 | 下版本。 |
+| 8 | P1-CLR 清结算、结算、对账和报表 | 旧 `clearing-reconciliation` 草稿只作为历史参考。 | 当前有效 backlog 作废，不继续模型、契约测试、DDL 或批处理实现。 | 重新设计和 Manual Approval 前不进入 Harness 队列。 | 已作废，下一轮重设。 |
+| 9 | P1-PROJ 余额投影与交易投影再查验 | `payment-ledger`、`transaction-layer` 和投影历史草稿仅用于确认事实源、读模型边界、重放边界和红线。 | 只做设计/流程再查验，不实现 checkpoint、watermark、formal rebuild、formal replay、报表或指标治理。 | 文档校验；若后续进入 DDL、重建或正式重放，必须新建 OpenSpec change 和 Manual Approval。 | 待确认。 |
+| 10 | P1-FX 外汇运营对象 | FX 报价、锁价、审批、费用、汇损益需要独立 change。 | 下版本隔离领域对象，避免交易层重新自动换汇。 | 需要 DDL、外部执行或数据修复时进入 Manual Approval。 | 下版本。 |
 
-本轮之后的 CAD 自动推进顺序固定为：P0-C、P0-CTRL、P0-E、P0-G、P0-H-API、P0-H-PKG 和 P0-ROUTE 已闭合。清分、清算、对账、账本账目归档、余额快照、完整 FX 运营对象和相关运营工作台排入下版本。若后续编码中发现 OpenSpec 规格缺口，先补最小 spec delta 和测试计划，再改代码。
+本轮之后的 CAD 自动推进顺序固定为：P0-C、P0-CTRL、P0-E、P0-G、P0-H-API、P0-H-PKG 和 P0-ROUTE 已闭合。清分、清算、清结算、结算出款、对账、报表、归档移动、指标治理和完整 FX 运营对象不再作为当前队列任务。当前只保留余额投影和交易投影的设计再查验；若后续编码中发现 OpenSpec 规格缺口，先补最小 spec delta 和测试计划，再改代码。
 
 # 九、编码落地顺序
 
@@ -531,9 +562,9 @@ Route 层 CR 后补测矩阵：
 1. `FundsBalanceControlService#adjust` 是交易层余额控制入口，可承接三类语义：资金账户余额调账、信用账户额度调整、预算组预算调整。
 2. 资金账户仍走 `BALANCE_ADJUST`，通过平台 `ADJUSTMENT` 账户形成平衡调账分录；信用账户和预算组走 `LIMIT_ADJUST`，不表达真实现金流，也不引入平台资金账户平衡。
 3. 信用账户额度调增同步增加 `AVAILABLE`；额度调减同步减少 `AVAILABLE`。调减导致受控负 `AVAILABLE` 时必须有授信策略、上限、审批、原因和审计。
-4. 预算组预算调增同步增加 `AVAILABLE`；预算调减同步减少 `AVAILABLE`。调减导致受控负 `AVAILABLE` 时必须有预算周期、治理策略、审批、原因、上限、账龄和报表标记；新授权必须重新经过预算策略。
+4. 预算组预算调增同步增加 `AVAILABLE`；预算调减同步减少 `AVAILABLE`。调减导致受控负 `AVAILABLE` 时必须有预算周期、治理策略、审批、原因、上限、账龄和治理标记；新授权必须重新经过预算策略。
 5. `LIMIT` 只允许在 `BALANCE_CONTROL / LIMIT_ADJUST` 受控调额路径中表达额度或预算总量调整；普通支付、授权结算、退款、争议拒付、手续费或直接交易不得把 `LIMIT` 当 source/target。
-6. 本轮不新增公共 `ControlAdjustmentSpec`，也不新增账务 `CONSUMED`；已消费继续由授权结算、退款、争议拒付、调额和预算周期规则进入产品报表或交易视图投影。
+6. 本轮不新增公共 `ControlAdjustmentSpec`，也不新增账务 `CONSUMED`；已消费继续由授权结算、退款、争议拒付、调额和预算周期规则进入产品读模型或交易视图投影。
 
 任务计划按 OpenSpec / Superpowers / Harness 重新整理如下：
 
@@ -541,7 +572,7 @@ Route 层 CR 后补测矩阵：
 | --- | --- | --- | --- | --- |
 | 1 | 补齐控制账户调额文档一致性 | `wallets`、`transaction-layer` 规格与 PRD/ADR/DSL 的 `LIMIT_ADJUST` 口径一致。 | 只改文档，不改代码；先确认没有 `LIMIT` 普通迁移和 `LIMIT_ADJUST` 调额互相冲突。 | `rg "LIMIT_ADJUST\|预算调减\|FundsBalanceControlService#adjust"` 人工复审。 |
 | 2 | 补信用账户调额服务门面测试 | `FundsBalanceControlService#adjust` 承接信用额度调增、调减和受控负数。 | 先写调增、调减、缺审批失败、超过策略失败测试，再做最小实现。 | `just test-one FundsTransactionCommandServiceImplTests tests`。 |
-| 3 | 补预算组调额服务门面测试 | 预算组调额必须保留预算周期、治理策略、审批、原因、上限、账龄和报表标记。 | 先写预算调增、调减、受控负数、缺预算治理上下文失败测试。 | `just test-one FundsTransactionCommandServiceImplTests tests`。 |
+| 3 | 补预算组调额服务门面测试 | 预算组调额必须保留预算周期、治理策略、审批、原因、上限、账龄和治理标记。 | 先写预算调增、调减、受控负数、缺预算治理上下文失败测试。 | `just test-one FundsTransactionCommandServiceImplTests tests`。 |
 | 4 | 补 `LIMIT` 红线测试 | `LIMIT` 仅允许在 `BALANCE_CONTROL / LIMIT_ADJUST` 受控路径出现。 | 先写普通交易、授权结算、退款、手续费不得把 `LIMIT` 当 source/target 的失败用例。 | `just test-one BalanceControlFundsInstructionRouteResolverTests tests` 和相关 route replay 测试。 |
 | 5 | 最小实现收口 | 若测试暴露规格缺口，先补 OpenSpec spec delta，再改代码。 | 只在 request 校验、converter、resolver 或 context 内补齐，不新增公共 `ControlAdjustmentSpec`，不新增账务 `CONSUMED`。 | `just compile`、相关测试；`just pmd` 若依赖解析可用则执行，不可用则按环境问题记录。 |
 
@@ -549,12 +580,12 @@ Route 层 CR 后补测矩阵：
 
 ## 9.2 P0：wind-funds 与 Ledger Posting
 
-1. 已补 `SourceFactBoundaryContractTests`：生产契约和 transaction-layer DSL 样例不恢复 `sourceObjectType/sourceObjectSn`，也不提前暴露 `sourceFactRef`；当前继续以 `businessScene/businessSn/reference` 为基线，冻结、清结算、争议、对账差错等独立事实成熟后再设计 `sourceFactRef`。
+1. 已补 `SourceFactBoundaryContractTests`：生产契约和 transaction-layer DSL 样例不恢复 `sourceObjectType/sourceObjectSn`，也不提前暴露 `sourceFactRef`；当前继续以 `businessScene/businessSn/reference` 为基线，冻结、争议等独立事实成熟后再设计 `sourceFactRef`。清结算和对账差错如未来恢复，必须重新设计后再纳入该值对象。
 2. 修正 entry 摘要字段，排除持久化流水和易变字段。
 3. 已补 route leg 到 posting plan 的稳定引用，并通过账本入账、投影、查询和摘要契约测试保护持久化投影与摘要字段。
 4. 已补平衡校验、账目允许、normal balance 推导、幂等不重复投影、缺账本失败、缺余额桶失败和展示查询未初始化语义测试。
 
-退出条件：直接交易、授权占用、冻结、清结算类 DSL 都能生成稳定、平衡、可追溯的账本交易。
+退出条件：直接交易、授权占用、冻结和逆向交易类 DSL 都能生成稳定、平衡、可追溯的账本交易。
 
 ## 9.3 P0：Wallets 账户和余额控制
 
@@ -574,31 +605,31 @@ Route 层 CR 后补测矩阵：
 
 退出条件：直接交易、逆向交易、授权交易、余额控制都有应用服务测试，核心失败路径可诊断、可回滚、可审计。
 
-## 9.5 P1：清结算、对账和报表
+## 9.5 已作废：清结算、对账和报表
 
-1. 建立清算候选、清算批次、结算单、出款单、对账批次和差错单模型。
-2. 清算确认、结算锁定、出款成功、出款失败回退都通过来源事实生成账本交易。
-3. 差错阻断、审批放行、调账和核销有完整状态机和审计。
-4. 报表只读明细和快照，不反写账本事实。
+1. 清算候选、清算批次、结算单、出款单、对账批次、差错单和报表快照不再属于当前有效任务。
+2. 历史草稿中的测试名、DDL、外部集成、批处理、调账、核销和报表任务均不作为下一轮 CAD 自动推进依据。
+3. 下一轮如需恢复，必须重新完成产品语义、来源事实、状态机、账务矩阵、测试矩阵、OpenSpec change 和 Harness Manual Approval 设计。
 
-退出条件：清结算与对账能解释资金流、账户流、账务流和差错处理路径。
+退出条件：本轮仅要求有效 backlog 中不再保留清结算、对账和报表的可执行任务。
 
-## 9.6 P1：归档、重放和指标治理
+## 9.6 待确认：余额投影和交易投影
 
-1. 建立 `BalanceCheckpoint`、`BalanceProjectionWatermark`、`ArchiveManifest`。
-2. 手动归档必须校验 cutoff 不晚于水位、不晚于热保留边界，且已有已验证检查点。
-3. 余额重建使用 cold checkpoint + hot entries；交易视图重放限定时间窗口和主体范围。
-4. 运营指标使用独立 `MetricWatermark`，不能复用归档时间边界。
+1. 余额投影继续以 `LedgerEntry`、账本 profile、normal balance 和受控负余额策略为唯一事实源；业务余额日志只观察，不反写。
+2. 交易投影继续作为只读读模型设计入口；它只能派生用户账单、商户账单、运营时间线或运营 case view，不生成 route/entry，不修正账本余额。
+3. `BalanceCheckpoint`、`BalanceProjectionWatermark`、余额重建、交易视图正式重放只作为待查验设计项；当前不进入 DDL 或实现。
+4. 指标治理和报表投影已作废待重设，不混入余额投影和交易投影的下一轮边界。
 
-退出条件：余额投影在冷热分层、归档、重建和指标统计下无 gap、无 overlap。
+退出条件：用户确认余额投影和交易投影的事实源、流程、重放边界、DDL 风险和测试矩阵后，再决定是否创建新的 OpenSpec change。
 
 # 十、进入编码前确认项
 
 | 事项 | 建议默认值 | 原因 |
 | --- | --- | --- |
 | 交易门面归属 | 放入 `transaction/transaction-face`，wallet 对外交易服务逐步收敛或迁移。 | 符合“交易层对业务侧提供统一能力”的目标。 |
-| 第一批代码范围 | P0-C、P0-R、P0-CTRL、P0-E、P0-G、P0-H-API、P0-H-PKG 和 P0-ROUTE 已闭合。 | 避免把清结算、对账、归档、余额快照和完整 FX 运营对象混入当前交易/钱包/ledger/route 闭环。 |
-| 清结算代码范围 | 排入下版本，当前只保留 PRD、DSL、OpenSpec 和系分追溯，不做批处理实现。 | 清结算依赖账本、交易、对账和运营策略，过早实现容易反复返工。 |
+| 第一批代码范围 | P0-C、P0-R、P0-CTRL、P0-E、P0-G、P0-H-API、P0-H-PKG 和 P0-ROUTE 已闭合。 | 避免把清结算、对账、报表、归档移动、指标治理和完整 FX 运营对象混入当前交易/钱包/ledger/route 闭环。 |
+| 清结算代码范围 | 已作废，下一轮需要时重新设计。 | 清结算依赖账本、交易、对账和运营策略，过早保留实现任务容易反复返工。 |
+| 余额投影和交易投影 | 先做设计、流程和红线确认；暂不进入 DDL、formal rebuild 或 formal replay。 | 投影是读写事实链的边界问题，需要先确认事实源、范围、幂等、重放、权限和回滚。 |
 | DDL 和迁移 | 单独出数据库变更方案和回滚方案后再执行。 | 涉及资金事实、余额投影、归档和分表，必须有评审和验证。 |
 | Harness 接入 | 先用本地命令和测试矩阵跑通，再创建真实 pipeline。 | 避免在规范未固化前引入 CI 凭据和远程环境变量。 |
 
@@ -606,4 +637,4 @@ Route 层 CR 后补测矩阵：
 
 从设计完整性看，产品目标、DSL、OpenSpec、核心系分、API 契约、测试矩阵和 Harness 本地门禁已经形成编码输入闭环；但执行顺序需要以 8.1 的再审查结果为准。
 
-进入代码前建议先确认 `P0 编码任务拆分.md` 中的当前工作包状态。P0-A 测试保护、P0-D 交易门面、P0-C 账本主链路首轮、P0-F helper/route 主链路、P0-R 产品口径回归、P0-CTRL 控制账户调额、P0-E 钱包账户与余额控制、P0-G 命名治理、P0-H-API 三类服务测试矩阵、P0-H-PKG 测试包名对齐和 P0-ROUTE 路由层 CR 已经完成主体落地；后续进入下版本前，需要重新评估清结算、对账、归档和余额快照任务的 OpenSpec change、DDL 风险和 Harness manual approval gate。
+进入代码前建议先确认 `P0 编码任务拆分.md` 中的当前工作包状态。P0-A 测试保护、P0-D 交易门面、P0-C 账本主链路首轮、P0-F helper/route 主链路、P0-R 产品口径回归、P0-CTRL 控制账户调额、P0-E 钱包账户与余额控制、P0-G 命名治理、P0-H-API 三类服务测试矩阵、P0-H-PKG 测试包名对齐和 P0-ROUTE 路由层 CR 已经完成主体落地；清结算、结算出款、对账和报表已作废待重设；余额投影和交易投影需要在下一步先完成设计、流程、DDL 风险和测试矩阵确认。

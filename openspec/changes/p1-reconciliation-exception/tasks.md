@@ -1,36 +1,26 @@
 # Tasks: P1 Reconciliation Exception
 
+> 2026-05-18 作废说明：本 change 已从当前 CAD 任务队列移除。对账、差错、阻断和差错调账相关内容仅作为历史设计草稿保留，不作为下一轮实现、测试、外部文件接入或 DDL 的有效依据；如后续重新启动，必须重新设计并创建新的 OpenSpec change。
+
 ## 1. Change Scaffolding
 
 - [x] Create `p1-reconciliation-exception` OpenSpec change.
 - [x] Define proposal, design and task boundaries.
 - [x] Keep this change documentation-only: no Java code, no DDL, no real Harness pipeline, no external file integration and no adjustment execution.
 
-## 2. Product and System Boundary
+## 2. Voided Historical Draft Scope
 
-- [x] Define `ReconciliationBatch`, `ReconciliationItem`, `ReconciliationException`, `BlockingRule` and `ExceptionEvidence` semantics.
-- [x] Define reconciliation batch flow, matching dimensions and exception types.
-- [x] Define exception state machine, blocking scopes and release conditions.
-- [x] Define action boundary for supplement, reverse, adjustment, suspense, claim, return and write-off.
-- [x] Clarify exception handling must not modify historical ledger, balance projection or transaction facts.
+- [x] Mark the previous `ReconciliationBatch`, `ReconciliationItem`, `ReconciliationException`, `BlockingRule`, evidence and exception state-machine notes as historical draft only.
+- [x] Remove the previous `clearing-reconciliation` and `transaction-layer` spec delta work from the effective task queue.
+- [x] Keep clearing batch, settlement payout, report, FX and archive work out of this voided change.
 
-## 3. Spec Delta
+## 3. Voided Implementation Tasks
 
-- [x] Add `clearing-reconciliation` requirements for reconciliation matching, blocking controls and exception handling.
-- [x] Add `transaction-layer` requirement for `RECONCILIATION_EXCEPTION` source fact reference.
-- [x] Keep clearing batch, settlement payout, report, FX and archive work out of this change.
+- [x] Void the previous implementation queue for `p1-reconciliation-exception`.
+- [x] Remove `ReconciliationMatchingServiceTests`, `ReconciliationExceptionAdjustmentTests`, reconciliation DDL, external file integration and exception adjustment from the current effective backlog.
+- [x] Require a fresh product/system design review before any future reconciliation, exception or adjustment task is reintroduced.
 
-## 4. Future Implementation Tasks
-
-- [ ] Before coding, confirm Execution Grant for `p1-reconciliation-exception` implementation.
-- [ ] Before coding, create failing `ReconciliationMatchingServiceTests` covering standardization, duplicate external success, single-side records, amount/currency mismatch and later matching.
-- [ ] Before coding, create failing `ReconciliationExceptionAdjustmentTests` covering approval, source fact mapping, no historical mutation and block release.
-- [ ] Before DDL, provide table design, unique constraints, migration and rollback plan for manual approval.
-- [ ] Before external file integration, provide file schema, signature/checksum, retention, desensitization and retry/failure semantics for manual approval.
-- [ ] Before any adjustment implementation, provide funds instruction mapping, route event mapping, rollback/compensation plan and finance approval evidence.
-- [ ] After implementation, run focused reconciliation tests, transaction tests, compile and PMD according to the final write scope.
-
-## 5. Validation
+## 4. Validation
 
 - [x] Run `git diff --check` after this documentation-only change.
 - [x] Run `openspec validate p1-reconciliation-exception --strict` after this OpenSpec change.
