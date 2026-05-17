@@ -125,6 +125,7 @@
   - [x] Split subject ledger initializer validation scenarios from `DefaultSubjectLedgerInitializerTests` into `DefaultSubjectLedgerInitializerValidationTests` with shared `DefaultSubjectLedgerInitializerTestSupport`.
   - [x] Split frozen-order lifecycle validation scenarios from `DefaultFundsFrozenOrderLifecycleSaverTests` into `DefaultFundsFrozenOrderLifecycleValidationTests` with shared `DefaultFundsFrozenOrderLifecycleSaverTestSupport`.
   - [x] Split fee summary scenarios from `DefaultFundsInstructionLifecycleSuccessSummaryTests` into `DefaultFundsInstructionLifecycleFeeSummaryTests`.
+  - [x] Split reference-transaction reuse boundary scenarios from `DefaultFundsInstructionLifecycleSaverIdempotencyTests` into `DefaultFundsInstructionLifecycleReferenceTransactionTests`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
