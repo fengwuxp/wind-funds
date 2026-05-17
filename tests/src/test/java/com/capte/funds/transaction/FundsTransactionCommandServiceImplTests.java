@@ -1,6 +1,7 @@
 package com.capte.funds.transaction;
 
 import com.capte.domain.core.operator.WindOperator;
+import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
@@ -16,6 +17,7 @@ import com.wind.integration.funds.route.enums.RouteLegType;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
+import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
@@ -27,6 +29,8 @@ import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -226,6 +230,57 @@ class FundsTransactionCommandServiceImplTests extends FundsTransactionCommandSer
                 LedgerSubjectCode.SETTLEMENT, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.SETTLEMENT);
     }
 
+    /**
+     * 场景：信用账户付款时业务层显式传入 FeeSpec。
+     * 输入：CREDIT_ACCOUNT 支付 700，FeeSpec 固定费用 25，费率费用受上下限约束。
+     * 输出：付款主 leg 和平台 FEE leg。
+     * 预期：FeeSpec 保留在 instruction context，手续费从信用账户 AVAILABLE 扣到平台 FEE。
+     * 红线：交易门面不得丢失业务层费用决策，信用账户付款不得漏收手续费或触碰 LIMIT。
+     */
+    @Test
+    void testPayShouldPropagateExplicitFeeSpecAndAppendCreditAccountFeeLeg() {
+        FundsAccountId payer = creditAccount("credit_001");
+        FundsAccountId merchant = fundingAccount("merchant_001");
+        FeeSpec feeSpec = FeeSpec.builder()
+                .feeType("SMALL_AMOUNT_FEE")
+                .fixedFee(25)
+                .feeRate(new BigDecimal("0.01"))
+                .maxAmountWithRate(50)
+                .minAmountWithRate(10)
+                .build();
+
+        service.pay(new FundsTransactionPayRequest()
+                .setAccountId(payer)
+                .setPayeeId(merchant)
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(700L)))
+                .setFeeSpec(feeSpec)
+                .setBusinessScene("PAY")
+                .setBusinessSn("PAY_WITH_FEE_00000001")
+                .setDescription("pay with explicit fee"), WindOperator.system());
+
+        FundsInstructionSpec instruction = instruction();
+        ResolvedRouteSpec route = route();
+        assertThat(instruction.getContextVariables())
+                .containsEntry(FundsInstructionContextKeys.FEE_SPEC, feeSpec);
+        assertThat(route.getLegs()).hasSize(2);
+        assertLeg(route.getLegs().get(0), RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCode.SETTLEMENT, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.SETTLEMENT);
+        assertThat(route.getLegs().get(1)).satisfies(leg -> {
+            assertThat(leg.getLegId()).isEqualTo("FEE");
+            assertThat(leg.getAmount()).isEqualTo(amount(75L));
+            assertThat(leg.getSourceNode().getSubjectRef().getSubjectType().name())
+                    .isEqualTo(payer.type());
+            assertThat(leg.getSourceNode().getSubjectRef().getSubjectId()).isEqualTo(payer.id());
+            assertLeg(leg, RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.AVAILABLE,
+                    LedgerSubjectCode.FEE, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.FEE);
+        });
+        assertThat(route.getParticipants())
+                .extracting(participant -> participant.getParticipantRole().name())
+                .contains(RouteParticipantRole.AUTH_HOLDER.name(), RouteParticipantRole.FEE_RECEIVER.name());
+        assertNoLimitNodes(route);
+    }
+
     @Test
     void testRefundShouldBuildRestoreRoute() {
         FundsAccountId payer = fundingAccount("merchant_001");
@@ -266,5 +321,40 @@ class FundsTransactionCommandServiceImplTests extends FundsTransactionCommandSer
         assertLeg(leg, RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCode.FEE, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.FEE);
         assertNoLimitNodes(route());
+    }
+
+    /**
+     * 场景：信用账户独立收取授权拒付类手续费。
+     * 输入：CREDIT_ACCOUNT 发起 fee，feeType 使用业务自定义 code。
+     * 输出：FEE_STANDARD route。
+     * 预期：feeType 原样透传，费用从信用账户 AVAILABLE 扣到平台 FEE。
+     * 红线：FeeType 不依赖账户级 FeeProvider，不把信用账户费用落入 LIMIT。
+     */
+    @Test
+    void testFeeShouldSupportCustomFeeTypeForCreditAccount() {
+        FundsAccountId payer = creditAccount("credit_001");
+
+        service.fee(new FundsTransactionFeeRequest()
+                .setAccountId(payer)
+                .setAmount(amount(45L))
+                .setFeeType("AUTH_DECLINE_FEE")
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_CREDIT_00000001")
+                .setDescription("credit account auth decline fee"), WindOperator.system());
+
+        FundsInstructionSpec instruction = instruction();
+        ResolvedRouteSpec route = route();
+        RouteLegSpec leg = route.getLegs().getFirst();
+        assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.FEE);
+        assertThat(instruction.getContextVariables())
+                .containsEntry(FundsInstructionContextKeys.FEE_TYPE, "AUTH_DECLINE_FEE");
+        assertThat(leg.getSourceNode().getSubjectRef().getSubjectType().name()).isEqualTo(payer.type());
+        assertThat(leg.getSourceNode().getSubjectRef().getSubjectId()).isEqualTo(payer.id());
+        assertLeg(leg, RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCode.FEE, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.FEE);
+        assertThat(route.getParticipants())
+                .extracting(participant -> participant.getParticipantRole().name())
+                .contains(RouteParticipantRole.AUTH_HOLDER.name(), RouteParticipantRole.FEE_RECEIVER.name());
+        assertNoLimitNodes(route);
     }
 }
