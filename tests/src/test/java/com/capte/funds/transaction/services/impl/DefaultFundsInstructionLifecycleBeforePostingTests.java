@@ -173,7 +173,8 @@ class DefaultFundsInstructionLifecycleBeforePostingTests {
         assertThat(insertedDetails)
                 .extracting(FundsTransactionDetail::getContextVariables)
                 .allSatisfy(contextVariables -> assertThat(contextVariables)
-                        .contains("\"replayConsumedLegIds\":[\"SOURCE_LEG_001\"]"));
+                        .contains("\"replayConsumedLegIds\":[\"SOURCE_LEG_001\"]")
+                        .contains("\"replayConsumedLegAmounts\":{\"SOURCE_LEG_001\":1000}"));
     }
 
     /**

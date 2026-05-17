@@ -22,11 +22,15 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -73,17 +77,34 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         AssertUtils.hasText(referenceTransactionSn, "原资金交易流水号不能为空");
         AssertUtils.notNull(eventType, "资金交易事件类型不能为空");
         AssertUtils.hasText(replayRefLegId, "RouteReplay 原 legId 不能为空");
-        FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.referenceDetailSn.eq(referenceTransactionSn))
-                .and(ref.eventType.eq(eventType))
-                .and(ref.status.eq(FundsTransactionDetailStatus.SUCCEEDED))
-                .and(ref.ledgerTransactionSn.isNotNull())
-                .orderBy(ref.id.asc());
-        return fundsTransactionDetailMapper.selectListByQuery(wrapper)
+        return queryConsumedReplayDetails(referenceTransactionSn, eventType)
                 .stream()
                 .anyMatch(detail -> isReplayLegConsumed(detail, replayRefLegId));
+    }
+
+    @Override
+    public @NonNull Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+                                                     @NonNull FundsTransactionEventType eventType,
+                                                     @NonNull String replayRefLegId,
+                                                     @NonNull CurrencyIsoCode currency) {
+        AssertUtils.hasText(referenceTransactionSn, "原资金交易流水号不能为空");
+        AssertUtils.notNull(eventType, "资金交易事件类型不能为空");
+        AssertUtils.hasText(replayRefLegId, "RouteReplay 原 legId 不能为空");
+        AssertUtils.notNull(currency, "RouteReplay 币种不能为空");
+        Map<String, Long> consumedAmounts = new LinkedHashMap<>();
+        for (FundsTransactionDetail detail : queryConsumedReplayDetails(referenceTransactionSn, eventType)) {
+            Long amount = consumedReplayLegAmount(detail, replayRefLegId);
+            if (amount == null) {
+                continue;
+            }
+            AssertUtils.isTrue(detail.getCurrency() == currency,
+                    "RouteReplay 已消费金额币种不一致，referenceSn = {}，eventType = {}，legId = {}",
+                    referenceTransactionSn, eventType, replayRefLegId);
+            String consumeKey = detail.getBusinessScene() + ":" + detail.getBusinessSn();
+            consumedAmounts.merge(consumeKey, amount, Math::max);
+        }
+        long result = consumedAmounts.values().stream().mapToLong(Long::longValue).sum();
+        return Money.immutable(result, currency);
     }
 
     @Override
@@ -126,12 +147,34 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     }
 
     private boolean isReplayLegConsumed(FundsTransactionDetail detail, String replayRefLegId) {
+        return consumedReplayLegAmount(detail, replayRefLegId) != null;
+    }
+
+    private Long consumedReplayLegAmount(FundsTransactionDetail detail, String replayRefLegId) {
         if (!hasText(detail.getContextVariables())) {
-            return false;
+            return null;
         }
         JSONObject values = JSON.parseObject(detail.getContextVariables());
+        JSONObject replayConsumedAmounts = values.getJSONObject(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_AMOUNTS);
+        if (replayConsumedAmounts != null && replayConsumedAmounts.containsKey(replayRefLegId)) {
+            return replayConsumedAmounts.getLong(replayRefLegId);
+        }
         JSONArray replayConsumedLegIds = values.getJSONArray(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_IDS);
-        return replayConsumedLegIds != null && replayConsumedLegIds.contains(replayRefLegId);
+        return replayConsumedLegIds != null && replayConsumedLegIds.contains(replayRefLegId)
+                ? detail.getAmount() : null;
+    }
+
+    private List<FundsTransactionDetail> queryConsumedReplayDetails(String referenceTransactionSn,
+                                                                    FundsTransactionEventType eventType) {
+        FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.referenceDetailSn.eq(referenceTransactionSn))
+                .and(ref.eventType.eq(eventType))
+                .and(ref.status.eq(FundsTransactionDetailStatus.SUCCEEDED))
+                .and(ref.ledgerTransactionSn.isNotNull())
+                .orderBy(ref.id.asc());
+        return fundsTransactionDetailMapper.selectListByQuery(wrapper);
     }
 
     private Optional<RouteSnapshotSpec> findRouteSnapshotInFreezeOrder(FundsFrozenOrder order) {

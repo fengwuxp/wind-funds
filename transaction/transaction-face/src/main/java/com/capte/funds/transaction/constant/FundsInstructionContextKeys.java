@@ -79,6 +79,8 @@ public final class FundsInstructionContextKeys {
 
     public static final String REPLAY_CONSUMED_LEG_IDS = "replayConsumedLegIds";
 
+    public static final String REPLAY_CONSUMED_LEG_AMOUNTS = "replayConsumedLegAmounts";
+
     private FundsInstructionContextKeys() {
     }
 }

@@ -58,6 +58,8 @@ import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -680,6 +682,14 @@ class FundsTransactionOrchestrationFlowTests {
                                             @NonNull FundsTransactionEventType eventType,
                                             @NonNull String replayRefLegId) {
             return false;
+        }
+
+        @Override
+        public @NonNull Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+                                                         @NonNull FundsTransactionEventType eventType,
+                                                         @NonNull String replayRefLegId,
+                                                         @NonNull CurrencyIsoCode currency) {
+            return Money.immutable(0L, currency);
         }
 
         @Override

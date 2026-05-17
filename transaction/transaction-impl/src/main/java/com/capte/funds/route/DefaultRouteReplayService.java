@@ -80,7 +80,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     @Override
     public @NonNull ResolvedRouteSpec resolve(@NonNull FundsInstructionSpec instruction) {
         RouteSnapshotSpec snapshot = requireReplaySnapshot(instruction);
-        return replay(snapshot, ImmutableReplayRequestSpec.builder()
+        ReplayRequestSpec replayRequest = ImmutableReplayRequestSpec.builder()
                 .replayType(resolveReplayType(instruction.getEventType()))
                 .eventType(instruction.getEventType())
                 .businessScene(instruction.getBusinessScene())
@@ -94,7 +94,9 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .description(instruction.getDescription())
                 .operator(instruction.getOperator())
                 .contextVariables(instruction.getContextVariables())
-                .build());
+                .build();
+        assertReplayLegAmountNotOverConsumed(instruction.getReference(), snapshot, replayRequest);
+        return replay(snapshot, replayRequest);
     }
 
     public @NonNull ResolvedRouteSpec replay(@NonNull RouteSnapshotSpec snapshot,
@@ -152,6 +154,23 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                             reference.getReferenceSn(), instruction.getEventType(), leg.getLegId()),
                     "RouteSnapshot leg 仅允许成功回放一次，referenceSn = {}，eventType = {}，legId = {}",
                     reference.getReferenceSn(), instruction.getEventType(), leg.getLegId());
+        }
+    }
+
+    private void assertReplayLegAmountNotOverConsumed(@NonNull FundsInstructionReferenceSpec reference,
+                                                      @NonNull RouteSnapshotSpec routeSnapshot,
+                                                      @NonNull ReplayRequestSpec replayRequest) {
+        FundsTransactionEventType eventType = resolveEventType(replayRequest);
+        List<RouteLegSpec> sourceLegs = selectReplayLegs(routeSnapshot, replayRequest);
+        for (RouteLegSpec sourceLeg : sourceLegs) {
+            Money replayAmount = resolveReplayAmount(sourceLeg, replayRequest);
+            Money consumedAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(
+                    reference.getReferenceSn(), eventType, sourceLeg.getLegId(),
+                    sourceLeg.getAmount().getCurrency());
+            long consumedTotal = consumedAmount.getAmount() + replayAmount.getAmount();
+            AssertUtils.isTrue(consumedTotal <= sourceLeg.getAmount().getAmount(),
+                    "RouteSnapshot leg 回放累计金额不能大于原 RouteLeg 金额，referenceSn = {}，eventType = {}，legId = {}",
+                    reference.getReferenceSn(), eventType, sourceLeg.getLegId());
         }
     }
 

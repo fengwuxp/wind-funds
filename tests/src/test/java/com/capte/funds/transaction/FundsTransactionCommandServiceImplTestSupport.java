@@ -351,6 +351,14 @@ abstract class FundsTransactionCommandServiceImplTestSupport {
         }
 
         @Override
+        public @NonNull Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+                                                         @NonNull FundsTransactionEventType eventType,
+                                                         @NonNull String replayRefLegId,
+                                                         @NonNull CurrencyIsoCode currency) {
+            return Money.immutable(0L, currency);
+        }
+
+        @Override
         public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(@NonNull String transactionSn) {
             return Optional.ofNullable(routeSnapshots.get(transactionSn));
         }

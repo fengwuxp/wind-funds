@@ -602,6 +602,22 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         List<String> replayConsumedLegIds = replayConsumedLegIds(routeSnapshot, participant);
         if (!replayConsumedLegIds.isEmpty()) {
             result.put(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_IDS, replayConsumedLegIds);
+            result.put(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_AMOUNTS,
+                    replayConsumedLegAmounts(routeSnapshot, replayConsumedLegIds));
+        }
+        return result;
+    }
+
+    private Map<String, Long> replayConsumedLegAmounts(RouteSnapshotSpec routeSnapshot,
+                                                       List<String> replayConsumedLegIds) {
+        Map<String, Long> result = new LinkedHashMap<>();
+        for (RouteLegSpec leg : routeSnapshot.getLegs()) {
+            String replayRefLegId = leg.getReplayRefLegId();
+            if (replayRefLegId == null || replayRefLegId.isBlank()
+                    || !replayConsumedLegIds.contains(replayRefLegId)) {
+                continue;
+            }
+            result.put(replayRefLegId, leg.getAmount().getAmount());
         }
         return result;
     }

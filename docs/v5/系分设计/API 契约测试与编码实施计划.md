@@ -250,7 +250,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 清算后退款 | `PTDD-REF-003` | `FundsTransactionLedgerBalanceAssertionsTests` | L2 | 商户 `AVAILABLE` 减少，用户 `AVAILABLE` 增加；商户不足进入人工/负余额/追偿策略。 | 部分已有 |
 | 出款中或已出款后退款 | `PTDD-REF-004` | 后续退款/追偿服务测试 | L2/L3 | 不直接做 `SETTLEMENT -> 用户 AVAILABLE`；必须进入人工或追偿流程。 | 下版本 |
 | 手工直接退款 | `PTDD-REF-005` | `ManualRefundServiceTests` | L2 | 权限、审批、原因、凭证、额度缺失均失败；不得冒充原交易退款。 | 待补 |
-| 手续费退回 | `PTDD-REF-006` | `DefaultRouteReplayServiceTests`、`TransactionServiceAbilityDslJsonContractTests`、`FundsTransactionCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests` | L1/L2 | 普通退款不默认退费；费用退款只回放 fee leg。 | 当前服务层入口与业务组合已补，累计上限仍待生命周期规则收敛 |
+| 手续费退回 | `PTDD-REF-006` | `DefaultRouteReplayServiceTests`、`TransactionServiceAbilityDslJsonContractTests`、`FundsTransactionCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests` | L1/L2 | 普通退款不默认退费；费用退款只回放 fee leg。 | 服务层入口、业务组合与 replay 累计上限已补；按原 fee leg 已消费金额校验，避免多主体明细重复累计 |
 | 授权成功 | `PTDD-AUTH-001` | `AuthorizationFundsInstructionRouteResolverTests`、`FundsTransactionLedgerBalanceAssertionsTests` | L1/L2 | 一个或多个主体 `AVAILABLE -> AUTHORIZATION`；多主体任一失败整体失败。 | 已有 |
 | 授权拒绝 | `PTDD-AUTH-002` | `TransactionServiceAbilityDslJsonContractTests`、`FundsTransactionCommandServiceImplTests` | L1/L2 | 保存拒绝事实；无 route、无 entry；不增加 `chargebackAmount`。 | 已有 |
 | 授权撤销 | `PTDD-AUTH-003` | `DefaultRouteReplayServiceTests` | L1/L2 | 基于原快照 `AUTHORIZATION -> AVAILABLE`；超剩余撤销失败。 | 已有 |

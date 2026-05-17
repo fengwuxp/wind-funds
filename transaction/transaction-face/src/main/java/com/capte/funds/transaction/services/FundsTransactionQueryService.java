@@ -4,6 +4,8 @@ import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
@@ -50,6 +52,24 @@ public interface FundsTransactionQueryService {
     boolean hasConsumedReplayLeg(@NonNull String referenceTransactionSn,
                                  @NonNull FundsTransactionEventType eventType,
                                  @NonNull String replayRefLegId);
+
+    /**
+     * 汇总指定 replay leg 已成功消费金额。
+     *
+     * <p>能力范围：用于后续退款、手续费退回、拒付等 replay 累计上限校验。实现侧应基于成功的交易明细或
+     * 账本交易事实判断，并按原 RouteLeg 去重，避免同一 replay 生成的多主体明细重复累计。</p>
+     *
+     * @param referenceTransactionSn 原资金交易流水号
+     * @param eventType 本次 replay 事件语义
+     * @param replayRefLegId 原 RouteLeg ID
+     * @param currency 原 RouteLeg 币种
+     * @return 已成功消费金额；不存在时返回 0
+     */
+    @NonNull
+    Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+                                     @NonNull FundsTransactionEventType eventType,
+                                     @NonNull String replayRefLegId,
+                                     @NonNull CurrencyIsoCode currency);
 
     /**
      * 查询已保存的 RouteSnapshot。

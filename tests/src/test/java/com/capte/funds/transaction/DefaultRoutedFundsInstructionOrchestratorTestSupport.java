@@ -253,6 +253,8 @@ abstract class DefaultRoutedFundsInstructionOrchestratorTestSupport {
 
         final AtomicReference<String> consumedReplayLegId = new AtomicReference<>();
 
+        final AtomicReference<Money> consumedReplayLegAmount = new AtomicReference<>();
+
         @Override
         public @NonNull Optional<FundsTransactionDTO> queryFundsTransaction(@NonNull String transactionSn) {
             return Optional.empty();
@@ -268,6 +270,15 @@ abstract class DefaultRoutedFundsInstructionOrchestratorTestSupport {
                                             @NonNull FundsTransactionEventType eventType,
                                             @NonNull String replayRefLegId) {
             return replayRefLegId.equals(consumedReplayLegId.get());
+        }
+
+        @Override
+        public @NonNull Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+                                                         @NonNull FundsTransactionEventType eventType,
+                                                         @NonNull String replayRefLegId,
+                                                         @NonNull CurrencyIsoCode currency) {
+            Money consumed = consumedReplayLegAmount.get();
+            return consumed == null ? Money.immutable(0L, currency) : consumed;
         }
 
         @Override

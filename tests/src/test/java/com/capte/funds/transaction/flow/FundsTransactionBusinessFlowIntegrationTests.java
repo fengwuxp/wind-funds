@@ -60,6 +60,7 @@ import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.RouteResolver;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
+import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
@@ -97,6 +98,7 @@ import static com.capte.funds.support.FundsBalanceAssertionSupport.assertPosting
 import static com.capte.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FundsTransactionBusinessFlowIntegrationTests {
 
@@ -247,6 +249,39 @@ class FundsTransactionBusinessFlowIntegrationTests {
         assertBucket(ledgerBook.balance(merchant), LedgerSubjectCode.SETTLEMENT, 20L, CURRENCY);
         assertBucket(ledgerBook.balance(fee), LedgerSubjectCode.FEE, 0L, CURRENCY);
         assertPostedTransactions(4);
+    }
+
+    /**
+     * 场景：手续费退回累计金额超过原手续费事实。
+     * 输入：充值 100、付款 40、固定手续费 5、先全额退费 5、再重复退费 5。
+     * 输出：第二次退费失败，余额保持第一次退费后的状态。
+     * 预期：手续费退回基于原 fee leg 累计上限校验，失败前不生成新账本交易。
+     * 红线：费用退款不得超过原收费金额。
+     */
+    @Test
+    void testFeeRefundShouldRejectWhenCumulativeAmountExceedsOriginalFee() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId merchant = fundingAccount("merchant_001");
+        FundsAccountId fee = feeAccount();
+
+        topup(user, 100L, "FEE_REFUND_LIMIT_TOPUP");
+        String paySn = pay(user, merchant, 40L, fixedFeeSpec(5L), "FEE_REFUND_LIMIT_PAY");
+        refundFee(user, 5L, paySn, "FEE_REFUND_LIMIT_FIRST");
+        BalanceSnapshot afterFirstFeeRefund = snapshot(balances(user, merchant, fee, cashMappingAccount(),
+                prepaymentAccount()));
+
+        assertThatThrownBy(() -> refundFee(user, 5L, paySn, "FEE_REFUND_LIMIT_SECOND"))
+                .hasMessageContaining("回放累计金额不能大于原 RouteLeg 金额");
+
+        BalanceSnapshot afterRejectedFeeRefund = snapshot(balances(user, merchant, fee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstFeeRefund, afterRejectedFeeRefund,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(merchant, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(fee, LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertPostedTransactions(3);
     }
 
     /**
@@ -1131,6 +1166,8 @@ class FundsTransactionBusinessFlowIntegrationTests {
 
         private final Map<String, RouteSnapshotSpec> freezeOrderSnapshots = new LinkedHashMap<>();
 
+        private final List<ConsumedReplayLeg> consumedReplayLegs = new ArrayList<>();
+
         @Override
         public boolean supports(@NonNull FundsInstructionSpec instruction) {
             return true;
@@ -1156,6 +1193,10 @@ class FundsTransactionBusinessFlowIntegrationTests {
         public void markSucceeded(@NonNull FundsInstructionSpec instruction,
                                   @NonNull FundsInstructionLifecycleResult result,
                                   @Nullable String ledgerTransactionSn) {
+            RouteSnapshotSpec routeSnapshot = routeSnapshots.get(result.getTransactionSn());
+            if (instruction.getReference() != null && routeSnapshot != null) {
+                recordConsumedReplayLegs(instruction, routeSnapshot);
+            }
             if (ledgerTransactionSn != null) {
                 succeededLedgerTransactionSns.add(ledgerTransactionSn);
             }
@@ -1186,6 +1227,30 @@ class FundsTransactionBusinessFlowIntegrationTests {
         }
 
         @Override
+        public @NonNull Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+                                                         @NonNull FundsTransactionEventType eventType,
+                                                         @NonNull String replayRefLegId,
+                                                         @NonNull CurrencyIsoCode currency) {
+            long amount = consumedReplayLegs
+                    .stream()
+                    .filter(leg -> replayRefLegId.equals(leg.replayRefLegId()))
+                    .filter(leg -> leg.eventType() == eventType)
+                    .filter(leg -> leg.currency() == currency)
+                    .mapToLong(ConsumedReplayLeg::amount)
+                    .sum();
+            return Money.immutable(amount, currency);
+        }
+
+        private void recordConsumedReplayLegs(FundsInstructionSpec instruction, RouteSnapshotSpec routeSnapshot) {
+            routeSnapshot.getLegs()
+                    .stream()
+                    .filter(leg -> leg.getReplayRefLegId() != null && !leg.getReplayRefLegId().isBlank())
+                    .map(leg -> new ConsumedReplayLeg(instruction.getEventType(), leg.getReplayRefLegId(),
+                            leg.getAmount().getAmount(), leg.getAmount().getCurrency()))
+                    .forEach(consumedReplayLegs::add);
+        }
+
+        @Override
         public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(@NonNull String transactionSn) {
             return Optional.ofNullable(routeSnapshots.get(transactionSn));
         }
@@ -1194,6 +1259,12 @@ class FundsTransactionBusinessFlowIntegrationTests {
         public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(@NonNull String freezeOrderSn) {
             return Optional.ofNullable(freezeOrderSnapshots.get(freezeOrderSn));
         }
+    }
+
+    private record ConsumedReplayLeg(FundsTransactionEventType eventType,
+                                     String replayRefLegId,
+                                     long amount,
+                                     CurrencyIsoCode currency) {
     }
 
     @SuppressWarnings("unchecked")
