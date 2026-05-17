@@ -225,7 +225,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | `DefaultFundsInstructionLifecycleSaverTests` | L2 | 交易事实生命周期、引用事实回放、退款/拒付上限、冻结引用不回写消费。 | 已有 |
 | `DefaultFundsFrozenOrderLifecycleSaverTests` | L2 | 冻结/解冻事实生命周期、剩余可释放金额、超额释放失败。 | 已有 |
 | `FundsFrozenOrderServiceImplTests` | L2 | 冻结单创建、必填校验、金额和币种校验。 | 已有 |
-| `DefaultLedgerProfileServiceImplTests` | L1/L2 | Funding/Credit/Budget/Platform profile 的 required 账目、normal balance、受控负数和缺账目失败。 | 已有 |
+| `DefaultLedgerProfileFundingAccountTests`、`DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests` | L1/L2 | Funding/Credit/Budget/Platform profile 的 required 账目、normal balance、受控负数和缺账目失败。 | 已有 |
 | `PlatformFundingAccountServiceImplTests` | L2 | 平台资金账户角色按租户、币种和角色解析到具体 FundingAccount，缺配置失败且不自动创建。 | 已有 |
 | `PlatformFundingAccountRoleTests` | L1 | 平台资金账户角色名称、中文语义、FUNDING_PLATFORM profile 和目标账目映射。 | 已有 |
 | `WalletLayerBoundaryTests` | L4 | wallet 只承载账户能力，不直接写交易事实或账本事实。 | 已有 |
@@ -260,7 +260,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 授权链退款和争议拒付上限 | `PTDD-AUTH-005` | `DefaultFundsInstructionLifecycleSaverTests` | L2 | `refundedAmount + chargebackAmount <= settledAmount`；争议拒付不是授权拒付。 | 已有 |
 | 冻结与解冻 | `PTDD-CTRL-001` | `DefaultFundsFrozenOrderLifecycleSaverTests`、`FundsFrozenOrderBoundaryTests` | L2/L4 | 冻结只做 `AVAILABLE <-> FROZEN`；不创建 `FundsTransaction`；超额解冻失败。 | 已有 |
 | 资金余额调账 | `PTDD-CTRL-002` | `FundsBalanceControlInstructionConverterTests`、`FundsTransactionCommandServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、后续 `ReconciliationExceptionAdjustmentTests` | L1/L2 | 请求显式携带原因、凭证、审批和可选差错引用；缺原因、凭证或审批时交易编排前失败；通过平台 `ADJUSTMENT` 账户形成平衡分录。 | 已落地基础调账红线，差错调账状态机 P1 |
-| 信用/预算额度调整 | `PTDD-CTRL-003`、`AT-BASE-040`、`AT-BASE-041` | `DefaultLedgerProfileServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、`FundsBalanceControlCommandServiceImplTests`、后续 `ControlAccountLedgerRulesTests` | L1/L2 | `FundsBalanceControlService#adjust` 支持资金账户余额调账、信用账户额度调整和预算组预算调整；资金账户生成 `BALANCE_ADJUST`，信用/预算生成 `LIMIT_ADJUST`；`LIMIT` 不开放给普通交易迁移；不新增 `CONSUMED`；预算调减受控负数必须有预算周期、审批、上限、账龄和治理路径。 | 已补服务门面和 route 红线测试，后续只保留回归保护 |
+| 信用/预算额度调整 | `PTDD-CTRL-003`、`AT-BASE-040`、`AT-BASE-041` | `DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests`、`BalanceControlFundsInstructionRouteResolverTests`、`FundsBalanceControlCommandServiceImplTests`、后续 `ControlAccountLedgerRulesTests` | L1/L2 | `FundsBalanceControlService#adjust` 支持资金账户余额调账、信用账户额度调整和预算组预算调整；资金账户生成 `BALANCE_ADJUST`，信用/预算生成 `LIMIT_ADJUST`；`LIMIT` 不开放给普通交易迁移；不新增 `CONSUMED`；预算调减受控负数必须有预算周期、审批、上限、账龄和治理路径。 | 已补服务门面和 route 红线测试，后续只保留回归保护 |
 | 受控负余额 | `PTDD-CTRL-004`、`PTDD-CTRL-005` | `LedgerBalanceProjectionServiceImplTests`、`ControlledNegativeAvailableTests` | L1/L2 | 有来源、策略、上限、账龄、审批或风控标记；负余额不能当作可继续消费余额。 | 部分已有 |
 | 余额控制无 FX | `PTDD-CTRL-006`、`AT-BASE-039` | `FundsBalanceControlInstructionConverterTests` | L1/L2 | freeze/unfreeze/adjust 金额币种必须等于账户或账本币种；不调用 `FxService`、不接收 FX 快照；错币种直接失败，不挂账、不生成 route/entry。 | 已落地 |
 | 交易层门面归属 | `PTDD-ARCH-001` | `WalletLayerBoundaryTests`、`FundsTransactionServiceApiContractTests` | L4/L2 | 交易命令归 transaction；wallet 不直接写交易事实或账本事实。 | 已有 |
@@ -311,7 +311,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | Posting plan 摘要 | DSL 五、OpenSpec ledger | `LedgerPostingPlanDigestContractTests` | L1 | 相同账务计划语义重算一致；`routeLegId`、`postingScope` 和 `balanceEffectType` 变化会改变摘要。 | 已有 |
 | Ledger entry 摘要 | DSL 五、OpenSpec ledger | `LedgerEntryDigestContractTests` | L1 | 相同业务事实重算一致；排除 entry sn、ID、ledger transaction sn、plan sn、审计时间。 | 已有 |
 | Entry 展示语义隔离 | DSL 五 | `TransactionViewProjectionBoundaryTests` | L4 | Entry 不出现账单标题、展示原因、国际化文案。 | 部分已有 |
-| Profile 和余额桶 | DSL 六、OpenSpec wallets | `DefaultLedgerProfileServiceImplTests`、`LedgerBalanceProjectionServiceImplTests` | L1/L2 | 账目规则由 profile 决定；`CONSUMED` 不入账；平台 profile 包含 `CASH/PREPAYMENT/CLEARING/SETTLEMENT/FEE/ADJUSTMENT`。 | 已有 |
+| Profile 和余额桶 | DSL 六、OpenSpec wallets | `DefaultLedgerProfileFundingAccountTests`、`DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests`、`LedgerBalanceProjectionServiceImplTests` | L1/L2 | 账目规则由 profile 决定；`CONSUMED` 不入账；平台 profile 包含 `CASH/PREPAYMENT/CLEARING/SETTLEMENT/FEE/ADJUSTMENT`。 | 已有 |
 | 冻结只迁移同主体余额 | DSL 六、OpenSpec wallets | `FundsFrozenOrderBoundaryTests`、`DefaultFundsFrozenOrderLifecycleSaverTests` | L2/L4 | 冻结不改变资金归属，不跨主体转移，不创建 `FundsTransaction`。 | 已有 |
 | JSON 样例机械校验 | DSL 8.0 | `TransactionServiceAbilityDslJsonContractTests` | L1 | JSON 可解析；posting plan 平衡；平台角色不直接入账；query/replay 样例无 posting。 | 已有 |
 | 归档和视图重放 | DSL 十 | `BalanceProjectionArchiveContractTests`、`TransactionViewReplayRangeTests` | L2/L3 | watermark 边界、checkpoint、manifest、有界重放、禁止视图反推余额。 | 部分已有 |
@@ -323,7 +323,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | Ledger Posting | `Ledger DSL Posting 系分设计.md` | `DefaultLedgerPostingAssemblerTests`、`DefaultLedgerTransactionPostingServiceImplTests` | L1/L2 | 成功入账、plan 不平衡失败、混币种失败、外部主体失败、ledgerId 缺失失败。 | 已有 |
 | Ledger 投影 | `Ledger DSL Posting 系分设计.md` | `LedgerBalanceProjectionServiceImplTests` | L1/L2 | 借方/贷方 normal balance、禁止负数、受控负数、账本不匹配失败。 | 已有 |
 | Ledger 事务回滚 | `Ledger DSL Posting 系分设计.md` | `LedgerPostingLocalTransactionTests` | L3 | 分录写入后投影失败时交易、计划、分录全部回滚。 | 待补 |
-| Wallet 账户初始化 | `Wallets 账户与余额控制系分设计.md` | `DefaultSubjectLedgerInitializerTests`、`DefaultLedgerProfileServiceImplTests` | L2 | required ledger 初始化、幂等创建、缺 profile 失败。 | 已有 |
+| Wallet 账户初始化 | `Wallets 账户与余额控制系分设计.md` | `DefaultSubjectLedgerInitializerTests`、`DefaultLedgerProfileFundingAccountTests`、`DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests` | L2 | required ledger 初始化、幂等创建、缺 profile 失败。 | 已有 |
 | Wallet 余额查询 | `Wallets 账户与余额控制系分设计.md` | `DefaultFundsAccountQueryServiceImplTests` | L2 | 未建账展示查询返回 initialized=false；写流程缺账本失败；空集合不返回 null。 | 已有 |
 | Platform role 解析 | `Wallets 账户与余额控制系分设计.md` | `PlatformFundingAccountServiceImplTests`、`PlatformFundingAccountRoleTests` | L1/L2 | 平台角色解析到具体 funding account；缺角色失败；角色不作为 entry subject。 | 已有 |
 | 冻结订单生命周期 | `Wallets`、`交易层服务能力系分设计.md` | `FundsFrozenOrderServiceImplTests`、`DefaultFundsFrozenOrderLifecycleSaverTests` | L2 | 创建、冻结成功、部分解冻、全部解冻、超额解冻、审计字段。 | 已有 |
@@ -423,7 +423,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | Transaction layer | `mvn -pl tests -am test -Dtest=FundsTransactionCommandServiceImplTests,DefaultRoutedFundsInstructionOrchestratorTests,DefaultFundsInstructionLifecycleSaverTests` |
 | Transaction service facade | `mvn -pl tests -am test -Dtest=FundsTransactionCommandServiceImplTests,FundsAuthorizationTransactionCommandServiceImplTests,FundsBalanceControlCommandServiceImplTests` |
 | Frozen order / balance control | `mvn -pl tests -am test -Dtest=FundsFrozenOrderServiceImplTests,DefaultFundsFrozenOrderLifecycleSaverTests,BalanceControlFundsInstructionRouteResolverTests` |
-| Wallet account capability | `mvn -pl tests -am test -Dtest=DefaultLedgerProfileServiceImplTests,DefaultFundsAccountQueryServiceImplTests,PlatformFundingAccountServiceImplTests,PlatformFundingAccountRoleTests,WalletLayerBoundaryTests` |
+| Wallet account capability | `mvn -pl tests -am test -Dtest=DefaultLedgerProfileFundingAccountTests,DefaultLedgerProfileBudgetGroupTests,DefaultLedgerProfileRequiredItemTests,DefaultFundsAccountQueryServiceImplTests,PlatformFundingAccountServiceImplTests,PlatformFundingAccountRoleTests,WalletLayerBoundaryTests` |
 | 资金变化组合链路 | `mvn -pl tests -am test -Dtest=FundsTransactionLedgerBalanceAssertionsTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionFeeBusinessFlowTests,FundsTransactionOrchestrationFlowTests,FundsTransactionOrchestrationReplayFlowTests` |
 | 架构边界 | `mvn -pl tests -am test -Dtest=LedgerLayerBoundaryTests,RouteLayerBoundaryTests,WalletLayerBoundaryTests` |
 | 全量基础验证 | `mvn compile`，再按变更范围执行聚焦测试，最后执行团队认可的静态扫描。 |
@@ -466,7 +466,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 0 | P0-C Ledger Posting 主链路 | `payment-ledger` 与 `transaction-layer` 已覆盖 posting plan、entry、balance projection 和幂等入账结果主契约。 | 已按账本入账正向、写前失败、投影缺省语义和命名兼容测试驱动完成。 | `DefaultLedgerTransactionPostingServiceImplTests`、`DefaultLedgerTransactionPostingValidationTests`、`LedgerBalanceProjectionServiceImplTests`、`DefaultFundsAccountQueryServiceImplTests`。 | 已闭合，后续只保留回归保护。 |
 | 1 | P0-R 产品口径回归 | `transaction-layer`、`payment-ledger`、`clearing-reconciliation` 已覆盖 FX 外置、余额日志和结算策略红线。 | 已按红线用例驱动完成。 | `SettlementPolicySpecTests`、FX converter、余额控制和余额投影事件测试。 | 已闭合，后续只保留回归保护。 |
 | 2 | P0-CTRL 控制账户调额 | `wallets` 规格承接信用额度和预算组控制语义；`transaction-layer` 规格承接 `FundsBalanceControlService#adjust` 入口。 | 已按信用额度调增/调减、预算调增/调减、受控负数和 `LIMIT` 红线测试驱动完成。 | `FundsTransactionCommandServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、`just compile`。 | 已闭合，后续只保留回归保护。 |
-| 3 | P0-E Wallets 账户与余额控制 | `wallets` 规格继续保护账户 profile、平台角色、冻结事实、受控负余额和预算治理。 | 保持 wallet 是账户能力层，不承载交易命令；新增资金变化必须先补余额断言。 | `DefaultLedgerProfileServiceImplTests`、`PlatformFundingAccountServiceImplTests`、`WalletLayerBoundaryTests`、`ControlAccountLedgerRulesTests`。 | 已闭合，后续只保留回归保护。 |
+| 3 | P0-E Wallets 账户与余额控制 | `wallets` 规格继续保护账户 profile、平台角色、冻结事实、受控负余额和预算治理。 | 保持 wallet 是账户能力层，不承载交易命令；新增资金变化必须先补余额断言。 | `DefaultLedgerProfileFundingAccountTests`、`DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests`、`PlatformFundingAccountServiceImplTests`、`WalletLayerBoundaryTests`、`ControlAccountLedgerRulesTests`。 | 已闭合，后续只保留回归保护。 |
 | 4 | P0-G 命名治理残余 | OpenSpec 不直接驱动纯命名，但公共契约名称变化必须同步 spec delta。 | 已按账本入账结果、生命周期记录器、余额控制服务和账户类型语义轴分批治理；包名统一保留为独立重构轮次。 | `WalletLayerBoundaryTests`、`FundsTransactionServiceApiContractTests`、`DefaultFundsAccountTypeTests`、`PlatformFundingAccountRoleTests`。 | 已闭合，后续只保留回归保护。 |
 | 5 | P0-H-API 三类服务测试矩阵 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 已补 `FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单测和业务组合集成测试矩阵。 | `FundsTransactionCommandServiceImplTests`、`FundsAuthorizationTransactionCommandServiceImplTests`、`FundsBalanceControlCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests`、`FundsTransactionFeeBusinessFlowTests`。 | 已完成：三类服务门面与业务组合矩阵均已有回归测试。 |
 | 6 | P0-H-PKG 测试包名对齐 | OpenSpec 不直接约束测试包名，但包名必须反映能力归属，避免 wallet/transaction 历史语义漂移。 | 小批次迁移 `com.capte.funds.transaction`、`com.capte.funds.transaction.flow` 到 `application`、`application.flow`、`contract`、`boundary`、`accounting`、`ledger`、`support` 等目标包名，不夹带业务逻辑。 | 聚焦执行被迁移测试类，必要时补 `rg "package com.capte.funds.transaction"` 人工复核。 | 已完成：交易根包测试已清空，门面服务、指令编排、契约、边界、账务口径、账本断言、共享 support 和业务组合 flow 测试均按能力归属迁移。 |

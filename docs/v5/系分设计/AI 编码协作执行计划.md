@@ -187,7 +187,7 @@ flowchart TD
 | 禁止事项 | 不把付款、退款、提现、转账等交易命令迁回 wallet；不让 wallet 直接写 `FundsTransaction` 或 `LedgerTransaction`；不把信用账户和预算组当真实资金；不新增账务 `CONSUMED`；不让负 `AVAILABLE` 静默产生。 |
 | 建议任务 | wallet 实现或 adapter 归位；`FUNDING_MERCHANT`、平台 `ADJUSTMENT` 角色、`RESERVE_FUND` 命名收敛、FrozenOrder 生命周期和负余额策略模型已有回归保护，后续以迁移和清结算批处理复用为主。 |
 | 验收 | `wallet-face` 已承载账户能力契约；`wallet-impl` 有明确实现或 adapter 策略；账户主体账目集合符合 PRD；平台角色可解析到具体 funding account；冻结订单生命周期可审计；transaction 通过 wallet-face 使用账户能力。 |
-| 验证命令 | `mvn -pl tests -am test -Dtest=FundsFrozenOrderServiceImplTests,BalanceControlFundsInstructionRouteResolverTests`；`mvn -pl tests -am test -Dtest=DefaultLedgerProfileServiceImplTests,PlatformFundingAccountServiceImplTests,WalletLayerBoundaryTests`。 |
+| 验证命令 | `mvn -pl tests -am test -Dtest=FundsFrozenOrderServiceImplTests,BalanceControlFundsInstructionRouteResolverTests`；`mvn -pl tests -am test -Dtest=DefaultLedgerProfileFundingAccountTests,DefaultLedgerProfileBudgetGroupTests,DefaultLedgerProfileRequiredItemTests,PlatformFundingAccountServiceImplTests,WalletLayerBoundaryTests`。 |
 
 ## 5.7 Wave 4：P0-G 命名治理
 
