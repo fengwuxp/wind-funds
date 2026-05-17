@@ -141,6 +141,7 @@
   - [x] Split subject-balance query validation scenarios from `DefaultFundsSubjectBalanceQueryTests` into `DefaultFundsSubjectBalanceQueryValidationTests`.
   - [x] Split posting-plan entry validation scenarios from `DefaultLedgerPostingPlanValidationTests` into `DefaultLedgerPostingPlanEntryValidationTests`.
   - [x] Split subject-balance query initialization scenarios from `DefaultFundsSubjectBalanceQueryTests` into `DefaultFundsSubjectBalanceQueryInitializationTests`.
+  - [x] Split frozen-order compatibility and schema contract scenarios from `FundsFrozenOrderServiceImplTests` into `FundsFrozenOrderCompatibilityContractTests`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
