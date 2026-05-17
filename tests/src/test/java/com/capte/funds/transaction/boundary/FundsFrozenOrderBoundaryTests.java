@@ -1,5 +1,6 @@
-package com.capte.funds.transaction;
+package com.capte.funds.transaction.boundary;
 
+import com.capte.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.capte.funds.transaction.services.FundsFrozenOrderService;
 import org.junit.jupiter.api.Test;
 

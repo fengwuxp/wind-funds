@@ -1,4 +1,4 @@
-package com.capte.funds.transaction;
+package com.capte.funds.transaction.boundary;
 
 import org.junit.jupiter.api.Test;
 
