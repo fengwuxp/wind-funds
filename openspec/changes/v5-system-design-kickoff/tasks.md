@@ -112,6 +112,7 @@
   - [x] Split fee command scenarios from `FundsTransactionCommandServiceImplTests` into `FundsTransactionFeeCommandServiceImplTests` with shared `FundsTransactionCommandServiceImplTestSupport`.
   - [x] Split ledger transaction digest contract scenarios from `LedgerTransactionServiceImplTests` into `LedgerTransactionDigestContractTests` with shared `LedgerTransactionServiceImplTestSupport`.
   - [x] Split posting plan digest contract scenarios from `LedgerTransactionDigestContractTests` into `LedgerPostingPlanDigestContractTests`.
+  - [x] Split ledger transaction service idempotency scenarios from `LedgerTransactionServiceImplTests` into `LedgerTransactionServiceIdempotencyTests`.
   - [x] Split funds account balance-query scenarios from `DefaultFundsAccountQueryServiceImplTests` into dedicated query tests with shared `DefaultFundsAccountQueryServiceImplTestSupport`.
   - [x] Split ledger profile required-item and controlled-negative policy scenarios from `DefaultLedgerProfileServiceImplTests` into `DefaultLedgerProfileRequiredItemTests`.
   - [x] Split ledger balance projection event, negative-constraint and validation scenarios from `LedgerBalanceProjectionServiceImplTests` into dedicated tests with shared `LedgerBalanceProjectionServiceImplTestSupport`.
