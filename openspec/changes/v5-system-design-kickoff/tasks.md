@@ -88,6 +88,7 @@
   - [x] Align routed instruction orchestration tests and shared support to `com.capte.funds.transaction.application.orchestration`.
   - [x] Align transaction API and participant contract tests to `com.capte.funds.transaction.contract`.
   - [x] Align transaction boundary tests to `com.capte.funds.transaction.boundary`.
+  - [x] Align transaction accounting semantics tests to `com.capte.funds.transaction.accounting`.
   - [x] Align remaining transaction flow tests to `com.capte.funds.transaction.application.flow` without business logic changes.
 
 ## 8. 2026-05-15 CR Calibration

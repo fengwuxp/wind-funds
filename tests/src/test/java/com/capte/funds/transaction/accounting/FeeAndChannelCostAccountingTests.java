@@ -1,4 +1,4 @@
-package com.capte.funds.transaction;
+package com.capte.funds.transaction.accounting;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
