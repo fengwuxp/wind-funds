@@ -1,6 +1,7 @@
-package com.capte.funds.transaction;
+package com.capte.funds.transaction.application.orchestration;
 
 import com.capte.funds.route.DefaultRouteSnapshotFactory;
+import com.capte.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import org.junit.jupiter.api.Test;
