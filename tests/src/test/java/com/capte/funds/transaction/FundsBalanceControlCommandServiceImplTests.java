@@ -4,11 +4,13 @@ import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.route.enums.RouteLegType;
+import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
@@ -61,6 +63,43 @@ class FundsBalanceControlCommandServiceImplTests extends FundsTransactionCommand
         assertThat(instruction.getReference().getReferenceSn()).isEqualTo("FREEZE_00000001");
         assertLeg(leg, RouteLegType.RELEASE, LedgerSubjectCode.FROZEN,
                 LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.RELEASE, LedgerPhaseCode.UNFREEZE);
+    }
+
+    @Test
+    void testAdjustFundingAccountIncreaseShouldBuildBalanceAdjustmentRoute() {
+        FundsAccountId account = fundingAccount("funding_001");
+
+        service.adjust(adjustRequest(account, 1_000L, Boolean.TRUE, "ADJUST", "ADJUST_00000001")
+                .setReconciliationExceptionRef("REC_DIFF_0001")
+                .setDescription("increase funding balance"), WindOperator.system());
+
+        FundsInstructionSpec instruction = instruction();
+        ResolvedRouteSpec route = route();
+        RouteLegSpec leg = route.getLegs().getFirst();
+        assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.BALANCE_ADJUST);
+        assertThat(instruction.getContextVariables())
+                .containsEntry(FundsInstructionContextKeys.RECONCILIATION_EXCEPTION_REF, "REC_DIFF_0001")
+                .containsEntry(FundsInstructionContextKeys.ADJUST_REASON, "adjust reason")
+                .containsEntry(FundsInstructionContextKeys.ADJUST_EVIDENCE_REF, "EVIDENCE_ADJUST_00000001")
+                .containsEntry(FundsInstructionContextKeys.APPROVAL_REF, "APPROVAL_ADJUST_00000001");
+        assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.ADJUSTMENT,
+                LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.INCREASE, LedgerPhaseCode.ADJUSTMENT);
+    }
+
+    @Test
+    void testAdjustFundingAccountDecreaseShouldConstrainAvailableBalance() {
+        FundsAccountId account = fundingAccount("funding_001");
+
+        service.adjust(adjustRequest(account, 700L, Boolean.FALSE, "ADJUST", "ADJUST_00000002")
+                .setDescription("decrease funding balance"), WindOperator.system());
+
+        RouteLegSpec leg = route().getLegs().getFirst();
+        assertThat(instruction().getEventType()).isEqualTo(FundsTransactionEventType.BALANCE_ADJUST);
+        assertLeg(leg, RouteLegType.ADJUST, LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCode.ADJUSTMENT, LedgerBalanceEffectType.DECREASE, LedgerPhaseCode.ADJUSTMENT);
+        assertThat(leg.getConstraintOverrides())
+                .containsEntry(constraintKey(account, LedgerSubjectCode.AVAILABLE),
+                        LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
     }
 
     @Test
