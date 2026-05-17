@@ -423,14 +423,14 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 顺序 | 工作包 | OpenSpec 检查 | Superpowers 执行纪律 | Harness 门禁 | 当前状态 |
 | --- | --- | --- | --- | --- | --- |
 | 0 | P0-R 产品口径回归 | `transaction-layer`、`payment-ledger`、`clearing-reconciliation` 已覆盖 FX 外置、余额日志和结算策略红线。 | 已按红线用例驱动完成。 | `SettlementPolicySpecTests`、FX converter、余额控制和余额投影事件测试。 | 已闭合，后续只保留回归保护。 |
-| 1 | P0-CTRL 控制账户调额 | `wallets` 规格承接信用额度和预算组控制语义；`transaction-layer` 规格承接 `FundsBalanceControlService#adjust` 入口。 | 先补信用额度调增/调减、预算调增/调减、受控负数和 `LIMIT` 红线测试，再做最小实现。 | `just test-one FundsTransactionCommandServiceImplTests tests`、`just test-one BalanceControlFundsInstructionRouteResolverTests tests`、必要时 `just compile`。 | 下一批优先。 |
-| 2 | P0-E Wallets 账户与余额控制 | `wallets` 规格继续保护账户 profile、平台角色、冻结事实、受控负余额和预算治理。 | 保持 wallet 是账户能力层，不承载交易命令；新增资金变化必须先补余额断言。 | `DefaultLedgerProfileServiceImplTests`、`PlatformFundingAccountServiceImplTests`、`WalletLayerBoundaryTests`。 | 第二顺位。 |
-| 3 | P0-G 命名治理残余 | OpenSpec 不直接驱动纯命名，但公共契约名称变化必须同步 spec delta。 | 单轮只做一个命名轴，不夹带业务逻辑；旧契约需要兼容别名时先写迁移说明。 | `just compile`、边界测试和受影响契约测试。 | 第三顺位。 |
-| 4 | P0-H 测试资产治理残余 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 巨型测试类拆分、余额断言覆盖复核和场景注释补强分批推进。 | 受影响测试类聚焦回归，必要时补业务组合测试。 | 第四顺位。 |
+| 1 | P0-CTRL 控制账户调额 | `wallets` 规格承接信用额度和预算组控制语义；`transaction-layer` 规格承接 `FundsBalanceControlService#adjust` 入口。 | 已按信用额度调增/调减、预算调增/调减、受控负数和 `LIMIT` 红线测试驱动完成。 | `FundsTransactionCommandServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、`just compile`。 | 已闭合，后续只保留回归保护。 |
+| 2 | P0-E Wallets 账户与余额控制 | `wallets` 规格继续保护账户 profile、平台角色、冻结事实、受控负余额和预算治理。 | 保持 wallet 是账户能力层，不承载交易命令；新增资金变化必须先补余额断言。 | `DefaultLedgerProfileServiceImplTests`、`PlatformFundingAccountServiceImplTests`、`WalletLayerBoundaryTests`、`ControlAccountLedgerRulesTests`。 | 已闭合，后续只保留回归保护。 |
+| 3 | P0-G 命名治理残余 | OpenSpec 不直接驱动纯命名，但公共契约名称变化必须同步 spec delta。 | 已按账本入账结果、生命周期记录器、余额控制服务和账户类型语义轴分批治理；包名统一保留为独立重构轮次。 | `WalletLayerBoundaryTests`、`FundsTransactionServiceApiContractTests`、`DefaultFundsAccountTypeTests`、`PlatformFundingAccountRoleTests`。 | 已闭合，后续只保留回归保护。 |
+| 4 | P0-H 测试资产治理残余 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 巨型测试类拆分、余额断言覆盖复核和场景注释补强分批推进。 | 受影响测试类聚焦回归，必要时补业务组合测试。 | 下一批优先。 |
 | 5 | P1-CLR 清结算与对账 | `clearing-reconciliation` 需要补产品层 `SettlementPolicy`、候选、批次、结算单、出款单、差错单 spec delta。 | 先做模型和契约测试，不直接上完整批处理。 | 进入清结算集成测试、对账差错测试和 Manual Approval。 | P1，等待 P0 稳定。 |
 | 6 | P1-FX / P1-ARC 外汇运营与归档治理 | FX 报价、锁价、审批、费用、汇损益以及 archive/checkpoint/watermark 需要独立 change。 | 先隔离领域对象和只读投影边界，避免交易层重新自动换汇或报表反写账本。 | 需要 DDL 或数据修复时进入 Manual Approval。 | P1，暂不进入当前编码批次。 |
 
-本轮之后的 CAD 自动推进顺序固定为：先执行 P0-CTRL，再执行 P0-E，再按 P0-G/P0-H 做治理，最后再进入 P1 清结算、FX 运营和归档治理。若 P0-CTRL 编码中发现 OpenSpec 规格缺口，先补最小 spec delta 和测试计划，再改代码。
+本轮之后的 CAD 自动推进顺序固定为：P0-CTRL、P0-E 和 P0-G 已闭合，下一批先执行 P0-H 测试资产治理，再进入 P1 清结算、FX 运营和归档治理。若后续编码中发现 OpenSpec 规格缺口，先补最小 spec delta 和测试计划，再改代码。
 
 # 九、编码落地顺序
 

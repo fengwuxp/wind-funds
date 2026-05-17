@@ -75,12 +75,13 @@
   - [x] Close first-pass posting/projection behavior: positive amounts, postable subjects, route-leg traceability, idempotent no-reprojection, missing-ledger failure, missing-balance-bucket failure, and read-side uninitialized bucket semantics.
   - [x] Rename `LedgerTransactionCreateResult` to the posting result main contract with a compatibility alias.
 - [x] Execute P0-D Transaction Layer service facade tasks.
-- [ ] Execute P0-E Wallets account and balance-control tasks.
+- [x] Execute P0-E Wallets account and balance-control tasks.
 - [x] Execute P0-F Route/helper/Fx convergence tasks.
-- [ ] Execute P0-G naming governance tasks.
+- [x] Execute P0-G naming governance tasks.
   - [x] Introduce `LedgerTransactionPostResult` as the ledger posting result main contract with `LedgerTransactionCreateResult` retained as a deprecated compatibility alias.
   - [x] Introduce `FundsInstructionLifecycleRecorder` as the lifecycle write-side main contract with `FundsInstructionLifecycleSaver` retained as a deprecated compatibility alias.
   - [x] Introduce `DelegatingFundsInstructionLifecycleRecorder` as the composite lifecycle-dispatch main implementation with `CompositeFundsInstructionLifecycleSaver` retained as a deprecated compatibility alias.
+  - [x] Confirm account-type semantic axes through `ExternalFundsAccountType`, `UserWalletFundsAccountType`, `CreditFundsAccountType`, `FundsSubjectType` and `PlatformFundingAccountRole`, with `DefaultFundsAccountType` retained only as a compatibility umbrella.
 - [ ] Execute P0-H test asset governance tasks.
 
 ## 8. 2026-05-15 CR Calibration
@@ -90,7 +91,7 @@
 - [x] Move account, balance-query, ledger-profile, platform-role and payment-instrument contracts into `wallet-face`.
 - [x] Decide that corresponding account capability implementations and DAL belong in `wallet-impl`, not transaction-impl adapters.
 - [x] Move corresponding account capability implementations, DAL, Mapper and Converter into `wallet-impl`.
-- [ ] Review and batch-fix module, package, class and method names according to P0-G.
+- [x] Review and batch-fix module, package, class and method names according to P0-G.
 - [x] Review and batch-fix test method naming and key scenario comments according to P0-H first pass.
 - [ ] Review balance assertions and split large test classes according to P0-H follow-up.
 
@@ -114,5 +115,6 @@
   - [x] Apply minimal request validation, converter, resolver or context changes only after failing tests expose the gap.
 - [x] Resume P0-E Wallets account and balance-control follow-up after P0-CTRL.
   - [x] Add `ControlAccountLedgerRulesTests` for CREDIT/BUDGET control buckets and no ledger `CONSUMED` bucket.
-- [ ] Resume P0-G naming governance and P0-H test asset governance after P0-E.
+- [x] Resume P0-G naming governance after P0-E.
+- [ ] Resume P0-H test asset governance after P0-G.
 - [ ] Keep P1 clearing/reconciliation, FX operations and archive governance behind separate OpenSpec changes and Harness manual approval gates when they introduce new objects, DDL or high-risk behavior.
