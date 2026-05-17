@@ -147,6 +147,7 @@
   - [x] Extract shared delegating lifecycle-recorder fixtures from `DelegatingFundsInstructionLifecycleRecorderTests` into `DelegatingFundsInstructionLifecycleRecorderTestSupport`.
   - [x] Split topup and withdraw orchestration scenarios from `FundsTransactionOrchestrationFlowTests` into `FundsFundingOrchestrationFlowTests`.
   - [x] Split authorization replay command scenarios from `FundsAuthorizationTransactionCommandServiceImplTests` into `FundsAuthorizationReplayCommandServiceImplTests`.
+  - [x] Split ledger posting assembler validation scenarios from `DefaultLedgerPostingAssemblerTests` into `DefaultLedgerPostingAssemblerValidationTests`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
