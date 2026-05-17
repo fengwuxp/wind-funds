@@ -13,14 +13,14 @@
   - settlement order and payout order.
   - reconciliation batch, exception and adjustment.
   - report snapshot and read-only reporting boundary.
-- [ ] For each future change, define source facts, state machines, idempotency keys, audit fields and ledger posting events.
-- [ ] Define focused tests before implementation:
+- [x] For each future change, define source facts, state machines, idempotency keys, audit fields and ledger posting events.
+- [x] Define focused tests before implementation:
   - `MerchantClearingBatchServiceTests`.
   - `SettlementOrderServiceTests`.
   - `PayoutResultServiceTests`.
   - `ReconciliationMatchingServiceTests`.
   - `ReconciliationExceptionAdjustmentTests`.
-- [ ] Require Harness manual approval before DDL, payout, reconciliation adjustment or blocking-rule implementation.
+- [x] Require Harness manual approval before DDL, payout, reconciliation adjustment or blocking-rule implementation.
 
 ## 3. FX Operations Readiness
 
@@ -29,12 +29,12 @@
   - execution result and external evidence.
   - fees, gain/loss and reporting.
   - cross-border or regulatory task references.
-- [ ] Keep transaction-layer no-auto-FX redline as regression protection.
-- [ ] Define focused tests before implementation:
+- [x] Keep transaction-layer no-auto-FX redline as regression protection.
+- [x] Define focused tests before implementation:
   - `FxQuoteExecutionTests`.
   - `CrossBorderComplianceBoundaryTests`.
   - `RegulatoryReportingRetryTests`.
-- [ ] Require Harness manual approval before FX execution, DDL or regulatory reporting implementation.
+- [x] Require Harness manual approval before FX execution, DDL or regulatory reporting implementation.
 
 ## 4. Archive, Replay and Metrics Readiness
 
@@ -44,12 +44,12 @@
   - balance rebuild task and difference report.
   - transaction view replay task.
   - `MetricWatermark` and `MetricSnapshot`.
-- [ ] Define focused tests before implementation:
+- [x] Define focused tests before implementation:
   - `BalanceProjectionArchiveContractTests`.
   - `BalanceWatermarkAdvanceTests`.
   - `TransactionViewReplayRangeTests`.
   - `MetricWatermarkTests`.
-- [ ] Require Harness manual approval before archive movement, formal rebuild, formal replay, metric backfill or DDL.
+- [x] Require Harness manual approval before archive movement, formal rebuild, formal replay, metric backfill or DDL.
 
 ## 5. Cross-Cutting Gates
 

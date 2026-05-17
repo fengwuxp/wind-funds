@@ -125,6 +125,23 @@ P1 FX operations 只处理业务层或外汇域已经显式决策后的事实，
 | 验证证据 | 失败用例、聚焦测试、编译、静态检查或无法执行原因。 |
 | 回滚/补偿 | 可撤销范围、反向账务、补差批次、重跑策略和人工兜底。 |
 
+## Future Change Execution Gates
+
+| 未来 change | source fact / reference | 状态机最低要求 | 幂等与审计 | posting event | 先行测试 | manual approval |
+| --- | --- | --- | --- | --- | --- | --- |
+| `p1-clearing-batch` | `CLEARING_BATCH`，包含 batchSn、version、policyVersion。 | `CREATED -> CHECKED -> APPROVING -> CONFIRMED / CANCELLED / FAILED`。 | 以主体、币种、账期、策略版本、候选版本和数据源版本幂等；记录 operator、approvalRef、rerunReason。 | `MERCHANT_CLEARING_COMPLETE`。 | `MerchantClearingBatchServiceTests`。 | DDL、确认入账、重跑补差。 |
+| `p1-settlement-payout` | `SETTLEMENT_ORDER`、`PAYOUT_ORDER`，包含 orderSn、payoutSn、externalReceiptRef。 | 结算：`DRAFT -> CALCULATED -> APPROVING -> LOCKED / CANCELLED / FAILED`；出款：`CREATED -> SUBMITTED -> SUCCEEDED / FAILED / RETURNED / MANUAL_REVIEW / CLOSED`。 | 结算单版本和出款单流水幂等；回单核验、失败原因、审批和操作人留痕。 | `MERCHANT_SETTLEMENT_LOCK`、`MERCHANT_PAYOUT_SUCCESS`、`MERCHANT_PAYOUT_FAIL_RESTORE`。 | `SettlementOrderServiceTests`、`PayoutResultServiceTests`。 | 出款提交、成功入账、失败回退、DDL。 |
+| `p1-reconciliation-exception` | `RECONCILIATION_EXCEPTION`，包含 exceptionSn、differenceType、responsibleParty、evidenceRef。 | `CREATED -> CONFIRMED -> WAITING_APPROVAL -> PROCESSING -> RESOLVED / REJECTED / FAILED / CLOSED`。 | 对账批次、外部 reference、处理动作和 adjustmentSn 幂等；记录前后值、原因、凭证和审批。 | `FUNDING_BALANCE_ADJUST_STANDARD` 或后续专项调账事件。 | `ReconciliationMatchingServiceTests`、`ReconciliationExceptionAdjustmentTests`。 | 差错调账、阻断规则、挂账认领、DDL。 |
+| `p1-reporting-readonly` | `REPORT_SNAPSHOT` 仅表达报表版本和 source window。 | `CREATED -> GENERATED -> PUBLISHED -> RECALCULATED / INVALIDATED`。 | snapshotVersion、sourceWindow、metricVersion 幂等；导出、查看和重算留审计。 | 无；报表不得触发资金 posting。 | 报表边界测试。 | 已发布财务或商户报表正式重算。 |
+| `p1-fx-quote-lock` | `FX_QUOTE`、`FX_QUOTE_LOCK`，包含 quoteId、rateId、expiresAt、confirmedAt。 | `QUOTED -> LOCKED -> EXPIRED / CANCELLED / READY_FOR_EXECUTION`。 | quoteId、rateId、lockSn 幂等；记录报价来源、用户确认、审批和有效期。 | 无；报价和锁价不入账。 | `FxQuoteExecutionTests`。 | DDL、锁价影响真实交易。 |
+| `p1-fx-execution-result` | `FX_EXECUTION`，包含 executionSn、externalRef、originalAmount、targetAmount、feeAmount、gainLossAmount。 | `READY -> SUBMITTED -> EXECUTED / FAILED / REVERSED / MANUAL_REVIEW`。 | executionSn 和 externalRef 幂等；记录外部回单、费用、汇差、审批和失败原因。 | 后续专项 FX posting event，不能复用普通交易自动换汇。 | `FxQuoteExecutionTests`。 | FX execution 正式写入、跨境付款、退汇。 |
+| `p1-cross-border-compliance` | `REGULATORY_REPORT_TASK` 或合规材料引用，不作为入账事实。 | `CREATED -> REVIEWING -> APPROVED / REJECTED -> SUBMITTED / FAILED / CLOSED`。 | reportTaskSn、sourceBatchSn 和 ackRef 幂等；材料、确认方、规则版本和提交结果留痕。 | 无；报送不入账。 | `CrossBorderComplianceBoundaryTests`、`RegulatoryReportingRetryTests`。 | 监管报送、跨境数据、外部机构正式提交。 |
+| `p1-balance-checkpoint-watermark` | `BALANCE_WATERMARK_TASK`，包含 batchNo、previousWatermark、targetWatermark、digest。 | `CREATED -> CALCULATED -> VERIFIED -> WATERMARK_ADVANCED / FAILED`。 | batchNo 和 watermark range 幂等；摘要、数量、金额、执行人和失败原因留痕。 | 无；水位推进不入账。 | `BalanceWatermarkAdvanceTests`。 | DDL、水位正式推进、历史数据扫描。 |
+| `p1-archive-manifest` | `ARCHIVE_MANIFEST`，包含 archiveNo、cutoffTime、watermarkTime、approvalRef。 | `CREATED -> PRECHECKED -> APPROVED -> ARCHIVING -> COMPLETED / FAILED / PARTIAL_FAILED`。 | archiveNo、cutoff、object range 幂等；冷热位置、摘要、抽样和审批留痕。 | 无；归档不入账。 | `BalanceProjectionArchiveContractTests`。 | 手动归档、冷热移动、DDL。 |
+| `p1-balance-rebuild` | `BALANCE_REBUILD_TASK`，只生成重建结果和差异。 | `CREATED -> VERIFY_ONLY -> DIFFERENCE_FOUND / MATCHED -> CLOSED`。 | taskSn、targetTime、subject range 幂等；差异、建议、审批和操作者留痕。 | 无；修复需另走补记、冲正或调账事实。 | 余额重建契约测试。 | 正式余额修复、修数、回填。 |
+| `p1-transaction-view-replay` | `TRANSACTION_VIEW_REPLAY_TASK`，只写视图或差异报告。 | `CREATED -> VERIFY_ONLY -> SHADOW_BUILT -> APPLIED / FAILED / CANCELLED`。 | taskSn、projectionCode、range、mode 幂等；游标、差异和 apply 审计留痕。 | 无；不得生成 route、posting 或 ledger entry。 | `TransactionViewReplayRangeTests`。 | 正式 apply、跨表大范围重放。 |
+| `p1-metric-governance` | `METRIC_WATERMARK_TASK`，只驱动指标快照。 | `CREATED -> CALCULATED -> VERIFIED -> PUBLISHED / FAILED`。 | metricCode、dimension、sourceWindow 幂等；口径版本、摘要和重算原因留痕。 | 无；指标差异不改事实。 | `MetricWatermarkTests`。 | 指标大范围回填、正式报表重算。 |
+
 ## CAD Boundary
 
 在用户未单独确认 P1 Execution Grant 前，CAD 自动推进只允许：
