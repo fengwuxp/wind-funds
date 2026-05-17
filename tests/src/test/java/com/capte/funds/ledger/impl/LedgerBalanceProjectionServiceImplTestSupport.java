@@ -5,7 +5,7 @@ import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.request.CreateLedgerRequest;
 import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.service.LedgerService;
-import com.capte.funds.transaction.FundsTransactionTestSupport;
+import com.capte.funds.support.FundsTransactionTestSupport;
 import com.capte.funds.wallet.ImmutableFundsAccount;
 import com.capte.funds.wallet.ImmutableFundsBalanceView;
 import com.wind.common.query.WindPagination;

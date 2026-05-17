@@ -1,9 +1,7 @@
-package com.capte.funds.transaction;
+package com.capte.funds.transaction.ledger;
 
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
-import com.capte.funds.transaction.FundsTransactionTestSupport;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
+import com.capte.funds.support.FundsTransactionTestSupport;
 import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.integration.funds.ledger.LedgerBalanceBucket;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
@@ -19,6 +17,7 @@ import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;

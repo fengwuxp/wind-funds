@@ -7,7 +7,7 @@ import com.capte.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.capte.funds.ledger.impl.LedgerTransactionServiceImpl;
-import com.capte.funds.transaction.FundsTransactionTestSupport;
+import com.capte.funds.support.FundsTransactionTestSupport;
 import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
 import com.mybatisflex.core.BaseMapper;
 import com.wind.common.util.WindObjectDigestUtils;

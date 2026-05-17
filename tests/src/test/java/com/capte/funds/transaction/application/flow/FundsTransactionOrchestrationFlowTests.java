@@ -13,7 +13,7 @@ import com.capte.funds.route.support.PlatformAccountRouteSupport;
 import com.capte.funds.route.support.RouteParticipantFactory;
 import com.capte.funds.route.support.RouteSubjectSupport;
 import com.capte.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
-import com.capte.funds.transaction.FundsTransactionTestSupport;
+import com.capte.funds.support.FundsTransactionTestSupport;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;

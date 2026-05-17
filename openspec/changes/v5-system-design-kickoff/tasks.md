@@ -90,6 +90,7 @@
   - [x] Align transaction boundary tests to `com.capte.funds.transaction.boundary`.
   - [x] Align transaction accounting semantics tests to `com.capte.funds.transaction.accounting`.
   - [x] Align remaining transaction flow tests to `com.capte.funds.transaction.application.flow` without business logic changes.
+  - [x] Align transaction ledger assertion tests to `com.capte.funds.transaction.ledger` and shared transaction test support to `com.capte.funds.support`.
 
 ## 8. 2026-05-15 CR Calibration
 

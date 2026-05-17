@@ -3,7 +3,7 @@ package com.capte.funds.ledger.impl;
 import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
-import com.capte.funds.transaction.FundsTransactionTestSupport;
+import com.capte.funds.support.FundsTransactionTestSupport;
 import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
 import com.mybatisflex.core.BaseMapper;
 import com.wind.common.util.WindObjectDigestUtils;

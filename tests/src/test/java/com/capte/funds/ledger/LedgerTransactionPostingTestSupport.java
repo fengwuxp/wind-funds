@@ -12,7 +12,7 @@ import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.request.UpdateLedgerTransactionRequest;
 import com.capte.funds.ledger.service.LedgerService;
 import com.capte.funds.ledger.service.LedgerTransactionService;
-import com.capte.funds.transaction.FundsTransactionTestSupport;
+import com.capte.funds.support.FundsTransactionTestSupport;
 import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
 import com.wind.common.exception.BaseException;
 import com.wind.common.query.WindPagination;

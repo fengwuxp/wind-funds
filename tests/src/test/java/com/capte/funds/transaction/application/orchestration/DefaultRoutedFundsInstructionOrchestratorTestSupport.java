@@ -2,7 +2,7 @@ package com.capte.funds.transaction.application.orchestration;
 
 import com.capte.funds.route.CompositeRouteResolver;
 import com.capte.funds.route.DefaultRouteReplayService;
-import com.capte.funds.transaction.FundsTransactionTestSupport;
+import com.capte.funds.support.FundsTransactionTestSupport;
 import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;

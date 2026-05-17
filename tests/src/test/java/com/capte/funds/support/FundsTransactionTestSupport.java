@@ -1,4 +1,4 @@
-package com.capte.funds.transaction;
+package com.capte.funds.support;
 
 import com.capte.funds.wallet.ImmutableFundsAccount;
 import com.capte.funds.wallet.ImmutableFundsBalanceView;
