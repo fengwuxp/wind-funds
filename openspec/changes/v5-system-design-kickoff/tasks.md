@@ -95,6 +95,7 @@
 - [x] Review and batch-fix module, package, class and method names according to P0-G.
 - [x] Review and batch-fix test method naming and key scenario comments according to P0-H first pass.
 - [ ] Review balance assertions and split large test classes according to P0-H follow-up.
+  - [x] Split ledger posting validation scenarios from `DefaultLedgerTransactionPostingServiceImplTests` into `DefaultLedgerTransactionPostingValidationTests` with shared `LedgerTransactionPostingTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
