@@ -132,6 +132,40 @@ class DefaultRouteReplayPolicyTests {
     }
 
     @Test
+    void testReplayShouldRejectEmptySnapshotLegs() {
+        RouteSnapshotSpec sourceSnapshot = authorizationSnapshot();
+        RouteSnapshotSpec snapshot = copySnapshot(sourceSnapshot, sourceSnapshot.getSnapshotSchemaVersion(),
+                List.of());
+
+        assertThatThrownBy(() -> new DefaultRouteReplayService().replay(snapshot,
+                replayRequest(RouteReplayType.RELEASE_HOLD, FundsRouteTestSupport.amount(200L))))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("legs 不能为空");
+    }
+
+    @Test
+    void testReplayShouldRejectPartialMissingReplayLegIds() {
+        RouteSnapshotSpec snapshot = authorizationSnapshot();
+        String existingLegId = snapshot.getLegs().getFirst().getLegId();
+
+        assertThatThrownBy(() -> new DefaultRouteReplayService().replay(snapshot,
+                ImmutableReplayRequestSpec.builder()
+                        .replayType(RouteReplayType.RELEASE_HOLD)
+                        .businessScene("CARD_REPLAY")
+                        .businessSn("PARTIAL_MISSING_LEG_0001")
+                        .amount(FundsRouteTestSupport.amount(200L))
+                        .originalAmount(FundsRouteTestSupport.amount(200L))
+                        .replayLegIds(List.of(existingLegId, "MISSING_LEG"))
+                        .eventTime(LocalDateTime.of(2026, 5, 9, 12, 30))
+                        .operator(systemActor())
+                        .contextVariables(Map.of())
+                        .build()))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("leg 不存在或不可回放")
+                .hasMessageContaining("MISSING_LEG");
+    }
+
+    @Test
     void testReplayShouldReuseOriginalExchangeSnapshotInsteadOfRequote() {
         RouteSnapshotSpec sourceSnapshot = authorizationSnapshot();
         RouteLegSpec sourceLeg = sourceSnapshot.getLegs().getFirst();

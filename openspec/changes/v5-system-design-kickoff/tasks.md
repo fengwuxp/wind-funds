@@ -188,7 +188,7 @@
 - [ ] Execute P0-ROUTE route-layer CR and scenario-coverage tasks.
   - [x] Add `CompositeRouteResolver` tests for single match, multiple-match ambiguity failure, no match, `Ordered` support evaluation, self-exclusion and replay resolver mutual-exclusion priority.
   - [x] Add `RouteReplaySupportTests` for replay event/reference recognition, missing reference, blank reference, external transaction non-replay and non-replay events.
-  - [ ] Add route replay support tests for direct refund, fee refund, authorization reversal, authorization settlement, authorization refund, chargeback, unfreeze, missing reference, missing original route snapshot, empty legs, partial missing leg ids and external transaction non-replay.
+  - [x] Add route replay support tests for direct refund, fee refund, authorization reversal, authorization settlement, authorization refund, chargeback, unfreeze, missing reference, missing original route snapshot, empty legs, partial missing leg ids and external transaction non-replay.
   - [ ] Pin the authorization follow-up default rule: reversal, settlement and authorization refund require `reference` and must use replay; missing reference must not fall back to a normal authorization route.
   - [ ] Add direct, balance-control and authorization route scenario coverage for platform-account gaps, wrong-currency platform accounts, controlled negative balance, credit limit adjustment, budget limit adjustment, shared-card and multi-subject authorization paths.
   - [ ] Refactor route leg construction, route constraint keys and subject-node construction to reduce duplicated private logic and overlong method parameters without changing face-layer contracts.
