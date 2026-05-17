@@ -128,6 +128,7 @@
   - [x] Split fee summary scenarios from `DefaultFundsInstructionLifecycleSuccessSummaryTests` into `DefaultFundsInstructionLifecycleFeeSummaryTests`.
   - [x] Split reference-transaction reuse boundary scenarios from `DefaultFundsInstructionLifecycleSaverIdempotencyTests` into `DefaultFundsInstructionLifecycleReferenceTransactionTests`.
   - [x] Split lifecycle recorder compatibility-alias scenario from `DelegatingFundsInstructionLifecycleRecorderTests` into `DelegatingFundsInstructionLifecycleRecorderCompatibilityTests`.
+  - [x] Split metric fact-mutation boundary scenario from `MetricWatermarkBoundaryTests` into `MetricFactMutationBoundaryTests` with shared `MetricBoundaryTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
