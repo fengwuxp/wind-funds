@@ -13,6 +13,7 @@ import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.RouteLegType;
+import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
@@ -356,6 +357,7 @@ class BalanceControlFundsInstructionRouteResolverTests {
         assertThat(route.getLegs()).singleElement().satisfies(leg -> {
             assertLeg(leg, RouteLegType.HOLD, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN,
                     LedgerBalanceEffectType.HOLD, LedgerPhaseCode.FREEZE);
+            assertThat(leg.getReplayPolicy()).isEqualTo(RouteReplayPolicy.PARTIAL_ALLOWED);
             assertMustNotBeNegative(leg, accountId, LedgerSubjectCode.AVAILABLE);
         });
     }

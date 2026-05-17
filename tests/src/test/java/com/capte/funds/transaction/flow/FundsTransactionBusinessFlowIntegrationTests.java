@@ -35,6 +35,7 @@ import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConve
 import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.capte.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
+import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
@@ -245,6 +246,55 @@ class FundsTransactionBusinessFlowIntegrationTests {
     }
 
     /**
+     * 场景：用户充值后一次冻结余额，再按同一冻结事实分两次释放。
+     * 输入：充值 100、冻结 60、解冻 20、解冻 40。
+     * 输出：用户 AVAILABLE/FROZEN 和平台 CASH/PREPAYMENT 余额快照。
+     * 预期：冻结后可用减少且冻结增加，两次解冻只在同主体 AVAILABLE/FROZEN 间回转，最终冻结归零。
+     * 红线：多次解冻必须引用原冻结事实回放原路径，不得表达消费、扣划或跨主体价值转移。
+     */
+    @Test
+    void testFreezeOnceUnfreezeTwiceShouldReplayOriginalFreezePath() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        topup(user, 100L, "FREEZE_UNFREEZE_TWICE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String freezeSn = freeze(user, 60L, "FREEZE_UNFREEZE_TWICE_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        unfreeze(user, 20L, freezeSn, "FREEZE_UNFREEZE_TWICE_UNFREEZE_1");
+        BalanceSnapshot afterFirstUnfreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterFirstUnfreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, 20L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -20L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        unfreeze(user, 40L, freezeSn, "FREEZE_UNFREEZE_TWICE_UNFREEZE_2");
+        BalanceSnapshot afterSecondUnfreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstUnfreeze, afterSecondUnfreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(ledgerBook.balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(ledgerBook.balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertPostedTransactions(4);
+    }
+
+    /**
      * 场景：用户 A 充值后转给 B，B 支付给商户，并把剩余资金冻结后提现。
      * 输入：A 充值 150、A 转 B 100、B 付款 40、B 冻结 60、B 提现 60。
      * 输出：A/B/商户/平台的余额快照。
@@ -349,13 +399,23 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setDescription("transfer"), WindOperator.system());
     }
 
-    private void freeze(FundsAccountId accountId, long amount, String businessSn) {
-        service.freeze(new FundsBalanceFreezeRequest()
+    private String freeze(FundsAccountId accountId, long amount, String businessSn) {
+        return service.freeze(new FundsBalanceFreezeRequest()
                 .setAccountId(accountId)
                 .setAmount(amount(amount))
                 .setBusinessScene("FREEZE")
                 .setBusinessSn(businessSn)
                 .setDescription("freeze"), WindOperator.system());
+    }
+
+    private void unfreeze(FundsAccountId accountId, long amount, String referenceFreezeSn, String businessSn) {
+        service.unfreeze(new FundsBalanceUnfreezeRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setReferenceFreezeSn(referenceFreezeSn)
+                .setBusinessScene("UNFREEZE")
+                .setBusinessSn(businessSn)
+                .setDescription("unfreeze"), WindOperator.system());
     }
 
     private void withdraw(FundsAccountId accountId, long amount, String businessSn) {
@@ -584,6 +644,8 @@ class FundsTransactionBusinessFlowIntegrationTests {
 
         private final Map<String, RouteSnapshotSpec> routeSnapshots = new LinkedHashMap<>();
 
+        private final Map<String, RouteSnapshotSpec> freezeOrderSnapshots = new LinkedHashMap<>();
+
         @Override
         public boolean supports(@NonNull FundsInstructionSpec instruction) {
             return true;
@@ -595,6 +657,10 @@ class FundsTransactionBusinessFlowIntegrationTests {
                                                                       @NonNull RouteSnapshotSpec routeSnapshot) {
             String transactionSn = "FT_" + String.format("%06d", transactionSequence.incrementAndGet());
             routeSnapshots.put(transactionSn, routeSnapshot);
+            if (instruction.getReference() == null
+                    && instruction.getEventType() == FundsTransactionEventType.FREEZE) {
+                freezeOrderSnapshots.put(transactionSn, routeSnapshot);
+            }
             return new FundsInstructionLifecycleResult()
                     .setTransactionSn(transactionSn)
                     .setTransactionDetailSns(List.of(transactionSn + "_DETAIL"))
@@ -641,7 +707,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
 
         @Override
         public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(@NonNull String freezeOrderSn) {
-            return Optional.empty();
+            return Optional.ofNullable(freezeOrderSnapshots.get(freezeOrderSn));
         }
     }
 

@@ -148,6 +148,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.FROZEN))
                 .balanceEffectType(LedgerBalanceEffectType.HOLD)
                 .phaseCode(LedgerPhaseCode.FREEZE)
+                .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
                 .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
                 .build());
         List<RouteParticipantSpec> participants = List.of(subjectParticipant(accountId, instruction));
