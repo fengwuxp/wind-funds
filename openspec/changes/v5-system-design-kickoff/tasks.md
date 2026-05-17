@@ -130,6 +130,7 @@
   - [x] Split lifecycle recorder compatibility-alias scenario from `DelegatingFundsInstructionLifecycleRecorderTests` into `DelegatingFundsInstructionLifecycleRecorderCompatibilityTests`.
   - [x] Split metric fact-mutation boundary scenario from `MetricWatermarkBoundaryTests` into `MetricFactMutationBoundaryTests` with shared `MetricBoundaryTestSupport`.
   - [x] Consolidate entry-level digest scenarios into `LedgerEntryDigestContractTests` and keep `LedgerTransactionDigestContractTests` focused on transaction-level digest contracts.
+  - [x] Split transfer fee route scenarios from `TransferFundsInstructionRouteResolverTests` into `TransferFundsInstructionFeeRouteResolverTests` with shared `TransferFundsInstructionRouteResolverTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
