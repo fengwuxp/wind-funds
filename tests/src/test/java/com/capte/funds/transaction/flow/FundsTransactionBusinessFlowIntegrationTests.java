@@ -34,6 +34,7 @@ import com.capte.funds.transaction.converter.FundsAuthorizationInstructionConver
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.capte.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
+import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
@@ -68,6 +69,7 @@ import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.core.WritableContextVariables;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
@@ -458,6 +460,52 @@ class FundsTransactionBusinessFlowIntegrationTests {
         assertPostedTransactions(4);
     }
 
+    /**
+     * 场景：共享卡授权同时占用信用账户、预算组和真实资金账户。
+     * 输入：信用账户、预算组、真实资金账户各自初始可用余额充足，授权 60。
+     * 输出：三个主体的 AVAILABLE/AUTHORIZATION 余额快照。
+     * 预期：三个主体都独立从 AVAILABLE 占用到 AUTHORIZATION，并生成独立可追溯的 posting plan。
+     * 红线：共享卡授权不得触碰 LIMIT，也不得把多主体授权合并成一笔不透明分录。
+     */
+    @Test
+    void testSharedCardAuthorizationShouldHoldLinkedControlAndFundingSubjects() {
+        FundsAccountId credit = creditAccount("credit_shared_001");
+        FundsAccountId budgetGroup = budgetGroup("budget_shared_001");
+        FundsAccountId funding = fundingAccount("funding_shared_001");
+        BalanceSnapshot before = snapshot(balances(credit, budgetGroup, funding));
+
+        authorizeSharedCard(credit, budgetGroup, funding, 60L, "AUTH_SHARED_CARD_AUTHORIZE");
+
+        BalanceSnapshot after = snapshot(balances(credit, budgetGroup, funding));
+        assertOnlyBalanceDeltas(before, after,
+                delta(credit, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(budgetGroup, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(budgetGroup, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY),
+                delta(budgetGroup, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY));
+        LedgerTransactionSpec authorizationTransaction = ledgerBook.postedTransactions.getFirst();
+        assertEntriesForSubject(authorizationTransaction, credit, LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCode.AUTHORIZATION);
+        assertEntriesForSubject(authorizationTransaction, budgetGroup, LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCode.AUTHORIZATION);
+        assertEntriesForSubject(authorizationTransaction, funding, LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCode.AUTHORIZATION);
+        assertNoLedgerSubject(authorizationTransaction, LedgerSubjectCode.LIMIT);
+
+        assertThat(authorizationTransaction.getPostingPlans()).hasSize(3);
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.AVAILABLE, 440L, CURRENCY);
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.LIMIT, 300L, CURRENCY);
+        assertBucket(ledgerBook.balance(budgetGroup), LedgerSubjectCode.AVAILABLE, 340L, CURRENCY);
+        assertBucket(ledgerBook.balance(budgetGroup), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertBucket(ledgerBook.balance(funding), LedgerSubjectCode.AVAILABLE, 240L, CURRENCY);
+        assertBucket(ledgerBook.balance(funding), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertPostedTransactions(1);
+    }
+
     private void seedLedgers() {
         List<FundsAccountId> fundingAccounts = List.of(
                 fundingAccount("funding_user"),
@@ -479,10 +527,21 @@ class FundsTransactionBusinessFlowIntegrationTests {
         ledgerBook.ensureLedger(authorizedCredit, LedgerSubjectCode.LIMIT, 100L);
         ledgerBook.ensureLedger(authorizedCredit, LedgerSubjectCode.AVAILABLE, 500L);
         ledgerBook.ensureLedger(authorizedCredit, LedgerSubjectCode.AUTHORIZATION, 0L);
+        FundsAccountId sharedCredit = creditAccount("credit_shared_001");
+        ledgerBook.ensureLedger(sharedCredit, LedgerSubjectCode.LIMIT, 300L);
+        ledgerBook.ensureLedger(sharedCredit, LedgerSubjectCode.AVAILABLE, 500L);
+        ledgerBook.ensureLedger(sharedCredit, LedgerSubjectCode.AUTHORIZATION, 0L);
         FundsAccountId budgetGroup = budgetGroup("budget_001");
         ledgerBook.ensureLedger(budgetGroup, LedgerSubjectCode.LIMIT, 0L);
         ledgerBook.ensureLedger(budgetGroup, LedgerSubjectCode.AVAILABLE, 100L);
         ledgerBook.ensureLedger(budgetGroup, LedgerSubjectCode.AUTHORIZATION, 0L);
+        FundsAccountId sharedBudgetGroup = budgetGroup("budget_shared_001");
+        ledgerBook.ensureLedger(sharedBudgetGroup, LedgerSubjectCode.LIMIT, 0L);
+        ledgerBook.ensureLedger(sharedBudgetGroup, LedgerSubjectCode.AVAILABLE, 400L);
+        ledgerBook.ensureLedger(sharedBudgetGroup, LedgerSubjectCode.AUTHORIZATION, 0L);
+        FundsAccountId sharedFunding = fundingAccount("funding_shared_001");
+        ledgerBook.ensureLedger(sharedFunding, LedgerSubjectCode.AVAILABLE, 300L);
+        ledgerBook.ensureLedger(sharedFunding, LedgerSubjectCode.AUTHORIZATION, 0L);
         ledgerBook.ensureLedger(cashMappingAccount(), LedgerSubjectCode.CASH, 10_000L);
         ledgerBook.ensureLedger(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L);
         ledgerBook.ensureLedger(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L);
@@ -600,6 +659,24 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setBusinessSn(businessSn)
                 .setAuthorizedTime(ACTIVE_TIME)
                 .setDescription("authorize"), WindOperator.system());
+    }
+
+    private String authorizeSharedCard(FundsAccountId accountId,
+                                       FundsAccountId budgetGroupId,
+                                       FundsAccountId fundingAccountId,
+                                       long amount,
+                                       String businessSn) {
+        return service.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setApproved(true)
+                .setBusinessScene("AUTHORIZE")
+                .setBusinessSn(businessSn)
+                .setAuthorizedTime(ACTIVE_TIME)
+                .setContextVariables(contextVariables(Map.of(
+                        FundsInstructionContextKeys.LINKED_BUDGET_GROUP_ID, budgetGroupId,
+                        FundsInstructionContextKeys.LINKED_FUNDING_ACCOUNT_ID, fundingAccountId)))
+                .setDescription("shared card authorize"), WindOperator.system());
     }
 
     private void reversal(FundsAccountId accountId, long amount, String authorizationSn, String businessSn) {
@@ -732,6 +809,12 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .build();
     }
 
+    private static WritableContextVariables contextVariables(Map<String, Object> variables) {
+        TestContextVariables result = new TestContextVariables();
+        variables.forEach(result::putVariable);
+        return result;
+    }
+
     private static PlatformFundingAccountService platformFundingAccountService() {
         return new PlatformFundingAccountService() {
             @Override
@@ -762,6 +845,28 @@ class FundsTransactionBusinessFlowIntegrationTests {
         private static LedgerKey of(LedgerQuery query) {
             return new LedgerKey(query.getTenantId(), query.getSubjectId(), query.getSubjectType(),
                     query.getLedgerSubjectCode(), query.getPeriodType(), query.getPeriodId());
+        }
+    }
+
+    private static final class TestContextVariables implements WritableContextVariables {
+
+        private final Map<String, Object> variables = new LinkedHashMap<>();
+
+        @Override
+        public WritableContextVariables putVariable(String name, Object val) {
+            variables.put(name, val);
+            return this;
+        }
+
+        @Override
+        public WritableContextVariables removeVariable(String name) {
+            variables.remove(name);
+            return this;
+        }
+
+        @Override
+        public Map<String, Object> getContextVariables() {
+            return Map.copyOf(variables);
         }
     }
 
