@@ -79,26 +79,26 @@ public enum DefaultFundsAccountType implements DescriptiveEnum {
     GLOBAL_ACCOUNT(LedgerSubjectCategory.LIABILITY, "全球账户"),
 
     /**
-     * 返利账户
+     * 返利账户（平台对用户的返利负债）
      */
-    REBATE_WALLET(LedgerSubjectCategory.LIABILITY, "返利钱包"),
+    REBATE_ACCOUNT(LedgerSubjectCategory.LIABILITY, "返利账户"),
 
     /**
      * 冻结账户（风控冻结）
      */
     FROZEN(LedgerSubjectCategory.LIABILITY, "冻结账户"),
 
-    /* ===== VCC 账户 ===== */
+    /* ===== 卡账户 ===== */
 
     /**
      * 预付卡账户
      */
-    PREPAID_VCC(LedgerSubjectCategory.LIABILITY, "预付卡"),
+    PREPAID_CARD(LedgerSubjectCategory.LIABILITY, "预付卡账户"),
 
     /**
      * 共享卡账户
      */
-    SHARE_VCC(LedgerSubjectCategory.LIABILITY, "共享卡"),
+    SHARED_CARD(LedgerSubjectCategory.LIABILITY, "共享卡账户"),
 
     /**
      * 信用卡账户（授信负债）
@@ -162,6 +162,18 @@ public enum DefaultFundsAccountType implements DescriptiveEnum {
 
     public static boolean isCreditCard(@NonNull DefaultFundsAccountType accountType) {
         return CreditFundsAccountType.isCreditAccountType(accountType);
+    }
+
+    public static boolean isFundingAccountType(@NonNull FundsAccountId accountId) {
+        return isFundingAccountType(accountId.type());
+    }
+
+    public static boolean isFundingAccountType(@NonNull String accountType) {
+        return FundingAccountType.isFundingAccountType(accountType);
+    }
+
+    public static boolean isFundingAccountType(@NonNull DefaultFundsAccountType accountType) {
+        return FundingAccountType.isFundingAccountType(accountType);
     }
 
     public static boolean isUserWalletType(@NonNull FundsAccountId accountId) {

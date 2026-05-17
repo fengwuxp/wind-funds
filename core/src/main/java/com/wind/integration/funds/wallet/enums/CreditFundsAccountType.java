@@ -13,9 +13,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 信用与 VCC 资金账户类型。
+ * 信用与共享卡资金账户类型。
  *
- * <p>该分类轴只表达预付、共享额度和信用账户形态，不承载用户钱包、外部账户或平台账户类型。
+ * <p>该分类轴只表达共享额度和信用账户形态，不承载预付卡、用户钱包、外部账户或平台账户类型。
  *
  * @author Codex
  * @date 2026-05-15
@@ -24,9 +24,7 @@ import java.util.stream.Collectors;
 @Getter
 public enum CreditFundsAccountType implements DescriptiveEnum {
 
-    PREPAID_VCC(DefaultFundsAccountType.PREPAID_VCC, "预付 VCC"),
-
-    SHARED_VCC(DefaultFundsAccountType.SHARE_VCC, "共享额度 VCC"),
+    SHARED_CARD(DefaultFundsAccountType.SHARED_CARD, "共享卡账户"),
 
     CREDIT_CARD(DefaultFundsAccountType.CREDIT_CARD, "信用卡账户");
 

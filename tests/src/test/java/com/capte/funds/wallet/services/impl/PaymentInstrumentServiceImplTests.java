@@ -23,7 +23,7 @@ class PaymentInstrumentServiceImplTests {
 
     /**
      * 场景：创建支付工具。
-     * 输入：用户共享虚拟卡支付工具，方向为 PAYMENT，币种 USD。
+     * 输入：用户共享卡支付工具，方向为 PAYMENT，币种 USD。
      * 输出：写入支付工具记录。
      * 预期：默认状态为 ACTIVE，并保留支付方向和脱敏工具号。
      * 红线：支付工具只是支付媒介，不得被当作账本主体或资金余额来源。
@@ -50,7 +50,7 @@ class PaymentInstrumentServiceImplTests {
                 .setTenantId(1L)
                 .setOwnerId("user_001")
                 .setOwnerType(FundsAccountOwnerType.USER)
-                .setInstrumentType("SHARE_VCC")
+                .setInstrumentType("SHARED_CARD")
                 .setInstrumentDirection(PaymentInstrumentDirection.PAYMENT)
                 .setInstrumentNo("CARD_****9876")
                 .setCurrency(CurrencyIsoCode.USD));

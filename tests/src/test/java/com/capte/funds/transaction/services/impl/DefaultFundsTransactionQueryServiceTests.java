@@ -316,7 +316,7 @@ class DefaultFundsTransactionQueryServiceTests {
             return ImmutablePaymentInstrumentRefSpec.builder()
                     .tenantId(1L)
                     .instrumentId("PI_001")
-                    .instrumentType("SHARE_VCC")
+                    .instrumentType("SHARED_CARD")
                     .instrumentNo("411111******1111")
                     .ownerId("credit_001")
                     .ownerType("CREDIT_ACCOUNT")

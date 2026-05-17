@@ -81,7 +81,8 @@
   - [x] Introduce `LedgerTransactionPostResult` as the ledger posting result main contract with `LedgerTransactionCreateResult` retained as a deprecated compatibility alias.
   - [x] Introduce `FundsInstructionLifecycleRecorder` as the lifecycle write-side main contract with `FundsInstructionLifecycleSaver` retained as a deprecated compatibility alias.
   - [x] Introduce `DelegatingFundsInstructionLifecycleRecorder` as the composite lifecycle-dispatch main implementation with `CompositeFundsInstructionLifecycleSaver` retained as a deprecated compatibility alias.
-  - [x] Confirm account-type semantic axes through `ExternalFundsAccountType`, `UserWalletFundsAccountType`, `CreditFundsAccountType`, `FundsSubjectType` and `PlatformFundingAccountRole`, with `DefaultFundsAccountType` retained only as a compatibility umbrella.
+  - [x] Confirm account-type semantic axes through `ExternalFundsAccountType`, `FundingAccountType`, `UserWalletFundsAccountType`, `CreditFundsAccountType`, `FundsSubjectType` and `PlatformFundingAccountRole`, with `DefaultFundsAccountType` retained only as a compatibility umbrella.
+  - [x] Reclassify `PREPAID_CARD` as a funding account product and `REBATE_ACCOUNT` as a rebate-liability funding account; keep only `SHARED_CARD` and `CREDIT_CARD` in the credit account axis.
 - [ ] Execute P0-H test asset governance tasks.
 
 ## 8. 2026-05-15 CR Calibration
