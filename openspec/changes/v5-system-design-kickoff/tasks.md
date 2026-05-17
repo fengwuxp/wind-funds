@@ -108,6 +108,7 @@
   - [x] Split ledger posting assembler period lookup scenarios from `DefaultLedgerPostingAssemblerTests` into `DefaultLedgerPostingAssemblerPeriodTests` with shared `DefaultLedgerPostingAssemblerTestSupport`.
   - [x] Split route replay orchestration scenarios from `DefaultRoutedFundsInstructionOrchestratorTests` into `DefaultRoutedFundsInstructionOrchestratorReplayTests` with shared `DefaultRoutedFundsInstructionOrchestratorTestSupport`.
   - [x] Split authorization and balance-control command scenarios from `FundsTransactionCommandServiceImplTests` into dedicated command service tests with shared `FundsTransactionCommandServiceImplTestSupport`.
+  - [x] Split fee command scenarios from `FundsTransactionCommandServiceImplTests` into `FundsTransactionFeeCommandServiceImplTests` with shared `FundsTransactionCommandServiceImplTestSupport`.
   - [x] Split ledger transaction digest contract scenarios from `LedgerTransactionServiceImplTests` into `LedgerTransactionDigestContractTests` with shared `LedgerTransactionServiceImplTestSupport`.
   - [x] Split posting plan digest contract scenarios from `LedgerTransactionDigestContractTests` into `LedgerPostingPlanDigestContractTests`.
   - [x] Split funds account balance-query scenarios from `DefaultFundsAccountQueryServiceImplTests` into dedicated query tests with shared `DefaultFundsAccountQueryServiceImplTestSupport`.
