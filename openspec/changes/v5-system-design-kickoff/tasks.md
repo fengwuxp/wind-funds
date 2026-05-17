@@ -129,4 +129,11 @@
   - [x] Add `ControlAccountLedgerRulesTests` for CREDIT/BUDGET control buckets and no ledger `CONSUMED` bucket.
 - [x] Resume P0-G naming governance after P0-E.
 - [ ] Resume P0-H test asset governance after P0-G.
+- [x] Re-scope unfinished current-version tasks to transaction, wallet and ledger layers first.
+- [x] Defer clearing, settlement, reconciliation, ledger account/archive, balance snapshot and full FX operation tasks to the next version.
+- [x] Align the current-version service test matrix for `FundsDirectTransactionService`, `FundsAuthorizationTransactionService` and `FundsBalanceControlService`.
+- [x] Define test package alignment rules for transaction application, business-flow, converter, route, wallet and ledger tests.
+- [ ] Implement missing current-version service facade unit tests for the three transaction services.
+- [ ] Implement missing current-version business-combination integration tests for direct transaction, authorization and balance-control flows.
+- [ ] Migrate test package names in small batches without mixing business-logic changes.
 - [ ] Keep P1 clearing/reconciliation, FX operations and archive governance behind separate OpenSpec changes and Harness manual approval gates when they introduce new objects, DDL or high-risk behavior.
