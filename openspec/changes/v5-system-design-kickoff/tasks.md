@@ -103,6 +103,7 @@
   - [x] Split funds account balance-query scenarios from `DefaultFundsAccountQueryServiceImplTests` into dedicated query tests with shared `DefaultFundsAccountQueryServiceImplTestSupport`.
   - [x] Split ledger balance projection event, negative-constraint and validation scenarios from `LedgerBalanceProjectionServiceImplTests` into dedicated tests with shared `LedgerBalanceProjectionServiceImplTestSupport`.
   - [x] Split funds transaction route snapshot query scenarios from `DefaultFundsTransactionQueryServiceTests` into `DefaultFundsTransactionRouteSnapshotQueryTests` with shared `DefaultFundsTransactionQueryServiceTestSupport`.
+  - [x] Split wallet layer boundary contract, instrument and implementation ownership scenarios from `WalletLayerBoundaryTests` into dedicated boundary tests with shared `WalletLayerBoundaryTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
