@@ -137,6 +137,7 @@
   - [x] Split direct-transaction command validation scenarios from `FundsTransactionCommandServiceImplTests` into `FundsTransactionCommandValidationTests`.
   - [x] Split subject-balance query validation scenarios from `DefaultFundsSubjectBalanceQueryTests` into `DefaultFundsSubjectBalanceQueryValidationTests`.
   - [x] Split posting-plan entry validation scenarios from `DefaultLedgerPostingPlanValidationTests` into `DefaultLedgerPostingPlanEntryValidationTests`.
+  - [x] Split subject-balance query initialization scenarios from `DefaultFundsSubjectBalanceQueryTests` into `DefaultFundsSubjectBalanceQueryInitializationTests`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
