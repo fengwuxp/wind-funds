@@ -1,4 +1,4 @@
-package com.capte.funds.transaction;
+package com.capte.funds.transaction.contract;
 
 import com.capte.funds.transaction.enums.FundsEffectType;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
