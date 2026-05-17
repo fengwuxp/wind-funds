@@ -219,7 +219,8 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | `FundsTransactionLedgerBalanceAssertionsTests` | L1/L2 | 核心资金变化的余额桶 delta 和 posting 平衡。 | 已有 |
 | `FundsTransactionBusinessFlowIntegrationTests` | L2 | 充值 -> 付款 -> 退款，充值 -> 冻结 -> 提现，A -> B -> 商户 -> 提现、资金/信用/预算调额和授权组合链路。 | 已有 |
 | `FundsTransactionFeeBusinessFlowTests` | L2 | 显式手续费付款、普通退款不退费、手续费退回和退费累计上限。 | 已有 |
-| `FundsTransactionOrchestrationFlowTests` | L2 | route resolver、orchestrator、recording posting service 编排链路。 | 已有 |
+| `FundsTransactionOrchestrationFlowTests` | L2 | 普通 route resolver、orchestrator、recording posting service 编排链路。 | 已有 |
+| `FundsTransactionOrchestrationReplayFlowTests` | L2 | 授权撤销、授权结算、拒付、解冻等 replay route resolver 编排链路。 | 已有 |
 | `FundsTransactionCommandServiceImplTests` | L2 | 交易门面、幂等、请求摘要、授权拒绝和逆向链路。 | 已有 |
 | `DefaultFundsInstructionLifecycleSaverTests` | L2 | 交易事实生命周期、引用事实回放、退款/拒付上限、冻结引用不回写消费。 | 已有 |
 | `DefaultFundsFrozenOrderLifecycleSaverTests` | L2 | 冻结/解冻事实生命周期、剩余可释放金额、超额释放失败。 | 已有 |
@@ -422,7 +423,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | Transaction service facade | `mvn -pl tests -am test -Dtest=FundsTransactionCommandServiceImplTests,FundsAuthorizationTransactionCommandServiceImplTests,FundsBalanceControlCommandServiceImplTests` |
 | Frozen order / balance control | `mvn -pl tests -am test -Dtest=FundsFrozenOrderServiceImplTests,DefaultFundsFrozenOrderLifecycleSaverTests,BalanceControlFundsInstructionRouteResolverTests` |
 | Wallet account capability | `mvn -pl tests -am test -Dtest=DefaultLedgerProfileServiceImplTests,DefaultFundsAccountQueryServiceImplTests,PlatformFundingAccountServiceImplTests,PlatformFundingAccountRoleTests,WalletLayerBoundaryTests` |
-| 资金变化组合链路 | `mvn -pl tests -am test -Dtest=FundsTransactionLedgerBalanceAssertionsTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionFeeBusinessFlowTests,FundsTransactionOrchestrationFlowTests` |
+| 资金变化组合链路 | `mvn -pl tests -am test -Dtest=FundsTransactionLedgerBalanceAssertionsTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionFeeBusinessFlowTests,FundsTransactionOrchestrationFlowTests,FundsTransactionOrchestrationReplayFlowTests` |
 | 架构边界 | `mvn -pl tests -am test -Dtest=LedgerLayerBoundaryTests,RouteLayerBoundaryTests,WalletLayerBoundaryTests` |
 | 全量基础验证 | `mvn compile`，再按变更范围执行聚焦测试，最后执行团队认可的静态扫描。 |
 
@@ -502,7 +503,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 4. `FeeSpec#feeType` 使用字符串 code 表达费用类型；`DefaultFeeType` 只作为默认 code 集暴露给上层使用，业务可扩展 `SMALL_AMOUNT_FEE`、`AUTH_DECLINE_FEE`、`CROSS_BORDER_FEE` 等费用类型。
 5. 直接交易附带手续费和独立手续费交易都必须支持资金账户、信用账户和预算组。信用账户或预算组手续费优先消耗其 `AVAILABLE` 控制桶，并继续受受控负余额、限额、审批或风控策略约束；手续费不得混入本金 route leg、商户本金或通道成本。
 
-当前验证：`mvn -pl tests -am test -Dtest=FundsDirectTransactionInstructionConverterTests,FundsAuthorizationInstructionConverterTests,FundsBalanceControlInstructionConverterTests,FundsTransactionCommandServiceImplTests,TransferFundsInstructionRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,DefaultRouteReplayServiceTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionFeeBusinessFlowTests,FundsTransactionOrchestrationFlowTests`。
+当前验证：`mvn -pl tests -am test -Dtest=FundsDirectTransactionInstructionConverterTests,FundsAuthorizationInstructionConverterTests,FundsBalanceControlInstructionConverterTests,FundsTransactionCommandServiceImplTests,TransferFundsInstructionRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,DefaultRouteReplayServiceTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionFeeBusinessFlowTests,FundsTransactionOrchestrationFlowTests,FundsTransactionOrchestrationReplayFlowTests`。
 
 退出条件：`PTDD-RAIL-FX-003`、`PTDD-CTRL-006`、`PTDD-LEDGER-001`、`AT-BASE-038`、`AT-BASE-039`、`RED-014A`、`RED-014B`、`RED-019`、`RED-020` 对应测试或明确测试计划已经落入 7.2/7.6 清单。
 

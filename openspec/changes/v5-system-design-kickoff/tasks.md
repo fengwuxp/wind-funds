@@ -114,6 +114,7 @@
   - [x] Split funds instruction lifecycle before-posting and success-summary scenarios from `DefaultFundsInstructionLifecycleSaverTests` into dedicated lifecycle saver tests.
   - [x] Split route replay authorization, direct refund and replay-policy scenarios from `DefaultRouteReplayServiceTests` into dedicated route replay tests.
   - [x] Split fee business-flow scenarios from `FundsTransactionBusinessFlowIntegrationTests` into `FundsTransactionFeeBusinessFlowTests` with shared `FundsTransactionBusinessFlowTestSupport`.
+  - [x] Split replay orchestration-flow scenarios from `FundsTransactionOrchestrationFlowTests` into `FundsTransactionOrchestrationReplayFlowTests` with shared `FundsTransactionOrchestrationFlowTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
