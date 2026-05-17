@@ -151,6 +151,7 @@
   - [x] Split ledger posting assembler validation scenarios from `DefaultLedgerPostingAssemblerTests` into `DefaultLedgerPostingAssemblerValidationTests`.
   - [x] Extract shared before-posting replay fixture from `DefaultFundsInstructionLifecycleSaverIdempotencyTests` into `FundsInstructionLifecycleSaverTestSupport`.
   - [x] Split ledger profile funding-account and budget-group scenarios from `DefaultLedgerProfileServiceImplTests` into dedicated profile tests.
+  - [x] Split direct-transaction fee converter scenarios from `FundsDirectTransactionInstructionConverterTests` into `FundsDirectTransactionFeeInstructionConverterTests`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
