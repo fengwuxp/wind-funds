@@ -527,7 +527,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 
 ## 9.2 P0：wind-funds 与 Ledger Posting
 
-1. 复核当前 `businessScene/businessSn/reference` 基线，避免把业务流水伪装成资金事实流水；冻结、清结算、争议、对账差错等独立事实成熟后再设计 `sourceFactRef`。
+1. 已补 `SourceFactBoundaryContractTests`：生产契约和 transaction-layer DSL 样例不恢复 `sourceObjectType/sourceObjectSn`，也不提前暴露 `sourceFactRef`；当前继续以 `businessScene/businessSn/reference` 为基线，冻结、清结算、争议、对账差错等独立事实成熟后再设计 `sourceFactRef`。
 2. 修正 entry 摘要字段，排除持久化流水和易变字段。
 3. 已补 route leg 到 posting plan 的稳定引用，后续 P0-C 继续验证持久化投影和摘要字段。
 4. 补平衡校验、账目允许、normal balance 推导测试。
