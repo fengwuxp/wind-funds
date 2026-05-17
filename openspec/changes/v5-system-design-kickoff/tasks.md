@@ -122,6 +122,7 @@
   - [x] Split authorization business-flow scenarios from `FundsTransactionBusinessFlowIntegrationTests` into `FundsAuthorizationBusinessFlowTests` with shared `FundsTransactionBusinessFlowTestSupport`.
   - [x] Split replay orchestration-flow scenarios from `FundsTransactionOrchestrationFlowTests` into `FundsTransactionOrchestrationReplayFlowTests` with shared `FundsTransactionOrchestrationFlowTestSupport`.
   - [x] Split credit-account and budget-group `LIMIT_ADJUST` route scenarios from `BalanceControlFundsInstructionRouteResolverTests` into `BalanceControlLimitAdjustRouteResolverTests` with shared `BalanceControlFundsInstructionRouteResolverTestSupport`.
+  - [x] Split subject ledger initializer validation scenarios from `DefaultSubjectLedgerInitializerTests` into `DefaultSubjectLedgerInitializerValidationTests` with shared `DefaultSubjectLedgerInitializerTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
