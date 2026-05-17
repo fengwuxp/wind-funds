@@ -506,6 +506,40 @@ class FundsTransactionBusinessFlowIntegrationTests {
     }
 
     /**
+     * 场景：外部授权问询被拒绝。
+     * 输入：信用账户初始可用 500，授权请求 100，授权结果为拒绝。
+     * 输出：信用账户 AVAILABLE/AUTHORIZATION/LIMIT、平台 SETTLEMENT 余额快照。
+     * 预期：拒绝事实不生成入账交易，余额保持不变，route snapshot 不包含 route leg。
+     * 红线：授权拒付不得改余额、不得生成 entry，也不得按争议拒付或授权结算路径处理。
+     */
+    @Test
+    void testAuthorizationDeclinedShouldNotPostLedgerOrChangeBalances() {
+        FundsAccountId credit = creditAccount("credit_auth_001");
+        FundsAccountId settlement = settlementAccount();
+        BalanceSnapshot before = snapshot(balances(credit, settlement));
+
+        String transactionSn = authorizeDeclined(credit, 100L, "insufficient_funds",
+                "AUTH_DECLINED_NO_POSTING");
+
+        BalanceSnapshot after = snapshot(balances(credit, settlement));
+        assertThat(transactionSn).isNotBlank();
+        assertOnlyBalanceDeltas(before, after,
+                delta(credit, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(settlement, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        RouteSnapshotSpec declinedRoute = lifecycleSaver.routeSnapshots.get(transactionSn);
+        assertThat(declinedRoute).isNotNull();
+        assertThat(declinedRoute.getLegs()).isEmpty();
+        assertThat(ledgerBook.postedTransactions).isEmpty();
+        assertThat(lifecycleSaver.succeededLedgerTransactionSns).isEmpty();
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.AVAILABLE, 500L, CURRENCY);
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.LIMIT, 100L, CURRENCY);
+        assertBucket(ledgerBook.balance(settlement), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+    }
+
+    /**
      * 场景：共享卡授权同时占用信用账户、预算组和真实资金账户。
      * 输入：信用账户、预算组、真实资金账户各自初始可用余额充足，授权 60。
      * 输出：三个主体的 AVAILABLE/AUTHORIZATION 余额快照。
@@ -704,6 +738,21 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setBusinessSn(businessSn)
                 .setAuthorizedTime(ACTIVE_TIME)
                 .setDescription("authorize"), WindOperator.system());
+    }
+
+    private String authorizeDeclined(FundsAccountId accountId,
+                                     long amount,
+                                     String declineReason,
+                                     String businessSn) {
+        return service.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setApproved(Boolean.FALSE)
+                .setDeclineReason(declineReason)
+                .setBusinessScene("AUTHORIZE")
+                .setBusinessSn(businessSn)
+                .setAuthorizedTime(ACTIVE_TIME)
+                .setDescription("authorize declined"), WindOperator.system());
     }
 
     private String authorizeSharedCard(FundsAccountId accountId,
