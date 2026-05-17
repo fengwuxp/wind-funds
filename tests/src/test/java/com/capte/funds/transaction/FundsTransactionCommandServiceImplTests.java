@@ -1,8 +1,10 @@
 package com.capte.funds.transaction;
 
 import com.capte.domain.core.operator.WindOperator;
+import com.capte.funds.route.DefaultRouteSnapshotFactory;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
@@ -321,6 +323,39 @@ class FundsTransactionCommandServiceImplTests extends FundsTransactionCommandSer
         assertLeg(leg, RouteLegType.INTERNAL_TRANSFER, LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCode.FEE, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.FEE);
         assertNoLimitNodes(route());
+    }
+
+    @Test
+    void testFeeRefundShouldReplayOriginalFeeLegOnly() {
+        FundsAccountId payer = fundingAccount("funding_001");
+        service.fee(new FundsTransactionFeeRequest()
+                .setAccountId(payer)
+                .setAmount(amount(30L))
+                .setFeeType(DefaultFeeType.FEE.getCode())
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_00000001")
+                .setDescription("fee"), WindOperator.system());
+        transactionQueryService.routeSnapshots.put("FEE_TX_00000001",
+                new DefaultRouteSnapshotFactory().createSnapshot(route()));
+
+        service.feeRefund(new FundsTransactionFeeRefundRequest()
+                .setAccountId(payer)
+                .setAmount(amount(30L))
+                .setFeeSourceTransactionSn("FEE_TX_00000001")
+                .setBusinessScene("FEE_REFUND")
+                .setBusinessSn("FEE_REFUND_00000001")
+                .setDescription("fee refund"), WindOperator.system());
+
+        FundsInstructionSpec instruction = instruction();
+        ResolvedRouteSpec route = route();
+        RouteLegSpec leg = route.getLegs().getFirst();
+        assertThat(instruction.getEventType()).isEqualTo(FundsTransactionEventType.FEE_REFUND);
+        assertThat(instruction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
+        assertThat(instruction.getReference().getReferenceType()).isEqualTo(FundsInstructionReferenceType.FEE);
+        assertThat(instruction.getReference().getReferenceSn()).isEqualTo("FEE_TX_00000001");
+        assertLeg(leg, RouteLegType.RESTORE, LedgerSubjectCode.FEE,
+                LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.RESTORE, LedgerPhaseCode.REFUND);
+        assertNoLimitNodes(route);
     }
 
     /**

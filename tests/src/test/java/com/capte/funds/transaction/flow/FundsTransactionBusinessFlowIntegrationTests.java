@@ -42,6 +42,7 @@ import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSe
 import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
@@ -180,11 +181,11 @@ class FundsTransactionBusinessFlowIntegrationTests {
     }
 
     /**
-     * 场景：用户充值后带业务显式手续费付款，后续商户对付款主金额做部分退款。
-     * 输入：充值 100、付款 40、固定手续费 5、退款 20。
+     * 场景：用户充值后带业务显式手续费付款，后续商户对付款主金额做部分退款，再退回手续费。
+     * 输入：充值 100、付款 40、固定手续费 5、本金退款 20、手续费退款 5。
      * 输出：用户 AVAILABLE、商户 SETTLEMENT、平台 FEE 和平台 CASH/PREPAYMENT 余额快照。
-     * 预期：用户充值后可用 +100，付款后用户 -45、商户 +40、平台费用 +5，退款后用户 +20、商户 -20。
-     * 红线：手续费由交易层请求显式传入并独立入账，退款只回补付款主金额，不冲回平台手续费。
+     * 预期：普通退款只回补付款主金额，费用退款只回放 fee leg，最终平台费用归零。
+     * 红线：手续费由交易层请求显式传入并独立入账，普通退款不默认退费，费用退款不得冲销本金 leg。
      */
     @Test
     void testTopupPayWithFeeRefundShouldKeepLedgerBalances() {
@@ -202,7 +203,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
-        pay(user, merchant, 40L, fixedFeeSpec(5L), "TOPUP_PAY_FEE_REFUND_PAY");
+        String paySn = pay(user, merchant, 40L, fixedFeeSpec(5L), "TOPUP_PAY_FEE_REFUND_PAY");
         BalanceSnapshot afterPay = snapshot(balances(user, merchant, fee, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterPay,
                 delta(user, LedgerSubjectCode.AVAILABLE, -45L, CURRENCY),
@@ -210,6 +211,10 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 delta(fee, LedgerSubjectCode.FEE, 5L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerTransactionSpec payTransaction = ledgerBook.postedTransactions.get(1);
+        assertEntriesForSubject(payTransaction, user, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.AVAILABLE);
+        assertEntriesForSubject(payTransaction, merchant, LedgerSubjectCode.SETTLEMENT);
+        assertEntriesForSubject(payTransaction, fee, LedgerSubjectCode.FEE);
 
         refund(user, merchant, 20L, "TOPUP_PAY_FEE_REFUND_REFUND");
         BalanceSnapshot afterRefund = snapshot(balances(user, merchant, fee, cashMappingAccount(), prepaymentAccount()));
@@ -219,11 +224,29 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 delta(fee, LedgerSubjectCode.FEE, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerTransactionSpec refundTransaction = ledgerBook.postedTransactions.get(2);
+        assertEntriesForSubject(refundTransaction, user, LedgerSubjectCode.AVAILABLE);
+        assertEntriesForSubject(refundTransaction, merchant, LedgerSubjectCode.SETTLEMENT);
+        assertNoEntriesForSubject(refundTransaction, fee);
 
-        assertBucket(ledgerBook.balance(user), LedgerSubjectCode.AVAILABLE, 75L, CURRENCY);
+        feeRefund(user, 5L, paySn, "TOPUP_PAY_FEE_REFUND_FEE_REFUND");
+        BalanceSnapshot afterFeeRefund = snapshot(balances(user, merchant, fee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRefund, afterFeeRefund,
+                delta(user, LedgerSubjectCode.AVAILABLE, 5L, CURRENCY),
+                delta(merchant, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(fee, LedgerSubjectCode.FEE, -5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerTransactionSpec feeRefundTransaction = ledgerBook.postedTransactions.get(3);
+        assertEntriesForSubject(feeRefundTransaction, user, LedgerSubjectCode.AVAILABLE);
+        assertEntriesForSubject(feeRefundTransaction, fee, LedgerSubjectCode.FEE);
+        assertNoEntriesForSubject(feeRefundTransaction, merchant);
+
+        assertBucket(ledgerBook.balance(user), LedgerSubjectCode.AVAILABLE, 80L, CURRENCY);
         assertBucket(ledgerBook.balance(merchant), LedgerSubjectCode.SETTLEMENT, 20L, CURRENCY);
-        assertBucket(ledgerBook.balance(fee), LedgerSubjectCode.FEE, 5L, CURRENCY);
-        assertPostedTransactions(3);
+        assertBucket(ledgerBook.balance(fee), LedgerSubjectCode.FEE, 0L, CURRENCY);
+        assertPostedTransactions(4);
     }
 
     /**
@@ -641,16 +664,16 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setDescription("topup"), WindOperator.system());
     }
 
-    private void pay(FundsAccountId payer, FundsAccountId merchant, long amount, String businessSn) {
-        pay(payer, merchant, amount, null, businessSn);
+    private String pay(FundsAccountId payer, FundsAccountId merchant, long amount, String businessSn) {
+        return pay(payer, merchant, amount, null, businessSn);
     }
 
-    private void pay(FundsAccountId payer,
-                     FundsAccountId merchant,
-                     long amount,
-                     @Nullable FeeSpec feeSpec,
-                     String businessSn) {
-        service.pay(new FundsTransactionPayRequest()
+    private String pay(FundsAccountId payer,
+                       FundsAccountId merchant,
+                       long amount,
+                       @Nullable FeeSpec feeSpec,
+                       String businessSn) {
+        return service.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(merchant)
                 .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
@@ -670,6 +693,16 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setBusinessScene("REFUND")
                 .setBusinessSn(businessSn)
                 .setDescription("refund"), WindOperator.system());
+    }
+
+    private void feeRefund(FundsAccountId accountId, long amount, String feeTransactionSn, String businessSn) {
+        service.feeRefund(new FundsTransactionFeeRefundRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setFeeSourceTransactionSn(feeTransactionSn)
+                .setBusinessScene("FEE_REFUND")
+                .setBusinessSn(businessSn)
+                .setDescription("fee refund"), WindOperator.system());
     }
 
     private void transfer(FundsAccountId payer, FundsAccountId payee, long amount, String businessSn) {

@@ -5,6 +5,7 @@ import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.wallet.service.PlatformFundingAccountService;
 import com.capte.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
@@ -215,6 +216,28 @@ public class FundsDirectTransactionInstructionConverter {
                 .contextVariables(mergeContext(request.getContextVariables(), Map.of(
                         FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
                         FundsInstructionContextKeys.FEE_TYPE, request.getFeeType())))
+                .build();
+    }
+
+    public @NonNull FundsInstructionSpec convertToFeeRefundInstruction(@NonNull FundsTransactionFeeRefundRequest request,
+                                                                       @NonNull WindOperator operator) {
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.FEE_REFUND)
+                .transactionType(DefaultFundsTransactionType.REFUND)
+                .amount(amount.amount())
+                .originalAmount(amount.originalAmount())
+                .exchangeRate(amount.exchangeRate())
+                .reference(reference(FundsInstructionReferenceType.FEE, request.getFeeSourceTransactionSn(), null))
+                .businessScene(request.getBusinessScene())
+                .businessSn(request.getBusinessSn())
+                .eventTime(LocalDateTime.now())
+                .description(request.getDescription())
+                .operator(operationActor(operator))
+                .contextVariables(mergeContext(request.getContextVariables(), Map.of(
+                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId())))
                 .build();
     }
 

@@ -1,6 +1,7 @@
 package com.capte.funds.transaction.application;
 
 import com.capte.domain.core.operator.WindOperator;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
@@ -69,6 +70,15 @@ public interface FundsDirectTransactionService {
      * @return 交易流水号
      */
     String fee(FundsTransactionFeeRequest request, WindOperator operator);
+
+    /**
+     * 手续费退回。
+     *
+     * @param request  手续费退回请求
+     * @param operator 操作人
+     * @return 交易流水号
+     */
+    String feeRefund(FundsTransactionFeeRefundRequest request, WindOperator operator);
 
 
 }

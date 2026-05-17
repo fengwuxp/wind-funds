@@ -9,6 +9,7 @@ import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSe
 import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
@@ -95,6 +96,12 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Transactional(rollbackFor = Exception.class)
     public String fee(FundsTransactionFeeRequest request, WindOperator operator) {
         return execute(directTransactionInstructionConverter.convertToFeeInstruction(request, operator));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String feeRefund(FundsTransactionFeeRefundRequest request, WindOperator operator) {
+        return execute(directTransactionInstructionConverter.convertToFeeRefundInstruction(request, operator));
     }
 
     @Override
