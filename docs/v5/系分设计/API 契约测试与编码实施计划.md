@@ -185,7 +185,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 
 本节是进入编码前的统一测试 backlog，承接产品设计、DSL 契约矩阵、OpenSpec 和各系分设计。后续新增、修改或删除测试时，必须能追溯到本节或对应上游设计；如果上游设计新增能力，也必须同步补充本节测试项。
 
-2026-05-17 CR 再校准：当前版本只继续推进交易、钱包和 ledger 层的测试与实现闭环，优先补齐 `FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单元测试、业务组合集成测试和测试包名对齐。清分、清算、对账、账本账目归档、余额快照、完整外汇运营对象和相关运营工作台统一排入下一版本，不进入当前 CAD 自动提交批次。
+2026-05-17 CR 再校准：当前版本只继续推进交易、钱包和 ledger 层的测试与实现闭环；`FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单元测试、业务组合集成测试和测试包名对齐已完成。清分、清算、对账、账本账目归档、余额快照、完整外汇运营对象和相关运营工作台统一排入下一版本，不进入当前 CAD 自动提交批次。
 
 测试状态口径：
 
@@ -464,12 +464,12 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 1 | P0-CTRL 控制账户调额 | `wallets` 规格承接信用额度和预算组控制语义；`transaction-layer` 规格承接 `FundsBalanceControlService#adjust` 入口。 | 已按信用额度调增/调减、预算调增/调减、受控负数和 `LIMIT` 红线测试驱动完成。 | `FundsTransactionCommandServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、`just compile`。 | 已闭合，后续只保留回归保护。 |
 | 2 | P0-E Wallets 账户与余额控制 | `wallets` 规格继续保护账户 profile、平台角色、冻结事实、受控负余额和预算治理。 | 保持 wallet 是账户能力层，不承载交易命令；新增资金变化必须先补余额断言。 | `DefaultLedgerProfileServiceImplTests`、`PlatformFundingAccountServiceImplTests`、`WalletLayerBoundaryTests`、`ControlAccountLedgerRulesTests`。 | 已闭合，后续只保留回归保护。 |
 | 3 | P0-G 命名治理残余 | OpenSpec 不直接驱动纯命名，但公共契约名称变化必须同步 spec delta。 | 已按账本入账结果、生命周期记录器、余额控制服务和账户类型语义轴分批治理；包名统一保留为独立重构轮次。 | `WalletLayerBoundaryTests`、`FundsTransactionServiceApiContractTests`、`DefaultFundsAccountTypeTests`、`PlatformFundingAccountRoleTests`。 | 已闭合，后续只保留回归保护。 |
-| 4 | P0-H-API 三类服务测试矩阵 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 先补 `FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单测和业务组合集成测试矩阵，再做缺口实现。 | `FundsTransactionCommandServiceImplTests`、`FundsAuthorizationTransactionCommandServiceImplTests`、`FundsBalanceControlCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests`。 | 当前版本下一批优先。 |
+| 4 | P0-H-API 三类服务测试矩阵 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 已补 `FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单测和业务组合集成测试矩阵。 | `FundsTransactionCommandServiceImplTests`、`FundsAuthorizationTransactionCommandServiceImplTests`、`FundsBalanceControlCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests`。 | 已完成：三类服务门面与业务组合矩阵均已有回归测试。 |
 | 5 | P0-H-PKG 测试包名对齐 | OpenSpec 不直接约束测试包名，但包名必须反映能力归属，避免 wallet/transaction 历史语义漂移。 | 小批次迁移 `com.capte.funds.transaction`、`com.capte.funds.transaction.flow` 到 `application`、`application.flow`、`contract`、`boundary`、`accounting`、`ledger`、`support` 等目标包名，不夹带业务逻辑。 | 聚焦执行被迁移测试类，必要时补 `rg "package com.capte.funds.transaction"` 人工复核。 | 已完成：交易根包测试已清空，门面服务、指令编排、契约、边界、账务口径、账本断言、共享 support 和业务组合 flow 测试均按能力归属迁移。 |
 | 6 | P1-CLR 清结算与对账 | `clearing-reconciliation` 需要补产品层 `SettlementPolicy`、候选、批次、结算单、出款单、差错单 spec delta。 | 下版本再做模型、契约测试和批处理实现，不直接进入当前 CAD 批次。 | 进入清结算集成测试、对账差错测试和 Manual Approval。 | 下版本。 |
 | 7 | P1-FX / P1-ARC 外汇运营与归档治理 | FX 报价、锁价、审批、费用、汇损益以及 archive/checkpoint/watermark 需要独立 change。 | 下版本隔离领域对象、余额快照、归档账目和只读投影边界，避免交易层重新自动换汇或报表反写账本。 | 需要 DDL 或数据修复时进入 Manual Approval。 | 下版本。 |
 
-本轮之后的 CAD 自动推进顺序固定为：P0-CTRL、P0-E 和 P0-G 已闭合；当前版本下一批只执行 P0-H-API 三类服务测试矩阵和 P0-H-PKG 测试包名对齐；清分、清算、对账、账本账目归档、余额快照、完整 FX 运营对象和相关运营工作台排入下版本。若后续编码中发现 OpenSpec 规格缺口，先补最小 spec delta 和测试计划，再改代码。
+本轮之后的 CAD 自动推进顺序固定为：P0-CTRL、P0-E、P0-G、P0-H-API 和 P0-H-PKG 已闭合；当前版本剩余只保留回归保护、余额断言审查和必要的小型测试资产维护。清分、清算、对账、账本账目归档、余额快照、完整 FX 运营对象和相关运营工作台排入下版本。若后续编码中发现 OpenSpec 规格缺口，先补最小 spec delta 和测试计划，再改代码。
 
 # 九、编码落地顺序
 
@@ -479,7 +479,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 2. 补齐 JSON 契约样例和 ContractTests。
 3. 建立幂等键、请求摘要、来源事实引用和审计字段的公共约束；来源事实引用先以 `businessScene/businessSn/reference` 为基线，独立事实成熟后再引入 `sourceFactRef`。
 4. 已完成有资金变化用例的账本余额断言和业务组合集成测试；后续作为回归保护。
-5. P0-R、P0-CTRL、P0-E 和 P0-G 已闭合；当前版本下一批只继续 P0-H-API 三类服务测试矩阵和 P0-H-PKG 测试包名对齐。
+5. P0-R、P0-CTRL、P0-E、P0-G、P0-H-API 和 P0-H-PKG 已闭合；当前版本后续只保留回归保护、余额断言审查和必要的小型测试资产维护。
 
 退出条件：契约测试能覆盖 DSL 矩阵的 P0 场景，且不需要启动 Spring 即可验证 DSL 和 posting 基础规则。
 
@@ -575,7 +575,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 事项 | 建议默认值 | 原因 |
 | --- | --- | --- |
 | 交易门面归属 | 放入 `transaction/transaction-face`，wallet 对外交易服务逐步收敛或迁移。 | 符合“交易层对业务侧提供统一能力”的目标。 |
-| 第一批代码范围 | P0-R、P0-CTRL、P0-E 和 P0-G 已闭合；当前版本下一批只做三类服务测试矩阵、业务组合集成测试和测试包名对齐。 | 避免把清结算、对账、归档、余额快照和完整 FX 运营对象混入当前交易/钱包/ledger 闭环。 |
+| 第一批代码范围 | P0-R、P0-CTRL、P0-E、P0-G、P0-H-API 和 P0-H-PKG 已闭合；当前版本后续只保留回归保护、余额断言审查和必要的小型测试资产维护。 | 避免把清结算、对账、归档、余额快照和完整 FX 运营对象混入当前交易/钱包/ledger 闭环。 |
 | 清结算代码范围 | 排入下版本，当前只保留 PRD、DSL、OpenSpec 和系分追溯，不做批处理实现。 | 清结算依赖账本、交易、对账和运营策略，过早实现容易反复返工。 |
 | DDL 和迁移 | 单独出数据库变更方案和回滚方案后再执行。 | 涉及资金事实、余额投影、归档和分表，必须有评审和验证。 |
 | Harness 接入 | 先用本地命令和测试矩阵跑通，再创建真实 pipeline。 | 避免在规范未固化前引入 CI 凭据和远程环境变量。 |
@@ -584,4 +584,4 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 
 从设计完整性看，产品目标、DSL、OpenSpec、核心系分、API 契约、测试矩阵和 Harness 本地门禁已经形成编码输入闭环；但执行顺序需要以 8.1 的再审查结果为准。
 
-进入代码前建议先确认 `P0 编码任务拆分.md` 中的当前工作包状态。P0-A 测试保护、P0-D 交易门面、P0-C 账本主链路首轮、P0-F helper/route 主链路、P0-R 产品口径回归、P0-CTRL 控制账户调额、P0-E 钱包账户与余额控制和 P0-G 命名治理已经完成主体落地；下一批按“P0-H-API 三类服务测试矩阵 -> P0-H-PKG 测试包名对齐”的顺序小步落地，之后再重新评估是否进入下版本清结算、对账、归档和余额快照任务。
+进入代码前建议先确认 `P0 编码任务拆分.md` 中的当前工作包状态。P0-A 测试保护、P0-D 交易门面、P0-C 账本主链路首轮、P0-F helper/route 主链路、P0-R 产品口径回归、P0-CTRL 控制账户调额、P0-E 钱包账户与余额控制、P0-G 命名治理、P0-H-API 三类服务测试矩阵和 P0-H-PKG 测试包名对齐已经完成主体落地；后续再重新评估是否进入下版本清结算、对账、归档和余额快照任务。
