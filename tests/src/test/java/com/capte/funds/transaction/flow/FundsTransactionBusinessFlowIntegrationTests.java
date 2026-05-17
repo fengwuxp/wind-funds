@@ -34,6 +34,10 @@ import com.capte.funds.transaction.converter.FundsAuthorizationInstructionConver
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.capte.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
@@ -386,6 +390,74 @@ class FundsTransactionBusinessFlowIntegrationTests {
         assertPostedTransactions(3);
     }
 
+    /**
+     * 场景：外部授权问询通过后，发生部分撤销、部分结算，再对结算事实做部分退款。
+     * 输入：信用账户初始可用 500，授权 100，撤销 20，结算 60，退款 30。
+     * 输出：信用账户 AVAILABLE/AUTHORIZATION、平台 SETTLEMENT 余额快照。
+     * 预期：授权只占用 AVAILABLE 到 AUTHORIZATION；撤销释放 20；结算捕获 60；退款回补 30。
+     * 红线：普通授权结算和退款不得触碰 LIMIT，且每次回放只使用本次金额。
+     */
+    @Test
+    void testAuthorizationPartialReversalSettleRefundShouldKeepLedgerBalances() {
+        FundsAccountId credit = creditAccount("credit_auth_001");
+        FundsAccountId settlement = settlementAccount();
+        BalanceSnapshot before = snapshot(balances(credit, settlement));
+
+        String authorizationSn = authorize(credit, 100L, "AUTH_PARTIAL_CHAIN_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(credit, settlement));
+        assertOnlyBalanceDeltas(before, afterAuthorize,
+                delta(credit, LedgerSubjectCode.AVAILABLE, -100L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, 100L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(settlement, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        LedgerTransactionSpec authorizationTransaction = ledgerBook.postedTransactions.getFirst();
+        assertEntriesForSubject(authorizationTransaction, credit, LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCode.AUTHORIZATION);
+        assertNoLedgerSubject(authorizationTransaction, LedgerSubjectCode.LIMIT);
+
+        reversal(credit, 20L, authorizationSn, "AUTH_PARTIAL_CHAIN_REVERSAL");
+        BalanceSnapshot afterReversal = snapshot(balances(credit, settlement));
+        assertOnlyBalanceDeltas(afterAuthorize, afterReversal,
+                delta(credit, LedgerSubjectCode.AVAILABLE, 20L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, -20L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(settlement, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        LedgerTransactionSpec reversalTransaction = ledgerBook.postedTransactions.get(1);
+        assertEntriesForSubject(reversalTransaction, credit, LedgerSubjectCode.AUTHORIZATION,
+                LedgerSubjectCode.AVAILABLE);
+        assertNoLedgerSubject(reversalTransaction, LedgerSubjectCode.LIMIT);
+
+        String settlementSn = settle(credit, 60L, authorizationSn, "AUTH_PARTIAL_CHAIN_SETTLE");
+        BalanceSnapshot afterSettlement = snapshot(balances(credit, settlement));
+        assertOnlyBalanceDeltas(afterReversal, afterSettlement,
+                delta(credit, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(settlement, LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY));
+        LedgerTransactionSpec settlementTransaction = ledgerBook.postedTransactions.get(2);
+        assertEntriesForSubject(settlementTransaction, credit, LedgerSubjectCode.AUTHORIZATION);
+        assertEntriesForSubject(settlementTransaction, settlement, LedgerSubjectCode.SETTLEMENT);
+        assertNoLedgerSubject(settlementTransaction, LedgerSubjectCode.LIMIT);
+
+        authRefund(credit, 30L, settlementSn, "AUTH_PARTIAL_CHAIN_REFUND");
+        BalanceSnapshot afterRefund = snapshot(balances(credit, settlement));
+        assertOnlyBalanceDeltas(afterSettlement, afterRefund,
+                delta(credit, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(settlement, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY));
+        LedgerTransactionSpec refundTransaction = ledgerBook.postedTransactions.get(3);
+        assertEntriesForSubject(refundTransaction, credit, LedgerSubjectCode.AVAILABLE);
+        assertEntriesForSubject(refundTransaction, settlement, LedgerSubjectCode.SETTLEMENT);
+        assertNoLedgerSubject(refundTransaction, LedgerSubjectCode.LIMIT);
+
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.AVAILABLE, 450L, CURRENCY);
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.AUTHORIZATION, 20L, CURRENCY);
+        assertBucket(ledgerBook.balance(credit), LedgerSubjectCode.LIMIT, 100L, CURRENCY);
+        assertBucket(ledgerBook.balance(settlement), LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY);
+        assertPostedTransactions(4);
+    }
+
     private void seedLedgers() {
         List<FundsAccountId> fundingAccounts = List.of(
                 fundingAccount("funding_user"),
@@ -402,6 +474,11 @@ class FundsTransactionBusinessFlowIntegrationTests {
         FundsAccountId credit = creditAccount("credit_001");
         ledgerBook.ensureLedger(credit, LedgerSubjectCode.LIMIT, 100L);
         ledgerBook.ensureLedger(credit, LedgerSubjectCode.AVAILABLE, 0L);
+        ledgerBook.ensureLedger(credit, LedgerSubjectCode.AUTHORIZATION, 0L);
+        FundsAccountId authorizedCredit = creditAccount("credit_auth_001");
+        ledgerBook.ensureLedger(authorizedCredit, LedgerSubjectCode.LIMIT, 100L);
+        ledgerBook.ensureLedger(authorizedCredit, LedgerSubjectCode.AVAILABLE, 500L);
+        ledgerBook.ensureLedger(authorizedCredit, LedgerSubjectCode.AUTHORIZATION, 0L);
         FundsAccountId budgetGroup = budgetGroup("budget_001");
         ledgerBook.ensureLedger(budgetGroup, LedgerSubjectCode.LIMIT, 0L);
         ledgerBook.ensureLedger(budgetGroup, LedgerSubjectCode.AVAILABLE, 100L);
@@ -512,6 +589,50 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setAdjustEvidenceRef("EVIDENCE_" + businessSn)
                 .setApprovalRef("APPROVAL_" + businessSn)
                 .setDescription("adjust"), WindOperator.system());
+    }
+
+    private String authorize(FundsAccountId accountId, long amount, String businessSn) {
+        return service.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setApproved(true)
+                .setBusinessScene("AUTHORIZE")
+                .setBusinessSn(businessSn)
+                .setAuthorizedTime(ACTIVE_TIME)
+                .setDescription("authorize"), WindOperator.system());
+    }
+
+    private void reversal(FundsAccountId accountId, long amount, String authorizationSn, String businessSn) {
+        service.reversal(new FundsAuthorizationTransactionReversalRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setBusinessScene("REVERSAL")
+                .setBusinessSn(businessSn)
+                .setReversalTime(ACTIVE_TIME)
+                .setDescription("reversal"), WindOperator.system());
+    }
+
+    private String settle(FundsAccountId accountId, long amount, String authorizationSn, String businessSn) {
+        return service.settle(new FundsAuthorizationTransactionSettleRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setBusinessScene("SETTLE")
+                .setBusinessSn(businessSn)
+                .setSettleTime(ACTIVE_TIME)
+                .setDescription("settle"), WindOperator.system());
+    }
+
+    private void authRefund(FundsAccountId accountId, long amount, String settlementSn, String businessSn) {
+        service.settleRefund(new FundsAuthorizationTransactionRefundRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setAuthorizationTransactionSn(settlementSn)
+                .setBusinessScene("AUTH_REFUND")
+                .setBusinessSn(businessSn)
+                .setRefundTime(ACTIVE_TIME)
+                .setDescription("auth refund"), WindOperator.system());
     }
 
     private List<FundsSubjectBalanceDTO> balances(FundsAccountId... accountIds) {
