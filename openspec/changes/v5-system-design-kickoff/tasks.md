@@ -145,6 +145,7 @@
   - [x] Extract a shared before-posting lifecycle fixture from `DefaultFundsInstructionLifecycleBeforePostingTests` into `FundsInstructionLifecycleSaverTestSupport`.
   - [x] Split ledger posting amount and exchange-rate validation scenarios from `DefaultLedgerTransactionPostingValidationTests` into `DefaultLedgerTransactionPostingAmountValidationTests`.
   - [x] Extract shared delegating lifecycle-recorder fixtures from `DelegatingFundsInstructionLifecycleRecorderTests` into `DelegatingFundsInstructionLifecycleRecorderTestSupport`.
+  - [x] Split topup and withdraw orchestration scenarios from `FundsTransactionOrchestrationFlowTests` into `FundsFundingOrchestrationFlowTests`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
