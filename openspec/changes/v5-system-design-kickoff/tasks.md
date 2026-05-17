@@ -83,7 +83,7 @@
   - [x] Introduce `DelegatingFundsInstructionLifecycleRecorder` as the composite lifecycle-dispatch main implementation with `CompositeFundsInstructionLifecycleSaver` retained as a deprecated compatibility alias.
   - [x] Confirm account-type semantic axes through `ExternalFundsAccountType`, `FundingAccountType`, `UserWalletFundsAccountType`, `CreditFundsAccountType`, `FundsSubjectType` and `PlatformFundingAccountRole`, with `DefaultFundsAccountType` retained only as a compatibility umbrella.
   - [x] Reclassify `PREPAID_CARD` as a funding account product and `REBATE_ACCOUNT` as a rebate-liability funding account; keep only `SHARED_CARD` and `CREDIT_CARD` in the credit account axis.
-- [ ] Execute P0-H test asset governance tasks.
+- [x] Execute P0-H test asset governance tasks.
   - [x] Align transaction service facade tests and shared support to `com.capte.funds.transaction.application`.
   - [x] Align routed instruction orchestration tests and shared support to `com.capte.funds.transaction.application.orchestration`.
   - [x] Align transaction API and participant contract tests to `com.capte.funds.transaction.contract`.
@@ -101,7 +101,7 @@
 - [x] Move corresponding account capability implementations, DAL, Mapper and Converter into `wallet-impl`.
 - [x] Review and batch-fix module, package, class and method names according to P0-G.
 - [x] Review and batch-fix test method naming and key scenario comments according to P0-H first pass.
-- [ ] Review balance assertions and split large test classes according to P0-H follow-up.
+- [x] Review balance assertions and split large test classes according to P0-H follow-up.
   - [x] Split ledger posting validation scenarios from `DefaultLedgerTransactionPostingServiceImplTests` into `DefaultLedgerTransactionPostingValidationTests` with shared `LedgerTransactionPostingTestSupport`.
   - [x] Split posting plan structure validation scenarios from `DefaultLedgerTransactionPostingValidationTests` into `DefaultLedgerPostingPlanValidationTests`.
   - [x] Split ledger-entry amount, ledger binding, profile and subject-type validation scenarios from `DefaultLedgerTransactionPostingServiceImplTests` into `DefaultLedgerEntryValidationTests`.
