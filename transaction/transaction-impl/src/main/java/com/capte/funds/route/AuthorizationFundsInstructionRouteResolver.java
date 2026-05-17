@@ -31,6 +31,7 @@ import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
+import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -87,7 +88,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return instruction.getInstructionType() == FundsInstructionType.AUTHORIZATION_TRANSACTION
-                && !RouteReplaySupport.isReplayInstruction(instruction);
+                && instruction.getEventType() == FundsTransactionEventType.AUTHORIZE;
     }
 
     @Override

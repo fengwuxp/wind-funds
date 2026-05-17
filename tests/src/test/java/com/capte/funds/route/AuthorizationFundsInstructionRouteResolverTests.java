@@ -7,13 +7,18 @@ import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.route.RouteResolver;
 import com.wind.integration.funds.route.enums.RouteLegType;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AuthorizationFundsInstructionRouteResolverTests extends AuthorizationFundsInstructionRouteResolverTestSupport {
 
@@ -66,5 +71,32 @@ class AuthorizationFundsInstructionRouteResolverTests extends AuthorizationFunds
             assertMustNotBeNegative(leg, accountId, LedgerSubjectCode.AUTHORIZATION);
         });
         assertThat(route.getPlatformAccounts()).isNotNull();
+    }
+
+    @Test
+    void testSupportsShouldRejectAuthorizationFollowUpEventsWithoutReference() {
+        RouteResolver resolver = FundsRouteTestSupport.authorizationRouteResolver();
+
+        for (FundsTransactionEventType eventType : List.of(FundsTransactionEventType.REVERSAL,
+                FundsTransactionEventType.SETTLE, FundsTransactionEventType.AUTH_REFUND)) {
+            assertThat(resolver.supports(sharedCardInstruction(eventType)))
+                    .as("eventType = %s", eventType)
+                    .isFalse();
+        }
+    }
+
+    @Test
+    void testCompositeShouldNotFallbackToNormalAuthorizationRouteForMissingFollowUpReference() {
+        CompositeRouteResolver resolver = new CompositeRouteResolver(List.of(
+                FundsRouteTestSupport.authorizationRouteResolver(),
+                new DefaultRouteReplayService()));
+
+        for (FundsTransactionEventType eventType : List.of(FundsTransactionEventType.REVERSAL,
+                FundsTransactionEventType.SETTLE, FundsTransactionEventType.AUTH_REFUND)) {
+            assertThatThrownBy(() -> resolver.resolve(sharedCardInstruction(eventType)))
+                    .as("eventType = %s", eventType)
+                    .isInstanceOf(com.wind.common.exception.BaseException.class)
+                    .hasMessageContaining("未找到匹配的 RouteResolver");
+        }
     }
 }

@@ -83,16 +83,16 @@ class DefaultRouteReplayServiceTests {
     @Test
     void testResolveShouldReplaySavedSnapshotForSupportedLifecycleEvents() {
         List<ResolveCase> cases = List.of(
-                resolveCase(FundsTransactionEventType.REVERSAL, FundsInstructionReferenceType.ORIGINAL_TRANSACTION,
+                resolveCase(FundsTransactionEventType.REVERSAL, FundsInstructionReferenceType.AUTHORIZATION,
                         "AUTH_0001", authorizationSnapshot(), FundsRouteTestSupport.amount(100L),
                         FundsRouteCodes.AUTHORIZATION_REVERSAL_REPLAY),
-                resolveCase(FundsTransactionEventType.SETTLE, FundsInstructionReferenceType.ORIGINAL_TRANSACTION,
+                resolveCase(FundsTransactionEventType.SETTLE, FundsInstructionReferenceType.AUTHORIZATION,
                         "AUTH_0002", authorizationSnapshot(), FundsRouteTestSupport.amount(100L),
                         FundsRouteCodes.AUTHORIZATION_SETTLE_REPLAY),
-                resolveCase(FundsTransactionEventType.AUTH_REFUND, FundsInstructionReferenceType.ORIGINAL_TRANSACTION,
+                resolveCase(FundsTransactionEventType.AUTH_REFUND, FundsInstructionReferenceType.AUTHORIZATION,
                         "SETTLE_0001", authorizationSettlementSnapshot(), FundsRouteTestSupport.amount(100L),
                         FundsRouteCodes.AUTHORIZATION_REFUND_REPLAY),
-                resolveCase(FundsTransactionEventType.CHARGEBACK, FundsInstructionReferenceType.ORIGINAL_TRANSACTION,
+                resolveCase(FundsTransactionEventType.CHARGEBACK, FundsInstructionReferenceType.AUTHORIZATION,
                         "SETTLE_0002", authorizationSettlementSnapshot(), FundsRouteTestSupport.amount(100L),
                         FundsRouteCodes.CHARGEBACK_REPLAY),
                 resolveCase(FundsTransactionEventType.REFUND, FundsInstructionReferenceType.ORIGINAL_TRANSACTION,
