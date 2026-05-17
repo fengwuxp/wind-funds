@@ -100,6 +100,7 @@
   - [x] Split route replay orchestration scenarios from `DefaultRoutedFundsInstructionOrchestratorTests` into `DefaultRoutedFundsInstructionOrchestratorReplayTests` with shared `DefaultRoutedFundsInstructionOrchestratorTestSupport`.
   - [x] Split authorization and balance-control command scenarios from `FundsTransactionCommandServiceImplTests` into dedicated command service tests with shared `FundsTransactionCommandServiceImplTestSupport`.
   - [x] Split ledger transaction digest contract scenarios from `LedgerTransactionServiceImplTests` into `LedgerTransactionDigestContractTests` with shared `LedgerTransactionServiceImplTestSupport`.
+  - [x] Split funds account balance-query scenarios from `DefaultFundsAccountQueryServiceImplTests` into dedicated query tests with shared `DefaultFundsAccountQueryServiceImplTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
