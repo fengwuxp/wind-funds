@@ -102,6 +102,34 @@ class PlatformFundingAccountServiceImplTests {
     }
 
     /**
+     * 场景：平台账户查询条件期望 USD，但底层配置返回了 EUR 账户。
+     * 输入：tenantId=1、USD、SETTLEMENT，数据库异常返回 settlement_eur。
+     * 输出：拒绝返回该资金账户。
+     * 预期：错误信息暴露 expected/actual currency，不触发自动创建。
+     * 红线：route snapshot 不能把错币种平台账户固化为本次交易平台账户。
+     */
+    @Test
+    void testRequireAccountIdShouldRejectMismatchedPlatformFundingAccountCurrency() {
+        FundingAccount account = fundingAccount("settlement_eur", DefaultFundsAccountType.PLATFORM_LIABILITY.name());
+        account.setCurrency(CurrencyIsoCode.EUR);
+        AtomicInteger queryCount = new AtomicInteger();
+        AtomicInteger insertCount = new AtomicInteger();
+        FundingAccountMapper mapper = mapper(queryCount, insertCount, account);
+        PlatformFundingAccountServiceImpl service = new PlatformFundingAccountServiceImpl(mapper);
+
+        assertThatThrownBy(() -> service.requireAccountId(1L, CurrencyIsoCode.USD,
+                PlatformFundingAccountRole.SETTLEMENT))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("平台资金账户币种不匹配")
+                .hasMessageContaining("expectedCurrency = USD")
+                .hasMessageContaining("actualCurrency = EUR")
+                .hasMessageContaining("role = SETTLEMENT");
+
+        assertThat(queryCount).hasValue(1);
+        assertThat(insertCount).hasValue(0);
+    }
+
+    /**
      * 场景：同一租户、币种、角色配置了多个平台 FundingAccount。
      * 输入：tenantId=1、USD、FEE，数据库返回两个 ACTIVE 平台 FundingAccount。
      * 输出：拒绝解析平台资金账户。
@@ -157,6 +185,7 @@ class PlatformFundingAccountServiceImplTests {
         result.setAccountType(accountType);
         result.setPlatform(true);
         result.setStatus(FundsAccountStatus.ACTIVE);
+        result.setCurrency(CurrencyIsoCode.USD);
         return result;
     }
 

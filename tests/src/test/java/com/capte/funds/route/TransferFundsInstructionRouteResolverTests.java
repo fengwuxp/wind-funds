@@ -6,8 +6,12 @@ import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
+import com.capte.funds.route.support.PlatformAccountRouteSupport;
+import com.capte.funds.route.support.RouteParticipantFactory;
+import com.capte.funds.route.support.RouteSubjectSupport;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
@@ -16,7 +20,10 @@ import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TransferFundsInstructionRouteResolverTests extends TransferFundsInstructionRouteResolverTestSupport {
 
@@ -128,5 +135,36 @@ class TransferFundsInstructionRouteResolverTests extends TransferFundsInstructio
                     LedgerSubjectCode.AVAILABLE, LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.TRANSFER);
             assertMustNotBeNegative(leg, payerAccountId, LedgerSubjectCode.AVAILABLE);
         });
+    }
+
+    /**
+     * 场景：提现 route 需要平台 CASH_MAPPING 和 PREPAYMENT 账户，但配置缺失。
+     * 输入：已转换的提现指令，route resolver 查询平台 PREPAYMENT 时失败。
+     * 输出：route 解析失败。
+     * 预期：错误向上抛出，不生成缺平台账户的 route snapshot。
+     * 红线：平台账户角色不得被 route 层隐式创建、跳过或用角色字面量代替真实资金账户。
+     */
+    @Test
+    void testResolveWithdrawShouldRejectMissingPlatformPrepaymentAccount() {
+        FundsInstructionSpec instruction = converter.convertToWithdrawInstruction(new FundsTransactionWithdrawRequest()
+                .setAccountId(FundsRouteTestSupport.fundingAccount("funding_001"))
+                .setPayeeId(FundsAccountId.immutable("external_bank_001", DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn("FREEZE_0002")
+                .setTransactionAmount(FundsRouteTestSupport.transactionAmount(800L))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_0002"), WindOperator.system());
+        TransferFundsInstructionRouteResolver resolver = transferRouteResolverWithout(
+                PlatformFundingAccountRole.PREPAYMENT);
+
+        assertThatThrownBy(() -> resolver.resolve(instruction))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("missing platform funding account: PREPAYMENT");
+    }
+
+    private static TransferFundsInstructionRouteResolver transferRouteResolverWithout(
+            PlatformFundingAccountRole missingRole) {
+        return new TransferFundsInstructionRouteResolver(new RouteParticipantFactory(), new RouteSubjectSupport(),
+                new PlatformAccountRouteSupport(FundsRouteTestSupport.platformFundingAccountServiceWithout(
+                        Set.of(missingRole))));
     }
 }

@@ -190,7 +190,7 @@
   - [x] Add `RouteReplaySupportTests` for replay event/reference recognition, missing reference, blank reference, external transaction non-replay and non-replay events.
   - [x] Add route replay support tests for direct refund, fee refund, authorization reversal, authorization settlement, authorization refund, chargeback, unfreeze, missing reference, missing original route snapshot, empty legs, partial missing leg ids and external transaction non-replay.
   - [x] Pin the authorization follow-up default rule: reversal, settlement and authorization refund require `reference` and must use replay; missing reference must not fall back to a normal authorization route.
-  - [ ] Add direct, balance-control and authorization route scenario coverage for platform-account gaps, wrong-currency platform accounts, controlled negative balance, credit limit adjustment, budget limit adjustment, shared-card and multi-subject authorization paths.
+  - [x] Add direct, balance-control and authorization route scenario coverage for platform-account gaps, wrong-currency platform accounts, controlled negative balance, credit limit adjustment, budget limit adjustment, shared-card and multi-subject authorization paths.
   - [ ] Refactor route leg construction, route constraint keys and subject-node construction to reduce duplicated private logic and overlong method parameters without changing face-layer contracts.
   - [ ] Clean obsolete route constants, private methods and legacy compatibility branches only after focused route tests pass.
   - [ ] Keep route-layer boundary tests proving route code does not write transaction facts, frozen-order facts, ledger facts, DAL mapper state or balance projections.

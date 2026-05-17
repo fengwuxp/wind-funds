@@ -57,6 +57,9 @@ public class PlatformFundingAccountServiceImpl implements PlatformFundingAccount
         AssertUtils.isTrue(Boolean.TRUE.equals(result.getPlatform()) && result.getStatus() == FundsAccountStatus.ACTIVE,
                 "平台资金账户状态不可用，tenantId = {}, currency = {}, role = {}, accountId = {}, platform = {}, status = {}",
                 tenantId, currency, role, result.getSn(), result.getPlatform(), result.getStatus());
+        AssertUtils.isTrue(result.getCurrency() == currency,
+                "平台资金账户币种不匹配，tenantId = {}, expectedCurrency = {}, actualCurrency = {}, role = {}, accountId = {}",
+                tenantId, currency, result.getCurrency(), role, result.getSn());
         return FundsAccountId.immutable(result.getSn(), result.getAccountType());
     }
 }

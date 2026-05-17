@@ -25,6 +25,7 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Route / Converter 测试支撑。
@@ -76,6 +77,26 @@ public final class FundsRouteTestSupport {
             @Override
             public FundsAccountId requireAccountId(Long tenantId, CurrencyIsoCode currency,
                                                    PlatformFundingAccountRole role) {
+                return FundsAccountId.immutable("platform_" + role.name().toLowerCase(),
+                        FundsSubjectType.FUNDING_ACCOUNT);
+            }
+        };
+    }
+
+    public static PlatformFundingAccountService platformFundingAccountServiceWithout(
+            Set<PlatformFundingAccountRole> missingRoles) {
+        return new PlatformFundingAccountService() {
+            @Override
+            public FundsAccountId requireAccountId(CurrencyIsoCode currency, PlatformFundingAccountRole role) {
+                return requireAccountId(TENANT_ID, currency, role);
+            }
+
+            @Override
+            public FundsAccountId requireAccountId(Long tenantId, CurrencyIsoCode currency,
+                                                   PlatformFundingAccountRole role) {
+                if (missingRoles.contains(role)) {
+                    throw new IllegalStateException("missing platform funding account: " + role);
+                }
                 return FundsAccountId.immutable("platform_" + role.name().toLowerCase(),
                         FundsSubjectType.FUNDING_ACCOUNT);
             }
