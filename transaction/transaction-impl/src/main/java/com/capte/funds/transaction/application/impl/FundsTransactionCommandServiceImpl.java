@@ -100,7 +100,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String feeRefund(FundsTransactionFeeRefundRequest request, WindOperator operator) {
+    public String refundFee(FundsTransactionFeeRefundRequest request, WindOperator operator) {
         return execute(directTransactionInstructionConverter.convertToFeeRefundInstruction(request, operator));
     }
 

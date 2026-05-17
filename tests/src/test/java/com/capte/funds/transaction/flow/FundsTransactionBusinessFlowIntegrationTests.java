@@ -229,7 +229,7 @@ class FundsTransactionBusinessFlowIntegrationTests {
         assertEntriesForSubject(refundTransaction, merchant, LedgerSubjectCode.SETTLEMENT);
         assertNoEntriesForSubject(refundTransaction, fee);
 
-        feeRefund(user, 5L, paySn, "TOPUP_PAY_FEE_REFUND_FEE_REFUND");
+        refundFee(user, 5L, paySn, "TOPUP_PAY_FEE_REFUND_FEE_REFUND");
         BalanceSnapshot afterFeeRefund = snapshot(balances(user, merchant, fee, cashMappingAccount(),
                 prepaymentAccount()));
         assertOnlyBalanceDeltas(afterRefund, afterFeeRefund,
@@ -695,8 +695,8 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setDescription("refund"), WindOperator.system());
     }
 
-    private void feeRefund(FundsAccountId accountId, long amount, String feeTransactionSn, String businessSn) {
-        service.feeRefund(new FundsTransactionFeeRefundRequest()
+    private void refundFee(FundsAccountId accountId, long amount, String feeTransactionSn, String businessSn) {
+        service.refundFee(new FundsTransactionFeeRefundRequest()
                 .setAccountId(accountId)
                 .setAmount(amount(amount))
                 .setFeeSourceTransactionSn(feeTransactionSn)

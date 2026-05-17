@@ -338,7 +338,7 @@ class FundsTransactionCommandServiceImplTests extends FundsTransactionCommandSer
         transactionQueryService.routeSnapshots.put("FEE_TX_00000001",
                 new DefaultRouteSnapshotFactory().createSnapshot(route()));
 
-        service.feeRefund(new FundsTransactionFeeRefundRequest()
+        service.refundFee(new FundsTransactionFeeRefundRequest()
                 .setAccountId(payer)
                 .setAmount(amount(30L))
                 .setFeeSourceTransactionSn("FEE_TX_00000001")

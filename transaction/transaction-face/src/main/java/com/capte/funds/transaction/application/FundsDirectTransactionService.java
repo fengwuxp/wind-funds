@@ -78,7 +78,7 @@ public interface FundsDirectTransactionService {
      * @param operator 操作人
      * @return 交易流水号
      */
-    String feeRefund(FundsTransactionFeeRefundRequest request, WindOperator operator);
+    String refundFee(FundsTransactionFeeRefundRequest request, WindOperator operator);
 
 
 }

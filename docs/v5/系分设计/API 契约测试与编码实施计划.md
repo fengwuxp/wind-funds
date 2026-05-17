@@ -343,7 +343,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 
 | 服务 | 服务门面单元测试必须覆盖 | 业务组合集成测试必须覆盖 |
 | --- | --- | --- |
-| `FundsDirectTransactionService` | `topup/pay/transfer/withdraw/refund/fee/feeRefund` 的指令类型、事件、参与方、route leg、显式 `TransactionAmount`、`FeeSpec`、本金/费用汇总、幂等和失败不入编排；`feeRefund` 必须引用原手续费事实所在交易。 | `充值 -> 付款 -> 退款`、`充值 -> 冻结 -> 提现`、`A 充值 -> 转给 B -> B 付款 -> B 提现`、`付款含手续费 -> 本金退款 -> 费用退款`。 |
+| `FundsDirectTransactionService` | `topup/pay/transfer/withdraw/refund/fee/refundFee` 的指令类型、事件、参与方、route leg、显式 `TransactionAmount`、`FeeSpec`、本金/费用汇总、幂等和失败不入编排；`refundFee` 必须引用原手续费事实所在交易。 | `充值 -> 付款 -> 退款`、`充值 -> 冻结 -> 提现`、`A 充值 -> 转给 B -> B 付款 -> B 提现`、`付款含手续费 -> 本金退款 -> 费用退款`。 |
 | `FundsAuthorizationTransactionService` | `authorize/reversal/settle/authRefund/chargeback` 的原交易引用、route replay、授权拒绝无 posting、部分撤销/部分结算/部分退款、共享卡多主体、拒付上限和 `LIMIT` 红线。 | `交易问询 -> 部分撤销 -> 部分结算 -> 部分退款`、`交易问询 -> 授权拒付`、授权交易直接结算、资金账户/共享卡/预算组组合授权。 |
 | `FundsBalanceControlService` | `freeze/unfreeze/adjust` 的冻结引用、多次解冻、资金账户余额调账、信用额度调额、预算组调额、受控负数、治理上下文和无 FX 边界。 | `一次冻结多次解冻`、资金账户调额、信用账户额度调额、预算组预算调额，以及与提现、授权链路组合后的余额桶回归。 |
 
