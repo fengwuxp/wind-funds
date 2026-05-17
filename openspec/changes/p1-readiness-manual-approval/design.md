@@ -45,6 +45,15 @@ flowchart TD
 3. 对账阻断规则影响自动清算、结算或出款。
 4. 报表重算影响已发布财务或商户报表。
 
+### Future Change Split
+
+| 未来 change | 范围 | 来源事实 | 先行测试 | 审批门禁 |
+| --- | --- | --- | --- | --- |
+| `p1-clearing-batch` | `ClearingCandidate`、`ClearingBatch`、`ClearingItem`、候选版本和排除原因。 | `CLEARING_BATCH`，字段至少包含 batchSn、version、policyCode、policyVersion、operator、approvalRef。 | `MerchantClearingBatchServiceTests`、重复清算失败、阻断差错排除候选。 | DDL、清算确认入账、重跑补差。 |
+| `p1-settlement-payout` | `SettlementOrder`、`SettlementLine`、`PayoutOrder`、出款回单和失败回退。 | `SETTLEMENT_ORDER`、`PAYOUT_ORDER`，保留结算单版本、出款单流水和外部回单引用。 | `SettlementOrderServiceTests`、`PayoutResultServiceTests`、外部受理不等于成功、失败只回退一次。 | 出款、出款成功入账、失败回退、DDL。 |
+| `p1-reconciliation-exception` | `ReconciliationBatch`、`ReconciliationException`、匹配维度、阻断规则和处理动作。 | `RECONCILIATION_EXCEPTION`，保留 exceptionSn、differenceType、responsibleParty、evidenceRef、approvalRef。 | `ReconciliationMatchingServiceTests`、`ReconciliationExceptionAdjustmentTests`、差错不直接改历史 entry。 | 差错调账、阻断规则、挂账认领、DDL。 |
+| `p1-reporting-readonly` | `ReportSnapshot`、报表口径版本、重算任务和只读报表边界。 | `REPORT_SNAPSHOT` 只作为报表版本引用，不触发资金入账。 | 报表边界测试、已发布报表重算版本化、报表不反写事实。 | 影响已发布财务/商户报表的正式重算。 |
+
 ## Workstream B: FX Operations
 
 ### Scope
@@ -65,6 +74,14 @@ P1 FX operations 只处理业务层或外汇域已经显式决策后的事实，
 2. 换汇执行、跨境付款、退汇或监管报送进入正式写入路径。
 3. 任何把错币种交易从“失败或差错”改为“自动换汇后入账”的行为。
 
+### Future Change Split
+
+| 未来 change | 范围 | 来源事实 | 先行测试 | 审批门禁 |
+| --- | --- | --- | --- | --- |
+| `p1-fx-quote-lock` | 报价、锁价、有效期、用户确认、审批和报价失效。 | `FX_QUOTE`、`FX_QUOTE_LOCK`，保留 quoteId、rateId、expiresAt、confirmedAt、approvalRef。 | `FxQuoteExecutionTests` 中报价过期、缺确认、缺审批失败。 | DDL、报价锁定影响真实交易。 |
+| `p1-fx-execution-result` | 换汇执行结果、外部回单、费用、汇差和回补路径。 | `FX_EXECUTION`，保留 executionSn、externalRef、originalAmount、targetAmount、feeAmount、gainLossAmount。 | 换汇结果金额可解释、费用和汇损益不混入本金 route。 | FX execution 正式写入、跨境付款、退汇。 |
+| `p1-cross-border-compliance` | 跨境材料、真实性、数据跨境、监管或机构报送任务。 | `REGULATORY_REPORT_TASK` 或合规材料引用，不作为资金入账事实。 | `CrossBorderComplianceBoundaryTests`、`RegulatoryReportingRetryTests`。 | 监管报送、跨境数据、外部机构正式提交。 |
+
 ## Workstream C: Archive, Replay and Metrics Governance
 
 ### Scope
@@ -83,6 +100,16 @@ P1 FX operations 只处理业务层或外汇域已经显式决策后的事实，
 1. 新增 checkpoint、watermark、manifest、replay、metric 相关 DDL。
 2. 手动归档、冷热移动、历史数据重建、正式视图重放或指标重算。
 3. 任何删除、迁移、修复历史资金事实或账本事实的方案。
+
+### Future Change Split
+
+| 未来 change | 范围 | 来源事实 | 先行测试 | 审批门禁 |
+| --- | --- | --- | --- | --- |
+| `p1-balance-checkpoint-watermark` | `BalanceCheckpoint`、`BalanceProjectionWatermark`、摘要和水位推进。 | `BALANCE_WATERMARK_TASK`，保留 batchNo、previousWatermark、targetWatermark、digest。 | `BalanceWatermarkAdvanceTests`、失败时水位不推进。 | DDL、水位正式推进、历史数据扫描。 |
+| `p1-archive-manifest` | `ArchiveManifest`、归档预检查、清单、校验和冷热位置。 | `ARCHIVE_MANIFEST`，保留 archiveNo、cutoffTime、watermarkTime、approvalRef。 | `BalanceProjectionArchiveContractTests`、cutoff 晚于水位失败、缺检查点失败。 | 手动归档、冷热移动、DDL。 |
+| `p1-balance-rebuild` | 余额重建任务、差异报告和修复任务引用。 | `BALANCE_REBUILD_TASK`，不作为入账事实，只产生差异和后续修复建议。 | checkpoint + hot entries 重建；缺 manifest/digest 失败；不从视图反推余额。 | 正式余额修复、修数、回填。 |
+| `p1-transaction-view-replay` | 交易视图有界重放、游标、差异和 apply 模式。 | `TRANSACTION_VIEW_REPLAY_TASK`，只写读模型或差异报告。 | `TransactionViewReplayRangeTests`、无范围失败、apply 不写 ledger/transaction/frozen facts。 | 正式 apply、跨表大范围重放。 |
+| `p1-metric-governance` | `MetricWatermark`、`MetricSnapshot`、指标口径版本和重算。 | `METRIC_WATERMARK_TASK`，只驱动指标快照，不入账。 | `MetricWatermarkTests`、指标失败不推进水位、不改事实。 | 指标大范围回填、正式报表重算。 |
 
 ## Approval Packet
 

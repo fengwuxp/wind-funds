@@ -8,7 +8,7 @@
 
 ## 2. Clearing and Reconciliation Readiness
 
-- [ ] Split clearing/reconciliation implementation into separate future changes:
+- [x] Split clearing/reconciliation implementation into separate future changes:
   - clearing candidates and clearing batch.
   - settlement order and payout order.
   - reconciliation batch, exception and adjustment.
@@ -24,7 +24,7 @@
 
 ## 3. FX Operations Readiness
 
-- [ ] Split FX operations into separate future changes:
+- [x] Split FX operations into separate future changes:
   - quote and quote lock.
   - execution result and external evidence.
   - fees, gain/loss and reporting.
@@ -38,7 +38,7 @@
 
 ## 4. Archive, Replay and Metrics Readiness
 
-- [ ] Split archive governance into separate future changes:
+- [x] Split archive governance into separate future changes:
   - `BalanceCheckpoint` and `BalanceProjectionWatermark`.
   - `ArchiveManifest` and manual archive precheck.
   - balance rebuild task and difference report.
