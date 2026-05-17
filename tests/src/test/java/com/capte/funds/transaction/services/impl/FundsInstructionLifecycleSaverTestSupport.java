@@ -1,5 +1,6 @@
 package com.capte.funds.transaction.services.impl;
 
+import com.capte.funds.route.DefaultRouteSnapshotFactory;
 import com.capte.funds.support.FundsAccountServiceTestSupport;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.dal.entities.FundsTransaction;
@@ -53,6 +54,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 final class FundsInstructionLifecycleSaverTestSupport {
@@ -147,6 +149,10 @@ final class FundsInstructionLifecycleSaverTestSupport {
                 .description(snapshot.getDescription())
                 .contextVariables(snapshot.getContextVariables())
                 .build();
+    }
+
+    static RouteSnapshotSpec routeSnapshot(ResolvedRouteSpec route) {
+        return new DefaultRouteSnapshotFactory().createSnapshot(route);
     }
 
     static Map<String, Object> queryValues(QueryWrapper query) {
@@ -252,9 +258,49 @@ final class FundsInstructionLifecycleSaverTestSupport {
         return new BeforePostingFixture(saver, insertedTransaction, insertedDetails);
     }
 
+    static BeforePostingReplayFixture beforePostingReplayFixture(ResolvedRouteSpec route) {
+        BeforePostingFixture fixture = beforePostingSaver();
+        RouteSnapshotSpec snapshot = routeSnapshot(route);
+        fixture.saver().beforePosting(new SimpleInstruction(), route, snapshot);
+        return new BeforePostingReplayFixture(
+                fixture.insertedTransaction(),
+                fixture.insertedDetails(),
+                beforePostingReuseSaver(fixture.insertedTransaction(), fixture.insertedDetails()),
+                snapshot
+        );
+    }
+
+    private static DefaultFundsInstructionLifecycleSaver beforePostingReuseSaver(
+            AtomicReference<FundsTransaction> insertedTransaction,
+            List<FundsTransactionDetail> insertedDetails) {
+        AtomicInteger detailQueryIndex = new AtomicInteger();
+        return newLifecycleSaver(
+                FundsAccountServiceTestSupport.mapper(
+                        FundsTransactionMapper.class,
+                        entity -> {
+                            throw new UnsupportedOperationException("insertSelective");
+                        },
+                        query -> insertedTransaction.get()
+                ),
+                FundsAccountServiceTestSupport.mapper(
+                        FundsTransactionDetailMapper.class,
+                        entity -> {
+                            throw new UnsupportedOperationException("insertSelective");
+                        },
+                        query -> insertedDetails.get(detailQueryIndex.getAndIncrement())
+                )
+        );
+    }
+
     record BeforePostingFixture(DefaultFundsInstructionLifecycleSaver saver,
                                 AtomicReference<FundsTransaction> insertedTransaction,
                                 List<FundsTransactionDetail> insertedDetails) {
+    }
+
+    record BeforePostingReplayFixture(AtomicReference<FundsTransaction> insertedTransaction,
+                                      List<FundsTransactionDetail> insertedDetails,
+                                      DefaultFundsInstructionLifecycleSaver reuseSaver,
+                                      RouteSnapshotSpec snapshot) {
     }
 
     static FundsTransaction directTransaction(DefaultFundsTransactionType transactionType) {
