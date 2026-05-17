@@ -34,6 +34,7 @@ import com.capte.funds.transaction.converter.FundsAuthorizationInstructionConver
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.capte.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
+import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
@@ -327,22 +328,89 @@ class FundsTransactionBusinessFlowIntegrationTests {
         assertPostedTransactions(5);
     }
 
+    /**
+     * 场景：运营在同一批次内对普通资金账户、信用账户和预算组做调账/调额。
+     * 输入：资金账户调增 30、信用账户可用额度调增 100、预算组可用预算调减 40。
+     * 输出：资金账户 AVAILABLE、平台 ADJUSTMENT、信用/预算 LIMIT 与 AVAILABLE 控制桶。
+     * 预期：普通资金调账通过平台 ADJUSTMENT 平衡，信用/预算只在自身控制桶内调整。
+     * 红线：普通资金调账不得触碰 LIMIT，LIMIT 只出现在 LIMIT_ADJUST 路径。
+     */
+    @Test
+    void testFundingCreditBudgetAdjustShouldKeepControlBoundaries() {
+        FundsAccountId funding = fundingAccount("funding_adjust_user");
+        FundsAccountId credit = creditAccount("credit_001");
+        FundsAccountId budgetGroup = budgetGroup("budget_001");
+        FundsAccountId adjustment = adjustmentAccount();
+        BalanceSnapshot before = snapshot(balances(funding, credit, budgetGroup, adjustment));
+
+        adjust(funding, 30L, true, "ADJUST", "ADJUST_COMBO_FUNDING");
+        BalanceSnapshot afterFundingAdjust = snapshot(balances(funding, credit, budgetGroup, adjustment));
+        assertOnlyBalanceDeltas(before, afterFundingAdjust,
+                delta(funding, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(adjustment, LedgerSubjectCode.ADJUSTMENT, -30L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(budgetGroup, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(budgetGroup, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY));
+        LedgerTransactionSpec fundingAdjust = ledgerBook.postedTransactions.getFirst();
+        assertEntriesForSubject(fundingAdjust, funding, LedgerSubjectCode.AVAILABLE);
+        assertEntriesForSubject(fundingAdjust, adjustment, LedgerSubjectCode.ADJUSTMENT);
+        assertNoLedgerSubject(fundingAdjust, LedgerSubjectCode.LIMIT);
+
+        adjust(credit, 100L, true, "LIMIT", "ADJUST_COMBO_CREDIT");
+        BalanceSnapshot afterCreditAdjust = snapshot(balances(funding, credit, budgetGroup, adjustment));
+        assertOnlyBalanceDeltas(afterFundingAdjust, afterCreditAdjust,
+                delta(funding, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(adjustment, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, -100L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(budgetGroup, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(budgetGroup, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY));
+        LedgerTransactionSpec creditAdjust = ledgerBook.postedTransactions.get(1);
+        assertEntriesForSubject(creditAdjust, credit, LedgerSubjectCode.LIMIT, LedgerSubjectCode.AVAILABLE);
+        assertNoEntriesForSubject(creditAdjust, adjustment);
+
+        adjust(budgetGroup, 40L, false, "BUDGET", "ADJUST_COMBO_BUDGET");
+        BalanceSnapshot afterBudgetAdjust = snapshot(balances(funding, credit, budgetGroup, adjustment));
+        assertOnlyBalanceDeltas(afterCreditAdjust, afterBudgetAdjust,
+                delta(funding, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(adjustment, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY),
+                delta(credit, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(budgetGroup, LedgerSubjectCode.LIMIT, 40L, CURRENCY),
+                delta(budgetGroup, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY));
+        LedgerTransactionSpec budgetAdjust = ledgerBook.postedTransactions.get(2);
+        assertEntriesForSubject(budgetAdjust, budgetGroup, LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.LIMIT);
+        assertNoEntriesForSubject(budgetAdjust, adjustment);
+
+        assertPostedTransactions(3);
+    }
+
     private void seedLedgers() {
         List<FundsAccountId> fundingAccounts = List.of(
                 fundingAccount("funding_user"),
                 fundingAccount("funding_user_a"),
                 fundingAccount("funding_user_b"),
-                fundingAccount("merchant_001")
+                fundingAccount("merchant_001"),
+                fundingAccount("funding_adjust_user")
         );
         fundingAccounts.forEach(accountId -> {
             ledgerBook.ensureLedger(accountId, LedgerSubjectCode.AVAILABLE, 0L);
             ledgerBook.ensureLedger(accountId, LedgerSubjectCode.FROZEN, 0L);
             ledgerBook.ensureLedger(accountId, LedgerSubjectCode.SETTLEMENT, 0L);
         });
+        FundsAccountId credit = creditAccount("credit_001");
+        ledgerBook.ensureLedger(credit, LedgerSubjectCode.LIMIT, 100L);
+        ledgerBook.ensureLedger(credit, LedgerSubjectCode.AVAILABLE, 0L);
+        FundsAccountId budgetGroup = budgetGroup("budget_001");
+        ledgerBook.ensureLedger(budgetGroup, LedgerSubjectCode.LIMIT, 0L);
+        ledgerBook.ensureLedger(budgetGroup, LedgerSubjectCode.AVAILABLE, 100L);
+        ledgerBook.ensureLedger(budgetGroup, LedgerSubjectCode.AUTHORIZATION, 0L);
         ledgerBook.ensureLedger(cashMappingAccount(), LedgerSubjectCode.CASH, 10_000L);
         ledgerBook.ensureLedger(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L);
         ledgerBook.ensureLedger(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L);
         ledgerBook.ensureLedger(feeAccount(), LedgerSubjectCode.FEE, 0L);
+        ledgerBook.ensureLedger(adjustmentAccount(), LedgerSubjectCode.ADJUSTMENT, 0L);
     }
 
     private void topup(FundsAccountId accountId, long amount, String businessSn) {
@@ -429,6 +497,23 @@ class FundsTransactionBusinessFlowIntegrationTests {
                 .setDescription("withdraw"), WindOperator.system());
     }
 
+    private void adjust(FundsAccountId accountId,
+                        long amount,
+                        boolean increase,
+                        String businessScene,
+                        String businessSn) {
+        service.adjust(new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setIncrease(increase)
+                .setBusinessScene(businessScene)
+                .setBusinessSn(businessSn)
+                .setAdjustReason("adjust reason")
+                .setAdjustEvidenceRef("EVIDENCE_" + businessSn)
+                .setApprovalRef("APPROVAL_" + businessSn)
+                .setDescription("adjust"), WindOperator.system());
+    }
+
     private List<FundsSubjectBalanceDTO> balances(FundsAccountId... accountIds) {
         return List.of(accountIds).stream()
                 .map(ledgerBook::balance)
@@ -444,8 +529,51 @@ class FundsTransactionBusinessFlowIntegrationTests {
         assertThat(lifecycleSaver.succeededLedgerTransactionSns).hasSize(expectedSize);
     }
 
+    private static void assertEntriesForSubject(LedgerTransactionSpec transaction,
+                                                FundsAccountId subjectRef,
+                                                LedgerSubjectCode... subjectCodes) {
+        assertThat(entriesOf(transaction).stream()
+                .filter(entry -> Objects.equals(entry.getSubjectId(), subjectRef.id())
+                        && Objects.equals(entry.getSubjectType(), subjectRef.type()))
+                .map(LedgerEntrySpec::getLedgerSubjectCode)
+                .toList())
+                .containsExactlyInAnyOrder(subjectCodes);
+    }
+
+    private static void assertNoEntriesForSubject(LedgerTransactionSpec transaction,
+                                                  FundsAccountId subjectRef) {
+        assertThat(entriesOf(transaction).stream()
+                .filter(entry -> Objects.equals(entry.getSubjectId(), subjectRef.id())
+                        && Objects.equals(entry.getSubjectType(), subjectRef.type()))
+                .toList())
+                .isEmpty();
+    }
+
+    private static void assertNoLedgerSubject(LedgerTransactionSpec transaction,
+                                              LedgerSubjectCode subjectCode) {
+        assertThat(entriesOf(transaction).stream()
+                .map(LedgerEntrySpec::getLedgerSubjectCode)
+                .toList())
+                .doesNotContain(subjectCode);
+    }
+
+    private static List<LedgerEntrySpec> entriesOf(LedgerTransactionSpec transaction) {
+        return transaction.getPostingPlans().stream()
+                .map(LedgerPostingPlanSpec::getEntries)
+                .flatMap(List::stream)
+                .toList();
+    }
+
     private static FundsAccountId fundingAccount(String accountId) {
         return FundsAccountId.immutable(accountId, FundsSubjectType.FUNDING_ACCOUNT.name());
+    }
+
+    private static FundsAccountId creditAccount(String accountId) {
+        return FundsAccountId.immutable(accountId, FundsSubjectType.CREDIT_ACCOUNT.name());
+    }
+
+    private static FundsAccountId budgetGroup(String accountId) {
+        return FundsAccountId.immutable(accountId, FundsSubjectType.BUDGET_GROUP.name());
     }
 
     private static FundsAccountId cashMappingAccount() {
@@ -462,6 +590,10 @@ class FundsTransactionBusinessFlowIntegrationTests {
 
     private static FundsAccountId feeAccount() {
         return platformAccount(PlatformFundingAccountRole.FEE);
+    }
+
+    private static FundsAccountId adjustmentAccount() {
+        return platformAccount(PlatformFundingAccountRole.ADJUSTMENT);
     }
 
     private static FundsAccountId platformAccount(PlatformFundingAccountRole role) {
