@@ -143,6 +143,7 @@
   - [x] Split subject-balance query initialization scenarios from `DefaultFundsSubjectBalanceQueryTests` into `DefaultFundsSubjectBalanceQueryInitializationTests`.
   - [x] Split frozen-order compatibility and schema contract scenarios from `FundsFrozenOrderServiceImplTests` into `FundsFrozenOrderCompatibilityContractTests`.
   - [x] Extract a shared before-posting lifecycle fixture from `DefaultFundsInstructionLifecycleBeforePostingTests` into `FundsInstructionLifecycleSaverTestSupport`.
+  - [x] Split ledger posting amount and exchange-rate validation scenarios from `DefaultLedgerTransactionPostingValidationTests` into `DefaultLedgerTransactionPostingAmountValidationTests`.
   - [x] Extract shared delegating lifecycle-recorder fixtures from `DelegatingFundsInstructionLifecycleRecorderTests` into `DelegatingFundsInstructionLifecycleRecorderTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
