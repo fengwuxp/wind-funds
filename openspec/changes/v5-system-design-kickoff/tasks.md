@@ -186,7 +186,7 @@
 - [x] Implement missing current-version business-combination integration tests for direct transaction, authorization and balance-control flows.
 - [x] Migrate test package names in small batches without mixing business-logic changes.
 - [ ] Execute P0-ROUTE route-layer CR and scenario-coverage tasks.
-  - [ ] Add `CompositeRouteResolver` tests for single match, multiple-match priority, no match, `Ordered` sorting, self-exclusion and replay resolver priority.
+  - [x] Add `CompositeRouteResolver` tests for single match, multiple-match ambiguity failure, no match, `Ordered` support evaluation, self-exclusion and replay resolver mutual-exclusion priority.
   - [ ] Add route replay support tests for direct refund, fee refund, authorization reversal, authorization settlement, authorization refund, chargeback, unfreeze, missing reference, missing original route snapshot, empty legs, partial missing leg ids and external transaction non-replay.
   - [ ] Pin the authorization follow-up default rule: reversal, settlement and authorization refund require `reference` and must use replay; missing reference must not fall back to a normal authorization route.
   - [ ] Add direct, balance-control and authorization route scenario coverage for platform-account gaps, wrong-currency platform accounts, controlled negative balance, credit limit adjustment, budget limit adjustment, shared-card and multi-subject authorization paths.
