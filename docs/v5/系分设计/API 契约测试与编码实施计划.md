@@ -217,7 +217,8 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | `DefaultLedgerTransactionPostingServiceImplTests` | L2 | 成功入账、不平衡失败、外部主体失败、账本缺失失败。 | 已有 |
 | `LedgerBalanceProjectionServiceImplTests` | L1/L2 | normal balance、禁止负数、受控负数、投影失败路径。 | 已有 |
 | `FundsTransactionLedgerBalanceAssertionsTests` | L1/L2 | 核心资金变化的余额桶 delta 和 posting 平衡。 | 已有 |
-| `FundsTransactionBusinessFlowIntegrationTests` | L2 | 充值 -> 付款 -> 退款，充值 -> 冻结 -> 提现，A -> B -> 商户 -> 提现组合链路。 | 已有 |
+| `FundsTransactionBusinessFlowIntegrationTests` | L2 | 充值 -> 付款 -> 退款，充值 -> 冻结 -> 提现，A -> B -> 商户 -> 提现、资金/信用/预算调额和授权组合链路。 | 已有 |
+| `FundsTransactionFeeBusinessFlowTests` | L2 | 显式手续费付款、普通退款不退费、手续费退回和退费累计上限。 | 已有 |
 | `FundsTransactionOrchestrationFlowTests` | L2 | route resolver、orchestrator、recording posting service 编排链路。 | 已有 |
 | `FundsTransactionCommandServiceImplTests` | L2 | 交易门面、幂等、请求摘要、授权拒绝和逆向链路。 | 已有 |
 | `DefaultFundsInstructionLifecycleSaverTests` | L2 | 交易事实生命周期、引用事实回放、退款/拒付上限、冻结引用不回写消费。 | 已有 |
@@ -250,7 +251,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 清算后退款 | `PTDD-REF-003` | `FundsTransactionLedgerBalanceAssertionsTests` | L2 | 商户 `AVAILABLE` 减少，用户 `AVAILABLE` 增加；商户不足进入人工/负余额/追偿策略。 | 部分已有 |
 | 出款中或已出款后退款 | `PTDD-REF-004` | 后续退款/追偿服务测试 | L2/L3 | 不直接做 `SETTLEMENT -> 用户 AVAILABLE`；必须进入人工或追偿流程。 | 下版本 |
 | 手工直接退款 | `PTDD-REF-005` | `ManualRefundServiceTests` | L2 | 权限、审批、原因、凭证、额度缺失均失败；不得冒充原交易退款。 | 待补 |
-| 手续费退回 | `PTDD-REF-006` | `DefaultRouteReplayServiceTests`、`TransactionServiceAbilityDslJsonContractTests`、`FundsTransactionCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests` | L1/L2 | 普通退款不默认退费；费用退款只回放 fee leg。 | 服务层入口、业务组合与 replay 累计上限已补；按原 fee leg 已消费金额校验，避免多主体明细重复累计 |
+| 手续费退回 | `PTDD-REF-006` | `DefaultRouteReplayServiceTests`、`TransactionServiceAbilityDslJsonContractTests`、`FundsTransactionCommandServiceImplTests`、`FundsTransactionFeeBusinessFlowTests` | L1/L2 | 普通退款不默认退费；费用退款只回放 fee leg。 | 服务层入口、业务组合与 replay 累计上限已补；按原 fee leg 已消费金额校验，避免多主体明细重复累计 |
 | 授权成功 | `PTDD-AUTH-001` | `AuthorizationFundsInstructionRouteResolverTests`、`FundsTransactionLedgerBalanceAssertionsTests` | L1/L2 | 一个或多个主体 `AVAILABLE -> AUTHORIZATION`；多主体任一失败整体失败。 | 已有 |
 | 授权拒绝 | `PTDD-AUTH-002` | `TransactionServiceAbilityDslJsonContractTests`、`FundsTransactionCommandServiceImplTests` | L1/L2 | 保存拒绝事实；无 route、无 entry；不增加 `chargebackAmount`。 | 已有 |
 | 授权撤销 | `PTDD-AUTH-003` | `DefaultRouteReplayServiceTests` | L1/L2 | 基于原快照 `AUTHORIZATION -> AVAILABLE`；超剩余撤销失败。 | 已有 |
@@ -421,7 +422,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | Transaction service facade | `mvn -pl tests -am test -Dtest=FundsTransactionCommandServiceImplTests,FundsAuthorizationTransactionCommandServiceImplTests,FundsBalanceControlCommandServiceImplTests` |
 | Frozen order / balance control | `mvn -pl tests -am test -Dtest=FundsFrozenOrderServiceImplTests,DefaultFundsFrozenOrderLifecycleSaverTests,BalanceControlFundsInstructionRouteResolverTests` |
 | Wallet account capability | `mvn -pl tests -am test -Dtest=DefaultLedgerProfileServiceImplTests,DefaultFundsAccountQueryServiceImplTests,PlatformFundingAccountServiceImplTests,PlatformFundingAccountRoleTests,WalletLayerBoundaryTests` |
-| 资金变化组合链路 | `mvn -pl tests -am test -Dtest=FundsTransactionLedgerBalanceAssertionsTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionOrchestrationFlowTests` |
+| 资金变化组合链路 | `mvn -pl tests -am test -Dtest=FundsTransactionLedgerBalanceAssertionsTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionFeeBusinessFlowTests,FundsTransactionOrchestrationFlowTests` |
 | 架构边界 | `mvn -pl tests -am test -Dtest=LedgerLayerBoundaryTests,RouteLayerBoundaryTests,WalletLayerBoundaryTests` |
 | 全量基础验证 | `mvn compile`，再按变更范围执行聚焦测试，最后执行团队认可的静态扫描。 |
 
@@ -465,7 +466,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 2 | P0-CTRL 控制账户调额 | `wallets` 规格承接信用额度和预算组控制语义；`transaction-layer` 规格承接 `FundsBalanceControlService#adjust` 入口。 | 已按信用额度调增/调减、预算调增/调减、受控负数和 `LIMIT` 红线测试驱动完成。 | `FundsTransactionCommandServiceImplTests`、`BalanceControlFundsInstructionRouteResolverTests`、`just compile`。 | 已闭合，后续只保留回归保护。 |
 | 3 | P0-E Wallets 账户与余额控制 | `wallets` 规格继续保护账户 profile、平台角色、冻结事实、受控负余额和预算治理。 | 保持 wallet 是账户能力层，不承载交易命令；新增资金变化必须先补余额断言。 | `DefaultLedgerProfileServiceImplTests`、`PlatformFundingAccountServiceImplTests`、`WalletLayerBoundaryTests`、`ControlAccountLedgerRulesTests`。 | 已闭合，后续只保留回归保护。 |
 | 4 | P0-G 命名治理残余 | OpenSpec 不直接驱动纯命名，但公共契约名称变化必须同步 spec delta。 | 已按账本入账结果、生命周期记录器、余额控制服务和账户类型语义轴分批治理；包名统一保留为独立重构轮次。 | `WalletLayerBoundaryTests`、`FundsTransactionServiceApiContractTests`、`DefaultFundsAccountTypeTests`、`PlatformFundingAccountRoleTests`。 | 已闭合，后续只保留回归保护。 |
-| 5 | P0-H-API 三类服务测试矩阵 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 已补 `FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单测和业务组合集成测试矩阵。 | `FundsTransactionCommandServiceImplTests`、`FundsAuthorizationTransactionCommandServiceImplTests`、`FundsBalanceControlCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests`。 | 已完成：三类服务门面与业务组合矩阵均已有回归测试。 |
+| 5 | P0-H-API 三类服务测试矩阵 | 测试治理不新增规格，但必须保持 PRD、DSL 和 OpenSpec 验收口径可追溯。 | 已补 `FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService` 的服务门面单测和业务组合集成测试矩阵。 | `FundsTransactionCommandServiceImplTests`、`FundsAuthorizationTransactionCommandServiceImplTests`、`FundsBalanceControlCommandServiceImplTests`、`FundsTransactionBusinessFlowIntegrationTests`、`FundsTransactionFeeBusinessFlowTests`。 | 已完成：三类服务门面与业务组合矩阵均已有回归测试。 |
 | 6 | P0-H-PKG 测试包名对齐 | OpenSpec 不直接约束测试包名，但包名必须反映能力归属，避免 wallet/transaction 历史语义漂移。 | 小批次迁移 `com.capte.funds.transaction`、`com.capte.funds.transaction.flow` 到 `application`、`application.flow`、`contract`、`boundary`、`accounting`、`ledger`、`support` 等目标包名，不夹带业务逻辑。 | 聚焦执行被迁移测试类，必要时补 `rg "package com.capte.funds.transaction"` 人工复核。 | 已完成：交易根包测试已清空，门面服务、指令编排、契约、边界、账务口径、账本断言、共享 support 和业务组合 flow 测试均按能力归属迁移。 |
 | 7 | P1-CLR 清结算与对账 | `clearing-reconciliation` 需要补产品层 `SettlementPolicy`、候选、批次、结算单、出款单、差错单 spec delta。 | 下版本再做模型、契约测试和批处理实现，不直接进入当前 CAD 批次。 | 进入清结算集成测试、对账差错测试和 Manual Approval。 | 下版本。 |
 | 8 | P1-FX / P1-ARC 外汇运营与归档治理 | FX 报价、锁价、审批、费用、汇损益以及 archive/checkpoint/watermark 需要独立 change。 | 下版本隔离领域对象、余额快照、归档账目和只读投影边界，避免交易层重新自动换汇或报表反写账本。 | 需要 DDL 或数据修复时进入 Manual Approval。 | 下版本。 |
@@ -501,7 +502,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 4. `FeeSpec#feeType` 使用字符串 code 表达费用类型；`DefaultFeeType` 只作为默认 code 集暴露给上层使用，业务可扩展 `SMALL_AMOUNT_FEE`、`AUTH_DECLINE_FEE`、`CROSS_BORDER_FEE` 等费用类型。
 5. 直接交易附带手续费和独立手续费交易都必须支持资金账户、信用账户和预算组。信用账户或预算组手续费优先消耗其 `AVAILABLE` 控制桶，并继续受受控负余额、限额、审批或风控策略约束；手续费不得混入本金 route leg、商户本金或通道成本。
 
-当前验证：`mvn -pl tests -am test -Dtest=FundsDirectTransactionInstructionConverterTests,FundsAuthorizationInstructionConverterTests,FundsBalanceControlInstructionConverterTests,FundsTransactionCommandServiceImplTests,TransferFundsInstructionRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,DefaultRouteReplayServiceTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionOrchestrationFlowTests`。
+当前验证：`mvn -pl tests -am test -Dtest=FundsDirectTransactionInstructionConverterTests,FundsAuthorizationInstructionConverterTests,FundsBalanceControlInstructionConverterTests,FundsTransactionCommandServiceImplTests,TransferFundsInstructionRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,DefaultRouteReplayServiceTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionFeeBusinessFlowTests,FundsTransactionOrchestrationFlowTests`。
 
 退出条件：`PTDD-RAIL-FX-003`、`PTDD-CTRL-006`、`PTDD-LEDGER-001`、`AT-BASE-038`、`AT-BASE-039`、`RED-014A`、`RED-014B`、`RED-019`、`RED-020` 对应测试或明确测试计划已经落入 7.2/7.6 清单。
 

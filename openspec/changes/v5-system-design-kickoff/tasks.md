@@ -113,6 +113,7 @@
   - [x] Split wallet layer boundary contract, instrument and implementation ownership scenarios from `WalletLayerBoundaryTests` into dedicated boundary tests with shared `WalletLayerBoundaryTestSupport`.
   - [x] Split funds instruction lifecycle before-posting and success-summary scenarios from `DefaultFundsInstructionLifecycleSaverTests` into dedicated lifecycle saver tests.
   - [x] Split route replay authorization, direct refund and replay-policy scenarios from `DefaultRouteReplayServiceTests` into dedicated route replay tests.
+  - [x] Split fee business-flow scenarios from `FundsTransactionBusinessFlowIntegrationTests` into `FundsTransactionFeeBusinessFlowTests` with shared `FundsTransactionBusinessFlowTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
