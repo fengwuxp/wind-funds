@@ -135,6 +135,7 @@
   - [x] Split shared-card authorization route scenarios from `AuthorizationFundsInstructionRouteResolverTests` into `AuthorizationSharedCardFundsInstructionRouteResolverTests` with shared `AuthorizationFundsInstructionRouteResolverTestSupport`.
   - [x] Split fee replay orchestration scenarios from `DefaultRoutedFundsInstructionOrchestratorReplayTests` into `DefaultRoutedFundsInstructionOrchestratorFeeReplayTests`.
   - [x] Split direct-transaction command validation scenarios from `FundsTransactionCommandServiceImplTests` into `FundsTransactionCommandValidationTests`.
+  - [x] Split subject-balance query validation scenarios from `DefaultFundsSubjectBalanceQueryTests` into `DefaultFundsSubjectBalanceQueryValidationTests`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
