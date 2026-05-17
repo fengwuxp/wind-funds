@@ -194,4 +194,4 @@
   - [x] Refactor route leg construction, route constraint keys and subject-node construction to reduce duplicated private logic and overlong method parameters without changing face-layer contracts.
   - [x] Clean obsolete route constants, private methods and legacy compatibility branches only after focused route tests pass.
   - [x] Keep route-layer boundary tests proving route code does not write transaction facts, frozen-order facts, ledger facts, DAL mapper state or balance projections.
-- [ ] Keep P1 clearing/reconciliation, FX operations and archive governance behind separate OpenSpec changes and Harness manual approval gates when they introduce new objects, DDL or high-risk behavior.
+- [x] Create `p1-readiness-manual-approval` as the separate OpenSpec entry for P1 clearing/reconciliation, FX operations and archive governance; future implementation changes still require their own proposal/design/tasks/spec delta and Harness manual approval when they introduce new objects, DDL or high-risk behavior.
