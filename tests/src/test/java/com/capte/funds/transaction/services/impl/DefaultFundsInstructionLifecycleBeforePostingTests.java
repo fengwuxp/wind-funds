@@ -18,15 +18,15 @@ import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.capte.funds.transaction.services.impl.FundsInstructionLifecycleSaverTestSupport.BeforePostingFixture;
 import static com.capte.funds.transaction.services.impl.FundsInstructionLifecycleSaverTestSupport.SharedCardResolvedRoute;
 import static com.capte.funds.transaction.services.impl.FundsInstructionLifecycleSaverTestSupport.SimpleInstruction;
 import static com.capte.funds.transaction.services.impl.FundsInstructionLifecycleSaverTestSupport.SimpleResolvedRoute;
 import static com.capte.funds.transaction.services.impl.FundsInstructionLifecycleSaverTestSupport.TransactionTypeChangedInstruction;
+import static com.capte.funds.transaction.services.impl.FundsInstructionLifecycleSaverTestSupport.beforePostingSaver;
 import static com.capte.funds.transaction.services.impl.FundsInstructionLifecycleSaverTestSupport.newLifecycleSaver;
 import static com.capte.funds.transaction.services.impl.FundsInstructionLifecycleSaverTestSupport.queryValues;
 import static com.capte.funds.transaction.services.impl.FundsInstructionLifecycleSaverTestSupport.transaction;
@@ -42,54 +42,33 @@ class DefaultFundsInstructionLifecycleBeforePostingTests {
      */
     @Test
     void testLifecycleSaverShouldCreateOneTransactionAndManyParticipantDetails() {
-        AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
-        List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
-        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionMapper.class,
-                        entity -> {
-                            FundsTransaction transaction = (FundsTransaction) entity;
-                            transaction.setId(501L);
-                            insertedTransaction.set(transaction);
-                        },
-                        query -> null
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionDetailMapper.class,
-                        entity -> {
-                            FundsTransactionDetail detail = (FundsTransactionDetail) entity;
-                            detail.setId(502L + insertedDetails.size());
-                            insertedDetails.add(detail);
-                        },
-                        query -> null
-                )
-        );
+        BeforePostingFixture fixture = beforePostingSaver();
         FundsInstructionSpec instruction = new SimpleInstruction();
         ResolvedRouteSpec route = new SimpleResolvedRoute(1_000L);
         RouteSnapshotSpec snapshot = new DefaultRouteSnapshotFactory().createSnapshot(route);
 
-        FundsInstructionLifecycleResult result = saver.beforePosting(instruction, route, snapshot);
+        FundsInstructionLifecycleResult result = fixture.saver().beforePosting(instruction, route, snapshot);
 
         assertThat(result.getTransactionSn()).startsWith("FT");
         assertThat(result.getTransactionDetailSns()).hasSize(2);
         assertThat(result.isCompleted()).isFalse();
-        FundsTransaction transaction = insertedTransaction.get();
+        FundsTransaction transaction = fixture.insertedTransaction().get();
         assertThat(transaction.getTransactionMode()).isEqualTo(FundsTransactionMode.AUTHORIZATION);
         assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.PROCESSING);
         assertThat(transaction.getBusinessSn()).isEqualTo("AUTH_BUSINESS_0001");
         assertThat(transaction.getAuthorizedAmount()).isZero();
         assertThat(transaction.getRouteSnapshot()).isNotBlank();
-        assertThat(insertedDetails).hasSize(2);
-        assertThat(insertedDetails)
+        assertThat(fixture.insertedDetails()).hasSize(2);
+        assertThat(fixture.insertedDetails())
                 .extracting(FundsTransactionDetail::getTransactionSn)
                 .containsOnly(result.getTransactionSn());
-        assertThat(insertedDetails)
+        assertThat(fixture.insertedDetails())
                 .extracting(FundsTransactionDetail::getFundsEffectType)
                 .containsOnly(FundsEffectType.HOLD);
-        assertThat(insertedDetails)
+        assertThat(fixture.insertedDetails())
                 .extracting(FundsTransactionDetail::getStatus)
                 .containsOnly(FundsTransactionDetailStatus.PROCESSING);
-        assertThat(insertedDetails)
+        assertThat(fixture.insertedDetails())
                 .extracting(FundsTransactionDetail::getParticipantRole)
                 .containsExactlyInAnyOrder(RouteParticipantRole.AUTH_HOLDER,
                         RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT);
@@ -144,33 +123,12 @@ class DefaultFundsInstructionLifecycleBeforePostingTests {
      */
     @Test
     void testReplayOnceDetailShouldRecordConsumedReplayLegIds() {
-        AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
-        List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
-        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionMapper.class,
-                        entity -> {
-                            FundsTransaction transaction = (FundsTransaction) entity;
-                            transaction.setId(501L);
-                            insertedTransaction.set(transaction);
-                        },
-                        query -> null
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionDetailMapper.class,
-                        entity -> {
-                            FundsTransactionDetail detail = (FundsTransactionDetail) entity;
-                            detail.setId(502L + insertedDetails.size());
-                            insertedDetails.add(detail);
-                        },
-                        query -> null
-                )
-        );
+        BeforePostingFixture fixture = beforePostingSaver();
         ResolvedRouteSpec route = new SimpleResolvedRoute(1_000L, "SOURCE_LEG_001");
 
-        saver.beforePosting(new SimpleInstruction(), route, new DefaultRouteSnapshotFactory().createSnapshot(route));
+        fixture.saver().beforePosting(new SimpleInstruction(), route, new DefaultRouteSnapshotFactory().createSnapshot(route));
 
-        assertThat(insertedDetails)
+        assertThat(fixture.insertedDetails())
                 .extracting(FundsTransactionDetail::getContextVariables)
                 .allSatisfy(contextVariables -> assertThat(contextVariables)
                         .contains("\"replayConsumedLegIds\":[\"SOURCE_LEG_001\"]")
@@ -185,42 +143,21 @@ class DefaultFundsInstructionLifecycleBeforePostingTests {
      */
     @Test
     void testTransactionAmountShouldNotSumParticipantDetails() {
-        AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
-        List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
-        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionMapper.class,
-                        entity -> {
-                            FundsTransaction transaction = (FundsTransaction) entity;
-                            transaction.setId(501L);
-                            insertedTransaction.set(transaction);
-                        },
-                        query -> null
-                ),
-                FundsAccountServiceTestSupport.mapper(
-                        FundsTransactionDetailMapper.class,
-                        entity -> {
-                            FundsTransactionDetail detail = (FundsTransactionDetail) entity;
-                            detail.setId(502L + insertedDetails.size());
-                            insertedDetails.add(detail);
-                        },
-                        query -> null
-                )
-        );
+        BeforePostingFixture fixture = beforePostingSaver();
         ResolvedRouteSpec route = new SharedCardResolvedRoute(1_000L);
         RouteSnapshotSpec snapshot = new DefaultRouteSnapshotFactory().createSnapshot(route);
 
-        FundsInstructionLifecycleResult result = saver.beforePosting(new SimpleInstruction(), route, snapshot);
+        FundsInstructionLifecycleResult result = fixture.saver().beforePosting(new SimpleInstruction(), route, snapshot);
 
         assertThat(result.getTransactionDetailSns()).hasSize(3);
-        assertThat(insertedDetails)
+        assertThat(fixture.insertedDetails())
                 .extracting(FundsTransactionDetail::getParticipantRole)
                 .containsExactlyInAnyOrder(RouteParticipantRole.AUTH_HOLDER,
                         RouteParticipantRole.BUDGET_CONTROLLER,
                         RouteParticipantRole.REAL_FUNDING_SOURCE);
-        assertThat(insertedDetails)
+        assertThat(fixture.insertedDetails())
                 .extracting(FundsTransactionDetail::getAmount)
                 .containsOnly(1_000L);
-        assertThat(insertedTransaction.get().getAmount()).isEqualTo(1_000L);
+        assertThat(fixture.insertedTransaction().get().getAmount()).isEqualTo(1_000L);
     }
 }

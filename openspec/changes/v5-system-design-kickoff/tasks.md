@@ -142,6 +142,7 @@
   - [x] Split posting-plan entry validation scenarios from `DefaultLedgerPostingPlanValidationTests` into `DefaultLedgerPostingPlanEntryValidationTests`.
   - [x] Split subject-balance query initialization scenarios from `DefaultFundsSubjectBalanceQueryTests` into `DefaultFundsSubjectBalanceQueryInitializationTests`.
   - [x] Split frozen-order compatibility and schema contract scenarios from `FundsFrozenOrderServiceImplTests` into `FundsFrozenOrderCompatibilityContractTests`.
+  - [x] Extract a shared before-posting lifecycle fixture from `DefaultFundsInstructionLifecycleBeforePostingTests` into `FundsInstructionLifecycleSaverTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 

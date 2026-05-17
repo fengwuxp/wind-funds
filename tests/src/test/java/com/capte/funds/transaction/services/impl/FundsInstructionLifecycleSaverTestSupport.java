@@ -49,6 +49,7 @@ import org.jspecify.annotations.Nullable;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -223,6 +224,37 @@ final class FundsInstructionLifecycleSaverTestSupport {
             FundsTransactionMapper fundsTransactionMapper,
             FundsTransactionDetailMapper fundsTransactionDetailMapper) {
         return new DefaultFundsInstructionLifecycleSaver(fundsTransactionMapper, fundsTransactionDetailMapper);
+    }
+
+    static BeforePostingFixture beforePostingSaver() {
+        AtomicReference<FundsTransaction> insertedTransaction = new AtomicReference<>();
+        List<FundsTransactionDetail> insertedDetails = new ArrayList<>();
+        DefaultFundsInstructionLifecycleSaver saver = newLifecycleSaver(
+                FundsAccountServiceTestSupport.mapper(
+                        FundsTransactionMapper.class,
+                        entity -> {
+                            FundsTransaction transaction = (FundsTransaction) entity;
+                            transaction.setId(501L);
+                            insertedTransaction.set(transaction);
+                        },
+                        query -> null
+                ),
+                FundsAccountServiceTestSupport.mapper(
+                        FundsTransactionDetailMapper.class,
+                        entity -> {
+                            FundsTransactionDetail detail = (FundsTransactionDetail) entity;
+                            detail.setId(502L + insertedDetails.size());
+                            insertedDetails.add(detail);
+                        },
+                        query -> null
+                )
+        );
+        return new BeforePostingFixture(saver, insertedTransaction, insertedDetails);
+    }
+
+    record BeforePostingFixture(DefaultFundsInstructionLifecycleSaver saver,
+                                AtomicReference<FundsTransaction> insertedTransaction,
+                                List<FundsTransactionDetail> insertedDetails) {
     }
 
     static FundsTransaction directTransaction(DefaultFundsTransactionType transactionType) {
