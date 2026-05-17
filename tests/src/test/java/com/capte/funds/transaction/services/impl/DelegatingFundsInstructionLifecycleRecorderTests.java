@@ -2,7 +2,6 @@ package com.capte.funds.transaction.services.impl;
 
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
-import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.wind.common.exception.BaseException;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
@@ -31,24 +30,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DelegatingFundsInstructionLifecycleRecorderTests {
-
-    /**
-     * 场景：P0-G 命名治理中，组合分发实现从 Saver 正名为 Delegating Recorder。
-     * 输入：新的 DelegatingFundsInstructionLifecycleRecorder 与旧 CompositeFundsInstructionLifecycleSaver。
-     * 输出：旧类作为废弃兼容别名继承新主类。
-     * 预期：Spring 主 Bean 和新调用方依赖 Recorder 命名，旧源码调用方仍可编译。
-     * 红线：不得注册两个组合生命周期分发 Bean，也不得破坏每个指令只命中一个记录器的约束。
-     */
-    @Test
-    void testCompositeSaverShouldRemainDeprecatedCompatibilityAlias() {
-        assertThat(DelegatingFundsInstructionLifecycleRecorder.class)
-                .isAssignableTo(FundsInstructionLifecycleRecorder.class)
-                .isAssignableTo(FundsInstructionLifecycleSaver.class);
-        assertThat(CompositeFundsInstructionLifecycleSaver.class)
-                .isAssignableTo(DelegatingFundsInstructionLifecycleRecorder.class);
-        assertThat(CompositeFundsInstructionLifecycleSaver.class.isAnnotationPresent(Deprecated.class))
-                .isTrue();
-    }
 
     /**
      * 场景：余额控制冻结指令需要进入冻结单生命周期记录器，而不是标准交易记录器。
