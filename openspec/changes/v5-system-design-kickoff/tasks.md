@@ -105,6 +105,7 @@
   - [x] Split ledger posting validation scenarios from `DefaultLedgerTransactionPostingServiceImplTests` into `DefaultLedgerTransactionPostingValidationTests` with shared `LedgerTransactionPostingTestSupport`.
   - [x] Split posting plan structure validation scenarios from `DefaultLedgerTransactionPostingValidationTests` into `DefaultLedgerPostingPlanValidationTests`.
   - [x] Split ledger-entry amount, ledger binding, profile and subject-type validation scenarios from `DefaultLedgerTransactionPostingServiceImplTests` into `DefaultLedgerEntryValidationTests`.
+  - [x] Split ledger-entry subject-type boundary scenarios from `DefaultLedgerEntryValidationTests` into `DefaultLedgerEntrySubjectValidationTests`.
   - [x] Split ledger posting assembler period lookup scenarios from `DefaultLedgerPostingAssemblerTests` into `DefaultLedgerPostingAssemblerPeriodTests` with shared `DefaultLedgerPostingAssemblerTestSupport`.
   - [x] Split route replay orchestration scenarios from `DefaultRoutedFundsInstructionOrchestratorTests` into `DefaultRoutedFundsInstructionOrchestratorReplayTests` with shared `DefaultRoutedFundsInstructionOrchestratorTestSupport`.
   - [x] Split authorization and balance-control command scenarios from `FundsTransactionCommandServiceImplTests` into dedicated command service tests with shared `FundsTransactionCommandServiceImplTestSupport`.
