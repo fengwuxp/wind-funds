@@ -132,6 +132,7 @@
   - [x] Consolidate entry-level digest scenarios into `LedgerEntryDigestContractTests` and keep `LedgerTransactionDigestContractTests` focused on transaction-level digest contracts.
   - [x] Split transfer fee route scenarios from `TransferFundsInstructionRouteResolverTests` into `TransferFundsInstructionFeeRouteResolverTests` with shared `TransferFundsInstructionRouteResolverTestSupport`.
   - [x] Split funding-account balance-adjust and controlled-negative route scenarios from `BalanceControlFundsInstructionRouteResolverTests` into `BalanceControlFundingAdjustRouteResolverTests`.
+  - [x] Split shared-card authorization route scenarios from `AuthorizationFundsInstructionRouteResolverTests` into `AuthorizationSharedCardFundsInstructionRouteResolverTests` with shared `AuthorizationFundsInstructionRouteResolverTestSupport`.
 
 ## 9. 2026-05-16 OpenSpec / Superpowers / Harness Replan
 
