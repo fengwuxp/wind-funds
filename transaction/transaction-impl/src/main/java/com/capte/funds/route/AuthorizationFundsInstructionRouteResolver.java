@@ -9,25 +9,18 @@ import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.capte.funds.transaction.support.FundsRouteCodes;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
-import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
-import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.RouteResolver;
 import com.wind.integration.funds.route.enums.RouteLegType;
-import com.wind.integration.funds.route.enums.RouteNodeRole;
-import com.wind.integration.funds.route.enums.RouteNodeType;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
-import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
@@ -41,6 +34,11 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static com.capte.funds.route.support.RouteSpecSupport.mustNotBeNegative;
+import static com.capte.funds.route.support.RouteSpecSupport.routeLeg;
+import static com.capte.funds.route.support.RouteSpecSupport.sourceNode;
+import static com.capte.funds.route.support.RouteSpecSupport.targetNode;
 
 /**
  * 授权交易 RouteResolver。
@@ -56,8 +54,6 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
     private static final String LEG_AUTHORIZATION_SETTLEMENT_PREFIX = "AUTHORIZATION_SETTLEMENT_";
 
     private static final String LEG_SETTLE_REFUND_PREFIX = "SETTLE_REFUND_";
-
-    private static final String CONSTRAINT_KEY_SEPARATOR = ":";
 
     private static final String UNSUPPORTED_EVENT_TYPE_MESSAGE = "unsupported authorization eventType: ";
 
@@ -313,44 +309,6 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         AssertUtils.notNull(route.getResolvedAt(), RESOLVED_AT_REQUIRED_MESSAGE);
     }
 
-    private ImmutableRouteLegSpec.ImmutableRouteLegSpecBuilder routeLeg(String legId,
-                                                                        int sequence,
-                                                                        RouteLegType legType,
-                                                                        FundsInstructionSpec instruction) {
-        return ImmutableRouteLegSpec.builder()
-                .legId(legId)
-                .sequence(sequence)
-                .legType(legType)
-                .amount(instruction.getAmount())
-                .originalAmount(instruction.getOriginalAmount())
-                .exchangeRate(instruction.getExchangeRate())
-                .periodType(AccountBalancePeriodType.LIFETIME)
-                .periodId(AccountBalancePeriodType.LIFETIME.name())
-                .replayPolicy(RouteReplayPolicy.FULL_ONLY)
-                .constraintOverrides(Map.of())
-                .description(instruction.getDescription())
-                .contextVariables(Map.of());
-    }
-
-    private RouteNodeSpec sourceNode(SubjectRef subjectRef, LedgerSubjectCode ledgerSubjectCode) {
-        return routeNode(subjectRef, ledgerSubjectCode, RouteNodeRole.SOURCE);
-    }
-
-    private RouteNodeSpec targetNode(SubjectRef subjectRef, LedgerSubjectCode ledgerSubjectCode) {
-        return routeNode(subjectRef, ledgerSubjectCode, RouteNodeRole.TARGET);
-    }
-
-    private RouteNodeSpec routeNode(SubjectRef subjectRef,
-                                    LedgerSubjectCode ledgerSubjectCode,
-                                    RouteNodeRole nodeRole) {
-        return ImmutableRouteNodeSpec.builder()
-                .nodeType(RouteNodeType.SUBJECT)
-                .subjectRef(subjectRef)
-                .ledgerSubjectCode(ledgerSubjectCode)
-                .nodeRole(nodeRole)
-                .build();
-    }
-
     private PlatformAccountsSnapshotSpec settlementAccountSnapshot(FundsInstructionSpec instruction) {
         FundsAccountId settlementAccount = platformAccountRouteSupport.requireAccount(
                 instruction.getAmount().getCurrency(), PlatformFundingAccountRole.SETTLEMENT);
@@ -380,14 +338,6 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 platformAccountRouteSupport.createSubjectRef(accountId),
                 platformAccountRouteSupport.resolveLedgerProfileCode(PlatformFundingAccountRole.SETTLEMENT).name(),
                 instruction.getAmount(), instruction.getDescription(), Map.of());
-    }
-
-    private Map<String, LedgerBalanceConstraintType> mustNotBeNegative(FundsAccountId accountId,
-                                                                       LedgerSubjectCode subjectCode) {
-        return Map.of(accountId.type() + CONSTRAINT_KEY_SEPARATOR
-                        + accountId.id() + CONSTRAINT_KEY_SEPARATOR
-                        + subjectCode.name(),
-                LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
     }
 
     @Override

@@ -9,26 +9,18 @@ import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.capte.funds.transaction.support.FundsRouteCodes;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
-import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
-import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.RouteResolver;
 import com.wind.integration.funds.route.enums.RouteLegType;
-import com.wind.integration.funds.route.enums.RouteNodeRole;
-import com.wind.integration.funds.route.enums.RouteNodeType;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
-import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
-import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
@@ -40,10 +32,14 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static com.capte.funds.route.support.RouteSpecSupport.mustNotBeNegative;
+import static com.capte.funds.route.support.RouteSpecSupport.routeLeg;
+import static com.capte.funds.route.support.RouteSpecSupport.sourceNode;
+import static com.capte.funds.route.support.RouteSpecSupport.targetNode;
 
 /**
  * 直接交易 RouteResolver。
@@ -67,8 +63,6 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     private static final String LEG_FUND_OUT = "FUND_OUT";
 
     private static final String LEG_FEE = "FEE";
-
-    private static final String CONSTRAINT_KEY_SEPARATOR = ":";
 
     private static final String SAME_ACCOUNT_MESSAGE = "付款账号和收款账户不能一致";
 
@@ -372,63 +366,6 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         AssertUtils.notNull(route.getResolvedAt(), RESOLVED_AT_REQUIRED_MESSAGE);
     }
 
-    private ImmutableRouteLegSpec.ImmutableRouteLegSpecBuilder routeLeg(String legId,
-                                                                        int sequence,
-                                                                        RouteLegType legType,
-                                                                        FundsInstructionSpec instruction) {
-        return routeLeg(legId, sequence, legType, instruction.getAmount(), instruction.getOriginalAmount(),
-                instruction.getExchangeRate(), instruction.getDescription());
-    }
-
-    private ImmutableRouteLegSpec.ImmutableRouteLegSpecBuilder routeLeg(String legId,
-                                                                        int sequence,
-                                                                        RouteLegType legType,
-                                                                        Money amount,
-                                                                        String description) {
-        return routeLeg(legId, sequence, legType, amount, amount, BigDecimal.ONE, description);
-    }
-
-    private ImmutableRouteLegSpec.ImmutableRouteLegSpecBuilder routeLeg(String legId,
-                                                                        int sequence,
-                                                                        RouteLegType legType,
-                                                                        Money amount,
-                                                                        Money originalAmount,
-                                                                        BigDecimal exchangeRate,
-                                                                        String description) {
-        return ImmutableRouteLegSpec.builder()
-                .legId(legId)
-                .sequence(sequence)
-                .legType(legType)
-                .amount(amount)
-                .originalAmount(originalAmount)
-                .exchangeRate(exchangeRate)
-                .periodType(AccountBalancePeriodType.LIFETIME)
-                .periodId(AccountBalancePeriodType.LIFETIME.name())
-                .replayPolicy(RouteReplayPolicy.FULL_ONLY)
-                .constraintOverrides(Map.of())
-                .description(description)
-                .contextVariables(Map.of());
-    }
-
-    private RouteNodeSpec sourceNode(SubjectRef subjectRef, LedgerSubjectCode ledgerSubjectCode) {
-        return routeNode(subjectRef, ledgerSubjectCode, RouteNodeRole.SOURCE);
-    }
-
-    private RouteNodeSpec targetNode(SubjectRef subjectRef, LedgerSubjectCode ledgerSubjectCode) {
-        return routeNode(subjectRef, ledgerSubjectCode, RouteNodeRole.TARGET);
-    }
-
-    private RouteNodeSpec routeNode(SubjectRef subjectRef,
-                                    LedgerSubjectCode ledgerSubjectCode,
-                                    RouteNodeRole nodeRole) {
-        return ImmutableRouteNodeSpec.builder()
-                .nodeType(RouteNodeType.SUBJECT)
-                .subjectRef(subjectRef)
-                .ledgerSubjectCode(ledgerSubjectCode)
-                .nodeRole(nodeRole)
-                .build();
-    }
-
     private Money calculateFee(FundsInstructionSpec instruction, Money transactionAmount) {
         FeeSpec fee = FundsInstructionContextReader.getValue(instruction, FundsInstructionContextKeys.FEE_SPEC,
                 FeeSpec.class);
@@ -453,14 +390,6 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 platformAccountRouteSupport.createSubjectRef(accountId),
                 platformAccountRouteSupport.resolveLedgerProfileCode(accountRole).name(), amount, description,
                 Map.of());
-    }
-
-    private Map<String, LedgerBalanceConstraintType> mustNotBeNegative(FundsAccountId accountId,
-                                                                       LedgerSubjectCode subjectCode) {
-        return Map.of(accountId.type() + CONSTRAINT_KEY_SEPARATOR
-                        + accountId.id() + CONSTRAINT_KEY_SEPARATOR
-                        + subjectCode.name(),
-                LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
     }
 
     @Override
