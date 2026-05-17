@@ -103,6 +103,7 @@
 - [x] Review and batch-fix test method naming and key scenario comments according to P0-H first pass.
 - [ ] Review balance assertions and split large test classes according to P0-H follow-up.
   - [x] Split ledger posting validation scenarios from `DefaultLedgerTransactionPostingServiceImplTests` into `DefaultLedgerTransactionPostingValidationTests` with shared `LedgerTransactionPostingTestSupport`.
+  - [x] Split posting plan and ledger-entry structure validation scenarios from `DefaultLedgerTransactionPostingValidationTests` into `DefaultLedgerPostingPlanValidationTests`.
   - [x] Split ledger posting assembler period lookup scenarios from `DefaultLedgerPostingAssemblerTests` into `DefaultLedgerPostingAssemblerPeriodTests` with shared `DefaultLedgerPostingAssemblerTestSupport`.
   - [x] Split route replay orchestration scenarios from `DefaultRoutedFundsInstructionOrchestratorTests` into `DefaultRoutedFundsInstructionOrchestratorReplayTests` with shared `DefaultRoutedFundsInstructionOrchestratorTestSupport`.
   - [x] Split authorization and balance-control command scenarios from `FundsTransactionCommandServiceImplTests` into dedicated command service tests with shared `FundsTransactionCommandServiceImplTestSupport`.
