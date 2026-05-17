@@ -71,7 +71,7 @@
 - [x] Execute P0-B wind-funds / DSL contract tasks.
   - [x] Close RouteReplay naming, DSL JSON fixtures, digest contract and instruction type naming first pass.
   - [x] Keep source fact boundary as regression protection until clearing, dispute and reconciliation facts are independently modeled.
-- [ ] Execute P0-C Ledger Posting main-chain tasks.
+- [x] Execute P0-C Ledger Posting main-chain tasks.
   - [x] Close first-pass posting/projection behavior: positive amounts, postable subjects, route-leg traceability, idempotent no-reprojection, missing-ledger failure, missing-balance-bucket failure, and read-side uninitialized bucket semantics.
   - [x] Rename `LedgerTransactionCreateResult` to the posting result main contract with a compatibility alias.
 - [x] Execute P0-D Transaction Layer service facade tasks.
