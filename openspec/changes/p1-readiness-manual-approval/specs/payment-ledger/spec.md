@@ -2,30 +2,29 @@
 
 ## ADDED Requirements
 
-### Requirement: P1 archive governance must protect balance rebuild
+### Requirement: Balance projection re-check must preserve ledger facts as the source of truth
 
-P1 archive, checkpoint, watermark and metric implementation MUST preserve immutable ledger facts and balance rebuild correctness.
+Balance projection MUST remain derived from ledger facts and MUST NOT be rebuilt or corrected from transaction views, reports, statements or business balance-change logs.
 
-#### Scenario: Archive implementation readiness review
+#### Scenario: Balance projection boundary is reviewed
 
-- WHEN `BalanceCheckpoint`, `BalanceProjectionWatermark` or `ArchiveManifest` implementation is proposed
-- THEN the change MUST define checkpoint granularity, watermark advancement order, archive precheck, digest inputs and failure handling
-- AND it MUST prove watermark is advanced only after calculation, write and verification succeed
-- AND DDL, archive movement or historical data migration MUST require manual approval
+- WHEN balance projection design or implementation is changed
+- THEN the change MUST prove the projection is derived from `LedgerTransaction`, `LedgerEntry`, ledger profile, normal balance and controlled-negative rules
+- AND `LedgerBalanceChangedEvent` or any business balance-change log MUST remain observational output only
+- AND event or log failure MUST NOT roll back a successfully validated balance projection
 
-#### Scenario: Balance rebuild readiness review
+#### Scenario: Future checkpoint, watermark or rebuild work is proposed
 
-- WHEN balance rebuild implementation is proposed
-- THEN the change MUST use verified checkpoint or cold summary plus hot ledger entries after watermark
-- AND it MUST fail when checkpoint, watermark, manifest or digest validation is missing
-- AND it MUST NOT rebuild balances from transaction views, reports or current balance snapshots
+- WHEN `BalanceCheckpoint`, `BalanceProjectionWatermark`, `ArchiveManifest` or balance rebuild implementation is proposed
+- THEN the future change MUST define checkpoint granularity, watermark advancement order, digest inputs, verify-only behavior, failure handling and rollback strategy
+- AND DDL, archive movement, formal rebuild or historical data migration MUST require a separate OpenSpec change and manual approval
 
-### Requirement: P1 metrics must not mutate funds facts
+### Requirement: Metric and reporting governance must not be bundled with balance projection
 
-P1 metric implementation MUST keep metric watermarks and snapshots independent from ledger and transaction facts.
+Metric, report and finance-view governance MUST NOT be implemented as part of the current balance projection re-check.
 
-#### Scenario: Metric implementation readiness review
+#### Scenario: Metric or report implementation is proposed
 
-- WHEN `MetricWatermark` or `MetricSnapshot` implementation is proposed
-- THEN the change MUST define source window, metric version, dimensions, digest and recompute rule
-- AND it MUST prove metric differences create alerts, differences or review tasks instead of changing ledger, wallet or transaction facts
+- WHEN metric watermark, report snapshot, finance report or report recompute work is requested
+- THEN it MUST be redirected to a fresh product/system design and OpenSpec change
+- AND it MUST NOT mutate ledger, wallet, transaction or balance projection facts
