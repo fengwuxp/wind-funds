@@ -6,7 +6,7 @@
 
 它不是 PRD。PRD 说明业务为什么需要、使用者如何操作、运营如何验收；本文件说明这些业务事实进入资金底座后，如何被稳定表达为指令、路由、账务计划、账本分录和投影。
 
-它也不是某个类的详细设计。它属于**系分设计里的领域 DSL 契约规范**：向上承接产品语义，向下指导接口、枚举、转换器、路由、账务、测试资源和 OpenSpec。
+它也不是实现方案。它属于**系分设计里的领域 DSL 契约规范**：向上承接产品语义，向下统一接口、枚举、路由、账务、投影和契约验收的共同语言。
 
 最重要的结论：
 
@@ -108,7 +108,7 @@ JSON 约定：
 | 字段风格 | 使用 `lowerCamelCase`。 |
 | 枚举风格 | 使用 `UPPER_SNAKE_CASE`。 |
 | 金额 | 使用 `{ "currency": "USD", "minorValue": 10000 }`，`minorValue` 表示最小货币单位。 |
-| 时间 | 使用 ISO-8601 字符串，系分阶段再明确时区和精度。 |
+| 时间 | 使用 ISO-8601 字符串；业务发生时间必须可追溯，时区和精度由系统契约统一。 |
 | 扩展字段 | 使用 `contextVariables`，但不能把必填主语义藏进去。 |
 | 摘要字段 | 不包含数据库 ID、自增流水、创建时间、修改时间、展示文案和处理状态。 |
 
@@ -119,8 +119,6 @@ JSON 约定：
 `FundsInstruction` 是账本可理解的资金事实请求。它不是业务订单，也不是账本分录。
 
 它回答：“这一次要处理的资金事实是什么？”
-
-代码落点：`core/src/main/java/com/wind/integration/funds/spec/transaction/FundsInstructionSpec.java`。
 
 ```json
 {
@@ -160,7 +158,7 @@ JSON 约定：
 | --- | --- |
 | `instructionType` | 指令大类：直接交易、授权交易、余额控制。 |
 | `eventType` | 稳定资金事件，例如 `PAY`、`REFUND`、`AUTHORIZE`、`FREEZE`。 |
-| `transactionType` | 当前代码仍使用 `DefaultFundsTransactionType`，目标态可在系分中继续收敛。 |
+| `transactionType` | 资金交易类型，用于表达本次资金事实在交易生命周期中的业务类型。 |
 | `amount` | 账务主链路金额，即入账金额。 |
 | `originalAmount` | 业务原始金额；无错币种时等于 `amount`。 |
 | `exchangeRate` | `originalAmount -> amount` 的汇率快照，无换汇时为 `1`。 |
@@ -172,18 +170,10 @@ JSON 约定：
 
 `RouteSnapshot` 是冻结后的路径事实，回答：“后续 replay 应该按当时哪条路径处理？”
 
-代码落点：
-
-- `core/src/main/java/com/wind/integration/funds/route/spec/ResolvedRouteSpec.java`
-- `core/src/main/java/com/wind/integration/funds/route/spec/RouteSnapshotSpec.java`
-- `core/src/main/java/com/wind/integration/funds/route/spec/RouteLegSpec.java`
-
 ```json
 {
   "expectedRoute": {
     "routeCode": "DIRECT_PAY_STANDARD",
-    "routeVersion": "v4",
-    "snapshotSchemaVersion": "route.snapshot.v4",
     "participants": [
       {
         "participantRole": "PAYER",
@@ -237,19 +227,13 @@ JSON 约定：
 
 - `RouteLeg` 不是会计分录。
 - 外部账户、支付工具、平台角色不能直接入账。
-- `snapshotSchemaVersion` 和 `routeVersion` 必须分开。
+- 路径快照必须固化本次参与方、平台账户、外部引用和规则结果。
 - 退款、撤销、授权结算、拒付、退费、解冻必须优先基于原快照。
 - 缺原快照不得重新选路兜底。
 
 ### 5.3 LedgerTransaction、PostingPlan 和 LedgerEntry
 
 账务层回答：“这笔路径如何变成平衡分录？”
-
-代码落点：
-
-- `core/src/main/java/com/wind/integration/funds/spec/ledger/LedgerTransactionSpec.java`
-- `core/src/main/java/com/wind/integration/funds/spec/ledger/LedgerPostingPlanSpec.java`
-- `core/src/main/java/com/wind/integration/funds/spec/ledger/LedgerEntrySpec.java`
 
 ```json
 {
@@ -346,7 +330,7 @@ JSON 约定：
 | `Y+N@MM-DD` | 每 N 年指定月日结算。 |
 | `C@DD-DD` | 自定义账期。 |
 
-实现不能把 `RT` 固化为唯一策略；不支持的表达式必须显式失败。
+规则不能把 `RT` 固化为唯一策略；不支持的表达式必须显式失败。
 
 ## 6. 基础语义
 
@@ -500,13 +484,11 @@ FX 边界：
       "payeeId": "fa_merchant_20001_usd",
       "payeeLedgerSubjectCode": "CLEARING",
       "feeRuleCode": "MERCHANT_STANDARD_001",
-      "feeRuleVersion": "2026-05"
+      "feeRuleSnapshot": "MERCHANT_STANDARD_001@CONFIRMED"
     }
   },
   "expectedRoute": {
     "routeCode": "DIRECT_PAY_STANDARD",
-    "routeVersion": "v4",
-    "snapshotSchemaVersion": "route.snapshot.v4",
     "platformAccounts": {
       "feeFundingAccount": {
         "subjectType": "FUNDING_ACCOUNT",
@@ -626,12 +608,12 @@ FX 边界：
     "mustPass": [
       "本金和费用使用独立 route leg",
       "费用账户来自平台账户角色快照",
-      "费用规则版本进入 contextVariables",
+      "费用规则快照进入 contextVariables",
       "每个 posting plan 独立平衡"
     ],
     "mustFail": [
       "费用和本金混入同一金额口径",
-      "缺 feeRuleVersion",
+      "缺 feeRuleSnapshot",
       "平台费用账户未初始化",
       "业务侧直接提交 LedgerEntry"
     ]
@@ -1082,31 +1064,7 @@ DSL 设计必须能直接推导测试。每个 JSON 场景至少包含：
 | FX 边界 | 交易层记录金额事实，余额控制不做 FX。 |
 | 投影边界 | 余额重建不读交易视图，交易视图重放不写账。 |
 
-当前可对齐的测试资源：
-
-| 资源 | 用途 |
-| --- | --- |
-| `core/src/test/resources/dsl/transaction-layer/direct-wallet-payment-with-fee.json` | 付款加手续费。 |
-| `core/src/test/resources/dsl/transaction-layer/reverse-refund-original-route.json` | 原路径退款。 |
-| `core/src/test/resources/dsl/transaction-layer/authorization-approve-multi-subject.json` | 多主体授权。 |
-| `core/src/test/resources/dsl/transaction-layer/authorization-decline-no-posting.json` | 授权拒绝无账务。 |
-| `core/src/test/resources/dsl/transaction-layer/balance-freeze-order.json` | 冻结单余额控制。 |
-| `core/src/test/resources/dsl/transaction-layer/transaction-view-replay-range.json` | 交易视图有界重放。 |
-
-## 11. 系分和编码落点
-
-| DSL 对象 | 系分关注点 | 代码或测试落点 |
-| --- | --- | --- |
-| `FundsInstruction` | 请求模型、幂等键、金额事实、FX 边界、引用对象。 | `core/spec/transaction/FundsInstructionSpec.java`、`transaction-face/model/request`、converter tests。 |
-| `ResolvedRoute` | 主体解析、平台账户、route code、route replay。 | `core/route/spec`、`transaction-impl/route`、route tests。 |
-| `RouteSnapshot` | 快照 schema version、原路径回放、快照 JSON 持久化。 | `DefaultRouteSnapshotFactory`、`RouteSnapshotJsonSupport`、replay tests。 |
-| `PostingPlan` | route leg 到借贷计划的转换、独立平衡、摘要。 | `DefaultLedgerPostingAssembler`、`CompositeLedgerPostingAssemblerTests`。 |
-| `LedgerEntry` | 入账主体、账目、借贷方向、金额、摘要、余额约束。 | `ledger-impl`、`DefaultLedgerTransactionPostingServiceImplTests`、digest tests。 |
-| `BalanceProjection` | 水位、检查点、归档清单、冷热拼接。 | `LedgerBalanceProjectionServiceImpl`、balance projection tests。 |
-| `TransactionView` | 只读投影、范围重放、差异报告。 | transaction query/view projection tests。 |
-| `SettlementPolicy` | 非 RT 策略解析、候选日期、失败边界。 | `SettlementPolicySpecTests`。 |
-
-## 12. 禁止清单
+## 11. 禁止清单
 
 | 禁止项 | 原因 |
 | --- | --- |
@@ -1122,30 +1080,11 @@ DSL 设计必须能直接推导测试。每个 JSON 场景至少包含：
 | 缺 route snapshot 时重新选路 replay | 会导致绑定关系和平台账户变化后资金路径漂移。 |
 | 交易层或余额控制层隐式调用 `FxService` | 是否换汇是业务层或外汇域决策。 |
 
-## 13. 评审清单
+## 12. 评审清单
 
 | 评审视角 | 检查项 |
 | --- | --- |
 | 产品评审 | 场景是否能追溯到 PRD 用例；使用者能否理解资金事实、冻结、授权、清结算、对账差错和投影边界。 |
-| 系分评审 | `instruction`、`route`、`snapshot`、`posting`、`entry`、`projection` 的模块归属是否清楚。 |
+| 系分评审 | `instruction`、`route`、`snapshot`、`posting`、`entry`、`projection` 的职责边界是否清楚。 |
 | 测试评审 | 是否有 JSON 契约样例；是否覆盖成功、失败、幂等、余额变化、replay 和 digest。 |
-| 编码评审 | 是否避免业务方直接传 entry；是否保持 core 纯契约；是否遵循 MapStruct、MyBatis Flex 和 selective 写入等项目约规。 |
-
-## 14. 资料来源
-
-- `docs/v5/v5 DSL 规范设计.md`
-- `docs/v5/v5 DSL 契约复审矩阵.md`
-- `docs/v5/产品设计/v5 DSL 与 wind-funds 契约差距清单.md`
-- `docs/产品设计/01-PRD 总览.md`
-- `docs/产品设计/02-交易-路由-钱包-账目-余额投影-交易投影.md`
-- `docs/产品设计/03-清分-清算-对账.md`
-- `docs/产品设计/04-归档重放与资金交易指标.md`
-- `docs/产品设计/05-产品验收用例矩阵.md`
-- `openspec/specs/payment-ledger/spec.md`
-- `openspec/specs/transaction-layer/spec.md`
-- `openspec/specs/wallets/spec.md`
-- `openspec/specs/clearing-reconciliation/spec.md`
-- `core/src/main/java/com/wind/integration/funds/spec`
-- `core/src/main/java/com/wind/integration/funds/route`
-- `core/src/main/java/com/wind/integration/funds/ledger`
-- `core/src/test/resources/dsl/transaction-layer`
+| 交付评审 | 是否能由本设计推导接口、测试、运营验收和差错处理；是否没有把技术细节写进领域契约。 |
