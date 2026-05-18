@@ -48,6 +48,7 @@ import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
 import com.capte.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
@@ -221,6 +222,18 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setBusinessScene("REFUND")
                 .setBusinessSn(businessSn)
                 .setDescription("refund"), WindOperator.system());
+    }
+
+    protected void withdraw(FundsAccountId accountId, long amount, String referenceFreezeSn, String businessSn) {
+        directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(accountId)
+                .setPayeeId(FundsAccountId.immutable("external_bank_001",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn(referenceFreezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn(businessSn)
+                .setDescription("withdraw"), WindOperator.system());
     }
 
     protected String freeze(FundsAccountId accountId, long amount, String businessSn) {
