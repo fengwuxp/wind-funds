@@ -6,11 +6,9 @@ import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.ledger.dal.entities.table.LedgerEntryNameRefs;
-import com.capte.funds.ledger.dal.entities.table.LedgerNameRefs;
 import com.capte.funds.ledger.dal.entities.table.LedgerPostingPlanNameRefs;
 import com.capte.funds.ledger.dal.entities.table.LedgerTransactionNameRefs;
 import com.capte.funds.ledger.dal.mapper.LedgerEntryMapper;
-import com.capte.funds.ledger.dal.mapper.LedgerMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.capte.funds.ledger.dto.LedgerDTO;
@@ -56,38 +54,33 @@ import com.capte.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycl
 import com.capte.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
 import com.capte.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
 import com.capte.funds.transaction.services.impl.DelegatingFundsInstructionLifecycleRecorder;
-import com.capte.funds.wallet.ImmutableFundsAccount;
-import com.capte.funds.wallet.ImmutableFundsBalanceView;
+import com.capte.funds.wallet.dal.entities.FundingAccount;
+import com.capte.funds.wallet.dal.entities.table.FundingAccountNameRefs;
+import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
-import com.capte.funds.wallet.service.PlatformFundingAccountService;
+import com.capte.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.capte.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.integration.funds.ledger.LedgerBalanceBucket;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
+import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFeeType;
-import com.wind.integration.funds.wallet.FundsAccount;
-import com.wind.integration.funds.wallet.FundsAccountBalanceView;
 import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.wallet.FundsAccountOwner;
-import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.transaction.core.Money;
-import com.wind.transaction.core.enums.CurrencyIsoCode;
-import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
@@ -99,16 +92,15 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * 资金交易流程测试基座。
  *
- * <p>服务层流程测试只替换外部账户查询和平台账户发现边界；交易转换、路由解析、编排器、记账翻译、
- * lifecycle saver、posting service、mapper 和 H2 表结构均使用真实实现，确保断言落在持久化事实上。</p>
+ * <p>服务层流程测试使用真实账户查询、平台账户解析、交易转换、路由解析、编排器、记账翻译、
+ * lifecycle saver、posting service、mapper 和 H2 表结构；账户依赖由测试 setup 显式准备，
+ * 确保断言落在真实服务路径和持久化事实上。</p>
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
@@ -128,6 +120,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             "t_funds_frozen_order",
             "t_funds_transaction_detail",
             "t_funds_transaction",
+            "t_funding_account",
             "t_ledger");
 
     @Autowired
@@ -152,11 +145,15 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     private FundsFrozenOrderMapper fundsFrozenOrderMapper;
 
     @Autowired
+    private FundingAccountMapper fundingAccountMapper;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
         cleanupFlowTestData();
+        seedFundingAccounts();
         seedLedgers();
     }
 
@@ -173,9 +170,68 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         ensureLedger(feeAccount(), LedgerSubjectCode.FEE, 0L);
     }
 
+    private void seedFundingAccounts() {
+        ensureFundingAccount(fundingAccount("funding_user"));
+        for (PlatformFundingAccountRole role : PlatformFundingAccountRole.values()) {
+            ensurePlatformFundingAccount(role);
+        }
+    }
+
+    private void ensureFundingAccount(FundsAccountId accountId) {
+        if (!FundsSubjectType.FUNDING_ACCOUNT.name().equals(accountId.type())
+                || fundingAccountExists(accountId.id())) {
+            return;
+        }
+        FundingAccount account = new FundingAccount();
+        account.setTenantId(TENANT_ID);
+        account.setSn(accountId.id());
+        account.setOwnerId("owner_" + accountId.id());
+        account.setOwnerType(FundsAccountOwnerType.USER);
+        account.setAccountType(accountId.type());
+        account.setPlatform(Boolean.FALSE);
+        account.setCurrency(CURRENCY);
+        account.setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
+        account.setLedgerProfileVersion(1);
+        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setDescription("flow test funding account");
+        account.setVersion(0);
+        fundingAccountMapper.insertSelective(account);
+    }
+
+    private void ensurePlatformFundingAccount(PlatformFundingAccountRole role) {
+        FundsAccountId accountId = platformAccount(role);
+        if (fundingAccountExists(accountId.id())) {
+            return;
+        }
+        FundingAccount account = new FundingAccount();
+        account.setTenantId(TENANT_ID);
+        account.setSn(accountId.id());
+        account.setOwnerId("platform");
+        account.setOwnerType(FundsAccountOwnerType.PLATFORM);
+        account.setAccountType(accountId.type());
+        account.setPlatform(Boolean.TRUE);
+        account.setAccountRoleCode(role);
+        account.setCurrency(CURRENCY);
+        account.setLedgerProfileCode(role.getLedgerProfileCode());
+        account.setLedgerProfileVersion(1);
+        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setDescription("flow test platform funding account");
+        account.setVersion(0);
+        fundingAccountMapper.insertSelective(account);
+    }
+
+    private boolean fundingAccountExists(String accountSn) {
+        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.sn.eq(accountSn));
+        return fundingAccountMapper.selectCountByQuery(wrapper) > 0;
+    }
+
     private void ensureLedger(FundsAccountId accountId,
                               LedgerSubjectCode ledgerSubjectCode,
                               long initialBalance) {
+        ensureFundingAccount(accountId);
         Optional<LedgerDTO> existing = findLedger(accountId, ledgerSubjectCode);
         if (existing.isPresent()) {
             return;
@@ -491,128 +547,10 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultFundsInstructionLifecycleSaver.class,
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
-            DefaultFundsTransactionQueryService.class
+            DefaultFundsTransactionQueryService.class,
+            DefaultFundsAccountQueryServiceImpl.class,
+            PlatformFundingAccountServiceImpl.class
     })
     static class Config {
-
-        @Bean
-        PlatformFundingAccountService platformFundingAccountService() {
-            return new PlatformFundingAccountService() {
-                @Override
-                public FundsAccountId requireAccountId(CurrencyIsoCode currency, PlatformFundingAccountRole role) {
-                    return requireAccountId(TENANT_ID, currency, role);
-                }
-
-                @Override
-                public FundsAccountId requireAccountId(Long tenantId,
-                                                       CurrencyIsoCode currency,
-                                                       PlatformFundingAccountRole role) {
-                    return platformAccount(role);
-                }
-            };
-        }
-
-        @Bean
-        @Primary
-        FundsAccountQueryService fundsAccountQueryService(LedgerMapper ledgerMapper) {
-            return new LedgerBackedFundsAccountQueryService(ledgerMapper);
-        }
-    }
-
-    private static final class LedgerBackedFundsAccountQueryService implements FundsAccountQueryService {
-
-        private final LedgerMapper ledgerMapper;
-
-        private LedgerBackedFundsAccountQueryService(LedgerMapper ledgerMapper) {
-            this.ledgerMapper = ledgerMapper;
-        }
-
-        @Override
-        public @NonNull FundsAccount getAccount(@NonNull FundsAccountId accountId) {
-            Map<LedgerSubjectCode, Long> ledgerIds = findLedgers(accountId).stream()
-                    .collect(Collectors.toMap(
-                            LedgerDTO::getLedgerSubjectCode,
-                            LedgerDTO::getId,
-                            (left, right) -> left,
-                            () -> new EnumMap<>(LedgerSubjectCode.class)));
-            return ImmutableFundsAccount.builder()
-                    .id(1L)
-                    .tenantId(TENANT_ID)
-                    .accountId(accountId)
-                    .owner(FundsAccountOwner.of("owner_" + accountId.id(), FundsAccountOwnerType.USER))
-                    .status(FundsAccountStatus.ACTIVE)
-                    .currency(CURRENCY)
-                    .accountLedgerIds(ledgerIds)
-                    .version(0)
-                    .build();
-        }
-
-        @Override
-        public @NonNull FundsAccountBalanceView getBalance(@NonNull FundsAccountId accountId) {
-            return ImmutableFundsBalanceView.builder()
-                    .id(1L)
-                    .tenantId(TENANT_ID)
-                    .accountId(accountId)
-                    .currency(CURRENCY)
-                    .balanceBuckets(balanceBuckets(accountId))
-                    .build();
-        }
-
-        @Override
-        public boolean supports(@NonNull FundsAccountId accountId) {
-            return true;
-        }
-
-        private List<LedgerDTO> findLedgers(FundsAccountId accountId) {
-            LedgerNameRefs ref = LedgerNameRefs.ledger;
-            QueryWrapper wrapper = QueryWrapper.create().from(ref)
-                    .where(ref.tenantId.eq(TENANT_ID))
-                    .and(ref.subjectId.eq(accountId.id()))
-                    .and(ref.subjectType.eq(accountId.type()))
-                    .and(ref.currency.eq(CURRENCY))
-                    .and(ref.periodType.eq(AccountBalancePeriodType.LIFETIME))
-                    .and(ref.periodId.eq(AccountBalancePeriodType.LIFETIME.name()))
-                    .orderBy(ref.id.asc());
-            return ledgerMapper.selectListByQuery(wrapper).stream()
-                    .map(toLedgerDTO())
-                    .toList();
-        }
-
-        private Map<LedgerSubjectCode, LedgerBalanceBucket> balanceBuckets(FundsAccountId accountId) {
-            Map<LedgerSubjectCode, LedgerBalanceBucket> result = new EnumMap<>(LedgerSubjectCode.class);
-            findLedgers(accountId).forEach(ledger -> result.put(ledger.getLedgerSubjectCode(),
-                    LedgerBalanceBucket.builder()
-                            .accountCode(ledger.getLedgerSubjectCode())
-                            .balance(Money.immutable(ledger.getNormalBalance(), CURRENCY))
-                            .periodType(ledger.getPeriodType())
-                            .periodId(ledger.getPeriodId())
-                            .activeTime(ACTIVE_TIME)
-                            .build()));
-            return result;
-        }
-
-        private Function<com.capte.funds.ledger.dal.entities.Ledger, LedgerDTO> toLedgerDTO() {
-            return ledger -> new LedgerDTO()
-                    .setId(ledger.getId())
-                    .setGmtCreate(ledger.getGmtCreate())
-                    .setGmtModified(ledger.getGmtModified())
-                    .setTenantId(ledger.getTenantId())
-                    .setSubjectId(ledger.getSubjectId())
-                    .setSubjectType(ledger.getSubjectType())
-                    .setLedgerProfileCode(ledger.getLedgerProfileCode())
-                    .setLedgerProfileVersion(ledger.getLedgerProfileVersion())
-                    .setLedgerSubjectCode(ledger.getLedgerSubjectCode())
-                    .setLedgerSubjectCategory(ledger.getLedgerSubjectCategory())
-                    .setNormalBalanceSide(ledger.getNormalBalanceSide())
-                    .setAllowNegative(ledger.getAllowNegative())
-                    .setDebitAmount(ledger.getDebitAmount())
-                    .setCreditAmount(ledger.getCreditAmount())
-                    .setCurrency(ledger.getCurrency())
-                    .setSettlementPolicy(ledger.getSettlementPolicy())
-                    .setCutOffTime(ledger.getCutOffTime())
-                    .setPeriodType(ledger.getPeriodType())
-                    .setPeriodId(ledger.getPeriodId())
-                    .setVersion(ledger.getVersion());
-        }
     }
 }
