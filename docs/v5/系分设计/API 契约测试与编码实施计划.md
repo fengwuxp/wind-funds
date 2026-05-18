@@ -310,7 +310,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | 幂等摘要稳定 | DSL 三、API 5.2 | `FundsIdempotencyDigestContractTests`、`FundsIdempotencyCoreFundsDigestContractTests` | L1 | 摘要排除数据库 ID、持久化流水、审计时间、展示文案、traceId；金额、币种、主体和 route 语义变化必须改变摘要并拒绝幂等复用。 | 已落地 |
 | Route 只表达资金路径 | DSL 四 | `RouteDslContractTests`、`RouteLayerBoundaryTests` | L1/L4 | route leg 不承载通道处理、审批、证据提交或页面流程。 | 已有 |
 | Snapshot 版本和平台账户 | DSL 四 | `RouteDslContractTests`、`PlatformFundingAccountServiceImplTests` | L1/L2 | `snapshotSchemaVersion/routeVersion` 分离；平台角色解析到具体 funding account。 | 已有 |
-| Tool/external ref 只作快照 | DSL 四、OpenSpec ledger | `LedgerPostableSubjectContractTests` 或现有边界测试 | L1/L4 | 银行卡、VA、VCC、PSP、外部账户不得成为 `LedgerEntry.subjectType`。 | 部分已有 |
+| Tool/external ref 只作快照 | DSL 四、OpenSpec ledger | `DefaultLedgerTransactionPostingServiceImplTests#testPostShouldRejectExternalRefsAsLedgerEntrySubject`、`RouteLayerBoundaryTests` | L1/L4 | 银行卡、VA、VCC、PSP、外部账户不得成为 `LedgerEntry.subjectType`。 | 已落地 |
 | Replay 使用原路径 | DSL 七 | `DefaultRouteReplayServiceTests` | L1/L2 | 原绑定关系变化后仍使用原 snapshot；未知 schema version 失败。 | 已有 |
 | Posting plan 独立平衡 | DSL 五、OpenSpec ledger | `DefaultLedgerPostingAssemblerTests`、`DefaultLedgerTransactionPostingServiceImplTests` | L1/L2 | 每个 plan 同币种借贷相等；空 plan、混币种、不平衡失败。 | 已有 |
 | Posting plan 摘要 | DSL 五、OpenSpec ledger | `LedgerPostingPlanDigestContractTests` | L1 | 相同账务计划语义重算一致；`routeLegId`、`postingScope` 和 `balanceEffectType` 变化会改变摘要。 | 已有 |
@@ -393,7 +393,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 
 | 红线 ID | 建议测试资产 | 层级 | 必须失败条件 | 状态 |
 | --- | --- | --- | --- | --- |
-| `RED-001` | `LedgerPostableSubjectContractTests`、`RouteLayerBoundaryTests` | L1/L4 | 外部银行账户、VA、VCC、PSP 账户被创建为内部 ledger subject。 | 部分已有 |
+| `RED-001` | `DefaultLedgerTransactionPostingServiceImplTests#testPostShouldRejectExternalRefsAsLedgerEntrySubject`、`RouteLayerBoundaryTests` | L1/L4 | 外部银行账户、VA、VCC、PSP 账户被创建为内部 ledger subject。 | 已落地 |
 | `RED-002` | `DefaultRouteReplayServiceTests` | L1/L2 | 退款、撤销、结算、拒付、手续费退回缺原 `RouteSnapshot`。 | 已有 |
 | `RED-003` | `DefaultFundsInstructionLifecycleSaverTests` | L2 | 累计退款超过剩余可退金额。 | 已有 |
 | `RED-004` | `TransactionServiceAbilityDslJsonContractTests`、`FundsTransactionCommandServiceImplTests` | L1/L2 | 授权拒绝写入 `chargebackAmount` 或生成账务路径。 | 已有 |

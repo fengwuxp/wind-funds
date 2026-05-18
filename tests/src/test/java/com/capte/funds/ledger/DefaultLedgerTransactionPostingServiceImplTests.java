@@ -2,9 +2,12 @@ package com.capte.funds.ledger;
 
 import com.wind.common.exception.BaseException;
 import com.wind.integration.funds.ledger.enums.EntrySide;
+import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
@@ -100,6 +103,36 @@ class DefaultLedgerTransactionPostingServiceImplTests extends LedgerTransactionP
         assertThat(transactionService.createdTransactions).isEmpty();
         assertThat(firstProjectionService.projectedEntries).isEmpty();
         assertThat(secondProjectionService.projectedEntries).isEmpty();
+    }
+
+    /**
+     * 场景：外部支付工具或外部账户引用被错误写成账本分录主体。
+     * 输入：银行卡、VA、VCC、PSP、外部账户等非内部资金主体 subjectType。
+     * 输出：入账服务在创建账本交易前拒绝。
+     * 预期：外部引用只能作为 route/transaction 快照，不得成为 LedgerEntry.subjectType。
+     * 红线：不得把外部工具引用创建为内部 ledger subject。
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"BANK_CARD", "VIRTUAL_ACCOUNT", "VCC", "PSP_ACCOUNT", "EXTERNAL_ACCOUNT"})
+    void testPostShouldRejectExternalRefsAsLedgerEntrySubject(String externalSubjectType) {
+        RecordingLedgerTransactionService transactionService = new RecordingLedgerTransactionService();
+        RecordingProjectionService projectionService = new RecordingProjectionService(true);
+        DefaultLedgerTransactionPostingServiceImpl service = new DefaultLedgerTransactionPostingServiceImpl(
+                transactionService, defaultLedgerService(), List.of(projectionService));
+        String ledgerTransactionSn = "LE_EXTERNAL_REF_00000001";
+        LedgerEntrySpec externalEntry = entry(EntrySide.DEBIT, ledgerTransactionSn)
+                .setSubjectId("external_ref_001")
+                .setSubjectType(externalSubjectType);
+        LedgerEntrySpec fundingEntry = entry(EntrySide.CREDIT, ledgerTransactionSn);
+        LedgerTransactionSpec transaction = transaction(ledgerTransactionSn,
+                List.of(postingPlan(ledgerTransactionSn, List.of(externalEntry, fundingEntry))));
+
+        assertThatThrownBy(() -> service.post(transaction))
+                .isInstanceOf(BaseException.class)
+                .hasMessageContaining("账本分录主体类型不允许入账")
+                .hasMessageContaining(externalSubjectType);
+        assertThat(transactionService.createdTransactions).isEmpty();
+        assertThat(projectionService.projectedEntries).isEmpty();
     }
 
     /**
