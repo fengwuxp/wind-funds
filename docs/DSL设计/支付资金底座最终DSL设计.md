@@ -40,7 +40,7 @@
 | 金额先于余额 | 金额是事实输入，余额是分录派生结果。 | DSL 不直接修改余额，只生成可校验的 `LedgerEntry`。 |
 | 路径先于分录 | 先说明资金或控制余额如何流动，再推导借贷方向。 | 业务方不能直接提交 `LedgerEntry`、`EntrySide` 或 `PostingPlan`。 |
 | 分录是余额事实源 | 余额、账单、报表和投影都从账本分录派生。 | 余额投影和交易投影不能反向修正账本事实。 |
-| 快照保护回放 | 后续退款、reversal、结算、拒付、退费、解冻必须沿用原事实路径。 | 缺原路径快照时不能重新选路兜底。 |
+| 快照保护回放 | 后续退款、撤销、结算、拒付、退费、解冻必须沿用原事实路径。 | 缺原路径快照时不能重新选路兜底。 |
 | JSON 服务于验证 | JSON 用来表达 DSL 对象和契约用例，使场景可以被机器解析和 TDD 验收。 | 设计意图、流程说明、禁止清单不用 JSON 包装。 |
 
 ### 1.3 资金事实主链路
@@ -73,7 +73,7 @@
 | 事实稳定 | 同一事实在同一输入下产生稳定的 route、posting 和 entry，不受后续绑定关系、账户配置或展示规则漂移影响。 |
 | 账务平衡 | 每个 `PostingPlan` 必须独立借贷平衡，整笔 `LedgerTransaction` 必须平衡。 |
 | 可解释 | 能解释资金从哪来、到哪去、为什么发生、由谁触发、引用了哪个原事实。 |
-| 可回放 | 后续退款、reversal、结算、拒付、退费、解冻能基于原路径快照派生。 |
+| 可回放 | 后续退款、撤销、结算、拒付、退费、解冻能基于原路径快照派生。 |
 | 可测试 | 字段、枚举、边界、红线和场景可以沉淀为 JSON 契约用例和 TDD 验收。 |
 | 可治理 | 大数据量下余额投影、交易投影、归档、重放和差异检查有清晰边界。 |
 
@@ -99,7 +99,7 @@
 | 金额、币种、汇率 | `amount`、`originalAmount`、`exchangeRate` | 金额校验、币种边界、错币种事实记录。 | 金额为正，余额控制不做 FX。 |
 | 资金路径 | `ResolvedRoute`、`RouteLeg`、`RouteNode` | 路由解析、平台账户角色、原路径回放。 | 缺快照不重新选路。 |
 | 账务影响 | `PostingPlan`、`LedgerEntry` | 分录生成、借贷平衡、余额投影。 | 每个计划独立平衡，余额从分录派生。 |
-| 后续事件 | `Reference`、`RouteSnapshot` | 退款、reversal、结算、拒付、退费、解冻。 | 不超过原事实剩余额度或金额。 |
+| 后续事件 | `Reference`、`RouteSnapshot` | 退款、撤销、结算、拒付、退费、解冻。 | 不超过原事实剩余额度或金额。 |
 | 验收红线 | `validation.mustPass`、`validation.mustFail` | 契约测试、集成测试、回归测试。 | 正向、反向、边界、幂等、审计均可验证。 |
 
 这张表是产品评审、系分设计、开发实现和测试验收之间的共同语言。产品只要新增一个资金场景，就必须能填满这张表；填不满时，不应进入开发。
@@ -122,7 +122,7 @@
 | 交易能力 | 业务含义 | DSL 指令 | 典型场景 |
 | --- | --- | --- | --- |
 | 直接交易 | 已确认发生价值转移、责任变化或资金状态变化。 | `DIRECT_TRANSACTION` | 充值、付款、转账、提现、退款、手续费、清算确认、结算锁定、调账。 |
-| 授权交易 | 先占用额度或资金，后续 reversal、结算、退款或拒付。 | `AUTHORIZATION_TRANSACTION` | 卡授权、共享卡授权、部分 reversal、部分结算、授权链退款、争议拒付。 |
+| 授权交易 | 先占用额度或资金，后续撤销、结算、退款或拒付。 | `AUTHORIZATION_TRANSACTION` | 卡授权、共享卡授权、部分撤销、部分结算、授权链退款、争议拒付。 |
 | 余额控制 | 不发生跨主体价值转移，只控制同主体余额、额度或预算。 | `BALANCE_CONTROL` | 冻结、解冻、信用调额、预算调额。 |
 
 交易结构必须让开发和测试同时看懂：
@@ -202,7 +202,7 @@ flowchart TD
 | `PREPAYMENT` | 平台对用户或商户的预收、待付责任。 |
 | `AVAILABLE` | 可用余额、可用额度或可用预算。 |
 | `FROZEN` | 冻结余额，只限制同主体可用性。 |
-| `AUTHORIZATION` | 授权占用，后续由 reversal、结算、释放、过期或拒付关闭或减少。 |
+| `AUTHORIZATION` | 授权占用，后续由撤销、结算、释放、过期或拒付关闭或减少。 |
 | `CLEARING` | 商户待清算资金，订单款默认先进该桶。 |
 | `SETTLEMENT` | 出款中或结算处理中锁定资金。 |
 | `LIMIT` | 信用或预算总量，只能由 `LIMIT_ADJUST` 受控调整。 |
@@ -233,7 +233,7 @@ FX 边界：
 | 来源事实 | 是否直接成为 DSL 主对象 | 说明 |
 | --- | --- | --- |
 | 付款、充值、提现、转账、退款 | 是 | 形成 `DIRECT_TRANSACTION` 指令。 |
-| 授权批准、reversal、结算、拒付 | 是 | 形成 `AUTHORIZATION_TRANSACTION` 指令。 |
+| 授权批准、撤销、结算、拒付 | 是 | 形成 `AUTHORIZATION_TRANSACTION` 指令。 |
 | 冻结、解冻、额度调整、预算调整 | 是 | 形成 `BALANCE_CONTROL` 指令。 |
 | 清算确认、结算锁定、出款结果 | 是 | 只有确认后的资金结果进入 DSL。 |
 | 对账差错调账、核销 | 是 | 必须带差错来源、审批、凭证和审计。 |
@@ -266,7 +266,7 @@ FX 边界：
 | instructionType | 说明 | 典型事件 |
 | --- | --- | --- |
 | `DIRECT_TRANSACTION` | 已确认发生价值转移、责任变化或资金状态变化的直接交易。 | 入金、出金、转账、付款、退款、费用、清算确认、结算锁定、调账。 |
-| `AUTHORIZATION_TRANSACTION` | 授权占用、reversal、结算、授权链退款和争议拒付等生命周期事实。 | 授权、reversal、结算、授权退款、争议拒付。 |
+| `AUTHORIZATION_TRANSACTION` | 授权占用、撤销、结算、授权链退款和争议拒付等生命周期事实。 | 授权、撤销、结算、授权退款、争议拒付。 |
 | `BALANCE_CONTROL` | 不发生跨主体价值转移，只控制同主体可用性或额度。 | 冻结、解冻、额度调整、预算调整。 |
 
 ### 7.2 引用对象
@@ -276,7 +276,7 @@ FX 边界：
 | `SubjectRef` | 指向可入账主体。 | 只有 `FUNDING_ACCOUNT`、`CREDIT_ACCOUNT`、`BUDGET_GROUP` 可进入分录。 |
 | `PaymentInstrumentRef` | 记录卡、VA、银行卡、支付工具等工具快照。 | 不直接入账。 |
 | `ExternalAccountRef` | 记录外部银行、通道、托管户等外部端点。 | 不直接入账。 |
-| `Reference` | 记录退款、reversal、结算、拒付、退费、解冻等后续事件引用的原事实。 | 缺引用时不得回放。 |
+| `Reference` | 记录退款、撤销、结算、拒付、退费、解冻等后续事件引用的原事实。 | 缺引用时不得回放。 |
 
 ### 7.3 Route DSL
 
@@ -295,7 +295,7 @@ FX 边界：
 - `RouteLeg` 不是会计分录。
 - 外部账户、支付工具、平台角色不能直接入账。
 - 平台角色必须解析为具体资金账户后进入 route。
-- 退款、reversal、授权结算、拒付、退费、解冻必须优先基于原快照。
+- 退款、撤销、授权结算、拒付、退费、解冻必须优先基于原快照。
 - 缺原快照不得重新选路兜底。
 
 ### 7.4 Posting 与 Ledger DSL
@@ -325,7 +325,7 @@ Replay 用于后续事件沿用原路径事实。
 | --- | --- |
 | 原交易退款 | 基于原付款快照反向生成路径，不按当前绑定关系重新选路。 |
 | 手续费退回 | 使用独立 `FEE_REFUND`，不得混入普通退款。 |
-| 授权 reversal | 释放原授权占用，不新增价值转移。 |
+| 授权撤销 | 释放原授权占用，不新增价值转移。 |
 | 授权结算 | 不超过剩余授权金额。 |
 | 授权链退款 | 不超过已结算金额。 |
 | 争议拒付 | 不超过可追偿金额，且与授权拒绝区分。 |
@@ -380,7 +380,7 @@ Replay 用于后续事件沿用原路径事实。
 | 用例族 | 能力边界 | 测试主轴 |
 | --- | --- | --- |
 | 直接交易 | 已确认发生价值转移、责任变化或资金状态变化。 | 余额变化、route leg、posting 平衡、退款/退费上限、幂等。 |
-| 授权交易 | 先占用，后 reversal、结算、退款、拒付或释放。 | 授权剩余、已结算金额、可退金额、原路径 replay、拒绝无账务。 |
+| 授权交易 | 先占用，后撤销、结算、退款、拒付或释放。 | 授权剩余、已结算金额、可退金额、原路径 replay、拒绝无账务。 |
 | 余额控制 | 不发生跨主体价值转移，只控制余额、额度或预算。 | 同主体桶间控制、`LIMIT_ADJUST` 红线、冻结/解冻累计上限、无 FX。 |
 
 ### 9.1 直接交易用例族
@@ -411,9 +411,9 @@ Replay 用于后续事件沿用原路径事实。
 | --- | --- | --- | --- | --- |
 | 授权批准 | `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | 主体 `AVAILABLE` -> `AUTHORIZATION`。 | 支持资金账户、信用账户、预算组的授权占用 route。 | 授权占用增加，可用减少；posting 平衡。 |
 | 授权拒绝 | 拒绝事实，不产生入账指令。 | 无 route、posting、entry。 | 拒绝只记录状态和原因，不进入账务。 | 授权拒绝无账务；不得写入 `CHARGEBACK`。 |
-| 授权查询 | 查询授权事实和剩余额度。 | 不改变资金链路。 | 提供授权金额、已 reversal、已结算、剩余可用口径。 | 查询不写账；金额口径与后续 reversal/结算一致。 |
-| 部分 reversal | `AUTHORIZATION_TRANSACTION / REVERSAL`。 | 原授权 `AUTHORIZATION` -> `AVAILABLE`。 | 支持原授权快照 replay 和剩余授权校验。 | reversal 不超过剩余授权；缺快照失败。 |
-| 全额 reversal | `REVERSAL` 覆盖剩余授权。 | 释放全部剩余授权。 | reversal 后授权剩余归零。 | 后续再 reversal 失败；余额恢复。 |
+| 授权查询 | 查询授权事实和剩余额度。 | 不改变资金链路。 | 提供授权金额、已撤销、已结算、剩余可用口径。 | 查询不写账；金额口径与后续撤销/结算一致。 |
+| 部分撤销 | `AUTHORIZATION_TRANSACTION / REVERSAL`。 | 原授权 `AUTHORIZATION` -> `AVAILABLE`。 | 支持原授权快照 replay 和剩余授权校验。 | 撤销不超过剩余授权；缺快照失败。 |
+| 全额撤销 | `REVERSAL` 覆盖剩余授权。 | 释放全部剩余授权。 | 撤销后授权剩余归零。 | 后续再撤销失败；余额恢复。 |
 | 部分结算 | `AUTHORIZATION_TRANSACTION / CAPTURE`。 | 原授权 `AUTHORIZATION` -> 收款方或清算桶。 | 支持累计已结算和剩余授权校验。 | 结算不超过剩余授权；普通结算不触碰 `LIMIT`。 |
 | 授权直接结算 | 授权批准后一次性 `CAPTURE`。 | `AVAILABLE -> AUTHORIZATION -> CLEARING/SETTLEMENT`。 | 支持授权与结算在一个业务流程中连续完成。 | 结算后授权占用减少，收款方或清算桶增加。 |
 | 授权部分结算后退款 | `CAPTURE` 后 `REFUND`。 | 退款基于已结算路径反向。 | 支持已结算金额和可退金额校验。 | 退款不超过已结算金额；不读取当前绑定重新选路。 |
@@ -461,7 +461,7 @@ Replay 用于后续事件沿用原路径事实。
 | --- | --- | --- | --- |
 | 授权批准 | `AUTHORIZATION_TRANSACTION / AUTHORIZE` | 主体 `AVAILABLE` -> `AUTHORIZATION`。 | 只占用授权，不结算。 |
 | 授权拒绝 | 无入账指令 | 无 route、posting、entry。 | 只记录拒绝事实，不写拒付金额。 |
-| 部分 reversal | `AUTHORIZATION_TRANSACTION / REVERSAL` | 原授权 `AUTHORIZATION` -> `AVAILABLE`。 | 不超过剩余授权。 |
+| 部分撤销 | `AUTHORIZATION_TRANSACTION / REVERSAL` | 原授权 `AUTHORIZATION` -> `AVAILABLE`。 | 不超过剩余授权。 |
 | 部分结算 | `AUTHORIZATION_TRANSACTION / CAPTURE` | 原授权 `AUTHORIZATION` -> 收款方或清算桶。 | 不超过剩余授权，结算不触碰 `LIMIT`。 |
 | 授权退款 | `AUTHORIZATION_TRANSACTION / REFUND` | 基于原结算路径反向。 | 不超过已结算金额。 |
 | 授权拒付 | `AUTHORIZATION_TRANSACTION / CHARGEBACK` | 基于原结算或追偿路径。 | 与授权拒绝严格区分。 |
@@ -1093,7 +1093,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 }
 ```
 
-### 11.6 授权批准、部分 reversal、部分结算与授权拒绝
+### 11.6 授权批准、部分撤销、部分结算与授权拒绝
 
 ```json
 {
@@ -1183,7 +1183,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
   "validation": {
     "mustPass": [
       "授权批准进入 AUTHORIZATION",
-      "部分 reversal 不超过剩余授权",
+      "部分撤销不超过剩余授权",
       "部分结算不超过剩余授权",
       "授权拒绝不生成 route、posting、entry"
     ],
