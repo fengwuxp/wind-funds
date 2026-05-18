@@ -21,7 +21,7 @@ import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.request.CreateLedgerRequest;
 import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.service.LedgerService;
-import com.capte.funds.support.AbstractFundsServiceTest;
+import com.capte.funds.AbstractFundsServiceTest;
 import com.capte.funds.route.AuthorizationFundsInstructionRouteResolver;
 import com.capte.funds.route.BalanceControlFundsInstructionRouteResolver;
 import com.capte.funds.route.CompositeRouteResolver;

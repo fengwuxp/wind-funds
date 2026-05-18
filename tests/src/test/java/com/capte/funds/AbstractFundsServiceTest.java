@@ -1,4 +1,4 @@
-package com.capte.funds.support;
+package com.capte.funds;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.mybatisflex.spring.FlexSqlSessionFactoryBean;
