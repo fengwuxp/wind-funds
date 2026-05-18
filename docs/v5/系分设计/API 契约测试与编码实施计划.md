@@ -327,7 +327,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | --- | --- | --- | --- | --- | --- |
 | Ledger Posting | `Ledger DSL Posting 系分设计.md` | `DefaultLedgerPostingAssemblerTests`、`DefaultLedgerTransactionPostingServiceImplTests` | L1/L2 | 成功入账、plan 不平衡失败、混币种失败、外部主体失败、ledgerId 缺失失败。 | 已有 |
 | Ledger 投影 | `Ledger DSL Posting 系分设计.md` | `LedgerBalanceProjectionServiceImplTests` | L1/L2 | 借方/贷方 normal balance、禁止负数、受控负数、账本不匹配失败。 | 已有 |
-| Ledger 事务回滚 | `Ledger DSL Posting 系分设计.md` | `LedgerPostingLocalTransactionTests` | L3 | 分录写入后投影失败时交易、计划、分录全部回滚。 | 待补 |
+| Ledger 事务回滚 | `Ledger DSL Posting 系分设计.md` | `LedgerPostingLocalTransactionTests` | L3 | 分录写入后投影失败时交易、计划、分录全部回滚。 | 已落地 |
 | Wallet 账户初始化 | `Wallets 账户与余额控制系分设计.md` | `DefaultSubjectLedgerInitializerTests`、`DefaultLedgerProfileFundingAccountTests`、`DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests` | L2 | required ledger 初始化、幂等创建、缺 profile 失败。 | 已有 |
 | Wallet 余额查询 | `Wallets 账户与余额控制系分设计.md` | `DefaultFundsAccountQueryServiceImplTests` | L2 | 未建账展示查询返回 initialized=false；写流程缺账本失败；空集合不返回 null。 | 已有 |
 | Platform role 解析 | `Wallets 账户与余额控制系分设计.md` | `PlatformFundingAccountServiceImplTests`、`PlatformFundingAccountRoleTests` | L1/L2 | 平台角色解析到具体 funding account；缺角色失败；角色不作为 entry subject。 | 已有 |
