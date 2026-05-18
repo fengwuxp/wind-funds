@@ -315,7 +315,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | Posting plan 独立平衡 | DSL 五、OpenSpec ledger | `DefaultLedgerPostingAssemblerTests`、`DefaultLedgerTransactionPostingServiceImplTests` | L1/L2 | 每个 plan 同币种借贷相等；空 plan、混币种、不平衡失败。 | 已有 |
 | Posting plan 摘要 | DSL 五、OpenSpec ledger | `LedgerPostingPlanDigestContractTests` | L1 | 相同账务计划语义重算一致；`routeLegId`、`postingScope` 和 `balanceEffectType` 变化会改变摘要。 | 已有 |
 | Ledger entry 摘要 | DSL 五、OpenSpec ledger | `LedgerEntryDigestContractTests` | L1 | 相同业务事实重算一致；排除 entry sn、ID、ledger transaction sn、plan sn、审计时间。 | 已有 |
-| Entry 展示语义隔离 | DSL 五 | `TransactionViewProjectionBoundaryTests` | L4 | Entry 不出现账单标题、展示原因、国际化文案。 | 部分已有 |
+| Entry 展示语义隔离 | DSL 五 | `TransactionViewProjectionBoundaryTests` | L4 | Entry 不出现账单标题、展示原因、国际化文案。 | 已落地 |
 | Profile 和余额桶 | DSL 六、OpenSpec wallets | `DefaultLedgerProfileFundingAccountTests`、`DefaultLedgerProfileBudgetGroupTests`、`DefaultLedgerProfileRequiredItemTests`、`LedgerBalanceProjectionServiceImplTests` | L1/L2 | 账目规则由 profile 决定；`CONSUMED` 不入账；平台 profile 包含 `CASH/PREPAYMENT/CLEARING/SETTLEMENT/FEE/ADJUSTMENT`。 | 已有 |
 | 冻结只迁移同主体余额 | DSL 六、OpenSpec wallets | `FundsFrozenOrderBoundaryTests`、`DefaultFundsFrozenOrderLifecycleSaverTests` | L2/L4 | 冻结不改变资金归属，不跨主体转移，不创建 `FundsTransaction`。 | 已有 |
 | JSON 样例机械校验 | DSL 8.0 | `TransactionServiceAbilityDslJsonContractTests` | L1 | JSON 可解析；posting plan 平衡；平台角色不直接入账；query/replay 样例无 posting。 | 已有 |
@@ -402,7 +402,7 @@ JSON 样例用于验证 DSL 和服务契约可解析、可测试、可回归。�
 | `RED-007` | `DefaultLedgerPostingAssemblerTests` | L1 | 任一 posting plan 借贷不平仍保存。 | 已有 |
 | `RED-008` | `FundsBalanceControlInstructionConverterTests`、`FundsTransactionCommandServiceImplTests` | L1/L2 | 无原因、凭证或审批的资金调账成功；对账差错调账不进入当前有效任务。 | 已落地基础调账红线；对账差错调账已作废待重设 |
 | `RED-009` | 重新设计后再定 | L2/L4 | 对账差异直接修改历史 entry 或余额。 | 已作废，下一轮重设 |
-| `RED-010` | `TransactionViewProjectionBoundaryTests` | L4 | 展示投影写回 ledger 事实。 | 部分已有 |
+| `RED-010` | `TransactionViewProjectionBoundaryTests` | L4 | 展示投影写回 ledger 事实。 | 已落地 |
 | `RED-011` | `ControlledNegativeAvailableTests` | L2 | 负 `AVAILABLE` 被当作可继续消费、授权或出款余额。 | 部分已有 |
 | `RED-012` | `ComplianceCapabilityBoundaryTests` | L4 | 未确认资质启用支付账户、备付金、跨境或外汇能力。 | 设计保留 |
 | `RED-013A` | `CrossBorderComplianceBoundaryTests` | L4 | 缺真实性材料、报价过期或数据出境未确认仍执行跨境/换汇。 | 设计保留 |

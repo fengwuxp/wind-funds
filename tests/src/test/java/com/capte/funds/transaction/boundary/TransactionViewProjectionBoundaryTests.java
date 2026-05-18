@@ -1,13 +1,18 @@
 package com.capte.funds.transaction.boundary;
 
+import com.capte.funds.ledger.dal.entities.LedgerEntry;
+import com.capte.funds.ledger.dto.LedgerEntryDTO;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +43,24 @@ class TransactionViewProjectionBoundaryTests {
             "ReplayScopeType"
     );
 
+    private static final List<String> FORBIDDEN_LEDGER_ENTRY_DISPLAY_FIELD_PREFIXES = List.of(
+            "display",
+            "i18n",
+            "localized",
+            "view",
+            "ui"
+    );
+
+    private static final List<String> FORBIDDEN_LEDGER_ENTRY_DISPLAY_FIELD_NAMES = List.of(
+            "billTitle",
+            "billSubtitle",
+            "billRemark",
+            "title",
+            "subtitle",
+            "icon",
+            "label"
+    );
+
     /**
      * 场景：v4 阶段只冻结交易事实边界，交易展示投影留到 v5 重新设计实现。
      * 输入：扫描 funds 交易与钱包模块的生产源码类型名。
@@ -56,6 +79,27 @@ class TransactionViewProjectionBoundaryTests {
 
         assertThat(violations)
                 .as("transaction view projection is deferred to v5 and should not be implemented in v4")
+                .isEmpty();
+    }
+
+    /**
+     * 场景：账本分录作为资金事实，不承载账单展示语义。
+     * 输入：反射读取 LedgerEntry 和 LedgerEntryDTO 的声明字段。
+     * 输出：命中的展示投影字段列表。
+     * 预期：账单标题、展示原因、国际化文案、UI 标签等字段不能写回 ledger entry。
+     */
+    @Test
+    void testLedgerEntryShouldNotContainDisplayProjectionFields() {
+        List<String> violations = Stream.of(LedgerEntry.class, LedgerEntryDTO.class)
+                .flatMap(type -> Arrays.stream(type.getDeclaredFields())
+                        .map(Field::getName)
+                        .filter(TransactionViewProjectionBoundaryTests::isDisplayProjectionField)
+                        .map(fieldName -> type.getSimpleName() + "." + fieldName))
+                .sorted()
+                .toList();
+
+        assertThat(violations)
+                .as("ledger entry is a ledger fact and must not carry transaction view display fields")
                 .isEmpty();
     }
 
@@ -82,6 +126,15 @@ class TransactionViewProjectionBoundaryTests {
 
     private static boolean containsDeferredViewProjectionTypeName(String fileName) {
         return DEFERRED_VIEW_PROJECTION_TYPE_NAMES.stream().anyMatch(fileName::contains);
+    }
+
+    private static boolean isDisplayProjectionField(String fieldName) {
+        String normalizedFieldName = fieldName.toLowerCase(Locale.ROOT);
+        return FORBIDDEN_LEDGER_ENTRY_DISPLAY_FIELD_PREFIXES.stream()
+                .anyMatch(normalizedFieldName::startsWith)
+                || FORBIDDEN_LEDGER_ENTRY_DISPLAY_FIELD_NAMES.stream()
+                .map(name -> name.toLowerCase(Locale.ROOT))
+                .anyMatch(normalizedFieldName::equals);
     }
 
     private static Path projectRoot() {
