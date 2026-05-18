@@ -1,15 +1,15 @@
 package com.capte.funds.transaction.application.flow;
 
+import com.capte.funds.ledger.dal.entities.LedgerEntry;
+import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
+import com.capte.funds.ledger.dal.entities.LedgerTransaction;
+import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
-import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
-import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
+import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -57,27 +57,38 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 delta(user, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
-        assertBucket(ledgerBook.balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
-        assertBucket(ledgerBook.balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
 
         assertPostedTransactions(3);
-        LedgerTransactionSpec releaseTransaction = ledgerBook.postedTransactions.get(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .doesNotContain(FundsTransactionEventType.WITHDRAW.name());
+
+        LedgerTransaction releaseTransaction = ledgerTransactionByBusinessSn("WITHDRAW_REJECTED_UNFREEZE");
         assertThat(entriesOf(releaseTransaction).stream()
-                .map(LedgerEntrySpec::getLedgerSubjectCode)
+                .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
                 .containsExactlyInAnyOrder(LedgerSubjectCode.FROZEN, LedgerSubjectCode.AVAILABLE);
-        assertThat(releaseTransaction.getPostingPlans().stream()
-                .map(LedgerPostingPlanSpec::getPostingPhases)
-                .flatMap(List::stream)
-                .map(phase -> phase.getPhaseCode())
+        assertThat(postingPlansOf(releaseTransaction).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
-                .containsOnly(LedgerPhaseCode.UNFREEZE);
-    }
+                .containsOnly(LedgerPhaseCode.UNFREEZE.name());
 
-    private static List<LedgerEntrySpec> entriesOf(LedgerTransactionSpec transaction) {
-        return transaction.getPostingPlans().stream()
-                .map(LedgerPostingPlanSpec::getEntries)
-                .flatMap(List::stream)
-                .toList();
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_FREEZE").getReleasedAmount()).isEqualTo(60L);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_UNFREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+
+        unfreeze(user, 60L, freezeSn, "WITHDRAW_REJECTED_UNFREEZE");
+        BalanceSnapshot afterDuplicateUnfreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRejected, afterDuplicateUnfreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertPostedTransactions(3);
     }
 }
