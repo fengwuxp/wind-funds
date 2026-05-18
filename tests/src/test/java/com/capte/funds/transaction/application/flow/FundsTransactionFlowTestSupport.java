@@ -48,6 +48,7 @@ import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
@@ -213,6 +214,19 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setBusinessScene("TOPUP")
                 .setBusinessSn(businessSn)
                 .setDescription("topup"), WindOperator.system());
+    }
+
+    protected void transfer(FundsAccountId payerAccountId,
+                            FundsAccountId payeeAccountId,
+                            long amount,
+                            String businessSn) {
+        directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payerAccountId)
+                .setPayeeAccountId(payeeAccountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn(businessSn)
+                .setDescription("transfer"), WindOperator.system());
     }
 
     protected void pay(FundsAccountId accountId,
