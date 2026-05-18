@@ -45,6 +45,8 @@ import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.ledger.DefaultLedgerPostingAssembler;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
@@ -174,6 +176,10 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         }
     }
 
+    protected void ensureLedger(FundsAccountId accountId, LedgerSubjectCode ledgerSubjectCode) {
+        ensureLedger(accountId, ledgerSubjectCode, 0L);
+    }
+
     protected void topup(FundsAccountId accountId, long amount, String businessSn) {
         directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setAccountId(accountId)
@@ -185,6 +191,36 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setBusinessScene("TOPUP")
                 .setBusinessSn(businessSn)
                 .setDescription("topup"), WindOperator.system());
+    }
+
+    protected void pay(FundsAccountId accountId,
+                       FundsAccountId payeeId,
+                       LedgerSubjectCode payeeLedgerCode,
+                       long amount,
+                       String businessSn) {
+        directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(accountId)
+                .setPayeeId(payeeId)
+                .setPayeeLedgerCode(payeeLedgerCode)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setBusinessScene("PAY")
+                .setBusinessSn(businessSn)
+                .setDescription("pay"), WindOperator.system());
+    }
+
+    protected void refund(FundsAccountId accountId,
+                          FundsAccountId payerId,
+                          LedgerSubjectCode payerLedgerCode,
+                          long amount,
+                          String businessSn) {
+        directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(accountId)
+                .setPayerId(payerId)
+                .setPayerLedgerCode(payerLedgerCode)
+                .setAmount(amount(amount))
+                .setBusinessScene("REFUND")
+                .setBusinessSn(businessSn)
+                .setDescription("refund"), WindOperator.system());
     }
 
     protected String freeze(FundsAccountId accountId, long amount, String businessSn) {
