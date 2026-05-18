@@ -1,0 +1,53 @@
+# TDD 基线重置设计
+
+## 一、三层基线
+
+```mermaid
+flowchart TD
+    Docs["最终版 docs\n产品 / DSL / 系分 / TDD"] --> Spec["OpenSpec\n开发基线规格"]
+    Spec --> Super["Superpowers\nTDD / Review / Refactor / 红线"]
+    Super --> Harness["Harness\n批次 / 写入范围 / 验证门禁"]
+    Harness --> Code["后续编码批次\n测试先行 / 最小实现 / 验证"]
+    Code --> Feedback["设计错漏反馈\n回补 docs 与 OpenSpec"]
+    Feedback --> Docs
+```
+
+## 二、作废策略
+
+| 对象 | 处理方式 | 保留内容 |
+| --- | --- | --- |
+| 旧 OpenSpec specs | 删除并重建。 | 新规格 `payment-funds-foundation/spec.md`。 |
+| 旧 OpenSpec changes | 删除并重建。 | 新 change `tdd-baseline-reset`。 |
+| 旧 Superpowers/Harness 计划 | 以新 `tasks.md` 取代。 | TDD 纪律和 Harness 门禁。 |
+| 旧测试代码 | 删除 `*/src/test/java`。 | `*/src/test/resources`。 |
+
+## 三、差距复核方法
+
+每个后续批次按以下顺序复核：
+
+1. 从 TDD 用例 ID 选择本批次最小目标。
+2. 回看产品验收、DSL 契约和系分模块，确认语义一致。
+3. 扫描当前代码服务、枚举、请求、转换器、路由、生命周期、账本、投影差距。
+4. 先写失败测试或契约测试。
+5. 做最小实现。
+6. 运行批次验证命令。
+7. 若发现设计错漏，先改 docs 和 OpenSpec，再继续。
+
+## 四、首批差距
+
+| 差距 | 影响 | 处理批次 |
+| --- | --- | --- |
+| 授权 `EXPIRE` 事件和服务入口缺失 | 授权过期无法与外部撤销区分。 | 批次 4 授权交易。 |
+| `settle` 强制完成模式缺少契约字段 | 无前置授权强制完成无法证明策略、上限、原因和审计。 | 批次 4 授权交易。 |
+| 旧测试源码删除后测试体系为空 | 不能依赖旧测试证明目标态。 | 批次 1 起逐步重建。 |
+| 清结算、对账、归档、指标不应混入主链路 | 容易扩大主链路复杂度。 | 批次 7、8 独立处理。 |
+
+## 五、人工确认点
+
+以下事项进入编码前必须人工确认：
+
+1. 公共契约字段新增、删除或兼容策略。
+2. 枚举新增、状态机变更和数据库表结构变更。
+3. 授权过期和强制完成对历史数据、幂等键和对账解释的影响。
+4. 清结算、对账、归档和重放是否进入本轮实现。
+5. 是否开启 CAD Mode、Git 策略和 Execution Grant。
