@@ -84,7 +84,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -107,11 +110,21 @@ import static org.assertj.core.api.Assertions.assertThat;
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
         FundsTransactionFlowTestSupport.Config.class
 })
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
 abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest {
 
     private static final LocalDateTime ACTIVE_TIME = LocalDateTime.of(2026, 5, 18, 0, 0);
 
     private static final int MAX_LEDGER_BUCKET_SIZE = 50;
+
+    private static final List<String> FLOW_TEST_TABLES = List.of(
+            "t_ledger_entry",
+            "t_ledger_posting_plan",
+            "t_ledger_transaction",
+            "t_funds_frozen_order",
+            "t_funds_transaction_detail",
+            "t_funds_transaction",
+            "t_ledger");
 
     @Autowired
     protected FundsDirectTransactionService directTransactionService;
@@ -134,9 +147,17 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     @Autowired
     private FundsFrozenOrderMapper fundsFrozenOrderMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setUp() {
+        cleanupFlowTestData();
         seedLedgers();
+    }
+
+    private void cleanupFlowTestData() {
+        FLOW_TEST_TABLES.forEach(table -> jdbcTemplate.update("DELETE FROM " + table));
     }
 
     private void seedLedgers() {
