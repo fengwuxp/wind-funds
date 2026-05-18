@@ -18,7 +18,6 @@ import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.capte.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.capte.funds.transaction.application.FundsBalanceControlService;
-import com.capte.funds.transaction.application.FundsBalanceControlTransactionService;
 import com.capte.funds.transaction.application.FundsDirectTransactionService;
 import com.capte.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
@@ -45,7 +44,6 @@ import java.util.Objects;
 @Service
 public class FundsTransactionCommandServiceImpl implements FundsDirectTransactionService,
         FundsBalanceControlService,
-        FundsBalanceControlTransactionService,
         FundsAuthorizationTransactionService {
 
     private final FundsDirectTransactionInstructionConverter directTransactionInstructionConverter;
