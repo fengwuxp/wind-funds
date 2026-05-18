@@ -62,6 +62,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 资金交易命令/转换边界测试基类。
+ *
+ * <p>这里的 {@link RecordingOrchestrator} 只捕获 Command Service 输出的资金指令，
+ * 用于验证请求到指令、指令到 route 的转换语义；完整编排、入账和余额变化由
+ * {@code com.capte.funds.transaction.application.flow} 包中的 Spring 流程测试覆盖。</p>
+ */
 abstract class FundsTransactionCommandServiceImplTestSupport {
 
     protected static final Long TENANT_ID = 1L;

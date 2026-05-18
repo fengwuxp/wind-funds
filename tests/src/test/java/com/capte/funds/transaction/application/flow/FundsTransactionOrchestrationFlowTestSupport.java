@@ -46,6 +46,7 @@ import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -53,6 +54,12 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -63,64 +70,48 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 资金交易编排流程测试基类。
+ *
+ * <p>测试通过最小 Spring 上下文注入 command service、converter、route resolver 和 orchestrator；
+ * Recording 组件仅用于捕获 route、lifecycle、posting 边界输出，避免替代被测内部编排链路。</p>
+ */
+@SpringJUnitConfig(FundsTransactionOrchestrationFlowTestSupport.Config.class)
 abstract class FundsTransactionOrchestrationFlowTestSupport {
     protected static final Long TENANT_ID = 1L;
 
     protected static final com.wind.transaction.core.enums.CurrencyIsoCode CURRENCY =
             com.wind.transaction.core.enums.CurrencyIsoCode.USD;
 
+    @Autowired
     protected RecordingRouteResolver routeResolver;
 
+    @Autowired
     protected RecordingLifecycleSaver lifecycleSaver;
 
+    @Autowired
     protected RecordingLedgerPostingAssembler postingAssembler;
 
+    @Autowired
     protected RecordingPostingService postingService;
 
+    @Autowired
     protected RecordingTransactionQueryService transactionQueryService;
 
+    @Autowired
     protected FundsAuthorizationInstructionConverter authorizationInstructionConverter;
 
+    @Autowired
     protected FundsTransactionCommandServiceImpl service;
 
     @BeforeEach
     void setUp() {
         ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
-        PlatformFundingAccountService platformFundingAccountService = platformFundingAccountService();
-        authorizationInstructionConverter = new FundsAuthorizationInstructionConverter(
-                FundsRouteTestSupport.accountQueryService(CURRENCY));
-        RouteSubjectSupport routeSubjectSupport = new RouteSubjectSupport();
-        PlatformAccountRouteSupport platformAccountRouteSupport = new PlatformAccountRouteSupport(
-                platformFundingAccountService);
-        RouteParticipantFactory routeParticipantFactory = new RouteParticipantFactory();
-        transactionQueryService = new RecordingTransactionQueryService();
-        RouteResolver delegate = new CompositeRouteResolver(List.of(
-                new DefaultRouteReplayService(transactionQueryService),
-                new TransferFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
-                        platformAccountRouteSupport),
-                new BalanceControlFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
-                        platformAccountRouteSupport),
-                new AuthorizationFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
-                        platformAccountRouteSupport)
-        ));
-        routeResolver = new RecordingRouteResolver(delegate);
-        lifecycleSaver = new RecordingLifecycleSaver();
-        postingAssembler = new RecordingLedgerPostingAssembler();
-        postingService = new RecordingPostingService();
-        DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
-                routeResolver,
-                new DefaultRouteSnapshotFactory(),
-                postingAssembler,
-                postingService,
-                lifecycleSaver
-        );
-        service = new FundsTransactionCommandServiceImpl(
-                new FundsDirectTransactionInstructionConverter(platformFundingAccountService,
-                        FundsRouteTestSupport.accountQueryService(CURRENCY)),
-                new FundsBalanceControlInstructionConverter(FundsRouteTestSupport.accountQueryService(CURRENCY)),
-                authorizationInstructionConverter,
-                orchestrator
-        );
+        routeResolver.reset();
+        lifecycleSaver.reset();
+        postingAssembler.reset();
+        postingService.reset();
+        transactionQueryService.reset();
     }
 
     @AfterEach
@@ -178,32 +169,18 @@ abstract class FundsTransactionOrchestrationFlowTestSupport {
         return com.wind.transaction.core.Money.immutable(value, CURRENCY);
     }
 
-    private static PlatformFundingAccountService platformFundingAccountService() {
-        return new PlatformFundingAccountService() {
-            @Override
-            public FundsAccountId requireAccountId(com.wind.transaction.core.enums.CurrencyIsoCode currency,
-                                                   PlatformFundingAccountRole role) {
-                return requireAccountId(TENANT_ID, currency, role);
-            }
-
-            @Override
-            public FundsAccountId requireAccountId(Long tenantId,
-                                                   com.wind.transaction.core.enums.CurrencyIsoCode currency,
-                                                   PlatformFundingAccountRole role) {
-                return FundsAccountId.immutable("platform_" + role.name().toLowerCase(),
-                        FundsSubjectType.FUNDING_ACCOUNT);
-            }
-        };
-    }
-
     protected static final class RecordingRouteResolver implements RouteResolver {
 
         private final RouteResolver delegate;
 
         final AtomicReference<FundsInstructionSpec> instruction = new AtomicReference<>();
 
-        private RecordingRouteResolver(RouteResolver delegate) {
+        RecordingRouteResolver(RouteResolver delegate) {
             this.delegate = delegate;
+        }
+
+        private void reset() {
+            instruction.set(null);
         }
 
         @Override
@@ -223,6 +200,11 @@ abstract class FundsTransactionOrchestrationFlowTestSupport {
         final AtomicReference<ResolvedRouteSpec> beforePostingRoute = new AtomicReference<>();
 
         final AtomicReference<String> succeededLedgerTransactionSn = new AtomicReference<>();
+
+        private void reset() {
+            beforePostingRoute.set(null);
+            succeededLedgerTransactionSn.set(null);
+        }
 
         @Override
         public boolean supports(@NonNull FundsInstructionSpec instruction) {
@@ -258,6 +240,10 @@ abstract class FundsTransactionOrchestrationFlowTestSupport {
     protected static final class RecordingLedgerPostingAssembler implements LedgerPostingAssembler<ResolvedRouteSpec> {
 
         final AtomicReference<ResolvedRouteSpec> route = new AtomicReference<>();
+
+        private void reset() {
+            route.set(null);
+        }
 
         @Override
         public @NonNull LedgerTransactionSpec assemble(@NonNull FundsInstructionSpec instruction,
@@ -310,6 +296,10 @@ abstract class FundsTransactionOrchestrationFlowTestSupport {
 
         final AtomicReference<LedgerTransactionSpec> transaction = new AtomicReference<>();
 
+        private void reset() {
+            transaction.set(null);
+        }
+
         @Override
         public void post(LedgerTransactionSpec transaction) {
             this.transaction.set(transaction);
@@ -321,6 +311,11 @@ abstract class FundsTransactionOrchestrationFlowTestSupport {
         final Map<String, RouteSnapshotSpec> routeSnapshots = new ConcurrentHashMap<>();
 
         final Map<String, RouteSnapshotSpec> freezeOrderSnapshots = new ConcurrentHashMap<>();
+
+        private void reset() {
+            routeSnapshots.clear();
+            freezeOrderSnapshots.clear();
+        }
 
         @Override
         public @NonNull Optional<FundsTransactionDTO> queryFundsTransaction(@NonNull String transactionSn) {
@@ -355,6 +350,87 @@ abstract class FundsTransactionOrchestrationFlowTestSupport {
         @Override
         public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(@NonNull String freezeOrderSn) {
             return Optional.ofNullable(freezeOrderSnapshots.get(freezeOrderSn));
+        }
+    }
+
+    @Configuration
+    @Import({
+            FundsDirectTransactionInstructionConverter.class,
+            FundsBalanceControlInstructionConverter.class,
+            FundsAuthorizationInstructionConverter.class,
+            RouteParticipantFactory.class,
+            RouteSubjectSupport.class,
+            PlatformAccountRouteSupport.class,
+            DefaultRouteReplayService.class,
+            TransferFundsInstructionRouteResolver.class,
+            BalanceControlFundsInstructionRouteResolver.class,
+            AuthorizationFundsInstructionRouteResolver.class,
+            DefaultRouteSnapshotFactory.class,
+            DefaultRoutedFundsInstructionOrchestrator.class,
+            FundsTransactionCommandServiceImpl.class
+    })
+    static class Config {
+
+        @Bean
+        RecordingTransactionQueryService transactionQueryService() {
+            return new RecordingTransactionQueryService();
+        }
+
+        @Bean
+        CompositeRouteResolver delegateRouteResolver(DefaultRouteReplayService replayService,
+                                                     TransferFundsInstructionRouteResolver transferResolver,
+                                                     BalanceControlFundsInstructionRouteResolver balanceResolver,
+                                                     AuthorizationFundsInstructionRouteResolver authorizationResolver) {
+            return new CompositeRouteResolver(List.of(replayService, transferResolver, balanceResolver,
+                    authorizationResolver));
+        }
+
+        @Bean
+        @Primary
+        RecordingRouteResolver routeResolver(CompositeRouteResolver delegate) {
+            return new RecordingRouteResolver(delegate);
+        }
+
+        @Bean
+        @Primary
+        RecordingLifecycleSaver lifecycleSaver() {
+            return new RecordingLifecycleSaver();
+        }
+
+        @Bean
+        @Primary
+        RecordingLedgerPostingAssembler postingAssembler() {
+            return new RecordingLedgerPostingAssembler();
+        }
+
+        @Bean
+        @Primary
+        RecordingPostingService postingService() {
+            return new RecordingPostingService();
+        }
+
+        @Bean
+        PlatformFundingAccountService platformFundingAccountService() {
+            return new PlatformFundingAccountService() {
+                @Override
+                public FundsAccountId requireAccountId(com.wind.transaction.core.enums.CurrencyIsoCode currency,
+                                                       PlatformFundingAccountRole role) {
+                    return requireAccountId(TENANT_ID, currency, role);
+                }
+
+                @Override
+                public FundsAccountId requireAccountId(Long tenantId,
+                                                       com.wind.transaction.core.enums.CurrencyIsoCode currency,
+                                                       PlatformFundingAccountRole role) {
+                    return FundsAccountId.immutable("platform_" + role.name().toLowerCase(),
+                            FundsSubjectType.FUNDING_ACCOUNT);
+                }
+            };
+        }
+
+        @Bean
+        FundsAccountQueryService fundsAccountQueryService() {
+            return FundsRouteTestSupport.accountQueryService(CURRENCY);
         }
     }
 }

@@ -68,6 +68,7 @@ import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.transaction.core.Money;
@@ -76,6 +77,12 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 import java.lang.reflect.Proxy;
 import java.time.LocalDateTime;
@@ -92,6 +99,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertPostingBalanced;
 import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * 资金交易业务组合流程测试基类。
+ *
+ * <p>测试通过最小 Spring 上下文注入 command service、converter、route resolver、orchestrator
+ * 和 posting assembler；只用内存账本和生命周期记录器替换外部持久化边界，确保流程用例验证真实内部链路。</p>
+ */
+@SpringJUnitConfig(FundsTransactionBusinessFlowTestSupport.Config.class)
 abstract class FundsTransactionBusinessFlowTestSupport {
 
     protected static final Long TENANT_ID = 1L;
@@ -100,46 +114,21 @@ abstract class FundsTransactionBusinessFlowTestSupport {
 
     protected static final LocalDateTime ACTIVE_TIME = LocalDateTime.of(2026, 5, 14, 0, 0);
 
+    @Autowired
     protected FundsTransactionCommandServiceImpl service;
 
+    @Autowired
     protected InMemoryLedgerBook ledgerBook;
 
+    @Autowired
     protected RecordingLifecycleSaver lifecycleSaver;
 
     @BeforeEach
     void setUp() {
         ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
-        ledgerBook = new InMemoryLedgerBook();
+        ledgerBook.reset();
+        lifecycleSaver.reset();
         seedLedgers();
-        PlatformFundingAccountService platformFundingAccountService = platformFundingAccountService();
-        RouteSubjectSupport routeSubjectSupport = new RouteSubjectSupport();
-        PlatformAccountRouteSupport platformAccountRouteSupport = new PlatformAccountRouteSupport(
-                platformFundingAccountService);
-        RouteParticipantFactory routeParticipantFactory = new RouteParticipantFactory();
-        lifecycleSaver = new RecordingLifecycleSaver();
-        RouteResolver routeResolver = new CompositeRouteResolver(List.of(
-                new DefaultRouteReplayService(lifecycleSaver),
-                new TransferFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
-                        platformAccountRouteSupport),
-                new BalanceControlFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
-                        platformAccountRouteSupport),
-                new AuthorizationFundsInstructionRouteResolver(routeParticipantFactory, routeSubjectSupport,
-                        platformAccountRouteSupport)
-        ));
-        DefaultRoutedFundsInstructionOrchestrator orchestrator = new DefaultRoutedFundsInstructionOrchestrator(
-                routeResolver,
-                new DefaultRouteSnapshotFactory(),
-                new DefaultLedgerPostingAssembler(ledgerBook),
-                ledgerBook,
-                lifecycleSaver
-        );
-        service = new FundsTransactionCommandServiceImpl(
-                new FundsDirectTransactionInstructionConverter(platformFundingAccountService,
-                        FundsRouteTestSupport.accountQueryService(CURRENCY)),
-                new FundsBalanceControlInstructionConverter(FundsRouteTestSupport.accountQueryService(CURRENCY)),
-                new FundsAuthorizationInstructionConverter(FundsRouteTestSupport.accountQueryService(CURRENCY)),
-                orchestrator
-        );
     }
 
     @AfterEach
@@ -481,21 +470,6 @@ abstract class FundsTransactionBusinessFlowTestSupport {
         return result;
     }
 
-    private static PlatformFundingAccountService platformFundingAccountService() {
-        return new PlatformFundingAccountService() {
-            @Override
-            public FundsAccountId requireAccountId(CurrencyIsoCode currency, PlatformFundingAccountRole role) {
-                return requireAccountId(TENANT_ID, currency, role);
-            }
-
-            @Override
-            public FundsAccountId requireAccountId(Long tenantId, CurrencyIsoCode currency,
-                                                   PlatformFundingAccountRole role) {
-                return platformAccount(role);
-            }
-        };
-    }
-
     private record LedgerKey(Long tenantId,
                              String subjectId,
                              String subjectType,
@@ -545,6 +519,13 @@ abstract class FundsTransactionBusinessFlowTestSupport {
         final List<LedgerTransactionSpec> postedTransactions = new ArrayList<>();
 
         private long nextLedgerId = 1L;
+
+        private void reset() {
+            ledgers.clear();
+            ledgersById.clear();
+            postedTransactions.clear();
+            nextLedgerId = 1L;
+        }
 
         private void ensureLedger(FundsAccountId accountId, LedgerSubjectCode subjectCode, long initialBalance) {
             LedgerKey key = LedgerKey.of(accountId, subjectCode);
@@ -672,6 +653,14 @@ abstract class FundsTransactionBusinessFlowTestSupport {
 
         private final List<ConsumedReplayLeg> consumedReplayLegs = new ArrayList<>();
 
+        private void reset() {
+            transactionSequence.set(0);
+            succeededLedgerTransactionSns.clear();
+            routeSnapshots.clear();
+            freezeOrderSnapshots.clear();
+            consumedReplayLegs.clear();
+        }
+
         @Override
         public boolean supports(@NonNull FundsInstructionSpec instruction) {
             return true;
@@ -769,6 +758,59 @@ abstract class FundsTransactionBusinessFlowTestSupport {
                                      String replayRefLegId,
                                      long amount,
                                      CurrencyIsoCode currency) {
+    }
+
+    @Configuration
+    @Import({
+            FundsDirectTransactionInstructionConverter.class,
+            FundsBalanceControlInstructionConverter.class,
+            FundsAuthorizationInstructionConverter.class,
+            RouteParticipantFactory.class,
+            RouteSubjectSupport.class,
+            PlatformAccountRouteSupport.class,
+            DefaultRouteReplayService.class,
+            TransferFundsInstructionRouteResolver.class,
+            BalanceControlFundsInstructionRouteResolver.class,
+            AuthorizationFundsInstructionRouteResolver.class,
+            CompositeRouteResolver.class,
+            DefaultRouteSnapshotFactory.class,
+            DefaultLedgerPostingAssembler.class,
+            DefaultRoutedFundsInstructionOrchestrator.class,
+            FundsTransactionCommandServiceImpl.class
+    })
+    static class Config {
+
+        @Bean
+        InMemoryLedgerBook ledgerBook() {
+            return new InMemoryLedgerBook();
+        }
+
+        @Bean
+        @Primary
+        RecordingLifecycleSaver lifecycleSaver() {
+            return new RecordingLifecycleSaver();
+        }
+
+        @Bean
+        PlatformFundingAccountService platformFundingAccountService() {
+            return new PlatformFundingAccountService() {
+                @Override
+                public FundsAccountId requireAccountId(CurrencyIsoCode currency, PlatformFundingAccountRole role) {
+                    return requireAccountId(TENANT_ID, currency, role);
+                }
+
+                @Override
+                public FundsAccountId requireAccountId(Long tenantId, CurrencyIsoCode currency,
+                                                       PlatformFundingAccountRole role) {
+                    return platformAccount(role);
+                }
+            };
+        }
+
+        @Bean
+        FundsAccountQueryService fundsAccountQueryService() {
+            return FundsRouteTestSupport.accountQueryService(CURRENCY);
+        }
     }
 
     @SuppressWarnings("unchecked")
