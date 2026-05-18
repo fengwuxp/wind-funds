@@ -80,6 +80,12 @@ class FundsTransactionFeeCommandServiceImplTests extends FundsTransactionCommand
         assertNoLimitNodes(route);
     }
 
+    /**
+     * 场景：资金账户发生独立手续费扣收。
+     * 输入：FundingAccount、手续费金额 30、默认 feeType。
+     * 输出：FEE 资金交易和独立手续费 route。
+     * 预期：费用从付款方 AVAILABLE 扣到平台 FEE，不触碰信用 LIMIT。
+     */
     @Test
     void testFeeShouldBuildIndependentFeeRoute() {
         FundsAccountId payer = fundingAccount("funding_001");
@@ -100,6 +106,12 @@ class FundsTransactionFeeCommandServiceImplTests extends FundsTransactionCommand
         assertNoLimitNodes(route());
     }
 
+    /**
+     * 场景：对原手续费交易发起手续费退回。
+     * 输入：原 FEE 交易快照、退款金额 30 和原手续费交易流水。
+     * 输出：FEE_REFUND 指令引用原手续费交易，并按原费用 leg 回放。
+     * 预期：只把平台 FEE 回退到付款方 AVAILABLE，不重放付款本金路径。
+     */
     @Test
     void testFeeRefundShouldReplayOriginalFeeLegOnly() {
         FundsAccountId payer = fundingAccount("funding_001");

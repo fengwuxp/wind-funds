@@ -20,6 +20,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class FundsAuthorizationTransactionCommandServiceImplTests extends FundsTransactionCommandServiceImplTestSupport {
 
+    /**
+     * 场景：外部授权问询通过，信用账户需要占用可用额度。
+     * 输入：CREDIT_ACCOUNT、授权金额 600、approved=true。
+     * 输出：AUTHORIZATION_TRANSACTION / AUTHORIZE 指令和 HOLD route。
+     * 预期：AVAILABLE 转入 AUTHORIZATION，并对 AVAILABLE 加上不得为负的约束。
+     */
     @Test
     void testAuthorizeShouldBuildHoldRouteWhenApproved() {
         FundsAccountId credit = creditAccount("credit_001");
@@ -46,6 +52,12 @@ class FundsAuthorizationTransactionCommandServiceImplTests extends FundsTransact
                         LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
     }
 
+    /**
+     * 场景：外部授权问询被拒绝。
+     * 输入：CREDIT_ACCOUNT、授权金额 600、approved=false 和拒绝原因。
+     * 输出：AUTHORIZE 生命周期指令、拒绝原因上下文和授权主体参与方。
+     * 预期：拒绝授权不生成账本 route leg，不改变余额。
+     */
     @Test
     void testAuthorizeShouldNotBuildLedgerLegWhenDeclined() {
         service.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
