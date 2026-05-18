@@ -45,6 +45,7 @@ import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.ledger.DefaultLedgerPostingAssembler;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
@@ -67,6 +68,8 @@ import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.spec.transaction.FeeSpec;
+import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.wallet.FundsAccount;
 import com.wind.integration.funds.wallet.FundsAccountBalanceView;
 import com.wind.integration.funds.wallet.FundsAccountId;
@@ -167,6 +170,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         ensureLedger(user, LedgerSubjectCode.FROZEN, 0L);
         ensureLedger(cashMappingAccount(), LedgerSubjectCode.CASH, 10_000L);
         ensureLedger(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L);
+        ensureLedger(feeAccount(), LedgerSubjectCode.FEE, 0L);
     }
 
     private void ensureLedger(FundsAccountId accountId,
@@ -244,6 +248,26 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setDescription("pay"), WindOperator.system());
     }
 
+    protected void payWithFixedFee(FundsAccountId accountId,
+                                   FundsAccountId payeeId,
+                                   LedgerSubjectCode payeeLedgerCode,
+                                   long amount,
+                                   long feeAmount,
+                                   String businessSn) {
+        directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(accountId)
+                .setPayeeId(payeeId)
+                .setPayeeLedgerCode(payeeLedgerCode)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setFeeSpec(FeeSpec.builder()
+                        .feeType(DefaultFeeType.FEE.getCode())
+                        .fixedFee(Math.toIntExact(feeAmount))
+                        .build())
+                .setBusinessScene("PAY")
+                .setBusinessSn(businessSn)
+                .setDescription("pay with fee"), WindOperator.system());
+    }
+
     protected void refund(FundsAccountId accountId,
                           FundsAccountId payerId,
                           LedgerSubjectCode payerLedgerCode,
@@ -257,6 +281,19 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setBusinessScene("REFUND")
                 .setBusinessSn(businessSn)
                 .setDescription("refund"), WindOperator.system());
+    }
+
+    protected String refundFee(FundsAccountId accountId,
+                               long amount,
+                               String feeSourceTransactionSn,
+                               String businessSn) {
+        return directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setFeeSourceTransactionSn(feeSourceTransactionSn)
+                .setBusinessScene("FEE_REFUND")
+                .setBusinessSn(businessSn)
+                .setDescription("fee refund"), WindOperator.system());
     }
 
     protected void withdraw(FundsAccountId accountId, long amount, String referenceFreezeSn, String businessSn) {
@@ -369,6 +406,10 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected static FundsAccountId prepaymentAccount() {
         return platformAccount(PlatformFundingAccountRole.PREPAYMENT);
+    }
+
+    protected static FundsAccountId feeAccount() {
+        return platformAccount(PlatformFundingAccountRole.FEE);
     }
 
     private static FundsAccountId platformAccount(PlatformFundingAccountRole role) {
