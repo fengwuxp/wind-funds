@@ -400,7 +400,7 @@ Replay 用于后续事件沿用原路径事实。
 | 原交易全额退款 | `DIRECT_TRANSACTION / REFUND`。 | 基于原 route snapshot 反向。 | 支持原路径 replay、可退金额校验和幂等。 | 退款不超过原交易；缺快照失败；不按当前绑定重新选路。 |
 | 原交易部分退款 | `DIRECT_TRANSACTION / REFUND`。 | 原路径部分反向。 | 记录累计已退金额和剩余可退金额。 | 多次退款累计不超过原交易；每次 posting 平衡。 |
 | 手续费退回 | `DIRECT_TRANSACTION / FEE_REFUND`。 | 平台费用账户 -> 原付费方。 | 退费独立事件处理，不混入普通退款。 | 普通退款不默认退费；退费不超过原手续费。 |
-| 清算确认 | `DIRECT_TRANSACTION / SETTLEMENT` 或稳定清算事件。 | `CLEARING` -> 可结算或待处理口径。 | 只处理确认后的清算结果。 | 清算批次生成不直接入账；确认结果入账可追溯。 |
+| 清算确认 | `DIRECT_TRANSACTION / CLEARING_CONFIRM` 或稳定清算事件。 | `CLEARING` -> 可结算或待处理口径。 | 只处理确认后的清算结果。 | 清算批次生成不直接入账；确认结果入账可追溯。 |
 | 结算锁定与出款结果 | `SETTLEMENT_LOCK`、`FUND_OUT`、失败回退。 | `CLEARING/AVAILABLE -> SETTLEMENT -> 出款结果`。 | 支持锁定、成功消耗、失败回退三类事实。 | 锁定不等于出款成功；失败回退恢复原口径。 |
 | 对账差错调账 | `DIRECT_TRANSACTION / ADJUST`。 | 差错来源 -> `ADJUSTMENT` 或业务指定口径。 | 必须带差错来源、审批、凭证和审计上下文。 | 无审批调账失败；调账分录平衡；差错可核销。 |
 | 错币种直接交易 | `DIRECT_TRANSACTION` 携带 `originalAmount` 与 `amount`。 | 账务主链路使用 `amount.currency`。 | 只记录业务层已决策的 FX 事实，不隐式换汇。 | 汇率快照完整；交易层不调用 FX；余额控制不承接 FX。 |
@@ -480,8 +480,8 @@ Replay 用于后续事件沿用原路径事实。
 
 | 场景 | DSL 进入点 | 账务要求 |
 | --- | --- | --- |
-| 清算确认 | 确认后的清算结果。 | 从 `CLEARING` 进入可结算或待处理口径。 |
-| 结算锁定 | 确认后的结算出款候选。 | 从 `CLEARING` 或 `AVAILABLE` 锁定到 `SETTLEMENT`。 |
+| 清算确认 | 确认后的清算结果，事件语义使用 `CLEARING_CONFIRM`。 | 从 `CLEARING` 进入可结算或待处理口径。 |
+| 结算锁定 | 确认后的结算出款候选，事件语义使用 `SETTLEMENT_LOCK`。 | 从 `AVAILABLE` 锁定到 `SETTLEMENT`。 |
 | 出款成功 | 外部出款结果成立。 | 释放或消耗 `SETTLEMENT`，保留外部引用。 |
 | 出款失败回退 | 外部出款失败已确认。 | 从 `SETTLEMENT` 回退到原口径。 |
 | 对账差错调账 | 差错已审批、凭证已确认。 | 进入 `ADJUSTMENT` 或业务指定口径，必须可审计。 |
@@ -1380,7 +1380,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
   "settlementInstruction": {
     "tenantId": 1,
     "instructionType": "DIRECT_TRANSACTION",
-    "eventType": "SETTLEMENT",
+    "eventType": "SETTLEMENT_LOCK",
     "transactionType": "SETTLEMENT_LOCK",
     "businessScene": "MERCHANT_SETTLEMENT_LOCK",
     "businessSn": "SETTLEMENT_LOCK_202605180001",
