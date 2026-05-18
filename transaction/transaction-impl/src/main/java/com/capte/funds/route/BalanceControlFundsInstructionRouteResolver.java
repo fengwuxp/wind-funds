@@ -2,6 +2,7 @@ package com.capte.funds.route;
 
 import com.capte.funds.route.support.PlatformAccountRouteSupport;
 import com.capte.funds.route.support.RouteParticipantFactory;
+import com.capte.funds.route.support.RouteSpecSupport;
 import com.capte.funds.route.support.RouteSubjectSupport;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
@@ -34,12 +35,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-
-import static com.capte.funds.route.support.RouteSpecSupport.balanceConstraint;
-import static com.capte.funds.route.support.RouteSpecSupport.mustNotBeNegative;
-import static com.capte.funds.route.support.RouteSpecSupport.routeLeg;
-import static com.capte.funds.route.support.RouteSpecSupport.sourceNode;
-import static com.capte.funds.route.support.RouteSpecSupport.targetNode;
 
 /**
  * 余额控制 RouteResolver。
@@ -140,13 +135,15 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
     private ResolvedRouteSpec resolveFreeze(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionContextKeys.ACCOUNT_ID);
-        List<RouteLegSpec> legs = List.of(routeLeg(LEG_FREEZE, 1, RouteLegType.HOLD, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.FROZEN))
+        List<RouteLegSpec> legs = List.of(RouteSpecSupport.routeLeg(LEG_FREEZE, 1, RouteLegType.HOLD, instruction)
+                .sourceNode(RouteSpecSupport.sourceNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
+                .targetNode(RouteSpecSupport.targetNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.FROZEN))
                 .balanceEffectType(LedgerBalanceEffectType.HOLD)
                 .phaseCode(LedgerPhaseCode.FREEZE)
                 .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
+                .constraintOverrides(RouteSpecSupport.mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
                 .build());
         List<RouteParticipantSpec> participants = List.of(subjectParticipant(accountId, instruction));
         return route(instruction, FundsRouteCodes.BALANCE_FREEZE_STANDARD, participants, legs);
@@ -155,12 +152,14 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
     private ResolvedRouteSpec resolveUnfreeze(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionContextKeys.ACCOUNT_ID);
-        List<RouteLegSpec> legs = List.of(routeLeg(LEG_UNFREEZE, 1, RouteLegType.RELEASE, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.FROZEN))
-                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
+        List<RouteLegSpec> legs = List.of(RouteSpecSupport.routeLeg(LEG_UNFREEZE, 1, RouteLegType.RELEASE, instruction)
+                .sourceNode(RouteSpecSupport.sourceNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.FROZEN))
+                .targetNode(RouteSpecSupport.targetNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .balanceEffectType(LedgerBalanceEffectType.RELEASE)
                 .phaseCode(LedgerPhaseCode.UNFREEZE)
-                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.FROZEN))
+                .constraintOverrides(RouteSpecSupport.mustNotBeNegative(accountId, LedgerSubjectCode.FROZEN))
                 .build());
         List<RouteParticipantSpec> participants = List.of(subjectParticipant(accountId, instruction));
         return route(instruction, FundsRouteCodes.BALANCE_UNFREEZE_STANDARD, participants, legs);
@@ -186,17 +185,19 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
         FundsAccountId adjustmentAccount = platformAccountRouteSupport.requireAccount(
                 instruction.getAmount().getCurrency(), PlatformFundingAccountRole.ADJUSTMENT);
         RouteLegSpec leg = increase
-                ? routeLeg(LEG_FUNDING_BALANCE_ADJUST, 1, RouteLegType.ADJUST, instruction)
-                .sourceNode(sourceNode(platformAccountRouteSupport.createSubjectRef(adjustmentAccount),
+                ? RouteSpecSupport.routeLeg(LEG_FUNDING_BALANCE_ADJUST, 1, RouteLegType.ADJUST, instruction)
+                .sourceNode(RouteSpecSupport.sourceNode(platformAccountRouteSupport.createSubjectRef(adjustmentAccount),
                         platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.ADJUSTMENT)))
-                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
+                .targetNode(RouteSpecSupport.targetNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .balanceEffectType(LedgerBalanceEffectType.INCREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
                 .constraintOverrides(Map.of())
                 .build()
-                : routeLeg(LEG_FUNDING_BALANCE_ADJUST, 1, RouteLegType.ADJUST, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(adjustmentAccount),
+                : RouteSpecSupport.routeLeg(LEG_FUNDING_BALANCE_ADJUST, 1, RouteLegType.ADJUST, instruction)
+                .sourceNode(RouteSpecSupport.sourceNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
+                .targetNode(RouteSpecSupport.targetNode(platformAccountRouteSupport.createSubjectRef(adjustmentAccount),
                         platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.ADJUSTMENT)))
                 .balanceEffectType(LedgerBalanceEffectType.DECREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
@@ -228,16 +229,20 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                                                          String routeCode) {
         boolean increase = FundsInstructionContextReader.requireBoolean(instruction, FundsInstructionContextKeys.INCREASE);
         RouteLegSpec leg = increase
-                ? routeLeg(LEG_LIMIT_ADJUST, 1, RouteLegType.ADJUST, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.LIMIT))
-                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
+                ? RouteSpecSupport.routeLeg(LEG_LIMIT_ADJUST, 1, RouteLegType.ADJUST, instruction)
+                .sourceNode(RouteSpecSupport.sourceNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.LIMIT))
+                .targetNode(RouteSpecSupport.targetNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .balanceEffectType(LedgerBalanceEffectType.INCREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
                 .constraintOverrides(Map.of())
                 .build()
-                : routeLeg(LEG_LIMIT_ADJUST, 1, RouteLegType.ADJUST, instruction)
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.LIMIT))
+                : RouteSpecSupport.routeLeg(LEG_LIMIT_ADJUST, 1, RouteLegType.ADJUST, instruction)
+                .sourceNode(RouteSpecSupport.sourceNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
+                .targetNode(RouteSpecSupport.targetNode(
+                        routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.LIMIT))
                 .balanceEffectType(LedgerBalanceEffectType.DECREASE)
                 .phaseCode(LedgerPhaseCode.ADJUSTMENT)
                 .constraintOverrides(adjustAvailableBalanceConstraint(instruction, accountId))
@@ -305,7 +310,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 instruction,
                 FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE,
                 Boolean.class))) {
-            return balanceConstraint(
+            return RouteSpecSupport.balanceConstraint(
                     accountId,
                     LedgerSubjectCode.AVAILABLE,
                     LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE);
@@ -338,7 +343,8 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                         LocalDateTime.class),
                 ALLOW_NEGATIVE_BALANCE_AGING_REQUIRED_MESSAGE);
         requireBudgetGovernance(instruction, accountId);
-        return balanceConstraint(accountId, LedgerSubjectCode.AVAILABLE, LedgerBalanceConstraintType.ALLOW_NEGATIVE);
+        return RouteSpecSupport.balanceConstraint(
+                accountId, LedgerSubjectCode.AVAILABLE, LedgerBalanceConstraintType.ALLOW_NEGATIVE);
     }
 
     private void requireBudgetGovernance(FundsInstructionSpec instruction, FundsAccountId accountId) {
