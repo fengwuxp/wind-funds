@@ -5,6 +5,7 @@ import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
+import com.capte.funds.route.support.RouteSpecSupport;
 import com.capte.funds.transaction.support.FundsRouteCodes;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.common.exception.AssertUtils;
@@ -109,7 +110,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         for (RouteLegSpec sourceLeg : sourceLegs) {
             replayLegs.add(replayLeg(snapshot, sourceLeg, replayRequest, sequence++));
         }
-        return ImmutableResolvedRouteSpec.builder()
+        ResolvedRouteSpec result = ImmutableResolvedRouteSpec.builder()
                 .tenantId(snapshot.getTenantId())
                 .routeCode(resolveRouteCode(replayRequest))
                 .routeVersion(snapshot.getRouteVersion())
@@ -128,6 +129,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .description(replayRequest.getDescription())
                 .contextVariables(replayRequest.getContextVariables())
                 .build();
+        RouteSpecSupport.validateResolvedRoute(result);
+        return result;
     }
 
     private RouteSnapshotSpec requireReplaySnapshot(FundsInstructionSpec instruction) {
