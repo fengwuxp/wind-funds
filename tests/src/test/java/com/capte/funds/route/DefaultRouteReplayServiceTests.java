@@ -31,6 +31,8 @@ class DefaultRouteReplayServiceTests {
 
     private static final String MISSING_REPLAY_REFERENCE_MESSAGE = "RouteSnapshot 回放事件缺少原路径引用";
 
+    private static final String MISSING_ROUTE_SNAPSHOT_MESSAGE = "RouteSnapshot 回放事件未找到原路径快照";
+
     private final DefaultRouteReplayService routeReplayService = new DefaultRouteReplayService(
             new EmptyFundsTransactionQueryService());
 
@@ -63,6 +65,25 @@ class DefaultRouteReplayServiceTests {
 
         assertThatThrownBy(() -> routeReplayService.resolve(replayInstruction(reference)))
                 .hasMessageContaining(MISSING_REPLAY_REFERENCE_MESSAGE);
+    }
+
+    /**
+     * 场景：业务侧传入有效原交易引用，但系统无法查询到原交易的 RouteSnapshot。
+     * 输入：`REFUND` 事件、`ORIGINAL_TRANSACTION` 引用、存在格式的 `referenceSn`。
+     * 输出：解析器拒绝回放。
+     * 预期：异常信息明确指向缺少原路径快照，并带上原交易流水号。
+     * 红线：Route Replay 缺原路径快照时不得按当前绑定关系重新路由。
+     */
+    @Test
+    void testResolveReplayInstructionWithoutRouteSnapshotShouldFailClearly() {
+        FundsInstructionReferenceSpec reference = ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.ORIGINAL_TRANSACTION)
+                .referenceSn("FT202605190001")
+                .build();
+
+        assertThatThrownBy(() -> routeReplayService.resolve(replayInstruction(reference)))
+                .hasMessageContaining(MISSING_ROUTE_SNAPSHOT_MESSAGE)
+                .hasMessageContaining("FT202605190001");
     }
 
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference) {
