@@ -42,6 +42,8 @@ import com.capte.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.ledger.DefaultLedgerPostingAssembler;
+import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
+import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
@@ -58,6 +60,7 @@ import com.capte.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycl
 import com.capte.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
 import com.capte.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
 import com.capte.funds.transaction.services.impl.DelegatingFundsInstructionLifecycleRecorder;
+import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.capte.funds.wallet.dal.entities.FundingAccount;
 import com.capte.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
@@ -135,6 +138,9 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     @Autowired
     protected FundsBalanceControlService balanceControlService;
+
+    @Autowired
+    protected FundsTransactionQueryService fundsTransactionQueryService;
 
     @Autowired
     protected LedgerService ledgerService;
@@ -480,6 +486,15 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .where(ref.tenantId.eq(TENANT_ID))
                 .orderBy(ref.id.asc());
         return ledgerTransactionMapper.selectListByQuery(wrapper);
+    }
+
+    protected FundsTransactionDTO fundsTransaction(String transactionSn) {
+        return fundsTransactionQueryService.queryFundsTransaction(transactionSn)
+                .orElseThrow(() -> new AssertionError("funds transaction not found: " + transactionSn));
+    }
+
+    protected List<FundsTransactionDetailDTO> fundsTransactionDetails(String transactionSn) {
+        return fundsTransactionQueryService.queryFundsTransactionDetails(transactionSn);
     }
 
     protected LedgerTransaction ledgerTransactionByBusinessSn(String businessSn) {

@@ -4,6 +4,9 @@ import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.capte.funds.transaction.enums.FundsTransactionStatus;
+import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
@@ -22,6 +25,52 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 授权交易业务流测试。
  */
 class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSupport {
+
+    /**
+     * 场景：风控或额度判断拒绝授权。
+     * 输入：账户余额 100，授权请求 60，授权结果 approved=false。
+     * 输出：记录授权拒绝交易事实和拒绝明细，余额不变，无账务路径。
+     * 预期：拒绝不是授权创建，不生成 route leg、posting plan 或 LedgerEntry。
+     * 红线：授权拒绝不得被当作完成后拒付，也不得写入 chargeback/declined 累计金额。
+     */
+    @Test
+    void testAuthorizationDeclinedShouldRecordRejectedFactWithoutLedgerPosting() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "AUTH_DECLINE_TOPUP");
+        BalanceSnapshot beforeDecline = snapshot(balances(user, settlementAccount()));
+
+        String authorizationSn = authorize(user, 60L, false, "AUTH_DECLINE_AUTHORIZE");
+
+        BalanceSnapshot afterDecline = snapshot(balances(user, settlementAccount()));
+        assertOnlyBalanceDeltas(beforeDecline, afterDecline,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+        assertThat(transaction.getAuthorizedAmount()).isZero();
+        assertThat(transaction.getSettledAmount()).isZero();
+        assertThat(transaction.getDeclinedAmount()).isZero();
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
+                .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getLegs()).isEmpty());
+
+        assertThat(fundsTransactionDetails(authorizationSn))
+                .singleElement()
+                .satisfies(detail -> {
+                    assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
+                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getLedgerTransactionSn()).isNull();
+                    assertThat(detail.getContextVariables()).contains("\"approved\":false");
+                });
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+    }
 
     /**
      * 场景：用户充值后发起资金账户授权，授权批准后全额完成。
