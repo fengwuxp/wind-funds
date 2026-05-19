@@ -45,6 +45,7 @@ import com.capte.funds.transaction.ledger.DefaultLedgerPostingAssembler;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
@@ -432,6 +433,19 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setBusinessScene("AUTHORIZATION_SETTLE")
                 .setBusinessSn(businessSn)
                 .setDescription("authorization settle"), WindOperator.system());
+    }
+
+    protected String refundSettledAuthorization(FundsAccountId accountId,
+                                                long amount,
+                                                String authorizationTransactionSn,
+                                                String businessSn) {
+        return authorizationTransactionService.settleRefund(new FundsAuthorizationTransactionRefundRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setAuthorizationTransactionSn(authorizationTransactionSn)
+                .setBusinessScene("AUTHORIZATION_REFUND")
+                .setBusinessSn(businessSn)
+                .setDescription("authorization refund"), WindOperator.system());
     }
 
     protected String reverseAuthorization(FundsAccountId accountId,

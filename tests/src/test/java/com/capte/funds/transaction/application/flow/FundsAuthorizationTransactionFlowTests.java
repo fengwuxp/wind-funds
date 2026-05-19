@@ -371,4 +371,82 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .toList())
                 .containsOnly(LedgerPhaseCode.SETTLEMENT.name());
     }
+
+    /**
+     * 场景：用户充值后发起授权，授权全额完成后再全额退款。
+     * 输入：充值 100、授权批准 60、全额完成 60、全额退款 60。
+     * 输出：用户 AVAILABLE/AUTHORIZATION、平台 SETTLEMENT 余额逐步变化和账务事实。
+     * 预期：完成后退款沿原完成路径回退，回补用户 AVAILABLE 并扣减平台 SETTLEMENT。
+     * 红线：完成后退款不得重新释放 AUTHORIZATION，不得按当前绑定重新选路。
+     */
+    @Test
+    void testFundingAuthorizationFullSettleThenFullRefundShouldRestoreAvailableBalance() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        topup(user, 100L, "AUTH_FULL_REFUND_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        String authorizationSn = authorize(user, 60L, true, "AUTH_FULL_REFUND_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        settleAuthorization(user, 60L, authorizationSn, "AUTH_FULL_REFUND_CAPTURE");
+        BalanceSnapshot afterSettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY));
+
+        refundSettledAuthorization(user, 60L, authorizationSn, "AUTH_FULL_REFUND_RETURN");
+        BalanceSnapshot afterRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterSettle, afterRefund,
+                delta(user, LedgerSubjectCode.AVAILABLE, 60L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, -60L, CURRENCY));
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
+        assertThat(transaction.getSettledAmount()).isEqualTo(60L);
+        assertThat(transaction.getRefundedAmount()).isEqualTo(60L);
+        assertThat(transaction.getReversedAmount()).isZero();
+        assertThat(transaction.getDeclinedAmount()).isZero();
+
+        assertPostedTransactions(4);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.AUTHORIZE.name(),
+                        FundsTransactionEventType.SETTLE.name(),
+                        FundsTransactionEventType.AUTH_REFUND.name());
+
+        LedgerTransaction refundTransaction = ledgerTransactionByBusinessSn("AUTH_FULL_REFUND_RETURN");
+        assertThat(entriesOf(refundTransaction).stream()
+                .map(LedgerEntry::getLedgerSubjectCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
+        assertThat(postingPlansOf(refundTransaction).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsOnly(LedgerPhaseCode.REFUND.name());
+    }
 }
