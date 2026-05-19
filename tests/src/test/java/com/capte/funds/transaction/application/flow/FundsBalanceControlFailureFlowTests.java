@@ -2,6 +2,7 @@ package com.capte.funds.transaction.application.flow;
 
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.wallet.FundsAccountId;
@@ -94,5 +95,51 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_CURRENCY_FREEZE")).isFalse();
+    }
+
+    /**
+     * 场景：资金账户余额调账请求缺少调账原因、凭证或审批引用。
+     * 输入：同一个账户分别提交缺少原因、缺少凭证、缺少审批引用的调账请求。
+     * 输出：三个请求均被拒绝，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持不变。
+     * 预期：余额调账必须携带审计上下文，不能绕过原因、证据和审批约束。
+     * 红线：调账失败不得写入 ledger transaction，不得改变余额桶。
+     */
+    @Test
+    void testBalanceAdjustWithoutAuditContextShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
+                "BALANCE_ADJUST_AUDIT_MISSING_REASON"), WindOperator.system()))
+                .hasMessageContaining("余额调账缺少调账原因");
+        assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
+                "BALANCE_ADJUST_AUDIT_MISSING_EVIDENCE")
+                .setAdjustReason("customer service balance adjust"), WindOperator.system()))
+                .hasMessageContaining("余额调账缺少调账凭证");
+        assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
+                "BALANCE_ADJUST_AUDIT_MISSING_APPROVAL")
+                .setAdjustReason("customer service balance adjust")
+                .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_001"), WindOperator.system()))
+                .hasMessageContaining("余额调账缺少审批引用");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertPostedTransactions(0);
+    }
+
+    private static FundsBalanceAdjustRequest balanceAdjustRequest(FundsAccountId accountId, String businessSn) {
+        return new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(Money.immutable(10L, CURRENCY))
+                .setIncrease(Boolean.TRUE)
+                .setBusinessScene("BALANCE_ADJUST")
+                .setBusinessSn(businessSn)
+                .setDescription("balance adjust without audit context");
     }
 }
