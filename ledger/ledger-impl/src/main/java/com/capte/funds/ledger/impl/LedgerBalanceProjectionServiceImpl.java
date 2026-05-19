@@ -21,6 +21,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -102,8 +104,7 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
                                             long beforeBalance,
                                             long currentBalance,
                                             long balanceDelta) {
-        try {
-            SpringEventPublishUtils.publishWithTransactionCommitOrImmediately(LedgerBalanceChangedEvent.builder()
+        LedgerBalanceChangedEvent event = LedgerBalanceChangedEvent.builder()
                     .subjectId(accountId.id())
                     .subjectType(accountId.type())
                     .ledgerId(ledger.getId())
@@ -119,17 +120,55 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
                     .businessSn(entry.getBusinessSn())
                     .transactionTime(entry.getTransactionTime())
                     .contextVariables(Map.copyOf(entry.getContextVariables()))
-                    .build());
+                    .build();
+        publishBalanceChangedEvent(event, entry, ledger, accountId);
+    }
+
+    private void publishBalanceChangedEvent(LedgerBalanceChangedEvent event,
+                                            LedgerEntrySpec entry,
+                                            LedgerDTO ledger,
+                                            FundsAccountId accountId) {
+        try {
+            if (TransactionSynchronizationManager.isSynchronizationActive()
+                    && TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+
+                    @Override
+                    public void afterCommit() {
+                        publishBalanceChangedEventImmediately(event, entry, ledger, accountId);
+                    }
+                });
+                return;
+            }
+            publishBalanceChangedEventImmediately(event, entry, ledger, accountId);
         } catch (RuntimeException ex) {
-            Throwable cause = NestedExceptionUtils.getMostSpecificCause(ex);
-            log.warn("发布账本余额变更观察事件失败，ledgerTransactionSn = {}, ledgerId = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, cause = {}",
-                    entry.getLedgerTransactionSn(),
-                    ledger.getId(),
-                    accountId.id(),
-                    accountId.type(),
-                    ledger.getLedgerSubjectCode(),
-                    cause.toString());
+            logBalanceChangedEventFailure(entry, ledger, accountId, ex);
         }
+    }
+
+    private void publishBalanceChangedEventImmediately(LedgerBalanceChangedEvent event,
+                                                       LedgerEntrySpec entry,
+                                                       LedgerDTO ledger,
+                                                       FundsAccountId accountId) {
+        try {
+            SpringEventPublishUtils.publishEvent(event);
+        } catch (RuntimeException ex) {
+            logBalanceChangedEventFailure(entry, ledger, accountId, ex);
+        }
+    }
+
+    private void logBalanceChangedEventFailure(LedgerEntrySpec entry,
+                                               LedgerDTO ledger,
+                                               FundsAccountId accountId,
+                                               RuntimeException ex) {
+        Throwable cause = NestedExceptionUtils.getMostSpecificCause(ex);
+        log.warn("发布账本余额变更观察事件失败，ledgerTransactionSn = {}, ledgerId = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, cause = {}",
+                entry.getLedgerTransactionSn(),
+                ledger.getId(),
+                accountId.id(),
+                accountId.type(),
+                ledger.getLedgerSubjectCode(),
+                cause.toString());
     }
 
     private FundsAccountId requireSingleFundsAccount(List<LedgerEntrySpec> entries) {

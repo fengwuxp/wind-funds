@@ -1,148 +1,174 @@
 package com.capte.funds.ledger.impl;
 
+import com.capte.funds.AbstractFundsServiceTest;
 import com.capte.funds.ledger.dto.LedgerDTO;
-import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.request.CreateLedgerRequest;
 import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.service.LedgerService;
-import com.capte.funds.wallet.ImmutableFundsBalanceView;
-import com.wind.common.query.WindPagination;
-import com.wind.common.query.WindQuery;
-import com.wind.common.query.supports.QueryOrderField;
+import com.capte.funds.wallet.dal.entities.FundingAccount;
+import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
+import com.capte.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.common.spring.SpringEventPublishUtils;
-import com.wind.integration.funds.ledger.LedgerBalanceBucket;
+import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
-import com.wind.integration.funds.wallet.FundsAccount;
-import com.wind.integration.funds.wallet.FundsAccountBalanceView;
 import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.wallet.FundsAccountQueryService;
+import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
 import lombok.Getter;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
- * 账本余额投影边界测试。
+ * 账本余额投影服务流程测试。
  */
-class LedgerBalanceProjectionServiceImplTests {
-
-    private static final Long LEDGER_ID = 1001L;
+@SpringJUnitConfig({
+        AbstractFundsServiceTest.TestInfrastructureConfig.class,
+        LedgerBalanceProjectionServiceImplTests.Config.class
+})
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
+class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String ACCOUNT_ID = "funding_user_balance_log";
 
-    private static final String ACCOUNT_TYPE = "FUNDING_ACCOUNT";
+    private static final String ACCOUNT_TYPE = FundsSubjectType.FUNDING_ACCOUNT.name();
 
     private static final CurrencyIsoCode CURRENCY = CurrencyIsoCode.USD;
 
+    @Autowired
+    private LedgerBalanceProjectionService projectionService;
+
+    @Autowired
+    private LedgerService ledgerService;
+
+    @Autowired
+    private FundingAccountMapper fundingAccountMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private Long availableLedgerId;
+
     /**
      * 场景：余额投影已经完成账本余额更新，但余额变更事件发布器临时不可用。
-     * 输入：AVAILABLE 账本期初余额 100，一笔借方入账 25；事件发布器抛出运行时异常。
-     * 输出：投影服务吞掉观察事件失败并保留余额更新请求。
+     * 输入：H2 中存在资金账户和 AVAILABLE 账本，期初正常余额 100，一笔借方入账 25；事件发布器抛出运行时异常。
+     * 输出：投影服务保留余额更新结果，观察事件失败不向调用方冒泡。
      * 预期：余额变更事件只是业务切入/观察口，不是余额事实源。
      * 红线：余额变更日志或事件失败不得回滚、阻断或篡改 Ledger 余额投影事实。
      */
     @Test
     void testProjectShouldKeepLedgerBalanceUpdateWhenBalanceChangedEventPublishFails() {
+        AtomicInteger eventAttempts = new AtomicInteger();
         setApplicationEventPublisher(event -> {
+            eventAttempts.incrementAndGet();
             throw new IllegalStateException("balance log sink unavailable");
         });
-        RecordingLedgerService ledgerService = new RecordingLedgerService(availableLedger());
-        LedgerBalanceProjectionServiceImpl projectionService = new LedgerBalanceProjectionServiceImpl(
-                new FixedFundsAccountQueryService(balanceView(100L)),
-                ledgerService);
 
-        projectionService.project(List.of(ledgerEntry(25L)));
+        assertThatCode(() -> projectionService.project(List.of(ledgerEntry(25L))))
+                .doesNotThrowAnyException();
 
-        assertThat(ledgerService.updateRequests()).singleElement().satisfies(request -> {
-            assertThat(request.getId()).isEqualTo(LEDGER_ID);
-            assertThat(request.getDebitAmountDelta()).isEqualTo(25L);
-            assertThat(request.getCreditAmountDelta()).isZero();
-            assertThat(request.getMinimumNormalBalance()).isZero();
-        });
+        LedgerDTO ledger = ledgerService.getLedgerById(availableLedgerId);
+        assertThat(eventAttempts).hasValue(1);
+        assertThat(ledger.getDebitAmount()).isEqualTo(125L);
+        assertThat(ledger.getCreditAmount()).isZero();
+        assertThat(ledger.getNormalBalance()).isEqualTo(125L);
+    }
+
+    @BeforeEach
+    void setUpProjectionServiceTestData() {
+        cleanupProjectionServiceTestData();
+        seedFundingAccount();
+        availableLedgerId = createAvailableLedger(100L);
     }
 
     @AfterEach
-    void resetApplicationEventPublisher() {
+    void tearDownProjectionServiceTestData() {
         setApplicationEventPublisher(event -> {
         });
+        cleanupProjectionServiceTestData();
     }
 
-    private static LedgerDTO availableLedger() {
-        LocalDateTime now = LocalDateTime.of(2026, 5, 19, 12, 0);
-        return new LedgerDTO()
-                .setId(LEDGER_ID)
-                .setGmtCreate(now)
-                .setGmtModified(now)
+    private void cleanupProjectionServiceTestData() {
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", ACCOUNT_ID);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn = ?", ACCOUNT_ID);
+    }
+
+    private void seedFundingAccount() {
+        FundingAccount account = new FundingAccount();
+        account.setTenantId(TENANT_ID);
+        account.setSn(ACCOUNT_ID);
+        account.setOwnerId("owner_" + ACCOUNT_ID);
+        account.setOwnerType(FundsAccountOwnerType.USER);
+        account.setAccountType(ACCOUNT_TYPE);
+        account.setPlatform(Boolean.FALSE);
+        account.setCurrency(CURRENCY);
+        account.setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
+        account.setLedgerProfileVersion(1);
+        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setDescription("balance projection service flow test funding account");
+        account.setVersion(0);
+        fundingAccountMapper.insertSelective(account);
+    }
+
+    private Long createAvailableLedger(long initialBalance) {
+        Long ledgerId = ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
                 .setSubjectId(ACCOUNT_ID)
                 .setSubjectType(ACCOUNT_TYPE)
-                .setTenantId(1L)
-                .setLedgerProfileCode("FUNDING_ACCOUNT_STANDARD")
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
                 .setLedgerProfileVersion(1)
                 .setLedgerSubjectCode(LedgerSubjectCode.AVAILABLE)
                 .setLedgerSubjectCategory(LedgerSubjectCategory.ASSET)
                 .setNormalBalanceSide(EntrySide.DEBIT)
-                .setAllowNegative(false)
-                .setDebitAmount(100L)
-                .setCreditAmount(0L)
+                .setAllowNegative(Boolean.FALSE)
                 .setCurrency(CURRENCY)
                 .setSettlementPolicy("RT")
                 .setCutOffTime(LocalTime.MIDNIGHT)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
-                .setPeriodId(AccountBalancePeriodType.LIFETIME.name())
-                .setVersion(1);
+                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+        ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
+                .setId(ledgerId)
+                .setDebitAmountDelta(initialBalance)
+                .setCreditAmountDelta(0L));
+        return ledgerId;
     }
 
-    private static FundsAccountBalanceView balanceView(long availableAmount) {
-        return ImmutableFundsBalanceView.builder()
-                .tenantId(1L)
-                .accountId(FundsAccountId.immutable(ACCOUNT_ID, ACCOUNT_TYPE))
-                .currency(CURRENCY)
-                .balanceBuckets(Map.of(
-                        LedgerSubjectCode.AVAILABLE,
-                        balanceBucket(LedgerSubjectCode.AVAILABLE, availableAmount),
-                        LedgerSubjectCode.FROZEN,
-                        balanceBucket(LedgerSubjectCode.FROZEN, 0L),
-                        LedgerSubjectCode.AUTHORIZATION,
-                        balanceBucket(LedgerSubjectCode.AUTHORIZATION, 0L)))
-                .build();
-    }
-
-    private static LedgerBalanceBucket balanceBucket(LedgerSubjectCode ledgerSubjectCode, long amount) {
-        return LedgerBalanceBucket.builder()
-                .accountCode(ledgerSubjectCode)
-                .balance(Money.immutable(amount, CURRENCY))
-                .periodType(AccountBalancePeriodType.LIFETIME)
-                .periodId(AccountBalancePeriodType.LIFETIME.name())
-                .activeTime(LocalDateTime.of(2026, 1, 1, 0, 0))
-                .build();
-    }
-
-    private static LedgerEntrySpec ledgerEntry(long amount) {
+    private LedgerEntrySpec ledgerEntry(long amount) {
         return TestLedgerEntrySpec.builder()
                 .subjectId(ACCOUNT_ID)
                 .subjectType(ACCOUNT_TYPE)
                 .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
                 .ledgerSubjectCategory(LedgerSubjectCategory.ASSET)
-                .ledgerId(LEDGER_ID)
+                .ledgerId(availableLedgerId)
                 .ledgerTransactionSn("LT-BALANCE-LOG-001")
                 .entryType(EntrySide.DEBIT)
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
@@ -170,68 +196,13 @@ class LedgerBalanceProjectionServiceImplTests {
         }
     }
 
-    private record FixedFundsAccountQueryService(FundsAccountBalanceView balanceView) implements FundsAccountQueryService {
-
-        @Override
-        public FundsAccount getAccount(FundsAccountId accountId) {
-            throw new UnsupportedOperationException("account lookup is not needed by balance projection test");
-        }
-
-        @Override
-        public FundsAccountBalanceView getBalance(FundsAccountId accountId) {
-            return balanceView;
-        }
-
-        @Override
-        public boolean supports(FundsAccountId accountId) {
-            return true;
-        }
-    }
-
-    private static final class RecordingLedgerService implements LedgerService {
-
-        private final LedgerDTO ledger;
-
-        private final List<UpdateLedgerBalanceRequest> updateRequests = new ArrayList<>();
-
-        private RecordingLedgerService(LedgerDTO ledger) {
-            this.ledger = ledger;
-        }
-
-        @Override
-        public Long createLedger(CreateLedgerRequest request) {
-            throw new UnsupportedOperationException("ledger creation is not needed by balance projection test");
-        }
-
-        @Override
-        public void updateLedgerBalance(UpdateLedgerBalanceRequest request) {
-            updateRequests.add(request);
-        }
-
-        @Override
-        public void deleteLedgerByIds(Long... ids) {
-            throw new UnsupportedOperationException("ledger deletion is not needed by balance projection test");
-        }
-
-        @Override
-        public LedgerDTO getLedgerById(Long id) {
-            return ledger;
-        }
-
-        @Override
-        public List<LedgerDTO> getLedgerByIds(Collection<Long> ids) {
-            return List.of(ledger);
-        }
-
-        @Override
-        public WindPagination<LedgerDTO> queryLedgers(LedgerQuery query,
-                                                      WindQuery<? extends QueryOrderField> options) {
-            throw new UnsupportedOperationException("ledger query is not needed by balance projection test");
-        }
-
-        private List<UpdateLedgerBalanceRequest> updateRequests() {
-            return updateRequests;
-        }
+    @Configuration
+    @Import({
+            DefaultFundsAccountQueryServiceImpl.class,
+            LedgerServiceImpl.class,
+            LedgerBalanceProjectionServiceImpl.class
+    })
+    static class Config {
     }
 
     @Getter
