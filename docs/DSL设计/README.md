@@ -22,6 +22,21 @@ DSL 设计归属为**产品到系分之间的领域承载层**，不是产品 PR
 4. 业务沟通时，重点用本文统一“单、账、钱、余额、状态、链路”的共同语言。
 5. 授权链路统一使用“授权完成”承接产品侧“授权结算”，事件使用 `AUTHORIZATION_TRANSACTION / SETTLE`；不要把它和商户清结算的 `SETTLEMENT` 账目混用。
 
+## 新增场景落地口径
+
+任何新增资金场景进入 DSL 前，必须先能回答下列问题；回答不完整时，应回到 PRD 或系分补设计。
+
+| 问题 | 必须有的答案 |
+| --- | --- |
+| 这是什么事实 | `instructionType`、`eventType`、`transactionType` 和 `businessScene` 是否明确。 |
+| 谁受影响 | 所有业务主体是否能解析为内部可记账主体或明确外部引用。 |
+| 金额是否安全 | 金额、币种、原始金额、汇率、精度、上限和累计可处理金额是否可校验。 |
+| 路径是否稳定 | route、route snapshot、payment instrument、external account、platform account 和 funding allocation 是否可解释。 |
+| 账务是否平衡 | expected posting 是否能落到 entry 级别，且每个 posting plan 独立平衡。 |
+| 失败是否无副作用 | 拒绝、余额不足、缺快照、错币种、规则不唯一、权限不足是否不生成 route、posting 或 entry。 |
+| 后续是否可回放 | 退款、撤销、退费、拒付、解冻或清结算重跑是否能沿用原快照。 |
+| 审计是否足够 | 操作者、原因、凭证、规则版本、请求摘要和外部 reference 是否可追溯。 |
+
 ## JSON 使用边界
 
 本文档写给人读，优先用中文叙述、表格和流程图解释设计目标、语义边界和流程。只有真正的 DSL 契约对象和场景夹具使用 `json` 代码块，便于表达可验证的业务事实。

@@ -64,6 +64,19 @@
 | 路由层 | 这笔事实影响哪些主体和账目？ | `ResolvedRoute`、`RouteSnapshot` |
 | 账务层 | 这条路径如何成为平衡分录？ | `LedgerTransaction`、`PostingPlan`、`LedgerEntry` |
 
+### 1.4 新增 DSL 场景最小闭环
+
+新增资金场景不要求一开始就写完整实现，但 DSL 契约必须足够让产品、研发、测试和运营对同一件事达成一致。最小闭环如下：
+
+| 闭环项 | 必须说明 | 不满足时的处理 |
+| --- | --- | --- |
+| 输入事实 | `instructionType`、`eventType`、`transactionType`、金额、币种、业务流水、操作者和引用对象。 | 不进入 DSL 契约，先补产品场景。 |
+| 主体和引用 | 哪些是内部可记账主体，哪些只是支付工具、外部账户、业务单或通道引用。 | 不允许生成 `LedgerEntry`。 |
+| 路由结果 | route code、参与方、账目、平台角色、工具快照、资金来源决策和账本周期。 | 路由失败且无账务副作用。 |
+| 账务结果 | posting plan、entry 主体、entry side、金额、币种、账目和周期。 | 不允许只断言“状态成功”。 |
+| 逆向依据 | 是否需要原 route snapshot、原交易、原授权、原冻结或原清结算批次。 | 缺原事实时必须失败或进入人工处理。 |
+| 验收红线 | `validation.mustPass` 和 `validation.mustFail` 至少各有一项可测试断言。 | 不进入 TDD 任务。 |
+
 ## 二、设计目标与非目标
 
 ### 2.1 设计目标
@@ -290,6 +303,8 @@ FX 边界：
 | `RouteParticipant` | 路由参与方，例如付款方、收款方、平台费用账户、授权主体。 |
 | `RouteNode` | 参与方上的具体账目节点。 |
 | `RouteLeg` | 一段资金、额度或预算变化路径。 |
+| `RoutingDecision` | 固化本次路径选择原因、命中规则、工具引用、外部账户引用、平台账户和资金来源决策。 |
+| `FundingAllocationDecision` | 固化某笔金额来自哪个内部账务主体、账目、优先级和选择原因。 |
 
 路由红线：
 
@@ -298,6 +313,7 @@ FX 边界：
 - 平台角色必须解析为具体资金账户后进入 route。
 - 退款、撤销、授权完成、拒付、退费、解冻必须优先基于原快照。
 - 缺原快照不得重新选路兜底。
+- 支付工具、绑定关系和资金来源只能帮助解析内部可记账主体；工具状态、方向、绑定、外部账户引用和资金来源选择必须进入 `RoutingDecision` 或 `RouteSnapshot`。
 
 ### 7.4 Posting 与 Ledger DSL
 
@@ -534,6 +550,17 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 
 这个矩阵用于指导开发和测试拆分任务：开发按三类能力拆交易服务、路由解析、账务计划和投影更新；测试按三类能力分别补契约测试、业务组合集成测试和余额断言。
 
+### 9.4 支付工具、绑定和资金来源用例族
+
+支付工具 DSL 的核心不是“给工具记余额”，而是证明工具如何参与路径选择、如何固化快照、失败时如何无副作用、逆向交易如何不受当前绑定变化影响。
+
+| 用例 | 资金交易结构 | 资金链路重点 | 开发承接 | 测试承接 |
+| --- | --- | --- | --- | --- |
+| 支付工具付款成功 | `DIRECT_TRANSACTION / PAY` 或 `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | 工具只进入 `PaymentInstrumentRef`；route leg 最终落到资金账户、信用账户或预算组。 | 工具状态、方向、绑定、资金来源和账户能力校验通过后生成 `RoutingDecision`。 | `DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`TDD-ROUTE-011`、`TDD-WALLET-010`。 |
+| 支付工具准入失败 | 不生成资金路径。 | 工具不可用、方向不匹配、资金来源不唯一、账户能力不足。 | 失败返回可解释原因或授权拒绝；不生成 route、posting、entry。 | `DSL-PAYMENT-INSTRUMENT-FAIL-001`、`TDD-ROUTE-012`、`TDD-RED-035`。 |
+| 工具换绑后原路退款 | `DIRECT_TRANSACTION / REFUND` 或授权链退款。 | 使用原 `RouteSnapshot`、原 `PaymentInstrumentRef` 和原 `RoutingDecision`。 | route replay 不读取当前默认绑定或当前资金来源。 | `DSL-PAYMENT-INSTRUMENT-REPLAY-001`、`TDD-ROUTE-013`、`TDD-RED-036`。 |
+| 敏感信息治理 | 所有含工具引用的指令和快照。 | 只保存掩码号、别名或安全 token reference。 | 完整 PAN、CVV、密钥、token secret 和银行账户敏感号不得进入快照、日志、导出或报表。 | `TDD-WALLET-011`、`TDD-RED-034`。 |
+
 ## 十、场景账务规则矩阵
 
 ### 10.1 直接交易
@@ -600,6 +627,16 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 2. 清算批次确认、结算锁定、出款结果和经审批的差错调账，才进入资金 DSL。
 3. 对账通过不生成账务；对账差异也不直接改账。只有补事实、冲正、调账或追偿等明确资金事实才生成 DSL 指令。
 4. 有条件放行只影响清结算流程准入，不表达资金转移；若放行后产生资金事实，仍必须由对应资金指令承接。
+
+### 10.5 支付工具、绑定和资金来源
+
+| 场景 | 指令 | 路径 | 账务要求 |
+| --- | --- | --- | --- |
+| 工具付款成功 | `DIRECT_TRANSACTION / PAY`。 | 工具引用 -> 绑定关系 -> 资金来源关系 -> 内部可记账主体。 | `PaymentInstrumentRef` 和 `ExternalAccountRef` 只进快照；LedgerEntry 主体只能是资金账户、信用账户或预算组。 |
+| 工具授权成功 | `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | VCC、卡或 token 只作为工具快照；内部资金主体 `AVAILABLE -> AUTHORIZATION`。 | spend controls 通过不等于资金占用成功，仍需通过余额、额度、预算、周期和 route 校验。 |
+| 工具准入失败 | 无入账指令。 | 无 route、posting、entry。 | 状态、方向、币种、账户能力、资金来源缺失或不唯一时失败；授权场景可记录拒绝事实。 |
+| 工具换绑后退款 | `DIRECT_TRANSACTION / REFUND` 或 `AUTHORIZATION_TRANSACTION / AUTH_REFUND`。 | 使用原 route snapshot 反向。 | 不读取当前绑定、当前默认资金来源或当前费率重新选路；累计退款不超过原可退金额。 |
+| 敏感信息治理 | 所有含工具引用的 DSL 对象。 | 只保存掩码号、别名、安全 token reference 和审计摘要。 | 完整 PAN、CVV、密钥、token secret、银行账户敏感号不得进入普通快照、日志、导出或报表。 |
 
 ## 十一、JSON 契约用例
 
@@ -1786,6 +1823,482 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 }
 ```
 
+### 11.10 SettlementPolicy 结算策略契约
+
+```json
+{
+  "caseId": "DSL-SETTLEMENT-POLICY-001",
+  "scenarioCode": "SETTLEMENT_POLICY_PARSE_AND_GUARD",
+  "expectedRoute": {
+    "shouldCreateRoute": false,
+    "reason": "SettlementPolicy 只决定候选结算日期或节奏，不表达资金路径。"
+  },
+  "expectedPosting": {
+    "shouldCreatePosting": false,
+    "reason": "SettlementPolicy 解析本身不生成 LedgerEntry。"
+  },
+  "policySamples": [
+    {
+      "policy": "RT",
+      "expected": {
+        "policyType": "REAL_TIME",
+        "settlementDelayDays": 0
+      }
+    },
+    {
+      "policy": "T+1",
+      "expected": {
+        "policyType": "T_PLUS_N",
+        "settlementDelayDays": 1
+      }
+    },
+    {
+      "policy": "D@23:00",
+      "expected": {
+        "policyType": "DAILY_AT",
+        "cutoffTime": "23:00",
+        "timezone": "Asia/Shanghai"
+      }
+    },
+    {
+      "policy": "W@MON",
+      "expected": {
+        "policyType": "WEEKLY",
+        "settlementDayOfWeek": "MON"
+      }
+    },
+    {
+      "policy": "M@15",
+      "expected": {
+        "policyType": "MONTHLY",
+        "settlementDayOfMonth": 15
+      }
+    },
+    {
+      "policy": "C@contract-2026-05-16_2026-06-15",
+      "expected": {
+        "policyType": "CUSTOM_RANGE",
+        "rangeId": "contract-2026-05-16_2026-06-15"
+      }
+    }
+  ],
+  "validation": {
+    "mustPass": [
+      "策略表达可以稳定解析为类型、窗口和必要参数",
+      "结算策略只决定候选结算日期或结算节奏",
+      "清算账期、结算策略和账本周期必须各自独立"
+    ],
+    "mustFail": [
+      "空策略不能静默降级为 RT",
+      "UNKNOWN 不能静默降级为 RT",
+      "T+X 不能被解析为 T+0",
+      "D@25:00 必须失败",
+      "C@ 缺少 rangeId 必须失败",
+      "用结算策略替代账本周期必须失败"
+    ]
+  }
+}
+```
+
+### 11.11 支付工具路由、失败和原路径回放
+
+```json
+{
+  "caseId": "DSL-PAYMENT-INSTRUMENT-ROUTE-001",
+  "scenarioCode": "PAY_WITH_ACTIVE_PAYMENT_INSTRUMENT",
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "DIRECT_TRANSACTION",
+    "eventType": "PAY",
+    "transactionType": "PAY",
+    "businessScene": "WALLET_PAY_BY_CARD_TOKEN",
+    "businessSn": "PAY_PI_202605180001",
+    "amount": {
+      "currency": "USD",
+      "minorValue": 3000
+    },
+    "originalAmount": {
+      "currency": "USD",
+      "minorValue": 3000
+    },
+    "exchangeRate": "1",
+    "eventTime": "2026-05-18T13:01:00",
+    "operator": {
+      "actorType": "USER",
+      "actorId": "user_10001"
+    },
+    "instrumentRef": {
+      "instrumentId": "pi_card_10001",
+      "instrumentType": "CARD_TOKEN",
+      "instrumentNo": "****4242",
+      "ownerId": "user_10001",
+      "ownerType": "USER",
+      "tenantId": 1,
+      "currency": "USD",
+      "status": "ACTIVE",
+      "bindingSnapshot": {
+        "bindingSn": "PIB202605180001",
+        "bindingRole": "PAYMENT_SUBJECT",
+        "direction": "PAYMENT",
+        "priority": 100,
+        "version": 3,
+        "effectiveAt": "2026-05-18T00:00:00"
+      }
+    },
+    "contextVariables": {
+      "externalAccountRef": {
+        "externalAccountId": "ext_card_token_10001",
+        "type": "CARD_TOKEN",
+        "providerCode": "CARD_PROCESSOR",
+        "channelCode": "VCC_GATEWAY",
+        "currency": "USD",
+        "externalReference": "tok_ref_4242"
+      },
+      "payeeAccountId": "fa_merchant_20001_usd",
+      "payeeLedgerSubjectCode": "CLEARING"
+    }
+  },
+  "expectedRoute": {
+    "routeCode": "DIRECT_PAY_BY_INSTRUMENT",
+    "routingDecision": {
+      "policyCode": "PAYMENT_INSTRUMENT_DEFAULT",
+      "matchedRules": [
+        "instrument_status_active",
+        "direction_payment",
+        "funding_relation_primary"
+      ],
+      "decisionReason": "Active payment instrument resolved to primary funding account.",
+      "fundingAllocations": [
+        {
+          "allocationId": "alloc_primary_funding",
+          "subjectRef": {
+            "subjectType": "FUNDING_ACCOUNT",
+            "subjectId": "fa_user_10001_usd"
+          },
+          "ledgerSubjectCode": "AVAILABLE",
+          "amount": {
+            "currency": "USD",
+            "minorValue": 3000
+          },
+          "priority": 100,
+          "reason": "PRIMARY_FUNDING"
+        }
+      ]
+    },
+    "paymentInstrumentRef": {
+      "instrumentId": "pi_card_10001",
+      "instrumentType": "CARD_TOKEN",
+      "instrumentNo": "****4242",
+      "status": "ACTIVE"
+    },
+    "externalAccountRef": {
+      "externalAccountId": "ext_card_token_10001",
+      "type": "CARD_TOKEN",
+      "providerCode": "CARD_PROCESSOR",
+      "channelCode": "VCC_GATEWAY"
+    },
+    "legs": [
+      {
+        "legId": "PAY_BY_INSTRUMENT",
+        "legType": "INTERNAL_TRANSFER",
+        "sourceNode": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "targetNode": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_merchant_20001_usd",
+          "ledgerSubjectCode": "CLEARING"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 3000
+        },
+        "balanceEffectType": "CONSUME",
+        "phaseCode": "PAYMENT",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      }
+    ]
+  },
+  "expectedPosting": {
+    "postingPlans": [
+      {
+        "routeLegId": "PAY_BY_INSTRUMENT",
+        "intent": "TRANSFER",
+        "postingScope": "BETWEEN_SUBJECTS",
+        "entries": [
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 3000
+            }
+          },
+          {
+            "subjectId": "fa_merchant_20001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "CLEARING",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 3000
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "mustPass": [
+      "支付工具只作为 instrumentRef 和 externalAccountRef 快照",
+      "routingDecision 保存命中规则、资金来源、优先级和选择原因",
+      "route leg 最终只使用内部可记账主体",
+      "posting plan 独立平衡"
+    ],
+    "mustFail": [
+      "支付工具 ID 被写成 LedgerEntry 主体",
+      "externalAccountRef 被写成 LedgerEntry 主体",
+      "资金来源缺失或不唯一仍随机选择",
+      "完整 PAN、CVV、密钥或 token secret 进入快照"
+    ]
+  }
+}
+```
+
+```json
+{
+  "caseId": "DSL-PAYMENT-INSTRUMENT-FAIL-001",
+  "scenarioCode": "PAYMENT_INSTRUMENT_GUARD_FAILURE",
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "DIRECT_TRANSACTION",
+    "eventType": "PAY",
+    "transactionType": "PAY",
+    "businessScene": "WALLET_PAY_BY_SUSPENDED_CARD",
+    "businessSn": "PAY_PI_202605180002",
+    "amount": {
+      "currency": "USD",
+      "minorValue": 3000
+    },
+    "originalAmount": {
+      "currency": "USD",
+      "minorValue": 3000
+    },
+    "exchangeRate": "1",
+    "eventTime": "2026-05-18T13:05:00",
+    "operator": {
+      "actorType": "USER",
+      "actorId": "user_10001"
+    },
+    "instrumentRef": {
+      "instrumentId": "pi_card_10001",
+      "instrumentType": "CARD_TOKEN",
+      "instrumentNo": "****4242",
+      "ownerId": "user_10001",
+      "ownerType": "USER",
+      "tenantId": 1,
+      "currency": "USD",
+      "status": "SUSPENDED",
+      "bindingSnapshot": {
+        "bindingSn": "PIB202605180001",
+        "bindingRole": "PAYMENT_SUBJECT",
+        "direction": "RECEIVE",
+        "priority": 100,
+        "version": 3
+      }
+    },
+    "contextVariables": {
+      "failureCandidates": [
+        "INSTRUMENT_STATUS_NOT_ACTIVE",
+        "INSTRUMENT_DIRECTION_MISMATCH",
+        "FUNDING_RELATION_NOT_UNIQUE",
+        "ACCOUNT_CAPABILITY_MISSING"
+      ]
+    }
+  },
+  "expectedRoute": {
+    "shouldCreateRoute": false,
+    "failureReason": "INSTRUMENT_NOT_ALLOWED_FOR_ACTION"
+  },
+  "expectedPosting": {
+    "shouldCreatePosting": false,
+    "reason": "支付工具准入失败不生成 PostingPlan 或 LedgerEntry。"
+  },
+  "validation": {
+    "mustPass": [
+      "失败原因可查询",
+      "授权场景可记录授权拒绝事实",
+      "直接交易、提现或退款场景失败无账务副作用"
+    ],
+    "mustFail": [
+      "工具状态 SUSPENDED 仍生成 route",
+      "RECEIVE 方向工具用于付款",
+      "资金来源不唯一时随机选路",
+      "账户缺少 PAY 能力仍继续入账"
+    ]
+  }
+}
+```
+
+```json
+{
+  "caseId": "DSL-PAYMENT-INSTRUMENT-REPLAY-001",
+  "scenarioCode": "REFUND_AFTER_PAYMENT_INSTRUMENT_REBINDING",
+  "originalRouteSnapshot": {
+    "routeSnapshotId": "route_snapshot_pi_pay_001",
+    "paymentInstrumentRef": {
+      "instrumentId": "pi_card_10001",
+      "instrumentType": "CARD_TOKEN",
+      "instrumentNo": "****4242",
+      "status": "ACTIVE",
+      "bindingSnapshot": {
+        "bindingSn": "PIB202605180001",
+        "bindingRole": "PAYMENT_SUBJECT",
+        "direction": "PAYMENT",
+        "priority": 100,
+        "version": 3
+      }
+    },
+    "routingDecision": {
+      "policyCode": "PAYMENT_INSTRUMENT_DEFAULT",
+      "fundingAllocations": [
+        {
+          "allocationId": "alloc_primary_funding",
+          "subjectRef": {
+            "subjectType": "FUNDING_ACCOUNT",
+            "subjectId": "fa_user_10001_usd"
+          },
+          "ledgerSubjectCode": "AVAILABLE",
+          "amount": {
+            "currency": "USD",
+            "minorValue": 3000
+          },
+          "priority": 100,
+          "reason": "PRIMARY_FUNDING"
+        }
+      ]
+    },
+    "routeCode": "DIRECT_PAY_BY_INSTRUMENT"
+  },
+  "currentBindingState": {
+    "instrumentId": "pi_card_10001",
+    "bindingSn": "PIB202605190009",
+    "defaultFundingAccountId": "fa_user_10001_new_usd",
+    "version": 9,
+    "status": "ACTIVE"
+  },
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "DIRECT_TRANSACTION",
+    "eventType": "REFUND",
+    "transactionType": "REFUND",
+    "businessScene": "REFUND_BY_ORIGINAL_PAYMENT_INSTRUMENT",
+    "businessSn": "REFUND_PI_202605190001",
+    "amount": {
+      "currency": "USD",
+      "minorValue": 1200
+    },
+    "originalAmount": {
+      "currency": "USD",
+      "minorValue": 1200
+    },
+    "exchangeRate": "1",
+    "eventTime": "2026-05-19T10:01:00",
+    "operator": {
+      "actorType": "SYSTEM",
+      "actorId": "refund-service"
+    },
+    "references": [
+      {
+        "referenceType": "ORIGINAL_ROUTE_SNAPSHOT",
+        "referenceSn": "route_snapshot_pi_pay_001"
+      },
+      {
+        "referenceType": "ORIGINAL_TRANSACTION",
+        "referenceSn": "PAY_PI_202605180001"
+      }
+    ]
+  },
+  "expectedRoute": {
+    "routeCode": "DIRECT_PAY_BY_INSTRUMENT_REPLAY",
+    "mustUseRouteSnapshotId": "route_snapshot_pi_pay_001",
+    "currentBindingRouteSelectionAllowed": false,
+    "legs": [
+      {
+        "legId": "REFUND_BY_ORIGINAL_INSTRUMENT",
+        "legType": "INTERNAL_TRANSFER",
+        "sourceNode": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_merchant_20001_usd",
+          "ledgerSubjectCode": "CLEARING"
+        },
+        "targetNode": {
+          "subjectType": "FUNDING_ACCOUNT",
+          "subjectId": "fa_user_10001_usd",
+          "ledgerSubjectCode": "AVAILABLE"
+        },
+        "amount": {
+          "currency": "USD",
+          "minorValue": 1200
+        },
+        "balanceEffectType": "REFUND",
+        "phaseCode": "REFUND",
+        "replayPolicy": "PARTIAL_ALLOWED"
+      }
+    ]
+  },
+  "expectedPosting": {
+    "postingPlans": [
+      {
+        "routeLegId": "REFUND_BY_ORIGINAL_INSTRUMENT",
+        "intent": "REFUND",
+        "postingScope": "BETWEEN_SUBJECTS",
+        "entries": [
+          {
+            "subjectId": "fa_merchant_20001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "CLEARING",
+            "entrySide": "DEBIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 1200
+            }
+          },
+          {
+            "subjectId": "fa_user_10001_usd",
+            "subjectType": "FUNDING_ACCOUNT",
+            "ledgerSubjectCode": "AVAILABLE",
+            "entrySide": "CREDIT",
+            "amount": {
+              "currency": "USD",
+              "minorValue": 1200
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "mustPass": [
+      "退款使用原 route snapshot 和原 funding allocation",
+      "当前绑定和当前默认资金来源不参与重路由",
+      "累计退款不得超过原付款可退金额",
+      "工具快照仅用于解释历史路径，不作为账本主体"
+    ],
+    "mustFail": [
+      "退款读取当前默认资金来源重新选路",
+      "缺原 route snapshot 仍成功退款",
+      "工具换绑导致退款入到新资金账户",
+      "累计退款超过原交易可退金额"
+    ]
+  }
+}
+```
+
 ## 十二、DSL 契约验收
 
 每个 JSON 契约用例至少包含：
@@ -1806,8 +2319,11 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | 指令完整 | 业务标识、金额、原始金额、汇率、事件、操作者、引用对象完整。 |
 | 主体合法 | 所有入账主体只能是资金账户、信用账户或预算组。 |
 | route 合法 | 工具、外部账户、平台角色不能直接入账。 |
+| 支付工具契约 | `PaymentInstrumentRef` 只保存脱敏展示和绑定快照；`RoutingDecision` 保存命中规则、资金来源和原因。 |
 | posting 平衡 | 每个 `PostingPlan` 独立平衡，整笔交易平衡。 |
 | replay 边界 | 缺原快照失败，不读取当前绑定关系重新选路。 |
+| 工具换绑边界 | 退款、撤销、退费或拒付必须按原 route snapshot 和原工具快照回放。 |
+| 结算策略 | `SettlementPolicy` 解析失败、空表达式或未知策略必须显式失败，不能降级为实时结算。 |
 | 授权拒绝 | 不生成 route、posting、entry。 |
 | 冻结 | 不创建资金交易，只控制同主体余额桶。 |
 | LIMIT 红线 | 普通授权完成不触碰 `LIMIT`。 |

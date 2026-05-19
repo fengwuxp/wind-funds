@@ -74,6 +74,18 @@ flowchart TD
 | AC-ROUTE-005 | 路由失败不写账 | 账户不存在、币种不一致、余额不足、周期缺失、规则不唯一或外部账户被当作内部主体。 | 返回明确失败原因或进入人工处理。 | 不生成 posting plan、LedgerEntry 或余额投影；不得自动换路径试入账。 |
 | AC-ROUTE-006 | 授权路由周期隔离 | 授权占用资金、信用额度或预算。 | route snapshot 保存主体、账目、账本周期和授权快照。 | 预算或信用的非 `LIFETIME` 周期必须有 `periodId`；释放和结算必须回到原周期。 |
 
+### 5.2.1 支付工具、绑定和资金来源
+
+| 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
+| --- | --- | --- | --- | --- |
+| AC-PI-001 | 支付工具引用快照 | 付款、授权、提现、入金或退款使用卡、VA、外部账户、虚拟卡或通道 token。 | route snapshot 保存支付工具引用、外部账户引用和脱敏展示信息。 | 支付工具和外部账户只做引用，不作为 LedgerEntry 主体；完整卡号、CVV、密钥或 token secret 不得入快照、日志或导出。 |
+| AC-PI-002 | 支付工具绑定解析 | 工具绑定到付款主体、收款主体、信用账户、预算组或真实资金账户。 | 路由解析出最终可记账主体。 | 绑定关系只提供候选；最终 route leg 必须落到资金账户、信用账户、预算组或解析后的平台账户角色。 |
+| AC-PI-003 | 工具方向和状态校验 | 工具方向为收款、付款或双向，状态为未验证、暂停、解绑、过期或可用。 | 不符合当前动作时失败或授权拒绝。 | 失败不得生成 route、posting plan 或 LedgerEntry；原因和审计可查询。 |
+| AC-PI-004 | 资金来源决策 | 同一支付工具可关联真实资金账户、信用账户、预算组或兜底资金来源。 | routing decision 保存资金来源、优先级、命中规则和原因。 | 多来源命中必须有确定优先级；缺失或不唯一时路由失败，不得随机选路。 |
+| AC-PI-005 | 工具换绑后的原路退款 | 原交易后支付工具绑定关系或默认资金来源发生变化。 | 退款、撤销、退费或拒付按原 route snapshot 和原工具快照解释。 | 不按当前绑定重新选路；累计金额和原路径仍可核对。 |
+| AC-PI-006 | 账户能力和工具动作匹配 | 工具解析出的资金账户缺少收款、付款或提现能力。 | 路由失败或进入人工处理。 | 账户无对应能力时不得继续入账；不能用支付工具能力绕过账户能力。 |
+| AC-PI-007 | 绑定历史和审计留痕 | 工具绑定、默认标识、优先级、方向、状态或资金来源关系发生变更。 | 系统保留当前有效绑定、历史变更记录、前后值、操作者、原因、时间和版本。 | 当前态用于新交易候选；历史审计用于争议、对账、回放和客服证明；不得用覆盖更新抹掉历史证据。 |
+
 ### 5.3 授权、撤销与结算
 
 `AC-AUTH-008` 至 `AC-AUTH-010` 是发卡授权控制扩展用例，只在 VCC、企业卡、员工卡或发卡产品启用 spend-controls 时纳入验收；资金底座默认授权能力要求 `AC-AUTH-001` 至 `AC-AUTH-007`，并通过 `AC-AUTH-011`、`AC-AUTH-012` 覆盖外部无前置授权但需要入账或退款的授权链异常事实。
@@ -243,6 +255,10 @@ flowchart TD
 | RED-043 | 路由规则不唯一仍入账 | 多个账户、账目、平台角色或规则同时命中时，系统随机选择一个路径并继续入账。 |
 | RED-044 | 路由失败自动换路径 | 账户缺失、余额不足、币种不一致、周期缺失或外部账户误用时，系统自动改走其他路径入账。 |
 | RED-045 | 普通支付误入商户清算 | 非商户订单收款场景被默认路由到商户 `CLEARING`。 |
+| RED-046 | 支付工具直接入账 | 卡、VA、外部账户、通道 token、钱包标识或支付工具 ID 被写成 LedgerEntry 主体或余额投影主体。 |
+| RED-047 | 支付工具敏感信息泄露 | 完整卡号、CVV、密钥、token secret、银行账户敏感号或身份凭证进入普通快照、日志、导出或报表。 |
+| RED-048 | 工具换绑导致历史重路由 | 退款、撤销、退费或拒付按当前工具绑定、当前默认资金来源或当前费率重新选路。 |
+| RED-049 | 绑定历史被覆盖 | 支付工具绑定、资金来源关系、默认关系或优先级变更只覆盖当前记录，缺少历史版本、前后值、操作者、原因和审计证据。 |
 
 ## 7. TDD 用例书写模板
 
@@ -277,6 +293,7 @@ flowchart TD
 | `AC-ROUTE-004` | `RouteSnapshot` 平台角色、`expectedRoute.legs` | 平台费用、预收待付、现金映射和调整账户必须解析到唯一平台账户角色；缺失或多命中时不入账。 |
 | `AC-ROUTE-005` | `expectedRouteCreated=false`、`expectedPostingCreated=false` | 账户缺失、币种不一致、余额不足、周期缺失、规则不唯一或外部账户误用时，失败不生成 route、posting、entry。 |
 | `AC-ROUTE-006` | `AUTHORIZATION_TRANSACTION / AUTHORIZE`、`DSL-AUTH-LIFECYCLE-001` | 授权占用保存主体、账目、账本周期和授权快照；释放和结算必须回到原周期。 |
+| `AC-PI-001` 至 `AC-PI-007` | `PaymentInstrumentRefSpec`、`ExternalAccountRefSpec`、`RoutingDecisionSpec`、`FundingAllocationDecisionSpec`、`RouteSnapshotSpec`、`BindingHistory` | 支付工具只做路由输入和快照引用；工具绑定、方向、状态、资金来源决策、账户能力和绑定历史审计必须可解释；逆向交易按原快照回放。 |
 | `AC-AUTH-011` | `AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`DSL-AUTH-LIFECYCLE-001` | 无前置授权的外部消费结果通过 `settle` 承接，不伪造授权占用；策略、上限、原因和审计必填。 |
 | `AC-AUTH-012` | `AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式、`DSL-AUTH-LIFECYCLE-001` | 无前置授权但有外部原消费、原完成或差错凭证时通过 `settleRefund` 承接；不得补造授权占用或静默退款。 |
 | `RED-043` | `expectedRouteCreated=false` | 多个账户、账目、平台角色或规则同时命中时，不能随机选择路径继续入账。 |
@@ -296,7 +313,7 @@ flowchart TD
 | 产品验收族 | DSL 承接 | TDD 承接 | 追踪重点 |
 | --- | --- | --- | --- |
 | `AC-IN-*`、`AC-PAY-*`、`AC-MER-*`、`AC-FEE-*` | `DIRECT_TRANSACTION`、`DSL-DIRECT-PAY-FEE-001`、`DSL-DIRECT-FUND-IN-FEE-001`、`DSL-DIRECT-CHAIN-001`、`DSL-REVERSE-REFUND-FEE-001` | `TDD-DIR-*`、`TDD-DIR-FLOW-*`、`TDD-DIR-ERR-*` | 入金、付款、商户收款、转账、提现、退款、手续费和退费都能说明 route、posting、余额桶、幂等和原路径回放。 |
-| `AC-ROUTE-*`、`RED-043`、`RED-044`、`RED-045` | `RouteSnapshot`、`RouteLeg`、`Route Replay DSL`、`expectedRouteCreated=false` | `TDD-ROUTE-*`、`TDD-RED-001`、`TDD-RED-003`、`TDD-RED-007` | 路由只解析路径，不写账；外部账户只做引用；失败不自动换路；普通支付不误入商户清算。 |
+| `AC-ROUTE-*`、`AC-PI-*`、`RED-043` 至 `RED-049` | `RouteSnapshotSpec`、`RouteLegSpec`、`PaymentInstrumentRefSpec`、`ExternalAccountRefSpec`、`RoutingDecisionSpec`、`FundingAllocationDecisionSpec`、`Route Replay DSL`、`BindingHistory`、`DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`DSL-PAYMENT-INSTRUMENT-FAIL-001`、`DSL-PAYMENT-INSTRUMENT-REPLAY-001`、`expectedRouteCreated=false` | `TDD-ROUTE-*`、`TDD-WALLET-*`、`TDD-RACE-009`、`TDD-RED-001`、`TDD-RED-003`、`TDD-RED-029`、`TDD-RED-034` 至 `TDD-RED-037` | 路由只解析路径，不写账；支付工具和外部账户只做引用；绑定、方向、状态、资金来源、账户能力和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
 | `AC-AUTH-*`、`AC-RAIL-001`、`AC-RAIL-002` | `AUTHORIZATION_TRANSACTION`、`DSL-AUTH-LIFECYCLE-001` | `TDD-AUTH-*`、`TDD-AUTH-FLOW-*`、`TDD-AUTH-ERR-*`、`TDD-AUTH-EXT-*` | 授权批准、拒绝、撤销、过期、完成、强制完成、完成后退款、无授权退款和发卡控制扩展边界一致。 |
 | `AC-CTRL-*` | `BALANCE_CONTROL`、`DSL-BALANCE-FREEZE-WITHDRAW-001`、`DSL-LIMIT-ADJUST-001` | `TDD-CTRL-*`、`TDD-CTRL-FLOW-*`、`TDD-CTRL-ERR-*`、`TDD-WALLET-*` | 冻结、解冻、资金调账、信用额度、预算组和受控负余额不混用；`LIMIT` 只能由调额触碰。 |
 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*` | `DSL-SETTLEMENT-RECONCILIATION-001`、清结算与对账差错账务规则 | `TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-RED-020` 至 `TDD-RED-022` | 清分、清算、结算、出款和对账对象独立；清分前基础对账、清算前置对账、差错追加事实和重跑审计闭环可验证。 |
@@ -326,7 +343,8 @@ flowchart TD
 | --- | --- | --- |
 | 状态机 | `AC-AUTH-*`、`AC-CTRL-*`、`AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`AC-ARCH-*`、`AC-REPLAY-*` | 每类对象都有状态方向、成功终态、失败终态、人工处理和审计要求。 |
 | 账务矩阵 | `AC-IN-*`、`AC-OUT-*`、`AC-PAY-*`、`AC-MER-*`、`AC-FEE-*`、`AC-ROUTE-*`、`AC-AUTH-*`、`AC-CTRL-*` | 每个资金变化都能说明来源账目、目标账目、周期口径、route snapshot 和余额断言。 |
-| 路由契约 | `AC-ROUTE-*`、`RED-003`、`RED-043`、`RED-044`、`RED-045` | route snapshot、平台角色、原路径回放、路由失败不写账和普通支付不误入商户清算可验收。 |
+| 支付工具 | `AC-PI-*`、`RED-001`、`RED-046`、`RED-047`、`RED-048`、`RED-049` | 支付工具、外部账户和通道 token 只做引用和快照；绑定关系、方向、状态、资金来源决策、账户能力和绑定历史审计可验收；敏感信息不进入普通快照、日志、导出或报表。 |
+| 路由契约 | `AC-ROUTE-*`、`AC-PI-*`、`RED-003`、`RED-043` 至 `RED-049` | route snapshot、平台角色、支付工具引用、外部账户引用、资金来源决策、绑定历史审计、原路径回放、路由失败不写账和普通支付不误入商户清算可验收。 |
 | 运营后台 | `AC-OPS-*`、`RED-010`、`RED-011`、`RED-028` | 后台只推进处理单和审批，不直接修改历史分录、余额或投影。 |
 | 清结算对象 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`RED-020`、`RED-030`、`RED-031`、`RED-032`、`RED-033` | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单对象关系清楚。 |
 | 外部规则核验 | `AC-RAIL-*`、`AC-FX-*`、`RED-021` | 涉及卡组织、ACH、银行、PSP、跨境、外汇和持牌能力时，保留规则来源和待确认方。 |
