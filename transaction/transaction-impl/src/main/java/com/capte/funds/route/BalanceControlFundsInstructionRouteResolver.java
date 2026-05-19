@@ -25,6 +25,7 @@ import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
+import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -109,11 +110,16 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
     private static final String ALLOW_NEGATIVE_BALANCE_LIMIT_AMOUNT_MESSAGE =
             "受控负余额调账上限必须大于 0";
 
+    private static final String FREEZE_AVAILABLE_BALANCE_NOT_ENOUGH_MESSAGE =
+            "账本余额不足，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, beforeBalance = {}, balanceDelta = {}, afterBalance = {}";
+
     private final RouteParticipantFactory routeParticipantFactory;
 
     private final RouteSubjectSupport routeSubjectSupport;
 
     private final PlatformAccountRouteSupport platformAccountRouteSupport;
+
+    private final FundsAccountQueryService fundsAccountQueryService;
 
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
@@ -135,6 +141,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
     private ResolvedRouteSpec resolveFreeze(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionContextKeys.ACCOUNT_ID);
+        assertEnoughAvailableBalance(accountId, instruction.getAmount());
         List<RouteLegSpec> legs = List.of(RouteSpecSupport.routeLeg(LEG_FREEZE, 1, RouteLegType.HOLD, instruction)
                 .sourceNode(RouteSpecSupport.sourceNode(
                         routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
@@ -147,6 +154,21 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 .build());
         List<RouteParticipantSpec> participants = List.of(subjectParticipant(accountId, instruction));
         return route(instruction, FundsRouteCodes.BALANCE_FREEZE_STANDARD, participants, legs);
+    }
+
+    private void assertEnoughAvailableBalance(FundsAccountId accountId, Money amount) {
+        Money beforeBalance = fundsAccountQueryService.getBalance(accountId).getAvailableBalance();
+        long beforeAmount = beforeBalance.getAmount();
+        long balanceDelta = -amount.getAmount();
+        long afterAmount = beforeAmount + balanceDelta;
+        AssertUtils.isTrue(afterAmount >= 0,
+                FREEZE_AVAILABLE_BALANCE_NOT_ENOUGH_MESSAGE,
+                accountId.id(),
+                accountId.type(),
+                LedgerSubjectCode.AVAILABLE,
+                beforeAmount,
+                balanceDelta,
+                afterAmount);
     }
 
     private ResolvedRouteSpec resolveUnfreeze(FundsInstructionSpec instruction) {

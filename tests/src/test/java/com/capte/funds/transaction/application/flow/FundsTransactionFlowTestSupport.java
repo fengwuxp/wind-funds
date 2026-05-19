@@ -472,6 +472,14 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return result;
     }
 
+    protected boolean frozenOrderExistsByBusinessSn(String businessSn) {
+        FundsFrozenOrderNameRefs ref = FundsFrozenOrderNameRefs.fundsFrozenOrder;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.businessSn.eq(businessSn));
+        return fundsFrozenOrderMapper.selectCountByQuery(wrapper) > 0;
+    }
+
     protected static FundsAccountId fundingAccount(String accountId) {
         return FundsAccountId.immutable(accountId, FundsSubjectType.FUNDING_ACCOUNT.name());
     }
