@@ -24,6 +24,16 @@
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
+            <artifactId>wind-funds-reconciliation-impl</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.funds</groupId>
+            <artifactId>wind-funds-governance-impl</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.funds</groupId>
             <artifactId>wind-funds-wallet-impl</artifactId>
             <scope>test</scope>
         </dependency>

@@ -25,9 +25,13 @@
         <module>ledger/ledger-face</module>
         <module>ledger/ledger-impl</module>
         <module>transaction/transaction-face</module>
+        <module>reconciliation/reconciliation-face</module>
+        <module>governance/governance-face</module>
         <module>transaction/transaction-impl</module>
         <module>wallet/wallet-face</module>
         <module>wallet/wallet-impl</module>
+        <module>reconciliation/reconciliation-impl</module>
+        <module>governance/governance-impl</module>
         <module>tests</module>
         <module>dependencies</module>
     </modules>
@@ -74,6 +78,26 @@
             <dependency>
                 <groupId>com.wind.funds</groupId>
                 <artifactId>wind-funds-transaction-impl</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
+                <artifactId>wind-funds-reconciliation-face</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
+                <artifactId>wind-funds-reconciliation-impl</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
+                <artifactId>wind-funds-governance-face</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
+                <artifactId>wind-funds-governance-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

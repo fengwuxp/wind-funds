@@ -24,7 +24,7 @@
 | 批次 5 | `transaction-*`、`tests/src/test/java` 中余额控制测试和最小实现。 |
 | 批次 6 | `transaction-*`、`ledger-*`、`tests/src/test/java` 中 Route Replay、余额日志、交易投影测试和最小实现。 |
 | 批次 7 | 清结算、对账相关新模块或包，需先确认。 |
-| 批次 8 | 归档、余额重建、交易投影重放相关新模块或包，需先确认；指标仅保留边界测试。 |
+| 批次 8 | 归档、余额重建、账本余额快照、交易投影重放相关新模块或包，需先确认；指标仅保留普通指标快照边界测试。 |
 
 ## 2. 全局只读范围
 
@@ -139,7 +139,7 @@ just compile
 | B5-02 | 固化冻结后提现与组合路径。 | `transaction-*`、`tests/src/test/java` | 产品验收用例。 | 提现忽略冻结、冻结释放后余额桶错误。 | 逐步骤断言可用、冻结、实际扣划。 | `just test-balance-control` |
 | B5-03 | 固化资金调账、信用额度、预算额度。 | `transaction-*`、`tests/src/test/java` | 账户/额度/预算概念边界。 | 调账绕过凭证，额度与余额混用。 | 保持调账凭证、额度口径和预算控制分离。 | `just test-balance-control` |
 | B5-04 | 固化 FX 与余额控制边界。 | `transaction-*`、`tests/src/test/java` | TDD 红线。 | 余额控制承接 FX 或隐式换汇。 | 余额控制只处理同币种余额桶。 | `just test-boundary` |
-| B5-05 | 固化冻结、解冻和提现并发竞争红线。 | `transaction-*`、`tests/src/test/java` | TDD 13.5、余额控制组合场景。 | 同一冻结来源被解冻和提现确认并发消费，导致重复释放、重复扣划或 `FROZEN` 为负。 | 通过冻结来源状态版本、剩余金额校验、幂等键和唯一约束保证同一冻结来源只被消费或释放一次。 | `just test-balance-control` |
+| B5-05 | 固化冻结、解冻和提现并发竞争红线。 | `transaction-*`、`tests/src/test/java` | TDD 13.5、余额控制组合场景、冻结动作明细。 | 同一冻结来源被解冻和提现确认并发关闭，导致重复释放、重复关闭或 `FROZEN` 为负。 | 通过冻结动作明细、剩余金额校验、动作幂等键和唯一约束保证同一冻结来源只被关闭或释放一次。 | `just test-balance-control` |
 
 ### 批次 6：Route Replay、交易投影和余额日志
 
@@ -174,10 +174,11 @@ just compile
 | B8-01 | 确认归档和重放任务模型。 | 待确认的新模块或独立包 | 系分 04、归档重放设计。 | 无审批、无范围、无 Manifest 即执行归档/重放。 | 人工确认后建立任务、审批、范围和 Manifest 边界。 | 待确认 |
 | B8-02 | 固化归档门禁和水位推进顺序。 | 待确认 | 归档流程。 | 先推水位再写结果、缺差异报告。 | checkpoint、watermark、Manifest、差异报告作为上线门禁。 | 待确认 |
 | B8-03 | 固化余额重建和交易投影重放。 | 待确认 | Balance Rebuild、Transaction Projection Replay。 | 余额重建从交易投影、余额日志或报表反推余额；交易投影重放重新入账。 | 保持事实只读、投影可重建、差异可解释；余额重建只从账本分录、检查点、水位和 Manifest 出发。 | 待确认 |
-| B8-04 | 固化指标只读和指标水位隔离。 | 待确认 | 指标治理仅列指标项、`TDD-METRIC-003`。 | 在本模块实现报表指标计算，或指标失败推进余额水位、修改归档 Manifest。 | 仅提供业务关心的指标口径输入，具体实现交给报表指标模块；指标水位独立于余额水位、归档 Manifest 和交易投影 checkpoint。 | 待确认 |
-| B8-05 | 固化归档和重放范围互斥。 | 待确认 | TDD 13.5、归档门禁和重放差异报告。 | 同一范围重复正式 apply、dry-run 推进 checkpoint、水位或 Manifest 被并发任务重复推进。 | 建立范围锁、任务幂等键、dry-run/apply 分离和成功后单次推进规则；失败任务不得推进水位。 | 待确认 |
+| B8-04 | 固化账本余额快照覆盖模式。 | 待确认 | 系分 04 账本余额快照、`DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`。 | `HOT_ONLY` 强制要求 Manifest、`COLD_MANIFEST` 缺 Manifest 仍通过、`MIXED` 跳过冷热合并摘要校验。 | 建立 `HOT_ONLY`、`COLD_MANIFEST`、`MIXED` 三种覆盖模式校验；冷区和混合覆盖缺 Manifest 不得进入 `VERIFIED`；失败不得推进余额水位。 | 待确认 |
+| B8-05 | 固化指标只读和指标水位隔离。 | 待确认 | 指标治理仅列指标项、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001`、`TDD-METRIC-003`、`TDD-METRIC-004`。 | 在本模块实现报表指标计算，或指标失败推进余额水位、修改归档 Manifest；普通指标快照成功替代账本余额快照。 | 仅提供业务关心的指标口径输入，具体实现交给报表指标模块；指标水位独立于余额水位、归档 Manifest 和交易投影 checkpoint；普通指标快照不能证明余额正确。 | 待确认 |
+| B8-06 | 固化归档、重放和快照范围互斥。 | 待确认 | TDD 13.5、归档门禁、重放差异报告和普通指标快照并发边界。 | 同一范围重复正式 apply、dry-run 推进 checkpoint、水位或 Manifest 被并发任务重复推进；普通指标快照覆盖余额快照状态。 | 建立范围锁、任务幂等键、dry-run/apply 分离、成功后单次推进规则和指标/余额快照状态隔离；失败任务不得推进水位。 | 待确认 |
 
-人工确认点：生产重放范围、审批策略、回滚策略、指标模块接口边界。
+人工确认点：生产重放范围、审批策略、回滚策略、账本余额快照覆盖模式字段、Manifest 覆盖策略、指标模块接口边界。
 
 ## 8. 依赖、门禁与设计反馈
 
@@ -202,7 +203,7 @@ just compile
 | 批次 5 | `AC-CTRL-001` 至 `AC-CTRL-008`、`AC-ADJ-001` | `DSL-BALANCE-*`、`DSL-LIMIT-ADJUST-001` | `TDD-CTRL-*`、`TDD-CTRL-FLOW-*`、`TDD-CTRL-ERR-*`、`TDD-RACE-004`、`TDD-RED-033` |
 | 批次 6 | `AC-ROUTE-*`、`AC-PI-005`、`AC-VIEW-*`、`AC-BALLOG-001`、`AC-REPLAY-*`、`RED-003`、`RED-016`、`RED-017`、`RED-036`、`RED-043`、`RED-044`、`RED-048`、`RED-049` | Route Replay、支付工具换绑后原路径回放、交易投影、余额日志 | `TDD-ROUTE-*`、`TDD-RACE-009`、`TDD-VIEW-*`、`TDD-REPLAY-*` |
 | 批次 7 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`RED-030` 至 `RED-033` | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单独立对象 | `TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-RACE-005` 至 `TDD-RACE-007`、`TDD-RED-033` |
-| 批次 8 | `AC-ARCH-*`、`AC-REPLAY-*`、`AC-RPT-*`、`RED-016` 至 `RED-019`、`RED-029`、`RED-034`、`RED-040` 至 `RED-042` | 归档、余额重建、交易投影重放、指标只读和指标水位隔离边界 | `TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`、`TDD-RACE-008`、`TDD-RED-033` |
+| 批次 8 | `AC-ARCH-*`、`AC-REPLAY-*`、`AC-RPT-*`、`RED-016` 至 `RED-019`、`RED-029`、`RED-034`、`RED-040` 至 `RED-042` | `DSL-GOVERNANCE-ARCHIVE-MANIFEST-001`、`DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`、`DSL-GOVERNANCE-PROJECTION-REPLAY-001`、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001`、归档、余额重建、交易投影重放、指标只读和指标水位隔离边界 | `TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`、`TDD-RACE-008`、`TDD-RACE-010`、`TDD-RED-033` |
 
 ## 10. Execution Grant 候选模板
 

@@ -2,7 +2,7 @@
 
 ## 一、文档定位：产品到系分的核心承载层
 
-支付资金底座 DSL 是产品语义到系统分析设计之间的**核心承载层**。它把产品侧的交易场景、账户语义、资金流、状态约束和验收红线，转译为系统侧可开发、可测试、可审计的资金交易结构和资金链路结构。
+支付资金底座 DSL 是产品语义到系统分析设计之间的核心承载层。它把产品侧的交易场景、账户语义、资金流、状态约束和验收红线，转译为系统侧可开发、可测试、可审计的资金交易结构和资金链路结构。
 
 它不是 PRD。PRD 负责说明用户、目标、业务流程、运营规则和产品验收。
 
@@ -192,7 +192,7 @@ flowchart TD
 
 | 主体 | 定义 | 典型账目 |
 | --- | --- | --- |
-| `FUNDING_ACCOUNT` | 承载真实资金余额或平台责任余额的资金账户。 | `AVAILABLE`、`FROZEN`、`AUTHORIZATION`、`CLEARING`、`SETTLEMENT`、`CASH`、`PREPAYMENT`、`FEE`、`ADJUSTMENT` |
+| `FUNDING_ACCOUNT` | 承载真实资金余额或平台责任余额的资金账户。 | `AVAILABLE`、`FROZEN`、`AUTHORIZATION`、`CLEARING`、`SETTLEMENT`、`IN_TRANSIT`、`CASH`、`PREPAYMENT`、`FEE`、`ADJUSTMENT` |
 | `CREDIT_ACCOUNT` | 承载授信额度、可用额度和授权占用的控制账户。 | `LIMIT`、`AVAILABLE`、`AUTHORIZATION` |
 | `BUDGET_GROUP` | 承载预算总量、可用预算和预算授权占用的控制账户。 | `LIMIT`、`AVAILABLE`、`AUTHORIZATION` |
 
@@ -219,6 +219,7 @@ flowchart TD
 | `AUTHORIZATION` | 授权占用，后续由撤销、结算、释放、过期或拒付关闭或减少。 |
 | `CLEARING` | 商户待清算资金，订单款默认先进该桶。 |
 | `SETTLEMENT` | 出款中或结算处理中锁定资金。 |
+| `IN_TRANSIT` | 外部已受理但还没有最终成功或失败的在途资金，必须有外部引用、责任方、账龄和到期重查口径。 |
 | `LIMIT` | 信用或预算总量，只能由 `LIMIT_ADJUST` 受控调整。 |
 | `FEE` | 手续费、服务费或成本扣收归集。 |
 | `ADJUSTMENT` | 差错、调账或人工核销的中间口径。 |
@@ -291,6 +292,16 @@ FX 边界：
 | `PaymentInstrumentRef` | 记录卡、VA、银行卡、支付工具等工具快照。 | 不直接入账。 |
 | `ExternalAccountRef` | 记录外部银行、通道、托管户等外部端点。 | 不直接入账。 |
 | `Reference` | 记录退款、撤销、结算、拒付、退费、解冻等后续事件引用的原事实。 | 缺引用时不得回放。 |
+
+`PaymentInstrumentRef` 字段语义：
+
+| 字段 | 语义 | 约束 |
+| --- | --- | --- |
+| `instrumentSn` | 支付工具在资金底座内的稳定工具号，对应系分表中的 `sn` 或绑定表中的 `instrument_sn`。 | 用于路由快照、绑定历史、回放和审计，不承载完整卡号、完整外部账户或敏感凭证。 |
+| `instrumentDisplayNo` | 支付工具的脱敏展示号、别名号或安全 token reference，对应系分表中的 `instrument_no` 语义。 | 只能用于展示、查询辅助和审计辅助；不得作为稳定工具主键或可记账主体。 |
+| `externalInstrumentId` | 通道、卡处理器、银行或外部系统的工具引用。 | 只做外部核验、回单、对账和争议证据，不进入 LedgerEntry 主体。 |
+
+若历史代码或旧样例中出现 `instrumentNo`，在 DSL 语义上只能按脱敏展示号理解；新增契约样例统一使用 `instrumentSn` 和 `instrumentDisplayNo`，避免把稳定工具号和展示号混用。
 
 ### 7.3 Route DSL
 
@@ -398,7 +409,7 @@ Replay 语义边界：
 | --- | --- | --- |
 | `BalanceProjection` | `LedgerEntry`、检查点、水位、归档清单。 | 不读交易视图反推余额。 |
 | `TransactionView` | 资金交易事实、路径快照、账本分录摘要。 | 不写账，不修正余额。 |
-| 报表指标 | 事实投影和统计口径。 | 不反向污染资金事实。 |
+| 报表指标输入 | 指标项、业务问题、建议事实来源和口径引用。 | 只作为报表指标模块输入，不反向污染资金事实，不复用归档水位或重放 checkpoint。 |
 
 ### 7.9 扩展与治理 DSL 边界
 
@@ -407,7 +418,9 @@ Replay 语义边界：
 | Spend Controls / 发卡授权控制扩展 | 作为授权前策略结果写入 `contextVariables`、规则版本和拒绝原因。 | 只决定授权是否可进入 `AUTHORIZE`，不生成 route、posting 或 entry；spend-rule window 不等同于账本周期。 |
 | 归档和余额重建 | 通过 `BalanceProjection`、检查点、水位、归档清单和差异报告承接。 | 只校验、重算或重建投影，不改变历史分录。 |
 | 交易投影重放 | 通过 `TransactionView`、重放范围、重放模式和差异报告承接。 | 只修复只读视图，不补写交易事实或账本事实。 |
-| 报表指标 | 只保留指标项、口径版本和来源引用。 | 指标采集、计算、调度、存储和展示由报表指标模块实现，不进入资金主链路。 |
+| 报表指标输入 | 只保留指标项、业务问题、口径引用和建议事实来源。 | 指标采集、计算、调度、存储、展示、导出和订阅由报表指标模块实现，不进入资金主链路，不复用归档、重建或重放控制对象。 |
+
+治理类 JSON 契约不是资金指令，不生成 `ResolvedRoute`、`PostingPlan` 或 `LedgerEntry`。它只用于让归档申请、资金归档 Manifest、余额检查点、交易投影重放任务、差异报告和统一治理流程的状态映射可被测试解析。编码时不得把治理任务 JSON 误接到资金交易编排器，也不得用统一治理任务号替代资金归档 Manifest、余额水位或交易投影重放 checkpoint。
 
 ## 八、DSL 不变量
 
@@ -448,9 +461,9 @@ Replay 语义边界：
 | 充值成功 + 付款并收手续费 | `FUND_IN` 后接本金 `PAY` + 费用 `FEE_CHARGE`。 | 入金进入用户 `AVAILABLE`；付款本金和手续费拆为独立 leg。 | 支持充值后付款、`FeeSpec` 驱动费用 leg、费用账户快照。 | 入金余额增加；付款本金和费用分别扣减；重复入金不重复记账。 |
 | 充值 -> 付款 -> 退款 -> 手续费退回 | `FUND_IN` + `PAY` + `REFUND` + `FEE_REFUND`。 | 退款基于付款原路径，退费基于费用原路径。 | 支持本金退款和费用退回分开引用、分开累计、分开上限。 | 普通退款不默认退费；退款不超过已付本金；退费不超过已收手续费。 |
 | A 转给 B | `DIRECT_TRANSACTION / TRANSFER`。 | A `AVAILABLE` -> B `AVAILABLE` 或目标业务桶。 | 支持跨主体内部转账、双方主体解析和幂等。 | A 减少、B 增加；币种一致；双方分录可追溯。 |
-| 提现成功 + 手续费收取 | `FREEZE` 后接 `FUND_OUT` + `FEE_CHARGE`。 | 提现申请先冻结提现本金及按规则预留的手续费；外部出款成功后消耗冻结来源，手续费作为独立费用 leg 入平台 `FEE`。 | 支持提现冻结单、出款确认结果、`FeeSpec` 和费用账户快照；手续费来源桶必须由规则明确。 | 申请阶段只冻结不出款；成功后本金和手续费分别入账；手续费不混入提现本金；重复回调不重复转出或收费。 |
+| 提现成功 + 手续费收取 | `FREEZE` 后接 `FUND_OUT` + `FEE_CHARGE`。 | 提现申请先冻结提现本金及按规则预留的手续费；外部出款成功后引用并关闭冻结来源，手续费作为独立费用 leg 入平台 `FEE`。 | 支持提现冻结单、出款确认结果、`FeeSpec` 和费用账户快照；手续费来源桶必须由规则明确。 | 申请阶段只冻结不出款；成功后本金和手续费分别入账；手续费不混入提现本金；重复回调不重复转出或收费。 |
 | 提现撤销或被拒绝 | `FREEZE` 后接 `UNFREEZE`。 | 提现已冻结但未确认出款；用户撤销、风控拒绝或通道拒绝时释放冻结，本金和费用预留回到用户 `AVAILABLE`。 | 支持引用原提现冻结单、撤销/拒绝原因、解冻幂等和剩余冻结校验；不得生成 `FUND_OUT`。 | 撤销/拒绝不扣本金、不默认收费；重复撤销/拒绝不重复解冻；没有冻结单或超额解冻失败。 |
-| A 充值 -> 转给 B -> B 付款 -> B 提现 | `FUND_IN` + `TRANSFER` + `PAY` + `FREEZE` + `FUND_OUT`。 | A 入金后转给 B；B 付款进入商户清算桶；B 提现先冻结资金，外部出款成功后再确认转出并消耗冻结来源。 | 支持多主体组合链路、跨主体转账、付款、提现冻结和出款结果入账。 | 每一步断言 A、B、商户、平台余额桶；提现申请阶段只冻结；出款成功后冻结来源关闭，撤销或拒绝走解冻路径。 |
+| A 充值 -> 转给 B -> B 付款 -> B 提现 | `FUND_IN` + `TRANSFER` + `PAY` + `FREEZE` + `FUND_OUT`。 | A 入金后转给 B；B 付款进入商户清算桶；B 提现先冻结资金，外部出款成功后再确认转出并关闭冻结来源。 | 支持多主体组合链路、跨主体转账、付款、提现冻结和出款结果入账。 | 每一步断言 A、B、商户、平台余额桶；提现申请阶段只冻结；出款成功后冻结来源关闭，撤销或拒绝走解冻路径。 |
 | 资金账户允许受控透支付款 | `DIRECT_TRANSACTION / PAY`，允许 `AVAILABLE` 受控为负。 | 付款方 `AVAILABLE` 可按 profile 策略短暂为负，必须有来源、上限、账龄和风险状态。 | 支持负余额策略、风险标记、追偿或补足路径。 | 无策略透支失败；有策略透支成功但生成风险治理口径。 |
 | 资金账户禁止透支付款 | `DIRECT_TRANSACTION / PAY` 校验失败。 | `AVAILABLE` 不足且无受控负余额策略。 | 余额约束前置校验，失败不生成 route、posting、entry。 | 余额不足失败；失败不改余额；错误原因可解释。 |
 | 后置手续费触发受控透支 | `DIRECT_TRANSACTION / FEE_CHARGE`。 | 已确认费用补扣时，用户 `AVAILABLE` 不足可按策略受控为负。 | 支持后置费用、跨境费、拒付费等显式费用事实；无策略不得静默透支。 | 有策略时生成负余额治理口径；无策略时失败或进入人工差错处理，不得继续消费。 |
@@ -458,7 +471,7 @@ Replay 语义边界：
 | 原交易部分退款 | `DIRECT_TRANSACTION / REFUND`。 | 原路径部分反向。 | 记录累计已退金额和剩余可退金额。 | 多次退款累计不超过原交易；每次 posting 平衡。 |
 | 手续费退回 | `DIRECT_TRANSACTION / FEE_REFUND`。 | 平台费用账户 -> 原付费方。 | 退费独立事件处理，不混入普通退款。 | 普通退款不默认退费；退费不超过原手续费。 |
 | 清算确认 | `DIRECT_TRANSACTION / CLEARING_CONFIRM` 或稳定清算事件。 | `CLEARING -> AVAILABLE`，形成可结算口径。 | 只处理确认后的清算结果。 | 清算批次生成不直接入账；确认结果入账可追溯。 |
-| 结算锁定与出款结果 | `SETTLEMENT_LOCK`、`FUND_OUT`、失败回退。 | `AVAILABLE -> SETTLEMENT -> 出款结果`。 | 支持锁定、成功消耗、失败回退三类事实。 | 锁定不等于出款成功；失败回退恢复原口径。 |
+| 结算锁定与出款结果 | `SETTLEMENT_LOCK`、`FUND_OUT`、失败回退。 | 从 `AVAILABLE` 锁定到 `SETTLEMENT`；需要账本可见在途时进入 `IN_TRANSIT`；最终按出款结果关闭或回退。 | 支持锁定、外部在途、成功关闭、失败回退四类事实。 | 锁定不等于出款成功；外部受理不等于成功；失败回退恢复原口径。 |
 | 对账差错调账 | `DIRECT_TRANSACTION / ADJUST`。 | 差错来源 -> `ADJUSTMENT` 或业务指定口径。 | 必须带差错来源、审批、凭证和审计上下文。 | 无审批调账失败；调账分录平衡；差错可核销。 |
 | 错币种直接交易 | `DIRECT_TRANSACTION` 携带 `originalAmount` 与 `amount`。 | 账务主链路使用 `amount.currency`。 | 只记录业务层已决策的 FX 事实，不隐式换汇。 | 汇率快照完整；交易层不调用 FX；余额控制不承接 FX。 |
 
@@ -602,7 +615,7 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 | --- | --- | --- | --- |
 | 冻结 | `BALANCE_CONTROL / FREEZE` | 同主体 `AVAILABLE` -> `FROZEN`。 | 不创建资金交易，不表达消费。 |
 | 多次解冻 | `BALANCE_CONTROL / UNFREEZE` | 同主体 `FROZEN` -> `AVAILABLE`。 | 引用原冻结单，不超过剩余冻结。 |
-| 提现消耗冻结 | `DIRECT_TRANSACTION / FUND_OUT` | 已确认出款结果消耗冻结或锁定金额。 | 不是解冻后再无来源扣款。 |
+| 提现确认关闭冻结来源 | `DIRECT_TRANSACTION / FUND_OUT` | 已确认出款结果引用并关闭冻结或锁定金额。 | 不是解冻后再无来源扣款；冻结单自身不表达消费。 |
 | 信用调额 | `BALANCE_CONTROL / LIMIT_ADJUST` | 信用账户 `LIMIT` 调整。 | 仅调额可触碰 `LIMIT`。 |
 | 预算组调额 | `BALANCE_CONTROL / LIMIT_ADJUST` | 预算组 `LIMIT` 调整。 | 预算控制不表达真实资金沉淀。 |
 
@@ -617,8 +630,9 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 | 清算前置对账 | 不进入资金 DSL，只作为清算确认事实的准入上下文。 | 重大差错阻断清算确认；有解释差异只能按放行矩阵有条件放行。 |
 | 清算确认 | 确认后的清算结果，事件语义使用 `CLEARING_CONFIRM`。 | 从 `CLEARING` 进入 `AVAILABLE` 可结算口径。 |
 | 结算锁定 | 确认后的结算出款候选，事件语义使用 `SETTLEMENT_LOCK`。 | 从 `AVAILABLE` 锁定到 `SETTLEMENT`。 |
-| 出款成功 | 外部出款结果成立。 | 释放或消耗 `SETTLEMENT`，保留外部引用。 |
-| 出款失败回退 | 外部出款失败已确认。 | 从 `SETTLEMENT` 回退到原口径。 |
+| 外部出款受理在途 | 外部已受理但未最终成功或失败。 | 需要账本可见在途时从 `SETTLEMENT` 进入 `IN_TRANSIT`；未启用在途桶时必须保持出款单待确认，禁止展示成功。 |
+| 出款成功 | 外部出款结果成立。 | 关闭 `SETTLEMENT` 或 `IN_TRANSIT`，保留外部引用。 |
+| 出款失败回退 | 外部出款失败已确认。 | 从 `SETTLEMENT` 或 `IN_TRANSIT` 回退到原口径。 |
 | 对账差错调账 | 差错已审批、凭证已确认。 | 进入 `ADJUSTMENT` 或业务指定口径，必须可审计。 |
 
 清结算与对账的 DSL 边界：
@@ -627,6 +641,7 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 2. 清算批次确认、结算锁定、出款结果和经审批的差错调账，才进入资金 DSL。
 3. 对账通过不生成账务；对账差异也不直接改账。只有补事实、冲正、调账或追偿等明确资金事实才生成 DSL 指令。
 4. 有条件放行只影响清结算流程准入，不表达资金转移；若放行后产生资金事实，仍必须由对应资金指令承接。
+5. 当前基线不新增 `SETTLEMENT` 类 `transactionType`。`SETTLEMENT_LOCK` 可临时使用 `DIRECT_TRANSACTION / ADJUSTMENT` 作为兼容载体，但必须通过 `eventType=SETTLEMENT_LOCK`、清结算上下文和结算操作类型区分，不得复用人工调账的审批、权限、报表或差错核销语义。
 
 ### 10.5 支付工具、绑定和资金来源
 
@@ -1273,9 +1288,10 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "actorId": "card-processor"
     },
     "instrumentRef": {
-      "instrumentId": "vcc_90001",
+      "instrumentSn": "PI20260518090001",
       "instrumentType": "VCC",
-      "instrumentNo": "****4242",
+      "instrumentDisplayNo": "****4242",
+      "externalInstrumentId": "vcc_90001",
       "ownerId": "holder_10001",
       "ownerType": "CARDHOLDER",
       "currency": "USD",
@@ -1658,7 +1674,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "mustPass": [
       "冻结只做同主体 AVAILABLE 到 FROZEN",
       "多次解冻累计不超过剩余冻结",
-      "提现成功消耗明确来源的冻结金额"
+      "提现成功引用并关闭明确来源的冻结金额"
     ],
     "mustFail": [
       "冻结表达跨主体资金转移",
@@ -1761,7 +1777,11 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "contextVariables": {
       "merchantAccountId": "fa_merchant_20001_usd",
       "sourceLedgerSubjectCode": "AVAILABLE",
-      "targetLedgerSubjectCode": "SETTLEMENT"
+      "targetLedgerSubjectCode": "SETTLEMENT",
+      "settlementOperationType": "SETTLEMENT_LOCK",
+      "postingScope": "SETTLEMENT",
+      "transactionTypeCompatibilityCarrier": "ADJUSTMENT",
+      "semanticBoundary": "SYSTEM_SETTLEMENT_LOCK_NOT_MANUAL_ADJUSTMENT"
     }
   },
   "clearingAndReconciliationContext": {
@@ -1928,9 +1948,10 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "actorId": "user_10001"
     },
     "instrumentRef": {
-      "instrumentId": "pi_card_10001",
+      "instrumentSn": "PI20260518010001",
       "instrumentType": "CARD_TOKEN",
-      "instrumentNo": "****4242",
+      "instrumentDisplayNo": "****4242",
+      "externalInstrumentId": "pi_card_10001",
       "ownerId": "user_10001",
       "ownerType": "USER",
       "tenantId": 1,
@@ -1986,9 +2007,10 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       ]
     },
     "paymentInstrumentRef": {
-      "instrumentId": "pi_card_10001",
+      "instrumentSn": "PI20260518010001",
       "instrumentType": "CARD_TOKEN",
-      "instrumentNo": "****4242",
+      "instrumentDisplayNo": "****4242",
+      "externalInstrumentId": "pi_card_10001",
       "status": "ACTIVE"
     },
     "externalAccountRef": {
@@ -2095,9 +2117,10 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "actorId": "user_10001"
     },
     "instrumentRef": {
-      "instrumentId": "pi_card_10001",
+      "instrumentSn": "PI20260518010001",
       "instrumentType": "CARD_TOKEN",
-      "instrumentNo": "****4242",
+      "instrumentDisplayNo": "****4242",
+      "externalInstrumentId": "pi_card_10001",
       "ownerId": "user_10001",
       "ownerType": "USER",
       "tenantId": 1,
@@ -2151,9 +2174,10 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
   "originalRouteSnapshot": {
     "routeSnapshotId": "route_snapshot_pi_pay_001",
     "paymentInstrumentRef": {
-      "instrumentId": "pi_card_10001",
+      "instrumentSn": "PI20260518010001",
       "instrumentType": "CARD_TOKEN",
-      "instrumentNo": "****4242",
+      "instrumentDisplayNo": "****4242",
+      "externalInstrumentId": "pi_card_10001",
       "status": "ACTIVE",
       "bindingSnapshot": {
         "bindingSn": "PIB202605180001",
@@ -2185,7 +2209,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "routeCode": "DIRECT_PAY_BY_INSTRUMENT"
   },
   "currentBindingState": {
-    "instrumentId": "pi_card_10001",
+    "instrumentSn": "PI20260518010001",
+    "externalInstrumentId": "pi_card_10001",
     "bindingSn": "PIB202605190009",
     "defaultFundingAccountId": "fa_user_10001_new_usd",
     "version": 9,
@@ -2299,6 +2324,282 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 }
 ```
 
+### 11.12 资金数据治理任务边界
+
+```json
+{
+  "caseId": "DSL-GOVERNANCE-ARCHIVE-MANIFEST-001",
+  "scenarioCode": "FUNDS_ARCHIVE_REQUEST_AND_MANIFEST_BOUNDARY",
+  "governanceTask": {
+    "taskSn": "GOV_TASK_202605180001",
+    "taskType": "ARCHIVE",
+    "taskStatus": "COMPLETED",
+    "operator": {
+      "actorType": "OPS",
+      "actorId": "ops_10001"
+    },
+    "approvalRef": {
+      "approvalSn": "APPROVAL_202605180010",
+      "approvalStatus": "APPROVED",
+      "approvedAt": "2026-05-18T22:00:00"
+    }
+  },
+  "archiveRequest": {
+    "archiveRequestSn": "FAR202605180001",
+    "status": "RUNNING",
+    "scope": {
+      "tenantId": 1,
+      "objectTypes": [
+        "FUNDS_TRANSACTION",
+        "FUNDS_TRANSACTION_DETAIL",
+        "LEDGER_TRANSACTION",
+        "LEDGER_ENTRY"
+      ],
+      "currency": "USD",
+      "windowStart": "2025-01-01T00:00:00",
+      "windowEnd": "2025-12-31T23:59:59"
+    },
+    "precheck": {
+      "scopeValid": true,
+      "checkpointExists": true,
+      "watermarkCovered": true,
+      "reconciliationClosed": true,
+      "approvalRequired": true
+    }
+  },
+  "archiveManifest": {
+    "archiveManifestSn": "FAM202605180001",
+    "status": "VERIFYING",
+    "recordCount": 1250000,
+    "debitAmount": {
+      "currency": "USD",
+      "minorValue": 985000000
+    },
+    "creditAmount": {
+      "currency": "USD",
+      "minorValue": 985000000
+    },
+    "checkpointRef": {
+      "checkpointSn": "BCP202512310001",
+      "watermarkSn": "BWM202512310001",
+      "checkpointTime": "2025-12-31T23:59:59"
+    },
+    "hotLocation": "ledger_entry_hot_partition_2025",
+    "coldLocation": "s3://funds-archive/tenant-1/2025/",
+    "digest": "sha256:archive_manifest_digest"
+  },
+  "expectedRoute": {
+    "shouldCreateRoute": false,
+    "reason": "治理任务不生成资金路径。"
+  },
+  "expectedPosting": {
+    "shouldCreatePosting": false,
+    "reason": "归档申请、Manifest 和统一治理任务状态不表达资金转移。"
+  },
+  "validation": {
+    "mustPass": [
+      "统一任务完成不等于资金归档 Manifest 完成",
+      "Manifest 完成前不能作为余额重建或交易投影重放的可信边界",
+      "归档申请状态和 Manifest 状态分别维护",
+      "余额水位、归档 Manifest 和统一任务号互不替代"
+    ],
+    "mustFail": [
+      "用统一治理任务号替代 archiveManifestSn",
+      "统一任务 COMPLETED 时直接标记归档成功",
+      "缺 checkpoint 或 watermark 仍允许账务归档",
+      "归档任务生成 route、posting 或 LedgerEntry"
+    ]
+  }
+}
+```
+
+```json
+{
+  "caseId": "DSL-GOVERNANCE-PROJECTION-REPLAY-001",
+  "scenarioCode": "TRANSACTION_PROJECTION_REPLAY_BOUNDARY",
+  "projectionReplayTask": {
+    "taskSn": "PRT202605180001",
+    "viewDomain": "MERCHANT_BILL",
+    "mode": "REBUILD_APPLY",
+    "scopeType": "TIME_WINDOW",
+    "scopeValue": {
+      "tenantId": 1,
+      "subjectType": "FUNDING_ACCOUNT",
+      "subjectId": "fa_merchant_20001_usd",
+      "currency": "USD",
+      "windowStart": "2025-10-01T00:00:00",
+      "windowEnd": "2025-10-31T23:59:59"
+    },
+    "replayCheckpointRef": {
+      "checkpointType": "TRANSACTION_VIEW_CURSOR",
+      "checkpointValue": "txn_view_cursor_20251031_0001",
+      "processedCount": 300000
+    },
+    "approvalRef": {
+      "approvalSn": "APPROVAL_202605180011",
+      "approvalStatus": "APPROVED"
+    },
+    "differenceReport": {
+      "reportSn": "DR202605180001",
+      "differenceType": "STATUS_MISMATCH",
+      "severity": "MEDIUM",
+      "status": "RESOLVED"
+    }
+  },
+  "sourceFacts": {
+    "archiveManifestSn": "FAM202605180001",
+    "manifestStatus": "COMPLETED",
+    "hotAndColdReadable": true,
+    "semanticCompatibleFrom": "2025-01-01T00:00:00",
+    "factStableUntil": "2025-10-31T23:59:59"
+  },
+  "expectedRoute": {
+    "shouldCreateRoute": false,
+    "reason": "交易投影重放只读取事实并修复只读视图。"
+  },
+  "expectedPosting": {
+    "shouldCreatePosting": false,
+    "reason": "交易投影重放不得重新入账或修改账本事实。"
+  },
+  "validation": {
+    "mustPass": [
+      "REBUILD_APPLY 必须有范围、审批、差异报告和 checkpoint",
+      "冷区事实可读且 Manifest 完成后才允许跨冷热重放",
+      "重放 checkpoint 只表达交易投影进度",
+      "正式覆盖只写只读交易投影"
+    ],
+    "mustFail": [
+      "无范围全量在线重放",
+      "冷区不可读或 Manifest 未完成仍覆盖历史投影",
+      "重放 checkpoint 复用余额水位或指标水位",
+      "交易投影重放生成资金交易、route、posting 或 LedgerEntry"
+    ]
+  }
+}
+```
+
+```json
+{
+  "caseId": "DSL-GOVERNANCE-BALANCE-SNAPSHOT-001",
+  "scenarioCode": "LEDGER_BALANCE_SNAPSHOT_VERIFICATION_BOUNDARY",
+  "balanceSnapshotVerification": {
+    "taskSn": "BSV202605180001",
+    "taskCategory": "LEDGER_BALANCE_CHECKPOINT",
+    "bucketKey": {
+      "tenantId": 1,
+      "subjectType": "FUNDING_ACCOUNT",
+      "subjectId": "fa_merchant_20001_usd",
+      "ledgerBookCode": "DEFAULT",
+      "ledgerSubjectCode": "CLEARING",
+      "currency": "USD",
+      "periodType": "LIFETIME",
+      "periodId": "LIFETIME"
+    },
+    "checkpointRef": {
+      "checkpointSn": "BCP202512310001",
+      "watermarkSn": "BWM202512310001",
+      "checkpointTime": "2025-12-31T23:59:59",
+      "lastEntrySn": "LE202512310001"
+    },
+    "coverageMode": "MIXED",
+    "manifestSn": "FAM202605180001",
+    "hotLastEntrySn": "LE202605180001",
+    "coldLastEntrySn": "LE202512310001",
+    "entryCount": 100000,
+    "debitAmount": {
+      "currency": "USD",
+      "minorValue": 985000000
+    },
+    "creditAmount": {
+      "currency": "USD",
+      "minorValue": 985000000
+    },
+    "balanceAmount": {
+      "currency": "USD",
+      "minorValue": 32000000
+    },
+    "digest": "sha256:balance_snapshot_digest",
+    "verifyStatus": "VERIFYING",
+    "differenceReport": {
+      "reportSn": "DR202605180002",
+      "severity": "LOW",
+      "status": "RESOLVED"
+    }
+  },
+  "expectedRoute": {
+    "shouldCreateRoute": false,
+    "reason": "账本余额快照只校验余额边界，不生成资金路径。"
+  },
+  "expectedPosting": {
+    "shouldCreatePosting": false,
+    "reason": "账本余额快照不得重新入账、修改分录或表达资金转移。"
+  },
+  "validation": {
+    "mustPass": [
+      "余额快照可以复用广义指标快照任务骨架，但 taskCategory 必须是 LEDGER_BALANCE_CHECKPOINT",
+      "HOT_ONLY 覆盖可以没有 manifestSn，但必须校验热区分录、游标和 digest",
+      "COLD_MANIFEST 覆盖必须引用已完成 Manifest",
+      "MIXED 覆盖必须同时校验冷区 Manifest 和热区游标",
+      "只有余额快照 VERIFIED 且差异报告无阻断项，才允许推进余额水位"
+    ],
+    "mustFail": [
+      "用 REPORTING_METRIC_SNAPSHOT 替代 LEDGER_BALANCE_CHECKPOINT",
+      "COLD_MANIFEST 或 MIXED 覆盖缺 manifestSn 仍进入 VERIFIED",
+      "用指标水位、报表周期、自然日或归档日期替代余额水位",
+      "余额快照生成 route、posting 或 LedgerEntry"
+    ]
+  }
+}
+```
+
+```json
+{
+  "caseId": "DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001",
+  "scenarioCode": "REPORTING_METRIC_SNAPSHOT_BOUNDARY",
+  "metricSnapshot": {
+    "taskSn": "RMS202605180001",
+    "taskCategory": "REPORTING_METRIC_SNAPSHOT",
+    "metricCode": "merchant_clearing_balance_observation",
+    "metricVersion": "v2026.05",
+    "metricWatermark": "2026-05-18T00:00:00",
+    "publishStatus": "PUBLISHED",
+    "qualityStatus": "PASSED",
+    "sourceRefs": [
+      {
+        "sourceType": "LEDGER_ENTRY",
+        "sourceBoundary": "read-only"
+      },
+      {
+        "sourceType": "FUNDS_ARCHIVE_MANIFEST",
+        "sourceBoundary": "read-only-summary"
+      }
+    ]
+  },
+  "expectedRoute": {
+    "shouldCreateRoute": false,
+    "reason": "普通指标快照只属于报表指标发布上下文。"
+  },
+  "expectedPosting": {
+    "shouldCreatePosting": false,
+    "reason": "普通指标快照不得表达资金转移、余额证明或账务确认。"
+  },
+  "validation": {
+    "mustPass": [
+      "普通指标快照可以只读消费资金事实或治理摘要",
+      "普通指标快照的指标水位只属于报表指标模块",
+      "普通指标快照成功只表示指标可查询或可发布",
+      "指标失败只影响报表发布和指标查询"
+    ],
+    "mustFail": [
+      "用普通指标快照成功状态推进余额水位",
+      "用指标水位替代余额水位、归档 Manifest 或交易投影重放 checkpoint",
+      "用指标质量报告替代资金差异报告或对账差错单",
+      "普通指标快照生成 route、posting 或 LedgerEntry"
+    ]
+  }
+}
+```
+
 ## 十二、DSL 契约验收
 
 每个 JSON 契约用例至少包含：
@@ -2310,6 +2611,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 - `expectedPosting` 或明确说明不应产生账务
 - `validation.mustPass`
 - `validation.mustFail`
+
+治理类 JSON 契约可以使用 `governanceTask`、`archiveRequest`、`archiveManifest`、`projectionReplayTask`、`balanceSnapshotVerification`、`metricSnapshot`、`differenceReport` 等对象替代 `instruction`，但必须显式声明 `expectedRoute.shouldCreateRoute=false` 和 `expectedPosting.shouldCreatePosting=false`，证明它不是资金交易指令。
 
 契约验收矩阵：
 
@@ -2324,6 +2627,9 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | replay 边界 | 缺原快照失败，不读取当前绑定关系重新选路。 |
 | 工具换绑边界 | 退款、撤销、退费或拒付必须按原 route snapshot 和原工具快照回放。 |
 | 结算策略 | `SettlementPolicy` 解析失败、空表达式或未知策略必须显式失败，不能降级为实时结算。 |
+| 治理任务边界 | 统一治理任务、资金归档 Manifest、余额水位、账本余额快照、普通指标快照和交易投影重放 checkpoint 状态独立，治理任务不生成资金路径或账务分录。 |
+| 账本余额快照 | `HOT_ONLY`、`COLD_MANIFEST`、`MIXED` 覆盖模式分别校验；冷区和混合覆盖缺 Manifest 必须失败；普通指标快照不能替代余额快照。 |
+| 普通指标快照 | 只属于报表指标模块的发布和质量上下文；指标水位不得推进余额水位、修改归档 Manifest 或替代交易投影重放 checkpoint。 |
 | 授权拒绝 | 不生成 route、posting、entry。 |
 | 冻结 | 不创建资金交易，只控制同主体余额桶。 |
 | LIMIT 红线 | 普通授权完成不触碰 `LIMIT`。 |

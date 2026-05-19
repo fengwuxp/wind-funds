@@ -41,6 +41,26 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
+                <artifactId>wind-funds-reconciliation-face</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
+                <artifactId>wind-funds-reconciliation-impl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
+                <artifactId>wind-funds-governance-face</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
+                <artifactId>wind-funds-governance-impl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
                 <artifactId>wind-funds-wallet-face</artifactId>
                 <version>${project.version}</version>
             </dependency>
