@@ -62,8 +62,10 @@ public class FundsTransactionProjectionReplayService {
         AssertUtils.notNull(request.replayRange(), "交易投影重放范围不能为空");
         AssertUtils.isTrue(request.replayRange().isBounded(), "交易投影重放必须指定单笔、主体、时间窗口或批次范围");
         AssertUtils.notNull(request.checkpoint(), "交易投影重放 checkpoint 不能为空");
+        AssertUtils.notNull(request.checkpoint().type(), "交易投影重放 checkpoint 类型不能为空");
+        AssertUtils.hasText(request.checkpoint().checkpointSn(), "交易投影重放 checkpoint 流水号不能为空");
         AssertUtils.isTrue(request.checkpoint().type() == FundsTransactionProjectionCheckpointType.TRANSACTION_PROJECTION,
-                "交易投影重放不得复用余额水位、归档 Manifest 或报表 checkpoint");
+                "交易投影重放 checkpoint 类型必须为交易投影");
     }
 
     private FundsTransactionProjectionRow rebuildProjectionRow(FundsTransactionProjectionFact fact) {

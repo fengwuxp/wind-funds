@@ -9,9 +9,9 @@ import org.jspecify.annotations.NonNull;
  *
  * <p>职责：记录本次投影重放从哪个交易投影边界继续，保证任务可追溯、可暂停、可恢复。</p>
  *
- * <p>能力：与重放范围共同确定事实读取边界，并在结果中回传给运营、测试或审计侧确认。</p>
+ * <p>能力：通过类型和流水号共同标识处理边界，并在结果中回传给运营、测试或审计侧确认。</p>
  *
- * <p>边界：只能用于交易投影重放，不得复用余额水位、归档 manifest 或报表指标 checkpoint。</p>
+ * <p>边界：只能用于交易投影重放，不承载其他投影域或批处理域的 checkpoint 语义。</p>
  */
 @Builder
 public record FundsTransactionProjectionCheckpoint(@NonNull FundsTransactionProjectionCheckpointType type,

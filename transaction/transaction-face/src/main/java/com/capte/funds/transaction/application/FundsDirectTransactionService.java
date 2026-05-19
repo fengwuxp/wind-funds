@@ -22,7 +22,7 @@ public interface FundsDirectTransactionService {
     /**
      * 充值（外部资金进入平台账户）
      *
-     * @param request  入账交易请求对象
+     * @param request  充值请求对象
      * @param operator 操作人
      * @return 交易流水号
      */
@@ -40,7 +40,8 @@ public interface FundsDirectTransactionService {
     /**
      * 账户付款
      *
-     * @param request 入账交易请求对象
+     * @param request  付款请求对象
+     * @param operator 操作人
      * @return 交易流水号
      */
     String pay(FundsTransactionPayRequest request, WindOperator operator);
@@ -64,9 +65,10 @@ public interface FundsDirectTransactionService {
     String withdraw(FundsTransactionWithdrawRequest request, WindOperator operator);
 
     /**
-     * 手续费收取 (单独手续手续费场景)
+     * 手续费收取 (单独手续费场景)
      *
-     * @param request 手续费收取请求
+     * @param request  手续费收取请求
+     * @param operator 操作人
      * @return 交易流水号
      */
     String fee(FundsTransactionFeeRequest request, WindOperator operator);

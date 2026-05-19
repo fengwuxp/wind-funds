@@ -11,7 +11,7 @@ import java.util.List;
  *
  * <p>能力：支持 verify-only 差异核对、shadow 灰度核对和 apply 正式投影刷新。</p>
  *
- * <p>边界：端口只能处理投影视图数据，不得写交易事实、账本分录、余额桶、清结算批次或报表指标。</p>
+ * <p>边界：端口只能处理投影视图数据，不得写交易事实、账本分录、余额桶或其他业务域数据。</p>
  */
 public interface FundsTransactionProjectionWriter {
 

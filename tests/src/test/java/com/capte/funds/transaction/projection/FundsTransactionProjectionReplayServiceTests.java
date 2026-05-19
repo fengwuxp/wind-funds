@@ -35,14 +35,14 @@ class FundsTransactionProjectionReplayServiceTests {
     }
 
     /**
-     * 场景：调用方误把余额水位当成交易投影重放 checkpoint。
-     * 输入：单笔重放范围、`BALANCE_WATERMARK` checkpoint。
+     * 场景：调用方发起交易投影重放，但没有提供 checkpoint 流水号。
+     * 输入：单笔重放范围、缺少 checkpointSn 的交易投影 checkpoint。
      * 输出：服务拒绝执行。
-     * 预期：交易投影重放只能使用交易投影自己的 checkpoint。
-     * 红线：不得复用余额水位、归档 Manifest 或报表 checkpoint 作为交易投影处理边界。
+     * 预期：交易投影重放必须明确处理边界流水号。
+     * 红线：交易投影重放不得接收不可追踪的 checkpoint。
      */
     @Test
-    void testReplayWithBalanceWatermarkCheckpointShouldFail() {
+    void testReplayWithoutCheckpointSnShouldFail() {
         FundsTransactionProjectionReplayService service = newService(new RecordingProjectionWriter());
         FundsTransactionProjectionReplayRequest request = FundsTransactionProjectionReplayRequest.builder()
                 .taskSn("TPR-202605190002")
@@ -52,13 +52,13 @@ class FundsTransactionProjectionReplayServiceTests {
                         .sourceSn("FT202605190001")
                         .build())
                 .checkpoint(FundsTransactionProjectionCheckpoint.builder()
-                        .type(FundsTransactionProjectionCheckpointType.BALANCE_WATERMARK)
-                        .checkpointSn("BW-202605190001")
+                        .type(FundsTransactionProjectionCheckpointType.TRANSACTION_PROJECTION)
+                        .checkpointSn("")
                         .build())
                 .build();
 
         assertThatThrownBy(() -> service.replay(request))
-                .hasMessageContaining("交易投影重放不得复用余额水位、归档 Manifest 或报表 checkpoint");
+                .hasMessageContaining("交易投影重放 checkpoint 流水号不能为空");
     }
 
     /**
