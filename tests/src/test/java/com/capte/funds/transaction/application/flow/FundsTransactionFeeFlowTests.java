@@ -15,6 +15,7 @@ import static com.capte.funds.support.FundsBalanceAssertionSupport.assertOnlyBal
 import static com.capte.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 手续费组合业务流测试。
@@ -132,5 +133,67 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.REFUND.name());
+    }
+
+    /**
+     * 场景：用户付款产生固定手续费，全额退费后再次尝试退回同一原交易手续费。
+     * 输入：原交易手续费 5、第一次手续费退款 5、平台手续费账户另有足额余额、第二次手续费退款 5。
+     * 输出：第二次退费失败，付款方、收款方、平台手续费和现金账户余额均保持不变。
+     * 预期：手续费退款按原交易 FEE leg 回放，同一原交易累计退费金额不得超过原交易手续费。
+     * 红线：不能因为平台手续费账户余额充足，就允许对同一原交易超额退费或落下失败账务事实。
+     */
+    @Test
+    void testRepeatedFeeRefundForSameTransactionShouldLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("fee_refund_exceed_payee");
+        FundsAccountId reservePayer = fundingAccount("fee_refund_reserve_user");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(reservePayer, LedgerSubjectCode.AVAILABLE);
+
+        topup(payer, 100L, "FEE_REFUND_EXCEED_TOPUP");
+        payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L,
+                "FEE_REFUND_EXCEED_PAY");
+        String feeSourceTransactionSn = ledgerTransactionByBusinessSn("FEE_REFUND_EXCEED_PAY")
+                .getFundsTransactionSn();
+        refundFee(payer, 5L, feeSourceTransactionSn, "FEE_REFUND_EXCEED_FIRST_RETURN");
+
+        topup(reservePayer, 100L, "FEE_REFUND_EXCEED_RESERVE_TOPUP");
+        payWithFixedFee(reservePayer, payee, LedgerSubjectCode.SETTLEMENT, 10L, 20L,
+                "FEE_REFUND_EXCEED_RESERVE_PAY");
+        BalanceSnapshot beforeFailure = snapshot(balances(payer, payee, reservePayer, feeAccount(),
+                cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> refundFee(payer, 5L, feeSourceTransactionSn,
+                "FEE_REFUND_EXCEED_SECOND_RETURN"))
+                .hasMessageContaining("回放累计金额不能大于原 RouteLeg 金额");
+
+        BalanceSnapshot afterFailure = snapshot(balances(payer, payee, reservePayer, feeAccount(),
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(reservePayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 80L, CURRENCY);
+        assertBucket(balance(reservePayer), LedgerSubjectCode.AVAILABLE, 70L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 20L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(5);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name(),
+                        FundsTransactionEventType.FEE_REFUND.name(),
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name());
     }
 }
