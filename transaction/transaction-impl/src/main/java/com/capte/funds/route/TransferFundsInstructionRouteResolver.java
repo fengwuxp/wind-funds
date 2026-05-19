@@ -7,6 +7,7 @@ import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.capte.funds.transaction.support.FundsRouteCodes;
+import com.capte.funds.transaction.support.FundsRouteLegIds;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.integration.funds.wallet.FundsAccountId;
@@ -47,22 +48,6 @@ import static com.capte.funds.route.support.RouteSpecSupport.targetNode;
 @Component
 @AllArgsConstructor
 public class TransferFundsInstructionRouteResolver implements RouteResolver, Ordered {
-
-    private static final String LEG_FUND_IN = "FUND_IN";
-
-    private static final String LEG_TOPUP_SETTLEMENT = "TOPUP_SETTLEMENT";
-
-    private static final String LEG_TRANSFER = "TRANSFER";
-
-    private static final String LEG_PAY = "PAY";
-
-    private static final String LEG_REFUND = "REFUND";
-
-    private static final String LEG_WITHDRAW_SETTLEMENT = "WITHDRAW_SETTLEMENT";
-
-    private static final String LEG_FUND_OUT = "FUND_OUT";
-
-    private static final String LEG_FEE = "FEE";
 
     private static final String SAME_ACCOUNT_MESSAGE = "付款账号和收款账户不能一致";
 
@@ -122,7 +107,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         SubjectRef prepaymentSubject = platformAccountRouteSupport.createSubjectRef(prepaymentAccount);
         SubjectRef accountSubject = routeSubjectSupport.createSubjectRef(accountId);
         List<RouteLegSpec> legs = new ArrayList<>();
-        legs.add(routeLeg(LEG_FUND_IN, 1, RouteLegType.EXTERNAL_IN, instruction)
+        legs.add(routeLeg(FundsRouteLegIds.FUND_IN, 1, RouteLegType.EXTERNAL_IN, instruction)
                 .sourceNode(sourceNode(cashMappingSubject,
                         platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.CASH_MAPPING)))
                 .targetNode(targetNode(prepaymentSubject,
@@ -130,7 +115,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .balanceEffectType(LedgerBalanceEffectType.INCREASE)
                 .phaseCode(LedgerPhaseCode.FUND_IN)
                 .build());
-        legs.add(routeLeg(LEG_TOPUP_SETTLEMENT, 2, RouteLegType.INTERNAL_TRANSFER, instruction)
+        legs.add(routeLeg(FundsRouteLegIds.TOPUP_SETTLEMENT, 2, RouteLegType.INTERNAL_TRANSFER, instruction)
                 .sourceNode(sourceNode(prepaymentSubject,
                         platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
                 .targetNode(targetNode(accountSubject, LedgerSubjectCode.AVAILABLE))
@@ -158,7 +143,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 FundsInstructionContextKeys.PAYEE_ACCOUNT_ID);
         AssertUtils.isFalse(payerAccountId.equals(payeeAccountId), SAME_ACCOUNT_MESSAGE);
         List<RouteLegSpec> legs = new ArrayList<>();
-        legs.add(routeLeg(LEG_TRANSFER, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
+        legs.add(routeLeg(FundsRouteLegIds.TRANSFER, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerAccountId),
                         LedgerSubjectCode.AVAILABLE))
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(payeeAccountId),
@@ -185,7 +170,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         LedgerSubjectCode payeeLedgerSubjectCode = FundsInstructionContextReader.requireLedgerSubjectCode(instruction,
                 FundsInstructionContextKeys.PAYEE_LEDGER_SUBJECT_CODE);
         List<RouteLegSpec> legs = new ArrayList<>();
-        legs.add(routeLeg(LEG_PAY, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
+        legs.add(routeLeg(FundsRouteLegIds.PAY, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(payeeId), payeeLedgerSubjectCode))
                 .balanceEffectType(LedgerBalanceEffectType.CONSUME)
@@ -210,7 +195,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionContextKeys.ACCOUNT_ID);
         List<RouteLegSpec> legs = new ArrayList<>();
-        legs.add(routeLeg(LEG_REFUND, 1, RouteLegType.RESTORE, instruction)
+        legs.add(routeLeg(FundsRouteLegIds.REFUND, 1, RouteLegType.RESTORE, instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerId), payerLedgerSubjectCode))
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .balanceEffectType(LedgerBalanceEffectType.RESTORE)
@@ -237,7 +222,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         SubjectRef cashMappingSubject = platformAccountRouteSupport.createSubjectRef(cashMappingAccount);
         SubjectRef prepaymentSubject = platformAccountRouteSupport.createSubjectRef(prepaymentAccount);
         List<RouteLegSpec> legs = new ArrayList<>();
-        legs.add(routeLeg(LEG_WITHDRAW_SETTLEMENT, 1, RouteLegType.CONSUME, instruction)
+        legs.add(routeLeg(FundsRouteLegIds.WITHDRAW_SETTLEMENT, 1, RouteLegType.CONSUME, instruction)
                 .sourceNode(sourceNode(accountSubject, LedgerSubjectCode.FROZEN))
                 .targetNode(targetNode(prepaymentSubject,
                         platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
@@ -245,7 +230,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.FROZEN))
                 .build());
-        legs.add(routeLeg(LEG_FUND_OUT, 2, RouteLegType.EXTERNAL_OUT, instruction)
+        legs.add(routeLeg(FundsRouteLegIds.FUND_OUT, 2, RouteLegType.EXTERNAL_OUT, instruction)
                 .sourceNode(sourceNode(prepaymentSubject,
                         platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.PREPAYMENT)))
                 .targetNode(targetNode(cashMappingSubject,
@@ -272,7 +257,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 FundsInstructionContextKeys.ACCOUNT_ID);
         FundsAccountId feeAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
                 PlatformFundingAccountRole.FEE);
-        List<RouteLegSpec> legs = List.of(routeLeg(LEG_FEE, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
+        List<RouteLegSpec> legs = List.of(routeLeg(FundsRouteLegIds.FEE, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId), LedgerSubjectCode.AVAILABLE))
                 .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(feeAccount),
                         platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.FEE)))
@@ -301,7 +286,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         }
         FundsAccountId feeAccount = platformAccountRouteSupport.requireAccount(feeAmount.getCurrency(),
                 PlatformFundingAccountRole.FEE);
-        legs.add(routeLeg(LEG_FEE, currentSize + 1, RouteLegType.INTERNAL_TRANSFER,
+        legs.add(routeLeg(FundsRouteLegIds.FEE, currentSize + 1, RouteLegType.INTERNAL_TRANSFER,
                 feeAmount, instruction.getDescription())
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerAccountId),
                         LedgerSubjectCode.AVAILABLE))

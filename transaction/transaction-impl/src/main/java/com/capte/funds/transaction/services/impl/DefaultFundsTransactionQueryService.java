@@ -4,24 +4,25 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
-import com.capte.funds.transaction.dal.entities.FundsTransaction;
 import com.capte.funds.transaction.dal.entities.FundsFrozenOrder;
+import com.capte.funds.transaction.dal.entities.FundsTransaction;
 import com.capte.funds.transaction.dal.entities.FundsTransactionDetail;
+import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
+import com.capte.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
+import com.capte.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.capte.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.capte.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
 import com.capte.funds.transaction.dal.entities.table.FundsTransactionNameRefs;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
-import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
-import com.capte.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
-import com.capte.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.capte.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
+import com.capte.funds.transaction.support.FundsRouteLegIds;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
+import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -43,8 +44,6 @@ import java.util.Optional;
 @Service
 @AllArgsConstructor
 public class DefaultFundsTransactionQueryService implements FundsTransactionQueryService {
-
-    private static final String FREEZE_ROUTE_LEG_ID = "FREEZE";
 
     private final FundsTransactionMapper fundsTransactionMapper;
 
@@ -174,7 +173,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
 
     private Long freezeOrderWithdrawConsumedAmount(FundsTransactionDetail detail, String replayRefLegId) {
         if (detail.getEventType() != FundsTransactionEventType.WITHDRAW
-                || !FREEZE_ROUTE_LEG_ID.equals(replayRefLegId)
+                || !FundsRouteLegIds.FREEZE.equals(replayRefLegId)
                 || detail.getParticipantRole() == RouteParticipantRole.FEE_RECEIVER
                 || !hasText(detail.getReferenceDetailSn())) {
             return null;

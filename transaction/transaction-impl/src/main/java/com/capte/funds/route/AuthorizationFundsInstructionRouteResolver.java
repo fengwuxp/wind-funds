@@ -7,6 +7,7 @@ import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.capte.funds.transaction.support.FundsRouteCodes;
+import com.capte.funds.transaction.support.FundsRouteLegIds;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.integration.funds.wallet.FundsAccountId;
@@ -46,14 +47,6 @@ import static com.capte.funds.route.support.RouteSpecSupport.targetNode;
 @Component
 @AllArgsConstructor
 public class AuthorizationFundsInstructionRouteResolver implements RouteResolver, Ordered {
-
-    private static final String LEG_AUTHORIZATION_PREFIX = "AUTHORIZATION_";
-
-    private static final String LEG_REVERSAL_PREFIX = "REVERSAL_";
-
-    private static final String LEG_AUTHORIZATION_SETTLEMENT_PREFIX = "AUTHORIZATION_SETTLEMENT_";
-
-    private static final String LEG_SETTLE_REFUND_PREFIX = "SETTLE_REFUND_";
 
     private static final String UNSUPPORTED_EVENT_TYPE_MESSAGE = "unsupported authorization eventType: ";
 
@@ -181,7 +174,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         List<RouteLegSpec> result = new ArrayList<>(authorizationSubjects.size());
         int sequence = 1;
         for (FundsAccountId subject : authorizationSubjects) {
-            result.add(routeLeg(LEG_AUTHORIZATION_PREFIX + sequence, sequence, RouteLegType.HOLD,
+            result.add(routeLeg(FundsRouteLegIds.AUTHORIZATION_PREFIX + sequence, sequence, RouteLegType.HOLD,
                     instruction)
                     .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject), LedgerSubjectCode.AVAILABLE))
                     .targetNode(targetNode(routeSubjectSupport.createSubjectRef(subject),
@@ -201,7 +194,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         List<RouteLegSpec> result = new ArrayList<>(authorizationSubjects.size());
         int sequence = 1;
         for (FundsAccountId subject : authorizationSubjects) {
-            result.add(routeLeg(LEG_REVERSAL_PREFIX + sequence, sequence, RouteLegType.RELEASE,
+            result.add(routeLeg(FundsRouteLegIds.REVERSAL_PREFIX + sequence, sequence, RouteLegType.RELEASE,
                     instruction)
                     .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject),
                             LedgerSubjectCode.AUTHORIZATION))
@@ -225,7 +218,8 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         LedgerSubjectCode settlementLedgerSubjectCode = platformAccountRouteSupport.resolveLedgerSubjectCode(
                 PlatformFundingAccountRole.SETTLEMENT);
         for (FundsAccountId subject : authorizationSubjects) {
-            result.add(routeLeg(LEG_AUTHORIZATION_SETTLEMENT_PREFIX + sequence, sequence, RouteLegType.CONSUME,
+            result.add(routeLeg(FundsRouteLegIds.AUTHORIZATION_SETTLEMENT_PREFIX + sequence, sequence,
+                    RouteLegType.CONSUME,
                     instruction)
                     .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject),
                             LedgerSubjectCode.AUTHORIZATION))
@@ -249,7 +243,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         LedgerSubjectCode settlementLedgerSubjectCode = platformAccountRouteSupport.resolveLedgerSubjectCode(
                 PlatformFundingAccountRole.SETTLEMENT);
         for (FundsAccountId subject : authorizationSubjects) {
-            result.add(routeLeg(LEG_SETTLE_REFUND_PREFIX + sequence, sequence, RouteLegType.RESTORE,
+            result.add(routeLeg(FundsRouteLegIds.SETTLE_REFUND_PREFIX + sequence, sequence, RouteLegType.RESTORE,
                     instruction)
                     .sourceNode(sourceNode(settlementSubject, settlementLedgerSubjectCode))
                     .targetNode(targetNode(routeSubjectSupport.createSubjectRef(subject), LedgerSubjectCode.AVAILABLE))
