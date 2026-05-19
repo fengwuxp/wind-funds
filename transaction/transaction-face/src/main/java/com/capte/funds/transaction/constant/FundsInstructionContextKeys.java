@@ -21,6 +21,9 @@ public final class FundsInstructionContextKeys {
 
     public static final String APPROVED = "approved";
 
+    /**
+     * 授权拒绝原因，仅用于 approved=false 的授权拒绝，不表示结算后的拒付/争议。
+     */
     public static final String DECLINE_REASON = "declineReason";
 
     public static final String MERCHANT_INFO = "merchantInfo";

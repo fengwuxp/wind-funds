@@ -82,7 +82,7 @@ public class FundsTransactionDTO implements Serializable {
     @Schema(description = "累计退款金额")
     private Long refundedAmount;
 
-    @Schema(description = "累计拒付或拒绝金额")
+    @Schema(description = "累计拒付/争议退回金额，不包含授权拒绝金额")
     private Long declinedAmount;
 
     @Schema(description = "累计手续费金额")

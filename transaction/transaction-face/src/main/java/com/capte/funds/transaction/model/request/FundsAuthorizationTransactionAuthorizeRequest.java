@@ -61,7 +61,7 @@ public class FundsAuthorizationTransactionAuthorizeRequest {
     @Schema(description = "交易描述")
     private String description;
 
-    @Schema(description = "授权拒付原因，仅授权失败时需要")
+    @Schema(description = "授权拒绝原因，仅授权失败时需要，不表示结算后的拒付/争议")
     private String declineReason;
 
     @Schema(description = "上下文变量")
