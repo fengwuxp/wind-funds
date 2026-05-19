@@ -318,9 +318,9 @@ FX 边界：
 | `phaseCode` | 资金阶段，例如付款、手续费、授权、结算、对账差错。 |
 | `entries` | 平衡分录列表。 |
 
-### 7.5 Replay DSL
+### 7.5 Route Replay DSL
 
-Replay 用于后续事件沿用原路径事实。
+Route Replay 用于后续事件沿用原路径事实。它解决“退款、撤销、结算、拒付、退费、解冻如何回到原 route snapshot”的问题，不负责余额重建、交易投影重放或归档任务续跑。
 
 | 场景 | Replay 要求 |
 | --- | --- |
@@ -331,6 +331,15 @@ Replay 用于后续事件沿用原路径事实。
 | 授权链退款 | 不超过已完成金额。 |
 | 争议拒付 | 不超过可追偿金额，且与授权拒绝区分。 |
 | 解冻 | 引用原冻结单，只在同主体内释放冻结。 |
+
+Replay 语义边界：
+
+| 名称 | 解决的问题 | 事实来源 | 不做什么 |
+| --- | --- | --- | --- |
+| Route Replay | 后续资金事件沿原路径回放。 | 原资金事实、原 route snapshot、原费用 leg、原冻结单或原授权/完成事实。 | 不重建余额，不修复交易视图，不推进归档水位。 |
+| Transaction Projection Replay | 重建用户账单、商户账单、运营时间线或批次视图。 | 交易事实、route snapshot、账本分录摘要、清结算对象和对账结果。 | 不重新入账，不改变分录，不修改余额投影。 |
+| Balance Rebuild | 从检查点和增量分录重建余额投影。 | 账本分录、余额检查点、余额水位、Manifest。 | 不从交易投影、余额日志、报表指标或汇总金额反推余额。 |
+| Archive Resume | 归档或重放任务断点续跑。 | 任务范围、checkpoint、Manifest、差异报告和审批记录。 | 不作为资金路径选择依据，不替代账本周期或余额水位。 |
 
 ### 7.6 账本周期 DSL
 
@@ -418,7 +427,7 @@ Replay 用于后续事件沿用原路径事实。
 | 用例 | 资金交易结构 | 资金链路重点 | 开发承接 | 测试承接 |
 | --- | --- | --- | --- | --- |
 | 充值成功 | `DIRECT_TRANSACTION / FUND_IN`。 | 外部入金结果 -> 用户资金账户 `AVAILABLE`。 | 处理外部入金结果、幂等键、外部引用和账户初始化校验。 | 余额增加；重复通知不重复入账；外部账户不入账。 |
-| 付款成功 | `DIRECT_TRANSACTION / PAY`。 | 付款方 `AVAILABLE` -> 收款方 `CLEARING`。 | 支持付款 route、收款方清算桶、平台账户角色解析。 | 付款方减少、收款方清算增加；posting 独立平衡。 |
+| 付款成功 | `DIRECT_TRANSACTION / PAY`。 | 付款方 `AVAILABLE` -> 收款方指定目标账目；商户订单收款才进入商户 `CLEARING`。 | 支持普通支付 route、商户订单收款 route、平台账户角色解析和业务场景识别。 | 付款方减少；普通收款方按产品命令增加指定目标账目；商户订单款进入 `CLEARING`；posting 独立平衡。 |
 | 充值成功 + 入金手续费收取 | `FUND_IN` 后接入金费用 `FEE_CHARGE`。 | 入金先进入用户 `AVAILABLE`；手续费再从用户 `AVAILABLE` 到平台 `FEE`。 | 支持入金结果和费用收取拆为两个事实，费用必须有 `FeeSpec` 和原入金引用。 | 入金失败不收手续费；重复入金通知不重复收费；费用不混入充值本金。 |
 | 充值成功 + 付款并收手续费 | `FUND_IN` 后接本金 `PAY` + 费用 `FEE_CHARGE`。 | 入金进入用户 `AVAILABLE`；付款本金和手续费拆为独立 leg。 | 支持充值后付款、`FeeSpec` 驱动费用 leg、费用账户快照。 | 入金余额增加；付款本金和费用分别扣减；重复入金不重复记账。 |
 | 充值 -> 付款 -> 退款 -> 手续费退回 | `FUND_IN` + `PAY` + `REFUND` + `FEE_REFUND`。 | 退款基于付款原路径，退费基于费用原路径。 | 支持本金退款和费用退回分开引用、分开累计、分开上限。 | 普通退款不默认退费；退款不超过已付本金；退费不超过已收手续费。 |
@@ -478,6 +487,7 @@ VCC 授权接入口径：
 | 用例 | 覆盖级别 | DSL 语义 | 服务/事件承接 | 测试承接 |
 | --- | --- | --- | --- | --- |
 | 已完成授权退款 | 必须 | 基于已完成的授权路径做反向退款。 | `AUTHORIZATION_TRANSACTION / AUTH_REFUND`，`settleRefund`。 | 退款入账；关联原授权和原完成明细；累计退款不超过已完成金额；不按当前绑定重新选路。 |
+| 无授权直接退款 | 必须 | 外部没有前置授权，但存在原消费、原完成或差错凭证，需要按退款事实回补。 | `AUTHORIZATION_TRANSACTION / AUTH_REFUND`，`settleRefund` 的无授权退款模式。 | 不补造授权占用；必须保留原事实引用、原因、凭证和审计上下文；无原消费或凭证时失败或进入差错。 |
 | 多次退款 | 必须 | 同一授权完成后允许多次退款。 | 多次 `settleRefund`。 | 多次退款累计正确；同一授权可多次退款；累计退款不超过已完成金额。 |
 | 已完成授权拒付承接 | 必须 | 已完成授权发生外部争议、拒付或扣回时，按授权链逆向资金事实处理。 | `settleRefund` 携带拒付原因、凭证、外部引用和审计上下文。 | 与授权拒绝严格区分；累计拒付/退款不超过已完成金额；不要求落到 `FundsAuthorizationTransactionService#chargeback`；即使底层终态复用退款终态，也必须在 reason、external reference、projection 和 audit 中保留拒付语义。 |
 
@@ -531,7 +541,7 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 | 场景 | 指令 | 路径 | 账务要求 |
 | --- | --- | --- | --- |
 | 充值 | `DIRECT_TRANSACTION / FUND_IN` | 外部入金结果 -> 用户资金账户 `AVAILABLE`。 | 余额增加，外部引用可追溯，重复通知幂等。 |
-| 付款 | `DIRECT_TRANSACTION / PAY` | 付款方 `AVAILABLE` -> 收款方 `CLEARING`。 | 本金和费用拆 leg，付款后每步余额可断言。 |
+| 付款 | `DIRECT_TRANSACTION / PAY` | 付款方 `AVAILABLE` -> 收款方指定目标账目；商户订单收款才进入商户 `CLEARING`。 | 本金和费用拆 leg，普通支付不默认套商户清算，付款后每步余额可断言。 |
 | 转账 | `DIRECT_TRANSACTION / TRANSFER` | A `AVAILABLE` -> B `AVAILABLE` 或目标清算桶。 | 同币种平衡，双方主体明确。 |
 | 退款 | `DIRECT_TRANSACTION / REFUND` | 基于原路径反向。 | 不超过可退金额，普通退款不默认退费。 |
 | 手续费 | `DIRECT_TRANSACTION / FEE_CHARGE` | 付费方 -> 平台费用资金账户。 | 费用 leg 独立平衡。 |
@@ -552,6 +562,7 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 | 授权撤销释放 | `AUTHORIZATION_TRANSACTION / REVERSAL` | 原授权剩余 `AUTHORIZATION` -> `AVAILABLE`。 | 释放金额不超过剩余授权；撤销终态与过期终态区分。 |
 | 授权过期释放 | `AUTHORIZATION_TRANSACTION / EXPIRE`。 | 原授权剩余 `AUTHORIZATION` -> `AVAILABLE`。 | 系统过期事实；只释放剩余授权；已完成金额不得被释放。 |
 | 无授权强制完成 | `AUTHORIZATION_TRANSACTION / SETTLE` 的强制完成模式。 | 无前置授权；付款主体 `AVAILABLE` 可按策略 -> 收款方或清算桶。 | 必须有策略、上限、原因和审计；不得伪造授权占用；不得污染授权生命周期。 |
+| 无授权直接退款 | `AUTHORIZATION_TRANSACTION / AUTH_REFUND` 的无授权退款模式。 | 基于外部原消费、原完成或差错凭证反向回补。 | 必须保留原事实引用、原因、凭证和审计；无原消费或凭证时失败或进入差错；不得补造授权占用。 |
 | 已完成授权退款 | `AUTHORIZATION_TRANSACTION / AUTH_REFUND` | 基于原完成路径反向。 | 关联原授权和原完成明细；累计退款不超过已完成金额；不按当前绑定重新选路。 |
 | 多次授权退款 | 多次 `AUTHORIZATION_TRANSACTION / AUTH_REFUND`，同一原授权或完成引用。 | 原完成路径分次反向。 | 相同幂等摘要不重复入账；不同退款明细累计闭合；累计退款不超过已完成金额。 |
 | 授权拒付承接 | `AUTHORIZATION_TRANSACTION / AUTH_REFUND` 携带拒付原因、凭证和审计上下文 | 基于原完成或追偿路径。 | 与授权拒绝严格区分；必须有争议来源、凭证和审计；不要求独立 `chargeback` 服务入口；查询和投影不得把拒付压缩成不可区分的普通退款。 |
@@ -572,11 +583,23 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 
 | 场景 | DSL 进入点 | 账务要求 |
 | --- | --- | --- |
+| 可清分明细识别 | 不进入资金 DSL，只作为清结算域准入结果。 | 不生成 route、posting plan 或 LedgerEntry；来源必须能追溯交易明细和商户 `CLEARING` 分录。 |
+| 清分批次确认 | 不进入资金 DSL，只固化明细归类、规则版本和复核结果。 | 不触发 `CLEARING -> AVAILABLE`；不得从余额、报表或人工汇总反推资金事实。 |
+| 清算候选生成 | 不进入资金 DSL，只作为清算确认前候选上下文。 | 候选必须来自已确认清分批次，并通过清算账期、风控、退款、争议和对账守卫。 |
+| 清分前基础对账 | 不进入资金 DSL，只作为生成可清分明细的准入上下文。 | 对账不改历史分录和余额；差异进入差错对象。 |
+| 清算前置对账 | 不进入资金 DSL，只作为清算确认事实的准入上下文。 | 重大差错阻断清算确认；有解释差异只能按放行矩阵有条件放行。 |
 | 清算确认 | 确认后的清算结果，事件语义使用 `CLEARING_CONFIRM`。 | 从 `CLEARING` 进入 `AVAILABLE` 可结算口径。 |
 | 结算锁定 | 确认后的结算出款候选，事件语义使用 `SETTLEMENT_LOCK`。 | 从 `AVAILABLE` 锁定到 `SETTLEMENT`。 |
 | 出款成功 | 外部出款结果成立。 | 释放或消耗 `SETTLEMENT`，保留外部引用。 |
 | 出款失败回退 | 外部出款失败已确认。 | 从 `SETTLEMENT` 回退到原口径。 |
 | 对账差错调账 | 差错已审批、凭证已确认。 | 进入 `ADJUSTMENT` 或业务指定口径，必须可审计。 |
+
+清结算与对账的 DSL 边界：
+
+1. 可清分明细、清分批次、清算候选、对账任务、对账匹配结果和差错等级是产品/系分对象，不是资金路径，不作为 route leg 或 ledger phase。
+2. 清算批次确认、结算锁定、出款结果和经审批的差错调账，才进入资金 DSL。
+3. 对账通过不生成账务；对账差异也不直接改账。只有补事实、冲正、调账或追偿等明确资金事实才生成 DSL 指令。
+4. 有条件放行只影响清结算流程准入，不表达资金转移；若放行后产生资金事实，仍必须由对应资金指令承接。
 
 ## 十一、JSON 契约用例
 
@@ -1412,6 +1435,31 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       }
     },
     "authorizationRefunds": {
+      "refundWithoutAuthorization": {
+        "eventType": "AUTH_REFUND",
+        "refundMode": "WITHOUT_AUTHORIZATION",
+        "businessScene": "AUTHORIZATION_REFUND_WITHOUT_AUTHORIZATION",
+        "businessSn": "AUTH_REFUND_DIRECT_202605180001",
+        "amount": {
+          "currency": "USD",
+          "minorValue": 2500
+        },
+        "reference": {
+          "referenceType": "EXTERNAL_ORIGINAL_CONSUMPTION",
+          "referenceBusinessSn": "EXT_CONSUMPTION_202605180001",
+          "externalReference": "processor_settle_202605180001"
+        },
+        "contextVariables": {
+          "refundReason": "PROCESSOR_DIRECT_REFUND",
+          "evidenceRef": "evidence_202605180001"
+        },
+        "expected": {
+          "authorizationHoldCreated": false,
+          "originalFactReferenceRequired": true,
+          "reasonAndAuditRequired": true,
+          "silentOriginalAuthorizationCreationAllowed": false
+        }
+      },
       "refundInstructions": [
         {
           "eventType": "AUTH_REFUND",
@@ -1458,6 +1506,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "授权过期使用独立 EXPIRE 语义，只释放剩余授权",
       "多次完成按幂等摘要区分重复通知和拆单完成",
       "强制完成使用 SETTLE 的 FORCE 模式，不伪造授权占用，必须有受控策略和审计",
+      "无授权直接退款使用 AUTH_REFUND 的无授权退款模式，不补造授权占用，必须有原事实引用、原因和审计",
       "授权链退款基于原完成路径反向，累计退款不超过已完成金额"
     ],
     "mustFail": [
@@ -1467,6 +1516,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "spend controls 通过后绕过余额、额度、预算或 route 校验",
       "完成后过期释放已完成金额",
       "无原授权时补造授权占用",
+      "无原消费或凭证时静默执行无授权退款",
       "缺原授权快照时按当前绑定重新选路",
       "授权退款超过已完成金额"
     ]
@@ -1677,6 +1727,23 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "targetLedgerSubjectCode": "SETTLEMENT"
     }
   },
+  "clearingAndReconciliationContext": {
+    "splittableDetailSn": "SD202605180001",
+    "splitBatchSn": "SB20260518-M1001-USD-0001",
+    "clearingCandidateSn": "CC202605190001",
+    "clearingBatchSn": "CB20260519-M1001-USD-0001",
+    "preClearingReconciliationSn": "RB202605190001",
+    "reconciliationResult": "BALANCED",
+    "consistencyTargets": [
+      "REAL",
+      "BOOK",
+      "DOCUMENT",
+      "BALANCE"
+    ],
+    "releaseDecision": "PASS",
+    "clearingPeriod": "2026-05-19",
+    "ruleVersion": "CLEARING_RULE_V1"
+  },
   "reconciliationAdjustmentInstruction": {
     "tenantId": 1,
     "instructionType": "DIRECT_TRANSACTION",
@@ -1706,8 +1773,13 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "清结算运营流程不作为 route leg"
     ],
     "mustFail": [
+      "可清分明细生成直接入账",
+      "清分批次确认直接入账",
+      "清算候选生成直接入账",
       "清算批次生成直接入账",
+      "清算前置对账未完成或重大差错仍生成清算确认事实",
       "结算审批中写 LedgerEntry",
+      "有解释差异未按放行矩阵审批却继续释放资金",
       "无审批的对账差错调账"
     ]
   }

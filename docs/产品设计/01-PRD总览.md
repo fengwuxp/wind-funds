@@ -112,9 +112,11 @@ Capte 业务会覆盖 VCC 发卡、ACH、全球收付款、平台内部交易、
 | 冻结单 | 同一个资金主体内部把可用余额暂时转为冻结余额。 | 冻结不是消费、扣划、授权或退款；若后续要扣划，必须创建新的资金事实。 |
 | 资金路由 | 把交易事实解析为付款方、收款方、平台角色、余额桶和账务路径。 | 不判断业务订单是否成立，不直接改余额，不在缺快照时重新选路。 |
 | 钱包 | 面向用户、商户、企业和运营展示资金、额度、预算和余额状态的产品层。 | 不替代账本，不允许业务侧绕过交易层直接改余额。 |
-| 资金账户 | 承载真实资金余额的账户主体。 | 可以有可用、冻结、授权、待清算、出款中等余额桶；外部银行账户不是内部资金账户。 |
-| 信用账户 | 承载授信额度和授权占用的控制账户。 | 不是现金账户；额度不是钱；已消费进入交易视图和报表，不新增账务 `CONSUMED`。 |
-| 预算组 | 承载预算总量、可用预算和预算占用的控制账户。 | 不是资金池；预算超用和预算调减要进入报表或治理流程。 |
+| 业务主体 | 用户、商户、企业、部门、平台角色或外部机构等业务上的权利义务归属方。 | 业务主体不一定能直接记账；进入账本前必须解析成资金账户、信用账户或预算组等账务主体。 |
+| 账务主体 / 可记账主体 | 账务层可以作为分录主体、余额投影主体和账本 bucket 归属方的对象。 | 本 PRD 默认只有资金账户、信用账户、预算组和明确配置的平台账户角色可以作为账务主体；业务订单、用户、商户经营主体、卡、VA、银行账户、支付工具和通道账户不能直接入账。 |
+| 资金账户 | 承载真实资金余额的账户主体，也是最常见的账务主体。 | 可以有可用、冻结、授权、待清算、出款中等余额桶；外部银行账户不是内部资金账户，不能直接作为账务主体。 |
+| 信用账户 | 承载授信额度和授权占用的控制账户，也是可记账主体。 | 不是现金账户；额度不是钱；可记录 `LIMIT`、`AVAILABLE`、`AUTHORIZATION` 等额度账目，已消费进入交易视图和报表，不新增账务 `CONSUMED`。 |
+| 预算组 | 承载预算总量、可用预算和预算占用的控制账户，也是可记账主体。 | 不是资金池；预算不是现金沉淀；可记录 `LIMIT`、`AVAILABLE`、`AUTHORIZATION` 等预算账目，预算超用和预算调减要进入报表或治理流程。 |
 | Spend Controls / 发卡授权控制扩展 | 发卡、VCC、企业卡或员工卡场景中，授权发生前用于判断某次支出是否允许的可选扩展能力，例如单笔金额、MCC、商户、国家、入卡方式、CVV/AVS、次数和周期窗口。 | 它决定“能不能进入授权占用”，不是资金底座核心主链路、不是账本、不是路由、不是清结算；未启用发卡授权控制时，普通资金交易和授权交易不依赖该能力。 |
 | 账本 | 某主体、币种和账本 Profile 下的账务事实容器。 | 缺账本不得自动入账；账本不是钱包、业务订单或报表。 |
 | 账本周期 | 同一主体、币种、账目下按生命周期、天、小时、周、月、季、年或自定义周期切分的账本 bucket。 | 不是清结算账期、报表周期或归档水位；非 `LIFETIME` 周期必须有明确 `periodId` 和周期策略，不能跨周期串账。 |
@@ -544,7 +546,7 @@ flowchart LR
 | Highnote Spend Controls 目录：[Spend Rules](https://docs.highnote.com/docs/issuing/spend-controls/spend-rules)、[Velocity Controls](https://docs.highnote.com/docs/issuing/spend-controls/velocity-controls)、[Suspend an Account](https://docs.highnote.com/docs/issuing/spend-controls/suspend-account)、[Collaborative Authorization](https://docs.highnote.com/docs/issuing/spend-controls/collaborative-authorization)、[Collaborative Authorization Fleet Data](https://docs.highnote.com/docs/issuing/spend-controls/collaborative-authorization-fleet)、[Simulate Collaborative Authorization](https://docs.highnote.com/docs/issuing/spend-controls/sim-collaborative-authorization) | 发卡授权前的支出规则、MCC/MID/国家/POS/PAN/CVV/AVS、单笔金额、次数、时间窗口、账户暂停、协同授权和模拟授权。 | 支撑本 PRD 将 spend-controls 定位为“发卡授权控制扩展”，只在发卡、VCC、企业卡或员工卡场景下作为授权前决策能力，不放入资金底座核心能力。 | 公开产品文档入口，2026-05-18 按 Highnote spend-controls 目录核验。 | 不照搬 Highnote 的 GraphQL、规则数量限制、Fleet 形态或 UTC 窗口；正式启用时需要按自身产品确认作用域、优先级、规则版本、窗口口径、生效延迟、协同授权超时和审计。 |
 | [Stripe Issuing Spending Controls](https://docs.stripe.com/issuing/controls/spending-controls) 与 [Real-time Authorizations](https://docs.stripe.com/issuing/controls/real-time-authorizations) | 对发卡卡片或持卡人设置 spending controls，并可通过实时授权扩展外部决策。 | 支撑“规则控制”和“外部授权决策”分层：spend controls 是授权前门禁，实时授权是外部决策接入，不替代资金路由和账本。 | Stripe 官方公开文档，2026-05-18 核验。 | Stripe 的卡产品对象、API 和风控结果不等同于本产品 DSL；只吸收产品分层。 |
 | [Marqeta Velocity Controls](https://www.marqeta.com/docs/core-api/velocity-controls) | 基于金额、次数、商户、MCC、时间窗口等条件限制授权交易。 | 支撑 velocity control 作为独立累计窗口，不和账本周期、清算账期或报表周期混用。 | Marqeta 官方公开文档，2026-05-18 核验。 | 不照搬 Marqeta 资源模型、字段名或窗口限制；仅作为发卡授权控制参考。 |
-| [Lithic Authorization Rules v2](https://docs.lithic.com/docs/authorization-rules-v2) | 支持基于规则、速度限制、商户和交易属性的授权决策。 | 支撑“规则条件、动作、拒绝原因和版本审计”作为发卡授权控制扩展的产品口径。 | Lithic 官方公开文档，2026-05-18 核验。 | 不采用 Lithic API 结构；仅作为行业规则模型参考。 |
+| [Lithic Authorization Rules](https://docs.lithic.com/docs/authorization-rules-v2) | 支持基于规则、速度限制、商户和交易属性的授权决策。 | 支撑“规则条件、动作、拒绝原因和版本审计”作为发卡授权控制扩展的产品口径。 | Lithic 官方公开文档，2026-05-18 核验。 | 不采用 Lithic API 结构；仅作为行业规则模型参考。 |
 | [Adyen Issuing Transaction Rules](https://docs.adyen.com/issuing/transaction-rules/) | 通过交易规则定义发卡交易的允许、拒绝、暂停或审批动作。 | 支撑 spend-controls 可扩展到交易规则、审批和运营动作，但仍属于发卡授权控制扩展。 | Adyen 官方公开文档，2026-05-18 核验。 | Adyen 规则动作和平台对象需按实际 Issuer/Processor/Program 协议重新确认。 |
 | [Nacha Operating Rules](https://www.nacha.org/rules/operating-rules) | ACH 规则变更、风险管理、return、IAT、资金可用性等规则入口。 | 提醒 ACH 场景必须保留 return、风险监控、IAT 和资金可用性待确认项。 | 公开规则入口；正式启用 ACH 能力前必须二次核验规则、适用法域和合作银行要求。 | 本 PRD 不定义 ACH 合规结论；正式启用必须按 Nacha 规则和合作银行要求确认。 |
 | [Visa Rules and Policy](https://usa.visa.com/support/consumer/visa-rules.html) 与 [Visa Core Rules Public PDF](https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf) | Visa 网络规则、区域规则、争议、责任和网络参与方约束。 | 作为 VCC、授权、清算、争议拒付和证据留存的外部规则入口。 | 公开规则入口；正式启用 Visa 相关能力前必须核验规则版本、区域、BIN、Issuer/Program Manager 责任。 | 具体卡产品必须按签约区域、BIN、Issuer/Program Manager 规则确认。 |
