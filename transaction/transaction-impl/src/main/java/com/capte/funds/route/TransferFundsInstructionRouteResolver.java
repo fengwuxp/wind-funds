@@ -2,6 +2,7 @@ package com.capte.funds.route;
 
 import com.capte.funds.route.support.PlatformAccountRouteSupport;
 import com.capte.funds.route.support.RouteParticipantFactory;
+import com.capte.funds.route.support.RouteSpecSupport;
 import com.capte.funds.route.support.RouteSubjectSupport;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
@@ -52,24 +53,6 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     private static final String SAME_ACCOUNT_MESSAGE = "付款账号和收款账户不能一致";
 
     private static final String UNSUPPORTED_ADJUSTMENT_MESSAGE = "adjustment must handled by balance-control resolver";
-
-    private static final String PARTICIPANTS_REQUIRED_MESSAGE = "ResolvedRoute participants 不能为空";
-
-    private static final String ROUTE_CODE_REQUIRED_MESSAGE = "ResolvedRoute routeCode 不能为空";
-
-    private static final String ROUTE_VERSION_REQUIRED_MESSAGE = "ResolvedRoute routeVersion 不能为空";
-
-    private static final String BUSINESS_SCENE_REQUIRED_MESSAGE = "ResolvedRoute businessScene 不能为空";
-
-    private static final String BUSINESS_SN_REQUIRED_MESSAGE = "ResolvedRoute businessSn 不能为空";
-
-    private static final String INSTRUCTION_TYPE_REQUIRED_MESSAGE = "ResolvedRoute instructionType 不能为空";
-
-    private static final String EVENT_TYPE_REQUIRED_MESSAGE = "ResolvedRoute eventType 不能为空";
-
-    private static final String TRANSACTION_TYPE_REQUIRED_MESSAGE = "ResolvedRoute transactionType 不能为空";
-
-    private static final String RESOLVED_AT_REQUIRED_MESSAGE = "ResolvedRoute resolvedAt 不能为空";
 
     private final RouteParticipantFactory routeParticipantFactory;
 
@@ -316,7 +299,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                                     @Nullable ExternalAccountRefSpec externalAccountRef,
                                     @Nullable PlatformAccountsSnapshotSpec platformAccounts) {
         List<RouteParticipantSpec> distinctParticipants = routeParticipantFactory.distinct(participants);
-        AssertUtils.isTrue(!distinctParticipants.isEmpty(), PARTICIPANTS_REQUIRED_MESSAGE);
+        RouteSpecSupport.requireParticipants(distinctParticipants);
         ResolvedRouteSpec result = ImmutableResolvedRouteSpec.builder()
                 .tenantId(instruction.getTenantId())
                 .routeCode(routeCode)
@@ -335,20 +318,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .description(instruction.getDescription())
                 .contextVariables(instruction.getContextVariables())
                 .build();
-        validate(result);
+        RouteSpecSupport.validateResolvedRoute(result);
         return result;
-    }
-
-    private void validate(ResolvedRouteSpec route) {
-        AssertUtils.hasText(route.getRouteCode(), ROUTE_CODE_REQUIRED_MESSAGE);
-        AssertUtils.hasText(route.getRouteVersion(), ROUTE_VERSION_REQUIRED_MESSAGE);
-        AssertUtils.hasText(route.getBusinessScene(), BUSINESS_SCENE_REQUIRED_MESSAGE);
-        AssertUtils.hasText(route.getBusinessSn(), BUSINESS_SN_REQUIRED_MESSAGE);
-        AssertUtils.notNull(route.getInstructionType(), INSTRUCTION_TYPE_REQUIRED_MESSAGE);
-        AssertUtils.notNull(route.getEventType(), EVENT_TYPE_REQUIRED_MESSAGE);
-        AssertUtils.notNull(route.getTransactionType(), TRANSACTION_TYPE_REQUIRED_MESSAGE);
-        AssertUtils.isTrue(!route.getParticipants().isEmpty(), PARTICIPANTS_REQUIRED_MESSAGE);
-        AssertUtils.notNull(route.getResolvedAt(), RESOLVED_AT_REQUIRED_MESSAGE);
     }
 
     private Money calculateFee(FundsInstructionSpec instruction, Money transactionAmount) {

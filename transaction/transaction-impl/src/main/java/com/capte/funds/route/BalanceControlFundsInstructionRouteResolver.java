@@ -49,24 +49,6 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private static final String UNSUPPORTED_ADJUST_SUBJECT_TYPE_MESSAGE = "unsupported adjust subject type: ";
 
-    private static final String PARTICIPANTS_REQUIRED_MESSAGE = "ResolvedRoute participants 不能为空";
-
-    private static final String ROUTE_CODE_REQUIRED_MESSAGE = "ResolvedRoute routeCode 不能为空";
-
-    private static final String ROUTE_VERSION_REQUIRED_MESSAGE = "ResolvedRoute routeVersion 不能为空";
-
-    private static final String BUSINESS_SCENE_REQUIRED_MESSAGE = "ResolvedRoute businessScene 不能为空";
-
-    private static final String BUSINESS_SN_REQUIRED_MESSAGE = "ResolvedRoute businessSn 不能为空";
-
-    private static final String INSTRUCTION_TYPE_REQUIRED_MESSAGE = "ResolvedRoute instructionType 不能为空";
-
-    private static final String EVENT_TYPE_REQUIRED_MESSAGE = "ResolvedRoute eventType 不能为空";
-
-    private static final String TRANSACTION_TYPE_REQUIRED_MESSAGE = "ResolvedRoute transactionType 不能为空";
-
-    private static final String RESOLVED_AT_REQUIRED_MESSAGE = "ResolvedRoute resolvedAt 不能为空";
-
     private static final String ALLOW_NEGATIVE_BALANCE_POLICY_REQUIRED_MESSAGE =
             "受控负余额调账缺少策略编码";
 
@@ -282,7 +264,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                                     List<RouteParticipantSpec> participants,
                                     List<RouteLegSpec> legs,
                                     @Nullable PlatformAccountsSnapshotSpec platformAccounts) {
-        AssertUtils.isTrue(!participants.isEmpty(), PARTICIPANTS_REQUIRED_MESSAGE);
+        RouteSpecSupport.requireParticipants(participants);
         ResolvedRouteSpec result = ImmutableResolvedRouteSpec.builder()
                 .tenantId(instruction.getTenantId())
                 .routeCode(routeCode)
@@ -300,20 +282,8 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 .description(instruction.getDescription())
                 .contextVariables(instruction.getContextVariables())
                 .build();
-        validate(result);
+        RouteSpecSupport.validateResolvedRoute(result);
         return result;
-    }
-
-    private void validate(ResolvedRouteSpec route) {
-        AssertUtils.hasText(route.getRouteCode(), ROUTE_CODE_REQUIRED_MESSAGE);
-        AssertUtils.hasText(route.getRouteVersion(), ROUTE_VERSION_REQUIRED_MESSAGE);
-        AssertUtils.hasText(route.getBusinessScene(), BUSINESS_SCENE_REQUIRED_MESSAGE);
-        AssertUtils.hasText(route.getBusinessSn(), BUSINESS_SN_REQUIRED_MESSAGE);
-        AssertUtils.notNull(route.getInstructionType(), INSTRUCTION_TYPE_REQUIRED_MESSAGE);
-        AssertUtils.notNull(route.getEventType(), EVENT_TYPE_REQUIRED_MESSAGE);
-        AssertUtils.notNull(route.getTransactionType(), TRANSACTION_TYPE_REQUIRED_MESSAGE);
-        AssertUtils.isTrue(!route.getParticipants().isEmpty(), PARTICIPANTS_REQUIRED_MESSAGE);
-        AssertUtils.notNull(route.getResolvedAt(), RESOLVED_AT_REQUIRED_MESSAGE);
     }
 
     private RouteParticipantSpec subjectParticipant(FundsAccountId accountId, FundsInstructionSpec instruction) {
