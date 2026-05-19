@@ -82,7 +82,8 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
         }
         if (resolvedRoute.getLegs().isEmpty()) {
             fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, null);
-            publishProjection(instruction, resolvedRoute, routeSnapshot, lifecycleResult, null);
+            publishProjection(instruction, resolvedRoute, routeSnapshot,
+                    completedLifecycleResult(lifecycleResult, null), null);
             return lifecycleResult.getTransactionSn();
         }
         LedgerTransactionSpec transaction = postingAssembler.assemble(instruction, lifecycleResult.getTransactionSn(),
@@ -90,7 +91,8 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
         try {
             ledgerTransactionPostingService.post(transaction);
             fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, transaction.getSn());
-            publishProjection(instruction, resolvedRoute, routeSnapshot, lifecycleResult, transaction);
+            publishProjection(instruction, resolvedRoute, routeSnapshot,
+                    completedLifecycleResult(lifecycleResult, transaction.getSn()), transaction);
             return lifecycleResult.getTransactionSn();
         } catch (Throwable throwable) {
             fundsInstructionLifecycleRecorder.markFailed(instruction, lifecycleResult, throwable);
@@ -109,6 +111,15 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
     @Override
     public boolean supports(@NonNull Class<FundsInstructionSpec> specType) {
         return FundsInstructionSpec.class.isAssignableFrom(specType);
+    }
+
+    private FundsInstructionLifecycleResult completedLifecycleResult(FundsInstructionLifecycleResult source,
+                                                                     String ledgerTransactionSn) {
+        return new FundsInstructionLifecycleResult()
+                .setTransactionSn(source.getTransactionSn())
+                .setTransactionDetailSns(source.getTransactionDetailSns())
+                .setLedgerTransactionSn(ledgerTransactionSn)
+                .setCompleted(true);
     }
 
     private void publishProjection(FundsInstructionSpec instruction,
