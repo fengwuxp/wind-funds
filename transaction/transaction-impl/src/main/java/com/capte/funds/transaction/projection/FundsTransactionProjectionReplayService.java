@@ -1,11 +1,8 @@
 package com.capte.funds.transaction.projection;
 
 import com.wind.common.exception.AssertUtils;
-import lombok.Builder;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -75,130 +72,5 @@ public class FundsTransactionProjectionReplayService {
                 .occurredTime(fact.occurredTime())
                 .payload(Map.copyOf(fact.payload()))
                 .build();
-    }
-
-    public interface FundsTransactionProjectionReplaySource {
-
-        @NonNull
-        List<FundsTransactionProjectionFact> loadFacts(@NonNull FundsTransactionProjectionReplayRange range);
-    }
-
-    public interface FundsTransactionProjectionWriter {
-
-        @NonNull
-        List<FundsTransactionProjectionDifference> compare(@NonNull String viewDomain,
-                                                           @NonNull List<FundsTransactionProjectionRow> rebuiltRows);
-
-        void upsertShadow(@NonNull String taskSn, @NonNull List<FundsTransactionProjectionRow> rebuiltRows);
-
-        void upsertOfficial(@NonNull String taskSn, @NonNull List<FundsTransactionProjectionRow> rebuiltRows);
-    }
-
-    public enum FundsTransactionProjectionReplayMode {
-
-        /**
-         * 只生成差异报告，不写正式或影子投影。
-         */
-        VERIFY_ONLY,
-
-        /**
-         * 写影子投影，用于灰度核对。
-         */
-        REBUILD_SHADOW,
-
-        /**
-         * 覆盖正式只读投影。
-         */
-        REBUILD_APPLY
-    }
-
-    public enum FundsTransactionProjectionCheckpointType {
-
-        TRANSACTION_PROJECTION,
-
-        BALANCE_WATERMARK,
-
-        ARCHIVE_MANIFEST,
-
-        REPORT_METRIC
-    }
-
-    @Builder
-    public record FundsTransactionProjectionReplayRequest(@NonNull String taskSn,
-                                                          @NonNull FundsTransactionProjectionReplayMode mode,
-                                                          @NonNull String viewDomain,
-                                                          @NonNull FundsTransactionProjectionReplayRange replayRange,
-                                                          @NonNull FundsTransactionProjectionCheckpoint checkpoint) {
-    }
-
-    @Builder
-    public record FundsTransactionProjectionReplayRange(@Nullable String sourceSn,
-                                                        @Nullable String ownerType,
-                                                        @Nullable String ownerId,
-                                                        @Nullable LocalDateTime startTime,
-                                                        @Nullable LocalDateTime endTime,
-                                                        @Nullable String batchType,
-                                                        @Nullable String batchSn) {
-
-        private boolean isBounded() {
-            return hasText(sourceSn)
-                    || (hasText(ownerType) && hasText(ownerId))
-                    || (startTime != null && endTime != null && startTime.isBefore(endTime))
-                    || (hasText(batchType) && hasText(batchSn));
-        }
-
-        private boolean hasText(String value) {
-            return value != null && !value.isBlank();
-        }
-    }
-
-    @Builder
-    public record FundsTransactionProjectionCheckpoint(@NonNull FundsTransactionProjectionCheckpointType type,
-                                                       @NonNull String checkpointSn) {
-    }
-
-    @Builder
-    public record FundsTransactionProjectionFact(@NonNull String viewDomain,
-                                                 @NonNull String ownerType,
-                                                 @NonNull String ownerId,
-                                                 @NonNull String sourceSn,
-                                                 @NonNull String displayType,
-                                                 @NonNull String displayStatus,
-                                                 long amount,
-                                                 @NonNull String currency,
-                                                 @NonNull LocalDateTime occurredTime,
-                                                 @NonNull Map<String, Object> payload) {
-    }
-
-    @Builder
-    public record FundsTransactionProjectionRow(@NonNull String projectionSn,
-                                                @NonNull String viewDomain,
-                                                @NonNull String ownerType,
-                                                @NonNull String ownerId,
-                                                @NonNull String sourceSn,
-                                                @NonNull String displayType,
-                                                @NonNull String displayStatus,
-                                                long amount,
-                                                @NonNull String currency,
-                                                @NonNull LocalDateTime occurredTime,
-                                                @NonNull Map<String, Object> payload) {
-    }
-
-    @Builder
-    public record FundsTransactionProjectionDifference(@NonNull String sourceSn,
-                                                       @NonNull String fieldName,
-                                                       @Nullable Object expectedValue,
-                                                       @Nullable Object actualValue) {
-    }
-
-    @Builder
-    public record FundsTransactionProjectionReplayResult(@NonNull String taskSn,
-                                                         @NonNull FundsTransactionProjectionReplayMode mode,
-                                                         @NonNull String viewDomain,
-                                                         @NonNull FundsTransactionProjectionReplayRange range,
-                                                         int loadedFactCount,
-                                                         int rebuiltRowCount,
-                                                         @NonNull List<FundsTransactionProjectionDifference> differences,
-                                                         @NonNull FundsTransactionProjectionCheckpoint checkpoint) {
     }
 }
