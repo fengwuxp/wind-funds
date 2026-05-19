@@ -15,6 +15,12 @@ import java.util.List;
  */
 public interface FundsTransactionProjectionReplaySource {
 
+    /**
+     * 按指定范围加载交易投影重放所需的来源事实。
+     *
+     * @param range 有界重放范围，必须由调用方在服务层校验为单笔、主体、时间窗口或批次范围
+     * @return 可用于重建投影视图的只读事实列表；没有匹配事实时返回空列表
+     */
     @NonNull
     List<FundsTransactionProjectionFact> loadFacts(@NonNull FundsTransactionProjectionReplayRange range);
 }

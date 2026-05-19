@@ -1,4 +1,8 @@
-package com.capte.funds.transaction.projection;
+package com.capte.funds.transaction.enums;
+
+import com.wind.common.enums.DescriptiveEnum;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 /**
  * 交易投影重放模式，定义重放任务对投影视图的写入强度。
@@ -9,20 +13,24 @@ package com.capte.funds.transaction.projection;
  *
  * <p>边界：模式只控制交易投影写入行为，不代表交易状态推进、账务处理或余额调整。</p>
  */
-public enum FundsTransactionProjectionReplayMode {
+@AllArgsConstructor
+@Getter
+public enum FundsTransactionProjectionReplayMode implements DescriptiveEnum {
 
     /**
      * 只生成差异报告，不写正式或影子投影。
      */
-    VERIFY_ONLY,
+    VERIFY_ONLY("仅校验"),
 
     /**
      * 写影子投影，用于灰度核对。
      */
-    REBUILD_SHADOW,
+    REBUILD_SHADOW("重建影子投影"),
 
     /**
      * 覆盖正式只读投影。
      */
-    REBUILD_APPLY
+    REBUILD_APPLY("重建正式投影");
+
+    private final String desc;
 }

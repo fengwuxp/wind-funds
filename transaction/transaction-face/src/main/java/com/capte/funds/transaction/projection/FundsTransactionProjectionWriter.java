@@ -15,11 +15,30 @@ import java.util.List;
  */
 public interface FundsTransactionProjectionWriter {
 
+    /**
+     * 比较现有投影视图与本次重建结果之间的差异。
+     *
+     * @param viewDomain 投影视图域，例如用户账单、商户流水或运营视图
+     * @param rebuiltRows 根据来源事实重建出的候选投影行
+     * @return 字段级差异列表；完全一致时返回空列表
+     */
     @NonNull
     List<FundsTransactionProjectionDifference> compare(@NonNull String viewDomain,
                                                        @NonNull List<FundsTransactionProjectionRow> rebuiltRows);
 
+    /**
+     * 写入影子投影，用于灰度核对、人工复核或正式覆盖前的结果预览。
+     *
+     * @param taskSn 本次重放任务号，用于区分不同批次的影子结果
+     * @param rebuiltRows 根据来源事实重建出的候选投影行
+     */
     void upsertShadow(@NonNull String taskSn, @NonNull List<FundsTransactionProjectionRow> rebuiltRows);
 
+    /**
+     * 写入正式只读投影，用于在确认重建结果后刷新线上投影视图。
+     *
+     * @param taskSn 本次重放任务号，用于审计追踪投影刷新来源
+     * @param rebuiltRows 根据来源事实重建出的正式投影行
+     */
     void upsertOfficial(@NonNull String taskSn, @NonNull List<FundsTransactionProjectionRow> rebuiltRows);
 }

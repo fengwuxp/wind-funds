@@ -1,5 +1,7 @@
 package com.capte.funds.transaction.projection;
 
+import com.capte.funds.transaction.enums.FundsTransactionProjectionCheckpointType;
+import com.capte.funds.transaction.enums.FundsTransactionProjectionReplayMode;
 import com.wind.common.exception.AssertUtils;
 import org.jspecify.annotations.NonNull;
 

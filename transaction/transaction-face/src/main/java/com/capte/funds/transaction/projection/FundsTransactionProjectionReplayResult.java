@@ -1,5 +1,6 @@
 package com.capte.funds.transaction.projection;
 
+import com.capte.funds.transaction.enums.FundsTransactionProjectionReplayMode;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 
