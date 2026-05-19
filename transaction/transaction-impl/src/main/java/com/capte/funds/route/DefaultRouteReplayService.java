@@ -63,6 +63,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private static final String REPLAY_LEG_ID_SEPARATOR = "_";
 
+    private static final String REPLAY_REFERENCE_REQUIRED_MESSAGE = "RouteSnapshot 回放事件缺少原路径引用";
+
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
     @Autowired
@@ -135,7 +137,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private RouteSnapshotSpec requireReplaySnapshot(FundsInstructionSpec instruction) {
         AssertUtils.notNull(fundsTransactionQueryService, "Route replay resolver requires FundsTransactionQueryService");
-        FundsInstructionReferenceSpec reference = instruction.getReference();
+        FundsInstructionReferenceSpec reference = requireReplayReference(instruction);
         Optional<RouteSnapshotSpec> routeSnapshot = switch (reference.getReferenceType()) {
             case FREEZE_ORDER -> fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(reference.getReferenceSn());
             default -> fundsTransactionQueryService.findRouteSnapshotByTransactionSn(reference.getReferenceSn());
@@ -145,6 +147,14 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         RouteSnapshotSpec result = routeSnapshot.get();
         assertReplayOnceNotConsumed(instruction, reference, result);
         return result;
+    }
+
+    private FundsInstructionReferenceSpec requireReplayReference(FundsInstructionSpec instruction) {
+        FundsInstructionReferenceSpec reference = instruction.getReference();
+        AssertUtils.notNull(reference, REPLAY_REFERENCE_REQUIRED_MESSAGE);
+        AssertUtils.notNull(reference.getReferenceType(), REPLAY_REFERENCE_REQUIRED_MESSAGE);
+        AssertUtils.hasText(reference.getReferenceSn(), REPLAY_REFERENCE_REQUIRED_MESSAGE);
+        return reference;
     }
 
     private void assertReplayOnceNotConsumed(FundsInstructionSpec instruction,
