@@ -20,6 +20,7 @@ import static com.capte.funds.support.FundsBalanceAssertionSupport.assertOnlyBal
 import static com.capte.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 授权交易业务流测试。
@@ -227,6 +228,70 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.SETTLEMENT.name());
+    }
+
+    /**
+     * 场景：用户充值后授权批准，部分撤销后再次发起超过剩余授权的撤销。
+     * 输入：充值 100、授权批准 80、先撤销 30、再撤销 60。
+     * 输出：第二次撤销失败，余额、交易累计和账务事实保持第一次撤销后的状态。
+     * 预期：剩余授权只有 50 时，不允许再释放 60。
+     * 红线：超额撤销不得透支 AUTHORIZATION，不得把失败请求记录成成功账务事实。
+     */
+    @Test
+    void testAuthorizationReversalExceedingRemainingShouldLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        topup(user, 100L, "AUTH_REVERSAL_EXCEED_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        String authorizationSn = authorize(user, 80L, true, "AUTH_REVERSAL_EXCEED_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -80L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        reverseAuthorization(user, 30L, authorizationSn, "AUTH_REVERSAL_EXCEED_FIRST_CANCEL");
+        BalanceSnapshot afterFirstReversal = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterFirstReversal,
+                delta(user, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        assertThatThrownBy(() -> reverseAuthorization(user, 60L, authorizationSn,
+                "AUTH_REVERSAL_EXCEED_SECOND_CANCEL"))
+                .hasMessageContaining("回放累计金额不能大于原 RouteLeg 金额");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterFirstReversal, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
+        assertThat(transaction.getReversedAmount()).isEqualTo(30L);
+        assertThat(transaction.getSettledAmount()).isZero();
+        assertThat(transaction.getRefundedAmount()).isZero();
+
+        assertPostedTransactions(3);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.AUTHORIZE.name(),
+                        FundsTransactionEventType.REVERSAL.name());
     }
 
     /**
