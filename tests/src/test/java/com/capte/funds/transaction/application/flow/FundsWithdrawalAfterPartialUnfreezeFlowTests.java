@@ -16,6 +16,7 @@ import static com.capte.funds.support.FundsBalanceAssertionSupport.assertOnlyBal
 import static com.capte.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 部分解冻后提现业务流测试。
@@ -109,5 +110,71 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
         assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_FREEZE").getReleasedAmount()).isEqualTo(30L);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_RELEASE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+    }
+
+    /**
+     * 场景：用户充值后冻结资金，随后分两次解冻，并尝试超过剩余冻结金额的第三次解冻。
+     * 输入：充值 120、冻结 90、解冻 20、解冻 30、超额解冻 50。
+     * 输出：用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 余额快照和冻结单释放状态。
+     * 预期：两次解冻逐步释放冻结金额，超额解冻失败且无余额副作用。
+     * 红线：累计解冻不得超过原冻结剩余金额；失败请求不得生成新的入账事实。
+     */
+    @Test
+    void testTopupFreezeMultipleUnfreezeThenExceedShouldKeepBalanceUnchanged() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        topup(user, 120L, "BALANCE_MULTI_UNFREEZE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 120L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -120L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String freezeSn = freeze(user, 90L, "BALANCE_MULTI_UNFREEZE_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -90L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 90L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        unfreeze(user, 20L, freezeSn, "BALANCE_MULTI_UNFREEZE_RELEASE_1");
+        BalanceSnapshot afterFirstRelease = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterFirstRelease,
+                delta(user, LedgerSubjectCode.AVAILABLE, 20L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -20L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        unfreeze(user, 30L, freezeSn, "BALANCE_MULTI_UNFREEZE_RELEASE_2");
+        BalanceSnapshot afterSecondRelease = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstRelease, afterSecondRelease,
+                delta(user, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 80L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 40L, CURRENCY);
+
+        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.PARTIALLY_RELEASED);
+        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getReleasedAmount()).isEqualTo(50L);
+        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_1").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_2").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+
+        assertThatThrownBy(() -> unfreeze(user, 50L, freezeSn, "BALANCE_MULTI_UNFREEZE_EXCEED"))
+                .hasMessageContaining("冻结单剩余可释放金额不足");
+        BalanceSnapshot afterExceed = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterSecondRelease, afterExceed,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertPostedTransactions(4);
+        assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getReleasedAmount()).isEqualTo(50L);
     }
 }
