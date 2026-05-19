@@ -26,7 +26,7 @@ public class FundsTransactionFeeRequest {
     @NotNull
     private Money amount;
 
-    @Schema(description = "业务流水号，提现凭证，例如：提现申请单流水号")
+    @Schema(description = "业务流水号，手续费收取凭证，例如：手续费单流水号、小额交易手续费流水号")
     @NotNull
     private String businessSn;
 

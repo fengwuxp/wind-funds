@@ -25,7 +25,7 @@ public class FundsAuthorizationTransactionRefundRequest {
     @NotNull
     private FundsAccountId accountId;
 
-    @Schema(description = "结算金额")
+    @Schema(description = "退款金额")
     @NotNull
     private Money amount;
 

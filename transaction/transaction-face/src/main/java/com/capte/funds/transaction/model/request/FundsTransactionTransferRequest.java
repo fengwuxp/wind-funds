@@ -34,7 +34,7 @@ public class FundsTransactionTransferRequest {
     @Schema(description = "本次交易显式手续费规则")
     private FeeSpec feeSpec;
 
-    @Schema(description = "业务流水号，入账凭证，例如：在线充值流水号，人工入账单流水号、退款单交易流水号")
+    @Schema(description = "业务流水号，转账凭证，例如：账户转账单流水号、内部调拨单流水号")
     @NotNull
     private String businessSn;
 

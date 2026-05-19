@@ -27,11 +27,11 @@ public class FundsBalanceAdjustRequest {
     @NotNull
     private Money amount;
 
-    @Schema(description = "是否为为增加额度，true: 增加额度，false: 减少额度")
+    @Schema(description = "是否增加余额或额度，true: 增加，false: 减少")
     @NotNull
     private Boolean increase;
 
-    @Schema(description = "业务流水号，调额凭证，例如：调整余额申请单流水号")
+    @Schema(description = "业务流水号，调整凭证，例如：余额调账单流水号、额度调整单流水号")
     @NotNull
     private String businessSn;
 
