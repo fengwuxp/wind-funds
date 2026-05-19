@@ -3,9 +3,28 @@ package com.capte.funds.route;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
+import com.capte.funds.transaction.support.FundsRouteCodes;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
+import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
+import com.wind.integration.funds.model.route.ImmutablePaymentInstrumentRefSpec;
+import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
+import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
+import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
+import com.wind.integration.funds.model.route.ImmutableRouteSnapshotSpec;
+import com.wind.integration.funds.model.route.ImmutableSubjectRef;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.route.enums.RouteLegType;
+import com.wind.integration.funds.route.enums.RouteNodeRole;
+import com.wind.integration.funds.route.enums.RouteNodeType;
+import com.wind.integration.funds.route.enums.RouteParticipantRole;
+import com.wind.integration.funds.route.enums.RouteReplayPolicy;
+import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
+import com.wind.integration.funds.route.ref.SubjectRef;
+import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
@@ -22,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -86,13 +106,46 @@ class DefaultRouteReplayServiceTests {
                 .hasMessageContaining("FT202605190001");
     }
 
+    /**
+     * 场景：原交易完成后支付工具发生换绑，业务侧用新的工具引用发起退款回放。
+     * 输入：原 RouteSnapshot 持有旧工具快照，退款指令持有新工具引用。
+     * 输出：回放成功，ResolvedRoute 使用原 RouteSnapshot 中的工具快照。
+     * 预期：回放结果的 `paymentInstrumentRef` 与原快照一致，不被当前指令覆盖。
+     * 红线：Route Replay 必须按原路径事实回放，不得因当前绑定或当前工具引用重新选路。
+     */
+    @Test
+    void testResolveReplayInstructionShouldReuseSnapshotPaymentInstrumentRef() {
+        PaymentInstrumentRefSpec originalInstrument = paymentInstrumentRef("CARD-OLD", "old-binding");
+        PaymentInstrumentRefSpec currentInstrument = paymentInstrumentRef("CARD-NEW", "new-binding");
+        FundsInstructionReferenceSpec reference = ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.ORIGINAL_TRANSACTION)
+                .referenceSn("FT202605190002")
+                .build();
+        DefaultRouteReplayService replayService = new DefaultRouteReplayService(
+                new SnapshotFundsTransactionQueryService(routeSnapshot(originalInstrument)));
+
+        ResolvedRouteSpec resolvedRoute = replayService.resolve(replayInstruction(reference, currentInstrument));
+
+        assertThat(resolvedRoute.getPaymentInstrumentRef()).isSameAs(originalInstrument);
+        assertThat(resolvedRoute.getPaymentInstrumentRef().getInstrumentId()).isEqualTo("CARD-OLD");
+        assertThat(resolvedRoute.getPaymentInstrumentRef().getBindingSnapshot())
+                .containsEntry("bindingId", "old-binding");
+        assertThat(resolvedRoute.getPaymentInstrumentRef()).isNotSameAs(currentInstrument);
+    }
+
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference) {
+        return replayInstruction(reference, null);
+    }
+
+    private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference,
+                                                   PaymentInstrumentRefSpec instrumentRef) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.REFUND)
                 .transactionType(DefaultFundsTransactionType.REFUND)
                 .amount(Money.immutable(10L, CurrencyIsoCode.USD))
+                .instrumentRef(instrumentRef)
                 .reference(reference)
                 .businessScene("REFUND")
                 .businessSn("REPLAY_MISSING_REFERENCE")
@@ -106,7 +159,89 @@ class DefaultRouteReplayServiceTests {
                 .build();
     }
 
-    private static final class EmptyFundsTransactionQueryService implements FundsTransactionQueryService {
+    private RouteSnapshotSpec routeSnapshot(PaymentInstrumentRefSpec paymentInstrumentRef) {
+        SubjectRef payer = fundingAccount("PAYER-001");
+        SubjectRef payee = fundingAccount("PAYEE-001");
+        return ImmutableRouteSnapshotSpec.builder()
+                .tenantId(1L)
+                .snapshotId("SNAPSHOT-202605190002")
+                .snapshotSchemaVersion(FundsRouteCodes.CURRENT_ROUTE_VERSION)
+                .routeCode(FundsRouteCodes.DIRECT_PAY_STANDARD)
+                .routeVersion(FundsRouteCodes.CURRENT_ROUTE_VERSION)
+                .businessScene("PAY")
+                .businessSn("PAY-202605190002")
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of(participant(RouteParticipantRole.PAYER, payer),
+                        participant(RouteParticipantRole.PAYEE, payee)))
+                .legs(List.of(routeLeg(payer, payee)))
+                .paymentInstrumentRef(paymentInstrumentRef)
+                .resolvedAt(LocalDateTime.of(2026, 5, 18, 12, 0))
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private ImmutableRouteLegSpec routeLeg(SubjectRef payer, SubjectRef payee) {
+        return ImmutableRouteLegSpec.builder()
+                .legId("PAY")
+                .sequence(1)
+                .legType(RouteLegType.CONSUME)
+                .sourceNode(routeNode(payer, RouteNodeRole.SOURCE))
+                .targetNode(routeNode(payee, RouteNodeRole.TARGET))
+                .amount(Money.immutable(10L, CurrencyIsoCode.USD))
+                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
+                .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
+                .constraintOverrides(Map.of())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private ImmutableRouteNodeSpec routeNode(SubjectRef subjectRef, RouteNodeRole nodeRole) {
+        return ImmutableRouteNodeSpec.builder()
+                .nodeType(RouteNodeType.SUBJECT)
+                .subjectRef(subjectRef)
+                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .nodeRole(nodeRole)
+                .build();
+    }
+
+    private ImmutableRouteParticipantSpec participant(RouteParticipantRole role, SubjectRef subjectRef) {
+        return ImmutableRouteParticipantSpec.builder()
+                .participantRole(role)
+                .subjectRef(subjectRef)
+                .currency(CurrencyIsoCode.USD.name())
+                .amount(Money.immutable(10L, CurrencyIsoCode.USD))
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private SubjectRef fundingAccount(String accountId) {
+        return ImmutableSubjectRef.builder()
+                .tenantId(1L)
+                .subjectId(accountId)
+                .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .currency(CurrencyIsoCode.USD.name())
+                .ledgerProfileCode("DEFAULT")
+                .build();
+    }
+
+    private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentId, String bindingId) {
+        return ImmutablePaymentInstrumentRefSpec.builder()
+                .instrumentId(instrumentId)
+                .instrumentType("CARD")
+                .instrumentNo("**** 4242")
+                .ownerId("PAYER-001")
+                .ownerType("USER")
+                .tenantId(1L)
+                .currency(CurrencyIsoCode.USD.name())
+                .status("ACTIVE")
+                .bindingSnapshot(Map.of("bindingId", bindingId))
+                .build();
+    }
+
+    private static class EmptyFundsTransactionQueryService implements FundsTransactionQueryService {
 
         @Override
         public Optional<FundsTransactionDTO> queryFundsTransaction(String transactionSn) {
@@ -141,6 +276,20 @@ class DefaultRouteReplayServiceTests {
         @Override
         public Optional<RouteSnapshotSpec> findRouteSnapshotByFreezeOrderSn(String freezeOrderSn) {
             return Optional.empty();
+        }
+    }
+
+    private static final class SnapshotFundsTransactionQueryService extends EmptyFundsTransactionQueryService {
+
+        private final RouteSnapshotSpec routeSnapshot;
+
+        private SnapshotFundsTransactionQueryService(RouteSnapshotSpec routeSnapshot) {
+            this.routeSnapshot = routeSnapshot;
+        }
+
+        @Override
+        public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(String transactionSn) {
+            return Optional.of(routeSnapshot);
         }
     }
 }
