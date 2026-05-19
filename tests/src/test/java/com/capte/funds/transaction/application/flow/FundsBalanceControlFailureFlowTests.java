@@ -1,8 +1,12 @@
 package com.capte.funds.transaction.application.flow;
 
+import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;
@@ -50,5 +54,45 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_FAIL_FREEZE")).isFalse();
+    }
+
+    /**
+     * 场景：用户 USD 资金账户发起 CNY 冻结请求。
+     * 输入：充值 50 USD、冻结请求 10 CNY。
+     * 输出：冻结请求失败，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持冻结前状态。
+     * 预期：余额控制只接受同币种余额桶控制，错币种由业务层先完成决策或换汇后再提交。
+     * 红线：`FundsBalanceControlService` 不承接 FX，不做隐式换汇，不留下冻结单或账务事实。
+     */
+    @Test
+    void testFreezeWithDifferentCurrencyShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        topup(user, 50L, "BALANCE_FREEZE_CURRENCY_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertThatThrownBy(() -> balanceControlService.freeze(new FundsBalanceFreezeRequest()
+                .setAccountId(user)
+                .setAmount(Money.immutable(10L, CurrencyIsoCode.CNY))
+                .setBusinessScene("FREEZE")
+                .setBusinessSn("BALANCE_FREEZE_CURRENCY_FREEZE")
+                .setDescription("freeze with different currency"), WindOperator.system()))
+                .hasMessageContaining("amount currency must equal account currency");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertPostedTransactions(1);
+        assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_CURRENCY_FREEZE")).isFalse();
     }
 }
