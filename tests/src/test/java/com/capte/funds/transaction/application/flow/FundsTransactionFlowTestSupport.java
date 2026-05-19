@@ -364,6 +364,26 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setDescription("withdraw"), WindOperator.system());
     }
 
+    protected void withdrawWithFixedFee(FundsAccountId accountId,
+                                        long amount,
+                                        long feeAmount,
+                                        String referenceFreezeSn,
+                                        String businessSn) {
+        directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(accountId)
+                .setPayeeId(FundsAccountId.immutable("external_bank_001",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn(referenceFreezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setFeeSpec(FeeSpec.builder()
+                        .feeType(DefaultFeeType.FEE.getCode())
+                        .fixedFee(Math.toIntExact(feeAmount))
+                        .build())
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn(businessSn)
+                .setDescription("withdraw with fee"), WindOperator.system());
+    }
+
     protected String freeze(FundsAccountId accountId, long amount, String businessSn) {
         return balanceControlService.freeze(new FundsBalanceFreezeRequest()
                 .setAccountId(accountId)
