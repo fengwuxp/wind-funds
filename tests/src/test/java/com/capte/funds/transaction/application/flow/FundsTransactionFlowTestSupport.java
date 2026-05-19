@@ -30,6 +30,7 @@ import com.capte.funds.route.support.PlatformAccountRouteSupport;
 import com.capte.funds.route.support.RouteParticipantFactory;
 import com.capte.funds.route.support.RouteSubjectSupport;
 import com.capte.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
+import com.capte.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.capte.funds.transaction.application.FundsBalanceControlService;
 import com.capte.funds.transaction.application.FundsDirectTransactionService;
 import com.capte.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
@@ -41,6 +42,9 @@ import com.capte.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.ledger.DefaultLedgerPostingAssembler;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
@@ -127,6 +131,9 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected FundsDirectTransactionService directTransactionService;
 
     @Autowired
+    protected FundsAuthorizationTransactionService authorizationTransactionService;
+
+    @Autowired
     protected FundsBalanceControlService balanceControlService;
 
     @Autowired
@@ -165,8 +172,10 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         FundsAccountId user = fundingAccount("funding_user");
         ensureLedger(user, LedgerSubjectCode.AVAILABLE, 0L);
         ensureLedger(user, LedgerSubjectCode.FROZEN, 0L);
+        ensureLedger(user, LedgerSubjectCode.AUTHORIZATION, 0L);
         ensureLedger(cashMappingAccount(), LedgerSubjectCode.CASH, 10_000L);
         ensureLedger(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L);
+        ensureLedger(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L);
         ensureLedger(feeAccount(), LedgerSubjectCode.FEE, 0L);
     }
 
@@ -393,6 +402,45 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setDescription("freeze"), WindOperator.system());
     }
 
+    protected String authorize(FundsAccountId accountId,
+                               long amount,
+                               boolean approved,
+                               String businessSn) {
+        return authorizationTransactionService.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setApproved(approved)
+                .setBusinessScene("AUTHORIZATION")
+                .setBusinessSn(businessSn)
+                .setDescription("authorization"), WindOperator.system());
+    }
+
+    protected String settleAuthorization(FundsAccountId accountId,
+                                         long amount,
+                                         String authorizationTransactionSn,
+                                         String businessSn) {
+        return authorizationTransactionService.settle(new FundsAuthorizationTransactionSettleRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setAuthorizationTransactionSn(authorizationTransactionSn)
+                .setBusinessScene("AUTHORIZATION_SETTLE")
+                .setBusinessSn(businessSn)
+                .setDescription("authorization settle"), WindOperator.system());
+    }
+
+    protected String reverseAuthorization(FundsAccountId accountId,
+                                          long amount,
+                                          String authorizationTransactionSn,
+                                          String businessSn) {
+        return authorizationTransactionService.reversal(new FundsAuthorizationTransactionReversalRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setAuthorizationTransactionSn(authorizationTransactionSn)
+                .setBusinessScene("AUTHORIZATION_REVERSAL")
+                .setBusinessSn(businessSn)
+                .setDescription("authorization reversal"), WindOperator.system());
+    }
+
     protected void unfreeze(FundsAccountId accountId, long amount, String referenceFreezeSn, String businessSn) {
         balanceControlService.unfreeze(new FundsBalanceUnfreezeRequest()
                 .setAccountId(accountId)
@@ -490,6 +538,10 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected static FundsAccountId prepaymentAccount() {
         return platformAccount(PlatformFundingAccountRole.PREPAYMENT);
+    }
+
+    protected static FundsAccountId settlementAccount() {
+        return platformAccount(PlatformFundingAccountRole.SETTLEMENT);
     }
 
     protected static FundsAccountId feeAccount() {
