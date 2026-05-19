@@ -305,12 +305,12 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setDescription("transfer"), WindOperator.system());
     }
 
-    protected void pay(FundsAccountId accountId,
-                       FundsAccountId payeeId,
-                       LedgerSubjectCode payeeLedgerCode,
-                       long amount,
-                       String businessSn) {
-        directTransactionService.pay(new FundsTransactionPayRequest()
+    protected String pay(FundsAccountId accountId,
+                         FundsAccountId payeeId,
+                         LedgerSubjectCode payeeLedgerCode,
+                         long amount,
+                         String businessSn) {
+        return directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(accountId)
                 .setPayeeId(payeeId)
                 .setPayeeLedgerCode(payeeLedgerCode)
