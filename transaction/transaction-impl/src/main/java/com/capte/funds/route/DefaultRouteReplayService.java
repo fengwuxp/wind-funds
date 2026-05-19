@@ -31,6 +31,7 @@ import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
@@ -167,11 +168,25 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
             Money consumedAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(
                     reference.getReferenceSn(), eventType, sourceLeg.getLegId(),
                     sourceLeg.getAmount().getCurrency());
-            long consumedTotal = consumedAmount.getAmount() + replayAmount.getAmount();
+            long consumedTotal = consumedAmount.getAmount()
+                    + freezeOrderWithdrawConsumedAmount(reference, eventType, sourceLeg)
+                    + replayAmount.getAmount();
             AssertUtils.isTrue(consumedTotal <= sourceLeg.getAmount().getAmount(),
                     "RouteSnapshot leg 回放累计金额不能大于原 RouteLeg 金额，referenceSn = {}，eventType = {}，legId = {}",
                     reference.getReferenceSn(), eventType, sourceLeg.getLegId());
         }
+    }
+
+    private long freezeOrderWithdrawConsumedAmount(@NonNull FundsInstructionReferenceSpec reference,
+                                                   @NonNull FundsTransactionEventType eventType,
+                                                   @NonNull RouteLegSpec sourceLeg) {
+        if (reference.getReferenceType() != FundsInstructionReferenceType.FREEZE_ORDER
+                || eventType != FundsTransactionEventType.UNFREEZE) {
+            return 0L;
+        }
+        return fundsTransactionQueryService.sumConsumedReplayLegAmount(reference.getReferenceSn(),
+                FundsTransactionEventType.WITHDRAW, sourceLeg.getLegId(),
+                sourceLeg.getAmount().getCurrency()).getAmount();
     }
 
     private RouteReplayType resolveReplayType(FundsTransactionEventType eventType) {

@@ -21,6 +21,7 @@ import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
+import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -42,6 +43,8 @@ import java.util.Optional;
 @Service
 @AllArgsConstructor
 public class DefaultFundsTransactionQueryService implements FundsTransactionQueryService {
+
+    private static final String FREEZE_ROUTE_LEG_ID = "FREEZE";
 
     private final FundsTransactionMapper fundsTransactionMapper;
 
@@ -151,6 +154,11 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     }
 
     private Long consumedReplayLegAmount(FundsTransactionDetail detail, String replayRefLegId) {
+        Long amount = consumedReplayLegAmountFromContext(detail, replayRefLegId);
+        return amount == null ? freezeOrderWithdrawConsumedAmount(detail, replayRefLegId) : amount;
+    }
+
+    private Long consumedReplayLegAmountFromContext(FundsTransactionDetail detail, String replayRefLegId) {
         if (!hasText(detail.getContextVariables())) {
             return null;
         }
@@ -162,6 +170,16 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         JSONArray replayConsumedLegIds = values.getJSONArray(FundsInstructionContextKeys.REPLAY_CONSUMED_LEG_IDS);
         return replayConsumedLegIds != null && replayConsumedLegIds.contains(replayRefLegId)
                 ? detail.getAmount() : null;
+    }
+
+    private Long freezeOrderWithdrawConsumedAmount(FundsTransactionDetail detail, String replayRefLegId) {
+        if (detail.getEventType() != FundsTransactionEventType.WITHDRAW
+                || !FREEZE_ROUTE_LEG_ID.equals(replayRefLegId)
+                || detail.getParticipantRole() == RouteParticipantRole.FEE_RECEIVER
+                || !hasText(detail.getReferenceDetailSn())) {
+            return null;
+        }
+        return detail.getAmount();
     }
 
     private List<FundsTransactionDetail> queryConsumedReplayDetails(String referenceTransactionSn,

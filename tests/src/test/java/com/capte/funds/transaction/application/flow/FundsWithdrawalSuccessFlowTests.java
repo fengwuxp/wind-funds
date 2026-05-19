@@ -16,6 +16,7 @@ import static com.capte.funds.support.FundsBalanceAssertionSupport.assertOnlyBal
 import static com.capte.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 提现成功业务流测试。
@@ -168,5 +169,43 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
         assertPostedTransactions(3);
+    }
+
+    /**
+     * 场景：用户充值、冻结并提现成功后，又收到同一冻结来源的撤销或拒绝解冻请求。
+     * 输入：充值 100、冻结 60、提现确认 60、随后解冻 60。
+     * 输出：解冻请求失败；用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 保持提现成功后的状态。
+     * 预期：已确认出款不能被简单解冻；失败请求不得生成解冻账务事实或冻结释放记录。
+     * 红线：提现成功后的拒绝、撤销或回滚应进入后续差错/追偿流程，不得回写冻结语义。
+     */
+    @Test
+    void testUnfreezeAfterSuccessfulWithdrawShouldFailAndKeepBalanceUnchanged() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "WITHDRAW_UNFREEZE_AFTER_SUCCESS_TOPUP");
+        String freezeSn = freeze(user, 60L, "WITHDRAW_UNFREEZE_AFTER_SUCCESS_FREEZE");
+        withdraw(user, 60L, freezeSn, "WITHDRAW_UNFREEZE_AFTER_SUCCESS_CONFIRM");
+        BalanceSnapshot afterWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> unfreeze(user, 60L, freezeSn,
+                "WITHDRAW_UNFREEZE_AFTER_SUCCESS_RELEASE"))
+                .hasMessageContaining("RouteSnapshot leg 回放累计金额不能大于原 RouteLeg 金额");
+
+        BalanceSnapshot afterRejectedRelease = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterWithdraw, afterRejectedRelease,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(3);
+        assertThat(frozenOrderExistsByBusinessSn("WITHDRAW_UNFREEZE_AFTER_SUCCESS_RELEASE"))
+                .isFalse();
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_UNFREEZE_AFTER_SUCCESS_FREEZE").getReleasedAmount())
+                .isZero();
     }
 }
