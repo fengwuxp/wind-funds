@@ -11,7 +11,11 @@ import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 
 /**
- * FundsFrozenOrder model converter.
+ * 资金冻结单模型转换器。
+ *
+ * <p>职责：在冻结单创建请求、持久化实体和 DTO 之间做字段映射，并补齐冻结单创建默认值。</p>
+ *
+ * <p>边界：只做同名字段映射和冻结单初始状态默认值处理，不查询数据库、不写账本、不推进资金交易状态。</p>
  *
  * @author Codex
  * @date 2026-05-08
@@ -22,23 +26,23 @@ public interface FundsFrozenOrderConverter {
     FundsFrozenOrderConverter INSTANCE = Mappers.getMapper(FundsFrozenOrderConverter.class);
 
     /**
-     * CreateFundsFrozenOrderRequest convert to FundsFrozenOrder.
+     * 将冻结单创建请求转换为持久化实体。
      *
      * @param request 创建请求
-     * @return FundsFrozenOrder 实例
+     * @return 资金冻结单实体
      */
     FundsFrozenOrder convertToFundsFrozenOrder(CreateFundsFrozenOrderRequest request);
 
     /**
-     * FundsFrozenOrder convert to FundsFrozenOrderDTO.
+     * 将冻结单实体转换为查询 DTO。
      *
-     * @param data FundsFrozenOrder 实例
-     * @return FundsFrozenOrderDTO 实例
+     * @param data 资金冻结单实体
+     * @return 资金冻结单 DTO
      */
     FundsFrozenOrderDTO convertToFundsFrozenOrderDTO(FundsFrozenOrder data);
 
     /**
-     * Fill create defaults after same-name field mapping.
+     * 在同名字段映射后补齐冻结单创建默认值。
      *
      * @param request 创建请求
      * @param entity 资金冻结订单实体
