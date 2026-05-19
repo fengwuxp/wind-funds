@@ -30,6 +30,7 @@ import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
+import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import com.wind.transaction.core.Money;
@@ -86,9 +87,20 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                                                                   @NonNull ResolvedRouteSpec resolvedRoute,
                                                                   @NonNull RouteSnapshotSpec routeSnapshot) {
         FundsTransaction transaction = findOrCreateTransaction(instruction, routeSnapshot);
-        List<FundsTransactionDetail> details = findOrCreateTransactionDetails(instruction, routeSnapshot, transaction.getSn());
+        List<FundsTransactionDetail> existingDetails = findExistingTransactionDetails(instruction, routeSnapshot,
+                transaction.getSn());
+        if (!existingDetails.isEmpty() && existingDetails.stream().allMatch(this::isCompletedDetail)) {
+            return lifecycleResult(transaction.getSn(), existingDetails);
+        }
+        assertPostingSummaryAllowed(instruction, transaction);
+        List<FundsTransactionDetail> details = findOrCreateTransactionDetails(instruction, routeSnapshot,
+                transaction.getSn());
+        return lifecycleResult(transaction.getSn(), details);
+    }
+
+    private FundsInstructionLifecycleResult lifecycleResult(String transactionSn, List<FundsTransactionDetail> details) {
         return new FundsInstructionLifecycleResult()
-                .setTransactionSn(transaction.getSn())
+                .setTransactionSn(transactionSn)
                 .setTransactionDetailSns(details.stream().map(FundsTransactionDetail::getSn).toList())
                 .setLedgerTransactionSn(resolveLedgerTransactionSn(details))
                 .setCompleted(details.stream().allMatch(this::isCompletedDetail));
@@ -182,6 +194,27 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         fundsTransactionMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建资金交易聚合记录失败");
         return entity;
+    }
+
+    private List<FundsTransactionDetail> findExistingTransactionDetails(FundsInstructionSpec instruction,
+                                                                        RouteSnapshotSpec routeSnapshot,
+                                                                        String transactionSn) {
+        List<RouteParticipantSpec> participants = routeSnapshot.getParticipants();
+        AssertUtils.isFalse(participants.isEmpty(),
+                "RouteSnapshot participants 不能为空");
+        List<FundsTransactionDetail> result = new ArrayList<>(participants.size());
+        for (RouteParticipantSpec participant : participants) {
+            String requestHash = computeDetailRequestHash(instruction, routeSnapshot, participant);
+            FundsTransactionDetail detail = findDetailByBusinessEventAndParticipant(instruction, transactionSn,
+                    participant);
+            if (detail == null) {
+                return List.of();
+            }
+            AssertUtils.isTrue(Objects.equals(detail.getRequestHash(), requestHash),
+                    "资金交易明细请求参数不一致，sn = {}", detail.getSn());
+            result.add(detail);
+        }
+        return result;
     }
 
     private List<FundsTransactionDetail> findOrCreateTransactionDetails(FundsInstructionSpec instruction,
@@ -310,6 +343,21 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             case CHARGEBACK -> applyChargebackSummary(transaction, amount);
             case FREEZE, UNFREEZE, BALANCE_ADJUST, LIMIT_ADJUST ->
                     transaction.setStatus(resolveBalanceControlStatus(primaryDetail));
+        }
+    }
+
+    private void assertPostingSummaryAllowed(FundsInstructionSpec instruction, FundsTransaction transaction) {
+        FundsTransactionEventType eventType = instruction.getEventType();
+        long amount = instruction.getAmount().getAmount();
+        switch (eventType) {
+            case AUTH_REFUND, REFUND -> {
+                if (shouldAssertSettledReversibleAmount(transaction)) {
+                    assertSettledReversibleAmountSufficient(transaction, amount);
+                }
+            }
+            case CHARGEBACK -> assertSettledReversibleAmountSufficient(transaction, amount);
+            default -> {
+            }
         }
     }
 
