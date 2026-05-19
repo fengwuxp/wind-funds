@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 组合路由解析器选择边界测试。
@@ -40,6 +41,45 @@ class CompositeRouteResolverTests {
         assertThat(delegate.resolveCalls).isZero();
     }
 
+    /**
+     * 场景：组合解析器执行路由解析，但没有任何委托解析器支持该指令。
+     * 输入：一个 `supports=false` 的委托解析器。
+     * 输出：路由解析失败。
+     * 预期：只允许执行候选判定，不得调用委托 `resolve`。
+     * 红线：未命中 RouteResolver 时不得尝试解析或写事实。
+     */
+    @Test
+    void testResolveWithoutCandidateShouldNotInvokeDelegateResolve() {
+        RecordingRouteResolver delegate = new RecordingRouteResolver(false);
+        CompositeRouteResolver resolver = new CompositeRouteResolver(List.of(delegate));
+
+        assertThatThrownBy(() -> resolver.resolve(directInstruction()))
+                .hasMessageContaining("未找到匹配的 RouteResolver");
+        assertThat(delegate.supportsCalls).isEqualTo(1);
+        assertThat(delegate.resolveCalls).isZero();
+    }
+
+    /**
+     * 场景：组合解析器执行路由解析，但多个委托解析器同时支持该指令。
+     * 输入：两个 `supports=true` 的委托解析器。
+     * 输出：路由解析失败。
+     * 预期：只允许执行候选判定，不得选择任一委托继续 `resolve`。
+     * 红线：RouteResolver 命中不唯一时必须整体失败，不能随机选路。
+     */
+    @Test
+    void testResolveWithMultipleCandidatesShouldNotInvokeDelegateResolve() {
+        RecordingRouteResolver first = new RecordingRouteResolver(true);
+        RecordingRouteResolver second = new RecordingRouteResolver(true);
+        CompositeRouteResolver resolver = new CompositeRouteResolver(List.of(first, second));
+
+        assertThatThrownBy(() -> resolver.resolve(directInstruction()))
+                .hasMessageContaining("RouteResolver 命中不唯一");
+        assertThat(first.supportsCalls).isEqualTo(1);
+        assertThat(second.supportsCalls).isEqualTo(1);
+        assertThat(first.resolveCalls).isZero();
+        assertThat(second.resolveCalls).isZero();
+    }
+
     private FundsInstructionSpec directInstruction() {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
@@ -61,14 +101,24 @@ class CompositeRouteResolverTests {
 
     private static final class RecordingRouteResolver implements RouteResolver {
 
+        private final boolean supported;
+
         private int supportsCalls;
 
         private int resolveCalls;
 
+        private RecordingRouteResolver() {
+            this(true);
+        }
+
+        private RecordingRouteResolver(boolean supported) {
+            this.supported = supported;
+        }
+
         @Override
         public boolean supports(FundsInstructionSpec instruction) {
             supportsCalls++;
-            return true;
+            return supported;
         }
 
         @Override
