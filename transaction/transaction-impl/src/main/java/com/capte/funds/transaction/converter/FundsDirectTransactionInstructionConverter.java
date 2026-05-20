@@ -12,6 +12,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
+import com.wind.common.exception.AssertUtils;
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.route.ImmutableExternalAccountRefSpec;
@@ -112,6 +113,9 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToPayInstruction(@NonNull FundsTransactionPayRequest request,
                                                                  @NonNull WindOperator operator) {
+        AssertUtils.notNull(request.getAccountId(), "直接付款账户不能为空");
+        AssertUtils.notNull(request.getPayeeId(), "直接付款收款主体不能为空");
+        AssertUtils.notNull(request.getPayeeLedgerCode(), "直接付款收款账目不能为空");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());

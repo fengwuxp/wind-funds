@@ -225,6 +225,48 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接付款缺少收款主体。
+     * 输入：付款方充值 50 后，提交 payeeId 为空的直接付款。
+     * 输出：请求被拒绝；付款方和平台账户余额保持充值后的状态。
+     * 预期：直接付款必须先解析到最终可记账收款主体，缺主体不能进入 route 和 ledger。
+     * 红线：缺主体不能以 NPE 或半截账务事实形式泄露到生产链路。
+     */
+    @Test
+    void testPayWithoutPayeeShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+
+        topup(payer, 50L, "DIRECT_PAY_MISSING_PAYEE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(payer)
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("PAY")
+                .setBusinessSn("DIRECT_PAY_MISSING_PAYEE")
+                .setDescription("pay without payee"), WindOperator.system()))
+                .hasMessageContaining("直接付款收款主体不能为空");
+
+        BalanceSnapshot afterRejectedPay = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRejectedPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+    }
+
+    /**
      * 场景：直接付款使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
      * 输入：充值 100，付款 40 使用业务流水 `DIRECT_IDEMPOTENT_PAY`，随后同流水同金额重试，再同流水改金额为 41。
      * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次付款后的状态。
