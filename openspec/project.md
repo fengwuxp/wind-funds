@@ -4,14 +4,13 @@
 
 本目录是支付资金底座进入后续开发前的规格基线目录。它不保存历史版本演进，不承载历史过程内容，也不替代产品设计、DSL 设计、系分设计和 TDD 设计。
 
-Gbrain 与 OpenSpec / Superpowers / Harness 在本项目中的定位：
+OpenSpec / Superpowers / Harness 在本项目中的定位：
 
-1. Gbrain 做记忆和检索：查询和沉淀本项目的设计决策、规格基线、Execution Grant、CR 结论、验证摘要和交付复盘。
-2. OpenSpec 定目标：把当前最终版设计转成可开发、可测试、可评审的能力规格。
-3. Superpowers 保纪律：以测试驱动设计、Review、Refactor、金融红线和验证门禁约束后续编码。
-4. Harness 管协作：按模块拆分开发批次、写入范围、只读范围、验证命令和人工确认点。
+1. OpenSpec 定目标：把当前最终版设计转成可开发、可测试、可评审的能力规格。
+2. Superpowers 保纪律：以测试驱动设计、Review、Refactor、金融红线和验证门禁约束后续编码。
+3. Harness 管协作：按模块拆分开发批次、写入范围、只读范围、验证命令和人工确认点。
 
-Gbrain 是上下文层，不是权威规格层。Gbrain 命中的历史决策必须回到 `docs/`、`openspec/`、Harness Plan 和 Git 提交点校验；Gbrain 未命中时，不阻塞编码准入，但必须在交付说明中记录未命中，并以当前权威规格和用户确认作为执行依据。
+项目决策和协作结论必须回到 `docs/`、`openspec/`、Harness Plan、Git 提交点或用户确认，不依赖外部记忆层作为编码准入或验收依据。
 
 ## 二、历史内容处理
 
@@ -37,7 +36,6 @@ Gbrain 是上下文层，不是权威规格层。Gbrain 命中的历史决策必
 | TDD | `docs/TDD设计/支付资金底座测试驱动设计.md` | 判断测试顺序、测试分层、红线用例和进入编码前检查项。 |
 | OpenSpec | `openspec/specs/payment-funds-foundation/spec.md` | 把上述设计压缩成后续开发基线。 |
 | Harness | `openspec/changes/tdd-baseline-reset/tasks.md` | 按 TDD 拆分后续落地批次和验证门禁。 |
-| Gbrain | `.gbrain-source` = `wind-funds` | 跨轮检索项目决策、CR 结论、Execution Grant 和验证摘要；不作为规格或验收的唯一依据。 |
 
 ### 3.1 当前对齐点
 
@@ -61,7 +59,7 @@ Gbrain 是上下文层，不是权威规格层。Gbrain 命中的历史决策必
 7. 当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；未冻结前不得把后续编码实现混入同一轮交付。
 8. 若本批次需要修改公共契约、枚举、请求模型、状态机或表结构，Execution Grant 必须显式写明“允许修改公共契约/表结构/新增模块”的取值和范围。
 9. 若本批次触碰生产行为、外部结果回调、并发写入、余额锁定、清结算批次、归档重放或报表口径，Execution Grant 必须补齐容量假设、并发和锁策略、观测告警、回滚或补偿方案。
-10. 编码准入或重大设计 CR 前，应先查询 Gbrain 中的本项目历史决策；若未命中，以当前 Source of Truth 和用户确认作为执行依据，并在交付说明中记录。
+10. 编码准入或重大设计 CR 前，以当前 Source of Truth、Harness Plan、Git 提交点和用户确认作为执行依据；若发现规格缺口，先补齐权威文档或人工确认点。
 
 ## 五、后续开发 Definition of Done
 
@@ -77,6 +75,6 @@ Gbrain 是上下文层，不是权威规格层。Gbrain 命中的历史决策必
 
 ## 六、语言与协作规则
 
-OpenSpec、Superpowers、Harness 和 Gbrain 协作摘要默认使用简体中文。代码标识符、协议字段、枚举、命令、包名、类名和第三方产品名保持英文原文。
+OpenSpec、Superpowers 和 Harness 协作摘要默认使用简体中文。代码标识符、协议字段、枚举、命令、包名、类名和第三方产品名保持英文原文。
 
 本目录只记录规格与协作基线。进入 CAD Mode 仍需要单独确认 Execution Grant、Git 策略、人工确认点和停止条件。
