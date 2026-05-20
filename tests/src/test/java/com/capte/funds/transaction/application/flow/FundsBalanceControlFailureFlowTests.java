@@ -1,9 +1,11 @@
 package com.capte.funds.transaction.application.flow;
 
 import com.capte.domain.core.operator.WindOperator;
+import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
+import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
@@ -135,6 +137,58 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_ZERO_FREEZE")).isFalse();
+    }
+
+    /**
+     * 场景：用户冻结余额后发起 0 金额解冻请求。
+     * 输入：充值 50、冻结 30、解冻 0。
+     * 输出：解冻请求失败，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持冻结后状态。
+     * 预期：0 金额不能进入解冻指令、route、posting 或冻结单释放生命周期。
+     * 红线：解冻不能用 0 金额制造释放动作、幂等占位或无账务观察事件。
+     */
+    @Test
+    void testUnfreezeWithZeroAmountShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        topup(user, 50L, "BALANCE_UNFREEZE_ZERO_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String freezeSn = freeze(user, 30L, "BALANCE_UNFREEZE_ZERO_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertThatThrownBy(() -> balanceControlService.unfreeze(new FundsBalanceUnfreezeRequest()
+                .setAccountId(user)
+                .setAmount(Money.immutable(0L, CURRENCY))
+                .setReferenceFreezeSn(freezeSn)
+                .setBusinessScene("UNFREEZE")
+                .setBusinessSn("BALANCE_UNFREEZE_ZERO_RELEASE")
+                .setDescription("unfreeze with zero amount"), WindOperator.system()))
+                .hasMessageContaining("fundsInstruction.amount must be positive");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
+        assertPostedTransactions(2);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE").getReleasedAmount()).isZero();
+        assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_ZERO_RELEASE")).isFalse();
     }
 
     /**
