@@ -6,8 +6,10 @@ import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
 import com.capte.funds.route.support.RouteSpecSupport;
+import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.support.FundsRouteCodes;
 import com.capte.funds.transaction.services.FundsTransactionQueryService;
+import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
@@ -35,6 +37,7 @@ import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -47,6 +50,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -64,6 +68,9 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     private static final String REPLAY_LEG_ID_SEPARATOR = "_";
 
     private static final String REPLAY_REFERENCE_REQUIRED_MESSAGE = "RouteSnapshot 回放事件缺少原路径引用";
+
+    private static final String FREEZE_ORDER_SUBJECT_MISMATCH_MESSAGE =
+            "冻结单引用主体与请求账户不一致";
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
@@ -145,6 +152,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         AssertUtils.isTrue(routeSnapshot.isPresent(), "RouteSnapshot 回放事件未找到原路径快照，referenceSn = {}",
                 reference.getReferenceSn());
         RouteSnapshotSpec result = routeSnapshot.get();
+        assertFreezeOrderSubjectMatchesInstruction(instruction, reference, result);
         assertReplayOnceNotConsumed(instruction, reference, result);
         return result;
     }
@@ -155,6 +163,49 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         AssertUtils.notNull(reference.getReferenceType(), REPLAY_REFERENCE_REQUIRED_MESSAGE);
         AssertUtils.hasText(reference.getReferenceSn(), REPLAY_REFERENCE_REQUIRED_MESSAGE);
         return reference;
+    }
+
+    private void assertFreezeOrderSubjectMatchesInstruction(FundsInstructionSpec instruction,
+                                                            FundsInstructionReferenceSpec reference,
+                                                            RouteSnapshotSpec routeSnapshot) {
+        if (reference.getReferenceType() != FundsInstructionReferenceType.FREEZE_ORDER) {
+            return;
+        }
+        FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
+                FundsInstructionContextKeys.ACCOUNT_ID);
+        AssertUtils.isTrue(snapshotContainsSubject(routeSnapshot, accountId),
+                FREEZE_ORDER_SUBJECT_MISMATCH_MESSAGE + "，referenceSn = {}，accountId = {}，accountType = {}",
+                reference.getReferenceSn(), accountId.id(), accountId.type());
+    }
+
+    private boolean snapshotContainsSubject(RouteSnapshotSpec routeSnapshot, FundsAccountId accountId) {
+        for (RouteParticipantSpec participant : routeSnapshot.getParticipants()) {
+            if (sameSubject(participant.getSubjectRef(), accountId)) {
+                return true;
+            }
+        }
+        for (RouteLegSpec leg : routeSnapshot.getLegs()) {
+            if (sameSubject(leg.getSourceNode().getSubjectRef(), accountId)
+                    || sameSubject(leg.getTargetNode().getSubjectRef(), accountId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean sameSubject(SubjectRef subjectRef, FundsAccountId accountId) {
+        return Objects.equals(subjectRef.getSubjectId(), accountId.id())
+                && subjectRef.getSubjectType() == resolveSubjectType(accountId);
+    }
+
+    private FundsSubjectType resolveSubjectType(FundsAccountId accountId) {
+        if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
+            return FundsSubjectType.CREDIT_ACCOUNT;
+        }
+        if (Objects.equals(accountId.type(), FundsSubjectType.BUDGET_GROUP.name())) {
+            return FundsSubjectType.BUDGET_GROUP;
+        }
+        return FundsSubjectType.FUNDING_ACCOUNT;
     }
 
     private void assertReplayOnceNotConsumed(FundsInstructionSpec instruction,

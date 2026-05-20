@@ -243,6 +243,69 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
+     * 场景：用户 A 冻结余额后，用户 B 引用用户 A 的冻结单发起解冻。
+     * 输入：A 充值 50、冻结 30，B 解冻 10 并传入 A 的 `referenceFreezeSn`。
+     * 输出：解冻请求失败，A/B AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持冻结后状态。
+     * 预期：解冻引用的原冻结单主体必须与请求账户一致。
+     * 红线：不得跨主体释放冻结余额，不得生成释放 route、posting 或账务事实。
+     */
+    @Test
+    void testUnfreezeWithDifferentAccountReferenceShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId anotherUser = fundingAccount("funding_user_another");
+        ensureLedger(anotherUser, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(anotherUser, LedgerSubjectCode.FROZEN);
+        BalanceSnapshot before = snapshot(balances(user, anotherUser, cashMappingAccount(), prepaymentAccount()));
+
+        topup(user, 50L, "BALANCE_UNFREEZE_ACCOUNT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, anotherUser, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String freezeSn = freeze(user, 30L, "BALANCE_UNFREEZE_ACCOUNT_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, anotherUser, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 30L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertThatThrownBy(() -> balanceControlService.unfreeze(new FundsBalanceUnfreezeRequest()
+                .setAccountId(anotherUser)
+                .setAmount(Money.immutable(10L, CURRENCY))
+                .setReferenceFreezeSn(freezeSn)
+                .setBusinessScene("UNFREEZE")
+                .setBusinessSn("BALANCE_UNFREEZE_ACCOUNT_RELEASE")
+                .setDescription("unfreeze with different account reference"), WindOperator.system()))
+                .hasMessageContaining("冻结单引用主体与请求账户不一致");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, anotherUser, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
+        assertBucket(balance(anotherUser), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(anotherUser), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertPostedTransactions(2);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE").getReleasedAmount()).isZero();
+        assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_RELEASE")).isFalse();
+    }
+
+    /**
      * 场景：用户冻结余额后发起 0 金额解冻请求。
      * 输入：充值 50、冻结 30、解冻 0。
      * 输出：解冻请求失败，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持冻结后状态。
