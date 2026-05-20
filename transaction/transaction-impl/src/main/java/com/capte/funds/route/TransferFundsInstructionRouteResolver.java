@@ -6,6 +6,7 @@ import com.capte.funds.route.support.RouteSpecSupport;
 import com.capte.funds.route.support.RouteSubjectSupport;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
+import com.capte.funds.transaction.services.FundsTransactionQueryService;
 import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.capte.funds.transaction.support.FundsRouteCodes;
 import com.capte.funds.transaction.support.FundsRouteLegIds;
@@ -24,8 +25,11 @@ import com.wind.integration.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
+import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.spec.transaction.FeeSpec;
+import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
@@ -37,6 +41,8 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 import static com.capte.funds.route.support.RouteSpecSupport.mustNotBeNegative;
 import static com.capte.funds.route.support.RouteSpecSupport.routeLeg;
@@ -59,6 +65,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     private final RouteSubjectSupport routeSubjectSupport;
 
     private final PlatformAccountRouteSupport platformAccountRouteSupport;
+
+    private final FundsTransactionQueryService fundsTransactionQueryService;
 
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
@@ -197,6 +205,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     private ResolvedRouteSpec resolveWithdraw(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionContextKeys.ACCOUNT_ID);
+        assertWithdrawReferenceMatchesAccount(instruction, accountId);
         FundsAccountId cashMappingAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
                 PlatformFundingAccountRole.CASH_MAPPING);
         FundsAccountId prepaymentAccount = platformAccountRouteSupport.requireAccount(
@@ -233,6 +242,41 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 instruction.getExternalAccountRef(),
                 platformAccountRouteSupport.createExternalFundMovementSnapshot(cashMappingAccount, prepaymentAccount,
                         feeAccount));
+    }
+
+    private void assertWithdrawReferenceMatchesAccount(FundsInstructionSpec instruction, FundsAccountId accountId) {
+        FundsInstructionReferenceSpec reference = instruction.getReference();
+        AssertUtils.isTrue(reference != null
+                        && reference.getReferenceType() == FundsInstructionReferenceType.FREEZE_ORDER
+                        && hasText(reference.getReferenceSn()),
+                "提现必须引用冻结单");
+        Optional<RouteSnapshotSpec> routeSnapshot =
+                fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(reference.getReferenceSn());
+        AssertUtils.isTrue(routeSnapshot.isPresent(),
+                "提现引用冻结单不存在或缺少原冻结路径，referenceSn = {}", reference.getReferenceSn());
+        AssertUtils.isTrue(snapshotContainsSubject(routeSnapshot.get(), accountId),
+                "提现引用冻结单主体与请求账户不一致，referenceSn = {}，accountId = {}，accountType = {}",
+                reference.getReferenceSn(), accountId.id(), accountId.type());
+    }
+
+    private boolean snapshotContainsSubject(RouteSnapshotSpec routeSnapshot, FundsAccountId accountId) {
+        for (RouteParticipantSpec participant : routeSnapshot.getParticipants()) {
+            if (sameSubject(participant.getSubjectRef(), accountId)) {
+                return true;
+            }
+        }
+        for (RouteLegSpec leg : routeSnapshot.getLegs()) {
+            if (sameSubject(leg.getSourceNode().getSubjectRef(), accountId)
+                    || sameSubject(leg.getTargetNode().getSubjectRef(), accountId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean sameSubject(SubjectRef subjectRef, FundsAccountId accountId) {
+        return Objects.equals(subjectRef.getSubjectId(), accountId.id())
+                && subjectRef.getSubjectType() == routeSubjectSupport.resolveSubjectType(accountId);
     }
 
     private ResolvedRouteSpec resolveFee(FundsInstructionSpec instruction) {
@@ -351,5 +395,9 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
     @Override
     public int getOrder() {
         return 0;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }

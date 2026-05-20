@@ -228,6 +228,106 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：用户存在冻结余额，但提现确认引用了不存在的冻结单。
+     * 输入：充值 100、冻结 60，随后提现确认 60，但 `referenceFreezeSn` 指向不存在的冻结单。
+     * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 保持冻结后的状态。
+     * 预期：提现必须按原冻结单消费冻结余额，不能只因账户存在 FROZEN 余额就允许出款。
+     * 红线：未知冻结单引用不得生成提现 route、posting、ledger entry 或外部出款事实。
+     */
+    @Test
+    void testWithdrawWithUnknownReferenceFreezeSnShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "WITHDRAW_UNKNOWN_REF_TOPUP");
+        freeze(user, 60L, "WITHDRAW_UNKNOWN_REF_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> withdraw(user, 60L, "FREEZE_ORDER_NOT_EXISTS", "WITHDRAW_UNKNOWN_REF_CONFIRM"))
+                .hasMessageContaining("提现引用冻结单不存在");
+
+        BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterRejectedWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name());
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_UNKNOWN_REF_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_UNKNOWN_REF_FREEZE").getReleasedAmount()).isZero();
+    }
+
+    /**
+     * 场景：用户 A 与用户 B 都存在冻结余额，用户 B 提现时引用用户 A 的冻结单。
+     * 输入：A/B 各充值 100、冻结 60，B 提现确认 60，但 `referenceFreezeSn` 指向 A 的冻结单。
+     * 输出：提现请求被拒绝；A/B AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 保持冻结后的状态。
+     * 预期：提现引用的原冻结单主体必须与提现账户一致。
+     * 红线：不得跨主体消费冻结余额，不得生成提现 route、posting、ledger entry 或外部出款事实。
+     */
+    @Test
+    void testWithdrawWithDifferentAccountReferenceFreezeSnShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId anotherUser = fundingAccount("funding_user_another");
+        ensureLedger(anotherUser, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(anotherUser, LedgerSubjectCode.FROZEN);
+
+        topup(user, 100L, "WITHDRAW_ACCOUNT_REF_TOPUP");
+        String freezeSn = freeze(user, 60L, "WITHDRAW_ACCOUNT_REF_FREEZE");
+        topup(anotherUser, 100L, "WITHDRAW_ACCOUNT_REF_ANOTHER_TOPUP");
+        freeze(anotherUser, 60L, "WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, anotherUser, cashMappingAccount(),
+                prepaymentAccount()));
+
+        assertThatThrownBy(() -> withdraw(anotherUser, 60L, freezeSn, "WITHDRAW_ACCOUNT_REF_CONFIRM"))
+                .hasMessageContaining("提现引用冻结单主体与请求账户不一致");
+
+        BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, anotherUser, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterRejectedWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
+        assertBucket(balance(anotherUser), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(anotherUser), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(4);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name(),
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name());
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_FREEZE").getReleasedAmount()).isZero();
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE").getReleasedAmount()).isZero();
+    }
+
+    /**
      * 场景：提现确认把内部资金账户作为收款方。
      * 输入：用户充值 100、冻结 60，随后用另一个资金账户作为提现 payeeId。
      * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN、内部收款方和平台账户余额保持冻结后的状态。
