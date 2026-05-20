@@ -1,14 +1,20 @@
 package com.capte.funds.transaction.application.flow;
 
+import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
+import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
+import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;
@@ -169,6 +175,56 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
         assertPostedTransactions(3);
+    }
+
+    /**
+     * 场景：USD 资金账户冻结后收到 CNY 提现确认。
+     * 输入：充值 100 USD、冻结 60 USD，随后用同一冻结流水确认提现 60 CNY。
+     * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 保持冻结后的状态。
+     * 预期：提现确认只能消费同币种冻结余额，FX 必须由业务层显式完成后再提交资金指令。
+     * 红线：提现不得隐式换汇，不得释放冻结、生成出款 route、posting、ledger entry 或余额投影副作用。
+     */
+    @Test
+    void testWithdrawWithDifferentCurrencyShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "WITHDRAW_CURRENCY_TOPUP");
+        String freezeSn = freeze(user, 60L, "WITHDRAW_CURRENCY_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(user)
+                .setPayeeId(FundsAccountId.immutable("external_bank_withdraw_currency",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn(freezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CurrencyIsoCode.CNY)))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_CURRENCY_CONFIRM")
+                .setDescription("withdraw with different currency"), WindOperator.system()))
+                .hasMessageContaining("transactionAmount.amount currency must equal account currency");
+
+        BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterRejectedWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name());
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_CURRENCY_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_CURRENCY_FREEZE").getReleasedAmount()).isZero();
     }
 
     /**
