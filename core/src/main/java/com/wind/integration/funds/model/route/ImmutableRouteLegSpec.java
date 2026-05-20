@@ -5,6 +5,7 @@ import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.route.enums.RouteLegType;
+import com.wind.integration.funds.route.enums.RouteNodeType;
 import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
@@ -39,6 +40,8 @@ public record ImmutableRouteLegSpec(String legId,
                                     Map<String, Object> contextVariables) implements RouteLegSpec {
 
     public ImmutableRouteLegSpec {
+        validateLedgerPostableNode(sourceNode, "sourceNode");
+        validateLedgerPostableNode(targetNode, "targetNode");
         originalAmount = originalAmount == null ? amount : originalAmount;
         exchangeRate = exchangeRate == null ? BigDecimal.ONE : exchangeRate;
         if (amount.getAmount() <= 0) {
@@ -55,6 +58,13 @@ public record ImmutableRouteLegSpec(String legId,
         }
         constraintOverrides = Map.copyOf(constraintOverrides == null ? Map.of() : constraintOverrides);
         contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+    }
+
+    private static void validateLedgerPostableNode(RouteNodeSpec node, String fieldName) {
+        RouteNodeType nodeType = node.getNodeType();
+        if (nodeType == RouteNodeType.PAYMENT_INSTRUMENT || nodeType == RouteNodeType.EXTERNAL_ACCOUNT) {
+            throw new IllegalArgumentException("RouteLeg " + fieldName + " must be ledger-postable");
+        }
     }
 
     private static boolean hasText(String value) {

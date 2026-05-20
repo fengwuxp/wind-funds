@@ -64,6 +64,9 @@ public final class ImmutableReplayRequestSpec implements ReplayRequestSpec {
                                        @Nullable String description,
                                        @Nullable FundsOperationActorSpec operator,
                                        @Nullable Map<String, Object> contextVariables) {
+        if (!hasText(referenceSnapshotId)) {
+            throw new IllegalArgumentException("referenceSnapshotId is required for route replay");
+        }
         this.replayType = replayType;
         this.eventType = eventType;
         this.businessScene = businessScene;
@@ -78,6 +81,10 @@ public final class ImmutableReplayRequestSpec implements ReplayRequestSpec {
         this.description = description;
         this.operator = operator;
         this.contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     @Override
