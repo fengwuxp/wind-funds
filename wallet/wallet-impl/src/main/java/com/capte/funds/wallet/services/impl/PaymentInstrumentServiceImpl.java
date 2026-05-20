@@ -35,6 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
 @AllArgsConstructor
 public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
 
+    private static final int MIN_RAW_PAN_LENGTH = 12;
+
+    private static final int MAX_RAW_PAN_LENGTH = 19;
+
     private final PaymentInstrumentMapper paymentInstrumentMapper;
 
     private final PaymentInstrumentBindingMapper paymentInstrumentBindingMapper;
@@ -42,6 +46,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createPaymentInstrument(@NonNull CreatePaymentInstrumentRequest request) {
+        assertNoRawSensitiveInstrumentNo(request);
         PaymentInstrument entity = PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrument(request);
         paymentInstrumentMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建支付工具失败");
@@ -128,5 +133,27 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
 
     private PaymentInstrumentBindingDTO toDTO(PaymentInstrumentBinding entity) {
         return PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBindingDTO(entity);
+    }
+
+    private void assertNoRawSensitiveInstrumentNo(CreatePaymentInstrumentRequest request) {
+        AssertUtils.isFalse(isRawSensitiveInstrumentNo(request.getInstrumentNo()),
+                "instrumentNo must be masked or token reference");
+    }
+
+    private boolean isRawSensitiveInstrumentNo(String instrumentNo) {
+        if (instrumentNo == null) {
+            return false;
+        }
+        String compactInstrumentNo = instrumentNo.replace(" ", "").replace("-", "");
+        if (compactInstrumentNo.length() < MIN_RAW_PAN_LENGTH
+                || compactInstrumentNo.length() > MAX_RAW_PAN_LENGTH) {
+            return false;
+        }
+        for (int i = 0; i < compactInstrumentNo.length(); i++) {
+            if (!Character.isDigit(compactInstrumentNo.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 }
