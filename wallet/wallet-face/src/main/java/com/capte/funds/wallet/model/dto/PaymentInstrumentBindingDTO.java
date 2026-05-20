@@ -70,6 +70,9 @@ public class PaymentInstrumentBindingDTO implements Serializable {
     @Schema(description = "状态")
     private FundsAccountStatus status;
 
+    @Schema(description = "绑定版本")
+    private Integer version;
+
     @Schema(description = "生效时间")
     private LocalDateTime validFrom;
 

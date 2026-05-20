@@ -1,9 +1,12 @@
 package com.capte.funds.wallet.service;
 
 import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
+import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingHistoryDTO;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentDTO;
+import com.capte.funds.wallet.model.query.PaymentInstrumentBindingHistoryQuery;
 import com.capte.funds.wallet.model.query.PaymentInstrumentBindingQuery;
 import com.capte.funds.wallet.model.query.PaymentInstrumentQuery;
+import com.capte.funds.wallet.model.request.ChangePaymentInstrumentBindingRequest;
 import com.capte.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.capte.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.common.query.WindPagination;
@@ -42,6 +45,16 @@ public interface PaymentInstrumentService {
      * @return 绑定主键
      */
     @NonNull Long createPaymentInstrumentBinding(@NonNull CreatePaymentInstrumentBindingRequest request);
+
+    /**
+     * 变更支付工具绑定当前态。
+     *
+     * <p>能力范围：只更新当前候选关系，并追加绑定历史；不得覆盖历史证据。</p>
+     *
+     * @param request 变更请求
+     * @return 当前绑定主键
+     */
+    @NonNull Long changePaymentInstrumentBinding(@NonNull ChangePaymentInstrumentBindingRequest request);
 
     /**
      * 根据主键查询支付工具。
@@ -87,5 +100,18 @@ public interface PaymentInstrumentService {
      */
     @NonNull WindPagination<PaymentInstrumentBindingDTO> queryPaymentInstrumentBindings(
             @NonNull PaymentInstrumentBindingQuery query,
+            @NonNull WindQuery<? extends QueryOrderField> options);
+
+    /**
+     * 分页查询支付工具绑定历史。
+     *
+     * <p>能力范围：只读查询绑定审计证据，不作为新交易路由候选来源。</p>
+     *
+     * @param query 查询条件
+     * @param options 查询选项
+     * @return 支付工具绑定历史分页结果
+     */
+    @NonNull WindPagination<PaymentInstrumentBindingHistoryDTO> queryPaymentInstrumentBindingHistories(
+            @NonNull PaymentInstrumentBindingHistoryQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options);
 }

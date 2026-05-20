@@ -2,7 +2,9 @@ package com.capte.funds.wallet.mapstruct;
 
 import com.capte.funds.wallet.dal.entities.PaymentInstrument;
 import com.capte.funds.wallet.dal.entities.PaymentInstrumentBinding;
+import com.capte.funds.wallet.dal.entities.PaymentInstrumentBindingHistory;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
+import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingHistoryDTO;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentDTO;
 import com.capte.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.capte.funds.wallet.model.request.CreatePaymentInstrumentRequest;
@@ -57,6 +59,14 @@ public interface PaymentInstrumentConverter {
     PaymentInstrumentBindingDTO convertToPaymentInstrumentBindingDTO(PaymentInstrumentBinding data);
 
     /**
+     * PaymentInstrumentBindingHistory convert to PaymentInstrumentBindingHistoryDTO.
+     *
+     * @param data PaymentInstrumentBindingHistory 实例
+     * @return PaymentInstrumentBindingHistoryDTO 实例
+     */
+    PaymentInstrumentBindingHistoryDTO convertToPaymentInstrumentBindingHistoryDTO(PaymentInstrumentBindingHistory data);
+
+    /**
      * Fill create defaults after same-name field mapping.
      *
      * @param request 创建请求
@@ -79,5 +89,6 @@ public interface PaymentInstrumentConverter {
         entity.setPriority(request.getPriority() == null ? 0 : request.getPriority());
         entity.setDefaultBinding(Boolean.TRUE.equals(request.getDefaultBinding()));
         entity.setStatus(request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus());
+        entity.setVersion(1);
     }
 }

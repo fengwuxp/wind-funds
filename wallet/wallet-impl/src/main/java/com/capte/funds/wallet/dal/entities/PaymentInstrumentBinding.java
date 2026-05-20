@@ -11,6 +11,7 @@ import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.experimental.FieldNameConstants;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -24,6 +25,7 @@ import java.time.LocalDateTime;
  */
 @Data
 @Table(PaymentInstrumentBinding.TABLE_NAME)
+@FieldNameConstants
 public class PaymentInstrumentBinding implements Serializable, TenantIsolationObject<Long> {
 
     @Serial
@@ -68,6 +70,9 @@ public class PaymentInstrumentBinding implements Serializable, TenantIsolationOb
 
     @NotNull
     private FundsAccountStatus status;
+
+    @NotNull
+    private Integer version;
 
     private LocalDateTime validFrom;
 

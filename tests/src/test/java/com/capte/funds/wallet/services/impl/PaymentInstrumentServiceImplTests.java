@@ -2,9 +2,12 @@ package com.capte.funds.wallet.services.impl;
 
 import com.capte.funds.AbstractFundsServiceTest;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
+import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingHistoryDTO;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentDTO;
+import com.capte.funds.wallet.model.query.PaymentInstrumentBindingHistoryQuery;
 import com.capte.funds.wallet.model.query.PaymentInstrumentBindingQuery;
 import com.capte.funds.wallet.model.query.PaymentInstrumentQuery;
+import com.capte.funds.wallet.model.request.ChangePaymentInstrumentBindingRequest;
 import com.capte.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.capte.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.capte.funds.wallet.service.PaymentInstrumentService;
@@ -12,6 +15,7 @@ import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingChangeType;
 import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.integration.funds.wallet.enums.PaymentInstrumentDirection;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -26,6 +30,8 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,6 +56,12 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private static final String OWNER_ID = "owner_pi_service";
 
     private static final String FUNDING_ACCOUNT_ID = "funding_pi_binding_target";
+
+    private static final String OPERATOR_ID = "ops_pi_service";
+
+    private static final String CREATE_BINDING_REQUEST_SN = "req_pi_binding_create";
+
+    private static final String CHANGE_BINDING_REQUEST_SN = "req_pi_binding_change";
 
     private static final String INSTRUMENT_TYPE_CARD = "CARD";
 
@@ -140,9 +152,76 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                     assertThat(binding.getPriority()).isEqualTo(10);
                     assertThat(binding.getDefaultBinding()).isTrue();
                     assertThat(binding.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+                    assertThat(binding.getVersion()).isEqualTo(1);
                 });
         assertThat(countRows("t_ledger", "subject_id", BINDING_SN)).isZero();
         assertThat(countRows("t_ledger", "subject_id", PAYMENT_INSTRUMENT_SN)).isZero();
+        assertLedgerFacts(before);
+    }
+
+    @Test
+    void testChangePaymentInstrumentBindingShouldAppendHistoryWithoutOverwritingEvidence() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        LedgerFacts before = loadLedgerFacts();
+
+        Long changedBindingId = paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setPriority(20)
+                        .setDefaultBinding(Boolean.FALSE)
+                        .setStatus(FundsAccountStatus.SUSPENDED)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("risk review")
+                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)
+                        .setContextVariables("{\"ticket\":\"PI-007\"}"));
+
+        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+        List<PaymentInstrumentBindingHistoryDTO> histories = new ArrayList<>(paymentInstrumentService
+                .queryPaymentInstrumentBindingHistories(new PaymentInstrumentBindingHistoryQuery()
+                                .setTenantId(TENANT_ID)
+                                .setBindingSn(BINDING_SN),
+                        DefaultPageQueryOptions.defaults(10))
+                .getRecords());
+        histories.sort(Comparator.comparing(PaymentInstrumentBindingHistoryDTO::getVersion));
+
+        assertThat(changedBindingId).isEqualTo(binding.getId());
+        assertThat(binding.getPriority()).isEqualTo(20);
+        assertThat(binding.getDefaultBinding()).isFalse();
+        assertThat(binding.getStatus()).isEqualTo(FundsAccountStatus.SUSPENDED);
+        assertThat(binding.getVersion()).isEqualTo(2);
+        assertThat(histories)
+                .extracting(PaymentInstrumentBindingHistoryDTO::getChangeType)
+                .containsExactly(PaymentInstrumentBindingChangeType.CREATE, PaymentInstrumentBindingChangeType.UPDATE);
+        assertThat(histories)
+                .extracting(PaymentInstrumentBindingHistoryDTO::getVersion)
+                .containsExactly(1, 2);
+        assertThat(histories.getFirst())
+                .satisfies(history -> {
+                    assertThat(history.getBeforeSnapshot()).isNull();
+                    assertThat(history.getAfterSnapshot()).contains("\"priority\":10");
+                    assertThat(history.getOperatorId()).isEqualTo(OPERATOR_ID);
+                    assertThat(history.getChangeReason()).isEqualTo("bind funding account");
+                    assertThat(history.getRequestSn()).isEqualTo(CREATE_BINDING_REQUEST_SN);
+                });
+        assertThat(histories.get(1))
+                .satisfies(history -> {
+                    assertThat(history.getBeforeSnapshot()).contains("\"priority\":10");
+                    assertThat(history.getBeforeSnapshot()).contains("\"version\":1");
+                    assertThat(history.getAfterSnapshot()).contains("\"priority\":20");
+                    assertThat(history.getAfterSnapshot()).contains("\"defaultBinding\":false");
+                    assertThat(history.getAfterSnapshot()).contains("\"status\":\"SUSPENDED\"");
+                    assertThat(history.getAfterSnapshot()).contains("\"version\":2");
+                    assertThat(history.getOperatorId()).isEqualTo(OPERATOR_ID);
+                    assertThat(history.getChangeReason()).isEqualTo("risk review");
+                    assertThat(history.getRequestSn()).isEqualTo(CHANGE_BINDING_REQUEST_SN);
+                });
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isEqualTo(2);
         assertLedgerFacts(before);
     }
 
@@ -157,6 +236,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupPaymentInstrumentTestData() {
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn = ?", BINDING_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn = ?", BINDING_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?)",
                 PAYMENT_INSTRUMENT_SN,
@@ -187,7 +267,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.TRUE);
+                .setDefaultBinding(Boolean.TRUE)
+                .setOperatorId(OPERATOR_ID)
+                .setChangeReason("bind funding account")
+                .setRequestSn(CREATE_BINDING_REQUEST_SN);
     }
 
     private LedgerFacts loadLedgerFacts() {

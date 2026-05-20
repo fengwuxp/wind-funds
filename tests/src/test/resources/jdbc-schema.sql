@@ -140,6 +140,7 @@ CREATE TABLE `t_payment_instrument_binding`
     `priority`            INT(11)     NOT NULL DEFAULT 0 COMMENT '路由优先级',
     `is_default`          TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '是否默认绑定',
     `status`              VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
+    `version`             INT(11)     NOT NULL DEFAULT 1 COMMENT '绑定版本',
     `valid_from`          DATETIME             DEFAULT NULL COMMENT '生效时间',
     `valid_to`            DATETIME             DEFAULT NULL COMMENT '失效时间',
     `description`         VARCHAR(512)         DEFAULT NULL COMMENT '描述',
@@ -152,6 +153,37 @@ CREATE TABLE `t_payment_instrument_binding`
     KEY `idx_payment_instrument_binding_status` (`status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '支付工具绑定表';
+
+-- ----------------------------
+-- 支付工具绑定历史表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_payment_instrument_binding_history`;
+CREATE TABLE `t_payment_instrument_binding_history`
+(
+    `id`                  BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                  VARCHAR(64)  NOT NULL COMMENT '审计号，全局唯一',
+    `tenant_id`           BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `binding_sn`          VARCHAR(64)  NOT NULL COMMENT '绑定号',
+    `instrument_sn`       VARCHAR(64)  NOT NULL COMMENT '工具号',
+    `change_type`         VARCHAR(50)  NOT NULL COMMENT '变更类型',
+    `version`             INT(11)      NOT NULL COMMENT '绑定版本',
+    `before_snapshot`     TEXT                  DEFAULT NULL COMMENT '变更前快照',
+    `after_snapshot`      TEXT         NOT NULL COMMENT '变更后快照',
+    `operator_id`         VARCHAR(64)  NOT NULL COMMENT '操作者',
+    `change_reason`       VARCHAR(256) NOT NULL COMMENT '变更原因',
+    `effective_at`        DATETIME              DEFAULT NULL COMMENT '生效时间',
+    `request_sn`          VARCHAR(64)           DEFAULT NULL COMMENT '请求号',
+    `context_variables`   TEXT                  DEFAULT NULL COMMENT '扩展上下文',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_payment_instrument_binding_history_sn` (`sn`),
+    UNIQUE KEY `uk_payment_instrument_binding_history_version` (`binding_sn`, `version`),
+    UNIQUE KEY `uk_payment_instrument_binding_history_request` (`tenant_id`, `request_sn`),
+    KEY `idx_payment_instrument_binding_history_binding` (`binding_sn`),
+    KEY `idx_payment_instrument_binding_history_instrument` (`instrument_sn`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '支付工具绑定历史表';
 
 -- ----------------------------
 -- 支出主体资金关系表
