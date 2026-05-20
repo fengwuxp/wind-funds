@@ -1,0 +1,202 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1040" width="1600" height="1040" role="img" aria-labelledby="title desc">
+  <title id="title">系分核心链路：模块边界与写入架构</title>
+  <desc id="desc">支付资金底座系统分析设计视角的核心架构图，展示外部调用方、契约边界、运行时模块、事实和读模型，以及写入、运营和治理闭环。</desc>
+  <style>
+    text {
+      font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", "Microsoft JhengHei", "SimHei", sans-serif;
+      fill: #111827;
+    }
+    .title { font-size: 28px; font-weight: 700; }
+    .subtitle { font-size: 14px; fill: #6b7280; }
+    .section-title { font-size: 16px; font-weight: 700; fill: #374151; }
+    .node-title { font-size: 15px; font-weight: 700; }
+    .node-sub { font-size: 12px; fill: #4b5563; }
+    .small { font-size: 12px; fill: #6b7280; }
+    .container { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; stroke-dasharray: 8 7; rx: 18; ry: 18; }
+    .node { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; rx: 10; ry: 10; }
+    .blue { fill: #eff6ff; stroke: #bfdbfe; }
+    .green { fill: #f0fdf4; stroke: #bbf7d0; }
+    .purple { fill: #faf5ff; stroke: #e9d5ff; }
+    .orange { fill: #fff7ed; stroke: #fed7aa; }
+    .red { fill: #fef2f2; stroke: #fecaca; }
+    .teal { fill: #f0fdfa; stroke: #99f6e4; }
+    .gray { fill: #f8fafc; stroke: #cbd5e1; }
+    .arrow-main { stroke: #2563eb; stroke-width: 2.6; fill: none; marker-end: url(#arrow-blue); }
+    .arrow-ledger { stroke: #16a34a; stroke-width: 2.6; fill: none; marker-end: url(#arrow-green); }
+    .arrow-read { stroke: #9333ea; stroke-width: 2.2; fill: none; marker-end: url(#arrow-purple); }
+    .arrow-ops { stroke: #ea580c; stroke-width: 2.4; fill: none; marker-end: url(#arrow-orange); }
+    .arrow-guard { stroke: #dc2626; stroke-width: 2.2; fill: none; marker-end: url(#arrow-red); stroke-dasharray: 8 6; }
+    .arrow-ext { stroke: #64748b; stroke-width: 2.1; fill: none; marker-end: url(#arrow-gray); stroke-dasharray: 7 6; }
+    .label-box { fill: #ffffff; opacity: 0.96; stroke: #e5e7eb; stroke-width: 1; rx: 6; ry: 6; }
+  </style>
+  <defs>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#9333ea"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#ea580c"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#dc2626"/>
+    </marker>
+    <marker id="arrow-gray" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="1040" fill="#ffffff"/>
+  <text x="60" y="56" class="title">系分核心链路：模块边界与写入架构</text>
+  <text x="60" y="84" class="subtitle">来源：docs/系分设计/01-系分设计总览.md、02-交易路由钱包账目与投影系分设计.md、03-清结算与对账系分设计.md</text>
+
+  <rect x="40" y="120" width="220" height="610" class="container"/>
+  <text x="60" y="153" class="section-title">外部输入</text>
+
+  <rect x="70" y="185" width="160" height="86" class="node blue"/>
+  <text x="150" y="217" text-anchor="middle" class="node-title">业务接入方</text>
+  <text x="150" y="242" text-anchor="middle" class="node-sub">订单 / 授权</text>
+  <text x="150" y="260" text-anchor="middle" class="node-sub">退款 / 出款 / 调整</text>
+
+  <rect x="70" y="325" width="160" height="86" class="node orange"/>
+  <text x="150" y="357" text-anchor="middle" class="node-title">运营财务风控</text>
+  <text x="150" y="382" text-anchor="middle" class="node-sub">查询 / 审批</text>
+  <text x="150" y="400" text-anchor="middle" class="node-sub">对账 / 处理</text>
+
+  <rect x="70" y="465" width="160" height="86" class="node gray"/>
+  <text x="150" y="497" text-anchor="middle" class="node-title">外部资金证据</text>
+  <text x="150" y="522" text-anchor="middle" class="node-sub">银行 / 通道</text>
+  <text x="150" y="540" text-anchor="middle" class="node-sub">文件 / 回单</text>
+
+  <rect x="300" y="120" width="260" height="610" class="container"/>
+  <text x="320" y="153" class="section-title">契约边界</text>
+
+  <rect x="330" y="185" width="200" height="72" class="node blue"/>
+  <text x="430" y="215" text-anchor="middle" class="node-title">transaction-face</text>
+  <text x="430" y="239" text-anchor="middle" class="node-sub">交易 / 授权 / 余额控制</text>
+
+  <rect x="330" y="285" width="200" height="72" class="node teal"/>
+  <text x="430" y="315" text-anchor="middle" class="node-title">wallet-face</text>
+  <text x="430" y="339" text-anchor="middle" class="node-sub">账户 / 工具 / 余额查询</text>
+
+  <rect x="330" y="385" width="200" height="72" class="node green"/>
+  <text x="430" y="415" text-anchor="middle" class="node-title">ledger-face</text>
+  <text x="430" y="439" text-anchor="middle" class="node-sub">账本 / 分录 / 过账查询</text>
+
+  <rect x="330" y="485" width="200" height="72" class="node orange"/>
+  <text x="430" y="515" text-anchor="middle" class="node-title">reconciliation</text>
+  <text x="430" y="539" text-anchor="middle" class="node-sub">对账 / 清分 / 结算</text>
+
+  <rect x="330" y="585" width="200" height="72" class="node purple"/>
+  <text x="430" y="615" text-anchor="middle" class="node-title">governance port</text>
+  <text x="430" y="639" text-anchor="middle" class="node-sub">归档 / 重放 / 差异报告</text>
+
+  <rect x="600" y="120" width="500" height="610" class="container"/>
+  <text x="620" y="153" class="section-title">wind-funds 模块化单体运行时</text>
+
+  <rect x="740" y="175" width="220" height="76" class="node purple"/>
+  <text x="850" y="207" text-anchor="middle" class="node-title">core</text>
+  <text x="850" y="232" text-anchor="middle" class="node-sub">DSL / 枚举 / 值对象 / 端口</text>
+
+  <rect x="630" y="300" width="200" height="92" class="node blue"/>
+  <text x="730" y="331" text-anchor="middle" class="node-title">transaction-impl</text>
+  <text x="730" y="356" text-anchor="middle" class="node-sub">CommandService / Converter</text>
+  <text x="730" y="374" text-anchor="middle" class="node-sub">Orchestrator / Lifecycle</text>
+
+  <rect x="870" y="300" width="200" height="92" class="node teal"/>
+  <text x="970" y="331" text-anchor="middle" class="node-title">wallet-impl</text>
+  <text x="970" y="356" text-anchor="middle" class="node-sub">账户建模 / 工具绑定</text>
+  <text x="970" y="374" text-anchor="middle" class="node-sub">显式建账 / 余额查询</text>
+
+  <rect x="630" y="445" width="200" height="92" class="node green"/>
+  <text x="730" y="476" text-anchor="middle" class="node-title">ledger-impl</text>
+  <text x="730" y="501" text-anchor="middle" class="node-sub">LedgerPosting</text>
+  <text x="730" y="519" text-anchor="middle" class="node-sub">Entry / Projection</text>
+
+  <rect x="870" y="445" width="200" height="92" class="node orange"/>
+  <text x="970" y="476" text-anchor="middle" class="node-title">reconciliation-impl</text>
+  <text x="970" y="501" text-anchor="middle" class="node-sub">批次 / 差错 / 出款</text>
+  <text x="970" y="519" text-anchor="middle" class="node-sub">追偿 / 审批 / 审计</text>
+
+  <rect x="740" y="590" width="220" height="76" class="node purple"/>
+  <text x="850" y="622" text-anchor="middle" class="node-title">governance</text>
+  <text x="850" y="647" text-anchor="middle" class="node-sub">Manifest / checkpoint / replay</text>
+
+  <rect x="1140" y="120" width="420" height="610" class="container"/>
+  <text x="1160" y="153" class="section-title">事实与只读派生</text>
+
+  <rect x="1175" y="185" width="340" height="76" class="node blue"/>
+  <text x="1345" y="216" text-anchor="middle" class="node-title">交易事实</text>
+  <text x="1345" y="241" text-anchor="middle" class="node-sub">交易 / 明细 / route snapshot / 余额控制</text>
+
+  <rect x="1175" y="300" width="340" height="76" class="node green"/>
+  <text x="1345" y="331" text-anchor="middle" class="node-title">账务事实</text>
+  <text x="1345" y="356" text-anchor="middle" class="node-sub">LedgerTransaction / LedgerEntry</text>
+
+  <rect x="1175" y="415" width="340" height="76" class="node orange"/>
+  <text x="1345" y="446" text-anchor="middle" class="node-title">运营事实</text>
+  <text x="1345" y="471" text-anchor="middle" class="node-sub">清算批次 / 差错单 / 结算单 / 出款单</text>
+
+  <rect x="1175" y="530" width="340" height="76" class="node purple"/>
+  <text x="1345" y="561" text-anchor="middle" class="node-title">只读派生</text>
+  <text x="1345" y="586" text-anchor="middle" class="node-sub">余额投影 / 交易投影 / 指标项输入</text>
+
+  <rect x="620" y="785" width="920" height="155" class="container"/>
+  <text x="640" y="818" class="section-title">横切验证与门禁</text>
+  <rect x="650" y="845" width="200" height="62" class="node red"/>
+  <text x="750" y="872" text-anchor="middle" class="node-title">测试边界</text>
+  <text x="750" y="894" text-anchor="middle" class="node-sub">契约 / 流程 / 账务 / 红线</text>
+  <rect x="890" y="845" width="200" height="62" class="node red"/>
+  <text x="990" y="872" text-anchor="middle" class="node-title">观测审计</text>
+  <text x="990" y="894" text-anchor="middle" class="node-sub">Metric / Trace / Audit / Alert</text>
+  <rect x="1130" y="845" width="200" height="62" class="node red"/>
+  <text x="1230" y="872" text-anchor="middle" class="node-title">Execution Grant</text>
+  <text x="1230" y="894" text-anchor="middle" class="node-sub">契约 / 枚举 / 表结构变更门禁</text>
+
+  <path d="M 230 228 L 330 228" class="arrow-main"/>
+  <path d="M 530 221 L 630 330" class="arrow-main"/>
+  <path d="M 830 346 L 850 346 L 850 251" class="arrow-main"/>
+  <path d="M 730 392 L 730 445" class="arrow-ledger"/>
+  <path d="M 830 491 L 1175 338" class="arrow-ledger"/>
+  <path d="M 1070 491 L 1175 453" class="arrow-ops"/>
+  <path d="M 830 346 L 1175 223" class="arrow-main"/>
+  <path d="M 1515 338 L 1535 338 L 1535 568 L 1515 568" class="arrow-read"/>
+
+  <path d="M 230 368 L 330 321" class="arrow-read"/>
+  <path d="M 530 321 L 570 321 L 570 270 L 970 270 L 970 300" class="arrow-read"/>
+  <path d="M 970 392 L 970 445" class="arrow-ops"/>
+  <path d="M 230 508 L 330 521" class="arrow-ext"/>
+  <path d="M 530 521 L 870 491" class="arrow-ext"/>
+  <path d="M 970 537 L 970 695 L 430 695 L 430 557" class="arrow-ops"/>
+  <rect x="684" y="683" width="188" height="24" class="label-box"/>
+  <text x="778" y="700" text-anchor="middle" class="small">资金变化回到交易层追加事实</text>
+
+  <path d="M 530 421 L 630 491" class="arrow-ledger"/>
+  <path d="M 530 621 L 740 628" class="arrow-read"/>
+  <path d="M 960 628 L 1175 568" class="arrow-read"/>
+  <path d="M 850 666 L 850 785" class="arrow-guard"/>
+  <path d="M 1345 606 L 1345 785" class="arrow-guard"/>
+
+  <path d="M 740 213 L 560 213" class="arrow-ext"/>
+  <path d="M 740 213 L 560 421" class="arrow-ext"/>
+  <path d="M 960 213 L 1140 223" class="arrow-ext"/>
+
+  <g transform="translate(60 980)">
+    <line x1="0" y1="0" x2="42" y2="0" class="arrow-main"/>
+    <text x="56" y="5" class="small">主写入调用</text>
+    <line x1="165" y1="0" x2="207" y2="0" class="arrow-ledger"/>
+    <text x="221" y="5" class="small">账本过账链路</text>
+    <line x1="370" y1="0" x2="412" y2="0" class="arrow-read"/>
+    <text x="426" y="5" class="small">查询与派生</text>
+    <line x1="545" y1="0" x2="587" y2="0" class="arrow-ops"/>
+    <text x="601" y="5" class="small">运营闭环</text>
+    <line x1="715" y1="0" x2="757" y2="0" class="arrow-ext"/>
+    <text x="771" y="5" class="small">外部证据或只读依赖</text>
+    <line x1="980" y1="0" x2="1022" y2="0" class="arrow-guard"/>
+    <text x="1036" y="5" class="small">验证门禁与红线</text>
+  </g>
+</svg>

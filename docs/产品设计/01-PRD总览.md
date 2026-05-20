@@ -96,7 +96,7 @@ Capte 业务会覆盖 VCC 发卡、ACH、全球收付款、平台内部交易、
 | --- | --- | --- | --- |
 | 业务产品层 | 业务订单、卡授权、ACH 指令、提现申请、商户结算申请、争议单 | 业务系统自己的单据和状态。 | 由业务系统决定 |
 | 交易接入层 | 资金指令、资金交易、交易明细 | 底座接收业务资金事实的统一入口。 | 是，记录资金侧事实 |
-| 余额控制层 | 冻结单 | 表达冻结、解冻、部分释放、到期释放。 | 是，记录控制事实 |
+| 余额控制层 | 冻结单、冻结动作、余额调整动作 | 表达冻结、解冻、部分释放、到期释放，以及同主体资金账户余额调整、信用账户额度调整和预算组额度调整。 | 是，记录控制事实 |
 | 钱包账户层 | 资金账户、信用账户、预算组、平台资金账户角色、支付工具引用 | 表达主体、账户、余额桶和展示口径。 | 账户是事实，余额来自账本 |
 | 资金路由层 | 参与方、路径、route snapshot、账务计划 | 把资金事实翻译成可入账路径。 | route snapshot 是回放事实 |
 | 账务事实层 | 账本、账目、账本交易、分录 | 不可变账务事实和审计依据。 | 是，账务最终事实源 |
@@ -110,6 +110,7 @@ Capte 业务会覆盖 VCC 发卡、ACH、全球收付款、平台内部交易、
 | --- | --- | --- |
 | 资金交易 | 一笔已经进入资金处理链路的事实，例如入金、支付、转账、退款、授权、结算、费用、调账。 | 不等于业务订单，也不等于账本交易；冻结不放进资金交易主表。 |
 | 冻结单 | 同一个资金主体内部把可用余额暂时转为冻结余额。 | 冻结不是消费、扣划、授权或退款；若后续要扣划，必须创建新的资金事实。 |
+| 余额调整动作 | 余额控制服务内的受控调整，覆盖资金账户余额调整、信用账户额度调整和预算组额度调整。 | 只允许同主体、同币种、同周期、明确来源的目标账目调整；不承接跨主体价值转移。对账差错若只修正同主体余额，可引用差错单生成余额调整动作；跨主体补偿必须走批次授权直接交易调账事实。 |
 | 资金路由 | 把交易事实解析为付款方、收款方、平台角色、余额桶和账务路径。 | 不判断业务订单是否成立，不直接改余额，不在缺快照时重新选路。 |
 | 钱包 | 面向用户、商户、企业和运营展示资金、额度、预算和余额状态的产品层。 | 不替代账本，不允许业务侧绕过交易层直接改余额。 |
 | 业务主体 | 用户、商户、企业、部门、平台角色或外部机构等业务上的权利义务归属方。 | 业务主体不一定能直接记账；进入账本前必须解析成资金账户、信用账户或预算组等账务主体。 |
@@ -127,13 +128,14 @@ Capte 业务会覆盖 VCC 发卡、ACH、全球收付款、平台内部交易、
 | 清算 | 平台内部确认待清算金额可以进入可结算口径。 | 默认表达内部资金明细确认和账务转换；外部清算规则另行确认。 |
 | 对账 | 比较业务、交易、账本、外部文件、银行流水、余额投影和报表是否一致。 | 发现差异后不能直接改历史账，要进入差错、补记、冲正、调账或核销流程。 |
 
-### 4.3 三类行为不能混用
+### 4.3 四类行为不能混用
 
 | 行为 | 产品含义 | 是否改变资金归属 | 事实载体 | 典型账目变化 |
 | --- | --- | --- | --- | --- |
-| 直接交易 | 已确认的资金事实，如入金、支付、转账、退款、费用、调账。 | 通常改变 | 资金交易 | 付款方目标桶减少，收款方目标桶增加。 |
+| 直接交易 | 已确认的资金事实，如入金、支付、转账、退款、费用、跨主体补偿或批次授权调账。 | 通常改变 | 资金交易 | 付款方目标桶减少，收款方目标桶增加。 |
 | 授权交易 | 最终交易前的资金、额度或预算占用。 | 授权成功阶段不改变，结算后改变 | 资金交易 | AVAILABLE -> AUTHORIZATION；结算时关闭或减少占用。 |
 | 冻结行为 | 风控、运营、提现或争议下的可用性限制。 | 不改变 | 冻结单 | AVAILABLE <-> FROZEN。 |
+| 余额调整行为 | 余额控制服务内的同主体受控调整，如资金账户目标账目修正、信用账户额度调整、预算组额度调整。 | 不改变跨主体资金归属 | 余额调整动作 | 资金账户目标桶按审批增减；信用账户或预算组 LIMIT、AVAILABLE 按规则变化。 |
 
 ### 4.4 核心对象关系
 
@@ -141,6 +143,7 @@ Capte 业务会覆盖 VCC 发卡、ACH、全球收付款、平台内部交易、
 erDiagram
     FUNDS_INSTRUCTION ||--o{ FUNDS_TRANSACTION : "creates"
     FUNDS_INSTRUCTION ||--o{ FROZEN_ORDER : "creates"
+    FUNDS_INSTRUCTION ||--o{ BALANCE_ADJUST_ACTION : "creates"
     FUNDS_TRANSACTION ||--o{ TRANSACTION_DETAIL : "has"
     FUNDS_TRANSACTION ||--|| ROUTE_SNAPSHOT : "uses"
     ROUTE_SNAPSHOT ||--|| POSTING_PLAN : "derives"
@@ -155,17 +158,19 @@ erDiagram
     SETTLEMENT_ORDER ||--o{ PAYOUT_ORDER : "creates"
     PAYOUT_ORDER ||--o{ RECON_BATCH : "checked_by"
     RECON_BATCH ||--o{ EXCEPTION_CASE : "finds"
+    EXCEPTION_CASE ||--o{ BALANCE_ADJUST_ACTION : "may_create"
     EXCEPTION_CASE ||--o{ ADJUSTMENT_FACT : "resolved_by"
     LEDGER_ENTRY ||--o{ ARCHIVE_MANIFEST : "covered_by"
 ```
 
 对象关系的核心判断：
 
-1. 资金指令只是入口，真正的事实分为资金交易和冻结单。
+1. 资金指令只是入口，真正的事实分为资金交易、冻结单和余额调整动作。
 2. 资金交易、route snapshot、posting plan、账本交易和分录构成写入证据链。
-3. 余额投影和交易投影都从事实派生，只读可重建。
-4. 清算候选、清算批次、结算单、出款单、对账批次和差错单是不同运营对象，不能合并成一个状态机。
-5. 归档清单覆盖事实范围，不能改变事实身份。
+3. 余额调整动作只表达同主体余额、额度或预算控制；跨主体价值转移仍由资金交易和调账事实证据承接。
+4. 余额投影和交易投影都从事实派生，只读可重建。
+5. 清算候选、清算批次、结算单、出款单、对账批次和差错单是不同运营对象，不能合并成一个状态机。
+6. 归档清单覆盖事实范围，不能改变事实身份。
 
 ## 5. 角色与使用者
 
@@ -217,8 +222,9 @@ mindmap
       余额控制
         冻结
         解冻
-        额度调整
-        预算调整
+        资金账户余额调整
+        信用账户额度调整
+        预算组额度调整
     钱包账户
       资金账户
       信用账户
@@ -344,75 +350,72 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    subgraph L0["使用者和业务"]
-        Biz["业务系统\nVCC / ACH / 全球收付款 / 收单 / 平台内部交易"]
-        User["用户 / 商户 / 企业管理员"]
-        Ops["运营 / 财务 / 风控 / 合规"]
+    subgraph L0["使用者与业务目标"]
+        Biz["业务接入方\n提交入金 / 支付 / 授权 / 退款 / 出款 / 调整事实"]
+        User["用户 / 商户 / 企业管理员\n查看余额、账单、状态和失败原因"]
+        Ops["运营 / 财务 / 风控 / 合规\n处理差错、审批、核对和审计"]
     end
 
     subgraph L1["产品入口"]
-        Tx["交易服务能力\n直接交易 / 授权交易 / 余额控制"]
-        Query["查询服务能力\n余额 / 账单 / 报表 / 时间线"]
-        Admin["运营服务能力\n清结算 / 对账 / 审批 / 差错"]
+        Tx["交易入口\n直接交易 / 授权交易 / 余额控制"]
+        Query["查询入口\n余额 / 账单 / 时间线 / 指标项"]
+        Workbench["运营入口\n清结算 / 对账 / 审批 / 差错"]
     end
 
-    subgraph L2["资金事实"]
+    subgraph L2["资金事实链"]
         Instruction["资金指令\n业务键 / 幂等 / 请求摘要"]
-        FundsTxn["资金交易和明细\n生命周期 / 金额 / 账本引用"]
-        Frozen["冻结单\n冻结 / 解冻 / 释放"]
+        FundsTxn["资金交易和明细\n生命周期 / route snapshot / 账本引用"]
+        Control["余额控制事实\n冻结单 / 余额调整动作"]
+        Account["账户和账目\n资金账户 / 信用账户 / 预算组 / 平台角色"]
+        Route["资金路由\n参与方 / 账目 / 账本周期"]
+        Posting["账务计划\nPostingPlan / 借贷方向 / 平衡校验"]
+        Ledger["账务事实\n账本交易 / LedgerEntry / 稳定摘要"]
     end
 
-    subgraph L3["账户和路由"]
-        Wallets["Wallets\n资金账户 / 信用账户 / 预算组 / 平台角色"]
-        Route["资金路由\n参与方 / 账目 / 路径 / 快照"]
-        Posting["账务计划\n借贷方向 / 平衡校验"]
-    end
-
-    subgraph L4["账务事实"]
-        Ledger["Ledger\n账本交易 / 分录 / 稳定摘要"]
+    subgraph L3["运营闭环和只读数据面"]
         Balance["余额投影\n余额桶 / 检查点 / 水位"]
+        View["交易投影\n用户账单 / 商户账单 / 运营时间线"]
+        Clearing["清结算\n清算候选 / 清算批次 / 结算出款"]
+        Recon["对账差错\n对账批次 / 差错单 / 核销追偿"]
+        Archive["归档重放\nManifest / 余额重建 / 交易重放"]
+        Metrics["指标项输入\n业务问题 / 建议事实源 / 只读口径"]
     end
 
-    subgraph L5["运营和数据面"]
-        Clearing["清分清算\n清算批次 / 结算单 / 出款单"]
-        Recon["对账差错\n对账批次 / 差错单 / 调账核销"]
-        View["交易投影\n用户账单 / 商户账单 / 运营时间线 / 报表"]
-        Archive["归档重放\n归档清单 / 余额重建 / 交易重放"]
+    subgraph L4["外部引用边界"]
+        External["外部账户 / 支付工具 / 通道 / 银行 / 清算网络\n只做引用、回单和对账来源"]
     end
 
-    subgraph L6["外部引用"]
-        External["外部账户 / 支付工具 / 通道 / 银行 / 清算网络"]
-    end
-
-    Biz --> Tx
-    User --> Query
-    Ops --> Admin
-    Tx --> Instruction
-    Instruction --> FundsTxn
-    Instruction --> Frozen
-    FundsTxn --> Wallets
-    Frozen --> Wallets
-    Wallets --> Route
-    FundsTxn --> Route
-    Frozen --> Route
-    Route --> Posting
-    Posting --> Ledger
-    Ledger --> Balance
-    Balance --> Query
-    FundsTxn --> View
-    Frozen --> View
-    Ledger --> View
-    Admin --> Clearing
-    Admin --> Recon
-    Clearing --> Instruction
-    Recon --> Instruction
-    Ledger --> Recon
-    Ledger --> Archive
-    View --> Archive
-    External --> Instruction
-    External --> Clearing
-    External --> Recon
+    Biz -->|提交资金事实| Tx
+    User -->|查询可解释结果| Query
+    Ops -->|处理和复核| Workbench
+    Tx -->|标准化| Instruction
+    Instruction -->|直接 / 授权| FundsTxn
+    Instruction -->|冻结 / 调整| Control
+    FundsTxn -->|校验账户能力| Account
+    Control -->|校验余额桶| Account
+    Account -->|解析资金路径| Route
+    Route -->|生成账务计划| Posting
+    Posting -->|过账| Ledger
+    Ledger -->|派生| Balance
+    Ledger -->|派生| View
+    Workbench -->|形成处理单据| Clearing
+    Workbench -->|形成差错闭环| Recon
+    Clearing -->|追加资金事实| Instruction
+    Recon -->|追加调整或核销事实| Instruction
+    Ledger -->|归档与校验| Archive
+    Balance -->|重建基准| Archive
+    View -->|有界重放| Archive
+    Balance -->|只读展示| Query
+    View -->|只读展示| Query
+    Ledger -->|事实来源| Metrics
+    Clearing -->|运营来源| Metrics
+    Recon -->|差错来源| Metrics
+    Metrics -->|只读观察| Query
+    External -.->|外部引用 / 回单 / 文件| Tx
+    External -.->|对账来源| Recon
 ```
+
+读图方式：实线表示产品主链路或运营处理闭环，虚线表示外部引用和对账来源；余额投影、交易投影和指标项输入只能只读消费事实，不反写资金事实。
 
 ## 9. 产品范围
 

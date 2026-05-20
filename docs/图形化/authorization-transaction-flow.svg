@@ -1,0 +1,141 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 920" width="1500" height="920" role="img" aria-labelledby="title desc">
+  <title id="title">授权交易流程</title>
+  <desc id="desc">授权交易从授权申请、准入判断、批准占用或拒绝记录，到撤销、过期、结算、退款和拒付承接的生命周期流程。</desc>
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", "Microsoft JhengHei", "SimHei", sans-serif; fill: #111827; }
+    .title { font-size: 28px; font-weight: 700; }
+    .subtitle { font-size: 14px; fill: #6b7280; }
+    .section-title { font-size: 16px; font-weight: 700; fill: #374151; }
+    .node-title { font-size: 15px; font-weight: 700; }
+    .node-sub { font-size: 12px; fill: #4b5563; }
+    .small { font-size: 12px; fill: #6b7280; }
+    .container { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; stroke-dasharray: 8 7; rx: 18; ry: 18; }
+    .node { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; rx: 10; ry: 10; }
+    .blue { fill: #eff6ff; stroke: #bfdbfe; }
+    .green { fill: #f0fdf4; stroke: #bbf7d0; }
+    .purple { fill: #faf5ff; stroke: #e9d5ff; }
+    .orange { fill: #fff7ed; stroke: #fed7aa; }
+    .red { fill: #fef2f2; stroke: #fecaca; }
+    .teal { fill: #f0fdfa; stroke: #99f6e4; }
+    .decision { fill: #ffffff; stroke: #f59e0b; stroke-width: 1.7; }
+    .arrow-main { stroke: #2563eb; stroke-width: 2.6; fill: none; marker-end: url(#arrow-blue); }
+    .arrow-ledger { stroke: #16a34a; stroke-width: 2.6; fill: none; marker-end: url(#arrow-green); }
+    .arrow-read { stroke: #9333ea; stroke-width: 2.2; fill: none; marker-end: url(#arrow-purple); }
+    .arrow-risk { stroke: #dc2626; stroke-width: 2.3; fill: none; marker-end: url(#arrow-red); stroke-dasharray: 8 6; }
+    .arrow-note { stroke: #64748b; stroke-width: 2.1; fill: none; marker-end: url(#arrow-gray); stroke-dasharray: 7 6; }
+  </style>
+  <defs>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#2563eb"/></marker>
+    <marker id="arrow-green" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#16a34a"/></marker>
+    <marker id="arrow-purple" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#9333ea"/></marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#dc2626"/></marker>
+    <marker id="arrow-gray" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#64748b"/></marker>
+  </defs>
+
+  <rect width="1500" height="920" fill="#ffffff"/>
+  <text x="56" y="55" class="title">授权交易流程</text>
+  <text x="56" y="83" class="subtitle">来源：PRD 02 授权交易生命周期；系分 02 FundsAuthorizationTransactionService 创建和后续事件流程</text>
+
+  <rect x="40" y="118" width="1420" height="300" class="container"/>
+  <text x="62" y="151" class="section-title">授权创建：批准后才进入 route 和账本；拒绝只记录拒绝事实</text>
+
+  <rect x="62" y="210" width="150" height="82" class="node blue"/>
+  <text x="137" y="240" text-anchor="middle" class="node-title">授权请求</text>
+  <text x="137" y="264" text-anchor="middle" class="node-sub">卡 / 账户 / 预算</text>
+  <text x="137" y="282" text-anchor="middle" class="node-sub">金额 / 币种 / 工具</text>
+
+  <rect x="262" y="210" width="170" height="82" class="node teal"/>
+  <text x="347" y="240" text-anchor="middle" class="node-title">准入校验</text>
+  <text x="347" y="264" text-anchor="middle" class="node-sub">幂等 / 主体 / 周期</text>
+  <text x="347" y="282" text-anchor="middle" class="node-sub">工具 / 风控 / 策略</text>
+
+  <polygon points="555,200 625,251 555,302 485,251" class="decision"/>
+  <text x="555" y="246" text-anchor="middle" class="node-title">可授权?</text>
+  <text x="555" y="266" text-anchor="middle" class="node-sub">approve / decline</text>
+
+  <rect x="705" y="155" width="170" height="82" class="node red"/>
+  <text x="790" y="185" text-anchor="middle" class="node-title">授权拒绝</text>
+  <text x="790" y="209" text-anchor="middle" class="node-sub">记录原因 / 规则版本</text>
+  <text x="790" y="227" text-anchor="middle" class="node-sub">无 route / posting / entry</text>
+
+  <rect x="705" y="285" width="170" height="82" class="node orange"/>
+  <text x="790" y="315" text-anchor="middle" class="node-title">授权批准</text>
+  <text x="790" y="339" text-anchor="middle" class="node-sub">生成授权路径</text>
+  <text x="790" y="357" text-anchor="middle" class="node-sub">AVAILABLE -> AUTH</text>
+
+  <rect x="945" y="285" width="170" height="82" class="node green"/>
+  <text x="1030" y="315" text-anchor="middle" class="node-title">账本过账</text>
+  <text x="1030" y="339" text-anchor="middle" class="node-sub">保存 route snapshot</text>
+  <text x="1030" y="357" text-anchor="middle" class="node-sub">余额投影</text>
+
+  <rect x="1185" y="285" width="170" height="82" class="node purple"/>
+  <text x="1270" y="315" text-anchor="middle" class="node-title">授权占用</text>
+  <text x="1270" y="339" text-anchor="middle" class="node-sub">HELD / 剩余可处理</text>
+  <text x="1270" y="357" text-anchor="middle" class="node-sub">等待后续事件</text>
+
+  <path d="M 212 251 L 262 251" class="arrow-main"/>
+  <path d="M 432 251 L 485 251" class="arrow-main"/>
+  <path d="M 625 251 L 665 251 L 665 196 L 705 196" class="arrow-risk"/>
+  <path d="M 625 251 L 665 251 L 665 326 L 705 326" class="arrow-main"/>
+  <path d="M 875 326 L 945 326" class="arrow-ledger"/>
+  <path d="M 1115 326 L 1185 326" class="arrow-read"/>
+
+  <rect x="40" y="460" width="1420" height="295" class="container"/>
+  <text x="62" y="493" class="section-title">后续事件：先校验原事实、剩余金额和幂等摘要，再按原快照或受控策略入账</text>
+
+  <rect x="62" y="555" width="170" height="82" class="node blue"/>
+  <text x="147" y="585" text-anchor="middle" class="node-title">归一后事件</text>
+  <text x="147" y="609" text-anchor="middle" class="node-sub">reversal / expire</text>
+  <text x="147" y="627" text-anchor="middle" class="node-sub">settle / settleRefund</text>
+
+  <rect x="292" y="555" width="170" height="82" class="node teal"/>
+  <text x="377" y="585" text-anchor="middle" class="node-title">引用校验</text>
+  <text x="377" y="609" text-anchor="middle" class="node-sub">原授权 / 原完成</text>
+  <text x="377" y="627" text-anchor="middle" class="node-sub">策略 / 凭证 / 剩余金额</text>
+
+  <polygon points="595,545 665,596 595,647 525,596" class="decision"/>
+  <text x="595" y="591" text-anchor="middle" class="node-title">有效?</text>
+  <text x="595" y="611" text-anchor="middle" class="node-sub">引用 + 金额</text>
+
+  <rect x="755" y="485" width="170" height="72" class="node green"/>
+  <text x="840" y="514" text-anchor="middle" class="node-title">撤销 / 过期</text>
+  <text x="840" y="538" text-anchor="middle" class="node-sub">AUTH -> AVAILABLE</text>
+
+  <rect x="755" y="595" width="170" height="72" class="node orange"/>
+  <text x="840" y="624" text-anchor="middle" class="node-title">结算完成</text>
+  <text x="840" y="648" text-anchor="middle" class="node-sub">AUTH -> 收款方 / CLEARING</text>
+
+  <rect x="755" y="690" width="170" height="48" class="node purple"/>
+  <text x="840" y="721" text-anchor="middle" class="node-title">结算后退款 / 拒付</text>
+
+  <rect x="1010" y="555" width="170" height="82" class="node green"/>
+  <text x="1095" y="585" text-anchor="middle" class="node-title">生成 posting</text>
+  <text x="1095" y="609" text-anchor="middle" class="node-sub">账本入账</text>
+  <text x="1095" y="627" text-anchor="middle" class="node-sub">投影视图区分语义</text>
+
+  <rect x="1245" y="555" width="170" height="82" class="node purple"/>
+  <text x="1330" y="585" text-anchor="middle" class="node-title">更新生命周期</text>
+  <text x="1330" y="609" text-anchor="middle" class="node-sub">累计完成 / 释放</text>
+  <text x="1330" y="627" text-anchor="middle" class="node-sub">终态可解释</text>
+
+  <rect x="525" y="680" width="140" height="58" class="node red"/>
+  <text x="595" y="705" text-anchor="middle" class="node-title">失败 / 差错</text>
+  <text x="595" y="727" text-anchor="middle" class="node-sub">无 ledger entry</text>
+
+  <path d="M 232 596 L 292 596" class="arrow-main"/>
+  <path d="M 462 596 L 525 596" class="arrow-main"/>
+  <path d="M 595 647 L 595 680" class="arrow-risk"/>
+  <path d="M 665 596 L 705 596 L 705 521 L 755 521" class="arrow-main"/>
+  <path d="M 665 596 L 755 631" class="arrow-main"/>
+  <path d="M 665 596 L 705 596 L 705 714 L 755 714" class="arrow-main"/>
+  <path d="M 925 521 L 965 521 L 965 596 L 1010 596" class="arrow-ledger"/>
+  <path d="M 925 631 L 1010 596" class="arrow-ledger"/>
+  <path d="M 925 714 L 965 714 L 965 596 L 1010 596" class="arrow-ledger"/>
+  <path d="M 1180 596 L 1245 596" class="arrow-read"/>
+
+  <rect x="40" y="800" width="1420" height="74" class="container"/>
+  <text x="62" y="833" class="section-title">授权红线</text>
+  <text x="82" y="862" class="small">1. 授权拒绝不得生成 RouteLeg、PostingPlan、LedgerEntry 或 chargebackAmount。</text>
+  <text x="585" y="862" class="small">2. 授权成功不是最终消费；完成不新增 CONSUMED，不触碰 LIMIT。</text>
+  <text x="1055" y="862" class="small">3. 默认无 close 事件，历史逆向优先回放原快照。</text>
+</svg>

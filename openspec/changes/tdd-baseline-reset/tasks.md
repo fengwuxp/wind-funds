@@ -80,6 +80,79 @@ just compile
 | `04-归档重放与指标治理` | `governance-face`、`governance-impl` 已有交易投影重放骨架和局部边界测试。 | 批次 8 不抢跑批次 7；归档 Manifest、账本余额快照、普通指标快照和水位隔离仍需独立 Execution Grant。 |
 | 导出附件 | 若工作树存在 `docs/*.zip` 等导出包，只能作为评审附件。 | 导出包不作为规格、任务或验收 Source of Truth；是否纳入版本库需用户单独确认。 |
 
+### 5.2 生产交付判定
+
+本 Harness Plan 的任务结论只表示设计和批次计划已经对齐，不表示生产交付已经完成。后续每个批次必须在交付记录中单独说明 Done 证据。
+
+| 批次域 | 当前判定 | Done 证据要求 |
+| --- | --- | --- |
+| 批次 1 至批次 6 | 02 主链路可按 Execution Grant 进入编码。 | 对应 AC/DSL/TDD/RED 映射闭合，相关测试通过，资金变化断言覆盖状态、route、posting、entry、projection、幂等和审计。 |
+| 批次 7 | 03 清结算与对账只保留边界、计划和准入门禁。 | 独立 OpenSpec change、模块/表/接口确认、DDL/H2、服务级 H2 测试、对账阻断和清结算幂等测试通过。 |
+| 批次 8 | 04 归档重放与指标边界只保留边界、计划和准入门禁；交易投影重放只是局部基线。 | Manifest、checkpoint、watermark、余额快照、指标水位隔离、范围锁、差异报告和回滚/续跑测试通过。 |
+
+### 5.3 批次交付证据包
+
+后续每个批次开始和完成时，分别补齐申请卡和验收记录。字段不允许留空；不适用时必须写 `N/A + 原因`。字段留空、用“待补”占位或无法说明不适用原因时，视为该批次仍未达到 Done。
+
+批次开始前先填写申请卡：
+
+```text
+批次：
+申请目标：
+设计域：
+覆盖产品验收：
+覆盖 DSL caseId：
+覆盖 TDD 用例：
+覆盖红线：
+写入范围：
+只读范围：
+非目标：
+允许修改公共契约：是/否
+公共契约允许修改范围：
+允许新增枚举或事件：是/否
+允许新增服务入口：是/否
+允许扩展 Request/Query/DTO：是/否
+允许修改状态机：是/否
+允许修改表结构：是/否
+允许新增模块：是/否
+是否影响架构 ADR：是/否
+受影响 ADR：
+是否触碰能力域边界：是/否
+是否触碰事实端口层：是/否
+架构边界测试范围：
+先写或先恢复的测试：
+验证命令：
+人工确认点：
+停止条件：
+```
+
+批次完成时再填写验收记录：
+
+```text
+批次：
+Execution Grant：
+覆盖产品验收：
+覆盖 DSL caseId：
+覆盖 TDD 用例：
+覆盖红线：
+修改范围：
+公共契约变化：
+DDL/H2 schema 变化：
+服务契约证据：
+状态机和幂等证据：
+资金断言证据：
+观测和审计证据：
+架构边界证据：
+外部规则和待确认项：
+验证命令：
+验证结果：
+未覆盖项：
+残余风险：
+完成结论：Done / Conditional Done / Not Done
+```
+
+设计准入评审可以使用“通过、带条件通过、阻断”；编码批次验收只能使用 `Done / Conditional Done / Not Done`。只有文档、设计或计划闭合时不得写 Done；本批生产目标必需的 DDL/H2、服务级测试、资金断言、幂等或审计证据缺失时必须写 Not Done。
+
 ## 6. 里程碑拆解
 
 | 里程碑 | 目标 | 完成标志 | 阻塞关系 |
@@ -147,7 +220,7 @@ just compile
 | --- | --- | --- | --- | --- | --- | --- |
 | B5-01 | 固化冻结/解冻控制语义。 | `transaction-*`、`tests/src/test/java` | 余额控制 DSL、资金红线。 | 冻结表达消费、跨主体冻结、多次解冻超额。 | 保持同主体 `AVAILABLE <-> FROZEN` 控制。 | `just test-balance-control` |
 | B5-02 | 固化冻结后提现与组合路径。 | `transaction-*`、`tests/src/test/java` | 产品验收用例。 | 提现忽略冻结、冻结释放后余额桶错误。 | 逐步骤断言可用、冻结、实际扣划。 | `just test-balance-control` |
-| B5-03 | 固化资金调账、信用额度、预算额度。 | `transaction-*`、`tests/src/test/java` | 账户/额度/预算概念边界。 | 调账绕过凭证，额度与余额混用。 | 保持调账凭证、额度口径和预算控制分离。 | `just test-balance-control` |
+| B5-03 | 固化资金账户余额调整、信用账户额度、预算组额度。 | `transaction-*`、`tests/src/test/java` | 账户/额度/预算概念边界。 | 余额调整缺来源、审批、凭证或审计，跨主体价值转移误用 adjust，额度与余额混用。 | 保持资金账户余额调整、信用账户额度和预算组额度分离；adjust 必须有准入来源和审计；完整对账差错闭环在批次 7 验证。 | `just test-balance-control` |
 | B5-04 | 固化 FX 与余额控制边界。 | `transaction-*`、`tests/src/test/java` | TDD 红线。 | 余额控制承接 FX 或隐式换汇。 | 余额控制只处理同币种余额桶。 | `just test-boundary` |
 | B5-05 | 固化冻结、解冻和提现并发竞争红线。 | `transaction-*`、`tests/src/test/java` | TDD 13.5、余额控制组合场景、冻结动作明细。 | 同一冻结来源被解冻和提现确认并发关闭，导致重复释放、重复关闭或 `FROZEN` 为负。 | 通过冻结动作明细、剩余金额校验、动作幂等键和唯一约束保证同一冻结来源只被关闭或释放一次。 | `just test-balance-control` |
 
@@ -170,7 +243,7 @@ just compile
 | B7-01 | 确认独立模块、表和状态机。 | 待确认的 `reconciliation-*` 扩展或独立包 | 系分 03、产品清分/清算/对账。 | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单或追偿单混成一个对象。 | 人工确认后建立独立对象边界。 | 待确认 |
 | B7-02 | 固化可清分准入、清分批次和清算候选排除。 | 待确认 | 可清分规则、清分批次、清算候选。 | 未完成交易入可清分明细、清分批次确认即入账、冻结或重大差错交易入清算候选。 | 可清分只来自成功交易、已过账 `CLEARING` 分录和完整来源快照；清分批次只固化归类和规则版本；候选只来自已确认清分结果且满足可清算规则。 | 待确认 |
 | B7-03 | 固化清算批次确认、结算锁定、出款成功/失败和追偿。 | 待确认 | 清算批次、结算单、出款单、追偿单边界。 | 候选入池即清算、清算前置对账缺失、出款失败直接改历史分录，或重复出款。 | 清算批次确认才触发 `CLEARING -> AVAILABLE`；结算锁定、出款单、失败原因和追偿链路各自独立。 | 待确认 |
-| B7-04 | 固化对账批次、差错单和核销。 | 待确认 | 对账差错闭环。 | 对账差异直接改分录或余额。 | 强制差错单、审批、凭证、调账/冲正、核销、重新对账。 | 待确认 |
+| B7-04 | 固化对账批次、差错单和核销。 | 待确认 | 对账差错闭环。 | 对账差异直接改分录或余额，或绕过差错闭环直接调用 adjust。 | 强制差错单、审批、凭证、调账/冲正、核销、重新对账；差错类资金账户余额调整由闭环触发余额控制 adjust 或批次授权直接交易调账事实。 | 待确认 |
 | B7-05 | 固化清结算与对账并发竞争红线。 | 待确认 | TDD 13.5、清结算退款时序、对账重跑。 | 清算候选锁定与退款并发、结算锁定与出款回单/退款并发、对账重跑与差错核销并发导致重复扣减、重复出款或证据覆盖。 | 建立对象级锁定、批次唯一键、候选状态版本、重跑运行记录和差错核销互斥；失败方必须可审计且无副作用。 | 待确认 |
 
 人工确认点：是否新建模块、模块命名、表命名、状态机、是否进入本轮开发范围。
@@ -198,7 +271,7 @@ just compile
 4. 批次 1 是后续所有交易、账本和授权测试的前置门禁。
 5. 批次 2 是后续业务流余额断言、账务平衡和组合测试的前置门禁。
 6. 批次 1 已有 DSL 契约测试基线，但仍未替代后续变更授权；如继续修改 `core` 公共枚举、Spec 或值对象，Execution Grant 必须显式确认是否允许修改公共契约和枚举，以及允许修改的范围。
-7. 批次 4 涉及公共契约、枚举、服务入口和请求模型，必须先经人工确认再改生产代码；`settle` 强制完成和 `settleRefund` 无授权退款必须有策略、原事实引用、凭证、原因和审计；chargeback 不作为 `FundsAuthorizationTransactionService#chargeback` 目标入口。
+7. 批次 4 涉及公共契约、枚举、服务入口和 Request/Query/DTO，必须先经人工确认再改生产代码；`settle` 强制完成和 `settleRefund` 无授权退款必须有策略、原事实引用、凭证、原因和审计；chargeback 不作为 `FundsAuthorizationTransactionService#chargeback` 目标入口。
 8. 批次 7、批次 8 属于独立域，不得在批次 1-6 中顺手落入交易、钱包或账本主链路；进入编码前必须另起独立 OpenSpec change。
 9. 除非用户再次调整，批次 8 不抢跑批次 7；04 只能消费 02 和 03 已确认的事实边界、批次摘要、差异报告和只读投影输入。
 10. 任一批次发现产品、DSL、系分或 TDD 口径冲突时，先记录“设计错漏”，同步修正设计文档和 OpenSpec，再继续编码。
@@ -212,11 +285,11 @@ just compile
 | 批次 1 | `RED-001`、`RED-003`、`RED-009`、`RED-020`、`RED-022`、`RED-023`、`RED-046` 至 `RED-049` | Route DSL、PaymentInstrument Route DSL、Posting/Ledger DSL、SettlementPolicy、金额临界值、JSON 契约 | `TDD-RED-001`、`TDD-RED-003`、`TDD-RED-004`、`TDD-RED-031`、`TDD-RED-032`、`TDD-RED-034` 至 `TDD-RED-037`、`TDD-LEDGER-001` 至 `TDD-LEDGER-011`、`TDD-ROUTE-011` 至 `TDD-ROUTE-013` |
 | 批次 2 | `AC-PI-001` 至 `AC-PI-004`、`AC-PI-006`、`AC-PI-007`、`AC-CTRL-009` 至 `AC-CTRL-011`、`AC-BALLOG-001`、`RED-036`、`RED-046`、`RED-047`、`RED-049` | 支付工具、绑定关系、绑定历史审计、资金来源关系、账本周期、余额投影、余额日志 | `TDD-WALLET-*`、`TDD-ROUTE-011`、`TDD-ROUTE-012`、`TDD-LEDGER-*`、`TDD-VIEW-003` |
 | 批次 3 | `AC-IN-*`、`AC-OUT-*`、`AC-PAY-*`、`AC-MER-*`、`AC-FEE-*` | `DSL-DIRECT-*`、`DSL-REVERSE-REFUND-FEE-001` | `TDD-DIR-*`、`TDD-DIR-FLOW-*`、`TDD-DIR-ERR-*` |
-| 批次 4 | `AC-AUTH-001` 至 `AC-AUTH-012`、`AC-RAIL-001`、`AC-RAIL-002`、`RED-025` 至 `RED-027`、`RED-035` | `DSL-AUTH-LIFECYCLE-001`、`AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式、VCC 授权控制扩展 | `TDD-AUTH-*`、`TDD-AUTH-FLOW-*`、`TDD-AUTH-ERR-*`、`TDD-AUTH-EXT-*`、`TDD-RACE-001` 至 `TDD-RACE-003`、`TDD-RED-033` |
-| 批次 5 | `AC-CTRL-001` 至 `AC-CTRL-008`、`AC-ADJ-001` | `DSL-BALANCE-*`、`DSL-LIMIT-ADJUST-001` | `TDD-CTRL-*`、`TDD-CTRL-FLOW-*`、`TDD-CTRL-ERR-*`、`TDD-RACE-004`、`TDD-RED-033` |
-| 批次 6 | `AC-ROUTE-*`、`AC-PI-005`、`AC-VIEW-*`、`AC-BALLOG-001`、`AC-REPLAY-*`、`RED-003`、`RED-016`、`RED-017`、`RED-036`、`RED-043`、`RED-044`、`RED-048`、`RED-049` | Route Replay、支付工具换绑后原路径回放、交易投影、余额日志 | `TDD-ROUTE-*`、`TDD-RACE-009`、`TDD-VIEW-*`、`TDD-REPLAY-*` |
-| 批次 7 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`RED-030` 至 `RED-033` | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单独立对象 | `TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-RACE-005` 至 `TDD-RACE-007`、`TDD-RED-033` |
-| 批次 8 | `AC-ARCH-*`、`AC-REPLAY-*`、`AC-RPT-*`、`RED-016` 至 `RED-019`、`RED-029`、`RED-034`、`RED-040` 至 `RED-042` | `DSL-GOVERNANCE-ARCHIVE-MANIFEST-001`、`DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`、`DSL-GOVERNANCE-PROJECTION-REPLAY-001`、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001`、归档、余额重建、交易投影重放、指标只读和指标水位隔离边界 | `TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`、`TDD-RACE-008`、`TDD-RACE-010`、`TDD-RED-033` |
+| 批次 4 | `AC-AUTH-001` 至 `AC-AUTH-012`、`AC-RAIL-001`、`AC-RAIL-002`、`RED-025` 至 `RED-027`、`RED-035` | `DSL-AUTH-LIFECYCLE-001`、`DSL-AUTH-FORCE-CAPTURE-001`、`DSL-AUTH-REFUND-001`、`AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式、VCC 授权归一边界和授权控制扩展 | `TDD-AUTH-*`、`TDD-AUTH-FLOW-*`、`TDD-AUTH-ERR-*`、`TDD-AUTH-EXT-*`、`TDD-ROUTE-003`、`TDD-ROUTE-005`、`TDD-ROUTE-008`、`TDD-ROUTE-009`、`TDD-RACE-001` 至 `TDD-RACE-003`、`TDD-RAIL-001`、`TDD-RAIL-002`、`TDD-RED-003`、`TDD-RED-005`、`TDD-RED-008`、`TDD-RED-016`、`TDD-RED-017`、`TDD-RED-033`、`TDD-RED-036` |
+| 批次 5 | `AC-CTRL-001` 至 `AC-CTRL-008`、`AC-ADJ-001` 的 adjust 入口和红线；其中 `AC-CTRL-004` 为资金账户余额调整 | `DSL-BALANCE-CONTROL-FREEZE-001`、`DSL-BALANCE-CONTROL-ADJUST-001`、`DSL-BALANCE-CONTROL-LIMIT-BUDGET-001`、`DSL-SETTLEMENT-RECONCILIATION-ADJUST-001` 的 adjust 红线 | `TDD-CTRL-*`、`TDD-CTRL-FLOW-*`、`TDD-CTRL-ERR-*`、`TDD-CTRL-009`、`TDD-CTRL-ERR-005`、`TDD-RACE-004`、`TDD-RED-006`、`TDD-RED-011`、`TDD-RED-012`、`TDD-RED-015`、`TDD-RED-033` |
+| 批次 6 | `AC-ROUTE-*`、`AC-PI-005`、`AC-VIEW-*`、`AC-BALLOG-001`、`AC-REPLAY-*`、`RED-003`、`RED-016`、`RED-017`、`RED-036`、`RED-043`、`RED-044`、`RED-048`、`RED-049` | Route Replay、支付工具换绑后原路径回放、交易投影、余额日志 | `TDD-ROUTE-*`、`TDD-ROUTE-013`、`TDD-RACE-009`、`TDD-VIEW-*`、`TDD-REPLAY-*`、`TDD-RED-003`、`TDD-RED-010`、`TDD-RED-013`、`TDD-RED-014`、`TDD-RED-029`、`TDD-RED-034` 至 `TDD-RED-037` |
+| 批次 7 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`AC-ADJ-001`、`RED-030` 至 `RED-033`、`RED-037` 至 `RED-039` | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单独立对象、`DSL-SETTLEMENT-RECONCILIATION-ADJUST-001` 完整差错闭环 | `TDD-CLS-*`、`TDD-CLS-FLOW-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-RACE-005` 至 `TDD-RACE-007`、`TDD-RED-020` 至 `TDD-RED-025`、`TDD-RED-033` |
+| 批次 8 | `AC-ARCH-*`、`AC-REPLAY-*`、`AC-RPT-*`、`RED-016` 至 `RED-019`、`RED-029`、`RED-034`、`RED-040` 至 `RED-042` | `DSL-GOVERNANCE-ARCHIVE-MANIFEST-001`、`DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`、`DSL-GOVERNANCE-PROJECTION-REPLAY-001`、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001`、归档、余额重建、交易投影重放、指标只读和指标水位隔离边界 | `TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`、`TDD-RACE-008`、`TDD-RACE-010`、`TDD-RED-018`、`TDD-RED-019`、`TDD-RED-026` 至 `TDD-RED-028`、`TDD-RED-033` |
 
 ## 10. Execution Grant 候选模板
 
@@ -233,9 +306,14 @@ just compile
 公共契约允许修改范围：
 允许新增枚举或事件：是/否
 允许新增服务入口：是/否
-允许扩展请求模型：是/否
+允许扩展 Request/Query/DTO：是/否
 允许修改表结构：是/否
 允许新增模块：是/否
+是否影响架构 ADR：是/否
+受影响 ADR：
+是否触碰能力域边界：是/否
+是否触碰事实端口层：是/否
+架构边界测试范围：
 人工确认点：
 基础验证命令：just mvn-version、just compile
 专项验证命令：
@@ -257,9 +335,14 @@ just compile
 公共契约允许修改范围：仅限支撑 DSL 契约测试所需的兼容性补齐；不得删除既有公开字段或破坏既有调用方
 允许新增枚举或事件：待用户确认；若新增 `EXPIRE` 等事件，必须先有失败测试和兼容说明
 允许新增服务入口：否
-允许扩展请求模型：否
+允许扩展 Request/Query/DTO：否
 允许修改表结构：否
 允许新增模块：否
+是否影响架构 ADR：否；如新增公共枚举或调整 core 依赖方向，必须重新确认
+受影响 ADR：ADR-002 core 作为资金语义内核
+是否触碰能力域边界：否
+是否触碰事实端口层：否
+架构边界测试范围：如改动 core 依赖或公共 Spec 依赖方向，补充 `just test-boundary` 或等效静态检查
 人工确认点：公共枚举新增、Spec 字段新增、JSON 契约字段命名、PaymentInstrumentRef/RoutingDecision/FundingAllocationDecision 字段边界、Route Replay 与交易投影重放边界
 基础验证命令：just mvn-version、just compile
 专项验证命令：just test-core
