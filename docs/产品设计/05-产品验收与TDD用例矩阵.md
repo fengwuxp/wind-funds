@@ -12,8 +12,8 @@
 
 | 结论 | 本矩阵中的最低证据 | 不允许的误判 |
 | --- | --- | --- |
-| 通过 | 本次范围内的 `AC-*`、`RED-*`、DSL 契约、系分落点和 TDD 用例都能互相追溯，且没有未关闭的资金安全或金融红线阻断项。 | 只因为主流程能跑通就判定通过。 |
-| 带条件通过 | 主链路 `AC-*` 有 TDD 承接，待确认项不影响资金不变量，并写清负责人、补齐时点和不覆盖范围。 | 把外部规则、合规确认、争议证据、调账审批或敏感数据边界当成普通后续优化。 |
+| 通过 | 本次范围内的 AC-*、RED-*、DSL 契约、系分落点和 TDD 用例都能互相追溯，且没有未关闭的资金安全或金融红线阻断项。 | 只因为主流程能跑通就判定通过。 |
+| 带条件通过 | 主链路 AC-* 有 TDD 承接，待确认项不影响资金不变量，并写清负责人、补齐时点和不覆盖范围。 | 把外部规则、合规确认、争议证据、调账审批或敏感数据边界当成普通后续优化。 |
 | 阻断 | 存在未覆盖红线、资金路径不可追溯、账务主体不清、投影反写、缺快照逆向、周期混用、敏感信息泄露或外部规则未确认等关键问题。 | 用人工处理、后台改数、报表修正或测试暂缓来替代设计闭环。 |
 
 ## 2. 验收分层
@@ -61,28 +61,28 @@ flowchart TD
 
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
 | --- | --- | --- | --- | --- |
-| AC-IN-001 | 用户充值成功 | 外部通道确认成功，用户账户和平台账户存在。 | 用户 `AVAILABLE` 增加，平台现金或预收待付路径可解释。 | 资金交易、route snapshot、账本交易、分录、余额投影全部生成；外部账户不入账。 |
+| AC-IN-001 | 用户充值成功 | 外部通道确认成功，用户账户和平台账户存在。 | 用户 AVAILABLE 增加，平台现金或预收待付路径可解释。 | 资金交易、route snapshot、账本交易、分录、余额投影全部生成；外部账户不入账。 |
 | AC-IN-002 | 充值通知重复 | 同一业务键、相同请求摘要重复到达。 | 返回原处理结果。 | 不重复生成资金交易、分录和投影。 |
 | AC-IN-003 | 外部到账但内部不可入账 | VA 未匹配、账户缺失或主体未建账。 | 生成挂账或补入账任务。 | 用户余额不自动增加，异常可追踪。 |
-| AC-OUT-001 | 用户提现申请 | 用户 `AVAILABLE` 充足，外部账户和风控通过。 | 创建冻结或锁定，用户可用减少。 | 提现申请不等于外部到账；冻结单含原因、期限、审批和审计。 |
+| AC-OUT-001 | 用户提现申请 | 用户 AVAILABLE 充足，外部账户和风控通过。 | 创建冻结或锁定，用户可用减少。 | 提现申请不等于外部到账；冻结单含原因、期限、审批和审计。 |
 | AC-OUT-002 | 用户提现成功 | 提现冻结存在，外部成功回单金额一致。 | 冻结金额被消耗，出款完成。 | 重复成功通知幂等，账本和外部回单可核对。 |
-| AC-OUT-003 | 用户提现失败回退 | 外部明确失败。 | `FROZEN -> AVAILABLE`。 | 只回退一次，成功和失败不能双终态。 |
+| AC-OUT-003 | 用户提现失败回退 | 外部明确失败。 | FROZEN -> AVAILABLE。 | 只回退一次，成功和失败不能双终态。 |
 
 ### 5.2 支付、转账与商户收款
 
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
 | --- | --- | --- | --- | --- |
-| AC-PAY-001 | 系统内转账成功 | 付款方、收款方账户存在且同币种，付款方余额充足。 | 付款方 `AVAILABLE` 减少，收款方 `AVAILABLE` 增加。 | 同主体失败，币种不一致失败，外部账户不入账。 |
+| AC-PAY-001 | 系统内转账成功 | 付款方、收款方账户存在且同币种，付款方余额充足。 | 付款方 AVAILABLE 减少，收款方 AVAILABLE 增加。 | 同主体失败，币种不一致失败，外部账户不入账。 |
 | AC-PAY-002 | 普通支付成功 | 付款方余额充足，收款方为普通资金账户。 | 按产品命令进入收款方指定目标桶。 | 不默认套用商户清算路径。 |
-| AC-MER-001 | 商户订单收款 | 用户基于订单向商户付款。 | 用户 `AVAILABLE` 减少，商户 `CLEARING` 增加。 | 商户订单款不得直入 `AVAILABLE` 或 `SETTLEMENT`。 |
-| AC-FEE-001 | 手续费收取 | 原交易含手续费规则。 | 本金和手续费分别入账，平台 `FEE` 增加。 | 本金、手续费、通道成本和补贴金额拆开。 |
-| AC-FEE-002 | 手续费退回 | 原费用事实存在且符合退费规则。 | 平台 `FEE` 减少，原责任方余额回补。 | 普通退款不自动退手续费；退费不超过原收费。 |
-| AC-ROUTE-001 | 商户收款路由快照 | 用户订单付款，存在用户资金账户、商户资金账户和平台费用账户角色。 | 生成包含用户、商户、平台角色、账目、费用拆分和规则版本的 route snapshot。 | 用户扣 `AVAILABLE`，商户入 `CLEARING`，平台费用入 `FEE`；本金、手续费、补贴和成本不可混成一个净额。 |
-| AC-ROUTE-002 | 普通支付不套商户清算 | 付款方支付给普通资金账户，不属于商户订单收款。 | 收款方进入产品命令指定目标账目。 | 不默认进入商户 `CLEARING`；路由必须先识别业务场景。 |
+| AC-MER-001 | 商户订单收款 | 用户基于订单向商户付款。 | 用户 AVAILABLE 减少，商户 CLEARING 增加。 | 商户订单款不得直入 AVAILABLE 或 SETTLEMENT。 |
+| AC-FEE-001 | 手续费收取 | 原交易含手续费规则。 | 本金和手续费分别入账，平台 FEE 增加。 | 本金、手续费、通道成本和补贴金额拆开。 |
+| AC-FEE-002 | 手续费退回 | 原费用事实存在且符合退费规则。 | 平台 FEE 减少，原责任方余额回补。 | 普通退款不自动退手续费；退费不超过原收费。 |
+| AC-ROUTE-001 | 商户收款路由快照 | 用户订单付款，存在用户资金账户、商户资金账户和平台费用账户角色。 | 生成包含用户、商户、平台角色、账目、费用拆分和规则版本的 route snapshot。 | 用户扣 AVAILABLE，商户入 CLEARING，平台费用入 FEE；本金、手续费、补贴和成本不可混成一个净额。 |
+| AC-ROUTE-002 | 普通支付不套商户清算 | 付款方支付给普通资金账户，不属于商户订单收款。 | 收款方进入产品命令指定目标账目。 | 不默认进入商户 CLEARING；路由必须先识别业务场景。 |
 | AC-ROUTE-003 | 原交易退款回放路径 | 原交易存在 route snapshot 且剩余可退金额充足。 | 生成基于原快照的逆向 route。 | 不按当前账户绑定、当前费率或当前商户配置重新选路；累计退款不得超额。 |
 | AC-ROUTE-004 | 平台角色解析 | 交易需要平台手续费、预收待付、现金映射或调整账户。 | 解析为唯一平台账户角色。 | 缺失或命中多个平台角色时路由失败；不得把“平台”抽象主体直接入账。 |
 | AC-ROUTE-005 | 路由失败不写账 | 账户不存在、币种不一致、余额不足、周期缺失、规则不唯一或外部账户被当作内部主体。 | 返回明确失败原因或进入人工处理。 | 不生成 posting plan、LedgerEntry 或余额投影；不得自动换路径试入账。 |
-| AC-ROUTE-006 | 授权路由周期隔离 | 授权占用资金、信用额度或预算。 | route snapshot 保存主体、账目、账本周期和授权快照。 | 预算或信用的非 `LIFETIME` 周期必须有 `periodId`；释放和结算必须回到原周期。 |
+| AC-ROUTE-006 | 授权路由周期隔离 | 授权占用资金、信用额度或预算。 | route snapshot 保存主体、账目、账本周期和授权快照。 | 预算或信用的非 LIFETIME 周期必须有 periodId；释放和结算必须回到原周期。 |
 
 ### 5.2.1 支付工具、绑定和资金来源
 
@@ -98,55 +98,55 @@ flowchart TD
 
 ### 5.3 授权、撤销与结算
 
-`AC-AUTH-008` 至 `AC-AUTH-010` 是发卡授权控制扩展用例，只在 VCC、企业卡、员工卡或发卡产品启用 spend-controls 时纳入验收；资金底座默认授权能力要求 `AC-AUTH-001` 至 `AC-AUTH-007`，并通过 `AC-AUTH-011`、`AC-AUTH-012` 覆盖外部无前置授权但需要入账或退款的授权链异常事实。
+AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企业卡、员工卡或发卡产品启用 spend-controls 时纳入验收；资金底座默认授权能力要求 AC-AUTH-001 至 AC-AUTH-007，并通过 AC-AUTH-011、AC-AUTH-012 覆盖外部无前置授权但需要入账或退款的授权链异常事实。
 
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
 | --- | --- | --- | --- | --- |
-| AC-AUTH-001 | 授权成功 | 资金账户、信用账户或预算组可用余额充足。 | `AVAILABLE -> AUTHORIZATION`。 | 授权成功不是最终消费；保存授权快照。 |
+| AC-AUTH-001 | 授权成功 | 资金账户、信用账户或预算组可用余额充足。 | AVAILABLE -> AUTHORIZATION。 | 授权成功不是最终消费；保存授权快照。 |
 | AC-AUTH-002 | 多主体授权 | 资金、信用、预算多个主体共同参与。 | 全部成功或全部失败。 | 不允许部分主体入账成功、部分失败。 |
 | AC-AUTH-003 | 授权拒绝 | 风控、额度或余额不足。 | 记录拒绝原因，不生成账务路径。 | 不生成 route leg 和 LedgerEntry，不计入争议拒付。 |
-| AC-AUTH-004 | 授权撤销释放 | 原授权存在且剩余可释放，外部明确撤销或冲正。 | `AUTHORIZATION -> AVAILABLE`。 | 基于原快照，超剩余释放失败；撤销终态和过期终态可区分。 |
-| AC-AUTH-005 | 授权过期释放 | 原授权到期且存在剩余授权金额。 | `AUTHORIZATION -> AVAILABLE`，状态为 `EXPIRED`。 | 只释放剩余授权；不得释放已完成金额。 |
-| AC-AUTH-006 | 授权部分结算 | 原授权存在，结算金额小于剩余授权。 | 占用减少，商户或平台目标增加，剩余授权可释放。 | 不写 `AUTHORIZATION -> LIMIT`，不新增账务 `CONSUMED`。 |
+| AC-AUTH-004 | 授权撤销释放 | 原授权存在且剩余可释放，外部明确撤销或冲正。 | AUTHORIZATION -> AVAILABLE。 | 基于原快照，超剩余释放失败；撤销终态和过期终态可区分。 |
+| AC-AUTH-005 | 授权过期释放 | 原授权到期且存在剩余授权金额。 | AUTHORIZATION -> AVAILABLE，状态为 EXPIRED。 | 只释放剩余授权；不得释放已完成金额。 |
+| AC-AUTH-006 | 授权部分结算 | 原授权存在，结算金额小于剩余授权。 | 占用减少，商户或平台目标增加，剩余授权可释放。 | 不写 AUTHORIZATION -> LIMIT，不新增账务 CONSUMED。 |
 | AC-AUTH-007 | 授权结算后退款 | 原结算交易存在。 | 基于原结算快照回补。 | 累计退款和争议不得超过已结算金额；退款不得按当前绑定重新选路。 |
-| AC-AUTH-011 | 无授权强制完成 | 外部没有前置授权，但确认发生了必须入账的消费结果。 | 使用 `settle` 的强制完成模式入账。 | 不伪造授权占用；必须有策略、上限、原因和审计；不得污染授权生命周期。 |
-| AC-AUTH-012 | 无授权直接退款 | 无前置授权，但存在外部原消费、原完成或差错凭证。 | 使用 `settleRefund` 的无授权退款模式回补。 | 不补造原授权；必须保留原事实引用、原因、凭证和审计；无原消费或凭证不得静默退款。 |
+| AC-AUTH-011 | 无授权强制完成 | 外部没有前置授权，但确认发生了必须入账的消费结果。 | 使用 settle 的强制完成模式入账。 | 不伪造授权占用；必须有策略、上限、原因和审计；不得污染授权生命周期。 |
+| AC-AUTH-012 | 无授权直接退款 | 无前置授权，但存在外部原消费、原完成或差错凭证。 | 使用 settleRefund 的无授权退款模式回补。 | 不补造原授权；必须保留原事实引用、原因、凭证和审计；无原消费或凭证不得静默退款。 |
 | AC-AUTH-008 | 发卡扩展：支出规则命中拒绝 | 授权请求命中禁用 MCC、商户、国家、POS、PAN entry mode、CVV/AVS 或金额规则。 | 授权拒绝，返回可解释原因。 | 记录命中规则、规则版本和审计信息；不生成 route、LedgerEntry 或 chargeback。 |
 | AC-AUTH-009 | 发卡扩展：周期限额命中拒绝 | 授权请求超过日、周、月或自定义周期内的金额或次数窗口。 | 授权拒绝，累计窗口不被错误推进。 | 周期窗口口径明确；不得用清算账期、报表周期或归档水位替代支出窗口。 |
-| AC-AUTH-010 | 发卡扩展：支出规则通过后授权占用 | 卡状态、支出规则、风控、预算和余额均通过。 | 进入资金路由并生成 `AVAILABLE -> AUTHORIZATION`。 | 支出规则只做前置决策，账务变化仍由 route 和 ledger 负责。 |
+| AC-AUTH-010 | 发卡扩展：支出规则通过后授权占用 | 卡状态、支出规则、风控、预算和余额均通过。 | 进入资金路由并生成 AVAILABLE -> AUTHORIZATION。 | 支出规则只做前置决策，账务变化仍由 route 和 ledger 负责。 |
 
 ### 5.4 冻结、解冻、调额、调账与负余额
 
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
 | --- | --- | --- | --- | --- |
-| AC-CTRL-001 | 冻结成功 | 主体可用余额充足，原因、期限和权限合法。 | 创建冻结单，`AVAILABLE -> FROZEN`。 | 冻结不创建资金交易，不改变资金归属。 |
-| AC-CTRL-002 | 解冻成功 | 原冻结单存在，剩余冻结金额充足。 | `FROZEN -> AVAILABLE`。 | 超额解冻失败，释放记录可审计。 |
+| AC-CTRL-001 | 冻结成功 | 主体可用余额充足，原因、期限和权限合法。 | 创建冻结单，AVAILABLE -> FROZEN。 | 冻结不创建资金交易，不改变资金归属。 |
+| AC-CTRL-002 | 解冻成功 | 原冻结单存在，剩余冻结金额充足。 | FROZEN -> AVAILABLE。 | 超额解冻失败，释放记录可审计。 |
 | AC-CTRL-003 | 冻结后扣划 | 原冻结单存在，后续需追偿或调账。 | 创建独立资金事实并引用冻结单。 | 不通过修改冻结状态表达消费。 |
 | AC-CTRL-004 | 编号保留 | 预留给余额控制专项补充场景。 | 不作为验收用例。 | 评审和测试不应按缺失用例处理。 |
 | AC-ADJ-001 | 资金调账 | 财务或运营提交原因、凭证、审批和差错引用。 | 作为直接交易调账或对账差错调账事实，生成平衡调账分录。 | 不修改历史分录；不通过余额控制表达跨主体价值转移；无审批失败。 |
-| AC-CTRL-005 | 信用额度调整 | 管理员调增或调减信用额度。 | `LIMIT` 和 `AVAILABLE` 按规则变化。 | `LIMIT` 不作为普通交易 source/target。 |
-| AC-CTRL-006 | 预算调整 | 管理员调增或调减预算。 | 预算 `LIMIT` 和 `AVAILABLE` 变化。 | 预算不是资金，不入现金流。 |
-| AC-CTRL-007 | 受控负余额 | 后置费用、争议费、清算差额、追偿或调额导致 `AVAILABLE` 为负。 | 负余额进入报表、风控、抵扣或追偿。 | 必须有来源、策略、上限、账龄和处理路径。 |
-| AC-CTRL-008 | 负余额后继续交易 | 主体 `AVAILABLE` 已为负仍继续支付、冻结、授权或出款。 | 失败或进入策略审批。 | 不得把负余额当作可继续消费余额。 |
-| AC-CTRL-009 | 月度预算周期隔离 | 预算组存在 `MONTHLY/2026-04` 和 `MONTHLY/2026-05` 两个账本 bucket。 | 2026-05 的授权、冻结或调整只影响 2026-05。 | 不得消费、释放或抵扣 2026-04 的余额。 |
-| AC-CTRL-010 | 默认生命周期账本 | 普通资金账户未显式传周期。 | 使用 `LIFETIME/LIFETIME` 账本 bucket。 | 不得因缺 `periodId` 错配到天、月或自定义周期 bucket。 |
-| AC-CTRL-011 | 自定义周期预算 | 企业预算按合同周期 `CUSTOM_CYCLE` 管理。 | 周期 ID、起止规则、时区、日切和规则版本可查询。 | 缺周期 ID 或规则版本不得入账。 |
+| AC-CTRL-005 | 信用额度调整 | 管理员调增或调减信用额度。 | LIMIT 和 AVAILABLE 按规则变化。 | LIMIT 不作为普通交易 source/target。 |
+| AC-CTRL-006 | 预算调整 | 管理员调增或调减预算。 | 预算 LIMIT 和 AVAILABLE 变化。 | 预算不是资金，不入现金流。 |
+| AC-CTRL-007 | 受控负余额 | 后置费用、争议费、清算差额、追偿或调额导致 AVAILABLE 为负。 | 负余额进入报表、风控、抵扣或追偿。 | 必须有来源、策略、上限、账龄和处理路径。 |
+| AC-CTRL-008 | 负余额后继续交易 | 主体 AVAILABLE 已为负仍继续支付、冻结、授权或出款。 | 失败或进入策略审批。 | 不得把负余额当作可继续消费余额。 |
+| AC-CTRL-009 | 月度预算周期隔离 | 预算组存在 MONTHLY/2026-04 和 MONTHLY/2026-05 两个账本 bucket。 | 2026-05 的授权、冻结或调整只影响 2026-05。 | 不得消费、释放或抵扣 2026-04 的余额。 |
+| AC-CTRL-010 | 默认生命周期账本 | 普通资金账户未显式传周期。 | 使用 LIFETIME/LIFETIME 账本 bucket。 | 不得因缺 periodId 错配到天、月或自定义周期 bucket。 |
+| AC-CTRL-011 | 自定义周期预算 | 企业预算按合同周期 CUSTOM_CYCLE 管理。 | 周期 ID、起止规则、时区、日切和规则版本可查询。 | 缺周期 ID 或规则版本不得入账。 |
 | AC-CTRL-012 | 业务主体解析为账务主体 | 请求中包含用户、商户、平台角色、信用账户、预算组、卡或外部账户引用。 | route snapshot 和 LedgerEntry 只能使用资金账户、信用账户、预算组或解析后的平台账户角色作为账务主体。 | 用户 ID、商户 ID、业务订单、卡、VA、银行账户、支付工具和通道账户不得直接作为可记账主体。 |
 
 ### 5.5 清分、清算、结算与出款
 
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
 | --- | --- | --- | --- | --- |
-| AC-CLR-001 | 交易进入可清分 | 商户订单收款成功、已过账、命中商户 `CLEARING`，明细和快照完整。 | 生成可清分明细。 | 可追溯到交易、明细、route snapshot、posting plan、账本交易和分录。 |
-| AC-CLR-002 | 可清分准入排除 | 交易未成功、未过账、非 `CLEARING` 分录、来源不完整、策略解析失败或重复入批。 | 不生成可清分明细，并记录不可清分原因。 | 不进入清分批次，不从余额或报表反推明细。 |
-| AC-CLR-003 | 清分批次确认 | 可清分明细满足主体、币种、清分周期、业务线和规则版本分组。 | 清分批次确认，固化明细归类和规则快照。 | 不触发 `CLEARING -> AVAILABLE`，批次摘要、明细集合和规则版本可审计。 |
+| AC-CLR-001 | 交易进入可清分 | 商户订单收款成功、已过账、命中商户 CLEARING，明细和快照完整。 | 生成可清分明细。 | 可追溯到交易、明细、route snapshot、posting plan、账本交易和分录。 |
+| AC-CLR-002 | 可清分准入排除 | 交易未成功、未过账、非 CLEARING 分录、来源不完整、策略解析失败或重复入批。 | 不生成可清分明细，并记录不可清分原因。 | 不进入清分批次，不从余额或报表反推明细。 |
+| AC-CLR-003 | 清分批次确认 | 可清分明细满足主体、币种、清分周期、业务线和规则版本分组。 | 清分批次确认，固化明细归类和规则快照。 | 不触发 CLEARING -> AVAILABLE，批次摘要、明细集合和规则版本可审计。 |
 | AC-CLR-004 | 进入可清算候选 | 清分批次已确认，清算账期满足，退款、争议、风控、对账差错均可放行。 | 生成可清算候选。 | 候选来自已确认清分批次，不重复进入未关闭清算批次。 |
 | AC-CLR-005 | 清算候选排除 | 清分结果存在退款中、争议中、冻结、重大差错或风控阻断。 | 候选被排除并记录原因。 | 不进入清算批次。 |
-| AC-CLR-006 | 清算批次确认 | 可清算候选被锁定，清算批次复核通过。 | 商户 `CLEARING -> AVAILABLE`。 | 批次重跑不重复清算，清算确认可追溯到候选、批次和账本。 |
+| AC-CLR-006 | 清算批次确认 | 可清算候选被锁定，清算批次复核通过。 | 商户 CLEARING -> AVAILABLE。 | 批次重跑不重复清算，清算确认可追溯到候选、批次和账本。 |
 | AC-SET-001 | 结算单生成 | 商户可结算余额、费用、扣减项和规则版本完整。 | 生成结算净额。 | 每个金额项可追溯到明细或审批。 |
-| AC-SET-002 | 结算锁定 | 结算单复核通过。 | 商户 `AVAILABLE -> SETTLEMENT`。 | 出款中金额不可再次结算；默认一张结算单只能生成一张出款单。 |
-| AC-SET-003 | 出款成功 | 外部成功回单金额一致。 | 关闭 `SETTLEMENT` 或 `IN_TRANSIT`，出款完成。 | 外部 reference、账本、结算单可核对。 |
-| AC-SET-004 | 出款失败 | 外部明确失败。 | `SETTLEMENT/IN_TRANSIT -> AVAILABLE`。 | 只回退一次，失败原因可审计。 |
+| AC-SET-002 | 结算锁定 | 结算单复核通过。 | 商户 AVAILABLE -> SETTLEMENT。 | 出款中金额不可再次结算；默认一张结算单只能生成一张出款单。 |
+| AC-SET-003 | 出款成功 | 外部成功回单金额一致。 | 关闭 SETTLEMENT 或 IN_TRANSIT，出款完成。 | 外部 reference、账本、结算单可核对。 |
+| AC-SET-004 | 出款失败 | 外部明确失败。 | SETTLEMENT/IN_TRANSIT -> AVAILABLE。 | 只回退一次，失败原因可审计。 |
 | AC-SET-005 | 已出款后退款或拒付 | 商户资金已出款完成。 | 进入追偿、准备金、负余额或后续抵扣。 | 不回滚已完成出款。 |
 
 ### 5.6 对账、差错与核销
@@ -164,7 +164,7 @@ flowchart TD
 | AC-REC-009 | 账实一致验收 | 内部账本需要对应外部现金、文件或回单。 | 生成账实匹配结果。 | 内部账务主体、账目和余额桶必须能映射到银行流水、通道文件、托管户流水或外部回单。 |
 | AC-REC-010 | 账账一致验收 | 业务账、支付账、账户账、商户账、总账、明细账需要核对。 | 生成账账匹配结果。 | 同一业务事实在各账的金额、方向、主体、状态一致，汇总等于明细。 |
 | AC-REC-011 | 单账一致验收 | 业务单、支付单、退款单、清分批次、清算批次、结算单、调账单需要核对。 | 生成单账匹配结果。 | 有单无账、有账无单、重复单据均进入差错，不得人工忽略。 |
-| AC-REC-012 | 余额一致验收 | 资金账户、信用账户、预算组、平台账户角色需要按余额桶核对。 | 输出余额桶公式校验结果。 | `CLEARING`、`AVAILABLE`、`SETTLEMENT`、`IN_TRANSIT`、`FROZEN` 等桶分别满足期初、本期入出和期末公式。 |
+| AC-REC-012 | 余额一致验收 | 资金账户、信用账户、预算组、平台账户角色需要按余额桶核对。 | 输出余额桶公式校验结果。 | CLEARING、AVAILABLE、SETTLEMENT、IN_TRANSIT、FROZEN 等桶分别满足期初、本期入出和期末公式。 |
 | AC-REC-013 | 有解释差异放行 | 文件延迟、手续费尾差、汇率尾差、跨日归属等低风险差异。 | 进入有条件放行或暂缓。 | 必须有差异类型、金额、主体、币种、责任方、审批、阈值、账龄、风险承接和到期重查。 |
 | AC-REC-014 | 重大差错阻断 | 错主体、错币种、金额不平、余额公式不成立、重复出款、缺分录或外部失败内部成功。 | 阻断清分、清算、结算、出款或报表发布。 | 不允许带原因放行；必须补事实、冲正、调账、挂账、追偿或核销后重新对账。 |
 | AC-REC-015 | 对账任务生命周期 | 对账任务创建、收数、匹配、差异、阻断、重跑、关闭。 | 每次运行有状态和报告。 | 任务失败、文件延迟、等待超时、重跑和人工关闭都必须保留审计；重跑不得覆盖旧运行记录。 |
@@ -174,16 +174,16 @@ flowchart TD
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
 | --- | --- | --- | --- | --- |
 | AC-VIEW-001 | 用户账单生成 | 成功交易、冻结、退款或授权事件。 | 用户视角账单行。 | 来源事实和账本引用可追溯。 |
-| AC-VIEW-002 | 商户账单生成 | 商户收款、清算、退款、结算或出款事件。 | 商户视角账单行。 | 区分 `CLEARING/AVAILABLE/SETTLEMENT`。 |
+| AC-VIEW-002 | 商户账单生成 | 商户收款、清算、退款、结算或出款事件。 | 商户视角账单行。 | 区分 CLEARING/AVAILABLE/SETTLEMENT。 |
 | AC-VIEW-003 | 运营时间线 | 交易、冻结、对账、争议、审批事件。 | 统一时间线。 | 时间线不写回事实层。 |
 | AC-BALLOG-001 | 余额变更日志生成 | 账本分录完成且余额投影已更新。 | 生成余额变更观察事件或业务余额日志。 | 包含主体、账本、账目、币种、账本周期、变更前余额、变更后余额、变更额、ledger transaction、ledger entry 和业务引用；日志失败不回滚余额投影。 |
 | AC-ARCH-001 | 归档前检查 | 计划归档历史交易、交易明细、账目交易或账目明细。 | 预检查结果。 | 缺检查点、缺水位、缺对象策略、缺重放边界或巡检失败不得归档。 |
 | AC-ARCH-002 | 归档后余额重建 | 历史账目明细已冷归档，检查点和水位存在。 | 重建目标时点余额。 | 使用水位前检查点加水位后增量账目明细，不读交易投影。 |
-| AC-ARCH-003 | 水位推进 | 本次处理区间为 `[W0, W1)`。 | 校验通过后水位推进到 W1。 | 失败时水位停留在 W0。 |
+| AC-ARCH-003 | 水位推进 | 本次处理区间为 [W0, W1)。 | 校验通过后水位推进到 W1。 | 失败时水位停留在 W0。 |
 | AC-ARCH-004 | 归档对象策略 | 准备归档资金交易、交易明细、账目交易或账目明细。 | 生成对象化归档清单。 | 每类对象都有可归档前提、必留引用、冷热位置、数量金额摘要和 Manifest，不允许笼统归档“历史数据”。 |
-| AC-ARCH-005 | 余额快照计算 | 指定主体、账本、账目、币种、账本周期和目标水位。 | 生成余额检查点或冷汇总。 | 使用账目明细 `postedAt` 区间和借贷方向计算，不能使用自然日、归档日期、报表日期或交易投影。 |
+| AC-ARCH-005 | 余额快照计算 | 指定主体、账本、账目、币种、账本周期和目标水位。 | 生成余额检查点或冷汇总。 | 使用账目明细 postedAt 区间和借贷方向计算，不能使用自然日、归档日期、报表日期或交易投影。 |
 | AC-ARCH-005A | 热区余额快照 | 目标边界内分录仍在热区。 | 余额快照可校验通过。 | 不强制要求 Manifest；必须校验热区分录、last entry cursor、借贷摘要和 digest。 |
-| AC-ARCH-005B | 冷区余额快照 | 目标边界内分录已进入冷区。 | 余额快照可校验通过或输出阻断差异。 | 必须引用已完成 Manifest；缺 Manifest、Manifest 未完成或摘要不一致时不得进入 `VERIFIED`。 |
+| AC-ARCH-005B | 冷区余额快照 | 目标边界内分录已进入冷区。 | 余额快照可校验通过或输出阻断差异。 | 必须引用已完成 Manifest；缺 Manifest、Manifest 未完成或摘要不一致时不得进入 VERIFIED。 |
 | AC-ARCH-005C | 混合余额快照 | 目标边界横跨热区和冷区。 | 余额快照可校验通过或输出阻断差异。 | 冷区按 Manifest 校验，热区按游标校验，合并摘要一致后才可推进余额水位。 |
 | AC-ARCH-006 | 交易归档后的重放边界 | 资金交易或交易明细已进入冷区。 | 输出允许重放起点、终点和事实源位置。 | 冷区不可读或 Manifest 不一致时，不得正式覆盖热区起点之前的交易投影。 |
 | AC-ARCH-007 | 账务归档后的余额边界 | 账目交易或账目明细已进入冷区。 | 历史余额仍可重建，当前余额不受影响。 | 冷区账目明细可按水位、游标和 Manifest 读取；未被检查点覆盖的账目明细不得归档。 |
@@ -200,7 +200,7 @@ flowchart TD
 | AC-RAIL-002 | VCC 授权拒绝 | 卡状态、风控或额度不通过。 | 记录拒绝事实。 | 不生成账务路径，不计入争议拒付。 |
 | AC-RAIL-003 | ACH return | ACH 已提交后收到 return code。 | 生成 return 处理对象和资金处理事实。 | return 不是普通退款。 |
 | AC-RAIL-004 | ACH NOC | 收到 NOC 通知。 | 更新后续使用信息或生成运营任务。 | NOC 不改原交易资金事实。 |
-| AC-RAIL-005 | 全球付款报文成功但未到账 | 合作方返回 message sent。 | 进入 `IN_TRANSIT` 或出款单待确认状态。 | 不展示为已到账，不关闭 `SETTLEMENT/IN_TRANSIT`。 |
+| AC-RAIL-005 | 全球付款报文成功但未到账 | 合作方返回 message sent。 | 进入 IN_TRANSIT 或出款单待确认状态。 | 不展示为已到账，不关闭 SETTLEMENT/IN_TRANSIT。 |
 | AC-RAIL-006 | 全球付款退汇 | 原付款被退回。 | 生成退汇事实、费用和责任处理。 | 退汇不是退款。 |
 | AC-FX-001 | 错币种到账 | 期望 USD，实际 EUR。 | 挂账、驳回或生成错币种差错。 | 不自动按 USD 入账。 |
 | AC-FX-002 | 业务换汇调整 | 有外部或业务 FX 决策快照。 | 记录原币、目标币、汇率、费用和审批。 | 底座不声明执行结售汇。 |
@@ -223,7 +223,7 @@ flowchart TD
 
 ## 6. 必须失败的红线用例
 
-本章红线 ID 是产品验收口径，表示业务和资金安全上“什么必须失败”。TDD 文档中的 `TDD-RED-*` 是工程测试口径，编号不要求与本章 `RED-*` 同号匹配；跨文档追踪以第 8 章映射表和 TDD 文档的产品验收覆盖门禁为准，避免把同一编号误认为同一风险。
+本章红线 ID 是产品验收口径，表示业务和资金安全上“什么必须失败”。TDD 文档中的 TDD-RED-* 是工程测试口径，编号不要求与本章 RED-* 同号匹配；跨文档追踪以第 8 章映射表和 TDD 文档的产品验收覆盖门禁为准，避免把同一编号误认为同一风险。
 
 | 红线 ID | 场景 | 必须失败的条件 |
 | --- | --- | --- |
@@ -233,13 +233,13 @@ flowchart TD
 | RED-004 | 退款超额 | 累计退款超过剩余可退金额。 |
 | RED-005 | 授权拒绝混入拒付 | 授权拒绝被计入争议拒付或生成账务路径。 |
 | RED-006 | 冻结表达消费 | 冻结单状态被用来表达扣划、消费或付款完成。 |
-| RED-007 | 商户款直入可结算 | 商户订单收款直接进入 `AVAILABLE` 或 `SETTLEMENT`。 |
-| RED-008 | 出款中自动退款 | 商户资金在 `SETTLEMENT` 阶段被自动回退给用户。 |
+| RED-007 | 商户款直入可结算 | 商户订单收款直接进入 AVAILABLE 或 SETTLEMENT。 |
+| RED-008 | 出款中自动退款 | 商户资金在 SETTLEMENT 阶段被自动回退给用户。 |
 | RED-009 | 不平衡分录 | 任一 posting plan 借贷不平仍写账。 |
 | RED-010 | 无审批调账 | 调账缺原因、凭证、审批或差错引用。 |
 | RED-011 | 对账差异直接改账 | 对账发现差异后直接修改历史分录或余额。 |
 | RED-012 | 投影污染事实 | 用户账单、商户账单、运营时间线写回资金交易或账本。 |
-| RED-013 | 负余额继续消费 | `AVAILABLE < 0` 时无策略继续支付、授权、冻结或出款。 |
+| RED-013 | 负余额继续消费 | AVAILABLE < 0 时无策略继续支付、授权、冻结或出款。 |
 | RED-014 | 错币种静默入账 | 实际币种与期望币种不一致，却无汇率、审批和差错记录直接入账。 |
 | RED-015 | 交易层自动换汇 | 底座自动调用 FX 并生成目标币种入账。 |
 | RED-016 | 无范围全量重放 | 生产交易投影重放没有单笔、主体、窗口、视图域或批次范围。 |
@@ -248,20 +248,20 @@ flowchart TD
 | RED-019 | 先推进水位再计算 | 批处理先更新水位，再计算区间分录。 |
 | RED-020 | 结算策略解析失败静默实时 | 策略表达式解析失败却按实时结算处理。 |
 | RED-021 | 未确认资质开放持牌能力 | 未确认许可证、经营地域、合作机构责任就启用支付账户、备付金、跨境或外汇能力。 |
-| RED-022 | 周期账本串账 | 同主体、同币种、同账目下，`MONTHLY/2026-05` 的交易命中 `2026-04` 或其他周期 bucket。 |
-| RED-023 | 非生命周期周期缺 periodId | `periodType` 不是 `LIFETIME` 却没有明确 `periodId`，仍然继续入账或查询。 |
-| RED-024 | 用清结算账期替代账本周期 | 把清算账期、结算周期、报表周期或归档水位当作账本 bucket 的 `periodId`。 |
+| RED-022 | 周期账本串账 | 同主体、同币种、同账目下，MONTHLY/2026-05 的交易命中 2026-04 或其他周期 bucket。 |
+| RED-023 | 非生命周期周期缺 periodId | periodType 不是 LIFETIME 却没有明确 periodId，仍然继续入账或查询。 |
+| RED-024 | 用清结算账期替代账本周期 | 把清算账期、结算周期、报表周期或归档水位当作账本 bucket 的 periodId。 |
 | RED-025 | 发卡扩展支出规则拒绝仍入账 | 授权已被 spend rule 拒绝，却继续生成 route、posting plan 或 LedgerEntry。 |
 | RED-026 | 发卡扩展支出规则无版本审计 | 授权拒绝只返回失败，不记录命中规则、规则版本、原因和请求摘要。 |
 | RED-027 | 发卡扩展支出窗口和账本周期混用 | 把 spend rule 的日/月/自定义累计窗口直接当作账本事实隔离，或反过来用账本周期替代规则累计口径。 |
 | RED-028 | 后台直接改账 | 运营后台提供直接修改余额、分录或投影的入口。 |
 | RED-029 | 指标异常反写事实 | 指标结果缺失、重复、异常或来源不一致后，反向修改交易、账本、余额、清结算或对账状态。 |
 | RED-030 | 清结算对象混用 | 未区分可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单和追偿单，就用一个对象或一个状态机表达。 |
-| RED-031 | 清分或候选即入账 | 可清分明细、清分批次或清算候选未经过清算批次确认就触发 `CLEARING -> AVAILABLE`。 |
+| RED-031 | 清分或候选即入账 | 可清分明细、清分批次或清算候选未经过清算批次确认就触发 CLEARING -> AVAILABLE。 |
 | RED-032 | 结算单等同出款单 | 结算单锁定后未等外部回单就展示为出款成功。 |
 | RED-033 | 差错核销未重新对账 | 差错单被人工关闭，但没有补事实、冲正、调账、挂账、追偿或重新对账结果。 |
 | RED-034 | Manifest 缺失仍归档成功 | 归档任务缺少 Manifest、检查点或校验摘要仍标记完成。 |
-| RED-035 | 发卡扩展进入默认核心能力 | 未确认 VCC、企业卡、员工卡或发卡产品启用，就把 `ISSUING_SPEND_CONTROLS` 作为资金底座默认核心能力。 |
+| RED-035 | 发卡扩展进入默认核心能力 | 未确认 VCC、企业卡、员工卡或发卡产品启用，就把 ISSUING_SPEND_CONTROLS 作为资金底座默认核心能力。 |
 | RED-036 | 余额日志反写余额 | 业务余额变更日志、订阅事件或通知被当作余额事实源，反向修改分录或余额投影。 |
 | RED-037 | 重大对账差错仍放行 | 错主体、错币种、金额不平、重复出款、缺分录、余额公式不成立或外部失败内部成功仍进入资金释放。 |
 | RED-038 | 清算缺前置对账 | 清分批次确认后未完成清算前置对账，就生成清算候选或确认清算批次。 |
@@ -271,7 +271,7 @@ flowchart TD
 | RED-042 | 汇总补造交易明细 | 交易明细缺失后，用汇总金额、报表结果或投影结果补造商户明细、清结算明细或账务引用。 |
 | RED-043 | 路由规则不唯一仍入账 | 多个账户、账目、平台角色或规则同时命中时，系统随机选择一个路径并继续入账。 |
 | RED-044 | 路由失败自动换路径 | 账户缺失、余额不足、币种不一致、周期缺失或外部账户误用时，系统自动改走其他路径入账。 |
-| RED-045 | 普通支付误入商户清算 | 非商户订单收款场景被默认路由到商户 `CLEARING`。 |
+| RED-045 | 普通支付误入商户清算 | 非商户订单收款场景被默认路由到商户 CLEARING。 |
 | RED-046 | 支付工具直接入账 | 卡、VA、外部账户、通道 token、钱包标识或支付工具 ID 被写成 LedgerEntry 主体或余额投影主体。 |
 | RED-047 | 支付工具敏感信息泄露 | 完整卡号、CVV、密钥、token secret、银行账户敏感号或身份凭证进入普通快照、日志、导出或报表。 |
 | RED-048 | 工具换绑导致历史重路由 | 退款、撤销、退费或拒付按当前工具绑定、当前默认资金来源或当前费率重新选路。 |
@@ -300,28 +300,28 @@ flowchart TD
 
 ## 8. PRD 用例到 DSL 场景映射
 
-本表只做产品验收到 DSL 场景的入口映射，不展开接口、测试类或工程细节。路由类用例用于把 PRD 的资金路径口径映射到 DSL 的 `expectedRoute`、`RouteSnapshot` 和 `PostingPlan`；发卡授权控制类用例属于扩展映射，不代表资金底座默认必须启用。
+本表只做产品验收到 DSL 场景的入口映射，不展开接口、测试类或工程细节。路由类用例用于把 PRD 的资金路径口径映射到 DSL 的 expectedRoute、RouteSnapshot 和 PostingPlan；发卡授权控制类用例属于扩展映射，不代表资金底座默认必须启用。
 
 | 产品验收 ID | DSL 场景 | 产品关注点 |
 | --- | --- | --- |
-| `AC-ROUTE-001` | `DIRECT_TRANSACTION / PAY`、`DSL-DIRECT-PAY-FEE-001`、`expectedRoute.routeCode=DIRECT_PAY_STANDARD` | 商户收款必须固化用户、商户、平台费用角色和规则版本；本金入商户 `CLEARING`，平台费用入 `FEE`，不得净额混记。 |
-| `AC-ROUTE-002` | `DIRECT_TRANSACTION / PAY` 普通支付路由变体 | 非商户订单收款不默认进入商户 `CLEARING`；收款方账目以产品命令和业务场景明确指定。 |
-| `AC-ROUTE-003` | `DIRECT_TRANSACTION / REFUND`、`DSL-REVERSE-REFUND-FEE-001`、`referenceRouteSnapshotId` | 退款按原 route snapshot 反向回放，不按当前账户绑定、当前费率或当前配置重新选路；累计退款不得超额。 |
-| `AC-ROUTE-004` | `RouteSnapshot` 平台角色、`expectedRoute.legs` | 平台费用、预收待付、现金映射和调整账户必须解析到唯一平台账户角色；缺失或多命中时不入账。 |
-| `AC-ROUTE-005` | `expectedRouteCreated=false`、`expectedPostingCreated=false` | 账户缺失、币种不一致、余额不足、周期缺失、规则不唯一或外部账户误用时，失败不生成 route、posting、entry。 |
-| `AC-ROUTE-006` | `AUTHORIZATION_TRANSACTION / AUTHORIZE`、`DSL-AUTH-LIFECYCLE-001` | 授权占用保存主体、账目、账本周期和授权快照；释放和结算必须回到原周期。 |
-| `AC-PI-001` 至 `AC-PI-007` | `PaymentInstrumentRefSpec`、`ExternalAccountRefSpec`、`RoutingDecisionSpec`、`FundingAllocationDecisionSpec`、`RouteSnapshotSpec`、`BindingHistory` | 支付工具只做路由输入和快照引用；工具绑定、方向、状态、资金来源决策、账户能力和绑定历史审计必须可解释；逆向交易按原快照回放。 |
-| `AC-AUTH-011` | `AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`DSL-AUTH-FORCE-CAPTURE-001` | 无前置授权的外部消费结果通过 `settle` 承接，不伪造授权占用；策略、上限、原因和审计必填。 |
-| `AC-AUTH-012` | `AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式、`DSL-AUTH-REFUND-001` | 无前置授权但有外部原消费、原完成或差错凭证时通过 `settleRefund` 承接；不得补造授权占用或静默退款。 |
-| `RED-043` | `expectedRouteCreated=false` | 多个账户、账目、平台角色或规则同时命中时，不能随机选择路径继续入账。 |
-| `RED-044` | `expectedRouteCreated=false`、`expectedPostingCreated=false` | 路由失败不能自动换路径试入账，也不能写账本事实或余额投影。 |
-| `RED-045` | `DIRECT_TRANSACTION / PAY` 普通支付路由变体 | 非商户订单收款不得被默认套入商户清算链路。 |
-| `AC-AUTH-008` | `AUTHORIZATION_CONTROL_DECLINE` / `DSL-AUTHORIZATION-CONTROL-SPEND-RULE-DECLINE-001` | 支出规则命中拒绝、拒绝原因、规则版本、请求摘要和审计。 |
-| `AC-AUTH-009` | `AUTHORIZATION_CONTROL_VELOCITY_DECLINE` | 日、周、月或自定义周期的金额/次数窗口，不能和账本周期混用。 |
-| `AC-AUTH-010` | `AUTHORIZATION_CONTROL_APPROVE_THEN_AUTHORIZE` | 授权控制通过后才进入资金路由；通过不等于授权占用成功。 |
-| `RED-025` | `AUTHORIZATION_CONTROL_DECLINE` | 支出规则拒绝后不得生成 route、posting plan 或 LedgerEntry。 |
-| `RED-026` | `AUTHORIZATION_CONTROL_DECLINE` | 拒绝必须保留规则版本、原因和请求摘要。 |
-| `RED-027` | `AUTHORIZATION_CONTROL_VELOCITY_DECLINE` | 支出窗口和账本周期双向隔离。 |
+| AC-ROUTE-001 | DIRECT_TRANSACTION / PAY、DSL-DIRECT-PAY-FEE-001、expectedRoute.routeCode=DIRECT_PAY_STANDARD | 商户收款必须固化用户、商户、平台费用角色和规则版本；本金入商户 CLEARING，平台费用入 FEE，不得净额混记。 |
+| AC-ROUTE-002 | DIRECT_TRANSACTION / PAY 普通支付路由变体 | 非商户订单收款不默认进入商户 CLEARING；收款方账目以产品命令和业务场景明确指定。 |
+| AC-ROUTE-003 | DIRECT_TRANSACTION / REFUND、DSL-REVERSE-REFUND-FEE-001、referenceRouteSnapshotId | 退款按原 route snapshot 反向回放，不按当前账户绑定、当前费率或当前配置重新选路；累计退款不得超额。 |
+| AC-ROUTE-004 | RouteSnapshot 平台角色、expectedRoute.legs | 平台费用、预收待付、现金映射和调整账户必须解析到唯一平台账户角色；缺失或多命中时不入账。 |
+| AC-ROUTE-005 | expectedRouteCreated=false、expectedPostingCreated=false | 账户缺失、币种不一致、余额不足、周期缺失、规则不唯一或外部账户误用时，失败不生成 route、posting、entry。 |
+| AC-ROUTE-006 | AUTHORIZATION_TRANSACTION / AUTHORIZE、DSL-AUTH-LIFECYCLE-001 | 授权占用保存主体、账目、账本周期和授权快照；释放和结算必须回到原周期。 |
+| AC-PI-001 至 AC-PI-007 | PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、RouteSnapshotSpec、BindingHistory | 支付工具只做路由输入和快照引用；工具绑定、方向、状态、资金来源决策、账户能力和绑定历史审计必须可解释；逆向交易按原快照回放。 |
+| AC-AUTH-011 | AUTHORIZATION_TRANSACTION / SETTLE 强制完成模式、DSL-AUTH-FORCE-CAPTURE-001 | 无前置授权的外部消费结果通过 settle 承接，不伪造授权占用；策略、上限、原因和审计必填。 |
+| AC-AUTH-012 | AUTHORIZATION_TRANSACTION / AUTH_REFUND 无授权退款模式、DSL-AUTH-REFUND-001 | 无前置授权但有外部原消费、原完成或差错凭证时通过 settleRefund 承接；不得补造授权占用或静默退款。 |
+| RED-043 | expectedRouteCreated=false | 多个账户、账目、平台角色或规则同时命中时，不能随机选择路径继续入账。 |
+| RED-044 | expectedRouteCreated=false、expectedPostingCreated=false | 路由失败不能自动换路径试入账，也不能写账本事实或余额投影。 |
+| RED-045 | DIRECT_TRANSACTION / PAY 普通支付路由变体 | 非商户订单收款不得被默认套入商户清算链路。 |
+| AC-AUTH-008 | AUTHORIZATION_CONTROL_DECLINE / DSL-AUTHORIZATION-CONTROL-SPEND-RULE-DECLINE-001 | 支出规则命中拒绝、拒绝原因、规则版本、请求摘要和审计。 |
+| AC-AUTH-009 | AUTHORIZATION_CONTROL_VELOCITY_DECLINE | 日、周、月或自定义周期的金额/次数窗口，不能和账本周期混用。 |
+| AC-AUTH-010 | AUTHORIZATION_CONTROL_APPROVE_THEN_AUTHORIZE | 授权控制通过后才进入资金路由；通过不等于授权占用成功。 |
+| RED-025 | AUTHORIZATION_CONTROL_DECLINE | 支出规则拒绝后不得生成 route、posting plan 或 LedgerEntry。 |
+| RED-026 | AUTHORIZATION_CONTROL_DECLINE | 拒绝必须保留规则版本、原因和请求摘要。 |
+| RED-027 | AUTHORIZATION_CONTROL_VELOCITY_DECLINE | 支出窗口和账本周期双向隔离。 |
 
 ### 8.1 用例族级追踪索引
 
@@ -329,16 +329,16 @@ flowchart TD
 
 | 产品验收族 | DSL 承接 | TDD 承接 | 追踪重点 |
 | --- | --- | --- | --- |
-| `AC-IN-*`、`AC-PAY-*`、`AC-MER-*`、`AC-FEE-*` | `DIRECT_TRANSACTION`、`DSL-DIRECT-PAY-FEE-001`、`DSL-DIRECT-FUND-IN-FEE-001`、`DSL-DIRECT-CHAIN-001`、`DSL-REVERSE-REFUND-FEE-001` | `TDD-DIR-*`、`TDD-DIR-FLOW-*`、`TDD-DIR-ERR-*` | 入金、付款、商户收款、转账、提现、退款、手续费和退费都能说明 route、posting、余额桶、幂等和原路径回放。 |
-| `AC-ROUTE-*`、`AC-PI-*`、`RED-043` 至 `RED-049` | `RouteSnapshotSpec`、`RouteLegSpec`、`PaymentInstrumentRefSpec`、`ExternalAccountRefSpec`、`RoutingDecisionSpec`、`FundingAllocationDecisionSpec`、`Route Replay DSL`、`BindingHistory`、`DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`DSL-PAYMENT-INSTRUMENT-FAIL-001`、`DSL-PAYMENT-INSTRUMENT-REPLAY-001`、`expectedRouteCreated=false` | `TDD-ROUTE-*`、`TDD-WALLET-*`、`TDD-RACE-009`、`TDD-RED-001`、`TDD-RED-003`、`TDD-RED-029`、`TDD-RED-034` 至 `TDD-RED-037` | 路由只解析路径，不写账；支付工具和外部账户只做引用；绑定、方向、状态、资金来源、账户能力和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
-| `AC-AUTH-*`、`AC-RAIL-001`、`AC-RAIL-002` | `AUTHORIZATION_TRANSACTION`、`DSL-AUTH-LIFECYCLE-001`、`DSL-AUTH-FORCE-CAPTURE-001`、`DSL-AUTH-REFUND-001` | `TDD-AUTH-*`、`TDD-AUTH-FLOW-*`、`TDD-AUTH-ERR-*`、`TDD-AUTH-EXT-*` | 授权批准、拒绝、撤销、过期、普通完成、强制完成、完成后退款、无授权退款和发卡控制扩展边界一致。 |
-| `AC-CTRL-*`、`RED-013` | `BALANCE_CONTROL`、`DSL-BALANCE-CONTROL-FREEZE-001`、`DSL-BALANCE-CONTROL-LIMIT-BUDGET-001`、`DSL-DIRECT-OVERDRAFT-001` | `TDD-CTRL-*`、`TDD-CTRL-FLOW-*`、`TDD-CTRL-ERR-*`、`TDD-WALLET-*`、`TDD-RED-012` | 冻结、解冻、信用额度、预算组和受控负余额不混用；`LIMIT` 只能由调额触碰；无策略负余额不得继续消费；余额控制不承接跨主体调账。 |
-| `AC-ADJ-001`、`RED-010` | `DIRECT_TRANSACTION / ADJUST`、`DSL-SETTLEMENT-RECONCILIATION-ADJUST-001`、差错调账账务规则 | `TDD-RECON-001`、`TDD-RECON-002`、`TDD-CTRL-ERR-005`、`TDD-OPS-001` | 调账必须有差错或调整来源、审批、凭证、账本交易和重新对账依据；不得落到余额控制，不得直接修改历史分录或投影。 |
-| `AC-CLR-*`、`AC-SET-*`、`AC-REC-*` | `DSL-SETTLEMENT-RECONCILIATION-001`、`DSL-SETTLEMENT-CLEARING-CONFIRM-001`、`DSL-SETTLEMENT-LOCK-001`、`DSL-SETTLEMENT-PAYOUT-RESULT-001`、`DSL-SETTLEMENT-RECONCILIATION-ADJUST-001`、`DSL-SETTLEMENT-POLICY-001` | `TDD-CLS-*`、`TDD-CLS-FLOW-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-RED-020` 至 `TDD-RED-022`、`TDD-RED-031` | 清分、清算、结算、出款和对账对象独立；清分前基础对账、清算前置对账、差错追加事实、账期临界和重跑审计闭环可验证。 |
-| `AC-VIEW-*`、`AC-BALLOG-*` | `Projection DSL`、余额日志和交易投影只读边界 | `TDD-LEDGER-*`、`TDD-VIEW-*`、`TDD-RED-010`、`TDD-RED-013`、`TDD-RED-014` | 余额投影、余额日志和交易投影都从事实派生；日志失败不回滚事实；投影和日志不得修复余额。 |
-| `AC-ARCH-*`、`AC-REPLAY-*` | `Replay DSL` 中的投影重放边界、归档 Manifest、Checkpoint、Watermark、`DSL-GOVERNANCE-ARCHIVE-MANIFEST-001`、`DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`、`DSL-GOVERNANCE-PROJECTION-REPLAY-001` | `TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-004`、`TDD-RACE-010`、`TDD-RED-016` 至 `TDD-RED-019` | 归档只改变冷热位置；统一治理任务不替代资金归档 Manifest、余额水位或交易投影 checkpoint；余额快照按 `HOT_ONLY`、`COLD_MANIFEST`、`MIXED` 覆盖模式校验，只能从账本事实确认；余额重建只从检查点和增量分录出发；交易投影重放有范围、dry-run/apply 和差异报告。 |
-| `AC-RPT-*` | 指标项来源、口径版本、只读边界、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001` | `TDD-METRIC-*`、`TDD-RACE-010`、`TDD-RED-019` | 资金底座只列产品和业务关心的指标项；指标实现由报表指标模块承接，不反写资金事实；普通指标快照不能替代账本余额快照确认，指标水位不能参与余额水位推进、归档 Manifest 或交易投影重放 checkpoint。 |
-| `AC-OPS-*`、`RED-010`、`RED-011`、`RED-028` | 审计上下文、差错单、调账事实、运营处理引用 | `TDD-RECON-*`、`TDD-RED-*`、系分安全与审计测试 | 后台只推进处理单、审批、凭证和审计，不直接修改历史分录、余额或投影。 |
+| AC-IN-*、AC-PAY-*、AC-MER-*、AC-FEE-* | DIRECT_TRANSACTION、DSL-DIRECT-PAY-FEE-001、DSL-DIRECT-FUND-IN-FEE-001、DSL-DIRECT-CHAIN-001、DSL-REVERSE-REFUND-FEE-001 | TDD-DIR-*、TDD-DIR-FLOW-*、TDD-DIR-ERR-* | 入金、付款、商户收款、转账、提现、退款、手续费和退费都能说明 route、posting、余额桶、幂等和原路径回放。 |
+| AC-ROUTE-*、AC-PI-*、RED-043 至 RED-049 | RouteSnapshotSpec、RouteLegSpec、PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、Route Replay DSL、BindingHistory、DSL-PAYMENT-INSTRUMENT-ROUTE-001、DSL-PAYMENT-INSTRUMENT-FAIL-001、DSL-PAYMENT-INSTRUMENT-REPLAY-001、expectedRouteCreated=false | TDD-ROUTE-*、TDD-WALLET-*、TDD-RACE-009、TDD-RED-001、TDD-RED-003、TDD-RED-029、TDD-RED-034 至 TDD-RED-037 | 路由只解析路径，不写账；支付工具和外部账户只做引用；绑定、方向、状态、资金来源、账户能力和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
+| AC-AUTH-*、AC-RAIL-001、AC-RAIL-002 | AUTHORIZATION_TRANSACTION、DSL-AUTH-LIFECYCLE-001、DSL-AUTH-FORCE-CAPTURE-001、DSL-AUTH-REFUND-001 | TDD-AUTH-*、TDD-AUTH-FLOW-*、TDD-AUTH-ERR-*、TDD-AUTH-EXT-* | 授权批准、拒绝、撤销、过期、普通完成、强制完成、完成后退款、无授权退款和发卡控制扩展边界一致。 |
+| AC-CTRL-*、RED-013 | BALANCE_CONTROL、DSL-BALANCE-CONTROL-FREEZE-001、DSL-BALANCE-CONTROL-LIMIT-BUDGET-001、DSL-DIRECT-OVERDRAFT-001 | TDD-CTRL-*、TDD-CTRL-FLOW-*、TDD-CTRL-ERR-*、TDD-WALLET-*、TDD-RED-012 | 冻结、解冻、信用额度、预算组和受控负余额不混用；LIMIT 只能由调额触碰；无策略负余额不得继续消费；余额控制不承接跨主体调账。 |
+| AC-ADJ-001、RED-010 | DIRECT_TRANSACTION / ADJUST、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、差错调账账务规则 | TDD-RECON-001、TDD-RECON-002、TDD-CTRL-ERR-005、TDD-OPS-001 | 调账必须有差错或调整来源、审批、凭证、账本交易和重新对账依据；不得落到余额控制，不得直接修改历史分录或投影。 |
+| AC-CLR-*、AC-SET-*、AC-REC-* | DSL-SETTLEMENT-RECONCILIATION-001、DSL-SETTLEMENT-CLEARING-CONFIRM-001、DSL-SETTLEMENT-LOCK-001、DSL-SETTLEMENT-PAYOUT-RESULT-001、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、DSL-SETTLEMENT-POLICY-001 | TDD-CLS-*、TDD-CLS-FLOW-*、TDD-SETTLE-*、TDD-RECON-*、TDD-RED-020 至 TDD-RED-022、TDD-RED-031 | 清分、清算、结算、出款和对账对象独立；清分前基础对账、清算前置对账、差错追加事实、账期临界和重跑审计闭环可验证。 |
+| AC-VIEW-*、AC-BALLOG-* | Projection DSL、余额日志和交易投影只读边界 | TDD-LEDGER-*、TDD-VIEW-*、TDD-RED-010、TDD-RED-013、TDD-RED-014 | 余额投影、余额日志和交易投影都从事实派生；日志失败不回滚事实；投影和日志不得修复余额。 |
+| AC-ARCH-*、AC-REPLAY-* | Replay DSL 中的投影重放边界、归档 Manifest、Checkpoint、Watermark、DSL-GOVERNANCE-ARCHIVE-MANIFEST-001、DSL-GOVERNANCE-BALANCE-SNAPSHOT-001、DSL-GOVERNANCE-PROJECTION-REPLAY-001 | TDD-GOV-*、TDD-ARCH-*、TDD-REPLAY-*、TDD-METRIC-004、TDD-RACE-010、TDD-RED-016 至 TDD-RED-019 | 归档只改变冷热位置；统一治理任务不替代资金归档 Manifest、余额水位或交易投影 checkpoint；余额快照按 HOT_ONLY、COLD_MANIFEST、MIXED 覆盖模式校验，只能从账本事实确认；余额重建只从检查点和增量分录出发；交易投影重放有范围、dry-run/apply 和差异报告。 |
+| AC-RPT-* | 指标项来源、口径版本、只读边界、DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001 | TDD-METRIC-*、TDD-RACE-010、TDD-RED-019 | 资金底座只列产品和业务关心的指标项；指标实现由报表指标模块承接，不反写资金事实；普通指标快照不能替代账本余额快照确认，指标水位不能参与余额水位推进、归档 Manifest 或交易投影重放 checkpoint。 |
+| AC-OPS-*、RED-010、RED-011、RED-028 | 审计上下文、差错单、调账事实、运营处理引用 | TDD-RECON-*、TDD-RED-*、系分安全与审计测试 | 后台只推进处理单、审批、凭证和审计，不直接修改历史分录、余额或投影。 |
 
 ## 9. 交付检查清单
 
@@ -359,14 +359,14 @@ flowchart TD
 
 | 补强项 | 产品验收入口 | 通过标准 |
 | --- | --- | --- |
-| 状态机 | `AC-AUTH-*`、`AC-CTRL-*`、`AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`AC-ARCH-*`、`AC-REPLAY-*` | 每类对象都有状态方向、成功终态、失败终态、人工处理和审计要求。 |
-| 账务矩阵 | `AC-IN-*`、`AC-OUT-*`、`AC-PAY-*`、`AC-MER-*`、`AC-FEE-*`、`AC-ROUTE-*`、`AC-AUTH-*`、`AC-CTRL-*` | 每个资金变化都能说明来源账目、目标账目、周期口径、route snapshot 和余额断言。 |
-| 支付工具 | `AC-PI-*`、`RED-001`、`RED-046`、`RED-047`、`RED-048`、`RED-049` | 支付工具、外部账户和通道 token 只做引用和快照；绑定关系、方向、状态、资金来源决策、账户能力和绑定历史审计可验收；敏感信息不进入普通快照、日志、导出或报表。 |
-| 路由契约 | `AC-ROUTE-*`、`AC-PI-*`、`RED-003`、`RED-043` 至 `RED-049` | route snapshot、平台角色、支付工具引用、外部账户引用、资金来源决策、绑定历史审计、原路径回放、路由失败不写账和普通支付不误入商户清算可验收。 |
-| 运营后台 | `AC-OPS-*`、`RED-010`、`RED-011`、`RED-028` | 后台只推进处理单和审批，不直接修改历史分录、余额或投影。 |
-| 清结算对象 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`RED-020`、`RED-030`、`RED-031`、`RED-032`、`RED-033` | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单对象关系清楚。 |
-| 外部规则核验 | `AC-RAIL-*`、`AC-FX-*`、`RED-021` | 涉及卡组织、ACH、银行、PSP、跨境、外汇和持牌能力时，保留规则来源和待确认方。 |
-| 归档重放门禁 | `AC-ARCH-*`、`AC-REPLAY-*`、`RED-016`、`RED-017`、`RED-018`、`RED-019`、`RED-034`、`RED-040`、`RED-041`、`RED-042` | 归档、余额重建、交易投影重放都有范围、检查点、Manifest、水位、冷热事实源边界和差异报告。 |
-| 报表指标模块 | `AC-RPT-*`、`RED-029` | 指标只读、来源可解释、异常不反写资金事实；资金底座不承接指标计算、报表看板、导出订阅和指标任务水位。 |
-| 余额变更观察 | `AC-BALLOG-*`、`RED-036` | 余额日志只从分录和余额投影派生，可观察、可补偿、可审计，但不得反写事实层。 |
-| 发卡授权控制扩展 | `AC-AUTH-008`、`AC-AUTH-009`、`AC-AUTH-010`、`RED-025`、`RED-026`、`RED-027`、`RED-035` | `ISSUING_SPEND_CONTROLS` 只在发卡产品启用后纳入验收，不作为资金底座默认核心能力。 |
+| 状态机 | AC-AUTH-*、AC-CTRL-*、AC-CLR-*、AC-SET-*、AC-REC-*、AC-ARCH-*、AC-REPLAY-* | 每类对象都有状态方向、成功终态、失败终态、人工处理和审计要求。 |
+| 账务矩阵 | AC-IN-*、AC-OUT-*、AC-PAY-*、AC-MER-*、AC-FEE-*、AC-ROUTE-*、AC-AUTH-*、AC-CTRL-* | 每个资金变化都能说明来源账目、目标账目、周期口径、route snapshot 和余额断言。 |
+| 支付工具 | AC-PI-*、RED-001、RED-046、RED-047、RED-048、RED-049 | 支付工具、外部账户和通道 token 只做引用和快照；绑定关系、方向、状态、资金来源决策、账户能力和绑定历史审计可验收；敏感信息不进入普通快照、日志、导出或报表。 |
+| 路由契约 | AC-ROUTE-*、AC-PI-*、RED-003、RED-043 至 RED-049 | route snapshot、平台角色、支付工具引用、外部账户引用、资金来源决策、绑定历史审计、原路径回放、路由失败不写账和普通支付不误入商户清算可验收。 |
+| 运营后台 | AC-OPS-*、RED-010、RED-011、RED-028 | 后台只推进处理单和审批，不直接修改历史分录、余额或投影。 |
+| 清结算对象 | AC-CLR-*、AC-SET-*、AC-REC-*、RED-020、RED-030、RED-031、RED-032、RED-033 | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单对象关系清楚。 |
+| 外部规则核验 | AC-RAIL-*、AC-FX-*、RED-021 | 涉及卡组织、ACH、银行、PSP、跨境、外汇和持牌能力时，保留规则来源和待确认方。 |
+| 归档重放门禁 | AC-ARCH-*、AC-REPLAY-*、RED-016、RED-017、RED-018、RED-019、RED-034、RED-040、RED-041、RED-042 | 归档、余额重建、交易投影重放都有范围、检查点、Manifest、水位、冷热事实源边界和差异报告。 |
+| 报表指标模块 | AC-RPT-*、RED-029 | 指标只读、来源可解释、异常不反写资金事实；资金底座不承接指标计算、报表看板、导出订阅和指标任务水位。 |
+| 余额变更观察 | AC-BALLOG-*、RED-036 | 余额日志只从分录和余额投影派生，可观察、可补偿、可审计，但不得反写事实层。 |
+| 发卡授权控制扩展 | AC-AUTH-008、AC-AUTH-009、AC-AUTH-010、RED-025、RED-026、RED-027、RED-035 | ISSUING_SPEND_CONTROLS 只在发卡产品启用后纳入验收，不作为资金底座默认核心能力。 |
