@@ -25,6 +25,7 @@ import com.wind.integration.funds.route.spec.RoutingDecisionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.integration.funds.util.FundsDslMoneyParser;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -208,6 +210,36 @@ class FundsAmountBoundaryContractTests {
         assertThatThrownBy(() -> routeSnapshot(routeLeg(100L), routingDecision))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("funding account allocation amount sum overflow");
+    }
+
+    /**
+     * 场景：DSL JSON 契约把金额表达为币种和最小货币单位。
+     * 预期：只接受整数 minorValue；小数主单位、非正数和超 long 上限必须失败。
+     * 红线：金额解析不能静默截断、四舍五入或让超币种精度输入绕过 DSL 边界。
+     */
+    @Test
+    void testDslJsonMoneyShouldUsePositiveIntegerMinorValue() {
+        Money money = FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", 1));
+
+        assertThat(money).isEqualTo(Money.immutable(1L, CURRENCY));
+        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "value", "1.001")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("money.minorValue is required");
+        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "amount", "1.001")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("money.minorValue is required");
+        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", 0)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("money.minorValue must be positive");
+        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", new BigDecimal("1.001"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("money.minorValue must be integer");
+        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", "-9223372036854775809")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("money.minorValue must be positive");
+        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", "9223372036854775808")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("money.minorValue exceeds system limit");
     }
 
     private ImmutableFundsInstructionSpec fundsInstruction(long amount, BigDecimal exchangeRate) {
