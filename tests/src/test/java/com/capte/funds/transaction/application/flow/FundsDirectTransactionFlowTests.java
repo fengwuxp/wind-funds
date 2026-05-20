@@ -1,13 +1,18 @@
 package com.capte.funds.transaction.application.flow;
 
+import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
+import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;
@@ -170,6 +175,53 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(0);
+    }
+
+    /**
+     * 场景：USD 资金账户发起 CNY 直接付款。
+     * 输入：付款方充值 50 USD，随后向普通收款方付款 10 CNY。
+     * 输出：请求被拒绝；付款方、收款方和平台账户余额保持充值后的状态。
+     * 预期：直接交易只接受账户同币种金额，FX 必须由业务层显式完成后再提交资金指令。
+     * 红线：直接付款不得隐式换汇，不得留下 route、posting、ledger entry 或余额投影副作用。
+     */
+    @Test
+    void testPayWithDifferentCurrencyShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("different_currency_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        topup(payer, 50L, "DIRECT_PAY_CURRENCY_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(payer)
+                .setPayeeId(payee)
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CurrencyIsoCode.CNY)))
+                .setBusinessScene("PAY")
+                .setBusinessSn("DIRECT_PAY_CURRENCY_PAY")
+                .setDescription("pay with different currency"), WindOperator.system()))
+                .hasMessageContaining("transactionAmount.amount currency must equal account currency");
+
+        BalanceSnapshot afterRejectedPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRejectedPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
     }
 
     /**
