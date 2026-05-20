@@ -188,6 +188,42 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：付款方可用余额不足时发起系统内转账。
+     * 输入：付款方未充值，向收款方转账 10。
+     * 输出：请求被拒绝；付款方、收款方和平台账户余额均不变化。
+     * 预期：转账必须受付款方 AVAILABLE 余额约束，余额不足时整体事务回滚。
+     * 红线：转账余额不足不能留下 route、posting、ledger entry 或余额投影副作用。
+     */
+    @Test
+    void testTransferWithInsufficientBalanceShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("transfer_low_payee");
+        ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
+
+        BalanceSnapshot before = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> transfer(payer, payee, 10L, "DIRECT_TRANSFER_INSUFFICIENT"))
+                .hasMessageContaining("账本余额不足");
+
+        BalanceSnapshot afterRejectedTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTransfer,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
+    }
+
+    /**
      * 场景：付款方可用余额不足时发起直接付款。
      * 输入：付款方未充值，向普通收款方付款 10。
      * 输出：请求被拒绝；付款方、收款方和平台账户余额均不变化。
