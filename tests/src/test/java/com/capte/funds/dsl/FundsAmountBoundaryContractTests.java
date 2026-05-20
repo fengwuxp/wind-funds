@@ -5,8 +5,11 @@ import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.model.route.ImmutableFundingAllocationDecisionSpec;
+import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
+import com.wind.integration.funds.model.route.ImmutableRouteSnapshotSpec;
+import com.wind.integration.funds.model.route.ImmutableRoutingDecisionSpec;
 import com.wind.integration.funds.model.route.ImmutableSubjectRef;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.integration.funds.operation.FundsOperationActorSpec;
@@ -15,7 +18,9 @@ import com.wind.integration.funds.route.enums.RouteLegType;
 import com.wind.integration.funds.route.enums.RouteNodeRole;
 import com.wind.integration.funds.route.enums.RouteNodeType;
 import com.wind.integration.funds.route.ref.SubjectRef;
+import com.wind.integration.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
+import com.wind.integration.funds.route.spec.RoutingDecisionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
@@ -25,6 +30,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -103,6 +109,57 @@ class FundsAmountBoundaryContractTests {
                 .hasMessageContaining("funding allocation amount must be positive");
     }
 
+    /**
+     * 场景：支付工具或共享卡解析出真实资金账户资金来源，同时 route leg 表达实际资金路径。
+     * 预期：真实资金账户 funding allocation 合计必须等于正向资金消耗 leg 合计。
+     * 红线：多 leg 或多资金来源金额不闭合不得进入 ResolvedRoute 或 RouteSnapshot。
+     */
+    @Test
+    void testRouteShouldRejectUnclosedFundingAccountAllocationAmount() {
+        RouteLegSpecMismatch mismatch = routeLegSpecMismatch(100L, 80L);
+
+        assertThatThrownBy(() -> resolvedRoute(mismatch.leg(), mismatch.routingDecision()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+        assertThatThrownBy(() -> routeSnapshot(mismatch.leg(), mismatch.routingDecision()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+    }
+
+    /**
+     * 场景：共享卡 + 预算组 + 资金账户模型同时带预算控制和真实资金来源。
+     * 预期：预算组 allocation 不表达真实资金沉淀，不参与真实资金合计闭合；资金账户必须闭合。
+     * 红线：不能把预算组金额当作现金来源来掩盖真实资金账户不闭合。
+     */
+    @Test
+    void testBudgetGroupAllocationShouldNotReplaceFundingAccountClosure() {
+        assertThatThrownBy(() -> resolvedRoute(routeLeg(100L),
+                routingDecision(List.of(fundingAllocation("ALLOC-BUDGET-001",
+                                subjectRef("BG-001", FundsSubjectType.BUDGET_GROUP),
+                                100L,
+                                10,
+                                "BUDGET_CONTROL"),
+                        fundingAllocation("ALLOC-FA-001",
+                                subjectRef("FA-FUNDING-001", FundsSubjectType.FUNDING_ACCOUNT),
+                                80L,
+                                20,
+                                "REAL_FUNDING_ACCOUNT")))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+
+        resolvedRoute(routeLeg(100L),
+                routingDecision(List.of(fundingAllocation("ALLOC-BUDGET-002",
+                                subjectRef("BG-002", FundsSubjectType.BUDGET_GROUP),
+                                100L,
+                                10,
+                                "BUDGET_CONTROL"),
+                        fundingAllocation("ALLOC-FA-002",
+                                subjectRef("FA-FUNDING-002", FundsSubjectType.FUNDING_ACCOUNT),
+                                100L,
+                                20,
+                                "REAL_FUNDING_ACCOUNT"))));
+    }
+
     private ImmutableFundsInstructionSpec fundsInstruction(long amount, BigDecimal exchangeRate) {
         return fundsInstruction(amount, Money.immutable(amount, CURRENCY), exchangeRate);
     }
@@ -150,14 +207,81 @@ class FundsAmountBoundaryContractTests {
     }
 
     private ImmutableFundingAllocationDecisionSpec fundingAllocation(long amount) {
+        return fundingAllocation("ALLOC-AMOUNT-001", subjectRef("FA-FUNDING-001"), amount, 10, "AMOUNT_BOUNDARY");
+    }
+
+    private ImmutableFundingAllocationDecisionSpec fundingAllocation(String allocationId,
+                                                                     SubjectRef subjectRef,
+                                                                     long amount,
+                                                                     Integer priority,
+                                                                     String reason) {
         return ImmutableFundingAllocationDecisionSpec.builder()
-                .allocationId("ALLOC-AMOUNT-001")
-                .subjectRef(subjectRef("FA-FUNDING-001"))
+                .allocationId(allocationId)
+                .subjectRef(subjectRef)
                 .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
                 .amount(Money.immutable(amount, CURRENCY))
-                .priority(10)
-                .reason("AMOUNT_BOUNDARY")
+                .priority(priority)
+                .reason(reason)
                 .build();
+    }
+
+    private ImmutableResolvedRouteSpec resolvedRoute(ImmutableRouteLegSpec leg, RoutingDecisionSpec routingDecision) {
+        return ImmutableResolvedRouteSpec.builder()
+                .tenantId(1L)
+                .routeCode("AMOUNT_BOUNDARY_ROUTE")
+                .routeVersion("v1")
+                .businessScene("AMOUNT_BOUNDARY_DSL")
+                .businessSn("BIZ-AMOUNT-001")
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of())
+                .legs(List.of(leg))
+                .routingDecision(routingDecision)
+                .resolvedAt(EVENT_TIME)
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private ImmutableRouteSnapshotSpec routeSnapshot(ImmutableRouteLegSpec leg,
+                                                     RoutingDecisionSpec routingDecision) {
+        return ImmutableRouteSnapshotSpec.builder()
+                .tenantId(1L)
+                .snapshotId("RS-AMOUNT-001")
+                .snapshotSchemaVersion("v1")
+                .routeCode("AMOUNT_BOUNDARY_ROUTE")
+                .routeVersion("v1")
+                .businessScene("AMOUNT_BOUNDARY_DSL")
+                .businessSn("BIZ-AMOUNT-001")
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of())
+                .legs(List.of(leg))
+                .routingDecision(routingDecision)
+                .resolvedAt(EVENT_TIME)
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private RoutingDecisionSpec routingDecision(List<FundingAllocationDecisionSpec> fundingAllocations) {
+        return ImmutableRoutingDecisionSpec.builder()
+                .policyCode("AMOUNT_BOUNDARY_POLICY")
+                .matchedRules(List.of("AMOUNT_CLOSURE"))
+                .fundingAllocations(fundingAllocations)
+                .decisionReason("AMOUNT_BOUNDARY")
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private RouteLegSpecMismatch routeLegSpecMismatch(long routeLegAmount, long fundingAllocationAmount) {
+        ImmutableRouteLegSpec leg = routeLeg(routeLegAmount);
+        RoutingDecisionSpec routingDecision = routingDecision(List.of(fundingAllocation("ALLOC-MISMATCH-001",
+                subjectRef("FA-FUNDING-001"),
+                fundingAllocationAmount,
+                10,
+                "REAL_FUNDING_ACCOUNT")));
+        return new RouteLegSpecMismatch(leg, routingDecision);
     }
 
     private RouteNodeSpec routeNode(String subjectId, RouteNodeRole nodeRole) {
@@ -170,10 +294,14 @@ class FundsAmountBoundaryContractTests {
     }
 
     private SubjectRef subjectRef(String subjectId) {
+        return subjectRef(subjectId, FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
+    private SubjectRef subjectRef(String subjectId, FundsSubjectType subjectType) {
         return ImmutableSubjectRef.builder()
                 .tenantId(1L)
                 .subjectId(subjectId)
-                .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .subjectType(subjectType)
                 .currency(CURRENCY.name())
                 .ledgerProfileCode("DEFAULT")
                 .build();
@@ -211,5 +339,9 @@ class FundsAmountBoundaryContractTests {
         public Map<String, Object> getContextVariables() {
             return Map.of();
         }
+    }
+
+    private record RouteLegSpecMismatch(ImmutableRouteLegSpec leg,
+                                        RoutingDecisionSpec routingDecision) {
     }
 }
