@@ -20,6 +20,19 @@ public record ImmutableFundingAllocationDecisionSpec(String allocationId,
                                                      @Nullable String reason)
         implements FundingAllocationDecisionSpec {
 
+    public ImmutableFundingAllocationDecisionSpec {
+        if (priority == null) {
+            throw new IllegalArgumentException("funding allocation priority is required");
+        }
+        if (!hasText(reason)) {
+            throw new IllegalArgumentException("funding allocation reason is required");
+        }
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     @Override
     public @NonNull String getAllocationId() {
         return allocationId;

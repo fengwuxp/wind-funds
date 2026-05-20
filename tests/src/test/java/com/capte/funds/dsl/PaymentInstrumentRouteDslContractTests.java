@@ -65,14 +65,11 @@ class PaymentInstrumentRouteDslContractTests {
      */
     @Test
     void testRoutingDecisionShouldRecordFundingAllocationPriorityAndReason() {
-        FundingAllocationDecisionSpec allocation = ImmutableFundingAllocationDecisionSpec.builder()
-                .allocationId("ALLOC-001")
-                .subjectRef(fundingAccount("FA-PAYER-001"))
-                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
-                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
-                .priority(10)
-                .reason("DEFAULT_PAYMENT_INSTRUMENT")
-                .build();
+        FundingAllocationDecisionSpec allocation = fundingAllocation("ALLOC-001",
+                fundingAccount("FA-PAYER-001"),
+                LedgerSubjectCode.AVAILABLE,
+                10,
+                "DEFAULT_PAYMENT_INSTRUMENT");
 
         RoutingDecisionSpec decision = ImmutableRoutingDecisionSpec.builder()
                 .policyCode("PAYMENT_INSTRUMENT_ROUTE")
@@ -92,6 +89,110 @@ class PaymentInstrumentRouteDslContractTests {
             assertThat(item.getPriority()).isEqualTo(10);
             assertThat(item.getReason()).isEqualTo("DEFAULT_PAYMENT_INSTRUMENT");
         });
+    }
+
+    /**
+     * 场景：授权组合场景使用资金账户、共享卡 + 资金账户、共享卡 + 预算组 + 资金账户三种模型。
+     * 预期：RoutingDecision 能分别表达真实资金来源、工具快照和预算额度控制维度。
+     * 红线：共享卡不得替代真实资金账户；预算组不得成为唯一真实资金来源。
+     */
+    @Test
+    void testRoutingDecisionShouldCoverRequiredFundingSourceModels() {
+        RoutingDecisionSpec fundingAccountOnly = routingDecision("FUNDING_ACCOUNT_ONLY",
+                List.of(fundingAllocation("ALLOC-FA",
+                        fundingAccount("FA-AUTH-001"),
+                        LedgerSubjectCode.AVAILABLE,
+                        10,
+                        "REAL_FUNDING_ACCOUNT")));
+        PaymentInstrumentRefSpec sharedCard = paymentInstrumentRef("PI-SHARED-001",
+                "**** 1888",
+                Map.of("bindingRole", "SHARED_CARD", "bindingVersion", 5));
+        RoutingDecisionSpec sharedCardFundingAccount = routingDecision("SHARED_CARD_FUNDING_ACCOUNT",
+                List.of(fundingAllocation("ALLOC-SHARED-FA",
+                        fundingAccount("FA-AUTH-002"),
+                        LedgerSubjectCode.AVAILABLE,
+                        10,
+                        "SHARED_CARD_REAL_FUNDING_ACCOUNT")));
+        RoutingDecisionSpec sharedCardBudgetGroupFundingAccount = routingDecision("SHARED_CARD_BUDGET_GROUP_FUNDING_ACCOUNT",
+                List.of(fundingAllocation("ALLOC-BUDGET",
+                                budgetGroup("BG-AUTH-001"),
+                                LedgerSubjectCode.AVAILABLE,
+                                10,
+                                "BUDGET_CONTROL"),
+                        fundingAllocation("ALLOC-BUDGET-FA",
+                                fundingAccount("FA-AUTH-003"),
+                                LedgerSubjectCode.AVAILABLE,
+                                20,
+                                "REAL_FUNDING_ACCOUNT")));
+
+        assertThat(fundingAccountOnly.getFundingAllocations())
+                .extracting(item -> item.getSubjectRef().getSubjectType())
+                .containsExactly(FundsSubjectType.FUNDING_ACCOUNT);
+        assertThat(sharedCard.getBindingSnapshot()).containsEntry("bindingRole", "SHARED_CARD");
+        assertThat(sharedCardFundingAccount.getFundingAllocations())
+                .extracting(item -> item.getSubjectRef().getSubjectType())
+                .containsExactly(FundsSubjectType.FUNDING_ACCOUNT);
+        assertThat(sharedCardBudgetGroupFundingAccount.getFundingAllocations())
+                .extracting(item -> item.getSubjectRef().getSubjectType())
+                .containsExactly(FundsSubjectType.BUDGET_GROUP, FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
+    /**
+     * 场景：支付工具命中多条资金来源规则但没有确定资金来源。
+     * 预期：RoutingDecision 构造期拒绝缺失资金来源。
+     * 红线：缺资金来源仍生成 route 会让后续回放和审计无法解释。
+     */
+    @Test
+    void testRoutingDecisionShouldRejectMissingFundingAllocation() {
+        assertThatThrownBy(() -> routingDecision("MISSING_FUNDING_SOURCE", List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundingAllocations must not be empty");
+    }
+
+    /**
+     * 场景：支付工具资金来源存在多个候选，但优先级缺失或冲突。
+     * 预期：FundingAllocation 必须有确定优先级，RoutingDecision 不允许重复优先级。
+     * 红线：多来源命中不得随机选路。
+     */
+    @Test
+    void testRoutingDecisionShouldRejectMissingOrDuplicateFundingPriority() {
+        assertThatThrownBy(() -> fundingAllocation("ALLOC-NO-PRIORITY",
+                fundingAccount("FA-NO-PRIORITY"),
+                LedgerSubjectCode.AVAILABLE,
+                null,
+                "REAL_FUNDING_ACCOUNT"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding allocation priority is required");
+
+        assertThatThrownBy(() -> routingDecision("DUPLICATE_PRIORITY",
+                List.of(fundingAllocation("ALLOC-FA-01",
+                                fundingAccount("FA-DUP-001"),
+                                LedgerSubjectCode.AVAILABLE,
+                                10,
+                                "REAL_FUNDING_ACCOUNT"),
+                        fundingAllocation("ALLOC-FA-02",
+                                budgetGroup("BG-DUP-001"),
+                                LedgerSubjectCode.AVAILABLE,
+                                10,
+                                "BUDGET_CONTROL"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding allocation priority must be unique");
+    }
+
+    /**
+     * 场景：资金来源决策只有主体和金额，没有选择原因。
+     * 预期：FundingAllocation 构造期拒绝缺失原因。
+     * 红线：缺少选择原因的资金来源不能支撑争议、对账和回放解释。
+     */
+    @Test
+    void testFundingAllocationShouldRejectMissingReason() {
+        assertThatThrownBy(() -> fundingAllocation("ALLOC-NO-REASON",
+                fundingAccount("FA-NO-REASON"),
+                LedgerSubjectCode.AVAILABLE,
+                10,
+                " "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding allocation reason is required");
     }
 
     /**
@@ -151,6 +252,33 @@ class PaymentInstrumentRouteDslContractTests {
                 .build();
     }
 
+    private RoutingDecisionSpec routingDecision(String policyCode,
+                                                List<FundingAllocationDecisionSpec> fundingAllocations) {
+        return ImmutableRoutingDecisionSpec.builder()
+                .policyCode(policyCode)
+                .matchedRules(List.of("INSTRUMENT_ACTIVE", "DIRECTION_PAY", policyCode))
+                .selectedProcessor("CARD_PROCESSOR")
+                .fundingAllocations(fundingAllocations)
+                .decisionReason(policyCode + "_DECISION")
+                .contextVariables(Map.of("accountModel", policyCode))
+                .build();
+    }
+
+    private FundingAllocationDecisionSpec fundingAllocation(String allocationId,
+                                                            SubjectRef subjectRef,
+                                                            LedgerSubjectCode ledgerSubjectCode,
+                                                            Integer priority,
+                                                            String reason) {
+        return ImmutableFundingAllocationDecisionSpec.builder()
+                .allocationId(allocationId)
+                .subjectRef(subjectRef)
+                .ledgerSubjectCode(ledgerSubjectCode)
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .priority(priority)
+                .reason(reason)
+                .build();
+    }
+
     private RouteNodeSpec routeNode(SubjectRef subjectRef, RouteNodeRole nodeRole) {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
@@ -161,16 +289,32 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     private SubjectRef fundingAccount(String subjectId) {
+        return subjectRef(subjectId, FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
+    private SubjectRef budgetGroup(String subjectId) {
+        return subjectRef(subjectId, FundsSubjectType.BUDGET_GROUP);
+    }
+
+    private SubjectRef subjectRef(String subjectId, FundsSubjectType subjectType) {
         return ImmutableSubjectRef.builder()
                 .tenantId(1L)
                 .subjectId(subjectId)
-                .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .subjectType(subjectType)
                 .currency(CurrencyIsoCode.USD.name())
                 .ledgerProfileCode("DEFAULT")
                 .build();
     }
 
     private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentId, String instrumentNo) {
+        return paymentInstrumentRef(instrumentId,
+                instrumentNo,
+                Map.of("bindingId", "BINDING-001", "bindingVersion", 3));
+    }
+
+    private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentId,
+                                                          String instrumentNo,
+                                                          Map<String, Object> bindingSnapshot) {
         return ImmutablePaymentInstrumentRefSpec.builder()
                 .tenantId(1L)
                 .instrumentId(instrumentId)
@@ -180,7 +324,7 @@ class PaymentInstrumentRouteDslContractTests {
                 .ownerType("USER")
                 .currency(CurrencyIsoCode.USD.name())
                 .status("ACTIVE")
-                .bindingSnapshot(Map.of("bindingId", "BINDING-001", "bindingVersion", 3))
+                .bindingSnapshot(bindingSnapshot)
                 .build();
     }
 

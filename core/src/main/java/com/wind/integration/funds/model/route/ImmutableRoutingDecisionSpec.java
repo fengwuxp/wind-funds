@@ -6,8 +6,10 @@ import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 不可变路径决策说明实现。
@@ -26,7 +28,24 @@ public record ImmutableRoutingDecisionSpec(@Nullable String policyCode,
     public ImmutableRoutingDecisionSpec {
         matchedRules = List.copyOf(matchedRules == null ? List.of() : matchedRules);
         fundingAllocations = List.copyOf(fundingAllocations == null ? List.of() : fundingAllocations);
+        validateFundingAllocations(fundingAllocations);
         contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+    }
+
+    private static void validateFundingAllocations(List<FundingAllocationDecisionSpec> fundingAllocations) {
+        if (fundingAllocations.isEmpty()) {
+            throw new IllegalArgumentException("fundingAllocations must not be empty");
+        }
+        Set<Integer> priorities = new HashSet<>();
+        for (FundingAllocationDecisionSpec allocation : fundingAllocations) {
+            Integer priority = allocation.getPriority();
+            if (priority == null) {
+                throw new IllegalArgumentException("funding allocation priority is required");
+            }
+            if (!priorities.add(priority)) {
+                throw new IllegalArgumentException("funding allocation priority must be unique");
+            }
+        }
     }
 
     @Override
