@@ -98,6 +98,46 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
+     * 场景：用户充值后发起 0 金额冻结请求。
+     * 输入：充值 50、冻结 0。
+     * 输出：冻结请求失败，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持冻结前状态。
+     * 预期：0 金额不能进入资金指令、route、posting 或冻结单生命周期。
+     * 红线：余额控制不能用 0 金额伪造冻结动作、幂等占位或无账务观察事件。
+     */
+    @Test
+    void testFreezeWithZeroAmountShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        topup(user, 50L, "BALANCE_FREEZE_ZERO_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertThatThrownBy(() -> balanceControlService.freeze(new FundsBalanceFreezeRequest()
+                .setAccountId(user)
+                .setAmount(Money.immutable(0L, CURRENCY))
+                .setBusinessScene("FREEZE")
+                .setBusinessSn("BALANCE_FREEZE_ZERO_FREEZE")
+                .setDescription("freeze with zero amount"), WindOperator.system()))
+                .hasMessageContaining("fundsInstruction.amount must be positive");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertPostedTransactions(1);
+        assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_ZERO_FREEZE")).isFalse();
+    }
+
+    /**
      * 场景：资金账户余额调账请求缺少调账原因、凭证或审批引用。
      * 输入：同一个账户分别提交缺少原因、缺少凭证、缺少审批引用的调账请求。
      * 输出：三个请求均被拒绝，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持不变。
