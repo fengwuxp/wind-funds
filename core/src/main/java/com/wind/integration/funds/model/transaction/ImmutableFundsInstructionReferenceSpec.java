@@ -1,5 +1,6 @@
 package com.wind.integration.funds.model.transaction;
 
+import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import lombok.Builder;
@@ -22,6 +23,14 @@ public record ImmutableFundsInstructionReferenceSpec(FundsInstructionReferenceTy
         implements FundsInstructionReferenceSpec {
 
     public ImmutableFundsInstructionReferenceSpec {
+        AssertUtils.notNull(referenceType, "fundsInstruction.referenceType must not be null");
+        if (!hasText(referenceSn)
+                && !hasText(referenceBusinessSn)
+                && !hasText(referenceLedgerTransactionSn)
+                && !hasText(externalTransactionId)
+                && !hasText(authCode)) {
+            throw new IllegalArgumentException("fundsInstruction.reference identifier is required");
+        }
         contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
     }
 
@@ -59,6 +68,10 @@ public record ImmutableFundsInstructionReferenceSpec(FundsInstructionReferenceTy
     @Override
     public @Nullable String getAuthCode() {
         return authCode;
+    }
+
+    private static boolean hasText(@Nullable String value) {
+        return value != null && !value.isBlank();
     }
 
 }

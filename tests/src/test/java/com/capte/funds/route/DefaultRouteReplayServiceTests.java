@@ -35,6 +35,8 @@ import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -78,10 +80,7 @@ class DefaultRouteReplayServiceTests {
      */
     @Test
     void testResolveReplayInstructionWithBlankReferenceSnShouldFailClearly() {
-        FundsInstructionReferenceSpec reference = ImmutableFundsInstructionReferenceSpec.builder()
-                .referenceType(FundsInstructionReferenceType.ORIGINAL_TRANSACTION)
-                .referenceSn(" ")
-                .build();
+        FundsInstructionReferenceSpec reference = new BlankReferenceSpec();
 
         assertThatThrownBy(() -> routeReplayService.resolve(replayInstruction(reference)))
                 .hasMessageContaining(MISSING_REPLAY_REFERENCE_MESSAGE);
@@ -290,6 +289,44 @@ class DefaultRouteReplayServiceTests {
         @Override
         public Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(String transactionSn) {
             return Optional.of(routeSnapshot);
+        }
+    }
+
+    private static final class BlankReferenceSpec implements FundsInstructionReferenceSpec {
+
+        @Override
+        public @NonNull FundsInstructionReferenceType getReferenceType() {
+            return FundsInstructionReferenceType.ORIGINAL_TRANSACTION;
+        }
+
+        @Override
+        public @Nullable String getReferenceSn() {
+            return " ";
+        }
+
+        @Override
+        public @Nullable String getReferenceBusinessSn() {
+            return null;
+        }
+
+        @Override
+        public @Nullable String getReferenceLedgerTransactionSn() {
+            return null;
+        }
+
+        @Override
+        public @Nullable String getExternalTransactionId() {
+            return null;
+        }
+
+        @Override
+        public @Nullable String getAuthCode() {
+            return null;
+        }
+
+        @Override
+        public @NonNull Map<String, Object> getContextVariables() {
+            return Map.of();
         }
     }
 }
