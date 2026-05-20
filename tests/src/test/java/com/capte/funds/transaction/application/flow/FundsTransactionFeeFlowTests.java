@@ -23,6 +23,39 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
 
     /**
+     * 场景：账户没有可用余额时直接收取独立手续费。
+     * 输入：用户未充值，提交独立手续费 5。
+     * 输出：请求被拒绝；用户 AVAILABLE/FROZEN 和平台 FEE 余额均不变化。
+     * 预期：无受控负余额策略时，独立手续费不能把用户可用余额打成负数。
+     * 红线：手续费失败不能留下 route、posting、ledger entry 或余额投影副作用。
+     */
+    @Test
+    void testStandaloneFeeWithoutBalanceShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+
+        assertThatThrownBy(() -> fee(payer, 5L, "FEE_NO_BALANCE_CHARGE"))
+                .hasMessageContaining("账本余额不足");
+
+        BalanceSnapshot afterFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertPostedTransactions(0);
+    }
+
+    /**
      * 场景：用户充值后付款并收取手续费，随后发起本金退款，再单独退回手续费。
      * 输入：充值 100、付款 70、固定手续费 5、本金退款 30、手续费退回 5。
      * 输出：付款方 AVAILABLE、收款方 SETTLEMENT、平台 FEE/CASH/PREPAYMENT 余额快照和账务事实。

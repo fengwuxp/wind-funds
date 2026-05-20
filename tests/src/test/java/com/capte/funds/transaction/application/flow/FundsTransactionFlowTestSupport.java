@@ -51,6 +51,7 @@ import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSe
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
@@ -366,6 +367,16 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn(businessSn)
                 .setDescription("fee refund"), WindOperator.system());
+    }
+
+    protected void fee(FundsAccountId accountId, long amount, String businessSn) {
+        directTransactionService.fee(new FundsTransactionFeeRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setFeeType(DefaultFeeType.FEE.getCode())
+                .setBusinessScene("FEE")
+                .setBusinessSn(businessSn)
+                .setDescription("fee"), WindOperator.system());
     }
 
     protected void withdraw(FundsAccountId accountId, long amount, String referenceFreezeSn, String businessSn) {
