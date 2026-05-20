@@ -42,6 +42,8 @@ public class FundsBalanceControlInstructionConverter {
 
     private static final String ADJUST_APPROVAL_REF_REQUIRED_MESSAGE = "余额调账缺少审批引用";
 
+    private static final String UNFREEZE_REFERENCE_REQUIRED_MESSAGE = "余额解冻缺少原冻结单引用";
+
     private final FundsInstructionAmountSupport amountSupport;
 
     @Autowired
@@ -72,6 +74,7 @@ public class FundsBalanceControlInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToUnfreezeInstruction(@NonNull FundsBalanceUnfreezeRequest request,
                                                                       @NonNull WindOperator operator) {
+        requireUnfreezeReference(request);
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
@@ -81,9 +84,7 @@ public class FundsBalanceControlInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .reference(request.getReferenceFreezeSn() == null
-                        ? null
-                        : reference(FundsInstructionReferenceType.FREEZE_ORDER, request.getReferenceFreezeSn()))
+                .reference(reference(FundsInstructionReferenceType.FREEZE_ORDER, request.getReferenceFreezeSn()))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -93,6 +94,10 @@ public class FundsBalanceControlInstructionConverter {
                         FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
                         FundsInstructionContextKeys.REFERENCE_FREEZE_SN, request.getReferenceFreezeSn())))
                 .build();
+    }
+
+    private void requireUnfreezeReference(@NonNull FundsBalanceUnfreezeRequest request) {
+        AssertUtils.hasText(request.getReferenceFreezeSn(), UNFREEZE_REFERENCE_REQUIRED_MESSAGE);
     }
 
     public @NonNull FundsInstructionSpec convertToAdjustInstruction(@NonNull FundsBalanceAdjustRequest request,
