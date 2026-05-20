@@ -117,9 +117,8 @@ public interface LedgerTransactionSpec {
 
     default boolean isBalanced() {
         List<LedgerPostingPlanSpec> postingPlans = getPostingPlans();
-        return postingPlans != null
-                && !postingPlans.isEmpty()
-                && postingPlans.stream().allMatch(plan -> plan != null && plan.isBalanced())
+        return !postingPlans.isEmpty()
+                && postingPlans.stream().allMatch(LedgerPostingPlanSpec::isBalanced)
                 && getTotalCreditAmount().equals(getTotalDebitAmount());
     }
 }

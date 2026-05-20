@@ -107,28 +107,23 @@ public interface LedgerPostingPlanSpec {
 
     default boolean isBalanced() {
         List<LedgerEntrySpec> entries = getEntries();
-        return entries != null
-                && !entries.isEmpty()
+        return !entries.isEmpty()
                 && entries.stream().allMatch(LedgerPostingPlanSpec::isPostableEntry)
                 && getTotalCreditAmount().equals(getTotalDebitAmount());
     }
 
-    private static boolean isPostableEntry(LedgerEntrySpec entry) {
-        return entry != null
-                && hasText(entry.getSubjectId())
+    private static boolean isPostableEntry(@NonNull LedgerEntrySpec entry) {
+        return hasText(entry.getSubjectId())
                 && hasText(entry.getSubjectType())
-                && entry.getLedgerSubjectCode() != null
-                && entry.getLedgerSubjectCategory() != null
                 && hasText(entry.getLedgerTransactionSn())
-                && entry.getEntryType() != null
                 && isPositiveEntryAmount(entry);
     }
 
-    private static boolean isPositiveEntryAmount(LedgerEntrySpec entry) {
-        return entry.getAmount() != null && entry.getAmount().getAmount() > 0;
+    private static boolean isPositiveEntryAmount(@NonNull LedgerEntrySpec entry) {
+        return entry.getAmount().getAmount() > 0;
     }
 
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
+    private static boolean hasText(@NonNull String value) {
+        return !value.isBlank();
     }
 }

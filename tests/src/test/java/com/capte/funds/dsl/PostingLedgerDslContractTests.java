@@ -61,16 +61,16 @@ class PostingLedgerDslContractTests {
 
     /**
      * 场景：LedgerEntry 作为最小不可变账务事实进入 PostingPlan。
-     * 预期：分录必须具备主体、账目、类别、交易流水、借贷方向和正金额。
-     * 红线：字段缺失的分录不能靠借贷合计相等伪装成可入账事实。
+     * 预期：分录必须具备有效主体、交易流水和正金额。
+     * 红线：空白业务标识和非正金额不能靠借贷合计相等伪装成可入账事实。
      */
     @Test
-    void testPostingPlanShouldRequireCompleteEntryFields() {
+    void testPostingPlanShouldRequireUsableEntryValues() {
         LedgerPostingPlanSpec completePlan = postingPlan("PLAN-COMPLETE",
                 entry(EntrySide.DEBIT, 100L),
                 entry(EntrySide.CREDIT, 100L));
-        LedgerPostingPlanSpec missingSubject = postingPlan("PLAN-MISSING-SUBJECT",
-                entry(null,
+        LedgerPostingPlanSpec blankSubject = postingPlan("PLAN-BLANK-SUBJECT",
+                entry(" ",
                         FundsSubjectType.FUNDING_ACCOUNT.name(),
                         LedgerSubjectCode.AVAILABLE,
                         LedgerSubjectCategory.ASSET,
@@ -78,34 +78,16 @@ class PostingLedgerDslContractTests {
                         EntrySide.DEBIT,
                         100L),
                 entry(EntrySide.CREDIT, 100L));
-        LedgerPostingPlanSpec missingSubjectType = postingPlan("PLAN-MISSING-SUBJECT-TYPE",
+        LedgerPostingPlanSpec blankSubjectType = postingPlan("PLAN-BLANK-SUBJECT-TYPE",
                 entry("FA-DSL-DEBIT",
-                        null,
+                        " ",
                         LedgerSubjectCode.AVAILABLE,
                         LedgerSubjectCategory.ASSET,
                         "LE-DSL-001",
                         EntrySide.DEBIT,
                         100L),
                 entry(EntrySide.CREDIT, 100L));
-        LedgerPostingPlanSpec missingLedgerSubjectCode = postingPlan("PLAN-MISSING-SUBJECT-CODE",
-                entry("FA-DSL-DEBIT",
-                        FundsSubjectType.FUNDING_ACCOUNT.name(),
-                        null,
-                        LedgerSubjectCategory.ASSET,
-                        "LE-DSL-001",
-                        EntrySide.DEBIT,
-                        100L),
-                entry(EntrySide.CREDIT, 100L));
-        LedgerPostingPlanSpec missingLedgerSubjectCategory = postingPlan("PLAN-MISSING-SUBJECT-CATEGORY",
-                entry("FA-DSL-DEBIT",
-                        FundsSubjectType.FUNDING_ACCOUNT.name(),
-                        LedgerSubjectCode.AVAILABLE,
-                        null,
-                        "LE-DSL-001",
-                        EntrySide.DEBIT,
-                        100L),
-                entry(EntrySide.CREDIT, 100L));
-        LedgerPostingPlanSpec missingLedgerTransactionSn = postingPlan("PLAN-MISSING-TX",
+        LedgerPostingPlanSpec blankLedgerTransactionSn = postingPlan("PLAN-BLANK-TX",
                 entry("FA-DSL-DEBIT",
                         FundsSubjectType.FUNDING_ACCOUNT.name(),
                         LedgerSubjectCode.AVAILABLE,
@@ -114,33 +96,11 @@ class PostingLedgerDslContractTests {
                         EntrySide.DEBIT,
                         100L),
                 entry(EntrySide.CREDIT, 100L));
-        LedgerPostingPlanSpec missingEntrySide = postingPlan("PLAN-MISSING-SIDE",
-                entry("FA-DSL-DEBIT",
-                        FundsSubjectType.FUNDING_ACCOUNT.name(),
-                        LedgerSubjectCode.AVAILABLE,
-                        LedgerSubjectCategory.ASSET,
-                        "LE-DSL-001",
-                        null,
-                        100L),
-                entry(EntrySide.CREDIT, 100L));
-        LedgerPostingPlanSpec missingAmount = postingPlan("PLAN-MISSING-AMOUNT",
-                entry("FA-DSL-DEBIT",
-                        FundsSubjectType.FUNDING_ACCOUNT.name(),
-                        LedgerSubjectCode.AVAILABLE,
-                        LedgerSubjectCategory.ASSET,
-                        "LE-DSL-001",
-                        EntrySide.DEBIT,
-                        null),
-                entry(EntrySide.CREDIT, 100L));
 
         assertThat(completePlan.isBalanced()).isTrue();
-        assertThat(missingSubject.isBalanced()).isFalse();
-        assertThat(missingSubjectType.isBalanced()).isFalse();
-        assertThat(missingLedgerSubjectCode.isBalanced()).isFalse();
-        assertThat(missingLedgerSubjectCategory.isBalanced()).isFalse();
-        assertThat(missingLedgerTransactionSn.isBalanced()).isFalse();
-        assertThat(missingEntrySide.isBalanced()).isFalse();
-        assertThat(missingAmount.isBalanced()).isFalse();
+        assertThat(blankSubject.isBalanced()).isFalse();
+        assertThat(blankSubjectType.isBalanced()).isFalse();
+        assertThat(blankLedgerTransactionSn.isBalanced()).isFalse();
     }
 
     /**
@@ -192,29 +152,13 @@ class PostingLedgerDslContractTests {
                                   String ledgerTransactionSn,
                                   EntrySide side,
                                   long amount) {
-        return entry(subjectId,
-                subjectType,
-                ledgerSubjectCode,
-                ledgerSubjectCategory,
-                ledgerTransactionSn,
-                side,
-                Money.immutable(amount, CurrencyIsoCode.USD));
-    }
-
-    private LedgerEntrySpec entry(String subjectId,
-                                  String subjectType,
-                                  LedgerSubjectCode ledgerSubjectCode,
-                                  LedgerSubjectCategory ledgerSubjectCategory,
-                                  String ledgerTransactionSn,
-                                  EntrySide side,
-                                  Money amount) {
         return new TestLedgerEntrySpec(subjectId,
                 subjectType,
                 ledgerSubjectCode,
                 ledgerSubjectCategory,
                 ledgerTransactionSn,
                 side,
-                amount);
+                Money.immutable(amount, CurrencyIsoCode.USD));
     }
 
     private LedgerTransactionSpec ledgerTransaction(List<LedgerPostingPlanSpec> postingPlans) {
