@@ -235,6 +235,54 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
+     * 场景：用户充值后发起超过可用余额的减少调账请求。
+     * 输入：充值 50、减少调账 80，并给齐调账原因、凭证和审批引用。
+     * 输出：调账请求失败，用户 AVAILABLE/FROZEN 与平台调整挂账余额保持调账前状态。
+     * 预期：默认调账减少必须遵守 AVAILABLE 不可为负约束。
+     * 红线：余额调账不能借人工审批语义绕过余额约束、透支客户资金或留下半成功账务事实。
+     */
+    @Test
+    void testBalanceDecreaseAdjustWithInsufficientAvailableBalanceShouldLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId adjustmentAccount = fundingAccount("platform_adjustment");
+        ensureLedger(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT);
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(), adjustmentAccount));
+
+        topup(user, 50L, "BALANCE_ADJUST_DECREASE_FAIL_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(), adjustmentAccount));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
+                delta(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY));
+
+        assertThatThrownBy(() -> balanceControlService.adjust(new FundsBalanceAdjustRequest()
+                .setAccountId(user)
+                .setAmount(Money.immutable(80L, CURRENCY))
+                .setIncrease(Boolean.FALSE)
+                .setBusinessScene("BALANCE_ADJUST")
+                .setBusinessSn("BALANCE_ADJUST_DECREASE_FAIL_ADJUST")
+                .setAdjustReason("customer service balance decrease adjust")
+                .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_DECREASE_FAIL")
+                .setApprovalRef("APPROVAL_BALANCE_ADJUST_DECREASE_FAIL")
+                .setDescription("balance decrease adjust exceeds available"), WindOperator.system()))
+                .hasMessageContaining("账本余额不足");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(), adjustmentAccount));
+        assertOnlyBalanceDeltas(afterTopup, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
+                delta(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(adjustmentAccount), LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY);
+        assertPostedTransactions(1);
+    }
+
+    /**
      * 场景：资金账户余额调账请求缺少调账原因、凭证或审批引用。
      * 输入：同一个账户分别提交缺少原因、缺少凭证、缺少审批引用的调账请求。
      * 输出：三个请求均被拒绝，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持不变。
