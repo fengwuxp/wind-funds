@@ -29,6 +29,7 @@ import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
@@ -116,6 +117,10 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.notNull(request.getAccountId(), "直接付款账户不能为空");
         AssertUtils.notNull(request.getPayeeId(), "直接付款收款主体不能为空");
         AssertUtils.notNull(request.getPayeeLedgerCode(), "直接付款收款账目不能为空");
+        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
+                "直接付款账户不能是外部账户");
+        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getPayeeId()),
+                "直接付款收款主体不能是外部账户");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());

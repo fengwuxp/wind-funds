@@ -11,6 +11,7 @@ import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -246,6 +247,51 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessSn("DIRECT_PAY_MISSING_PAYEE")
                 .setDescription("pay without payee"), WindOperator.system()))
                 .hasMessageContaining("直接付款收款主体不能为空");
+
+        BalanceSnapshot afterRejectedPay = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRejectedPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+    }
+
+    /**
+     * 场景：直接付款把外部账户作为收款主体。
+     * 输入：付款方充值 50 后，提交外部银行账户作为 payeeId。
+     * 输出：请求被拒绝；付款方和平台账户余额保持充值后的状态。
+     * 预期：外部账户只能作为出入金引用或快照，不能成为 ledger subject。
+     * 红线：外部账户不得生成 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testPayToExternalAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId externalPayee = FundsAccountId.immutable("external_bank_payee",
+                DefaultFundsAccountType.EXTERNAL_BANK);
+
+        topup(payer, 50L, "DIRECT_PAY_EXTERNAL_PAYEE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(payer)
+                .setPayeeId(externalPayee)
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("PAY")
+                .setBusinessSn("DIRECT_PAY_EXTERNAL_PAYEE")
+                .setDescription("pay to external payee"), WindOperator.system()))
+                .hasMessageContaining("直接付款收款主体不能是外部账户");
 
         BalanceSnapshot afterRejectedPay = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterRejectedPay,
