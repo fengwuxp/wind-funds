@@ -192,6 +192,49 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
+     * 场景：用户充值后发起 0 金额余额调账请求。
+     * 输入：充值 50、调账 0，并给齐调账原因、凭证和审批引用。
+     * 输出：调账请求失败，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持调账前状态。
+     * 预期：0 金额不能进入余额调账指令、route、posting 或账本分录生命周期。
+     * 红线：调账不能用 0 金额绕过审计上下文、制造幂等占位或无账务观察事件。
+     */
+    @Test
+    void testBalanceAdjustWithZeroAmountShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        topup(user, 50L, "BALANCE_ADJUST_ZERO_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertThatThrownBy(() -> balanceControlService.adjust(new FundsBalanceAdjustRequest()
+                .setAccountId(user)
+                .setAmount(Money.immutable(0L, CURRENCY))
+                .setIncrease(Boolean.TRUE)
+                .setBusinessScene("BALANCE_ADJUST")
+                .setBusinessSn("BALANCE_ADJUST_ZERO_ADJUST")
+                .setAdjustReason("customer service balance adjust")
+                .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_ZERO")
+                .setApprovalRef("APPROVAL_BALANCE_ADJUST_ZERO")
+                .setDescription("balance adjust with zero amount"), WindOperator.system()))
+                .hasMessageContaining("fundsInstruction.amount must be positive");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertPostedTransactions(1);
+    }
+
+    /**
      * 场景：资金账户余额调账请求缺少调账原因、凭证或审批引用。
      * 输入：同一个账户分别提交缺少原因、缺少凭证、缺少审批引用的调账请求。
      * 输出：三个请求均被拒绝，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持不变。
