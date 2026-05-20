@@ -228,6 +228,61 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：提现确认把内部资金账户作为收款方。
+     * 输入：用户充值 100、冻结 60，随后用另一个资金账户作为提现 payeeId。
+     * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN、内部收款方和平台账户余额保持冻结后的状态。
+     * 预期：提现只能引用外部账户作为出款对象，系统内价值转移必须走 transfer。
+     * 红线：内部账户不能被伪装成提现收款方，不得释放冻结、生成出款 route、posting、ledger entry 或余额投影副作用。
+     */
+    @Test
+    void testWithdrawToInternalAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId internalPayee = fundingAccount("withdraw_internal_payee");
+        ensureLedger(internalPayee, LedgerSubjectCode.AVAILABLE);
+
+        topup(user, 100L, "WITHDRAW_INTERNAL_PAYEE_TOPUP");
+        String freezeSn = freeze(user, 60L, "WITHDRAW_INTERNAL_PAYEE_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, internalPayee, cashMappingAccount(),
+                prepaymentAccount()));
+
+        assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(user)
+                .setPayeeId(internalPayee)
+                .setReferenceFreezeSn(freezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_INTERNAL_PAYEE_CONFIRM")
+                .setDescription("withdraw to internal account"), WindOperator.system()))
+                .hasMessageContaining("withdraw payee must external account");
+
+        BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, internalPayee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterRejectedWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(internalPayee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
+        assertBucket(balance(internalPayee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name());
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_INTERNAL_PAYEE_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_INTERNAL_PAYEE_FREEZE").getReleasedAmount()).isZero();
+    }
+
+    /**
      * 场景：用户充值、冻结并提现成功后，又收到同一冻结来源的撤销或拒绝解冻请求。
      * 输入：充值 100、冻结 60、提现确认 60、随后解冻 60。
      * 输出：解冻请求失败；用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 保持提现成功后的状态。
