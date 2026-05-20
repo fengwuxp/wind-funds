@@ -20,6 +20,10 @@ final class RouteAmountClosureValidator {
 
     private static final String FUNDING_ACCOUNT_CLOSURE_MESSAGE =
             "funding account allocation amount must equal consume route amount";
+    private static final String FUNDING_ACCOUNT_ROUTE_AMOUNT_OVERFLOW_MESSAGE =
+            "funding account route amount sum overflow";
+    private static final String FUNDING_ACCOUNT_ALLOCATION_AMOUNT_OVERFLOW_MESSAGE =
+            "funding account allocation amount sum overflow";
 
     private RouteAmountClosureValidator() {
     }
@@ -45,7 +49,7 @@ final class RouteAmountClosureValidator {
             if (!isFundingAccountConsumeLeg(leg)) {
                 continue;
             }
-            add(result, leg.getAmount());
+            add(result, leg.getAmount(), FUNDING_ACCOUNT_ROUTE_AMOUNT_OVERFLOW_MESSAGE);
         }
         return result;
     }
@@ -62,12 +66,16 @@ final class RouteAmountClosureValidator {
             if (allocation.getSubjectRef().getSubjectType() != FundsSubjectType.FUNDING_ACCOUNT) {
                 continue;
             }
-            add(result, allocation.getAmount());
+            add(result, allocation.getAmount(), FUNDING_ACCOUNT_ALLOCATION_AMOUNT_OVERFLOW_MESSAGE);
         }
         return result;
     }
 
-    private static void add(Map<CurrencyIsoCode, Long> target, Money amount) {
-        target.merge(amount.getCurrency(), amount.getAmount(), Math::addExact);
+    private static void add(Map<CurrencyIsoCode, Long> target, Money amount, String overflowMessage) {
+        try {
+            target.merge(amount.getCurrency(), amount.getAmount(), Math::addExact);
+        } catch (ArithmeticException ex) {
+            throw new IllegalArgumentException(overflowMessage, ex);
+        }
     }
 }

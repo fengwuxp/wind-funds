@@ -19,6 +19,7 @@ import com.wind.integration.funds.route.enums.RouteNodeRole;
 import com.wind.integration.funds.route.enums.RouteNodeType;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.FundingAllocationDecisionSpec;
+import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RoutingDecisionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
@@ -160,6 +161,55 @@ class FundsAmountBoundaryContractTests {
                                 "REAL_FUNDING_ACCOUNT"))));
     }
 
+    /**
+     * 场景：多个真实资金账户 route leg 在同币种下累计超过系统可表达上限。
+     * 预期：累计过程必须显式失败，不能发生 long 溢出后继续比较闭合结果。
+     * 红线：批量路由、清结算或归档重放汇总不得用溢出后的金额入账或发布快照。
+     */
+    @Test
+    void testRouteShouldRejectFundingAccountRouteAmountOverflow() {
+        List<RouteLegSpec> legs = List.of(routeLeg("LEG-AMOUNT-001", Long.MAX_VALUE),
+                routeLeg("LEG-AMOUNT-002", 1L));
+        RoutingDecisionSpec routingDecision = routingDecision(List.of(fundingAllocation("ALLOC-FA-001",
+                subjectRef("FA-FUNDING-001"),
+                Long.MAX_VALUE,
+                10,
+                "REAL_FUNDING_ACCOUNT")));
+
+        assertThatThrownBy(() -> resolvedRoute(legs, routingDecision))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding account route amount sum overflow");
+        assertThatThrownBy(() -> routeSnapshot(legs, routingDecision))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding account route amount sum overflow");
+    }
+
+    /**
+     * 场景：多个真实资金账户 funding allocation 在同币种下累计超过系统可表达上限。
+     * 预期：累计过程必须显式失败，不能发生 long 溢出后继续通过闭合校验。
+     * 红线：共享卡或多资金来源分配不得用溢出后的金额掩盖真实资金来源超上限。
+     */
+    @Test
+    void testRouteShouldRejectFundingAllocationAmountOverflow() {
+        RoutingDecisionSpec routingDecision = routingDecision(List.of(fundingAllocation("ALLOC-FA-001",
+                        subjectRef("FA-FUNDING-001"),
+                        Long.MAX_VALUE,
+                        10,
+                        "REAL_FUNDING_ACCOUNT"),
+                fundingAllocation("ALLOC-FA-002",
+                        subjectRef("FA-FUNDING-002"),
+                        1L,
+                        20,
+                        "REAL_FUNDING_ACCOUNT")));
+
+        assertThatThrownBy(() -> resolvedRoute(routeLeg(100L), routingDecision))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding account allocation amount sum overflow");
+        assertThatThrownBy(() -> routeSnapshot(routeLeg(100L), routingDecision))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding account allocation amount sum overflow");
+    }
+
     private ImmutableFundsInstructionSpec fundsInstruction(long amount, BigDecimal exchangeRate) {
         return fundsInstruction(amount, Money.immutable(amount, CURRENCY), exchangeRate);
     }
@@ -187,11 +237,22 @@ class FundsAmountBoundaryContractTests {
         return routeLeg(amount, null, null);
     }
 
+    private ImmutableRouteLegSpec routeLeg(String legId, long amount) {
+        return routeLeg(legId, amount, null, null);
+    }
+
     private ImmutableRouteLegSpec routeLeg(long amount,
                                            AccountBalancePeriodType periodType,
                                            String periodId) {
+        return routeLeg("LEG-AMOUNT-001", amount, periodType, periodId);
+    }
+
+    private ImmutableRouteLegSpec routeLeg(String legId,
+                                           long amount,
+                                           AccountBalancePeriodType periodType,
+                                           String periodId) {
         return ImmutableRouteLegSpec.builder()
-                .legId("LEG-AMOUNT-001")
+                .legId(legId)
                 .sequence(1)
                 .legType(RouteLegType.CONSUME)
                 .sourceNode(routeNode("FA-SOURCE-001", RouteNodeRole.SOURCE))
@@ -226,6 +287,11 @@ class FundsAmountBoundaryContractTests {
     }
 
     private ImmutableResolvedRouteSpec resolvedRoute(ImmutableRouteLegSpec leg, RoutingDecisionSpec routingDecision) {
+        return resolvedRoute(List.of(leg), routingDecision);
+    }
+
+    private ImmutableResolvedRouteSpec resolvedRoute(List<RouteLegSpec> legs,
+                                                     RoutingDecisionSpec routingDecision) {
         return ImmutableResolvedRouteSpec.builder()
                 .tenantId(1L)
                 .routeCode("AMOUNT_BOUNDARY_ROUTE")
@@ -236,7 +302,7 @@ class FundsAmountBoundaryContractTests {
                 .eventType(FundsTransactionEventType.PAY)
                 .transactionType(DefaultFundsTransactionType.PAY)
                 .participants(List.of())
-                .legs(List.of(leg))
+                .legs(legs)
                 .routingDecision(routingDecision)
                 .resolvedAt(EVENT_TIME)
                 .contextVariables(Map.of())
@@ -244,6 +310,11 @@ class FundsAmountBoundaryContractTests {
     }
 
     private ImmutableRouteSnapshotSpec routeSnapshot(ImmutableRouteLegSpec leg,
+                                                     RoutingDecisionSpec routingDecision) {
+        return routeSnapshot(List.of(leg), routingDecision);
+    }
+
+    private ImmutableRouteSnapshotSpec routeSnapshot(List<RouteLegSpec> legs,
                                                      RoutingDecisionSpec routingDecision) {
         return ImmutableRouteSnapshotSpec.builder()
                 .tenantId(1L)
@@ -257,7 +328,7 @@ class FundsAmountBoundaryContractTests {
                 .eventType(FundsTransactionEventType.PAY)
                 .transactionType(DefaultFundsTransactionType.PAY)
                 .participants(List.of())
-                .legs(List.of(leg))
+                .legs(legs)
                 .routingDecision(routingDecision)
                 .resolvedAt(EVENT_TIME)
                 .contextVariables(Map.of())
