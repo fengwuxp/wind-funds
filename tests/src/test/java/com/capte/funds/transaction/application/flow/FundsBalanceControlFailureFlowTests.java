@@ -235,6 +235,49 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
+     * 场景：用户 USD 资金账户发起 CNY 余额调账请求。
+     * 输入：充值 50 USD、调账 10 CNY，并给齐调账原因、凭证和审批引用。
+     * 输出：调账请求失败，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持调账前状态。
+     * 预期：余额调账只接受同币种余额桶控制，错币种由业务层先完成决策或换汇后再提交。
+     * 红线：`FundsBalanceControlService` 不承接 FX，不做隐式换汇，不留下 route、posting 或账务事实。
+     */
+    @Test
+    void testBalanceAdjustWithDifferentCurrencyShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        topup(user, 50L, "BALANCE_ADJUST_CURRENCY_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertThatThrownBy(() -> balanceControlService.adjust(new FundsBalanceAdjustRequest()
+                .setAccountId(user)
+                .setAmount(Money.immutable(10L, CurrencyIsoCode.CNY))
+                .setIncrease(Boolean.TRUE)
+                .setBusinessScene("BALANCE_ADJUST")
+                .setBusinessSn("BALANCE_ADJUST_CURRENCY_ADJUST")
+                .setAdjustReason("customer service balance adjust")
+                .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_CURRENCY")
+                .setApprovalRef("APPROVAL_BALANCE_ADJUST_CURRENCY")
+                .setDescription("balance adjust with different currency"), WindOperator.system()))
+                .hasMessageContaining("amount currency must equal account currency");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertPostedTransactions(1);
+    }
+
+    /**
      * 场景：用户充值后发起超过可用余额的减少调账请求。
      * 输入：充值 50、减少调账 80，并给齐调账原因、凭证和审批引用。
      * 输出：调账请求失败，用户 AVAILABLE/FROZEN 与平台调整挂账余额保持调账前状态。
