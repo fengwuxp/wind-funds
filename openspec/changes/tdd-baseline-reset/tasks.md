@@ -9,7 +9,7 @@
 - [x] 重建 OpenSpec 项目上下文。
 - [x] 重建支付资金底座开发基线规格。
 - [x] 校准 TDD 文档中“旧测试资产复用”表述。
-- [x] 冻结当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果，作为进入编码前的独立检查点；最新设计交付提交点：`620b5a5 docs: 精简并加固资金底座设计交付文档`。
+- [x] 冻结当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果，作为进入编码前的独立检查点；最新设计交付提交点以包含本 Harness Plan 的最新 docs 提交为准，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。
 - [x] 完成设计、代码、任务三方基线对齐：设计以 `docs/` 和最新提交点为准，代码能力以当前 HEAD 复核结果为准，任务以本 Harness Plan 和 OpenSpec spec 为准。
 
 ## 1. 全局写入范围
@@ -68,8 +68,8 @@ just compile
 - [x] Harness 已重新对齐：以本文件作为批次计划、写入范围、只读范围、禁止事项、人工确认点和交付记录入口。
 - [x] 旧测试源码已移除，测试 resources 保留。
 - [x] 当前阶段为“任务拆解与准入规划”，尚未进入 CAD 自动提交模式；进入编码前仍需用户按批次授予 Execution Grant。
-- [x] 当前工作树的设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；最新设计交付提交点：`620b5a5 docs: 精简并加固资金底座设计交付文档`。后续编码仍需用户按批次单独授予 Execution Grant。
-- [x] 代码基线已复核至当前 HEAD `620b5a5`：批次 1 DSL 契约测试已存在；批次 2 支付工具、绑定历史、资金来源关系、显式建账和余额投影已有局部服务层基线；批次 3 至 6 已有部分直接交易、授权、余额控制、Route Replay 和交易投影测试；批次 7 仅保留 `reconciliation-*` 空模块骨架；批次 8 已有 `governance-*` 交易投影重放骨架。上述都只作为局部代码基线，不表示对应批次全量完成或可跳过 Execution Grant。
+- [x] 当前工作树的设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；最新设计交付提交点以包含本 Harness Plan 的最新 docs 提交为准，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。后续编码仍需用户按批次单独授予 Execution Grant。
+- [x] 代码基线已复核至 7b4fe22 fix: 拦截直接付款外部收款主体：批次 1 DSL 契约测试已存在；批次 2 支付工具、绑定历史、资金来源关系、显式建账和余额投影已有局部服务层基线；批次 3 至 6 已有部分直接交易、授权、余额控制、Route Replay 和交易投影测试；批次 7 仅保留 reconciliation-* 空模块骨架；批次 8 已有 governance-* 交易投影重放骨架。上述都只作为局部代码基线，不表示对应批次全量完成或可跳过 Execution Grant。
 
 ### 5.1 设计、代码、任务对齐矩阵
 
@@ -192,7 +192,7 @@ just compile
 
 ## 8. 依赖、门禁与设计反馈
 
-1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；当前最新设计交付提交点为 `620b5a5 docs: 精简并加固资金底座设计交付文档`，之后才能进入具体编码批次。
+1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；当前最新设计交付提交点以包含本 Harness Plan 的最新 docs 提交为准，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档，之后才能进入具体编码批次。
 2. 当前执行优先级固定为：先做 `02-交易路由钱包账目与投影`，再做 `03-清结算与对账`，最后做 `04-归档重放与指标治理`。
 3. 批次 1 至批次 6 合并构成 02 阶段，内部仍按 DSL/core、钱包账户与账本、直接交易、授权交易、余额控制、Route Replay 与投影推进。
 4. 批次 1 是后续所有交易、账本和授权测试的前置门禁。
@@ -252,7 +252,7 @@ just compile
 禁止写入范围：transaction-*、wallet-*、ledger-* 业务实现；清结算、对账、归档、指标实现；生产配置；外部通道适配
 必须覆盖的 TDD 用例：TDD-RED-001、TDD-RED-003、TDD-RED-004、TDD-RED-031、TDD-RED-032、TDD-RED-034 至 TDD-RED-037、TDD-LEDGER-001 至 TDD-LEDGER-011、TDD-ROUTE-007、TDD-ROUTE-010 至 TDD-ROUTE-013
 必须覆盖的 AC/DSL ID：RED-001、RED-003、RED-009、RED-020、RED-022、RED-023、RED-046 至 RED-049；Route DSL、Route Replay DSL、PaymentInstrument Route DSL、Posting/Ledger DSL、SettlementPolicy、金额临界值、JSON 契约
-基线是否已冻结：已冻结，最新设计交付提交点 `620b5a5 docs: 精简并加固资金底座设计交付文档`；继续执行或调整批次 1 仍需用户确认 Execution Grant
+基线是否已冻结：已冻结，最新设计交付提交点以包含本 Harness Plan 的最新 docs 提交为准；继续执行或调整批次 1 仍需用户确认 Execution Grant
 允许修改公共契约：待用户确认
 公共契约允许修改范围：仅限支撑 DSL 契约测试所需的兼容性补齐；不得删除既有公开字段或破坏既有调用方
 允许新增枚举或事件：待用户确认；若新增 `EXPIRE` 等事件，必须先有失败测试和兼容说明
