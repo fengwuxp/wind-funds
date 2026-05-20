@@ -1,7 +1,10 @@
 package com.capte.funds.wallet.services.impl;
 
+import com.capte.funds.wallet.dal.entities.FundingAccount;
 import com.capte.funds.wallet.dal.entities.SpendSubjectFundingRel;
+import com.capte.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.capte.funds.wallet.dal.entities.table.SpendSubjectFundingRelNameRefs;
+import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.capte.funds.wallet.dal.mapper.SpendSubjectFundingRelMapper;
 import com.capte.funds.wallet.mapstruct.SpendSubjectFundingRelationConverter;
 import com.capte.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
@@ -31,10 +34,14 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
 
     private final SpendSubjectFundingRelMapper spendSubjectFundingRelMapper;
 
+    private final FundingAccountMapper fundingAccountMapper;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createSpendSubjectFundingRelation(
             @NonNull CreateSpendSubjectFundingRelationRequest request) {
+        FundingAccount fundingAccount = getFundingAccount(request.getTenantId(), request.getFundingAccountId());
+        assertFundingAccountCanBind(fundingAccount, request);
         SpendSubjectFundingRel entity =
                 SpendSubjectFundingRelationConverter.INSTANCE.convertToSpendSubjectFundingRel(request);
         spendSubjectFundingRelMapper.insertSelective(entity);
@@ -74,5 +81,24 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
 
     private SpendSubjectFundingRelationDTO toDTO(SpendSubjectFundingRel entity) {
         return SpendSubjectFundingRelationConverter.INSTANCE.convertToSpendSubjectFundingRelationDTO(entity);
+    }
+
+    private FundingAccount getFundingAccount(Long tenantId, String fundingAccountId) {
+        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(fundingAccountId));
+        FundingAccount result = fundingAccountMapper.selectOneByQuery(wrapper);
+        AssertUtils.notNull(result, "资金账户不存在，fundingAccountId = {}", fundingAccountId);
+        return result;
+    }
+
+    private void assertFundingAccountCanBind(FundingAccount fundingAccount,
+                                             CreateSpendSubjectFundingRelationRequest request) {
+        AssertUtils.isTrue(fundingAccount.getStatus().canDebit(),
+                "资金账户不可作为资金来源，fundingAccountId = {}", request.getFundingAccountId());
+        AssertUtils.equals(fundingAccount.getCurrency(), request.getCurrency(),
+                "资金账户币种与资金来源关系币种不一致，fundingAccountId = {}", request.getFundingAccountId());
     }
 }

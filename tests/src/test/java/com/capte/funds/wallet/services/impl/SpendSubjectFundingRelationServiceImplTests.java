@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 支出主体资金来源关系服务层边界测试。
@@ -106,6 +107,44 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertLedgerFacts(before);
     }
 
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldRejectMissingFundingAccountWithoutRelation() {
+        LedgerFacts before = loadLedgerFacts();
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setFundingAccountId("missing_relation_target")))
+                .hasMessageContaining("资金账户不存在");
+
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
+        assertLedgerFacts(before);
+    }
+
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldRejectUnavailableFundingAccountWithoutRelation() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setStatus(FundsAccountStatus.SUSPENDED));
+        LedgerFacts before = loadLedgerFacts();
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()))
+                .hasMessageContaining("资金账户不可作为资金来源");
+
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
+        assertLedgerFacts(before);
+    }
+
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldRejectCurrencyMismatchWithoutRelation() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        LedgerFacts before = loadLedgerFacts();
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setCurrency(CurrencyIsoCode.CNY)))
+                .hasMessageContaining("资金账户币种与资金来源关系币种不一致");
+
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
+        assertLedgerFacts(before);
+    }
+
     @BeforeEach
     void setUpSpendSubjectFundingRelationTestData() {
         cleanupSpendSubjectFundingRelationTestData();
@@ -170,6 +209,12 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
     private long countRows(String tableName) {
         Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
+        return result;
+    }
+
+    private long countRows(String tableName, String columnName, Object value) {
+        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
+                Long.class, value);
         return result;
     }
 
