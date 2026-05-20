@@ -74,6 +74,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>com.alibaba.fastjson2</groupId>
+            <artifactId>fastjson2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.wind.tools</groupId>
             <artifactId>mybatis-flex-codegen</artifactId>
             <scope>test</scope>
