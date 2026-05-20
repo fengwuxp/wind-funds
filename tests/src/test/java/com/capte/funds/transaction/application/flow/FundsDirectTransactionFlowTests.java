@@ -101,6 +101,42 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：同一资金账户向自己发起系统内转账。
+     * 输入：充值 100 后，付款方和收款方均为同一账户，转账 10。
+     * 输出：请求被拒绝；余额、资金交易事实和账务事实保持充值后的状态。
+     * 预期：系统内转账必须是跨主体价值转移，同主体转账不能生成 route、posting 或 ledger entry。
+     * 红线：不能用一借一贷自循环掩盖无业务意义的资金事实。
+     */
+    @Test
+    void testSameAccountTransferShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId account = fundingAccount("funding_user");
+
+        topup(account, 100L, "DIRECT_SAME_ACCOUNT_TRANSFER_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> transfer(account, account, 10L, "DIRECT_SAME_ACCOUNT_TRANSFER"))
+                .hasMessageContaining("付款账号和收款账户不能一致");
+
+        BalanceSnapshot afterRejectedTransfer = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRejectedTransfer,
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+    }
+
+    /**
      * 场景：直接付款使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
      * 输入：充值 100，付款 40 使用业务流水 `DIRECT_IDEMPOTENT_PAY`，随后同流水同金额重试，再同流水改金额为 41。
      * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次付款后的状态。
