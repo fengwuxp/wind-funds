@@ -320,6 +320,47 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接付款收款主体存在，但目标收款账目未建账。
+     * 输入：付款方充值 50，收款资金账户存在但没有 SETTLEMENT 账本。
+     * 输出：付款失败；付款方、收款方和平台账户余额保持充值后的状态。
+     * 预期：账务计划缺目标账本时整体事务回滚，不自动建账、不展示交易成功。
+     * 红线：缺账本不能留下资金交易、route、posting、ledger entry 或余额投影副作用。
+     */
+    @Test
+    void testPayWithoutPayeeLedgerShouldRejectAndRollbackTransactionFacts() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("no_payee_ledger");
+        ensureFundingAccount(payee);
+
+        topup(payer, 50L, "DIRECT_PAY_MISSING_LEDGER_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 10L,
+                "DIRECT_PAY_MISSING_LEDGER"))
+                .hasMessageContaining("账本不存在或不唯一");
+
+        BalanceSnapshot afterRejectedPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRejectedPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertThat(balance(payee).getBalanceBuckets()).doesNotContainKey(LedgerSubjectCode.SETTLEMENT);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+    }
+
+    /**
      * 场景：直接付款把外部账户作为收款主体。
      * 输入：付款方充值 50 后，提交外部银行账户作为 payeeId。
      * 输出：请求被拒绝；付款方和平台账户余额保持充值后的状态。

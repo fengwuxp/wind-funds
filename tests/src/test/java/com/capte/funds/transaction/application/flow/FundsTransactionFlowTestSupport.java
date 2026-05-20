@@ -193,7 +193,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         }
     }
 
-    private void ensureFundingAccount(FundsAccountId accountId) {
+    protected void ensureFundingAccount(FundsAccountId accountId) {
         if (!FundsSubjectType.FUNDING_ACCOUNT.name().equals(accountId.type())
                 || fundingAccountExists(accountId.id())) {
             return;
