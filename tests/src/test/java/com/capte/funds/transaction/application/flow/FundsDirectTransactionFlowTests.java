@@ -313,6 +313,45 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接付款把外部账户作为付款主体。
+     * 输入：外部银行账户作为 accountId，向普通收款方付款 10。
+     * 输出：请求被拒绝；收款方和平台账户余额均不变化。
+     * 预期：外部账户只能作为出入金引用或快照，不能成为直接付款的 ledger subject。
+     * 红线：外部账户不得生成 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testPayFromExternalAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId externalPayer = FundsAccountId.immutable("external_bank_payer",
+                DefaultFundsAccountType.EXTERNAL_BANK);
+        FundsAccountId payee = fundingAccount("external_payer_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot before = snapshot(balances(payee, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(externalPayer)
+                .setPayeeId(payee)
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("PAY")
+                .setBusinessSn("DIRECT_PAY_EXTERNAL_PAYER")
+                .setDescription("pay from external payer"), WindOperator.system()))
+                .hasMessageContaining("直接付款账户不能是外部账户");
+
+        BalanceSnapshot afterRejectedPay = snapshot(balances(payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedPay,
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
+    }
+
+    /**
      * 场景：直接付款使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
      * 输入：充值 100，付款 40 使用业务流水 `DIRECT_IDEMPOTENT_PAY`，随后同流水同金额重试，再同流水改金额为 41。
      * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次付款后的状态。
