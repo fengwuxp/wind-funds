@@ -5,7 +5,9 @@ import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
@@ -233,6 +235,45 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+    }
+
+    /**
+     * 场景：USD 资金账户收到 CNY 充值请求。
+     * 输入：用户资金账户为 USD，外部通道充值请求金额为 10 CNY。
+     * 输出：请求被拒绝；用户账户、平台现金和预收款余额均不变化。
+     * 预期：充值只接受目标账户同币种金额，FX 必须由业务层显式完成后再提交资金指令。
+     * 红线：充值不得静默换汇，不得留下 route、posting、ledger entry 或余额投影副作用。
+     */
+    @Test
+    void testTopupWithDifferentCurrencyShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId account = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_topup_currency",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_TOPUP_CURRENCY_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CurrencyIsoCode.CNY)))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_TOPUP_CURRENCY")
+                .setDescription("topup with different currency"), WindOperator.system()))
+                .hasMessageContaining("transactionAmount.amount currency must equal account currency");
+
+        BalanceSnapshot afterRejectedTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTopup,
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
     }
 
     /**
