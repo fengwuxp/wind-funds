@@ -107,6 +107,51 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接退款出资方余额不足。
+     * 输入：付款方充值 100、向收款方付款 70，随后收款方尝试退款 80。
+     * 输出：退款失败；付款方、收款方和平台账户余额保持付款后的状态。
+     * 预期：退款出资方余额不足时整体事务回滚，不生成退款交易事实或账务事实。
+     * 红线：退款失败不能留下 route、posting、ledger entry 或余额投影副作用。
+     */
+    @Test
+    void testRefundWithInsufficientPayerBalanceShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_low_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        topup(payer, 100L, "DIRECT_REFUND_INSUFFICIENT_TOPUP");
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_INSUFFICIENT_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> refund(payer, payee, LedgerSubjectCode.SETTLEMENT, 80L,
+                "DIRECT_REFUND_INSUFFICIENT_REFUND"))
+                .hasMessageContaining("账本余额不足");
+
+        BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterRejectedRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name());
+    }
+
+    /**
      * 场景：同一资金账户向自己发起系统内转账。
      * 输入：充值 100 后，付款方和收款方均为同一账户，转账 10。
      * 输出：请求被拒绝；余额、资金交易事实和账务事实保持充值后的状态。
