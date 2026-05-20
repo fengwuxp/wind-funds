@@ -51,6 +51,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String RAW_PAYMENT_INSTRUMENT_SN = "pi_service_raw_card";
 
+    private static final String SUSPENDED_PAYMENT_INSTRUMENT_SN = "pi_service_suspended_card";
+
+    private static final String RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN = "pi_service_receive_card";
+
     private static final String BINDING_SN = "pi_binding_service_candidate";
 
     private static final String OWNER_ID = "owner_pi_service";
@@ -160,6 +164,56 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     @Test
+    void testCreatePaymentInstrumentBindingShouldRejectUnavailableInstrumentWithoutRouteCandidate() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
+                .setSn(SUSPENDED_PAYMENT_INSTRUMENT_SN)
+                .setStatus(FundsAccountStatus.SUSPENDED));
+        LedgerFacts before = loadLedgerFacts();
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setInstrumentSn(SUSPENDED_PAYMENT_INSTRUMENT_SN)))
+                .hasMessageContaining("支付工具不可用于绑定");
+
+        assertThat(countRows("t_payment_instrument_binding", "instrument_sn", SUSPENDED_PAYMENT_INSTRUMENT_SN))
+                .isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "instrument_sn", SUSPENDED_PAYMENT_INSTRUMENT_SN))
+                .isZero();
+        assertLedgerFacts(before);
+    }
+
+    @Test
+    void testCreatePaymentInstrumentBindingShouldRejectDirectionMismatchWithoutRouteCandidate() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
+                .setSn(RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN)
+                .setInstrumentDirection(PaymentInstrumentDirection.RECEIVE));
+        LedgerFacts before = loadLedgerFacts();
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setInstrumentSn(RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN)))
+                .hasMessageContaining("支付工具方向不支持绑定角色");
+
+        assertThat(countRows("t_payment_instrument_binding", "instrument_sn", RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN))
+                .isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "instrument_sn", RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN))
+                .isZero();
+        assertLedgerFacts(before);
+    }
+
+    @Test
+    void testCreatePaymentInstrumentBindingShouldRejectCurrencyMismatchWithoutRouteCandidate() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFacts before = loadLedgerFacts();
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setCurrency(CurrencyIsoCode.CNY)))
+                .hasMessageContaining("支付工具币种与绑定币种不一致");
+
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertLedgerFacts(before);
+    }
+
+    @Test
     void testChangePaymentInstrumentBindingShouldAppendHistoryWithoutOverwritingEvidence() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
@@ -238,9 +292,11 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private void cleanupPaymentInstrumentTestData() {
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn = ?", BINDING_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn = ?", BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
-                RAW_PAYMENT_INSTRUMENT_SN);
+                RAW_PAYMENT_INSTRUMENT_SN,
+                SUSPENDED_PAYMENT_INSTRUMENT_SN,
+                RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN);
     }
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest() {

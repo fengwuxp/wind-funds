@@ -28,7 +28,10 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
+import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingChangeType;
+import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingRole;
+import com.wind.integration.funds.wallet.enums.PaymentInstrumentDirection;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
@@ -81,6 +84,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createPaymentInstrumentBinding(@NonNull CreatePaymentInstrumentBindingRequest request) {
+        PaymentInstrument instrument = getInstrumentBySn(request.getTenantId(), request.getInstrumentSn());
+        assertInstrumentCanBind(instrument, request);
         PaymentInstrumentBinding entity =
                 PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBinding(request);
         paymentInstrumentBindingMapper.insertSelective(entity);
@@ -227,6 +232,36 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         PaymentInstrumentBinding result = paymentInstrumentBindingMapper.selectOneByQuery(wrapper);
         AssertUtils.notNull(result, "支付工具绑定不存在，bindingSn = {}", bindingSn);
         return result;
+    }
+
+    private PaymentInstrument getInstrumentBySn(Long tenantId, String instrumentSn) {
+        PaymentInstrumentNameRefs ref = PaymentInstrumentNameRefs.paymentInstrument;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(instrumentSn));
+        PaymentInstrument result = paymentInstrumentMapper.selectOneByQuery(wrapper);
+        AssertUtils.notNull(result, "支付工具不存在，instrumentSn = {}", instrumentSn);
+        return result;
+    }
+
+    private void assertInstrumentCanBind(PaymentInstrument instrument, CreatePaymentInstrumentBindingRequest request) {
+        AssertUtils.isTrue(instrument.getStatus() == FundsAccountStatus.ACTIVE,
+                "支付工具不可用于绑定，instrumentSn = {}",
+                request.getInstrumentSn());
+        AssertUtils.isTrue(instrument.getCurrency() == request.getCurrency(),
+                "支付工具币种与绑定币种不一致，instrumentSn = {}",
+                request.getInstrumentSn());
+        AssertUtils.isTrue(supportsBindingRole(instrument.getInstrumentDirection(), request.getBindingRole()),
+                "支付工具方向不支持绑定角色，instrumentSn = {}",
+                request.getInstrumentSn());
+    }
+
+    private boolean supportsBindingRole(PaymentInstrumentDirection direction, PaymentInstrumentBindingRole bindingRole) {
+        if (bindingRole == PaymentInstrumentBindingRole.RECEIVE_SUBJECT) {
+            return direction == PaymentInstrumentDirection.RECEIVE || direction == PaymentInstrumentDirection.BOTH;
+        }
+        return direction == PaymentInstrumentDirection.PAYMENT || direction == PaymentInstrumentDirection.BOTH;
     }
 
     private void applyBindingChanges(PaymentInstrumentBinding entity, ChangePaymentInstrumentBindingRequest request) {
