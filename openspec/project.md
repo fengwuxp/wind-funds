@@ -39,6 +39,15 @@ Gbrain 是上下文层，不是权威规格层。Gbrain 命中的历史决策必
 | Harness | `openspec/changes/tdd-baseline-reset/tasks.md` | 按 TDD 拆分后续落地批次和验证门禁。 |
 | Gbrain | `.gbrain-source` = `wind-funds` | 跨轮检索项目决策、CR 结论、Execution Grant 和验证摘要；不作为规格或验收的唯一依据。 |
 
+### 3.1 当前对齐点
+
+| 基线 | 当前对齐点 | 说明 |
+| --- | --- | --- |
+| 设计交付基线 | `620b5a5 docs: 精简并加固资金底座设计交付文档` | 产品设计、DSL 设计、系分设计和 TDD 设计已完成精简、CR 和交付评分，可作为准入评估输入。 |
+| 规格任务基线 | `openspec/project.md`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md` | 本轮把最新设计、当前代码和后续批次重新对齐；后续编码仍需按批次授予 Execution Grant。 |
+| 代码能力基线 | 当前工作树 HEAD `620b5a5`；代码能力已复核至支付工具、资金来源关系和部分交易/投影测试基线。 | 批次 1 已有 DSL 契约测试，批次 2 已有支付工具、绑定历史和资金来源关系服务层基线，批次 3 至 6 只有局部流程测试，批次 7/8 仍是独立待落地域。 |
+| 导出附件 | `docs/*.zip` 等导出包不作为 Source of Truth。 | 评审、编码和测试只以 Markdown、OpenSpec、源码、测试和 Git 提交点为准。 |
+
 ## 四、后续开发 Definition of Ready
 
 任一编码批次开始前必须满足：

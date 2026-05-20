@@ -68,14 +68,29 @@
 
 以下差距用于指导后续 TDD 批次，不在本规格中直接修改代码。
 
+### 5.1 代码能力对齐
+
+| 批次域 | 当前代码和测试基线 | 对齐结论 |
+| --- | --- | --- |
+| 批次 1 DSL 契约 | 已存在 `FundsInstructionDslContractTests`、`RouteDslContractTests`、`PaymentInstrumentRouteDslContractTests`、`PostingLedgerDslContractTests`、`SettlementPolicySpecTests`、`FundsAmountBoundaryContractTests`、`FundsDslJsonContractTests`。 | DSL、Route、PaymentInstrument Route、Posting/Ledger、金额临界值和 JSON 契约已有测试基线；仍需按后续批次发现的公共契约缺口补 Red 用例。 |
+| 批次 2 钱包账户与账本基础 | 已存在 `FundingAccountServiceImplTests`、`ControlAccountLedgerInitializationTests`、`PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests`、`LedgerBalanceProjectionServiceImplTests`。 | 支付工具、绑定历史、资金来源关系、显式账本初始化和投影 afterCommit 已有局部服务层基线；账本周期、全量余额断言和组合交易仍需后续批次继续闭合。 |
+| 批次 3 直接交易 | 已存在 `FundsDirectTransactionFlowTests`、`FundsTransferPayWithdrawChainFlowTests`、`FundsTransactionFeeFlowTests`。 | 直接交易主链路、退款、手续费和链式流程已有局部流程基线；仍需按 TDD 覆盖全部 `AC-IN/OUT/PAY/MER/FEE` 和红线失败。 |
+| 批次 4 授权交易 | 已存在 `FundsAuthorizationTransactionFlowTests`，覆盖授权拒绝、撤销、部分完成、全额完成、退款超额等局部场景。 | 授权批准、拒绝、撤销、完成和完成后退款已有局部基线；授权过期、强制完成、无授权直接退款、拒付承接口径和并发竞争仍是待落地缺口。 |
+| 批次 5 余额控制 | 已存在 `FundsBalanceControlFailureFlowTests`、`FundsWithdrawalSuccessFlowTests`、`FundsWithdrawalAfterPartialUnfreezeFlowTests`、`FundsWithdrawalRejectionFlowTests`。 | 冻结、解冻、提现、失败无副作用和部分组合路径已有局部基线；额度调整、预算调整、冻结关闭并发和全量金额临界值仍需补齐。 |
+| 批次 6 Route Replay 与投影 | 已存在 `DefaultRouteReplayServiceTests`、`CompositeRouteResolverTests`、`DefaultRoutedFundsInstructionOrchestratorProjectionTests`。 | Route Replay、resolver 无副作用、交易投影 afterCommit 和投影失败不回滚事实已有局部基线；支付工具换绑后全链路回放、余额日志边界和投影重放全量覆盖仍需补齐。 |
+| 批次 7 清结算与对账 | 仅保留 `reconciliation-face`、`reconciliation-impl` 空模块骨架。 | 不能声明清结算和对账已实现；进入编码前必须另起独立 OpenSpec change 和 Execution Grant。 |
+| 批次 8 归档重放与指标边界 | 已存在 `governance-face`、`governance-impl` 交易投影重放骨架和 `FundsProjectionReplayServiceTests`。 | 交易投影重放有局部边界基线；归档 Manifest、账本余额快照覆盖模式、余额水位隔离、普通指标快照和指标水位隔离仍需独立落地。 |
+
+### 5.2 差距清单
+
 | 编号 | 设计基线 | 当前代码观察 | 后续落地要求 |
 | --- | --- | --- | --- |
 | GAP-AUTH-001 | 授权过期必须有 `EXPIRE` 事件和 `expire` 服务入口。 | 授权服务当前只有 `authorize/reversal/settle/settleRefund/chargeback`，事件枚举未见 `EXPIRE`。 | 先补 TDD，再补枚举、请求、服务、转换、路由/回放、生命周期、账务和查询断言。 |
 | GAP-AUTH-002 | `settle` 支持强制完成模式，必须有策略、原因、上限和审计。 | `FundsAuthorizationTransactionSettleRequest` 当前以原授权交易号为必填，未表达强制完成策略字段。 | 先补强制完成失败测试，再设计请求契约兼容方案。 |
-| GAP-AUTH-003 | 拒付只作为已完成授权后的争议/扣回业务语义，不要求新增或强化 `chargeback` 服务入口。 | 代码中可能存在 `chargeback` 入口，但实际处理口径优先通过 `settleRefund` 完成。 | 后续 TDD 只验证拒付与授权拒绝可区分、拒付原因/凭证/审计可追溯、退款/扣回金额不超过已完成金额；不以 `chargeback` 方法为目标落地点。 |
-| GAP-AUTH-004 | `settleRefund` 无授权退款模式必须可表达外部原消费、外部原完成或差错凭证。 | 代码契约是否已支持无授权退款的引用、原因、凭证和审计上下文需在批次 4 复核。 | 先补无授权直接退款成功、无原事实失败、审计缺失失败测试；必要时扩展请求契约并保持兼容。 |
-| GAP-PI-001 | 支付工具、绑定关系、资金来源关系和绑定历史审计必须能支撑 route snapshot、原路径回放和敏感信息治理。 | 当前代码、表结构和测试是否已有 `PaymentInstrumentService`、绑定当前态、绑定历史审计、资金来源关系、工具方向/状态守卫和脱敏快照需在批次 2 复核。 | 先补 `AC-PI-*`、`DSL-PAYMENT-INSTRUMENT-*` 和 `TDD-WALLET-005/006/009/010/011/012` 对应测试，再按兼容原则补齐当前态表、历史表、服务契约、route snapshot 和 replay 断言。 |
-| GAP-TDD-001 | 测试必须按最终 TDD 重建。 | 历史过渡测试已作废；当前已有服务层流程、Route Replay、余额投影和交易投影重放等局部目标态测试，但批次 1 至批次 6 尚未按 TDD 覆盖索引完整闭环。 | 继续按批次从 DSL 契约和核心红线开始补齐测试，不恢复已废弃断言；已重建测试只作为对应批次的局部基线。 |
+| GAP-AUTH-003 | 拒付只作为已完成授权后的争议、扣回或追偿语义，不等同于授权拒绝。 | 代码已有 `FundsAuthorizationTransactionService#chargeback` 和 `CHARGEBACK` eventType，请求模型也有 `FundsAuthorizationTransactionChargebackRequest`；当前目标态仍要求保留拒付原因、凭证、上下文、外部引用和审计，不能只留下普通退款结果。 | 后续 TDD 只验证拒付与授权拒绝可区分、拒付原因/凭证/审计可追溯、退款/扣回金额不超过已完成金额；是否继续保留或收敛 `chargeback` 入口需在批次 4 Execution Grant 中明确。 |
+| GAP-AUTH-004 | `settleRefund` 无授权退款模式必须可表达外部原消费、外部原完成或差错凭证。 | `FundsAuthorizationTransactionRefundRequest` 当前仍要求 `authorizationTransactionSn`，尚不能表达无前置授权退款。 | 先补无授权直接退款成功、无原事实失败、审计缺失失败测试；必要时扩展请求契约并保持兼容。 |
+| GAP-PI-001 | 支付工具、绑定关系、资金来源关系和绑定历史审计必须能支撑 route snapshot、原路径回放和敏感信息治理。 | 当前已有 `PaymentInstrumentService`、绑定当前态、绑定历史审计、资金来源关系、工具方向/状态守卫和脱敏快照相关实现与服务层测试。 | 批次 2 的支付工具基础能力可作为局部基线；后续仍需补支付工具换绑后资金全链路 replay、route snapshot 引用和组合交易断言。 |
+| GAP-TDD-001 | 测试必须按最终 TDD 重建。 | 历史过渡测试已作废；当前已有批次 1、批次 2 和批次 3 至 6 的局部目标态测试，但批次 1 至批次 6 尚未按覆盖索引完整闭环。 | 继续按批次补齐测试，不恢复已废弃断言；已重建测试只作为对应批次的局部基线。 |
 | GAP-CLS-001 | 清结算与对账对象需独立状态机和表设计落地。 | 当前代码仅保留 `reconciliation-face` 和 `reconciliation-impl` 空模块骨架，未保留对账任务 DTO、Request、Service 或 Impl 代码；尚未落可清分明细、清分批次、清算候选、清算批次、结算单、出款单、差错单、追偿单、表结构和目标态服务层测试。 | 单独 OpenSpec change 和 Harness 批次处理，不混入交易主链路；后续确认是否复用现有 `reconciliation-*` 模块作为落点。 |
 | GAP-ARCH-001 | 归档、重放、普通指标快照和账本余额快照边界需按 04 系分独立落地。 | 当前代码已有 `governance-face` 和 `governance-impl` 交易投影重放骨架，已覆盖有界范围、交易投影 checkpoint 和 verify-only 不写投影等局部边界；尚未落归档 Manifest、余额快照覆盖模式、余额水位隔离、普通指标快照边界和指标水位隔离。 | 批次 8 另起独立 OpenSpec change；归档/重放只做事实治理；账本余额快照按 `HOT_ONLY`、`COLD_MANIFEST`、`MIXED` 校验；普通指标快照只输出报表指标模块输入和边界测试。 |
 
