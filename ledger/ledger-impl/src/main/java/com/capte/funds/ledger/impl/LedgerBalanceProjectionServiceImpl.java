@@ -26,6 +26,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -54,32 +55,42 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
         FundsAccountId accountId = requireSingleFundsAccount(entries);
         // 按照 ledger_id 分组，避免同一科目在不同周期账本间串账。
         Map<Long, List<LedgerEntrySpec>> groups = entries.stream()
-                .collect(Collectors.groupingBy(this::requireLedgerId));
+                .collect(Collectors.groupingBy(this::requireLedgerId, LinkedHashMap::new, Collectors.toList()));
         FundsAccountBalanceView beforeBalance = fundsAccountQueryService.getBalance(accountId);
-        for (Map.Entry<Long, List<LedgerEntrySpec>> entry : groups.entrySet()) {
-            Long ledgerId = entry.getKey();
-            LedgerDTO ledger = ledgerService.getLedgerById(ledgerId);
-            AssertUtils.notNull(ledger, "账本不存在，ledgerId = {}", ledgerId);
-            assertEntriesMatchLedger(ledger, entry.getValue());
-            LedgerSubjectCode ledgerCode = ledger.getLedgerSubjectCode();
-            ProjectionDelta delta = computeProjectionDelta(entry.getValue(), ledger.getNormalBalanceSide());
-            LedgerBalanceBucket beforeBalanceBucket = beforeBalance.getBalanceBucketNullable(ledgerCode);
-            AssertUtils.notNull(beforeBalanceBucket,
-                    "资金账户余额桶未初始化，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, ledgerId = {}",
-                    accountId.id(),
-                    accountId.type(),
-                    ledgerCode,
-                    ledgerId);
-            Money beforeBalanceAmount = beforeBalanceBucket.balance();
-            assertMustNotBeNegativeBalance(ledger, entry.getValue(), beforeBalanceAmount, delta);
-            UpdateLedgerBalanceRequest balanceRequest = new UpdateLedgerBalanceRequest()
-                    .setId(ledgerId)
+        List<ProjectionCommand> commands = groups.entrySet().stream()
+                .map(entry -> prepareProjectionCommand(accountId, beforeBalance, entry.getKey(), entry.getValue()))
+                .toList();
+        commands.forEach(command -> {
+            LedgerDTO ledger = command.ledger();
+            ProjectionDelta delta = command.delta();
+            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
+                    .setId(ledger.getId())
                     .setDebitAmountDelta(delta.debitAmountDelta())
                     .setCreditAmountDelta(delta.creditAmountDelta())
-                    .setMinimumNormalBalance(resolveMinimumNormalBalance(ledger, entry.getValue()));
-            ledgerService.updateLedgerBalance(balanceRequest);
-            publishBalanceChangedEvents(accountId, ledger, entry.getValue(), beforeBalanceAmount, delta);
-        }
+                    .setMinimumNormalBalance(resolveMinimumNormalBalance(ledger, command.entries())));
+            publishBalanceChangedEvents(accountId, ledger, command.entries(), command.beforeBalanceAmount(), delta);
+        });
+    }
+
+    private ProjectionCommand prepareProjectionCommand(FundsAccountId accountId,
+                                                       FundsAccountBalanceView beforeBalance,
+                                                       Long ledgerId,
+                                                       List<LedgerEntrySpec> entries) {
+        LedgerDTO ledger = ledgerService.getLedgerById(ledgerId);
+        AssertUtils.notNull(ledger, "账本不存在，ledgerId = {}", ledgerId);
+        assertEntriesMatchLedger(ledger, entries);
+        LedgerSubjectCode ledgerCode = ledger.getLedgerSubjectCode();
+        ProjectionDelta delta = computeProjectionDelta(entries, ledger.getNormalBalanceSide());
+        LedgerBalanceBucket beforeBalanceBucket = beforeBalance.getBalanceBucketNullable(ledgerCode);
+        AssertUtils.notNull(beforeBalanceBucket,
+                "资金账户余额桶未初始化，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, ledgerId = {}",
+                accountId.id(),
+                accountId.type(),
+                ledgerCode,
+                ledgerId);
+        Money beforeBalanceAmount = beforeBalanceBucket.balance();
+        assertMustNotBeNegativeBalance(ledger, entries, beforeBalanceAmount, delta);
+        return new ProjectionCommand(ledger, entries, beforeBalanceAmount, delta);
     }
 
     private void publishBalanceChangedEvents(FundsAccountId accountId,
@@ -298,5 +309,10 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
     private record ProjectionDelta(long balanceDelta, long debitAmountDelta, long creditAmountDelta) {
     }
 
+    private record ProjectionCommand(LedgerDTO ledger,
+                                     List<LedgerEntrySpec> entries,
+                                     Money beforeBalanceAmount,
+                                     ProjectionDelta delta) {
+    }
 
 }

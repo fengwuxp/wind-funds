@@ -7,6 +7,7 @@ import com.capte.funds.ledger.service.LedgerTransactionService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.integration.funds.ledger.LedgerTransactionPostingService;
+import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
@@ -67,7 +68,8 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         assertAllPostingPlansBalanced(transaction);
         assertAllEntriesUsePostableSubjects(transaction);
         assertAllEntriesBoundToLedgers(transaction);
-        assertAllEntriesMatchBoundLedgers(transaction);
+        Map<Long, LedgerDTO> boundLedgers = assertAllEntriesMatchBoundLedgers(transaction);
+        assertAllLedgerBalanceConstraintsSatisfied(transaction, boundLedgers);
 
         // 按照账务主体分组更新余额
         Map<@NotNull FundsAccountId, List<LedgerEntrySpec>> groups = transaction.getPostingPlans()
@@ -244,7 +246,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                         entry.getLedgerSubjectCode()));
     }
 
-    private void assertAllEntriesMatchBoundLedgers(LedgerTransactionSpec transaction) {
+    private Map<Long, LedgerDTO> assertAllEntriesMatchBoundLedgers(LedgerTransactionSpec transaction) {
         List<LedgerEntrySpec> entries = transaction.getPostingPlans()
                 .stream()
                 .map(LedgerPostingPlanSpec::getEntries)
@@ -261,6 +263,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
             AssertUtils.notNull(ledger, "账户账本不存在，ledgerId = {}", entry.getLedgerId());
             assertEntryMatchesLedger(entry, ledger);
         });
+        return ledgers;
     }
 
     private void assertEntryMatchesLedger(LedgerEntrySpec entry, LedgerDTO ledger) {
@@ -279,6 +282,80 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                 ledger.getLedgerSubjectCode());
     }
 
+    private void assertAllLedgerBalanceConstraintsSatisfied(LedgerTransactionSpec transaction,
+                                                            Map<Long, LedgerDTO> ledgers) {
+        transaction.getPostingPlans()
+                .stream()
+                .map(LedgerPostingPlanSpec::getEntries)
+                .flatMap(List::stream)
+                .collect(Collectors.groupingBy(LedgerEntrySpec::getLedgerId, LinkedHashMap::new, Collectors.toList()))
+                .forEach((ledgerId, entries) -> {
+                    LedgerDTO ledger = ledgers.get(ledgerId);
+                    Long minimumNormalBalance = resolveMinimumNormalBalance(ledger, entries);
+                    if (minimumNormalBalance == null) {
+                        return;
+                    }
+                    long normalBalanceDelta = computeBalanceDelta(entries, ledger.getNormalBalanceSide());
+                    long beforeBalance = ledger.getNormalBalance();
+                    AssertUtils.isTrue(beforeBalance >= minimumNormalBalance,
+                            "账本余额不允许低于下限，ledgerId = {}, subjectId = {}, subjectType = {}, "
+                                    + "ledgerSubjectCode = {}, beforeBalance = {}, minimumNormalBalance = {}",
+                            ledger.getId(),
+                            ledger.getSubjectId(),
+                            ledger.getSubjectType(),
+                            ledger.getLedgerSubjectCode(),
+                            beforeBalance,
+                            minimumNormalBalance);
+                    long afterBalance = beforeBalance + normalBalanceDelta;
+                    AssertUtils.isTrue(afterBalance >= minimumNormalBalance,
+                            "账本余额不足，ledgerId = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, "
+                                    + "beforeBalance = {}, balanceDelta = {}, afterBalance = {}, "
+                                    + "minimumNormalBalance = {}",
+                            ledger.getId(),
+                            ledger.getSubjectId(),
+                            ledger.getSubjectType(),
+                            ledger.getLedgerSubjectCode(),
+                            beforeBalance,
+                            normalBalanceDelta,
+                            afterBalance,
+                            minimumNormalBalance);
+                });
+    }
+
+    private Long resolveMinimumNormalBalance(LedgerDTO ledger, List<LedgerEntrySpec> entries) {
+        if (!Boolean.TRUE.equals(ledger.getAllowNegative())) {
+            return 0L;
+        }
+        boolean mustNotBeNegative = entries.stream()
+                .map(this::resolveConstraintType)
+                .anyMatch(LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE::equals);
+        return mustNotBeNegative ? 0L : null;
+    }
+
+    private LedgerBalanceConstraintType resolveConstraintType(LedgerEntrySpec entry) {
+        LedgerBalanceConstraintType value = entry.getBalanceConstraintType();
+        if (value == null) {
+            return LedgerBalanceConstraintType.PROFILE_DEFAULT;
+        }
+        return value;
+    }
+
+    private long computeBalanceDelta(List<LedgerEntrySpec> entries, EntrySide normalBalanceSide) {
+        AssertUtils.notNull(normalBalanceSide, "账本正常余额方向不能为空");
+        long debitAmountDelta = 0L;
+        long creditAmountDelta = 0L;
+        for (LedgerEntrySpec entry : entries) {
+            long amount = entry.getAmount().getAmount();
+            if (entry.getEntryType() == EntrySide.DEBIT) {
+                debitAmountDelta += amount;
+            } else {
+                creditAmountDelta += amount;
+            }
+        }
+        long rawDelta = debitAmountDelta - creditAmountDelta;
+        return normalBalanceSide == EntrySide.DEBIT ? rawDelta : -rawDelta;
+    }
+
     private Map<FundsAccountId, LedgerBalanceProjectionService> resolveProjectionServices(
             Map<@NotNull FundsAccountId, List<LedgerEntrySpec>> groups) {
         Map<FundsAccountId, LedgerBalanceProjectionService> result = new LinkedHashMap<>();
@@ -292,4 +369,5 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         }
         return result;
     }
+
 }

@@ -12,6 +12,7 @@ import com.wind.common.spring.SpringEventPublishUtils;
 import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
@@ -47,6 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 账本余额投影服务流程测试。
@@ -101,6 +103,28 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getDebitAmount()).isEqualTo(125L);
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isEqualTo(125L);
+    }
+
+    /**
+     * 场景：同一资金账户的一批投影同时命中多个余额桶，其中后一个桶余额不足。
+     * 输入：先给 FROZEN 桶加 10，再从 AVAILABLE 桶扣 200；AVAILABLE 期初只有 100。
+     * 输出：请求被拒绝；AVAILABLE 和 FROZEN 均保持期初余额。
+     * 预期：投影服务必须先完成整批余额约束校验，再写任一余额桶。
+     * 红线：不能出现前一个余额桶已更新、后一个余额桶失败的半截投影。
+     */
+    @Test
+    void testProjectShouldRejectWholeBatchWhenLaterLedgerWouldBeNegative() {
+        Long frozenLedgerId = createFrozenLedger(0L);
+
+        assertThatThrownBy(() -> projectionService.project(List.of(
+                ledgerEntry(frozenLedgerId, LedgerSubjectCode.FROZEN, EntrySide.CREDIT, 10L),
+                ledgerEntry(availableLedgerId, LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT, 200L))))
+                .hasMessageContaining("账本余额不足");
+
+        LedgerDTO availableLedger = ledgerService.getLedgerById(availableLedgerId);
+        LedgerDTO frozenLedger = ledgerService.getLedgerById(frozenLedgerId);
+        assertThat(availableLedger.getNormalBalance()).isEqualTo(100L);
+        assertThat(frozenLedger.getNormalBalance()).isZero();
     }
 
     @BeforeEach
@@ -162,15 +186,47 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         return ledgerId;
     }
 
+    private Long createFrozenLedger(long initialBalance) {
+        Long ledgerId = ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(ACCOUNT_ID)
+                .setSubjectType(ACCOUNT_TYPE)
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
+                .setLedgerProfileVersion(1)
+                .setLedgerSubjectCode(LedgerSubjectCode.FROZEN)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
+                .setNormalBalanceSide(EntrySide.CREDIT)
+                .setAllowNegative(Boolean.FALSE)
+                .setCurrency(CURRENCY)
+                .setSettlementPolicy("RT")
+                .setCutOffTime(LocalTime.MIDNIGHT)
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+        if (initialBalance != 0L) {
+            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
+                    .setId(ledgerId)
+                    .setDebitAmountDelta(initialBalance < 0L ? -initialBalance : null)
+                    .setCreditAmountDelta(initialBalance > 0L ? initialBalance : null));
+        }
+        return ledgerId;
+    }
+
     private LedgerEntrySpec ledgerEntry(long amount) {
+        return ledgerEntry(availableLedgerId, LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT, amount);
+    }
+
+    private LedgerEntrySpec ledgerEntry(Long ledgerId,
+                                        LedgerSubjectCode ledgerSubjectCode,
+                                        EntrySide entrySide,
+                                        long amount) {
         return TestLedgerEntrySpec.builder()
                 .subjectId(ACCOUNT_ID)
                 .subjectType(ACCOUNT_TYPE)
-                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
-                .ledgerSubjectCategory(LedgerSubjectCategory.ASSET)
-                .ledgerId(availableLedgerId)
+                .ledgerSubjectCode(ledgerSubjectCode)
+                .ledgerSubjectCategory(resolveLedgerSubjectCategory(ledgerSubjectCode))
+                .ledgerId(ledgerId)
                 .ledgerTransactionSn("LT-BALANCE-LOG-001")
-                .entryType(EntrySide.DEBIT)
+                .entryType(entrySide)
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .businessScene("BALANCE_LOG_BOUNDARY")
                 .businessSn("BALANCE_LOG_BOUNDARY_001")
@@ -181,7 +237,14 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                 .description("balance log boundary")
                 .contextVariables(Map.of("ledgerEntrySn", "LE-BALANCE-LOG-001"))
                 .sha256("sha256-balance-log-001")
+                .balanceConstraintType(LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE)
                 .build();
+    }
+
+    private LedgerSubjectCategory resolveLedgerSubjectCategory(LedgerSubjectCode ledgerSubjectCode) {
+        return ledgerSubjectCode == LedgerSubjectCode.AVAILABLE
+                ? LedgerSubjectCategory.ASSET
+                : LedgerSubjectCategory.LIABILITY;
     }
 
     private static void setApplicationEventPublisher(ApplicationEventPublisher publisher) {
@@ -224,6 +287,8 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
 
         private final LedgerPhaseCode phaseCode;
 
+        private final LedgerBalanceConstraintType balanceConstraintType;
+
         private final String businessScene;
 
         private final String businessSn;
@@ -251,6 +316,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                                     String ledgerTransactionSn,
                                     EntrySide entryType,
                                     LedgerPhaseCode phaseCode,
+                                    LedgerBalanceConstraintType balanceConstraintType,
                                     String businessScene,
                                     String businessSn,
                                     Money amount,
@@ -268,6 +334,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
             this.ledgerTransactionSn = ledgerTransactionSn;
             this.entryType = entryType;
             this.phaseCode = phaseCode;
+            this.balanceConstraintType = balanceConstraintType;
             this.businessScene = businessScene;
             this.businessSn = businessSn;
             this.amount = amount;
