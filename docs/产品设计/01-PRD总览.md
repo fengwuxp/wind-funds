@@ -443,6 +443,7 @@ flowchart TB
 8. 交易投影、报表和余额变更日志不得反向污染事实层。
 9. 归档不能破坏余额重建和审计追溯。
 10. 涉及客户资金、备付金、跨境、外汇、持牌能力、个人信息和金融数据时，必须保留法务、财务、合规、安全和持牌机构待确认项。
+11. 客户资金、商户待结算资金、平台自有资金、保证金、补贴资金和手续费收入必须分账解释；未确认资质、合同和资金归属前，不得把平台内部待结算口径称为客户备付金。
 
 ## 11. 验收总原则
 
@@ -587,7 +588,7 @@ flowchart LR
 | [Stripe Issuing Spending Controls](https://docs.stripe.com/issuing/controls/spending-controls) 与 [Real-time Authorizations](https://docs.stripe.com/issuing/controls/real-time-authorizations) | 对发卡卡片或持卡人设置 spending controls，并可通过实时授权扩展外部决策。 | 支撑“规则控制”和“外部授权决策”分层：spend controls 是授权前门禁，实时授权是外部决策接入，不替代资金路由和账本。 | Stripe 官方公开文档，2026-05-18 核验。 | Stripe 的卡产品对象、API 和风控结果不等同于本产品 DSL；只吸收产品分层。 |
 | [Marqeta Velocity Controls](https://www.marqeta.com/docs/core-api/velocity-controls) | 基于金额、次数、商户、MCC、时间窗口等条件限制授权交易。 | 支撑 velocity control 作为独立累计窗口，不和账本周期、清算账期或报表周期混用。 | Marqeta 官方公开文档，2026-05-18 核验。 | 不照搬 Marqeta 资源模型、字段名或窗口限制；仅作为发卡授权控制参考。 |
 | [Lithic Authorization Rules](https://docs.lithic.com/docs/authorization-rules-v2) | 支持基于规则、速度限制、商户和交易属性的授权决策。 | 支撑“规则条件、动作、拒绝原因和版本审计”作为发卡授权控制扩展的产品口径。 | Lithic 官方公开文档，2026-05-18 核验。 | 不采用 Lithic API 结构；仅作为行业规则模型参考。 |
-| [Adyen Issuing Transaction Rules](https://docs.adyen.com/issuing/transaction-rules/) | 通过交易规则定义发卡交易的允许、拒绝、暂停或审批动作。 | 支撑 spend-controls 可扩展到交易规则、审批和运营动作，但仍属于发卡授权控制扩展。 | Adyen 官方公开文档，2026-05-18 核验。 | Adyen 规则动作和平台对象需按实际 Issuer/Processor/Program 协议重新确认。 |
+| [Adyen Issuing Transaction Rules](https://docs.adyen.com/issuing/transaction-rules/) | 通过交易规则定义发卡交易的允许、拒绝、暂停或审批动作。 | 支撑 spend-controls 覆盖交易规则、审批和运营动作，但仍属于发卡授权控制能力。 | Adyen 官方公开文档，2026-05-18 核验。 | Adyen 规则动作和平台对象需按实际 Issuer/Processor/Program 协议重新确认。 |
 | [Nacha Operating Rules](https://www.nacha.org/rules/operating-rules) | ACH 规则变更、风险管理、return、IAT、资金可用性等规则入口。 | 提醒 ACH 场景必须保留 return、风险监控、IAT 和资金可用性待确认项。 | 公开规则入口；正式启用 ACH 能力前必须二次核验规则、适用法域和合作银行要求。 | 本 PRD 不定义 ACH 合规结论；正式启用必须按 Nacha 规则和合作银行要求确认。 |
 | [Visa Rules and Policy](https://usa.visa.com/support/consumer/visa-rules.html) 与 [Visa Core Rules Public PDF](https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf) | Visa 网络规则、区域规则、争议、责任和网络参与方约束。 | 作为 VCC、授权、清算、争议拒付和证据留存的外部规则入口。 | 公开规则入口；正式启用 Visa 相关能力前必须核验规则版本、区域、BIN、Issuer/Program Manager 责任。 | 具体卡产品必须按签约区域、BIN、Issuer/Program Manager 规则确认。 |
 | [Mastercard Rules](https://www.mastercard.com/us/en/business/support/rules.html) | Mastercard 公开规则入口，说明公开站点与官方规则之间的优先级关系。 | 作为 Mastercard 场景的争议、清算、责任和证据口径入口。 | 公开规则入口；正式启用 Mastercard 相关能力前必须核验规则版本、区域和合作方协议。 | 不能用公开网页替代正式规则、合作方协议或卡组织通知。 |
@@ -596,11 +597,11 @@ flowchart LR
 | [Adyen Manage Disputes](https://docs.adyen.com/risk-management/manage-disputes) 与 [Risk Management](https://docs.adyen.com/risk-management) | 争议接受、抗辩、自动抗辩、证据要求、风险规则和 case management。 | 支撑运营后台中争议处理、风险 case、证据材料和权限角色设计。 | 公开 PSP 文档入口，PRD 阶段按争议和风控运营参考使用。 | 不等同于本产品争议流程；需要按实际 PSP、卡组织和地区规则裁剪。 |
 | [Martin Fowler: Event Sourcing](https://www.martinfowler.com/eaaDev/EventSourcing.html) | 用事件序列保存状态变化，并可通过重放重建状态。 | 支撑事实不可变、投影可重建、归档重放和差异报告的产品原则。 | 公开工程文章，PRD 阶段按设计思想参考使用。 | 本产品不是纯 Event Sourcing 架构；只吸收事实日志和可重建原则。 |
 
-## 16. 未尽事宜与未来方向
+## 16. 交付确认项
 
-### 16.1 未尽事宜
+### 16.1 待确认项
 
-| 类别 | 未尽事宜 | 为什么不能在 PRD 里直接定死 | 产品边界 |
+| 类别 | 待确认项 | 确认依据 | 产品边界 |
 | --- | --- | --- | --- |
 | 合规和持牌 | 客户资金、备付金、跨境、外汇、IAT、金融数据、隐私和监管报送。 | 依赖地区、牌照、合作机构、产品形态和正式规则。 | PRD 只保留待确认项和风险边界，不给合规最终结论。 |
 | 卡产品 | VCC、授权协作、清算文件、拒付证据、网络费用和 BIN/Program 规则。 | 依赖卡组织、Issuer、Processor 和 Program Manager。 | 仅保留发卡扩展定位、对象边界和验收红线。 |
@@ -612,24 +613,35 @@ flowchart LR
 | 非功能 | SLO、容量、性能、并发、锁、监控、告警、容灾和数据保留。 | 依赖业务规模、交易峰值、部署拓扑和数据保留要求。 | PRD 只保留产品风险、审计、追溯和生产安全边界。 |
 | 数据和报表 | 指标口径、报表维度、日切、月结、关账、导出和数据质量。 | 报表能力落地依赖数据平台、任务调度和财务口径确认。 | 本 PRD 只列指标项、业务问题、使用者、建议事实来源和只读边界。 |
 
-### 16.2 未来方向
+### 16.1.1 外部规则确认责任矩阵
+
+下列事项未确认前，只能作为产品边界和测试红线进入设计，不得作为默认生产能力或上线结论。
+
+| 待确认域 | 确认方 | 必须确认 | 未确认前不得做 |
+| --- | --- | --- | --- |
+| 客户资金、备付金和持牌边界 | 法务、合规、财务、持牌主体负责人 | 资金归属、账户性质、资金隔离、监管报送和合同责任。 | 把平台内部账目称为客户备付金，或把内部清结算写成持牌清算能力。 |
+| 卡产品和 VCC | 卡组织、Issuer、Processor、Program Manager、风控、合规 | BIN/Program 规则、授权协作、spend controls、争议证据、网络费用和拒付责任。 | 把发卡授权控制作为默认主链路，或用公开文档替代正式规则。 |
+| ACH、银行转账和全球付款 | 合作银行、ODFI/RDFI、通道负责人、合规、财务 | return、NOC、IAT、退汇、资金可用性、外部受理和到账状态。 | 把外部受理展示为到账成功，或把退汇当普通退款处理。 |
+| 跨境、外汇和多币种 | 合规、财务、税务、通道负责人 | 适用法域、牌照、汇率来源、费用、税务、会计入账和报送。 | 静默换汇，或让余额控制、清结算、报表周期替代 FX 专项设计。 |
+| 税务、会计和关账 | 财务、税务、会计、审计 | 收入确认、费用、准备金、坏账核销、日切月结、凭证映射和关账检查。 | 用资金交易状态替代会计结论，或用报表口径反推账本事实。 |
+| 敏感数据和导出 | 安全、合规、数据治理、业务负责人 | PAN、CVV、银行账户、证件、手机号、邮箱、密钥、token secret 的存储、展示、导出和留存边界。 | 在普通日志、快照、导出、报表或测试数据中保存明文敏感信息。 |
+
+### 16.2 最终交付边界
 
 ```mermaid
 flowchart LR
     Base["资金事实可信\n交易 / 路由 / 钱包 / 账本 / 投影"] --> Ops["运营闭环可信\n清分 / 清算 / 结算 / 出款 / 差错"]
     Ops --> Data["资金数据治理可信\n检查点 / 水位 / 重放 / 差异报告 / 指标项输入"]
-    Data --> Rails["业务轨道专业化\nVCC / ACH / 全球收付款 / 收单 / 平台内转"]
-    Rails --> Smart["运营智能化和风险治理\n风险信号 / 自动化复核 / SLA / 财务关账"]
+    Data --> Guard["准入评审可信\n产品 / DSL / 系分 / TDD / 红线"]
 ```
 
-| 方向 | 目标 | 关键能力 |
+| 交付域 | 目标 | 关键能力 |
 | --- | --- | --- |
 | 资金主链路稳态 | 让每一笔资金事实都能稳定入账、可查、可追溯。 | 交易接入、route snapshot、posting plan、ledger entry、余额投影、交易投影。 |
 | 清结算和对账闭环 | 让商户、平台、通道和外部资金文件可以按批次核对和处理。 | 清算候选、结算单、出款单、对账批次、差错单、追偿和调账。 |
 | 归档重放和资金数据治理 | 在大数据量下仍能证明余额和交易视图的正确性，并向报表指标模块提供可信输入。 | 检查点、水位、归档清单、formal rebuild、formal replay、差异报告、指标项来源边界。 |
-| 业务轨道专业化 | 支撑 VCC、ACH、全球收付款、收单和平台内部交易的差异化规则。 | 轨道模板、外部状态映射、费用模型、争议/return/退汇处理。 |
-| 运营智能化和风险治理 | 降低人工处理成本，提高风控、财务和运营响应质量。 | 风险信号、自动阻断、人工复核、证据包、SLA、异常趋势和自动核销建议。 |
-| 业财一体化 | 把产品账本、财务报表、关账和审计证据连接起来。 | 报表口径版本、凭证映射、日切月结、关账检查、导出审计。 |
+| 支付轨道边界 | VCC、ACH、全球收付款、收单和平台内部交易只在规则、外部状态和责任方确认后进入具体场景。 | 轨道模板、外部状态映射、费用模型、争议/return/退汇处理和待确认规则清单。 |
+| 运营、风控与业财边界 | 运营动作、风险信号、财务报表、关账和审计证据必须能回到资金事实和审批证据链。 | 风险信号、人工复核、证据包、SLA、报表口径版本、凭证映射、日切月结、关账检查和导出审计。 |
 
 ## 17. 专题文档
 

@@ -6,6 +6,16 @@
 
 产品验收不只看“接口不报错”，还要看状态、金额、账目、账本、投影、幂等、审计和异常路径是否完整。
 
+## 1.1 准入评估结论口径
+
+本矩阵是产品、开发和测试做准入评估时的共同证据表。评审结论必须回到 [../README.md#设计准入评估总控](../README.md#设计准入评估总控) 的三类口径：通过、带条件通过、阻断。
+
+| 结论 | 本矩阵中的最低证据 | 不允许的误判 |
+| --- | --- | --- |
+| 通过 | 本次范围内的 `AC-*`、`RED-*`、DSL 契约、系分落点和 TDD 用例都能互相追溯，且没有未关闭的资金安全或金融红线阻断项。 | 只因为主流程能跑通就判定通过。 |
+| 带条件通过 | 主链路 `AC-*` 有 TDD 承接，待确认项不影响资金不变量，并写清负责人、补齐时点和不覆盖范围。 | 把外部规则、合规确认、争议证据、调账审批或敏感数据边界当成普通后续优化。 |
+| 阻断 | 存在未覆盖红线、资金路径不可追溯、账务主体不清、投影反写、缺快照逆向、周期混用、敏感信息泄露或外部规则未确认等关键问题。 | 用人工处理、后台改数、报表修正或测试暂缓来替代设计闭环。 |
+
 ## 2. 验收分层
 
 | 层级 | 验收目标 | 典型测试方式 |
@@ -112,6 +122,7 @@ flowchart TD
 | AC-CTRL-001 | 冻结成功 | 主体可用余额充足，原因、期限和权限合法。 | 创建冻结单，`AVAILABLE -> FROZEN`。 | 冻结不创建资金交易，不改变资金归属。 |
 | AC-CTRL-002 | 解冻成功 | 原冻结单存在，剩余冻结金额充足。 | `FROZEN -> AVAILABLE`。 | 超额解冻失败，释放记录可审计。 |
 | AC-CTRL-003 | 冻结后扣划 | 原冻结单存在，后续需追偿或调账。 | 创建独立资金事实并引用冻结单。 | 不通过修改冻结状态表达消费。 |
+| AC-CTRL-004 | 编号保留 | 预留给余额控制专项补充场景。 | 不作为验收用例。 | 评审和测试不应按缺失用例处理。 |
 | AC-ADJ-001 | 资金调账 | 财务或运营提交原因、凭证、审批和差错引用。 | 作为直接交易调账或对账差错调账事实，生成平衡调账分录。 | 不修改历史分录；不通过余额控制表达跨主体价值转移；无审批失败。 |
 | AC-CTRL-005 | 信用额度调整 | 管理员调增或调减信用额度。 | `LIMIT` 和 `AVAILABLE` 按规则变化。 | `LIMIT` 不作为普通交易 source/target。 |
 | AC-CTRL-006 | 预算调整 | 管理员调增或调减预算。 | 预算 `LIMIT` 和 `AVAILABLE` 变化。 | 预算不是资金，不入现金流。 |
@@ -300,8 +311,8 @@ flowchart TD
 | `AC-ROUTE-005` | `expectedRouteCreated=false`、`expectedPostingCreated=false` | 账户缺失、币种不一致、余额不足、周期缺失、规则不唯一或外部账户误用时，失败不生成 route、posting、entry。 |
 | `AC-ROUTE-006` | `AUTHORIZATION_TRANSACTION / AUTHORIZE`、`DSL-AUTH-LIFECYCLE-001` | 授权占用保存主体、账目、账本周期和授权快照；释放和结算必须回到原周期。 |
 | `AC-PI-001` 至 `AC-PI-007` | `PaymentInstrumentRefSpec`、`ExternalAccountRefSpec`、`RoutingDecisionSpec`、`FundingAllocationDecisionSpec`、`RouteSnapshotSpec`、`BindingHistory` | 支付工具只做路由输入和快照引用；工具绑定、方向、状态、资金来源决策、账户能力和绑定历史审计必须可解释；逆向交易按原快照回放。 |
-| `AC-AUTH-011` | `AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`DSL-AUTH-LIFECYCLE-001` | 无前置授权的外部消费结果通过 `settle` 承接，不伪造授权占用；策略、上限、原因和审计必填。 |
-| `AC-AUTH-012` | `AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式、`DSL-AUTH-LIFECYCLE-001` | 无前置授权但有外部原消费、原完成或差错凭证时通过 `settleRefund` 承接；不得补造授权占用或静默退款。 |
+| `AC-AUTH-011` | `AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`DSL-AUTH-FORCE-CAPTURE-001` | 无前置授权的外部消费结果通过 `settle` 承接，不伪造授权占用；策略、上限、原因和审计必填。 |
+| `AC-AUTH-012` | `AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式、`DSL-AUTH-REFUND-001` | 无前置授权但有外部原消费、原完成或差错凭证时通过 `settleRefund` 承接；不得补造授权占用或静默退款。 |
 | `RED-043` | `expectedRouteCreated=false` | 多个账户、账目、平台角色或规则同时命中时，不能随机选择路径继续入账。 |
 | `RED-044` | `expectedRouteCreated=false`、`expectedPostingCreated=false` | 路由失败不能自动换路径试入账，也不能写账本事实或余额投影。 |
 | `RED-045` | `DIRECT_TRANSACTION / PAY` 普通支付路由变体 | 非商户订单收款不得被默认套入商户清算链路。 |
@@ -314,15 +325,16 @@ flowchart TD
 
 ### 8.1 用例族级追踪索引
 
-本表用于从产品验收反查 DSL 契约族和 TDD 测试族。它不替代第 5 节逐条验收矩阵，也不要求每个产品用例都具备独立 JSON 样例；当一个用例族已有代表性 DSL 样例和 TDD 场景时，编码阶段可按族扩展测试。
+本表用于从产品验收反查 DSL 契约族和 TDD 测试族。它不替代第 5 节逐条验收矩阵，也不要求每个产品用例都具备独立 JSON 样例；当一个用例族已有代表性 DSL 样例和 TDD 场景时，实现时按族补齐测试覆盖。
 
 | 产品验收族 | DSL 承接 | TDD 承接 | 追踪重点 |
 | --- | --- | --- | --- |
 | `AC-IN-*`、`AC-PAY-*`、`AC-MER-*`、`AC-FEE-*` | `DIRECT_TRANSACTION`、`DSL-DIRECT-PAY-FEE-001`、`DSL-DIRECT-FUND-IN-FEE-001`、`DSL-DIRECT-CHAIN-001`、`DSL-REVERSE-REFUND-FEE-001` | `TDD-DIR-*`、`TDD-DIR-FLOW-*`、`TDD-DIR-ERR-*` | 入金、付款、商户收款、转账、提现、退款、手续费和退费都能说明 route、posting、余额桶、幂等和原路径回放。 |
 | `AC-ROUTE-*`、`AC-PI-*`、`RED-043` 至 `RED-049` | `RouteSnapshotSpec`、`RouteLegSpec`、`PaymentInstrumentRefSpec`、`ExternalAccountRefSpec`、`RoutingDecisionSpec`、`FundingAllocationDecisionSpec`、`Route Replay DSL`、`BindingHistory`、`DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`DSL-PAYMENT-INSTRUMENT-FAIL-001`、`DSL-PAYMENT-INSTRUMENT-REPLAY-001`、`expectedRouteCreated=false` | `TDD-ROUTE-*`、`TDD-WALLET-*`、`TDD-RACE-009`、`TDD-RED-001`、`TDD-RED-003`、`TDD-RED-029`、`TDD-RED-034` 至 `TDD-RED-037` | 路由只解析路径，不写账；支付工具和外部账户只做引用；绑定、方向、状态、资金来源、账户能力和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
-| `AC-AUTH-*`、`AC-RAIL-001`、`AC-RAIL-002` | `AUTHORIZATION_TRANSACTION`、`DSL-AUTH-LIFECYCLE-001` | `TDD-AUTH-*`、`TDD-AUTH-FLOW-*`、`TDD-AUTH-ERR-*`、`TDD-AUTH-EXT-*` | 授权批准、拒绝、撤销、过期、完成、强制完成、完成后退款、无授权退款和发卡控制扩展边界一致。 |
-| `AC-CTRL-*` | `BALANCE_CONTROL`、`DSL-BALANCE-FREEZE-WITHDRAW-001`、`DSL-LIMIT-ADJUST-001` | `TDD-CTRL-*`、`TDD-CTRL-FLOW-*`、`TDD-CTRL-ERR-*`、`TDD-WALLET-*` | 冻结、解冻、资金调账、信用额度、预算组和受控负余额不混用；`LIMIT` 只能由调额触碰。 |
-| `AC-CLR-*`、`AC-SET-*`、`AC-REC-*` | `DSL-SETTLEMENT-RECONCILIATION-001`、清结算与对账差错账务规则 | `TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-RED-020` 至 `TDD-RED-022` | 清分、清算、结算、出款和对账对象独立；清分前基础对账、清算前置对账、差错追加事实和重跑审计闭环可验证。 |
+| `AC-AUTH-*`、`AC-RAIL-001`、`AC-RAIL-002` | `AUTHORIZATION_TRANSACTION`、`DSL-AUTH-LIFECYCLE-001`、`DSL-AUTH-FORCE-CAPTURE-001`、`DSL-AUTH-REFUND-001` | `TDD-AUTH-*`、`TDD-AUTH-FLOW-*`、`TDD-AUTH-ERR-*`、`TDD-AUTH-EXT-*` | 授权批准、拒绝、撤销、过期、普通完成、强制完成、完成后退款、无授权退款和发卡控制扩展边界一致。 |
+| `AC-CTRL-*`、`RED-013` | `BALANCE_CONTROL`、`DSL-BALANCE-CONTROL-FREEZE-001`、`DSL-BALANCE-CONTROL-LIMIT-BUDGET-001`、`DSL-DIRECT-OVERDRAFT-001` | `TDD-CTRL-*`、`TDD-CTRL-FLOW-*`、`TDD-CTRL-ERR-*`、`TDD-WALLET-*`、`TDD-RED-012` | 冻结、解冻、信用额度、预算组和受控负余额不混用；`LIMIT` 只能由调额触碰；无策略负余额不得继续消费；余额控制不承接跨主体调账。 |
+| `AC-ADJ-001`、`RED-010` | `DIRECT_TRANSACTION / ADJUST`、`DSL-SETTLEMENT-RECONCILIATION-ADJUST-001`、差错调账账务规则 | `TDD-RECON-001`、`TDD-RECON-002`、`TDD-CTRL-ERR-005`、`TDD-OPS-001` | 调账必须有差错或调整来源、审批、凭证、账本交易和重新对账依据；不得落到余额控制，不得直接修改历史分录或投影。 |
+| `AC-CLR-*`、`AC-SET-*`、`AC-REC-*` | `DSL-SETTLEMENT-RECONCILIATION-001`、`DSL-SETTLEMENT-CLEARING-CONFIRM-001`、`DSL-SETTLEMENT-LOCK-001`、`DSL-SETTLEMENT-PAYOUT-RESULT-001`、`DSL-SETTLEMENT-RECONCILIATION-ADJUST-001`、`DSL-SETTLEMENT-POLICY-001` | `TDD-CLS-*`、`TDD-CLS-FLOW-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-RED-020` 至 `TDD-RED-022`、`TDD-RED-031` | 清分、清算、结算、出款和对账对象独立；清分前基础对账、清算前置对账、差错追加事实、账期临界和重跑审计闭环可验证。 |
 | `AC-VIEW-*`、`AC-BALLOG-*` | `Projection DSL`、余额日志和交易投影只读边界 | `TDD-LEDGER-*`、`TDD-VIEW-*`、`TDD-RED-010`、`TDD-RED-013`、`TDD-RED-014` | 余额投影、余额日志和交易投影都从事实派生；日志失败不回滚事实；投影和日志不得修复余额。 |
 | `AC-ARCH-*`、`AC-REPLAY-*` | `Replay DSL` 中的投影重放边界、归档 Manifest、Checkpoint、Watermark、`DSL-GOVERNANCE-ARCHIVE-MANIFEST-001`、`DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`、`DSL-GOVERNANCE-PROJECTION-REPLAY-001` | `TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-004`、`TDD-RACE-010`、`TDD-RED-016` 至 `TDD-RED-019` | 归档只改变冷热位置；统一治理任务不替代资金归档 Manifest、余额水位或交易投影 checkpoint；余额快照按 `HOT_ONLY`、`COLD_MANIFEST`、`MIXED` 覆盖模式校验，只能从账本事实确认；余额重建只从检查点和增量分录出发；交易投影重放有范围、dry-run/apply 和差异报告。 |
 | `AC-RPT-*` | 指标项来源、口径版本、只读边界、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001` | `TDD-METRIC-*`、`TDD-RACE-010`、`TDD-RED-019` | 资金底座只列产品和业务关心的指标项；指标实现由报表指标模块承接，不反写资金事实；普通指标快照不能替代账本余额快照确认，指标水位不能参与余额水位推进、归档 Manifest 或交易投影重放 checkpoint。 |
