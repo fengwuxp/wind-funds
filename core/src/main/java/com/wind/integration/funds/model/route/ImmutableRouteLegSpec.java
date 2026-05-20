@@ -39,8 +39,26 @@ public record ImmutableRouteLegSpec(String legId,
                                     Map<String, Object> contextVariables) implements RouteLegSpec {
 
     public ImmutableRouteLegSpec {
+        originalAmount = originalAmount == null ? amount : originalAmount;
+        exchangeRate = exchangeRate == null ? BigDecimal.ONE : exchangeRate;
+        if (amount.getAmount() <= 0) {
+            throw new IllegalArgumentException("routeLeg.amount must be positive");
+        }
+        if (originalAmount.getAmount() <= 0) {
+            throw new IllegalArgumentException("routeLeg.originalAmount must be positive");
+        }
+        if (exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("routeLeg.exchangeRate must be positive");
+        }
+        if (periodType != null && periodType != AccountBalancePeriodType.LIFETIME && !hasText(periodId)) {
+            throw new IllegalArgumentException("routeLeg.periodId is required for non-lifetime period");
+        }
         constraintOverrides = Map.copyOf(constraintOverrides == null ? Map.of() : constraintOverrides);
         contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     @Override

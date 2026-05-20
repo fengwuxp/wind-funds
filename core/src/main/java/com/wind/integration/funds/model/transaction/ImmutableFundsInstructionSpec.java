@@ -50,6 +50,15 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
         AssertUtils.hasText(businessSn, "fundsInstruction.businessSn must not be blank");
         originalAmount = originalAmount == null ? amount : originalAmount;
         exchangeRate = exchangeRate == null ? BigDecimal.ONE : exchangeRate;
+        if (amount.getAmount() <= 0) {
+            throw new IllegalArgumentException("fundsInstruction.amount must be positive");
+        }
+        if (originalAmount.getAmount() <= 0) {
+            throw new IllegalArgumentException("fundsInstruction.originalAmount must be positive");
+        }
+        if (exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("fundsInstruction.exchangeRate must be positive");
+        }
         contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
     }
 

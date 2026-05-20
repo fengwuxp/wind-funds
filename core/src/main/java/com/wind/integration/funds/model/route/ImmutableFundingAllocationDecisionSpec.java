@@ -24,6 +24,9 @@ public record ImmutableFundingAllocationDecisionSpec(String allocationId,
         if (priority == null) {
             throw new IllegalArgumentException("funding allocation priority is required");
         }
+        if (amount.getAmount() <= 0) {
+            throw new IllegalArgumentException("funding allocation amount must be positive");
+        }
         if (!hasText(reason)) {
             throw new IllegalArgumentException("funding allocation reason is required");
         }
