@@ -48,6 +48,7 @@ import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAu
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
+import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
@@ -67,7 +68,15 @@ import com.capte.funds.wallet.dal.entities.FundingAccount;
 import com.capte.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.capte.funds.wallet.model.request.CreateBudgetGroupRequest;
+import com.capte.funds.wallet.model.request.CreateCreditAccountRequest;
+import com.capte.funds.wallet.service.BudgetGroupService;
+import com.capte.funds.wallet.service.CreditAccountService;
+import com.capte.funds.wallet.services.impl.BudgetGroupServiceImpl;
+import com.capte.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.capte.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.capte.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
+import com.capte.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.capte.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
@@ -81,6 +90,7 @@ import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
@@ -130,6 +140,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             "t_funds_transaction_detail",
             "t_funds_transaction",
             "t_funding_account",
+            "t_credit_account",
+            "t_budget_group",
             "t_ledger");
 
     @Autowired
@@ -146,6 +158,12 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     @Autowired
     protected LedgerService ledgerService;
+
+    @Autowired
+    protected CreditAccountService creditAccountService;
+
+    @Autowired
+    protected BudgetGroupService budgetGroupService;
 
     @Autowired
     private LedgerTransactionMapper ledgerTransactionMapper;
@@ -278,6 +296,47 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected void ensureLedger(FundsAccountId accountId, LedgerSubjectCode ledgerSubjectCode) {
         ensureLedger(accountId, ledgerSubjectCode, 0L);
+    }
+
+    protected void ensureCreditAccount(FundsAccountId accountId) {
+        assertThat(accountId.type()).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT.name());
+        if (!findLedgers(accountId).isEmpty()) {
+            return;
+        }
+        creditAccountService.createCreditAccount(new CreateCreditAccountRequest()
+                .setSn(accountId.id())
+                .setTenantId(TENANT_ID)
+                .setOwnerId("owner_" + accountId.id())
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setAccountType(CreditFundsAccountType.SHARED_CARD.name())
+                .setCurrency(CURRENCY));
+    }
+
+    protected void ensureBudgetGroup(FundsAccountId accountId) {
+        assertThat(accountId.type()).isEqualTo(FundsSubjectType.BUDGET_GROUP.name());
+        if (!findLedgers(accountId).isEmpty()) {
+            return;
+        }
+        budgetGroupService.createBudgetGroup(new CreateBudgetGroupRequest()
+                .setSn(accountId.id())
+                .setTenantId(TENANT_ID)
+                .setOwnerId("owner_" + accountId.id())
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setBudgetType(DefaultFundsAccountType.BUDGET_GROUP.name())
+                .setCurrency(CURRENCY));
+    }
+
+    protected void adjustBalance(FundsAccountId accountId, long amount, boolean increase, String businessSn) {
+        balanceControlService.adjust(new FundsBalanceAdjustRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setIncrease(increase)
+                .setBusinessScene("BALANCE_ADJUST")
+                .setBusinessSn(businessSn)
+                .setAdjustReason("flow test balance adjust")
+                .setAdjustEvidenceRef("EVIDENCE_" + businessSn)
+                .setApprovalRef("APPROVAL_" + businessSn)
+                .setDescription("balance adjust"), WindOperator.system());
     }
 
     protected void topup(FundsAccountId accountId, long amount, String businessSn) {
@@ -572,6 +631,14 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return FundsAccountId.immutable(accountId, FundsSubjectType.FUNDING_ACCOUNT.name());
     }
 
+    protected static FundsAccountId creditAccount(String accountId) {
+        return FundsAccountId.immutable(accountId, FundsSubjectType.CREDIT_ACCOUNT.name());
+    }
+
+    protected static FundsAccountId budgetGroup(String accountId) {
+        return FundsAccountId.immutable(accountId, FundsSubjectType.BUDGET_GROUP.name());
+    }
+
     protected static FundsAccountId cashMappingAccount() {
         return platformAccount(PlatformFundingAccountRole.CASH_MAPPING);
     }
@@ -668,6 +735,10 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
+            DefaultLedgerProfileServiceImpl.class,
+            DefaultSubjectLedgerInitializer.class,
+            CreditAccountServiceImpl.class,
+            BudgetGroupServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             PlatformFundingAccountServiceImpl.class
     })

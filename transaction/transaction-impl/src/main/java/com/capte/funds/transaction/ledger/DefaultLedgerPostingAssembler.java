@@ -129,9 +129,11 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         LedgerPostingIntentType intent = resolveIntent(resolvedRoute);
         LedgerPostingScope postingScope = resolvePostingScope(intent, leg.getPhaseCode());
         List<LedgerEntrySpec> entries = List.of(
-                toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getSourceNode(), MovementDirection.DECREASE,
+                toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getSourceNode(),
+                        resolveSourceDirection(resolvedRoute, leg),
                         intent, postingScope),
-                toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getTargetNode(), MovementDirection.INCREASE,
+                toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getTargetNode(),
+                        resolveTargetDirection(resolvedRoute, leg),
                         intent, postingScope)
         );
         LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(leg.getPhaseCode(), entries);
@@ -146,6 +148,28 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                 .description(leg.getDescription())
                 .contextVariables(mergedContext(resolvedRoute, leg))
                 .build();
+    }
+
+    private MovementDirection resolveSourceDirection(ResolvedRouteSpec resolvedRoute, RouteLegSpec leg) {
+        if (resolvedRoute.getEventType() == FundsTransactionEventType.LIMIT_ADJUST) {
+            return resolveLimitAdjustDirection(leg);
+        }
+        return MovementDirection.DECREASE;
+    }
+
+    private MovementDirection resolveTargetDirection(ResolvedRouteSpec resolvedRoute, RouteLegSpec leg) {
+        if (resolvedRoute.getEventType() == FundsTransactionEventType.LIMIT_ADJUST) {
+            return resolveLimitAdjustDirection(leg);
+        }
+        return MovementDirection.INCREASE;
+    }
+
+    private MovementDirection resolveLimitAdjustDirection(RouteLegSpec leg) {
+        return switch (leg.getBalanceEffectType()) {
+            case INCREASE -> MovementDirection.INCREASE;
+            case DECREASE -> MovementDirection.DECREASE;
+            default -> throw new IllegalArgumentException("LIMIT_ADJUST only supports INCREASE or DECREASE effect");
+        };
     }
 
     private LedgerEntrySpec toEntry(String ledgerTransactionSn,

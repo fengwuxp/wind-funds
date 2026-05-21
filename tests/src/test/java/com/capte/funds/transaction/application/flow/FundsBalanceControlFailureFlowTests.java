@@ -577,6 +577,102 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
+     * 场景：信用账户发起额度调增后再调减。
+     * 输入：信用账户额度调增 100、调减 40，并给齐调账原因、凭证和审批引用。
+     * 输出：只调整该信用账户 LIMIT/AVAILABLE 控制账本，AUTHORIZATION、资金账户和平台资金账本不变。
+     * 预期：信用额度调整与资金账户余额调整分离，不经由平台调整挂账户承载价值转移。
+     * 红线：额度调整不得污染真实资金账户、平台 CASH/PREPAYMENT 或授权占用账本。
+     */
+    @Test
+    void testCreditLimitAdjustShouldAffectOnlyCreditControlLedgers() {
+        FundsAccountId credit = creditAccount("credit_limit_flow");
+        FundsAccountId funding = fundingAccount("funding_user");
+        ensureCreditAccount(credit);
+        BalanceSnapshot before = snapshot(balances(credit, funding, cashMappingAccount(), prepaymentAccount()));
+
+        adjustBalance(credit, 100L, true, "CREDIT_LIMIT_ADJUST_INCREASE");
+
+        BalanceSnapshot afterIncrease = snapshot(balances(credit, funding, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterIncrease,
+                delta(credit, LedgerSubjectCode.LIMIT, 100L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        adjustBalance(credit, 40L, false, "CREDIT_LIMIT_ADJUST_DECREASE");
+
+        BalanceSnapshot afterDecrease = snapshot(balances(credit, funding, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterIncrease, afterDecrease,
+                delta(credit, LedgerSubjectCode.LIMIT, -40L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
+                delta(credit, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(credit), LedgerSubjectCode.LIMIT, 60L, CURRENCY);
+        assertBucket(balance(credit), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
+        assertBucket(balance(credit), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(funding), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertPostedTransactions(2);
+    }
+
+    /**
+     * 场景：预算组发起额度调增后再调减。
+     * 输入：预算组额度调增 300、调减 120，并给齐调账原因、凭证和审批引用。
+     * 输出：只调整该预算组 LIMIT/AVAILABLE 控制账本，AUTHORIZATION、资金账户和平台资金账本不变。
+     * 预期：预算额度调整与资金账户余额调整分离，预算控制只表达额度治理，不表达实际资金沉淀。
+     * 红线：预算额度调整不得污染真实资金账户、平台 CASH/PREPAYMENT 或授权占用账本。
+     */
+    @Test
+    void testBudgetLimitAdjustShouldAffectOnlyBudgetControlLedgers() {
+        FundsAccountId budget = budgetGroup("budget_limit_flow");
+        FundsAccountId funding = fundingAccount("funding_user");
+        ensureBudgetGroup(budget);
+        BalanceSnapshot before = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
+
+        adjustBalance(budget, 300L, true, "BUDGET_LIMIT_ADJUST_INCREASE");
+
+        BalanceSnapshot afterIncrease = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterIncrease,
+                delta(budget, LedgerSubjectCode.LIMIT, 300L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, 300L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        adjustBalance(budget, 120L, false, "BUDGET_LIMIT_ADJUST_DECREASE");
+
+        BalanceSnapshot afterDecrease = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterIncrease, afterDecrease,
+                delta(budget, LedgerSubjectCode.LIMIT, -120L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, -120L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(budget), LedgerSubjectCode.LIMIT, 180L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AVAILABLE, 180L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(funding), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertPostedTransactions(2);
+    }
+
+    /**
      * 场景：用户充值后发起超过可用余额的减少调账请求。
      * 输入：充值 50、减少调账 80，并给齐调账原因、凭证和审批引用。
      * 输出：调账请求失败，用户 AVAILABLE/FROZEN 与平台调整挂账余额保持调账前状态。

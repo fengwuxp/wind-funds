@@ -31,6 +31,7 @@ import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
+import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
@@ -58,6 +59,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * 默认账务计划装配器周期契约测试。
@@ -126,6 +128,34 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         });
     }
 
+    @Test
+    void testAssembleLimitAdjustIncreaseShouldBalanceControlLedgerEntries() {
+        LedgerTransactionSpec transaction = assembler.assemble(
+                limitAdjustInstruction(), "FUNDS_TX_LIMIT_INC", limitAdjustRoute(true));
+
+        assertThat(transaction.getPostingPlans()).hasSize(1);
+        assertThat(transaction.getPostingPlans().getFirst().isBalanced()).isTrue();
+        assertThat(transaction.getPostingPlans().getFirst().getEntries())
+                .extracting(LedgerEntrySpec::getLedgerSubjectCode, LedgerEntrySpec::getEntryType)
+                .containsExactly(
+                        tuple(LedgerSubjectCode.LIMIT, EntrySide.DEBIT),
+                        tuple(LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT));
+    }
+
+    @Test
+    void testAssembleLimitAdjustDecreaseShouldBalanceControlLedgerEntries() {
+        LedgerTransactionSpec transaction = assembler.assemble(
+                limitAdjustInstruction(), "FUNDS_TX_LIMIT_DEC", limitAdjustRoute(false));
+
+        assertThat(transaction.getPostingPlans()).hasSize(1);
+        assertThat(transaction.getPostingPlans().getFirst().isBalanced()).isTrue();
+        assertThat(transaction.getPostingPlans().getFirst().getEntries())
+                .extracting(LedgerEntrySpec::getLedgerSubjectCode, LedgerEntrySpec::getEntryType)
+                .containsExactly(
+                        tuple(LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT),
+                        tuple(LedgerSubjectCode.LIMIT, EntrySide.CREDIT));
+    }
+
     private FundsInstructionSpec instruction() {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(TENANT_ID)
@@ -137,6 +167,28 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .exchangeRate(BigDecimal.ONE)
                 .businessScene("POSTING_PERIOD")
                 .businessSn("BIZ-POSTING-PERIOD-001")
+                .eventTime(EVENT_TIME)
+                .operator(ImmutableFundsOperationActorSpec.builder()
+                        .operatorId(1L)
+                        .operatorType("SYSTEM")
+                        .appName("funds-test")
+                        .contextVariables(Map.of())
+                        .build())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsInstructionSpec limitAdjustInstruction() {
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(TENANT_ID)
+                .instructionType(FundsInstructionType.BALANCE_CONTROL)
+                .eventType(FundsTransactionEventType.LIMIT_ADJUST)
+                .transactionType(DefaultFundsTransactionType.ADJUSTMENT)
+                .amount(AMOUNT)
+                .originalAmount(AMOUNT)
+                .exchangeRate(BigDecimal.ONE)
+                .businessScene("LIMIT_ADJUST")
+                .businessSn("BIZ-LIMIT-ADJUST-001")
                 .eventTime(EVENT_TIME)
                 .operator(ImmutableFundsOperationActorSpec.builder()
                         .operatorId(1L)
@@ -165,17 +217,62 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .build();
     }
 
+    private ResolvedRouteSpec limitAdjustRoute(boolean increase) {
+        return ImmutableResolvedRouteSpec.builder()
+                .tenantId(TENANT_ID)
+                .routeCode("LIMIT_ADJUST_ROUTE")
+                .routeVersion("v1")
+                .businessScene("LIMIT_ADJUST")
+                .businessSn("BIZ-LIMIT-ADJUST-001")
+                .instructionType(FundsInstructionType.BALANCE_CONTROL)
+                .eventType(FundsTransactionEventType.LIMIT_ADJUST)
+                .transactionType(DefaultFundsTransactionType.ADJUSTMENT)
+                .participants(List.of())
+                .legs(List.of(limitAdjustLeg(increase)))
+                .resolvedAt(EVENT_TIME)
+                .contextVariables(Map.of())
+                .build();
+    }
+
     private RouteLegSpec routeLeg(AccountBalancePeriodType periodType, String periodId) {
         return new TestRouteLegSpec(
                 routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.SOURCE),
                 routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.TARGET),
                 periodType,
-                periodId
+                periodId,
+                LedgerBalanceEffectType.CONSUME,
+                LedgerPhaseCode.TRANSFER
+        );
+    }
+
+    private RouteLegSpec limitAdjustLeg(boolean increase) {
+        return new TestRouteLegSpec(
+                increase
+                        ? routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT,
+                        LedgerSubjectCode.LIMIT, RouteNodeRole.SOURCE)
+                        : routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT,
+                        LedgerSubjectCode.AVAILABLE, RouteNodeRole.SOURCE),
+                increase
+                        ? routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT,
+                        LedgerSubjectCode.AVAILABLE, RouteNodeRole.TARGET)
+                        : routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT,
+                        LedgerSubjectCode.LIMIT, RouteNodeRole.TARGET),
+                AccountBalancePeriodType.LIFETIME,
+                null,
+                increase ? LedgerBalanceEffectType.INCREASE : LedgerBalanceEffectType.DECREASE,
+                LedgerPhaseCode.ADJUSTMENT
         );
     }
 
     private RouteNodeSpec routeNode(String subjectId,
                                     FundsSubjectType subjectType,
+                                    RouteNodeRole nodeRole) {
+        return routeNode(subjectId, subjectType, LedgerSubjectCode.AVAILABLE, nodeRole);
+    }
+
+    private RouteNodeSpec routeNode(String subjectId,
+                                    FundsSubjectType subjectType,
+                                    LedgerSubjectCode ledgerSubjectCode,
                                     RouteNodeRole nodeRole) {
         SubjectRef subjectRef = ImmutableSubjectRef.builder()
                 .tenantId(TENANT_ID)
@@ -186,7 +283,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
                 .subjectRef(subjectRef)
-                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .ledgerSubjectCode(ledgerSubjectCode)
                 .nodeRole(nodeRole)
                 .build();
     }
@@ -194,7 +291,9 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     private record TestRouteLegSpec(RouteNodeSpec sourceNode,
                                     RouteNodeSpec targetNode,
                                     AccountBalancePeriodType periodType,
-                                    String periodId) implements RouteLegSpec {
+                                    String periodId,
+                                    LedgerBalanceEffectType balanceEffectType,
+                                    LedgerPhaseCode phaseCode) implements RouteLegSpec {
 
         @Override
         public String getLegId() {
@@ -223,12 +322,12 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
 
         @Override
         public LedgerBalanceEffectType getBalanceEffectType() {
-            return LedgerBalanceEffectType.CONSUME;
+            return balanceEffectType;
         }
 
         @Override
         public LedgerPhaseCode getPhaseCode() {
-            return LedgerPhaseCode.TRANSFER;
+            return phaseCode;
         }
 
         @Override
@@ -301,8 +400,8 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                     .setLedgerProfileCode("POSTING_PERIOD")
                     .setLedgerProfileVersion(1)
                     .setLedgerSubjectCode(query.getLedgerSubjectCode())
-                    .setLedgerSubjectCategory(LedgerSubjectCategory.ASSET)
-                    .setNormalBalanceSide(EntrySide.DEBIT)
+                    .setLedgerSubjectCategory(resolveSubjectCategory(query.getLedgerSubjectCode()))
+                    .setNormalBalanceSide(resolveNormalSide(query.getLedgerSubjectCode()))
                     .setAllowNegative(Boolean.FALSE)
                     .setDebitAmount(0L)
                     .setCreditAmount(0L)
@@ -312,6 +411,18 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                     .setPeriodType(query.getPeriodType())
                     .setPeriodId(query.getPeriodId())
                     .setVersion(0);
+        }
+
+        private LedgerSubjectCategory resolveSubjectCategory(LedgerSubjectCode ledgerSubjectCode) {
+            return ledgerSubjectCode == LedgerSubjectCode.LIMIT
+                    ? LedgerSubjectCategory.CONTROL
+                    : LedgerSubjectCategory.LIABILITY;
+        }
+
+        private EntrySide resolveNormalSide(LedgerSubjectCode ledgerSubjectCode) {
+            return ledgerSubjectCode == LedgerSubjectCode.LIMIT
+                    ? EntrySide.DEBIT
+                    : EntrySide.CREDIT;
         }
     }
 
