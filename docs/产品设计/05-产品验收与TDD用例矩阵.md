@@ -84,7 +84,25 @@ flowchart TD
 | AC-ROUTE-005 | 路由失败不写账 | 账户不存在、币种不一致、余额不足、周期缺失、规则不唯一或外部账户被当作内部主体。 | 返回明确失败原因或进入人工处理。 | 不生成 posting plan、LedgerEntry 或余额投影；不得自动换路径试入账。 |
 | AC-ROUTE-006 | 授权路由周期隔离 | 授权占用资金、信用额度或预算。 | route snapshot 保存主体、账目、账本周期和授权快照。 | 预算或信用的非 LIFETIME 周期必须有 periodId；释放和结算必须回到原周期。 |
 
-### 5.2.1 支付工具、绑定和资金来源
+### 5.2.1 权益金额组件
+
+权益金额组件用于承接优惠券、代金券、平台补贴、商户让利和储值券核销等已经由订单、交易业务系统或营销权益系统决策完成的结果。资金底座不计算券可用性、不做最优券选择、不维护券包生命周期，只把权益结果固化为可审计、可回放、可清结算和可对账的资金语义。
+
+| 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
+| --- | --- | --- | --- | --- |
+| AC-BEN-001 | 无权益交易兼容 | 交易指令不携带权益快照。 | 直接交易、授权、退款、route、posting 和投影行为保持原语义。 | `FundsInstruction.amount` 仍表达资金主链路金额；缺 `benefitSnapshot` 不影响既有主流程。 |
+| AC-BEN-002 | 商户优惠券支付 | 订单原价、用户实付、商户券金额和商户承担方快照完整。 | 用户按实付扣款，商户按优惠后金额或合同口径进入 CLEARING。 | 商户让利不生成独立 LedgerEntry；商户应收和清分展示能解释让利金额。 |
+| AC-BEN-003 | 平台补贴券补足商户 | 用户实付小于订单原价，平台补贴由平台承担并补足商户。 | 用户实付形成主付款路径，平台补贴形成独立资金影响或明确的伴随指令。 | 本金、手续费、平台补贴不得净额混记；补贴承担方、受益方、规则版本和核销引用可追溯。 |
+| AC-BEN-004 | 平台券不补足商户 | 平台券仅降低用户实付，商户也按优惠后金额结算。 | 交易不生成平台补贴资金路径。 | 合同或业务快照明确商户应收口径；不得把展示优惠误记为平台成本。 |
+| AC-BEN-005 | 储值、预付或礼品卡代金券 | 用户使用储值券、预付券或礼品卡抵扣订单。 | 按负债、预收待付或用户权益余额语义处理。 | 必须标记资金性质和专业确认口径；不得当作普通营销优惠券。 |
+| AC-BEN-006 | 授权时占券，完成时核销 | 授权请求携带权益占用引用和权益快照。 | 授权阶段只占用或冻结权益引用，完成阶段核销或入账。 | 授权拒绝、撤销和过期不得核销权益；授权完成不按当前券规则重算。 |
+| AC-BEN-007 | 不退券但冲补贴 | 原交易权益规则为用户侧不返券、资金侧冲回补贴。 | 用户现金按原实付退款，补贴按原组件冲回或减少商户应收。 | `NO_REFUND` 和 `REVERSE_SUBSIDY` 可同时表达；用户侧处置和资金侧处置不混成一个布尔值。 |
+| AC-BEN-008 | 不退券且不冲补贴 | 原交易权益规则为用户侧不返券、资金侧保留补贴。 | 现金退款和补贴保留按原规则处理。 | 必须有规则版本、用户提示或客服解释依据，以及财务、会计或合同确认口径。 |
+| AC-BEN-009 | 部分退款分摊权益 | 原交易含权益，发起部分退款。 | 按原快照中的商品行、比例、现金优先、权益优先或不可退优先策略分摊。 | 多次退款累计不得超过原实付、原权益金额或原可冲回金额；尾差和分摊依据可追溯。 |
+| AC-BEN-010 | 缺原权益快照的逆向处理 | 原交易被标记为含权益，但退款、清结算或对账时找不到权益快照。 | 失败或进入人工处理。 | 不调用当前营销规则重算，不用当前活动状态补造历史权益结果。 |
+| AC-BEN-011 | 含权益交易进入清结算和对账 | 商户券、平台补贴、储值券、手续费和退款冲回同时存在。 | 清分、清算、结算、对账明细能拆分各金额项。 | 营销核销金额、订单金额、资金入账、商户应收和补贴冲回可核对；差异进入差错单。 |
+
+### 5.2.2 支付工具、绑定和资金来源
 
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
 | --- | --- | --- | --- | --- |
@@ -285,6 +303,14 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | RED-047 | 支付工具敏感信息泄露 | 完整卡号、CVV、密钥、token secret、银行账户敏感号或身份凭证进入普通快照、日志、导出或报表。 |
 | RED-048 | 工具换绑导致历史重路由 | 退款、撤销、退费或拒付按当前工具绑定、当前默认资金来源或当前费率重新选路。 |
 | RED-049 | 绑定历史被覆盖 | 支付工具绑定、资金来源关系、默认关系或优先级变更只覆盖当前记录，缺少历史版本、前后值、操作者、原因和审计证据。 |
+| RED-050 | 资金底座重算优惠券 | 资金底座根据当前活动规则、券状态、库存或用户券包重新计算优惠金额。 |
+| RED-051 | 权益改写主链路金额 | 优惠券、代金券或补贴改变 `FundsInstruction.amount` 的既有语义，导致主链路金额无法解释。 |
+| RED-052 | 无资金影响权益入账 | 商户让利、展示优惠或 `NO_LEDGER` 权益组件生成 LedgerEntry、posting plan 或余额 delta。 |
+| RED-053 | 授权拒绝核销权益 | 授权拒绝、支付工具准入失败、风控拒绝、余额不足或预算不足后仍核销、作废或冲减权益。 |
+| RED-054 | 权益退款按当前规则重算 | 退款、撤销、授权过期、拒付或清结算差错处理时，不读取原权益快照，而按当前营销规则重新判断。 |
+| RED-055 | 储值券误作普通优惠券 | 储值、预付、礼品卡或用户权益余额未确认负债、预收待付或资金归属口径，就作为普通平台券处理。 |
+| RED-056 | 不退券和不冲补贴混用 | 只用一个字段表达“不退券”，无法区分用户侧不返券、资金侧冲补贴或保留补贴。 |
+| RED-057 | 权益差异静默补平 | 营销核销、订单金额、资金入账、清结算金额不一致时，系统静默改金额、补贴或清算项，不生成差错和审计。 |
 
 ## 7. TDD 用例书写模板
 
@@ -331,6 +357,8 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | RED-025 | AUTHORIZATION_CONTROL_DECLINE | 支出规则拒绝后不得生成 route、posting plan 或 LedgerEntry。 |
 | RED-026 | AUTHORIZATION_CONTROL_DECLINE | 拒绝必须保留规则版本、原因和请求摘要。 |
 | RED-027 | AUTHORIZATION_CONTROL_VELOCITY_DECLINE | 支出窗口和账本周期双向隔离。 |
+| AC-BEN-001 至 AC-BEN-011 | FundsBenefitSnapshotSpec、DSL-BENEFIT-SNAPSHOT-001、DSL-BENEFIT-MERCHANT-DISCOUNT-001、DSL-BENEFIT-PLATFORM-SUBSIDY-001、DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001、DSL-BENEFIT-AUTH-HOLD-001、DSL-BENEFIT-REFUND-NO-COUPON-001、DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001、DSL-BENEFIT-PREPAID-VOUCHER-001、DSL-BENEFIT-PARTIAL-REFUND-001、DSL-BENEFIT-MISSING-SNAPSHOT-REPLAY-001、DSL-BENEFIT-CLEARING-RECONCILIATION-001 | 权益快照只承接已决策结果；商户券、平台补贴、平台展示优惠、储值券、不退券、授权占券、部分退款和清结算拆分都必须能解释资金影响。 |
+| RED-050 至 RED-057 | expectedBenefitSnapshot、expectedRoute、expectedPosting、expectedReplay | 资金底座不得重算券；不得改写主金额语义；无资金影响权益不得入账；授权拒绝不得核销权益；逆向事件不得按当前规则重算；储值券不得误作普通券；权益差异不得静默补平。 |
 
 ### 8.1 用例族级追踪索引
 
@@ -339,6 +367,7 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | 产品验收族 | DSL 承接 | TDD 承接 | 追踪重点 |
 | --- | --- | --- | --- |
 | AC-IN-*、AC-PAY-*、AC-MER-*、AC-FEE-* | DIRECT_TRANSACTION、DSL-DIRECT-PAY-FEE-001、DSL-DIRECT-FUND-IN-FEE-001、DSL-DIRECT-CHAIN-001、DSL-REVERSE-REFUND-FEE-001 | TDD-DIR-*、TDD-DIR-FLOW-*、TDD-DIR-ERR-* | 入金、付款、商户收款、转账、提现、退款、手续费和退费都能说明 route、posting、余额桶、幂等和原路径回放。 |
+| AC-BEN-*、RED-050 至 RED-057 | FundsBenefitSnapshotSpec、DSL-BENEFIT-*、expectedBenefitSnapshot、benefit components、refund dispositions | TDD-BEN-*、TDD-BEN-RED-*、TDD-DIR-*、TDD-AUTH-*、TDD-CLS-*、TDD-RECON-* | 权益金额组件只承接业务侧已决策结果；商户让利、平台补贴、储值券、不退券、授权占券、部分退款、清结算拆分和营销资金差异都可追踪；无资金影响权益不入账，有资金影响权益不得和本金或手续费净额混记。 |
 | AC-ROUTE-*、AC-PI-*、RED-043 至 RED-049 | RouteSnapshotSpec、RouteLegSpec、PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、Route Replay DSL、BindingHistory、DSL-PAYMENT-INSTRUMENT-ROUTE-001、DSL-PAYMENT-INSTRUMENT-FAIL-001、DSL-PAYMENT-INSTRUMENT-REPLAY-001、expectedRouteCreated=false | TDD-ROUTE-*、TDD-WALLET-*、TDD-RACE-009、TDD-RED-001、TDD-RED-003、TDD-RED-029、TDD-RED-034 至 TDD-RED-037 | 路由只解析路径，不写账；支付工具和外部账户只做引用；绑定、方向、状态、资金来源、账户能力和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
 | AC-AUTH-*、AC-RAIL-001、AC-RAIL-002 | AUTHORIZATION_TRANSACTION、DSL-AUTH-LIFECYCLE-001、DSL-AUTH-FORCE-CAPTURE-001、DSL-AUTH-REFUND-001 | TDD-AUTH-*、TDD-AUTH-FLOW-*、TDD-AUTH-ERR-*、TDD-AUTH-EXT-*、TDD-ROUTE-005、TDD-ROUTE-009、TDD-RACE-001 至 TDD-RACE-003、TDD-RAIL-001、TDD-RAIL-002、TDD-RED-003、TDD-RED-005、TDD-RED-008、TDD-RED-016、TDD-RED-017、TDD-RED-033、TDD-RED-036 | 授权批准、拒绝、撤销、过期、普通完成、强制完成、完成后退款、无授权退款、拒付原因承接、原路径回放和 VCC 授权归一边界一致；完整支付轨道仍按 AC-RAIL-* 专项确认。 |
 | AC-CTRL-*、RED-013 | BALANCE_CONTROL、DSL-BALANCE-CONTROL-FREEZE-001、DSL-BALANCE-CONTROL-ADJUST-001、DSL-BALANCE-CONTROL-LIMIT-BUDGET-001、DSL-DIRECT-OVERDRAFT-001、账本周期 DSL、SubjectRef / RouteNode 主体解析 | TDD-CTRL-*、TDD-CTRL-FLOW-*、TDD-CTRL-ERR-*、TDD-LEDGER-008 至 TDD-LEDGER-011、TDD-WALLET-001 至 TDD-WALLET-004、TDD-ROUTE-004、TDD-RACE-004、TDD-RED-006、TDD-RED-011、TDD-RED-012、TDD-RED-015、TDD-RED-033 | 冻结、解冻、资金账户余额调整、信用账户额度调整、预算组额度调整和受控负余额不混用；AC-CTRL-009 至 AC-CTRL-011 必须证明账本周期隔离和继承；AC-CTRL-012 必须证明用户、商户、卡、VA、银行账户、支付工具和业务单据不能直接作为可记账主体；冻结单状态不得表达消费、扣划或付款完成；LIMIT 只能由调额触碰；余额控制不承接跨主体价值转移。 |
@@ -370,6 +399,7 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | --- | --- | --- |
 | 状态机 | AC-AUTH-*、AC-CTRL-*、AC-CLR-*、AC-SET-*、AC-REC-*、AC-ARCH-*、AC-REPLAY-* | 每类对象都有状态方向、成功终态、失败终态、人工处理和审计要求。 |
 | 账务矩阵 | AC-IN-*、AC-OUT-*、AC-PAY-*、AC-MER-*、AC-FEE-*、AC-ROUTE-*、AC-AUTH-*、AC-CTRL-* | 每个资金变化都能说明来源账目、目标账目、周期口径、route snapshot 和余额断言。 |
+| 权益金额组件 | AC-BEN-*、RED-050 至 RED-057 | 优惠券、代金券、商户让利、平台补贴和储值券只作为已决策权益快照进入资金底座；金额闭合、退款处置、清结算拆分、对账差异和人工处理都有验收入口。 |
 | 支付工具 | AC-PI-*、RED-001、RED-046、RED-047、RED-048、RED-049 | 支付工具、外部账户和通道 token 只做引用和快照；绑定关系、方向、状态、资金来源决策、账户能力和绑定历史审计可验收；敏感信息不进入普通快照、日志、导出或报表。 |
 | 路由契约 | AC-ROUTE-*、AC-PI-*、RED-003、RED-043 至 RED-049 | route snapshot、平台角色、支付工具引用、外部账户引用、资金来源决策、绑定历史审计、原路径回放、路由失败不写账和普通支付不误入商户清算可验收。 |
 | 运营后台 | AC-OPS-*、RED-010、RED-011、RED-028 | 后台只推进处理单和审批，不直接修改历史分录、余额或投影。 |
