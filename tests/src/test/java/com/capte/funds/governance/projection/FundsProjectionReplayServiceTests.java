@@ -91,14 +91,73 @@ class FundsProjectionReplayServiceTests {
         assertThat(writer.officialWrites()).isEmpty();
     }
 
+    /**
+     * 场景：运营人员以影子模式重放单笔用户账单，用于正式覆盖前的灰度核对。
+     * 输入：单笔重放范围、`REBUILD_SHADOW` 模式、合法交易投影 checkpoint。
+     * 输出：读取事实、比较差异并写入影子投影。
+     * 预期：影子模式只写影子投影，不覆盖正式投影。
+     * 红线：影子重放不得借灰度核对修改正式用户账单、交易事实、账本事实或余额投影。
+     */
+    @Test
+    void testShadowReplayShouldWriteOnlyShadowProjection() {
+        RecordingProjectionWriter writer = new RecordingProjectionWriter();
+        FundsProjectionReplayService service = newService(writer);
+
+        FundsTransactionProjectionReplayResult result = service.replay(replayRequest(
+                ProjectionReplayMode.REBUILD_SHADOW,
+                FundsTransactionProjectionReplayRange.builder()
+                        .sourceSn("FT202605190001")
+                        .build()));
+
+        assertThat(result.mode()).isEqualTo(ProjectionReplayMode.REBUILD_SHADOW);
+        assertThat(result.loadedFactCount()).isEqualTo(1);
+        assertThat(result.rebuiltRowCount()).isEqualTo(1);
+        assertThat(writer.comparedRows()).hasSize(1);
+        assertThat(writer.shadowWrites()).singleElement()
+                .satisfies(row -> assertThat(row.projectionSn()).isEqualTo("TP-FT202605190001"));
+        assertThat(writer.officialWrites()).isEmpty();
+    }
+
+    /**
+     * 场景：影子核对完成后，运营人员以正式重建模式刷新只读用户账单。
+     * 输入：单笔重放范围、`REBUILD_APPLY` 模式、合法交易投影 checkpoint。
+     * 输出：读取事实、比较差异并写入正式投影。
+     * 预期：正式重建只覆盖只读投影，不写影子投影。
+     * 红线：正式投影重放仍不得重新入账、补写交易事实、修改账本分录或修正余额投影。
+     */
+    @Test
+    void testApplyReplayShouldWriteOnlyOfficialProjection() {
+        RecordingProjectionWriter writer = new RecordingProjectionWriter();
+        FundsProjectionReplayService service = newService(writer);
+
+        FundsTransactionProjectionReplayResult result = service.replay(replayRequest(
+                ProjectionReplayMode.REBUILD_APPLY,
+                FundsTransactionProjectionReplayRange.builder()
+                        .sourceSn("FT202605190001")
+                        .build()));
+
+        assertThat(result.mode()).isEqualTo(ProjectionReplayMode.REBUILD_APPLY);
+        assertThat(result.loadedFactCount()).isEqualTo(1);
+        assertThat(result.rebuiltRowCount()).isEqualTo(1);
+        assertThat(writer.comparedRows()).hasSize(1);
+        assertThat(writer.shadowWrites()).isEmpty();
+        assertThat(writer.officialWrites()).singleElement()
+                .satisfies(row -> assertThat(row.projectionSn()).isEqualTo("TP-FT202605190001"));
+    }
+
     private static FundsProjectionReplayService newService(RecordingProjectionWriter writer) {
         return new FundsProjectionReplayService(new FixedProjectionReplaySource(), writer);
     }
 
     private static FundsTransactionProjectionReplayRequest replayRequest(FundsTransactionProjectionReplayRange replayRange) {
+        return replayRequest(ProjectionReplayMode.VERIFY_ONLY, replayRange);
+    }
+
+    private static FundsTransactionProjectionReplayRequest replayRequest(ProjectionReplayMode mode,
+                                                                         FundsTransactionProjectionReplayRange replayRange) {
         return FundsTransactionProjectionReplayRequest.builder()
                 .taskSn("TPR-202605190001")
-                .mode(ProjectionReplayMode.VERIFY_ONLY)
+                .mode(mode)
                 .viewDomain("USER_BILL")
                 .replayRange(replayRange)
                 .checkpoint(FundsTransactionProjectionCheckpoint.builder()
