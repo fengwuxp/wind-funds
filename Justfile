@@ -25,35 +25,45 @@ pmd-update:
 
 # Run one test class in a Maven module. Defaults to the tests module.
 test-one tests module='tests':
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl {{module}} -am test -Dtest={{tests}} {{test_flags}}
+    @just _run-test-classes "{{tests}}" {{module}}
+
+_assert-test-classes tests:
+    @tests="{{tests}}"; missing=0; for test in ${(s:,:)tests}; do test_class="${test%%#*}"; found=$(find . -path "*/src/test/java/*/${test_class}.java" -print -quit); if [[ -z "$found" ]]; then echo "Missing test class: $test_class"; missing=1; fi; done; exit $missing
+
+_assert-surefire-reports tests marker:
+    @tests="{{tests}}"; marker="{{marker}}"; failed=0; for test in ${(s:,:)tests}; do test_class="${test%%#*}"; reports=$(find . -path "*/target/surefire-reports/TEST-*${test_class}.xml" -newer "$marker" -print); if [[ -z "$reports" ]]; then echo "Missing fresh surefire report: $test_class"; failed=1; continue; fi; for report in ${(f)reports}; do if grep -Eq 'errors="[1-9][0-9]*"|failures="[1-9][0-9]*"' "$report"; then echo "Failed surefire report: $report"; failed=1; fi; done; done; exit $failed
+
+_run-test-classes tests module='tests':
+    @just _assert-test-classes "{{tests}}"
+    @marker=$(mktemp /tmp/wind-funds-tests.XXXXXX); touch "$marker"; if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl {{module}} -am test -Dtest="{{tests}}" {{test_flags}}; mvn_status=$?; just _assert-surefire-reports "{{tests}}" "$marker"; report_status=$?; rm -f "$marker"; if (( mvn_status != 0 || report_status != 0 )); then exit 1; fi
 
 # Run all tests in one Maven module.
 test-module module='tests':
     @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl {{module}} -am test {{test_flags}}
 
 # Core DSL and contract tests.
-test-core tests='FundsInstructionSpecContractTests,RouteDslContractTests,TransactionServiceAbilityDslJsonContractTests':
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl core -am test -Dtest={{tests}} {{test_flags}}
+test-core tests='FundsInstructionDslContractTests,RouteDslContractTests,FundsDslJsonContractTests,FundsBenefitSnapshotSpecTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,SettlementPolicySpecTests,FundsAmountBoundaryContractTests':
+    @just _run-test-classes "{{tests}}" tests
 
 # Ledger assembly, posting, and projection tests.
-test-ledger tests='DefaultLedgerPostingAssemblerTests,DefaultLedgerTransactionPostingServiceImplTests,LedgerBalanceProjectionServiceImplTests':
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl tests -am test -Dtest={{tests}} {{test_flags}}
+test-ledger tests='DefaultLedgerPostingAssemblerTests,LedgerBalanceProjectionServiceImplTests,LedgerServiceImplTests':
+    @just _run-test-classes "{{tests}}" tests
 
 # Transaction orchestration and lifecycle tests.
-test-transaction tests='FundsTransactionCommandServiceImplTests,DefaultRoutedFundsInstructionOrchestratorTests,DefaultFundsInstructionLifecycleSaverTests':
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl tests -am test -Dtest={{tests}} {{test_flags}}
+test-transaction tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,DefaultRoutedFundsInstructionOrchestratorProjectionTests':
+    @just _run-test-classes "{{tests}}" tests
 
 # Frozen order and balance-control route tests.
-test-balance-control tests='FundsFrozenOrderServiceImplTests,DefaultFundsFrozenOrderLifecycleSaverTests,BalanceControlFundsInstructionRouteResolverTests':
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl tests -am test -Dtest={{tests}} {{test_flags}}
+test-balance-control tests='FundsBalanceControlFailureFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalAfterPartialUnfreezeFlowTests':
+    @just _run-test-classes "{{tests}}" tests
 
 # Business flow and balance assertion tests.
-test-business-flow tests='FundsTransactionLedgerBalanceAssertionsTests,FundsTransactionBusinessFlowIntegrationTests,FundsTransactionOrchestrationFlowTests':
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl tests -am test -Dtest={{tests}} {{test_flags}}
+test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalRejectionFlowTests,FundsTransferPayWithdrawChainFlowTests,FundsTransactionFeeFlowTests':
+    @just _run-test-classes "{{tests}}" tests
 
-# Architecture boundary tests.
-test-boundary tests='LedgerLayerBoundaryTests,RouteLayerBoundaryTests,WalletLayerBoundaryTests':
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl tests -am test -Dtest={{tests}} {{test_flags}}
+# Contract and route boundary tests.
+test-boundary tests='RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests':
+    @just _run-test-classes "{{tests}}" tests
 
 # Fast CAD verification for non-business tooling or test-asset changes.
 verify-fast: compile test-boundary
