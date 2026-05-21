@@ -1,6 +1,10 @@
 {
   "caseId": "DSL-BENEFIT-SNAPSHOT-001",
+  "fixtureLevel": "CONTRACT_ONLY",
   "scenarioCode": "DIRECT_PAY_WITH_MERCHANT_COUPON_NO_LEDGER",
+  "acceptanceIds": ["AC-BEN-001", "AC-BEN-012", "AC-BEN-013", "RED-050", "RED-058", "RED-059"],
+  "tddIds": ["TDD-BEN-001", "TDD-BEN-002", "TDD-BEN-003", "TDD-BEN-004", "TDD-BEN-005", "TDD-BEN-006", "TDD-BEN-007"],
+  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#权益快照分期落点", "02-交易路由钱包账目与投影系分设计#阶段门禁"],
   "instruction": {
     "tenantId": 1,
     "instructionType": "DIRECT_TRANSACTION",
@@ -56,5 +60,17 @@
       "payerAccountId": "fa_user_10001_usd",
       "payeeAccountId": "fa_merchant_20001_usd"
     }
+  },
+  "validation": {
+    "mustPass": [
+      "benefitSnapshot 可作为请求态契约字段被解析",
+      "ORDER_DISCOUNT_CLOSURE 组件参与订单正向金额闭合",
+      "稳定摘要覆盖权益快照 ID、组件金额、闭合角色、规则版本和退款处置"
+    ],
+    "mustFail": [
+      "把权益核心字段藏入 contextVariables",
+      "只凭请求态 benefitSnapshot 声明含权益生产链路 Done",
+      "把 MERCHANT_RECEIVABLE_EFFECT 或 VIEW_RECONCILIATION_ONLY 算入订单正向闭合"
+    ]
   }
 }

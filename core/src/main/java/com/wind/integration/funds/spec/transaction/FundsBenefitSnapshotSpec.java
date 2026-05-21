@@ -64,6 +64,18 @@ public interface FundsBenefitSnapshotSpec {
         return null;
     }
 
+    /**
+     * 权益快照稳定摘要，用于后续请求摘要、回放和对账消费时区分不同权益结果。
+     *
+     * <p>摘要只覆盖权益一等契约字段，不读取 {@code contextVariables} 中的扩展上下文。</p>
+     *
+     * @return sha256 稳定摘要
+     */
+    @NonNull
+    default String getStableDigest() {
+        return FundsBenefitStableDigest.compute(this);
+    }
+
     @NonNull
     Map<String, Object> getContextVariables();
 }

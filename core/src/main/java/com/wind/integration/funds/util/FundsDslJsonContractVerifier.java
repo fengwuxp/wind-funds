@@ -79,10 +79,31 @@ public final class FundsDslJsonContractVerifier {
 
     public static void verifyTransactionLayerCase(@NonNull Map<String, ?> document) {
         requireText(document, "caseId");
+        verifyContractFixtureMetadata(document);
         verifyInstruction(asNullableMap(document.get("instruction"), "instruction"));
         verifyRoute(asNullableMap(document.get("expectedRoute"), "expectedRoute"));
         verifyPosting(asNullableMap(document.get("expectedPosting"), "expectedPosting"));
         verifyReplayRequest(asNullableMap(document.get("replayRequest"), "replayRequest"));
+    }
+
+    private static void verifyContractFixtureMetadata(Map<String, ?> document) {
+        Object fixtureLevel = document.get("fixtureLevel");
+        if (fixtureLevel == null) {
+            return;
+        }
+        if (!(fixtureLevel instanceof String value) || value.isBlank()) {
+            throw new IllegalArgumentException("fixtureLevel is required");
+        }
+        if (!"CONTRACT_ONLY".equals(value)) {
+            return;
+        }
+        requireText(document, "scenarioCode");
+        requiredChildTexts(document, "acceptanceIds", "acceptanceIds");
+        requiredChildTexts(document, "tddIds", "tddIds");
+        requiredChildTexts(document, "systemDesignRefs", "systemDesignRefs");
+        Map<String, ?> validation = asMap(document.get("validation"), "validation");
+        requiredChildTexts(validation, "mustPass", "validation.mustPass");
+        requiredChildTexts(validation, "mustFail", "validation.mustFail");
     }
 
     private static void verifyInstruction(@Nullable Map<String, ?> instruction) {

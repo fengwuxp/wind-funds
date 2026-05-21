@@ -203,6 +203,64 @@ class FundsBenefitSnapshotSpecTests {
     }
 
     /**
+     * 场景：同一业务流水下，权益快照核心字段发生变化。
+     * 预期：稳定摘要随快照 ID、组件金额、闭合角色、退款处置或规则版本变化。
+     * 红线：后续幂等摘要不能忽略权益快照差异并复用原交易结果。
+     */
+    @Test
+    void testStableDigestShouldChangeWhenBenefitSnapshotCoreFieldsChange() {
+        FundsBenefitSnapshotSpec baseSnapshot = merchantDiscountSnapshot(8000L, 2000L);
+
+        assertThat(benefitSnapshot("BS-MERCHANT-002",
+                money(10000L),
+                money(8000L),
+                List.of(merchantDiscountComponent("BC-MERCHANT-001", 2000L))).getStableDigest())
+                .isNotEqualTo(baseSnapshot.getStableDigest());
+        assertThat(benefitSnapshot("BS-MERCHANT-001",
+                money(10000L),
+                money(7000L),
+                List.of(merchantDiscountComponent("BC-MERCHANT-001", 3000L))).getStableDigest())
+                .isNotEqualTo(baseSnapshot.getStableDigest());
+        assertThat(benefitSnapshot("BS-MERCHANT-001",
+                money(10000L),
+                money(8000L),
+                List.of(merchantDiscountComponentWithRole("BC-MERCHANT-001",
+                        2000L,
+                        FundsBenefitAmountClosureRole.VIEW_RECONCILIATION_ONLY),
+                        merchantDiscountComponent("BC-MERCHANT-002", 2000L))).getStableDigest())
+                .isNotEqualTo(baseSnapshot.getStableDigest());
+        assertThat(benefitSnapshot("BS-MERCHANT-001",
+                money(10000L),
+                money(8000L),
+                List.of(merchantDiscountComponentWithRefundPolicy("BC-MERCHANT-001",
+                        2000L,
+                        merchantRefundPolicyWithDispositions(
+                                "merchant-refund-v3",
+                                FundsBenefitRefundDisposition.REISSUE)))).getStableDigest())
+                .isNotEqualTo(baseSnapshot.getStableDigest());
+        assertThat(benefitSnapshot("BS-MERCHANT-001",
+                money(10000L),
+                money(8000L),
+                List.of(merchantDiscountComponentWithReference("BC-MERCHANT-001",
+                        2000L,
+                        benefitReference("merchant-rule-v4")))).getStableDigest())
+                .isNotEqualTo(baseSnapshot.getStableDigest());
+    }
+
+    /**
+     * 场景：权益快照只存在于请求对象，还没有进入 route snapshot、交易事实或等价不可变存储。
+     * 预期：契约层只能给出稳定摘要，不能宣称生产链路已经可回放。
+     * 红线：RED-058 作为生产 Done 门禁，不在 B1-10 被越权关闭。
+     */
+    @Test
+    void testRequestBenefitSnapshotShouldOnlyProvideContractDigestBoundary() {
+        FundsBenefitSnapshotSpec snapshot = merchantDiscountSnapshot(8000L, 2000L);
+
+        assertThat(snapshot.getStableDigest()).startsWith("sha256:");
+        assertThat(snapshot.getStableDigest()).hasSize("sha256:".length() + 64);
+    }
+
+    /**
      * 场景：实现者试图把权益核心金额、规则版本或退款处置放入 contextVariables。
      * 预期：模型构造阶段显式失败。
      * 红线：contextVariables 只能承载非关键扩展信息。
@@ -266,12 +324,58 @@ class FundsBenefitSnapshotSpecTests {
     }
 
     private FundsBenefitComponentSpec merchantDiscountComponent(String componentSn, long amount) {
+        return merchantDiscountComponentWithRefundPolicy(componentSn, amount, merchantRefundPolicy());
+    }
+
+    private FundsBenefitComponentSpec merchantDiscountComponentWithReference(String componentSn,
+                                                                            long amount,
+                                                                            FundsBenefitReferenceSpec reference) {
         return ImmutableFundsBenefitComponentSpec.builder()
                 .componentSn(componentSn)
                 .sequence(1)
                 .benefitType(FundsBenefitType.MERCHANT_COUPON)
                 .componentType(FundsBenefitComponentType.MERCHANT_DISCOUNT)
                 .closureRole(FundsBenefitAmountClosureRole.ORDER_DISCOUNT_CLOSURE)
+                .amount(money(amount))
+                .ledgerEffect(FundsBenefitLedgerEffect.NO_LEDGER)
+                .fundingNature(FundsBenefitFundingNature.MERCHANT_BORNE)
+                .bearerSubjectRef(subjectRef("MERCHANT-001"))
+                .beneficiarySubjectRef(subjectRef("USER-001"))
+                .benefitReference(reference)
+                .refundPolicy(merchantRefundPolicy())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsBenefitComponentSpec merchantDiscountComponentWithRefundPolicy(String componentSn,
+                                                                               long amount,
+                                                                               FundsBenefitRefundPolicySpec refundPolicy) {
+        return ImmutableFundsBenefitComponentSpec.builder()
+                .componentSn(componentSn)
+                .sequence(1)
+                .benefitType(FundsBenefitType.MERCHANT_COUPON)
+                .componentType(FundsBenefitComponentType.MERCHANT_DISCOUNT)
+                .closureRole(FundsBenefitAmountClosureRole.ORDER_DISCOUNT_CLOSURE)
+                .amount(money(amount))
+                .ledgerEffect(FundsBenefitLedgerEffect.NO_LEDGER)
+                .fundingNature(FundsBenefitFundingNature.MERCHANT_BORNE)
+                .bearerSubjectRef(subjectRef("MERCHANT-001"))
+                .beneficiarySubjectRef(subjectRef("USER-001"))
+                .benefitReference(benefitReference())
+                .refundPolicy(refundPolicy)
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsBenefitComponentSpec merchantDiscountComponentWithRole(String componentSn,
+                                                                       long amount,
+                                                                       FundsBenefitAmountClosureRole closureRole) {
+        return ImmutableFundsBenefitComponentSpec.builder()
+                .componentSn(componentSn)
+                .sequence(1)
+                .benefitType(FundsBenefitType.MERCHANT_COUPON)
+                .componentType(FundsBenefitComponentType.MERCHANT_DISCOUNT)
+                .closureRole(closureRole)
                 .amount(money(amount))
                 .ledgerEffect(FundsBenefitLedgerEffect.NO_LEDGER)
                 .fundingNature(FundsBenefitFundingNature.MERCHANT_BORNE)
@@ -321,22 +425,32 @@ class FundsBenefitSnapshotSpecTests {
     }
 
     private FundsBenefitReferenceSpec benefitReference() {
+        return benefitReference("merchant-rule-v3");
+    }
+
+    private FundsBenefitReferenceSpec benefitReference(String ruleVersion) {
         return ImmutableFundsBenefitReferenceSpec.builder()
                 .campaignId("campaign-001")
                 .couponId("coupon-001")
                 .writeOffId("write-off-001")
-                .ruleVersion("merchant-rule-v3")
+                .ruleVersion(ruleVersion)
                 .externalDecisionId("pricing-decision-001")
                 .contextVariables(Map.of())
                 .build();
     }
 
     private FundsBenefitRefundPolicySpec merchantRefundPolicy() {
+        return merchantRefundPolicyWithDispositions("merchant-refund-v3",
+                FundsBenefitRefundDisposition.NO_REFUND,
+                FundsBenefitRefundDisposition.REDUCE_MERCHANT_RECEIVABLE);
+    }
+
+    private FundsBenefitRefundPolicySpec merchantRefundPolicyWithDispositions(String ruleVersion,
+                                                                             FundsBenefitRefundDisposition... dispositions) {
         return ImmutableFundsBenefitRefundPolicySpec.builder()
                 .partialRefundStrategy(FundsBenefitPartialRefundStrategy.ITEM_LINE_BASED)
-                .dispositions(List.of(FundsBenefitRefundDisposition.NO_REFUND,
-                        FundsBenefitRefundDisposition.REDUCE_MERCHANT_RECEIVABLE))
-                .refundRuleVersion("merchant-refund-v3")
+                .dispositions(List.of(dispositions))
+                .refundRuleVersion(ruleVersion)
                 .refundPolicyCode("MERCHANT_COUPON_NO_RETURN")
                 .contextVariables(Map.of())
                 .build();
