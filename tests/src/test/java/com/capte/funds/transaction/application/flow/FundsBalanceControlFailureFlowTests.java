@@ -140,6 +140,43 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
+     * 场景：用户冻结成功后，使用相同业务流水重复提交但把冻结金额改大。
+     * 输入：充值 100、第一次冻结 30，随后同业务流水改为冻结 40。
+     * 输出：第二次请求被冻结单请求摘要拒绝，AVAILABLE/FROZEN 和既有冻结单保持第一次冻结后的状态。
+     * 预期：冻结幂等必须保护金额、主体和 route 摘要，不只按业务键静默短路。
+     * 红线：同业务流水不同冻结请求不得新增 ledger transaction，不得改变冻结余额或冻结单金额。
+     */
+    @Test
+    void testFreezeSameBusinessSnWithDifferentAmountShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "BALANCE_FREEZE_IDEMPOTENT_TOPUP");
+        String freezeSn = freeze(user, 30L, "BALANCE_FREEZE_IDEMPOTENT_FREEZE");
+        BalanceSnapshot afterFirstFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> freeze(user, 40L, "BALANCE_FREEZE_IDEMPOTENT_FREEZE"))
+                .hasMessageContaining("资金冻结单请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstFreeze, afterConflict,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 70L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(frozenOrderByBusinessSn("BALANCE_FREEZE_IDEMPOTENT_FREEZE"))
+                .satisfies(order -> {
+                    assertThat(order.getSn()).isEqualTo(freezeSn);
+                    assertThat(order.getAmount()).isEqualTo(30L);
+                    assertThat(order.getReleasedAmount()).isZero();
+                    assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.FROZEN);
+                });
+    }
+
+    /**
      * 场景：用户 USD 资金账户冻结后发起 CNY 解冻请求。
      * 输入：充值 50 USD、冻结 30 USD、解冻请求 10 CNY。
      * 输出：解冻请求失败，用户 AVAILABLE/FROZEN 与平台 CASH/PREPAYMENT 余额保持冻结后状态。
@@ -407,6 +444,50 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_ZERO_RELEASE")).isFalse();
+    }
+
+    /**
+     * 场景：用户部分解冻成功后，使用相同业务流水重复提交但把解冻金额改大。
+     * 输入：充值 100、冻结 70、第一次解冻 20，随后同业务流水改为解冻 30。
+     * 输出：第二次请求被冻结单请求摘要拒绝，AVAILABLE/FROZEN、原冻结单和释放记录保持第一次解冻后的状态。
+     * 预期：解冻幂等必须保护原冻结引用、解冻金额、主体和 route 摘要。
+     * 红线：同业务流水不同解冻请求不得新增 ledger transaction，不得重复释放或污染原冻结单释放金额。
+     */
+    @Test
+    void testUnfreezeSameBusinessSnWithDifferentAmountShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "BALANCE_UNFREEZE_IDEMPOTENT_TOPUP");
+        String freezeSn = freeze(user, 70L, "BALANCE_UNFREEZE_IDEMPOTENT_FREEZE");
+        unfreeze(user, 20L, freezeSn, "BALANCE_UNFREEZE_IDEMPOTENT_RELEASE");
+        BalanceSnapshot afterFirstUnfreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> unfreeze(user, 30L, freezeSn,
+                "BALANCE_UNFREEZE_IDEMPOTENT_RELEASE"))
+                .hasMessageContaining("资金冻结单请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstUnfreeze, afterConflict,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 50L, CURRENCY);
+
+        assertPostedTransactions(3);
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_IDEMPOTENT_FREEZE"))
+                .satisfies(order -> {
+                    assertThat(order.getAmount()).isEqualTo(70L);
+                    assertThat(order.getReleasedAmount()).isEqualTo(20L);
+                    assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.PARTIALLY_RELEASED);
+                });
+        assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_IDEMPOTENT_RELEASE"))
+                .satisfies(order -> {
+                    assertThat(order.getAmount()).isEqualTo(20L);
+                    assertThat(order.getReleasedAmount()).isZero();
+                    assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.RELEASED);
+                });
     }
 
     /**
