@@ -2,6 +2,7 @@ package com.capte.funds.transaction.services.impl;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.dal.entities.FundsTransaction;
 import com.capte.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.capte.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
@@ -16,7 +17,7 @@ import com.capte.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.capte.funds.transaction.model.FundsTransactionParticipant;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
-import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
+import com.capte.funds.transaction.support.FundsRequestHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
@@ -40,10 +41,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -66,8 +63,6 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private static final WindSequenceType FUNDS_TRANSACTION_DETAIL_SEQUENCE_TYPE = WindSequenceType.immutable(
             "FUNDS_TRANSACTION_DETAIL", "FTD", 6);
-
-    private static final String SHA_256_ALGORITHM = "SHA-256";
 
     private static final int MAX_ERROR_MESSAGE_LENGTH = 512;
 
@@ -589,7 +584,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("reference", referenceSummary(instruction.getReference()));
         values.put("route", routeRequestHashSummary(routeSnapshot));
         values.put("participant", participantSummary(participant));
-        return sha256(toJson(values));
+        return FundsRequestHashSupport.sha256Json(values);
     }
 
     private Map<String, Object> routeRequestHashSummary(RouteSnapshotSpec routeSnapshot) {
@@ -597,7 +592,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.remove("snapshotId");
         values.remove("resolvedAt");
         values.remove("expiresAt");
-        return stableRequestHashMap(values);
+        return FundsRequestHashSupport.stableHashMap(values);
     }
 
     private Map<String, Object> referenceSummary(FundsInstructionReferenceSpec reference) {
@@ -611,7 +606,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("referenceLedgerTransactionSn", reference.getReferenceLedgerTransactionSn());
         values.put("externalTransactionId", reference.getExternalTransactionId());
         values.put("authCode", reference.getAuthCode());
-        values.put("contextVariables", stableRequestHashMap(reference.getContextVariables()));
+        values.put("contextVariables", FundsRequestHashSupport.stableHashMap(reference.getContextVariables()));
         return values;
     }
 
@@ -622,7 +617,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("ledgerProfileCode", participant.getLedgerProfileCode());
         values.put("currency", participant.getCurrency());
         values.put("amount", moneySummary(participant.getAmount()));
-        values.put("contextVariables", stableRequestHashMap(participant.getContextVariables()));
+        values.put("contextVariables", FundsRequestHashSupport.stableHashMap(participant.getContextVariables()));
         return values;
     }
 
@@ -731,50 +726,6 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("amount", money.getAmount());
         values.put("currency", money.getCurrency().name());
         return values;
-    }
-
-    private Map<String, Object> stableRequestHashMap(Map<?, ?> values) {
-        Map<String, Object> result = new TreeMap<>();
-        if (values == null || values.isEmpty()) {
-            return result;
-        }
-        for (Map.Entry<?, ?> entry : values.entrySet()) {
-            String key = String.valueOf(entry.getKey());
-            if (isVolatileRequestHashField(key)) {
-                continue;
-            }
-            result.put(key, stableRequestHashValue(entry.getValue()));
-        }
-        return result;
-    }
-
-    private Object stableRequestHashValue(Object value) {
-        if (value instanceof Map<?, ?> map) {
-            return stableRequestHashMap(map);
-        }
-        if (value instanceof List<?> list) {
-            return list.stream()
-                    .map(this::stableRequestHashValue)
-                    .toList();
-        }
-        return value;
-    }
-
-    private boolean isVolatileRequestHashField(String key) {
-        return "description".equals(key)
-                || "subjectName".equals(key)
-                || "traceId".equals(key)
-                || "traceID".equals(key)
-                || "trace_id".equals(key);
-    }
-
-    private String sha256(String text) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance(SHA_256_ALGORITHM);
-            return HexFormat.of().formatHex(digest.digest(text.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 algorithm unavailable", exception);
-        }
     }
 
     private String toJson(Object value) {

@@ -9,6 +9,7 @@ import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
+import com.capte.funds.transaction.support.FundsRequestHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.ref.SubjectRef;
@@ -26,11 +27,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,8 +46,6 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
 
     private static final WindSequenceType FUNDS_FROZEN_ORDER_SEQUENCE_TYPE = WindSequenceType.immutable(
             "FUNDS_FROZEN_ORDER", "FO", 6);
-
-    private static final String SHA_256_ALGORITHM = "SHA-256";
 
     private static final String FROZEN_ORDER_REQUEST_HASH = "frozenOrderRequestHash";
 
@@ -341,7 +336,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         values.put("subjectType", subjectType(instruction, routeSnapshot));
         values.put("freezeType", resolveFreezeType(instruction));
         values.put("route", routeHashSummary(routeSnapshot));
-        return sha256(JSON.toJSONString(values));
+        return FundsRequestHashSupport.sha256Json(values);
     }
 
     private Map<String, Object> routeHashSummary(@Nullable RouteSnapshotSpec routeSnapshot) {
@@ -352,51 +347,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         values.remove("snapshotId");
         values.remove("resolvedAt");
         values.remove("expiresAt");
-        return stableRequestHashMap(values);
-    }
-
-    private Map<String, Object> stableRequestHashMap(Map<?, ?> values) {
-        Map<String, Object> result = new TreeMap<>();
-        if (values == null || values.isEmpty()) {
-            return result;
-        }
-        for (Map.Entry<?, ?> entry : values.entrySet()) {
-            String key = String.valueOf(entry.getKey());
-            if (isVolatileRequestHashField(key)) {
-                continue;
-            }
-            result.put(key, stableRequestHashValue(entry.getValue()));
-        }
-        return result;
-    }
-
-    private Object stableRequestHashValue(Object value) {
-        if (value instanceof Map<?, ?> map) {
-            return stableRequestHashMap(map);
-        }
-        if (value instanceof List<?> list) {
-            return list.stream()
-                    .map(this::stableRequestHashValue)
-                    .toList();
-        }
-        return value;
-    }
-
-    private boolean isVolatileRequestHashField(String key) {
-        return "description".equals(key)
-                || "subjectName".equals(key)
-                || "traceId".equals(key)
-                || "traceID".equals(key)
-                || "trace_id".equals(key);
-    }
-
-    private String sha256(String text) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance(SHA_256_ALGORITHM);
-            return HexFormat.of().formatHex(digest.digest(text.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 algorithm unavailable", exception);
-        }
+        return FundsRequestHashSupport.stableHashMap(values);
     }
 
 }
