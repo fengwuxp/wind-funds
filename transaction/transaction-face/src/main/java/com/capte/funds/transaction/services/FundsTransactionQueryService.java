@@ -7,6 +7,7 @@ import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
@@ -70,6 +71,30 @@ public interface FundsTransactionQueryService {
                                      @NonNull FundsTransactionEventType eventType,
                                      @NonNull String replayRefLegId,
                                      @NonNull CurrencyIsoCode currency);
+
+    /**
+     * 汇总指定 replay leg 已成功消费金额，并可排除当前幂等业务事件。
+     *
+     * <p>用于路由解析阶段做来源级剩余额度校验，同时允许同一 `businessScene + businessSn`
+     * 的幂等重试继续进入生命周期记录器做请求摘要一致性校验。</p>
+     *
+     * @param referenceTransactionSn 原资金交易或冻结单流水号
+     * @param eventType 本次 replay 或引用消费事件语义
+     * @param replayRefLegId 原 RouteLeg ID
+     * @param currency 原 RouteLeg 币种
+     * @param excludedBusinessScene 需要排除的业务场景；为空时不排除
+     * @param excludedBusinessSn 需要排除的业务流水；为空时不排除
+     * @return 已成功消费金额；不存在时返回 0
+     */
+    @NonNull
+    default Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+                                             @NonNull FundsTransactionEventType eventType,
+                                             @NonNull String replayRefLegId,
+                                             @NonNull CurrencyIsoCode currency,
+                                             @Nullable String excludedBusinessScene,
+                                             @Nullable String excludedBusinessSn) {
+        return sumConsumedReplayLegAmount(referenceTransactionSn, eventType, replayRefLegId, currency);
+    }
 
     /**
      * 查询已保存的 RouteSnapshot。

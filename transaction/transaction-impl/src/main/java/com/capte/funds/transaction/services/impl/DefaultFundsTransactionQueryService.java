@@ -28,6 +28,7 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -89,12 +90,25 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
                                                      @NonNull FundsTransactionEventType eventType,
                                                      @NonNull String replayRefLegId,
                                                      @NonNull CurrencyIsoCode currency) {
+        return sumConsumedReplayLegAmount(referenceTransactionSn, eventType, replayRefLegId, currency, null, null);
+    }
+
+    @Override
+    public @NonNull Money sumConsumedReplayLegAmount(@NonNull String referenceTransactionSn,
+                                                     @NonNull FundsTransactionEventType eventType,
+                                                     @NonNull String replayRefLegId,
+                                                     @NonNull CurrencyIsoCode currency,
+                                                     @Nullable String excludedBusinessScene,
+                                                     @Nullable String excludedBusinessSn) {
         AssertUtils.hasText(referenceTransactionSn, "原资金交易流水号不能为空");
         AssertUtils.notNull(eventType, "资金交易事件类型不能为空");
         AssertUtils.hasText(replayRefLegId, "RouteReplay 原 legId 不能为空");
         AssertUtils.notNull(currency, "RouteReplay 币种不能为空");
         Map<String, Long> consumedAmounts = new LinkedHashMap<>();
         for (FundsTransactionDetail detail : queryConsumedReplayDetails(referenceTransactionSn, eventType)) {
+            if (sameBusinessEvent(detail, excludedBusinessScene, excludedBusinessSn)) {
+                continue;
+            }
             Long amount = consumedReplayLegAmount(detail, replayRefLegId);
             if (amount == null) {
                 continue;
@@ -107,6 +121,15 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         }
         long result = consumedAmounts.values().stream().mapToLong(Long::longValue).sum();
         return Money.immutable(result, currency);
+    }
+
+    private boolean sameBusinessEvent(FundsTransactionDetail detail,
+                                      @Nullable String businessScene,
+                                      @Nullable String businessSn) {
+        return hasText(businessScene)
+                && hasText(businessSn)
+                && businessScene.equals(detail.getBusinessScene())
+                && businessSn.equals(detail.getBusinessSn());
     }
 
     @Override

@@ -31,6 +31,7 @@ import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
+import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -254,9 +255,61 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(reference.getReferenceSn());
         AssertUtils.isTrue(routeSnapshot.isPresent(),
                 "提现引用冻结单不存在或缺少原冻结路径，referenceSn = {}", reference.getReferenceSn());
-        AssertUtils.isTrue(snapshotContainsSubject(routeSnapshot.get(), accountId),
+        RouteSnapshotSpec snapshot = routeSnapshot.get();
+        AssertUtils.isTrue(snapshotContainsSubject(snapshot, accountId),
                 "提现引用冻结单主体与请求账户不一致，referenceSn = {}，accountId = {}，accountType = {}",
                 reference.getReferenceSn(), accountId.id(), accountId.type());
+        assertFreezeOrderWithdrawAmountAvailable(instruction, reference, snapshot);
+    }
+
+    private void assertFreezeOrderWithdrawAmountAvailable(FundsInstructionSpec instruction,
+                                                          FundsInstructionReferenceSpec reference,
+                                                          RouteSnapshotSpec routeSnapshot) {
+        RouteLegSpec freezeLeg = routeSnapshot.getLegs().stream()
+                .filter(leg -> FundsRouteLegIds.FREEZE.equals(leg.getLegId()))
+                .findFirst()
+                .orElse(null);
+        AssertUtils.notNull(freezeLeg, "提现引用冻结单缺少原冻结路径，referenceSn = {}", reference.getReferenceSn());
+        Money freezeAmount = freezeLeg.getAmount();
+        AssertUtils.isTrue(instruction.getAmount().getCurrency() == freezeAmount.getCurrency(),
+                "提现引用冻结单币种与请求金额不一致，referenceSn = {}", reference.getReferenceSn());
+        long totalUsedAmount = sumFreezeOrderUsedAmount(reference.getReferenceSn(), freezeAmount);
+        long usedAmount = sumFreezeOrderUsedAmount(instruction, reference.getReferenceSn(), freezeAmount);
+        if (totalUsedAmount > usedAmount) {
+            return;
+        }
+        long remainingAmount = freezeAmount.getAmount() - usedAmount;
+        AssertUtils.isTrue(instruction.getAmount().getAmount() <= remainingAmount,
+                "冻结单剩余可提现金额不足，referenceSn = {}，remainingAmount = {}，amount = {}",
+                reference.getReferenceSn(), remainingAmount, instruction.getAmount().getAmount());
+    }
+
+    private long sumFreezeOrderUsedAmount(String freezeOrderSn, Money freezeAmount) {
+        Money withdrawAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(freezeOrderSn,
+                FundsTransactionEventType.WITHDRAW,
+                FundsRouteLegIds.FREEZE,
+                freezeAmount.getCurrency());
+        Money unfreezeAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(freezeOrderSn,
+                FundsTransactionEventType.UNFREEZE,
+                FundsRouteLegIds.FREEZE,
+                freezeAmount.getCurrency());
+        return withdrawAmount.getAmount() + unfreezeAmount.getAmount();
+    }
+
+    private long sumFreezeOrderUsedAmount(FundsInstructionSpec instruction, String freezeOrderSn, Money freezeAmount) {
+        Money withdrawAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(freezeOrderSn,
+                FundsTransactionEventType.WITHDRAW,
+                FundsRouteLegIds.FREEZE,
+                freezeAmount.getCurrency(),
+                instruction.getBusinessScene(),
+                instruction.getBusinessSn());
+        Money unfreezeAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(freezeOrderSn,
+                FundsTransactionEventType.UNFREEZE,
+                FundsRouteLegIds.FREEZE,
+                freezeAmount.getCurrency(),
+                instruction.getBusinessScene(),
+                instruction.getBusinessSn());
+        return withdrawAmount.getAmount() + unfreezeAmount.getAmount();
     }
 
     private boolean snapshotContainsSubject(RouteSnapshotSpec routeSnapshot, FundsAccountId accountId) {
