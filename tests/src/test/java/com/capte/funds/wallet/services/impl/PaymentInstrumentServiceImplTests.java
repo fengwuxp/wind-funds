@@ -1,6 +1,7 @@
 package com.capte.funds.wallet.services.impl;
 
 import com.capte.funds.AbstractFundsServiceTest;
+import com.capte.funds.wallet.dal.entities.PaymentInstrument;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingHistoryDTO;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentDTO;
@@ -124,6 +125,25 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
         assertThat(countRows("t_payment_instrument", "sn", RAW_PAYMENT_INSTRUMENT_SN)).isZero();
         assertLedgerFacts(before);
+    }
+
+    @Test
+    void testPaymentInstrumentModelsShouldHideSensitiveIdentifiersInToString() {
+        PaymentInstrument entity = new PaymentInstrument();
+        entity.setInstrumentNo(MASKED_INSTRUMENT_NO);
+        entity.setExternalInstrumentId(EXTERNAL_INSTRUMENT_ID);
+
+        PaymentInstrumentDTO dto = new PaymentInstrumentDTO()
+                .setInstrumentNo(MASKED_INSTRUMENT_NO)
+                .setExternalInstrumentId(EXTERNAL_INSTRUMENT_ID);
+        PaymentInstrumentQuery query = new PaymentInstrumentQuery()
+                .setInstrumentNo(MASKED_INSTRUMENT_NO)
+                .setExternalInstrumentId(EXTERNAL_INSTRUMENT_ID);
+
+        assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(entity);
+        assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(dto);
+        assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(query);
+        assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(createPaymentInstrumentRequest());
     }
 
     @Test
@@ -339,6 +359,14 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private void assertLedgerFacts(LedgerFacts expected) {
         assertThat(loadLedgerFacts()).isEqualTo(expected);
+    }
+
+    private void assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(Object value) {
+        assertThat(value.toString())
+                .doesNotContain("instrumentNo")
+                .doesNotContain("externalInstrumentId")
+                .doesNotContain(MASKED_INSTRUMENT_NO)
+                .doesNotContain(EXTERNAL_INSTRUMENT_ID);
     }
 
     private long countRows(String tableName) {

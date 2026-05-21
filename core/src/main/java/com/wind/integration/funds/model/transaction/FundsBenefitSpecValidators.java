@@ -46,14 +46,10 @@ final class FundsBenefitSpecValidators {
     private FundsBenefitSpecValidators() {
     }
 
-    static void hasText(@Nullable String value, String message) {
+    static void requireText(@Nullable String value, String message) {
         if (!StringUtils.hasText(value)) {
             throw new IllegalArgumentException(message);
         }
-    }
-
-    static boolean hasText(@Nullable String value) {
-        return StringUtils.hasText(value);
     }
 
     static Map<String, Object> immutableContext(Map<String, Object> contextVariables, String owner) {

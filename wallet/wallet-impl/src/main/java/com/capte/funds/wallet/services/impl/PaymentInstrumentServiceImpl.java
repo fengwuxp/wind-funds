@@ -32,6 +32,7 @@ import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingChangeType;
 import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.integration.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
@@ -54,10 +55,6 @@ import java.util.Map;
 @Service
 @AllArgsConstructor
 public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
-
-    private static final int MIN_RAW_PAN_LENGTH = 12;
-
-    private static final int MAX_RAW_PAN_LENGTH = 19;
 
     private static final WindSequenceType PAYMENT_INSTRUMENT_BINDING_HISTORY_SEQUENCE_TYPE =
             WindSequenceType.immutable("PAYMENT_INSTRUMENT_BINDING_HISTORY", "PIBH", 6);
@@ -407,24 +404,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     }
 
     private void assertNoRawSensitiveInstrumentNo(CreatePaymentInstrumentRequest request) {
-        AssertUtils.isFalse(isRawSensitiveInstrumentNo(request.getInstrumentNo()),
+        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.isRawSensitiveInstrumentNo(
+                        request.getInstrumentNo()),
                 "instrumentNo must be masked or token reference");
-    }
-
-    private boolean isRawSensitiveInstrumentNo(String instrumentNo) {
-        if (instrumentNo == null) {
-            return false;
-        }
-        String compactInstrumentNo = instrumentNo.replace(" ", "").replace("-", "");
-        if (compactInstrumentNo.length() < MIN_RAW_PAN_LENGTH
-                || compactInstrumentNo.length() > MAX_RAW_PAN_LENGTH) {
-            return false;
-        }
-        for (int i = 0; i < compactInstrumentNo.length(); i++) {
-            if (!Character.isDigit(compactInstrumentNo.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
     }
 }

@@ -11,6 +11,7 @@ import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import lombok.ToString;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -23,6 +24,7 @@ import java.time.LocalDateTime;
  * @date 2026-05-07
  */
 @Data
+@ToString(exclude = {"instrumentNo", "externalInstrumentId"})
 @Table(PaymentInstrument.TABLE_NAME)
 public class PaymentInstrument implements Serializable, TenantIsolationObject<Long> {
 

@@ -8,6 +8,7 @@ import com.wind.transaction.core.Money;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.util.HashSet;
 import java.util.List;
@@ -34,12 +35,12 @@ public record ImmutableFundsBenefitSnapshotSpec(String benefitSnapshotId,
         implements FundsBenefitSnapshotSpec {
 
     public ImmutableFundsBenefitSnapshotSpec {
-        FundsBenefitSpecValidators.hasText(benefitSnapshotId,
+        FundsBenefitSpecValidators.requireText(benefitSnapshotId,
                 "fundsBenefit.benefitSnapshotId must not be blank");
-        benefitSchemaVersion = FundsBenefitSpecValidators.hasText(benefitSchemaVersion)
+        benefitSchemaVersion = StringUtils.hasText(benefitSchemaVersion)
                 ? benefitSchemaVersion
                 : "1.0";
-        FundsBenefitSpecValidators.hasText(benefitGroupSn, "fundsBenefit.benefitGroupSn must not be blank");
+        FundsBenefitSpecValidators.requireText(benefitGroupSn, "fundsBenefit.benefitGroupSn must not be blank");
         if (orderAmount == null) {
             throw new IllegalArgumentException("fundsBenefit.orderAmount must not be null");
         }

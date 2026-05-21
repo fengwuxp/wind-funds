@@ -13,6 +13,7 @@ import com.wind.transaction.core.Money;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.util.Map;
 
@@ -39,7 +40,7 @@ public record ImmutableFundsBenefitComponentSpec(String componentSn,
         implements FundsBenefitComponentSpec {
 
     public ImmutableFundsBenefitComponentSpec {
-        FundsBenefitSpecValidators.hasText(componentSn, "fundsBenefit.componentSn must not be blank");
+        FundsBenefitSpecValidators.requireText(componentSn, "fundsBenefit.componentSn must not be blank");
         if (benefitType == null) {
             throw new IllegalArgumentException("fundsBenefit.benefitType must not be null");
         }
@@ -160,22 +161,22 @@ public record ImmutableFundsBenefitComponentSpec(String componentSn,
         }
         if (ledgerEffect == FundsBenefitLedgerEffect.POSTING_REQUIRED
                 && fundingSubjectRef == null
-                && !FundsBenefitSpecValidators.hasText(fundingAccountRole)) {
+                && !StringUtils.hasText(fundingAccountRole)) {
             throw new IllegalArgumentException("fundsBenefit.funding source is required for POSTING_REQUIRED");
         }
         if (ledgerEffect == FundsBenefitLedgerEffect.HOLD_ONLY
-                && !FundsBenefitSpecValidators.hasText(benefitReference.getHoldId())) {
+                && !StringUtils.hasText(benefitReference.getHoldId())) {
             throw new IllegalArgumentException("fundsBenefit.holdId is required for HOLD_ONLY");
         }
         if (ledgerEffect == FundsBenefitLedgerEffect.RELEASE_ONLY
-                && !FundsBenefitSpecValidators.hasText(benefitReference.getHoldId())
-                && !FundsBenefitSpecValidators.hasText(benefitReference.getReleaseId())) {
+                && !StringUtils.hasText(benefitReference.getHoldId())
+                && !StringUtils.hasText(benefitReference.getReleaseId())) {
             throw new IllegalArgumentException("fundsBenefit.holdId or releaseId is required for RELEASE_ONLY");
         }
         if (fundingNature == FundsBenefitFundingNature.PREPAID_LIABILITY
                 && fundingSubjectRef == null
-                && !FundsBenefitSpecValidators.hasText(benefitReference.getVoucherId())
-                && !FundsBenefitSpecValidators.hasText(benefitReference.getBenefitInstanceId())) {
+                && !StringUtils.hasText(benefitReference.getVoucherId())
+                && !StringUtils.hasText(benefitReference.getBenefitInstanceId())) {
             throw new IllegalArgumentException("fundsBenefit prepaid liability reference is required");
         }
     }

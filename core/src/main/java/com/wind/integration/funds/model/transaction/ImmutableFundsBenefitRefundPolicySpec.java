@@ -7,6 +7,7 @@ import com.wind.transaction.core.Money;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -39,9 +40,9 @@ public record ImmutableFundsBenefitRefundPolicySpec(FundsBenefitPartialRefundStr
         validateMoney(refundableAmount, "fundsBenefit.refundPolicy.refundableAmount");
         validateMoney(nonRefundableAmount, "fundsBenefit.refundPolicy.nonRefundableAmount");
         if (dispositions.contains(FundsBenefitRefundDisposition.NO_REFUND)
-                && !FundsBenefitSpecValidators.hasText(refundRuleVersion)
-                && !FundsBenefitSpecValidators.hasText(refundDecisionId)
-                && !FundsBenefitSpecValidators.hasText(decisionSource)) {
+                && !StringUtils.hasText(refundRuleVersion)
+                && !StringUtils.hasText(refundDecisionId)
+                && !StringUtils.hasText(decisionSource)) {
             throw new IllegalArgumentException("fundsBenefit.refundPolicy NO_REFUND requires rule version or decision reference");
         }
         contextVariables = FundsBenefitSpecValidators.immutableContext(

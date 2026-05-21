@@ -1,6 +1,7 @@
 package com.wind.integration.funds.model.route;
 
 import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
+import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -24,26 +25,10 @@ public record ImmutablePaymentInstrumentRefSpec(String instrumentId,
         implements PaymentInstrumentRefSpec {
 
     public ImmutablePaymentInstrumentRefSpec {
-        if (isRawSensitiveInstrumentNo(instrumentNo)) {
+        if (PaymentInstrumentSensitiveValueValidator.isRawSensitiveInstrumentNo(instrumentNo)) {
             throw new IllegalArgumentException("instrumentNo must be masked or token reference");
         }
         bindingSnapshot = Map.copyOf(bindingSnapshot == null ? Map.of() : bindingSnapshot);
-    }
-
-    private static boolean isRawSensitiveInstrumentNo(String instrumentNo) {
-        if (instrumentNo == null) {
-            return false;
-        }
-        String compactInstrumentNo = instrumentNo.replace(" ", "").replace("-", "");
-        if (compactInstrumentNo.length() < 12 || compactInstrumentNo.length() > 19) {
-            return false;
-        }
-        for (int i = 0; i < compactInstrumentNo.length(); i++) {
-            if (!Character.isDigit(compactInstrumentNo.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
     }
 
     @Override

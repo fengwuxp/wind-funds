@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode
-@ToString
+@ToString(exclude = {"instrumentNo", "externalInstrumentId"})
 @Accessors(chain = true)
 public class CreatePaymentInstrumentRequest {
 

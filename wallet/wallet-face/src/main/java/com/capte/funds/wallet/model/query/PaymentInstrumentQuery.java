@@ -20,7 +20,7 @@ import lombok.experimental.Accessors;
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode
-@ToString
+@ToString(exclude = {"instrumentNo", "externalInstrumentId"})
 @Accessors(chain = true)
 public class PaymentInstrumentQuery {
 
