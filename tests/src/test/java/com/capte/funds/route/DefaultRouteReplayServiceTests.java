@@ -8,7 +8,10 @@ import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
+import com.wind.integration.funds.model.route.ImmutableExternalAccountRefSpec;
+import com.wind.integration.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.integration.funds.model.route.ImmutablePaymentInstrumentRefSpec;
+import com.wind.integration.funds.model.route.ImmutableRoutingDecisionSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
@@ -22,10 +25,12 @@ import com.wind.integration.funds.route.enums.RouteNodeRole;
 import com.wind.integration.funds.route.enums.RouteNodeType;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.enums.RouteReplayPolicy;
+import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
+import com.wind.integration.funds.route.spec.RoutingDecisionSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
@@ -132,12 +137,55 @@ class DefaultRouteReplayServiceTests {
         assertThat(resolvedRoute.getPaymentInstrumentRef()).isNotSameAs(currentInstrument);
     }
 
+    /**
+     * 场景：原交易完成后外部收款账户和默认资金来源关系发生变化，业务侧用当前账户上下文发起退款回放。
+     * 输入：原 RouteSnapshot 持有旧外部账户和旧资金来源决策，退款指令持有新的外部账户引用。
+     * 输出：回放成功，ResolvedRoute 继续使用原 RouteSnapshot 中的外部账户和 funding allocation。
+     * 预期：外部账户、路由决策和资金来源分配均来自原快照，不被当前请求上下文覆盖。
+     * 红线：Route Replay 必须按原路径事实回放，不得因当前收款账户或默认资金来源变化重新选路。
+     */
+    @Test
+    void testResolveReplayInstructionShouldReuseSnapshotExternalAccountAndFundingAllocation() {
+        PaymentInstrumentRefSpec originalInstrument = paymentInstrumentRef("CARD-OLD", "old-binding");
+        PaymentInstrumentRefSpec currentInstrument = paymentInstrumentRef("CARD-NEW", "new-binding");
+        ExternalAccountRefSpec originalExternalAccount = externalAccountRef("EXT-OLD", "ach-old");
+        ExternalAccountRefSpec currentExternalAccount = externalAccountRef("EXT-NEW", "ach-new");
+        RoutingDecisionSpec originalDecision = routingDecision("ALLOC-OLD", fundingAccount("PAYER-001"));
+        FundsInstructionReferenceSpec reference = ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.ORIGINAL_TRANSACTION)
+                .referenceSn("FT202605190003")
+                .build();
+        DefaultRouteReplayService replayService = new DefaultRouteReplayService(
+                new SnapshotFundsTransactionQueryService(routeSnapshot(originalInstrument, originalExternalAccount,
+                        originalDecision)));
+
+        ResolvedRouteSpec resolvedRoute = replayService.resolve(replayInstruction(reference, currentInstrument,
+                currentExternalAccount));
+
+        assertThat(resolvedRoute.getPaymentInstrumentRef()).isSameAs(originalInstrument);
+        assertThat(resolvedRoute.getExternalAccountRef()).isSameAs(originalExternalAccount);
+        assertThat(resolvedRoute.getExternalAccountRef()).isNotSameAs(currentExternalAccount);
+        assertThat(resolvedRoute.getRoutingDecision()).isSameAs(originalDecision);
+        assertThat(resolvedRoute.getRoutingDecision().getFundingAllocations()).singleElement()
+                .satisfies(allocation -> {
+                    assertThat(allocation.getAllocationId()).isEqualTo("ALLOC-OLD");
+                    assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo("PAYER-001");
+                    assertThat(allocation.getReason()).isEqualTo("original funding allocation snapshot");
+                });
+    }
+
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference) {
         return replayInstruction(reference, null);
     }
 
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference,
                                                    PaymentInstrumentRefSpec instrumentRef) {
+        return replayInstruction(reference, instrumentRef, null);
+    }
+
+    private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference,
+                                                   PaymentInstrumentRefSpec instrumentRef,
+                                                   ExternalAccountRefSpec externalAccountRef) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -145,6 +193,7 @@ class DefaultRouteReplayServiceTests {
                 .transactionType(DefaultFundsTransactionType.REFUND)
                 .amount(Money.immutable(10L, CurrencyIsoCode.USD))
                 .instrumentRef(instrumentRef)
+                .externalAccountRef(externalAccountRef)
                 .reference(reference)
                 .businessScene("REFUND")
                 .businessSn("REPLAY_MISSING_REFERENCE")
@@ -159,6 +208,12 @@ class DefaultRouteReplayServiceTests {
     }
 
     private RouteSnapshotSpec routeSnapshot(PaymentInstrumentRefSpec paymentInstrumentRef) {
+        return routeSnapshot(paymentInstrumentRef, null, routingDecision("ALLOC-DEFAULT", fundingAccount("PAYER-001")));
+    }
+
+    private RouteSnapshotSpec routeSnapshot(PaymentInstrumentRefSpec paymentInstrumentRef,
+                                            ExternalAccountRefSpec externalAccountRef,
+                                            RoutingDecisionSpec routingDecision) {
         SubjectRef payer = fundingAccount("PAYER-001");
         SubjectRef payee = fundingAccount("PAYEE-001");
         return ImmutableRouteSnapshotSpec.builder()
@@ -175,7 +230,9 @@ class DefaultRouteReplayServiceTests {
                 .participants(List.of(participant(RouteParticipantRole.PAYER, payer),
                         participant(RouteParticipantRole.PAYEE, payee)))
                 .legs(List.of(routeLeg(payer, payee)))
+                .routingDecision(routingDecision)
                 .paymentInstrumentRef(paymentInstrumentRef)
+                .externalAccountRef(externalAccountRef)
                 .resolvedAt(LocalDateTime.of(2026, 5, 18, 12, 0))
                 .contextVariables(Map.of())
                 .build();
@@ -237,6 +294,38 @@ class DefaultRouteReplayServiceTests {
                 .currency(CurrencyIsoCode.USD.name())
                 .status("ACTIVE")
                 .bindingSnapshot(Map.of("bindingId", bindingId))
+                .build();
+    }
+
+    private ExternalAccountRefSpec externalAccountRef(String externalAccountId, String channelCode) {
+        return ImmutableExternalAccountRefSpec.builder()
+                .externalAccountId(externalAccountId)
+                .externalAccountType("ACH_ACCOUNT")
+                .externalAccountNo("token:" + externalAccountId)
+                .providerCode("ACH_PROVIDER")
+                .channelCode(channelCode)
+                .currency(CurrencyIsoCode.USD.name())
+                .countryCode("US")
+                .contextVariables(Map.of("snapshot", externalAccountId))
+                .build();
+    }
+
+    private RoutingDecisionSpec routingDecision(String allocationId, SubjectRef fundingAccount) {
+        return ImmutableRoutingDecisionSpec.builder()
+                .policyCode("PAYMENT_INSTRUMENT_SNAPSHOT_POLICY")
+                .matchedRules(List.of("original-default-funding-source"))
+                .selectedProcessor("ORIGINAL_PROCESSOR")
+                .selectedCashFundingAccount(fundingAccount.getSubjectId())
+                .fundingAllocations(List.of(ImmutableFundingAllocationDecisionSpec.builder()
+                        .allocationId(allocationId)
+                        .subjectRef(fundingAccount)
+                        .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                        .amount(Money.immutable(10L, CurrencyIsoCode.USD))
+                        .priority(1)
+                        .reason("original funding allocation snapshot")
+                        .build()))
+                .decisionReason("original route snapshot")
+                .contextVariables(Map.of("snapshot", allocationId))
                 .build();
     }
 
