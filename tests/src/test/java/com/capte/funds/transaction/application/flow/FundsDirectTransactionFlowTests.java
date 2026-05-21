@@ -739,6 +739,65 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接付款使用相同业务流水重复提交，但第二次把付款方和收款方都换成新的主体。
+     * 输入：两个付款方各充值 100，第一次付款方 A 向收款方 A 支付 40，随后同业务流水改为付款方 B 向收款方 B 支付 40。
+     * 输出：第二次请求被幂等摘要拒绝；付款方 B、收款方 B 和既有交易事实均不变化。
+     * 预期：同业务流水的幂等保护必须覆盖参与主体，不只覆盖金额。
+     * 红线：同业务流水不同参与方不得新增 detail、route、posting、ledger entry 或污染余额。
+     */
+    @Test
+    void testDirectPaySameBusinessSnWithDifferentParticipantsShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId anotherPayer = fundingAccount("idem_payer2");
+        FundsAccountId payee = fundingAccount("idem_payee1");
+        FundsAccountId anotherPayee = fundingAccount("idem_payee2");
+        ensureLedger(anotherPayer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(anotherPayer, LedgerSubjectCode.FROZEN);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(anotherPayee, LedgerSubjectCode.SETTLEMENT);
+
+        topup(payer, 100L, "DIRECT_IDEMPOTENT_PARTICIPANT_TOPUP");
+        topup(anotherPayer, 100L, "DIRECT_IDEMPOTENT_PARTICIPANT_ANOTHER_TOPUP");
+        String firstPaySn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
+                "DIRECT_IDEMPOTENT_PAY_PARTICIPANT");
+        BalanceSnapshot afterFirstPay = snapshot(balances(payer, anotherPayer, payee, anotherPayee,
+                cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> pay(anotherPayer, anotherPayee, LedgerSubjectCode.SETTLEMENT, 40L,
+                "DIRECT_IDEMPOTENT_PAY_PARTICIPANT"))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(payer, anotherPayer, payee, anotherPayee,
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstPay, afterConflict,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherPayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherPayer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(anotherPayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
+        assertBucket(balance(anotherPayer), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
+        assertBucket(balance(anotherPayee), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(3);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name());
+        assertThat(fundsTransactionDetails(firstPaySn)).hasSize(2);
+    }
+
+    /**
      * 场景：系统内转账使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
      * 输入：充值 100、转账 40，随后同流水同金额重试，再同流水改金额为 41。
      * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次转账后的状态。

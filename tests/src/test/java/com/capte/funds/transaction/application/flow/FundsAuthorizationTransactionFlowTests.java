@@ -561,6 +561,64 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .toList())
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
+                FundsTransactionEventType.AUTHORIZE.name());
+        assertThat(fundsTransactionDetails(authorizationSn)).hasSize(1);
+    }
+
+    /**
+     * 场景：授权批准使用相同业务流水重复提交，但第二次把授权账户换成新的主体。
+     * 输入：两个账户各充值 100，第一次账户 A 授权 60，随后同业务流水改为账户 B 授权 60。
+     * 输出：第二次请求被幂等摘要拒绝；账户 B 不冻结，授权聚合和账务事实保持第一次授权后的状态。
+     * 预期：授权批准幂等必须覆盖授权主体，不只覆盖金额。
+     * 红线：同业务流水不同授权主体不得新增 detail、route、posting、ledger entry 或污染余额。
+     */
+    @Test
+    void testAuthorizeSameBusinessSnWithDifferentAccountShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId anotherUser = fundingAccount("auth_user2");
+        ensureLedger(anotherUser, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(anotherUser, LedgerSubjectCode.AUTHORIZATION);
+
+        topup(user, 100L, "AUTH_IDEMPOTENT_ACCOUNT_TOPUP");
+        topup(anotherUser, 100L, "AUTH_IDEMPOTENT_ACCOUNT_ANOTHER_TOPUP");
+        String authorizationSn = authorize(user, 60L, true, "AUTH_IDEMPOTENT_ACCOUNT");
+        BalanceSnapshot afterFirstAuthorize = snapshot(balances(user, anotherUser, cashMappingAccount(),
+                settlementAccount()));
+
+        assertThatThrownBy(() -> authorize(anotherUser, 60L, true, "AUTH_IDEMPOTENT_ACCOUNT"))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(user, anotherUser, cashMappingAccount(),
+                settlementAccount()));
+        assertOnlyBalanceDeltas(afterFirstAuthorize, afterConflict,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertBucket(balance(anotherUser), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance(anotherUser), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
+        assertThat(transaction.getReversedAmount()).isZero();
+        assertThat(transaction.getSettledAmount()).isZero();
+        assertThat(transaction.getRefundedAmount()).isZero();
+
+        assertPostedTransactions(3);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.AUTHORIZE.name());
         assertThat(fundsTransactionDetails(authorizationSn)).hasSize(1);
     }

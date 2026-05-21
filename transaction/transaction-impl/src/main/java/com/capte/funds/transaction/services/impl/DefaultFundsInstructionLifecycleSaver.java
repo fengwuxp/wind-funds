@@ -202,12 +202,21 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         List<RouteParticipantSpec> participants = routeSnapshot.getParticipants();
         AssertUtils.isFalse(participants.isEmpty(),
                 "RouteSnapshot participants 不能为空");
+        List<FundsTransactionDetail> businessDetails = findDetailsByBusinessEvent(instruction, transactionSn);
+        if (!businessDetails.isEmpty()) {
+            AssertUtils.isTrue(businessDetails.size() == participants.size(),
+                    "资金交易明细请求参数不一致，transactionSn = {}，businessSn = {}",
+                    transactionSn, instruction.getBusinessSn());
+        }
         List<FundsTransactionDetail> result = new ArrayList<>(participants.size());
         for (RouteParticipantSpec participant : participants) {
             String requestHash = computeDetailRequestHash(instruction, routeSnapshot, participant);
             FundsTransactionDetail detail = findDetailByBusinessEventAndParticipant(instruction, transactionSn,
                     participant);
             if (detail == null) {
+                AssertUtils.isTrue(businessDetails.isEmpty(),
+                        "资金交易明细请求参数不一致，transactionSn = {}，businessSn = {}",
+                        transactionSn, instruction.getBusinessSn());
                 return List.of();
             }
             AssertUtils.isTrue(Objects.equals(detail.getRequestHash(), requestHash),
@@ -223,12 +232,21 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         List<RouteParticipantSpec> participants = routeSnapshot.getParticipants();
         AssertUtils.isFalse(participants.isEmpty(),
                 "RouteSnapshot participants 不能为空");
+        List<FundsTransactionDetail> businessDetails = findDetailsByBusinessEvent(instruction, transactionSn);
+        if (!businessDetails.isEmpty()) {
+            AssertUtils.isTrue(businessDetails.size() == participants.size(),
+                    "资金交易明细请求参数不一致，transactionSn = {}，businessSn = {}",
+                    transactionSn, instruction.getBusinessSn());
+        }
         List<FundsTransactionDetail> result = new ArrayList<>(participants.size());
         for (RouteParticipantSpec participant : participants) {
             String requestHash = computeDetailRequestHash(instruction, routeSnapshot, participant);
             FundsTransactionDetail detail = findDetailByBusinessEventAndParticipant(instruction, transactionSn,
                     participant);
             if (detail == null) {
+                AssertUtils.isTrue(businessDetails.isEmpty(),
+                        "资金交易明细请求参数不一致，transactionSn = {}，businessSn = {}",
+                        transactionSn, instruction.getBusinessSn());
                 detail = createTransactionDetail(instruction, routeSnapshot, transactionSn, participant, requestHash);
             } else {
                 AssertUtils.isTrue(Objects.equals(detail.getRequestHash(), requestHash),
@@ -292,6 +310,20 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 .and(ref.participantRole.eq(RouteParticipantRole.valueOf(participant.getParticipantRole().name())))
                 .and(ref.fundsEffectType.eq(resolveFundsEffectType(instruction)));
         return fundsTransactionDetailMapper.selectOneByQuery(wrapper);
+    }
+
+    private List<FundsTransactionDetail> findDetailsByBusinessEvent(FundsInstructionSpec instruction,
+                                                                    String transactionSn) {
+        FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(instruction.getTenantId()))
+                .and(ref.transactionSn.eq(transactionSn))
+                .and(ref.businessScene.eq(instruction.getBusinessScene()))
+                .and(ref.businessSn.eq(instruction.getBusinessSn()))
+                .and(ref.transactionType.eq(instruction.getTransactionType()))
+                .and(ref.eventType.eq(instruction.getEventType()))
+                .and(ref.fundsEffectType.eq(resolveFundsEffectType(instruction)));
+        return fundsTransactionDetailMapper.selectListByQuery(wrapper);
     }
 
     private FundsTransaction findTransactionBySn(String sn) {
