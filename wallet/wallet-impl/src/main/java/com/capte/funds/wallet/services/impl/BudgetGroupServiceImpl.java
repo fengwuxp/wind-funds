@@ -68,7 +68,7 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
 
     private void validatePeriodId(CreateBudgetGroupRequest request) {
         AccountBalancePeriodType periodType = request.getPeriodType() == null
-                ? AccountBalancePeriodType.MONTHLY : request.getPeriodType();
+                ? AccountBalancePeriodType.LIFETIME : request.getPeriodType();
         if (periodType != AccountBalancePeriodType.LIFETIME) {
             AssertUtils.hasText(request.getPeriodId(), "非生命周期账本周期 periodId 不能为空");
         }

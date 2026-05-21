@@ -129,8 +129,32 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void testCreateBudgetGroupShouldInitializeMonthlyControlLedgers() {
+    void testCreateBudgetGroupShouldInitializeLifetimeControlLedgersByDefault() {
         Long budgetGroupId = budgetGroupService.createBudgetGroup(createBudgetGroupRequest());
+
+        BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
+        List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.BUDGET_GROUP, BUDGET_GROUP_SN);
+
+        assertThat(budgetGroup.getSn()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(budgetGroup.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
+        assertThat(budgetGroup.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.BUDGET_BASIC);
+        assertThat(budgetGroup.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
+        assertThat(ledgers).hasSize(3);
+        assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
+                ledger,
+                FundsSubjectType.BUDGET_GROUP,
+                BUDGET_GROUP_SN,
+                LedgerProfileCode.BUDGET_BASIC,
+                AccountBalancePeriodType.LIFETIME,
+                AccountBalancePeriodType.LIFETIME.name()));
+    }
+
+    @Test
+    void testCreateBudgetGroupShouldInitializeMonthlyControlLedgersWhenSpecified() {
+        Long budgetGroupId = budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(MONTHLY_PERIOD_ID));
 
         BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
         List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.BUDGET_GROUP, BUDGET_GROUP_SN);
@@ -247,8 +271,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setBudgetType(DefaultFundsAccountType.BUDGET_GROUP.name())
-                .setCurrency(CurrencyIsoCode.USD)
-                .setPeriodId(MONTHLY_PERIOD_ID);
+                .setCurrency(CurrencyIsoCode.USD);
     }
 
     private CreateBudgetGroupRequest customCycleBudgetGroupRequest() {

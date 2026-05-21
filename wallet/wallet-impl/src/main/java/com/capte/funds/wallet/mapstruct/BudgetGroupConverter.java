@@ -50,7 +50,7 @@ public interface BudgetGroupConverter {
     @AfterMapping
     default void fillCreateDefaults(CreateBudgetGroupRequest request, @MappingTarget BudgetGroup entity) {
         AccountBalancePeriodType periodType = request.getPeriodType() == null
-                ? AccountBalancePeriodType.MONTHLY : request.getPeriodType();
+                ? AccountBalancePeriodType.LIFETIME : request.getPeriodType();
         entity.setPeriodType(periodType);
         entity.setLedgerProfileCode(request.getLedgerProfileCode() == null
                 ? LedgerProfileCode.BUDGET_BASIC : request.getLedgerProfileCode());
