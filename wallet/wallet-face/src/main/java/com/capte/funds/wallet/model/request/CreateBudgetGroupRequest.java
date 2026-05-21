@@ -54,6 +54,9 @@ public class CreateBudgetGroupRequest {
     @Schema(description = "周期类型")
     private AccountBalancePeriodType periodType;
 
+    @Schema(description = "周期标识，periodType 不为 LIFETIME 时必填")
+    private String periodId;
+
     @Schema(description = "周期策略")
     private String periodPolicy;
 

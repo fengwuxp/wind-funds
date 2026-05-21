@@ -52,9 +52,10 @@ public class DefaultSubjectLedgerInitializer implements SubjectLedgerInitializer
             }
             AccountBalancePeriodType periodType = request.getPeriodType() == null
                     ? item.getPeriodType() : request.getPeriodType();
-            LedgerDTO existingLedger = findExistingLedger(request, item, periodType);
+            String periodId = resolvePeriodId(request, periodType);
+            LedgerDTO existingLedger = findExistingLedger(request, item, periodType, periodId);
             Long ledgerId = existingLedger == null
-                    ? createLedger(request, profile, item, periodType)
+                    ? createLedger(request, profile, item, periodType, periodId)
                     : reuseExistingLedger(request, profile, item, existingLedger);
             result.put(item.getLedgerSubjectCode(), ledgerId);
         }
@@ -63,7 +64,8 @@ public class DefaultSubjectLedgerInitializer implements SubjectLedgerInitializer
 
     private LedgerDTO findExistingLedger(InitializeSubjectLedgerRequest request,
                                          LedgerProfileItemDTO item,
-                                         AccountBalancePeriodType periodType) {
+                                         AccountBalancePeriodType periodType,
+                                         String periodId) {
         List<LedgerDTO> records = ledgerService.queryLedgers(new LedgerQuery()
                         .setTenantId(request.getTenantId())
                         .setSubjectId(request.getSubjectId())
@@ -71,7 +73,7 @@ public class DefaultSubjectLedgerInitializer implements SubjectLedgerInitializer
                         .setCurrency(request.getCurrency())
                         .setLedgerSubjectCode(item.getLedgerSubjectCode())
                         .setPeriodType(periodType)
-                        .setPeriodId(periodType.formatPeriodId()),
+                        .setPeriodId(periodId),
                 DefaultPageQueryOptions.defaults(2)).getRecords();
         AssertUtils.isTrue(records.size() <= 1,
                 "账本唯一桶配置不唯一，subjectId = {}, ledgerSubjectCode = {}, currency = {}, periodType = {}, periodId = {}",
@@ -79,14 +81,15 @@ public class DefaultSubjectLedgerInitializer implements SubjectLedgerInitializer
                 item.getLedgerSubjectCode(),
                 request.getCurrency(),
                 periodType,
-                periodType.formatPeriodId());
+                periodId);
         return records.isEmpty() ? null : records.getFirst();
     }
 
     private Long createLedger(InitializeSubjectLedgerRequest request,
                               LedgerProfileDTO profile,
                               LedgerProfileItemDTO item,
-                              AccountBalancePeriodType periodType) {
+                              AccountBalancePeriodType periodType,
+                              String periodId) {
         return ledgerService.createLedger(new CreateLedgerRequest()
                 .setTenantId(request.getTenantId())
                 .setSubjectId(request.getSubjectId())
@@ -99,9 +102,17 @@ public class DefaultSubjectLedgerInitializer implements SubjectLedgerInitializer
                 .setNormalBalanceSide(item.getNormalBalanceSide())
                 .setAllowNegative(item.getAllowNegative())
                 .setPeriodType(periodType)
-                .setPeriodId(periodType.formatPeriodId())
+                .setPeriodId(periodId)
                 .setSettlementPolicy(item.getSettlementPolicy())
                 .setCutOffTime(item.getCutOffTime()));
+    }
+
+    private String resolvePeriodId(InitializeSubjectLedgerRequest request, AccountBalancePeriodType periodType) {
+        if (periodType == AccountBalancePeriodType.LIFETIME) {
+            return AccountBalancePeriodType.LIFETIME.name();
+        }
+        AssertUtils.hasText(request.getPeriodId(), "非生命周期账本周期 periodId 不能为空");
+        return request.getPeriodId();
     }
 
     private Long reuseExistingLedger(InitializeSubjectLedgerRequest request,

@@ -54,6 +54,9 @@ public class CreateCreditAccountRequest {
     @Schema(description = "账本周期类型")
     private AccountBalancePeriodType periodType;
 
+    @Schema(description = "账本周期标识，periodType 不为 LIFETIME 时必填")
+    private String periodId;
+
     @Schema(description = "ledger profile 编码")
     private LedgerProfileCode ledgerProfileCode;
 

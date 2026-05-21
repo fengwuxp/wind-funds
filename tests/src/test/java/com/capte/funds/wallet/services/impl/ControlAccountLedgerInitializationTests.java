@@ -9,8 +9,10 @@ import com.capte.funds.wallet.model.dto.BudgetGroupDTO;
 import com.capte.funds.wallet.model.dto.CreditAccountDTO;
 import com.capte.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.capte.funds.wallet.model.request.CreateCreditAccountRequest;
+import com.capte.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.capte.funds.wallet.service.BudgetGroupService;
 import com.capte.funds.wallet.service.CreditAccountService;
+import com.capte.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
@@ -38,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 信用账户和预算组控制账本初始化服务层测试。
@@ -51,7 +54,17 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     private static final String CREDIT_ACCOUNT_SN = "credit_control_basic";
 
+    private static final String NON_LIFETIME_CREDIT_ACCOUNT_SN = "credit_control_monthly";
+
     private static final String BUDGET_GROUP_SN = "budget_control_basic";
+
+    private static final String CUSTOM_BUDGET_GROUP_SN = "budget_control_custom";
+
+    private static final String CUSTOM_PERIOD_ID = "CONTRACT-2026-H1";
+
+    private static final String MONTHLY_PERIOD_ID = "2026-05";
+
+    private static final String CUSTOM_PERIOD_POLICY = "CONTRACT_H1_RULE_V1";
 
     private static final String OWNER_ID = "owner_control_basic";
 
@@ -72,6 +85,9 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Autowired
     private BudgetGroupService budgetGroupService;
+
+    @Autowired
+    private SubjectLedgerInitializer subjectLedgerInitializer;
 
     @Autowired
     private LedgerService ledgerService;
@@ -102,6 +118,17 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     @Test
+    void testCreateCreditAccountShouldRejectNonLifetimeWithoutPeriodId() {
+        assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()
+                .setSn(NON_LIFETIME_CREDIT_ACCOUNT_SN)
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)))
+                .hasMessageContaining("非生命周期账本周期 periodId 不能为空");
+
+        assertThat(countRows("t_credit_account", "sn", NON_LIFETIME_CREDIT_ACCOUNT_SN)).isZero();
+        assertThat(countRows("t_ledger", "subject_id", NON_LIFETIME_CREDIT_ACCOUNT_SN)).isZero();
+    }
+
+    @Test
     void testCreateBudgetGroupShouldInitializeMonthlyControlLedgers() {
         Long budgetGroupId = budgetGroupService.createBudgetGroup(createBudgetGroupRequest());
 
@@ -120,7 +147,63 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 BUDGET_GROUP_SN,
                 LedgerProfileCode.BUDGET_BASIC,
                 AccountBalancePeriodType.MONTHLY,
-                AccountBalancePeriodType.MONTHLY.formatPeriodId()));
+                MONTHLY_PERIOD_ID));
+    }
+
+    @Test
+    void testCreateBudgetGroupShouldRejectCustomCycleWithoutPeriodId() {
+        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(customCycleBudgetGroupRequest()))
+                .hasMessageContaining("非生命周期账本周期 periodId 不能为空");
+
+        assertThat(countRows("t_budget_group", "sn", CUSTOM_BUDGET_GROUP_SN)).isZero();
+        assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
+    }
+
+    @Test
+    void testCreateBudgetGroupShouldInitializeCustomCycleControlLedgers() {
+        Long budgetGroupId = budgetGroupService.createBudgetGroup(
+                customCycleBudgetGroupRequest().setPeriodId(CUSTOM_PERIOD_ID));
+
+        BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
+        List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.BUDGET_GROUP, CUSTOM_BUDGET_GROUP_SN);
+
+        assertThat(budgetGroup.getSn()).isEqualTo(CUSTOM_BUDGET_GROUP_SN);
+        assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.CUSTOM_CYCLE);
+        assertThat(budgetGroup.getPeriodPolicy()).isEqualTo(CUSTOM_PERIOD_POLICY);
+        assertThat(budgetGroup.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
+        assertThat(ledgers).hasSize(3);
+        assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
+                ledger,
+                FundsSubjectType.BUDGET_GROUP,
+                CUSTOM_BUDGET_GROUP_SN,
+                LedgerProfileCode.BUDGET_BASIC,
+                AccountBalancePeriodType.CUSTOM_CYCLE,
+                CUSTOM_PERIOD_ID));
+    }
+
+    @Test
+    void testInitializeCustomCycleLedgersShouldRequirePeriodId() {
+        assertThatThrownBy(() -> subjectLedgerInitializer.initializeRequiredLedgers(customBudgetLedgerRequest()))
+                .hasMessageContaining("非生命周期账本周期 periodId 不能为空");
+
+        assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
+    }
+
+    @Test
+    void testInitializeCustomCycleLedgersShouldUseExplicitPeriodId() {
+        Map<LedgerSubjectCode, Long> ledgerIds = subjectLedgerInitializer.initializeRequiredLedgers(
+                customBudgetLedgerRequest().setPeriodId(CUSTOM_PERIOD_ID));
+        List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.BUDGET_GROUP, CUSTOM_BUDGET_GROUP_SN);
+
+        assertThat(ledgerIds).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
+        assertThat(ledgers).hasSize(3);
+        assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
+                ledger,
+                FundsSubjectType.BUDGET_GROUP,
+                CUSTOM_BUDGET_GROUP_SN,
+                LedgerProfileCode.BUDGET_BASIC,
+                AccountBalancePeriodType.CUSTOM_CYCLE,
+                CUSTOM_PERIOD_ID));
     }
 
     @BeforeEach
@@ -134,11 +217,17 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupControlAccountLedgerTestData() {
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?, ?)",
                 CREDIT_ACCOUNT_SN,
-                BUDGET_GROUP_SN);
-        jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", CREDIT_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_budget_group WHERE sn = ?", BUDGET_GROUP_SN);
+                NON_LIFETIME_CREDIT_ACCOUNT_SN,
+                BUDGET_GROUP_SN,
+                CUSTOM_BUDGET_GROUP_SN);
+        jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn IN (?, ?)",
+                CREDIT_ACCOUNT_SN,
+                NON_LIFETIME_CREDIT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_budget_group WHERE sn IN (?, ?)",
+                BUDGET_GROUP_SN,
+                CUSTOM_BUDGET_GROUP_SN);
     }
 
     private CreateCreditAccountRequest createCreditAccountRequest() {
@@ -158,7 +247,26 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setBudgetType(DefaultFundsAccountType.BUDGET_GROUP.name())
-                .setCurrency(CurrencyIsoCode.USD);
+                .setCurrency(CurrencyIsoCode.USD)
+                .setPeriodId(MONTHLY_PERIOD_ID);
+    }
+
+    private CreateBudgetGroupRequest customCycleBudgetGroupRequest() {
+        return createBudgetGroupRequest()
+                .setSn(CUSTOM_BUDGET_GROUP_SN)
+                .setPeriodType(AccountBalancePeriodType.CUSTOM_CYCLE)
+                .setPeriodId(null)
+                .setPeriodPolicy(CUSTOM_PERIOD_POLICY);
+    }
+
+    private InitializeSubjectLedgerRequest customBudgetLedgerRequest() {
+        return new InitializeSubjectLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(CUSTOM_BUDGET_GROUP_SN)
+                .setSubjectType(FundsSubjectType.BUDGET_GROUP)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerProfileCode(LedgerProfileCode.BUDGET_BASIC)
+                .setPeriodType(AccountBalancePeriodType.CUSTOM_CYCLE);
     }
 
     private List<LedgerDTO> loadLedgers(FundsSubjectType subjectType, String subjectId) {
@@ -168,6 +276,12 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                         .setSubjectType(subjectType.name())
                         .setCurrency(CurrencyIsoCode.USD),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
+    }
+
+    private long countRows(String tableName, String columnName, Object value) {
+        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
+                Long.class, value);
+        return result;
     }
 
     private void assertControlLedger(LedgerDTO ledger,

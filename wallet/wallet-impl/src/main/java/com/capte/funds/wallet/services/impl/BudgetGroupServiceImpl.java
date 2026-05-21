@@ -20,8 +20,9 @@ import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
-import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -50,6 +51,7 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createBudgetGroup(@NonNull CreateBudgetGroupRequest request) {
+        validatePeriodId(request);
         BudgetGroup entity = BudgetGroupConverter.INSTANCE.convertToBudgetGroup(request);
         budgetGroupMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建预算组失败");
@@ -59,8 +61,17 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
                 .setSubjectType(FundsSubjectType.BUDGET_GROUP)
                 .setCurrency(entity.getCurrency())
                 .setLedgerProfileCode(entity.getLedgerProfileCode())
-                .setPeriodType(entity.getPeriodType()));
+                .setPeriodType(entity.getPeriodType())
+                .setPeriodId(request.getPeriodId()));
         return entity.getId();
+    }
+
+    private void validatePeriodId(CreateBudgetGroupRequest request) {
+        AccountBalancePeriodType periodType = request.getPeriodType() == null
+                ? AccountBalancePeriodType.MONTHLY : request.getPeriodType();
+        if (periodType != AccountBalancePeriodType.LIFETIME) {
+            AssertUtils.hasText(request.getPeriodId(), "非生命周期账本周期 periodId 不能为空");
+        }
     }
 
     @Override
