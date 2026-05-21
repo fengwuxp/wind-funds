@@ -73,7 +73,7 @@ CREATE TABLE `t_budget_group`
     `owner_type`             VARCHAR(50)  NOT NULL COMMENT '归属主体类型',
     `budget_type`            VARCHAR(50)  NOT NULL COMMENT '预算类型',
     `currency`               VARCHAR(10)  NOT NULL COMMENT '币种',
-    `period_type`            VARCHAR(20)  NOT NULL DEFAULT 'MONTHLY' COMMENT '周期类型',
+    `period_type`            VARCHAR(20)  NOT NULL DEFAULT 'LIFETIME' COMMENT '周期类型',
     `period_policy`          VARCHAR(50)           DEFAULT NULL COMMENT '周期策略',
     `ledger_profile_code`    VARCHAR(50)  NOT NULL COMMENT 'ledger profile 编码',
     `ledger_profile_version` INT(11)      NOT NULL DEFAULT 1 COMMENT 'profile 版本',

@@ -176,8 +176,10 @@ public class LedgerServiceImpl implements LedgerService {
         if (entity.getPeriodType() == null) {
             entity.setPeriodType(AccountBalancePeriodType.LIFETIME);
         }
-        if (entity.getPeriodId() == null) {
-            entity.setPeriodId(entity.getPeriodType().formatPeriodId());
+        if (entity.getPeriodType() == AccountBalancePeriodType.LIFETIME) {
+            entity.setPeriodId(AccountBalancePeriodType.LIFETIME.name());
+        } else {
+            AssertUtils.hasText(entity.getPeriodId(), "非生命周期账本周期 periodId 不能为空");
         }
     }
 

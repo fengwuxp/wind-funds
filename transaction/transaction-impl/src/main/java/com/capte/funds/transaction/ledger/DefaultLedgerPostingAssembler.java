@@ -6,6 +6,7 @@ import com.capte.funds.ledger.service.LedgerService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.integration.funds.ledger.LedgerPostingAssembler;
+import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
@@ -206,11 +207,14 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
     }
 
     private String resolvePeriodId(RouteLegSpec leg) {
-        String periodId = leg.getPeriodId();
-        if (periodId != null && !periodId.isBlank()) {
-            return periodId;
+        AccountBalancePeriodType periodType = leg.getPeriodType();
+        AssertUtils.notNull(periodType, "账本周期类型不能为空");
+        if (periodType == AccountBalancePeriodType.LIFETIME) {
+            return AccountBalancePeriodType.LIFETIME.name();
         }
-        return leg.getPeriodType().formatPeriodId();
+        String periodId = leg.getPeriodId();
+        AssertUtils.hasText(periodId, "非生命周期账本周期 periodId 不能为空");
+        return periodId;
     }
 
     private EntrySide resolveEntrySide(EntrySide normalBalanceSide, MovementDirection direction) {
