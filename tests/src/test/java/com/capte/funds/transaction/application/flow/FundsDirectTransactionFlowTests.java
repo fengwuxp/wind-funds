@@ -7,6 +7,7 @@ import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
@@ -735,5 +736,142 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
         assertThat(fundsTransactionDetails(firstPaySn)).hasSize(2);
+    }
+
+    /**
+     * 场景：系统内转账使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
+     * 输入：充值 100、转账 40，随后同流水同金额重试，再同流水改金额为 41。
+     * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次转账后的状态。
+     * 预期：系统内转账幂等必须由业务键和请求摘要共同保护。
+     * 红线：同业务流水不同请求不得新增交易、route、posting、ledger entry 或污染余额。
+     */
+    @Test
+    void testDirectTransferSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("idem_transfer_payee");
+        ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
+
+        topup(payer, 100L, "DIRECT_IDEMPOTENT_TRANSFER_TOPUP");
+        String firstTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER")
+                .setDescription("idempotent transfer"), WindOperator.system());
+        BalanceSnapshot afterFirstTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+
+        String retryTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER")
+                .setDescription("idempotent transfer"), WindOperator.system());
+
+        assertThat(retryTransferSn).isEqualTo(firstTransferSn);
+        assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(41L, CURRENCY)))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER")
+                .setDescription("idempotent transfer"), WindOperator.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstTransfer, afterConflict,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.TRANSFER.name());
+        assertThat(fundsTransactionDetails(firstTransferSn)).hasSize(2);
+    }
+
+    /**
+     * 场景：直接退款使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
+     * 输入：充值 100、付款 70、退款 30，随后同流水同金额重试，再同流水改金额为 31。
+     * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次退款后的状态。
+     * 预期：退款幂等必须同时保护退款到账账户、退款出资账户、出资账目、金额和 route replay 摘要。
+     * 红线：同业务流水不同退款请求不得重复返还、超额扣减或污染账务事实。
+     */
+    @Test
+    void testDirectRefundSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("idem_refund_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        topup(payer, 100L, "DIRECT_IDEMPOTENT_REFUND_TOPUP");
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_IDEMPOTENT_REFUND_PAY");
+        String firstRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
+                .setDescription("idempotent refund"), WindOperator.system());
+        BalanceSnapshot afterFirstRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+
+        String retryRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
+                .setDescription("idempotent refund"), WindOperator.system());
+
+        assertThat(retryRefundSn).isEqualTo(firstRefundSn);
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(31L, CURRENCY))
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
+                .setDescription("idempotent refund"), WindOperator.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstRefund, afterConflict,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(3);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name(),
+                        FundsTransactionEventType.REFUND.name());
+        assertThat(fundsTransactionDetails(firstRefundSn)).hasSize(2);
     }
 }

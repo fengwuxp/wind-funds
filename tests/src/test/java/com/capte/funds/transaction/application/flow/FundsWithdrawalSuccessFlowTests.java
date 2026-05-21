@@ -383,6 +383,76 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：提现确认使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
+     * 输入：充值 100、冻结 60、提现确认 60，随后同流水同金额重试，再同流水改金额为 61。
+     * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次提现后的状态。
+     * 预期：提现确认幂等必须保护冻结引用、提现金额、外部收款方和出款 route 摘要。
+     * 红线：同业务流水不同提现请求不得重复释放冻结、重复出款或污染账务事实。
+     */
+    @Test
+    void testWithdrawSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "WITHDRAW_IDEMPOTENT_TOPUP");
+        String freezeSn = freeze(user, 60L, "WITHDRAW_IDEMPOTENT_FREEZE");
+        String firstWithdrawSn = directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(user)
+                .setPayeeId(FundsAccountId.immutable("external_bank_001",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn(freezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM")
+                .setDescription("idempotent withdraw"), WindOperator.system());
+        BalanceSnapshot afterFirstWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        String retryWithdrawSn = directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(user)
+                .setPayeeId(FundsAccountId.immutable("external_bank_001",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn(freezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM")
+                .setDescription("idempotent withdraw"), WindOperator.system());
+
+        assertThat(retryWithdrawSn).isEqualTo(firstWithdrawSn);
+        assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(user)
+                .setPayeeId(FundsAccountId.immutable("external_bank_001",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn(freezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(61L, CURRENCY)))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM")
+                .setDescription("idempotent withdraw"), WindOperator.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstWithdraw, afterConflict,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(3);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name(),
+                        FundsTransactionEventType.WITHDRAW.name());
+        assertThat(fundsTransactionDetails(firstWithdrawSn)).hasSize(3);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_IDEMPOTENT_FREEZE").getReleasedAmount()).isZero();
+    }
+
+    /**
      * 场景：用户充值、冻结并提现成功后，又收到同一冻结来源的撤销或拒绝解冻请求。
      * 输入：充值 100、冻结 60、提现确认 60、随后解冻 60。
      * 输出：解冻请求失败；用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 保持提现成功后的状态。
