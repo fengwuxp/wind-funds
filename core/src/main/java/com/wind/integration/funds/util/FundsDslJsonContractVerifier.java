@@ -12,20 +12,67 @@ import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.enums.RouteReplayType;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.integration.funds.transaction.enums.FundsBenefitAmountClosureRole;
+import com.wind.integration.funds.transaction.enums.FundsBenefitComponentType;
+import com.wind.integration.funds.transaction.enums.FundsBenefitFundingNature;
+import com.wind.integration.funds.transaction.enums.FundsBenefitLedgerEffect;
+import com.wind.integration.funds.transaction.enums.FundsBenefitPartialRefundStrategy;
+import com.wind.integration.funds.transaction.enums.FundsBenefitRefundDisposition;
+import com.wind.integration.funds.transaction.enums.FundsBenefitType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Verifier for DSL JSON contract samples.
  */
 public final class FundsDslJsonContractVerifier {
+
+    private static final BigInteger LONG_MAX_VALUE = BigInteger.valueOf(Long.MAX_VALUE);
+
+    private static final Set<String> RESERVED_BENEFIT_CONTEXT_KEYS = Set.of(
+            "benefitSnapshotId",
+            "benefitSchemaVersion",
+            "benefitGroupSn",
+            "orderAmount",
+            "userPayAmount",
+            "merchantReceivableAmount",
+            "componentSn",
+            "benefitType",
+            "componentType",
+            "closureRole",
+            "amount",
+            "ledgerEffect",
+            "fundingNature",
+            "benefitReference",
+            "refundPolicy",
+            "partialRefundStrategy",
+            "dispositions",
+            "refundDisposition",
+            "refundableAmount",
+            "nonRefundableAmount",
+            "refundRuleVersion",
+            "refundDecisionId",
+            "ruleVersion",
+            "currentMarketingRule",
+            "couponEligibility",
+            "couponAvailable",
+            "recalculatedDiscount",
+            "bestCoupon",
+            "activityRules",
+            "userCouponBag");
 
     private FundsDslJsonContractVerifier() {
     }
@@ -48,6 +95,7 @@ public final class FundsDslJsonContractVerifier {
         verifyMoney(instruction, "amount", "instruction.amount");
         verifyMoney(instruction, "originalAmount", "instruction.originalAmount");
         verifyReference(asNullableMap(instruction.get("reference"), "instruction.reference"));
+        verifyBenefitSnapshot(asNullableMap(instruction.get("benefitSnapshot"), "instruction.benefitSnapshot"));
     }
 
     private static void verifyReference(@Nullable Map<String, ?> reference) {
@@ -56,6 +104,158 @@ public final class FundsDslJsonContractVerifier {
         }
         verifyEnum(FundsInstructionReferenceType.class, reference, "referenceType", "instruction.reference.referenceType");
         requireText(reference, "referenceSn");
+    }
+
+    private static void verifyBenefitSnapshot(@Nullable Map<String, ?> snapshot) {
+        if (snapshot == null) {
+            return;
+        }
+        requireText(snapshot, "benefitSnapshotId");
+        requireText(snapshot, "benefitGroupSn");
+        Money orderAmount = verifyMoney(snapshot, "orderAmount", "instruction.benefitSnapshot.orderAmount");
+        Money userPayAmount = verifyMoney(snapshot, "userPayAmount", "instruction.benefitSnapshot.userPayAmount",
+                false);
+        verifyMoney(snapshot, "merchantReceivableAmount", "instruction.benefitSnapshot.merchantReceivableAmount",
+                false, false);
+        List<Map<String, ?>> components = requiredChildObjects(snapshot,
+                "components",
+                "instruction.benefitSnapshot.components");
+        Set<String> componentSns = new HashSet<>();
+        long orderDiscountAmount = 0L;
+        for (Map<String, ?> component : components) {
+            String componentSn = requireText(component, "componentSn");
+            if (!componentSns.add(componentSn)) {
+                throw new IllegalArgumentException("instruction.benefitSnapshot.components.componentSn must be unique");
+            }
+            verifyEnum(FundsBenefitType.class, component, "benefitType",
+                    "instruction.benefitSnapshot.components.benefitType");
+            verifyEnum(FundsBenefitComponentType.class, component, "componentType",
+                    "instruction.benefitSnapshot.components.componentType");
+            FundsBenefitAmountClosureRole closureRole = verifyEnum(FundsBenefitAmountClosureRole.class,
+                    component,
+                    "closureRole",
+                    "instruction.benefitSnapshot.components.closureRole");
+            Money componentMoney = verifyMoney(component, "amount",
+                    "instruction.benefitSnapshot.components.amount");
+            if (!orderAmount.getCurrency().equals(componentMoney.getCurrency())) {
+                throw new IllegalArgumentException(
+                        "instruction.benefitSnapshot.components.amount currency must equal orderAmount");
+            }
+            if (closureRole == FundsBenefitAmountClosureRole.ORDER_DISCOUNT_CLOSURE) {
+                orderDiscountAmount = addExact(orderDiscountAmount, componentMoney.getAmount(),
+                        "instruction.benefitSnapshot.components.amount sum overflow");
+            }
+            FundsBenefitLedgerEffect ledgerEffect = verifyEnum(FundsBenefitLedgerEffect.class,
+                    component,
+                    "ledgerEffect",
+                    "instruction.benefitSnapshot.components.ledgerEffect");
+            verifyEnum(FundsBenefitFundingNature.class, component, "fundingNature",
+                    "instruction.benefitSnapshot.components.fundingNature");
+            verifyBenefitSubjectRef(asNullableMap(component.get("bearerSubjectRef"),
+                            "instruction.benefitSnapshot.components.bearerSubjectRef"),
+                    "instruction.benefitSnapshot.components.bearerSubjectRef");
+            verifyBenefitSubjectRef(asNullableMap(component.get("beneficiarySubjectRef"),
+                            "instruction.benefitSnapshot.components.beneficiarySubjectRef"),
+                    "instruction.benefitSnapshot.components.beneficiarySubjectRef");
+            verifyBenefitSubjectRef(asNullableMap(component.get("fundingSubjectRef"),
+                            "instruction.benefitSnapshot.components.fundingSubjectRef"),
+                    "instruction.benefitSnapshot.components.fundingSubjectRef");
+            if (ledgerEffect == FundsBenefitLedgerEffect.POSTING_REQUIRED
+                    && component.get("fundingSubjectRef") == null
+                    && !hasText(component.get("fundingAccountRole"))) {
+                throw new IllegalArgumentException(
+                        "instruction.benefitSnapshot.components funding source is required for POSTING_REQUIRED");
+            }
+            if (ledgerEffect == FundsBenefitLedgerEffect.NO_LEDGER && component.get("bearerSubjectRef") == null) {
+                throw new IllegalArgumentException(
+                        "instruction.benefitSnapshot.components.bearerSubjectRef is required for NO_LEDGER");
+            }
+            verifyBenefitReference(asNullableMap(component.get("benefitReference"),
+                            "instruction.benefitSnapshot.components.benefitReference"),
+                    "instruction.benefitSnapshot.components.benefitReference",
+                    ledgerEffect);
+            verifyBenefitRefundPolicy(asNullableMap(component.get("refundPolicy"),
+                            "instruction.benefitSnapshot.components.refundPolicy"),
+                    "instruction.benefitSnapshot.components.refundPolicy");
+            verifyBenefitContext(asNullableMap(component.get("contextVariables"),
+                            "instruction.benefitSnapshot.components.contextVariables"),
+                    "instruction.benefitSnapshot.components.contextVariables");
+        }
+        if (!orderAmount.getCurrency().equals(userPayAmount.getCurrency())) {
+            throw new IllegalArgumentException("instruction.benefitSnapshot.userPayAmount currency must equal orderAmount");
+        }
+        long closedAmount = addExact(userPayAmount.getAmount(), orderDiscountAmount,
+                "instruction.benefitSnapshot amount sum overflow");
+        if (closedAmount != orderAmount.getAmount()) {
+            throw new IllegalArgumentException(
+                    "instruction.benefitSnapshot amount must close: "
+                            + "userPayAmount + ORDER_DISCOUNT_CLOSURE components.amount = orderAmount");
+        }
+        verifyBenefitRefundPolicy(asNullableMap(snapshot.get("refundPolicy"),
+                        "instruction.benefitSnapshot.refundPolicy"),
+                "instruction.benefitSnapshot.refundPolicy");
+        verifyBenefitContext(asNullableMap(snapshot.get("contextVariables"),
+                        "instruction.benefitSnapshot.contextVariables"),
+                "instruction.benefitSnapshot.contextVariables");
+    }
+
+    private static void verifyBenefitSubjectRef(@Nullable Map<String, ?> subjectRef, String path) {
+        if (subjectRef == null) {
+            return;
+        }
+        requireText(subjectRef, "subjectType", path + ".subjectType");
+        requireText(subjectRef, "subjectId", path + ".subjectId");
+    }
+
+    private static void verifyBenefitReference(@Nullable Map<String, ?> reference,
+                                               String path,
+                                               FundsBenefitLedgerEffect ledgerEffect) {
+        if (reference == null) {
+            throw new IllegalArgumentException(path + " is required");
+        }
+        if (ledgerEffect == FundsBenefitLedgerEffect.HOLD_ONLY && !hasText(reference.get("holdId"))) {
+            throw new IllegalArgumentException(path + ".holdId is required for HOLD_ONLY");
+        }
+        if (ledgerEffect == FundsBenefitLedgerEffect.RELEASE_ONLY
+                && !hasText(reference.get("holdId"))
+                && !hasText(reference.get("releaseId"))) {
+            throw new IllegalArgumentException(path + ".holdId or releaseId is required for RELEASE_ONLY");
+        }
+        verifyBenefitContext(asNullableMap(reference.get("contextVariables"), path + ".contextVariables"),
+                path + ".contextVariables");
+    }
+
+    private static void verifyBenefitRefundPolicy(@Nullable Map<String, ?> policy, String path) {
+        if (policy == null) {
+            return;
+        }
+        verifyEnum(FundsBenefitPartialRefundStrategy.class, policy, "partialRefundStrategy",
+                path + ".partialRefundStrategy");
+        List<String> dispositions = requiredChildTexts(policy, "dispositions", path + ".dispositions");
+        for (String disposition : dispositions) {
+            enumValue(FundsBenefitRefundDisposition.class, disposition, path + ".dispositions");
+        }
+        verifyMoney(policy, "refundableAmount", path + ".refundableAmount", false, false);
+        verifyMoney(policy, "nonRefundableAmount", path + ".nonRefundableAmount", false, false);
+        if (dispositions.contains(FundsBenefitRefundDisposition.NO_REFUND.name())
+                && !hasText(policy.get("refundRuleVersion"))
+                && !hasText(policy.get("refundDecisionId"))
+                && !hasText(policy.get("decisionSource"))) {
+            throw new IllegalArgumentException(path + " NO_REFUND requires rule version or decision reference");
+        }
+        verifyBenefitContext(asNullableMap(policy.get("contextVariables"), path + ".contextVariables"),
+                path + ".contextVariables");
+    }
+
+    private static void verifyBenefitContext(@Nullable Map<String, ?> contextVariables, String path) {
+        if (contextVariables == null) {
+            return;
+        }
+        for (String key : contextVariables.keySet()) {
+            if (RESERVED_BENEFIT_CONTEXT_KEYS.contains(key)) {
+                throw new IllegalArgumentException(path + " must not contain core benefit field: " + key);
+            }
+        }
     }
 
     private static void verifyRoute(@Nullable Map<String, ?> route) {
@@ -120,50 +320,128 @@ public final class FundsDslJsonContractVerifier {
         verifyEnum(FundsSubjectType.class, replayRequest, "subjectType", "replayRequest.subjectType", false);
     }
 
-    private static void verifyMoney(Map<String, ?> owner, String fieldName, String path) {
+    private static Money verifyMoney(Map<String, ?> owner, String fieldName, String path) {
+        return verifyMoney(owner, fieldName, path, true);
+    }
+
+    private static Money verifyMoney(Map<String, ?> owner, String fieldName, String path, boolean positive) {
+        return verifyMoney(owner, fieldName, path, true, positive);
+    }
+
+    private static @Nullable Money verifyMoney(Map<String, ?> owner,
+                                               String fieldName,
+                                               String path,
+                                               boolean required,
+                                               boolean positive) {
         Map<String, ?> money = asNullableMap(owner.get(fieldName), path);
         if (money == null) {
-            throw new IllegalArgumentException(path + " is required");
+            if (required) {
+                throw new IllegalArgumentException(path + " is required");
+            }
+            return null;
         }
         try {
-            FundsDslMoneyParser.parse(money);
+            return parseMoney(money, positive);
         } catch (IllegalArgumentException ex) {
             throw new IllegalArgumentException(path + ": " + ex.getMessage(), ex);
         }
     }
 
-    private static <E extends Enum<E>> void verifyEnum(Class<E> enumType,
+    private static @NonNull Money parseMoney(@NonNull Map<String, ?> values, boolean positive) {
+        Object rawCurrency = values.get("currency");
+        if (!(rawCurrency instanceof String currency) || currency.isBlank()) {
+            throw new IllegalArgumentException("money.currency is required");
+        }
+        if (!values.containsKey("minorValue")) {
+            throw new IllegalArgumentException("money.minorValue is required");
+        }
+        long minorValue = parseMinorValue(values.get("minorValue"), positive);
+        return Money.immutable(minorValue, CurrencyIsoCode.valueOf(currency));
+    }
+
+    private static long parseMinorValue(Object value, boolean positive) {
+        BigInteger parsed = switch (value) {
+            case Byte number -> BigInteger.valueOf(number.longValue());
+            case Short number -> BigInteger.valueOf(number.longValue());
+            case Integer number -> BigInteger.valueOf(number.longValue());
+            case Long number -> BigInteger.valueOf(number);
+            case BigInteger number -> number;
+            case BigDecimal number -> parseIntegerDecimal(number);
+            case String text when text.matches("-?\\d+") -> new BigInteger(text);
+            default -> throw new IllegalArgumentException("money.minorValue must be integer");
+        };
+        BigInteger minimum = positive ? BigInteger.ONE : BigInteger.ZERO;
+        if (parsed.compareTo(minimum) < 0) {
+            throw new IllegalArgumentException(positive
+                    ? "money.minorValue must be positive"
+                    : "money.minorValue must not be negative");
+        }
+        if (parsed.compareTo(LONG_MAX_VALUE) > 0) {
+            throw new IllegalArgumentException("money.minorValue exceeds system limit");
+        }
+        return parsed.longValue();
+    }
+
+    private static BigInteger parseIntegerDecimal(BigDecimal value) {
+        try {
+            return value.toBigIntegerExact();
+        } catch (ArithmeticException ex) {
+            throw new IllegalArgumentException("money.minorValue must be integer", ex);
+        }
+    }
+
+    private static <E extends Enum<E>> E verifyEnum(Class<E> enumType,
                                                        Map<String, ?> owner,
                                                        String fieldName,
                                                        String path) {
-        verifyEnum(enumType, owner, fieldName, path, true);
+        return verifyEnum(enumType, owner, fieldName, path, true);
     }
 
-    private static <E extends Enum<E>> void verifyEnum(Class<E> enumType,
+    private static <E extends Enum<E>> E verifyEnum(Class<E> enumType,
                                                        Map<String, ?> owner,
                                                        String fieldName,
                                                        String path,
                                                        boolean required) {
         Object rawValue = owner.get(fieldName);
         if (rawValue == null && !required) {
-            return;
+            return null;
         }
         if (!(rawValue instanceof String value) || value.isBlank()) {
             throw new IllegalArgumentException(path + " is required");
         }
+        return enumValue(enumType, value, path);
+    }
+
+    private static <E extends Enum<E>> E enumValue(Class<E> enumType, String value, String path) {
         try {
-            Enum.valueOf(enumType, value);
+            return Enum.valueOf(enumType, value);
         } catch (IllegalArgumentException ex) {
             throw new IllegalArgumentException(path + " must be " + enumType.getSimpleName(), ex);
         }
     }
 
     private static String requireText(Map<String, ?> owner, String fieldName) {
+        return requireText(owner, fieldName, fieldName);
+    }
+
+    private static String requireText(Map<String, ?> owner, String fieldName, String path) {
         Object value = owner.get(fieldName);
         if (!(value instanceof String text) || text.isBlank()) {
-            throw new IllegalArgumentException(fieldName + " is required");
+            throw new IllegalArgumentException(path + " is required");
         }
         return text;
+    }
+
+    private static boolean hasText(Object value) {
+        return value instanceof String text && !text.isBlank();
+    }
+
+    private static long addExact(long left, long right, String message) {
+        try {
+            return Math.addExact(left, right);
+        } catch (ArithmeticException ex) {
+            throw new IllegalArgumentException(message, ex);
+        }
     }
 
     private static List<Map<String, ?>> childObjects(Map<String, ?> owner, String fieldName, String path) {
@@ -179,6 +457,29 @@ public final class FundsDslJsonContractVerifier {
             objects.add(asMap(value, path));
         }
         return List.copyOf(objects);
+    }
+
+    private static List<Map<String, ?>> requiredChildObjects(Map<String, ?> owner, String fieldName, String path) {
+        List<Map<String, ?>> result = childObjects(owner, fieldName, path);
+        if (result.isEmpty()) {
+            throw new IllegalArgumentException(path + " must not be empty");
+        }
+        return result;
+    }
+
+    private static List<String> requiredChildTexts(Map<String, ?> owner, String fieldName, String path) {
+        Object rawValue = owner.get(fieldName);
+        if (!(rawValue instanceof List<?> values) || values.isEmpty()) {
+            throw new IllegalArgumentException(path + " must not be empty");
+        }
+        List<String> texts = new ArrayList<>(values.size());
+        for (Object value : values) {
+            if (!(value instanceof String text) || text.isBlank()) {
+                throw new IllegalArgumentException(path + " must contain text values");
+            }
+            texts.add(text);
+        }
+        return List.copyOf(texts);
     }
 
     private static Map<String, ?> asMap(Object value, String path) {

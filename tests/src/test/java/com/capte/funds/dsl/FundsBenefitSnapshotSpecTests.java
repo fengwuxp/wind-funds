@@ -1,0 +1,397 @@
+package com.capte.funds.dsl;
+
+import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
+import com.wind.integration.funds.model.route.ImmutableSubjectRef;
+import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitComponentSpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitReferenceSpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitRefundPolicySpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitSnapshotSpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.integration.funds.operation.FundsOperationActorSpec;
+import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.route.ref.SubjectRef;
+import com.wind.integration.funds.spec.transaction.FundsBenefitComponentSpec;
+import com.wind.integration.funds.spec.transaction.FundsBenefitReferenceSpec;
+import com.wind.integration.funds.spec.transaction.FundsBenefitRefundPolicySpec;
+import com.wind.integration.funds.spec.transaction.FundsBenefitSnapshotSpec;
+import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.integration.funds.transaction.enums.FundsBenefitAmountClosureRole;
+import com.wind.integration.funds.transaction.enums.FundsBenefitComponentType;
+import com.wind.integration.funds.transaction.enums.FundsBenefitFundingNature;
+import com.wind.integration.funds.transaction.enums.FundsBenefitLedgerEffect;
+import com.wind.integration.funds.transaction.enums.FundsBenefitPartialRefundStrategy;
+import com.wind.integration.funds.transaction.enums.FundsBenefitRefundDisposition;
+import com.wind.integration.funds.transaction.enums.FundsBenefitType;
+import com.wind.integration.funds.transaction.enums.FundsInstructionType;
+import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * 权益快照 DSL 契约测试。
+ */
+class FundsBenefitSnapshotSpecTests {
+
+    private static final CurrencyIsoCode CURRENCY = CurrencyIsoCode.USD;
+    private static final LocalDateTime EVENT_TIME = LocalDateTime.of(2026, 5, 21, 10, 0);
+
+    /**
+     * 场景：既有资金指令不携带权益快照。
+     * 预期：benefitSnapshot 为空，amount、originalAmount 和 exchangeRate 语义不变。
+     * 红线：不能为了权益支持破坏无权益交易、授权或退款的兼容性。
+     */
+    @Test
+    void testInstructionWithoutBenefitSnapshotShouldRemainCompatible() {
+        FundsInstructionSpec instruction = instruction(null, money(100L));
+
+        assertThat(instruction.getBenefitSnapshot()).isNull();
+        assertThat(instruction.getAmount()).isEqualTo(money(100L));
+        assertThat(instruction.getOriginalAmount()).isEqualTo(money(100L));
+        assertThat(instruction.getExchangeRate()).isEqualByComparingTo(BigDecimal.ONE);
+    }
+
+    /**
+     * 场景：业务侧已经完成商户券决策，把权益快照带入资金指令。
+     * 预期：快照、组件、引用、退款策略和上下文都有一等字段表达。
+     * 红线：权益核心语义不能只藏在 contextVariables。
+     */
+    @Test
+    void testMinimalBenefitSnapshotShouldExposeStableFields() {
+        FundsBenefitSnapshotSpec snapshot = merchantDiscountSnapshot(8000L, 2000L);
+        FundsInstructionSpec instruction = instruction(snapshot, money(8000L));
+
+        assertThat(instruction.getBenefitSnapshot()).isSameAs(snapshot);
+        assertThat(snapshot.getBenefitSnapshotId()).isEqualTo("BS-MERCHANT-001");
+        assertThat(snapshot.getBenefitSchemaVersion()).isEqualTo("1.0");
+        assertThat(snapshot.getOrderAmount()).isEqualTo(money(10000L));
+        assertThat(snapshot.getUserPayAmount()).isEqualTo(money(8000L));
+        assertThat(snapshot.getMerchantReceivableAmount()).isEqualTo(money(8000L));
+        assertThat(snapshot.getComponents()).hasSize(1);
+        assertThat(snapshot.getComponents().getFirst().getBenefitReference().getRuleVersion())
+                .isEqualTo("merchant-rule-v3");
+        assertThat(snapshot.getComponents().getFirst().getRefundPolicy().getDispositions())
+                .containsExactly(FundsBenefitRefundDisposition.NO_REFUND,
+                        FundsBenefitRefundDisposition.REDUCE_MERCHANT_RECEIVABLE);
+        assertThat(snapshot.getContextVariables()).isEmpty();
+        assertThat(snapshot.getComponents().getFirst().getContextVariables()).isEmpty();
+    }
+
+    /**
+     * 场景：订单金额、用户实付和权益组件进入同一快照。
+     * 预期：userPayAmount + ORDER_DISCOUNT_CLOSURE components.amount = orderAmount 才能构造成功。
+     * 红线：权益累计超额或缺口不能进入 route/posting 后再被解释。
+     */
+    @Test
+    void testBenefitSnapshotShouldRequireAmountClosure() {
+        FundsBenefitSnapshotSpec snapshot = merchantDiscountSnapshot(8000L, 2000L);
+
+        assertThat(snapshot.getOrderAmount()).isEqualTo(money(10000L));
+        assertThatThrownBy(() -> benefitSnapshot("BS-MISMATCH-001",
+                money(10000L),
+                money(9000L),
+                List.of(merchantDiscountComponent("BC-MISMATCH-001", 2000L))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ORDER_DISCOUNT_CLOSURE components.amount = orderAmount");
+    }
+
+    /**
+     * 场景：组件表示商户应收影响或展示对账，不属于订单正向抵扣闭合。
+     * 预期：该组件不得被计入 userPayAmount + 抵扣金额 = orderAmount。
+     * 红线：闭合角色混用会导致平台补贴、退款处置或商户应收被误算成订单优惠。
+     */
+    @Test
+    void testOnlyOrderDiscountClosureComponentsShouldCloseOrderAmount() {
+        assertThatThrownBy(() -> benefitSnapshot("BS-CLOSURE-ROLE-001",
+                money(10000L),
+                money(8000L),
+                List.of(merchantReceivableEffectComponent("BC-CLOSURE-ROLE-001", 2000L))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ORDER_DISCOUNT_CLOSURE components.amount = orderAmount");
+    }
+
+    /**
+     * 场景：权益组件没有声明金额闭合角色。
+     * 预期：DSL 入口拒绝构造。
+     * 红线：资金底座不能猜测组件参与哪一种闭合公式。
+     */
+    @Test
+    void testBenefitComponentShouldRequireClosureRole() {
+        assertThatThrownBy(() -> ImmutableFundsBenefitComponentSpec.builder()
+                .componentSn("BC-NO-CLOSURE-001")
+                .sequence(1)
+                .benefitType(FundsBenefitType.MERCHANT_COUPON)
+                .componentType(FundsBenefitComponentType.MERCHANT_DISCOUNT)
+                .amount(money(2000L))
+                .ledgerEffect(FundsBenefitLedgerEffect.NO_LEDGER)
+                .fundingNature(FundsBenefitFundingNature.MERCHANT_BORNE)
+                .bearerSubjectRef(subjectRef("MERCHANT-001"))
+                .benefitReference(benefitReference())
+                .contextVariables(Map.of())
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsBenefit.closureRole must not be null");
+    }
+
+    /**
+     * 场景：同一权益快照内出现两个相同组件号。
+     * 预期：DSL 入口拒绝重复组件。
+     * 红线：退款、对账或问题定位不能依赖不唯一的 componentSn。
+     */
+    @Test
+    void testBenefitSnapshotShouldRequireUniqueComponentSn() {
+        FundsBenefitComponentSpec component = merchantDiscountComponent("BC-DUP-001", 1000L);
+
+        assertThatThrownBy(() -> benefitSnapshot("BS-DUP-001",
+                money(10000L),
+                money(8000L),
+                List.of(component, component)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsBenefit.componentSn must be unique");
+    }
+
+    /**
+     * 场景：券覆盖全额，用户侧实付为 0。
+     * 预期：权益快照可表达零实付，但主资金指令的正金额规则仍不被放宽。
+     * 红线：不能把零金额用户付款静默塞进当前主链路。
+     */
+    @Test
+    void testZeroUserPayShouldBeExplicitBenefitBoundary() {
+        FundsBenefitSnapshotSpec snapshot = benefitSnapshot("BS-ZERO-PAY-001",
+                money(10000L),
+                Money.immutable(0L, CURRENCY),
+                List.of(platformSubsidyComponent("BC-ZERO-PAY-001", 10000L)));
+
+        assertThat(snapshot.getUserPayAmount()).isEqualTo(Money.immutable(0L, CURRENCY));
+        assertThatThrownBy(() -> instruction(snapshot, Money.immutable(0L, CURRENCY)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsInstruction.amount must be positive");
+    }
+
+    /**
+     * 场景：退款时用户侧不退券，但资金侧需要冲回补贴。
+     * 预期：退款策略同时表达用户侧和资金侧处置，并保留业务决策来源。
+     * 红线：资金底座不能自行判断券能不能退。
+     */
+    @Test
+    void testRefundPolicyShouldCarryBusinessDecisionReference() {
+        FundsBenefitRefundPolicySpec refundPolicy = ImmutableFundsBenefitRefundPolicySpec.builder()
+                .partialRefundStrategy(FundsBenefitPartialRefundStrategy.PROPORTIONAL)
+                .dispositions(List.of(FundsBenefitRefundDisposition.NO_REFUND,
+                        FundsBenefitRefundDisposition.REVERSE_SUBSIDY))
+                .refundRuleVersion("platform-refund-v5")
+                .refundPolicyCode("NO_COUPON_RETURN_REVERSE_SUBSIDY")
+                .refundDecisionId("refund-decision-001")
+                .decisionSource("ORDER_REFUND_ENGINE")
+                .contextVariables(Map.of())
+                .build();
+
+        assertThat(refundPolicy.getDispositions())
+                .containsExactly(FundsBenefitRefundDisposition.NO_REFUND,
+                        FundsBenefitRefundDisposition.REVERSE_SUBSIDY);
+        assertThat(refundPolicy.getRefundDecisionId()).isEqualTo("refund-decision-001");
+        assertThat(refundPolicy.getDecisionSource()).isEqualTo("ORDER_REFUND_ENGINE");
+    }
+
+    /**
+     * 场景：实现者试图把权益核心金额、规则版本或退款处置放入 contextVariables。
+     * 预期：模型构造阶段显式失败。
+     * 红线：contextVariables 只能承载非关键扩展信息。
+     */
+    @Test
+    void testBenefitCoreFieldsShouldNotBeHiddenInContextVariables() {
+        assertThatThrownBy(() -> ImmutableFundsBenefitSnapshotSpec.builder()
+                .benefitSnapshotId("BS-CONTEXT-001")
+                .benefitGroupSn("BG-CONTEXT-001")
+                .orderAmount(money(10000L))
+                .userPayAmount(money(8000L))
+                .components(List.of(merchantDiscountComponent("BC-CONTEXT-001", 2000L)))
+                .contextVariables(Map.of("orderAmount", money(10000L)))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables must not contain core benefit field");
+    }
+
+    /**
+     * 场景：实现者把当前营销规则、券包或实时优惠计算信息塞入权益引用上下文。
+     * 预期：模型构造阶段显式失败。
+     * 红线：资金底座只消费原始已决策快照，不调用当前营销规则重算。
+     */
+    @Test
+    void testBenefitReferenceShouldRejectCurrentMarketingRuleInputs() {
+        assertThatThrownBy(() -> ImmutableFundsBenefitReferenceSpec.builder()
+                .campaignId("campaign-001")
+                .couponId("coupon-001")
+                .writeOffId("write-off-001")
+                .ruleVersion("rule-v1")
+                .contextVariables(Map.of("currentMarketingRule", "discount-now"))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables must not contain core benefit field");
+    }
+
+    private FundsBenefitSnapshotSpec merchantDiscountSnapshot(long userPayAmount, long componentAmount) {
+        return benefitSnapshot("BS-MERCHANT-001",
+                money(10000L),
+                money(userPayAmount),
+                List.of(merchantDiscountComponent("BC-MERCHANT-001", componentAmount)));
+    }
+
+    private FundsBenefitSnapshotSpec benefitSnapshot(String benefitSnapshotId,
+                                                     Money orderAmount,
+                                                     Money userPayAmount,
+                                                     List<FundsBenefitComponentSpec> components) {
+        return ImmutableFundsBenefitSnapshotSpec.builder()
+                .benefitSnapshotId(benefitSnapshotId)
+                .benefitGroupSn("BG-ORDER-001")
+                .orderSn("ORDER-001")
+                .pricingSnapshotSn("PRICE-001")
+                .orderAmount(orderAmount)
+                .userPayAmount(userPayAmount)
+                .merchantReceivableAmount(userPayAmount)
+                .components(components)
+                .decisionSource("ORDER_PRICING")
+                .decisionTraceId("TRACE-ORDER-001")
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsBenefitComponentSpec merchantDiscountComponent(String componentSn, long amount) {
+        return ImmutableFundsBenefitComponentSpec.builder()
+                .componentSn(componentSn)
+                .sequence(1)
+                .benefitType(FundsBenefitType.MERCHANT_COUPON)
+                .componentType(FundsBenefitComponentType.MERCHANT_DISCOUNT)
+                .closureRole(FundsBenefitAmountClosureRole.ORDER_DISCOUNT_CLOSURE)
+                .amount(money(amount))
+                .ledgerEffect(FundsBenefitLedgerEffect.NO_LEDGER)
+                .fundingNature(FundsBenefitFundingNature.MERCHANT_BORNE)
+                .bearerSubjectRef(subjectRef("MERCHANT-001"))
+                .beneficiarySubjectRef(subjectRef("USER-001"))
+                .benefitReference(benefitReference())
+                .refundPolicy(merchantRefundPolicy())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsBenefitComponentSpec platformSubsidyComponent(String componentSn, long amount) {
+        return ImmutableFundsBenefitComponentSpec.builder()
+                .componentSn(componentSn)
+                .sequence(1)
+                .benefitType(FundsBenefitType.PLATFORM_COUPON)
+                .componentType(FundsBenefitComponentType.PLATFORM_SUBSIDY)
+                .closureRole(FundsBenefitAmountClosureRole.ORDER_DISCOUNT_CLOSURE)
+                .amount(money(amount))
+                .ledgerEffect(FundsBenefitLedgerEffect.POSTING_REQUIRED)
+                .fundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS)
+                .fundingAccountRole("PLATFORM_SUBSIDY_COST")
+                .bearerSubjectRef(subjectRef("PLATFORM-001"))
+                .beneficiarySubjectRef(subjectRef("MERCHANT-001"))
+                .benefitReference(benefitReference())
+                .refundPolicy(platformRefundPolicy())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsBenefitComponentSpec merchantReceivableEffectComponent(String componentSn, long amount) {
+        return ImmutableFundsBenefitComponentSpec.builder()
+                .componentSn(componentSn)
+                .sequence(1)
+                .benefitType(FundsBenefitType.MERCHANT_COUPON)
+                .componentType(FundsBenefitComponentType.MERCHANT_DISCOUNT)
+                .closureRole(FundsBenefitAmountClosureRole.MERCHANT_RECEIVABLE_EFFECT)
+                .amount(money(amount))
+                .ledgerEffect(FundsBenefitLedgerEffect.NO_LEDGER)
+                .fundingNature(FundsBenefitFundingNature.MERCHANT_BORNE)
+                .bearerSubjectRef(subjectRef("MERCHANT-001"))
+                .beneficiarySubjectRef(subjectRef("USER-001"))
+                .benefitReference(benefitReference())
+                .refundPolicy(merchantRefundPolicy())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsBenefitReferenceSpec benefitReference() {
+        return ImmutableFundsBenefitReferenceSpec.builder()
+                .campaignId("campaign-001")
+                .couponId("coupon-001")
+                .writeOffId("write-off-001")
+                .ruleVersion("merchant-rule-v3")
+                .externalDecisionId("pricing-decision-001")
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsBenefitRefundPolicySpec merchantRefundPolicy() {
+        return ImmutableFundsBenefitRefundPolicySpec.builder()
+                .partialRefundStrategy(FundsBenefitPartialRefundStrategy.ITEM_LINE_BASED)
+                .dispositions(List.of(FundsBenefitRefundDisposition.NO_REFUND,
+                        FundsBenefitRefundDisposition.REDUCE_MERCHANT_RECEIVABLE))
+                .refundRuleVersion("merchant-refund-v3")
+                .refundPolicyCode("MERCHANT_COUPON_NO_RETURN")
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsBenefitRefundPolicySpec platformRefundPolicy() {
+        return ImmutableFundsBenefitRefundPolicySpec.builder()
+                .partialRefundStrategy(FundsBenefitPartialRefundStrategy.PROPORTIONAL)
+                .dispositions(List.of(FundsBenefitRefundDisposition.NO_REFUND,
+                        FundsBenefitRefundDisposition.REVERSE_SUBSIDY))
+                .refundRuleVersion("platform-refund-v5")
+                .refundDecisionId("refund-decision-platform-001")
+                .decisionSource("ORDER_REFUND_ENGINE")
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsInstructionSpec instruction(FundsBenefitSnapshotSpec snapshot, Money amount) {
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(1L)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .amount(amount)
+                .originalAmount(amount)
+                .exchangeRate(BigDecimal.ONE)
+                .benefitSnapshot(snapshot)
+                .businessScene("BENEFIT_DSL")
+                .businessSn("BIZ-BENEFIT-001")
+                .eventTime(EVENT_TIME)
+                .operator(operator())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundsOperationActorSpec operator() {
+        return ImmutableFundsOperationActorSpec.builder()
+                .operatorId(1L)
+                .operatorType("SYSTEM")
+                .operatorName("Codex")
+                .appName("wind-funds-tests")
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private SubjectRef subjectRef(String subjectId) {
+        return ImmutableSubjectRef.builder()
+                .tenantId(1L)
+                .subjectId(subjectId)
+                .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .currency(CURRENCY.name())
+                .build();
+    }
+
+    private Money money(long amount) {
+        return Money.immutable(amount, CURRENCY);
+    }
+}

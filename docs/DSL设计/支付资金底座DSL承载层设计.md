@@ -119,6 +119,21 @@
 
 这张表是产品评审、系分设计、开发实现和测试验收之间的共同语言。产品只要新增一个资金场景，就必须能填满这张表；填不满时，不应进入开发。
 
+### 3.1 能力域到 DSL 承载和契约证据矩阵
+
+本矩阵用于逐项检查 PRD 能力地图是否已经落到 DSL。若能力域没有稳定 DSL 对象、契约样例、验收字段或禁止项，不能进入系统设计和编码。
+
+| PRD 能力域 | DSL 承载对象 | 必须表达的事实 | JSON / TDD 证据 | 禁止漂移 |
+| --- | --- | --- | --- | --- |
+| 交易接入 | `FundsInstruction`、`FundsInstructionReferenceSpec`、`businessScene`、`eventType`、`transactionType`。 | 业务流水、幂等键、金额、币种、操作者、来源事实、后续引用。 | `DSL-DIRECT-*`、`DSL-AUTH-*`、`DSL-BALANCE-CONTROL-*`；`TDD-DIR-*`、`TDD-AUTH-*`、`TDD-CTRL-*`。 | 把业务订单状态、通道状态机或运营工单直接当作资金交易。 |
+| 权益语义 | `FundsBenefitSnapshotSpec`、`FundsBenefitComponentSpec`、`FundsBenefitReferenceSpec`、`FundsBenefitRefundPolicySpec`。 | 原权益结果、金额闭合、组件角色、承担方、受益方、规则版本、退款处置、本次决策引用。 | `DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`。 | 把核心权益金额、规则版本或退款处置藏进 `contextVariables`，或按当前营销规则重算历史权益。 |
+| 钱包账户 | `SubjectRef`、`PaymentInstrumentRef`、`ExternalAccountRef`、平台账户角色、资金来源决策。 | 可入账主体、支付工具引用、脱敏展示号、绑定快照、资金来源、账户能力和币种。 | `DSL-PAYMENT-INSTRUMENT-*`；`TDD-WALLET-*`、`TDD-ROUTE-*`。 | 把卡、VA、外部账户、支付工具或业务经营主体直接入账。 |
+| 资金路由 | `ResolvedRoute`、`RouteSnapshot`、`RouteParticipant`、`RouteNode`、`RouteLeg`、`RoutingDecision`、`FundingAllocationDecision`。 | 参与方、账目、账本周期、平台账户、资金来源、命中规则、失败原因和原路径回放。 | `DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`DSL-PAYMENT-INSTRUMENT-REPLAY-001`、`DSL-REVERSE-REFUND-FEE-001`；`TDD-ROUTE-*`。 | 缺原 route snapshot 时重新选路，或让 route 直接写交易事实和账本事实。 |
+| 账本账目 | `PostingPlan`、`LedgerTransaction`、`LedgerEntry`、`periodType`、`periodId`、`periodPolicy`。 | posting plan 独立平衡、entry 金额为正、借贷方向、账本周期、来源指令和 route leg。 | `DSL-DIRECT-PAY-FEE-001`、`DSL-BALANCE-CONTROL-LIMIT-BUDGET-001`；`TDD-LEDGER-*`。 | 用负金额表达反向、缺账本自动建账、用清算账期或报表周期替代账本周期。 |
+| 投影视图 | `BalanceProjection`、`TransactionView`、`metricSnapshot`、`projectionReplayTask`。 | 余额桶、检查点、水位、交易视图来源、重放范围、差异报告和指标只读口径。 | `DSL-GOVERNANCE-PROJECTION-REPLAY-001`、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001`；`TDD-VIEW-*`、`TDD-METRIC-*`。 | 交易投影、余额日志、报表指标反写事实或修正余额。 |
+| 清结算与对账 | `SettlementPolicySpec`、清结算 DSL 对象、差错和调账引用。 | 清分明细、清算候选、清算批次、结算锁定、出款结果、对账差异、审批和核销。 | `DSL-SETTLEMENT-*`、`DSL-BENEFIT-CLEARING-RECONCILIATION-001`；`TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`。 | 清分候选直接入账、对账差异直接改历史分录、结算锁定当出款成功。 |
+| 归档重放与治理 | `governanceTask`、`archiveRequest`、`archiveManifest`、`BalanceSnapshotVerifyRef`、`differenceReport`。 | 范围、审批、checkpoint、watermark、Manifest、coverage mode、dry-run/apply 和差异报告。 | `DSL-GOVERNANCE-*`；`TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`。 | 无范围重放、缺 Manifest 仍推进水位、普通指标快照替代账本余额快照。 |
+
 ## 四、资金交易结构化描述
 
 资金交易不是一个单一金额字段，也不是“某个服务方法”。在本设计中，一笔资金交易由六个结构共同描述：
@@ -319,6 +334,247 @@ DSL 契约统一使用 `instrumentSn` 和 `instrumentDisplayNo`：前者作为�
 | `FundsBenefitReferenceSpec` | 保存券、活动、核销、占用、规则版本和外部决策引用。 | 外部引用不是资金底座主键，不作为可入账主体。 |
 | `FundsBenefitRefundPolicySpec` | 保存组件级或快照级退款处置。 | 用户侧不返券和资金侧不冲补贴必须分开表达。 |
 
+职责边界：券能不能退是业务层、订单层、营销权益系统或运营审批链路的决策。资金底座不判断券是否可退，不读取当前券包状态，不调用当前营销规则重新计算。DSL 只承接两类事实：原交易权益快照中的默认退款策略，以及本次退款或后续事件由业务层给出的退款决策结果。后续退款、撤销、过期或拒付必须引用原权益快照和本次决策结果，不得在资金底座内补算。
+
+#### 7.2.1.1 设计目标、字段对齐和包结构
+
+权益快照的 DSL 设计目标是把优惠券、代金券、平台补贴、商户让利、储值权益等已经决策完成的权益结果变成资金底座可读、可审计、可回放的稳定事实。它解决四个问题：
+
+1. 让权益金额成为一等 DSL，而不是塞进 `contextVariables` 的临时扩展。
+2. 区分“只影响订单价格或展示”的权益和“需要形成资金影响”的权益。
+3. 为退款、撤销、授权过期、清结算、对账和交易投影重放保留原始权益事实。
+4. 避免后续事件按当前营销规则重算历史权益，导致资金路径、商户应收和补贴成本漂移。
+
+设计原则：
+
+1. 不改变 `FundsInstructionSpec` 既有主字段语义。
+2. 只在资金指令上增加一个可选一级字段：`benefitSnapshot`。
+3. 权益快照必须可被 route、posting、refund replay、clearing、reconciliation 和 projection 消费。
+4. 商户让利、展示优惠等无资金转移权益不能误生成 `LedgerEntry`。
+5. 平台补贴、储值代金券、合作方补贴等有资金影响权益必须能被拆成独立 route leg、独立伴随指令或独立 posting 依据。
+
+现有字段对齐：
+
+| 现有字段 | 当前语义 | 权益快照是否改变 |
+| --- | --- | --- |
+| `amount` | 当前资金指令主链路金额。 | 不改变；付款场景通常等于用户实付金额。 |
+| `originalAmount` | 当前资金指令原始金额和 FX 快照。 | 不改变；不拿来表达订单原价。 |
+| `exchangeRate` | `originalAmount -> amount` 的汇率快照。 | 不改变；权益跨币种必须由业务侧给出已决策 FX 快照。 |
+| `instrumentRef` | 支付工具引用快照。 | 不改变；只影响支付工具和资金来源解析。 |
+| `externalAccountRef` | 外部账户引用快照。 | 不改变；外部账户仍不得入账。 |
+| `reference` | 后续事件引用原资金事实、原 route snapshot 或原冻结/授权事实。 | 不改变；权益逆向事件还必须引用原权益快照或等价摘要。 |
+| `contextVariables` | 补充上下文。 | 不改变；但不得承载核心权益金额、金额闭合、规则版本或退款处置。 |
+
+建议新增到 `FundsInstructionSpec` 的可选字段：
+
+```java
+@Nullable
+default FundsBenefitSnapshotSpec getBenefitSnapshot() {
+    return null;
+}
+```
+
+该字段与 `instrumentRef`、`externalAccountRef`、`reference` 同级，是资金指令可选事实快照，不是临时上下文。
+
+包结构建议保持现有 `spec` / `model` / `enums` 分层风格：
+
+```text
+core/src/main/java/com/wind/integration/funds/spec/transaction/
+  FundsBenefitSnapshotSpec.java
+  FundsBenefitComponentSpec.java
+  FundsBenefitReferenceSpec.java
+  FundsBenefitRefundPolicySpec.java
+
+core/src/main/java/com/wind/integration/funds/model/transaction/
+  ImmutableFundsBenefitSnapshotSpec.java
+  ImmutableFundsBenefitComponentSpec.java
+  ImmutableFundsBenefitReferenceSpec.java
+  ImmutableFundsBenefitRefundPolicySpec.java
+
+core/src/main/java/com/wind/integration/funds/transaction/enums/
+  FundsBenefitType.java
+  FundsBenefitComponentType.java
+  FundsBenefitAmountClosureRole.java
+  FundsBenefitLedgerEffect.java
+  FundsBenefitFundingNature.java
+  FundsBenefitRefundDisposition.java
+  FundsBenefitPartialRefundStrategy.java
+  FundsBenefitLifecycleAction.java
+```
+
+不建议把权益模型放到 `route` 包。权益快照先属于资金指令事实，route、posting、清结算、对账和投影只消费它，不拥有它。
+
+#### 7.2.1.2 对象关系和接口草图
+
+```mermaid
+classDiagram
+    class FundsInstructionSpec {
+      +Money getAmount()
+      +Money getOriginalAmount()
+      +FundsInstructionReferenceSpec getReference()
+      +FundsBenefitSnapshotSpec getBenefitSnapshot()
+    }
+
+    class FundsBenefitSnapshotSpec {
+      +String getBenefitSnapshotId()
+      +String getBenefitSchemaVersion()
+      +String getBenefitGroupSn()
+      +Money getOrderAmount()
+      +Money getUserPayAmount()
+      +Money getMerchantReceivableAmount()
+      +List~FundsBenefitComponentSpec~ getComponents()
+      +FundsBenefitRefundPolicySpec getRefundPolicy()
+    }
+
+    class FundsBenefitComponentSpec {
+      +String getComponentSn()
+      +FundsBenefitType getBenefitType()
+      +FundsBenefitComponentType getComponentType()
+      +FundsBenefitAmountClosureRole getClosureRole()
+      +Money getAmount()
+      +FundsBenefitLedgerEffect getLedgerEffect()
+      +FundsBenefitFundingNature getFundingNature()
+      +FundsBenefitReferenceSpec getBenefitReference()
+      +FundsBenefitRefundPolicySpec getRefundPolicy()
+    }
+
+    class FundsBenefitReferenceSpec {
+      +String getCampaignId()
+      +String getCouponId()
+      +String getVoucherId()
+      +String getHoldId()
+      +String getWriteOffId()
+      +String getRuleVersion()
+    }
+
+    class FundsBenefitRefundPolicySpec {
+      +FundsBenefitPartialRefundStrategy getPartialRefundStrategy()
+      +List~FundsBenefitRefundDisposition~ getDispositions()
+      +Money getRefundableAmount()
+      +Money getNonRefundableAmount()
+    }
+
+    FundsInstructionSpec --> FundsBenefitSnapshotSpec
+    FundsBenefitSnapshotSpec --> FundsBenefitComponentSpec
+    FundsBenefitSnapshotSpec --> FundsBenefitRefundPolicySpec
+    FundsBenefitComponentSpec --> FundsBenefitReferenceSpec
+    FundsBenefitComponentSpec --> FundsBenefitRefundPolicySpec
+```
+
+接口草图用于约束公共契约骨架；字段完整语义、必填条件和默认值以本节字段表和校验规则为准。
+
+```java
+public interface FundsBenefitSnapshotSpec {
+
+    @NonNull String getBenefitSnapshotId();
+
+    @NonNull String getBenefitSchemaVersion();
+
+    @NonNull String getBenefitGroupSn();
+
+    @Nullable String getOrderSn();
+
+    @Nullable String getPricingSnapshotSn();
+
+    @NonNull Money getOrderAmount();
+
+    @NonNull Money getUserPayAmount();
+
+    @Nullable Money getMerchantReceivableAmount();
+
+    @NonNull List<FundsBenefitComponentSpec> getComponents();
+
+    @Nullable FundsBenefitRefundPolicySpec getRefundPolicy();
+
+    @Nullable String getDecisionSource();
+
+    @Nullable String getDecisionTraceId();
+
+    @NonNull Map<String, Object> getContextVariables();
+}
+
+public interface FundsBenefitComponentSpec {
+
+    @NonNull String getComponentSn();
+
+    int getSequence();
+
+    @NonNull FundsBenefitType getBenefitType();
+
+    @NonNull FundsBenefitComponentType getComponentType();
+
+    @NonNull FundsBenefitAmountClosureRole getClosureRole();
+
+    @NonNull Money getAmount();
+
+    @NonNull FundsBenefitLedgerEffect getLedgerEffect();
+
+    @NonNull FundsBenefitFundingNature getFundingNature();
+
+    @Nullable SubjectRef getBearerSubjectRef();
+
+    @Nullable SubjectRef getBeneficiarySubjectRef();
+
+    @Nullable SubjectRef getFundingSubjectRef();
+
+    @Nullable String getFundingAccountRole();
+
+    @NonNull FundsBenefitReferenceSpec getBenefitReference();
+
+    @Nullable FundsBenefitRefundPolicySpec getRefundPolicy();
+
+    @Nullable String getDescription();
+
+    @NonNull Map<String, Object> getContextVariables();
+}
+
+public interface FundsBenefitReferenceSpec {
+
+    @Nullable String getCampaignId();
+
+    @Nullable String getCouponId();
+
+    @Nullable String getVoucherId();
+
+    @Nullable String getBenefitInstanceId();
+
+    @Nullable String getHoldId();
+
+    @Nullable String getWriteOffId();
+
+    @Nullable String getReleaseId();
+
+    @Nullable String getRuleVersion();
+
+    @Nullable String getExternalDecisionId();
+
+    @NonNull Map<String, Object> getContextVariables();
+}
+
+public interface FundsBenefitRefundPolicySpec {
+
+    @NonNull FundsBenefitPartialRefundStrategy getPartialRefundStrategy();
+
+    @NonNull List<FundsBenefitRefundDisposition> getDispositions();
+
+    @Nullable Money getRefundableAmount();
+
+    @Nullable Money getNonRefundableAmount();
+
+    @Nullable String getRefundRuleVersion();
+
+    @Nullable String getRefundPolicyCode();
+
+    @Nullable String getRefundDecisionId();
+
+    @Nullable String getDecisionSource();
+
+    @Nullable Instant getDecisionTime();
+
+    @NonNull Map<String, Object> getContextVariables();
+}
+```
+
 核心字段：
 
 | 字段 | 必填 | 说明 |
@@ -344,6 +600,7 @@ DSL 契约统一使用 `instrumentSn` 和 `instrumentDisplayNo`：前者作为�
 | `sequence` | 否 | 组件稳定排序号，便于审计展示、序列化摘要和差错定位；缺省为 0。 |
 | `benefitType` | 是 | 权益类型，例如商户券、平台券、代金券、储值券、合作方补贴。 |
 | `componentType` | 是 | 金额组件类型，例如商户让利、平台补贴、代金券核销、补贴冲回。 |
+| `closureRole` | 是 | 金额闭合角色，用于区分正向订单抵扣、商户应收影响、逆向退款处置和只读展示对账。 |
 | `amount` | 是 | 组件金额，币种必须与快照金额一致，跨币种必须由业务侧给出已决策 FX 快照。 |
 | `ledgerEffect` | 是 | 账务效果，例如 `NO_LEDGER`、`POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED`。 |
 | `fundingNature` | 是 | 资金性质，例如商户承担、平台自有资金、预付负债、合作方出资。 |
@@ -380,6 +637,9 @@ DSL 契约统一使用 `instrumentSn` 和 `instrumentDisplayNo`：前者作为�
 | `nonRefundableAmount` | 否 | 当前组件不可退、不可返还或不可冲回金额。 |
 | `refundRuleVersion` | 条件必填 | 退款规则版本；不退券、保留补贴或释放收入等场景必须保留。 |
 | `refundPolicyCode` | 否 | 外部退款策略码，用于客服、运营和财务审计。 |
+| `refundDecisionId` | 否 | 本次退款、撤销、过期或争议处理的外部决策流水；用于证明退券决策来自业务层、营销权益系统或运营审批。 |
+| `decisionSource` | 否 | 本次退款决策来源，例如订单退款引擎、营销权益系统、客服工单或人工审批。 |
+| `decisionTime` | 否 | 本次退款决策时间；用于审计、对账和并发处理。 |
 | `contextVariables` | 是 | 非关键扩展上下文，缺省为空 Map。 |
 
 枚举取值：
@@ -393,14 +653,24 @@ DSL 契约统一使用 `instrumentSn` 和 `instrumentDisplayNo`：前者作为�
 | `FundsBenefitRefundDisposition` | `REISSUE`、`RELEASE_HOLD`、`VOID`、`NO_REFUND`、`REVERSE_SUBSIDY`、`RETAIN_SUBSIDY`、`REDUCE_MERCHANT_RECEIVABLE`、`RESTORE_PREPAID_LIABILITY`、`RELEASE_TO_INCOME_OR_BREAKAGE` |
 | `FundsBenefitPartialRefundStrategy` | `ORIGINAL_SNAPSHOT`、`ITEM_LINE_BASED`、`PROPORTIONAL`、`CASH_FIRST`、`BENEFIT_FIRST`、`NON_REFUNDABLE_BENEFIT_FIRST`、`MANUAL_REVIEW` |
 | `FundsBenefitLifecycleAction` | `DECIDED`、`HOLD`、`WRITE_OFF`、`RELEASE`、`REISSUE`、`VOID`、`REVERSAL` |
+| `FundsBenefitAmountClosureRole` | `ORDER_DISCOUNT_CLOSURE`、`MERCHANT_RECEIVABLE_EFFECT`、`REFUND_DISPOSITION_EFFECT`、`VIEW_RECONCILIATION_ONLY` |
 
 `FundsBenefitLifecycleAction` 第一阶段不作为组件必填字段，避免资金底座接管权益生命周期；可作为 `benefitReference.contextVariables` 或后续扩展字段使用。
 
 金额闭合规则：
 
 ```text
-orderAmount = userPayAmount + sum(benefit components participating in discount or subsidy)
+orderAmount = userPayAmount + sum(ORDER_DISCOUNT_CLOSURE components)
 ```
+
+组件金额不再默认全部进入正向订单闭合。平台补足商户、储值权益结算、补贴冲回、代金券恢复、不可退权益和展示项必须通过 `closureRole` 或等价字段进入各自闭合公式，不能参与 `orderAmount` 的正向抵扣闭合。
+
+| 闭合角色 | 说明 | 校验重点 |
+| --- | --- | --- |
+| `ORDER_DISCOUNT_CLOSURE` | 解释订单原价、用户实付和权益抵扣之间的关系。 | `userPayAmount + sum(role=ORDER_DISCOUNT_CLOSURE) = orderAmount`。 |
+| `MERCHANT_RECEIVABLE_EFFECT` | 解释商户应收、补足商户、清结算金额项。 | 必须说明是否补足商户、资金来源、承担方和受益方。 |
+| `REFUND_DISPOSITION_EFFECT` | 解释退款、撤销、授权过期、拒付或差错中的冲回、恢复和不可退。 | 必须引用原权益组件、本次退款决策和剩余可处理金额。 |
+| `VIEW_RECONCILIATION_ONLY` | 只影响用户、商户、运营、财务展示和对账解释。 | 不得生成 route leg、posting plan 或 ledger entry。 |
 
 第一阶段组件只放抵扣、让利、补贴、代金券核销和补贴冲回等权益金额；手续费、税费、通道成本仍走现有 `FeeSpec` 或清结算金额项，不放入权益组件。
 
@@ -411,7 +681,7 @@ orderAmount = userPayAmount + sum(benefit components participating in discount o
 3. `components` 非空时，每个 `componentSn` 在同一快照内唯一。
 4. 所有组件币种必须与 `orderAmount` 币种一致；跨币种场景必须由业务侧给出已决策 FX 快照，本模型不计算换汇。
 5. 权益金额合计不得超过 `orderAmount`，除非业务侧已裁剪为本次交易可用金额。
-6. `userPayAmount + components.amount` 应能解释 `orderAmount`；不参与抵扣或补贴闭合的费用、税费、通道成本不得放入 `components`。
+6. `userPayAmount + role=ORDER_DISCOUNT_CLOSURE 的 components.amount` 应能解释 `orderAmount`；不参与正向抵扣闭合的费用、税费、通道成本、逆向处置和展示项不得进入该公式。
 
 组件级校验：
 
@@ -424,6 +694,7 @@ orderAmount = userPayAmount + sum(benefit components participating in discount o
 | `PREPAID_LIABILITY` | 必须有 `voucherId`、`benefitInstanceId` 或 `fundingSubjectRef`，并需财务确认负债口径。 |
 | `REVERSE_SUBSIDY` | 必须能引用原补贴组件、原交易或原 route snapshot。 |
 | `NO_REFUND` | 必须有 `refundRuleVersion` 或原权益规则版本。 |
+| 本次退款决策 | 若本次处置不同于原快照默认退款策略，必须有 `refundDecisionId`、`decisionSource` 或等价审计引用；资金底座只校验引用和金额，不判断券是否可退。 |
 
 账务规则：
 
@@ -442,6 +713,46 @@ orderAmount = userPayAmount + sum(benefit components participating in discount o
 2. Phase 1 不强制 `RouteSnapshot`、`RouteResolver`、`PostingAssembler` 和表结构立即消费完整权益对象；若进入编码，Execution Grant 必须明确公共契约和枚举授权。
 3. 目标态 `RouteSnapshot` 应固化权益快照或等价摘要，否则权益退款、撤销、授权过期、清结算和对账需要回查原指令，不利于长期回放。
 4. 历史无权益快照但被判断为含权益的交易，逆向处理必须失败或进入人工处理，不按当前营销规则重算。
+5. 本次退款决策可以覆盖原快照默认退款策略，但必须来自业务层或审批链路，并保留决策来源、决策流水、规则版本和审计引用；资金底座不得自行推导“券能不能退”。
+
+生产承接门禁：
+
+| 阶段 | 可声明完成 | 不可声明完成 |
+| --- | --- | --- |
+| Phase 1 契约承载 | `FundsInstructionSpec` 可选携带 `benefitSnapshot`；无权益交易兼容；JSON、金额闭合、枚举和反序列化契约可测。 | route、posting、replay、清结算或对账已经完整消费权益快照。 |
+| Phase 2 route/posting 消费 | `POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 可生成独立资金路径或明确独立伴随指令；`NO_LEDGER` 不入账。 | 补贴、本金、手续费或代金券净额混记；缺资金来源仍放行。 |
+| Phase 3 replay/清结算/对账消费 | 原 route snapshot 或等价不可变事实能取回 `benefitSnapshotId`、`componentSn`、规则版本、退款策略和决策流水。 | 退款、撤销、授权过期、清结算重跑或对账差错按当前营销规则重算。 |
+| 生产链路 Done | 交易事实、route snapshot、posting context、清分金额项、对账差错和交易投影都能追溯权益组件摘要。 | 只有请求态对象或文档样例，没有不可变事实存储、幂等校验和逆向回放证据。 |
+
+Route、Posting 和 Replay 消费顺序：
+
+1. `RouteResolver` 先消费 `benefitSnapshot.components`，按 `ledgerEffect` 和 `fundingNature` 判断是否生成额外 leg、独立伴随指令或仅保存摘要。
+2. `RouteSnapshot` 必须固化权益快照或等价摘要；第一阶段可通过 `contextVariables` 过渡，但生产链路不得只依赖原请求回查。
+3. `LedgerPostingAssembler` 只消费 route leg 和组件账务效果，不理解营销规则；`NO_LEDGER` 不生成 posting，`POSTING_REQUIRED` 必须独立平衡。
+4. 后续退款、撤销、授权过期、拒付、清结算重跑和对账差错先读取原资金事实或原 route snapshot，再取得原权益快照和本次决策，不调用当前营销规则。
+5. `componentSn`、`benefitSnapshotId`、`ruleVersion`、`refundDecisionId` 和 `externalDecisionId` 应进入 route snapshot、posting context、清分金额项、对账差错和交易投影摘要中的至少一个可追溯位置。
+
+阶段落点建议：
+
+| 模块 | Phase 1 | Phase 2 | Phase 3 |
+| --- | --- | --- | --- |
+| `FundsInstructionSpec` | 新增可选 `benefitSnapshot`。 | 保持契约稳定。 | 保持契约稳定，必要时扩展 schema version。 |
+| `RouteSnapshotSpec` | 可先通过摘要或 context 过渡。 | 增加可选 `benefitSnapshot` 或等价不可变摘要。 | 作为退款、撤销、过期、拒付和差错回放来源。 |
+| `RouteResolver` | 不强制消费完整权益对象。 | 识别 `POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED`。 | 支持原权益组件反向回放和累计上限。 |
+| `PostingAssembler` | 只验证不误入账。 | 组件资金影响独立 posting，`componentSn` 进入 context。 | 支持清结算、对账和投影按组件追溯。 |
+| 清结算与对账 | 文档和 DSL caseId 定义金额项。 | 可读取权益摘要拆分金额项。 | 差异、重跑、核销和审计闭环。 |
+
+待确认问题：
+
+| 编号 | 问题 | 影响 |
+| --- | --- | --- |
+| C01 | `Money` 是否允许 `userPayAmount=0`。 | 决定零实付订单是单指令表达，还是拆成补贴或代金券资金事实。 |
+| C02 | 平台补贴作为同一资金指令额外 leg，还是独立伴随指令。 | 决定 route resolver、幂等键和交易投影粒度。 |
+| C03 | `RouteSnapshotSpec` 是否新增 `getBenefitSnapshot()`。 | 决定 replay 是否需要回查原指令，以及归档后如何回放。 |
+| C04 | 平台补贴账户是否进入 `PlatformAccountsSnapshotSpec`。 | 当前可先用 `fundingSubjectRef` 或 `fundingAccountRole`，目标态需明确平台成本账户角色。 |
+| C05 | 储值、礼品卡、预付代金券是否纳入当前一期。 | 决定是否需要负债账户、预收待付口径和财务确认。 |
+| C06 | 退款分摊是否必须支持商品行。 | 决定是否需要 `pricingSnapshotSn` 和商品行权益明细。 |
+| C07 | 历史无权益快照交易如何逆向处理。 | 决定迁移、人工处理和对账差错策略。 |
 
 ### 7.3 Route DSL
 
@@ -820,7 +1131,7 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 
 ## 十一、JSON 契约用例
 
-JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、数据库结构或运营页面。本文默认保留最小骨架和场景矩阵；对资金语义复杂、容易误实现的权益快照场景，补充完整 JSON 示例作为后续可执行夹具的来源。
+JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、数据库结构或运营页面。本文默认保留最小骨架和场景矩阵；对资金语义复杂、容易误实现的权益快照场景，补充契约夹具和资金流夹具示例作为后续可执行资产的来源。
 
 ### 11.1 最小契约骨架
 
@@ -905,9 +1216,9 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-GOVERNANCE-BALANCE-SNAPSHOT-001` | 账本余额快照确认。 | `BalanceSnapshotVerifyRef`、coverage mode、Manifest 引用。 | 余额快照只证明余额水位和归档门禁；冷区和混合覆盖必须校验 Manifest。 | 普通指标快照替代余额快照、缺 Manifest 进入 `VERIFIED`。 |
 | `DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001` | 普通指标快照边界。 | `metricSnapshot` 和指标水位。 | 只属于报表指标发布上下文，不推进余额水位、Manifest 或重放 checkpoint。 | 指标水位替代资金水位、指标质量报告替代资金差异报告。 |
 
-### 11.3 权益快照完整场景示例
+### 11.3 权益快照夹具场景示例
 
-本节将 `FundsBenefitSnapshotSpec完整设计.md` 中可作为权威契约的示例收敛到主 DSL 文档。以下示例采用完整夹具形态，可以按 `{caseId}.json` 迁移到 `tests/src/test/resources/dsl-contract-cases/`；正文示例只表达 DSL 契约、资金预期和验收预期，不表达 Controller 报文、数据库结构或运营页面字段。
+本节是权益快照 DSL 场景示例的权威入口。以下示例可以按 `{caseId}.json` 迁移到 `tests/src/test/resources/dsl-contract-cases/`；B1/B1-10 可先落契约夹具，B3/B4/B6/B7/B8 涉及资金路径、账务、投影、清结算、对账或归档事实时必须升级为资金流夹具。正文示例只表达 DSL 契约、资金预期和验收预期，不表达 Controller 报文、数据库结构或运营页面字段。
 
 #### 11.3.1 商户优惠券：不生成权益账务
 
@@ -1877,22 +2188,30 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 }
 ```
 
-### 11.4 完整夹具落地规则
+### 11.4 夹具落地规则
 
-完整 JSON 夹具应放入 `tests/src/test/resources/dsl-contract-cases/`。若某个批次尚未触碰测试资源，可以先在 Execution Grant 中声明“本批次不新增夹具”，但不得另起临时目录或只把完整夹具留在正文里。落地时必须满足：
+JSON 夹具分为契约夹具和资金流夹具，二者都应放入 `tests/src/test/resources/dsl-contract-cases/`。若某个批次尚未触碰测试资源，可以先在 Execution Grant 中声明“本批次不新增夹具”，但不得另起临时目录或只把夹具内容留在正文里。
+
+契约夹具用于 B1/B1-10 这类 DSL 承载批次，只证明 JSON 可解析、字段语义、枚举、金额闭合和 mustFail 条件，不声明 route、posting、replay、清结算或对账已经生产可用。契约夹具至少包含 `caseId`、`scenarioCode`、`acceptanceIds`、`tddIds`、`systemDesignRefs`、`instruction` 或治理对象，以及 `validation`。
+
+资金流夹具用于 B3/B4/B6/B7/B8 等会产生或消费资金路径、账务、投影、清结算、对账或归档事实的批次。资金流夹具必须在契约字段之外补齐 `expectedRoute`、`expectedPosting`、`balanceAssertions`、`projectionAssertions` 或对应的治理断言。
+
+落地时必须满足：
 
 1. `caseId` 与 TDD 用例、产品验收和系分服务入口可互相反查。
-2. 每个有资金变化的场景必须声明 `expectedRoute`、`expectedPosting` 和余额断言。
+2. 每个有资金变化或消费既有资金事实的资金流夹具必须声明 `expectedRoute`、`expectedPosting` 和余额断言；B1 契约夹具可显式声明 `fixtureLevel=CONTRACT_ONLY`，并在 `validation` 中说明不覆盖资金路径。
 3. 失败场景必须显式声明 `expectedRouteCreated=false` 或 `shouldCreateRoute=false`，并证明无 route、posting、entry 副作用。
 4. 治理类、归档类、指标类对象必须声明不生成资金路径和账务分录。
-5. 每个夹具文件名使用 `{caseId}.json`，文件内必须包含 `caseId`、`scenarioCode`、`acceptanceIds`、`tddIds`、`systemDesignRefs`、`instruction` 或治理对象、`expectedRoute`、`expectedPosting`、`balanceAssertions` 和 `validation`。
+5. 每个夹具文件名使用 `{caseId}.json`。契约夹具必须包含契约最小字段；资金流夹具必须额外包含 `expectedRoute`、`expectedPosting`、`balanceAssertions` 和必要的投影、对账或治理断言。
 6. JSON 只承载契约事实，不夹带 Controller 报文、数据库结构或运营页面字段。
 
-完整夹具的准入状态必须单独说明：
+夹具的准入状态必须单独说明：
 
 | 场景 | 准入口径 |
 | --- | --- |
 | 新增 DSL caseId | 必须新增 `{caseId}.json`，或在 Execution Grant 中声明本批次只做设计、不进入可执行 DSL 夹具验收。 |
+| B1 契约夹具 | 可以只覆盖契约解析、字段语义、枚举和 validation，不得用于声明资金流、route/posting/replay、清结算或对账通过。 |
+| 资金流夹具 | 一旦声明覆盖资金变化，必须补 expectedRoute、expectedPosting、balanceAssertions 和失败无副作用断言。 |
 | 修改已有 DSL caseId | 必须同步更新对应夹具、TDD 映射和产品验收族；不能只改正文描述。 |
 | 复用已有 DSL 样例 | 必须说明复用哪个样例、覆盖哪些 `AC-*` 和 `TDD-*`，以及未覆盖的差异。 |
 | 暂不新增夹具 | 只适用于文档评审或非 DSL 执行批次；不得用于声明该 caseId 已通过机器契约验收。 |
@@ -1920,8 +2239,12 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | 主体合法 | 所有入账主体只能是资金账户、信用账户或预算组。 |
 | route 合法 | 工具、外部账户、平台角色不能直接入账。 |
 | 支付工具契约 | `PaymentInstrumentRef` 只保存脱敏展示和绑定快照；`RoutingDecision` 保存命中规则、资金来源和原因。 |
+| 权益快照契约 | 无权益交易保持空值兼容；有权益交易必须保存快照 ID、关联组号、金额闭合、组件唯一性、规则版本和退款处置。 |
+| 权益金额闭合 | `ORDER_DISCOUNT_CLOSURE` 才参与正向订单抵扣闭合；商户应收、逆向处置和只读展示组件不得混入同一公式。 |
+| 权益生产门禁 | 请求态 `benefitSnapshot` 只能证明契约承载；生产链路必须证明 route snapshot、posting context、清分金额项、对账差错或交易投影中有可追溯摘要。 |
 | posting 平衡 | 每个 `PostingPlan` 独立平衡，整笔交易平衡。 |
 | replay 边界 | 缺原快照失败，不读取当前绑定关系重新选路。 |
+| 权益 replay 边界 | 缺原权益快照或等价摘要的退款、撤销、授权过期、拒付、清结算重跑和对账差错必须失败或人工处理，不按当前营销规则重算。 |
 | 工具换绑边界 | 退款、撤销、退费或拒付必须按原 route snapshot 和原工具快照回放。 |
 | 结算策略 | `SettlementPolicy` 解析失败、空表达式或未知策略必须显式失败，不能降级为实时结算。 |
 | 治理任务边界 | 统一治理任务、资金归档 Manifest、余额水位、账本余额快照、普通指标快照和交易投影重放 checkpoint 状态独立，治理任务不生成资金路径或账务分录。 |
@@ -1948,6 +2271,11 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | 用交易视图或报表修正余额 | 余额事实源只能是账本分录及其检查点和归档清单。 |
 | 缺 route snapshot 时重新选路 replay | 会导致绑定关系和平台账户变化后资金路径漂移。 |
 | 交易层或余额控制层隐式调用 `FxService` | 是否换汇是业务层或外汇域决策。 |
+| 把核心权益语义放进 `contextVariables` | 金额闭合、规则版本、资金性质、退款处置和决策流水必须是一等契约或可追溯摘要。 |
+| 只有请求态 `benefitSnapshot` 就声明生产完成 | 请求态对象不能证明逆向回放、清结算重跑、对账差错和归档后重放可用。 |
+| 按当前营销规则重算历史权益 | 会导致退款、撤销、授权过期、清结算和对账结果与原交易事实不一致。 |
+| 把所有权益组件默认纳入订单抵扣闭合 | 平台补足商户、储值负债、补贴冲回、不可退权益和展示项有不同闭合公式。 |
+| 平台补贴、本金、手续费或代金券净额混记 | 会破坏 posting 独立平衡、清结算拆分、对账核销和成本归集。 |
 
 ## 十四、评审清单
 
@@ -1955,6 +2283,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | --- | --- |
 | 产品评审 | 场景是否覆盖充值、付款、转账、退款、费用、授权、冻结、调额、清结算和对账差错。 |
 | 资金语义评审 | 主体、账目、金额、FX、route、posting 和投影边界是否清晰。 |
+| 权益语义评审 | `benefitSnapshot` 是否只承接已决策结果；`closureRole`、`ledgerEffect`、`fundingNature`、承担方、受益方、资金来源和退款处置是否能解释每个组件。 |
+| 权益生产评审 | 是否区分契约承载、route/posting 消费和生产链路 Done；是否证明原权益快照能被退款、撤销、过期、拒付、清结算、对账和交易投影重放取回。 |
 | 系分评审 | `instruction`、`route`、`snapshot`、`posting`、`entry`、`projection` 的职责是否单一。 |
-| 测试评审 | 是否有可解析 JSON 契约样例；是否覆盖成功、失败、幂等、余额变化、replay 和 digest。 |
+| 测试评审 | 是否有可解析 JSON 契约样例；是否覆盖成功、失败、幂等、余额变化、replay、digest、权益金额闭合、无权益兼容和缺原权益快照失败。 |
 | 运营与审计评审 | 差错、调账、退费、拒付、清结算结果是否具备来源、操作者、凭证和核销路径。 |

@@ -1,0 +1,60 @@
+{
+  "caseId": "DSL-BENEFIT-SNAPSHOT-001",
+  "scenarioCode": "DIRECT_PAY_WITH_MERCHANT_COUPON_NO_LEDGER",
+  "instruction": {
+    "tenantId": 1,
+    "instructionType": "DIRECT_TRANSACTION",
+    "eventType": "PAY",
+    "transactionType": "PAY",
+    "businessScene": "MERCHANT_ORDER_PAY",
+    "businessSn": "PAY_BEN_MERCHANT_202605210001",
+    "amount": { "currency": "USD", "minorValue": 8000 },
+    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+    "exchangeRate": "1",
+    "benefitSnapshot": {
+      "benefitSnapshotId": "bs_merchant_202605210001",
+      "benefitSchemaVersion": "1.0",
+      "benefitGroupSn": "bg_order_202605210001",
+      "orderSn": "order_10001",
+      "pricingSnapshotSn": "price_10001_v3",
+      "orderAmount": { "currency": "USD", "minorValue": 10000 },
+      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+      "merchantReceivableAmount": { "currency": "USD", "minorValue": 8000 },
+      "components": [
+        {
+          "componentSn": "bc_merchant_discount_001",
+          "sequence": 1,
+          "benefitType": "MERCHANT_COUPON",
+          "componentType": "MERCHANT_DISCOUNT",
+          "closureRole": "ORDER_DISCOUNT_CLOSURE",
+          "amount": { "currency": "USD", "minorValue": 2000 },
+          "ledgerEffect": "NO_LEDGER",
+          "fundingNature": "MERCHANT_BORNE",
+          "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_20001" },
+          "beneficiarySubjectRef": { "subjectType": "USER", "subjectId": "user_10001" },
+          "benefitReference": {
+            "campaignId": "merchant_campaign_01",
+            "couponId": "merchant_coupon_10001",
+            "writeOffId": "writeoff_90001",
+            "ruleVersion": "merchant_rule_v3",
+            "externalDecisionId": "pricing_decision_10001"
+          },
+          "refundPolicy": {
+            "partialRefundStrategy": "ITEM_LINE_BASED",
+            "dispositions": ["NO_REFUND", "REDUCE_MERCHANT_RECEIVABLE"],
+            "refundRuleVersion": "merchant_refund_v3",
+            "refundPolicyCode": "MERCHANT_COUPON_NO_RETURN"
+          },
+          "contextVariables": {}
+        }
+      ],
+      "decisionSource": "ORDER_PRICING",
+      "decisionTraceId": "trace_price_10001",
+      "contextVariables": {}
+    },
+    "contextVariables": {
+      "payerAccountId": "fa_user_10001_usd",
+      "payeeAccountId": "fa_merchant_20001_usd"
+    }
+  }
+}

@@ -9,8 +9,8 @@
 - [x] 重建 OpenSpec 项目上下文。
 - [x] 重建支付资金底座开发基线规格。
 - [x] 校准 TDD 文档中“旧测试资产复用”表述。
-- [x] 冻结当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果，作为进入编码前的独立检查点；最新设计交付提交点以包含本 Harness Plan 的最新 docs 提交为准，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。
-- [x] 完成设计、代码、任务三方基线对齐：设计以 `docs/` 和最新提交点为准，代码能力以当前 HEAD 复核结果为准，任务以本 Harness Plan 和 OpenSpec spec 为准。
+- [x] 冻结当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果，作为进入编码前的独立检查点；上一已冻结设计交付提交点为 30b1a00 docs: 冻结权益快照设计基线，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。
+- [x] 完成设计、代码、任务三方基线对齐：本轮提交纳入权益快照 DSL 契约、JSON 契约验证、TDD 覆盖矩阵和后续批次任务口径，作为新的编码准备基线；任务以本 Harness Plan 和 OpenSpec spec 为准。
 
 ## 1. 全局写入范围
 
@@ -68,8 +68,8 @@ just compile
 - [x] Harness 已重新对齐：以本文件作为批次计划、写入范围、只读范围、禁止事项、人工确认点和交付记录入口。
 - [x] 旧测试源码已移除，测试 resources 保留。
 - [x] 当前阶段为“任务拆解与准入规划”，尚未进入 CAD 自动提交模式；进入编码前仍需用户按批次授予 Execution Grant。
-- [x] 当前工作树的设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；最新设计交付提交点以包含本 Harness Plan 的最新 docs 提交为准，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。后续编码仍需用户按批次单独授予 Execution Grant。
-- [x] 代码基线已复核至 7b4fe22 fix: 拦截直接付款外部收款主体：批次 1 DSL 契约测试已存在；批次 2 支付工具、绑定历史、资金来源关系、显式建账和余额投影已有局部服务层基线；批次 3 至 6 已有部分直接交易、授权、余额控制、Route Replay 和交易投影测试；批次 7 仅保留 reconciliation-* 空模块骨架；批次 8 已有 governance-* 交易投影重放骨架。上述都只作为局部代码基线，不表示对应批次全量完成或可跳过 Execution Grant。
+- [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一冻结点为 30b1a00 docs: 冻结权益快照设计基线。本轮提交后，权益快照 DSL 契约和任务口径作为新的编码准备基线；后续编码仍需用户按批次单独授予 Execution Grant。
+- [x] 代码基线已复核至上一冻结点 30b1a00，并纳入本轮 B1-10 权益快照 DSL 契约承载实现和测试：批次 1 DSL 契约测试已存在；批次 2 支付工具、绑定历史、资金来源关系、显式建账和余额投影已有局部服务层基线；批次 3 至 6 已有部分直接交易、授权、余额控制、Route Replay 和交易投影测试；批次 7 仅保留 reconciliation-* 空模块骨架；批次 8 已有 governance-* 交易投影重放骨架。上述都只作为局部代码基线，不表示对应批次全量完成或可跳过 Execution Grant。
 
 ### 5.1 设计、代码、任务对齐矩阵
 
@@ -87,8 +87,8 @@ just compile
 | 批次域 | 当前判定 | Done 证据要求 |
 | --- | --- | --- |
 | 批次 1 至批次 6 | 02 主链路可按 Execution Grant 进入编码。 | 对应 AC/DSL/TDD/RED 映射闭合，相关测试通过，资金变化断言覆盖状态、route、posting、entry、projection、幂等和审计。 |
-| 批次 7 | 03 清结算与对账只保留边界、计划和准入门禁。 | 独立 OpenSpec change、模块/表/接口确认、DDL/H2、服务级 H2 测试、对账阻断和清结算幂等测试通过。 |
-| 批次 8 | 04 归档重放与指标边界只保留边界、计划和准入门禁；交易投影重放只是局部基线。 | Manifest、checkpoint、watermark、余额快照、指标水位隔离、范围锁、差异报告和回滚/续跑测试通过。 |
+| 批次 7 | 03 清结算与对账只保留边界、计划和设计评审输入；编码准入未打开。 | 独立 OpenSpec change、模块/表/接口确认、DDL/H2、服务级 H2 测试、对账阻断和清结算幂等测试通过。 |
+| 批次 8 | 04 归档重放与指标边界只保留边界、计划和设计评审输入；交易投影重放只是局部基线，编码准入未打开。 | Manifest、checkpoint、watermark、余额快照、指标水位隔离、范围锁、差异报告和回滚/续跑测试通过。 |
 
 ### 5.3 批次交付证据包
 
@@ -124,6 +124,12 @@ just compile
 验证命令：
 人工确认点：
 停止条件：
+工作树状态：
+允许纳入本批的未提交变更：
+必须排除的未提交变更：
+NFR 假设：
+观测告警：
+回滚或补偿：
 ```
 
 批次完成时再填写验收记录：
@@ -178,7 +184,7 @@ DDL/H2 schema 变化：
 | B1-07 | 固化 Posting/Ledger DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | DSL Posting、LedgerEntry、账务不变量。 | posting plan 不平衡仍可构造、entry 缺主体/账目/币种/周期仍通过。 | 补 posting、entry、digest 和账本周期契约测试。 | `just test-core` |
 | B1-08 | 固化 SettlementPolicy DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | DSL SettlementPolicy、结算策略边界。 | 策略解析失败被静默按实时处理。 | 补 `SettlementPolicySpecTests` 或等价策略解析红线。 | `just test-core` |
 | B1-09 | 固化金额临界值契约。 | `core/src/test/java`、必要的 `core/src/main/java` | TDD 5.1 金额临界值通用矩阵。 | 0 金额、负金额、超币种精度、超系统上限或多 leg 合计不闭合仍可入账。 | 补 `FundsAmountBoundaryContractTests` 或等价契约测试，统一最小单位、精度、上限和累计闭合校验。 | `just test-core` |
-| B1-10 | 固化权益快照 DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | `FundsBenefitSnapshotSpec`、`DSL-BENEFIT-SNAPSHOT-001`、产品 `AC-BEN-*`、红线 `RED-050` 至 `RED-057`。 | 权益核心字段藏入 `contextVariables`、无权益交易不兼容、金额不闭合、组件重复、用户侧不返券和资金侧不冲补贴无法分开表达。 | 补 `FundsBenefitSnapshotSpec`、组件、引用、退款策略和权益枚举的契约测试；Phase 1 只证明 DSL 承载，不宣称 route/posting/replay 已闭合。 | `just test-core` |
+| B1-10 | 固化权益快照 DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | `FundsBenefitSnapshotSpec`、`DSL-BENEFIT-SNAPSHOT-001`、产品 `AC-BEN-001`、`AC-BEN-012`、`AC-BEN-013`、红线 `RED-050` 至 `RED-059`、`TDD-BEN-001` 至 `TDD-BEN-007`、`TDD-BEN-ENTRY-005`。 | 权益核心字段藏入 `contextVariables`、无权益交易不兼容、金额不闭合、闭合角色缺失或混用、组件重复、稳定摘要未覆盖权益快照差异、用户侧不返券和资金侧不冲补贴无法分开表达、请求态快照被误判为生产 Done；B1-10 越权修改交易服务入口、Request/DTO、route/posting/replay 或主链路实现。 | 补 `FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、退款决策来源字段、稳定摘要边界和权益枚举的契约测试；Phase 1 只证明 DSL 承载和请求摘要可区分，不宣称 route/posting/replay 已闭合，不改直接交易或授权交易服务入口；`RED-058` 只作为生产 Done 门禁登记；交付结论只能写“契约承载 Done”。 | `just test-core` |
 
 ### 批次 2：钱包账户、账本和余额投影基础
 
@@ -199,7 +205,7 @@ DDL/H2 schema 变化：
 | B3-02 | 固化主路径资金流。 | `transaction-*`、`tests/src/test/java` | 产品流程、账务规则矩阵。 | 资金流方向、账本余额桶、平台账户处理错误。 | 逐步骤断言交易、route、entry、余额。 | `just test-business-flow` |
 | B3-03 | 固化退款、手续费、退费和原路径 replay。 | `transaction-*`、`tests/src/test/java` | DSL 场景账务规则矩阵。 | 退款超额、退费方向错误、replay 丢快照。 | 保持原路径、原费项和幂等 replay。 | `just test-transaction` |
 | B3-04 | 固化异常与红线。 | `transaction-*`、`tests/src/test/java` | TDD 异常路径。 | 错币种、受控负余额、重复请求、缺主体。 | 补失败原因、幂等键和余额不变断言。 | `just test-business-flow` |
-| B3-05 | 固化含权益直接交易资金流。 | `transaction-*`、`tests/src/test/java` | `DSL-BENEFIT-MERCHANT-DISCOUNT-001`、`DSL-BENEFIT-PLATFORM-SUBSIDY-001`、`DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`DSL-BENEFIT-PREPAID-VOUCHER-001`、`DSL-BENEFIT-PARTIAL-REFUND-001`。 | 商户让利生成 ledger entry、平台补贴与本金净额混记、储值券按普通优惠券入账、退款按当前营销规则重算、权益累计超额。 | route/posting 只消费原权益快照；`NO_LEDGER` 只入展示和对账解释；平台补贴或储值券必须形成可追溯资金影响或被专业口径阻断。 | `just test-business-flow` |
+| B3-05 | 固化含权益直接交易资金流。 | `transaction-*`、`tests/src/test/java` | `DSL-BENEFIT-MERCHANT-DISCOUNT-001`、`DSL-BENEFIT-PLATFORM-SUBSIDY-001`、`DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`DSL-BENEFIT-PREPAID-VOUCHER-001`、`DSL-BENEFIT-PARTIAL-REFUND-001`、`TDD-BEN-ENTRY-001`、`TDD-BEN-ENTRY-002`。 | 商户让利生成 ledger entry、平台补贴与本金净额混记、储值券按普通优惠券入账、退款按当前营销规则重算、权益累计超额、零实付选型未确认仍入主链路、同一业务流水不同权益快照复用幂等结果；为优惠券、代金券或补贴新增直接交易权益专用服务入口。 | 不新增直接交易权益专用服务入口；`pay` 承接含权益支付，可在对应 Execution Grant 确认后扩展可选 `benefitSnapshot`；含权益生产链路必须固化 route snapshot、交易事实快照、独立权益快照表或等价不可变存储之一；幂等摘要纳入权益快照稳定摘要；`refund` 承接含权益退款，优先引用原交易、原 route snapshot 和原权益快照；route/posting 只消费原权益快照；`NO_LEDGER` 只入展示和对账解释；平台补贴或储值券必须形成可追溯资金影响或被专业口径阻断。 | `just test-business-flow` |
 
 ### 批次 4：授权交易
 
@@ -213,7 +219,7 @@ DDL/H2 schema 变化：
 | B4-06 | 固化 VCC / Spend Controls 扩展边界。 | `transaction-*`、`tests/src/test/java` | Spend Controls 为扩展能力。 | 将 spend controls 当成资金主链路 P0。 | 默认只保留边界测试；未明确启用发卡产品时不做实现。 | `just test-boundary` |
 | B4-07 | 明确 chargeback 不落 `FundsAuthorizationTransactionService#chargeback`。 | `docs`、`openspec`、后续授权测试 | 用户补充口径、拒付业务事实。 | 测试或任务强制要求调用 `chargeback` 服务入口，或把拒付结果只保存成无法区分的普通退款。 | 拒付作为争议/扣回语义，通过 `settleRefund` 的原因、上下文、凭证和审计承接；如代码已有 `chargeback`，本轮不扩展为目标态主入口；查询、投影和审计必须能区分普通退款与拒付承接。 | `just test-transaction` |
 | B4-08 | 固化授权并发竞争红线。 | `transaction-*`、`core`、`tests/src/test/java` | TDD 13.5、授权生命周期。 | 同一授权的完成、撤销、过期、退款并发导致重复入账、重复释放或剩余为负。 | 通过幂等键、状态版本、唯一约束或锁定策略确保同一授权同一时刻只有合法迁移生效，失败方无副作用。 | `just test-business-flow` |
-| B4-09 | 固化授权占券和权益生命周期边界。 | `transaction-*`、`core`、`tests/src/test/java` | `DSL-BENEFIT-AUTH-HOLD-001`、`TDD-BEN-AUTH-*`、`RED-053`。 | 授权拒绝、工具准入失败或余额不足后仍核销权益；授权完成和过期并发导致同一权益重复核销或释放；完成时按当前券规则重算。 | 授权阶段只固化占用引用，完成按原快照核销，撤销或过期释放剩余占用；失败事件无 route/posting/entry 副作用。 | `just test-business-flow` |
+| B4-09 | 固化授权占券和权益生命周期边界。 | `transaction-*`、`core`、`tests/src/test/java` | `DSL-BENEFIT-AUTH-HOLD-001`、`TDD-BEN-AUTH-*`、`TDD-BEN-ENTRY-003`、`TDD-BEN-ENTRY-004`、`RED-053`。 | 授权拒绝、工具准入失败或余额不足后仍核销权益；授权完成和过期并发导致同一权益重复核销或释放；完成时按当前券规则重算；新增授权权益专用服务入口或授权后续事件接收当前权益结果。 | 不新增授权权益专用服务入口；`authorize` 可在对应 Execution Grant 确认后扩展可选 `benefitSnapshot` 或等价字段固化占用引用；`reversal`、`expire`、`settle` 和 `settleRefund` 读取原授权事实和原权益快照；授权阶段只固化占用引用，完成按原快照核销，撤销或过期释放剩余占用；失败事件无 route/posting/entry 副作用。 | `just test-business-flow` |
 
 人工确认点：`EXPIRE` 枚举、`expire` 服务入口、`settle` 强制完成请求契约、`settleRefund` 无授权退款引用和审计字段、授权占券字段和权益 hold/release/write-off 外部引用；VCC / Spend Controls 默认只做边界测试，只有明确启用发卡产品才进入实现范围。
 
@@ -236,11 +242,12 @@ DDL/H2 schema 变化：
 | B6-03 | 固化交易投影只读和有界重放。 | `transaction-*`、`tests/src/test/java` | 交易投影重放。 | 无范围重放、投影水位复用余额水位或归档 checkpoint。 | 引入范围、模式、checkpoint 和差异报告红线；交易投影重放不重新入账、不改余额。 | `just test-boundary` |
 | B6-04 | 固化余额日志边界。 | `ledger-*`、`tests/src/test/java` | 余额日志设计。 | 余额日志失败导致事实回滚，或被用于修复余额。 | 保持日志为观测与审计辅助，不作事实源。 | `just test-boundary` |
 | B6-05 | 固化支付工具换绑后原路径回放。 | `transaction-*`、`tests/src/test/java` | `DSL-PAYMENT-INSTRUMENT-REPLAY-001`、TDD 支付工具回放红线。 | 原交易后工具换绑、解绑、暂停或默认资金来源变化，退款、撤销、退费或拒付按当前绑定重新选路。 | Route Replay 必须使用原 route snapshot、原工具快照和原 funding allocation；当前绑定只作为审计上下文，不参与资金路径。 | `just test-business-flow` |
-| B6-06 | 固化权益快照回放和缺快照处理。 | `transaction-*`、`tests/src/test/java` | `DSL-BENEFIT-REFUND-NO-COUPON-001`、`DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001`、`DSL-BENEFIT-MISSING-SNAPSHOT-REPLAY-001`。 | 退款、撤销、过期或拒付按当前营销规则重算；缺原权益快照仍静默放行；不退券和不冲补贴混成一个布尔值；多次部分退款累计超额。 | replay 使用原权益快照、组件摘要和退款策略；缺快照失败或进入人工处理；累计金额、补贴冲回、储值恢复和不可退权益都可追溯。 | `just test-business-flow` |
+| B6-06 | 固化权益快照回放和缺快照处理。 | `transaction-*`、`tests/src/test/java` | `DSL-BENEFIT-REFUND-NO-COUPON-001`、`DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001`、`DSL-BENEFIT-MISSING-SNAPSHOT-REPLAY-001`、`TDD-BEN-ENTRY-002`、`TDD-BEN-ENTRY-004`、`TDD-BEN-REFUND-004`、`TDD-BEN-REFUND-005`、`TDD-BEN-REPLAY-002`。 | 退款、撤销、过期或拒付按当前营销规则重算；缺原权益快照仍静默放行；不退券和不冲补贴混成一个布尔值；多次部分退款累计超额或尾差随机分摊；仅用外部渠道流水替代原资金交易或原权益快照引用；含权益退款请求承载新的权益计算结果；资金底座自行判断券是否可退。 | replay 使用原权益快照、组件摘要、退款策略和业务层本次退款决策引用；直接退款 Request 如需扩展，应补原资金交易、原 route snapshot、原权益快照、业务决策流水或 replay 策略引用，不承载新的权益计算结果；缺快照失败或进入人工处理；累计金额、补贴冲回、储值恢复和不可退权益都可追溯；多组件部分退款必须有确定性尾差规则且重试结果稳定。 | `just test-business-flow` |
+| B6-07 | 固化交易投影和运营时间线可解释性。 | `transaction-*`、`tests/src/test/java` | 产品使用者可解释性矩阵、系分 05 可解释输出、`GAP-OPS-001`。 | 查询或投影只返回技术状态，无法说明金额来源、状态含义、失败阶段、不可操作原因或下一步动作；解释视图反写资金事实。 | 用户账单、商户账单、运营时间线和交易投影必须只读生成解释摘要，至少包含业务键、资金交易、route snapshot 摘要、账务引用、状态含义、失败原因和下一步动作；不修改交易、账本或余额事实。 | `just test-boundary` |
 
 ### 批次 7：清结算与对账
 
-批次 7 在本 change 中只保留边界、计划和准入门禁。当前代码仅保留 `reconciliation-face` 和 `reconciliation-impl` 空模块骨架，可作为后续候选落点；进入编码前仍必须另起独立 OpenSpec change，确认模块命名、表设计、状态机、接口和验证命令。
+批次 7 在本 change 中只保留边界、计划和设计评审输入，不表示编码准入已经打开。当前代码仅保留 `reconciliation-face` 和 `reconciliation-impl` 空模块骨架，可作为后续候选落点；进入编码前仍必须另起独立 OpenSpec change，确认模块命名、表设计、状态机、接口、DDL/H2、NFR 假设、观测告警和验证命令。
 
 | 任务 | 目标 | 写入范围 | 设计锚点 | Red 用例 | Green/实现动作 | 验证 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -249,13 +256,14 @@ DDL/H2 schema 变化：
 | B7-03 | 固化清算批次确认、结算锁定、出款成功/失败和追偿。 | 待确认 | 清算批次、结算单、出款单、追偿单边界。 | 候选入池即清算、清算前置对账缺失、出款失败直接改历史分录，或重复出款。 | 清算批次确认才触发 `CLEARING -> AVAILABLE`；结算锁定、出款单、失败原因和追偿链路各自独立。 | 待确认 |
 | B7-04 | 固化对账批次、差错单和核销。 | 待确认 | 对账差错闭环。 | 对账差异直接改分录或余额，或绕过差错闭环直接调用 adjust。 | 强制差错单、审批、凭证、调账/冲正、核销、重新对账；差错类资金账户余额调整由闭环触发余额控制 adjust 或批次授权直接交易调账事实。 | 待确认 |
 | B7-05 | 固化清结算与对账并发竞争红线。 | 待确认 | TDD 13.5、清结算退款时序、对账重跑。 | 清算候选锁定与退款并发、结算锁定与出款回单/退款并发、对账重跑与差错核销并发导致重复扣减、重复出款或证据覆盖。 | 建立对象级锁定、批次唯一键、候选状态版本、重跑运行记录和差错核销互斥；失败方必须可审计且无副作用。 | 待确认 |
-| B7-06 | 固化含权益交易的清结算和对账拆分。 | 待确认 | `DSL-BENEFIT-CLEARING-RECONCILIATION-001`、`AC-BEN-011`、`TDD-BEN-CLS-*`、`TDD-BEN-RECON-*`、`RED-057`。 | 营销核销、订单金额、用户实付、商户应收、平台补贴、手续费和退款冲回不一致时被静默补平；商户券被误当平台成本。 | 清分、清算、结算和对账明细拆出权益金额项；差异进入差错单和审计，不直接改历史资金事实。 | 待确认 |
+| B7-06 | 固化含权益交易的清结算和对账拆分。 | 待确认 | `DSL-BENEFIT-CLEARING-RECONCILIATION-001`、`AC-BEN-011`、`AC-BEN-013`、`TDD-BEN-CLS-*`、`TDD-BEN-RECON-*`、`RED-057`、`RED-059`。 | 营销核销、订单金额、用户实付、商户应收、平台补贴、手续费和退款冲回不一致时被静默补平；商户券被误当平台成本；补贴冲回、不可退权益、负债恢复或展示项混入订单正向闭合。 | 清分、清算、结算和对账明细拆出权益金额项；闭合角色决定金额项进入订单、退款、补贴冲回、负债恢复或展示解释；差异进入差错单和审计，不直接改历史资金事实。 | 待确认 |
+| B7-07 | 固化清结算、对账和出款工作台可解释性。 | 待确认 | 产品使用者可解释性矩阵、系分 03 运营后台、系分 05 告警到 Runbook 动作矩阵、`GAP-OPS-001`。 | 重大差错或前置对账未完成仍展示为可清算、可结算或可出款；出款受理展示为成功；差错缺责任方、阈值、账龄、审批或到期重查。 | 清分、清算、结算、出款、对账差错和追偿视图必须能解释金额来源、阻断原因、放行依据、审批链、下一步动作和恢复验收。 | 待确认 |
 
 人工确认点：是否新建模块、模块命名、表命名、状态机、权益清分字段、权益对账差错类型、是否进入本轮开发范围。
 
 ### 批次 8：归档、重放与指标边界
 
-批次 8 在本 change 中只保留边界、计划和准入门禁。当前代码已有 `governance-face` 和 `governance-impl` 交易投影重放骨架，可作为交易投影治理重放的候选落点；进入编码前仍必须另起独立 OpenSpec change，确认归档/重放任务模型、表设计、审批、回滚和生产门禁；指标只保留边界，不实现报表指标模块。
+批次 8 在本 change 中只保留边界、计划和设计评审输入，不表示编码准入已经打开。当前代码已有 `governance-face` 和 `governance-impl` 交易投影重放骨架，可作为交易投影治理重放的候选落点；进入编码前仍必须另起独立 OpenSpec change，确认归档/重放任务模型、表设计、审批、回滚、NFR 假设、观测告警和生产门禁；指标只保留边界，不实现报表指标模块。
 
 | 任务 | 目标 | 写入范围 | 设计锚点 | Red 用例 | Green/实现动作 | 验证 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -265,12 +273,13 @@ DDL/H2 schema 变化：
 | B8-04 | 固化账本余额快照覆盖模式。 | 待确认 | 系分 04 账本余额快照、`DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`。 | `HOT_ONLY` 强制要求 Manifest、`COLD_MANIFEST` 缺 Manifest 仍通过、`MIXED` 跳过冷热合并摘要校验。 | 建立 `HOT_ONLY`、`COLD_MANIFEST`、`MIXED` 三种覆盖模式校验；冷区和混合覆盖缺 Manifest 不得进入 `VERIFIED`；失败不得推进余额水位。 | 待确认 |
 | B8-05 | 固化指标只读和指标水位隔离。 | 待确认 | 指标治理仅列指标项、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001`、`TDD-METRIC-003`、`TDD-METRIC-004`。 | 在本模块实现报表指标计算，或指标失败推进余额水位、修改归档 Manifest；普通指标快照成功替代账本余额快照。 | 仅提供业务关心的指标口径输入，具体实现交给报表指标模块；指标水位独立于余额水位、归档 Manifest 和交易投影 checkpoint；普通指标快照不能证明余额正确。 | 待确认 |
 | B8-06 | 固化归档、重放和快照范围互斥。 | 待确认 | TDD 13.5、归档门禁、重放差异报告和普通指标快照并发边界。 | 同一范围重复正式 apply、dry-run 推进 checkpoint、水位或 Manifest 被并发任务重复推进；普通指标快照覆盖余额快照状态。 | 建立范围锁、任务幂等键、dry-run/apply 分离、成功后单次推进规则和指标/余额快照状态隔离；失败任务不得推进水位。 | 待确认 |
+| B8-07 | 固化归档、重放和指标边界 Runbook 信号。 | 待确认 | 系分 05 告警到 Runbook 动作矩阵、生产门禁、`GAP-OPS-001`。 | 归档或重放告警只有异常堆栈，没有范围、模式、checkpoint、Manifest、差异报告、止血动作或恢复验收。 | 归档、余额重建、交易投影重放和指标边界告警必须输出任务范围、dry-run/apply 模式、checkpoint、watermark、Manifest、差异报告、负责人、止血动作和恢复验收。 | 待确认 |
 
 人工确认点：生产重放范围、审批策略、回滚策略、账本余额快照覆盖模式字段、Manifest 覆盖策略、指标模块接口边界。
 
 ## 8. 依赖、门禁与设计反馈
 
-1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；当前最新设计交付提交点以包含本 Harness Plan 的最新 docs 提交为准，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档，之后才能进入具体编码批次。
+1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；上一冻结点为 30b1a00 docs: 冻结权益快照设计基线，上一历史冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。本轮提交后形成新的编码准备基线；后续具体编码批次仍必须通过 Execution Grant 明确授权。
 2. 当前执行优先级固定为：先做 `02-交易路由钱包账目与投影`，再做 `03-清结算与对账`，最后做 `04-归档重放与指标治理`。
 3. 批次 1 至批次 6 合并构成 02 阶段，内部仍按 DSL/core、钱包账户与账本、直接交易、授权交易、余额控制、Route Replay 与投影推进。
 4. 批次 1 是后续所有交易、账本和授权测试的前置门禁。
@@ -283,19 +292,21 @@ DDL/H2 schema 变化：
 11. 每批必须先提交 Red 用例，再做最小 Green 实现，最后补充重构、观测、边界和回归验证。
 12. 金额临界值按 TDD 5.1 作为所有资金变化测试的公共前置矩阵；并发竞争按 TDD 13.5 分散到授权、余额控制、清结算、对账和归档批次承接，不得只用顺序用例代替。
 13. 权益快照按三段落地：批次 1 只做 `core` DSL 契约和 JSON 兼容；批次 3、4、6 才进入直接交易、授权和 replay 的 route/posting 消费；批次 7 才进入清结算与对账拆分。未完成后段前，不得宣称含权益资金流已完整闭合。
+14. 直接交易和授权交易不因权益快照新增权益专用服务方法；后续如需扩展 `FundsTransactionPayRequest`、`FundsTransactionRefundRequest`、`FundsAuthorizationTransactionAuthorizeRequest` 或授权后续事件 Request，必须由对应批次 Execution Grant 明确允许。授权过期 `expire` 是 B4-03 既有授权生命周期缺口，不属于权益设计新增入口。
+15. 券能不能退由业务层、订单层、营销权益系统或运营审批链路决策；资金底座只承接原权益快照和本次退款决策引用，不调用当前营销规则、不读取当前券包状态、不自行判断退券可行性。
 
 ## 9. 批次到设计 ID 覆盖索引
 
 | 批次 | 产品验收 ID | DSL 契约或场景 | TDD 用例入口 |
 | --- | --- | --- | --- |
-| 批次 1 | `RED-001`、`RED-003`、`RED-009`、`RED-020`、`RED-022`、`RED-023`、`RED-046` 至 `RED-049`、`AC-BEN-001`、`RED-050` 至 `RED-057` | Route DSL、PaymentInstrument Route DSL、Posting/Ledger DSL、SettlementPolicy、金额临界值、权益快照、JSON 契约、`DSL-BENEFIT-SNAPSHOT-001` | `TDD-RED-001`、`TDD-RED-003`、`TDD-RED-004`、`TDD-RED-031`、`TDD-RED-032`、`TDD-RED-034` 至 `TDD-RED-037`、`TDD-LEDGER-001` 至 `TDD-LEDGER-011`、`TDD-ROUTE-011` 至 `TDD-ROUTE-013`、`TDD-BEN-001` 至 `TDD-BEN-005`、`TDD-BEN-RED-001` 至 `TDD-BEN-RED-002` |
+| 批次 1 | `RED-001`、`RED-003`、`RED-009`、`RED-020`、`RED-022`、`RED-023`、`RED-046` 至 `RED-049`、`AC-BEN-001`、`AC-BEN-012`、`AC-BEN-013`、`RED-050` 至 `RED-059` | Route DSL、PaymentInstrument Route DSL、Posting/Ledger DSL、SettlementPolicy、金额临界值、权益快照、JSON 契约、`DSL-BENEFIT-SNAPSHOT-001` | `TDD-RED-001`、`TDD-RED-003`、`TDD-RED-004`、`TDD-RED-031`、`TDD-RED-032`、`TDD-RED-034` 至 `TDD-RED-037`、`TDD-LEDGER-001` 至 `TDD-LEDGER-011`、`TDD-ROUTE-011` 至 `TDD-ROUTE-013`、`TDD-BEN-001` 至 `TDD-BEN-007`、`TDD-BEN-RED-001`、`TDD-BEN-RED-002`、`TDD-BEN-RED-012`、`TDD-BEN-RED-017`、`TDD-BEN-RED-018` |
 | 批次 2 | `AC-PI-001` 至 `AC-PI-004`、`AC-PI-006`、`AC-PI-007`、`AC-CTRL-009` 至 `AC-CTRL-011`、`AC-BALLOG-001`、`RED-036`、`RED-046`、`RED-047`、`RED-049` | 支付工具、绑定关系、绑定历史审计、资金来源关系、账本周期、余额投影、余额日志 | `TDD-WALLET-*`、`TDD-ROUTE-011`、`TDD-ROUTE-012`、`TDD-LEDGER-*`、`TDD-VIEW-003` |
-| 批次 3 | `AC-IN-*`、`AC-OUT-*`、`AC-PAY-*`、`AC-MER-*`、`AC-FEE-*`、`AC-BEN-002` 至 `AC-BEN-005`、`AC-BEN-009`、`RED-050` 至 `RED-057` | `DSL-DIRECT-*`、`DSL-REVERSE-REFUND-FEE-001`、`DSL-BENEFIT-MERCHANT-DISCOUNT-001`、`DSL-BENEFIT-PLATFORM-SUBSIDY-001`、`DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`DSL-BENEFIT-PREPAID-VOUCHER-001`、`DSL-BENEFIT-PARTIAL-REFUND-001` | `TDD-DIR-*`、`TDD-DIR-FLOW-*`、`TDD-DIR-ERR-*`、`TDD-BEN-DIR-*`、`TDD-BEN-REFUND-003`、`TDD-BEN-RED-003`、`TDD-BEN-RED-004`、`TDD-BEN-RED-006`、`TDD-BEN-RED-008` |
-| 批次 4 | `AC-AUTH-001` 至 `AC-AUTH-012`、`AC-RAIL-001`、`AC-RAIL-002`、`AC-BEN-006`、`RED-025` 至 `RED-027`、`RED-035`、`RED-053` | `DSL-AUTH-LIFECYCLE-001`、`DSL-AUTH-FORCE-CAPTURE-001`、`DSL-AUTH-REFUND-001`、`DSL-BENEFIT-AUTH-HOLD-001`、`AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式、VCC 授权归一边界和授权控制扩展 | `TDD-AUTH-*`、`TDD-AUTH-FLOW-*`、`TDD-AUTH-ERR-*`、`TDD-AUTH-EXT-*`、`TDD-BEN-AUTH-*`、`TDD-BEN-RACE-002`、`TDD-ROUTE-003`、`TDD-ROUTE-005`、`TDD-ROUTE-008`、`TDD-ROUTE-009`、`TDD-RACE-001` 至 `TDD-RACE-003`、`TDD-RAIL-001`、`TDD-RAIL-002`、`TDD-RED-003`、`TDD-RED-005`、`TDD-RED-008`、`TDD-RED-016`、`TDD-RED-017`、`TDD-RED-033`、`TDD-RED-036` |
+| 批次 3 | `AC-IN-*`、`AC-OUT-*`、`AC-PAY-*`、`AC-MER-*`、`AC-FEE-*`、`AC-BEN-002` 至 `AC-BEN-005`、`AC-BEN-009`、`AC-BEN-013`、`RED-050` 至 `RED-052`、`RED-054` 至 `RED-059` | `DSL-DIRECT-*`、`DSL-REVERSE-REFUND-FEE-001`、`DSL-BENEFIT-MERCHANT-DISCOUNT-001`、`DSL-BENEFIT-PLATFORM-SUBSIDY-001`、`DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`DSL-BENEFIT-PREPAID-VOUCHER-001`、`DSL-BENEFIT-PARTIAL-REFUND-001` | `TDD-DIR-*`、`TDD-DIR-FLOW-*`、`TDD-DIR-ERR-*`、`TDD-BEN-DIR-*`、`TDD-BEN-REFUND-003`、`TDD-BEN-RED-003`、`TDD-BEN-RED-004`、`TDD-BEN-RED-006`、`TDD-BEN-RED-008`、`TDD-BEN-RED-017` 至 `TDD-BEN-RED-019` |
+| 批次 4 | `AC-AUTH-001` 至 `AC-AUTH-012`、`AC-RAIL-001`、`AC-RAIL-002`、`AC-BEN-006`、`AC-BEN-013`、`RED-025` 至 `RED-027`、`RED-035`、`RED-053`、`RED-054`、`RED-059` | `DSL-AUTH-LIFECYCLE-001`、`DSL-AUTH-FORCE-CAPTURE-001`、`DSL-AUTH-REFUND-001`、`DSL-BENEFIT-AUTH-HOLD-001`、`AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式、VCC 授权归一边界和授权控制扩展 | `TDD-AUTH-*`、`TDD-AUTH-FLOW-*`、`TDD-AUTH-ERR-*`、`TDD-AUTH-EXT-*`、`TDD-BEN-AUTH-*`、`TDD-BEN-RACE-002`、`TDD-BEN-RED-005`、`TDD-BEN-RED-014`、`TDD-BEN-RED-017`、`TDD-ROUTE-003`、`TDD-ROUTE-005`、`TDD-ROUTE-008`、`TDD-ROUTE-009`、`TDD-RACE-001` 至 `TDD-RACE-003`、`TDD-RAIL-001`、`TDD-RAIL-002`、`TDD-RED-003`、`TDD-RED-005`、`TDD-RED-008`、`TDD-RED-016`、`TDD-RED-017`、`TDD-RED-033`、`TDD-RED-036` |
 | 批次 5 | `AC-CTRL-001` 至 `AC-CTRL-008`、`AC-ADJ-001` 的 adjust 入口和红线；其中 `AC-CTRL-004` 为资金账户余额调整 | `DSL-BALANCE-CONTROL-FREEZE-001`、`DSL-BALANCE-CONTROL-ADJUST-001`、`DSL-BALANCE-CONTROL-LIMIT-BUDGET-001`、`DSL-SETTLEMENT-RECONCILIATION-ADJUST-001` 的 adjust 红线 | `TDD-CTRL-*`、`TDD-CTRL-FLOW-*`、`TDD-CTRL-ERR-*`、`TDD-CTRL-009`、`TDD-CTRL-ERR-005`、`TDD-RACE-004`、`TDD-RED-006`、`TDD-RED-011`、`TDD-RED-012`、`TDD-RED-015`、`TDD-RED-033` |
-| 批次 6 | `AC-ROUTE-*`、`AC-PI-005`、`AC-VIEW-*`、`AC-BALLOG-001`、`AC-REPLAY-*`、`AC-BEN-007` 至 `AC-BEN-010`、`RED-003`、`RED-016`、`RED-017`、`RED-036`、`RED-043`、`RED-044`、`RED-048`、`RED-049`、`RED-054`、`RED-056` | Route Replay、支付工具换绑后原路径回放、权益快照回放、交易投影、余额日志、`DSL-BENEFIT-REFUND-NO-COUPON-001`、`DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001`、`DSL-BENEFIT-MISSING-SNAPSHOT-REPLAY-001` | `TDD-ROUTE-*`、`TDD-ROUTE-013`、`TDD-RACE-009`、`TDD-VIEW-*`、`TDD-REPLAY-*`、`TDD-BEN-REFUND-*`、`TDD-BEN-REPLAY-001`、`TDD-BEN-RACE-001`、`TDD-BEN-RED-002`、`TDD-BEN-RED-007` 至 `TDD-BEN-RED-009`、`TDD-RED-003`、`TDD-RED-010`、`TDD-RED-013`、`TDD-RED-014`、`TDD-RED-029`、`TDD-RED-034` 至 `TDD-RED-037` |
-| 批次 7 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`AC-ADJ-001`、`AC-BEN-011`、`RED-030` 至 `RED-033`、`RED-037` 至 `RED-039`、`RED-057` | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单独立对象、权益清分和权益对账拆分、`DSL-BENEFIT-CLEARING-RECONCILIATION-001`、`DSL-SETTLEMENT-RECONCILIATION-ADJUST-001` 完整差错闭环 | `TDD-CLS-*`、`TDD-CLS-FLOW-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-BEN-CLS-*`、`TDD-BEN-RECON-*`、`TDD-BEN-OPS-*`、`TDD-BEN-RED-010`、`TDD-RACE-005` 至 `TDD-RACE-007`、`TDD-RED-020` 至 `TDD-RED-025`、`TDD-RED-033` |
-| 批次 8 | `AC-ARCH-*`、`AC-REPLAY-*`、`AC-RPT-*`、`RED-016` 至 `RED-019`、`RED-029`、`RED-034`、`RED-040` 至 `RED-042` | `DSL-GOVERNANCE-ARCHIVE-MANIFEST-001`、`DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`、`DSL-GOVERNANCE-PROJECTION-REPLAY-001`、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001`、归档、余额重建、交易投影重放、指标只读和指标水位隔离边界 | `TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`、`TDD-RACE-008`、`TDD-RACE-010`、`TDD-RED-018`、`TDD-RED-019`、`TDD-RED-026` 至 `TDD-RED-028`、`TDD-RED-033` |
+| 批次 6 | `AC-ROUTE-*`、`AC-PI-005`、`AC-VIEW-*`、`AC-BALLOG-001`、`AC-REPLAY-*`、`AC-BEN-007` 至 `AC-BEN-010`、`AC-BEN-012`、使用者可解释性矩阵、`RED-003`、`RED-016`、`RED-017`、`RED-036`、`RED-043`、`RED-044`、`RED-048`、`RED-049`、`RED-054`、`RED-056`、`RED-058` | Route Replay、支付工具换绑后原路径回放、权益快照回放、交易投影、运营时间线、余额日志、`DSL-BENEFIT-REFUND-NO-COUPON-001`、`DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001`、`DSL-BENEFIT-MISSING-SNAPSHOT-REPLAY-001` | `TDD-ROUTE-*`、`TDD-ROUTE-013`、`TDD-RACE-009`、`TDD-VIEW-*`、`TDD-REPLAY-*`、`TDD-BEN-REFUND-*`、`TDD-BEN-REPLAY-001`、`TDD-BEN-RACE-001`、`TDD-BEN-RED-002`、`TDD-BEN-RED-007` 至 `TDD-BEN-RED-009`、`TDD-BEN-RED-018`、`FundsOperationExplainabilityTests`、`TDD-RED-003`、`TDD-RED-010`、`TDD-RED-013`、`TDD-RED-014`、`TDD-RED-029`、`TDD-RED-034` 至 `TDD-RED-037` |
+| 批次 7 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`AC-ADJ-001`、`AC-BEN-011`、`AC-BEN-013`、使用者可解释性矩阵、`RED-030` 至 `RED-033`、`RED-037` 至 `RED-039`、`RED-057`、`RED-059` | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单独立对象、权益清分和权益对账拆分、清结算工作台解释输出、`DSL-BENEFIT-CLEARING-RECONCILIATION-001`、`DSL-SETTLEMENT-RECONCILIATION-ADJUST-001` 完整差错闭环 | `TDD-CLS-*`、`TDD-CLS-FLOW-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-BEN-CLS-*`、`TDD-BEN-RECON-*`、`TDD-BEN-OPS-*`、`TDD-BEN-RED-010`、`TDD-BEN-RED-017`、`FundsOperationExplainabilityTests`、`FundsRunbookSignalTests`、`TDD-RACE-005` 至 `TDD-RACE-007`、`TDD-RED-020` 至 `TDD-RED-025`、`TDD-RED-033` |
+| 批次 8 | `AC-ARCH-*`、`AC-REPLAY-*`、`AC-RPT-*`、使用者可解释性矩阵、`RED-016` 至 `RED-019`、`RED-029`、`RED-034`、`RED-040` 至 `RED-042` | `DSL-GOVERNANCE-ARCHIVE-MANIFEST-001`、`DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`、`DSL-GOVERNANCE-PROJECTION-REPLAY-001`、`DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001`、归档、余额重建、交易投影重放、指标只读、指标水位隔离边界和 Runbook 信号 | `TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`、`FundsRunbookSignalTests`、`TDD-RACE-008`、`TDD-RACE-010`、`TDD-RED-018`、`TDD-RED-019`、`TDD-RED-026` 至 `TDD-RED-028`、`TDD-RED-033` |
 
 ## 10. Execution Grant 候选模板
 
@@ -308,6 +319,7 @@ DDL/H2 schema 变化：
 必须覆盖的 TDD 用例：
 必须覆盖的 AC/DSL ID：
 基线是否已冻结：是/否
+工作树状态：clean / dirty，若 dirty 必须列出允许纳入和必须排除的变更
 允许修改公共契约：是/否
 公共契约允许修改范围：
 允许新增枚举或事件：是/否
@@ -321,6 +333,9 @@ DDL/H2 schema 变化：
 是否触碰事实端口层：是/否
 架构边界测试范围：
 人工确认点：
+NFR 假设：
+观测告警：
+回滚或补偿：
 基础验证命令：just mvn-version、just compile
 专项验证命令：
 交付方式：
@@ -334,12 +349,13 @@ DDL/H2 schema 变化：
 授权批次：批次 1 / B1-10 权益快照 DSL 契约
 允许写入范围：tests/src/test/java/com/capte/funds/dsl；必要时 tests/src/test/resources/dsl-contract-cases；必要时 core/src/main/java/com/wind/integration/funds/spec/transaction、core/src/main/java/com/wind/integration/funds/model/transaction、core/src/main/java/com/wind/integration/funds/transaction/enums 中 FundsBenefitSnapshotSpec/FundsBenefitComponentSpec/FundsBenefitReferenceSpec/FundsBenefitRefundPolicySpec 和 FundsBenefit* 枚举的最小兼容修改
 禁止写入范围：transaction-*、wallet-*、ledger-* 业务实现；Route Resolver、Posting Assembler、Route Replay、授权生命周期、清结算、对账、归档、指标实现；生产配置；外部通道适配
-必须覆盖的 TDD 用例：TDD-BEN-001 至 TDD-BEN-005、TDD-BEN-RED-001、TDD-BEN-RED-002
-必须覆盖的 AC/DSL ID：AC-BEN-001、DSL-BENEFIT-SNAPSHOT-001；登记 RED-050 至 RED-057，但本批只做契约层红线，不声明 route/posting/replay 已闭合
-基线是否已冻结：已冻结，最新设计交付提交点以包含本 Harness Plan 的最新 docs 提交为准；继续执行或调整批次 1 仍需用户确认 Execution Grant
+必须覆盖的 TDD 用例：TDD-BEN-001 至 TDD-BEN-007、TDD-BEN-RED-001、TDD-BEN-RED-002、TDD-BEN-RED-012、TDD-BEN-RED-017、TDD-BEN-RED-018
+必须覆盖的 AC/DSL ID：AC-BEN-001、AC-BEN-012、AC-BEN-013、DSL-BENEFIT-SNAPSHOT-001；登记 RED-050 至 RED-059，其中 RED-058 只作为生产 Done 门禁，本批只做契约层红线，不声明 route/posting/replay 已闭合
+基线是否已冻结：已冻结，上一冻结点为 30b1a00 docs: 冻结权益快照设计基线；本轮提交后形成权益快照 DSL 契约承载的编码准备基线；继续执行或调整批次 1 仍需用户确认 Execution Grant
+工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
 允许修改公共契约：待用户确认；建议仅允许新增可选字段和新增权益模型，不允许删除或改写既有字段
 公共契约允许修改范围：仅限新增 `FundsInstructionSpec#getBenefitSnapshot()` 默认空值方法、权益快照 Spec/Immutable model、权益枚举和必要 JSON 解析兼容；不得改变 `amount`、`originalAmount`、`exchangeRate`、`reference`、`instrumentRef`、`externalAccountRef`、`contextVariables` 既有语义
-允许新增枚举或事件：待用户确认；建议只允许新增 `FundsBenefitType`、`FundsBenefitComponentType`、`FundsBenefitLedgerEffect`、`FundsBenefitFundingNature`、`FundsBenefitRefundDisposition`、`FundsBenefitPartialRefundStrategy`、`FundsBenefitLifecycleAction`，本批不新增交易事件
+允许新增枚举或事件：待用户确认；建议只允许新增 `FundsBenefitType`、`FundsBenefitComponentType`、`FundsBenefitAmountClosureRole`、`FundsBenefitLedgerEffect`、`FundsBenefitFundingNature`、`FundsBenefitRefundDisposition`、`FundsBenefitPartialRefundStrategy`、`FundsBenefitLifecycleAction`，本批不新增交易事件
 允许新增服务入口：否
 允许扩展 Request/Query/DTO：否
 允许修改表结构：否
@@ -350,12 +366,29 @@ DDL/H2 schema 变化：
 是否触碰事实端口层：否
 架构边界测试范围：如改动 core 依赖或公共 Spec 依赖方向，补充 `just test-boundary` 或等效静态检查
 人工确认点：`benefitSnapshot` 字段命名和空值兼容策略、权益枚举命名、退款处置枚举、`PLATFORM_DISPLAY_DISCOUNT` 与 `PLATFORM_SUBSIDY` 的语义边界、核心字段不得塞入 `contextVariables`
+NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部回调、清结算批次或归档重放；若扩大范围必须重开授权
+观测告警：本批不新增生产告警；后续进入 route/posting/replay 或清结算消费时必须补权益快照缺失、摘要冲突和回放失败告警
+回滚或补偿：本批不写生产数据；公共契约变更若撤回，必须保留兼容说明或版本迁移说明
 基础验证命令：just mvn-version、just compile
 专项验证命令：just test-one FundsBenefitSnapshotSpecTests tests；just test-one FundsDslJsonContractTests tests；必要时 just test-core
 交付方式：每轮说明覆盖用例、修改文件、验证命令、验证结果和残余风险；未获 Git 授权时不自动提交
 ```
 
 ## 12. 每批交付记录模板
+
+## 12.1 准入模拟验证记录（2026-05-21）
+
+本轮按 `B1-10 权益快照 DSL 契约` 做 TDD 模拟验证，结论如下：
+
+| 检查项 | 结论 | 证据 |
+| --- | --- | --- |
+| 任务边界 | 只允许进入 Phase 1 契约承载；未进入 route、posting、replay、清结算或对账生产消费。 | 当前写入范围限制在 core DSL/model/enums、DSL JSON verifier、tests DSL 契约和 JSON 夹具；未修改 `transaction-*`、`wallet-*`、`ledger-*` 业务实现。 |
+| 设计差异 | 已发现并修复代码缺少 `FundsBenefitAmountClosureRole` 的差异。 | DSL/TDD 要求只有 `ORDER_DISCOUNT_CLOSURE` 参与正向订单闭合，代码已补闭合角色枚举、组件字段、模型校验和 JSON 校验。 |
+| TDD 红线 | 已覆盖无权益兼容、核心字段不得塞入 `contextVariables`、金额闭合、闭合角色缺失或混用、组件唯一性、零实付边界、退款处置和当前营销规则输入拒绝；稳定摘要、请求态快照误判生产 Done 和闭合角色生产消费边界已纳入 B1-10 门禁。 | `FundsBenefitSnapshotSpecTests` 10 个用例通过；`FundsDslJsonContractTests` 8 个用例通过；稳定摘要、`RED-058` 和后续 route/posting/replay 消费断言需要在正式 B1-10 或后续批次交付记录中单独列明。 |
+| 验证命令 | Java 21 下编译、目标测试和 PMD 均通过。 | `WIND_FUNDS_JAVA_HOME=... just compile`；`just test-one FundsBenefitSnapshotSpecTests tests`；`just test-one FundsDslJsonContractTests tests`；`just pmd`。 |
+| 残余边界 | 只能声明 `B1-10 契约承载 Done`；B3/B4/B6/B7 仍需各自 Execution Grant。 | 平台补贴、储值券、退款回放、授权占券、清结算和对账尚未进入生产链路消费。 |
+
+准入结论：`B1-10` 可作为开始编码的第一批候选；若下一轮进入生产链路，必须重新声明目标批次、写入范围、公共契约变更、表结构变更、测试矩阵和验证命令。
 
 ```text
 批次：

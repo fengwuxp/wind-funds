@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -28,13 +29,8 @@ class FundsDslJsonContractTests {
      */
     @Test
     void testTransactionLayerJsonSamplesShouldRemainMachineVerifiable() throws IOException {
-        List<Path> samples;
-        try (Stream<Path> sampleStream = Files.list(transactionLayerDslDir())) {
-            samples = sampleStream
-                    .filter(path -> path.getFileName().toString().endsWith(".json"))
-                    .sorted()
-                    .toList();
-        }
+        List<Path> samples = jsonSamples(transactionLayerDslDir());
+        samples.addAll(jsonSamples(benefitContractCaseDir()));
 
         assertThat(samples).isNotEmpty();
         for (Path sample : samples) {
@@ -88,8 +84,248 @@ class FundsDslJsonContractTests {
                 .hasMessageContaining("DefaultFundsTransactionType");
     }
 
+    /**
+     * 场景：样例作者把权益快照核心金额藏入 contextVariables。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：权益金额闭合、规则版本和退款处置必须是一等字段。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectBenefitCoreFieldsInContextVariables() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-BENEFIT-CONTEXT-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "minorValue": 8000 },
+                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "benefitSnapshot": {
+                      "benefitSnapshotId": "bs_invalid_context_001",
+                      "benefitGroupSn": "bg_invalid_context_001",
+                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
+                      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+                      "components": [{
+                        "componentSn": "bc_invalid_context_001",
+                        "benefitType": "MERCHANT_COUPON",
+                        "componentType": "MERCHANT_DISCOUNT",
+                        "closureRole": "ORDER_DISCOUNT_CLOSURE",
+                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "ledgerEffect": "NO_LEDGER",
+                        "fundingNature": "MERCHANT_BORNE",
+                        "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
+                        "benefitReference": { "couponId": "coupon_001", "ruleVersion": "rule_v1" },
+                        "contextVariables": { "ruleVersion": "rule_v1" }
+                      }],
+                      "contextVariables": {}
+                    }
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables")
+                .hasMessageContaining("core benefit field");
+    }
+
+    /**
+     * 场景：样例作者把权益金额写成不闭合。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：权益累计超额或缺口不能进入 route/posting 后再补解释。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectUnclosedBenefitSnapshotAmount() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-BENEFIT-AMOUNT-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "minorValue": 8000 },
+                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "benefitSnapshot": {
+                      "benefitSnapshotId": "bs_invalid_amount_001",
+                      "benefitGroupSn": "bg_invalid_amount_001",
+                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
+                      "userPayAmount": { "currency": "USD", "minorValue": 9000 },
+                      "components": [{
+                        "componentSn": "bc_invalid_amount_001",
+                        "benefitType": "MERCHANT_COUPON",
+                        "componentType": "MERCHANT_DISCOUNT",
+                        "closureRole": "ORDER_DISCOUNT_CLOSURE",
+                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "ledgerEffect": "NO_LEDGER",
+                        "fundingNature": "MERCHANT_BORNE",
+                        "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
+                        "benefitReference": { "couponId": "coupon_001", "ruleVersion": "rule_v1" },
+                        "contextVariables": {}
+                      }],
+                      "contextVariables": {}
+                    }
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ORDER_DISCOUNT_CLOSURE components.amount = orderAmount");
+    }
+
+    /**
+     * 场景：样例作者没有声明权益金额闭合角色。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：资金底座不能按组件类型猜测闭合公式。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectMissingBenefitClosureRole() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-BENEFIT-MISSING-CLOSURE-ROLE-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "minorValue": 8000 },
+                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "benefitSnapshot": {
+                      "benefitSnapshotId": "bs_missing_closure_role_001",
+                      "benefitGroupSn": "bg_missing_closure_role_001",
+                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
+                      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+                      "components": [{
+                        "componentSn": "bc_missing_closure_role_001",
+                        "benefitType": "MERCHANT_COUPON",
+                        "componentType": "MERCHANT_DISCOUNT",
+                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "ledgerEffect": "NO_LEDGER",
+                        "fundingNature": "MERCHANT_BORNE",
+                        "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
+                        "benefitReference": { "couponId": "coupon_001", "ruleVersion": "rule_v1" },
+                        "contextVariables": {}
+                      }],
+                      "contextVariables": {}
+                    }
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("instruction.benefitSnapshot.components.closureRole");
+    }
+
+    /**
+     * 场景：样例作者把商户应收影响组件混入订单正向抵扣闭合。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：只有 ORDER_DISCOUNT_CLOSURE 组件能参与订单金额闭合。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectMixedBenefitClosureRole() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-BENEFIT-CLOSURE-ROLE-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "minorValue": 8000 },
+                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "benefitSnapshot": {
+                      "benefitSnapshotId": "bs_invalid_closure_role_001",
+                      "benefitGroupSn": "bg_invalid_closure_role_001",
+                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
+                      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+                      "components": [{
+                        "componentSn": "bc_invalid_closure_role_001",
+                        "benefitType": "MERCHANT_COUPON",
+                        "componentType": "MERCHANT_DISCOUNT",
+                        "closureRole": "MERCHANT_RECEIVABLE_EFFECT",
+                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "ledgerEffect": "NO_LEDGER",
+                        "fundingNature": "MERCHANT_BORNE",
+                        "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
+                        "benefitReference": { "couponId": "coupon_001", "ruleVersion": "rule_v1" },
+                        "contextVariables": {}
+                      }],
+                      "contextVariables": {}
+                    }
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ORDER_DISCOUNT_CLOSURE components.amount = orderAmount");
+    }
+
+    /**
+     * 场景：样例作者把当前营销规则输入放进权益引用上下文。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：资金底座不能根据当前活动规则、券包或最优券选择重算优惠。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectCurrentMarketingRuleInputs() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-BENEFIT-RECALC-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "minorValue": 8000 },
+                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "benefitSnapshot": {
+                      "benefitSnapshotId": "bs_invalid_recalc_001",
+                      "benefitGroupSn": "bg_invalid_recalc_001",
+                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
+                      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+                      "components": [{
+                        "componentSn": "bc_invalid_recalc_001",
+                        "benefitType": "MERCHANT_COUPON",
+                        "componentType": "MERCHANT_DISCOUNT",
+                        "closureRole": "ORDER_DISCOUNT_CLOSURE",
+                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "ledgerEffect": "NO_LEDGER",
+                        "fundingNature": "MERCHANT_BORNE",
+                        "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
+                        "benefitReference": {
+                          "couponId": "coupon_001",
+                          "ruleVersion": "rule_v1",
+                          "contextVariables": { "currentMarketingRule": "latest_rule" }
+                        },
+                        "contextVariables": {}
+                      }],
+                      "contextVariables": {}
+                    }
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("currentMarketingRule");
+    }
+
     private Path transactionLayerDslDir() {
         return workspaceRoot().resolve("core/src/test/resources/dsl/transaction-layer");
+    }
+
+    private Path benefitContractCaseDir() {
+        return workspaceRoot().resolve("tests/src/test/resources/dsl-contract-cases");
+    }
+
+    private List<Path> jsonSamples(Path dir) throws IOException {
+        if (!Files.isDirectory(dir)) {
+            return new ArrayList<>();
+        }
+        try (Stream<Path> sampleStream = Files.list(dir)) {
+            return new ArrayList<>(sampleStream
+                    .filter(path -> path.getFileName().toString().endsWith(".json"))
+                    .sorted()
+                    .toList());
+        }
     }
 
     private Path workspaceRoot() {
