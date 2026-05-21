@@ -21,12 +21,7 @@ public enum FundsEffectType implements DescriptiveEnum {
     RELEASE("释放"),
     CONSUME("消耗"),
     RETURN("回补"),
-    ADJUST("调整"),
-    /**
-     * @deprecated 争议是业务事件或状态，不是独立资金效果。拒付、退款等争议后的资金回退使用 {@link #RETURN}。
-     */
-    @Deprecated(since = "1.0.1", forRemoval = false)
-    DISPUTE("争议");
+    ADJUST("调整");
 
     private final String desc;
 }

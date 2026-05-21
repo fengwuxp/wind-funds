@@ -6,6 +6,7 @@ import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceTyp
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.util.Map;
 
@@ -24,11 +25,11 @@ public record ImmutableFundsInstructionReferenceSpec(FundsInstructionReferenceTy
 
     public ImmutableFundsInstructionReferenceSpec {
         AssertUtils.notNull(referenceType, "fundsInstruction.referenceType must not be null");
-        if (!hasText(referenceSn)
-                && !hasText(referenceBusinessSn)
-                && !hasText(referenceLedgerTransactionSn)
-                && !hasText(externalTransactionId)
-                && !hasText(authCode)) {
+        if (!StringUtils.hasText(referenceSn)
+                && !StringUtils.hasText(referenceBusinessSn)
+                && !StringUtils.hasText(referenceLedgerTransactionSn)
+                && !StringUtils.hasText(externalTransactionId)
+                && !StringUtils.hasText(authCode)) {
             throw new IllegalArgumentException("fundsInstruction.reference identifier is required");
         }
         contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
@@ -68,10 +69,6 @@ public record ImmutableFundsInstructionReferenceSpec(FundsInstructionReferenceTy
     @Override
     public @Nullable String getAuthCode() {
         return authCode;
-    }
-
-    private static boolean hasText(@Nullable String value) {
-        return value != null && !value.isBlank();
     }
 
 }

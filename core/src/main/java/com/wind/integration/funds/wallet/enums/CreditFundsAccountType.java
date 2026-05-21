@@ -30,10 +30,10 @@ public enum CreditFundsAccountType implements DescriptiveEnum {
 
     private static final Map<DefaultFundsAccountType, CreditFundsAccountType> BY_DEFAULT_ACCOUNT_TYPE =
             Arrays.stream(values())
-                    .collect(Collectors.toUnmodifiableMap(CreditFundsAccountType::getLegacyAccountType,
+                    .collect(Collectors.toUnmodifiableMap(CreditFundsAccountType::getAccountType,
                             Function.identity()));
 
-    private final DefaultFundsAccountType legacyAccountType;
+    private final DefaultFundsAccountType accountType;
 
     private final String desc;
 

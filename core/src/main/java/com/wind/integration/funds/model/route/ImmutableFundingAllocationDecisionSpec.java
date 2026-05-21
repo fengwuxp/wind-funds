@@ -7,6 +7,7 @@ import com.wind.transaction.core.Money;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 /**
  * 不可变资金来源决策明细实现。
@@ -27,13 +28,9 @@ public record ImmutableFundingAllocationDecisionSpec(String allocationId,
         if (amount.getAmount() <= 0) {
             throw new IllegalArgumentException("funding allocation amount must be positive");
         }
-        if (!hasText(reason)) {
+        if (!StringUtils.hasText(reason)) {
             throw new IllegalArgumentException("funding allocation reason is required");
         }
-    }
-
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 
     @Override

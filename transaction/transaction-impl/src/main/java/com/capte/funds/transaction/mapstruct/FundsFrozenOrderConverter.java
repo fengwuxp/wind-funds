@@ -9,6 +9,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
+import org.springframework.util.StringUtils;
 
 /**
  * 资金冻结单模型转换器。
@@ -50,19 +51,14 @@ public interface FundsFrozenOrderConverter {
     @AfterMapping
     default void fillCreateDefaults(CreateFundsFrozenOrderRequest request, @MappingTarget FundsFrozenOrder entity) {
         entity.setReleasedAmount(0L);
-        entity.setConsumedAmount(0L);
         entity.setStatus(request.getStatus() == null
                 ? resolveInitialStatus(request)
                 : request.getStatus());
     }
 
     private FundsFrozenOrderStatus resolveInitialStatus(CreateFundsFrozenOrderRequest request) {
-        return hasText(request.getFreezeLedgerTransactionSn())
+        return StringUtils.hasText(request.getFreezeLedgerTransactionSn())
                 ? FundsFrozenOrderStatus.FROZEN
                 : FundsFrozenOrderStatus.CREATED;
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 }

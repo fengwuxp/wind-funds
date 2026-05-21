@@ -49,7 +49,7 @@ public enum FundingAccountType implements DescriptiveEnum {
 
     private static final Map<DefaultFundsAccountType, FundingAccountType> BY_DEFAULT_ACCOUNT_TYPE =
             Arrays.stream(values())
-                    .collect(Collectors.toUnmodifiableMap(FundingAccountType::getLegacyAccountType,
+                    .collect(Collectors.toUnmodifiableMap(FundingAccountType::getAccountType,
                             Function.identity()));
 
     private static final Set<String> NON_FUNDING_ACCOUNT_TYPE_NAMES = Set.of(
@@ -62,10 +62,7 @@ public enum FundingAccountType implements DescriptiveEnum {
             RouteNodeType.EXTERNAL_ACCOUNT.name()
     );
 
-    /**
-     * 迁移期兼容的默认账户类型。
-     */
-    private final DefaultFundsAccountType legacyAccountType;
+    private final DefaultFundsAccountType accountType;
 
     private final String desc;
 

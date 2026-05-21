@@ -2,6 +2,7 @@ package com.capte.funds.governance.projection;
 
 import lombok.Builder;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 
@@ -25,13 +26,9 @@ public record FundsTransactionProjectionReplayRange(@Nullable String sourceSn,
                                                     @Nullable String batchSn) {
 
     public boolean isBounded() {
-        return hasText(sourceSn)
-                || (hasText(ownerType) && hasText(ownerId))
+        return StringUtils.hasText(sourceSn)
+                || (StringUtils.hasText(ownerType) && StringUtils.hasText(ownerId))
                 || (startTime != null && endTime != null && startTime.isBefore(endTime))
-                || (hasText(batchType) && hasText(batchSn));
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
+                || (StringUtils.hasText(batchType) && StringUtils.hasText(batchSn));
     }
 }

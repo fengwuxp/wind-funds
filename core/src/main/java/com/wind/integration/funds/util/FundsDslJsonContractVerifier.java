@@ -26,6 +26,7 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -91,7 +92,7 @@ public final class FundsDslJsonContractVerifier {
         if (fixtureLevel == null) {
             return;
         }
-        if (!(fixtureLevel instanceof String value) || value.isBlank()) {
+        if (!(fixtureLevel instanceof String value) || !StringUtils.hasText(value)) {
             throw new IllegalArgumentException("fixtureLevel is required");
         }
         if (!"CONTRACT_ONLY".equals(value)) {
@@ -183,7 +184,7 @@ public final class FundsDslJsonContractVerifier {
                     "instruction.benefitSnapshot.components.fundingSubjectRef");
             if (ledgerEffect == FundsBenefitLedgerEffect.POSTING_REQUIRED
                     && component.get("fundingSubjectRef") == null
-                    && !hasText(component.get("fundingAccountRole"))) {
+                    && !isTextValue(component.get("fundingAccountRole"))) {
                 throw new IllegalArgumentException(
                         "instruction.benefitSnapshot.components funding source is required for POSTING_REQUIRED");
             }
@@ -234,12 +235,12 @@ public final class FundsDslJsonContractVerifier {
         if (reference == null) {
             throw new IllegalArgumentException(path + " is required");
         }
-        if (ledgerEffect == FundsBenefitLedgerEffect.HOLD_ONLY && !hasText(reference.get("holdId"))) {
+        if (ledgerEffect == FundsBenefitLedgerEffect.HOLD_ONLY && !isTextValue(reference.get("holdId"))) {
             throw new IllegalArgumentException(path + ".holdId is required for HOLD_ONLY");
         }
         if (ledgerEffect == FundsBenefitLedgerEffect.RELEASE_ONLY
-                && !hasText(reference.get("holdId"))
-                && !hasText(reference.get("releaseId"))) {
+                && !isTextValue(reference.get("holdId"))
+                && !isTextValue(reference.get("releaseId"))) {
             throw new IllegalArgumentException(path + ".holdId or releaseId is required for RELEASE_ONLY");
         }
         verifyBenefitContext(asNullableMap(reference.get("contextVariables"), path + ".contextVariables"),
@@ -259,9 +260,9 @@ public final class FundsDslJsonContractVerifier {
         verifyMoney(policy, "refundableAmount", path + ".refundableAmount", false, false);
         verifyMoney(policy, "nonRefundableAmount", path + ".nonRefundableAmount", false, false);
         if (dispositions.contains(FundsBenefitRefundDisposition.NO_REFUND.name())
-                && !hasText(policy.get("refundRuleVersion"))
-                && !hasText(policy.get("refundDecisionId"))
-                && !hasText(policy.get("decisionSource"))) {
+                && !isTextValue(policy.get("refundRuleVersion"))
+                && !isTextValue(policy.get("refundDecisionId"))
+                && !isTextValue(policy.get("decisionSource"))) {
             throw new IllegalArgumentException(path + " NO_REFUND requires rule version or decision reference");
         }
         verifyBenefitContext(asNullableMap(policy.get("contextVariables"), path + ".contextVariables"),
@@ -370,7 +371,7 @@ public final class FundsDslJsonContractVerifier {
 
     private static @NonNull Money parseMoney(@NonNull Map<String, ?> values, boolean positive) {
         Object rawCurrency = values.get("currency");
-        if (!(rawCurrency instanceof String currency) || currency.isBlank()) {
+        if (!(rawCurrency instanceof String currency) || !StringUtils.hasText(currency)) {
             throw new IllegalArgumentException("money.currency is required");
         }
         if (!values.containsKey("minorValue")) {
@@ -427,7 +428,7 @@ public final class FundsDslJsonContractVerifier {
         if (rawValue == null && !required) {
             return null;
         }
-        if (!(rawValue instanceof String value) || value.isBlank()) {
+        if (!(rawValue instanceof String value) || !StringUtils.hasText(value)) {
             throw new IllegalArgumentException(path + " is required");
         }
         return enumValue(enumType, value, path);
@@ -447,14 +448,14 @@ public final class FundsDslJsonContractVerifier {
 
     private static String requireText(Map<String, ?> owner, String fieldName, String path) {
         Object value = owner.get(fieldName);
-        if (!(value instanceof String text) || text.isBlank()) {
+        if (!(value instanceof String text) || !StringUtils.hasText(text)) {
             throw new IllegalArgumentException(path + " is required");
         }
         return text;
     }
 
-    private static boolean hasText(Object value) {
-        return value instanceof String text && !text.isBlank();
+    private static boolean isTextValue(Object value) {
+        return value instanceof String text && StringUtils.hasText(text);
     }
 
     private static long addExact(long left, long right, String message) {
@@ -495,7 +496,7 @@ public final class FundsDslJsonContractVerifier {
         }
         List<String> texts = new ArrayList<>(values.size());
         for (Object value : values) {
-            if (!(value instanceof String text) || text.isBlank()) {
+            if (!(value instanceof String text) || !StringUtils.hasText(text)) {
                 throw new IllegalArgumentException(path + " must contain text values");
             }
             texts.add(text);

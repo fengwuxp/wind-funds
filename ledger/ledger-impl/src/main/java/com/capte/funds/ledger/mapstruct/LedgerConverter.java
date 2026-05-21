@@ -20,6 +20,7 @@ import com.wind.transaction.core.Money;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
+import org.springframework.util.StringUtils;
 
 /**
  * 账户账本 Converter
@@ -158,7 +159,7 @@ public interface LedgerConverter {
      * @return balance constraint type
      */
     default LedgerBalanceConstraintType toLedgerBalanceConstraintType(String value) {
-        return hasText(value) ? LedgerBalanceConstraintType.valueOf(value) : null;
+        return StringUtils.hasText(value) ? LedgerBalanceConstraintType.valueOf(value) : null;
     }
 
     /**
@@ -168,7 +169,7 @@ public interface LedgerConverter {
      * @return posting intent type
      */
     default LedgerPostingIntentType toLedgerPostingIntentType(String value) {
-        return hasText(value) ? LedgerPostingIntentType.valueOf(value) : null;
+        return StringUtils.hasText(value) ? LedgerPostingIntentType.valueOf(value) : null;
     }
 
     /**
@@ -178,7 +179,7 @@ public interface LedgerConverter {
      * @return posting scope
      */
     default LedgerPostingScope toLedgerPostingScope(String value) {
-        return hasText(value) ? LedgerPostingScope.valueOf(value) : null;
+        return StringUtils.hasText(value) ? LedgerPostingScope.valueOf(value) : null;
     }
 
     /**
@@ -188,7 +189,7 @@ public interface LedgerConverter {
      * @return balance effect type
      */
     default LedgerBalanceEffectType toLedgerBalanceEffectType(String value) {
-        return hasText(value) ? LedgerBalanceEffectType.valueOf(value) : null;
+        return StringUtils.hasText(value) ? LedgerBalanceEffectType.valueOf(value) : null;
     }
 
     /**
@@ -198,16 +199,6 @@ public interface LedgerConverter {
      * @return ledger phase code
      */
     default LedgerPhaseCode toLedgerPhaseCode(String value) {
-        return hasText(value) ? LedgerPhaseCode.valueOf(value) : null;
-    }
-
-    /**
-     * Check text value.
-     *
-     * @param value source value
-     * @return true if value has text
-     */
-    default boolean hasText(String value) {
-        return value != null && !value.isBlank();
+        return StringUtils.hasText(value) ? LedgerPhaseCode.valueOf(value) : null;
     }
 }

@@ -10,7 +10,6 @@ import com.capte.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.capte.funds.ledger.dal.mapper.LedgerTransactionMapper;
 import com.capte.funds.ledger.dto.LedgerEntryDTO;
-import com.capte.funds.ledger.dto.LedgerTransactionCreateResult;
 import com.capte.funds.ledger.dto.LedgerTransactionDTO;
 import com.capte.funds.ledger.dto.LedgerTransactionPostResult;
 import com.capte.funds.ledger.mapstruct.LedgerConverter;
@@ -44,6 +43,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -148,15 +148,6 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             }
         }
         return toPostResult(entity.getId(), true);
-    }
-
-    @Override
-    @Deprecated(since = "1.0.1", forRemoval = false)
-    public @NonNull LedgerTransactionCreateResult createLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
-        LedgerTransactionPostResult result = postLedgerTransaction(transaction);
-        return new LedgerTransactionCreateResult()
-                .setLedgerTransactionId(result.getLedgerTransactionId())
-                .setCreated(result.isNewlyPosted());
     }
 
     private LedgerTransactionPostResult resolveExistingLedgerTransaction(LedgerTransaction entity) {
@@ -372,7 +363,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
     }
 
     private String defaultIfBlank(String value, String defaultValue) {
-        return value == null || value.isBlank() ? defaultValue : value;
+        return StringUtils.hasText(value) ? value : defaultValue;
     }
 
     private String currentReconciliationBatch() {

@@ -30,6 +30,7 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -126,8 +127,8 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     private boolean sameBusinessEvent(FundsTransactionDetail detail,
                                       @Nullable String businessScene,
                                       @Nullable String businessSn) {
-        return hasText(businessScene)
-                && hasText(businessSn)
+        return StringUtils.hasText(businessScene)
+                && StringUtils.hasText(businessSn)
                 && businessScene.equals(detail.getBusinessScene())
                 && businessSn.equals(detail.getBusinessSn());
     }
@@ -136,7 +137,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     public @NonNull Optional<RouteSnapshotSpec> findRouteSnapshotByTransactionSn(@NonNull String transactionSn) {
         AssertUtils.hasText(transactionSn, "资金交易流水号不能为空");
         FundsTransaction transaction = findTransactionBySnNullable(transactionSn);
-        if (transaction == null || !hasText(transaction.getRouteSnapshot())) {
+        if (transaction == null || !StringUtils.hasText(transaction.getRouteSnapshot())) {
             return Optional.empty();
         }
         return Optional.of(RouteSnapshotJsonSupport.parseRouteSnapshot(
@@ -154,7 +155,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         if (frozenOrderSnapshot.isPresent()) {
             return frozenOrderSnapshot;
         }
-        return hasText(order.getTransactionSn())
+        return StringUtils.hasText(order.getTransactionSn())
                 ? findRouteSnapshotByTransactionSn(order.getTransactionSn())
                 : Optional.empty();
     }
@@ -181,7 +182,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     }
 
     private Long consumedReplayLegAmountFromContext(FundsTransactionDetail detail, String replayRefLegId) {
-        if (!hasText(detail.getContextVariables())) {
+        if (!StringUtils.hasText(detail.getContextVariables())) {
             return null;
         }
         JSONObject values = JSON.parseObject(detail.getContextVariables());
@@ -198,7 +199,7 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         if (detail.getEventType() != FundsTransactionEventType.WITHDRAW
                 || !FundsRouteLegIds.FREEZE.equals(replayRefLegId)
                 || detail.getParticipantRole() == RouteParticipantRole.FEE_RECEIVER
-                || !hasText(detail.getReferenceDetailSn())) {
+                || !StringUtils.hasText(detail.getReferenceDetailSn())) {
             return null;
         }
         return detail.getAmount();
@@ -218,18 +219,14 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     }
 
     private Optional<RouteSnapshotSpec> findRouteSnapshotInFreezeOrder(FundsFrozenOrder order) {
-        if (!hasText(order.getContextVariables())) {
+        if (!StringUtils.hasText(order.getContextVariables())) {
             return Optional.empty();
         }
         JSONObject values = JSON.parseObject(order.getContextVariables());
         String routeSnapshot = values.getString(FundsInstructionContextKeys.ROUTE_SNAPSHOT);
-        if (!hasText(routeSnapshot)) {
+        if (!StringUtils.hasText(routeSnapshot)) {
             return Optional.empty();
         }
         return Optional.of(RouteSnapshotJsonSupport.parseRouteSnapshot(routeSnapshot, order.getGmtCreate()));
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 }

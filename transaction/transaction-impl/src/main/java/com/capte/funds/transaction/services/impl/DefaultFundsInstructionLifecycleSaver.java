@@ -15,7 +15,7 @@ import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.capte.funds.transaction.model.FundsTransactionParticipant;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
-import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
+import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
@@ -38,6 +38,7 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -58,7 +59,7 @@ import java.util.TreeMap;
  */
 @Service
 @AllArgsConstructor
-public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLifecycleSaver {
+public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLifecycleRecorder {
 
     private static final WindSequenceType FUNDS_TRANSACTION_SEQUENCE_TYPE = WindSequenceType.immutable(
             "FUNDS_TRANSACTION", "FT", 6);
@@ -170,7 +171,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     private FundsTransaction findReferenceTransaction(FundsInstructionSpec instruction) {
         FundsInstructionReferenceSpec reference = instruction.getReference();
         if (reference == null
-                || !hasText(reference.getReferenceSn())
+                || !StringUtils.hasText(reference.getReferenceSn())
                 || !isFundsTransactionReference(reference.getReferenceType())) {
             return null;
         }
@@ -513,7 +514,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     }
 
     private Boolean resolveApproved(FundsTransactionDetail detail) {
-        if (!hasText(detail.getContextVariables())) {
+        if (!StringUtils.hasText(detail.getContextVariables())) {
             return null;
         }
         JSONObject values = JSON.parseObject(detail.getContextVariables());
@@ -556,7 +557,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private String resolveMainBusinessSn(FundsInstructionSpec instruction) {
         FundsInstructionReferenceSpec reference = instruction.getReference();
-        if (reference != null && hasText(reference.getReferenceBusinessSn())) {
+        if (reference != null && StringUtils.hasText(reference.getReferenceBusinessSn())) {
             return reference.getReferenceBusinessSn();
         }
         return instruction.getBusinessSn();
@@ -629,7 +630,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         String subjectKey = subjectKey(participant.getSubjectRef());
         return routeSnapshot.getLegs()
                 .stream()
-                .filter(leg -> leg.getReplayRefLegId() != null && !leg.getReplayRefLegId().isBlank())
+                .filter(leg -> StringUtils.hasText(leg.getReplayRefLegId()))
                 .filter(leg -> subjectKey(leg.getSourceNode().getSubjectRef()).equals(subjectKey)
                         || subjectKey(leg.getTargetNode().getSubjectRef()).equals(subjectKey))
                 .map(RouteLegSpec::getReplayRefLegId)
@@ -640,7 +641,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     private String resolveLedgerTransactionSn(List<FundsTransactionDetail> details) {
         return details.stream()
                 .map(FundsTransactionDetail::getLedgerTransactionSn)
-                .filter(this::hasText)
+                .filter(StringUtils::hasText)
                 .findFirst()
                 .orElse(null);
     }
@@ -666,7 +667,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private String resolveParticipantDescription(FundsInstructionSpec instruction,
                                                  RouteParticipantSpec participant) {
-        return hasText(participant.getDescription()) ? participant.getDescription() : instruction.getDescription();
+        return StringUtils.hasText(participant.getDescription()) ? participant.getDescription()
+                : instruction.getDescription();
     }
 
     private Map<String, Object> mergedContext(FundsInstructionSpec instruction, RouteParticipantSpec participant) {
@@ -693,7 +695,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         Map<String, Long> result = new LinkedHashMap<>();
         for (RouteLegSpec leg : routeSnapshot.getLegs()) {
             String replayRefLegId = leg.getReplayRefLegId();
-            if (replayRefLegId == null || replayRefLegId.isBlank()
+            if (!StringUtils.hasText(replayRefLegId)
                     || !replayConsumedLegIds.contains(replayRefLegId)) {
                 continue;
             }
@@ -786,7 +788,4 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         return message.substring(0, MAX_ERROR_MESSAGE_LENGTH);
     }
 
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
 }

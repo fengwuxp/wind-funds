@@ -3,6 +3,7 @@ package com.wind.integration.funds.util;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -22,7 +23,7 @@ public final class FundsDslMoneyParser {
 
     public static @NonNull Money parse(@NonNull Map<String, ?> values) {
         Object rawCurrency = values.get(CURRENCY_FIELD);
-        if (!(rawCurrency instanceof String currency) || currency.isBlank()) {
+        if (!(rawCurrency instanceof String currency) || !StringUtils.hasText(currency)) {
             throw new IllegalArgumentException("money.currency is required");
         }
         if (!values.containsKey(MINOR_VALUE_FIELD)) {

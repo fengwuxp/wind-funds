@@ -38,6 +38,7 @@ import com.wind.sequence.time.TemporalSequenceFactory;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -392,21 +393,17 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     }
 
     private String createOperatorId(CreatePaymentInstrumentBindingRequest request) {
-        if (hasText(request.getOperatorId())) {
+        if (StringUtils.hasText(request.getOperatorId())) {
             return request.getOperatorId();
         }
         return DEFAULT_CREATE_OPERATOR_ID;
     }
 
     private String createChangeReason(CreatePaymentInstrumentBindingRequest request) {
-        if (hasText(request.getChangeReason())) {
+        if (StringUtils.hasText(request.getChangeReason())) {
             return request.getChangeReason();
         }
         return DEFAULT_CREATE_REASON;
-    }
-
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 
     private void assertNoRawSensitiveInstrumentNo(CreatePaymentInstrumentRequest request) {

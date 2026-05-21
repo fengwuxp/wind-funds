@@ -38,6 +38,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -249,7 +250,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         FundsInstructionReferenceSpec reference = instruction.getReference();
         AssertUtils.isTrue(reference != null
                         && reference.getReferenceType() == FundsInstructionReferenceType.FREEZE_ORDER
-                        && hasText(reference.getReferenceSn()),
+                        && StringUtils.hasText(reference.getReferenceSn()),
                 "提现必须引用冻结单");
         Optional<RouteSnapshotSpec> routeSnapshot =
                 fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(reference.getReferenceSn());
@@ -450,7 +451,4 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
         return 0;
     }
 
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
 }

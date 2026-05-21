@@ -91,7 +91,7 @@ DoR 检查步骤：
 1. 代码、测试、DSL 契约和系分设计一致，若发现设计错漏，先回补设计再继续。
 2. 覆盖本批次对应 TDD 用例和必须失败红线。
 3. 资金变化测试同时断言状态、route snapshot、posting plan、ledger entry、余额投影和幂等。
-4. 不恢复历史测试源码或已废弃断言，不以历史测试通过替代当前最终版 TDD 断言。
+4. 不恢复旧测试源码或旧过渡断言，不以旧测试通过替代当前最终版 TDD 断言。
 5. 不引入未确认概念、无主依赖、真实外部调用、生产配置或敏感数据。
 6. 交付说明列出覆盖用例、验证命令、验证结果、未覆盖项和残余风险。
 7. 涉及生产行为的批次必须说明并发边界、幂等和锁保护、告警指标、降级/回滚或补偿路径。
@@ -112,7 +112,7 @@ DoD 检查步骤：
 | 步骤 | 检查问题 | 未通过时结论 |
 | --- | --- | --- |
 | 1. 范围是否一致 | 实际修改是否仍在 Execution Grant 写入范围内，未越过只读范围和非目标。 | Not Done。 |
-| 2. 契约是否闭合 | face、DTO、Request、Query、枚举、错误码、DSL fixture 和兼容性说明是否齐全。 | Not Done 或 Conditional Done。 |
+| 2. 契约是否闭合 | face、DTO、Request、Query、枚举、错误码、DSL fixture 和目标态语义说明是否齐全。 | Not Done 或 Conditional Done。 |
 | 3. 资金断言是否齐全 | 有资金变化的测试是否覆盖状态、route、posting、entry、projection、幂等和审计。 | Not Done。 |
 | 4. 数据落地是否齐全 | 涉及持久化时，DDL/H2 schema、Entity/Mapper、唯一键、索引和迁移影响是否说明。 | Not Done。 |
 | 5. 验证是否执行 | 编译、专项测试、边界测试或无法执行原因是否列明。 | Not Done。 |

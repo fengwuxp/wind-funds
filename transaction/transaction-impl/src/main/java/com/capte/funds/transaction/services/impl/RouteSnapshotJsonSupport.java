@@ -40,6 +40,7 @@ import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -451,7 +452,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static LedgerSubjectCode parseLedgerSubjectCode(String value) {
-        return hasText(value) ? LedgerSubjectCode.valueOf(value) : null;
+        return StringUtils.hasText(value) ? LedgerSubjectCode.valueOf(value) : null;
     }
 
     private static PlatformAccountsSnapshotSpec parsePlatformAccounts(JSONObject value) {
@@ -469,14 +470,11 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static LocalDateTime parseLocalDateTime(String value, LocalDateTime defaultValue) {
-        return hasText(value) ? LocalDateTime.parse(value) : defaultValue;
+        return StringUtils.hasText(value) ? LocalDateTime.parse(value) : defaultValue;
     }
 
     private static Map<String, Object> parseObjectMap(JSONObject value) {
         return value == null || value.isEmpty() ? Map.of() : Map.copyOf(value);
     }
 
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
 }

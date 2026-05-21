@@ -1,7 +1,6 @@
 package com.capte.funds.ledger.service;
 
 import com.capte.funds.ledger.dto.LedgerEntryDTO;
-import com.capte.funds.ledger.dto.LedgerTransactionCreateResult;
 import com.capte.funds.ledger.dto.LedgerTransactionDTO;
 import com.capte.funds.ledger.dto.LedgerTransactionPostResult;
 import com.capte.funds.ledger.query.LedgerEntryQuery;
@@ -28,22 +27,7 @@ public interface LedgerTransactionService {
      * @return 账户账本交易入账结果
      */
     @NonNull
-    default LedgerTransactionPostResult postLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
-        LedgerTransactionCreateResult result = createLedgerTransaction(transaction);
-        return new LedgerTransactionPostResult()
-                .setLedgerTransactionId(result.getLedgerTransactionId())
-                .setNewlyPosted(result.isCreated());
-    }
-
-    /**
-     * 创建 账户账本交易。
-     *
-     * @param transaction 创建请求对象
-     * @return 账户账本交易创建结果
-     * @deprecated use {@link #postLedgerTransaction(LedgerTransactionSpec)}. 该操作具有幂等入账语义。
-     */
-    @Deprecated(since = "1.0.1", forRemoval = false)
-    @NonNull LedgerTransactionCreateResult createLedgerTransaction(@NonNull LedgerTransactionSpec transaction);
+    LedgerTransactionPostResult postLedgerTransaction(@NonNull LedgerTransactionSpec transaction);
 
     /**
      * 更新 账户账本交易

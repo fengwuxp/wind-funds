@@ -13,6 +13,7 @@ import com.wind.transaction.core.Money;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -53,7 +54,8 @@ public record ImmutableRouteLegSpec(String legId,
         if (exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("routeLeg.exchangeRate must be positive");
         }
-        if (periodType != null && periodType != AccountBalancePeriodType.LIFETIME && !hasText(periodId)) {
+        if (periodType != null && periodType != AccountBalancePeriodType.LIFETIME
+                && !StringUtils.hasText(periodId)) {
             throw new IllegalArgumentException("routeLeg.periodId is required for non-lifetime period");
         }
         constraintOverrides = Map.copyOf(constraintOverrides == null ? Map.of() : constraintOverrides);
@@ -65,10 +67,6 @@ public record ImmutableRouteLegSpec(String legId,
         if (nodeType == RouteNodeType.PAYMENT_INSTRUMENT || nodeType == RouteNodeType.EXTERNAL_ACCOUNT) {
             throw new IllegalArgumentException("RouteLeg " + fieldName + " must be ledger-postable");
         }
-    }
-
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
     }
 
     @Override

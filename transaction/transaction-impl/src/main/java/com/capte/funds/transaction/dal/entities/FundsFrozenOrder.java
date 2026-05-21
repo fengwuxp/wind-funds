@@ -70,13 +70,6 @@ public class FundsFrozenOrder implements Serializable, TenantIsolationObject<Lon
     @NotNull
     private Long releasedAmount;
 
-    /**
-     * @deprecated 冻结单不再用自身字段表达消费或扣划。提现出款确认、追偿、退款或调账必须作为独立资金事实引用冻结单。
-     */
-    @Deprecated(since = "1.0.1", forRemoval = false)
-    @NotNull
-    private Long consumedAmount;
-
     @NotNull
     private CurrencyIsoCode currency;
 
@@ -86,12 +79,6 @@ public class FundsFrozenOrder implements Serializable, TenantIsolationObject<Lon
     private LocalDateTime expireTime;
 
     private LocalDateTime releaseTime;
-
-    /**
-     * @deprecated 冻结单不再用自身字段表达消费或扣划。提现出款确认、追偿、退款或调账必须作为独立资金事实引用冻结单。
-     */
-    @Deprecated(since = "1.0.1", forRemoval = false)
-    private LocalDateTime consumeTime;
 
     private String description;
 

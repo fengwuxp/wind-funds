@@ -5,7 +5,7 @@ import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 final class RouteReplaySupport {
 
@@ -18,7 +18,7 @@ final class RouteReplaySupport {
         }
         FundsInstructionReferenceSpec reference = instruction.getReference();
         return reference != null
-                && hasText(reference.getReferenceSn())
+                && StringUtils.hasText(reference.getReferenceSn())
                 && isRouteSnapshotReference(reference.getReferenceType());
     }
 
@@ -36,7 +36,4 @@ final class RouteReplaySupport {
         };
     }
 
-    private static boolean hasText(@Nullable String value) {
-        return value != null && !value.isBlank();
-    }
 }

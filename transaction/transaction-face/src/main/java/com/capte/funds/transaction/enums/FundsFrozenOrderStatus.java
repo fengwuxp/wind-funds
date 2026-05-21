@@ -18,16 +18,6 @@ public enum FundsFrozenOrderStatus implements DescriptiveEnum {
     FROZEN("已冻结"),
     PARTIALLY_RELEASED("部分释放"),
     RELEASED("已释放"),
-    /**
-     * @deprecated 冻结单只表达同主体 AVAILABLE 与 FROZEN 的控制事实，不再用冻结状态表达消费或扣划。
-     */
-    @Deprecated(since = "1.0.1", forRemoval = false)
-    PARTIALLY_CONSUMED("部分消耗"),
-    /**
-     * @deprecated 冻结单只表达同主体 AVAILABLE 与 FROZEN 的控制事实，不再用冻结状态表达消费或扣划。
-     */
-    @Deprecated(since = "1.0.1", forRemoval = false)
-    CONSUMED("已消耗"),
     EXPIRED("已过期"),
     CLOSED("已关闭");
 

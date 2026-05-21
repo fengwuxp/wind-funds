@@ -8,7 +8,7 @@ import com.capte.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
-import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
+import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.ref.SubjectRef;
@@ -24,6 +24,7 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -44,7 +45,7 @@ import java.util.TreeMap;
  */
 @Service
 @AllArgsConstructor
-public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLifecycleSaver {
+public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLifecycleRecorder {
 
     private static final WindSequenceType FUNDS_FROZEN_ORDER_SEQUENCE_TYPE = WindSequenceType.immutable(
             "FUNDS_FROZEN_ORDER", "FO", 6);
@@ -126,7 +127,6 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         entity.setBusinessSn(instruction.getBusinessSn());
         entity.setAmount(instruction.getAmount().getAmount());
         entity.setReleasedAmount(0L);
-        entity.setConsumedAmount(0L);
         entity.setCurrency(instruction.getAmount().getCurrency());
         entity.setStatus(FundsFrozenOrderStatus.CREATED);
         entity.setDescription(instruction.getDescription());
@@ -153,7 +153,6 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         entity.setBusinessSn(instruction.getBusinessSn());
         entity.setAmount(instruction.getAmount().getAmount());
         entity.setReleasedAmount(0L);
-        entity.setConsumedAmount(0L);
         entity.setCurrency(instruction.getAmount().getCurrency());
         entity.setStatus(FundsFrozenOrderStatus.CREATED);
         entity.setDescription(instruction.getDescription());
@@ -185,7 +184,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     }
 
     private FundsFrozenOrder findReferencedFrozenOrder(@Nullable FundsInstructionReferenceSpec reference) {
-        AssertUtils.isTrue(reference != null && hasText(reference.getReferenceSn()),
+        AssertUtils.isTrue(reference != null && StringUtils.hasText(reference.getReferenceSn()),
                 "解冻事件必须引用冻结单");
         return findFrozenOrderBySn(reference.getReferenceSn());
     }
@@ -205,15 +204,11 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
                 || order.getStatus() == FundsFrozenOrderStatus.CLOSED;
     }
 
-    private boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
-
     private void assertSameRequest(FundsFrozenOrder order,
                                    FundsInstructionSpec instruction,
                                    RouteSnapshotSpec routeSnapshot) {
         String requestHash = requestHash(order);
-        if (hasText(requestHash)) {
+        if (StringUtils.hasText(requestHash)) {
             AssertUtils.isTrue(Objects.equals(requestHash, computeRequestHash(instruction, routeSnapshot)),
                     "资金冻结单请求参数不一致，sn = {}", order.getSn());
             return;
@@ -271,12 +266,13 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     }
 
     private FundsTransactionEventType resolveEventType(FundsFrozenOrder order) {
-        if (!hasText(order.getContextVariables())) {
+        if (!StringUtils.hasText(order.getContextVariables())) {
             return FundsTransactionEventType.FREEZE;
         }
         JSONObject values = JSON.parseObject(order.getContextVariables());
         String eventType = values.getString(FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE);
-        return hasText(eventType) ? FundsTransactionEventType.valueOf(eventType) : FundsTransactionEventType.FREEZE;
+        return StringUtils.hasText(eventType) ? FundsTransactionEventType.valueOf(eventType)
+                : FundsTransactionEventType.FREEZE;
     }
 
     private String resolveFreezeType(FundsInstructionSpec instruction) {
@@ -295,7 +291,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     }
 
     private String requestHash(FundsFrozenOrder order) {
-        if (!hasText(order.getContextVariables())) {
+        if (!StringUtils.hasText(order.getContextVariables())) {
             return null;
         }
         JSONObject values = JSON.parseObject(order.getContextVariables());
@@ -303,7 +299,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     }
 
     private String referenceFreezeSn(FundsFrozenOrder order) {
-        if (!hasText(order.getContextVariables())) {
+        if (!StringUtils.hasText(order.getContextVariables())) {
             return null;
         }
         JSONObject values = JSON.parseObject(order.getContextVariables());

@@ -2,7 +2,6 @@ package com.capte.funds.transaction.services.impl;
 
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
-import com.capte.funds.transaction.services.FundsInstructionLifecycleSaver;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
@@ -23,7 +22,7 @@ import java.util.List;
 @Service
 @Primary
 @AllArgsConstructor
-public class DelegatingFundsInstructionLifecycleRecorder implements FundsInstructionLifecycleSaver {
+public class DelegatingFundsInstructionLifecycleRecorder implements FundsInstructionLifecycleRecorder {
 
     private final List<FundsInstructionLifecycleRecorder> delegates;
 

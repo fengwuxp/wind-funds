@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.funds.util.FundsDslJsonContractVerifier;
 import org.junit.jupiter.api.Test;
+import org.springframework.util.StringUtils;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -330,7 +331,7 @@ class FundsDslJsonContractTests {
 
     private Path workspaceRoot() {
         String multiModuleDir = System.getProperty("maven.multiModuleProjectDirectory");
-        if (multiModuleDir != null && !multiModuleDir.isBlank()) {
+        if (StringUtils.hasText(multiModuleDir)) {
             return Path.of(multiModuleDir);
         }
         Path current = Path.of("").toAbsolutePath();

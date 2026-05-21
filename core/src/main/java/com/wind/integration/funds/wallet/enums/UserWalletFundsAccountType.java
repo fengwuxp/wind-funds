@@ -36,13 +36,10 @@ public enum UserWalletFundsAccountType implements DescriptiveEnum {
 
     private static final Map<DefaultFundsAccountType, UserWalletFundsAccountType> BY_DEFAULT_ACCOUNT_TYPE =
             Arrays.stream(values())
-                    .collect(Collectors.toUnmodifiableMap(UserWalletFundsAccountType::getLegacyAccountType,
+                    .collect(Collectors.toUnmodifiableMap(UserWalletFundsAccountType::getAccountType,
                             Function.identity()));
 
-    /**
-     * 迁移期兼容的默认账户类型。
-     */
-    private final DefaultFundsAccountType legacyAccountType;
+    private final DefaultFundsAccountType accountType;
 
     private final String desc;
 

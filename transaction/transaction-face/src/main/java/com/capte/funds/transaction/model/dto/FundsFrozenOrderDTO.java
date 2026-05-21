@@ -75,13 +75,6 @@ public class FundsFrozenOrderDTO implements Serializable {
     @Schema(description = "已释放金额")
     private Long releasedAmount;
 
-    /**
-     * @deprecated 兼容历史字段。冻结单不再用自身字段表达消费或扣划。
-     */
-    @Deprecated(since = "1.0.1", forRemoval = false)
-    @Schema(description = "已消耗金额（历史兼容字段，不作为冻结单目标态消费语义）")
-    private Long consumedAmount;
-
     @Schema(description = "币种")
     private CurrencyIsoCode currency;
 
@@ -93,13 +86,6 @@ public class FundsFrozenOrderDTO implements Serializable {
 
     @Schema(description = "完全释放时间")
     private LocalDateTime releaseTime;
-
-    /**
-     * @deprecated 兼容历史字段。冻结单不再用自身字段表达消费或扣划。
-     */
-    @Deprecated(since = "1.0.1", forRemoval = false)
-    @Schema(description = "完全消耗时间（历史兼容字段，不作为冻结单目标态消费语义）")
-    private LocalDateTime consumeTime;
 
     @Schema(description = "描述")
     private String description;

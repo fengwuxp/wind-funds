@@ -3,7 +3,6 @@ package com.capte.funds.transaction.services.impl;
 import com.capte.funds.transaction.dal.entities.FundsFrozenOrder;
 import com.capte.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
-import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.mapstruct.FundsFrozenOrderConverter;
 import com.capte.funds.transaction.model.dto.FundsFrozenOrderDTO;
 import com.capte.funds.transaction.model.query.FundsFrozenOrderQuery;
@@ -88,12 +87,5 @@ public class FundsFrozenOrderServiceImpl implements FundsFrozenOrderService {
         AssertUtils.notNull(request.getAmount(), "冻结金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "冻结金额必须大于 0");
         AssertUtils.notNull(request.getCurrency(), "冻结币种不能为空");
-        AssertUtils.isFalse(isConsumptionStatus(request.getStatus()),
-                "冻结单状态不允许表达消费，status = {}", request.getStatus());
-    }
-
-    private boolean isConsumptionStatus(FundsFrozenOrderStatus status) {
-        return status == FundsFrozenOrderStatus.PARTIALLY_CONSUMED
-                || status == FundsFrozenOrderStatus.CONSUMED;
     }
 }

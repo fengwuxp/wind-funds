@@ -8,6 +8,7 @@ import com.wind.transaction.core.Money;
 import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.beans.Transient;
 import java.util.List;
@@ -113,9 +114,9 @@ public interface LedgerPostingPlanSpec {
     }
 
     private static boolean isPostableEntry(@NonNull LedgerEntrySpec entry) {
-        return hasText(entry.getSubjectId())
-                && hasText(entry.getSubjectType())
-                && hasText(entry.getLedgerTransactionSn())
+        return StringUtils.hasText(entry.getSubjectId())
+                && StringUtils.hasText(entry.getSubjectType())
+                && StringUtils.hasText(entry.getLedgerTransactionSn())
                 && isPositiveEntryAmount(entry);
     }
 
@@ -123,7 +124,4 @@ public interface LedgerPostingPlanSpec {
         return entry.getAmount().getAmount() > 0;
     }
 
-    private static boolean hasText(@NonNull String value) {
-        return !value.isBlank();
-    }
 }

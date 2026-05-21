@@ -184,7 +184,7 @@ DDL/H2 schema 变化：
 | B1-07 | 固化 Posting/Ledger DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | DSL Posting、LedgerEntry、账务不变量。 | posting plan 不平衡仍可构造、entry 缺主体/账目/币种/周期仍通过。 | 补 posting、entry、digest 和账本周期契约测试。 | `just test-core` |
 | B1-08 | 固化 SettlementPolicy DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | DSL SettlementPolicy、结算策略边界。 | 策略解析失败被静默按实时处理。 | 补 `SettlementPolicySpecTests` 或等价策略解析红线。 | `just test-core` |
 | B1-09 | 固化金额临界值契约。 | `core/src/test/java`、必要的 `core/src/main/java` | TDD 5.1 金额临界值通用矩阵。 | 0 金额、负金额、超币种精度、超系统上限或多 leg 合计不闭合仍可入账。 | 补 `FundsAmountBoundaryContractTests` 或等价契约测试，统一最小单位、精度、上限和累计闭合校验。 | `just test-core` |
-| B1-10 | 固化权益快照 DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | `FundsBenefitSnapshotSpec`、`DSL-BENEFIT-SNAPSHOT-001`、产品 `AC-BEN-001`、`AC-BEN-012`、`AC-BEN-013`、红线 `RED-050` 至 `RED-059`、`TDD-BEN-001` 至 `TDD-BEN-007`、`TDD-BEN-ENTRY-005`。 | 权益核心字段藏入 `contextVariables`、无权益交易不兼容、金额不闭合、闭合角色缺失或混用、组件重复、稳定摘要未覆盖权益快照差异、用户侧不返券和资金侧不冲补贴无法分开表达、请求态快照被误判为生产 Done；B1-10 越权修改交易服务入口、Request/DTO、route/posting/replay 或主链路实现。 | 补 `FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、退款决策来源字段、稳定摘要边界和权益枚举的契约测试；Phase 1 只证明 DSL 承载和请求摘要可区分，不宣称 route/posting/replay 已闭合，不改直接交易或授权交易服务入口；`RED-058` 只作为生产 Done 门禁登记；交付结论只能写“契约承载 Done”。 | `just test-core` |
+| B1-10 | 固化权益快照 DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | `FundsBenefitSnapshotSpec`、`DSL-BENEFIT-SNAPSHOT-001`、产品 `AC-BEN-001`、`AC-BEN-012`、`AC-BEN-013`、红线 `RED-050` 至 `RED-059`、`TDD-BEN-001` 至 `TDD-BEN-007`、`TDD-BEN-ENTRY-005`。 | 权益核心字段藏入 `contextVariables`、无权益交易空值语义不成立、金额不闭合、闭合角色缺失或混用、组件重复、稳定摘要未覆盖权益快照差异、用户侧不返券和资金侧不冲补贴无法分开表达、请求态快照被误判为生产 Done；B1-10 越权修改交易服务入口、Request/DTO、route/posting/replay 或主链路实现。 | 补 `FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、退款决策来源字段、稳定摘要边界和权益枚举的契约测试；Phase 1 只证明 DSL 承载和请求摘要可区分，不宣称 route/posting/replay 已闭合，不改直接交易或授权交易服务入口；`RED-058` 只作为生产 Done 门禁登记；交付结论只能写“契约承载 Done”。 | `just test-core` |
 
 ### 批次 2：钱包账户、账本和余额投影基础
 
@@ -291,7 +291,7 @@ DDL/H2 schema 变化：
 10. 任一批次发现产品、DSL、系分或 TDD 口径冲突时，先记录“设计错漏”，同步修正设计文档和 OpenSpec，再继续编码。
 11. 每批必须先提交 Red 用例，再做最小 Green 实现，最后补充重构、观测、边界和回归验证。
 12. 金额临界值按 TDD 5.1 作为所有资金变化测试的公共前置矩阵；并发竞争按 TDD 13.5 分散到授权、余额控制、清结算、对账和归档批次承接，不得只用顺序用例代替。
-13. 权益快照按三段落地：批次 1 只做 `core` DSL 契约和 JSON 兼容；批次 3、4、6 才进入直接交易、授权和 replay 的 route/posting 消费；批次 7 才进入清结算与对账拆分。未完成后段前，不得宣称含权益资金流已完整闭合。
+13. 权益快照按三段落地：批次 1 只做 `core` DSL 契约和 JSON 空值语义；批次 3、4、6 才进入直接交易、授权和 replay 的 route/posting 消费；批次 7 才进入清结算与对账拆分。未完成后段前，不得宣称含权益资金流已完整闭合。
 14. 直接交易和授权交易不因权益快照新增权益专用服务方法；后续如需扩展 `FundsTransactionPayRequest`、`FundsTransactionRefundRequest`、`FundsAuthorizationTransactionAuthorizeRequest` 或授权后续事件 Request，必须由对应批次 Execution Grant 明确允许。授权过期 `expire` 是 B4-03 既有授权生命周期缺口，不属于权益设计新增入口。
 15. 券能不能退由业务层、订单层、营销权益系统或运营审批链路决策；资金底座只承接原权益快照和本次退款决策引用，不调用当前营销规则、不读取当前券包状态、不自行判断退券可行性。
 
@@ -347,14 +347,14 @@ NFR 假设：
 
 ```text
 授权批次：批次 1 / B1-10 权益快照 DSL 契约
-允许写入范围：tests/src/test/java/com/capte/funds/dsl；必要时 tests/src/test/resources/dsl-contract-cases；必要时 core/src/main/java/com/wind/integration/funds/spec/transaction、core/src/main/java/com/wind/integration/funds/model/transaction、core/src/main/java/com/wind/integration/funds/transaction/enums 中 FundsBenefitSnapshotSpec/FundsBenefitComponentSpec/FundsBenefitReferenceSpec/FundsBenefitRefundPolicySpec 和 FundsBenefit* 枚举的最小兼容修改
+允许写入范围：tests/src/test/java/com/capte/funds/dsl；必要时 tests/src/test/resources/dsl-contract-cases；必要时 core/src/main/java/com/wind/integration/funds/spec/transaction、core/src/main/java/com/wind/integration/funds/model/transaction、core/src/main/java/com/wind/integration/funds/transaction/enums 中 FundsBenefitSnapshotSpec/FundsBenefitComponentSpec/FundsBenefitReferenceSpec/FundsBenefitRefundPolicySpec 和 FundsBenefit* 枚举的最小目标态契约修改
 禁止写入范围：transaction-*、wallet-*、ledger-* 业务实现；Route Resolver、Posting Assembler、Route Replay、授权生命周期、清结算、对账、归档、指标实现；生产配置；外部通道适配
 必须覆盖的 TDD 用例：TDD-BEN-001 至 TDD-BEN-007、TDD-BEN-RED-001、TDD-BEN-RED-002、TDD-BEN-RED-012、TDD-BEN-RED-017、TDD-BEN-RED-018
 必须覆盖的 AC/DSL ID：AC-BEN-001、AC-BEN-012、AC-BEN-013、DSL-BENEFIT-SNAPSHOT-001；登记 RED-050 至 RED-059，其中 RED-058 只作为生产 Done 门禁，本批只做契约层红线，不声明 route/posting/replay 已闭合
 基线是否已冻结：已冻结，上一冻结点为 30b1a00 docs: 冻结权益快照设计基线；本轮提交后形成权益快照 DSL 契约承载的编码准备基线；继续执行或调整批次 1 仍需用户确认 Execution Grant
 工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
 允许修改公共契约：待用户确认；建议仅允许新增可选字段和新增权益模型，不允许删除或改写既有字段
-公共契约允许修改范围：仅限新增 `FundsInstructionSpec#getBenefitSnapshot()` 默认空值方法、权益快照 Spec/Immutable model、权益枚举和必要 JSON 解析兼容；不得改变 `amount`、`originalAmount`、`exchangeRate`、`reference`、`instrumentRef`、`externalAccountRef`、`contextVariables` 既有语义
+公共契约允许修改范围：仅限新增 `FundsInstructionSpec#getBenefitSnapshot()` 默认空值方法、权益快照 Spec/Immutable model、权益枚举和必要 JSON 空值语义；不得改变 `amount`、`originalAmount`、`exchangeRate`、`reference`、`instrumentRef`、`externalAccountRef`、`contextVariables` 既有语义
 允许新增枚举或事件：待用户确认；建议只允许新增 `FundsBenefitType`、`FundsBenefitComponentType`、`FundsBenefitAmountClosureRole`、`FundsBenefitLedgerEffect`、`FundsBenefitFundingNature`、`FundsBenefitRefundDisposition`、`FundsBenefitPartialRefundStrategy`、`FundsBenefitLifecycleAction`，本批不新增交易事件
 允许新增服务入口：否
 允许扩展 Request/Query/DTO：否
@@ -365,10 +365,10 @@ NFR 假设：
 是否触碰能力域边界：否
 是否触碰事实端口层：否
 架构边界测试范围：如改动 core 依赖或公共 Spec 依赖方向，补充 `just test-boundary` 或等效静态检查
-人工确认点：`benefitSnapshot` 字段命名和空值兼容策略、权益枚举命名、退款处置枚举、`PLATFORM_DISPLAY_DISCOUNT` 与 `PLATFORM_SUBSIDY` 的语义边界、核心字段不得塞入 `contextVariables`
+人工确认点：`benefitSnapshot` 字段命名和空值语义、权益枚举命名、退款处置枚举、`PLATFORM_DISPLAY_DISCOUNT` 与 `PLATFORM_SUBSIDY` 的语义边界、核心字段不得塞入 `contextVariables`
 NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部回调、清结算批次或归档重放；若扩大范围必须重开授权
 观测告警：本批不新增生产告警；后续进入 route/posting/replay 或清结算消费时必须补权益快照缺失、摘要冲突和回放失败告警
-回滚或补偿：本批不写生产数据；公共契约变更若撤回，必须保留兼容说明或版本迁移说明
+回滚或补偿：本批不写生产数据；公共契约变更若撤回，必须同步目标态文档、契约测试和版本迁移说明
 基础验证命令：just mvn-version、just compile
 专项验证命令：just test-one FundsBenefitSnapshotSpecTests tests；just test-one FundsDslJsonContractTests tests；必要时 just test-core
 交付方式：每轮说明覆盖用例、修改文件、验证命令、验证结果和残余风险；未获 Git 授权时不自动提交
@@ -384,7 +384,7 @@ NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部�
 | --- | --- | --- |
 | 任务边界 | 只允许进入 Phase 1 契约承载；未进入 route、posting、replay、清结算或对账生产消费。 | 当前写入范围限制在 core DSL/model/enums、DSL JSON verifier、tests DSL 契约和 JSON 夹具；未修改 `transaction-*`、`wallet-*`、`ledger-*` 业务实现。 |
 | 设计差异 | 已发现并修复代码缺少 `FundsBenefitAmountClosureRole` 的差异。 | DSL/TDD 要求只有 `ORDER_DISCOUNT_CLOSURE` 参与正向订单闭合，代码已补闭合角色枚举、组件字段、模型校验和 JSON 校验。 |
-| TDD 红线 | 已覆盖无权益兼容、核心字段不得塞入 `contextVariables`、金额闭合、闭合角色缺失或混用、组件唯一性、零实付边界、退款处置和当前营销规则输入拒绝；稳定摘要、请求态快照误判生产 Done 和闭合角色生产消费边界已纳入 B1-10 门禁。 | `FundsBenefitSnapshotSpecTests` 10 个用例通过；`FundsDslJsonContractTests` 8 个用例通过；稳定摘要、`RED-058` 和后续 route/posting/replay 消费断言需要在正式 B1-10 或后续批次交付记录中单独列明。 |
+| TDD 红线 | 已覆盖无权益空值语义、核心字段不得塞入 `contextVariables`、金额闭合、闭合角色缺失或混用、组件唯一性、零实付边界、退款处置和当前营销规则输入拒绝；稳定摘要、请求态快照误判生产 Done 和闭合角色生产消费边界已纳入 B1-10 门禁。 | `FundsBenefitSnapshotSpecTests` 10 个用例通过；`FundsDslJsonContractTests` 8 个用例通过；稳定摘要、`RED-058` 和后续 route/posting/replay 消费断言需要在正式 B1-10 或后续批次交付记录中单独列明。 |
 | 验证命令 | Java 21 下编译、目标测试和 PMD 均通过。 | `WIND_FUNDS_JAVA_HOME=... just compile`；`just test-one FundsBenefitSnapshotSpecTests tests`；`just test-one FundsDslJsonContractTests tests`；`just pmd`。 |
 | 残余边界 | 只能声明 `B1-10 契约承载 Done`；B3/B4/B6/B7 仍需各自 Execution Grant。 | 平台补贴、储值券、退款回放、授权占券、清结算和对账尚未进入生产链路消费。 |
 
@@ -432,10 +432,10 @@ NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部�
 基线是否已冻结：已冻结；B1-10 契约承载基线为 6be9c99，本批启动前必须复核工作树干净
 工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
 允许修改公共契约：待用户确认；建议默认不删除、不改写既有 face/core 字段，只允许为账户、账本、支付工具基础能力做非破坏性新增或校验补齐
-公共契约允许修改范围：如确需变更，只限 wallet/ledger face 中账户角色、账本创建、账期、支付工具绑定和资金账户关系的最小兼容字段；不得调整交易指令、权益快照、直接交易或授权交易请求语义
+公共契约允许修改范围：如确需变更，只限 wallet/ledger face 中账户角色、账本创建、账期、支付工具绑定和资金账户关系的目标态字段；不得调整交易指令、权益快照、直接交易或授权交易请求语义
 允许新增枚举或事件：否；如账户角色、账本周期或支付工具状态缺口必须新增，需重新确认
 允许新增服务入口：否；优先复用既有 wallet/ledger 服务入口完成用例闭环
-允许扩展 Request/Query/DTO：待用户确认；建议默认不扩展交易 Request/DTO，wallet/ledger 基础对象如确需扩展必须保持可选、兼容和测试覆盖
+允许扩展 Request/Query/DTO：待用户确认；建议默认不扩展交易 Request/DTO，wallet/ledger 基础对象如确需扩展必须保持可选、语义明确并覆盖测试
 允许修改表结构：否；如 H2 测试表与生产模型缺口阻断本批验收，先停下补充表结构授权
 允许新增模块：否
 是否影响架构 ADR：否；如改变 core、wallet、ledger 依赖方向或事实归属，必须重新确认
@@ -446,7 +446,7 @@ NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部�
 人工确认点：账户角色命名与创建规则、显式账本创建边界、账期与分录平衡断言、余额投影事务边界、支付工具绑定历史审计、funding relation 与账户主体关系、是否需要表结构授权
 NFR 假设：本批只做本地服务层与 H2 验证，不处理生产并发容量、外部通道回调、清结算批次或权益回放告警
 观测告警：本批不新增生产告警；后续交易主链路和权益消费批次再补缺失快照、余额投影滞后、摘要冲突和回放失败告警
-回滚或补偿：本批如修改公共契约必须保持兼容；如新增测试表字段，必须同步说明生产迁移前置条件
+回滚或补偿：本批如修改公共契约必须同步目标态说明；如新增测试表字段，必须同步说明生产迁移前置条件
 基础验证命令：just mvn-version、just compile
 专项验证命令：just test-ledger；just test-boundary；必要时 just test-one <相关测试类> tests；提交前 just pmd
 交付方式：先补失败用例再实现，逐项声明覆盖的 TDD/AC/RED；完成后按 CAD 自动提交；未确认本授权前不得进入批次 2 编码

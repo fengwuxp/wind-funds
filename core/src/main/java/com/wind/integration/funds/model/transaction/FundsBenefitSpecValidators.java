@@ -1,6 +1,7 @@
 package com.wind.integration.funds.model.transaction;
 
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.util.Map;
 import java.util.Set;
@@ -46,13 +47,13 @@ final class FundsBenefitSpecValidators {
     }
 
     static void hasText(@Nullable String value, String message) {
-        if (value == null || value.isBlank()) {
+        if (!StringUtils.hasText(value)) {
             throw new IllegalArgumentException(message);
         }
     }
 
     static boolean hasText(@Nullable String value) {
-        return value != null && !value.isBlank();
+        return StringUtils.hasText(value);
     }
 
     static Map<String, Object> immutableContext(Map<String, Object> contextVariables, String owner) {

@@ -48,7 +48,7 @@ class FundsBenefitSnapshotSpecTests {
     /**
      * 场景：既有资金指令不携带权益快照。
      * 预期：benefitSnapshot 为空，amount、originalAmount 和 exchangeRate 语义不变。
-     * 红线：不能为了权益支持破坏无权益交易、授权或退款的兼容性。
+     * 红线：不能为了权益支持破坏无权益交易、授权或退款的目标态稳定性。
      */
     @Test
     void testInstructionWithoutBenefitSnapshotShouldRemainCompatible() {

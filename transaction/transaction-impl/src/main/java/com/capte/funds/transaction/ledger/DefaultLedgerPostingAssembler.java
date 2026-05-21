@@ -34,6 +34,7 @@ import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -354,7 +355,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         Map<String, Object> result = new LinkedHashMap<>(resolvedRoute.getContextVariables());
         result.putAll(leg.getContextVariables());
         result.put("routeLegId", leg.getLegId());
-        if (leg.getReplayRefLegId() != null && !leg.getReplayRefLegId().isBlank()) {
+        if (StringUtils.hasText(leg.getReplayRefLegId())) {
             result.put("replayRefLegId", leg.getReplayRefLegId());
         }
         result.put("replayPolicy", leg.getReplayPolicy().name());
