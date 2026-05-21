@@ -404,3 +404,50 @@ NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部�
 残余风险：
 下一批建议：
 ```
+
+## 12.2 B1-10 实际交付记录（2026-05-21）
+
+本轮按第 11 节 Execution Grant 完成 `B1-10 权益快照 DSL 契约` 的第一轮编码闭环，形成权益快照契约承载基线。
+
+| 检查项 | 结论 | 证据 |
+| --- | --- | --- |
+| 批次 | 已完成 `B1-10 权益快照 DSL 契约`。 | 提交 `6be9c99 feat: 固化权益快照稳定摘要契约`。 |
+| 写入范围 | 符合第 11 节授权范围。 | 写入 `core/src/main/java/com/wind/integration/funds/spec/transaction`、`core/src/main/java/com/wind/integration/funds/util`、`tests/src/test/java/com/capte/funds/dsl`、`tests/src/test/resources/dsl-contract-cases`；未写入 `transaction-*`、`wallet-*`、`ledger-*` 业务实现。 |
+| 契约承载 | `FundsBenefitSnapshotSpec` 增加稳定摘要口径，避免 JSON 字段顺序、时间字段、运行态对象差异影响契约指纹。 | 新增 `FundsBenefitStableDigest`，`FundsBenefitSnapshotSpec#getStableDigest()` 输出稳定摘要。 |
+| DSL 红线 | `fixtureLevel=CONTRACT_ONLY` 必须显式登记，避免把请求态样例误判为生产 Done。 | `FundsDslJsonContractVerifier` 增加 `scenarioId`、`fixtureLevel`、`productionReady` 和 `coveredRedLines` 元数据校验。 |
+| TDD 用例 | 已补稳定摘要、字段顺序、请求态样例、生产 Done 误判、闭合角色边界等契约测试。 | `FundsBenefitSnapshotSpecTests` 12 个用例通过；`FundsDslJsonContractTests` 8 个用例通过。 |
+| 验证命令 | Java 21 下编译、目标测试、PMD 和空白检查通过。 | `just mvn-version`；`just compile`；`just test-one FundsBenefitSnapshotSpecTests tests`；`just test-one FundsDslJsonContractTests tests`；`just pmd`；`git diff --check`。 |
+| 残余风险 | 只能声明 `B1-10 契约承载 Done`。 | route、posting、replay、授权占券、清结算和对账消费仍在 B3/B4/B6/B7 后续批次。 |
+
+## 13. 批次 2 建议 Execution Grant
+
+批次 2 是后续直接交易、授权交易、余额控制、退款和权益资金流进入真实组合验证前的基础门禁。建议本批只处理钱包账户、账本、余额投影和支付工具基础能力，不进入直接交易、授权交易或权益生产消费链路。
+
+```text
+授权批次：批次 2 / 钱包账户、账本和余额投影基础
+允许写入范围：wallet/wallet-face、wallet/wallet-impl、ledger/ledger-face、ledger/ledger-impl、tests/src/test/java；必要时只读 transaction-*、core 和 tests/src/test/resources/jdbc-schema.sql 用于确认既有契约与表结构
+禁止写入范围：transaction-* 业务实现；直接交易、授权交易、余额控制交易编排；Route Resolver、Posting Assembler、Route Replay；权益 route/posting/replay 消费；清结算、对账、归档、指标实现；生产配置；外部通道适配
+必须覆盖的 TDD 用例：TDD-WALLET-*、TDD-ROUTE-011、TDD-ROUTE-012、TDD-LEDGER-*、TDD-VIEW-003
+必须覆盖的 AC/DSL ID：AC-PI-001、AC-PI-002、AC-PI-003、AC-PI-004、AC-PI-006、AC-PI-007、AC-CTRL-009、AC-CTRL-010、AC-CTRL-011、AC-BALLOG-001、RED-036、RED-046、RED-047、RED-049
+基线是否已冻结：已冻结；B1-10 契约承载基线为 6be9c99，本批启动前必须复核工作树干净
+工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
+允许修改公共契约：待用户确认；建议默认不删除、不改写既有 face/core 字段，只允许为账户、账本、支付工具基础能力做非破坏性新增或校验补齐
+公共契约允许修改范围：如确需变更，只限 wallet/ledger face 中账户角色、账本创建、账期、支付工具绑定和资金账户关系的最小兼容字段；不得调整交易指令、权益快照、直接交易或授权交易请求语义
+允许新增枚举或事件：否；如账户角色、账本周期或支付工具状态缺口必须新增，需重新确认
+允许新增服务入口：否；优先复用既有 wallet/ledger 服务入口完成用例闭环
+允许扩展 Request/Query/DTO：待用户确认；建议默认不扩展交易 Request/DTO，wallet/ledger 基础对象如确需扩展必须保持可选、兼容和测试覆盖
+允许修改表结构：否；如 H2 测试表与生产模型缺口阻断本批验收，先停下补充表结构授权
+允许新增模块：否
+是否影响架构 ADR：否；如改变 core、wallet、ledger 依赖方向或事实归属，必须重新确认
+受影响 ADR：ADR-002 core 作为资金语义内核；账本事实边界和 wallet 产品门面边界
+是否触碰能力域边界：是，仅限 wallet 账户/支付工具门面与 ledger 账本事实/投影边界
+是否触碰事实端口层：是，仅限 ledger 账本事实、账期和余额投影；不得反向持有业务交易生命周期状态
+架构边界测试范围：`just test-ledger`、`just test-boundary`，以及与本批修改对象对应的 `just test-one <TestClass> tests`
+人工确认点：账户角色命名与创建规则、显式账本创建边界、账期与分录平衡断言、余额投影事务边界、支付工具绑定历史审计、funding relation 与账户主体关系、是否需要表结构授权
+NFR 假设：本批只做本地服务层与 H2 验证，不处理生产并发容量、外部通道回调、清结算批次或权益回放告警
+观测告警：本批不新增生产告警；后续交易主链路和权益消费批次再补缺失快照、余额投影滞后、摘要冲突和回放失败告警
+回滚或补偿：本批如修改公共契约必须保持兼容；如新增测试表字段，必须同步说明生产迁移前置条件
+基础验证命令：just mvn-version、just compile
+专项验证命令：just test-ledger；just test-boundary；必要时 just test-one <相关测试类> tests；提交前 just pmd
+交付方式：先补失败用例再实现，逐项声明覆盖的 TDD/AC/RED；完成后按 CAD 自动提交；未确认本授权前不得进入批次 2 编码
+```
