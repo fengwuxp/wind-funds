@@ -50,7 +50,7 @@ test-ledger tests='DefaultLedgerPostingAssemblerTests,LedgerBalanceProjectionSer
     @just _run-test-classes "{{tests}}" tests
 
 # Transaction orchestration and lifecycle tests.
-test-transaction tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,DefaultRoutedFundsInstructionOrchestratorProjectionTests':
+test-transaction tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,DefaultRoutedFundsInstructionOrchestratorProjectionTests,FundsStableHashSupportTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Frozen order and balance-control route tests.
