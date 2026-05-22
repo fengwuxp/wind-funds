@@ -183,7 +183,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 .and(ref.subjectType.eq(query.getSubjectType()))
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.defaultBinding.eq(query.getDefaultBinding()))
-                .and(ref.status.eq(query.getStatus()));
+                .and(ref.status.eq(query.getStatus()))
+                .orderBy(ref.priority.asc(), ref.id.asc());
         return MybatisQueryHelper.<PaymentInstrumentBinding, PaymentInstrumentBindingDTO>query(wrapper)
                 .counter(paymentInstrumentBindingMapper::selectCountByQuery)
                 .resultQueryFunc(paymentInstrumentBindingMapper::selectListByQuery)

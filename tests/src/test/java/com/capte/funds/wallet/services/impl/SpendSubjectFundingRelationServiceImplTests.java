@@ -54,6 +54,8 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
     private static final String PRIORITY_CONFLICT_RELATION_SN = "spend_funding_rel_priority_conflict";
 
+    private static final String PRIORITY_ORDER_RELATION_SN = "spend_funding_rel_priority_order";
+
     private static final String FUNDING_ACCOUNT_SN = "funding_relation_target";
 
     private static final String SECOND_FUNDING_ACCOUNT_SN = "funding_relation_second_target";
@@ -204,6 +206,39 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：同一支出主体下存在多个 ACTIVE 非默认资金来源，后续 route 需要按确定顺序读取候选。
+     * 输入：两个候选优先级分别为 20 和 10，创建顺序与优先级顺序相反。
+     * 输出：查询结果按 priority 升序返回，再由稳定主键兜底。
+     * 红线：资金来源候选查询不得依赖数据库自然顺序，避免后续 route 出现隐式随机选路。
+     */
+    @Test
+    void testQuerySpendSubjectFundingRelationsShouldReturnActiveCandidatesByPriority() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setSn(SECOND_FUNDING_ACCOUNT_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setDefaultRelation(Boolean.FALSE));
+        fundingRelationService.createSpendSubjectFundingRelation(createPriorityOrderRelationRequest());
+
+        List<SpendSubjectFundingRelationDTO> records = fundingRelationService.querySpendSubjectFundingRelations(
+                new SpendSubjectFundingRelationQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSpendSubjectId(SPEND_SUBJECT_ID)
+                        .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+
+        assertThat(records)
+                .extracting(SpendSubjectFundingRelationDTO::getSn)
+                .containsExactly(PRIORITY_ORDER_RELATION_SN, RELATION_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpSpendSubjectFundingRelationTestData() {
         cleanupSpendSubjectFundingRelationTestData();
@@ -215,10 +250,11 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     private void cleanupSpendSubjectFundingRelationTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?, ?, ?)",
                 RELATION_SN,
                 DUPLICATE_DEFAULT_RELATION_SN,
-                PRIORITY_CONFLICT_RELATION_SN);
+                PRIORITY_CONFLICT_RELATION_SN,
+                PRIORITY_ORDER_RELATION_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
                 FUNDING_ACCOUNT_SN,
                 SECOND_FUNDING_ACCOUNT_SN);
@@ -250,6 +286,14 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
                 .setPriority(20)
                 .setDefaultRelation(Boolean.TRUE);
+    }
+
+    private CreateSpendSubjectFundingRelationRequest createPriorityOrderRelationRequest() {
+        return createRelationRequest()
+                .setSn(PRIORITY_ORDER_RELATION_SN)
+                .setFundingAccountId(SECOND_FUNDING_ACCOUNT_SN)
+                .setPriority(10)
+                .setDefaultRelation(Boolean.FALSE);
     }
 
     private List<LedgerDTO> loadFundingAccountLedgers() {

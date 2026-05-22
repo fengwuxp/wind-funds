@@ -74,7 +74,8 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.relationType.eq(query.getRelationType()))
                 .and(ref.defaultRelation.eq(query.getDefaultRelation()))
-                .and(ref.status.eq(query.getStatus()));
+                .and(ref.status.eq(query.getStatus()))
+                .orderBy(ref.priority.asc(), ref.id.asc());
         return MybatisQueryHelper.<SpendSubjectFundingRel, SpendSubjectFundingRelationDTO>query(wrapper)
                 .counter(spendSubjectFundingRelMapper::selectCountByQuery)
                 .resultQueryFunc(spendSubjectFundingRelMapper::selectListByQuery)

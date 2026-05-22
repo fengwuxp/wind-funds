@@ -65,6 +65,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String PRIORITY_CONFLICT_BINDING_SN = "pi_binding_service_priority_conflict";
 
+    private static final String PRIORITY_ORDER_BINDING_SN = "pi_binding_service_priority_order";
+
     private static final String OWNER_ID = "owner_pi_service";
 
     private static final String FUNDING_ACCOUNT_ID = "funding_pi_binding_target";
@@ -84,6 +86,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private static final String PRIORITY_CONFLICT_CREATE_REQUEST_SN = "req_pi_binding_priority_conflict_create";
 
     private static final String PRIORITY_CONFLICT_CHANGE_REQUEST_SN = "req_pi_binding_priority_conflict_change";
+
+    private static final String PRIORITY_ORDER_CREATE_REQUEST_SN = "req_pi_binding_priority_order_create";
 
     private static final String INSTRUMENT_TYPE_CARD = "CARD";
 
@@ -387,6 +391,37 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：同一支付工具下存在多个 ACTIVE 非默认候选，后续 route 需要按确定顺序读取候选。
+     * 输入：两个候选优先级分别为 20 和 10，创建顺序与优先级顺序相反。
+     * 输出：查询结果按 priority 升序返回，再由稳定主键兜底。
+     * 红线：候选查询不得依赖数据库自然顺序，避免后续 route 出现隐式随机选路。
+     */
+    @Test
+    void testQueryPaymentInstrumentBindingsShouldReturnActiveCandidatesByPriority() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setPriority(20)
+                .setDefaultBinding(Boolean.FALSE));
+        paymentInstrumentService.createPaymentInstrumentBinding(createPriorityOrderBindingRequest());
+
+        List<PaymentInstrumentBindingDTO> records = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+
+        assertThat(records)
+                .extracting(PaymentInstrumentBindingDTO::getSn)
+                .containsExactly(PRIORITY_ORDER_BINDING_SN, BINDING_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testChangePaymentInstrumentBindingShouldAppendHistoryWithoutOverwritingEvidence() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
@@ -464,14 +499,16 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupPaymentInstrumentTestData() {
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?, ?, ?)",
                 BINDING_SN,
                 DUPLICATE_DEFAULT_BINDING_SN,
-                PRIORITY_CONFLICT_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?, ?)",
+                PRIORITY_CONFLICT_BINDING_SN,
+                PRIORITY_ORDER_BINDING_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?, ?, ?)",
                 BINDING_SN,
                 DUPLICATE_DEFAULT_BINDING_SN,
-                PRIORITY_CONFLICT_BINDING_SN);
+                PRIORITY_CONFLICT_BINDING_SN,
+                PRIORITY_ORDER_BINDING_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
                 RAW_PAYMENT_INSTRUMENT_SN,
@@ -524,6 +561,15 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setPriority(10)
                 .setDefaultBinding(Boolean.FALSE)
                 .setRequestSn(PRIORITY_CONFLICT_CREATE_REQUEST_SN);
+    }
+
+    private CreatePaymentInstrumentBindingRequest createPriorityOrderBindingRequest() {
+        return createBindingRequest()
+                .setSn(PRIORITY_ORDER_BINDING_SN)
+                .setSubjectId(SECOND_FUNDING_ACCOUNT_ID)
+                .setPriority(10)
+                .setDefaultBinding(Boolean.FALSE)
+                .setRequestSn(PRIORITY_ORDER_CREATE_REQUEST_SN);
     }
 
     private void assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(Object value) {
