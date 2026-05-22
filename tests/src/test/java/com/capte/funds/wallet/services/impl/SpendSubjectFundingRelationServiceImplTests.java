@@ -50,7 +50,11 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
     private static final String RELATION_SN = "spend_funding_rel_service";
 
+    private static final String DUPLICATE_DEFAULT_RELATION_SN = "spend_funding_rel_duplicate_default";
+
     private static final String FUNDING_ACCOUNT_SN = "funding_relation_target";
+
+    private static final String SECOND_FUNDING_ACCOUNT_SN = "funding_relation_second_target";
 
     private static final String SPEND_SUBJECT_ID = "credit_relation_subject";
 
@@ -148,6 +152,30 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：同一支出主体已经存在一个可用默认资金来源后，再配置第二个默认资金来源。
+     * 输入：同租户、同支出主体、同币种、同关系类型，两个 ACTIVE 默认关系。
+     * 输出：第二个关系被拒绝，保持原有唯一默认资金来源。
+     * 红线：默认资金来源不唯一时不得为后续 route 留下随机选路候选，也不得写账。
+     */
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldRejectDuplicateActiveDefaultRelation() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setSn(SECOND_FUNDING_ACCOUNT_SN));
+        fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setSn(DUPLICATE_DEFAULT_RELATION_SN)
+                .setFundingAccountId(SECOND_FUNDING_ACCOUNT_SN)
+                .setPriority(30)))
+                .hasMessageContaining("默认资金来源关系不唯一");
+
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", DUPLICATE_DEFAULT_RELATION_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpSpendSubjectFundingRelationTestData() {
         cleanupSpendSubjectFundingRelationTestData();
@@ -159,9 +187,15 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     private void cleanupSpendSubjectFundingRelationTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", RELATION_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", FUNDING_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn = ?", FUNDING_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?)",
+                RELATION_SN,
+                DUPLICATE_DEFAULT_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
+                FUNDING_ACCOUNT_SN,
+                SECOND_FUNDING_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)",
+                FUNDING_ACCOUNT_SN,
+                SECOND_FUNDING_ACCOUNT_SN);
     }
 
     private CreateFundingAccountRequest createFundingAccountRequest() {

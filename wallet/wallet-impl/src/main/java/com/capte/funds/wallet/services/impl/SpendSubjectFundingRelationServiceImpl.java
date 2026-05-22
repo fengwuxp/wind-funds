@@ -16,6 +16,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
+import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -42,6 +43,7 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
             @NonNull CreateSpendSubjectFundingRelationRequest request) {
         FundingAccount fundingAccount = getFundingAccount(request.getTenantId(), request.getFundingAccountId());
         assertFundingAccountCanBind(fundingAccount, request);
+        assertNoDuplicateActiveDefaultRelation(request);
         SpendSubjectFundingRel entity =
                 SpendSubjectFundingRelationConverter.INSTANCE.convertToSpendSubjectFundingRel(request);
         spendSubjectFundingRelMapper.insertSelective(entity);
@@ -100,5 +102,27 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 "资金账户不可作为资金来源，fundingAccountId = {}", request.getFundingAccountId());
         AssertUtils.equals(fundingAccount.getCurrency(), request.getCurrency(),
                 "资金账户币种与资金来源关系币种不一致，fundingAccountId = {}", request.getFundingAccountId());
+    }
+
+    private void assertNoDuplicateActiveDefaultRelation(CreateSpendSubjectFundingRelationRequest request) {
+        FundsAccountStatus status = request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus();
+        if (!Boolean.TRUE.equals(request.getDefaultRelation()) || status != FundsAccountStatus.ACTIVE) {
+            return;
+        }
+        SpendSubjectFundingRelNameRefs ref = SpendSubjectFundingRelNameRefs.spendSubjectFundingRel;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(request.getTenantId()))
+                .and(ref.spendSubjectId.eq(request.getSpendSubjectId()))
+                .and(ref.spendSubjectType.eq(request.getSpendSubjectType()))
+                .and(ref.currency.eq(request.getCurrency()))
+                .and(ref.relationType.eq(request.getRelationType()))
+                .and(ref.defaultRelation.eq(Boolean.TRUE))
+                .and(ref.status.eq(FundsAccountStatus.ACTIVE));
+        AssertUtils.isTrue(spendSubjectFundingRelMapper.selectCountByQuery(wrapper) == 0,
+                "默认资金来源关系不唯一，spendSubjectId = {}, relationType = {}, currency = {}",
+                request.getSpendSubjectId(),
+                request.getRelationType(),
+                request.getCurrency());
     }
 }
