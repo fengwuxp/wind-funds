@@ -220,7 +220,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         fundingAccountService.createFundingAccount(createFundingAccountRequest());
         fundingAccountService.createFundingAccount(createFundingAccountRequest()
                 .setSn(SECOND_FUNDING_ACCOUNT_SN));
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now().withNano(0);
         LocalDateTime switchAt = now.plusHours(1);
         fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
                 .setDefaultRelation(Boolean.FALSE)
@@ -303,7 +303,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 .setSn(SECOND_FUNDING_ACCOUNT_SN));
         fundingAccountService.createFundingAccount(createFundingAccountRequest()
                 .setSn(THIRD_FUNDING_ACCOUNT_SN));
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now().withNano(0);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()

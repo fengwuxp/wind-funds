@@ -303,7 +303,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     @Test
     void testCreatePaymentInstrumentBindingShouldAllowNonOverlappingDefaultCandidate() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now().withNano(0);
         LocalDateTime switchAt = now.plusHours(1);
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setValidFrom(now.minusDays(1))
@@ -510,6 +510,65 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThat(records)
                 .extracting(PaymentInstrumentBindingDTO::getSn)
                 .containsExactly(PRIORITY_ORDER_BINDING_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：支付工具绑定仍为 ACTIVE，但支付工具本身已被暂停。
+     * 输入：查询新交易可用的 ACTIVE 绑定候选。
+     * 输出：不返回该绑定，避免 route 使用已停用工具。
+     * 红线：支付工具状态不可用时不得继续生成资金路径，查询过滤本身不得改写账本事实。
+     */
+    @Test
+    void testQueryPaymentInstrumentBindingsShouldExcludeUnavailableInstrumentCandidates() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        jdbcTemplate.update("UPDATE t_payment_instrument SET status = ? WHERE sn = ?",
+                FundsAccountStatus.SUSPENDED.name(),
+                PAYMENT_INSTRUMENT_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        List<PaymentInstrumentBindingDTO> records = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+
+        assertThat(records).isEmpty();
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isOne();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：支付工具绑定已是 ACTIVE，但支付工具自身还未到生效时间。
+     * 输入：查询新交易可用的 ACTIVE 绑定候选。
+     * 输出：不返回该绑定，避免 route 提前使用未生效工具。
+     * 红线：支付工具有效期是工具可用性的一部分，不得只看绑定有效期。
+     */
+    @Test
+    void testQueryPaymentInstrumentBindingsShouldExcludeNotYetEffectiveInstrumentCandidates() {
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
+                .setValidFrom(now.plusHours(1))
+                .setValidTo(now.plusDays(1)));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        List<PaymentInstrumentBindingDTO> records = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+
+        assertThat(records).isEmpty();
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 

@@ -185,6 +185,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 .and(ref.defaultBinding.eq(query.getDefaultBinding()))
                 .and(ref.status.eq(query.getStatus()));
         applyCurrentEffectiveWindow(wrapper, ref, query.getStatus());
+        applyActiveInstrumentWindow(wrapper, query);
         wrapper.orderBy(ref.priority.asc(), ref.id.asc());
         return MybatisQueryHelper.<PaymentInstrumentBinding, PaymentInstrumentBindingDTO>query(wrapper)
                 .counter(paymentInstrumentBindingMapper::selectCountByQuery)
@@ -478,6 +479,23 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         LocalDateTime now = LocalDateTime.now();
         wrapper.and(ref.validFrom.isNull().or(ref.validFrom.le(now)))
                 .and(ref.validTo.isNull().or(ref.validTo.gt(now)));
+    }
+
+    private void applyActiveInstrumentWindow(QueryWrapper wrapper, PaymentInstrumentBindingQuery query) {
+        if (query.getStatus() != FundsAccountStatus.ACTIVE) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        PaymentInstrumentNameRefs instrumentRef = PaymentInstrumentNameRefs.paymentInstrument;
+        QueryWrapper activeInstrument = QueryWrapper.create()
+                .select(instrumentRef.sn)
+                .from(instrumentRef)
+                .where(instrumentRef.tenantId.eq(query.getTenantId()))
+                .and(instrumentRef.status.eq(FundsAccountStatus.ACTIVE))
+                .and(instrumentRef.validFrom.isNull().or(instrumentRef.validFrom.le(now)))
+                .and(instrumentRef.validTo.isNull().or(instrumentRef.validTo.gt(now)));
+        PaymentInstrumentBindingNameRefs bindingRef = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;
+        wrapper.in(bindingRef.instrumentSn.getName(), activeInstrument);
     }
 
     private boolean validityWindowsOverlap(LocalDateTime leftFrom,
