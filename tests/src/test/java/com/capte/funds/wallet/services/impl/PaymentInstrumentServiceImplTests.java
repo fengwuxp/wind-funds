@@ -63,6 +63,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String DUPLICATE_DEFAULT_BINDING_SN = "pi_binding_service_default_duplicate";
 
+    private static final String PRIORITY_CONFLICT_BINDING_SN = "pi_binding_service_priority_conflict";
+
     private static final String OWNER_ID = "owner_pi_service";
 
     private static final String FUNDING_ACCOUNT_ID = "funding_pi_binding_target";
@@ -78,6 +80,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private static final String DUPLICATE_DEFAULT_CREATE_REQUEST_SN = "req_pi_binding_duplicate_default_create";
 
     private static final String DUPLICATE_DEFAULT_CHANGE_REQUEST_SN = "req_pi_binding_duplicate_default_change";
+
+    private static final String PRIORITY_CONFLICT_CREATE_REQUEST_SN = "req_pi_binding_priority_conflict_create";
+
+    private static final String PRIORITY_CONFLICT_CHANGE_REQUEST_SN = "req_pi_binding_priority_conflict_change";
 
     private static final String INSTRUMENT_TYPE_CARD = "CARD";
 
@@ -319,6 +325,68 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：同一支付工具、绑定角色和币种已经存在 ACTIVE 候选优先级后，再创建同优先级绑定。
+     * 输入：两个不同资金主体绑定都处于 ACTIVE，且 priority 相同。
+     * 输出：第二个绑定被拒绝，原候选保持唯一可排序。
+     * 红线：支付工具绑定优先级冲突时不得给后续 route 留下随机选路空间，不写绑定当前态、历史或账本事实。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldRejectDuplicateActivePriorityCandidate() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setDefaultBinding(Boolean.FALSE));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(
+                createPriorityConflictBindingRequest()))
+                .hasMessageContaining("支付工具绑定优先级冲突");
+
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isOne();
+        assertThat(countRows("t_payment_instrument_binding", "sn", PRIORITY_CONFLICT_BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", PRIORITY_CONFLICT_BINDING_SN))
+                .isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一支付工具下已有两个 ACTIVE 非默认绑定，运营把第二个绑定改成已存在的优先级。
+     * 输入：第二个绑定仅变更 priority = 10，其他绑定维度与已有候选相同。
+     * 输出：变更被拒绝，第二个绑定保持原优先级和原版本。
+     * 红线：当前态变更入口不得绕过绑定优先级唯一性，也不得追加伪成功的绑定历史。
+     */
+    @Test
+    void testChangePaymentInstrumentBindingShouldRejectDuplicateActivePriorityCandidate() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setDefaultBinding(Boolean.FALSE));
+        paymentInstrumentService.createPaymentInstrumentBinding(createPriorityConflictBindingRequest()
+                .setPriority(20));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(PRIORITY_CONFLICT_BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setPriority(10)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("raise priority")
+                        .setRequestSn(PRIORITY_CONFLICT_CHANGE_REQUEST_SN)))
+                .hasMessageContaining("支付工具绑定优先级冲突");
+
+        PaymentInstrumentBindingDTO secondBinding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(PRIORITY_CONFLICT_BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+        assertThat(secondBinding.getPriority()).isEqualTo(20);
+        assertThat(secondBinding.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(secondBinding.getVersion()).isEqualTo(1);
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", PRIORITY_CONFLICT_BINDING_SN))
+                .isEqualTo(1);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testChangePaymentInstrumentBindingShouldAppendHistoryWithoutOverwritingEvidence() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
@@ -396,12 +464,14 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupPaymentInstrumentTestData() {
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?, ?)",
                 BINDING_SN,
-                DUPLICATE_DEFAULT_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?)",
+                DUPLICATE_DEFAULT_BINDING_SN,
+                PRIORITY_CONFLICT_BINDING_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?, ?)",
                 BINDING_SN,
-                DUPLICATE_DEFAULT_BINDING_SN);
+                DUPLICATE_DEFAULT_BINDING_SN,
+                PRIORITY_CONFLICT_BINDING_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
                 RAW_PAYMENT_INSTRUMENT_SN,
@@ -445,6 +515,15 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setSubjectId(SECOND_FUNDING_ACCOUNT_ID)
                 .setPriority(20)
                 .setRequestSn(DUPLICATE_DEFAULT_CREATE_REQUEST_SN);
+    }
+
+    private CreatePaymentInstrumentBindingRequest createPriorityConflictBindingRequest() {
+        return createBindingRequest()
+                .setSn(PRIORITY_CONFLICT_BINDING_SN)
+                .setSubjectId(SECOND_FUNDING_ACCOUNT_ID)
+                .setPriority(10)
+                .setDefaultBinding(Boolean.FALSE)
+                .setRequestSn(PRIORITY_CONFLICT_CREATE_REQUEST_SN);
     }
 
     private void assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(Object value) {

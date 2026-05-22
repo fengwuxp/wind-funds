@@ -87,6 +87,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         PaymentInstrumentBinding entity =
                 PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBinding(request);
         assertNoDuplicateActiveDefaultBinding(entity);
+        assertNoDuplicateActivePriorityBinding(entity);
         paymentInstrumentBindingMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建支付工具绑定失败");
         appendBindingHistory(null,
@@ -109,6 +110,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         applyBindingChanges(after, request);
         after.setVersion(before.getVersion() + 1);
         assertNoDuplicateActiveDefaultBinding(after);
+        assertNoDuplicateActivePriorityBinding(after);
         AssertUtils.isTrue(paymentInstrumentBindingMapper.updateByQuery(
                         toBindingUpdateEntity(after, request),
                         versionMatchedBinding(before)) == 1,
@@ -284,6 +286,30 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 binding.getInstrumentSn(),
                 binding.getBindingRole(),
                 binding.getCurrency());
+    }
+
+    private void assertNoDuplicateActivePriorityBinding(PaymentInstrumentBinding binding) {
+        if (binding.getStatus() != FundsAccountStatus.ACTIVE) {
+            return;
+        }
+        int priority = binding.getPriority() == null ? 0 : binding.getPriority();
+        PaymentInstrumentBindingNameRefs ref = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(binding.getTenantId()))
+                .and(ref.instrumentSn.eq(binding.getInstrumentSn()))
+                .and(ref.bindingRole.eq(binding.getBindingRole()))
+                .and(ref.currency.eq(binding.getCurrency()))
+                .and(ref.priority.eq(priority))
+                .and(ref.status.eq(FundsAccountStatus.ACTIVE));
+        boolean duplicated = paymentInstrumentBindingMapper.selectListByQuery(wrapper).stream()
+                .anyMatch(existing -> binding.getId() == null || !binding.getId().equals(existing.getId()));
+        AssertUtils.isFalse(duplicated,
+                "支付工具绑定优先级冲突，instrumentSn = {}, bindingRole = {}, currency = {}, priority = {}",
+                binding.getInstrumentSn(),
+                binding.getBindingRole(),
+                binding.getCurrency(),
+                priority);
     }
 
     private void applyBindingChanges(PaymentInstrumentBinding entity, ChangePaymentInstrumentBindingRequest request) {
