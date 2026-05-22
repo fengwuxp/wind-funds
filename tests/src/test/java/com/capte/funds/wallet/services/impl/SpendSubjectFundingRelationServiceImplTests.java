@@ -31,6 +31,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,6 +60,8 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     private static final String FUNDING_ACCOUNT_SN = "funding_relation_target";
 
     private static final String SECOND_FUNDING_ACCOUNT_SN = "funding_relation_second_target";
+
+    private static final String THIRD_FUNDING_ACCOUNT_SN = "funding_relation_third_target";
 
     private static final String SPEND_SUBJECT_ID = "credit_relation_subject";
 
@@ -239,6 +242,53 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：同一支出主体下存在过期、当前有效和未来生效的 ACTIVE 非默认资金来源。
+     * 输入：三条关系都为 ACTIVE，但 validFrom/validTo 覆盖过去、当前和未来窗口。
+     * 输出：查询当前 ACTIVE 资金来源候选时只返回当前有效记录。
+     * 红线：已过期或未生效的资金来源关系不得进入 route 候选，避免后续交易随机或错误扣款。
+     */
+    @Test
+    void testQuerySpendSubjectFundingRelationsShouldExcludeInactiveValidityWindowCandidates() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setSn(SECOND_FUNDING_ACCOUNT_SN));
+        fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setSn(THIRD_FUNDING_ACCOUNT_SN));
+        LocalDateTime now = LocalDateTime.now();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setDefaultRelation(Boolean.FALSE)
+                .setValidFrom(now.minusDays(2))
+                .setValidTo(now.minusDays(1)));
+        fundingRelationService.createSpendSubjectFundingRelation(createPriorityOrderRelationRequest()
+                .setValidFrom(now.minusMinutes(1))
+                .setValidTo(now.plusDays(1)));
+        fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setSn(PRIORITY_CONFLICT_RELATION_SN)
+                .setFundingAccountId(THIRD_FUNDING_ACCOUNT_SN)
+                .setPriority(30)
+                .setDefaultRelation(Boolean.FALSE)
+                .setValidFrom(now.plusDays(1))
+                .setValidTo(now.plusDays(2)));
+
+        List<SpendSubjectFundingRelationDTO> records = fundingRelationService.querySpendSubjectFundingRelations(
+                new SpendSubjectFundingRelationQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSpendSubjectId(SPEND_SUBJECT_ID)
+                        .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+
+        assertThat(records)
+                .extracting(SpendSubjectFundingRelationDTO::getSn)
+                .containsExactly(PRIORITY_ORDER_RELATION_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpSpendSubjectFundingRelationTestData() {
         cleanupSpendSubjectFundingRelationTestData();
@@ -255,12 +305,14 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 DUPLICATE_DEFAULT_RELATION_SN,
                 PRIORITY_CONFLICT_RELATION_SN,
                 PRIORITY_ORDER_RELATION_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
                 FUNDING_ACCOUNT_SN,
-                SECOND_FUNDING_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)",
+                SECOND_FUNDING_ACCOUNT_SN,
+                THIRD_FUNDING_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?)",
                 FUNDING_ACCOUNT_SN,
-                SECOND_FUNDING_ACCOUNT_SN);
+                SECOND_FUNDING_ACCOUNT_SN,
+                THIRD_FUNDING_ACCOUNT_SN);
     }
 
     private CreateFundingAccountRequest createFundingAccountRequest() {

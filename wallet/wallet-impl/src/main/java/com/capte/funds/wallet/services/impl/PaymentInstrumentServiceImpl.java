@@ -183,8 +183,9 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 .and(ref.subjectType.eq(query.getSubjectType()))
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.defaultBinding.eq(query.getDefaultBinding()))
-                .and(ref.status.eq(query.getStatus()))
-                .orderBy(ref.priority.asc(), ref.id.asc());
+                .and(ref.status.eq(query.getStatus()));
+        applyCurrentEffectiveWindow(wrapper, ref, query.getStatus());
+        wrapper.orderBy(ref.priority.asc(), ref.id.asc());
         return MybatisQueryHelper.<PaymentInstrumentBinding, PaymentInstrumentBindingDTO>query(wrapper)
                 .counter(paymentInstrumentBindingMapper::selectCountByQuery)
                 .resultQueryFunc(paymentInstrumentBindingMapper::selectListByQuery)
@@ -458,5 +459,16 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.isRawSensitiveInstrumentNo(
                         request.getInstrumentNo()),
                 "instrumentNo must be masked or token reference");
+    }
+
+    private void applyCurrentEffectiveWindow(QueryWrapper wrapper,
+                                             PaymentInstrumentBindingNameRefs ref,
+                                             FundsAccountStatus status) {
+        if (status != FundsAccountStatus.ACTIVE) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        wrapper.and(ref.validFrom.isNull().or(ref.validFrom.le(now)))
+                .and(ref.validTo.isNull().or(ref.validTo.gt(now)));
     }
 }

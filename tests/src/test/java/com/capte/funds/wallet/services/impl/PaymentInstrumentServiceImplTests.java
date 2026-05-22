@@ -32,6 +32,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -72,6 +73,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private static final String FUNDING_ACCOUNT_ID = "funding_pi_binding_target";
 
     private static final String SECOND_FUNDING_ACCOUNT_ID = "funding_pi_binding_second";
+
+    private static final String THIRD_FUNDING_ACCOUNT_ID = "funding_pi_binding_third";
 
     private static final String OPERATOR_ID = "ops_pi_service";
 
@@ -419,6 +422,47 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThat(records)
                 .extracting(PaymentInstrumentBindingDTO::getSn)
                 .containsExactly(PRIORITY_ORDER_BINDING_SN, BINDING_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一支付工具下存在过期、当前有效和未来生效的 ACTIVE 非默认候选。
+     * 输入：三条候选都为 ACTIVE，但 validFrom/validTo 覆盖过去、当前和未来窗口。
+     * 输出：查询当前 ACTIVE 候选时只返回当前有效记录。
+     * 红线：已过期或未生效的绑定不得进入 route 候选，避免后续交易使用错误资金来源。
+     */
+    @Test
+    void testQueryPaymentInstrumentBindingsShouldExcludeInactiveValidityWindowCandidates() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LocalDateTime now = LocalDateTime.now();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setPriority(20)
+                .setDefaultBinding(Boolean.FALSE)
+                .setValidFrom(now.minusDays(2))
+                .setValidTo(now.minusDays(1)));
+        paymentInstrumentService.createPaymentInstrumentBinding(createPriorityOrderBindingRequest()
+                .setValidFrom(now.minusMinutes(1))
+                .setValidTo(now.plusDays(1)));
+        paymentInstrumentService.createPaymentInstrumentBinding(createPriorityConflictBindingRequest()
+                .setSubjectId(THIRD_FUNDING_ACCOUNT_ID)
+                .setPriority(30)
+                .setValidFrom(now.plusDays(1))
+                .setValidTo(now.plusDays(2)));
+
+        List<PaymentInstrumentBindingDTO> records = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+
+        assertThat(records)
+                .extracting(PaymentInstrumentBindingDTO::getSn)
+                .containsExactly(PRIORITY_ORDER_BINDING_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 

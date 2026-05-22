@@ -23,6 +23,8 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 /**
  * 支出主体资金关系服务实现。
  *
@@ -74,8 +76,9 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.relationType.eq(query.getRelationType()))
                 .and(ref.defaultRelation.eq(query.getDefaultRelation()))
-                .and(ref.status.eq(query.getStatus()))
-                .orderBy(ref.priority.asc(), ref.id.asc());
+                .and(ref.status.eq(query.getStatus()));
+        applyCurrentEffectiveWindow(wrapper, ref, query.getStatus());
+        wrapper.orderBy(ref.priority.asc(), ref.id.asc());
         return MybatisQueryHelper.<SpendSubjectFundingRel, SpendSubjectFundingRelationDTO>query(wrapper)
                 .counter(spendSubjectFundingRelMapper::selectCountByQuery)
                 .resultQueryFunc(spendSubjectFundingRelMapper::selectListByQuery)
@@ -150,5 +153,16 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 request.getRelationType(),
                 request.getCurrency(),
                 priority);
+    }
+
+    private void applyCurrentEffectiveWindow(QueryWrapper wrapper,
+                                             SpendSubjectFundingRelNameRefs ref,
+                                             FundsAccountStatus status) {
+        if (status != FundsAccountStatus.ACTIVE) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        wrapper.and(ref.validFrom.isNull().or(ref.validFrom.le(now)))
+                .and(ref.validTo.isNull().or(ref.validTo.gt(now)));
     }
 }
