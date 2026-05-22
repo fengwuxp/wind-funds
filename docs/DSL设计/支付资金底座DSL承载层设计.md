@@ -126,7 +126,7 @@
 | PRD 能力域 | DSL 承载对象 | 必须表达的事实 | JSON / TDD 证据 | 禁止漂移 |
 | --- | --- | --- | --- | --- |
 | 交易接入 | `FundsInstruction`、`FundsInstructionReferenceSpec`、`businessScene`、`eventType`、`transactionType`。 | 业务流水、幂等键、金额、币种、操作者、来源事实、后续引用。 | `DSL-DIRECT-*`、`DSL-AUTH-*`、`DSL-BALANCE-CONTROL-*`；`TDD-DIR-*`、`TDD-AUTH-*`、`TDD-CTRL-*`。 | 把业务订单状态、通道状态机或运营工单直接当作资金交易。 |
-| 权益语义 | `FundsBenefitSnapshotSpec`、`FundsBenefitComponentSpec`、`FundsBenefitReferenceSpec`、`FundsBenefitRefundPolicySpec`。 | 原权益结果、金额闭合、组件角色、承担方、受益方、规则版本、退款处置、本次决策引用。 | `DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`。 | 把核心权益金额、规则版本或退款处置藏进 `contextVariables`，或按当前营销规则重算历史权益。 |
+| 权益语义 | `FundsBenefitSnapshotSpec`、`FundsBenefitComponentSpec`、`FundsBenefitReferenceSpec`、`FundsBenefitRefundPolicySpec`、伴随权益指令组、补充权益事实、审计证据包引用、使用者解释视图引用。 | 原权益结果、金额闭合、组件角色、承担方、受益方、规则版本、退款处置、本次决策引用、伴随指令原子性、补充事实来源、最终确认状态、视图防误导、证据最小化和外部规则核验状态。 | `DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`、`TDD-RACE-012`。 | 把核心权益金额、规则版本或退款处置藏进 `contextVariables`，按当前营销规则重算历史权益，或把伴随指令、补充事实、审计证据包、解释视图和外部规则核验当作备注字段处理。 |
 | 钱包账户 | `SubjectRef`、`PaymentInstrumentRef`、`ExternalAccountRef`、平台账户角色、资金来源决策。 | 可入账主体、支付工具引用、脱敏展示号、绑定快照、资金来源、账户能力和币种。 | `DSL-PAYMENT-INSTRUMENT-*`；`TDD-WALLET-*`、`TDD-ROUTE-*`。 | 把卡、VA、外部账户、支付工具或业务经营主体直接入账。 |
 | 资金路由 | `ResolvedRoute`、`RouteSnapshot`、`RouteParticipant`、`RouteNode`、`RouteLeg`、`RoutingDecision`、`FundingAllocationDecision`。 | 参与方、账目、账本周期、平台账户、资金来源、命中规则、失败原因和原路径回放。 | `DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`DSL-PAYMENT-INSTRUMENT-REPLAY-001`、`DSL-REVERSE-REFUND-FEE-001`；`TDD-ROUTE-*`。 | 缺原 route snapshot 时重新选路，或让 route 直接写交易事实和账本事实。 |
 | 账本账目 | `PostingPlan`、`LedgerTransaction`、`LedgerEntry`、`periodType`、`periodId`、`periodPolicy`。 | posting plan 独立平衡、entry 金额为正、借贷方向、账本周期、来源指令和 route leg。 | `DSL-DIRECT-PAY-FEE-001`、`DSL-BALANCE-CONTROL-LIMIT-BUDGET-001`；`TDD-LEDGER-*`。 | 用负金额表达反向、缺账本自动建账、用清算账期或报表周期替代账本周期。 |
@@ -720,8 +720,8 @@ Phase 与编码批次不是同一概念。Phase 描述权益能力从 DSL 承载
 | 能力阶段 | 典型批次映射 | 可编码边界 | 不可越界 |
 | --- | --- | --- | --- |
 | Phase 1 契约承载 | B1-10 或等价 contract-only 批次。 | `FundsInstructionSpec`、权益 Spec、枚举、JSON 契约、空值兼容和 contract fixture。 | 不宣称 route、posting、清结算、对账和 replay 已消费权益。 |
-| Phase 2 route/posting 消费 | B3、B4、B6 中被明确授权的 route、transaction、ledger 批次。 | 选择权益快照不可变事实源；选择零实付表达、平台补贴表达和资金流夹具；生成独立 route leg、伴随指令或 posting；幂等摘要纳入权益稳定摘要。 | 未选持久化落点、夹具级别或专业确认状态时实现生产资金流；把核心字段长期塞进 `contextVariables`。 |
-| Phase 3 replay/清结算/对账消费 | B7 或清结算、对账、投影专项批次。 | 清分金额项、对账差错、归档重放和交易投影按原权益快照追溯；补齐退款分摊、历史无快照处理和专业确认状态。 | 从当前营销规则、报表汇总或投影反推历史权益事实；用 `CONTRACT_ONLY` 夹具声明清结算或对账 Done。 |
+| Phase 2 route/posting 消费 | B3、B4、B6 中被明确授权的 route、transaction、ledger 批次。 | 选择权益快照不可变事实源；选择零实付表达、平台补贴表达和资金流夹具；生成独立 route leg、伴随指令或 posting；幂等摘要纳入权益稳定摘要；若选择独立伴随指令，必须声明主交易和伴随指令的原子性、幂等组、失败补偿和投影合并策略。 | 未选持久化落点、夹具级别、专业确认状态或伴随指令原子性策略时实现生产资金流；把核心字段长期塞进 `contextVariables`。 |
+| Phase 3 replay/清结算/对账/投影/归档消费 | B6、B7、B8 或 replay、清结算、对账、投影、归档、冷热读取、治理重放专项批次。 | 清分金额项、对账差错、归档重放和交易投影按原权益快照追溯；补齐退款分摊、历史无快照处理、补充权益事实模型、专业确认状态、审计证据包、伴随指令原子性消费、使用者解释视图、证据最小化和外部规则核验状态。 | 从当前营销规则、报表汇总、投影或归档结果反推历史权益事实；用 `CONTRACT_ONLY` 夹具声明 replay、清结算、对账、投影、归档、冷热读取或治理重放 Done；视图误导、证据越界或外部规则未核验仍自动放行。 |
 
 生产承接门禁：
 
@@ -729,8 +729,8 @@ Phase 与编码批次不是同一概念。Phase 描述权益能力从 DSL 承载
 | --- | --- | --- |
 | Phase 1 契约承载 | `FundsInstructionSpec` 可选携带 `benefitSnapshot`；无权益交易遵循空值语义；JSON、金额闭合、枚举和反序列化契约可测。 | route、posting、replay、清结算或对账已经完整消费权益快照。 |
 | Phase 2 route/posting 消费 | `POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 可生成独立资金路径或明确独立伴随指令；`NO_LEDGER` 不入账。 | 补贴、本金、手续费或代金券净额混记；缺资金来源仍放行。 |
-| Phase 3 replay/清结算/对账消费 | 原 route snapshot 或等价不可变事实能取回 `benefitSnapshotId`、`componentSn`、规则版本、退款策略和决策流水。 | 退款、撤销、授权过期、清结算重跑或对账差错按当前营销规则重算。 |
-| 生产链路 Done | 交易事实、route snapshot、posting context、清分金额项、对账差错和交易投影都能追溯权益组件摘要。 | 只有请求态对象或文档样例，没有不可变事实存储、幂等校验和逆向回放证据。 |
+| Phase 3 replay/清结算/对账/投影/归档消费 | 原 route snapshot 或等价不可变事实能取回 `benefitSnapshotId`、`componentSn`、规则版本、退款策略、决策流水、专业确认状态、审计证据引用、解释视图引用和外部规则核验引用；replay、projection、settlement、reconciliation、archive、cold/hot read 或 governance replay 的资金流夹具按范围声明完成。 | 退款、撤销、授权过期、清结算重跑、对账差错、投影重放、归档读取或治理重放按当前营销规则重算，或缺核验规则仍自动放行。 |
+| 生产链路 Done | 交易事实、route snapshot、posting context、清分金额项、对账差错、交易投影、归档 Manifest 或治理重放差异报告都能追溯权益组件摘要、伴随指令组、补充事实链、脱敏审计证据引用、使用者解释视图和外部规则核验状态。 | 只有请求态对象或文档样例，没有不可变事实存储、幂等校验、逆向回放证据、伴随指令原子性证据、补充事实审计链、审计证据包、视图防误导、证据最小化或规则核验证据。 |
 
 Route、Posting 和 Replay 消费顺序：
 
@@ -739,6 +739,21 @@ Route、Posting 和 Replay 消费顺序：
 3. `LedgerPostingAssembler` 只消费 route leg 和组件账务效果，不理解营销规则；`NO_LEDGER` 不生成 posting，`POSTING_REQUIRED` 必须独立平衡。
 4. 后续退款、撤销、授权过期、拒付、清结算重跑和对账差错先读取原资金事实或原 route snapshot，再取得原权益快照和本次决策，不调用当前营销规则。
 5. `componentSn`、`benefitSnapshotId`、`ruleVersion`、`refundDecisionId` 和 `externalDecisionId` 应进入 route snapshot、posting context、清分金额项、对账差错和交易投影摘要中的至少一个可追溯位置。
+
+伴随权益指令不是权益专用服务入口，而是含权益资金事实被拆分后的编排关系。选择伴随模式时，DSL 或等价运行态事实必须能表达以下对象口径：
+
+| 对象口径 | 必须字段或语义 | 消费方 | 禁止项 |
+| --- | --- | --- | --- |
+| 伴随指令组 | `companionGroupSn`、主从角色、主交易引用、伴随指令引用。 | route、posting、幂等、交易投影、清分、对账、归档。 | 主交易和伴随指令各自孤立成功，查询或对账无法聚合。 |
+| 原子性模式 | 同事务、同业务组幂等加补偿或 Saga 补偿。 | 编排器、幂等服务、补偿任务、审计。 | 未选模式仍声明生产可用。 |
+| 补偿策略 | 主成功伴随失败、伴随成功主失败、重复提交、超时未知和人工接管的处理方式。 | 交易状态机、差错单、清结算阻断、Runbook。 | 部分成功被展示为普通成功或清结算 Done。 |
+| 投影合并键 | `projectionMergeKey` 或等价业务组键。 | 用户账单、商户账单、运营时间线、财务视图和归档重放。 | 伴随指令在投影、清分或对账中丢失。 |
+
+历史补充权益事实只用于缺原权益快照的受控解释，不是补造原始快照。它可以是独立表、治理差异报告中的追加事实，或等价不可变存储，但必须满足：只追加、不覆盖；包含原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系；被撤销、证据缺失、范围不匹配或 digest 冲突时不得参与退款、对账、归档 apply 或治理重放 apply。
+
+审计证据包必须在最终写入前参与校验。预检时有效的确认状态，在 posting、refund、settlement confirmation、archive apply 或 governance replay apply 前仍需重新读取确认状态、有效期、适用范围、撤销/变更记录和脱敏证据引用；dry-run 成功不能作为 apply 证据。
+
+使用者解释视图也是 DSL 消费边界的一部分。用户账单、商户账单、运营时间线、财务对账视图和审计导出只能引用事实、快照、投影、证据摘要和外部 reference；不得把授权占用、冻结、待清算、出款受理、补充事实或专业确认状态展示成已完成资金结果。证据包、导出、日志和告警只允许保存最小必要信息；涉及税务、会计、合同、卡组织、银行、通道、KYC/KYB/AML、客户资金、跨境或外汇规则时，DSL 只能承载来源、版本、生效日期、适用主体、核验日期和确认人，未确认前不得作为自动资金处理依据。
 
 `contextVariables` 只允许作为 Phase 1 到 Phase 2 的短期迁移通道，且只能承载可追溯引用或稳定摘要，不承载完整资金规则。
 
@@ -771,6 +786,9 @@ Route、Posting 和 Replay 消费顺序：
 | C05 | 储值、礼品卡、预付代金券是否纳入当前一期。 | 决定是否需要负债账户、预收待付口径和财务确认；未确认前不得按普通平台券处理。 |
 | C06 | 退款分摊是否必须支持商品行。 | 决定是否需要 `pricingSnapshotSn` 和商品行权益明细；未确认前部分退款只能采用已明确的非商品行策略。 |
 | C07 | 历史无权益快照交易如何逆向处理。 | 决定迁移、人工处理和对账差错策略；未确认前默认失败或进入人工处理，不按当前营销规则重算。 |
+| C08 | 若选择独立伴随指令，主交易和伴随指令是否同事务、同业务组幂等或采用补偿模式。 | 决定部分成功状态、失败补偿、冲正、投影合并和审计解释；未确认前不得声明平台补贴独立伴随指令生产可用。 |
+| C09 | 专业确认在预检通过后、实际入账/退款/清结算/重放前被撤销、过期或范围变更时如何处理。 | 决定 TOCTOU 风险和阻断时机；未确认前必须在最终写入前重新校验确认状态。 |
+| C10 | 历史补充权益事实是否允许进入本阶段。 | 决定是否新增 supplemental benefit fact 或等价不可变存储、撤销关系、审计和重放校验；未确认前缺原快照只能失败、跳过或人工处理。 |
 
 ### 7.3 Route DSL
 
@@ -912,6 +930,12 @@ Replay 语义边界：
 | 资金底座不重算券 | 权益快照只保存已决策结果，不调用当前营销规则重新计算优惠金额。 |
 | `NO_LEDGER` 权益不入账 | 商户让利、展示优惠等无资金转移组件不得生成 `PostingPlan` 或 `LedgerEntry`。 |
 | 有资金影响权益必须独立解释 | 平台补贴、储值券、合作方补贴等不得和本金、手续费净额混记。 |
+| 伴随权益指令必须有组原子性 | 独立伴随指令必须声明业务组、主从角色、原子性模式、补偿策略和投影合并键。 |
+| 补充权益事实只追加 | 历史补录只能追加 supplemental benefit fact 或等价补充事实，不覆盖原交易、route snapshot、账本事实或余额投影。 |
+| 审计证据最终重校验 | 专业确认和审计证据包在最终写入、退款、清结算确认、归档 apply 或治理重放 apply 前重新校验。 |
+| 使用者视图不得误导 | 用户账单、商户账单、运营时间线、财务对账视图和审计导出不得把未完成资金状态展示为完成结果。 |
+| 证据最小必要 | 证据包、导出、日志和告警不得携带完整卡号、CVV、密钥、token secret、证件影像、完整银行账户敏感号、无关聊天记录或超范围个人信息。 |
+| 外部规则需核验 | 税务、会计、合同、卡组织、银行、通道、KYC/KYB/AML、客户资金、跨境或外汇口径未核验时不得驱动自动资金处理。 |
 | 不退券和不冲补贴分开 | 用户侧 `NO_REFUND` 与资金侧 `REVERSE_SUBSIDY`、`RETAIN_SUBSIDY`、`RESTORE_PREPAID_LIABILITY` 等处置必须能同时表达。 |
 | 储值券先确认资金性质 | 储值、预付、礼品卡或用户权益余额必须标记资金性质和待确认口径，不能按普通平台券处理。 |
 | 规则窗口不是账本周期 | 清算账期、结算周期、报表周期、归档水位、指标水位和 spend-rule window 不能替代 `periodType + periodId`。 |
@@ -1228,6 +1252,10 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001` | 不退券且不冲补贴。 | `NO_REFUND + RETAIN_SUBSIDY`。 | 保留补贴成本或合同口径，必须有规则版本和专业确认。 | 未确认财务口径仍自动放行。 |
 | `DSL-BENEFIT-PARTIAL-REFUND-001` | 部分退款权益分摊。 | `partialRefundStrategy` 和组件级 `refundPolicy`。 | 多次退款按原策略累计闭合，尾差可解释。 | 按当前活动规则重算、累计超额或尾差静默补平。 |
 | `DSL-BENEFIT-MISSING-SNAPSHOT-REPLAY-001` | 缺原权益快照的逆向处理。 | 原交易缺 `benefitSnapshot` 或等价快照。 | 失败或人工处理，不调用当前营销规则。 | 当前规则重算、补造历史权益结果。 |
+| `DSL-BENEFIT-COMPANION-INSTRUCTION-001` | 独立伴随权益指令原子性。 | 伴随指令组、主从角色、原子性模式、补偿策略、投影合并键。 | 主交易和伴随指令可按同一业务组幂等、补偿、投影和对账；部分成功进入差错或补偿。 | 缺组键、缺补偿策略、部分成功静默成功、伴随指令丢失在投影或清分中。 |
+| `DSL-BENEFIT-SUPPLEMENTAL-FACT-001` | 历史补充权益事实。 | 原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系。 | 只追加补充事实，用于退款、差错、对账、归档读取或治理重放解释。 | 覆盖原交易、原 route snapshot、原账本事实；缺证据仍参与 apply。 |
+| `DSL-BENEFIT-AUDIT-EVIDENCE-001` | 专业确认和审计证据包最终校验。 | 确认方、确认时间、结论版本、适用范围、有效期、脱敏证据引用、撤销或变更处理、审计责任人。 | 最终写入前重校验，失效时阻断、降级或转人工。 | dry-run 替代 apply 证据；过期、撤销、范围不匹配或敏感原文仍放行。 |
+| `DSL-BENEFIT-EXPLAINABLE-VIEW-001` | 含权益视图可理解且不误导。 | 视图类型、来源事实、状态含义、不可操作原因、下一步动作、脱敏证据引用和外部规则核验引用。 | 用户、商户、运营、财务和审计视图只读解释资金状态，敏感证据只展示脱敏摘要或 reference。 | 授权占用、冻结、待清算、出款受理、补充事实或未确认规则被展示为已完成资金结果。 |
 | `DSL-BENEFIT-CLEARING-RECONCILIATION-001` | 含权益交易进入清结算和对账。 | 清分候选、金额项、组件引用、营销核销引用和规则版本。 | 只拆分和核对金额项，不直接写资金事实；差异进入差错单。 | 权益差异静默补平、清分候选生成 LedgerEntry、补贴和本金净额混记。 |
 | `DSL-GOVERNANCE-ARCHIVE-MANIFEST-001` | 统一治理任务和资金归档 Manifest 状态隔离。 | `governanceTask`、`archiveRequest`、`archiveManifest`。 | 不生成 route/posting；统一任务完成不等于 Manifest 完成。 | 用统一任务号替代 Manifest、缺 checkpoint/watermark 仍归档成功。 |
 | `DSL-GOVERNANCE-PROJECTION-REPLAY-001` | 交易投影重放边界。 | `projectionReplayTask`、`differenceReport`、`replayCheckpoint`。 | 只读事实并修复交易投影；正式覆盖必须有范围、审批、差异报告和 checkpoint。 | 无范围全量在线重放、重放生成资金交易或 LedgerEntry。 |
@@ -2228,7 +2256,7 @@ JSON 夹具分为契约夹具和资金流夹具，二者都应放入 `tests/src/
 | 场景 | 准入口径 |
 | --- | --- |
 | 新增 DSL caseId | 必须新增 `{caseId}.json`，或在 Execution Grant 中声明本批次只做设计、不进入可执行 DSL 夹具验收。 |
-| B1 契约夹具 | 可以只覆盖契约解析、字段语义、枚举和 validation，不得用于声明资金流、route/posting/replay、清结算或对账通过。 |
+| B1 契约夹具 | 可以只覆盖契约解析、字段语义、枚举和 validation，不得用于声明资金流、route/posting/replay、清结算、对账、投影、归档、冷热读取或治理重放通过。 |
 | 资金流夹具 | 一旦声明覆盖资金变化，必须补 expectedRoute、expectedPosting、balanceAssertions 和失败无副作用断言。 |
 | 修改已有 DSL caseId | 必须同步更新对应夹具、TDD 映射和产品验收族；不能只改正文描述。 |
 | 复用已有 DSL 样例 | 必须说明复用哪个样例、覆盖哪些 `AC-*` 和 `TDD-*`，以及未覆盖的差异。 |

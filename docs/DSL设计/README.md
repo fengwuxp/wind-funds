@@ -81,7 +81,7 @@ DSL 文档中的结构、表格和 JSON 示例只有在进入测试资源、被�
 | 场景 | 可声明的结论 | 不可声明的结论 |
 | --- | --- | --- |
 | 只在文档中新增或调整 caseId | 设计语义已定义，可进入系分和 TDD 拆解。 | 机器契约已通过。 |
-| 在 `tests/src/test/resources/dsl-contract-cases/` 落契约夹具并被测试读取 | DSL 契约具备可执行验收入口。 | 已覆盖资金流、route/posting/replay、清结算或对账，除非夹具显式包含资金流断言并同步覆盖对应 AC/TDD/RED。 |
+| 在 `tests/src/test/resources/dsl-contract-cases/` 落契约夹具并被测试读取 | DSL 契约具备可执行验收入口。 | 已覆盖资金流、route/posting/replay、清结算、对账、投影、归档、冷热读取或治理重放，除非夹具显式包含资金流断言并同步覆盖对应 AC/TDD/RED。 |
 | 在 `tests/src/test/resources/dsl-contract-cases/` 落资金流夹具并被测试读取 | 夹具覆盖范围内的 route、posting、余额、投影或治理断言具备可执行验收入口。 | 已覆盖所有生产路径，除非同步覆盖该路径对应的 AC/TDD/RED、失败无副作用和残余风险。 |
 | 复用已有 DSL 样例 | 复用范围内的语义可作为局部证据。 | 未覆盖差异自动视为已验证。 |
 | 本批次不触碰 DSL 测试资源 | 可以作为文档评审结论。 | 新增 caseId 已具备生产契约通过证据。 |

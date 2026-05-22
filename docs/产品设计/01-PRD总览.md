@@ -289,7 +289,7 @@ mindmap
 | 能力域 | 产品架构位置 | 系统架构承接 | 职责边界 | 验收和测试入口 |
 | --- | --- | --- | --- | --- |
 | 交易接入 | 交易入口和资金事实链起点，承接直接交易、授权交易、余额控制和幂等。 | `transaction-face`、`transaction-impl`、`core` 指令和枚举。 | 记录资金侧事实、生命周期和请求摘要；不替代业务订单、外部通道状态机或运营工单。 | `AC-IN-*`、`AC-OUT-*`、`AC-PAY-*`、`AC-AUTH-*`、`AC-CTRL-*`；`TDD-DIR-*`、`TDD-AUTH-*`、`TDD-CTRL-*`。 |
-| 权益语义 | 交易入口上的已决策权益结果，解释订单金额、用户实付、商户应收、零实付准入和退款处置。 | `core` 的 `FundsBenefitSnapshotSpec` 及权益组件；后续由 transaction、route、ledger、清结算和对账消费。 | 只承接订单、业务系统或营销权益系统已决策结果；不计算券规则、不维护券包生命周期、不用当前规则重算历史权益；含权益生产批次必须先完成权益准入证明。 | `AC-BEN-*`、`RED-050` 至 `RED-063`；`DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`。 |
+| 权益语义 | 交易入口上的已决策权益结果，解释订单金额、用户实付、商户应收、零实付准入、退款处置、使用者解释视图和证据边界。 | `core` 的 `FundsBenefitSnapshotSpec` 及权益组件；后续由 transaction、route、ledger、清结算、对账、投影和归档消费。 | 只承接订单、业务系统或营销权益系统已决策结果；不计算券规则、不维护券包生命周期、不用当前规则重算历史权益；含权益生产批次必须先完成权益准入证明、使用者解释视图、证据最小化和外部规则核验状态。 | `AC-BEN-*`、`RED-050` 至 `RED-066`；`DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`。 |
 | 钱包账户 | 账户、余额桶、信用、预算、平台账户角色和支付工具引用。 | `wallet-face`、`wallet-impl`、`ledger-face` 查询、`core` 主体和值对象。 | 管理账户能力、工具绑定、显式建账和余额查询；不直接写交易事实、账本事实或绕过交易编排。 | `AC-PI-*`、`AC-CTRL-*`、`RED-046` 至 `RED-049`；`TDD-WALLET-*`、`TDD-ROUTE-011` 至 `TDD-ROUTE-013`。 |
 | 资金路由 | 资金事实到参与方、账目、账本周期和 route snapshot 的转译层。 | `RouteResolver`、`RouteSnapshot`、`FundingAllocationDecision`。 | 只解析路径和固化决策；不写交易事实、不写账本分录、不在缺快照时重新选路。 | `AC-ROUTE-*`、`RED-043` 至 `RED-045`；`TDD-ROUTE-*`、`TDD-RED-003`。 |
 | 账本账目 | 账本交易、posting plan、ledger entry、账本周期和余额事实源。 | `ledger-face`、`ledger-impl`、posting assembler、balance projection。 | 账本分录是不可变事实，posting plan 必须独立平衡；余额投影可重建，不反写历史分录。 | `AC-VIEW-*`、`AC-CTRL-009` 至 `AC-CTRL-012`、`RED-012`、`RED-022` 至 `RED-024`；`TDD-LEDGER-*`。 |
