@@ -62,7 +62,7 @@ test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTran
     @just _run-test-classes "{{tests}}" tests
 
 # Contract, route, and wallet boundary tests.
-test-boundary tests='RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests,FundingAccountServiceImplTests,ControlAccountLedgerInitializationTests,PaymentInstrumentServiceImplTests,SpendSubjectFundingRelationServiceImplTests,PlatformFundingAccountServiceImplTests,WalletLayerBoundaryTests':
+test-boundary tests='RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests,FundingAccountServiceImplTests,ControlAccountLedgerInitializationTests,PaymentInstrumentServiceImplTests,SpendSubjectFundingRelationServiceImplTests,PlatformFundingAccountServiceImplTests,FundsSubjectBalanceQueryServiceImplTests,WalletLayerBoundaryTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Governance projection replay boundary tests.
