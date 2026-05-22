@@ -52,6 +52,8 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
     private static final String DUPLICATE_DEFAULT_RELATION_SN = "spend_funding_rel_duplicate_default";
 
+    private static final String PRIORITY_CONFLICT_RELATION_SN = "spend_funding_rel_priority_conflict";
+
     private static final String FUNDING_ACCOUNT_SN = "funding_relation_target";
 
     private static final String SECOND_FUNDING_ACCOUNT_SN = "funding_relation_second_target";
@@ -176,6 +178,32 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：同一支出主体已经存在一个可用资金来源优先级后，再配置同优先级资金来源。
+     * 输入：同租户、同支出主体、同币种、同关系类型，两个 ACTIVE 非默认关系使用相同 priority。
+     * 输出：第二个关系被拒绝，保持原有资金来源候选唯一可排序。
+     * 红线：资金来源优先级冲突时不得为后续 route 留下随机选路候选，也不得写账。
+     */
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldRejectDuplicateActivePriorityRelation() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setSn(SECOND_FUNDING_ACCOUNT_SN));
+        fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setDefaultRelation(Boolean.FALSE));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setSn(PRIORITY_CONFLICT_RELATION_SN)
+                .setFundingAccountId(SECOND_FUNDING_ACCOUNT_SN)
+                .setDefaultRelation(Boolean.FALSE)))
+                .hasMessageContaining("资金来源关系优先级冲突");
+
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isOne();
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", PRIORITY_CONFLICT_RELATION_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpSpendSubjectFundingRelationTestData() {
         cleanupSpendSubjectFundingRelationTestData();
@@ -187,9 +215,10 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     private void cleanupSpendSubjectFundingRelationTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?)",
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?, ?)",
                 RELATION_SN,
-                DUPLICATE_DEFAULT_RELATION_SN);
+                DUPLICATE_DEFAULT_RELATION_SN,
+                PRIORITY_CONFLICT_RELATION_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
                 FUNDING_ACCOUNT_SN,
                 SECOND_FUNDING_ACCOUNT_SN);

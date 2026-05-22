@@ -44,6 +44,7 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
         FundingAccount fundingAccount = getFundingAccount(request.getTenantId(), request.getFundingAccountId());
         assertFundingAccountCanBind(fundingAccount, request);
         assertNoDuplicateActiveDefaultRelation(request);
+        assertNoDuplicateActivePriorityRelation(request);
         SpendSubjectFundingRel entity =
                 SpendSubjectFundingRelationConverter.INSTANCE.convertToSpendSubjectFundingRel(request);
         spendSubjectFundingRelMapper.insertSelective(entity);
@@ -124,5 +125,29 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 request.getSpendSubjectId(),
                 request.getRelationType(),
                 request.getCurrency());
+    }
+
+    private void assertNoDuplicateActivePriorityRelation(CreateSpendSubjectFundingRelationRequest request) {
+        FundsAccountStatus status = request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus();
+        if (status != FundsAccountStatus.ACTIVE) {
+            return;
+        }
+        SpendSubjectFundingRelNameRefs ref = SpendSubjectFundingRelNameRefs.spendSubjectFundingRel;
+        int priority = request.getPriority() == null ? 0 : request.getPriority();
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(request.getTenantId()))
+                .and(ref.spendSubjectId.eq(request.getSpendSubjectId()))
+                .and(ref.spendSubjectType.eq(request.getSpendSubjectType()))
+                .and(ref.currency.eq(request.getCurrency()))
+                .and(ref.relationType.eq(request.getRelationType()))
+                .and(ref.priority.eq(priority))
+                .and(ref.status.eq(FundsAccountStatus.ACTIVE));
+        AssertUtils.isTrue(spendSubjectFundingRelMapper.selectCountByQuery(wrapper) == 0,
+                "资金来源关系优先级冲突，spendSubjectId = {}, relationType = {}, currency = {}, priority = {}",
+                request.getSpendSubjectId(),
+                request.getRelationType(),
+                request.getCurrency(),
+                priority);
     }
 }
