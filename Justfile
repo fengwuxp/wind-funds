@@ -65,8 +65,12 @@ test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTran
 test-boundary tests='RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests,FundingAccountServiceImplTests,ControlAccountLedgerInitializationTests,PaymentInstrumentServiceImplTests,SpendSubjectFundingRelationServiceImplTests,WalletLayerBoundaryTests':
     @just _run-test-classes "{{tests}}" tests
 
+# Governance projection replay boundary tests.
+test-governance tests='FundsProjectionReplayServiceTests':
+    @just _run-test-classes "{{tests}}" tests
+
 # Fast CAD verification for non-business tooling or test-asset changes.
-verify-fast: compile test-boundary
+verify-fast: compile test-boundary test-governance
 
 # Install reactor snapshots locally when Maven plugin resolution needs local artifacts.
 install-snapshots:
