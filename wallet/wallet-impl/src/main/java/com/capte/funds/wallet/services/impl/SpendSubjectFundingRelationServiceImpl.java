@@ -124,7 +124,12 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 .and(ref.relationType.eq(request.getRelationType()))
                 .and(ref.defaultRelation.eq(Boolean.TRUE))
                 .and(ref.status.eq(FundsAccountStatus.ACTIVE));
-        AssertUtils.isTrue(spendSubjectFundingRelMapper.selectCountByQuery(wrapper) == 0,
+        boolean duplicated = spendSubjectFundingRelMapper.selectListByQuery(wrapper).stream()
+                .anyMatch(existing -> validityWindowsOverlap(existing.getValidFrom(),
+                        existing.getValidTo(),
+                        request.getValidFrom(),
+                        request.getValidTo()));
+        AssertUtils.isFalse(duplicated,
                 "默认资金来源关系不唯一，spendSubjectId = {}, relationType = {}, currency = {}",
                 request.getSpendSubjectId(),
                 request.getRelationType(),
@@ -147,7 +152,12 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 .and(ref.relationType.eq(request.getRelationType()))
                 .and(ref.priority.eq(priority))
                 .and(ref.status.eq(FundsAccountStatus.ACTIVE));
-        AssertUtils.isTrue(spendSubjectFundingRelMapper.selectCountByQuery(wrapper) == 0,
+        boolean duplicated = spendSubjectFundingRelMapper.selectListByQuery(wrapper).stream()
+                .anyMatch(existing -> validityWindowsOverlap(existing.getValidFrom(),
+                        existing.getValidTo(),
+                        request.getValidFrom(),
+                        request.getValidTo()));
+        AssertUtils.isFalse(duplicated,
                 "资金来源关系优先级冲突，spendSubjectId = {}, relationType = {}, currency = {}, priority = {}",
                 request.getSpendSubjectId(),
                 request.getRelationType(),
@@ -164,5 +174,14 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
         LocalDateTime now = LocalDateTime.now();
         wrapper.and(ref.validFrom.isNull().or(ref.validFrom.le(now)))
                 .and(ref.validTo.isNull().or(ref.validTo.gt(now)));
+    }
+
+    private boolean validityWindowsOverlap(LocalDateTime leftFrom,
+                                           LocalDateTime leftTo,
+                                           LocalDateTime rightFrom,
+                                           LocalDateTime rightTo) {
+        boolean leftEndsAfterRightStarts = leftTo == null || rightFrom == null || leftTo.isAfter(rightFrom);
+        boolean rightEndsAfterLeftStarts = rightTo == null || leftFrom == null || rightTo.isAfter(leftFrom);
+        return leftEndsAfterRightStarts && rightEndsAfterLeftStarts;
     }
 }

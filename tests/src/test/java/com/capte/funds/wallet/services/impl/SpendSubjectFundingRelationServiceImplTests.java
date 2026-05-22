@@ -210,6 +210,54 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     /**
+     * 场景：运营提前配置未来生效的同优先级资金来源，用于当前资金来源到期后的计划切换。
+     * 输入：两个 ACTIVE 非默认关系使用相同 priority，但 validFrom/validTo 首尾相接，不存在重叠。
+     * 输出：未来关系创建成功；当前 route 候选仍只返回当前有效关系。
+     * 红线：优先级唯一性只限制同一时刻有效候选，不得阻断计划内资金来源切换，也不得写账。
+     */
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldAllowNonOverlappingPriorityCandidate() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setSn(SECOND_FUNDING_ACCOUNT_SN));
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime switchAt = now.plusHours(1);
+        fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setDefaultRelation(Boolean.FALSE)
+                .setValidFrom(now.minusDays(1))
+                .setValidTo(switchAt));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        Long futureRelationId = fundingRelationService.createSpendSubjectFundingRelation(createPriorityOrderRelationRequest()
+                .setPriority(20)
+                .setValidFrom(switchAt)
+                .setValidTo(now.plusDays(1)));
+
+        List<SpendSubjectFundingRelationDTO> currentRelations = fundingRelationService.querySpendSubjectFundingRelations(
+                new SpendSubjectFundingRelationQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSpendSubjectId(SPEND_SUBJECT_ID)
+                        .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+        SpendSubjectFundingRelationDTO futureRelation = fundingRelationService.querySpendSubjectFundingRelations(
+                new SpendSubjectFundingRelationQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(PRIORITY_ORDER_RELATION_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+
+        assertThat(futureRelationId).isPositive();
+        assertThat(currentRelations)
+                .extracting(SpendSubjectFundingRelationDTO::getSn)
+                .containsExactly(RELATION_SN);
+        assertThat(futureRelation.getPriority()).isEqualTo(20);
+        assertThat(futureRelation.getValidFrom()).isAfter(now);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一支出主体下存在多个 ACTIVE 非默认资金来源，后续 route 需要按确定顺序读取候选。
      * 输入：两个候选优先级分别为 20 和 10，创建顺序与优先级顺序相反。
      * 输出：查询结果按 priority 升序返回，再由稳定主键兜底。

@@ -282,7 +282,11 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 .and(ref.defaultBinding.eq(Boolean.TRUE))
                 .and(ref.status.eq(FundsAccountStatus.ACTIVE));
         boolean duplicated = paymentInstrumentBindingMapper.selectListByQuery(wrapper).stream()
-                .anyMatch(existing -> binding.getId() == null || !binding.getId().equals(existing.getId()));
+                .filter(existing -> binding.getId() == null || !binding.getId().equals(existing.getId()))
+                .anyMatch(existing -> validityWindowsOverlap(existing.getValidFrom(),
+                        existing.getValidTo(),
+                        binding.getValidFrom(),
+                        binding.getValidTo()));
         AssertUtils.isFalse(duplicated,
                 "默认支付工具绑定不唯一，instrumentSn = {}, bindingRole = {}, currency = {}",
                 binding.getInstrumentSn(),
@@ -305,7 +309,11 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 .and(ref.priority.eq(priority))
                 .and(ref.status.eq(FundsAccountStatus.ACTIVE));
         boolean duplicated = paymentInstrumentBindingMapper.selectListByQuery(wrapper).stream()
-                .anyMatch(existing -> binding.getId() == null || !binding.getId().equals(existing.getId()));
+                .filter(existing -> binding.getId() == null || !binding.getId().equals(existing.getId()))
+                .anyMatch(existing -> validityWindowsOverlap(existing.getValidFrom(),
+                        existing.getValidTo(),
+                        binding.getValidFrom(),
+                        binding.getValidTo()));
         AssertUtils.isFalse(duplicated,
                 "支付工具绑定优先级冲突，instrumentSn = {}, bindingRole = {}, currency = {}, priority = {}",
                 binding.getInstrumentSn(),
@@ -470,5 +478,14 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         LocalDateTime now = LocalDateTime.now();
         wrapper.and(ref.validFrom.isNull().or(ref.validFrom.le(now)))
                 .and(ref.validTo.isNull().or(ref.validTo.gt(now)));
+    }
+
+    private boolean validityWindowsOverlap(LocalDateTime leftFrom,
+                                           LocalDateTime leftTo,
+                                           LocalDateTime rightFrom,
+                                           LocalDateTime rightTo) {
+        boolean leftEndsAfterRightStarts = leftTo == null || rightFrom == null || leftTo.isAfter(rightFrom);
+        boolean rightEndsAfterLeftStarts = rightTo == null || leftFrom == null || rightTo.isAfter(leftFrom);
+        return leftEndsAfterRightStarts && rightEndsAfterLeftStarts;
     }
 }

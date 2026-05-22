@@ -295,6 +295,53 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：运营提前配置未来生效的默认支付工具绑定，用于当前默认绑定到期后的计划切换。
+     * 输入：两个 ACTIVE 默认绑定的 validFrom/validTo 首尾相接，不存在同一时刻重叠。
+     * 输出：未来默认绑定创建成功；当前 route 候选仍只返回当前有效默认绑定。
+     * 红线：默认候选唯一性只限制同一时刻的有效候选，不得阻断计划内换绑，也不得写账。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldAllowNonOverlappingDefaultCandidate() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime switchAt = now.plusHours(1);
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setValidFrom(now.minusDays(1))
+                .setValidTo(switchAt));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        Long futureBindingId = paymentInstrumentService.createPaymentInstrumentBinding(createSecondBindingRequest()
+                .setDefaultBinding(Boolean.TRUE)
+                .setValidFrom(switchAt)
+                .setValidTo(now.plusDays(1)));
+
+        List<PaymentInstrumentBindingDTO> currentDefaults = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setDefaultBinding(Boolean.TRUE)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+        PaymentInstrumentBindingDTO futureBinding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(DUPLICATE_DEFAULT_BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+
+        assertThat(futureBindingId).isPositive();
+        assertThat(currentDefaults)
+                .extracting(PaymentInstrumentBindingDTO::getSn)
+                .containsExactly(BINDING_SN);
+        assertThat(futureBinding.getDefaultBinding()).isTrue();
+        assertThat(futureBinding.getValidFrom()).isAfter(now);
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", DUPLICATE_DEFAULT_BINDING_SN))
+                .isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一支付工具存在一个 ACTIVE 默认绑定和一个非默认绑定，运营尝试把非默认绑定改为默认。
      * 输入：第二个绑定仅变更 defaultBinding = true，其他绑定维度与原默认绑定相同。
      * 输出：变更被拒绝，第二个绑定仍保持非默认和原版本。
