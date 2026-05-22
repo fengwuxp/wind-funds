@@ -61,6 +61,10 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
 
     private static final String SECOND_OWNER_ID = "owner_balance_query_second";
 
+    private static final String MONTHLY_PERIOD_ID = "2026-05";
+
+    private static final String NEXT_MONTH_PERIOD_ID = "2026-06";
+
     @Autowired
     private FundsSubjectBalanceQueryService balanceQueryService;
 
@@ -258,6 +262,73 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：同一资金主体同时存在生命周期余额和月度预算型余额桶。
+     * 输入：FUNDING_ACCOUNT 初始化 AVAILABLE / LIFETIME 与 AVAILABLE / MONTHLY / 2026-05。
+     * 输出：默认查询只返回 LIFETIME，月度查询只返回指定月份。
+     * 红线：账本周期是余额隔离键，余额查询不得把生命周期余额和月度余额混用。
+     */
+    @Test
+    void testQueryCurrentBalancesShouldKeepLifetimeAndMonthlyPeriodIsolatedWithoutLedgerMutation() {
+        insertFundingAccountWithoutLedgers();
+        createLedger(UNINITIALIZED_ACCOUNT_SN, LedgerSubjectCode.AVAILABLE,
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name());
+        createLedger(UNINITIALIZED_ACCOUNT_SN, LedgerSubjectCode.AVAILABLE,
+                AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        FundsSubjectBalanceDTO lifetimeBalance = balanceQueryService.getRequiredCurrentBalance(balanceQuery()
+                .setLedgerSubjectCodes(List.of(LedgerSubjectCode.AVAILABLE)));
+        FundsSubjectBalanceDTO monthlyBalance = balanceQueryService.getRequiredCurrentBalance(balanceQuery()
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(MONTHLY_PERIOD_ID)
+                .setLedgerSubjectCodes(List.of(LedgerSubjectCode.AVAILABLE)));
+
+        LedgerBalanceBucket lifetimeBucket = lifetimeBalance.getBalanceBuckets().get(LedgerSubjectCode.AVAILABLE);
+        assertThat(lifetimeBucket.periodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
+        assertThat(lifetimeBucket.periodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
+        LedgerBalanceBucket monthlyBucket = monthlyBalance.getBalanceBuckets().get(LedgerSubjectCode.AVAILABLE);
+        assertThat(monthlyBucket.periodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
+        assertThat(monthlyBucket.periodId()).isEqualTo(MONTHLY_PERIOD_ID);
+        assertThat(countLedgers()).isEqualTo(2);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方查询不存在的月度余额桶。
+     * 输入：主体已有 LIFETIME 与 2026-05 月度 AVAILABLE，查询 2026-06 月度 AVAILABLE。
+     * 输出：普通查询返回未初始化视图，必需查询明确失败。
+     * 红线：余额查询不能因为目标月份缺桶而回退到 LIFETIME 或其他月份。
+     */
+    @Test
+    void testQueryCurrentBalancesShouldNotFallbackToOtherPeriodWithoutLedgerMutation() {
+        insertFundingAccountWithoutLedgers();
+        createLedger(UNINITIALIZED_ACCOUNT_SN, LedgerSubjectCode.AVAILABLE,
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name());
+        createLedger(UNINITIALIZED_ACCOUNT_SN, LedgerSubjectCode.AVAILABLE,
+                AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        List<FundsSubjectBalanceDTO> balances = balanceQueryService.queryCurrentBalances(balanceQuery()
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(NEXT_MONTH_PERIOD_ID)
+                .setLedgerSubjectCodes(List.of(LedgerSubjectCode.AVAILABLE)));
+
+        assertThat(balances)
+                .singleElement()
+                .satisfies(balance -> {
+                    assertThat(balance.isInitialized()).isFalse();
+                    assertThat(balance.getBalanceBuckets()).isEmpty();
+                });
+        assertThatThrownBy(() -> balanceQueryService.getRequiredCurrentBalance(balanceQuery()
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(NEXT_MONTH_PERIOD_ID)
+                .setLedgerSubjectCodes(List.of(LedgerSubjectCode.AVAILABLE))))
+                .hasMessageContaining("资金主体账本不存在");
+        assertThat(countLedgers()).isEqualTo(2);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpFundsSubjectBalanceQueryServiceTestData() {
         cleanupFundsSubjectBalanceQueryServiceTestData();
@@ -313,6 +384,14 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
     }
 
     private void createLifetimeLedger(String accountSn, LedgerSubjectCode ledgerSubjectCode) {
+        createLedger(accountSn, ledgerSubjectCode, AccountBalancePeriodType.LIFETIME,
+                AccountBalancePeriodType.LIFETIME.name());
+    }
+
+    private void createLedger(String accountSn,
+                              LedgerSubjectCode ledgerSubjectCode,
+                              AccountBalancePeriodType periodType,
+                              String periodId) {
         ledgerService.createLedger(new CreateLedgerRequest()
                 .setTenantId(TENANT_ID)
                 .setSubjectId(accountSn)
@@ -326,8 +405,8 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
                 .setCurrency(CURRENCY)
                 .setSettlementPolicy("RT")
                 .setCutOffTime(LocalTime.MIDNIGHT)
-                .setPeriodType(AccountBalancePeriodType.LIFETIME)
-                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+                .setPeriodType(periodType)
+                .setPeriodId(periodId));
     }
 
     private long countLedgers() {
