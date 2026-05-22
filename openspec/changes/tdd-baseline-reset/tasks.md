@@ -10,7 +10,7 @@
 - [x] 重建支付资金底座开发基线规格。
 - [x] 校准 TDD 文档中“旧测试资产复用”表述。
 - [x] 冻结当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果，作为进入编码前的独立检查点；上一已冻结设计交付提交点为 30b1a00 docs: 冻结权益快照设计基线，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。
-- [x] 完成设计、代码、任务三方基线对齐：本轮提交纳入权益快照 DSL 契约、JSON 契约验证、TDD 覆盖矩阵和后续批次任务口径，作为新的编码准备基线；任务以本 Harness Plan 和 OpenSpec spec 为准。
+- [x] 完成设计、代码、任务三方基线对齐：`eabd672` 纳入编码准备包，`6be9c99` 完成 B1-10 权益快照 DSL 契约承载，`75b46ef` 和 `9db3eba` 收敛请求摘要与稳定摘要支撑，`434f8a2` 校准账务计划装配器长 ID 测试规范；任务以本 Harness Plan 和 OpenSpec spec 为准。
 
 ## 1. 全局写入范围
 
@@ -20,7 +20,7 @@
 
 | 批次 | 写入范围 |
 | --- | --- |
-| 批次 1 | `core/src/test/java`、必要的 `core/src/main/java` DSL/枚举/Spec、Route DSL、PaymentInstrument DSL、RoutingDecision/FundingAllocation DSL、Posting/Ledger DSL、SettlementPolicy。 |
+| 批次 1 | `tests/src/test/java/com/capte/funds/dsl`、`tests/src/test/resources/dsl-contract-cases`、必要的 `core/src/main/java` DSL/枚举/Spec、Route DSL、PaymentInstrument DSL、RoutingDecision/FundingAllocation DSL、Posting/Ledger DSL、SettlementPolicy。 |
 | 批次 2 | `wallet-*`、`ledger-*`、`tests/src/test/java` 中账户、支付工具、绑定关系、支出主体资金来源关系、账本、投影相关测试和最小实现。 |
 | 批次 3 | `transaction-*`、`tests/src/test/java` 中直接交易测试和最小实现。 |
 | 批次 4 | `transaction-*`、`core`、`tests/src/test/java` 中授权交易、无授权直接退款测试和最小实现。 |
@@ -68,8 +68,8 @@ just compile
 - [x] Harness 已重新对齐：以本文件作为批次计划、写入范围、只读范围、禁止事项、人工确认点和交付记录入口。
 - [x] 旧测试源码已移除，测试 resources 保留。
 - [x] 当前阶段为“任务拆解与准入规划”，尚未进入 CAD 自动提交模式；进入编码前仍需用户按批次授予 Execution Grant。
-- [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一冻结点为 30b1a00 docs: 冻结权益快照设计基线。本轮提交后，权益快照 DSL 契约和任务口径作为新的编码准备基线；后续编码仍需用户按批次单独授予 Execution Grant。
-- [x] 代码基线已复核至上一冻结点 30b1a00，并纳入本轮 B1-10 权益快照 DSL 契约承载实现和测试：批次 1 DSL 契约测试已存在；批次 2 支付工具、绑定历史、资金来源关系、显式建账和余额投影已有局部服务层基线；批次 3 至 6 已有部分直接交易、授权、余额控制、Route Replay 和交易投影测试；批次 7 仅保留 reconciliation-* 空模块骨架；批次 8 已有 governance-* 交易投影重放骨架。上述都只作为局部代码基线，不表示对应批次全量完成或可跳过 Execution Grant。
+- [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线。当前编码准备基线截至 `434f8a2 test: 校准账务计划装配器长ID用例`；后续编码仍需用户按批次单独授予 Execution Grant。
+- [x] 代码基线已复核至当前 Git 基线 `434f8a2`，并纳入 B1-10 权益快照 DSL 契约承载实现和测试：批次 1 DSL 契约测试已存在；批次 2 支付工具、绑定历史、资金来源关系、显式建账、账务计划装配器长 ID 追溯和余额投影已有局部基线；批次 3 至 6 已有部分直接交易、授权、余额控制、Route Replay 和交易投影测试；批次 7 仅保留 reconciliation-* 空模块骨架；批次 8 已有 governance-* 交易投影重放骨架。上述都只作为局部代码基线，不表示对应批次全量完成或可跳过 Execution Grant。
 
 ### 5.1 设计、代码、任务对齐矩阵
 
@@ -174,17 +174,17 @@ DDL/H2 schema 变化：
 
 | 任务 | 目标 | 写入范围 | 设计锚点 | Red 用例 | Green/实现动作 | 验证 |
 | --- | --- | --- | --- | --- | --- | --- |
-| B1-01 | 重建核心测试骨架和命名规范。 | `core/src/test/java` | TDD 设计、DSL 设计。 | 测试目录为空时先建立最小失败样例。 | 建立按 DSL/枚举/JSON 分层的测试包，不迁回旧测试源码。 | `just test-core` |
-| B1-02 | 固化 `FundsInstructionSpec` 语义。 | `core/src/test/java`、必要的 `core/src/main/java` | DSL 语义结构、JSON 契约。 | 构造最小合法指令、缺字段、非法金额、非法主体用例。 | 补齐或校准 Spec 校验行为。 | `just test-core` |
-| B1-03 | 证明 `transactionType` 不承载生命周期事件。 | `core/src/test/java`、必要枚举。 | DSL 第九章、第十章。 | 将授权生命周期事件误塞入交易类型应失败。 | 保持交易类型与事件类型分离。 | `just test-core` |
-| B1-04 | 固化授权 `eventType` 生命周期边界。 | `core/src/test/java`、必要枚举。 | DSL 授权交易用例。 | `PENDING`、`SETTLE`、`REVERSAL`、`REFUND`、`EXPIRE` 的合法/非法组合，以及拒付不强制落独立 `CHARGEBACK` 事件。 | 必要时补 `EXPIRE` 枚举或先形成失败基线；拒付通过退款承接口径表达。 | `just test-core` |
-| B1-05 | 重建 JSON 契约样例解析测试。 | `core/src/test/java`、`core/src/test/resources` | DSL JSON 契约用例。 | JSON 样例无法解析、字段含义不一致、枚举不匹配。 | 让 DSL 样例能推导业务流程和 TDD 断言。 | `just test-core` |
-| B1-06 | 固化 Route DSL 和 Route Replay 类型契约。 | `core/src/test/java`、必要的 `core/src/main/java` | DSL Route、Route Replay、不变量。 | 外部账户或工具进入 ledger node、缺快照 Route Replay 仍成功、route code 漂移。 | 补 `RouteDslContractTests` 或等价契约测试，明确 Route Replay 不等同于交易投影重放、余额重建或归档续跑。 | `just test-core` |
-| B1-06A | 固化 PaymentInstrument Route DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | `DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`DSL-PAYMENT-INSTRUMENT-FAIL-001`、`DSL-PAYMENT-INSTRUMENT-REPLAY-001`。 | 支付工具、外部账户或通道 token 被写成 ledger subject；routing decision 缺资金来源、优先级或选择原因；敏感字段进入快照；工具换绑后按当前绑定重路由。 | 补 `PaymentInstrumentRouteDslContractTests` 或等价契约测试，固化 `PaymentInstrumentRef`、`ExternalAccountRef`、`RoutingDecision`、`FundingAllocationDecision` 和 route snapshot 不变量。 | `just test-core` |
-| B1-07 | 固化 Posting/Ledger DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | DSL Posting、LedgerEntry、账务不变量。 | posting plan 不平衡仍可构造、entry 缺主体/账目/币种/周期仍通过。 | 补 posting、entry、digest 和账本周期契约测试。 | `just test-core` |
-| B1-08 | 固化 SettlementPolicy DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | DSL SettlementPolicy、结算策略边界。 | 策略解析失败被静默按实时处理。 | 补 `SettlementPolicySpecTests` 或等价策略解析红线。 | `just test-core` |
-| B1-09 | 固化金额临界值契约。 | `core/src/test/java`、必要的 `core/src/main/java` | TDD 5.1 金额临界值通用矩阵。 | 0 金额、负金额、超币种精度、超系统上限或多 leg 合计不闭合仍可入账。 | 补 `FundsAmountBoundaryContractTests` 或等价契约测试，统一最小单位、精度、上限和累计闭合校验。 | `just test-core` |
-| B1-10 | 固化权益快照 DSL 契约。 | `core/src/test/java`、必要的 `core/src/main/java` | `FundsBenefitSnapshotSpec`、`DSL-BENEFIT-SNAPSHOT-001`、产品 `AC-BEN-001`、`AC-BEN-012`、`AC-BEN-013`、红线 `RED-050` 至 `RED-059`、`TDD-BEN-001` 至 `TDD-BEN-007`、`TDD-BEN-ENTRY-005`。 | 权益核心字段藏入 `contextVariables`、无权益交易空值语义不成立、金额不闭合、闭合角色缺失或混用、组件重复、稳定摘要未覆盖权益快照差异、用户侧不返券和资金侧不冲补贴无法分开表达、请求态快照被误判为生产 Done；B1-10 越权修改交易服务入口、Request/DTO、route/posting/replay 或主链路实现。 | 补 `FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、退款决策来源字段、稳定摘要边界和权益枚举的契约测试；Phase 1 只证明 DSL 承载和请求摘要可区分，不宣称 route/posting/replay 已闭合，不改直接交易或授权交易服务入口；`RED-058` 只作为生产 Done 门禁登记；交付结论只能写“契约承载 Done”。 | `just test-core` |
+| B1-01 | 重建核心测试骨架和命名规范。 | `tests/src/test/java/com/capte/funds/dsl` | TDD 设计、DSL 设计。 | 测试目录为空时先建立最小失败样例。 | 建立按 DSL/枚举/JSON 分层的测试包，不迁回旧测试源码。 | `just test-core` |
+| B1-02 | 固化 `FundsInstructionSpec` 语义。 | `tests/src/test/java/com/capte/funds/dsl`、必要的 `core/src/main/java` | DSL 语义结构、JSON 契约。 | 构造最小合法指令、缺字段、非法金额、非法主体用例。 | 补齐或校准 Spec 校验行为。 | `just test-core` |
+| B1-03 | 证明 `transactionType` 不承载生命周期事件。 | `tests/src/test/java/com/capte/funds/dsl`、必要枚举。 | DSL 第九章、第十章。 | 将授权生命周期事件误塞入交易类型应失败。 | 保持交易类型与事件类型分离。 | `just test-core` |
+| B1-04 | 固化授权 `eventType` 生命周期边界。 | `tests/src/test/java/com/capte/funds/dsl`、必要枚举。 | DSL 授权交易用例。 | `PENDING`、`SETTLE`、`REVERSAL`、`REFUND`、`EXPIRE` 的合法/非法组合，以及拒付不强制落独立 `CHARGEBACK` 事件。 | 必要时补 `EXPIRE` 枚举或先形成失败基线；拒付通过退款承接口径表达。 | `just test-core` |
+| B1-05 | 重建 JSON 契约样例解析测试。 | `tests/src/test/java/com/capte/funds/dsl`、`tests/src/test/resources/dsl-contract-cases` | DSL JSON 契约用例。 | JSON 样例无法解析、字段含义不一致、枚举不匹配。 | 让 DSL 样例能推导业务流程和 TDD 断言。 | `just test-core` |
+| B1-06 | 固化 Route DSL 和 Route Replay 类型契约。 | `tests/src/test/java/com/capte/funds/dsl`、必要的 `core/src/main/java` | DSL Route、Route Replay、不变量。 | 外部账户或工具进入 ledger node、缺快照 Route Replay 仍成功、route code 漂移。 | 补 `RouteDslContractTests` 或等价契约测试，明确 Route Replay 不等同于交易投影重放、余额重建或归档续跑。 | `just test-core` |
+| B1-06A | 固化 PaymentInstrument Route DSL 契约。 | `tests/src/test/java/com/capte/funds/dsl`、必要的 `core/src/main/java` | `DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`DSL-PAYMENT-INSTRUMENT-FAIL-001`、`DSL-PAYMENT-INSTRUMENT-REPLAY-001`。 | 支付工具、外部账户或通道 token 被写成 ledger subject；routing decision 缺资金来源、优先级或选择原因；敏感字段进入快照；工具换绑后按当前绑定重路由。 | 补 `PaymentInstrumentRouteDslContractTests` 或等价契约测试，固化 `PaymentInstrumentRef`、`ExternalAccountRef`、`RoutingDecision`、`FundingAllocationDecision` 和 route snapshot 不变量。 | `just test-core` |
+| B1-07 | 固化 Posting/Ledger DSL 契约。 | `tests/src/test/java/com/capte/funds/dsl`、必要的 `core/src/main/java` | DSL Posting、LedgerEntry、账务不变量。 | posting plan 不平衡仍可构造、entry 缺主体/账目/币种/周期仍通过。 | 补 posting、entry、digest 和账本周期契约测试。 | `just test-core` |
+| B1-08 | 固化 SettlementPolicy DSL 契约。 | `tests/src/test/java/com/capte/funds/dsl`、必要的 `core/src/main/java` | DSL SettlementPolicy、结算策略边界。 | 策略解析失败被静默按实时处理。 | 补 `SettlementPolicySpecTests` 或等价策略解析红线。 | `just test-core` |
+| B1-09 | 固化金额临界值契约。 | `tests/src/test/java/com/capte/funds/dsl`、必要的 `core/src/main/java` | TDD 5.1 金额临界值通用矩阵。 | 0 金额、负金额、超币种精度、超系统上限或多 leg 合计不闭合仍可入账。 | 补 `FundsAmountBoundaryContractTests` 或等价契约测试，统一最小单位、精度、上限和累计闭合校验。 | `just test-core` |
+| B1-10 | 固化权益快照 DSL 契约。 | `tests/src/test/java/com/capte/funds/dsl`、`tests/src/test/resources/dsl-contract-cases`、必要的 `core/src/main/java` | `FundsBenefitSnapshotSpec`、`DSL-BENEFIT-SNAPSHOT-001`、产品 `AC-BEN-001`、`AC-BEN-012`、`AC-BEN-013`、红线 `RED-050` 至 `RED-059`、`TDD-BEN-001` 至 `TDD-BEN-007`、`TDD-BEN-ENTRY-005`。 | 权益核心字段藏入 `contextVariables`、无权益交易空值语义不成立、金额不闭合、闭合角色缺失或混用、组件重复、稳定摘要未覆盖权益快照差异、用户侧不返券和资金侧不冲补贴无法分开表达、请求态快照被误判为生产 Done；B1-10 越权修改交易服务入口、Request/DTO、route/posting/replay 或主链路实现。 | 补 `FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、退款决策来源字段、稳定摘要边界和权益枚举的契约测试；Phase 1 只证明 DSL 承载和请求摘要可区分，不宣称 route/posting/replay 已闭合，不改直接交易或授权交易服务入口；`RED-058` 只作为生产 Done 门禁登记；交付结论只能写“契约承载 Done”。 | `just test-core` |
 
 ### 批次 2：钱包账户、账本和余额投影基础
 
@@ -279,7 +279,7 @@ DDL/H2 schema 变化：
 
 ## 8. 依赖、门禁与设计反馈
 
-1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；上一冻结点为 30b1a00 docs: 冻结权益快照设计基线，上一历史冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。本轮提交后形成新的编码准备基线；后续具体编码批次仍必须通过 Execution Grant 明确授权。
+1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线，当前编码准备基线截至 `434f8a2 test: 校准账务计划装配器长ID用例`；后续具体编码批次仍必须通过 Execution Grant 明确授权。
 2. 当前执行优先级固定为：先做 `02-交易路由钱包账目与投影`，再做 `03-清结算与对账`，最后做 `04-归档重放与指标治理`。
 3. 批次 1 至批次 6 合并构成 02 阶段，内部仍按 DSL/core、钱包账户与账本、直接交易、授权交易、余额控制、Route Replay 与投影推进。
 4. 批次 1 是后续所有交易、账本和授权测试的前置门禁。
@@ -294,6 +294,7 @@ DDL/H2 schema 变化：
 13. 权益快照按三段落地：批次 1 只做 `core` DSL 契约和 JSON 空值语义；批次 3、4、6 才进入直接交易、授权和 replay 的 route/posting 消费；批次 7 才进入清结算与对账拆分。未完成后段前，不得宣称含权益资金流已完整闭合。
 14. 直接交易和授权交易不因权益快照新增权益专用服务方法；后续如需扩展 `FundsTransactionPayRequest`、`FundsTransactionRefundRequest`、`FundsAuthorizationTransactionAuthorizeRequest` 或授权后续事件 Request，必须由对应批次 Execution Grant 明确允许。授权过期 `expire` 是 B4-03 既有授权生命周期缺口，不属于权益设计新增入口。
 15. 券能不能退由业务层、订单层、营销权益系统或运营审批链路决策；资金底座只承接原权益快照和本次退款决策引用，不调用当前营销规则、不读取当前券包状态、不自行判断退券可行性。
+16. 平台补贴、储值券、预付券、礼品卡、客户资金、商户待结算资金、负债、备付或收入成本口径进入 B3/B7 生产资金流前，必须在 Execution Grant 中登记财务、税务、会计、合规或法务确认状态；未确认时只能保留为契约或设计验证，不得进入生产 Done 结论。
 
 ## 9. 批次到设计 ID 覆盖索引
 
@@ -341,9 +342,9 @@ NFR 假设：
 交付方式：
 ```
 
-## 11. 批次 1 / B1-10 建议 Execution Grant
+## 11. 批次 1 / B1-10 历史 Execution Grant 参考（已完成）
 
-批次 1 是 02 阶段的首个可执行批次。当前设计已完成权益快照对齐，首轮编码建议只执行 `B1-10 权益快照 DSL 契约`，不重写既有 Route、PaymentInstrument、Posting/Ledger、SettlementPolicy 契约测试，不碰交易主链路实现。02 阶段完成前，不启动 03、04 的编码批次。
+本节保留 B1-10 已执行授权的历史参考，不能直接作为新的开工授权。B1-10 已在 `6be9c99 feat: 固化权益快照稳定摘要契约` 完成交付，后续 `75b46ef` 和 `9db3eba` 已收敛请求摘要与稳定摘要支撑，`434f8a2` 已校准账务计划装配器长 ID 用例规范。下一轮若继续修改权益契约、请求摘要、route/posting/replay 或生产主链路，必须另起目标批次 Execution Grant。
 
 ```text
 授权批次：批次 1 / B1-10 权益快照 DSL 契约
@@ -351,11 +352,11 @@ NFR 假设：
 禁止写入范围：transaction-*、wallet-*、ledger-* 业务实现；Route Resolver、Posting Assembler、Route Replay、授权生命周期、清结算、对账、归档、指标实现；生产配置；外部通道适配
 必须覆盖的 TDD 用例：TDD-BEN-001 至 TDD-BEN-007、TDD-BEN-RED-001、TDD-BEN-RED-002、TDD-BEN-RED-012、TDD-BEN-RED-017、TDD-BEN-RED-018
 必须覆盖的 AC/DSL ID：AC-BEN-001、AC-BEN-012、AC-BEN-013、DSL-BENEFIT-SNAPSHOT-001；登记 RED-050 至 RED-059，其中 RED-058 只作为生产 Done 门禁，本批只做契约层红线，不声明 route/posting/replay 已闭合
-基线是否已冻结：已冻结，上一冻结点为 30b1a00 docs: 冻结权益快照设计基线；本轮提交后形成权益快照 DSL 契约承载的编码准备基线；继续执行或调整批次 1 仍需用户确认 Execution Grant
+基线是否已冻结：已冻结；设计冻结点为 30b1a00；B1-10 契约承载基线为 6be9c99；当前代码基线截至 434f8a2；本节只作历史参考，继续执行或调整批次 1 仍需用户确认新的 Execution Grant
 工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
-允许修改公共契约：待用户确认；建议仅允许新增可选字段和新增权益模型，不允许删除或改写既有字段
+允许修改公共契约：历史授权仅允许 B1-10 最小新增；后续再次修改公共契约必须重新确认，不允许删除或改写既有字段
 公共契约允许修改范围：仅限新增 `FundsInstructionSpec#getBenefitSnapshot()` 默认空值方法、权益快照 Spec/Immutable model、权益枚举和必要 JSON 空值语义；不得改变 `amount`、`originalAmount`、`exchangeRate`、`reference`、`instrumentRef`、`externalAccountRef`、`contextVariables` 既有语义
-允许新增枚举或事件：待用户确认；建议只允许新增 `FundsBenefitType`、`FundsBenefitComponentType`、`FundsBenefitAmountClosureRole`、`FundsBenefitLedgerEffect`、`FundsBenefitFundingNature`、`FundsBenefitRefundDisposition`、`FundsBenefitPartialRefundStrategy`、`FundsBenefitLifecycleAction`，本批不新增交易事件
+允许新增枚举或事件：历史授权仅允许新增权益枚举，不新增交易事件；后续再次新增枚举或事件必须重新确认
 允许新增服务入口：否
 允许扩展 Request/Query/DTO：否
 允许修改表结构：否
@@ -378,17 +379,19 @@ NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部�
 
 ## 12.1 准入模拟验证记录（2026-05-21）
 
+本节是正式交付前的模拟记录，最新完成事实以 12.2 实际交付记录和当前 Git 基线为准。
+
 本轮按 `B1-10 权益快照 DSL 契约` 做 TDD 模拟验证，结论如下：
 
 | 检查项 | 结论 | 证据 |
 | --- | --- | --- |
 | 任务边界 | 只允许进入 Phase 1 契约承载；未进入 route、posting、replay、清结算或对账生产消费。 | 当前写入范围限制在 core DSL/model/enums、DSL JSON verifier、tests DSL 契约和 JSON 夹具；未修改 `transaction-*`、`wallet-*`、`ledger-*` 业务实现。 |
 | 设计差异 | 已发现并修复代码缺少 `FundsBenefitAmountClosureRole` 的差异。 | DSL/TDD 要求只有 `ORDER_DISCOUNT_CLOSURE` 参与正向订单闭合，代码已补闭合角色枚举、组件字段、模型校验和 JSON 校验。 |
-| TDD 红线 | 已覆盖无权益空值语义、核心字段不得塞入 `contextVariables`、金额闭合、闭合角色缺失或混用、组件唯一性、零实付边界、退款处置和当前营销规则输入拒绝；稳定摘要、请求态快照误判生产 Done 和闭合角色生产消费边界已纳入 B1-10 门禁。 | `FundsBenefitSnapshotSpecTests` 10 个用例通过；`FundsDslJsonContractTests` 8 个用例通过；稳定摘要、`RED-058` 和后续 route/posting/replay 消费断言需要在正式 B1-10 或后续批次交付记录中单独列明。 |
+| TDD 红线 | 已覆盖无权益空值语义、核心字段不得塞入 `contextVariables`、金额闭合、闭合角色缺失或混用、组件唯一性、零实付边界、退款处置和当前营销规则输入拒绝；稳定摘要、请求态快照误判生产 Done 和闭合角色生产消费边界已纳入 B1-10 门禁。 | 模拟阶段 `FundsBenefitSnapshotSpecTests` 10 个用例通过；正式交付见 12.2，已扩展为 `FundsBenefitSnapshotSpecTests` 12 个用例和 `FundsDslJsonContractTests` 8 个用例通过；route/posting/replay 消费断言仍归后续批次。 |
 | 验证命令 | Java 21 下编译、目标测试和 PMD 均通过。 | `WIND_FUNDS_JAVA_HOME=... just compile`；`just test-one FundsBenefitSnapshotSpecTests tests`；`just test-one FundsDslJsonContractTests tests`；`just pmd`。 |
 | 残余边界 | 只能声明 `B1-10 契约承载 Done`；B3/B4/B6/B7 仍需各自 Execution Grant。 | 平台补贴、储值券、退款回放、授权占券、清结算和对账尚未进入生产链路消费。 |
 
-准入结论：`B1-10` 可作为开始编码的第一批候选；若下一轮进入生产链路，必须重新声明目标批次、写入范围、公共契约变更、表结构变更、测试矩阵和验证命令。
+准入结论：`B1-10` 已转为历史交付基线；若下一轮进入生产链路，必须重新声明目标批次、写入范围、公共契约变更、表结构变更、测试矩阵和验证命令。
 
 ```text
 批次：
@@ -414,9 +417,10 @@ NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部�
 | 批次 | 已完成 `B1-10 权益快照 DSL 契约`。 | 提交 `6be9c99 feat: 固化权益快照稳定摘要契约`。 |
 | 写入范围 | 符合第 11 节授权范围。 | 写入 `core/src/main/java/com/wind/integration/funds/spec/transaction`、`core/src/main/java/com/wind/integration/funds/util`、`tests/src/test/java/com/capte/funds/dsl`、`tests/src/test/resources/dsl-contract-cases`；未写入 `transaction-*`、`wallet-*`、`ledger-*` 业务实现。 |
 | 契约承载 | `FundsBenefitSnapshotSpec` 增加稳定摘要口径，避免 JSON 字段顺序、时间字段、运行态对象差异影响契约指纹。 | 新增 `FundsBenefitStableDigest`，`FundsBenefitSnapshotSpec#getStableDigest()` 输出稳定摘要。 |
-| DSL 红线 | `fixtureLevel=CONTRACT_ONLY` 必须显式登记，避免把请求态样例误判为生产 Done。 | `FundsDslJsonContractVerifier` 增加 `scenarioId`、`fixtureLevel`、`productionReady` 和 `coveredRedLines` 元数据校验。 |
+| DSL 红线 | `fixtureLevel=CONTRACT_ONLY` 必须显式登记，避免把请求态样例误判为生产 Done。 | `FundsDslJsonContractVerifier` 增加 `fixtureLevel`、`scenarioCode`、`acceptanceIds`、`tddIds`、`systemDesignRefs` 和 `validation` 元数据校验。 |
 | TDD 用例 | 已补稳定摘要、字段顺序、请求态样例、生产 Done 误判、闭合角色边界等契约测试。 | `FundsBenefitSnapshotSpecTests` 12 个用例通过；`FundsDslJsonContractTests` 8 个用例通过。 |
 | 验证命令 | Java 21 下编译、目标测试、PMD 和空白检查通过。 | `just mvn-version`；`just compile`；`just test-one FundsBenefitSnapshotSpecTests tests`；`just test-one FundsDslJsonContractTests tests`；`just pmd`；`git diff --check`。 |
+| 后续基线收敛 | 请求摘要、稳定摘要支撑和账务计划装配器长 ID 用例规范已在后续提交中收敛，当前代码基线截至 `434f8a2`。 | `75b46ef refactor: 收敛资金请求摘要支撑`；`9db3eba refactor: 收敛资金稳定摘要支撑`；`434f8a2 test: 校准账务计划装配器长ID用例`。 |
 | 残余风险 | 只能声明 `B1-10 契约承载 Done`。 | route、posting、replay、授权占券、清结算和对账消费仍在 B3/B4/B6/B7 后续批次。 |
 
 ## 13. 批次 2 建议 Execution Grant
@@ -429,7 +433,7 @@ NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部�
 禁止写入范围：transaction-* 业务实现；直接交易、授权交易、余额控制交易编排；Route Resolver、Posting Assembler、Route Replay；权益 route/posting/replay 消费；清结算、对账、归档、指标实现；生产配置；外部通道适配
 必须覆盖的 TDD 用例：TDD-WALLET-*、TDD-ROUTE-011、TDD-ROUTE-012、TDD-LEDGER-*、TDD-VIEW-003
 必须覆盖的 AC/DSL ID：AC-PI-001、AC-PI-002、AC-PI-003、AC-PI-004、AC-PI-006、AC-PI-007、AC-CTRL-009、AC-CTRL-010、AC-CTRL-011、AC-BALLOG-001、RED-036、RED-046、RED-047、RED-049
-基线是否已冻结：已冻结；B1-10 契约承载基线为 6be9c99，本批启动前必须复核工作树干净
+基线是否已冻结：已冻结；B1-10 契约承载基线为 6be9c99，当前代码基线截至 434f8a2，本批启动前必须复核工作树干净
 工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
 允许修改公共契约：待用户确认；建议默认不删除、不改写既有 face/core 字段，只允许为账户、账本、支付工具基础能力做非破坏性新增或校验补齐
 公共契约允许修改范围：如确需变更，只限 wallet/ledger face 中账户角色、账本创建、账期、支付工具绑定和资金账户关系的目标态字段；不得调整交易指令、权益快照、直接交易或授权交易请求语义

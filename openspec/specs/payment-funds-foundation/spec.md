@@ -81,9 +81,9 @@
 
 | 批次域 | 当前代码和测试基线 | 对齐结论 |
 | --- | --- | --- |
-| 批次 1 DSL 契约 | 已存在 `FundsInstructionDslContractTests`、`RouteDslContractTests`、`PaymentInstrumentRouteDslContractTests`、`PostingLedgerDslContractTests`、`SettlementPolicySpecTests`、`FundsAmountBoundaryContractTests`、`FundsDslJsonContractTests`。 | DSL、Route、PaymentInstrument Route、Posting/Ledger、金额临界值和 JSON 契约已有测试基线；仍需按后续批次发现的公共契约缺口补 Red 用例。 |
-| 权益快照 DSL | 设计权威已统一到 `docs/DSL设计/支付资金底座DSL承载层设计.md`；`FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、权益枚举、JSON 夹具和契约测试随本轮提交纳入编码准备基线。 | 即使 core 契约已落地，也只能按验证结果声明 Phase 1 契约承载；不能声明含权益 route/posting/replay、清结算或对账生产链路已闭合。 |
-| 批次 2 钱包账户与账本基础 | 已存在 `FundingAccountServiceImplTests`、`ControlAccountLedgerInitializationTests`、`PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests`、`LedgerBalanceProjectionServiceImplTests`。 | 支付工具、绑定历史、资金来源关系、显式账本初始化和投影 afterCommit 已有局部服务层基线；账本周期、全量余额断言和组合交易仍需后续批次继续闭合。 |
+| 批次 1 DSL 契约 | 已存在 `FundsInstructionDslContractTests`、`RouteDslContractTests`、`PaymentInstrumentRouteDslContractTests`、`PostingLedgerDslContractTests`、`SettlementPolicySpecTests`、`FundsAmountBoundaryContractTests`、`FundsDslJsonContractTests`、`FundsBenefitSnapshotSpecTests`。 | DSL、Route、PaymentInstrument Route、Posting/Ledger、金额临界值、权益快照和 JSON 契约已有测试基线；仍需按后续批次发现的公共契约缺口补 Red 用例。 |
+| 权益快照 DSL | 设计权威已统一到 `docs/DSL设计/支付资金底座DSL承载层设计.md`；`FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、权益枚举、JSON 夹具和契约测试已在 `6be9c99` 形成 B1-10 契约承载基线，并在 `75b46ef`、`9db3eba` 收敛请求摘要和稳定摘要支撑。 | 即使 core 契约已落地，也只能按验证结果声明 Phase 1 契约承载；不能声明含权益 route/posting/replay、清结算或对账生产链路已闭合。 |
+| 批次 2 钱包账户与账本基础 | 已存在 `FundingAccountServiceImplTests`、`ControlAccountLedgerInitializationTests`、`PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests`、`LedgerBalanceProjectionServiceImplTests`、`DefaultLedgerPostingAssemblerTests`。 | 支付工具、绑定历史、资金来源关系、显式账本初始化、账务计划装配器长 ID 追溯和投影 afterCommit 已有局部基线；账本周期、全量余额断言和组合交易仍需后续批次继续闭合。 |
 | 批次 3 直接交易 | 已存在 `FundsDirectTransactionFlowTests`、`FundsTransferPayWithdrawChainFlowTests`、`FundsTransactionFeeFlowTests`。 | 直接交易主链路、退款、手续费和链式流程已有局部流程基线；仍需按 TDD 覆盖全部 `AC-IN/OUT/PAY/MER/FEE` 和红线失败。 |
 | 批次 4 授权交易 | 已存在 `FundsAuthorizationTransactionFlowTests`，覆盖授权拒绝、撤销、部分完成、全额完成、退款超额等局部场景。 | 授权批准、拒绝、撤销、完成和完成后退款已有局部基线；授权过期、强制完成、无授权直接退款、拒付承接口径、原路径回放、发卡控制扩展边界和并发竞争仍需按批次 4 覆盖索引闭合。 |
 | 批次 5 余额控制 | 已存在 `FundsBalanceControlFailureFlowTests`、`FundsWithdrawalSuccessFlowTests`、`FundsWithdrawalAfterPartialUnfreezeFlowTests`、`FundsWithdrawalRejectionFlowTests`。 | 冻结、解冻、提现、失败无副作用和部分组合路径已有局部基线；资金账户余额调整、信用账户额度调整、预算组额度调整、adjust 红线、冻结关闭并发和全量金额临界值仍需补齐。 |
