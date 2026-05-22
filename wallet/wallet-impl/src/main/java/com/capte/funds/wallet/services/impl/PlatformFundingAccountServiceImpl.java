@@ -45,8 +45,7 @@ public class PlatformFundingAccountServiceImpl implements PlatformFundingAccount
                 .where(ref.tenantId.eq(tenantId))
                 .and(ref.currency.eq(currency))
                 .and(ref.accountRoleCode.eq(role))
-                .and(ref.platform.eq(Boolean.TRUE))
-                .and(ref.status.eq(FundsAccountStatus.ACTIVE));
+                .and(ref.platform.eq(Boolean.TRUE));
         List<FundingAccount> results = fundingAccountMapper.selectListByQuery(wrapper);
         AssertUtils.isTrue(results != null && !results.isEmpty(),
                 "平台资金账户不存在，tenantId = {}, currency = {}, role = {}", tenantId, currency, role);
