@@ -55,6 +55,8 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
 
     private static final String SECOND_ACCOUNT_SN = "fbal_query_second";
 
+    private static final String MISSING_ACCOUNT_SN = "fbal_query_missing";
+
     private static final String OWNER_ID = "owner_balance_query";
 
     private static final String SECOND_OWNER_ID = "owner_balance_query_second";
@@ -117,6 +119,71 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
     }
 
     /**
+     * 场景：余额查询请求携带重复资金主体。
+     * 输入：subjectRefs 中同一个 FUNDING_ACCOUNT 出现两次。
+     * 输出：参数校验失败。
+     * 红线：批量余额查询不得返回重复视图，避免交易前置校验重复汇总同一余额桶。
+     */
+    @Test
+    void testQueryCurrentBalancesShouldRejectDuplicateSubjectRefsWithoutLedgerMutation() {
+        FundsAccountId subjectRef = FundsAccountId.immutable(UNINITIALIZED_ACCOUNT_SN,
+                FundsSubjectType.FUNDING_ACCOUNT);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> balanceQueryService.queryCurrentBalances(new FundsSubjectBalanceQuery()
+                .setTenantId(TENANT_ID)
+                .setSubjectRefs(List.of(subjectRef, subjectRef))
+                .setCurrency(CURRENCY)))
+                .hasMessageContaining("资金主体余额查询 subjectRefs 不能重复");
+
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：批量余额查询的资金主体不存在。
+     * 输入：FUNDING_ACCOUNT 主体引用不存在。
+     * 输出：明确失败，提示资金主体不存在。
+     * 红线：余额查询不得把不存在主体解释为未初始化余额，也不得补建账户或账本。
+     */
+    @Test
+    void testQueryCurrentBalancesShouldRejectMissingSubjectWithoutLedgerMutation() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> balanceQueryService.queryCurrentBalances(new FundsSubjectBalanceQuery()
+                .setTenantId(TENANT_ID)
+                .setSubjectRefs(List.of(FundsAccountId.immutable(MISSING_ACCOUNT_SN,
+                        FundsSubjectType.FUNDING_ACCOUNT)))
+                .setCurrency(CURRENCY)))
+                .hasMessageContaining("资金主体不存在");
+
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：必需余额查询误传多个资金主体。
+     * 输入：getRequiredCurrentBalance 的 subjectRefs 包含两个不同主体。
+     * 输出：参数校验失败。
+     * 红线：必需余额只能作为单主体前置校验，不能把多主体结果折叠成一个余额视图。
+     */
+    @Test
+    void testGetRequiredCurrentBalanceShouldRejectMultipleSubjectsWithoutLedgerMutation() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> balanceQueryService.getRequiredCurrentBalance(new FundsSubjectBalanceQuery()
+                .setTenantId(TENANT_ID)
+                .setSubjectRefs(List.of(
+                        FundsAccountId.immutable(UNINITIALIZED_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT),
+                        FundsAccountId.immutable(SECOND_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT)))
+                .setCurrency(CURRENCY)))
+                .hasMessageContaining("资金主体必需余额查询 subjectRefs 只能包含一个主体");
+
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：运营或交易前置校验批量查询多个资金主体的同一余额桶。
      * 输入：两个 FUNDING_ACCOUNT 主体均已初始化 AVAILABLE 和 FROZEN，查询顺序与入参相反，并只查询 AVAILABLE。
      * 输出：结果顺序与入参一致，只返回被请求的 AVAILABLE 余额桶。
@@ -149,6 +216,26 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
             assertThat(bucket.periodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         });
         assertThat(countLedgers()).isEqualTo(4);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：必需余额查询指定某个余额桶，但主体只初始化了其他余额桶。
+     * 输入：FUNDING_ACCOUNT 已初始化 AVAILABLE，必需查询 FROZEN。
+     * 输出：明确失败，提示资金主体账本不完整。
+     * 红线：交易前置校验不得用“已有其他账本”替代被请求的余额桶。
+     */
+    @Test
+    void testGetRequiredCurrentBalanceShouldRejectMissingRequestedBucketWithoutLedgerMutation() {
+        insertFundingAccountWithoutLedgers();
+        createLifetimeLedger(UNINITIALIZED_ACCOUNT_SN, LedgerSubjectCode.AVAILABLE);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> balanceQueryService.getRequiredCurrentBalance(balanceQuery()
+                .setLedgerSubjectCodes(List.of(LedgerSubjectCode.FROZEN))))
+                .hasMessageContaining("资金主体账本不完整");
+
+        assertThat(countLedgers()).isEqualTo(1);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
