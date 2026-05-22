@@ -1,22 +1,28 @@
 package com.capte.funds.wallet.services.impl;
 
 import com.capte.funds.AbstractFundsServiceTest;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.ledger.dto.LedgerDTO;
 import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.service.LedgerService;
 import com.capte.funds.ledger.impl.LedgerServiceImpl;
 import com.capte.funds.wallet.model.dto.FundingAccountDTO;
+import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.capte.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.capte.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.capte.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.capte.funds.wallet.service.FundingAccountService;
+import com.capte.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.capte.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
+import com.wind.integration.funds.ledger.LedgerBalanceBucket;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.FundingAccountType;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
@@ -37,6 +43,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 真实资金账户服务层流程测试。
@@ -57,6 +65,9 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
     @Autowired
     private SubjectLedgerInitializer subjectLedgerInitializer;
+
+    @Autowired
+    private FundsSubjectBalanceQueryService balanceQueryService;
 
     @Autowired
     private LedgerService ledgerService;
@@ -99,6 +110,37 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 Integer.class,
                 ACCOUNT_SN);
         assertThat(ledgerCount).isEqualTo(3);
+    }
+
+    /**
+     * 场景：真实资金账户已初始化基础账本后，查询当前余额。
+     * 输入：FUNDING_BASIC 资金账户，默认 LIFETIME 周期。
+     * 输出：返回 AVAILABLE、FROZEN、AUTHORIZATION 三个余额桶，周期均为 LIFETIME。
+     * 红线：余额查询只读账本投影，不新增 ledger transaction、posting plan 或 entry。
+     */
+    @Test
+    void testQueryFundingAccountBalanceShouldReadLifetimeLedgerProjectionWithoutLedgerFactsMutation() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        FundsSubjectBalanceDTO balance = balanceQueryService.getRequiredCurrentBalance(new FundsSubjectBalanceQuery()
+                .setTenantId(TENANT_ID)
+                .setSubjectRefs(List.of(FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT)))
+                .setCurrency(CurrencyIsoCode.USD));
+
+        assertThat(balance.isInitialized()).isTrue();
+        assertThat(balance.getSubjectRef())
+                .isEqualTo(FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT));
+        assertThat(balance.getBalanceBuckets())
+                .containsOnlyKeys(LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN,
+                        LedgerSubjectCode.AUTHORIZATION);
+        assertThat(balance.getBalanceBuckets().values())
+                .extracting(LedgerBalanceBucket::periodType)
+                .containsOnly(AccountBalancePeriodType.LIFETIME);
+        assertThat(balance.getBalanceBuckets().values())
+                .extracting(LedgerBalanceBucket::periodId)
+                .containsOnly(AccountBalancePeriodType.LIFETIME.name());
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @BeforeEach
@@ -169,6 +211,7 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
             LedgerServiceImpl.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            DefaultFundsAccountQueryServiceImpl.class,
             FundingAccountServiceImpl.class
     })
     static class Config {
