@@ -160,6 +160,7 @@ just test-transaction
 just test-balance-control
 just test-business-flow
 just test-boundary
+just test-governance
 just test-one <TestClass> [module]
 ```
 
@@ -168,6 +169,14 @@ just test-one <TestClass> [module]
 ```bash
 just pmd
 ```
+
+CAD 自动模式或完整基线复核优先执行：
+
+```bash
+just verify-cad
+```
+
+`verify-cad` 聚合 `mvn-version`、`compile`、`test-core`、`test-ledger`、`test-transaction`、`test-balance-control`、`test-business-flow`、`test-boundary`、`test-governance` 和 `pmd`，用于声明本地完整验证证据。
 
 如 `pmd:check` 因私有仓库、snapshot、本地 Maven 缓存或依赖解析失败，应在交付说明中按环境依赖问题记录，不得等同于代码规约违规。
 
