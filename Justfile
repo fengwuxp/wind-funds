@@ -72,6 +72,9 @@ test-governance tests='FundsProjectionReplayServiceTests':
 # Fast CAD verification for non-business tooling or test-asset changes.
 verify-fast: compile test-boundary test-governance
 
+# Full CAD verification for the rebuilt payment funds test baseline.
+verify-cad: compile test-core test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance pmd
+
 # Install reactor snapshots locally when Maven plugin resolution needs local artifacts.
 install-snapshots:
     @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn install -DskipTests -Dmaven.test.skip=true
