@@ -62,7 +62,7 @@ test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTran
     @just _run-test-classes "{{tests}}" tests
 
 # Contract, route, and wallet boundary tests.
-test-boundary tests='RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests,PaymentInstrumentServiceImplTests,SpendSubjectFundingRelationServiceImplTests,WalletLayerBoundaryTests':
+test-boundary tests='RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests,FundingAccountServiceImplTests,ControlAccountLedgerInitializationTests,PaymentInstrumentServiceImplTests,SpendSubjectFundingRelationServiceImplTests,WalletLayerBoundaryTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Fast CAD verification for non-business tooling or test-asset changes.
