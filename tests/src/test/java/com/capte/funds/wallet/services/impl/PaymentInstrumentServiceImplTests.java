@@ -61,15 +61,23 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String BINDING_SN = "pi_binding_service_candidate";
 
+    private static final String DUPLICATE_DEFAULT_BINDING_SN = "pi_binding_service_default_duplicate";
+
     private static final String OWNER_ID = "owner_pi_service";
 
     private static final String FUNDING_ACCOUNT_ID = "funding_pi_binding_target";
+
+    private static final String SECOND_FUNDING_ACCOUNT_ID = "funding_pi_binding_second";
 
     private static final String OPERATOR_ID = "ops_pi_service";
 
     private static final String CREATE_BINDING_REQUEST_SN = "req_pi_binding_create";
 
     private static final String CHANGE_BINDING_REQUEST_SN = "req_pi_binding_change";
+
+    private static final String DUPLICATE_DEFAULT_CREATE_REQUEST_SN = "req_pi_binding_duplicate_default_create";
+
+    private static final String DUPLICATE_DEFAULT_CHANGE_REQUEST_SN = "req_pi_binding_duplicate_default_change";
 
     private static final String INSTRUMENT_TYPE_CARD = "CARD";
 
@@ -236,6 +244,81 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：同一支付工具、绑定角色和币种已经存在 ACTIVE 默认绑定后，再创建第二个默认绑定。
+     * 输入：同一工具下两个不同资金主体绑定都声明 defaultBinding = true。
+     * 输出：第二个绑定被拒绝，默认候选仍只有原绑定。
+     * 红线：默认候选不唯一时不得给后续 route 留下随机选路空间，不写绑定当前态、历史或账本事实。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldRejectDuplicateActiveDefaultCandidate() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createSecondBindingRequest()
+                .setDefaultBinding(Boolean.TRUE)))
+                .hasMessageContaining("默认支付工具绑定不唯一");
+
+        List<PaymentInstrumentBindingDTO> defaults = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setDefaultBinding(Boolean.TRUE)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+        assertThat(defaults)
+                .singleElement()
+                .satisfies(binding -> {
+                    assertThat(binding.getSn()).isEqualTo(BINDING_SN);
+                    assertThat(binding.getSubjectId()).isEqualTo(FUNDING_ACCOUNT_ID);
+                });
+        assertThat(countRows("t_payment_instrument_binding", "sn", DUPLICATE_DEFAULT_BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", DUPLICATE_DEFAULT_BINDING_SN))
+                .isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一支付工具存在一个 ACTIVE 默认绑定和一个非默认绑定，运营尝试把非默认绑定改为默认。
+     * 输入：第二个绑定仅变更 defaultBinding = true，其他绑定维度与原默认绑定相同。
+     * 输出：变更被拒绝，第二个绑定仍保持非默认和原版本。
+     * 红线：当前态变更入口不得绕过默认候选唯一性，也不得追加伪成功的绑定历史。
+     */
+    @Test
+    void testChangePaymentInstrumentBindingShouldRejectDuplicateActiveDefaultCandidate() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createSecondBindingRequest()
+                .setDefaultBinding(Boolean.FALSE));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(DUPLICATE_DEFAULT_BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setDefaultBinding(Boolean.TRUE)
+                        .setStatus(FundsAccountStatus.ACTIVE)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("promote duplicate default")
+                        .setRequestSn(DUPLICATE_DEFAULT_CHANGE_REQUEST_SN)))
+                .hasMessageContaining("默认支付工具绑定不唯一");
+
+        PaymentInstrumentBindingDTO secondBinding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(DUPLICATE_DEFAULT_BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+        assertThat(secondBinding.getDefaultBinding()).isFalse();
+        assertThat(secondBinding.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(secondBinding.getVersion()).isEqualTo(1);
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", DUPLICATE_DEFAULT_BINDING_SN))
+                .isEqualTo(1);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testChangePaymentInstrumentBindingShouldAppendHistoryWithoutOverwritingEvidence() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
@@ -313,8 +396,12 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupPaymentInstrumentTestData() {
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn = ?", BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn = ?", BINDING_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?)",
+                BINDING_SN,
+                DUPLICATE_DEFAULT_BINDING_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?)",
+                BINDING_SN,
+                DUPLICATE_DEFAULT_BINDING_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
                 RAW_PAYMENT_INSTRUMENT_SN,
@@ -350,6 +437,14 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setOperatorId(OPERATOR_ID)
                 .setChangeReason("bind funding account")
                 .setRequestSn(CREATE_BINDING_REQUEST_SN);
+    }
+
+    private CreatePaymentInstrumentBindingRequest createSecondBindingRequest() {
+        return createBindingRequest()
+                .setSn(DUPLICATE_DEFAULT_BINDING_SN)
+                .setSubjectId(SECOND_FUNDING_ACCOUNT_ID)
+                .setPriority(20)
+                .setRequestSn(DUPLICATE_DEFAULT_CREATE_REQUEST_SN);
     }
 
     private void assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(Object value) {
