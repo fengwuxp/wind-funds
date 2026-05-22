@@ -7,19 +7,24 @@ import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.service.LedgerService;
 import com.capte.funds.wallet.model.dto.BudgetGroupDTO;
 import com.capte.funds.wallet.model.dto.CreditAccountDTO;
+import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.capte.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.capte.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.capte.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.capte.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.capte.funds.wallet.service.BudgetGroupService;
 import com.capte.funds.wallet.service.CreditAccountService;
+import com.capte.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.capte.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
+import com.wind.integration.funds.ledger.LedgerBalanceBucket;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
@@ -88,6 +93,9 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Autowired
     private SubjectLedgerInitializer subjectLedgerInitializer;
+
+    @Autowired
+    private FundsSubjectBalanceQueryService balanceQueryService;
 
     @Autowired
     private LedgerService ledgerService;
@@ -172,6 +180,39 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 LedgerProfileCode.BUDGET_BASIC,
                 AccountBalancePeriodType.MONTHLY,
                 MONTHLY_PERIOD_ID));
+    }
+
+    /**
+     * 场景：月度预算组已经初始化控制账本后，余额查询必须按指定账期返回余额桶。
+     * 输入：预算组周期为 MONTHLY，periodId 为 2026-05。
+     * 输出：返回 LIMIT、AVAILABLE、AUTHORIZATION 三个余额桶，且周期均为 MONTHLY/2026-05。
+     * 红线：余额查询只读取账本投影，不新增交易、posting plan 或 entry。
+     */
+    @Test
+    void testQueryMonthlyBudgetGroupBalanceShouldUseSpecifiedPeriod() {
+        budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(MONTHLY_PERIOD_ID));
+        LedgerFacts before = loadLedgerFacts();
+
+        FundsSubjectBalanceDTO balance = balanceQueryService.getRequiredCurrentBalance(new FundsSubjectBalanceQuery()
+                .setTenantId(TENANT_ID)
+                .setSubjectRefs(List.of(FundsAccountId.immutable(BUDGET_GROUP_SN, FundsSubjectType.BUDGET_GROUP)))
+                .setCurrency(CurrencyIsoCode.USD)
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(MONTHLY_PERIOD_ID));
+
+        assertThat(balance.isInitialized()).isTrue();
+        assertThat(balance.getSubjectRef())
+                .isEqualTo(FundsAccountId.immutable(BUDGET_GROUP_SN, FundsSubjectType.BUDGET_GROUP));
+        assertThat(balance.getBalanceBuckets()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
+        assertThat(balance.getBalanceBuckets().values())
+                .extracting(LedgerBalanceBucket::periodType)
+                .containsOnly(AccountBalancePeriodType.MONTHLY);
+        assertThat(balance.getBalanceBuckets().values())
+                .extracting(LedgerBalanceBucket::periodId)
+                .containsOnly(MONTHLY_PERIOD_ID);
+        assertLedgerFacts(before);
     }
 
     @Test
@@ -301,9 +342,26 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 DefaultPageQueryOptions.defaults(10)).getRecords();
     }
 
+    private LedgerFacts loadLedgerFacts() {
+        return new LedgerFacts(
+                countRows("t_ledger"),
+                countRows("t_ledger_transaction"),
+                countRows("t_ledger_posting_plan"),
+                countRows("t_ledger_entry"));
+    }
+
+    private void assertLedgerFacts(LedgerFacts expected) {
+        assertThat(loadLedgerFacts()).isEqualTo(expected);
+    }
+
     private long countRows(String tableName, String columnName, Object value) {
         Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
                 Long.class, value);
+        return result;
+    }
+
+    private long countRows(String tableName) {
+        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
         return result;
     }
 
@@ -338,8 +396,12 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
             CreditAccountServiceImpl.class,
-            BudgetGroupServiceImpl.class
+            BudgetGroupServiceImpl.class,
+            DefaultFundsAccountQueryServiceImpl.class
     })
     static class Config {
+    }
+
+    private record LedgerFacts(long ledgers, long transactions, long postingPlans, long entries) {
     }
 }
