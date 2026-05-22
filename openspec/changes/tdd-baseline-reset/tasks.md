@@ -10,7 +10,7 @@
 - [x] 重建支付资金底座开发基线规格。
 - [x] 校准 TDD 文档中“旧测试资产复用”表述。
 - [x] 冻结当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果，作为进入编码前的独立检查点；上一已冻结设计交付提交点为 30b1a00 docs: 冻结权益快照设计基线，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。
-- [x] 完成设计、代码、任务三方基线对齐：`eabd672` 纳入编码准备包，`6be9c99` 完成 B1-10 权益快照 DSL 契约承载，`75b46ef` 和 `9db3eba` 收敛请求摘要与稳定摘要支撑，`434f8a2` 校准账务计划装配器长 ID 测试规范，`5bad4b7` 对齐权益资金流编码基线，`42100dc` 固化权益生产准入门禁；任务以本 Harness Plan 和 OpenSpec spec 为准。
+- [x] 完成设计、代码、任务三方基线对齐：`eabd672` 纳入编码准备包，`6be9c99` 完成 B1-10 权益快照 DSL 契约承载，`75b46ef` 和 `9db3eba` 收敛请求摘要与稳定摘要支撑，`434f8a2` 校准账务计划装配器长 ID 测试规范，`5bad4b7` 对齐权益资金流编码基线，`42100dc` 固化权益生产准入门禁，`555a943` 至 `9fc2e5d` 完成权益准入任务基线、架构师工程约规、CAD 自动推进约规、测试最佳实践、预算组默认周期 `LIFETIME`、账务事实断言、钱包/交易/治理边界和 CAD 完整验证门禁收敛；任务以本 Harness Plan 和 OpenSpec spec 为准。
 
 ## 1. 全局写入范围
 
@@ -76,8 +76,8 @@ just verify-cad
 - [x] Harness 已重新对齐：以本文件作为批次计划、写入范围、只读范围、禁止事项、人工确认点和交付记录入口。
 - [x] 旧测试源码已移除，测试 resources 保留。
 - [x] 当前基线支持在用户明确授权后进入 CAD 自动提交模式；进入生产编码前仍需用户按批次授予 Execution Grant，且每轮交付必须声明专项验证或 `just verify-cad` 完整门禁结果。
-- [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线。当前编码准备基线至少截至 `42100dc docs: 固化权益生产准入门禁`，当前代码能力基线截至 `434f8a2 test: 校准账务计划装配器长ID用例`；后续编码仍需用户按批次单独授予 Execution Grant。
-- [x] 代码基线已复核至当前 Git 基线 `434f8a2`，并纳入 B1-10 权益快照 DSL 契约承载实现和测试：批次 1 DSL 契约测试已存在；批次 2 支付工具、绑定历史、资金来源关系、显式建账、账务计划装配器长 ID 追溯和余额投影已有局部基线；批次 3 至 6 已有部分直接交易、授权、余额控制、Route Replay 和交易投影测试；批次 7 仅保留 reconciliation-* 空模块骨架；批次 8 已有 governance-* 交易投影重放骨架。上述都只作为局部代码基线，不表示对应批次全量完成或可跳过 Execution Grant。
+- [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线。当前编码准备基线和代码能力基线截至 `9fc2e5d test: 对齐 CAD 完整验证入口`；后续生产编码仍需用户按批次单独授予 Execution Grant。
+- [x] 代码基线已复核至当前 Git 基线 `9fc2e5d`，并纳入 B1-10 权益快照 DSL 契约承载实现和测试：批次 1 DSL 契约测试已存在；批次 2 支付工具、绑定历史、资金来源关系、显式建账、预算组默认周期 `LIFETIME`、账务计划装配器长 ID 追溯和余额投影已有局部基线；批次 3 至 6 已有部分直接交易、授权、余额控制、Route Replay、交易投影和稳定摘要测试；批次 7 仅保留 reconciliation-* 空模块骨架；批次 8 已有 governance-* 交易投影重放骨架和局部边界测试。上述都只作为局部代码和验证门禁基线，不表示对应批次全量完成或可跳过 Execution Grant。
 
 ### 5.1 设计、代码、任务对齐矩阵
 
@@ -287,7 +287,7 @@ DDL/H2 schema 变化：
 
 ## 8. 依赖、门禁与设计反馈
 
-1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线，当前编码准备基线至少截至 `42100dc docs: 固化权益生产准入门禁`，当前代码能力基线截至 `434f8a2 test: 校准账务计划装配器长ID用例`；后续具体编码批次仍必须通过 Execution Grant 明确授权。
+1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线，当前编码准备基线和代码能力基线截至 `9fc2e5d test: 对齐 CAD 完整验证入口`；后续具体编码批次仍必须通过 Execution Grant 明确授权。
 2. 当前执行优先级固定为：先做 `02-交易路由钱包账目与投影`，再做 `03-清结算与对账`，最后做 `04-归档重放与指标治理`。
 3. 批次 1 至批次 6 合并构成 02 阶段，内部仍按 DSL/core、钱包账户与账本、直接交易、授权交易、余额控制、Route Replay 与投影推进。
 4. 批次 1 是后续所有交易、账本和授权测试的前置门禁。
@@ -369,7 +369,7 @@ NFR 假设：
 
 ## 11. 批次 1 / B1-10 历史 Execution Grant 参考（已完成）
 
-本节保留 B1-10 已执行授权的历史参考，不能直接作为新的开工授权。B1-10 已在 `6be9c99 feat: 固化权益快照稳定摘要契约` 完成交付，后续 `75b46ef` 和 `9db3eba` 已收敛请求摘要与稳定摘要支撑，`434f8a2` 已校准账务计划装配器长 ID 用例规范，`42100dc` 已固化权益生产准入门禁。下一轮若继续修改权益契约、请求摘要、route/posting/replay、投影、归档、治理重放或生产主链路，必须另起目标批次 Execution Grant。
+本节保留 B1-10 已执行授权的历史参考，不能直接作为新的开工授权。B1-10 已在 `6be9c99 feat: 固化权益快照稳定摘要契约` 完成交付，后续 `75b46ef` 和 `9db3eba` 已收敛请求摘要与稳定摘要支撑，`434f8a2` 已校准账务计划装配器长 ID 用例规范，`42100dc` 已固化权益生产准入门禁；仓库当前工程治理和测试门禁基线已推进至 `9fc2e5d`。下一轮若继续修改权益契约、请求摘要、route/posting/replay、投影、归档、治理重放或生产主链路，必须另起目标批次 Execution Grant。
 
 ```text
 授权批次：批次 1 / B1-10 权益快照 DSL 契约
@@ -378,7 +378,7 @@ NFR 假设：
 必须覆盖的 TDD 用例：TDD-BEN-001 至 TDD-BEN-007、TDD-BEN-RED-001、TDD-BEN-RED-002、TDD-BEN-RED-012、TDD-BEN-RED-017、TDD-BEN-RED-018
 必须覆盖的 AC/DSL ID：AC-BEN-001、AC-BEN-012、AC-BEN-013、DSL-BENEFIT-SNAPSHOT-001；登记 RED-050 至 RED-059，其中 RED-058 只作为生产 Done 门禁，本批只做契约层红线，不声明 route/posting/replay 已闭合
 后续准入补充：AC-BEN-014 至 AC-BEN-019、RED-060 至 RED-066、TDD-BEN-008、TDD-BEN-009、TDD-BEN-DIR-006、TDD-BEN-DIR-007、TDD-BEN-REPLAY-003、TDD-BEN-REPLAY-004、TDD-BEN-RED-020 至 TDD-BEN-RED-030、TDD-RACE-012 是 B1-10 后新增的 Phase 2/3 准入门禁，不改变 B1-10 历史完成结论；继续实现含权益生产资金流时必须另起 Execution Grant。
-基线是否已冻结：已冻结；设计冻结点为 30b1a00；B1-10 契约承载基线为 6be9c99；当前代码基线截至 434f8a2；本节只作历史参考，继续执行或调整批次 1 仍需用户确认新的 Execution Grant
+基线是否已冻结：已冻结；设计冻结点为 30b1a00；B1-10 契约承载基线为 6be9c99；仓库当前基线截至 9fc2e5d；本节只作历史参考，继续执行或调整批次 1 仍需用户确认新的 Execution Grant
 工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
 允许修改公共契约：历史授权仅允许 B1-10 最小新增；后续再次修改公共契约必须重新确认，不允许删除或改写既有字段
 公共契约允许修改范围：仅限新增 `FundsInstructionSpec#getBenefitSnapshot()` 默认空值方法、权益快照 Spec/Immutable model、权益枚举和必要 JSON 空值语义；不得改变 `amount`、`originalAmount`、`exchangeRate`、`reference`、`instrumentRef`、`externalAccountRef`、`contextVariables` 既有语义
@@ -446,7 +446,7 @@ NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部�
 | DSL 红线 | `fixtureLevel=CONTRACT_ONLY` 必须显式登记，避免把请求态样例误判为生产 Done。 | `FundsDslJsonContractVerifier` 增加 `fixtureLevel`、`scenarioCode`、`acceptanceIds`、`tddIds`、`systemDesignRefs` 和 `validation` 元数据校验。 |
 | TDD 用例 | 已补稳定摘要、字段顺序、请求态样例、生产 Done 误判、闭合角色边界等契约测试。 | `FundsBenefitSnapshotSpecTests` 12 个用例通过；`FundsDslJsonContractTests` 8 个用例通过。 |
 | 验证命令 | Java 21 下编译、目标测试、PMD 和空白检查通过。 | `just mvn-version`；`just compile`；`just test-one FundsBenefitSnapshotSpecTests tests`；`just test-one FundsDslJsonContractTests tests`；`just pmd`；`git diff --check`。 |
-| 后续基线收敛 | 请求摘要、稳定摘要支撑和账务计划装配器长 ID 用例规范已在后续提交中收敛，当前代码基线截至 `434f8a2`。 | `75b46ef refactor: 收敛资金请求摘要支撑`；`9db3eba refactor: 收敛资金稳定摘要支撑`；`434f8a2 test: 校准账务计划装配器长ID用例`。 |
+| 后续基线收敛 | 请求摘要、稳定摘要支撑、账务计划装配器长 ID、预算组默认周期 `LIFETIME`、账务事实断言、钱包/交易/治理边界和 CAD 完整验证门禁已在后续提交中收敛，当前仓库基线截至 `9fc2e5d`。 | `75b46ef`、`9db3eba`、`434f8a2`、`993a461`、`70d6df2`、`7da5e32`、`aab8060`、`f16dd88`、`ad0721c`、`b2cb476`、`91e7000`、`9fc2e5d`。 |
 | 残余风险 | 只能声明 `B1-10 契约承载 Done`。 | route、posting、replay、授权占券、清结算、对账、投影、归档、冷热读取和治理重放消费仍在 B3/B4/B6/B7/B8 后续批次；解释视图、证据最小化和外部规则核验仍在 B6/B7/B8 后续批次。 |
 
 ## 13. 批次 2 建议 Execution Grant
@@ -459,7 +459,7 @@ NFR 假设：本批只做契约承载，不触碰生产并发、容量、外部�
 禁止写入范围：transaction-* 业务实现；直接交易、授权交易、余额控制交易编排；Route Resolver、Posting Assembler、Route Replay；权益 route/posting/replay 消费；清结算、对账、归档、指标实现；生产配置；外部通道适配
 必须覆盖的 TDD 用例：TDD-WALLET-*、TDD-ROUTE-011、TDD-ROUTE-012、TDD-LEDGER-*、TDD-VIEW-003
 必须覆盖的 AC/DSL ID：AC-PI-001、AC-PI-002、AC-PI-003、AC-PI-004、AC-PI-006、AC-PI-007、AC-CTRL-009、AC-CTRL-010、AC-CTRL-011、AC-BALLOG-001、RED-036、RED-046、RED-047、RED-049
-基线是否已冻结：已冻结；B1-10 契约承载基线为 6be9c99，当前代码基线截至 434f8a2，本批启动前必须复核工作树干净
+基线是否已冻结：已冻结；B1-10 契约承载基线为 6be9c99，当前仓库基线截至 9fc2e5d，本批启动前必须复核工作树干净
 工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
 允许修改公共契约：待用户确认；建议默认不删除、不改写既有 face/core 字段，只允许为账户、账本、支付工具基础能力做非破坏性新增或校验补齐
 公共契约允许修改范围：如确需变更，只限 wallet/ledger face 中账户角色、账本创建、账期、支付工具绑定和资金账户关系的目标态字段；不得调整交易指令、权益快照、直接交易或授权交易请求语义
