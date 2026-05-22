@@ -2,13 +2,20 @@ package com.capte.funds.wallet.services.impl;
 
 import com.capte.funds.AbstractFundsServiceTest;
 import com.capte.funds.ledger.impl.LedgerServiceImpl;
+import com.capte.funds.ledger.request.CreateLedgerRequest;
+import com.capte.funds.ledger.service.LedgerService;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.wallet.dal.entities.FundingAccount;
 import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.capte.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.capte.funds.wallet.service.FundsSubjectBalanceQueryService;
+import com.wind.integration.funds.ledger.LedgerBalanceBucket;
+import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
+import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
+import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.FundingAccountType;
@@ -26,6 +33,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalTime;
 import java.util.List;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
@@ -43,12 +51,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest {
 
-    private static final String UNINITIALIZED_ACCOUNT_SN = "funding_balance_query_uninitialized";
+    private static final String UNINITIALIZED_ACCOUNT_SN = "fbal_query_uninit";
+
+    private static final String SECOND_ACCOUNT_SN = "fbal_query_second";
 
     private static final String OWNER_ID = "owner_balance_query";
 
+    private static final String SECOND_OWNER_ID = "owner_balance_query_second";
+
     @Autowired
     private FundsSubjectBalanceQueryService balanceQueryService;
+
+    @Autowired
+    private LedgerService ledgerService;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
@@ -101,6 +116,61 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：运营或交易前置校验批量查询多个资金主体的同一余额桶。
+     * 输入：两个 FUNDING_ACCOUNT 主体均已初始化 AVAILABLE 和 FROZEN，查询顺序与入参相反，并只查询 AVAILABLE。
+     * 输出：结果顺序与入参一致，只返回被请求的 AVAILABLE 余额桶。
+     * 红线：余额查询只能筛选已有账本投影，不得因批量查询重排主体、补建科目或写入账本事实。
+     */
+    @Test
+    void testQueryCurrentBalancesShouldKeepSubjectOrderAndFilterLedgerBucketsWithoutLedgerMutation() {
+        insertFundingAccountWithLifetimeLedgers(UNINITIALIZED_ACCOUNT_SN, OWNER_ID);
+        insertFundingAccountWithLifetimeLedgers(SECOND_ACCOUNT_SN, SECOND_OWNER_ID);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        List<FundsSubjectBalanceDTO> balances = balanceQueryService.queryCurrentBalances(new FundsSubjectBalanceQuery()
+                .setTenantId(TENANT_ID)
+                .setSubjectRefs(List.of(
+                        FundsAccountId.immutable(SECOND_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT),
+                        FundsAccountId.immutable(UNINITIALIZED_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT)))
+                .setCurrency(CURRENCY)
+                .setLedgerSubjectCodes(List.of(LedgerSubjectCode.AVAILABLE)));
+
+        assertThat(balances)
+                .extracting(FundsSubjectBalanceDTO::getSubjectRef)
+                .containsExactly(
+                        FundsAccountId.immutable(SECOND_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT),
+                        FundsAccountId.immutable(UNINITIALIZED_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT));
+        assertThat(balances).allSatisfy(balance -> {
+            assertThat(balance.isInitialized()).isTrue();
+            assertThat(balance.getBalanceBuckets()).containsOnlyKeys(LedgerSubjectCode.AVAILABLE);
+            LedgerBalanceBucket bucket = balance.getBalanceBuckets().get(LedgerSubjectCode.AVAILABLE);
+            assertThat(bucket.periodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
+            assertThat(bucket.periodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
+        });
+        assertThat(countLedgers()).isEqualTo(4);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：查询周期型余额时调用方遗漏 periodId。
+     * 输入：periodType=MONTHLY，periodId=null。
+     * 输出：参数校验失败。
+     * 红线：非 LIFETIME 周期不得退化成默认生命周期余额，也不得在失败时写任何账本事实。
+     */
+    @Test
+    void testQueryCurrentBalancesShouldRejectNonLifetimePeriodWithoutPeriodIdAndLedgerMutation() {
+        insertFundingAccountWithLifetimeLedgers(UNINITIALIZED_ACCOUNT_SN, OWNER_ID);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> balanceQueryService.queryCurrentBalances(balanceQuery()
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)))
+                .hasMessageContaining("资金主体余额查询 periodId 不能为空");
+
+        assertThat(countLedgers()).isEqualTo(2);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpFundsSubjectBalanceQueryServiceTestData() {
         cleanupFundsSubjectBalanceQueryServiceTestData();
@@ -112,8 +182,12 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
     }
 
     private void cleanupFundsSubjectBalanceQueryServiceTestData() {
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", UNINITIALIZED_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn = ?", UNINITIALIZED_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
+                UNINITIALIZED_ACCOUNT_SN,
+                SECOND_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)",
+                UNINITIALIZED_ACCOUNT_SN,
+                SECOND_ACCOUNT_SN);
     }
 
     private FundsSubjectBalanceQuery balanceQuery() {
@@ -125,10 +199,14 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
     }
 
     private void insertFundingAccountWithoutLedgers() {
+        insertFundingAccountWithoutLedgers(UNINITIALIZED_ACCOUNT_SN, OWNER_ID);
+    }
+
+    private void insertFundingAccountWithoutLedgers(String accountSn, String ownerId) {
         FundingAccount account = new FundingAccount();
-        account.setSn(UNINITIALIZED_ACCOUNT_SN);
+        account.setSn(accountSn);
         account.setTenantId(TENANT_ID);
-        account.setOwnerId(OWNER_ID);
+        account.setOwnerId(ownerId);
         account.setOwnerType(FundsAccountOwnerType.USER);
         account.setAccountType(FundingAccountType.USER_WALLET.name());
         account.setPlatform(Boolean.FALSE);
@@ -141,10 +219,35 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         fundingAccountMapper.insertSelective(account);
     }
 
+    private void insertFundingAccountWithLifetimeLedgers(String accountSn, String ownerId) {
+        insertFundingAccountWithoutLedgers(accountSn, ownerId);
+        createLifetimeLedger(accountSn, LedgerSubjectCode.AVAILABLE);
+        createLifetimeLedger(accountSn, LedgerSubjectCode.FROZEN);
+    }
+
+    private void createLifetimeLedger(String accountSn, LedgerSubjectCode ledgerSubjectCode) {
+        ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(accountSn)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name())
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
+                .setLedgerProfileVersion(1)
+                .setLedgerSubjectCode(ledgerSubjectCode)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
+                .setNormalBalanceSide(EntrySide.CREDIT)
+                .setAllowNegative(Boolean.FALSE)
+                .setCurrency(CURRENCY)
+                .setSettlementPolicy("RT")
+                .setCutOffTime(LocalTime.MIDNIGHT)
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+    }
+
     private long countLedgers() {
-        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_ledger WHERE subject_id = ?",
+        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_ledger WHERE subject_id IN (?, ?)",
                 Long.class,
-                UNINITIALIZED_ACCOUNT_SN);
+                UNINITIALIZED_ACCOUNT_SN,
+                SECOND_ACCOUNT_SN);
         return result;
     }
 
