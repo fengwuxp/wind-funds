@@ -720,8 +720,8 @@ Phase 与编码批次不是同一概念。Phase 描述权益能力从 DSL 承载
 | 能力阶段 | 典型批次映射 | 可编码边界 | 不可越界 |
 | --- | --- | --- | --- |
 | Phase 1 契约承载 | B1-10 或等价 contract-only 批次。 | `FundsInstructionSpec`、权益 Spec、枚举、JSON 契约、空值兼容和 contract fixture。 | 不宣称 route、posting、清结算、对账和 replay 已消费权益。 |
-| Phase 2 route/posting 消费 | B3、B4、B6 中被明确授权的 route、transaction、ledger 批次。 | 选择权益快照不可变事实源；生成独立 route leg、伴随指令或 posting；幂等摘要纳入权益稳定摘要。 | 未选持久化落点时实现生产资金流；把核心字段长期塞进 `contextVariables`。 |
-| Phase 3 replay/清结算/对账消费 | B7 或清结算、对账、投影专项批次。 | 清分金额项、对账差错、归档重放和交易投影按原权益快照追溯。 | 从当前营销规则、报表汇总或投影反推历史权益事实。 |
+| Phase 2 route/posting 消费 | B3、B4、B6 中被明确授权的 route、transaction、ledger 批次。 | 选择权益快照不可变事实源；选择零实付表达、平台补贴表达和资金流夹具；生成独立 route leg、伴随指令或 posting；幂等摘要纳入权益稳定摘要。 | 未选持久化落点、夹具级别或专业确认状态时实现生产资金流；把核心字段长期塞进 `contextVariables`。 |
+| Phase 3 replay/清结算/对账消费 | B7 或清结算、对账、投影专项批次。 | 清分金额项、对账差错、归档重放和交易投影按原权益快照追溯；补齐退款分摊、历史无快照处理和专业确认状态。 | 从当前营销规则、报表汇总或投影反推历史权益事实；用 `CONTRACT_ONLY` 夹具声明清结算或对账 Done。 |
 
 生产承接门禁：
 
