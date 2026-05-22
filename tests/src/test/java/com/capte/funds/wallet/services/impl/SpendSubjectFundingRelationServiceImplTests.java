@@ -5,6 +5,7 @@ import com.capte.funds.ledger.dto.LedgerDTO;
 import com.capte.funds.ledger.impl.LedgerServiceImpl;
 import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.service.LedgerService;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
 import com.capte.funds.wallet.model.query.SpendSubjectFundingRelationQuery;
 import com.capte.funds.wallet.model.request.CreateFundingAccountRequest;
@@ -34,6 +35,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 支出主体资金来源关系服务层边界测试。
@@ -68,7 +71,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     @Test
     void testCreateSpendSubjectFundingRelationShouldNotPostLedgerOrChangeFundingAccountBalance() {
         fundingAccountService.createFundingAccount(createFundingAccountRequest());
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         List<LedgerDTO> fundingLedgersBefore = loadFundingAccountLedgers();
 
         Long relationId = fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest());
@@ -104,45 +107,45 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertThat(loadFundingAccountLedgers())
                 .usingRecursiveFieldByFieldElementComparator()
                 .containsExactlyInAnyOrderElementsOf(fundingLedgersBefore);
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
     void testCreateSpendSubjectFundingRelationShouldRejectMissingFundingAccountWithoutRelation() {
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
                 .setFundingAccountId("missing_relation_target")))
                 .hasMessageContaining("资金账户不存在");
 
         assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
     void testCreateSpendSubjectFundingRelationShouldRejectUnavailableFundingAccountWithoutRelation() {
         fundingAccountService.createFundingAccount(createFundingAccountRequest()
                 .setStatus(FundsAccountStatus.SUSPENDED));
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()))
                 .hasMessageContaining("资金账户不可作为资金来源");
 
         assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
     void testCreateSpendSubjectFundingRelationShouldRejectCurrencyMismatchWithoutRelation() {
         fundingAccountService.createFundingAccount(createFundingAccountRequest());
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
                 .setCurrency(CurrencyIsoCode.CNY)))
                 .hasMessageContaining("资金账户币种与资金来源关系币种不一致");
 
         assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @BeforeEach
@@ -195,30 +198,10 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 DefaultPageQueryOptions.defaults(10)).getRecords();
     }
 
-    private LedgerFacts loadLedgerFacts() {
-        return new LedgerFacts(
-                countRows("t_ledger"),
-                countRows("t_ledger_transaction"),
-                countRows("t_ledger_posting_plan"),
-                countRows("t_ledger_entry"));
-    }
-
-    private void assertLedgerFacts(LedgerFacts expected) {
-        assertThat(loadLedgerFacts()).isEqualTo(expected);
-    }
-
-    private long countRows(String tableName) {
-        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
-        return result;
-    }
-
     private long countRows(String tableName, String columnName, Object value) {
         Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
                 Long.class, value);
         return result;
-    }
-
-    private record LedgerFacts(long ledgers, long transactions, long postingPlans, long entries) {
     }
 
     @Configuration

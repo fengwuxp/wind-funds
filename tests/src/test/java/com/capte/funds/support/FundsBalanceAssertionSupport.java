@@ -8,6 +8,7 @@ import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -22,6 +23,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 资金余额和账务计划断言支撑。
  */
 public final class FundsBalanceAssertionSupport {
+
+    private static final String LEDGER_TABLE = "t_ledger";
+
+    private static final String LEDGER_TRANSACTION_TABLE = "t_ledger_transaction";
+
+    private static final String LEDGER_POSTING_PLAN_TABLE = "t_ledger_posting_plan";
+
+    private static final String LEDGER_ENTRY_TABLE = "t_ledger_entry";
 
     private FundsBalanceAssertionSupport() {
         throw new AssertionError();
@@ -68,6 +77,23 @@ public final class FundsBalanceAssertionSupport {
             }
         }
         return new BalanceSnapshot(values);
+    }
+
+    public static LedgerFactSnapshot ledgerFactSnapshot(JdbcTemplate jdbcTemplate) {
+        return new LedgerFactSnapshot(
+                countRows(jdbcTemplate, LEDGER_TABLE),
+                countRows(jdbcTemplate, LEDGER_TRANSACTION_TABLE),
+                countRows(jdbcTemplate, LEDGER_POSTING_PLAN_TABLE),
+                countRows(jdbcTemplate, LEDGER_ENTRY_TABLE));
+    }
+
+    public static void assertLedgerFactsUnchanged(JdbcTemplate jdbcTemplate, LedgerFactSnapshot expected) {
+        assertThat(ledgerFactSnapshot(jdbcTemplate)).isEqualTo(expected);
+    }
+
+    private static long countRows(JdbcTemplate jdbcTemplate, String tableName) {
+        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
+        return result;
     }
 
     public static void assertOnlyBalanceDeltas(BalanceSnapshot before,
@@ -149,5 +175,8 @@ public final class FundsBalanceAssertionSupport {
                                        LedgerSubjectCode ledgerSubjectCode,
                                        long amountDelta,
                                        CurrencyIsoCode currency) {
+    }
+
+    public record LedgerFactSnapshot(long ledgers, long transactions, long postingPlans, long entries) {
     }
 }

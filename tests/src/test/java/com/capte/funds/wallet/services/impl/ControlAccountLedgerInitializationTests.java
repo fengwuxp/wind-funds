@@ -1,6 +1,7 @@
 package com.capte.funds.wallet.services.impl;
 
 import com.capte.funds.AbstractFundsServiceTest;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.ledger.dto.LedgerDTO;
 import com.capte.funds.ledger.impl.LedgerServiceImpl;
 import com.capte.funds.ledger.query.LedgerQuery;
@@ -46,6 +47,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 信用账户和预算组控制账本初始化服务层测试。
@@ -193,7 +196,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
                 .setPeriodType(AccountBalancePeriodType.MONTHLY)
                 .setPeriodId(MONTHLY_PERIOD_ID));
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         FundsSubjectBalanceDTO balance = balanceQueryService.getRequiredCurrentBalance(new FundsSubjectBalanceQuery()
                 .setTenantId(TENANT_ID)
@@ -212,7 +215,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(balance.getBalanceBuckets().values())
                 .extracting(LedgerBalanceBucket::periodId)
                 .containsOnly(MONTHLY_PERIOD_ID);
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
@@ -342,26 +345,9 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 DefaultPageQueryOptions.defaults(10)).getRecords();
     }
 
-    private LedgerFacts loadLedgerFacts() {
-        return new LedgerFacts(
-                countRows("t_ledger"),
-                countRows("t_ledger_transaction"),
-                countRows("t_ledger_posting_plan"),
-                countRows("t_ledger_entry"));
-    }
-
-    private void assertLedgerFacts(LedgerFacts expected) {
-        assertThat(loadLedgerFacts()).isEqualTo(expected);
-    }
-
     private long countRows(String tableName, String columnName, Object value) {
         Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
                 Long.class, value);
-        return result;
-    }
-
-    private long countRows(String tableName) {
-        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
         return result;
     }
 
@@ -400,8 +386,5 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
             DefaultFundsAccountQueryServiceImpl.class
     })
     static class Config {
-    }
-
-    private record LedgerFacts(long ledgers, long transactions, long postingPlans, long entries) {
     }
 }

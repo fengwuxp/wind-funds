@@ -1,6 +1,7 @@
 package com.capte.funds.wallet.services.impl;
 
 import com.capte.funds.AbstractFundsServiceTest;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.wallet.dal.entities.PaymentInstrument;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingHistoryDTO;
@@ -37,6 +38,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 支付工具和绑定关系服务层边界测试。
@@ -84,7 +87,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     @Test
     void testCreatePaymentInstrumentShouldPersistMaskedReferenceWithoutLedgerSubject() {
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Long instrumentId = paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
 
@@ -110,12 +113,12 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThat(instrument.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
         assertThat(records).extracting(PaymentInstrumentDTO::getSn).containsExactly(PAYMENT_INSTRUMENT_SN);
         assertThat(countRows("t_ledger", "subject_id", PAYMENT_INSTRUMENT_SN)).isZero();
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
     void testCreatePaymentInstrumentShouldRejectRawSensitiveInstrumentNo() {
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrument(
                 createPaymentInstrumentRequest()
@@ -124,7 +127,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .hasMessageContaining("instrumentNo must be masked or token reference");
 
         assertThat(countRows("t_payment_instrument", "sn", RAW_PAYMENT_INSTRUMENT_SN)).isZero();
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
@@ -149,7 +152,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     @Test
     void testCreatePaymentInstrumentBindingShouldPersistCandidateWithoutLedgerMutation() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Long bindingId = paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
 
@@ -180,7 +183,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 });
         assertThat(countRows("t_ledger", "subject_id", BINDING_SN)).isZero();
         assertThat(countRows("t_ledger", "subject_id", PAYMENT_INSTRUMENT_SN)).isZero();
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
@@ -188,7 +191,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
                 .setSn(SUSPENDED_PAYMENT_INSTRUMENT_SN)
                 .setStatus(FundsAccountStatus.SUSPENDED));
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setInstrumentSn(SUSPENDED_PAYMENT_INSTRUMENT_SN)))
@@ -198,7 +201,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .isZero();
         assertThat(countRows("t_payment_instrument_binding_history", "instrument_sn", SUSPENDED_PAYMENT_INSTRUMENT_SN))
                 .isZero();
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
@@ -206,7 +209,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
                 .setSn(RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN)
                 .setInstrumentDirection(PaymentInstrumentDirection.RECEIVE));
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setInstrumentSn(RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN)))
@@ -216,13 +219,13 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .isZero();
         assertThat(countRows("t_payment_instrument_binding_history", "instrument_sn", RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN))
                 .isZero();
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
     void testCreatePaymentInstrumentBindingShouldRejectCurrencyMismatchWithoutRouteCandidate() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setCurrency(CurrencyIsoCode.CNY)))
@@ -230,14 +233,14 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
         assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
         assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
     void testChangePaymentInstrumentBindingShouldAppendHistoryWithoutOverwritingEvidence() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
-        LedgerFacts before = loadLedgerFacts();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Long changedBindingId = paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
@@ -296,7 +299,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                     assertThat(history.getRequestSn()).isEqualTo(CHANGE_BINDING_REQUEST_SN);
                 });
         assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isEqualTo(2);
-        assertLedgerFacts(before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @BeforeEach
@@ -349,18 +352,6 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setRequestSn(CREATE_BINDING_REQUEST_SN);
     }
 
-    private LedgerFacts loadLedgerFacts() {
-        return new LedgerFacts(
-                countRows("t_ledger"),
-                countRows("t_ledger_transaction"),
-                countRows("t_ledger_posting_plan"),
-                countRows("t_ledger_entry"));
-    }
-
-    private void assertLedgerFacts(LedgerFacts expected) {
-        assertThat(loadLedgerFacts()).isEqualTo(expected);
-    }
-
     private void assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(Object value) {
         assertThat(value.toString())
                 .doesNotContain("instrumentNo")
@@ -369,19 +360,11 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .doesNotContain(EXTERNAL_INSTRUMENT_ID);
     }
 
-    private long countRows(String tableName) {
-        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
-        return result;
-    }
-
     private long countRows(String tableName, String columnName, String value) {
         Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
                 Long.class,
                 value);
         return result;
-    }
-
-    private record LedgerFacts(long ledgers, long transactions, long postingPlans, long entries) {
     }
 
     @Configuration
