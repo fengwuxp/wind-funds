@@ -6,7 +6,6 @@ import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.request.CreateLedgerRequest;
 import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.service.LedgerService;
-import com.capte.funds.transaction.support.FundsStableHashSupport;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.Pagination;
@@ -17,6 +16,8 @@ import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.integration.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
@@ -33,6 +34,7 @@ import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
+import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
@@ -64,7 +66,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 /**
- * 默认账务计划装配器周期契约测试。
+ * 默认账务计划装配器契约测试。
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
@@ -160,22 +162,46 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                         tuple(LedgerSubjectCode.LIMIT, EntrySide.CREDIT));
     }
 
+    /**
+     * 场景：直接交易路径的 route leg ID 过长，原始 planId 会超过落库长度。
+     * 输入：LIFETIME 周期，资金账户 AVAILABLE -> AVAILABLE，USD 100.00。
+     * 预期：posting plan ID 被压缩到 64 字符以内，交易号和 route leg 仍可追溯。
+     * 红线：长度保护不得破坏 posting plan 平衡、entry 交易号、主体、账目和借贷方向。
+     */
     @Test
-    void testAssembleShouldBuildStableTruncatedPlanIdForLongRouteLegId() {
+    void testAssembleShouldTruncateLongPlanIdWithoutLosingPostingFacts() {
         RouteLegSpec leg = routeLeg(AccountBalancePeriodType.LIFETIME, null, "LEG-"
                 + "POSTING-PERIOD-WITH-A-VERY-LONG-ROUTE-LEG-ID-001");
         LedgerTransactionSpec transaction = assembler.assemble(
                 instruction(), "FUNDS_TX_WITH_A_LONG_LEDGER_TRANSACTION_SN_001", resolvedRoute(leg));
 
-        String planId = transaction.getPostingPlans().getFirst().getPlanId();
+        LedgerPostingPlanSpec plan = transaction.getPostingPlans().getFirst();
+        String planId = plan.getPlanId();
         String rawPlanId = "TRANSFER_" + transaction.getSn() + "_" + leg.getLegId();
-        String expectedDigest = FundsStableHashSupport.sha256(rawPlanId).substring(0, 16);
-
-        assertThat(planId).hasSizeLessThanOrEqualTo(64);
-        assertThat(planId).startsWith("TRANSFER_" + transaction.getSn() + "_");
         String digest = planId.substring(planId.lastIndexOf('_') + 1);
+
+        assertThat(rawPlanId).hasSizeGreaterThan(64);
+        assertThat(planId).hasSizeLessThanOrEqualTo(64);
+        assertThat(planId).isNotEqualTo(rawPlanId);
+        assertThat(planId).startsWith("TRANSFER_" + transaction.getSn() + "_");
         assertThat(digest).matches(SHORT_HEX_DIGEST_PATTERN);
-        assertThat(digest).isEqualTo(expectedDigest);
+        assertThat(transaction.isBalanced()).isTrue();
+        assertThat(plan.isBalanced()).isTrue();
+        assertThat(plan.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+        assertThat(plan.getRouteLegId()).isEqualTo(leg.getLegId());
+        assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.TRANSFER);
+        assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS);
+        assertThat(plan.getEntries()).hasSize(2).allSatisfy(entry -> {
+            assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+            assertThat(entry.getAmount()).isEqualTo(AMOUNT);
+            assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.TRANSFER);
+        });
+        assertThat(plan.getEntries())
+                .extracting(LedgerEntrySpec::getSubjectId, LedgerEntrySpec::getLedgerSubjectCode,
+                        LedgerEntrySpec::getEntryType)
+                .containsExactly(
+                        tuple("source_account", LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT),
+                        tuple("target_account", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT));
     }
 
     private FundsInstructionSpec instruction() {
