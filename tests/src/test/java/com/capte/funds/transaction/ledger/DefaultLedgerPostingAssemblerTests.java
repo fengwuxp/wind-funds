@@ -6,6 +6,7 @@ import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.request.CreateLedgerRequest;
 import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.service.LedgerService;
+import com.capte.funds.transaction.support.FundsStableHashSupport;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.Pagination;
@@ -56,6 +57,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -76,6 +78,8 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     private static final LocalDateTime EVENT_TIME = LocalDateTime.of(2026, 5, 21, 10, 0);
 
     private static final String MONTHLY_PERIOD_ID = "2026-05";
+
+    private static final Pattern SHORT_HEX_DIGEST_PATTERN = Pattern.compile("[0-9a-f]{16}");
 
     @Autowired
     private DefaultLedgerPostingAssembler assembler;
@@ -154,6 +158,24 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .containsExactly(
                         tuple(LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT),
                         tuple(LedgerSubjectCode.LIMIT, EntrySide.CREDIT));
+    }
+
+    @Test
+    void testAssembleShouldBuildStableTruncatedPlanIdForLongRouteLegId() {
+        RouteLegSpec leg = routeLeg(AccountBalancePeriodType.LIFETIME, null, "LEG-"
+                + "POSTING-PERIOD-WITH-A-VERY-LONG-ROUTE-LEG-ID-001");
+        LedgerTransactionSpec transaction = assembler.assemble(
+                instruction(), "FUNDS_TX_WITH_A_LONG_LEDGER_TRANSACTION_SN_001", resolvedRoute(leg));
+
+        String planId = transaction.getPostingPlans().getFirst().getPlanId();
+        String rawPlanId = "TRANSFER_" + transaction.getSn() + "_" + leg.getLegId();
+        String expectedDigest = FundsStableHashSupport.sha256(rawPlanId).substring(0, 16);
+
+        assertThat(planId).hasSizeLessThanOrEqualTo(64);
+        assertThat(planId).startsWith("TRANSFER_" + transaction.getSn() + "_");
+        String digest = planId.substring(planId.lastIndexOf('_') + 1);
+        assertThat(digest).matches(SHORT_HEX_DIGEST_PATTERN);
+        assertThat(digest).isEqualTo(expectedDigest);
     }
 
     private FundsInstructionSpec instruction() {
@@ -235,7 +257,12 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     }
 
     private RouteLegSpec routeLeg(AccountBalancePeriodType periodType, String periodId) {
+        return routeLeg(periodType, periodId, "LEG-POSTING-PERIOD-001");
+    }
+
+    private RouteLegSpec routeLeg(AccountBalancePeriodType periodType, String periodId, String legId) {
         return new TestRouteLegSpec(
+                legId,
                 routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.SOURCE),
                 routeNode("target_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.TARGET),
                 periodType,
@@ -247,6 +274,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
 
     private RouteLegSpec limitAdjustLeg(boolean increase) {
         return new TestRouteLegSpec(
+                "LEG-POSTING-PERIOD-001",
                 increase
                         ? routeNode("credit_account", FundsSubjectType.CREDIT_ACCOUNT,
                         LedgerSubjectCode.LIMIT, RouteNodeRole.SOURCE)
@@ -288,7 +316,8 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .build();
     }
 
-    private record TestRouteLegSpec(RouteNodeSpec sourceNode,
+    private record TestRouteLegSpec(String legId,
+                                    RouteNodeSpec sourceNode,
                                     RouteNodeSpec targetNode,
                                     AccountBalancePeriodType periodType,
                                     String periodId,
@@ -297,7 +326,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
 
         @Override
         public String getLegId() {
-            return "LEG-POSTING-PERIOD-001";
+            return legId;
         }
 
         @Override

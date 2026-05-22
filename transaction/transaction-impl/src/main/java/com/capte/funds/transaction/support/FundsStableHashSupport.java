@@ -14,12 +14,12 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * 资金请求幂等摘要支撑。
+ * 资金稳定摘要支撑。
  *
- * <p>用于构造稳定的请求摘要输入：Map key 排序、递归处理嵌套 Map/List，并排除描述、trace 等易变字段。
+ * <p>用于构造稳定摘要输入：Map key 排序、递归处理嵌套 Map/List，并排除描述、trace 等易变字段。
  * 调用方仍负责选择哪些业务字段进入摘要。</p>
  */
-public final class FundsRequestHashSupport {
+public final class FundsStableHashSupport {
 
     private static final String SHA_256_ALGORITHM = "SHA-256";
 
@@ -30,7 +30,7 @@ public final class FundsRequestHashSupport {
             "traceID",
             "trace_id");
 
-    private FundsRequestHashSupport() {
+    private FundsStableHashSupport() {
     }
 
     /**
@@ -85,7 +85,7 @@ public final class FundsRequestHashSupport {
         }
         if (value instanceof List<?> list) {
             return list.stream()
-                    .map(FundsRequestHashSupport::stableHashValue)
+                    .map(FundsStableHashSupport::stableHashValue)
                     .toList();
         }
         return value;

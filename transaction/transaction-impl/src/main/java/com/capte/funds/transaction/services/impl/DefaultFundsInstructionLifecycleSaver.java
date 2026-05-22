@@ -17,7 +17,7 @@ import com.capte.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.capte.funds.transaction.model.FundsTransactionParticipant;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
-import com.capte.funds.transaction.support.FundsRequestHashSupport;
+import com.capte.funds.transaction.support.FundsStableHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
@@ -584,7 +584,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("reference", referenceSummary(instruction.getReference()));
         values.put("route", routeRequestHashSummary(routeSnapshot));
         values.put("participant", participantSummary(participant));
-        return FundsRequestHashSupport.sha256Json(values);
+        return FundsStableHashSupport.sha256Json(values);
     }
 
     private Map<String, Object> routeRequestHashSummary(RouteSnapshotSpec routeSnapshot) {
@@ -592,7 +592,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.remove("snapshotId");
         values.remove("resolvedAt");
         values.remove("expiresAt");
-        return FundsRequestHashSupport.stableHashMap(values);
+        return FundsStableHashSupport.stableHashMap(values);
     }
 
     private Map<String, Object> referenceSummary(FundsInstructionReferenceSpec reference) {
@@ -606,7 +606,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("referenceLedgerTransactionSn", reference.getReferenceLedgerTransactionSn());
         values.put("externalTransactionId", reference.getExternalTransactionId());
         values.put("authCode", reference.getAuthCode());
-        values.put("contextVariables", FundsRequestHashSupport.stableHashMap(reference.getContextVariables()));
+        values.put("contextVariables", FundsStableHashSupport.stableHashMap(reference.getContextVariables()));
         return values;
     }
 
@@ -617,7 +617,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put("ledgerProfileCode", participant.getLedgerProfileCode());
         values.put("currency", participant.getCurrency());
         values.put("amount", moneySummary(participant.getAmount()));
-        values.put("contextVariables", FundsRequestHashSupport.stableHashMap(participant.getContextVariables()));
+        values.put("contextVariables", FundsStableHashSupport.stableHashMap(participant.getContextVariables()));
         return values;
     }
 

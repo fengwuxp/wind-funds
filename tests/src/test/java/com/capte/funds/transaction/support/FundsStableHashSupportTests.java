@@ -8,13 +8,13 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 资金请求幂等摘要支撑测试。
+ * 资金稳定摘要支撑测试。
  */
-class FundsRequestHashSupportTests {
+class FundsStableHashSupportTests {
 
     @Test
     void testStableHashMapShouldSortKeysAndRemoveVolatileFieldsRecursively() {
-        Map<String, Object> stable = FundsRequestHashSupport.stableHashMap(Map.of(
+        Map<String, Object> stable = FundsStableHashSupport.stableHashMap(Map.of(
                 "traceId", "TRACE-1",
                 "b", Map.of(
                         "subjectName", "Alice",
@@ -34,11 +34,11 @@ class FundsRequestHashSupportTests {
 
     @Test
     void testSha256JsonShouldBeStableForDifferentMapInsertionOrders() {
-        String first = FundsRequestHashSupport.sha256Json(FundsRequestHashSupport.stableHashMap(Map.of(
+        String first = FundsStableHashSupport.sha256Json(FundsStableHashSupport.stableHashMap(Map.of(
                 "description", "first description",
                 "amount", 10,
                 "subject", Map.of("id", "user-1", "type", "USER"))));
-        String second = FundsRequestHashSupport.sha256Json(FundsRequestHashSupport.stableHashMap(Map.of(
+        String second = FundsStableHashSupport.sha256Json(FundsStableHashSupport.stableHashMap(Map.of(
                 "subject", Map.of("type", "USER", "id", "user-1"),
                 "amount", 10,
                 "description", "second description")));

@@ -9,7 +9,7 @@ import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
-import com.capte.funds.transaction.support.FundsRequestHashSupport;
+import com.capte.funds.transaction.support.FundsStableHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.route.ref.SubjectRef;
@@ -336,7 +336,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         values.put("subjectType", subjectType(instruction, routeSnapshot));
         values.put("freezeType", resolveFreezeType(instruction));
         values.put("route", routeHashSummary(routeSnapshot));
-        return FundsRequestHashSupport.sha256Json(values);
+        return FundsStableHashSupport.sha256Json(values);
     }
 
     private Map<String, Object> routeHashSummary(@Nullable RouteSnapshotSpec routeSnapshot) {
@@ -347,7 +347,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         values.remove("snapshotId");
         values.remove("resolvedAt");
         values.remove("expiresAt");
-        return FundsRequestHashSupport.stableHashMap(values);
+        return FundsStableHashSupport.stableHashMap(values);
     }
 
 }

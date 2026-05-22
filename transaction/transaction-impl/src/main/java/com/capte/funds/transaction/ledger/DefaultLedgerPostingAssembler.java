@@ -3,6 +3,7 @@ package com.capte.funds.transaction.ledger;
 import com.capte.funds.ledger.dto.LedgerDTO;
 import com.capte.funds.ledger.query.LedgerQuery;
 import com.capte.funds.ledger.service.LedgerService;
+import com.capte.funds.transaction.support.FundsStableHashSupport;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.integration.funds.ledger.LedgerPostingAssembler;
@@ -37,12 +38,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,8 +72,6 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
     private static final int POSTING_PLAN_ID_MAX_LENGTH = 64;
 
     private static final int POSTING_PLAN_ID_DIGEST_LENGTH = 16;
-
-    private static final String SHA_256_ALGORITHM = "SHA-256";
 
     private final LedgerService ledgerService;
 
@@ -333,22 +328,13 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         if (rawPlanId.length() <= POSTING_PLAN_ID_MAX_LENGTH) {
             return rawPlanId;
         }
-        String digest = sha256(rawPlanId).substring(0, POSTING_PLAN_ID_DIGEST_LENGTH);
+        String digest = FundsStableHashSupport.sha256(rawPlanId).substring(0, POSTING_PLAN_ID_DIGEST_LENGTH);
         String prefix = intent.name() + PLAN_ID_SEPARATOR + ledgerTransactionSn;
         int maxPrefixLength = POSTING_PLAN_ID_MAX_LENGTH - PLAN_ID_SEPARATOR.length() - digest.length();
         if (prefix.length() > maxPrefixLength) {
             prefix = prefix.substring(0, maxPrefixLength);
         }
         return prefix + PLAN_ID_SEPARATOR + digest;
-    }
-
-    private String sha256(String value) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance(SHA_256_ALGORITHM);
-            return HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException ex) {
-            throw new IllegalStateException("SHA-256 algorithm is unavailable", ex);
-        }
     }
 
     private Map<String, Object> mergedContext(ResolvedRouteSpec resolvedRoute, RouteLegSpec leg) {
