@@ -2,6 +2,7 @@ package com.capte.funds.support;
 
 import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.integration.funds.ledger.LedgerBalanceBucket;
+import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
@@ -72,7 +73,11 @@ public final class FundsBalanceAssertionSupport {
                 CurrencyIsoCode currency = balance.getCurrency() == null
                         ? bucketBalance.getCurrency()
                         : balance.getCurrency();
-                BalanceKey key = BalanceKey.of(subjectRef, entry.getKey(), currency);
+                AccountBalancePeriodType periodType = bucket.periodType();
+                String periodId = bucket.periodId();
+                assertThat(periodType).as("bucket %s period type", entry.getKey()).isNotNull();
+                assertThat(periodId).as("bucket %s period id", entry.getKey()).isNotBlank();
+                BalanceKey key = BalanceKey.of(subjectRef, entry.getKey(), currency, periodType, periodId);
                 assertThat(values.put(key, bucketBalance)).as("duplicate balance key %s", key).isNull();
             }
         }
@@ -102,7 +107,7 @@ public final class FundsBalanceAssertionSupport {
         Map<BalanceKey, Long> expectedDeltaMap = new LinkedHashMap<>();
         for (ExpectedBalanceDelta expectedDelta : expectedDeltas) {
             BalanceKey key = BalanceKey.of(expectedDelta.subjectRef(), expectedDelta.ledgerSubjectCode(),
-                    expectedDelta.currency());
+                    expectedDelta.currency(), expectedDelta.periodType(), expectedDelta.periodId());
             assertThat(expectedDeltaMap.put(key, expectedDelta.amountDelta()))
                     .as("duplicate expected balance delta %s", key)
                     .isNull();
@@ -123,7 +128,17 @@ public final class FundsBalanceAssertionSupport {
                                              LedgerSubjectCode ledgerSubjectCode,
                                              long amountDelta,
                                              CurrencyIsoCode currency) {
-        return new ExpectedBalanceDelta(subjectRef, ledgerSubjectCode, amountDelta, currency);
+        return delta(subjectRef, ledgerSubjectCode, amountDelta, currency,
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name());
+    }
+
+    public static ExpectedBalanceDelta delta(FundsAccountId subjectRef,
+                                             LedgerSubjectCode ledgerSubjectCode,
+                                             long amountDelta,
+                                             CurrencyIsoCode currency,
+                                             AccountBalancePeriodType periodType,
+                                             String periodId) {
+        return new ExpectedBalanceDelta(subjectRef, ledgerSubjectCode, amountDelta, currency, periodType, periodId);
     }
 
     public static void assertPostingBalanced(LedgerTransactionSpec transaction) {
@@ -160,21 +175,29 @@ public final class FundsBalanceAssertionSupport {
     public record BalanceKey(String subjectId,
                              String subjectType,
                              LedgerSubjectCode ledgerSubjectCode,
-                             CurrencyIsoCode currency) {
+                             CurrencyIsoCode currency,
+                             AccountBalancePeriodType periodType,
+                             String periodId) {
 
         public static BalanceKey of(FundsAccountId subjectRef,
                                     LedgerSubjectCode ledgerSubjectCode,
-                                    CurrencyIsoCode currency) {
+                                    CurrencyIsoCode currency,
+                                    AccountBalancePeriodType periodType,
+                                    String periodId) {
             assertThat(subjectRef).as("subject ref").isNotNull();
             assertThat(currency).as("currency").isNotNull();
-            return new BalanceKey(subjectRef.id(), subjectRef.type(), ledgerSubjectCode, currency);
+            assertThat(periodType).as("period type").isNotNull();
+            assertThat(periodId).as("period id").isNotBlank();
+            return new BalanceKey(subjectRef.id(), subjectRef.type(), ledgerSubjectCode, currency, periodType, periodId);
         }
     }
 
     public record ExpectedBalanceDelta(FundsAccountId subjectRef,
                                        LedgerSubjectCode ledgerSubjectCode,
                                        long amountDelta,
-                                       CurrencyIsoCode currency) {
+                                       CurrencyIsoCode currency,
+                                       AccountBalancePeriodType periodType,
+                                       String periodId) {
     }
 
     public record LedgerFactSnapshot(long ledgers, long transactions, long postingPlans, long entries) {
