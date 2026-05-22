@@ -78,6 +78,7 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 .and(ref.defaultRelation.eq(query.getDefaultRelation()))
                 .and(ref.status.eq(query.getStatus()));
         applyCurrentEffectiveWindow(wrapper, ref, query.getStatus());
+        applyActiveFundingAccountStatus(wrapper, query);
         wrapper.orderBy(ref.priority.asc(), ref.id.asc());
         return MybatisQueryHelper.<SpendSubjectFundingRel, SpendSubjectFundingRelationDTO>query(wrapper)
                 .counter(spendSubjectFundingRelMapper::selectCountByQuery)
@@ -174,6 +175,20 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
         LocalDateTime now = LocalDateTime.now();
         wrapper.and(ref.validFrom.isNull().or(ref.validFrom.le(now)))
                 .and(ref.validTo.isNull().or(ref.validTo.gt(now)));
+    }
+
+    private void applyActiveFundingAccountStatus(QueryWrapper wrapper, SpendSubjectFundingRelationQuery query) {
+        if (query.getStatus() != FundsAccountStatus.ACTIVE) {
+            return;
+        }
+        FundingAccountNameRefs accountRef = FundingAccountNameRefs.fundingAccount;
+        QueryWrapper activeFundingAccount = QueryWrapper.create()
+                .select(accountRef.sn)
+                .from(accountRef)
+                .where(accountRef.tenantId.eq(query.getTenantId()))
+                .and(accountRef.status.eq(FundsAccountStatus.ACTIVE));
+        SpendSubjectFundingRelNameRefs relationRef = SpendSubjectFundingRelNameRefs.spendSubjectFundingRel;
+        wrapper.in(relationRef.fundingAccountId.getName(), activeFundingAccount);
     }
 
     private boolean validityWindowsOverlap(LocalDateTime leftFrom,

@@ -337,6 +337,38 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：资金来源关系仍为 ACTIVE，但目标资金账户已被风控暂停。
+     * 输入：先创建可用资金账户和 ACTIVE 关系，再将资金账户状态改为 SUSPENDED。
+     * 输出：查询当前 ACTIVE 资金来源候选时不返回该关系。
+     * 红线：资金账户不可借记时不得进入 route 候选，也不得因为候选过滤写账或覆盖关系证据。
+     */
+    @Test
+    void testQuerySpendSubjectFundingRelationsShouldExcludeUnavailableFundingAccountCandidates() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setDefaultRelation(Boolean.FALSE));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        jdbcTemplate.update("UPDATE t_funding_account SET status = ? WHERE sn = ?",
+                FundsAccountStatus.SUSPENDED.name(),
+                FUNDING_ACCOUNT_SN);
+
+        List<SpendSubjectFundingRelationDTO> records = fundingRelationService.querySpendSubjectFundingRelations(
+                new SpendSubjectFundingRelationQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSpendSubjectId(SPEND_SUBJECT_ID)
+                        .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+
+        assertThat(records).isEmpty();
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpSpendSubjectFundingRelationTestData() {
         cleanupSpendSubjectFundingRelationTestData();
