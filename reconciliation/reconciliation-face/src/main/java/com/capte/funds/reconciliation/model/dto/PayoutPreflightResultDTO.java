@@ -2,6 +2,9 @@ package com.capte.funds.reconciliation.model.dto;
 
 import com.capte.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.capte.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
+import com.capte.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
+import com.capte.funds.reconciliation.enums.PayoutPreflightFactStatus;
+import com.capte.funds.reconciliation.enums.PayoutPreflightOperationStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -42,6 +45,15 @@ public class PayoutPreflightResultDTO implements Serializable {
 
     @Schema(description = "是否需要人工复核")
     private boolean manualReviewRequired;
+
+    @Schema(description = "事实状态")
+    private PayoutPreflightFactStatus factStatus;
+
+    @Schema(description = "展示状态")
+    private PayoutPreflightDisplayStatus displayStatus;
+
+    @Schema(description = "操作状态")
+    private PayoutPreflightOperationStatus operationStatus;
 
     @Schema(description = "外部规则核验状态")
     private ExternalRuleVerificationStatus externalRuleVerificationStatus;

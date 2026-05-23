@@ -4,6 +4,10 @@ import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.capte.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.capte.funds.reconciliation.enums.PayoutPreflightBlockingReasonCode;
+import com.capte.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
+import com.capte.funds.reconciliation.enums.PayoutPreflightFactStatus;
+import com.capte.funds.reconciliation.enums.PayoutPreflightOperationStatus;
+import com.capte.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
 import com.capte.funds.reconciliation.model.dto.PayoutPreflightBlockingReasonDTO;
 import com.capte.funds.reconciliation.model.dto.PayoutPreflightResultDTO;
 import com.capte.funds.reconciliation.model.request.CheckPayoutPreflightRequest;
@@ -50,9 +54,7 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
         addBlockingReasonIfMissing(blockingReasons, request.getChannelRef(),
                 PayoutPreflightBlockingReasonCode.CHANNEL_UNAVAILABLE,
                 "channelRef", "出款通道缺失或不可用", SYSTEM_CONFIRMATION_OWNER);
-        addBlockingReasonIfMissing(blockingReasons, request.getRuleEvidenceRef(),
-                PayoutPreflightBlockingReasonCode.EXTERNAL_RULE_UNVERIFIED,
-                "ruleEvidenceRef", "外部规则核验证据缺失", OPERATIONS_CONFIRMATION_OWNER);
+        addExternalRuleBlockingReasonIfUnverified(blockingReasons, request.getExternalRuleVerificationEvidence());
         addBlockingReasonIfMissing(blockingReasons, request.getApprovalRef(),
                 PayoutPreflightBlockingReasonCode.APPROVAL_REQUIRED,
                 "approvalRef", "审批证据缺失", OPERATIONS_CONFIRMATION_OWNER);
@@ -64,6 +66,9 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
                 .setBlockingLevel(passed ? PayoutPreflightBlockingLevel.PASSED : PayoutPreflightBlockingLevel.BLOCKED)
                 .setBlockingReasons(List.copyOf(blockingReasons))
                 .setManualReviewRequired(!passed)
+                .setFactStatus(resolveFactStatus(passed))
+                .setDisplayStatus(resolveDisplayStatus(passed))
+                .setOperationStatus(resolveOperationStatus(passed))
                 .setExternalRuleVerificationStatus(resolveExternalRuleVerificationStatus(request))
                 .setCheckedAt(checkedAt)
                 .setCheckedBy(String.valueOf(operator.getOperatorId()))
@@ -74,7 +79,6 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
     private void validateRequest(CheckPayoutPreflightRequest request) {
         AssertUtils.notNull(request.getTenantId(), "出款前准入检查租户 ID 不能为空");
         AssertUtils.hasText(request.getSettlementSn(), "出款前准入检查结算单号不能为空");
-        AssertUtils.hasText(request.getPayoutSn(), "出款前准入检查出款单号不能为空");
         AssertUtils.notNull(request.getCurrency(), "出款前准入检查币种不能为空");
         AssertUtils.notNull(request.getAmount(), "出款前准入检查金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0, "出款前准入检查金额必须大于 0");
@@ -99,8 +103,24 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
                 .setConfirmationOwner(confirmationOwner));
     }
 
+    private void addExternalRuleBlockingReasonIfUnverified(
+            List<PayoutPreflightBlockingReasonDTO> blockingReasons,
+            @Nullable ExternalRuleVerificationEvidenceDTO evidence) {
+        if (isExternalRuleVerified(evidence)) {
+            return;
+        }
+        blockingReasons.add(new PayoutPreflightBlockingReasonDTO()
+                .setCode(PayoutPreflightBlockingReasonCode.EXTERNAL_RULE_UNVERIFIED)
+                .setMessage("外部规则核验证据缺失或不完整")
+                .setGuardName("externalRuleVerificationEvidence")
+                .setSeverity(PayoutPreflightBlockingLevel.BLOCKED)
+                .setRecoverable(true)
+                .setEvidenceRef(evidence == null ? null : evidence.getEvidenceRef())
+                .setConfirmationOwner(OPERATIONS_CONFIRMATION_OWNER));
+    }
+
     private ExternalRuleVerificationStatus resolveExternalRuleVerificationStatus(CheckPayoutPreflightRequest request) {
-        if (StringUtils.hasText(request.getRuleEvidenceRef())) {
+        if (isExternalRuleVerified(request.getExternalRuleVerificationEvidence())) {
             return ExternalRuleVerificationStatus.VERIFIED;
         }
         return ExternalRuleVerificationStatus.UNVERIFIED;
@@ -108,12 +128,42 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
 
     private List<String> evidenceRefs(CheckPayoutPreflightRequest request) {
         List<String> result = new ArrayList<>();
-        if (StringUtils.hasText(request.getRuleEvidenceRef())) {
-            result.add(request.getRuleEvidenceRef());
+        ExternalRuleVerificationEvidenceDTO externalRuleEvidence = request.getExternalRuleVerificationEvidence();
+        if (externalRuleEvidence != null && StringUtils.hasText(externalRuleEvidence.getEvidenceRef())) {
+            result.add(externalRuleEvidence.getEvidenceRef());
         }
         if (StringUtils.hasText(request.getApprovalRef())) {
             result.add(request.getApprovalRef());
         }
         return List.copyOf(result);
+    }
+
+    private PayoutPreflightFactStatus resolveFactStatus(boolean passed) {
+        return passed ? PayoutPreflightFactStatus.PREFLIGHT_PASSED
+                : PayoutPreflightFactStatus.PREFLIGHT_BLOCKED;
+    }
+
+    private PayoutPreflightDisplayStatus resolveDisplayStatus(boolean passed) {
+        return passed ? PayoutPreflightDisplayStatus.READY_TO_SUBMIT
+                : PayoutPreflightDisplayStatus.WAITING_EVIDENCE;
+    }
+
+    private PayoutPreflightOperationStatus resolveOperationStatus(boolean passed) {
+        return passed ? PayoutPreflightOperationStatus.SUBMITTABLE
+                : PayoutPreflightOperationStatus.BLOCKED;
+    }
+
+    private boolean isExternalRuleVerified(@Nullable ExternalRuleVerificationEvidenceDTO evidence) {
+        if (evidence == null || evidence.getStatus() != ExternalRuleVerificationStatus.VERIFIED) {
+            return false;
+        }
+        return StringUtils.hasText(evidence.getEvidenceRef())
+                && StringUtils.hasText(evidence.getRuleSource())
+                && StringUtils.hasText(evidence.getVersionOrPublishedAt())
+                && evidence.getEffectiveDate() != null
+                && StringUtils.hasText(evidence.getApplicableScope())
+                && StringUtils.hasText(evidence.getJurisdiction())
+                && evidence.getVerifiedAt() != null
+                && StringUtils.hasText(evidence.getConfirmedBy());
     }
 }

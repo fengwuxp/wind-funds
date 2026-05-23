@@ -5,6 +5,10 @@ import com.capte.funds.AbstractFundsServiceTest;
 import com.capte.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.capte.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.capte.funds.reconciliation.enums.PayoutPreflightBlockingReasonCode;
+import com.capte.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
+import com.capte.funds.reconciliation.enums.PayoutPreflightFactStatus;
+import com.capte.funds.reconciliation.enums.PayoutPreflightOperationStatus;
+import com.capte.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
 import com.capte.funds.reconciliation.model.dto.PayoutPreflightBlockingReasonDTO;
 import com.capte.funds.reconciliation.model.dto.PayoutPreflightResultDTO;
 import com.capte.funds.reconciliation.model.request.CheckPayoutPreflightRequest;
@@ -19,6 +23,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -61,6 +67,9 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.BLOCKED);
+        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_BLOCKED);
+        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.WAITING_EVIDENCE);
+        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.BLOCKED);
         assertThat(result.getExternalRuleVerificationStatus())
                 .isEqualTo(ExternalRuleVerificationStatus.UNVERIFIED);
         assertThat(result.getBlockingReasons())
@@ -93,11 +102,60 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.PASSED);
         assertThat(result.getBlockingReasons()).isEmpty();
+        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
+        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.READY_TO_SUBMIT);
+        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.SUBMITTABLE);
         assertThat(result.getExternalRuleVerificationStatus()).isEqualTo(ExternalRuleVerificationStatus.VERIFIED);
         assertThat(result.getEvidenceRefs())
                 .containsExactly("rule-evidence-001", "approval-001");
         assertThat(result.getCheckedAt()).isNotNull();
         assertThat(result.getExpiresAt()).isAfter(result.getCheckedAt());
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：创建出款单前先按结算单做准入检查，尚未生成 payoutSn。
+     * 输入：结算单、金额、幂等键和全部准入证据齐备，出款单号为空。
+     * 输出：准入结果通过，并返回服务端解释状态。
+     * 红线：创建前检查不得强制要求已有出款单，也不得写入账务事实。
+     */
+    @Test
+    void testCheckPayoutPreflightShouldAllowPreCreateCheckWithoutPayoutSn() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+                readyPayoutPreflightRequest().setPayoutSn(null), WindOperator.system());
+
+        assertThat(result.isPassed()).isTrue();
+        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
+        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.READY_TO_SUBMIT);
+        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.SUBMITTABLE);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：外部规则只有证据号或缺少规则来源、版本、生效日、适用范围、法域、核验日、确认方、状态。
+     * 输入：其他出款准入证据齐备，但外部规则核验证据缺少完整核验口径。
+     * 输出：准入结果阻断，不能把单个 evidenceRef 当作已核验。
+     * 红线：规则未核验或字段不完整时，不生成出款、route、posting 或 entry。
+     */
+    @Test
+    void testCheckPayoutPreflightShouldBlockWhenExternalRuleEvidenceIncompleteWithoutLedgerFactsMutation() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+                readyPayoutPreflightRequest()
+                        .setExternalRuleVerificationEvidence(new ExternalRuleVerificationEvidenceDTO()
+                                .setEvidenceRef("rule-evidence-incomplete")
+                                .setStatus(ExternalRuleVerificationStatus.VERIFIED)),
+                WindOperator.system());
+
+        assertThat(result.isPassed()).isFalse();
+        assertThat(result.getExternalRuleVerificationStatus())
+                .isEqualTo(ExternalRuleVerificationStatus.UNVERIFIED);
+        assertThat(result.getBlockingReasons())
+                .extracting(PayoutPreflightBlockingReasonDTO::getCode)
+                .containsExactly(PayoutPreflightBlockingReasonCode.EXTERNAL_RULE_UNVERIFIED);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -116,8 +174,21 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 .setPayoutAccountRef("funding-account-001")
                 .setPayeeEndpointRef("bank-account-001")
                 .setChannelRef("ach-standard")
-                .setRuleEvidenceRef("rule-evidence-001")
+                .setExternalRuleVerificationEvidence(completeExternalRuleVerificationEvidence())
                 .setApprovalRef("approval-001");
+    }
+
+    private ExternalRuleVerificationEvidenceDTO completeExternalRuleVerificationEvidence() {
+        return new ExternalRuleVerificationEvidenceDTO()
+                .setEvidenceRef("rule-evidence-001")
+                .setRuleSource("ACH payout operating rule")
+                .setVersionOrPublishedAt("2026-05")
+                .setEffectiveDate(LocalDate.of(2026, 5, 1))
+                .setApplicableScope("US merchant USD payout")
+                .setJurisdiction("US")
+                .setVerifiedAt(LocalDate.of(2026, 5, 23))
+                .setConfirmedBy("compliance-ops")
+                .setStatus(ExternalRuleVerificationStatus.VERIFIED);
     }
 
     @Configuration
