@@ -9,6 +9,7 @@ import com.capte.funds.wallet.dal.entities.FundingAccount;
 import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.capte.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.common.spring.SpringEventPublishUtils;
+import com.wind.integration.funds.ledger.LedgerBalanceChangedEvent;
 import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
@@ -42,6 +43,7 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -103,6 +105,39 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getDebitAmount()).isEqualTo(125L);
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isEqualTo(125L);
+    }
+
+    /**
+     * 场景：余额投影成功后发布余额变更观察事件。
+     * 输入：期初 AVAILABLE 正常余额 100，一笔借方入账 25。
+     * 输出：事件包含主体、账本、账目、币种、余额前后值、变更额、账本交易、账本分录和业务引用。
+     * 预期：余额日志从 ledger entry 和 balance projection 派生，可观察、可追溯。
+     * 红线：余额变更观察事件不得丢失来源分录，也不得成为新的余额事实源。
+     */
+    @Test
+    void testProjectShouldPublishBalanceChangedEventWithSourceEvidence() {
+        List<LedgerBalanceChangedEvent> publishedEvents = new ArrayList<>();
+        setApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
+
+        projectionService.project(List.of(ledgerEntry(25L)));
+
+        assertThat(publishedEvents).singleElement().satisfies(event -> {
+            assertThat(event.getSubjectId()).isEqualTo(ACCOUNT_ID);
+            assertThat(event.getSubjectType()).isEqualTo(ACCOUNT_TYPE);
+            assertThat(event.getLedgerId()).isEqualTo(availableLedgerId);
+            assertThat(event.getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AVAILABLE);
+            assertThat(event.getCurrency()).isEqualTo(CURRENCY);
+            assertThat(event.getBeforeBalance()).isEqualTo(100L);
+            assertThat(event.getBalance()).isEqualTo(125L);
+            assertThat(event.getBalanceDelta()).isEqualTo(25L);
+            assertThat(event.getLedgerTransactionSn()).isEqualTo("LT-BALANCE-LOG-001");
+            assertThat(event.getLedgerEntrySn()).isEqualTo("LE-BALANCE-LOG-001");
+            assertThat(event.getLedgerEntryDigest()).isEqualTo("sha256-balance-log-001");
+            assertThat(event.getBusinessScene()).isEqualTo("BALANCE_LOG_BOUNDARY");
+            assertThat(event.getBusinessSn()).isEqualTo("BALANCE_LOG_BOUNDARY_001");
+            assertThat(event.getTransactionTime()).isEqualTo(LocalDateTime.of(2026, 5, 19, 12, 0));
+            assertThat(event.getContextVariables()).containsEntry("ledgerEntrySn", "LE-BALANCE-LOG-001");
+        });
     }
 
     /**
