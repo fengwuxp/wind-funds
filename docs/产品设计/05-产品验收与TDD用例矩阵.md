@@ -86,8 +86,8 @@ flowchart TD
 | 钱包账户和支付工具 | 资金账户、信用账户、预算组、平台账户角色、支付工具状态、绑定和资金来源。 | `SubjectRef`、`PaymentInstrumentRef`、`FundingAllocationDecision`。 | 02 分册钱包账户、支付工具、资金来源关系和 route 准入。 | `TDD-WALLET-*`、`TDD-ROUTE-006`、`TDD-ROUTE-011` 至 `TDD-ROUTE-013`。 | 支付工具、外部账户、卡或 VA 被设计成 ledger subject，或工具换绑导致历史回放漂移。 |
 | 资金路由和回放 | route snapshot、原路径退款、撤销、退费、拒付和解冻。 | `ResolvedRoute`、`RouteSnapshot`、`RoutingDecision`、`Reference`。 | 02 分册 RouteResolver、RouteSnapshot 和 RouteReplay。 | `TDD-ROUTE-*`、`TDD-RED-003`、`TDD-RED-036`。 | 缺原快照重新选路，或 route 层直接写账、改状态。 |
 | 账本账目和投影 | posting plan 平衡、ledger entry、账本周期、余额投影、交易投影。 | `PostingPlan`、`LedgerEntry`、`periodType`、`BalanceProjection`、`TransactionView`。 | 02 分册账务计划、账本写入、余额投影、交易投影。 | `TDD-LEDGER-*`、`TDD-VIEW-*`、`TDD-RACE-*`。 | 余额从投影或日志修复，周期语义混用，posting 不平衡仍写账。 |
-| 清结算与对账 | 清分、清算、结算、出款、对账差错、调账核销和追偿闭环。 | `SettlementPolicySpec`、`DSL-SETTLEMENT-*`、差错和调账引用。 | 03 分册可清分明细、批次、候选、结算单、出款单、对账批次、差错单。 | `TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-OPS-*`。 | 清分候选直接入账、缺前置对账仍清算、差错直接改历史分录。 |
-| 归档重放与指标治理 | Manifest、checkpoint、watermark、余额快照、投影重放、指标项承接和只读边界。 | `archiveManifest`、`projectionReplayTask`、`BalanceSnapshotVerifyRef`、指标项输入引用。 | 04 分册归档重放、余额快照、指标项边界。 | `TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`。 | 无范围重放、先推水位后计算、普通指标快照替代账本余额快照或指标实现进入资金主链路。 |
+| 清结算与对账 | 清分、清算、结算、出款前准入、外部非终态、出款解释状态、对账差错、调账核销和追偿闭环。 | `SettlementPolicySpec`、`DSL-SETTLEMENT-*`、出款准入、出款结果、差错和调账引用。 | 03 分册可清分明细、批次、候选、结算单、出款单、对账批次、差错单和出款处理台。 | `TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-SETTLE-004`、`TDD-SETTLE-005`、`TDD-RECON-*`、`TDD-OPS-*`。 | 清分候选直接入账、缺前置对账仍清算、出款准入未知仍放行、外部受理展示为成功、差错直接改历史分录。 |
+| 归档重放与指标治理 | Manifest、checkpoint、watermark、余额快照、投影重放、指标项承接、主流程、异常流程、人工处理和只读边界。 | `archiveManifest`、`projectionReplayTask`、`BalanceSnapshotVerifyRef`、指标项输入引用。 | 04 分册归档重放、余额快照、指标项边界、差异报告和人工处理入口。 | `TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`。 | 无范围重放、先推水位后计算、缺差异报告或人工处理闭环、普通指标快照替代账本余额快照或指标实现进入资金主链路。 |
 | 运营审计、权限和外部规则 | 高危操作、敏感查询、导出、外部规则确认、合规待确认项。 | `operatorRef`、`auditRef`、`validation.mustFail`、外部规则核验字段。 | 05 分册测试观测安全与金融红线；03/04 分册运营对象。 | `TDD-OPS-*`、`TDD-RAIL-*`、`TDD-FX-*`、`TDD-RED-*`。 | 后台直接改账、敏感原文进入日志/导出、公开资料被当成正式规则。 |
 
 ## 5. 产品验收用例矩阵
@@ -223,6 +223,8 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | AC-SET-008 | 出款金额不一致 | 外部回单金额、币种、手续费或到账主体与出款单不一致。 | 生成出款差错或挂账，保持待处理。 | 不按普通失败重复回退，不展示成功，差额有责任方和处理路径。 |
 | AC-SET-009 | 出款解释状态防误导 | 出款处于门禁待补、外部受理、处理中、在途、金额不一致、规则待确认或待人工处理。 | 商户账单、出款处理台和审计导出同时展示事实状态、展示状态和操作状态。 | 任一状态缺失时不得作为商户账单、运营台、审计导出或自动放行依据；非终态不得展示为到账成功、可出款完成或可自动放行。 |
 
+AC-SET-006 至 AC-SET-009 是目标态产品验收口径。已有或后续出现的 B7-00 出款前准入候选实现只能作为编码输入和差距复核起点；在未补齐出款单生命周期、回单处理、金额不一致、数据库级服务闭环和目标测试资产前，不得声明清结算、对账或出款生命周期生产 Done。
+
 ### 5.6 对账、差错与核销
 
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
@@ -261,6 +263,7 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | AC-ARCH-005C | 混合余额快照 | 目标边界横跨热区和冷区。 | 余额快照可校验通过或输出阻断差异。 | 冷区按 Manifest 校验，热区按游标校验，合并摘要一致后才可推进余额水位。 |
 | AC-ARCH-006 | 交易归档后的重放边界 | 资金交易或交易明细已进入冷区。 | 输出允许重放起点、终点和事实源位置。 | 冷区不可读或 Manifest 不一致时，不得正式覆盖热区起点之前的交易投影。 |
 | AC-ARCH-007 | 账务归档后的余额边界 | 账目交易或账目明细已进入冷区。 | 历史余额仍可重建，当前余额不受影响。 | 冷区账目明细可按水位、游标和 Manifest 读取；未被检查点覆盖的账目明细不得归档。 |
+| AC-ARCH-008 | 归档重放异常人工处理 | 缺范围、缺 Manifest、冷热摘要不一致、检查点不连续、重放差异、权限不足或外部规则待确认。 | 输出差异报告、阻断原因、影响范围、责任归属、人工处理入口和可重跑条件。 | 人工处理只能审批、补证据、调整范围、重跑或关闭差异，不得直接修改交易、账目、余额或投影事实。 |
 | AC-REPLAY-001 | 单笔交易投影重放 | 指定单笔来源对象。 | 重建账单或时间线。 | 不重新入账，不修改分录。 |
 | AC-REPLAY-002 | 有界批量重放 | 指定租户、视图域、时间窗口或主体范围。 | 重放任务和差异报告。 | 无范围全量在线重放必须失败。 |
 | AC-REPLAY-003 | 归档后跨冷热重放 | 历史交易、交易明细或账目引用跨热区和冷区。 | 重放任务可读取冷热事实并生成投影或差异报告。 | 重放范围不早于允许重放起点，冷区摘要一致，不用汇总金额补造交易明细。 |
@@ -428,9 +431,9 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | AC-AUTH-*、AC-RAIL-001、AC-RAIL-002 | AUTHORIZATION_TRANSACTION、DSL-AUTH-LIFECYCLE-001、DSL-AUTH-FORCE-CAPTURE-001、DSL-AUTH-REFUND-001 | TDD-AUTH-*、TDD-AUTH-FLOW-*、TDD-AUTH-ERR-*、TDD-AUTH-EXT-*、TDD-ROUTE-005、TDD-ROUTE-009、TDD-RACE-001 至 TDD-RACE-003、TDD-RAIL-001、TDD-RAIL-002、TDD-RED-003、TDD-RED-005、TDD-RED-008、TDD-RED-016、TDD-RED-017、TDD-RED-033、TDD-RED-036 | 授权批准、拒绝、撤销、过期、普通完成、强制完成、完成后退款、无授权退款、拒付原因承接、原路径回放和 VCC 授权归一边界一致；完整支付轨道仍按 AC-RAIL-* 专项确认。 |
 | AC-CTRL-*、RED-013 | BALANCE_CONTROL、DSL-BALANCE-CONTROL-FREEZE-001、DSL-BALANCE-CONTROL-ADJUST-001、DSL-BALANCE-CONTROL-LIMIT-BUDGET-001、DSL-DIRECT-OVERDRAFT-001、账本周期 DSL、SubjectRef / RouteNode 主体解析 | TDD-CTRL-*、TDD-CTRL-FLOW-*、TDD-CTRL-ERR-*、TDD-LEDGER-008 至 TDD-LEDGER-011、TDD-WALLET-001 至 TDD-WALLET-004、TDD-ROUTE-004、TDD-RACE-004、TDD-RED-006、TDD-RED-011、TDD-RED-012、TDD-RED-015、TDD-RED-033 | 冻结、解冻、资金账户余额调整、信用账户额度调整、预算组额度调整和受控负余额不混用；AC-CTRL-009 至 AC-CTRL-011 必须证明账本周期隔离和继承；AC-CTRL-012 必须证明用户、商户、卡、VA、银行账户、支付工具和业务单据不能直接作为可记账主体；冻结单状态不得表达消费、扣划或付款完成；LIMIT 只能由调额触碰；余额控制不承接跨主体价值转移。 |
 | AC-ADJ-001、RED-010 | BALANCE_CONTROL / BALANCE_ADJUST、批次授权 DIRECT_TRANSACTION / ADJUSTMENT、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、差错调账账务规则 | TDD-RECON-001、TDD-RECON-002、TDD-CTRL-ERR-005、TDD-OPS-001 | 调账必须有差错或调整来源、审批、凭证、账本交易和重新对账依据；不得绕过差错闭环直接改余额，不得直接修改历史分录或投影。 |
-| AC-CLR-*、AC-SET-*、AC-SET-009、AC-REC-* | DSL-SETTLEMENT-RECONCILIATION-001、DSL-SETTLEMENT-CLEARING-CONFIRM-001、DSL-SETTLEMENT-LOCK-001、DSL-SETTLEMENT-PAYOUT-RESULT-001、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、DSL-SETTLEMENT-POLICY-001 | TDD-CLS-*、TDD-CLS-FLOW-*、TDD-SETTLE-*、TDD-SETTLE-005、TDD-RECON-*、TDD-RED-020 至 TDD-RED-025、TDD-RED-031 | 清分、清算、结算、出款和对账对象独立；出款解释状态不误导；清分前基础对账、清算前置对账、差错追加事实、账期临界、退款时序和重跑审计闭环可验证。 |
+| AC-CLR-*、AC-SET-*、AC-SET-006 至 AC-SET-009、AC-REC-* | DSL-SETTLEMENT-RECONCILIATION-001、DSL-SETTLEMENT-CLEARING-CONFIRM-001、DSL-SETTLEMENT-LOCK-001、DSL-SETTLEMENT-PAYOUT-RESULT-001、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、DSL-SETTLEMENT-POLICY-001 | TDD-CLS-*、TDD-CLS-FLOW-*、TDD-SETTLE-*、TDD-SETTLE-004、TDD-SETTLE-005、TDD-RECON-*、TDD-RED-020 至 TDD-RED-025、TDD-RED-031、TDD-OPS-* | 清分、清算、结算、出款和对账对象独立；出款前准入、外部非终态、金额不一致和出款解释状态不误导；清分前基础对账、清算前置对账、差错追加事实、账期临界、退款时序和重跑审计闭环可验证。 |
 | AC-VIEW-*、AC-BALLOG-* | Projection DSL、余额日志和交易投影只读边界 | TDD-LEDGER-*、TDD-VIEW-*、TDD-RED-010、TDD-RED-013、TDD-RED-014 | 余额投影、余额日志和交易投影都从事实派生；日志失败不回滚事实；投影和日志不得修复余额。 |
-| AC-ARCH-*、AC-REPLAY-* | Replay DSL 中的投影重放边界、归档 Manifest、Checkpoint、Watermark、DSL-GOVERNANCE-ARCHIVE-MANIFEST-001、DSL-GOVERNANCE-BALANCE-SNAPSHOT-001、DSL-GOVERNANCE-PROJECTION-REPLAY-001 | TDD-GOV-*、TDD-ARCH-*、TDD-REPLAY-*、TDD-METRIC-004、TDD-RACE-008、TDD-RACE-010、TDD-RED-018、TDD-RED-026 至 TDD-RED-028 | 归档只改变冷热位置；统一治理任务不替代资金归档 Manifest、余额水位或交易投影 checkpoint；余额快照按 HOT_ONLY、COLD_MANIFEST、MIXED 覆盖模式校验，只能从账本事实确认；余额重建只从检查点和增量分录出发；交易投影重放有范围、dry-run/apply 和差异报告。 |
+| AC-ARCH-*、AC-ARCH-008、AC-REPLAY-* | Replay DSL 中的投影重放边界、归档 Manifest、Checkpoint、Watermark、differenceReport、manualResolutionRef、DSL-GOVERNANCE-ARCHIVE-MANIFEST-001、DSL-GOVERNANCE-BALANCE-SNAPSHOT-001、DSL-GOVERNANCE-PROJECTION-REPLAY-001 | TDD-GOV-*、TDD-ARCH-*、TDD-ARCH-009、TDD-REPLAY-*、TDD-METRIC-004、TDD-RACE-008、TDD-RACE-010、TDD-RED-018、TDD-RED-026 至 TDD-RED-028 | 归档只改变冷热位置；统一治理任务不替代资金归档 Manifest、余额水位或交易投影 checkpoint；余额快照按 HOT_ONLY、COLD_MANIFEST、MIXED 覆盖模式校验，只能从账本事实确认；余额重建只从检查点和增量分录出发；交易投影重放有范围、dry-run/apply、异常流程、人工处理和差异报告。 |
 | AC-RPT-* | 指标项来源、口径版本、只读边界、DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001 | TDD-METRIC-*、TDD-RACE-010、TDD-RED-019 | 资金底座只列产品和业务关心的指标项；指标实现由报表指标模块承接，不反写资金事实；普通指标快照不能替代账本余额快照确认，指标水位不能参与余额水位推进、归档 Manifest 或交易投影重放 checkpoint。 |
 | AC-OPS-*、RED-010、RED-011、RED-028 | 审计上下文、差错单、调账事实、运营处理引用 | TDD-RECON-*、TDD-RED-*、系分安全与审计测试 | 后台只推进处理单、审批、凭证和审计，不直接修改历史分录、余额或投影。 |
 
@@ -447,6 +450,7 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | 审计断言 | 高危操作必须有原因、凭证、审批、操作者和时间。 |
 | 红线断言 | 本文第 6 节红线必须有失败测试或明确不适用原因。 |
 | 可解释性断言 | 用户、商户、运营、财务、合规和审计视图必须能说明金额来源、状态含义、失败原因、处理入口和不可操作原因。 |
+| 生产 Done 断言 | 设计覆盖、候选实现或局部基线不得自动提升为生产 Done；必须同时具备代码、DDL/H2、服务级测试、验证命令、审计证据和外部规则核验结论。 |
 
 ## 10. 产品完整性验收入口
 
@@ -460,9 +464,9 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | 支付工具 | AC-PI-*、RED-001、RED-046、RED-047、RED-048、RED-049 | 支付工具、外部账户和通道 token 只做引用和快照；绑定关系、方向、状态、资金来源决策、账户能力和绑定历史审计可验收；敏感信息不进入普通快照、日志、导出或报表。 |
 | 路由契约 | AC-ROUTE-*、AC-PI-*、RED-003、RED-043 至 RED-049 | route snapshot、平台角色、支付工具引用、外部账户引用、资金来源决策、绑定历史审计、原路径回放、路由失败不写账和普通支付不误入商户清算可验收。 |
 | 运营后台 | AC-OPS-*、RED-010、RED-011、RED-028 | 后台只推进处理单和审批，不直接修改历史分录、余额或投影。 |
-| 清结算对象 | AC-CLR-*、AC-SET-*、AC-REC-*、RED-020、RED-030、RED-031、RED-032、RED-033 | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单对象关系清楚。 |
+| 清结算对象 | AC-CLR-*、AC-SET-*、AC-REC-*、RED-020、RED-030、RED-031、RED-032、RED-033、RED-037 | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单对象关系清楚；出款前准入、外部非终态、金额不一致和解释状态都有验收入口。 |
 | 外部规则核验 | AC-RAIL-*、AC-FX-*、RED-021、RED-066 | 涉及卡组织、ACH、银行、PSP、跨境、外汇和持牌能力时，保留规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方和确认状态；缺失时不得作为自动资金处理或生产放行依据。 |
-| 归档重放门禁 | AC-ARCH-*、AC-REPLAY-*、RED-016、RED-017、RED-018、RED-019、RED-034、RED-040、RED-041、RED-042 | 归档、余额重建、交易投影重放都有范围、检查点、Manifest、水位、冷热事实源边界和差异报告。 |
+| 归档重放门禁 | AC-ARCH-*、AC-ARCH-008、AC-REPLAY-*、RED-016、RED-017、RED-018、RED-019、RED-034、RED-040、RED-041、RED-042 | 归档、余额重建、交易投影重放都有范围、检查点、Manifest、水位、冷热事实源边界、差异报告、异常流程和人工处理入口。 |
 | 报表指标模块 | AC-RPT-*、RED-029 | 指标只读、来源可解释、异常不反写资金事实；资金底座不承接指标计算、报表看板、导出订阅和指标任务水位。 |
 | 余额变更观察 | AC-BALLOG-*、RED-036 | 余额日志只从分录和余额投影派生，可观察、可补偿、可审计，但不得反写事实层。 |
 | 发卡授权控制扩展 | AC-AUTH-008、AC-AUTH-009、AC-AUTH-010、RED-025、RED-026、RED-027、RED-035 | ISSUING_SPEND_CONTROLS 只在发卡产品启用后纳入验收，不作为资金底座默认核心能力。 |
