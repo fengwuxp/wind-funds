@@ -35,6 +35,43 @@ class FundsProjectionReplayServiceTests {
     }
 
     /**
+     * 场景：运营人员发起主体维度交易投影重放，但只填写 ownerType，缺少 ownerId。
+     * 输入：`VERIFY_ONLY` 模式、半截主体范围、合法交易投影 checkpoint。
+     * 输出：服务拒绝执行。
+     * 预期：主体范围必须同时包含主体类型和主体 ID，不能扩大为同类型全量重放。
+     * 红线：交易投影重放不得把不完整主体条件当成有效范围。
+     */
+    @Test
+    void testReplayWithIncompleteOwnerRangeShouldFail() {
+        FundsProjectionReplayService service = newService(new RecordingProjectionWriter());
+        FundsTransactionProjectionReplayRequest request = replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .ownerType("USER")
+                .build());
+
+        assertThatThrownBy(() -> service.replay(request))
+                .hasMessageContaining("交易投影重放必须指定单笔、主体、时间窗口或批次范围");
+    }
+
+    /**
+     * 场景：运营人员按时间窗口发起交易投影重放，但结束时间早于开始时间。
+     * 输入：`VERIFY_ONLY` 模式、倒置时间窗口、合法交易投影 checkpoint。
+     * 输出：服务拒绝执行。
+     * 预期：时间窗口必须是正向有界范围。
+     * 红线：交易投影重放不得把无效时间窗当成有效范围，避免误触发无界或异常批量重放。
+     */
+    @Test
+    void testReplayWithInvalidTimeRangeShouldFail() {
+        FundsProjectionReplayService service = newService(new RecordingProjectionWriter());
+        FundsTransactionProjectionReplayRequest request = replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .startTime(LocalDateTime.of(2026, 5, 20, 0, 0))
+                .endTime(LocalDateTime.of(2026, 5, 19, 0, 0))
+                .build());
+
+        assertThatThrownBy(() -> service.replay(request))
+                .hasMessageContaining("交易投影重放必须指定单笔、主体、时间窗口或批次范围");
+    }
+
+    /**
      * 场景：调用方发起交易投影重放，但没有提供 checkpoint 流水号。
      * 输入：单笔重放范围、缺少 checkpointSn 的交易投影 checkpoint。
      * 输出：服务拒绝执行。
