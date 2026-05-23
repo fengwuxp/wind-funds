@@ -169,6 +169,53 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：业务侧发起手续费退回，但传入的原费用交易流水不存在。
+     * 输入：用户充值 100、付款 70 并收取手续费 5，随后退费 5 且 `feeSourceTransactionSn` 指向未知交易。
+     * 输出：退费失败，付款方、收款方、平台 FEE/CASH/PREPAYMENT 余额保持付款后状态。
+     * 预期：手续费退回必须定位原 route snapshot 和原 FEE leg，未知引用不能退化为当前路径重新路由。
+     * 红线：缺原路径快照的退费不得生成 route、posting、ledger entry 或余额投影副作用。
+     */
+    @Test
+    void testFeeRefundWithUnknownSourceTransactionShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("fee_refund_no_src_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        topup(payer, 100L, "FEE_REFUND_UNKNOWN_SOURCE_TOPUP");
+        payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L,
+                "FEE_REFUND_UNKNOWN_SOURCE_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+
+        assertThatThrownBy(() -> refundFee(payer, 5L, "FUNDS_TRANSACTION_NOT_EXISTS",
+                "FEE_REFUND_UNKNOWN_SOURCE_RETURN"))
+                .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照");
+
+        BalanceSnapshot afterFailure = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 25L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name());
+    }
+
+    /**
      * 场景：用户付款产生固定手续费，全额退费后再次尝试退回同一原交易手续费。
      * 输入：原交易手续费 5、第一次手续费退款 5、平台手续费账户另有足额余额、第二次手续费退款 5。
      * 输出：第二次退费失败，付款方、收款方、平台手续费和现金账户余额均保持不变。
