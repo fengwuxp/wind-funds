@@ -67,7 +67,7 @@ flowchart TD
 | 资金路由和回放 | route snapshot、原路径退款、撤销、退费、拒付和解冻。 | `ResolvedRoute`、`RouteSnapshot`、`RoutingDecision`、`Reference`。 | 02 分册 RouteResolver、RouteSnapshot 和 RouteReplay。 | `TDD-ROUTE-*`、`TDD-RED-003`、`TDD-RED-036`。 | 缺原快照重新选路，或 route 层直接写账、改状态。 |
 | 账本账目和投影 | posting plan 平衡、ledger entry、账本周期、余额投影、交易投影。 | `PostingPlan`、`LedgerEntry`、`periodType`、`BalanceProjection`、`TransactionView`。 | 02 分册账务计划、账本写入、余额投影、交易投影。 | `TDD-LEDGER-*`、`TDD-VIEW-*`、`TDD-RACE-*`。 | 余额从投影或日志修复，周期语义混用，posting 不平衡仍写账。 |
 | 清结算与对账 | 清分、清算、结算、出款、对账差错、调账核销和追偿闭环。 | `SettlementPolicySpec`、`DSL-SETTLEMENT-*`、差错和调账引用。 | 03 分册可清分明细、批次、候选、结算单、出款单、对账批次、差错单。 | `TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-OPS-*`。 | 清分候选直接入账、缺前置对账仍清算、差错直接改历史分录。 |
-| 归档重放与指标治理 | Manifest、checkpoint、watermark、余额快照、投影重放、指标只读边界。 | `archiveManifest`、`projectionReplayTask`、`BalanceSnapshotVerifyRef`、`metricSnapshot`。 | 04 分册归档重放、余额快照、指标项边界。 | `TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`。 | 无范围重放、先推水位后计算、普通指标快照替代账本余额快照。 |
+| 归档重放与指标治理 | Manifest、checkpoint、watermark、余额快照、投影重放、指标项承接和只读边界。 | `archiveManifest`、`projectionReplayTask`、`BalanceSnapshotVerifyRef`、指标项输入引用。 | 04 分册归档重放、余额快照、指标项边界。 | `TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`。 | 无范围重放、先推水位后计算、普通指标快照替代账本余额快照或指标实现进入资金主链路。 |
 | 运营审计、权限和外部规则 | 高危操作、敏感查询、导出、外部规则确认、合规待确认项。 | `operatorRef`、`auditRef`、`validation.mustFail`、规则来源字段。 | 05 分册测试观测安全与金融红线；03/04 分册运营对象。 | `TDD-OPS-*`、`TDD-RAIL-*`、`TDD-FX-*`、`TDD-RED-*`。 | 后台直接改账、敏感原文进入日志/导出、公开资料被当成正式规则。 |
 
 ## 5. 产品验收用例矩阵
@@ -198,6 +198,9 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | AC-SET-003 | 出款成功 | 外部成功回单金额一致。 | 关闭 SETTLEMENT 或 IN_TRANSIT，出款完成。 | 外部 reference、账本、结算单可核对。 |
 | AC-SET-004 | 出款失败 | 外部明确失败。 | SETTLEMENT/IN_TRANSIT -> AVAILABLE。 | 只回退一次，失败原因可审计。 |
 | AC-SET-005 | 已出款后退款或拒付 | 商户资金已出款完成。 | 进入追偿、准备金、负余额或后续抵扣。 | 不回滚已完成出款。 |
+| AC-SET-006 | 出款前准入门禁 | 结算单已锁定，准备创建或提交出款。 | 完成出款账户、收款端点、外部通道可用性、通道额度、cutoff、风控合规、名单筛查、外部规则核验、负余额、准备金、对账差错、幂等和审批校验。 | 任一门禁失败、缺失或状态未知不得提交外部出款；外部规则未核验默认阻断。 |
+| AC-SET-007 | 外部受理不等于到账 | 外部返回 accepted、submitted、message sent 或 processing 等非终态。 | 出款单进入 ACCEPTED、PROCESSING、IN_TRANSIT 或待确认展示。 | 不关闭 SETTLEMENT/IN_TRANSIT，不展示为已到账，必须等待成功回单、到账证明或对账确认。 |
+| AC-SET-008 | 出款金额不一致 | 外部回单金额、币种、手续费或到账主体与出款单不一致。 | 生成出款差错或挂账，保持待处理。 | 不按普通失败重复回退，不展示成功，差额有责任方和处理路径。 |
 
 ### 5.6 对账、差错与核销
 
@@ -308,12 +311,12 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | RED-029 | 指标异常反写事实 | 指标结果缺失、重复、异常或来源不一致后，反向修改交易、账本、余额、清结算或对账状态。 |
 | RED-030 | 清结算对象混用 | 未区分可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单和追偿单，就用一个对象或一个状态机表达。 |
 | RED-031 | 清分或候选即入账 | 可清分明细、清分批次或清算候选未经过清算批次确认就触发 CLEARING -> AVAILABLE。 |
-| RED-032 | 结算单等同出款单 | 结算单锁定后未等外部回单就展示为出款成功。 |
+| RED-032 | 结算单等同出款单 | 结算单锁定、出款提交、外部 submitted/accepted/message sent/processing 或待确认状态被展示为已到账或出款成功，或提前关闭 SETTLEMENT/IN_TRANSIT。 |
 | RED-033 | 差错核销未重新对账 | 差错单被人工关闭，但没有补事实、冲正、调账、挂账、追偿或重新对账结果。 |
 | RED-034 | Manifest 缺失仍归档成功 | 归档任务缺少 Manifest、检查点或校验摘要仍标记完成。 |
 | RED-035 | 发卡扩展进入默认核心能力 | 未确认 VCC、企业卡、员工卡或发卡产品启用，就把 ISSUING_SPEND_CONTROLS 作为资金底座默认核心能力。 |
 | RED-036 | 余额日志反写余额 | 业务余额变更日志、订阅事件或通知被当作余额事实源，反向修改分录或余额投影。 |
-| RED-037 | 重大对账差错仍放行 | 错主体、错币种、金额不平、重复出款、缺分录、余额公式不成立或外部失败内部成功仍进入资金释放。 |
+| RED-037 | 重大对账差错仍放行 | 错主体、错币种、金额不平、重复出款、缺分录、余额公式不成立、出款门禁失败、外部账户或通道不可用、名单筛查未通过或外部失败内部成功仍进入资金释放。 |
 | RED-038 | 清算缺前置对账 | 清分批次确认后未完成清算前置对账，就生成清算候选或确认清算批次。 |
 | RED-039 | 对账重跑覆盖旧结果 | 差错处理后重跑对账覆盖原运行记录、差异报告或审批证据。 |
 | RED-040 | 账目明细未覆盖即归档 | 账目明细没有被检查点、水位、Manifest 和对账闭环覆盖，就从热区迁移或删除。 |
