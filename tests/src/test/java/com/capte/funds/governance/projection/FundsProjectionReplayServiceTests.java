@@ -99,6 +99,45 @@ class FundsProjectionReplayServiceTests {
     }
 
     /**
+     * 场景：调用方发起交易投影重放，但 checkpoint 没有声明所属水位域。
+     * 输入：单笔重放范围、缺少类型的 checkpoint。
+     * 输出：服务拒绝执行。
+     * 预期：交易投影重放必须显式使用交易投影自己的 checkpoint。
+     * 红线：不得让无类型 checkpoint 在交易投影、余额、归档或指标域之间被复用。
+     */
+    @Test
+    void testReplayWithoutCheckpointTypeShouldFail() {
+        FundsProjectionReplayService service = newService(new RecordingProjectionWriter());
+        FundsTransactionProjectionReplayRequest request = FundsTransactionProjectionReplayRequest.builder()
+                .taskSn("TPR-202605190003")
+                .mode(ProjectionReplayMode.VERIFY_ONLY)
+                .viewDomain("USER_BILL")
+                .replayRange(FundsTransactionProjectionReplayRange.builder()
+                        .sourceSn("FT202605190001")
+                        .build())
+                .checkpoint(FundsTransactionProjectionCheckpoint.builder()
+                        .checkpointSn("TPC-202605190003")
+                        .build())
+                .build();
+
+        assertThatThrownBy(() -> service.replay(request))
+                .hasMessageContaining("交易投影重放 checkpoint 类型不能为空");
+    }
+
+    /**
+     * 场景：治理域仍未打开归档、余额快照和指标水位编码准入。
+     * 输入：当前 `ProjectionCheckpointType` 枚举集合。
+     * 输出：枚举只包含交易投影 checkpoint。
+     * 预期：交易投影重放入口不承接余额、归档、报表或指标水位。
+     * 红线：不得用交易投影 checkpoint 替代余额水位、归档 Manifest 或指标水位。
+     */
+    @Test
+    void testProjectionCheckpointTypeShouldRemainTransactionProjectionOnly() {
+        assertThat(ProjectionCheckpointType.values())
+                .containsExactly(ProjectionCheckpointType.TRANSACTION_PROJECTION);
+    }
+
+    /**
      * 场景：先以校验模式重放单笔用户账单，准备生成差异报告。
      * 输入：单笔重放范围、`VERIFY_ONLY` 模式、合法交易投影 checkpoint。
      * 输出：读取事实并产出差异报告，不写影子投影，不写正式投影。
