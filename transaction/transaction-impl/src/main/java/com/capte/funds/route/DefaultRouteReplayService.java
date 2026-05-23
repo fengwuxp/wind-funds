@@ -231,26 +231,57 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
             Money replayAmount = resolveReplayAmount(sourceLeg, replayRequest);
             Money consumedAmount = fundsTransactionQueryService.sumConsumedReplayLegAmount(
                     reference.getReferenceSn(), eventType, sourceLeg.getLegId(),
-                    sourceLeg.getAmount().getCurrency());
-            long consumedTotal = consumedAmount.getAmount()
-                    + freezeOrderWithdrawConsumedAmount(reference, eventType, sourceLeg)
-                    + replayAmount.getAmount();
-            AssertUtils.isTrue(consumedTotal <= sourceLeg.getAmount().getAmount(),
-                    "RouteSnapshot leg 回放累计金额不能大于原 RouteLeg 金额，referenceSn = {}，eventType = {}，legId = {}",
-                    reference.getReferenceSn(), eventType, sourceLeg.getLegId());
+                    sourceLeg.getAmount().getCurrency(),
+                    replayRequest.getBusinessScene(),
+                    replayRequest.getBusinessSn());
+            long withdrawConsumedAmount = freezeOrderWithdrawConsumedAmount(reference, eventType, sourceLeg,
+                    replayRequest);
+            long consumedTotal = consumedAmount.getAmount() + withdrawConsumedAmount + replayAmount.getAmount();
+            assertReplayLegAmountWithinSource(reference, eventType, sourceLeg, replayAmount, consumedTotal,
+                    withdrawConsumedAmount);
         }
+    }
+
+    private void assertReplayLegAmountWithinSource(@NonNull FundsInstructionReferenceSpec reference,
+                                                   @NonNull FundsTransactionEventType eventType,
+                                                   @NonNull RouteLegSpec sourceLeg,
+                                                   @NonNull Money replayAmount,
+                                                   long consumedTotal,
+                                                   long withdrawConsumedAmount) {
+        if (shouldReportFrozenOrderReleaseAmount(reference, eventType, withdrawConsumedAmount)) {
+            long remainingAmount = Math.max(0L, sourceLeg.getAmount().getAmount()
+                    - (consumedTotal - replayAmount.getAmount()));
+            AssertUtils.isTrue(consumedTotal <= sourceLeg.getAmount().getAmount(),
+                    "冻结单剩余可释放金额不足，referenceSn = {}，remainingAmount = {}，amount = {}",
+                    reference.getReferenceSn(), remainingAmount, replayAmount.getAmount());
+            return;
+        }
+        AssertUtils.isTrue(consumedTotal <= sourceLeg.getAmount().getAmount(),
+                "RouteSnapshot leg 回放累计金额不能大于原 RouteLeg 金额，referenceSn = {}，eventType = {}，legId = {}",
+                reference.getReferenceSn(), eventType, sourceLeg.getLegId());
+    }
+
+    private boolean shouldReportFrozenOrderReleaseAmount(@NonNull FundsInstructionReferenceSpec reference,
+                                                         @NonNull FundsTransactionEventType eventType,
+                                                         long withdrawConsumedAmount) {
+        return reference.getReferenceType() == FundsInstructionReferenceType.FREEZE_ORDER
+                && eventType == FundsTransactionEventType.UNFREEZE
+                && withdrawConsumedAmount == 0L;
     }
 
     private long freezeOrderWithdrawConsumedAmount(@NonNull FundsInstructionReferenceSpec reference,
                                                    @NonNull FundsTransactionEventType eventType,
-                                                   @NonNull RouteLegSpec sourceLeg) {
+                                                   @NonNull RouteLegSpec sourceLeg,
+                                                   @NonNull ReplayRequestSpec replayRequest) {
         if (reference.getReferenceType() != FundsInstructionReferenceType.FREEZE_ORDER
                 || eventType != FundsTransactionEventType.UNFREEZE) {
             return 0L;
         }
         return fundsTransactionQueryService.sumConsumedReplayLegAmount(reference.getReferenceSn(),
                 FundsTransactionEventType.WITHDRAW, sourceLeg.getLegId(),
-                sourceLeg.getAmount().getCurrency()).getAmount();
+                sourceLeg.getAmount().getCurrency(),
+                replayRequest.getBusinessScene(),
+                replayRequest.getBusinessSn()).getAmount();
     }
 
     private RouteReplayType resolveReplayType(FundsTransactionEventType eventType) {

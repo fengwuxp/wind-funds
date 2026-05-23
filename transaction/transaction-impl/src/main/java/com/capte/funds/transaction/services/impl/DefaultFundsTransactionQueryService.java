@@ -13,6 +13,7 @@ import com.capte.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.capte.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.capte.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
 import com.capte.funds.transaction.dal.entities.table.FundsTransactionNameRefs;
+import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
@@ -35,6 +36,7 @@ import org.springframework.util.StringUtils;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -105,6 +107,10 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
         AssertUtils.notNull(eventType, "资金交易事件类型不能为空");
         AssertUtils.hasText(replayRefLegId, "RouteReplay 原 legId 不能为空");
         AssertUtils.notNull(currency, "RouteReplay 币种不能为空");
+        if (isFreezeOrderUnfreezeConsumption(eventType, replayRefLegId)) {
+            return sumFrozenOrderReleasedAmount(referenceTransactionSn, currency,
+                    excludedBusinessScene, excludedBusinessSn);
+        }
         Map<String, Long> consumedAmounts = new LinkedHashMap<>();
         for (FundsTransactionDetail detail : queryConsumedReplayDetails(referenceTransactionSn, eventType)) {
             if (sameBusinessEvent(detail, excludedBusinessScene, excludedBusinessSn)) {
@@ -203,6 +209,65 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
             return null;
         }
         return detail.getAmount();
+    }
+
+    private boolean isFreezeOrderUnfreezeConsumption(FundsTransactionEventType eventType, String replayRefLegId) {
+        return eventType == FundsTransactionEventType.UNFREEZE
+                && FundsRouteLegIds.FREEZE.equals(replayRefLegId);
+    }
+
+    private Money sumFrozenOrderReleasedAmount(String freezeOrderSn,
+                                               CurrencyIsoCode currency,
+                                               @Nullable String excludedBusinessScene,
+                                               @Nullable String excludedBusinessSn) {
+        FundsFrozenOrder order = findFreezeOrderBySnNullable(freezeOrderSn);
+        if (order == null) {
+            return Money.immutable(0L, currency);
+        }
+        AssertUtils.isTrue(order.getCurrency() == currency,
+                "RouteReplay 已释放金额币种不一致，referenceSn = {}，eventType = {}，legId = {}",
+                freezeOrderSn, FundsTransactionEventType.UNFREEZE, FundsRouteLegIds.FREEZE);
+        long releasedAmount = defaultAmount(order.getReleasedAmount());
+        long excludedAmount = sumExcludedFrozenOrderReleaseAmount(order, excludedBusinessScene, excludedBusinessSn);
+        AssertUtils.isTrue(releasedAmount >= excludedAmount,
+                "冻结单释放金额事实不一致，referenceSn = {}，releasedAmount = {}，excludedAmount = {}",
+                freezeOrderSn, releasedAmount, excludedAmount);
+        return Money.immutable(releasedAmount - excludedAmount, currency);
+    }
+
+    private long sumExcludedFrozenOrderReleaseAmount(FundsFrozenOrder originalOrder,
+                                                    @Nullable String excludedBusinessScene,
+                                                    @Nullable String excludedBusinessSn) {
+        if (!StringUtils.hasText(excludedBusinessScene) || !StringUtils.hasText(excludedBusinessSn)) {
+            return 0L;
+        }
+        FundsFrozenOrderNameRefs ref = FundsFrozenOrderNameRefs.fundsFrozenOrder;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(originalOrder.getTenantId()))
+                .and(ref.businessScene.eq(excludedBusinessScene))
+                .and(ref.businessSn.eq(excludedBusinessSn))
+                .and(ref.status.eq(FundsFrozenOrderStatus.RELEASED))
+                .and(ref.currency.eq(originalOrder.getCurrency()));
+        return fundsFrozenOrderMapper.selectListByQuery(wrapper)
+                .stream()
+                .filter(order -> isReleaseRecordFor(order, originalOrder.getSn()))
+                .mapToLong(FundsFrozenOrder::getAmount)
+                .sum();
+    }
+
+    private boolean isReleaseRecordFor(FundsFrozenOrder order, String freezeOrderSn) {
+        if (!StringUtils.hasText(order.getContextVariables())) {
+            return false;
+        }
+        JSONObject values = JSON.parseObject(order.getContextVariables());
+        return Objects.equals(values.getString(FundsInstructionContextKeys.REFERENCE_FREEZE_SN), freezeOrderSn)
+                && FundsTransactionEventType.UNFREEZE.name()
+                .equals(values.getString(FundsInstructionContextKeys.FROZEN_ORDER_EVENT_TYPE));
+    }
+
+    private long defaultAmount(Long amount) {
+        return amount == null ? 0L : amount;
     }
 
     private List<FundsTransactionDetail> queryConsumedReplayDetails(String referenceTransactionSn,

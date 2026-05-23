@@ -113,6 +113,55 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
     }
 
     /**
+     * 场景：同一冻结单已部分解冻，随后用新的业务流水提现并超过剩余冻结金额。
+     * 输入：充值 120、冻结 90、解冻 40、提现 60。
+     * 输出：提现失败；用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 保持解冻后的状态。
+     * 预期：提现确认必须把已解冻金额计入同一冻结来源累计处理上限。
+     * 红线：同一冻结来源累计解冻和提现不得超过原冻结金额；失败请求不得生成出款账务事实。
+     */
+    @Test
+    void testWithdrawAfterPartialUnfreezeExceedingFreezeSourceRemainingShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 120L, "WITHDRAW_AFTER_RELEASE_TOPUP");
+        String freezeSn = freeze(user, 90L, "WITHDRAW_AFTER_RELEASE_FREEZE");
+        unfreeze(user, 40L, freezeSn, "WITHDRAW_AFTER_RELEASE_UNFREEZE");
+        BalanceSnapshot afterRelease = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+
+        assertThatThrownBy(() -> withdraw(user, 60L, freezeSn, "WITHDRAW_AFTER_RELEASE_CONFIRM"))
+                .hasMessageContaining("冻结单剩余可提现金额不足");
+
+        BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRelease, afterRejectedWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 70L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 50L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_880L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(3);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name(),
+                        FundsTransactionEventType.UNFREEZE.name());
+        assertThat(frozenOrderExistsByBusinessSn("WITHDRAW_AFTER_RELEASE_CONFIRM"))
+                .isFalse();
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_RELEASE_FREEZE"))
+                .satisfies(order -> {
+                    assertThat(order.getStatus()).isEqualTo(FundsFrozenOrderStatus.PARTIALLY_RELEASED);
+                    assertThat(order.getReleasedAmount()).isEqualTo(40L);
+                });
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_RELEASE_UNFREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+    }
+
+    /**
      * 场景：用户充值后冻结资金，随后分两次解冻，并尝试超过剩余冻结金额的第三次解冻。
      * 输入：充值 120、冻结 90、解冻 20、解冻 30、超额解冻 50。
      * 输出：用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 余额快照和冻结单释放状态。
