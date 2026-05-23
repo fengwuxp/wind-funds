@@ -290,19 +290,38 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     }
 
     private List<LedgerDTO> loadLedgers(ResolvedFundsSubject subject) {
-        return loadLedgers(subject, null);
+        LedgerQuery query = baseLedgerQuery(subject);
+        applyDefaultAccountPeriod(query, subject);
+        return queryLedgers(query);
     }
 
     private List<LedgerDTO> loadLedgers(ResolvedFundsSubject subject, @Nullable FundsSubjectBalanceQuery balanceQuery) {
-        LedgerQuery query = new LedgerQuery()
-                .setTenantId(subject.tenantId())
-                .setSubjectId(subject.subjectId())
-                .setSubjectType(subject.subjectType().name())
-                .setCurrency(subject.currency());
+        LedgerQuery query = baseLedgerQuery(subject);
         if (balanceQuery != null) {
             query.setPeriodType(balanceQuery.getPeriodType());
             query.setPeriodId(resolvePeriodId(balanceQuery));
         }
+        return queryLedgers(query);
+    }
+
+    private LedgerQuery baseLedgerQuery(ResolvedFundsSubject subject) {
+        return new LedgerQuery()
+                .setTenantId(subject.tenantId())
+                .setSubjectId(subject.subjectId())
+                .setSubjectType(subject.subjectType().name())
+                .setCurrency(subject.currency());
+    }
+
+    private void applyDefaultAccountPeriod(LedgerQuery query, ResolvedFundsSubject subject) {
+        query.setPeriodType(subject.periodType());
+        if (subject.periodType() == AccountBalancePeriodType.LIFETIME) {
+            query.setPeriodId(AccountBalancePeriodType.LIFETIME.name());
+        } else {
+            query.setPeriodId(subject.periodId());
+        }
+    }
+
+    private List<LedgerDTO> queryLedgers(LedgerQuery query) {
         return ledgerService.queryLedgers(query, DefaultPageQueryOptions.defaults(MAX_LEDGER_BUCKET_SIZE))
                 .getRecords()
                 .stream()
@@ -363,6 +382,8 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
             FundsAccountOwnerType ownerType,
             FundsAccountStatus status,
             CurrencyIsoCode currency,
+            AccountBalancePeriodType periodType,
+            String periodId,
             Integer version
     ) {
 
@@ -376,6 +397,8 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     account.getOwnerType(),
                     account.getStatus(),
                     account.getCurrency(),
+                    AccountBalancePeriodType.LIFETIME,
+                    AccountBalancePeriodType.LIFETIME.name(),
                     account.getVersion()
             );
         }
@@ -390,6 +413,8 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     account.getOwnerType(),
                     account.getStatus(),
                     account.getCurrency(),
+                    account.getPeriodType(),
+                    account.getPeriodId(),
                     account.getVersion()
             );
         }
@@ -404,6 +429,8 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     account.getOwnerType(),
                     account.getStatus(),
                     account.getCurrency(),
+                    account.getPeriodType(),
+                    account.getPeriodId(),
                     account.getVersion()
             );
         }

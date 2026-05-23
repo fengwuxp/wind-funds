@@ -106,6 +106,8 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
                 .and(ref.ownerType.eq(query.getOwnerType()))
                 .and(ref.budgetType.eq(query.getBudgetType()))
                 .and(ref.currency.eq(query.getCurrency()))
+                .and(ref.periodType.eq(query.getPeriodType()))
+                .and(ref.periodId.eq(query.getPeriodId()))
                 .and(ref.status.eq(query.getStatus()));
         return MybatisQueryHelper.<BudgetGroup, BudgetGroupDTO>query(wrapper)
                 .counter(budgetGroupMapper::selectCountByQuery)
@@ -124,7 +126,9 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
                         .setTenantId(entity.getTenantId())
                         .setSubjectId(entity.getSn())
                         .setSubjectType(FundsSubjectType.BUDGET_GROUP.name())
-                        .setCurrency(entity.getCurrency()),
+                        .setCurrency(entity.getCurrency())
+                        .setPeriodType(entity.getPeriodType())
+                        .setPeriodId(entity.getPeriodId()),
                 DefaultPageQueryOptions.defaults(50)).getRecords().stream()
                 .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, LedgerDTO::getId));
     }

@@ -25,7 +25,9 @@ import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.wallet.FundsAccountBalanceView;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
@@ -98,6 +100,9 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     private SubjectLedgerInitializer subjectLedgerInitializer;
 
     @Autowired
+    private FundsAccountQueryService fundsAccountQueryService;
+
+    @Autowired
     private FundsSubjectBalanceQueryService balanceQueryService;
 
     @Autowired
@@ -116,6 +121,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(account.getSn()).isEqualTo(CREDIT_ACCOUNT_SN);
         assertThat(account.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
         assertThat(account.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
+        assertThat(account.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         assertThat(account.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.CREDIT_BASIC);
         assertThat(account.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(ledgers).hasSize(3);
@@ -140,6 +146,30 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     @Test
+    void testCreateCreditAccountShouldInitializeMonthlyControlLedgersWhenSpecified() {
+        Long accountId = creditAccountService.createCreditAccount(createCreditAccountRequest()
+                .setSn(NON_LIFETIME_CREDIT_ACCOUNT_SN)
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(MONTHLY_PERIOD_ID));
+
+        CreditAccountDTO account = creditAccountService.getCreditAccountById(accountId);
+        List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.CREDIT_ACCOUNT, NON_LIFETIME_CREDIT_ACCOUNT_SN);
+
+        assertThat(account.getSn()).isEqualTo(NON_LIFETIME_CREDIT_ACCOUNT_SN);
+        assertThat(account.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
+        assertThat(account.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
+        assertThat(account.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
+        assertThat(ledgers).hasSize(3);
+        assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
+                ledger,
+                FundsSubjectType.CREDIT_ACCOUNT,
+                NON_LIFETIME_CREDIT_ACCOUNT_SN,
+                LedgerProfileCode.CREDIT_BASIC,
+                AccountBalancePeriodType.MONTHLY,
+                MONTHLY_PERIOD_ID));
+    }
+
+    @Test
     void testCreateBudgetGroupShouldInitializeLifetimeControlLedgersByDefault() {
         Long budgetGroupId = budgetGroupService.createBudgetGroup(createBudgetGroupRequest());
 
@@ -149,6 +179,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(budgetGroup.getSn()).isEqualTo(BUDGET_GROUP_SN);
         assertThat(budgetGroup.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
         assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
+        assertThat(budgetGroup.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         assertThat(budgetGroup.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.BUDGET_BASIC);
         assertThat(budgetGroup.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(ledgers).hasSize(3);
@@ -173,6 +204,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(budgetGroup.getSn()).isEqualTo(BUDGET_GROUP_SN);
         assertThat(budgetGroup.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
         assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
+        assertThat(budgetGroup.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
         assertThat(budgetGroup.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.BUDGET_BASIC);
         assertThat(budgetGroup.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(ledgers).hasSize(3);
@@ -218,6 +250,32 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：月度预算组作为账户默认视图被查询。
+     * 输入：预算组创建时保存 MONTHLY/2026-05。
+     * 输出：FundsAccountQueryService#getBalance 使用主体默认周期返回 MONTHLY/2026-05 余额桶。
+     * 红线：默认账户视图不得只按 subject + accountCode 折叠不同账本周期。
+     */
+    @Test
+    void testDefaultBudgetGroupBalanceViewShouldUseStoredPeriodBucket() {
+        budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(MONTHLY_PERIOD_ID));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        FundsAccountBalanceView balanceView = fundsAccountQueryService.getBalance(
+                FundsAccountId.immutable(BUDGET_GROUP_SN, FundsSubjectType.BUDGET_GROUP));
+
+        assertThat(balanceView.getBalanceBuckets()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
+        assertThat(balanceView.getBalanceBuckets().values())
+                .extracting(LedgerBalanceBucket::periodType)
+                .containsOnly(AccountBalancePeriodType.MONTHLY);
+        assertThat(balanceView.getBalanceBuckets().values())
+                .extracting(LedgerBalanceBucket::periodId)
+                .containsOnly(MONTHLY_PERIOD_ID);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testCreateBudgetGroupShouldRejectCustomCycleWithoutPeriodId() {
         assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(customCycleBudgetGroupRequest()))
@@ -237,6 +295,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
         assertThat(budgetGroup.getSn()).isEqualTo(CUSTOM_BUDGET_GROUP_SN);
         assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.CUSTOM_CYCLE);
+        assertThat(budgetGroup.getPeriodId()).isEqualTo(CUSTOM_PERIOD_ID);
         assertThat(budgetGroup.getPeriodPolicy()).isEqualTo(CUSTOM_PERIOD_POLICY);
         assertThat(budgetGroup.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(ledgers).hasSize(3);

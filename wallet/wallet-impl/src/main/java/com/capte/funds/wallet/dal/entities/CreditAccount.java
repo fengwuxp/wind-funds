@@ -61,6 +61,9 @@ public class CreditAccount implements Serializable, TenantIsolationObject<Long> 
     private AccountBalancePeriodType periodType;
 
     @NotNull
+    private String periodId;
+
+    @NotNull
     private LedgerProfileCode ledgerProfileCode;
 
     @NotNull

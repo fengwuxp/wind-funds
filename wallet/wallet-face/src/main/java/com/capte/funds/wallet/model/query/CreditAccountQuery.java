@@ -2,6 +2,7 @@ package com.capte.funds.wallet.model.query;
 
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -40,6 +41,12 @@ public class CreditAccountQuery {
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;
+
+    @Schema(description = "账本周期类型")
+    private AccountBalancePeriodType periodType;
+
+    @Schema(description = "账本周期标识")
+    private String periodId;
 
     @Schema(description = "状态")
     private FundsAccountStatus status;

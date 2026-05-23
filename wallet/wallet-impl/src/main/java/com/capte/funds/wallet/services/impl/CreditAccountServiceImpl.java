@@ -106,6 +106,8 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 .and(ref.ownerType.eq(query.getOwnerType()))
                 .and(ref.accountType.eq(query.getAccountType()))
                 .and(ref.currency.eq(query.getCurrency()))
+                .and(ref.periodType.eq(query.getPeriodType()))
+                .and(ref.periodId.eq(query.getPeriodId()))
                 .and(ref.status.eq(query.getStatus()));
         return MybatisQueryHelper.<CreditAccount, CreditAccountDTO>query(wrapper)
                 .counter(creditAccountMapper::selectCountByQuery)
@@ -124,7 +126,9 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                         .setTenantId(entity.getTenantId())
                         .setSubjectId(entity.getSn())
                         .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT.name())
-                        .setCurrency(entity.getCurrency()),
+                        .setCurrency(entity.getCurrency())
+                        .setPeriodType(entity.getPeriodType())
+                        .setPeriodId(entity.getPeriodId()),
                 DefaultPageQueryOptions.defaults(50)).getRecords().stream()
                 .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, LedgerDTO::getId));
     }

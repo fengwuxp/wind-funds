@@ -64,6 +64,9 @@ public class CreditAccountDTO implements Serializable {
     @Schema(description = "账本周期类型")
     private AccountBalancePeriodType periodType;
 
+    @Schema(description = "账本周期标识")
+    private String periodId;
+
     @Schema(description = "ledger profile 编码")
     private LedgerProfileCode ledgerProfileCode;
 

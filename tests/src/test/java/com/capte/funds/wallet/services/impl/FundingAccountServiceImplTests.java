@@ -4,6 +4,7 @@ import com.capte.funds.AbstractFundsServiceTest;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.ledger.dto.LedgerDTO;
 import com.capte.funds.ledger.query.LedgerQuery;
+import com.capte.funds.ledger.request.CreateLedgerRequest;
 import com.capte.funds.ledger.service.LedgerService;
 import com.capte.funds.ledger.impl.LedgerServiceImpl;
 import com.capte.funds.wallet.model.dto.FundingAccountDTO;
@@ -22,7 +23,10 @@ import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.wallet.FundsAccount;
+import com.wind.integration.funds.wallet.FundsAccountBalanceView;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.wallet.enums.FundingAccountType;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
@@ -60,8 +64,13 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String OWNER_ID = "owner_fas_basic";
 
+    private static final String MONTHLY_PERIOD_ID = "2026-05";
+
     @Autowired
     private FundingAccountService fundingAccountService;
+
+    @Autowired
+    private FundsAccountQueryService fundsAccountQueryService;
 
     @Autowired
     private SubjectLedgerInitializer subjectLedgerInitializer;
@@ -143,6 +152,41 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：同一真实资金账户同一账目同时存在 LIFETIME 与 MONTHLY 两个余额 bucket。
+     * 输入：资金账户默认 LIFETIME 基础账本，额外存在 AVAILABLE / MONTHLY / 2026-05。
+     * 输出：账户基础查询和账户余额视图仍返回默认 LIFETIME 周期账本，不因同账目多周期重复 key 失败。
+     * 红线：账户默认视图不得把多周期账本随机折叠；跨周期余额必须走显式周期查询。
+     */
+    @Test
+    void testFundingAccountDefaultViewsShouldKeepLifetimeLedgersWhenMonthlyBucketCoexists() {
+        Long accountId = fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        FundingAccountDTO lifetimeAccount = fundingAccountService.getFundingAccountById(accountId);
+        Long monthlyAvailableLedgerId = createMonthlyAvailableLedger();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        FundingAccountDTO account = fundingAccountService.getFundingAccountById(accountId);
+        FundsAccount accountView = fundsAccountQueryService.getAccount(
+                FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT));
+        FundsAccountBalanceView balanceView = fundsAccountQueryService.getBalance(
+                FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT));
+
+        assertThat(account.getLedgerIds()).containsExactlyInAnyOrderEntriesOf(lifetimeAccount.getLedgerIds());
+        assertThat(accountView.getAccountLedgerIds()).containsExactlyInAnyOrderEntriesOf(lifetimeAccount.getLedgerIds());
+        assertThat(balanceView.getBalanceBuckets()).containsOnlyKeys(LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCode.FROZEN, LedgerSubjectCode.AUTHORIZATION);
+        assertThat(balanceView.getBalanceBuckets().values())
+                .extracting(LedgerBalanceBucket::periodType)
+                .containsOnly(AccountBalancePeriodType.LIFETIME);
+        assertThat(balanceView.getBalanceBuckets().values())
+                .extracting(LedgerBalanceBucket::periodId)
+                .containsOnly(AccountBalancePeriodType.LIFETIME.name());
+        assertThat(account.getLedgerIds()).doesNotContainValue(monthlyAvailableLedgerId);
+        assertThat(accountView.getAccountLedgerIds()).doesNotContainValue(monthlyAvailableLedgerId);
+        assertThat(loadLedgers()).hasSize(4);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpFundingAccountServiceTestData() {
         cleanupFundingAccountServiceTestData();
@@ -186,6 +230,24 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                         .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name())
                         .setCurrency(CurrencyIsoCode.USD),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
+    }
+
+    private Long createMonthlyAvailableLedger() {
+        return ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(ACCOUNT_SN)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name())
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
+                .setLedgerProfileVersion(1)
+                .setLedgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
+                .setNormalBalanceSide(EntrySide.CREDIT)
+                .setAllowNegative(Boolean.FALSE)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setSettlementPolicy("RT")
+                .setCutOffTime(LocalTime.MIDNIGHT)
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(MONTHLY_PERIOD_ID));
     }
 
     private void assertFundingBasicLedger(LedgerDTO ledger) {

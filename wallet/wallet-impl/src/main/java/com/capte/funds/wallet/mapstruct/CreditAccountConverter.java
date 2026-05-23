@@ -52,6 +52,8 @@ public interface CreditAccountConverter {
         AccountBalancePeriodType periodType = request.getPeriodType() == null
                 ? AccountBalancePeriodType.LIFETIME : request.getPeriodType();
         entity.setPeriodType(periodType);
+        entity.setPeriodId(periodType == AccountBalancePeriodType.LIFETIME
+                ? AccountBalancePeriodType.LIFETIME.name() : request.getPeriodId());
         entity.setLedgerProfileCode(request.getLedgerProfileCode() == null
                 ? LedgerProfileCode.CREDIT_BASIC : request.getLedgerProfileCode());
         entity.setLedgerProfileVersion(1);

@@ -60,6 +60,9 @@ public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
     @NotNull
     private AccountBalancePeriodType periodType;
 
+    @NotNull
+    private String periodId;
+
     private String periodPolicy;
 
     @NotNull

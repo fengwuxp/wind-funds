@@ -21,6 +21,7 @@ import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -114,7 +115,9 @@ public class FundingAccountServiceImpl implements FundingAccountService {
                         .setTenantId(tenantId)
                         .setSubjectId(subjectId)
                         .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name())
-                        .setCurrency(CurrencyIsoCode.valueOf(currency)),
+                        .setCurrency(CurrencyIsoCode.valueOf(currency))
+                        .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                        .setPeriodId(AccountBalancePeriodType.LIFETIME.name()),
                 DefaultPageQueryOptions.defaults(50)).getRecords().stream()
                 .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, LedgerDTO::getId));
     }
