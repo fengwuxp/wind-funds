@@ -5,9 +5,14 @@ import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 交易投影正常发布上下文。
@@ -23,4 +28,170 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
                                                        @NonNull RouteSnapshotSpec routeSnapshot,
                                                        @NonNull FundsInstructionLifecycleResult lifecycleResult,
                                                        @Nullable LedgerTransactionSpec ledgerTransaction) {
+
+    private static final String NOT_APPLICABLE = "N/A";
+
+    private static final String FACT_STATUS_POSTED = "POSTED";
+
+    private static final String FACT_STATUS_HELD = "HELD";
+
+    private static final String FACT_STATUS_RELEASED = "RELEASED";
+
+    private static final String FACT_STATUS_REJECTED = "REJECTED";
+
+    private static final String FACT_STATUS_COMPLETED_NO_LEDGER = "COMPLETED_NO_LEDGER";
+
+    private static final String FACT_STATUS_PROCESSING = "PROCESSING";
+
+    private static final String DISPLAY_STATUS_SUCCEEDED = "SUCCEEDED";
+
+    private static final String DISPLAY_STATUS_AUTHORIZED_HOLD = "AUTHORIZED_HOLD";
+
+    private static final String DISPLAY_STATUS_FROZEN = "FROZEN";
+
+    private static final String DISPLAY_STATUS_RELEASED = "RELEASED";
+
+    private static final String DISPLAY_STATUS_DECLINED = "DECLINED";
+
+    private static final String DISPLAY_STATUS_PROCESSING = "PROCESSING";
+
+    private static final String OPERATION_STATUS_NO_ACTION_REQUIRED = "NO_ACTION_REQUIRED";
+
+    private static final String OPERATION_STATUS_WAITING_CAPTURE_OR_RELEASE = "WAITING_CAPTURE_OR_RELEASE";
+
+    private static final String OPERATION_STATUS_WAITING_UNFREEZE_OR_CONSUME = "WAITING_UNFREEZE_OR_CONSUME";
+
+    private static final String OPERATION_STATUS_WAITING_FACT_COMPLETION = "WAITING_FACT_COMPLETION";
+
+    private static final String NEXT_ACTION_WAIT_FOR_CAPTURE_OR_RELEASE = "WAIT_FOR_CAPTURE_OR_RELEASE";
+
+    private static final String NEXT_ACTION_WAIT_FOR_UNFREEZE_OR_CONSUME = "WAIT_FOR_UNFREEZE_OR_CONSUME";
+
+    private static final String NEXT_ACTION_WAIT_FOR_FACT_COMPLETION = "WAIT_FOR_FACT_COMPLETION";
+
+    private static final String UNAVAILABLE_AUTHORIZATION_HOLD_NOT_FINAL_CONSUMPTION =
+            "AUTHORIZATION_HOLD_IS_NOT_FINAL_CONSUMPTION";
+
+    private static final String UNAVAILABLE_AUTHORIZATION_DECLINED = "AUTHORIZATION_DECLINED";
+
+    private static final String UNAVAILABLE_BALANCE_FREEZE_NOT_CONSUMPTION = "BALANCE_FREEZE_IS_NOT_CONSUMPTION";
+
+    /**
+     * 生成面向用户账单、商户账单和运营时间线的只读解释摘要。
+     *
+     * @return 投影解释摘要
+     */
+    public @NonNull FundsTransactionProjectionExplanation explanation() {
+        String ledgerTransactionSn = resolveLedgerTransactionSn();
+        return FundsTransactionProjectionExplanation.builder()
+                .businessScene(instruction.getBusinessScene())
+                .businessSn(instruction.getBusinessSn())
+                .fundsTransactionSn(lifecycleResult.getTransactionSn())
+                .routeSnapshotId(routeSnapshot.getSnapshotId())
+                .routeCode(routeSnapshot.getRouteCode())
+                .ledgerTransactionSn(ledgerTransactionSn)
+                .factStatus(resolveFactStatus(ledgerTransactionSn))
+                .displayStatus(resolveDisplayStatus(ledgerTransactionSn))
+                .operationStatus(resolveOperationStatus(ledgerTransactionSn))
+                .failureReason(NOT_APPLICABLE)
+                .unavailableReason(resolveUnavailableReason(ledgerTransactionSn))
+                .nextAction(resolveNextAction(ledgerTransactionSn))
+                .evidenceRefs(evidenceRefs(lifecycleResult.getTransactionSn(), routeSnapshot.getSnapshotId(),
+                        ledgerTransactionSn))
+                .externalRuleVerificationStatus(NOT_APPLICABLE)
+                .build();
+    }
+
+    private @Nullable String resolveLedgerTransactionSn() {
+        if (ledgerTransaction != null && StringUtils.hasText(ledgerTransaction.getSn())) {
+            return ledgerTransaction.getSn();
+        }
+        String ledgerTransactionSn = lifecycleResult.getLedgerTransactionSn();
+        if (StringUtils.hasText(ledgerTransactionSn)) {
+            return ledgerTransactionSn;
+        }
+        return null;
+    }
+
+    private @NonNull String resolveFactStatus(@Nullable String ledgerTransactionSn) {
+        if (!lifecycleResult.isCompleted()) {
+            return FACT_STATUS_PROCESSING;
+        }
+        return switch (instruction.getEventType()) {
+            case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn) ? FACT_STATUS_HELD : FACT_STATUS_REJECTED;
+            case FREEZE -> FACT_STATUS_HELD;
+            case REVERSAL, UNFREEZE -> FACT_STATUS_RELEASED;
+            default -> StringUtils.hasText(ledgerTransactionSn)
+                    ? FACT_STATUS_POSTED
+                    : FACT_STATUS_COMPLETED_NO_LEDGER;
+        };
+    }
+
+    private @NonNull String resolveDisplayStatus(@Nullable String ledgerTransactionSn) {
+        if (!lifecycleResult.isCompleted()) {
+            return DISPLAY_STATUS_PROCESSING;
+        }
+        return switch (instruction.getEventType()) {
+            case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn)
+                    ? DISPLAY_STATUS_AUTHORIZED_HOLD
+                    : DISPLAY_STATUS_DECLINED;
+            case FREEZE -> DISPLAY_STATUS_FROZEN;
+            case REVERSAL, UNFREEZE -> DISPLAY_STATUS_RELEASED;
+            default -> DISPLAY_STATUS_SUCCEEDED;
+        };
+    }
+
+    private @NonNull String resolveOperationStatus(@Nullable String ledgerTransactionSn) {
+        if (!lifecycleResult.isCompleted()) {
+            return OPERATION_STATUS_WAITING_FACT_COMPLETION;
+        }
+        return switch (instruction.getEventType()) {
+            case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn)
+                    ? OPERATION_STATUS_WAITING_CAPTURE_OR_RELEASE
+                    : OPERATION_STATUS_NO_ACTION_REQUIRED;
+            case FREEZE -> OPERATION_STATUS_WAITING_UNFREEZE_OR_CONSUME;
+            default -> OPERATION_STATUS_NO_ACTION_REQUIRED;
+        };
+    }
+
+    private @NonNull String resolveUnavailableReason(@Nullable String ledgerTransactionSn) {
+        if (!lifecycleResult.isCompleted()) {
+            return NOT_APPLICABLE;
+        }
+        return switch (instruction.getEventType()) {
+            case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn)
+                    ? UNAVAILABLE_AUTHORIZATION_HOLD_NOT_FINAL_CONSUMPTION
+                    : UNAVAILABLE_AUTHORIZATION_DECLINED;
+            case FREEZE -> UNAVAILABLE_BALANCE_FREEZE_NOT_CONSUMPTION;
+            default -> NOT_APPLICABLE;
+        };
+    }
+
+    private @NonNull String resolveNextAction(@Nullable String ledgerTransactionSn) {
+        if (!lifecycleResult.isCompleted()) {
+            return NEXT_ACTION_WAIT_FOR_FACT_COMPLETION;
+        }
+        FundsTransactionEventType eventType = instruction.getEventType();
+        if (eventType == FundsTransactionEventType.AUTHORIZE && StringUtils.hasText(ledgerTransactionSn)) {
+            return NEXT_ACTION_WAIT_FOR_CAPTURE_OR_RELEASE;
+        }
+        if (eventType == FundsTransactionEventType.FREEZE) {
+            return NEXT_ACTION_WAIT_FOR_UNFREEZE_OR_CONSUME;
+        }
+        return NOT_APPLICABLE;
+    }
+
+    private static @NonNull List<String> evidenceRefs(@Nullable String fundsTransactionSn,
+                                                      @NonNull String routeSnapshotId,
+                                                      @Nullable String ledgerTransactionSn) {
+        List<String> refs = new ArrayList<>();
+        if (StringUtils.hasText(fundsTransactionSn)) {
+            refs.add("fundsTransaction:" + fundsTransactionSn);
+        }
+        refs.add("routeSnapshot:" + routeSnapshotId);
+        if (StringUtils.hasText(ledgerTransactionSn)) {
+            refs.add("ledgerTransaction:" + ledgerTransactionSn);
+        }
+        return List.copyOf(refs);
+    }
 }

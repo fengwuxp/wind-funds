@@ -37,7 +37,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
     /**
      * 场景：真实资金服务链路完成充值和付款，付款事务提交后发布普通交易投影。
      * 输入：H2 中真实账户、账本、route、lifecycle saver、posting service 和 recording 投影发布端口。
-     * 输出：投影上下文包含真实资金指令、route snapshot、完成态生命周期结果和账本交易流水。
+     * 输出：投影上下文包含真实资金指令、route snapshot、完成态生命周期结果、账本交易流水和只读解释摘要。
      * 预期：普通交易投影入口由真实 Spring Bean 和 afterCommit 事务同步触发。
      * 红线：交易成功后不能缺失普通交易投影入口，且投影上下文不得停留在未完成生命周期结果。
      */
@@ -66,6 +66,42 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(context.lifecycleResult().isCompleted()).isTrue();
             assertThat(context.ledgerTransaction()).isNotNull();
             assertThat(context.ledgerTransaction().getSn()).isEqualTo(ledgerTransaction.getSn());
+            var explanation = context.explanation();
+            assertThat(explanation.businessScene()).isEqualTo("PAY");
+            assertThat(explanation.businessSn()).isEqualTo("PROJECTION_SUCCESS_PAY");
+            assertThat(explanation.fundsTransactionSn()).isEqualTo(transactionSn);
+            assertThat(explanation.routeSnapshotId()).isEqualTo(context.routeSnapshot().getSnapshotId());
+            assertThat(explanation.routeCode()).isEqualTo(context.routeSnapshot().getRouteCode());
+            assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+            assertThat(explanation.factStatus()).isEqualTo("POSTED");
+            assertThat(explanation.displayStatus()).isEqualTo("SUCCEEDED");
+            assertThat(explanation.operationStatus()).isEqualTo("NO_ACTION_REQUIRED");
+            assertThat(explanation.failureReason()).isEqualTo("N/A");
+            assertThat(explanation.unavailableReason()).isEqualTo("N/A");
+            assertThat(explanation.nextAction()).isEqualTo("N/A");
+            assertThat(explanation.evidenceRefs())
+                    .contains("fundsTransaction:" + transactionSn,
+                            "routeSnapshot:" + context.routeSnapshot().getSnapshotId(),
+                            "ledgerTransaction:" + ledgerTransaction.getSn());
+            assertThat(explanation.externalRuleVerificationStatus()).isEqualTo("N/A");
+            var payload = explanation.payload();
+            assertThat(payload)
+                    .containsEntry("businessScene", "PAY")
+                    .containsEntry("businessSn", "PROJECTION_SUCCESS_PAY")
+                    .containsEntry("fundsTransactionSn", transactionSn)
+                    .containsEntry("routeSnapshotId", context.routeSnapshot().getSnapshotId())
+                    .containsEntry("routeCode", context.routeSnapshot().getRouteCode())
+                    .containsEntry("ledgerTransactionSn", ledgerTransaction.getSn())
+                    .containsEntry("factStatus", "POSTED")
+                    .containsEntry("displayStatus", "SUCCEEDED")
+                    .containsEntry("operationStatus", "NO_ACTION_REQUIRED")
+                    .containsEntry("failureReason", "N/A")
+                    .containsEntry("unavailableReason", "N/A")
+                    .containsEntry("nextAction", "N/A")
+                    .containsEntry("externalRuleVerificationStatus", "N/A");
+            assertThat(payload.get("evidenceRefs"))
+                    .asList()
+                    .contains("routeSnapshot:" + context.routeSnapshot().getSnapshotId());
         });
         assertThat(fundsTransaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
         assertThat(details).isNotEmpty()
@@ -73,6 +109,85 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                     assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
                     assertThat(detail.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
                 });
+        assertPostedTransactions(2);
+    }
+
+    /**
+     * 场景：真实资金服务链路完成充值和授权占用，授权事务提交后发布普通交易投影。
+     * 输入：账户 AVAILABLE 余额 100，授权批准 60。
+     * 输出：投影解释摘要标记为授权占用，并给出等待 capture 或 release 的下一动作。
+     * 预期：授权占用不能展示成已完成消费结果。
+     * 红线：交易投影不得把 AUTHORIZE 占用态误导为最终付款成功。
+     */
+    @Test
+    void testAuthorizationHoldProjectionExplanationShouldNotDisplayAsFinalPaymentSuccess() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "PROJECTION_AUTH_TOPUP");
+        projectionPublisher.clear();
+
+        String authorizationSn = authorize(user, 60L, true, "PROJECTION_AUTH_AUTHORIZE");
+
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_AUTH_AUTHORIZE");
+        assertThat(projectionPublisher.contexts()).singleElement().satisfies(context -> {
+            assertThat(context.instruction().getBusinessSn()).isEqualTo("PROJECTION_AUTH_AUTHORIZE");
+            assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(authorizationSn);
+            assertThat(context.lifecycleResult().getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+            assertThat(context.lifecycleResult().isCompleted()).isTrue();
+            var explanation = context.explanation();
+            assertThat(explanation.businessScene()).isEqualTo("AUTHORIZATION");
+            assertThat(explanation.businessSn()).isEqualTo("PROJECTION_AUTH_AUTHORIZE");
+            assertThat(explanation.fundsTransactionSn()).isEqualTo(authorizationSn);
+            assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+            assertThat(explanation.factStatus()).isEqualTo("HELD");
+            assertThat(explanation.displayStatus()).isEqualTo("AUTHORIZED_HOLD");
+            assertThat(explanation.operationStatus()).isEqualTo("WAITING_CAPTURE_OR_RELEASE");
+            assertThat(explanation.unavailableReason())
+                    .isEqualTo("AUTHORIZATION_HOLD_IS_NOT_FINAL_CONSUMPTION");
+            assertThat(explanation.nextAction()).isEqualTo("WAIT_FOR_CAPTURE_OR_RELEASE");
+            assertThat(explanation.payload())
+                    .containsEntry("displayStatus", "AUTHORIZED_HOLD")
+                    .containsEntry("operationStatus", "WAITING_CAPTURE_OR_RELEASE")
+                    .containsEntry("nextAction", "WAIT_FOR_CAPTURE_OR_RELEASE");
+        });
+        assertPostedTransactions(2);
+    }
+
+    /**
+     * 场景：真实资金服务链路完成充值和余额冻结，冻结事务提交后发布普通交易投影。
+     * 输入：账户 AVAILABLE 余额 100，冻结 40。
+     * 输出：投影解释摘要标记为冻结占用，并给出等待解冻或扣划的下一动作。
+     * 预期：余额冻结不能展示成已完成消费结果。
+     * 红线：交易投影不得把 FREEZE 控制态误导为最终付款成功。
+     */
+    @Test
+    void testFreezeProjectionExplanationShouldNotDisplayAsFinalPaymentSuccess() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "PROJECTION_FREEZE_TOPUP");
+        projectionPublisher.clear();
+
+        String freezeSn = freeze(user, 40L, "PROJECTION_FREEZE_HOLD");
+
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_FREEZE_HOLD");
+        assertThat(projectionPublisher.contexts()).singleElement().satisfies(context -> {
+            assertThat(context.instruction().getBusinessSn()).isEqualTo("PROJECTION_FREEZE_HOLD");
+            assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(freezeSn);
+            assertThat(context.lifecycleResult().getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+            assertThat(context.lifecycleResult().isCompleted()).isTrue();
+            var explanation = context.explanation();
+            assertThat(explanation.businessScene()).isEqualTo("FREEZE");
+            assertThat(explanation.businessSn()).isEqualTo("PROJECTION_FREEZE_HOLD");
+            assertThat(explanation.fundsTransactionSn()).isEqualTo(freezeSn);
+            assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+            assertThat(explanation.factStatus()).isEqualTo("HELD");
+            assertThat(explanation.displayStatus()).isEqualTo("FROZEN");
+            assertThat(explanation.operationStatus()).isEqualTo("WAITING_UNFREEZE_OR_CONSUME");
+            assertThat(explanation.unavailableReason()).isEqualTo("BALANCE_FREEZE_IS_NOT_CONSUMPTION");
+            assertThat(explanation.nextAction()).isEqualTo("WAIT_FOR_UNFREEZE_OR_CONSUME");
+            assertThat(explanation.payload())
+                    .containsEntry("displayStatus", "FROZEN")
+                    .containsEntry("operationStatus", "WAITING_UNFREEZE_OR_CONSUME")
+                    .containsEntry("nextAction", "WAIT_FOR_UNFREEZE_OR_CONSUME");
+        });
         assertPostedTransactions(2);
     }
 
