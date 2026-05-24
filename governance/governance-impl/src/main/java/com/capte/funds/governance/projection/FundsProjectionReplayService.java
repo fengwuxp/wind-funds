@@ -4,6 +4,8 @@ import com.capte.funds.governance.enums.ProjectionCheckpointType;
 import com.capte.funds.governance.enums.ProjectionReplayMode;
 import com.wind.common.exception.AssertUtils;
 import org.jspecify.annotations.NonNull;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -20,6 +22,15 @@ import java.util.Map;
  * 不推进清结算或对账差错处理。</p>
  */
 public class FundsProjectionReplayService {
+
+    private static final List<String> EXPLAINABILITY_PAYLOAD_KEYS = List.of(
+            "factStatus",
+            "operationStatus",
+            "statusMeaning",
+            "unavailableReason",
+            "nextAction",
+            "evidenceRefs",
+            "externalRuleVerificationStatus");
 
     private final FundsTransactionProjectionReplaySource replaySource;
 
@@ -69,6 +80,7 @@ public class FundsProjectionReplayService {
     }
 
     private FundsTransactionProjectionRow rebuildProjectionRow(FundsTransactionProjectionFact fact) {
+        assertExplainabilityPayload(fact);
         return FundsTransactionProjectionRow.builder()
                 .projectionSn("TP-" + fact.sourceSn())
                 .viewDomain(fact.viewDomain())
@@ -82,5 +94,23 @@ public class FundsProjectionReplayService {
                 .occurredTime(fact.occurredTime())
                 .payload(Map.copyOf(fact.payload()))
                 .build();
+    }
+
+    private void assertExplainabilityPayload(FundsTransactionProjectionFact fact) {
+        for (String key : EXPLAINABILITY_PAYLOAD_KEYS) {
+            AssertUtils.isTrue(hasExplainabilityValue(fact.payload().get(key)),
+                    "交易投影重放缺少使用者解释视图字段，sourceSn = {}，field = {}",
+                    fact.sourceSn(), key);
+        }
+    }
+
+    private boolean hasExplainabilityValue(Object value) {
+        if (value instanceof String text) {
+            return StringUtils.hasText(text);
+        }
+        if (value instanceof List<?> values) {
+            return !CollectionUtils.isEmpty(values);
+        }
+        return value != null;
     }
 }

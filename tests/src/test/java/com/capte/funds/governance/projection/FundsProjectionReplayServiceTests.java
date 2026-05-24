@@ -221,6 +221,25 @@ class FundsProjectionReplayServiceTests {
                 .satisfies(row -> assertThat(row.projectionSn()).isEqualTo("TP-FT202605190001"));
     }
 
+    /**
+     * 场景：运营人员重放用户账单投影，但来源事实缺少使用者解释视图所需的操作状态、下一步动作和脱敏证据。
+     * 输入：单笔重放范围、`VERIFY_ONLY` 模式、缺解释载荷的交易投影事实。
+     * 输出：服务拒绝重建投影行。
+     * 预期：错误指向缺少使用者解释视图字段。
+     * 红线：用户账单、商户账单或运营时间线缺事实状态、展示状态或操作状态时，不得展示为可操作视图。
+     */
+    @Test
+    void testReplayFactWithoutExplainabilityPayloadShouldFail() {
+        FundsProjectionReplayService service = new FundsProjectionReplayService(new IncompleteProjectionReplaySource(),
+                new RecordingProjectionWriter());
+
+        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
+                .build())))
+                .hasMessageContaining("交易投影重放缺少使用者解释视图字段")
+                .hasMessageContaining("operationStatus");
+    }
+
     private static FundsProjectionReplayService newService(RecordingProjectionWriter writer) {
         return new FundsProjectionReplayService(new FixedProjectionReplaySource(), writer);
     }
@@ -257,9 +276,40 @@ class FundsProjectionReplayServiceTests {
                     .amount(100L)
                     .currency("USD")
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
-                    .payload(Map.of("businessScene", "ORDER_PAY"))
+                    .payload(explainablePayload())
                     .build());
         }
+    }
+
+    private static final class IncompleteProjectionReplaySource implements FundsTransactionProjectionReplaySource {
+
+        @Override
+        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+            return List.of(FundsTransactionProjectionFact.builder()
+                    .viewDomain("USER_BILL")
+                    .ownerType("USER")
+                    .ownerId("U1001")
+                    .sourceSn("FT202605190001")
+                    .displayType("PAYMENT")
+                    .displayStatus("SUCCEEDED")
+                    .amount(100L)
+                    .currency("USD")
+                    .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
+                    .payload(Map.of("businessScene", "ORDER_PAY", "factStatus", "POSTED"))
+                    .build());
+        }
+    }
+
+    private static Map<String, Object> explainablePayload() {
+        return Map.of(
+                "businessScene", "ORDER_PAY",
+                "factStatus", "POSTED",
+                "operationStatus", "NO_ACTION_REQUIRED",
+                "statusMeaning", "payment posted",
+                "unavailableReason", "N/A",
+                "nextAction", "N/A",
+                "evidenceRefs", List.of("routeSnapshot:RS-202605190001"),
+                "externalRuleVerificationStatus", "N/A");
     }
 
     private static final class RecordingProjectionWriter implements FundsTransactionProjectionWriter {
