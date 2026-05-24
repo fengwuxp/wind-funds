@@ -120,6 +120,7 @@ final class RouteSnapshotJsonSupport {
     private static Map<String, Object> legSummary(RouteLegSpec leg) {
         Map<String, Object> values = new TreeMap<>();
         values.put("legId", leg.getLegId());
+        values.put("sequence", leg.getSequence());
         values.put("legType", leg.getLegType().name());
         values.put("sourceNode", routeNodeSummary(leg.getSourceNode()));
         values.put("targetNode", routeNodeSummary(leg.getTargetNode()));
