@@ -91,6 +91,10 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     @Override
     public @NonNull ResolvedRouteSpec resolve(@NonNull FundsInstructionSpec instruction) {
         RouteSnapshotSpec snapshot = requireReplaySnapshot(instruction);
+        RouteBenefitSnapshotContextSupport.assertOriginalBenefitSnapshotPresent(instruction, snapshot);
+        Map<String, Object> replayContext =
+                RouteBenefitSnapshotContextSupport.mergeOriginalBenefitSnapshotSummary(
+                        instruction.getContextVariables(), snapshot);
         ReplayRequestSpec replayRequest = ImmutableReplayRequestSpec.builder()
                 .replayType(resolveReplayType(instruction.getEventType()))
                 .eventType(instruction.getEventType())
@@ -104,7 +108,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .eventTime(instruction.getEventTime())
                 .description(instruction.getDescription())
                 .operator(instruction.getOperator())
-                .contextVariables(instruction.getContextVariables())
+                .contextVariables(replayContext)
                 .build();
         assertReplayLegAmountNotOverConsumed(instruction.getReference(), snapshot, replayRequest);
         return replay(snapshot, replayRequest);

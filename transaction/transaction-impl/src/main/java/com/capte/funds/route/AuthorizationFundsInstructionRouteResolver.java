@@ -267,7 +267,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 .platformAccounts(platformAccounts)
                 .resolvedAt(instruction.getEventTime())
                 .description(instruction.getDescription())
-                .contextVariables(instruction.getContextVariables())
+                .contextVariables(RouteBenefitSnapshotContextSupport.mergeBenefitSnapshotSummary(instruction))
                 .build();
         RouteSpecSupport.validateResolvedRoute(result);
         return result;

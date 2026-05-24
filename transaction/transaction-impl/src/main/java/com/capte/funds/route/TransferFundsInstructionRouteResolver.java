@@ -414,7 +414,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .platformAccounts(platformAccounts)
                 .resolvedAt(instruction.getEventTime())
                 .description(instruction.getDescription())
-                .contextVariables(instruction.getContextVariables())
+                .contextVariables(RouteBenefitSnapshotContextSupport.mergeBenefitSnapshotSummary(instruction))
                 .build();
         RouteSpecSupport.validateResolvedRoute(result);
         return result;

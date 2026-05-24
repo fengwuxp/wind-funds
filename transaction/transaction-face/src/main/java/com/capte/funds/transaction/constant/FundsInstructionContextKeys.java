@@ -46,6 +46,20 @@ public final class FundsInstructionContextKeys {
 
     public static final String ROUTE_SNAPSHOT = "routeSnapshot";
 
+    /**
+     * 原权益快照 ID 摘要，用于 RouteSnapshot 回放、投影解释和审计追溯。
+     *
+     * <p>该字段不承载完整权益事实。</p>
+     */
+    public static final String BENEFIT_SNAPSHOT_ID = "benefitSnapshotId";
+
+    /**
+     * 原权益快照稳定摘要，用于判断回放是否引用原路径事实。
+     *
+     * <p>该字段不承载当前营销计算结果。</p>
+     */
+    public static final String BENEFIT_SNAPSHOT_STABLE_DIGEST = "stableDigest";
+
     public static final String ADJUST_REASON = "adjustReason";
 
     public static final String ADJUST_EVIDENCE_REF = "adjustEvidenceRef";
