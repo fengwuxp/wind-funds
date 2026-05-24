@@ -36,17 +36,18 @@ final class RouteBenefitSnapshotContextSupport {
 
     static void assertOriginalBenefitSnapshotPresent(FundsInstructionSpec instruction,
                                                      RouteSnapshotSpec routeSnapshot) {
+        Map<String, Object> originalContext = routeSnapshot.getContextVariables();
+        boolean hasOriginalSnapshotId = hasTextValue(originalContext, FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID);
+        boolean hasOriginalSnapshotDigest = hasTextValue(originalContext,
+                FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST);
         FundsBenefitSnapshotSpec benefitSnapshot = instruction.getBenefitSnapshot();
-        if (benefitSnapshot == null) {
+        if (benefitSnapshot == null && !hasOriginalSnapshotId && !hasOriginalSnapshotDigest) {
             return;
         }
-        Map<String, Object> originalContext = routeSnapshot.getContextVariables();
-        Object originalSnapshotId = originalContext.get(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID);
-        Object originalSnapshotDigest = originalContext.get(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST);
-        AssertUtils.isTrue(originalSnapshotId instanceof String snapshotId && StringUtils.hasText(snapshotId)
-                        && originalSnapshotDigest instanceof String stableDigest && StringUtils.hasText(stableDigest),
+        AssertUtils.isTrue(hasOriginalSnapshotId && hasOriginalSnapshotDigest,
                 MISSING_BENEFIT_SNAPSHOT_MESSAGE + "，referenceSn = {}，benefitSnapshotId = {}",
-                instruction.getReference().getReferenceSn(), benefitSnapshot.getBenefitSnapshotId());
+                instruction.getReference().getReferenceSn(),
+                benefitSnapshot == null ? null : benefitSnapshot.getBenefitSnapshotId());
     }
 
     static Map<String, Object> mergeOriginalBenefitSnapshotSummary(Map<String, Object> contextVariables,
@@ -63,5 +64,10 @@ final class RouteBenefitSnapshotContextSupport {
         if (value != null) {
             target.put(key, value);
         }
+    }
+
+    private static boolean hasTextValue(Map<String, Object> contextVariables, String key) {
+        Object value = contextVariables.get(key);
+        return value instanceof String text && StringUtils.hasText(text);
     }
 }

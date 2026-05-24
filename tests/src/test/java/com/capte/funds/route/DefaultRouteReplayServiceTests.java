@@ -253,6 +253,28 @@ class DefaultRouteReplayServiceTests {
     }
 
     /**
+     * 场景：原 RouteSnapshot 已被标记为含权益交易，但只保存了权益快照 ID，缺少稳定摘要。
+     * 输入：退款指令不携带新的权益结果，原路径快照 context 仅有 `benefitSnapshotId`。
+     * 输出：解析器拒绝回放。
+     * 预期：错误明确指向缺少原权益快照摘要，并带上原交易流水号。
+     * 红线：只保存部分权益线索不能被当成可回放的原权益快照事实。
+     */
+    @Test
+    void testResolveBenefitReplayWithPartialOriginalBenefitSnapshotSummaryShouldFail() {
+        FundsInstructionReferenceSpec reference = originalTransactionReference("FT202605190006");
+        RouteSnapshotSpec routeSnapshot = routeSnapshot(paymentInstrumentRef("CARD-OLD", "old-binding"),
+                null,
+                routingDecision("ALLOC-OLD", fundingAccount("PAYER-001")),
+                Map.of(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, "BS-ORIGINAL-PARTIAL-001"));
+        DefaultRouteReplayService replayService = new DefaultRouteReplayService(
+                new SnapshotFundsTransactionQueryService(routeSnapshot));
+
+        assertThatThrownBy(() -> replayService.resolve(replayInstruction(reference)))
+                .hasMessageContaining(MISSING_ORIGINAL_BENEFIT_SNAPSHOT_MESSAGE)
+                .hasMessageContaining("FT202605190006");
+    }
+
+    /**
      * 场景：含权益退款回放引用原 RouteSnapshot，当前请求也携带了新的权益快照。
      * 输入：原 RouteSnapshot context 只保存原权益快照 ID 和稳定摘要，当前请求携带另一份权益快照。
      * 输出：回放成功，ResolvedRoute context 继承原权益快照摘要。
