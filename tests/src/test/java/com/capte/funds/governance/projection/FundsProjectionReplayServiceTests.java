@@ -223,6 +223,46 @@ class FundsProjectionReplayServiceTests {
     }
 
     /**
+     * 场景：重放源错误返回了其他视图域的交易投影事实。
+     * 输入：请求视图域为 `USER_BILL`，来源事实视图域为 `MERCHANT_BILL`。
+     * 输出：服务拒绝重建投影行。
+     * 预期：错误指向来源事实不属于请求视图域。
+     * 红线：用户账单、商户账单和运营时间线不能在同一次重放中串域覆盖。
+     */
+    @Test
+    void testReplayFactWithMismatchedViewDomainShouldFail() {
+        FundsProjectionReplayService service = new FundsProjectionReplayService(new MismatchedViewDomainReplaySource(),
+                new RecordingProjectionWriter());
+
+        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
+                .build())))
+                .hasMessageContaining("交易投影重放来源事实不属于请求视图域")
+                .hasMessageContaining("MERCHANT_BILL")
+                .hasMessageContaining("USER_BILL");
+    }
+
+    /**
+     * 场景：重放源错误返回了本次 sourceSn 范围外的交易投影事实。
+     * 输入：请求只重放 `FT202605190001`，来源事实却是 `FT202605190999`。
+     * 输出：服务拒绝重建投影行。
+     * 预期：错误指向来源事实不属于请求范围。
+     * 红线：交易投影重放不能因读取源异常把影响面扩大到本次授权范围外。
+     */
+    @Test
+    void testReplayFactOutsideSourceRangeShouldFail() {
+        FundsProjectionReplayService service = new FundsProjectionReplayService(new OutsideSourceRangeReplaySource(),
+                new RecordingProjectionWriter());
+
+        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
+                .build())))
+                .hasMessageContaining("交易投影重放来源事实不属于请求范围")
+                .hasMessageContaining("sourceSn")
+                .hasMessageContaining("FT202605190999");
+    }
+
+    /**
      * 场景：运营人员重放用户账单投影，但来源事实缺少使用者解释视图所需的操作状态、下一步动作和脱敏证据。
      * 输入：单笔重放范围、`VERIFY_ONLY` 模式、缺解释载荷的交易投影事实。
      * 输出：服务拒绝重建投影行。
@@ -318,6 +358,44 @@ class FundsProjectionReplayServiceTests {
                     .currency("USD")
                     .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                     .payload(Map.of("businessScene", "ORDER_PAY", "factStatus", "POSTED"))
+                    .build());
+        }
+    }
+
+    private static final class MismatchedViewDomainReplaySource implements FundsTransactionProjectionReplaySource {
+
+        @Override
+        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+            return List.of(FundsTransactionProjectionFact.builder()
+                    .viewDomain("MERCHANT_BILL")
+                    .ownerType("USER")
+                    .ownerId("U1001")
+                    .sourceSn("FT202605190001")
+                    .displayType("PAYMENT")
+                    .displayStatus("SUCCEEDED")
+                    .amount(100L)
+                    .currency("USD")
+                    .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
+                    .payload(explainablePayload())
+                    .build());
+        }
+    }
+
+    private static final class OutsideSourceRangeReplaySource implements FundsTransactionProjectionReplaySource {
+
+        @Override
+        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+            return List.of(FundsTransactionProjectionFact.builder()
+                    .viewDomain("USER_BILL")
+                    .ownerType("USER")
+                    .ownerId("U1001")
+                    .sourceSn("FT202605190999")
+                    .displayType("PAYMENT")
+                    .displayStatus("SUCCEEDED")
+                    .amount(100L)
+                    .currency("USD")
+                    .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
+                    .payload(explainablePayload())
                     .build());
         }
     }

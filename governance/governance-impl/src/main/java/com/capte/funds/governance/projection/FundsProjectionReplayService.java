@@ -48,7 +48,7 @@ public class FundsProjectionReplayService {
         assertRequestValid(request);
         List<FundsTransactionProjectionFact> facts = replaySource.loadFacts(request.replayRange());
         List<FundsTransactionProjectionRow> rebuiltRows = facts.stream()
-                .map(this::rebuildProjectionRow)
+                .map(fact -> rebuildProjectionRow(request, fact))
                 .toList();
         List<FundsTransactionProjectionDifference> differences = projectionWriter.compare(request.viewDomain(),
                 rebuiltRows);
@@ -82,7 +82,9 @@ public class FundsProjectionReplayService {
                 "交易投影重放 checkpoint 类型必须为交易投影");
     }
 
-    private FundsTransactionProjectionRow rebuildProjectionRow(FundsTransactionProjectionFact fact) {
+    private FundsTransactionProjectionRow rebuildProjectionRow(FundsTransactionProjectionReplayRequest request,
+                                                               FundsTransactionProjectionFact fact) {
+        assertFactInRequestScope(request, fact);
         assertExplainabilityPayload(fact);
         return FundsTransactionProjectionRow.builder()
                 .projectionSn("TP-" + fact.sourceSn())
@@ -97,6 +99,45 @@ public class FundsProjectionReplayService {
                 .occurredTime(fact.occurredTime())
                 .payload(Map.copyOf(fact.payload()))
                 .build();
+    }
+
+    private void assertFactInRequestScope(FundsTransactionProjectionReplayRequest request,
+                                          FundsTransactionProjectionFact fact) {
+        AssertUtils.isTrue(request.viewDomain().equals(fact.viewDomain()),
+                "交易投影重放来源事实不属于请求视图域，sourceSn = {}，actual = {}，expected = {}",
+                fact.sourceSn(), fact.viewDomain(), request.viewDomain());
+        FundsTransactionProjectionReplayRange range = request.replayRange();
+        assertSourceInRange(range, fact);
+        assertOwnerInRange(range, fact);
+        assertOccurredTimeInRange(range, fact);
+    }
+
+    private void assertSourceInRange(FundsTransactionProjectionReplayRange range,
+                                     FundsTransactionProjectionFact fact) {
+        if (StringUtils.hasText(range.sourceSn())) {
+            AssertUtils.isTrue(range.sourceSn().equals(fact.sourceSn()),
+                    "交易投影重放来源事实不属于请求范围，field = sourceSn，actual = {}，expected = {}",
+                    fact.sourceSn(), range.sourceSn());
+        }
+    }
+
+    private void assertOwnerInRange(FundsTransactionProjectionReplayRange range,
+                                    FundsTransactionProjectionFact fact) {
+        if (StringUtils.hasText(range.ownerType()) && StringUtils.hasText(range.ownerId())) {
+            AssertUtils.isTrue(range.ownerType().equals(fact.ownerType()) && range.ownerId().equals(fact.ownerId()),
+                    "交易投影重放来源事实不属于请求范围，field = owner，actual = {}/{}，expected = {}/{}",
+                    fact.ownerType(), fact.ownerId(), range.ownerType(), range.ownerId());
+        }
+    }
+
+    private void assertOccurredTimeInRange(FundsTransactionProjectionReplayRange range,
+                                           FundsTransactionProjectionFact fact) {
+        if (range.startTime() != null && range.endTime() != null) {
+            AssertUtils.isTrue(!fact.occurredTime().isBefore(range.startTime())
+                            && fact.occurredTime().isBefore(range.endTime()),
+                    "交易投影重放来源事实不属于请求范围，field = occurredTime，sourceSn = {}",
+                    fact.sourceSn());
+        }
     }
 
     private void assertExplainabilityPayload(FundsTransactionProjectionFact fact) {
