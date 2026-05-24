@@ -232,12 +232,80 @@ class FundsProjectionReplayServiceTests {
     @Test
     void testReplayWithNullDifferencesShouldFail() {
         FundsProjectionReplayService service = new FundsProjectionReplayService(new FixedProjectionReplaySource(),
-                new NullDifferencesProjectionWriter());
+                new StaticDifferencesProjectionWriter(null));
 
         assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
                 .sourceSn("FT202605190001")
                 .build())))
                 .hasMessageContaining("交易投影重放差异列表不能为空");
+    }
+
+    /**
+     * 场景：投影写入端口比较差异时返回了 null 差异项。
+     * 输入：单笔重放范围、`VERIFY_ONLY` 模式、差异列表中包含 null 项。
+     * 输出：服务拒绝生成重放结果。
+     * 预期：每个差异项都必须是完整对象。
+     * 红线：交易投影重放不得输出无法被人工复核和审计追踪的空差异项。
+     */
+    @Test
+    void testReplayWithNullDifferenceItemShouldFail() {
+        List<FundsTransactionProjectionDifference> differences = new ArrayList<>();
+        differences.add(null);
+        FundsProjectionReplayService service = new FundsProjectionReplayService(new FixedProjectionReplaySource(),
+                new StaticDifferencesProjectionWriter(differences));
+
+        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
+                .build())))
+                .hasMessageContaining("交易投影重放差异项不能为空");
+    }
+
+    /**
+     * 场景：投影写入端口比较差异时返回了缺少字段名的差异项。
+     * 输入：单笔重放范围、`VERIFY_ONLY` 模式、`fieldName` 为空的差异项。
+     * 输出：服务拒绝生成重放结果。
+     * 预期：差异项必须说明是哪一笔来源事实的哪个字段发生差异。
+     * 红线：交易投影重放不得输出无法定位字段的差异报告。
+     */
+    @Test
+    void testReplayWithBlankDifferenceFieldNameShouldFail() {
+        FundsProjectionReplayService service = new FundsProjectionReplayService(new FixedProjectionReplaySource(),
+                new StaticDifferencesProjectionWriter(List.of(FundsTransactionProjectionDifference.builder()
+                        .sourceSn("FT202605190001")
+                        .fieldName("")
+                        .expectedValue("SUCCEEDED")
+                        .actualValue("FAILED")
+                        .build())));
+
+        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
+                .build())))
+                .hasMessageContaining("交易投影重放差异项字段不能为空")
+                .hasMessageContaining("fieldName");
+    }
+
+    /**
+     * 场景：投影写入端口比较差异时返回了缺少来源交易号的差异项。
+     * 输入：单笔重放范围、`VERIFY_ONLY` 模式、`sourceSn` 为空的差异项。
+     * 输出：服务拒绝生成重放结果。
+     * 预期：差异项必须绑定可追踪的来源事实。
+     * 红线：交易投影重放不得输出无法追溯来源事实的差异报告。
+     */
+    @Test
+    void testReplayWithBlankDifferenceSourceSnShouldFail() {
+        FundsProjectionReplayService service = new FundsProjectionReplayService(new FixedProjectionReplaySource(),
+                new StaticDifferencesProjectionWriter(List.of(FundsTransactionProjectionDifference.builder()
+                        .sourceSn("")
+                        .fieldName("displayStatus")
+                        .expectedValue("SUCCEEDED")
+                        .actualValue("FAILED")
+                        .build())));
+
+        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
+                .build())))
+                .hasMessageContaining("交易投影重放差异项字段不能为空")
+                .hasMessageContaining("sourceSn");
     }
 
     /**
@@ -534,12 +602,18 @@ class FundsProjectionReplayServiceTests {
                 "externalRuleVerificationStatus", "N/A");
     }
 
-    private static final class NullDifferencesProjectionWriter implements FundsTransactionProjectionWriter {
+    private static final class StaticDifferencesProjectionWriter implements FundsTransactionProjectionWriter {
+
+        private final List<FundsTransactionProjectionDifference> differences;
+
+        private StaticDifferencesProjectionWriter(List<FundsTransactionProjectionDifference> differences) {
+            this.differences = differences;
+        }
 
         @Override
         public List<FundsTransactionProjectionDifference> compare(String viewDomain,
                                                                   List<FundsTransactionProjectionRow> rebuiltRows) {
-            return null;
+            return differences;
         }
 
         @Override

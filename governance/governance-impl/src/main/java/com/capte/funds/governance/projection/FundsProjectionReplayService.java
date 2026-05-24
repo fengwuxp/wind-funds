@@ -54,6 +54,7 @@ public class FundsProjectionReplayService {
         List<FundsTransactionProjectionDifference> differences = projectionWriter.compare(request.viewDomain(),
                 rebuiltRows);
         AssertUtils.notNull(differences, "交易投影重放差异列表不能为空");
+        assertDifferencesComplete(differences);
         if (request.mode() == ProjectionReplayMode.REBUILD_SHADOW) {
             projectionWriter.upsertShadow(request.taskSn(), rebuiltRows);
         } else if (request.mode() == ProjectionReplayMode.REBUILD_APPLY) {
@@ -82,6 +83,18 @@ public class FundsProjectionReplayService {
         AssertUtils.hasText(request.checkpoint().checkpointSn(), "交易投影重放 checkpoint 流水号不能为空");
         AssertUtils.isTrue(request.checkpoint().type() == ProjectionCheckpointType.TRANSACTION_PROJECTION,
                 "交易投影重放 checkpoint 类型必须为交易投影");
+    }
+
+    private void assertDifferencesComplete(List<FundsTransactionProjectionDifference> differences) {
+        for (FundsTransactionProjectionDifference difference : differences) {
+            AssertUtils.notNull(difference, "交易投影重放差异项不能为空");
+            assertDifferenceHasText(difference.sourceSn(), "sourceSn");
+            assertDifferenceHasText(difference.fieldName(), "fieldName");
+        }
+    }
+
+    private void assertDifferenceHasText(String value, String fieldName) {
+        AssertUtils.hasText(value, "交易投影重放差异项字段不能为空，field = {}", fieldName);
     }
 
     private FundsTransactionProjectionRow rebuildProjectionRow(FundsTransactionProjectionReplayRequest request,
