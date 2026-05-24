@@ -53,6 +53,7 @@ public class FundsProjectionReplayService {
                 .toList();
         List<FundsTransactionProjectionDifference> differences = projectionWriter.compare(request.viewDomain(),
                 rebuiltRows);
+        AssertUtils.notNull(differences, "交易投影重放差异列表不能为空");
         if (request.mode() == ProjectionReplayMode.REBUILD_SHADOW) {
             projectionWriter.upsertShadow(request.taskSn(), rebuiltRows);
         } else if (request.mode() == ProjectionReplayMode.REBUILD_APPLY) {

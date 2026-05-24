@@ -223,6 +223,24 @@ class FundsProjectionReplayServiceTests {
     }
 
     /**
+     * 场景：投影写入端口比较差异时错误返回了空差异列表对象。
+     * 输入：单笔重放范围、`VERIFY_ONLY` 模式、返回 null 差异列表的 writer。
+     * 输出：服务拒绝生成重放结果。
+     * 预期：差异报告列表必须显式返回，完全一致时也应返回空列表。
+     * 红线：交易投影重放结果不得携带不可审计的 null 差异报告。
+     */
+    @Test
+    void testReplayWithNullDifferencesShouldFail() {
+        FundsProjectionReplayService service = new FundsProjectionReplayService(new FixedProjectionReplaySource(),
+                new NullDifferencesProjectionWriter());
+
+        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
+                .build())))
+                .hasMessageContaining("交易投影重放差异列表不能为空");
+    }
+
+    /**
      * 场景：重放源错误返回了其他视图域的交易投影事实。
      * 输入：请求视图域为 `USER_BILL`，来源事实视图域为 `MERCHANT_BILL`。
      * 输出：服务拒绝重建投影行。
@@ -514,6 +532,25 @@ class FundsProjectionReplayServiceTests {
                 "nextAction", "N/A",
                 "evidenceRefs", List.of("routeSnapshot:RS-202605190001"),
                 "externalRuleVerificationStatus", "N/A");
+    }
+
+    private static final class NullDifferencesProjectionWriter implements FundsTransactionProjectionWriter {
+
+        @Override
+        public List<FundsTransactionProjectionDifference> compare(String viewDomain,
+                                                                  List<FundsTransactionProjectionRow> rebuiltRows) {
+            return null;
+        }
+
+        @Override
+        public void upsertShadow(String taskSn, List<FundsTransactionProjectionRow> rebuiltRows) {
+            // No-op: this test only verifies compare contract hardening.
+        }
+
+        @Override
+        public void upsertOfficial(String taskSn, List<FundsTransactionProjectionRow> rebuiltRows) {
+            // No-op: this test only verifies compare contract hardening.
+        }
     }
 
     private static final class RecordingProjectionWriter implements FundsTransactionProjectionWriter {
