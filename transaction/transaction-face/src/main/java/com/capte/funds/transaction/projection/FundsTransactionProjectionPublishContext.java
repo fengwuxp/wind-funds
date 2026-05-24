@@ -14,6 +14,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.StringJoiner;
 
 /**
  * 交易投影正常发布上下文。
@@ -64,6 +65,23 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
 
     private static final String OPERATION_STATUS_WAITING_FACT_COMPLETION = "WAITING_FACT_COMPLETION";
 
+    private static final String STATUS_MEANING_FUNDS_POSTED = "FUNDS_POSTED";
+
+    private static final String STATUS_MEANING_AUTHORIZATION_HELD_NOT_CAPTURED =
+            "AUTHORIZATION_HELD_NOT_CAPTURED";
+
+    private static final String STATUS_MEANING_AUTHORIZATION_DECLINED_NO_FUNDS_POSTED =
+            "AUTHORIZATION_DECLINED_NO_FUNDS_POSTED";
+
+    private static final String STATUS_MEANING_BALANCE_FROZEN_NOT_CONSUMED =
+            "BALANCE_FROZEN_NOT_CONSUMED";
+
+    private static final String STATUS_MEANING_FUNDS_RELEASED = "FUNDS_RELEASED";
+
+    private static final String STATUS_MEANING_FACT_PROCESSING = "FACT_PROCESSING";
+
+    private static final String STATUS_MEANING_COMPLETED_WITHOUT_LEDGER = "COMPLETED_WITHOUT_LEDGER";
+
     private static final String NEXT_ACTION_WAIT_FOR_CAPTURE_OR_RELEASE = "WAIT_FOR_CAPTURE_OR_RELEASE";
 
     private static final String NEXT_ACTION_WAIT_FOR_UNFREEZE_OR_CONSUME = "WAIT_FOR_UNFREEZE_OR_CONSUME";
@@ -94,6 +112,8 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
                 .factStatus(resolveFactStatus(ledgerTransactionSn))
                 .displayStatus(resolveDisplayStatus(ledgerTransactionSn))
                 .operationStatus(resolveOperationStatus(ledgerTransactionSn))
+                .statusMeaning(resolveStatusMeaning(ledgerTransactionSn))
+                .amountSource(resolveAmountSource(ledgerTransactionSn))
                 .failureReason(resolveFailureReason(ledgerTransactionSn))
                 .unavailableReason(resolveUnavailableReason(ledgerTransactionSn))
                 .nextAction(resolveNextAction(ledgerTransactionSn))
@@ -168,6 +188,33 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
         return StringUtils.hasText(reason)
                 ? reason
                 : UNAVAILABLE_AUTHORIZATION_DECLINED;
+    }
+
+    private @NonNull String resolveStatusMeaning(@Nullable String ledgerTransactionSn) {
+        if (!lifecycleResult.isCompleted()) {
+            return STATUS_MEANING_FACT_PROCESSING;
+        }
+        return switch (instruction.getEventType()) {
+            case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn)
+                    ? STATUS_MEANING_AUTHORIZATION_HELD_NOT_CAPTURED
+                    : STATUS_MEANING_AUTHORIZATION_DECLINED_NO_FUNDS_POSTED;
+            case FREEZE -> STATUS_MEANING_BALANCE_FROZEN_NOT_CONSUMED;
+            case REVERSAL, UNFREEZE -> STATUS_MEANING_FUNDS_RELEASED;
+            default -> StringUtils.hasText(ledgerTransactionSn)
+                    ? STATUS_MEANING_FUNDS_POSTED
+                    : STATUS_MEANING_COMPLETED_WITHOUT_LEDGER;
+        };
+    }
+
+    private @NonNull String resolveAmountSource(@Nullable String ledgerTransactionSn) {
+        String ledgerRef = StringUtils.hasText(ledgerTransactionSn) ? ledgerTransactionSn : NOT_APPLICABLE;
+        StringJoiner joiner = new StringJoiner(", ");
+        joiner.add("instructionAmount=" + instruction.getAmount().getAmount() + " "
+                + instruction.getAmount().getCurrency().name());
+        joiner.add("routeLegCount=" + routeSnapshot.getLegs().size());
+        joiner.add("routeSnapshot=" + routeSnapshot.getSnapshotId());
+        joiner.add("ledgerTransaction=" + ledgerRef);
+        return joiner.toString();
     }
 
     private @NonNull String resolveUnavailableReason(@Nullable String ledgerTransactionSn) {

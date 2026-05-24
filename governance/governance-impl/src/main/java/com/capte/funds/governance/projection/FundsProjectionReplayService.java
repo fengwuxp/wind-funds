@@ -27,6 +27,7 @@ public class FundsProjectionReplayService {
             "factStatus",
             "operationStatus",
             "statusMeaning",
+            "amountSource",
             "unavailableReason",
             "nextAction",
             "evidenceRefs",
@@ -42,13 +43,15 @@ public class FundsProjectionReplayService {
         this.projectionWriter = projectionWriter;
     }
 
-    public @NonNull FundsTransactionProjectionReplayResult replay(@NonNull FundsTransactionProjectionReplayRequest request) {
+    public @NonNull FundsTransactionProjectionReplayResult replay(
+            @NonNull FundsTransactionProjectionReplayRequest request) {
         assertRequestValid(request);
         List<FundsTransactionProjectionFact> facts = replaySource.loadFacts(request.replayRange());
         List<FundsTransactionProjectionRow> rebuiltRows = facts.stream()
                 .map(this::rebuildProjectionRow)
                 .toList();
-        List<FundsTransactionProjectionDifference> differences = projectionWriter.compare(request.viewDomain(), rebuiltRows);
+        List<FundsTransactionProjectionDifference> differences = projectionWriter.compare(request.viewDomain(),
+                rebuiltRows);
         if (request.mode() == ProjectionReplayMode.REBUILD_SHADOW) {
             projectionWriter.upsertShadow(request.taskSn(), rebuiltRows);
         } else if (request.mode() == ProjectionReplayMode.REBUILD_APPLY) {

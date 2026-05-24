@@ -83,6 +83,11 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(explanation.factStatus()).isEqualTo("POSTED");
             assertThat(explanation.displayStatus()).isEqualTo("SUCCEEDED");
             assertThat(explanation.operationStatus()).isEqualTo("NO_ACTION_REQUIRED");
+            assertThat(explanation.statusMeaning()).isEqualTo("FUNDS_POSTED");
+            assertThat(explanation.amountSource())
+                    .isEqualTo("instructionAmount=70 USD, routeLegCount=1, routeSnapshot="
+                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction="
+                            + ledgerTransaction.getSn());
             assertThat(explanation.failureReason()).isEqualTo("N/A");
             assertThat(explanation.unavailableReason()).isEqualTo("N/A");
             assertThat(explanation.nextAction()).isEqualTo("N/A");
@@ -102,6 +107,10 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                     .containsEntry("factStatus", "POSTED")
                     .containsEntry("displayStatus", "SUCCEEDED")
                     .containsEntry("operationStatus", "NO_ACTION_REQUIRED")
+                    .containsEntry("statusMeaning", "FUNDS_POSTED")
+                    .containsEntry("amountSource", "instructionAmount=70 USD, routeLegCount=1, routeSnapshot="
+                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction="
+                            + ledgerTransaction.getSn())
                     .containsEntry("failureReason", "N/A")
                     .containsEntry("unavailableReason", "N/A")
                     .containsEntry("nextAction", "N/A")
@@ -148,6 +157,11 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(explanation.factStatus()).isEqualTo("HELD");
             assertThat(explanation.displayStatus()).isEqualTo("AUTHORIZED_HOLD");
             assertThat(explanation.operationStatus()).isEqualTo("WAITING_CAPTURE_OR_RELEASE");
+            assertThat(explanation.statusMeaning()).isEqualTo("AUTHORIZATION_HELD_NOT_CAPTURED");
+            assertThat(explanation.amountSource())
+                    .isEqualTo("instructionAmount=60 USD, routeLegCount=1, routeSnapshot="
+                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction="
+                            + ledgerTransaction.getSn());
             assertThat(explanation.unavailableReason())
                     .isEqualTo("AUTHORIZATION_HOLD_IS_NOT_FINAL_CONSUMPTION");
             assertThat(explanation.nextAction()).isEqualTo("WAIT_FOR_CAPTURE_OR_RELEASE");
@@ -186,6 +200,10 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(explanation.factStatus()).isEqualTo("REJECTED");
             assertThat(explanation.displayStatus()).isEqualTo("DECLINED");
             assertThat(explanation.operationStatus()).isEqualTo("NO_ACTION_REQUIRED");
+            assertThat(explanation.statusMeaning()).isEqualTo("AUTHORIZATION_DECLINED_NO_FUNDS_POSTED");
+            assertThat(explanation.amountSource())
+                    .isEqualTo("instructionAmount=60 USD, routeLegCount=0, routeSnapshot="
+                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction=N/A");
             assertThat(explanation.failureReason()).isEqualTo("RISK_DECLINED");
             assertThat(explanation.unavailableReason()).isEqualTo("AUTHORIZATION_DECLINED");
             assertThat(explanation.nextAction()).isEqualTo("N/A");
@@ -232,6 +250,11 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(explanation.factStatus()).isEqualTo("HELD");
             assertThat(explanation.displayStatus()).isEqualTo("FROZEN");
             assertThat(explanation.operationStatus()).isEqualTo("WAITING_UNFREEZE_OR_CONSUME");
+            assertThat(explanation.statusMeaning()).isEqualTo("BALANCE_FROZEN_NOT_CONSUMED");
+            assertThat(explanation.amountSource())
+                    .isEqualTo("instructionAmount=40 USD, routeLegCount=1, routeSnapshot="
+                            + context.routeSnapshot().getSnapshotId() + ", ledgerTransaction="
+                            + ledgerTransaction.getSn());
             assertThat(explanation.unavailableReason()).isEqualTo("BALANCE_FREEZE_IS_NOT_CONSUMPTION");
             assertThat(explanation.nextAction()).isEqualTo("WAIT_FOR_UNFREEZE_OR_CONSUME");
             assertThat(explanation.payload())

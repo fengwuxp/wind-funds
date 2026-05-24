@@ -26,6 +26,8 @@ public record FundsTransactionProjectionExplanation(@NonNull String businessScen
                                                     @NonNull String factStatus,
                                                     @NonNull String displayStatus,
                                                     @NonNull String operationStatus,
+                                                    @NonNull String statusMeaning,
+                                                    @NonNull String amountSource,
                                                     @NonNull String failureReason,
                                                     @NonNull String unavailableReason,
                                                     @NonNull String nextAction,
@@ -54,6 +56,8 @@ public record FundsTransactionProjectionExplanation(@NonNull String businessScen
         payload.put("factStatus", factStatus);
         payload.put("displayStatus", displayStatus);
         payload.put("operationStatus", operationStatus);
+        payload.put("statusMeaning", statusMeaning);
+        payload.put("amountSource", amountSource);
         payload.put("failureReason", failureReason);
         payload.put("unavailableReason", unavailableReason);
         payload.put("nextAction", nextAction);

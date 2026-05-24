@@ -149,9 +149,10 @@ class FundsProjectionReplayServiceTests {
         RecordingProjectionWriter writer = new RecordingProjectionWriter();
         FundsProjectionReplayService service = newService(writer);
 
-        FundsTransactionProjectionReplayResult result = service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
+        FundsTransactionProjectionReplayRange replayRange = FundsTransactionProjectionReplayRange.builder()
                 .sourceSn("FT202605190001")
-                .build()));
+                .build();
+        FundsTransactionProjectionReplayResult result = service.replay(replayRequest(replayRange));
 
         assertThat(result.loadedFactCount()).isEqualTo(1);
         assertThat(result.rebuiltRowCount()).isEqualTo(1);
@@ -240,16 +241,37 @@ class FundsProjectionReplayServiceTests {
                 .hasMessageContaining("operationStatus");
     }
 
+    /**
+     * 场景：运营人员重放用户账单投影，但来源事实缺少金额来源解释。
+     * 输入：单笔重放范围、`VERIFY_ONLY` 模式、缺 amountSource 的交易投影事实。
+     * 输出：服务拒绝重建投影行。
+     * 预期：错误指向缺少 amountSource 字段。
+     * 红线：用户账单、商户账单或运营时间线不能只给金额数字，必须能追溯金额来源。
+     */
+    @Test
+    void testReplayFactWithoutAmountSourceShouldFail() {
+        FundsProjectionReplayService service = new FundsProjectionReplayService(new MissingAmountSourceReplaySource(),
+                new RecordingProjectionWriter());
+
+        assertThatThrownBy(() -> service.replay(replayRequest(FundsTransactionProjectionReplayRange.builder()
+                .sourceSn("FT202605190001")
+                .build())))
+                .hasMessageContaining("交易投影重放缺少使用者解释视图字段")
+                .hasMessageContaining("amountSource");
+    }
+
     private static FundsProjectionReplayService newService(RecordingProjectionWriter writer) {
         return new FundsProjectionReplayService(new FixedProjectionReplaySource(), writer);
     }
 
-    private static FundsTransactionProjectionReplayRequest replayRequest(FundsTransactionProjectionReplayRange replayRange) {
+    private static FundsTransactionProjectionReplayRequest replayRequest(
+            FundsTransactionProjectionReplayRange replayRange) {
         return replayRequest(ProjectionReplayMode.VERIFY_ONLY, replayRange);
     }
 
-    private static FundsTransactionProjectionReplayRequest replayRequest(ProjectionReplayMode mode,
-                                                                         FundsTransactionProjectionReplayRange replayRange) {
+    private static FundsTransactionProjectionReplayRequest replayRequest(
+            ProjectionReplayMode mode,
+            FundsTransactionProjectionReplayRange replayRange) {
         return FundsTransactionProjectionReplayRequest.builder()
                 .taskSn("TPR-202605190001")
                 .mode(mode)
@@ -300,12 +322,40 @@ class FundsProjectionReplayServiceTests {
         }
     }
 
+    private static final class MissingAmountSourceReplaySource implements FundsTransactionProjectionReplaySource {
+
+        @Override
+        public List<FundsTransactionProjectionFact> loadFacts(FundsTransactionProjectionReplayRange range) {
+            return List.of(FundsTransactionProjectionFact.builder()
+                    .viewDomain("USER_BILL")
+                    .ownerType("USER")
+                    .ownerId("U1001")
+                    .sourceSn("FT202605190001")
+                    .displayType("PAYMENT")
+                    .displayStatus("SUCCEEDED")
+                    .amount(100L)
+                    .currency("USD")
+                    .occurredTime(LocalDateTime.of(2026, 5, 19, 12, 0))
+                    .payload(Map.of(
+                            "businessScene", "ORDER_PAY",
+                            "factStatus", "POSTED",
+                            "operationStatus", "NO_ACTION_REQUIRED",
+                            "statusMeaning", "payment posted",
+                            "unavailableReason", "N/A",
+                            "nextAction", "N/A",
+                            "evidenceRefs", List.of("routeSnapshot:RS-202605190001"),
+                            "externalRuleVerificationStatus", "N/A"))
+                    .build());
+        }
+    }
+
     private static Map<String, Object> explainablePayload() {
         return Map.of(
                 "businessScene", "ORDER_PAY",
                 "factStatus", "POSTED",
                 "operationStatus", "NO_ACTION_REQUIRED",
                 "statusMeaning", "payment posted",
+                "amountSource", "instructionAmount=100 USD, routeSnapshot=RS-202605190001",
                 "unavailableReason", "N/A",
                 "nextAction", "N/A",
                 "evidenceRefs", List.of("routeSnapshot:RS-202605190001"),
