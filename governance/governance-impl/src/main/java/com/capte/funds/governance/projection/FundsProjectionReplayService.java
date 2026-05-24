@@ -47,6 +47,7 @@ public class FundsProjectionReplayService {
             @NonNull FundsTransactionProjectionReplayRequest request) {
         assertRequestValid(request);
         List<FundsTransactionProjectionFact> facts = replaySource.loadFacts(request.replayRange());
+        AssertUtils.notNull(facts, "交易投影重放来源事实列表不能为空");
         List<FundsTransactionProjectionRow> rebuiltRows = facts.stream()
                 .map(fact -> rebuildProjectionRow(request, fact))
                 .toList();
@@ -84,6 +85,7 @@ public class FundsProjectionReplayService {
 
     private FundsTransactionProjectionRow rebuildProjectionRow(FundsTransactionProjectionReplayRequest request,
                                                                FundsTransactionProjectionFact fact) {
+        assertFactComplete(fact);
         assertFactInRequestScope(request, fact);
         assertExplainabilityPayload(fact);
         return FundsTransactionProjectionRow.builder()
@@ -99,6 +101,27 @@ public class FundsProjectionReplayService {
                 .occurredTime(fact.occurredTime())
                 .payload(Map.copyOf(fact.payload()))
                 .build();
+    }
+
+    private void assertFactComplete(FundsTransactionProjectionFact fact) {
+        AssertUtils.notNull(fact, "交易投影重放来源事实不能为空");
+        assertFactHasText(fact.viewDomain(), "viewDomain");
+        assertFactHasText(fact.ownerType(), "ownerType");
+        assertFactHasText(fact.ownerId(), "ownerId");
+        assertFactHasText(fact.sourceSn(), "sourceSn");
+        assertFactHasText(fact.displayType(), "displayType");
+        assertFactHasText(fact.displayStatus(), "displayStatus");
+        assertFactHasText(fact.currency(), "currency");
+        assertFactNotNull(fact.occurredTime(), "occurredTime");
+        assertFactNotNull(fact.payload(), "payload");
+    }
+
+    private void assertFactHasText(String value, String fieldName) {
+        AssertUtils.hasText(value, "交易投影重放来源事实字段不能为空，field = {}", fieldName);
+    }
+
+    private void assertFactNotNull(Object value, String fieldName) {
+        AssertUtils.notNull(value, "交易投影重放来源事实字段不能为空，field = {}", fieldName);
     }
 
     private void assertFactInRequestScope(FundsTransactionProjectionReplayRequest request,
