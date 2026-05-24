@@ -42,7 +42,11 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -60,8 +64,42 @@ class DefaultRouteReplayServiceTests {
 
     private static final String MISSING_ROUTE_SNAPSHOT_MESSAGE = "RouteSnapshot 回放事件未找到原路径快照";
 
+    private static final String ROUTE_REPLAY_SERVICE_SOURCE =
+            "transaction/transaction-impl/src/main/java/com/capte/funds/route/DefaultRouteReplayService.java";
+
+    private static final List<String> CURRENT_ROUTE_SELECTION_TOKENS = List.of(
+            "TransferFundsInstructionRouteResolver",
+            "AuthorizationFundsInstructionRouteResolver",
+            "BalanceControlFundsInstructionRouteResolver",
+            "CompositeRouteResolver",
+            "PlatformAccountRouteSupport",
+            "PaymentInstrumentService",
+            "SpendSubjectFundingRelationService",
+            "FundingAccountService",
+            "FundsSubjectBalanceQueryService");
+
     private final DefaultRouteReplayService routeReplayService = new DefaultRouteReplayService(
             new EmptyFundsTransactionQueryService());
+
+    /**
+     * 场景：开发者维护 Route Replay 实现时误接入当前选路解析器、账户关系或支付工具查询。
+     * 输入：DefaultRouteReplayService 生产源码。
+     * 输出：不依赖当前路由解析器、当前平台账户解析、当前支付工具或当前资金来源关系服务。
+     * 预期：回放入口只读取原 RouteSnapshot 和原引用事实，不能具备按当前绑定关系重算路径的能力。
+     * 红线：缺原路径快照时必须明确失败，不得通过 fallback resolver 或当前关系服务重新选路。
+     */
+    @Test
+    void testRouteReplayServiceShouldNotDependOnCurrentRouteSelectionPorts() throws IOException {
+        String source = Files.readString(workspaceRoot().resolve(ROUTE_REPLAY_SERVICE_SOURCE));
+
+        List<String> violations = CURRENT_ROUTE_SELECTION_TOKENS.stream()
+                .filter(source::contains)
+                .toList();
+
+        assertThat(violations)
+                .as("Route Replay must not depend on current route selection or rebinding services")
+                .isEmpty();
+    }
 
     /**
      * 场景：业务侧构造退款、撤销、解冻等 replay 事件，但没有传入原交易或冻结单引用。
@@ -327,6 +365,18 @@ class DefaultRouteReplayServiceTests {
                 .decisionReason("original route snapshot")
                 .contextVariables(Map.of("snapshot", allocationId))
                 .build();
+    }
+
+    private Path workspaceRoot() {
+        String multiModuleDir = System.getProperty("maven.multiModuleProjectDirectory");
+        if (StringUtils.hasText(multiModuleDir)) {
+            return Path.of(multiModuleDir);
+        }
+        Path current = Path.of("").toAbsolutePath();
+        if ("tests".equals(current.getFileName().toString())) {
+            return current.getParent();
+        }
+        return current;
     }
 
     private static class EmptyFundsTransactionQueryService implements FundsTransactionQueryService {
