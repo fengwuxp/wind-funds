@@ -492,6 +492,20 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setDescription("authorization"), WindOperator.system());
     }
 
+    protected String declineAuthorization(FundsAccountId accountId,
+                                          long amount,
+                                          String declineReason,
+                                          String businessSn) {
+        return authorizationTransactionService.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
+                .setApproved(false)
+                .setDeclineReason(declineReason)
+                .setBusinessScene("AUTHORIZATION")
+                .setBusinessSn(businessSn)
+                .setDescription("authorization declined"), WindOperator.system());
+    }
+
     protected String settleAuthorization(FundsAccountId accountId,
                                          long amount,
                                          String authorizationTransactionSn,

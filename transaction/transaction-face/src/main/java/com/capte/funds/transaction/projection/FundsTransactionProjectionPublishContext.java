@@ -1,5 +1,6 @@
 package com.capte.funds.transaction.projection;
 
+import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
@@ -93,7 +94,7 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
                 .factStatus(resolveFactStatus(ledgerTransactionSn))
                 .displayStatus(resolveDisplayStatus(ledgerTransactionSn))
                 .operationStatus(resolveOperationStatus(ledgerTransactionSn))
-                .failureReason(NOT_APPLICABLE)
+                .failureReason(resolveFailureReason(ledgerTransactionSn))
                 .unavailableReason(resolveUnavailableReason(ledgerTransactionSn))
                 .nextAction(resolveNextAction(ledgerTransactionSn))
                 .evidenceRefs(evidenceRefs(lifecycleResult.getTransactionSn(), routeSnapshot.getSnapshotId(),
@@ -152,6 +153,21 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
             case FREEZE -> OPERATION_STATUS_WAITING_UNFREEZE_OR_CONSUME;
             default -> OPERATION_STATUS_NO_ACTION_REQUIRED;
         };
+    }
+
+    private @NonNull String resolveFailureReason(@Nullable String ledgerTransactionSn) {
+        if (!lifecycleResult.isCompleted()) {
+            return NOT_APPLICABLE;
+        }
+        if (instruction.getEventType() != FundsTransactionEventType.AUTHORIZE
+                || StringUtils.hasText(ledgerTransactionSn)) {
+            return NOT_APPLICABLE;
+        }
+        Object declineReason = instruction.getContextVariables().get(FundsInstructionContextKeys.DECLINE_REASON);
+        String reason = declineReason == null ? null : declineReason.toString();
+        return StringUtils.hasText(reason)
+                ? reason
+                : UNAVAILABLE_AUTHORIZATION_DECLINED;
     }
 
     private @NonNull String resolveUnavailableReason(@Nullable String ledgerTransactionSn) {

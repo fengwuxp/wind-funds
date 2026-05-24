@@ -9,6 +9,7 @@ import com.capte.funds.transaction.projection.FundsTransactionProjectionPublishC
 import com.capte.funds.transaction.projection.FundsTransactionProjectionPublisher;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,12 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
     @Autowired
     private RecordingProjectionPublisher projectionPublisher;
 
+    private @NonNull FundsTransactionProjectionPublishContext singleProjectionContext() {
+        List<FundsTransactionProjectionPublishContext> contexts = projectionPublisher.contexts();
+        assertThat(contexts).hasSize(1);
+        return contexts.getFirst();
+    }
+
     /**
      * 场景：真实资金服务链路完成充值和付款，付款事务提交后发布普通交易投影。
      * 输入：H2 中真实账户、账本、route、lifecycle saver、posting service 和 recording 投影发布端口。
@@ -57,7 +64,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         List<FundsTransactionDetailDTO> details = fundsTransactionDetails(transactionSn);
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_SUCCESS_PAY");
 
-        assertThat(projectionPublisher.contexts()).singleElement().satisfies(context -> {
+        assertThat(singleProjectionContext()).satisfies(context -> {
             assertThat(context.instruction().getBusinessSn()).isEqualTo("PROJECTION_SUCCESS_PAY");
             assertThat(context.resolvedRoute().getBusinessSn()).isEqualTo("PROJECTION_SUCCESS_PAY");
             assertThat(context.routeSnapshot().getBusinessSn()).isEqualTo("PROJECTION_SUCCESS_PAY");
@@ -128,7 +135,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         String authorizationSn = authorize(user, 60L, true, "PROJECTION_AUTH_AUTHORIZE");
 
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_AUTH_AUTHORIZE");
-        assertThat(projectionPublisher.contexts()).singleElement().satisfies(context -> {
+        assertThat(singleProjectionContext()).satisfies(context -> {
             assertThat(context.instruction().getBusinessSn()).isEqualTo("PROJECTION_AUTH_AUTHORIZE");
             assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(authorizationSn);
             assertThat(context.lifecycleResult().getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
@@ -153,6 +160,50 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
     }
 
     /**
+     * 场景：风控或额度判断拒绝授权，授权事务提交后发布普通交易投影。
+     * 输入：账户 AVAILABLE 余额 100，授权 approved=false，拒绝原因为 RISK_DECLINED。
+     * 输出：投影解释摘要标记为拒绝，并保留业务层拒绝原因。
+     * 预期：运营时间线可以解释失败阶段和失败原因。
+     * 红线：授权拒绝不得只展示技术状态或 N/A 失败原因，也不得写入账本事实。
+     */
+    @Test
+    void testAuthorizationDeclinedProjectionExplanationShouldExposeDeclineReason() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "PROJECTION_AUTH_DECLINE_TOPUP");
+        projectionPublisher.clear();
+
+        String authorizationSn = declineAuthorization(user, 60L, "RISK_DECLINED",
+                "PROJECTION_AUTH_DECLINE");
+
+        assertThat(singleProjectionContext()).satisfies(context -> {
+            assertThat(context.instruction().getBusinessSn()).isEqualTo("PROJECTION_AUTH_DECLINE");
+            assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(authorizationSn);
+            assertThat(context.lifecycleResult().getLedgerTransactionSn()).isNull();
+            assertThat(context.lifecycleResult().isCompleted()).isTrue();
+            assertThat(context.ledgerTransaction()).isNull();
+            assertThat(context.routeSnapshot().getLegs()).isEmpty();
+            var explanation = context.explanation();
+            assertThat(explanation.factStatus()).isEqualTo("REJECTED");
+            assertThat(explanation.displayStatus()).isEqualTo("DECLINED");
+            assertThat(explanation.operationStatus()).isEqualTo("NO_ACTION_REQUIRED");
+            assertThat(explanation.failureReason()).isEqualTo("RISK_DECLINED");
+            assertThat(explanation.unavailableReason()).isEqualTo("AUTHORIZATION_DECLINED");
+            assertThat(explanation.nextAction()).isEqualTo("N/A");
+            assertThat(explanation.evidenceRefs())
+                    .contains("fundsTransaction:" + authorizationSn,
+                            "routeSnapshot:" + context.routeSnapshot().getSnapshotId());
+            assertThat(explanation.evidenceRefs())
+                    .noneMatch(ref -> ref.startsWith("ledgerTransaction:"));
+            assertThat(explanation.payload())
+                    .containsEntry("displayStatus", "DECLINED")
+                    .containsEntry("operationStatus", "NO_ACTION_REQUIRED")
+                    .containsEntry("failureReason", "RISK_DECLINED")
+                    .containsEntry("unavailableReason", "AUTHORIZATION_DECLINED");
+        });
+        assertPostedTransactions(1);
+    }
+
+    /**
      * 场景：真实资金服务链路完成充值和余额冻结，冻结事务提交后发布普通交易投影。
      * 输入：账户 AVAILABLE 余额 100，冻结 40。
      * 输出：投影解释摘要标记为冻结占用，并给出等待解冻或扣划的下一动作。
@@ -168,7 +219,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         String freezeSn = freeze(user, 40L, "PROJECTION_FREEZE_HOLD");
 
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_FREEZE_HOLD");
-        assertThat(projectionPublisher.contexts()).singleElement().satisfies(context -> {
+        assertThat(singleProjectionContext()).satisfies(context -> {
             assertThat(context.instruction().getBusinessSn()).isEqualTo("PROJECTION_FREEZE_HOLD");
             assertThat(context.lifecycleResult().getTransactionSn()).isEqualTo(freezeSn);
             assertThat(context.lifecycleResult().getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
