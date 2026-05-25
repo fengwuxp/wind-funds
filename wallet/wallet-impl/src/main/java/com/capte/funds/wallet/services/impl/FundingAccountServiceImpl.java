@@ -128,6 +128,6 @@ public class FundingAccountServiceImpl implements FundingAccountService {
             AssertUtils.notNull(request.getAccountRoleCode(), "平台资金账户必须指定平台账户角色");
             return;
         }
-        AssertUtils.isTrue(request.getAccountRoleCode() == null, "非平台资金账户不得指定平台账户角色");
+        AssertUtils.isNull(request.getAccountRoleCode(), "非平台资金账户不得指定平台账户角色");
     }
 }
