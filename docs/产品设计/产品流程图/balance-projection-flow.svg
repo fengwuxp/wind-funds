@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1220 780" width="1220" height="780" role="img" aria-label="余额投影产品流程图">
+<style>
+text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
+.title { font-size: 24px; font-weight: 700; fill: #111827; }
+.subtitle { font-size: 13px; fill: #6b7280; }
+.node-title { font-size: 15px; font-weight: 700; fill: #111827; }
+.node-text { font-size: 12px; fill: #374151; }
+.small { font-size: 11px; fill: #6b7280; }
+.lane-title { font-size: 16px; font-weight: 700; fill: #111827; }
+.label { font-size: 12px; fill: #6b7280; }
+</style>
+<defs><marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker><marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker><marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/></marker><marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/></marker><marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/></marker><marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker></defs>
+<rect width="1220" height="780" fill="#ffffff"/>
+<text x="40" y="46" class="title">余额投影产品流程图</text>
+<text x="40" y="72" class="subtitle">余额投影从账本分录派生，可重建可校验，但不能成为余额事实源</text>
+<g>
+<rect x="70" y="170" width="180" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="86" y="198" class="node-title">账本事实源</text>
+<text x="86" y="222" class="node-text" text-anchor="start"><tspan x="86" dy="0">LedgerTransaction</tspan><tspan x="86" dy="17">LedgerEntry</tspan><tspan x="86" dy="17">不可变分录</tspan></text>
+</g><g>
+<rect x="300" y="170" width="180" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="316" y="198" class="node-title">投影任务</text>
+<text x="316" y="222" class="node-text" text-anchor="start"><tspan x="316" dy="0">分录范围</tspan><tspan x="316" dy="17">主体 / 账目 / 周期</tspan><tspan x="316" dy="17">幂等键</tspan></text>
+</g><g>
+<rect x="530" y="170" width="180" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="546" y="198" class="node-title">计算余额</text>
+<text x="546" y="222" class="node-text" text-anchor="start"><tspan x="546" dy="0">当前余额</tspan><tspan x="546" dy="17">历史余额</tspan><tspan x="546" dy="17">变更前后值</tspan></text>
+</g><g>
+<rect x="760" y="170" width="180" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="776" y="198" class="node-title">校验</text>
+<text x="776" y="222" class="node-text" text-anchor="start"><tspan x="776" dy="0">借贷摘要</tspan><tspan x="776" dy="17">检查点 / 水位</tspan><tspan x="776" dy="17">账务巡检</tspan></text>
+</g><g>
+<rect x="990" y="170" width="180" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="1006" y="198" class="node-title">应用投影</text>
+<text x="1006" y="222" class="node-text" text-anchor="start"><tspan x="1006" dy="0">APPLIED</tspan><tspan x="1006" dy="17">余额查询</tspan><tspan x="1006" dy="17">余额变更观察事件</tspan></text>
+</g><g><line x1="250" y1="222" x2="300" y2="222" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><rect x="251" y="201" width="48" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="275" y="216" class="label" text-anchor="middle">派生</text></g><line x1="480" y1="222" x2="530" y2="222" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><line x1="710" y1="222" x2="760" y2="222" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><line x1="940" y1="222" x2="990" y2="222" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><g>
+<rect x="210" y="410" width="210" height="94" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="226" y="438" class="node-title">历史重建</text>
+<text x="226" y="462" class="node-text" text-anchor="start"><tspan x="226" dy="0">检查点 + 增量分录</tspan><tspan x="226" dy="17">目标时点余额</tspan><tspan x="226" dy="17">冷热统一读取</tspan></text>
+</g><g>
+<rect x="530" y="410" width="210" height="94" rx="8" ry="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+
+<text x="546" y="438" class="node-title">差异报告</text>
+<text x="546" y="462" class="node-text" text-anchor="start"><tspan x="546" dy="0">摘要不一致</tspan><tspan x="546" dy="17">投影缺失 / 账务异常</tspan><tspan x="546" dy="17">转人工或重建</tspan></text>
+</g><g>
+<rect x="850" y="410" width="210" height="94" rx="8" ry="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+
+<text x="866" y="438" class="node-title">观察日志补偿</text>
+<text x="866" y="462" class="node-text" text-anchor="start"><tspan x="866" dy="0">事件发布失败不回滚过账</tspan><tspan x="866" dy="17">补偿 / 重试 / 告警</tspan><tspan x="866" dy="17">可按范围重建</tspan></text>
+</g><g><path d="M 850 274 C 820 330, 670 340, 635 410" fill="none" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-rose)"/><rect x="712.5" y="321" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="742.5" y="336" class="label" text-anchor="middle">校验失败</text></g><g><line x1="300" y1="274" x2="315" y2="410" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-blue)"/><rect x="277.5" y="321" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="307.5" y="336" class="label" text-anchor="middle">历史查询</text></g><g><line x1="1080" y1="274" x2="955" y2="410" stroke="#ea580c" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-orange)"/><rect x="987.5" y="321" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="1017.5" y="336" class="label" text-anchor="middle">观察链路</text></g><g><rect x="70" y="590" width="1080" height="86" rx="14" ry="14" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/><text x="88" y="620" class="lane-title">余额投影红线</text></g><text x="96" y="638" class="node-text" text-anchor="start"><tspan x="96" dy="0">余额投影不是事实源；不能反写分录。非 LIFETIME 周期必须携带 periodId；余额日志失败不得回滚账本过账和余额投影。</tspan></text><g transform="translate(70,724)"><rect x="-14" y="-18" width="182" height="116" rx="10" fill="#ffffff" stroke="#e5e7eb"/><line x1="0" y1="0" x2="34" y2="0" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><text x="46" y="4" class="small">分录派生投影</text><line x1="0" y1="24" x2="34" y2="24" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)" stroke-dasharray="7 5"/><text x="46" y="28" class="small">历史余额重建</text><line x1="0" y1="48" x2="34" y2="48" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-orange)" stroke-dasharray="7 5"/><text x="46" y="52" class="small">观察链路补偿</text><line x1="0" y1="72" x2="34" y2="72" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-rose)"/><text x="46" y="76" class="small">差异和阻断</text></g>
+</svg>

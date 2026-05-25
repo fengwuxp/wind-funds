@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1350 790" width="1350" height="790" role="img" aria-label="大数据归档与重放产品流程图">
+<style>
+text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
+.title { font-size: 24px; font-weight: 700; fill: #111827; }
+.subtitle { font-size: 13px; fill: #6b7280; }
+.node-title { font-size: 15px; font-weight: 700; fill: #111827; }
+.node-text { font-size: 12px; fill: #374151; }
+.small { font-size: 11px; fill: #6b7280; }
+.lane-title { font-size: 16px; font-weight: 700; fill: #111827; }
+.label { font-size: 12px; fill: #6b7280; }
+</style>
+<defs><marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker><marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker><marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/></marker><marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/></marker><marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/></marker><marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker></defs>
+<rect width="1350" height="790" fill="#ffffff"/>
+<text x="40" y="46" class="title">大数据归档与重放产品流程图</text>
+<text x="40" y="72" class="subtitle">归档、余额重建、交易投影重放和指标项输入共同保证历史资金事实可证明、可重建、可审计</text>
+<g>
+<rect x="50" y="150" width="175" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="66" y="178" class="node-title">归档候选</text>
+<text x="66" y="202" class="node-text" text-anchor="start"><tspan x="66" dy="0">资金交易 / 明细</tspan><tspan x="66" dy="17">权益快照 / 账目明细</tspan><tspan x="66" dy="17">清结算 / 对账事实</tspan></text>
+</g><g>
+<rect x="265" y="150" width="175" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="281" y="178" class="node-title">准入检查</text>
+<text x="281" y="202" class="node-text" text-anchor="start"><tspan x="281" dy="0">终态 / 对账 / 关账</tspan><tspan x="281" dy="17">检查点 / 水位</tspan><tspan x="281" dy="17">阻断项为零</tspan></text>
+</g><g>
+<rect x="480" y="150" width="175" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="496" y="178" class="node-title">Manifest</text>
+<text x="496" y="202" class="node-text" text-anchor="start"><tspan x="496" dy="0">范围 / 引用 / 摘要</tspan><tspan x="496" dy="17">冷热交叉索引</tspan><tspan x="496" dy="17">审计证据</tspan></text>
+</g><g>
+<rect x="695" y="150" width="175" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="711" y="178" class="node-title">摘要试算</text>
+<text x="711" y="202" class="node-text" text-anchor="start"><tspan x="711" dy="0">数量 / 金额</tspan><tspan x="711" dy="17">借贷合计</tspan><tspan x="711" dy="17">digest 校验</tspan></text>
+</g><g>
+<rect x="910" y="150" width="175" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="926" y="178" class="node-title">冷区写入</text>
+<text x="926" y="202" class="node-text" text-anchor="start"><tspan x="926" dy="0">归档不改身份</tspan><tspan x="926" dy="17">热冷统一读取</tspan><tspan x="926" dy="17">权限和脱敏</tspan></text>
+</g><g>
+<rect x="1125" y="150" width="175" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="1141" y="178" class="node-title">水位推进</text>
+<text x="1141" y="202" class="node-text" text-anchor="start"><tspan x="1141" dy="0">先算后推</tspan><tspan x="1141" dy="17">检查点覆盖</tspan><tspan x="1141" dy="17">可重建证明</tspan></text>
+</g><line x1="225" y1="202" x2="265" y2="202" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><line x1="440" y1="202" x2="480" y2="202" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><line x1="655" y1="202" x2="695" y2="202" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><line x1="870" y1="202" x2="910" y2="202" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><line x1="1085" y1="202" x2="1125" y2="202" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><g>
+<rect x="150" y="395" width="210" height="96" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="166" y="423" class="node-title">余额重建</text>
+<text x="166" y="447" class="node-text" text-anchor="start"><tspan x="166" dy="0">检查点 + 增量分录</tspan><tspan x="166" dy="17">目标时点余额</tspan></text>
+</g><g>
+<rect x="420" y="395" width="210" height="96" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="436" y="423" class="node-title">交易投影重放</text>
+<text x="436" y="447" class="node-text" text-anchor="start"><tspan x="436" dy="0">VERIFY / SHADOW / APPLY</tspan><tspan x="436" dy="17">不重新入账</tspan></text>
+</g><g>
+<rect x="690" y="395" width="210" height="96" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="706" y="423" class="node-title">指标项输入</text>
+<text x="706" y="447" class="node-text" text-anchor="start"><tspan x="706" dy="0">只读建议来源</tspan><tspan x="706" dy="17">报表模块独立计算</tspan></text>
+</g><g>
+<rect x="960" y="395" width="210" height="96" rx="8" ry="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+
+<text x="976" y="423" class="node-title">差异和人工处理</text>
+<text x="976" y="447" class="node-text" text-anchor="start"><tspan x="976" dy="0">差异报告</tspan><tspan x="976" dy="17">审批 / 补证据 / 重跑</tspan></text>
+</g><g><path d="M 1210 254 C 1210 350, 240 300, 255 395" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-blue)"/><rect x="702.5" y="303.5" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="732.5" y="318.5" class="label" text-anchor="middle">冷热读取</text></g><g><path d="M 1210 254 C 1150 360, 560 320, 525 395" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-blue)"/><rect x="843.5" y="303.5" width="48" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="867.5" y="318.5" class="label" text-anchor="middle">重放</text></g><g><path d="M 1210 254 C 1120 360, 850 330, 795 395" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-blue)"/><rect x="972.5" y="303.5" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="1002.5" y="318.5" class="label" text-anchor="middle">只读输入</text></g><g><path d="M 785 254 C 850 330, 980 310, 1065 395" fill="none" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-rose)"/><rect x="895" y="303.5" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="925" y="318.5" class="label" text-anchor="middle">摘要失败</text></g><g><rect x="50" y="590" width="1250" height="90" rx="14" ry="14" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/><text x="68" y="620" class="lane-title">归档重放生产红线</text></g><text x="76" y="640" class="node-text" text-anchor="start"><tspan x="76" dy="0">归档只改变冷热位置，不改变事实身份；重建和重放只能修复只读模型；缺范围、缺 Manifest、摘要不一致、先推水位再计算、指标结果反写资金事实都必须失败。</tspan></text><g transform="translate(50,735)"><rect x="-14" y="-18" width="221" height="92" rx="10" fill="#ffffff" stroke="#e5e7eb"/><line x1="0" y1="0" x2="34" y2="0" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><text x="46" y="4" class="small">归档主链路</text><line x1="0" y1="24" x2="34" y2="24" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)" stroke-dasharray="7 5"/><text x="46" y="28" class="small">冷热读取和只读重建</text><line x1="0" y1="48" x2="34" y2="48" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-rose)"/><text x="46" y="52" class="small">差异和阻断</text></g>
+</svg>

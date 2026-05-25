@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1000" width="1440" height="1000" role="img" aria-label="wind-funds 产品总架构图">
+<style>
+text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
+.title { font-size: 24px; font-weight: 700; fill: #111827; }
+.subtitle { font-size: 13px; fill: #6b7280; }
+.node-title { font-size: 15px; font-weight: 700; fill: #111827; }
+.node-text { font-size: 12px; fill: #374151; }
+.small { font-size: 11px; fill: #6b7280; }
+.lane-title { font-size: 16px; font-weight: 700; fill: #111827; }
+.label { font-size: 12px; fill: #6b7280; }
+</style>
+<defs><marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker><marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker><marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/></marker><marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/></marker><marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/></marker><marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker></defs>
+<rect width="1440" height="1000" fill="#ffffff"/>
+<text x="40" y="46" class="title">wind-funds 产品总架构图</text>
+<text x="40" y="72" class="subtitle">统一资金内核优先，业务场景通过 capability pack 接入，外部轨道只作为归一资金事实输入</text>
+<g><rect x="36" y="96" width="1368" height="166" rx="14" ry="14" fill="#faf5ff" stroke="#e9d5ff" stroke-width="1.5"/><text x="54" y="126" class="lane-title">P2 业务场景补充：场景交易 capability pack</text><text x="54" y="148" class="small">业务语义补充分册只提交归一资金事实、外部引用和核验状态，不改变统一资金内核</text></g><g><rect x="36" y="292" width="1368" height="188" rx="14" ry="14" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/><text x="54" y="322" class="lane-title">P1 资金交易入口和使用者读模型</text><text x="54" y="344" class="small">直接交易、授权交易、余额控制、路由和交易投影都必须建立在 P0 可证明事实之上</text></g><g><rect x="36" y="510" width="1368" height="232" rx="14" ry="14" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="54" y="540" class="lane-title">P0 统一资金内核和运营账务闭环</text><text x="54" y="562" class="small">钱包账户、账本账目、余额投影、对账清结算、归档重放优先保障，所有业务复用</text></g><g><rect x="36" y="772" width="1368" height="124" rx="14" ry="14" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5" stroke-dasharray="8 6"/><text x="54" y="802" class="lane-title">外部轨道、报表和专业确认边界</text><text x="54" y="824" class="small">卡组织、ACH/Nacha、银行、PSP、跨境、FX、税务会计和持牌能力仅作引用或待确认</text></g><g>
+<rect x="70" y="145" width="190" height="82" rx="8" ry="8" fill="#ffffff" stroke="#e9d5ff" stroke-width="1.5"/>
+<rect x="82" y="157" width="38" height="24" rx="12" fill="#faf5ff" stroke="#e9d5ff"/><text x="101" y="174" text-anchor="middle" class="small" fill="#2563eb">P2</text>
+<text x="132" y="173" class="node-title">VCC 发卡业务</text>
+<text x="86" y="197" class="node-text" text-anchor="start"><tspan x="86" dy="0">授权 / clearing / refund</tspan><tspan x="86" dy="17">chargeback / 卡账单</tspan><tspan x="86" dy="17">卡和 PAN 不入账</tspan></text>
+</g><g>
+<rect x="300" y="145" width="190" height="82" rx="8" ry="8" fill="#ffffff" stroke="#e9d5ff" stroke-width="1.5"/>
+<rect x="312" y="157" width="38" height="24" rx="12" fill="#faf5ff" stroke="#e9d5ff"/><text x="331" y="174" text-anchor="middle" class="small" fill="#2563eb">P2</text>
+<text x="362" y="173" class="node-title">全球账户收付款</text>
+<text x="316" y="197" class="node-text" text-anchor="start"><tspan x="316" dy="0">入金 / 出金 / 在途</tspan><tspan x="316" dy="17">退汇 / FX 引用</tspan><tspan x="316" dy="17">外部账户不入账</tspan></text>
+</g><g>
+<rect x="530" y="145" width="190" height="82" rx="8" ry="8" fill="#ffffff" stroke="#e9d5ff" stroke-width="1.5"/>
+<rect x="542" y="157" width="38" height="24" rx="12" fill="#faf5ff" stroke="#e9d5ff"/><text x="561" y="174" text-anchor="middle" class="small" fill="#2563eb">P2</text>
+<text x="592" y="173" class="node-title">收单业务</text>
+<text x="546" y="197" class="node-text" text-anchor="start"><tspan x="546" dy="0">payment attempt / capture</tspan><tspan x="546" dy="17">refund / dispute</tspan><tspan x="546" dy="17">商户结算和准备金</tspan></text>
+</g><g>
+<rect x="760" y="145" width="190" height="82" rx="8" ry="8" fill="#ffffff" stroke="#e9d5ff" stroke-width="1.5"/>
+<rect x="772" y="157" width="38" height="24" rx="12" fill="#faf5ff" stroke="#e9d5ff"/><text x="791" y="174" text-anchor="middle" class="small" fill="#2563eb">P2</text>
+<text x="822" y="173" class="node-title">ACH 与银行转账</text>
+<text x="776" y="197" class="node-text" text-anchor="start"><tspan x="776" dy="0">只作为外部轨道</tspan><tspan x="776" dy="17">return/NOC/reversal 先解释</tspan><tspan x="776" dy="17">不内建 ACH 规则</tspan></text>
+</g><g>
+<rect x="1010" y="145" width="190" height="82" rx="8" ry="8" fill="#ffffff" stroke="#e9d5ff" stroke-width="1.5"/>
+<rect x="1022" y="157" width="38" height="24" rx="12" fill="#faf5ff" stroke="#e9d5ff"/><text x="1041" y="174" text-anchor="middle" class="small" fill="#2563eb">P2</text>
+<text x="1072" y="173" class="node-title">业务接入方</text>
+<text x="1026" y="197" class="node-text" text-anchor="start"><tspan x="1026" dy="0">业务流水 / 幂等键</tspan><tspan x="1026" dy="17">规则核验状态</tspan><tspan x="1026" dy="17">证据和外部引用</tspan></text>
+</g><g>
+<rect x="70" y="344" width="190" height="94" rx="8" ry="8" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+<rect x="82" y="356" width="38" height="24" rx="12" fill="#eff6ff" stroke="#bfdbfe"/><text x="101" y="373" text-anchor="middle" class="small" fill="#2563eb">P1</text>
+<text x="132" y="372" class="node-title">直接交易</text>
+<text x="86" y="396" class="node-text" text-anchor="start"><tspan x="86" dy="0">入金 / 支付 / 转账</tspan><tspan x="86" dy="17">退款 / 费用 / 调账</tspan><tspan x="86" dy="17">已确认资金事实</tspan></text>
+</g><g>
+<rect x="295" y="344" width="190" height="94" rx="8" ry="8" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+<rect x="307" y="356" width="38" height="24" rx="12" fill="#eff6ff" stroke="#bfdbfe"/><text x="326" y="373" text-anchor="middle" class="small" fill="#2563eb">P1</text>
+<text x="357" y="372" class="node-title">授权交易</text>
+<text x="311" y="396" class="node-text" text-anchor="start"><tspan x="311" dy="0">批准占用</tspan><tspan x="311" dy="17">撤销 / 过期 / 完成</tspan><tspan x="311" dy="17">拒绝无账务副作用</tspan></text>
+</g><g>
+<rect x="520" y="344" width="190" height="94" rx="8" ry="8" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+<rect x="532" y="356" width="38" height="24" rx="12" fill="#eff6ff" stroke="#bfdbfe"/><text x="551" y="373" text-anchor="middle" class="small" fill="#2563eb">P1</text>
+<text x="582" y="372" class="node-title">余额控制</text>
+<text x="536" y="396" class="node-text" text-anchor="start"><tspan x="536" dy="0">冻结 / 解冻</tspan><tspan x="536" dy="17">同主体调整</tspan><tspan x="536" dy="17">跨主体走交易事实</tspan></text>
+</g><g>
+<rect x="745" y="344" width="190" height="94" rx="8" ry="8" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+<rect x="757" y="356" width="38" height="24" rx="12" fill="#eff6ff" stroke="#bfdbfe"/><text x="776" y="373" text-anchor="middle" class="small" fill="#2563eb">P1</text>
+<text x="807" y="372" class="node-title">资金路由</text>
+<text x="761" y="396" class="node-text" text-anchor="start"><tspan x="761" dy="0">主体和账户定位</tspan><tspan x="761" dy="17">route snapshot</tspan><tspan x="761" dy="17">posting plan</tspan></text>
+</g><g>
+<rect x="970" y="344" width="190" height="94" rx="8" ry="8" fill="#ffffff" stroke="#bfdbfe" stroke-width="1.5"/>
+<rect x="982" y="356" width="38" height="24" rx="12" fill="#eff6ff" stroke="#bfdbfe"/><text x="1001" y="373" text-anchor="middle" class="small" fill="#2563eb">P1</text>
+<text x="1032" y="372" class="node-title">交易投影</text>
+<text x="986" y="396" class="node-text" text-anchor="start"><tspan x="986" dy="0">用户账单</tspan><tspan x="986" dy="17">商户账单</tspan><tspan x="986" dy="17">运营时间线 / 财务视图</tspan></text>
+</g><g>
+<rect x="70" y="568" width="190" height="104" rx="8" ry="8" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.5"/>
+<rect x="82" y="580" width="38" height="24" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/><text x="101" y="597" text-anchor="middle" class="small" fill="#2563eb">P0</text>
+<text x="132" y="596" class="node-title">钱包账户域</text>
+<text x="86" y="620" class="node-text" text-anchor="start"><tspan x="86" dy="0">FundingAccount</tspan><tspan x="86" dy="17">信用账户 / 预算组</tspan><tspan x="86" dy="17">余额桶和展示口径</tspan></text>
+</g><g>
+<rect x="300" y="568" width="190" height="104" rx="8" ry="8" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.5"/>
+<rect x="312" y="580" width="38" height="24" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/><text x="331" y="597" text-anchor="middle" class="small" fill="#2563eb">P0</text>
+<text x="362" y="596" class="node-title">账本账目</text>
+<text x="316" y="620" class="node-text" text-anchor="start"><tspan x="316" dy="0">LedgerTransaction</tspan><tspan x="316" dy="17">LedgerEntry</tspan><tspan x="316" dy="17">账本周期和分录平衡</tspan></text>
+</g><g>
+<rect x="530" y="568" width="190" height="104" rx="8" ry="8" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.5"/>
+<rect x="542" y="580" width="38" height="24" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/><text x="561" y="597" text-anchor="middle" class="small" fill="#2563eb">P0</text>
+<text x="592" y="596" class="node-title">余额投影</text>
+<text x="546" y="620" class="node-text" text-anchor="start"><tspan x="546" dy="0">当前余额</tspan><tspan x="546" dy="17">历史余额</tspan><tspan x="546" dy="17">检查点 / 水位</tspan></text>
+</g><g>
+<rect x="760" y="568" width="190" height="104" rx="8" ry="8" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.5"/>
+<rect x="772" y="580" width="38" height="24" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/><text x="791" y="597" text-anchor="middle" class="small" fill="#2563eb">P0</text>
+<text x="822" y="596" class="node-title">清结算与对账</text>
+<text x="776" y="620" class="node-text" text-anchor="start"><tspan x="776" dy="0">清分 / 清算 / 结算</tspan><tspan x="776" dy="17">出款 / 对账批次</tspan><tspan x="776" dy="17">差错 / 调账 / 追偿</tspan></text>
+</g><g>
+<rect x="1010" y="568" width="190" height="104" rx="8" ry="8" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.5"/>
+<rect x="1022" y="580" width="38" height="24" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/><text x="1041" y="597" text-anchor="middle" class="small" fill="#2563eb">P0</text>
+<text x="1072" y="596" class="node-title">归档重放治理</text>
+<text x="1026" y="620" class="node-text" text-anchor="start"><tspan x="1026" dy="0">Archive Manifest</tspan><tspan x="1026" dy="17">正式重建 / 正式重放</tspan><tspan x="1026" dy="17">差异报告 / 审计</tspan></text>
+</g><g>
+<rect x="70" y="812" width="210" height="70" rx="8" ry="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+<text x="86" y="840" class="node-title">外部机构和轨道</text>
+<text x="86" y="864" class="node-text" text-anchor="start"><tspan x="86" dy="0">银行 / PSP / 卡组织</tspan><tspan x="86" dy="17">ACH / 本地清算网络</tspan><tspan x="86" dy="17">只保存引用和摘要</tspan></text>
+</g><g>
+<rect x="330" y="812" width="210" height="70" rx="8" ry="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+<text x="346" y="840" class="node-title">法务合规财务确认</text>
+<text x="346" y="864" class="node-text" text-anchor="start"><tspan x="346" dy="0">法域 / 资质 / 客户资金</tspan><tspan x="346" dy="17">外部规则版本</tspan><tspan x="346" dy="17">确认状态</tspan></text>
+</g><g>
+<rect x="590" y="812" width="210" height="70" rx="8" ry="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+<text x="606" y="840" class="node-title">报表指标模块</text>
+<text x="606" y="864" class="node-text" text-anchor="start"><tspan x="606" dy="0">只读消费指标项输入</tspan><tspan x="606" dy="17">不反写资金事实</tspan><tspan x="606" dy="17">口径版本独立治理</tspan></text>
+</g><g>
+<rect x="850" y="812" width="210" height="70" rx="8" ry="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+<text x="866" y="840" class="node-title">运营工作台</text>
+<text x="866" y="864" class="node-text" text-anchor="start"><tspan x="866" dy="0">查询 / 复核 / 导出</tspan><tspan x="866" dy="17">高危动作审批</tspan><tspan x="866" dy="17">全链路审计</tspan></text>
+</g><g>
+<rect x="1110" y="812" width="210" height="70" rx="8" ry="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="1.5" stroke-dasharray="6 5"/>
+
+<text x="1126" y="840" class="node-title">测试验收矩阵</text>
+<text x="1126" y="864" class="node-text" text-anchor="start"><tspan x="1126" dy="0">状态 / 金额 / 账目</tspan><tspan x="1126" dy="17">分录 / 投影 / 幂等</tspan><tspan x="1126" dy="17">异常和红线 must-fail</tspan></text>
+</g><g><line x1="1168" y1="227" x2="1168" y2="344" stroke="#9333ea" stroke-width="2" marker-end="url(#arrow-purple)"/><rect x="1127" y="264.5" width="82" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="1168" y="279.5" class="label" text-anchor="middle">归一资金事实</text></g><g><path d="M 1160 391 C 1280 410, 1280 590, 1110 615" fill="none" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><rect x="1094" y="482" width="82" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="1135" y="497" class="label" text-anchor="middle">只读视图来源</text></g><g><path d="M 260 391 L 260 316 L 745 316 L 745 391" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/><rect x="450.5" y="288" width="104" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="502.5" y="303" class="label" text-anchor="middle">交易事实进入路由</text></g><g><path d="M 935 391 C 850 520, 450 510, 300 568" fill="none" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><rect x="527" y="458.5" width="181" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="617.5" y="473.5" class="label" text-anchor="middle">posting plan 入账</text></g><g><line x1="490" y1="620" x2="530" y2="620" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><rect x="480" y="599" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="510" y="614" class="label" text-anchor="middle">分录派生</text></g><g><line x1="720" y1="620" x2="760" y2="620" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><rect x="693.5" y="599" width="93" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="740" y="614" class="label" text-anchor="middle">批次和差错引用</text></g><g><line x1="950" y1="620" x2="1010" y2="620" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><rect x="950" y="599" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="980" y="614" class="label" text-anchor="middle">归档重放</text></g><g><path d="M 865 568 C 700 495, 440 500, 320 438" fill="none" stroke="#ea580c" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-orange)"/><rect x="540.5" y="482" width="104" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="592.5" y="497" class="label" text-anchor="middle">运营补事实白名单</text></g><g><path d="M 210 812 C 0 620, 0 320, 160 227" fill="none" stroke="#6b7280" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-gray)"/><rect x="144" y="498.5" width="82" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="185" y="513.5" class="label" text-anchor="middle">外部只做引用</text></g><g><path d="M 435 812 C 480 650, 980 360, 865 227" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-rose)"/><rect x="609" y="498.5" width="82" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="650" y="513.5" class="label" text-anchor="middle">确认状态约束</text></g><g transform="translate(54,940)"><rect x="-14" y="-18" width="299" height="140" rx="10" fill="#ffffff" stroke="#e5e7eb"/><line x1="0" y1="0" x2="34" y2="0" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/><text x="46" y="4" class="small">主业务动作 / 同步资金处理</text><line x1="0" y1="24" x2="34" y2="24" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><text x="46" y="28" class="small">账本事实和投影派生</text><line x1="0" y1="48" x2="34" y2="48" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-orange)" stroke-dasharray="7 5"/><text x="46" y="52" class="small">运营补事实 / 异步补证据</text><line x1="0" y1="72" x2="34" y2="72" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-rose)" stroke-dasharray="7 5"/><text x="46" y="76" class="small">阻断 / 待确认 / 金融红线</text><line x1="0" y1="96" x2="34" y2="96" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow-gray)" stroke-dasharray="7 5"/><text x="46" y="100" class="small">外部引用 / 非内建边界</text></g><g><rect x="1015" y="920" width="370" height="64" rx="10" fill="#fffbeb" stroke="#fde68a"/><text x="1029" y="944" class="small"><tspan x="1029" dy="0">产品结论：wind-funds 是统一资金底座，不是完整 VCC、全球账户、ACH 或收单系统。</tspan><tspan x="1029" dy="18">图中外部规则均为待专业确认项，不表示生产可用。</tspan></text></g>
+</svg>

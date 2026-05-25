@@ -45,6 +45,9 @@
 | P0 资金底座内核 | 钱包、账本、账目、余额投影、对账、清分、清算、结算、大数据归档和账本余额快照。 | 资金主体清晰、账务平衡、余额可重建、清结算可核对、对账差错可闭环、归档和快照可审计。 |
 | P1 交易与读模型扩展 | 直接交易、授权交易、余额控制、交易投影和交易投影重投影。 | 交易入口、生命周期、路由、冻结/解冻、授权、交易视图和重投影必须复用 P0 资金事实，不得反写账本或余额。 |
 | P2 业务模式能力包 | VCC 发卡、全球账户收付款和收单业务支持。 | 业务模式只通过归一资金事实接入资金底座；轨道协议、风控、合规、商户经营和产品体验保留在业务专项。 |
+| 外部银行转账轨道支撑 | ACH 或银行转账业务的资金底座支撑。 | ACH 业务、银行转账产品或通道适配层负责指令、授权、文件、批次、return、NOC、reversal 和外部规则解释；资金底座只承接归一资金事实、外部引用、对账差错、追偿和审计。 |
+
+ACH 和银行转账不作为独立 P2 业务分册参与验收；相关验收只用于证明资金底座支持外部轨道输入时不越界。完整边界见 [ACH与银行转账资金底座支持边界.md](ACH与银行转账资金底座支持边界.md)。
 
 ## 2. 验收分层
 
@@ -111,8 +114,8 @@ flowchart TD
 | 06 VCC | `VCC-AC-001`、`VCC-AC-002` | 授权批准只表达占用，授权拒绝无账务副作用。 | 授权交易 DSL、支付工具引用、route snapshot；02 系分授权状态机和 VCC 工具边界。 | `TDD-P2-VCC-001`、`TDD-RAIL-001`、`TDD-AUTH-*`。 | 必须先证明卡、token、PAN/CVC 不作为账本主体，且拒绝不生成 route、posting 或 ledger entry。 |
 | 06 VCC | `VCC-AC-003` 至 `VCC-AC-006` | 撤销、clearing、退款和 chargeback 都基于原授权或原 route 回放。 | `SETTLE`、`AUTH_REFUND`、原路径 replay、争议证据引用；02/03 系分授权回放和对账差错。 | `TDD-P2-VCC-002`、`TDD-P2-VCC-003`、`TDD-RECON-*`。 | clearing、forced post、chargeback 和证据时限未专业确认前，只能作为待确认设计或 contract-only 验证。 |
 | 06 VCC | `VCC-RED-001` | 完整 PAN/CVC 不得进入资金底座。 | 支付工具脱敏快照、审计引用和敏感导出边界；05 系分安全红线。 | `TDD-P2-VCC-RED-001`、`TDD-OPS-003`、`TDD-OPS-006`。 | 任何日志、投影、导出或测试夹具出现完整 PAN/CVC 都必须阻断。 |
-| 07 全球账户 | `GA-AC-001`、`GA-AC-002` | 银行流水或 VA 匹配后才入账；外部 accepted 保持在途。 | 外部账户引用、入金资金动作、`IN_TRANSIT` 展示状态；02/03 系分入金、对账和在途处理。 | `TDD-P2-GA-001`、`TDD-RAIL-004`。 | 银行协议、VA 字段和到账口径未确认前，不得把外部受理展示为到账成功。 |
-| 07 全球账户 | `GA-AC-003` 至 `GA-AC-005` | 出款前置检查、回单终态确认和退汇回补分层处理。 | 出款前准入、外部回单、退汇事实、费用引用；03 系分出款和对账差错。 | `TDD-P2-GA-002`、`TDD-RAIL-005`、`TDD-SETTLE-*`。 | 法域、合作银行、跨境材料和资金归属未确认前，只能阻断、降级、转人工或保留在途。 |
+| 07 全球账户 | `GA-AC-001`、`GA-AC-002` | 银行流水或 VA 匹配后才入账；外部 accepted 保持在途。 | 外部账户引用、入金资金动作、`IN_TRANSIT` 展示状态；02/03 系分入金、对账和在途处理。 | `TDD-P2-GA-001`、`TDD-RAIL-008`。 | 银行协议、VA 字段和到账口径未确认前，不得把外部受理展示为到账成功。 |
+| 07 全球账户 | `GA-AC-003` 至 `GA-AC-005` | 出款前置检查、回单终态确认和退汇回补分层处理。 | 出款前准入、外部回单、退汇事实、费用引用；03 系分出款和对账差错。 | `TDD-P2-GA-002`、`TDD-RAIL-009`、`TDD-SETTLE-*`。 | 法域、合作银行、跨境材料和资金归属未确认前，只能阻断、降级、转人工或保留在途。 |
 | 07 全球账户 | `GA-RED-001`、`GA-RED-002` | 错币种无 quote 阻断；外部银行账户不入账。 | FX 决策快照、externalAccountRef、账务主体解析；02 系分主体和币种边界。 | `TDD-P2-GA-RED-001`、`TDD-FX-001`、`TDD-FX-002`。 | 不得静默换汇，不得让银行账户、VA 或 Nostro/Vostro 出现在 ledger entry 主体中。 |
 | 08 收单 | `ACQ-AC-001` 至 `ACQ-AC-003` | capture 成功进入待清算，清分确认不释放可结算，清算确认才进入可结算。 | 收单场景 pack、商户 CLEARING、清分批次、清算批次；03 系分清分清算对象。 | `TDD-P2-ACQ-001`、`TDD-CLS-*`。 | 先清账再结算，清分候选、清算候选和清算批次不得混成一个状态。 |
 | 08 收单 | `ACQ-AC-004` 至 `ACQ-AC-006` | 结算出款、退款和 chargeback 追偿必须分离。 | 出款单、原路径退款、dispute case、准备金、负余额或追偿；03 系分出款、差错和追偿。 | `TDD-P2-ACQ-002`、`TDD-SETTLE-*`、`TDD-RECON-*`。 | refund 与 chargeback 碰撞必须防重复损失；出款回单缺失或金额不一致不得关闭为成功。 |
@@ -354,10 +357,14 @@ AC-SET-006 至 AC-SET-009 是目标态产品验收口径。出款前准入候选
 | --- | --- | --- | --- | --- |
 | AC-RAIL-001 | VCC 授权批准 | 卡状态、spend control、额度和币种规则通过。 | 授权占用成功。 | 授权批准不等于最终入账。 |
 | AC-RAIL-002 | VCC 授权拒绝 | 卡状态、风控或额度不通过。 | 记录拒绝事实。 | 不生成账务路径，不计入争议拒付。 |
-| AC-RAIL-003 | ACH return | ACH 已提交后收到 return code。 | 生成 return 处理对象和资金处理事实。 | return 不是普通退款。 |
-| AC-RAIL-004 | ACH NOC | 收到 NOC 通知。 | 更新后续使用信息或生成运营任务。 | NOC 不改原交易资金事实。 |
-| AC-RAIL-005 | 全球付款报文成功但未到账 | 合作方返回 message sent。 | 进入 IN_TRANSIT 或出款单待确认状态。 | 不展示为已到账，不关闭 SETTLEMENT/IN_TRANSIT。 |
-| AC-RAIL-006 | 全球付款退汇 | 原付款被退回。 | 生成退汇事实、费用和责任处理。 | 退汇不是退款。 |
+| AC-RAIL-002A | ACH 不作为内建业务 | 需求提出“支持 ACH”或“接入银行转账”。 | 评审结论定位为外部轨道资金底座支持，要求先归属上层业务或通道适配层。 | 不新增 ACH 产品 PRD、ACH 通道模块、ACH 交易主状态机或 `ach-*` 资金内核模块。 |
+| AC-RAIL-003 | ACH return 边界 | ACH 业务或通道适配层已把 return code 解释为资金影响、责任方、原事实引用和处理建议。 | 资金底座生成 return 处理对象、差错、追偿或调账核销事实。 | 资金底座不解析 return code，不把 return 当普通退款，不在缺上层解释时自动入账。 |
+| AC-RAIL-004 | ACH NOC 边界 | ACH 业务或通道适配层收到 NOC 并完成主数据影响判断。 | 更新后续使用信息的任务引用或生成运营任务。 | NOC 不改原交易资金事实，资金底座不维护 ACH 主数据规则。 |
+| AC-RAIL-005 | ACH 外部受理但未到账 | ACH 或银行转账外部返回 submitted、accepted、processing 或 message sent。 | 进入 IN_TRANSIT、出款单待确认或外部处理中展示。 | 不展示为到账成功，不提前释放 AVAILABLE，不关闭 SETTLEMENT/IN_TRANSIT。 |
+| AC-RAIL-006 | ACH 敏感数据最小化 | ACH 业务或银行转账产品传入银行账户、trace number、文件或回单信息。 | 资金底座只保存 externalAccountRef、token、摘要、脱敏展示、文件摘要或回单引用。 | 完整银行账户号、密钥、敏感原文、ACH 文件全集不得进入日志、快照、投影、导出或测试夹具。 |
+| AC-RAIL-007 | ACH 外部规则未确认 | Nacha、ODFI/RDFI、银行协议、适用法域、Debit 授权、return、NOC、reversal、Same Day ACH、IAT 或资金可用性规则未确认。 | 阻断、降级为 contract-only、进入人工复核或保留为待确认项。 | 不作为生产自动入账、自动退款、自动出款、自动追偿、自动调账或自动放行依据。 |
+| AC-RAIL-008 | 全球付款报文成功但未到账 | 合作方返回 message sent。 | 进入 IN_TRANSIT 或出款单待确认状态。 | 不展示为已到账，不关闭 SETTLEMENT/IN_TRANSIT。 |
+| AC-RAIL-009 | 全球付款退汇 | 原付款被退回。 | 生成退汇事实、费用和责任处理。 | 退汇不是退款。 |
 | AC-FX-001 | 错币种到账 | 期望 USD，实际 EUR。 | 挂账、驳回或生成错币种差错。 | 不自动按 USD 入账。 |
 | AC-FX-002 | 业务换汇调整 | 有外部或业务 FX 决策快照。 | 记录原币、目标币、汇率、费用和审批。 | 底座不声明执行结售汇。 |
 
@@ -508,7 +515,8 @@ AC-SET-006 至 AC-SET-009 是目标态产品验收口径。出款前准入候选
 | AC-IN-*、AC-PAY-*、AC-MER-*、AC-FEE-* | DIRECT_TRANSACTION、DSL-DIRECT-PAY-FEE-001、DSL-DIRECT-FUND-IN-FEE-001、DSL-DIRECT-CHAIN-001、DSL-REVERSE-REFUND-FEE-001 | TDD-DIR-*、TDD-DIR-FLOW-*、TDD-DIR-ERR-* | 入金、付款、商户收款、转账、提现、退款、手续费和退费都能说明 route、posting、余额桶、幂等和原路径回放。 |
 | AC-BEN-*、RED-050 至 RED-066 | FundsBenefitSnapshotSpec、DSL-BENEFIT-*、expectedBenefitSnapshot、benefit components、refund dispositions、closureRole、fixtureLevel、权益准入证明、伴随权益指令组、补充权益事实、审计证据包、explainableProjection | TDD-BEN-*、TDD-BEN-RED-*、TDD-DIR-*、TDD-AUTH-*、TDD-CLS-*、TDD-RECON-*、TDD-RACE-012、FundsOperationExplainabilityTests、FundsOperationPermissionBoundaryTests | 权益金额组件只承接业务侧已决策结果；商户让利、平台补贴、储值券、不退券、授权占券、部分退款、零实付权益、伴随指令、补充事实、清结算拆分和营销资金差异都可追踪；无资金影响权益不入账，有资金影响权益不得和本金或手续费净额混记；含权益生产链路必须能长期回放原权益快照或受控补充事实，闭合角色、夹具级别、准入决策、审计证据包、解释视图和外部规则确认不能混用。 |
 | AC-ROUTE-*、AC-PI-*、RED-043 至 RED-049、RED-067 | RouteSnapshotSpec、RouteLegSpec、PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、Route Replay DSL、BindingHistory、DSL-PAYMENT-INSTRUMENT-ROUTE-001、DSL-PAYMENT-INSTRUMENT-FAIL-001、DSL-PAYMENT-INSTRUMENT-REPLAY-001、expectedRouteCreated=false | TDD-ROUTE-*、TDD-WALLET-*、TDD-RACE-009、TDD-RED-001、TDD-RED-003、TDD-RED-029、TDD-RED-034 至 TDD-RED-037、TDD-RED-043 | 路由只解析路径，不写账；支付工具、钱包标识和外部账户只做引用；绑定、方向、状态、资金来源、账户能力、`FundingAccount` 语义边界和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
-| AC-AUTH-*、AC-RAIL-001、AC-RAIL-002 | AUTHORIZATION_TRANSACTION、DSL-AUTH-LIFECYCLE-001、DSL-AUTH-FORCE-CAPTURE-001、DSL-AUTH-REFUND-001 | TDD-AUTH-*、TDD-AUTH-FLOW-*、TDD-AUTH-ERR-*、TDD-AUTH-EXT-*、TDD-ROUTE-005、TDD-ROUTE-009、TDD-RACE-001 至 TDD-RACE-003、TDD-RAIL-001、TDD-RAIL-002、TDD-RED-003、TDD-RED-005、TDD-RED-008、TDD-RED-016、TDD-RED-017、TDD-RED-033、TDD-RED-036 | 授权批准、拒绝、撤销、过期、普通完成、强制完成、完成后退款、无授权退款、拒付原因承接、原路径回放和 VCC 授权归一边界一致；完整支付轨道仍按 AC-RAIL-* 专项确认。 |
+| AC-AUTH-*、AC-RAIL-001、AC-RAIL-002 | AUTHORIZATION_TRANSACTION、DSL-AUTH-LIFECYCLE-001、DSL-AUTH-FORCE-CAPTURE-001、DSL-AUTH-REFUND-001 | TDD-AUTH-*、TDD-AUTH-FLOW-*、TDD-AUTH-ERR-*、TDD-AUTH-EXT-*、TDD-ROUTE-005、TDD-ROUTE-009、TDD-RACE-001 至 TDD-RACE-003、TDD-RAIL-001、TDD-RED-003、TDD-RED-005、TDD-RED-008、TDD-RED-016、TDD-RED-017、TDD-RED-033、TDD-RED-036 | 授权批准、拒绝、撤销、过期、普通完成、强制完成、完成后退款、无授权退款、拒付原因承接、原路径回放和 VCC 授权归一边界一致；完整支付轨道仍按 AC-RAIL-* 专项确认。 |
+| AC-RAIL-002A 至 AC-RAIL-007、ACH-BOUNDARY-001 至 ACH-BOUNDARY-006 | P2 业务能力包外部轨道边界、ExternalAccountRefSpec、外部规则核验字段、对账差错和调账引用；不新增 ACH DSL 内核对象。 | TDD-RAIL-002 至 TDD-RAIL-007、TDD-RED-030、TDD-RED-034、TDD-P2-GA-*、TDD-P2-ACQ-*、TDD-RECON-*、TDD-OPS-* | ACH 或银行转账必须先由上层业务或通道适配层解释为资金事实；资金底座只承接外部引用、核验状态、在途、return 处理对象、差错、追偿、调账核销、投影和审计；不得实现 ACH 协议、Nacha/ODFI/RDFI 规则、Debit 授权、return code/NOC/reversal 解释或保存完整银行账户敏感信息。 |
 | AC-CTRL-*、RED-013 | BALANCE_CONTROL、DSL-BALANCE-CONTROL-FREEZE-001、DSL-BALANCE-CONTROL-ADJUST-001、DSL-BALANCE-CONTROL-LIMIT-BUDGET-001、DSL-DIRECT-OVERDRAFT-001、账本周期 DSL、SubjectRef / RouteNode 主体解析 | TDD-CTRL-*、TDD-CTRL-FLOW-*、TDD-CTRL-ERR-*、TDD-LEDGER-008 至 TDD-LEDGER-011、TDD-WALLET-001 至 TDD-WALLET-004、TDD-ROUTE-004、TDD-RACE-004、TDD-RED-006、TDD-RED-011、TDD-RED-012、TDD-RED-015、TDD-RED-033 | 冻结、解冻、资金账户余额调整、信用账户额度调整、预算组额度调整和受控负余额不混用；AC-CTRL-009 至 AC-CTRL-011 必须证明账本周期隔离和继承；AC-CTRL-012 必须证明用户、商户、卡、VA、银行账户、支付工具和业务单据不能直接作为可记账主体；冻结单状态不得表达消费、扣划或付款完成；LIMIT 只能由调额触碰；余额控制不承接跨主体价值转移。 |
 | AC-ADJ-001、RED-010 | BALANCE_CONTROL / BALANCE_ADJUST、批次授权 DIRECT_TRANSACTION / ADJUSTMENT、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、差错调账账务规则 | TDD-RECON-001、TDD-RECON-002、TDD-CTRL-ERR-005、TDD-OPS-001 | 调账必须有差错或调整来源、审批、凭证、账本交易和重新对账依据；不得绕过差错闭环直接改余额，不得直接修改历史分录或投影。 |
 | AC-CLR-*、AC-SET-*、AC-SET-006 至 AC-SET-009、AC-REC-* | DSL-SETTLEMENT-RECONCILIATION-001、DSL-SETTLEMENT-CLEARING-CONFIRM-001、DSL-SETTLEMENT-LOCK-001、DSL-SETTLEMENT-PAYOUT-RESULT-001、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、DSL-SETTLEMENT-POLICY-001 | TDD-CLS-*、TDD-CLS-FLOW-*、TDD-SETTLE-*、TDD-SETTLE-004、TDD-SETTLE-005、TDD-RECON-*、TDD-RED-020 至 TDD-RED-025、TDD-RED-031、TDD-OPS-* | 清分、清算、结算、出款和对账对象独立；出款前准入、外部非终态、金额不一致和出款解释状态不误导；清分前基础对账、清算前置对账、差错追加事实、账期临界、退款时序和重跑审计闭环可验证。 |
@@ -545,7 +553,7 @@ AC-SET-006 至 AC-SET-009 是目标态产品验收口径。出款前准入候选
 | 路由契约 | AC-ROUTE-*、AC-PI-*、RED-003、RED-043 至 RED-049 | route snapshot、平台角色、支付工具引用、外部账户引用、资金来源决策、绑定历史审计、原路径回放、路由失败不写账和普通支付不误入商户清算可验收。 |
 | 运营后台 | AC-OPS-*、RED-010、RED-011、RED-028 | 后台只推进处理单和审批，不直接修改历史分录、余额或投影。 |
 | 清结算对象 | AC-CLR-*、AC-SET-*、AC-REC-*、RED-020、RED-030、RED-031、RED-032、RED-033、RED-037 | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单对象关系清楚；出款前准入、外部非终态、金额不一致和解释状态都有验收入口。 |
-| 外部规则核验 | AC-RAIL-*、AC-FX-*、RED-021、RED-066 | 涉及卡组织、ACH、银行、PSP、跨境、外汇和持牌能力时，保留规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方和确认状态；缺失时不得作为自动资金处理或生产放行依据。 |
+| 外部规则核验 | AC-RAIL-*、AC-FX-*、RED-021、RED-066 | 涉及卡组织、ACH、银行、PSP、跨境、外汇和持牌能力时，保留规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方和确认状态；ACH 相关规则解释必须由上层业务、通道适配或专业方完成，资金底座只能消费归一结果。缺失时不得作为自动资金处理或生产放行依据。 |
 | 归档重放门禁 | AC-ARCH-*、AC-ARCH-008、AC-ARCH-009、AC-REPLAY-*、RED-016、RED-017、RED-018、RED-019、RED-034、RED-040、RED-041、RED-042 | 归档、余额重建、交易投影重放和大数据归档承接都有范围、检查点、Manifest、水位、冷热事实源边界、治理读取或导出快照、差异报告、异常流程和人工处理入口。 |
 | 报表指标模块 | AC-RPT-*、RED-029 | 指标只读、来源可解释、异常不反写资金事实；资金底座不承接指标计算、报表看板、导出订阅和指标任务水位。 |
 | 余额变更观察 | AC-BALLOG-*、RED-036 | 余额日志只从分录和余额投影派生，可观察、可补偿、可审计，但不得反写事实层。 |

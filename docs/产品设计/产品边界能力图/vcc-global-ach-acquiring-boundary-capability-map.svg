@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1460 1040" width="1460" height="1040" role="img" aria-label="VCC / 全球账户 / ACH / 收单产品边界能力图">
+<style>
+text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
+.title { font-size: 24px; font-weight: 700; fill: #111827; }
+.subtitle { font-size: 13px; fill: #6b7280; }
+.node-title { font-size: 15px; font-weight: 700; fill: #111827; }
+.node-text { font-size: 12px; fill: #374151; }
+.small { font-size: 11px; fill: #6b7280; }
+.lane-title { font-size: 16px; font-weight: 700; fill: #111827; }
+.label { font-size: 12px; fill: #6b7280; }
+</style>
+<defs><marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker><marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker><marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/></marker><marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/></marker><marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/></marker><marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker></defs>
+<rect width="1460" height="1040" fill="#ffffff"/>
+<text x="40" y="46" class="title">VCC / 全球账户 / ACH / 收单产品边界能力图</text>
+<text x="40" y="72" class="subtitle">三类业务通过场景 pack 接入统一资金内核，ACH 仅作为外部轨道支持边界</text>
+<g><rect x="430" y="250" width="560" height="360" rx="14" ry="14" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/><text x="448" y="280" class="lane-title">wind-funds 统一资金底座能力边界</text><text x="448" y="302" class="small">统一实现：钱包、账本、账目、对账、清结算、投影、归档和审计</text></g><g>
+<rect x="465" y="310" width="220" height="100" rx="8" ry="8" fill="#fff" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="481" y="338" class="node-title">钱包账户域</text>
+<text x="481" y="362" class="node-text" text-anchor="start"><tspan x="481" dy="0">FundingAccount</tspan><tspan x="481" dy="17">信用账户 / 预算组</tspan><tspan x="481" dy="17">平台账户角色</tspan></text>
+</g><g>
+<rect x="705" y="310" width="220" height="100" rx="8" ry="8" fill="#fff" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="721" y="338" class="node-title">账本账目</text>
+<text x="721" y="362" class="node-text" text-anchor="start"><tspan x="721" dy="0">账本周期</tspan><tspan x="721" dy="17">分录平衡</tspan><tspan x="721" dy="17">余额桶</tspan></text>
+</g><g>
+<rect x="465" y="450" width="220" height="100" rx="8" ry="8" fill="#fff" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="481" y="478" class="node-title">清结算对账</text>
+<text x="481" y="502" class="node-text" text-anchor="start"><tspan x="481" dy="0">清分 / 清算 / 结算</tspan><tspan x="481" dy="17">对账批次 / 差错</tspan><tspan x="481" dy="17">调账 / 追偿</tspan></text>
+</g><g>
+<rect x="705" y="450" width="220" height="100" rx="8" ry="8" fill="#fff" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="721" y="478" class="node-title">投影归档</text>
+<text x="721" y="502" class="node-text" text-anchor="start"><tspan x="721" dy="0">余额投影</tspan><tspan x="721" dy="17">交易投影</tspan><tspan x="721" dy="17">Manifest / 重放</tspan></text>
+</g><g><rect x="40" y="120" width="330" height="245" rx="14" ry="14" fill="#faf5ff" stroke="#e9d5ff" stroke-width="1.5"/><text x="58" y="150" class="lane-title">VCC 发卡业务 capability pack</text></g><g>
+<rect x="70" y="175" width="270" height="88" rx="8" ry="8" fill="#fff" stroke="#e9d5ff" stroke-width="1.5"/>
+
+<text x="86" y="203" class="node-title">进入资金底座</text>
+<text x="86" y="227" class="node-text" text-anchor="start"><tspan x="86" dy="0">授权批准占用</tspan><tspan x="86" dy="17">clearing 入账</tspan><tspan x="86" dy="17">refund / chargeback 资金影响</tspan></text>
+</g><g>
+<rect x="70" y="275" width="270" height="62" rx="8" ry="8" fill="#fff" stroke="#fecaca" stroke-width="1.5"/>
+
+<text x="86" y="303" class="node-title">不进入资金底座</text>
+<text x="86" y="327" class="node-text" text-anchor="start"><tspan x="86" dy="0">Program / Card / Cardholder / PAN / CVC / HSM / Processor 原始报文</tspan></text>
+</g><g><rect x="1050" y="120" width="370" height="245" rx="14" ry="14" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/><text x="1068" y="150" class="lane-title">全球账户收付款 capability pack</text></g><g>
+<rect x="1085" y="175" width="300" height="88" rx="8" ry="8" fill="#fff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="1101" y="203" class="node-title">进入资金底座</text>
+<text x="1101" y="227" class="node-text" text-anchor="start"><tspan x="1101" dy="0">入金确认 / 出金结果</tspan><tspan x="1101" dy="17">在途 / 退汇 / 费用</tspan><tspan x="1101" dy="17">FX 引用和多币种对账</tspan></text>
+</g><g>
+<rect x="1085" y="275" width="300" height="62" rx="8" ry="8" fill="#fff" stroke="#fecaca" stroke-width="1.5"/>
+
+<text x="1101" y="303" class="node-title">不进入资金底座</text>
+<text x="1101" y="327" class="node-text" text-anchor="start"><tspan x="1101" dy="0">VA 生命周期 / SWIFT 协议 / 本地清算网络 / 跨境材料管理</tspan></text>
+</g><g><rect x="40" y="670" width="330" height="250" rx="14" ry="14" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1.5" stroke-dasharray="8 6"/><text x="58" y="700" class="lane-title">ACH 与银行转账外部轨道边界</text></g><g>
+<rect x="70" y="728" width="270" height="88" rx="8" ry="8" fill="#fff" stroke="#e5e7eb" stroke-width="1.5"/>
+
+<text x="86" y="756" class="node-title">进入资金底座</text>
+<text x="86" y="780" class="node-text" text-anchor="start"><tspan x="86" dy="0">已解释资金事实</tspan><tspan x="86" dy="17">trace number 摘要</tspan><tspan x="86" dy="17">return / NOC / reversal 处理结果</tspan></text>
+</g><g>
+<rect x="70" y="830" width="270" height="62" rx="8" ry="8" fill="#fff" stroke="#fecaca" stroke-width="1.5"/>
+
+<text x="86" y="858" class="node-title">不进入资金底座</text>
+<text x="86" y="882" class="node-text" text-anchor="start"><tspan x="86" dy="0">ACH 文件 / Nacha 规则 / ODFI-RDFI 责任 / Debit 授权判断</tspan></text>
+</g><g><rect x="1050" y="670" width="370" height="250" rx="14" ry="14" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/><text x="1068" y="700" class="lane-title">收单业务 capability pack</text></g><g>
+<rect x="1085" y="728" width="300" height="88" rx="8" ry="8" fill="#fff" stroke="#fed7aa" stroke-width="1.5"/>
+
+<text x="1101" y="756" class="node-title">进入资金底座</text>
+<text x="1101" y="780" class="node-text" text-anchor="start"><tspan x="1101" dy="0">capture / refund / dispute</tspan><tspan x="1101" dy="17">商户待清算和可结算</tspan><tspan x="1101" dy="17">准备金 / 追偿 / 出款结果</tspan></text>
+</g><g>
+<rect x="1085" y="830" width="300" height="62" rx="8" ry="8" fill="#fff" stroke="#fecaca" stroke-width="1.5"/>
+
+<text x="1101" y="858" class="node-title">不进入资金底座</text>
+<text x="1101" y="882" class="node-text" text-anchor="start"><tspan x="1101" dy="0">商户入网 / 收银台 / 支付网关 / PCI token vault / PSP 协议</tspan></text>
+</g><g>
+<rect x="520" y="85" width="360" height="80" rx="8" ry="8" fill="#fffbeb" stroke="#fde68a" stroke-width="1.5"/>
+
+<text x="536" y="113" class="node-title">归一接入契约</text>
+<text x="536" y="137" class="node-text" text-anchor="start"><tspan x="536" dy="0">业务 pack 或通道适配层必须先提交：资金事实 + 外部引用 + 规则核验状态 + 幂等键 + 证据摘要</tspan></text>
+</g><g><path d="M 340 220 C 410 210, 450 120, 520 125" fill="none" stroke="#9333ea" stroke-width="2" marker-end="url(#arrow-purple)"/><rect x="400" y="151.5" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="430" y="166.5" class="label" text-anchor="middle">归一事实</text></g><g><path d="M 1085 220 C 1010 210, 950 120, 880 125" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/><rect x="952.5" y="151.5" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="982.5" y="166.5" class="label" text-anchor="middle">归一事实</text></g><g><path d="M 340 770 C 380 640, 450 260, 520 165" fill="none" stroke="#6b7280" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-gray)"/><rect x="394.5" y="446.5" width="71" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="430" y="461.5" class="label" text-anchor="middle">解释后提交</text></g><g><path d="M 1085 770 C 1010 640, 950 260, 880 165" fill="none" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-orange)"/><rect x="952.5" y="446.5" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="982.5" y="461.5" class="label" text-anchor="middle">归一事实</text></g><g><line x1="700" y1="165" x2="700" y2="250" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><rect x="659" y="186.5" width="82" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="700" y="201.5" class="label" text-anchor="middle">进入统一内核</text></g><g><rect x="455" y="645" width="510" height="64" rx="10" fill="#fffbeb" stroke="#fde68a"/><text x="469" y="669" class="small"><tspan x="469" dy="0">能力边界结论：交易层场景语义不完全通用，但钱包、账本、账目、对账、清分、清算、结算、投影、归档和审计应统一设计、统一实现。</tspan><tspan x="469" dy="18">ACH 不是第四个内建业务分册，只是外部银行转账轨道支持边界。</tspan></text></g><g><rect x="430" y="790" width="560" height="120" rx="14" ry="14" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/><text x="448" y="820" class="lane-title">专业确认和金融红线</text></g><text x="455" y="850" class="node-text" text-anchor="start"><tspan x="455" dy="0">卡组织、ACH/Nacha、银行、PSP、跨境、FX、税务、会计、客户资金、备付金和持牌边界必须由法务、合规、财务、通道或持牌机构确认；未确认不得自动入账、自动退款、自动清算或自动出款。</tspan></text><g transform="translate(40,970)"><rect x="-14" y="-18" width="260" height="164" rx="10" fill="#ffffff" stroke="#e5e7eb"/><line x1="0" y1="0" x2="34" y2="0" stroke="#9333ea" stroke-width="2" marker-end="url(#arrow-purple)"/><text x="46" y="4" class="small">VCC 场景资金事实</text><line x1="0" y1="24" x2="34" y2="24" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)"/><text x="46" y="28" class="small">全球账户资金事实</text><line x1="0" y1="48" x2="34" y2="48" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-orange)"/><text x="46" y="52" class="small">收单资金事实</text><line x1="0" y1="72" x2="34" y2="72" stroke="#6b7280" stroke-width="2" marker-end="url(#arrow-gray)" stroke-dasharray="7 5"/><text x="46" y="76" class="small">ACH/银行转账外部轨道</text><line x1="0" y1="96" x2="34" y2="96" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><text x="46" y="100" class="small">统一资金内核</text><line x1="0" y1="120" x2="34" y2="120" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-rose)"/><text x="46" y="124" class="small">禁止沉入资金底座</text></g>
+</svg>

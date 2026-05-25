@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1260 800" width="1260" height="800" role="img" aria-label="对账产品流程图">
+<style>
+text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
+.title { font-size: 24px; font-weight: 700; fill: #111827; }
+.subtitle { font-size: 13px; fill: #6b7280; }
+.node-title { font-size: 15px; font-weight: 700; fill: #111827; }
+.node-text { font-size: 12px; fill: #374151; }
+.small { font-size: 11px; fill: #6b7280; }
+.lane-title { font-size: 16px; font-weight: 700; fill: #111827; }
+.label { font-size: 12px; fill: #6b7280; }
+</style>
+<defs><marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker><marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker><marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/></marker><marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/></marker><marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/></marker><marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker></defs>
+<rect width="1260" height="800" fill="#ffffff"/>
+<text x="40" y="46" class="title">对账产品流程图</text>
+<text x="40" y="72" class="subtitle">对账比较业务、交易、账本、外部文件和投影，差异必须进入闭环而不是直接改账</text>
+<g>
+<rect x="50" y="150" width="180" height="84" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="66" y="178" class="node-title">业务单据</text>
+<text x="66" y="202" class="node-text" text-anchor="start"><tspan x="66" dy="0">订单 / 退款 / 出款</tspan><tspan x="66" dy="17">清结算批次</tspan></text>
+</g><g>
+<rect x="280" y="150" width="180" height="84" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="296" y="178" class="node-title">资金事实</text>
+<text x="296" y="202" class="node-text" text-anchor="start"><tspan x="296" dy="0">资金交易 / 冻结单</tspan><tspan x="296" dy="17">route snapshot</tspan></text>
+</g><g>
+<rect x="510" y="150" width="180" height="84" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="526" y="178" class="node-title">账本和投影</text>
+<text x="526" y="202" class="node-text" text-anchor="start"><tspan x="526" dy="0">LedgerEntry</tspan><tspan x="526" dy="17">余额投影</tspan></text>
+</g><g>
+<rect x="740" y="150" width="180" height="84" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="756" y="178" class="node-title">外部文件</text>
+<text x="756" y="202" class="node-text" text-anchor="start"><tspan x="756" dy="0">银行流水 / PSP 文件</tspan><tspan x="756" dy="17">卡组织 / ACH 摘要</tspan></text>
+</g><g>
+<rect x="970" y="150" width="180" height="84" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
+
+<text x="986" y="178" class="node-title">报表输入</text>
+<text x="986" y="202" class="node-text" text-anchor="start"><tspan x="986" dy="0">财务核对视图</tspan><tspan x="986" dy="17">指标项输入</tspan></text>
+</g><g>
+<rect x="250" y="330" width="210" height="92" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="266" y="358" class="node-title">对账任务收数</text>
+<text x="266" y="382" class="node-text" text-anchor="start"><tspan x="266" dy="0">范围 / 规则版本</tspan><tspan x="266" dy="17">等待数据 / 数据就绪</tspan><tspan x="266" dy="17">摘要校验</tspan></text>
+</g><g><polygon points="585,322 660,376 585,430 510,376" fill="#fffbeb" stroke="#fde68a" stroke-width="1.5"/><text x="585" y="372" class="node-title" text-anchor="middle">是否匹配?</text><text x="585" y="392" class="small" text-anchor="middle"><tspan x="585" dy="0">单账 / 账实 / 钱平</tspan></text></g><g>
+<rect x="780" y="295" width="220" height="88" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
+
+<text x="796" y="323" class="node-title">平账关闭</text>
+<text x="796" y="347" class="node-text" text-anchor="start"><tspan x="796" dy="0">生成平账报告</tspan><tspan x="796" dy="17">批次审计</tspan><tspan x="796" dy="17">可进入放行矩阵</tspan></text>
+</g><g>
+<rect x="780" y="430" width="220" height="98" rx="8" ry="8" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/>
+
+<text x="796" y="458" class="node-title">生成差错单</text>
+<text x="796" y="482" class="node-text" text-anchor="start"><tspan x="796" dy="0">差异分类 / 责任方</tspan><tspan x="796" dy="17">挂账 / 补事实 / 冲正</tspan><tspan x="796" dy="17">调账 / 追偿 / 核销</tspan></text>
+</g><g>
+<rect x="1045" y="430" width="170" height="98" rx="8" ry="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5"/>
+
+<text x="1061" y="458" class="node-title">重新对账</text>
+<text x="1061" y="482" class="node-text" text-anchor="start"><tspan x="1061" dy="0">处理后重跑</tspan><tspan x="1061" dy="17">有凭证才核销</tspan><tspan x="1061" dy="17">关闭差错</tspan></text>
+</g><line x1="140" y1="234" x2="355" y2="330" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-blue)"/><line x1="370" y1="234" x2="355" y2="330" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-blue)"/><line x1="600" y1="234" x2="355" y2="330" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-blue)"/><line x1="830" y1="234" x2="355" y2="330" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-blue)"/><line x1="1060" y1="234" x2="355" y2="330" stroke="#2563eb" stroke-width="2" stroke-dasharray="7 5" marker-end="url(#arrow-blue)"/><g><line x1="460" y1="376" x2="510" y2="376" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><rect x="455" y="355" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="485" y="370" class="label" text-anchor="middle">匹配规则</text></g><g><line x1="660" y1="350" x2="780" y2="338" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><rect x="696" y="323" width="48" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="720" y="338" class="label" text-anchor="middle">是</text></g><g><line x1="660" y1="405" x2="780" y2="478" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-rose)"/><rect x="696" y="420.5" width="48" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="720" y="435.5" class="label" text-anchor="middle">否</text></g><g><line x1="1000" y1="478" x2="1045" y2="478" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-orange)"/><rect x="992.5" y="457" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="1022.5" y="472" class="label" text-anchor="middle">处理结果</text></g><g><path d="M 1130 430 C 1120 590, 600 590, 590 430" fill="none" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-orange)"/><rect x="830" y="409" width="60" height="22" rx="11" fill="#ffffff" opacity="0.96"/><text x="860" y="424" class="label" text-anchor="middle">重跑验证</text></g><g><rect x="50" y="610" width="1165" height="86" rx="14" ry="14" fill="#fef2f2" stroke="#fecaca" stroke-width="1.5"/><text x="68" y="640" class="lane-title">对账红线</text></g><text x="76" y="658" class="node-text" text-anchor="start"><tspan x="76" dy="0">差异不得直接修改历史分录、余额投影、交易投影或外部流水；必须进入差错单、审批、凭证、补事实/冲正/调账/追偿和重新对账闭环。</tspan></text><g transform="translate(50,740)"><rect x="-14" y="-18" width="195" height="116" rx="10" fill="#ffffff" stroke="#e5e7eb"/><line x1="0" y1="0" x2="34" y2="0" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow-blue)" stroke-dasharray="7 5"/><text x="46" y="4" class="small">对账来源收集</text><line x1="0" y1="24" x2="34" y2="24" stroke="#16a34a" stroke-width="2" marker-end="url(#arrow-green)"/><text x="46" y="28" class="small">匹配和平账</text><line x1="0" y1="48" x2="34" y2="48" stroke="#dc2626" stroke-width="2" marker-end="url(#arrow-rose)"/><text x="46" y="52" class="small">差异和阻断</text><line x1="0" y1="72" x2="34" y2="72" stroke="#ea580c" stroke-width="2" marker-end="url(#arrow-orange)"/><text x="46" y="76" class="small">处理后重新对账</text></g>
+</svg>
