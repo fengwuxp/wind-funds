@@ -279,7 +279,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     private void assertRequiredLedgersPresent(FundsAccountId subjectRef,
                                               List<LedgerDTO> ledgers,
                                               List<LedgerSubjectCode> requiredSubjectCodes) {
-        AssertUtils.isTrue(!ledgers.isEmpty(), "资金主体账本不存在，accountId = {}", subjectRef);
+        AssertUtils.notEmpty(ledgers, "资金主体账本不存在，accountId = {}", subjectRef);
         if (requiredSubjectCodes == null || requiredSubjectCodes.isEmpty()) {
             return;
         }
