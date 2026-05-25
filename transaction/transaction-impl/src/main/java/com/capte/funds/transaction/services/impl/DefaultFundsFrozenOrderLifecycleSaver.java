@@ -247,7 +247,10 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
 
     private void assertEnoughReleasableAmount(FundsFrozenOrder originalOrder, Long releaseAmount) {
         long remainingAmount = remainingReleasableAmount(originalOrder);
-        AssertUtils.isTrue(releaseAmount != null && releaseAmount <= remainingAmount,
+        AssertUtils.notNull(releaseAmount,
+                "冻结单剩余可释放金额不足，sn = {}，remainingAmount = {}，amount = {}",
+                originalOrder.getSn(), remainingAmount, releaseAmount);
+        AssertUtils.isTrue(releaseAmount <= remainingAmount,
                 "冻结单剩余可释放金额不足，sn = {}，remainingAmount = {}，amount = {}",
                 originalOrder.getSn(), remainingAmount, releaseAmount);
     }
