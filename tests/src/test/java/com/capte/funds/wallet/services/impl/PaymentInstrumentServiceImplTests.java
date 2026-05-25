@@ -56,6 +56,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String RAW_PAYMENT_INSTRUMENT_SN = "pi_service_raw_card";
 
+    private static final String INVALID_WINDOW_PAYMENT_INSTRUMENT_SN = "pi_service_invalid_window_card";
+
     private static final String SUSPENDED_PAYMENT_INSTRUMENT_SN = "pi_service_suspended_card";
 
     private static final String RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN = "pi_service_receive_card";
@@ -148,6 +150,33 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .hasMessageContaining("instrumentNo must be masked or token reference");
 
         assertThat(countRows("t_payment_instrument", "sn", RAW_PAYMENT_INSTRUMENT_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：运营创建支付工具时配置了倒置或空的生效窗口。
+     * 输入：validTo 早于或等于 validFrom 的 ACTIVE 支付工具。
+     * 输出：创建被拒绝，不留下支付工具引用。
+     * 红线：无效工具窗口不得进入绑定或 route 候选池，也不得写账。
+     */
+    @Test
+    void testCreatePaymentInstrumentShouldRejectInvalidValidityWindowWithoutInstrument() {
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
+                .setSn(INVALID_WINDOW_PAYMENT_INSTRUMENT_SN)
+                .setValidFrom(now)
+                .setValidTo(now.minusSeconds(1))))
+                .hasMessageContaining("支付工具生效时间必须早于失效时间");
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
+                .setSn(INVALID_WINDOW_PAYMENT_INSTRUMENT_SN)
+                .setValidFrom(now)
+                .setValidTo(now)))
+                .hasMessageContaining("支付工具生效时间必须早于失效时间");
+
+        assertThat(countRows("t_payment_instrument", "sn", INVALID_WINDOW_PAYMENT_INSTRUMENT_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -251,6 +280,33 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setCurrency(CurrencyIsoCode.CNY)))
                 .hasMessageContaining("支付工具币种与绑定币种不一致");
+
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：运营创建支付工具绑定时配置了倒置或空的生效窗口。
+     * 输入：validTo 早于或等于 validFrom 的 ACTIVE 绑定关系。
+     * 输出：创建被拒绝，不留下绑定候选或历史。
+     * 红线：无效绑定窗口不得进入 route 候选池，也不得写账或污染审计证据。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldRejectInvalidValidityWindowWithoutBinding() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setValidFrom(now)
+                .setValidTo(now.minusSeconds(1))))
+                .hasMessageContaining("支付工具绑定生效时间必须早于失效时间");
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setValidFrom(now)
+                .setValidTo(now)))
+                .hasMessageContaining("支付工具绑定生效时间必须早于失效时间");
 
         assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
         assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
@@ -616,6 +672,53 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：运营变更支付工具绑定时把当前态改成倒置或空的生效窗口。
+     * 输入：已存在 ACTIVE 绑定，变更请求设置 validTo 早于或等于 validFrom。
+     * 输出：变更被拒绝，绑定当前态和历史证据保持不变。
+     * 红线：绑定变更入口不得绕过窗口校验，不得追加伪成功历史或污染 route 候选。
+     */
+    @Test
+    void testChangePaymentInstrumentBindingShouldRejectInvalidValidityWindowWithoutHistoryMutation() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setValidFrom(now)
+                        .setValidTo(now.minusSeconds(1))
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("invalid window")
+                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
+                .hasMessageContaining("支付工具绑定生效时间必须早于失效时间");
+
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setValidFrom(now)
+                        .setValidTo(now)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("invalid window")
+                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
+                .hasMessageContaining("支付工具绑定生效时间必须早于失效时间");
+
+        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+        assertThat(binding.getVersion()).isEqualTo(1);
+        assertThat(binding.getValidFrom()).isNull();
+        assertThat(binding.getValidTo()).isNull();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testChangePaymentInstrumentBindingShouldAppendHistoryWithoutOverwritingEvidence() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
@@ -703,9 +806,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 DUPLICATE_DEFAULT_BINDING_SN,
                 PRIORITY_CONFLICT_BINDING_SN,
                 PRIORITY_ORDER_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
                 RAW_PAYMENT_INSTRUMENT_SN,
+                INVALID_WINDOW_PAYMENT_INSTRUMENT_SN,
                 SUSPENDED_PAYMENT_INSTRUMENT_SN,
                 RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN);
     }

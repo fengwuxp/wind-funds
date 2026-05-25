@@ -73,6 +73,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createPaymentInstrument(@NonNull CreatePaymentInstrumentRequest request) {
         assertNoRawSensitiveInstrumentNo(request);
+        assertPaymentInstrumentValidityWindow(request.getValidFrom(), request.getValidTo());
         PaymentInstrument entity = PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrument(request);
         paymentInstrumentMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建支付工具失败");
@@ -86,6 +87,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         assertInstrumentCanBind(instrument, request);
         PaymentInstrumentBinding entity =
                 PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBinding(request);
+        assertBindingValidityWindow(entity);
         assertNoDuplicateActiveDefaultBinding(entity);
         assertNoDuplicateActivePriorityBinding(entity);
         paymentInstrumentBindingMapper.insertSelective(entity);
@@ -110,6 +112,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         PaymentInstrumentBinding after = copyBinding(before);
         applyBindingChanges(after, request);
         after.setVersion(before.getVersion() + 1);
+        assertBindingValidityWindow(after);
         assertNoDuplicateActiveDefaultBinding(after);
         assertNoDuplicateActivePriorityBinding(after);
         AssertUtils.isTrue(paymentInstrumentBindingMapper.updateByQuery(
@@ -266,6 +269,21 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         AssertUtils.isTrue(supportsBindingRole(instrument.getInstrumentDirection(), request.getBindingRole()),
                 "支付工具方向不支持绑定角色，instrumentSn = {}",
                 request.getInstrumentSn());
+    }
+
+    private void assertPaymentInstrumentValidityWindow(LocalDateTime validFrom, LocalDateTime validTo) {
+        if (validFrom == null || validTo == null) {
+            return;
+        }
+        AssertUtils.isTrue(validFrom.isBefore(validTo), "支付工具生效时间必须早于失效时间");
+    }
+
+    private void assertBindingValidityWindow(PaymentInstrumentBinding binding) {
+        if (binding.getValidFrom() == null || binding.getValidTo() == null) {
+            return;
+        }
+        AssertUtils.isTrue(binding.getValidFrom().isBefore(binding.getValidTo()),
+                "支付工具绑定生效时间必须早于失效时间");
     }
 
     private boolean supportsBindingRole(PaymentInstrumentDirection direction, PaymentInstrumentBindingRole bindingRole) {
