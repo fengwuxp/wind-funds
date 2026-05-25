@@ -71,6 +71,22 @@ OpenSpec / Superpowers / Harness 在本项目中的定位：
 
 首轮编码推荐路径：先做 B2 Round 0 开工核验，确认钱包账户、支付工具、账本、账目、余额投影和现有测试资产可承接，再由用户确认批次 2 Execution Grant。B1-10 已是历史交付基线，不作为新的默认开工授权；B3 至 B6 不得抢跑 B2 基础事实；B7/B8 仍需独立 TDD 分析和 Execution Grant。
 
+### 3.4 Execution Grant 最小字段
+
+Execution Grant 必须是可执行授权，不是口头“可以开始”。字段缺失时，本批只能做设计、Round 0、契约草案或 dry-run。
+
+| 字段 | 必填口径 |
+| --- | --- |
+| 能力域和批次 | B1、B2、B3 至 B6、B7、B8 或 P2 业务专项；不得混批授权。 |
+| 基线附件 | docs、OpenSpec、Harness Plan、Git 提交点、未提交变更清单和允许读取文件。 |
+| 写入范围 | 生产代码、测试代码、公共契约、枚举、Request/Query/DTO、状态机、表结构、H2 schema、运行时配置的允许项和禁止项。 |
+| 物理落点 | 模块、包、face/impl、端口、依赖方向、DTO/Entity/Mapper 归属和边界测试范围。 |
+| 首批 Red | Red ID、目标测试资产、失败断言、验证命令和必须先失败的证据。 |
+| 资金不变量 | 主体、账目、币种、周期、route、posting、entry、projection、幂等、失败无副作用和审计断言。 |
+| 运营治理门禁 | 清结算、对账、出款、归档、重放、指标水位、白名单、Manifest、checkpoint、差异报告和人工处理入口。 |
+| 外部规则核验 | 规则来源、版本或发布日期、生效日期、适用主体或范围、适用法域、核验日期、确认方和确认状态。 |
+| 验证和停止条件 | 目标验证命令、`just test-boundary` 或等效边界检查、PMD/完整验证口径、失败停止条件和 Not Done 判定。 |
+
 ## 四、后续开发 Definition of Ready
 
 任一编码批次开始前必须满足：

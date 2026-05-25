@@ -79,9 +79,9 @@ P2 业务专项进入编码前必须单独补 Execution Grant。授权中至少�
 | 强制完成 | 使用 `settle` 的强制完成模式，不新增独立事件，不伪造授权占用。 |
 | 无授权直接退款 | 无前置授权但存在外部原消费、外部原完成或差错凭证时，使用 `settleRefund` 的无授权退款模式承接；不得补造内部授权占用或静默退款。 |
 | 授权链拒付 | 表达已完成授权后的争议、扣回或追偿语义；资金底座目标态不要求落到 `FundsAuthorizationTransactionService#chargeback`，默认通过 `settleRefund` 携带拒付原因、凭证、上下文和审计承接。即使底层终态复用退款终态，也必须保留可查询、可投影、可审计的拒付语义，不能只留下普通退款结果。 |
-| 支付工具 | 卡、VA、外部账户、虚拟卡、钱包标识或通道 token 的路由输入和审计快照；不表达内部余额，不作为账本主体。 |
+| 支付工具 | 卡、VA、外部账户、虚拟卡、钱包标识或通道 token 的路由输入和审计快照；不表达内部余额，不作为账本主体。钱包标识只表示前台支付方式、外部钱包端点或工具引用，必须解析为资金账户、信用账户、预算组或平台账户角色后才能进入 route leg、posting 或 ledger entry。 |
 | 支付工具绑定 | 工具和付款主体、收款主体、信用账户、预算组或真实资金账户之间的候选关系；只用于路由候选和快照，不直接入账。 |
-| 支出主体资金来源关系 | 支出主体到资金账户、信用账户、预算组或兜底资金来源的解析关系；不计算 spend rules，不执行扣款，不写分录。 |
+| 支出主体资金来源关系 | 支出主体到资金账户、信用账户、预算组或兜底资金来源的解析关系；不计算 spend rules，不执行扣款，不写分录。`FundingAccount` 只表示真实资金账户，不得泛化承载信用账户、预算组、支付工具或钱包标识。 |
 | 权益快照 | `FundsBenefitSnapshotSpec`，只承接业务侧、订单侧或营销权益系统已决策的权益结果；不计算券规则，不判断券是否可用，不维护券生命周期。 |
 | 权益金额组件 | 单个商户让利、平台补贴、代金券核销、储值券抵扣或合作方补贴金额项；必须标记闭合角色、账务效果、资金性质、承担方、受益方和退款处置。 |
 | `NO_LEDGER` 权益 | 商户让利、展示优惠等无独立资金流组件，只能进入快照、清分展示、对账解释或投影辅助，不得生成 route leg、posting 或 ledger entry。 |
@@ -174,6 +174,23 @@ TDD 落地顺序同时受能力优先级和 Execution Grant 约束：P0 先保�
 | 禁止事项 | 不越界修改生产代码、不引入无主依赖、不恢复旧测试。 |
 | 验证命令 | 至少包含 `just mvn-version`、`just compile` 和本批次相关测试命令；CAD 自动模式或完整基线复核优先使用 `just verify-cad`；无法运行需说明。 |
 | 人工确认点 | 公共契约、表结构、枚举、资金红线、清结算对象、运营补事实命令白名单、权益退款分摊确定性规则、治理物理落点、归档重放、外部规则。 |
+
+### Round 0 和 Execution Grant 字段
+
+Round 0 是编码前核验，不是编码授权。Execution Grant 必须至少绑定以下字段；字段缺失时，本规格只能作为设计和 TDD 输入，不能作为生产代码、测试代码、DDL/H2 schema 或运行时配置写入依据。
+
+| 字段 | 要求 |
+| --- | --- |
+| abilityBatch | B1、B2、B3 至 B6、B7、B8 或 P2 业务专项；不得混批。 |
+| authorityBaseline | PRD、DSL、系分、TDD、OpenSpec、Harness Plan、Git 提交点和允许读取的未提交文件。 |
+| writeScope | 允许修改的模块、包、公共契约、枚举、Request/Query/DTO、状态机、表结构、H2 schema、测试资源和运行时配置。 |
+| noWriteScope | 明确禁止修改的模块、对象、资金语义和 Done 结论。 |
+| physicalLanding | 复用既有模块、新增 face/impl、暂不落物理模块或 contract-only；同时声明依赖方向、端口边界、DTO、Entity、Mapper 和边界测试。 |
+| firstRedSet | 首批 Red ID、失败行为、目标测试资产、失败断言和验证命令。 |
+| moneyInvariant | 金额闭合、主体、账目、币种、周期、route、posting、entry、projection、幂等、失败无副作用和审计断言。 |
+| operationGovernanceGate | `CLS-GATE-*`、`GOV-GATE-*`、运营补事实命令白名单、Manifest、checkpoint、watermark、差异报告、人工处理和指标水位隔离。 |
+| externalRuleStatus | 规则来源、版本或发布日期、生效日期、适用主体或范围、适用法域、核验日期、确认方和确认状态。 |
+| verificationAndStop | 验证命令、失败停止条件、Not Done 条件和回到设计或人工确认的触发器。 |
 
 ## 九、必须失败红线
 

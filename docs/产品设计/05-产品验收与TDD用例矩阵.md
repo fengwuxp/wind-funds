@@ -190,6 +190,8 @@ flowchart TD
 | AC-PI-005 | 工具换绑后的原路退款 | 原交易后支付工具绑定关系或默认资金来源发生变化。 | 退款、撤销、退费或拒付按原 route snapshot 和原工具快照解释。 | 不按当前绑定重新选路；累计金额和原路径仍可核对。 |
 | AC-PI-006 | 账户能力和工具动作匹配 | 工具解析出的资金账户缺少收款、付款或提现能力。 | 路由失败或进入人工处理。 | 账户无对应能力时不得继续入账；不能用支付工具能力绕过账户能力。 |
 | AC-PI-007 | 绑定历史和审计留痕 | 工具绑定、默认标识、优先级、方向、状态或资金来源关系发生变更。 | 系统保留当前有效绑定、历史变更记录、前后值、操作者、原因、时间和版本。 | 当前态用于新交易候选；历史审计用于争议、对账、回放和客服证明；不得用覆盖更新抹掉历史证据。 |
+| AC-PI-008 | 钱包标识作为支付方式引用 | 前台选择钱包余额、平台钱包或第三方钱包作为支付方式。 | route snapshot 可保存钱包标识或工具快照，但 posting 和 LedgerEntry 主体必须是解析后的资金账户、信用账户、预算组或平台账户角色。 | 钱包标识不等于钱包账户域，也不等于 `FundingAccount`；缺解析结果时失败，不得用钱包标识、工具号或 token 入账。 |
+| AC-PI-009 | `FundingAccount` 语义不泛化 | 信用账户、预算组、支付工具或平台账户角色进入路由、授权、余额查询或清结算。 | 信用账户、预算组保持独立主体类型；平台账户角色先解析到真实资金账户；支付工具只做引用。 | `FundingAccount` 只表示真实资金账户；不得把信用额度、预算控制或支付工具塞进 `FundingAccount` 统一处理。 |
 
 ### 5.3 授权、撤销与结算
 
@@ -447,6 +449,7 @@ AC-SET-006 至 AC-SET-009 是目标态产品验收口径。出款前准入候选
 | RED-064 | 含权益视图误导使用者 | 用户账单、商户账单、运营时间线、财务对账视图或审计导出把授权占用、冻结、待清算、出款受理、补充事实、证据包状态或专业确认状态展示成已完成资金结果。 |
 | RED-065 | 证据包或导出越过最小必要边界 | 审计证据包、补充材料、导出文件、日志或告警包含完整卡号、CVV、密钥、token secret、证件影像、完整银行账户敏感号、无关聊天记录或超范围个人信息。 |
 | RED-066 | 未核验外部规则被写成生产依据 | 税务、会计、合同、卡组织、银行、通道、KYC/KYB/AML、客户资金、跨境或外汇口径缺规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方或确认状态，仍作为自动入账、退款、清结算、出款、归档或审计放行依据。 |
+| RED-067 | `FundingAccount` 被泛化成万能账户 | 信用账户、预算组、支付工具、钱包标识或外部账户被写入 `FundingAccount` 口径，导致额度、预算、工具引用和真实资金混账。 |
 
 ## 7. TDD 用例书写模板
 
@@ -481,7 +484,7 @@ AC-SET-006 至 AC-SET-009 是目标态产品验收口径。出款前准入候选
 | AC-ROUTE-004 | RouteSnapshot 平台角色、expectedRoute.legs | 平台费用、预收待付、现金映射和调整账户必须解析到唯一平台账户角色；缺失或多命中时不入账。 |
 | AC-ROUTE-005 | expectedRouteCreated=false、expectedPostingCreated=false | 账户缺失、币种不一致、余额不足、周期缺失、规则不唯一或外部账户误用时，失败不生成 route、posting、entry。 |
 | AC-ROUTE-006 | AUTHORIZATION_TRANSACTION / AUTHORIZE、DSL-AUTH-LIFECYCLE-001 | 授权占用保存主体、账目、账本周期和授权快照；释放和结算必须回到原周期。 |
-| AC-PI-001 至 AC-PI-007 | PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、RouteSnapshotSpec、BindingHistory | 支付工具只做路由输入和快照引用；工具绑定、方向、状态、资金来源决策、账户能力和绑定历史审计必须可解释；逆向交易按原快照回放。 |
+| AC-PI-001 至 AC-PI-009 | PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、RouteSnapshotSpec、BindingHistory | 支付工具只做路由输入和快照引用；工具绑定、方向、状态、资金来源决策、账户能力、钱包标识解析和绑定历史审计必须可解释；逆向交易按原快照回放；`FundingAccount` 只表示真实资金账户。 |
 | AC-AUTH-011 | AUTHORIZATION_TRANSACTION / SETTLE 强制完成模式、DSL-AUTH-FORCE-CAPTURE-001 | 无前置授权的外部消费结果通过 settle 承接，不伪造授权占用；策略、上限、原因和审计必填。 |
 | AC-AUTH-012 | AUTHORIZATION_TRANSACTION / AUTH_REFUND 无授权退款模式、DSL-AUTH-REFUND-001 | 无前置授权但有外部原消费、原完成或差错凭证时通过 settleRefund 承接；不得补造授权占用或静默退款。 |
 | RED-043 | expectedRouteCreated=false | 多个账户、账目、平台角色或规则同时命中时，不能随机选择路径继续入账。 |
@@ -504,7 +507,7 @@ AC-SET-006 至 AC-SET-009 是目标态产品验收口径。出款前准入候选
 | --- | --- | --- | --- |
 | AC-IN-*、AC-PAY-*、AC-MER-*、AC-FEE-* | DIRECT_TRANSACTION、DSL-DIRECT-PAY-FEE-001、DSL-DIRECT-FUND-IN-FEE-001、DSL-DIRECT-CHAIN-001、DSL-REVERSE-REFUND-FEE-001 | TDD-DIR-*、TDD-DIR-FLOW-*、TDD-DIR-ERR-* | 入金、付款、商户收款、转账、提现、退款、手续费和退费都能说明 route、posting、余额桶、幂等和原路径回放。 |
 | AC-BEN-*、RED-050 至 RED-066 | FundsBenefitSnapshotSpec、DSL-BENEFIT-*、expectedBenefitSnapshot、benefit components、refund dispositions、closureRole、fixtureLevel、权益准入证明、伴随权益指令组、补充权益事实、审计证据包、explainableProjection | TDD-BEN-*、TDD-BEN-RED-*、TDD-DIR-*、TDD-AUTH-*、TDD-CLS-*、TDD-RECON-*、TDD-RACE-012、FundsOperationExplainabilityTests、FundsOperationPermissionBoundaryTests | 权益金额组件只承接业务侧已决策结果；商户让利、平台补贴、储值券、不退券、授权占券、部分退款、零实付权益、伴随指令、补充事实、清结算拆分和营销资金差异都可追踪；无资金影响权益不入账，有资金影响权益不得和本金或手续费净额混记；含权益生产链路必须能长期回放原权益快照或受控补充事实，闭合角色、夹具级别、准入决策、审计证据包、解释视图和外部规则确认不能混用。 |
-| AC-ROUTE-*、AC-PI-*、RED-043 至 RED-049 | RouteSnapshotSpec、RouteLegSpec、PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、Route Replay DSL、BindingHistory、DSL-PAYMENT-INSTRUMENT-ROUTE-001、DSL-PAYMENT-INSTRUMENT-FAIL-001、DSL-PAYMENT-INSTRUMENT-REPLAY-001、expectedRouteCreated=false | TDD-ROUTE-*、TDD-WALLET-*、TDD-RACE-009、TDD-RED-001、TDD-RED-003、TDD-RED-029、TDD-RED-034 至 TDD-RED-037 | 路由只解析路径，不写账；支付工具和外部账户只做引用；绑定、方向、状态、资金来源、账户能力和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
+| AC-ROUTE-*、AC-PI-*、RED-043 至 RED-049、RED-067 | RouteSnapshotSpec、RouteLegSpec、PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、Route Replay DSL、BindingHistory、DSL-PAYMENT-INSTRUMENT-ROUTE-001、DSL-PAYMENT-INSTRUMENT-FAIL-001、DSL-PAYMENT-INSTRUMENT-REPLAY-001、expectedRouteCreated=false | TDD-ROUTE-*、TDD-WALLET-*、TDD-RACE-009、TDD-RED-001、TDD-RED-003、TDD-RED-029、TDD-RED-034 至 TDD-RED-037、TDD-RED-043 | 路由只解析路径，不写账；支付工具、钱包标识和外部账户只做引用；绑定、方向、状态、资金来源、账户能力、`FundingAccount` 语义边界和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
 | AC-AUTH-*、AC-RAIL-001、AC-RAIL-002 | AUTHORIZATION_TRANSACTION、DSL-AUTH-LIFECYCLE-001、DSL-AUTH-FORCE-CAPTURE-001、DSL-AUTH-REFUND-001 | TDD-AUTH-*、TDD-AUTH-FLOW-*、TDD-AUTH-ERR-*、TDD-AUTH-EXT-*、TDD-ROUTE-005、TDD-ROUTE-009、TDD-RACE-001 至 TDD-RACE-003、TDD-RAIL-001、TDD-RAIL-002、TDD-RED-003、TDD-RED-005、TDD-RED-008、TDD-RED-016、TDD-RED-017、TDD-RED-033、TDD-RED-036 | 授权批准、拒绝、撤销、过期、普通完成、强制完成、完成后退款、无授权退款、拒付原因承接、原路径回放和 VCC 授权归一边界一致；完整支付轨道仍按 AC-RAIL-* 专项确认。 |
 | AC-CTRL-*、RED-013 | BALANCE_CONTROL、DSL-BALANCE-CONTROL-FREEZE-001、DSL-BALANCE-CONTROL-ADJUST-001、DSL-BALANCE-CONTROL-LIMIT-BUDGET-001、DSL-DIRECT-OVERDRAFT-001、账本周期 DSL、SubjectRef / RouteNode 主体解析 | TDD-CTRL-*、TDD-CTRL-FLOW-*、TDD-CTRL-ERR-*、TDD-LEDGER-008 至 TDD-LEDGER-011、TDD-WALLET-001 至 TDD-WALLET-004、TDD-ROUTE-004、TDD-RACE-004、TDD-RED-006、TDD-RED-011、TDD-RED-012、TDD-RED-015、TDD-RED-033 | 冻结、解冻、资金账户余额调整、信用账户额度调整、预算组额度调整和受控负余额不混用；AC-CTRL-009 至 AC-CTRL-011 必须证明账本周期隔离和继承；AC-CTRL-012 必须证明用户、商户、卡、VA、银行账户、支付工具和业务单据不能直接作为可记账主体；冻结单状态不得表达消费、扣划或付款完成；LIMIT 只能由调额触碰；余额控制不承接跨主体价值转移。 |
 | AC-ADJ-001、RED-010 | BALANCE_CONTROL / BALANCE_ADJUST、批次授权 DIRECT_TRANSACTION / ADJUSTMENT、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、差错调账账务规则 | TDD-RECON-001、TDD-RECON-002、TDD-CTRL-ERR-005、TDD-OPS-001 | 调账必须有差错或调整来源、审批、凭证、账本交易和重新对账依据；不得绕过差错闭环直接改余额，不得直接修改历史分录或投影。 |
@@ -523,7 +526,7 @@ AC-SET-006 至 AC-SET-009 是目标态产品验收口径。出款前准入候选
 | 账务断言 | 必须断言 posting plan 平衡、账本交易和分录可追溯。 |
 | 幂等断言 | 写操作必须覆盖重复请求和同键不同摘要。 |
 | 异常断言 | 覆盖余额不足、账户缺失、币种不一致、缺快照、超额、权限不足等失败路径。 |
-| 投影断言 | 用户、商户、运营或财务视图必须来自事实，不反向写事实。 |
+| 投影断言 | 用户、商户、运营、财务核对视图或指标项输入必须来自事实，不反向写事实，不生成正式财务报表。 |
 | 审计断言 | 高危操作必须有原因、凭证、审批、操作者和时间。 |
 | 红线断言 | 本文第 6 节红线必须有失败测试或明确不适用原因。 |
 | 可解释性断言 | 用户、商户、运营、财务、合规和审计视图必须能说明金额来源、状态含义、失败原因、处理入口和不可操作原因。 |

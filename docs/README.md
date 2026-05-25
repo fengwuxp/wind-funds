@@ -158,6 +158,23 @@ flowchart LR
 | 能力域首批 Red | 清结算与对账先补 `TDD-B7-RED-001` 至 `TDD-B7-RED-007`；归档重放与指标治理先补 `TDD-B8-RED-001` 至 `TDD-B8-RED-005`；未补前只能做设计、契约草案或 dry-run。 |
 | 审计证据包 | 记录确认方、确认时间、结论版本、适用范围、有效期、证据引用、撤销或变更处理、脱敏方式和审计责任人；证据引用只能保存摘要、脱敏值、文件编号或外部 reference，不保存完整凭证、卡号、密钥、证件或用户敏感信息。 |
 
+### Execution Grant 字段映射
+
+后续 OpenSpec change、Harness Plan 或任务说明可以使用下列字段名承接准入卡。字段缺失时，只能做设计、Round 0、TDD 分析、契约草案或 dry-run，不能进入生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
+
+| 字段 | 对应准入内容 |
+| --- | --- |
+| `abilityBatch` | 批次目标、能力域、PRD 验收 ID、DSL caseId、系分章节、TDD 用例和红线编号。 |
+| `authorityBaseline` | docs、OpenSpec、Harness Plan、Git 提交点、未提交变更清单和允许读取文件。 |
+| `writeScope` | 允许修改的模块、包、公共契约、枚举、Request/Query/DTO、状态机、表结构、H2 schema、测试资源和运行时配置。 |
+| `noWriteScope` | 只读范围、禁止范围、不得触碰的资金语义、外部协议、历史事实和 Not Done 结论。 |
+| `physicalLanding` | 复用既有模块、新增 face/impl、暂不落物理模块或 contract-only；依赖方向、端口边界、DTO、Entity、Mapper 和边界测试。 |
+| `firstRedSet` | 首批 Red、必须失败行为、目标测试资产、失败断言、测试层级和验证命令。 |
+| `moneyInvariant` | 金额闭合、主体、账目、币种、周期、route、posting、entry、projection、幂等、失败无副作用和审计断言。 |
+| `operationGovernanceGate` | 清结算、对账、出款、归档、重放、指标水位、运营补事实白名单、Manifest、checkpoint、差异报告和人工处理入口。 |
+| `externalRuleStatus` | 规则来源、版本或发布日期、生效日期、适用主体或范围、适用法域、核验日期、确认方和确认状态。 |
+| `verificationAndStop` | 验证命令、失败停止条件、Not Done 条件和回到设计或人工确认的触发器。 |
+
 ### TDD 分析准入卡
 
 进入 TDD 分析不等于进入编码。TDD 分析只允许产出测试资产设计、首批 Red 排序、DDL/H2 范围、服务级测试范围、边界测试、外部规则核验和残余风险矩阵；生产代码、测试代码、DDL/H2 schema 和运行时配置写入仍必须等待 Execution Grant。

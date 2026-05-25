@@ -202,6 +202,21 @@ DDL/H2 schema 变化：
 | 验证命令 | 指定最小目标测试、边界测试、PMD/compile/verify-cad 取舍，以及无法执行时的环境限制说明。 | 不得声明 Done。 |
 | 停止条件 | 明确公共契约冲突、表结构冲突、资金口径不一致、外部规则未确认、测试无法闭合、权限不足和工作树冲突时的暂停规则。 | 触发即停止并回到 CR。 |
 
+字段化授权建议：
+
+| 字段 | 承接内容 |
+| --- | --- |
+| `abilityBatch` | 批次、能力域、AC/DSL/系分/TDD/RED 和 Not Done 条件。 |
+| `authorityBaseline` | PRD、DSL、系分、TDD、OpenSpec、Harness Plan、Git 提交点、工作树状态和允许读取文件。 |
+| `writeScope` | 允许写入的生产代码、测试代码、公共契约、枚举、Request/Query/DTO、状态机、表结构、H2 schema、fixture 和运行时配置。 |
+| `noWriteScope` | 禁止写入范围、不得触碰的模块、对象、资金语义、外部协议、历史事实和用户未提交变更。 |
+| `physicalLanding` | 模块、包、face/impl、端口、依赖方向、DTO、Entity、Mapper、DDL/H2 和边界测试范围。 |
+| `firstRedSet` | 必须先失败的 Red、目标测试资产、失败断言、测试层级和验证命令。 |
+| `moneyInvariant` | 主体、账目、币种、周期、route、posting、entry、projection、余额、幂等、失败无副作用和审计证据。 |
+| `operationGovernanceGate` | 清结算、对账、出款、差错、白名单、归档、Manifest、checkpoint、watermark、差异报告、人工处理和指标水位隔离。 |
+| `externalRuleStatus` | 规则来源、版本或发布日期、生效日期、适用主体或范围、适用法域、核验日期、确认方和确认状态。 |
+| `verificationAndStop` | 目标验证命令、边界测试、PMD/完整验证取舍、失败停止条件和 Not Done 判定。 |
+
 ## 6. 里程碑拆解
 
 | 里程碑 | 目标 | 完成标志 | 阻塞关系 |
