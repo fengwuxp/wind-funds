@@ -10,28 +10,44 @@
 
 ## 二、范围
 
-### 2.1 默认核心范围
+### 2.1 能力保障优先级
 
-| 域 | 规格范围 |
-| --- | --- |
-| DSL 契约 | `FundsInstruction`、`eventType`、`transactionType`、金额临界值、引用、route、payment instrument、routing decision、funding allocation、posting、entry、`SettlementPolicy`、JSON 契约。 |
-| 权益金额组件 | `FundsInstruction.benefitSnapshot`、`FundsBenefitSnapshotSpec`、权益组件、权益引用、退款处置、商户券、平台补贴、储值券、授权占券、不退券、部分退款和缺快照逆向处理。 |
-| 直接交易 | 充值、付款、转账、提现、退款、手续费、退费、受控负余额。 |
-| 授权交易 | 授权批准、授权拒绝、授权撤销、授权完成、授权过期、授权链退款、无授权直接退款、拒付承接口径、`settle` 强制完成模式。 |
-| 余额控制 | 冻结、解冻、资金账户余额调整、信用账户额度调整和预算组额度调整；对账差错调账必须经过差错单、审批、凭证、审计和重新对账闭环，不得被简化成无来源的余额直接修改。 |
-| 路由与回放 | route resolver、route snapshot、Route Replay、缺快照失败、账本周期继承。 |
-| 账务与投影 | posting plan、ledger transaction、ledger entry、余额投影、余额日志、交易投影只读边界。 |
-| 钱包账户 | 资金账户、信用账户、预算组、平台账户角色、支付工具、支付工具绑定、支出主体资金来源关系、主体余额查询。 |
-| 使用者可解释性 | 用户账单、商户账单、运营时间线、财务对账视图、审计导出和 SRE Runbook 信号；只读解释资金事实、事实状态、展示状态、操作状态、状态含义、失败原因、处理入口和不可操作原因，不反写交易事实、账本事实、余额投影或清结算对象。 |
+本规格的范围按资金底座能力优先级组织。优先级不等于一次性编码授权；任何生产代码、测试代码、DDL/H2 schema 或运行时配置变更仍必须由独立 Execution Grant 明确写入范围、验证命令和停止条件。
 
-### 2.2 独立批次范围
+| 优先级 | 域 | 规格范围 |
+| --- | --- | --- |
+| P0 | DSL 契约与账务内核 | `FundsInstruction`、`eventType`、`transactionType`、金额临界值、引用、route、payment instrument、routing decision、funding allocation、posting、entry、`SettlementPolicy`、JSON 契约。 |
+| P0 | 钱包账户 | 资金账户、信用账户、预算组、平台账户角色、支付工具、支付工具绑定、支出主体资金来源关系、主体余额查询。 |
+| P0 | 账务与余额投影 | posting plan、ledger transaction、ledger entry、余额投影、余额日志、账本余额快照覆盖模式和只读边界。 |
+| P0 | 清结算与对账 | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单和调账核销。 |
+| P0 | 归档、大数据归档和治理 | 归档门禁、Manifest、checkpoint、watermark、余额重建、账本余额快照、差异报告、异常人工处理、大数据归档承接边界、治理读取或导出快照、脱敏、digest 和审计。 |
+| P1 | 直接交易 | 充值、付款、转账、提现、退款、手续费、退费、受控负余额。 |
+| P1 | 授权交易 | 授权批准、授权拒绝、授权撤销、授权完成、授权过期、授权链退款、无授权直接退款、拒付承接口径、`settle` 强制完成模式。 |
+| P1 | 余额控制 | 冻结、解冻、资金账户余额调整、信用账户额度调整和预算组额度调整；对账差错调账必须经过差错单、审批、凭证、审计和重新对账闭环，不得被简化成无来源的余额直接修改。 |
+| P1 | 路由、回放和交易投影 | route resolver、route snapshot、Route Replay、缺快照失败、账本周期继承、交易投影和交易投影重放只读边界。 |
+| P1 | 权益金额组件 | `FundsInstruction.benefitSnapshot`、`FundsBenefitSnapshotSpec`、权益组件、权益引用、退款处置、商户券、平台补贴、储值券、授权占券、不退券、部分退款和缺快照逆向处理。 |
+| P2 | 业务能力包 | VCC 发卡、全球账户收付款和收单业务只作为资金底座上层业务模式支持；资金底座承接归一资金事实、账户、账本、清结算、对账和归档，不内置轨道协议、风控模型、商户经营或合规结论。 |
+| 横切 | 使用者可解释性 | 用户账单、商户账单、运营时间线、财务对账视图、审计导出和 SRE Runbook 信号；只读解释资金事实、事实状态、展示状态、操作状态、状态含义、失败原因、处理入口和不可操作原因，不反写交易事实、账本事实、余额投影或清结算对象。 |
 
-| 域 | 规格范围 |
-| --- | --- |
-| 清结算与对账 | 可清分明细、清分批次、清算候选、清算批次、结算单、出款单、对账批次、差错单、追偿单和调账核销。 |
-| 归档与重放 | 归档门禁、Manifest、checkpoint、watermark、余额重建、账本余额快照覆盖模式、交易投影重放、差异报告和异常人工处理。 |
-| 指标项 | 只列产品和业务关心的指标项、使用者、业务问题和建议事实来源；普通指标快照属于报表指标模块，不能替代账本余额快照确认；具体计算、存储和展示由报表指标模块承接。 |
-| Spend Controls | 仅作为发卡、VCC、企业卡或员工卡授权前控制扩展；未启用发卡产品时不进入资金底座核心实现。 |
+### 2.2 批次授权边界
+
+P0 能力可以分布在批次 1、2、7、8 中，P1 能力主要分布在批次 3 至 6 中，P2 能力按业务专项进入。批次号只表示工程切分和写入范围，不表示 03、04 能力低于 02；清结算、对账、归档和账本余额快照属于 P0，但进入编码前仍需要独立 OpenSpec change 或 Execution Grant。
+
+| 批次组 | 能力优先级 | 授权口径 |
+| --- | --- | --- |
+| 批次 1、2 | P0 共享承载 | DSL、钱包、账本、账目和余额投影可按独立授权先闭合基础不变量。 |
+| 批次 3 至 6 | P1 扩展 | 直接交易、授权交易、余额控制、路由回放、交易投影和权益资金流必须复用 P0 基础事实。 |
+| 批次 7 | P0 运营账务闭环 | PRD、DSL、系分和 TDD 已可作为系分交付输入；清结算与对账编码必须另起授权，不混入交易入口实现。 |
+| 批次 8 | P0/P1 治理闭环 | 归档、大数据归档和账本余额快照是 P0；交易投影重放是 P1 读模型治理；二者必须明确范围、水位、Manifest 和差异处理。 |
+| 业务专项 | P2 能力包 | VCC、全球账户和收单业务只通过专项 PRD/系分/TDD 使用资金底座能力。 |
+
+P2 业务专项进入编码前必须单独补 Execution Grant。授权中至少写明：对应业务分册、业务验收 ID、场景 pack 范围、归一资金动作、外部引用脱敏字段、允许新增或修改的公共契约、是否触碰 DDL/H2 schema、P0/P1 回归测试、外部规则核验状态、`TDD-P2-*` 专项用例和 Not Done 红线。缺任一项时，P2 业务只能停留在产品、DSL、系分、TDD 或 contract-only 验证，不得声明业务生产资金流 Done。
+
+| 业务专项 | 可复用的资金底座能力 | 进入编码前必须证明 | Not Done 红线 |
+| --- | --- | --- | --- |
+| VCC 发卡 | 授权交易、支付工具、route snapshot、账本账目、清结算、对账、归档和审计。 | 卡、token、持卡人和 processor account 只作为脱敏工具或外部引用；授权拒绝无账务副作用；clearing、refund 和 chargeback 基于原授权或原 route。 | 完整 PAN/CVC 进入资金底座；VCC 卡被当作 ledger subject；授权拒绝生成 route、posting 或 ledger entry。 |
+| 全球账户收付款 | 直接交易、外部账户引用、出款前准入、IN_TRANSIT、费用和 FX 引用、对账、归档和审计。 | VA 或银行流水匹配后才入账；外部 accepted 不等于到账；退汇关联原出金；无 FX quote 不静默换汇。 | 外部银行账户、VA、Nostro/Vostro 成为 ledger subject；外部受理被展示为到账成功；错币种无 quote 仍入账。 |
+| 收单业务 | capture 归一资金动作、商户 CLEARING、清分、清算、结算、出款、退款、争议、对账和归档。 | capture 只进入待清算；清分、清算、结算和出款分层；refund 与 chargeback 防重复损失；敏感卡数据最小化。 | 支付成功直接展示可提现；清分确认释放可结算；chargeback 被普通退款吞掉；完整 PAN/CVC 进入日志、投影、导出或测试夹具。 |
 
 ## 三、非目标
 
@@ -54,6 +70,8 @@
 | 出款单唯一性 | 当前基线默认一张结算单只生成一张出款单；重复创建必须命中原出款单或失败。若要支持拆分出款，必须先补出款明细和拆分幂等模型。 |
 | 出款前准入门禁 | 结算锁定后、提交外部出款前必须完成出款账户、收款端点、通道额度、cutoff、名单筛查、外部规则核验、负余额、准备金、对账差错、幂等和审批校验；任一门禁缺失、失败或未知时不得提交外部出款，不得生成 `FUND_OUT` 或 `IN_TRANSIT` 资金事实。 |
 | 外部非终态出款 | 外部 `accepted/submitted/message sent/processing` 只表示受理或处理中，不等于到账成功；不得提前关闭 `SETTLEMENT/IN_TRANSIT`，必须等待成功回单、到账证明或对账确认。 |
+| 运营补事实命令白名单 | 清结算或对账通过交易层追加资金事实时，Execution Grant 必须列出允许命令或等价事件、来源单据、审批号、证据引用、幂等键、原事实引用、操作者、原因和可撤销边界；未列入白名单的运营动作不得生成 `FundsInstruction`、route、posting 或 ledger entry。 |
+| 权益退款分摊确定性规则 | 部分退款必须明确规则版本、分摊依据、稳定组件顺序、舍入模式、尾差归属、组件剩余额度版本、幂等摘要字段和并发保护；缺任一项时只能失败、转人工或停留在 contract-only。 |
 | 外部规则核验状态 | 依赖税务、会计、合同、卡组织、银行、通道、KYC/KYB/AML、客户资金、跨境或外汇口径时，必须保存规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方和确认状态；缺失时只能阻断、降级或转人工。 |
 | 授权撤销 | 外部明确撤销或冲正，事件使用 `REVERSAL`，终态可区分为撤销。 |
 | 授权过期 | 系统按有效期释放剩余授权，事件使用 `EXPIRE`，终态可区分为过期。 |
@@ -74,6 +92,7 @@
 | 广义指标快照 | 对某个范围、口径、时间边界和事实来源进行批量计算、校验和确认的任务形态。普通指标快照归报表指标模块；账本余额快照是特殊场景，确认的是账本 bucket 余额事实。 |
 | 账本余额快照覆盖模式 | `HOT_ONLY` 表示只覆盖热区分录；`COLD_MANIFEST` 表示只覆盖已归档冷区；`MIXED` 表示同时覆盖冷区 Manifest 和热区游标。冷区和混合覆盖缺 Manifest 不得进入 `VERIFIED`。 |
 | 普通指标快照 | 报表指标模块的发布和质量上下文，只影响指标查询、看板、导出或订阅；不得推进余额水位、修改归档 Manifest、替代交易投影重放 checkpoint 或证明余额正确。 |
+| 大数据归档承接边界 | 报表数仓、离线指标或经营分析只能通过治理读取、导出快照、Manifest 摘要、脱敏、digest 和审计消费资金历史事实；资金冷归档是事实留存和重放证据，不是在线报表库，不得被反写或用来推进资金水位。 |
 | 可解释输出 | 面向用户、商户、运营、财务、审计和 SRE 的只读解释结果，来自资金交易、route snapshot、ledger entry、余额投影、交易投影、批次、差错、审批和告警上下文；不能作为资金事实源，也不能用于补造或修正资金事实。 |
 
 ## 五、当前代码差距基线
@@ -85,14 +104,14 @@
 | 批次域 | 当前代码和测试基线 | 对齐结论 |
 | --- | --- | --- |
 | 批次 1 DSL 契约 | 已存在 `FundsInstructionDslContractTests`、`RouteDslContractTests`、`PaymentInstrumentRouteDslContractTests`、`PostingLedgerDslContractTests`、`SettlementPolicySpecTests`、`FundsAmountBoundaryContractTests`、`FundsDslJsonContractTests`、`FundsBenefitSnapshotSpecTests`。 | DSL、Route、PaymentInstrument Route、Posting/Ledger、金额临界值、权益快照和 JSON 契约已有测试基线；仍需按后续批次发现的公共契约缺口补 Red 用例。 |
-| 权益快照 DSL | 设计权威已统一到 `docs/DSL设计/支付资金底座DSL承载层设计.md`；`FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、权益枚举、JSON 夹具和契约测试已在 `6be9c99` 形成 B1-10 契约承载基线，并在 `75b46ef`、`9db3eba` 收敛请求摘要和稳定摘要支撑。 | 即使 core 契约已落地，也只能按验证结果声明 Phase 1 契约承载；不能声明含权益 route/posting/replay、清结算、对账、投影、归档、冷热读取或治理重放生产链路已闭合；后续含权益批次必须补 Phase/Batch、`fixtureLevel`、零实付表达、事实源、独立伴随指令原子性、储值/预付口径、退款分摊、历史无快照处理、补充权益事实模型、专业确认状态、审计证据包、使用者解释视图、证据最小化和外部规则核验状态准入。 |
+| 权益快照 DSL | 设计权威已统一到 `docs/DSL设计/支付资金底座DSL承载层设计.md`；`FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、权益枚举、JSON 夹具和契约测试已在 `6be9c99` 形成 B1-10 契约承载基线，并在 `75b46ef`、`9db3eba` 收敛请求摘要和稳定摘要支撑。 | 即使 core 契约已落地，也只能按验证结果声明 Phase 1 契约承载；不能声明含权益 route/posting/replay、清结算、对账、投影、归档、冷热读取或治理重放生产链路已闭合；后续含权益批次必须补 Phase/Batch、`fixtureLevel`、零实付表达、事实源、独立伴随指令原子性、储值/预付口径、退款分摊粒度、退款分摊确定性规则、历史无快照处理、补充权益事实模型、专业确认状态、审计证据包、使用者解释视图、证据最小化和外部规则核验状态准入。 |
 | 批次 2 钱包账户与账本基础 | 已存在 `FundingAccountServiceImplTests`、`ControlAccountLedgerInitializationTests`、`PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests`、`LedgerBalanceProjectionServiceImplTests`、`DefaultLedgerPostingAssemblerTests`。 | 支付工具、绑定历史、资金来源关系、显式账本初始化、账务计划装配器长 ID 追溯和投影 afterCommit 已有局部基线；账本周期、全量余额断言和组合交易仍需后续批次继续闭合。 |
 | 批次 3 直接交易 | 已存在 `FundsDirectTransactionFlowTests`、`FundsTransferPayWithdrawChainFlowTests`、`FundsTransactionFeeFlowTests`。 | 直接交易主链路、退款、手续费和链式流程已有局部流程基线；仍需按 TDD 覆盖全部 `AC-IN/OUT/PAY/MER/FEE` 和红线失败。 |
 | 批次 4 授权交易 | 已存在 `FundsAuthorizationTransactionFlowTests`，覆盖授权拒绝、撤销、部分完成、全额完成、退款超额等局部场景。 | 授权批准、拒绝、撤销、完成和完成后退款已有局部基线；授权过期、强制完成、无授权直接退款、拒付承接口径、原路径回放、发卡控制扩展边界和并发竞争仍需按批次 4 覆盖索引闭合。 |
 | 批次 5 余额控制 | 已存在 `FundsBalanceControlFailureFlowTests`、`FundsWithdrawalSuccessFlowTests`、`FundsWithdrawalAfterPartialUnfreezeFlowTests`、`FundsWithdrawalRejectionFlowTests`。 | 冻结、解冻、提现、失败无副作用和部分组合路径已有局部基线；资金账户余额调整、信用账户额度调整、预算组额度调整、adjust 红线、冻结关闭并发和全量金额临界值仍需补齐。 |
 | 批次 6 Route Replay 与投影 | 已存在 `DefaultRouteReplayServiceTests`、`CompositeRouteResolverTests`、`DefaultRoutedFundsInstructionOrchestratorProjectionTests`。 | Route Replay、resolver 无副作用、交易投影 afterCommit 和投影失败不回滚事实已有局部基线；支付工具换绑后全链路回放、敏感快照、绑定历史审计、余额日志边界和投影重放全量覆盖仍需按批次 6 覆盖索引闭合。 |
-| 批次 7 清结算与对账 | 当前代码基线包含 `reconciliation-face`、`reconciliation-impl` 模块骨架和 B7-00 出款前准入候选契约、服务与测试；只能作为后续候选输入。 | 不能声明清结算、对账或出款生命周期已实现；若后续扩展 B7-00 候选能力，进入编码前必须另起独立 OpenSpec change 和 Execution Grant，并显式列入允许写入范围与验证命令。 |
-| 批次 8 归档重放与指标边界 | 已存在 `governance-face`、`governance-impl` 交易投影重放骨架和 `FundsProjectionReplayServiceTests`。 | 交易投影重放有局部边界基线；归档 Manifest、账本余额快照覆盖模式、余额水位隔离、普通指标快照和指标水位隔离仍需独立落地。 |
+| 批次 7 清结算与对账 | 当前代码基线包含 `reconciliation-face`、`reconciliation-impl` 模块骨架和出款前准入候选契约、服务与测试；PRD、DSL、系分和 TDD 已可作为 TDD 分析输入，但代码只能作为后续候选输入。 | 不能声明清结算、对账或出款生命周期已实现；进入编码前必须另起独立 OpenSpec change 和 Execution Grant，并显式列入允许写入范围、验证命令、DDL/H2 schema、服务级 H2 测试、NFR 假设、观测告警、运营补事实命令白名单、专业确认状态、使用者解释字段、职责分离、证据最小化、`CLS-GATE-*` 和 `TDD-B7-RED-001` 至 `TDD-B7-RED-007` 首批 Red。 |
+| 批次 8 归档重放与指标边界 | 已存在 `governance-face`、`governance-impl` 交易投影重放骨架和 `FundsProjectionReplayServiceTests`；PRD、DSL、系分和 TDD 已可作为 TDD 分析输入。 | 交易投影重放有局部边界基线；归档 Manifest、账本余额快照覆盖模式、余额水位隔离、普通指标快照、指标水位隔离和大数据归档承接边界仍需独立落地。进入编码前必须在 Execution Grant 中确认 `GOV-GATE-*`、治理物理落点、依赖方向、是否新增公共契约、DDL/H2 schema、Mapper/Entity 归属、边界测试、指标水位隔离测试和 `TDD-B8-RED-001` 至 `TDD-B8-RED-005` 首批 Red。 |
 | 使用者可解释性和 Runbook | 当前仅有产品和系分矩阵，尚未形成专项可执行测试资产。 | 后续触碰交易投影、查询 DTO、清结算、对账、归档、重放、导出或告警时，必须补可解释输出和 Runbook 信号断言，不能只证明内部状态正确。 |
 
 ### 5.2 差距清单
@@ -105,33 +124,33 @@
 | GAP-AUTH-004 | `settleRefund` 无授权退款模式必须可表达外部原消费、外部原完成或差错凭证。 | `FundsAuthorizationTransactionRefundRequest` 当前仍要求 `authorizationTransactionSn`，尚不能表达无前置授权退款。 | 先补无授权直接退款成功、无原事实失败、审计缺失失败测试；必要时扩展请求契约并同步服务入口、摘要和验收矩阵。 |
 | GAP-PI-001 | 支付工具、绑定关系、资金来源关系和绑定历史审计必须能支撑 route snapshot、原路径回放和敏感信息治理。 | 当前已有 `PaymentInstrumentService`、绑定当前态、绑定历史审计、资金来源关系、工具方向/状态守卫和脱敏快照相关实现与服务层测试。 | 批次 2 的支付工具基础能力可作为局部基线；后续仍需补支付工具换绑后资金全链路 replay、route snapshot 引用和组合交易断言。 |
 | GAP-BEN-001 | `FundsInstruction` 可携带权益快照，且核心字段不能藏入 `contextVariables`。 | 本轮已形成 `FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、枚举、`benefitSnapshot` 字段、JSON 夹具和契约测试基线。 | 批次 1 关闭条件是 core 契约、无权益空值语义、金额闭合、闭合角色边界、组件唯一性、退款处置、Phase/Batch 边界、`fixtureLevel` 和 JSON 契约测试通过；未进入 route/posting/replay 消费前只能声明契约承载 Done。 |
-| GAP-BEN-002 | 直接交易需按原权益快照处理商户券、平台补贴、储值券、零实付权益和叠加权益。 | 当前 route/posting 不消费权益金额组件，也未选择零实付主指令或伴随权益指令。 | 批次 3 补商户让利 no-ledger、平台补贴独立资金影响、储值券资金性质、零实付表达、独立伴随指令原子性、部分成功补偿、专业确认、审计证据包、使用者解释视图、证据最小化、外部规则核验和退款分摊测试。 |
+| GAP-BEN-002 | 直接交易需按原权益快照处理商户券、平台补贴、储值券、零实付权益和叠加权益。 | 当前 route/posting 不消费权益金额组件，也未选择零实付主指令或伴随权益指令。 | 批次 3 补商户让利 no-ledger、平台补贴独立资金影响、储值券资金性质、零实付表达、独立伴随指令原子性、部分成功补偿、专业确认、审计证据包、使用者解释视图、证据最小化、外部规则核验和退款分摊确定性测试。 |
 | GAP-BEN-003 | 授权交易需表达占券、完成核销、撤销或过期释放，以及拒绝不处理权益。 | 当前授权链路未见权益占用、核销或释放语义。 | 批次 4 补授权占券、完成核销、撤销/过期释放、拒绝无副作用和并发竞争测试。 |
 | GAP-BEN-004 | 退款、撤销、过期、拒付和 Route Replay 必须使用原权益快照，不得按当前营销规则重算。 | 当前 replay 缺权益快照摘要、组件累计、事实源一致性、补充权益事实模型和缺快照人工处理边界。 | 批次 6 补原快照 digest、事实源一致性、缺快照失败、补充权益事实只追加、部分退款累计闭合、不退券和补贴冲回/保留分离测试。 |
-| GAP-BEN-005 | 含权益交易进入清结算与对账时，营销核销、订单金额、资金入账、商户应收和补贴冲回必须可拆分核对。 | 冻结基线中清结算与对账仍只有模块骨架和 B7-00 出款前准入候选实现；当前候选实现不覆盖权益清分、清算、结算或对账拆分。 | 批次 7 独立 OpenSpec change 中补权益清分、清算、结算、对账差错和人工处理矩阵。 |
-| GAP-BEN-006 | `CONTRACT_ONLY` 样例、请求态快照和 `contextVariables` 过渡不得替代生产事实源。 | 当前 B1-10 只形成契约承载基线，后续 route/posting/replay、清结算、对账、投影、归档、冷热读取和治理重放消费尚未闭合。 | 含权益 Phase 2/3 批次必须在 Execution Grant 中选择事实源、JSON 夹具级别、零实付表达、平台补贴表达、独立伴随指令原子性、储值预付口径、退款分摊、历史无快照处理、补充权益事实模型、专业确认状态、审计证据包、使用者解释视图、证据最小化和外部规则核验状态；缺决策时降级为 contract-only、设计验证或失败用例。 |
+| GAP-BEN-005 | 含权益交易进入清结算与对账时，营销核销、订单金额、资金入账、商户应收和补贴冲回必须可拆分核对。 | 冻结基线中清结算与对账仍只有模块骨架和出款前准入候选实现；当前候选实现不覆盖权益清分、清算、结算或对账拆分。 | 清结算与对账独立 OpenSpec change 中补权益清分、清算、结算、对账差错和人工处理矩阵。 |
+| GAP-BEN-006 | `CONTRACT_ONLY` 样例、请求态快照和 `contextVariables` 过渡不得替代生产事实源。 | 当前 B1-10 只形成契约承载基线，后续 route/posting/replay、清结算、对账、投影、归档、冷热读取和治理重放消费尚未闭合。 | 含权益 Phase 2/3 批次必须在 Execution Grant 中选择事实源、JSON 夹具级别、零实付表达、平台补贴表达、独立伴随指令原子性、储值预付口径、退款分摊粒度、退款分摊确定性规则、历史无快照处理、补充权益事实模型、专业确认状态、审计证据包、使用者解释视图、证据最小化和外部规则核验状态；缺决策时降级为 contract-only、设计验证或失败用例。 |
 | GAP-BEN-007 | 含权益视图、证据包和外部规则核验必须满足可理解、安全和可审计要求。 | 当前只有设计矩阵和准入门禁，缺 `DSL-BENEFIT-EXPLAINABLE-VIEW-001` 对应的可执行契约和服务/投影测试。 | 后续触碰含权益用户账单、商户账单、运营时间线、财务对账视图、审计导出、证据包、外部规则或告警时，必须补 `TDD-BEN-RED-028` 至 `TDD-BEN-RED-030`、解释视图断言、脱敏导出断言和外部规则核验断言。 |
 | GAP-OPS-001 | 使用者可解释性必须能说明金额来源、事实状态、展示状态、操作状态、失败原因、处理入口、不可操作原因和恢复验收。 | 当前只有设计矩阵，缺专项测试和查询/投影输出断言。 | 后续按批次补 `FundsOperationExplainabilityTests`、`FundsRunbookSignalTests` 或等价服务/投影测试；触碰高危查询、导出、告警或运营台时必须同步补权限、审计和只读边界。 |
 | GAP-TDD-001 | 测试必须按最终 TDD 重建。 | 旧过渡测试不作为目标态依据；当前已有批次 1、批次 2 和批次 3 至 6 的局部目标态测试，但批次 1 至批次 6 尚未按覆盖索引完整闭环。 | 继续按批次补齐测试；已重建测试只作为对应批次的局部基线。 |
-| GAP-CLS-001 | 清结算与对账对象需独立状态机和表设计落地。 | 冻结基线已有 `reconciliation-face`、`reconciliation-impl` 模块骨架和 B7-00 出款前准入候选实现，但未覆盖对账任务、可清分明细、清分批次、清算候选、清算批次、结算单、出款单完整生命周期、差错单、追偿单、表结构和目标态服务层测试。 | 单独 OpenSpec change 和 Harness 批次处理，不混入交易主链路；后续确认是否复用现有 `reconciliation-*` 模块和是否扩展 B7-00 候选能力。 |
-| GAP-CLS-002 | 出款前准入门禁、外部非终态、金额不一致和出款解释状态必须有服务契约与测试资产。 | 当前代码基线已包含 `PayoutOrderService#checkPayoutPreflight`、`CheckPayoutPreflightRequest`、`PayoutPreflightResultDTO` 和 `PayoutPreflightServiceTests` 候选实现；已覆盖结构化外部规则核验证据、创建前无 `payoutSn` 检查、`factStatus`、`displayStatus`、`operationStatus` 和只读无账务事实断言，但仍缺 `PayoutOrderDTO` 解释状态字段、出款门禁表/字段、出款结果/回单处理、金额不一致处理、数据库级闭环和 `PayoutExplainabilityTests`。 | 批次 7 必须把 `AC-SET-006` 至 `AC-SET-009`、`TDD-SETTLE-004`、`TDD-SETTLE-005`、`RED-032` 和 `RED-037` 纳入 Execution Grant；若继续扩展候选能力，必须显式列入允许写入范围，并继续补出款表、状态守卫、回单、金额不一致、审计和外部规则字段完整性校验。 |
-| GAP-ARCH-001 | 归档、重放、普通指标快照和账本余额快照边界需按 04 系分独立落地。 | 当前代码已有 `governance-face` 和 `governance-impl` 交易投影重放骨架，已覆盖有界范围、交易投影 checkpoint 和 verify-only 不写投影等局部边界；尚未落归档 Manifest、余额快照覆盖模式、余额水位隔离、普通指标快照边界、指标水位隔离和异常人工处理闭环。 | 批次 8 另起独立 OpenSpec change；归档/重放只做事实治理；账本余额快照按 `HOT_ONLY`、`COLD_MANIFEST`、`MIXED` 校验；普通指标快照只输出报表指标模块输入和边界测试；缺范围、缺 Manifest、冷热摘要不一致、检查点不连续、重放差异、权限不足或外部规则待确认时，只能生成差异报告、阻断、补证据、缩小范围、重跑或人工关闭，不得直接改事实。 |
+| GAP-CLS-001 | 清结算与对账对象需独立状态机和表设计落地。 | 冻结基线已有 `reconciliation-face`、`reconciliation-impl` 模块骨架和出款前准入候选实现，但未覆盖对账任务、可清分明细、清分批次、清算候选、清算批次、结算单、出款单完整生命周期、差错单、追偿单、表结构和目标态服务层测试。 | 单独 OpenSpec change 和 Harness 批次处理，不混入交易主链路；后续确认是否复用现有 `reconciliation-*` 模块和是否扩展出款前准入候选能力。 |
+| GAP-CLS-002 | 出款前准入门禁、外部非终态、金额不一致和出款解释状态必须有服务契约与测试资产。 | 当前代码基线已包含 `PayoutOrderService#checkPayoutPreflight`、`CheckPayoutPreflightRequest`、`PayoutPreflightResultDTO` 和 `PayoutPreflightServiceTests` 候选实现；已覆盖结构化外部规则核验证据、创建前无 `payoutSn` 检查、`factStatus`、`displayStatus`、`operationStatus` 和只读无账务事实断言，但仍缺 `PayoutOrderDTO` 解释状态字段、出款门禁表/字段、出款结果/回单处理、金额不一致处理、数据库级闭环和 `PayoutExplainabilityTests`。 | 清结算与对账 Execution Grant 必须把 `CLS-GATE-*`、`AC-SET-006` 至 `AC-SET-009`、`TDD-SETTLE-004`、`TDD-SETTLE-005`、`RED-032` 和 `RED-037` 纳入准入；若继续扩展候选能力，必须显式列入允许写入范围，并继续补出款表、状态守卫、回单、金额不一致、审计和外部规则字段完整性校验。 |
+| GAP-ARCH-001 | 归档、重放、普通指标快照、账本余额快照和大数据归档承接边界需按 04 系分独立落地。 | 当前代码已有 `governance-face` 和 `governance-impl` 交易投影重放骨架，已覆盖有界范围、交易投影 checkpoint 和 verify-only 不写投影等局部边界；尚未落归档 Manifest、余额快照覆盖模式、余额水位隔离、普通指标快照边界、指标水位隔离、异常人工处理闭环和大数据归档承接边界。 | 批次 8 另起独立 OpenSpec change；必须把 `GOV-GATE-*` 纳入准入；归档/重放只做事实治理；账本余额快照按 `HOT_ONLY`、`COLD_MANIFEST`、`MIXED` 校验；普通指标快照只输出报表指标模块输入和边界测试；大数据归档只能通过治理读取、导出快照、Manifest 摘要、脱敏、digest 和审计承接；缺范围、缺 Manifest、冷热摘要不一致、检查点不连续、重放差异、权限不足或外部规则待确认时，只能生成差异报告、阻断、补证据、缩小范围、重跑或人工关闭，不得直接改事实。 |
 
 ## 六、TDD 落地顺序
 
-当前执行优先级按设计文档域排列：先做 `02-交易路由钱包账目与投影`，再做 `03-清结算与对账`，最后做 `04-归档重放与指标治理`。下表的顺序 1 至 6 是 02 阶段的内部 TDD 子批次，必须整体优先于 03 和 04。
+TDD 落地顺序同时受能力优先级和 Execution Grant 约束：P0 先保证钱包、账本、账目、余额投影、对账、清分、清算、结算、大数据归档和账本余额快照的资金不变量；P1 再扩展直接交易、授权交易、余额控制、交易投影和交易投影重放；P2 业务模式能力包只在专项授权中接入。下表的顺序 1 至 8 是工程批次拆解，不表示 03、04 能力低于 02，也不表示任一批次可以越过独立授权直接编码。
 
 | 顺序 | 批次 | 目标 |
 | --- | --- | --- |
 | 0 | 基线重置 | 作废旧规格和旧测试；确认 docs、OpenSpec、resources 和代码差距。 |
-| 1 | 02 内部：DSL 契约与枚举红线 | 重建 `FundsInstruction`、event、transactionType、金额临界值、route、payment instrument、routing decision、funding allocation、posting、`SettlementPolicy`、权益快照、JSON 契约测试。 |
-| 2 | 02 内部：钱包账户与账本基础 | 重建账户、账本初始化、平台账户角色、支付工具、绑定关系、支出主体资金来源关系、账本周期、posting 平衡和余额投影测试。 |
-| 3 | 02 内部：直接交易 | 重建充值、付款、转账、提现、退款、手续费、退费、受控负余额，以及商户券、平台补贴、储值券和不退券直接交易测试。 |
-| 4 | 02 内部：授权交易 | 重建授权、拒绝、撤销、完成、过期、强制完成、完成后退款、无授权直接退款、拒付承接口径、授权占券和 VCC 扩展边界测试。 |
-| 5 | 02 内部：余额控制 | 重建冻结、解冻、资金账户余额调整、信用账户额度、预算组额度、冻结提现组合测试，以及 adjust 绕过差错闭环的红线测试。 |
-| 6 | 02 内部：Route Replay 与投影 | 重建 Route Replay、支付工具换绑后原路径回放、缺快照失败、权益快照回放、交易投影只读、余额日志边界测试。 |
-| 7 | 03-清结算与对账 | 按独立系分重建可清分准入、清分批次、清算候选、清算批次、结算单、出款单、出款前准入门禁、外部非终态、金额不一致、出款解释状态防误导、对账差错、权益拆分、退款时序和追偿测试。 |
-| 8 | 04-归档重放与指标边界 | 重建归档门禁、Manifest、水位、余额重建、账本余额快照覆盖模式、交易投影重放、异常人工处理、指标只读、指标水位隔离和普通指标快照并发边界测试。 |
+| 1 | P0 共享承载：DSL 契约与枚举红线 | 重建 `FundsInstruction`、event、transactionType、金额临界值、route、payment instrument、routing decision、funding allocation、posting、`SettlementPolicy`、权益快照、JSON 契约测试。 |
+| 2 | P0 基础事实：钱包账户与账本基础 | 重建账户、账本初始化、平台账户角色、支付工具、绑定关系、支出主体资金来源关系、账本周期、posting 平衡和余额投影测试。 |
+| 3 | P1 交易入口：直接交易 | 重建充值、付款、转账、提现、退款、手续费、退费、受控负余额，以及商户券、平台补贴、储值券和不退券直接交易测试。 |
+| 4 | P1 交易入口：授权交易 | 重建授权、拒绝、撤销、完成、过期、强制完成、完成后退款、无授权直接退款、拒付承接口径、授权占券和 VCC 扩展边界测试。 |
+| 5 | P1 控制入口：余额控制 | 重建冻结、解冻、资金账户余额调整、信用账户额度、预算组额度、冻结提现组合测试，以及 adjust 绕过差错闭环的红线测试。 |
+| 6 | P1 读模型：Route Replay 与投影 | 重建 Route Replay、支付工具换绑后原路径回放、缺快照失败、权益快照回放、交易投影只读、余额日志边界测试。 |
+| 7 | P0 运营账务闭环：清结算与对账 | 按独立系分重建可清分准入、清分批次、清算候选、清算批次、结算单、出款单、出款前准入门禁、外部非终态、金额不一致、出款解释状态防误导、对账差错、权益拆分、退款时序和追偿测试。 |
+| 8 | P0/P1 治理闭环：归档重放与指标边界 | 重建归档门禁、Manifest、水位、余额重建、账本余额快照覆盖模式、交易投影重放、异常人工处理、大数据归档承接边界、指标只读、指标水位隔离和普通指标快照并发边界测试。 |
 
 ## 七、Superpowers 纪律
 
@@ -154,7 +173,7 @@
 | 只读范围 | 明确可参考的 docs、OpenSpec、源码和 resources。 |
 | 禁止事项 | 不越界修改生产代码、不引入无主依赖、不恢复旧测试。 |
 | 验证命令 | 至少包含 `just mvn-version`、`just compile` 和本批次相关测试命令；CAD 自动模式或完整基线复核优先使用 `just verify-cad`；无法运行需说明。 |
-| 人工确认点 | 公共契约、表结构、枚举、资金红线、清结算对象、归档重放、外部规则。 |
+| 人工确认点 | 公共契约、表结构、枚举、资金红线、清结算对象、运营补事实命令白名单、权益退款分摊确定性规则、治理物理落点、归档重放、外部规则。 |
 
 ## 九、必须失败红线
 

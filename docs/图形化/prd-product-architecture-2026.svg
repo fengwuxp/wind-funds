@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 860" width="1280" height="860" role="img" aria-labelledby="title desc">
+  <title id="title">wind-funds 产品架构图</title>
+  <desc id="desc">展示 VCC、全球账户收付款、收单业务如何通过场景交易能力包接入统一资金内核，并由运营治理、外部规则和审计安全约束。</desc>
+  <style>
+    text {
+      font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif;
+      fill: #111827;
+    }
+    .title { font-size: 24px; font-weight: 700; }
+    .subtitle { font-size: 13px; fill: #6b7280; }
+    .layer-title { font-size: 15px; font-weight: 700; }
+    .node-title { font-size: 14px; font-weight: 700; }
+    .node-sub { font-size: 12px; fill: #4b5563; }
+    .small { font-size: 11px; fill: #6b7280; }
+    .layer { fill: #f9fafb; stroke: #d1d5db; stroke-width: 1.4; rx: 14; ry: 14; }
+    .box { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.4; rx: 10; ry: 10; }
+    .blue { fill: #eff6ff; stroke: #bfdbfe; }
+    .green { fill: #f0fdf4; stroke: #bbf7d0; }
+    .purple { fill: #faf5ff; stroke: #e9d5ff; }
+    .orange { fill: #fff7ed; stroke: #fed7aa; }
+    .teal { fill: #f0fdfa; stroke: #99f6e4; }
+    .red { fill: #fef2f2; stroke: #fecaca; }
+    .line-main { stroke: #2563eb; stroke-width: 2; fill: none; marker-end: url(#arrow-blue); }
+    .line-data { stroke: #16a34a; stroke-width: 2; fill: none; marker-end: url(#arrow-green); }
+    .line-rule { stroke: #dc2626; stroke-width: 2; fill: none; stroke-dasharray: 6 5; marker-end: url(#arrow-red); }
+    .line-audit { stroke: #9333ea; stroke-width: 2; fill: none; stroke-dasharray: 5 5; marker-end: url(#arrow-purple); }
+  </style>
+  <defs>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#2563eb"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#16a34a"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#dc2626"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#9333ea"/>
+    </marker>
+  </defs>
+  <rect width="1280" height="860" fill="#ffffff"/>
+  <text x="42" y="42" class="title">wind-funds 产品架构图</text>
+  <text x="42" y="66" class="subtitle">主线 PRD 01-05 承载统一资金底座；业务分册 06-08 通过场景交易 capability pack 接入，不反向污染资金内核。</text>
+
+  <rect x="36" y="92" width="1208" height="132" class="layer"/>
+  <text x="56" y="120" class="layer-title">业务场景层：业务语义保留在分册内</text>
+  <g transform="translate(70,138)">
+    <rect width="330" height="64" class="box blue"/>
+    <text x="18" y="27" class="node-title">06 VCC 发卡业务</text>
+    <text x="18" y="48" class="node-sub">授权 / clearing / refund / chargeback / 卡账单</text>
+  </g>
+  <g transform="translate(475,138)">
+    <rect width="330" height="64" class="box green"/>
+    <text x="18" y="27" class="node-title">07 全球账户收付款</text>
+    <text x="18" y="48" class="node-sub">入金 / 出金 / 在途 / 退汇 / FX / 多币种</text>
+  </g>
+  <g transform="translate(880,138)">
+    <rect width="330" height="64" class="box orange"/>
+    <text x="18" y="27" class="node-title">08 收单业务</text>
+    <text x="18" y="48" class="node-sub">payment attempt / capture / refund / dispute / 商户结算</text>
+  </g>
+
+  <rect x="170" y="252" width="940" height="108" class="layer"/>
+  <text x="190" y="280" class="layer-title">场景交易 capability pack：业务事件归一和资金准入</text>
+  <g transform="translate(210,298)">
+    <rect width="250" height="42" class="box"/>
+    <text x="16" y="26" class="node-title">状态映射和幂等</text>
+  </g>
+  <g transform="translate(515,298)">
+    <rect width="250" height="42" class="box"/>
+    <text x="16" y="26" class="node-title">外部引用和拒绝原因</text>
+  </g>
+  <g transform="translate(820,298)">
+    <rect width="250" height="42" class="box"/>
+    <text x="16" y="26" class="node-title">准入门禁和脱敏</text>
+  </g>
+
+  <rect x="36" y="392" width="1208" height="224" class="layer"/>
+  <text x="56" y="420" class="layer-title">统一资金内核：P0/P1 共用能力，不按业务线重复实现</text>
+  <g transform="translate(64,442)">
+    <rect width="168" height="62" class="box blue"/>
+    <text x="16" y="25" class="node-title">交易入口</text>
+    <text x="16" y="45" class="node-sub">指令 / 交易 / 明细</text>
+  </g>
+  <g transform="translate(258,442)">
+    <rect width="168" height="62" class="box green"/>
+    <text x="16" y="25" class="node-title">余额控制</text>
+    <text x="16" y="45" class="node-sub">冻结 / 解冻 / 调整</text>
+  </g>
+  <g transform="translate(452,442)">
+    <rect width="168" height="62" class="box teal"/>
+    <text x="16" y="25" class="node-title">钱包账户</text>
+    <text x="16" y="45" class="node-sub">账户 / 账目 / 余额桶</text>
+  </g>
+  <g transform="translate(646,442)">
+    <rect width="168" height="62" class="box orange"/>
+    <text x="16" y="25" class="node-title">资金路由</text>
+    <text x="16" y="45" class="node-sub">参与方 / route snapshot</text>
+  </g>
+  <g transform="translate(840,442)">
+    <rect width="168" height="62" class="box purple"/>
+    <text x="16" y="25" class="node-title">账务计划</text>
+    <text x="16" y="45" class="node-sub">posting plan / 平衡</text>
+  </g>
+  <g transform="translate(1034,442)">
+    <rect width="168" height="62" class="box green"/>
+    <text x="16" y="25" class="node-title">账本事实</text>
+    <text x="16" y="45" class="node-sub">ledger transaction / entry</text>
+  </g>
+  <g transform="translate(160,532)">
+    <rect width="210" height="54" class="box"/>
+    <text x="16" y="24" class="node-title">余额投影</text>
+    <text x="16" y="42" class="node-sub">当前余额 / 历史余额 / 检查点</text>
+  </g>
+  <g transform="translate(410,532)">
+    <rect width="210" height="54" class="box"/>
+    <text x="16" y="24" class="node-title">交易投影</text>
+    <text x="16" y="42" class="node-sub">账单 / 时间线 / 解释视图</text>
+  </g>
+  <g transform="translate(660,532)">
+    <rect width="210" height="54" class="box"/>
+    <text x="16" y="24" class="node-title">清结算对账</text>
+    <text x="16" y="42" class="node-sub">清分 / 清算 / 结算 / 差错</text>
+  </g>
+  <g transform="translate(910,532)">
+    <rect width="210" height="54" class="box"/>
+    <text x="16" y="24" class="node-title">归档重放</text>
+    <text x="16" y="42" class="node-sub">Manifest / 重建 / 差异报告</text>
+  </g>
+
+  <rect x="36" y="646" width="574" height="120" class="layer"/>
+  <text x="56" y="674" class="layer-title">使用者和运营治理</text>
+  <g transform="translate(64,694)">
+    <rect width="154" height="44" class="box blue"/>
+    <text x="14" y="27" class="node-title">查询入口</text>
+  </g>
+  <g transform="translate(244,694)">
+    <rect width="154" height="44" class="box orange"/>
+    <text x="14" y="27" class="node-title">运营工作台</text>
+  </g>
+  <g transform="translate(424,694)">
+    <rect width="154" height="44" class="box red"/>
+    <text x="14" y="27" class="node-title">审计安全</text>
+  </g>
+
+  <rect x="670" y="646" width="574" height="120" class="layer"/>
+  <text x="690" y="674" class="layer-title">外部引用和专业确认边界</text>
+  <g transform="translate(700,694)">
+    <rect width="220" height="44" class="box"/>
+    <text x="14" y="27" class="node-title">外部账户 / 卡 / VA / PSP / 银行</text>
+  </g>
+  <g transform="translate(964,694)">
+    <rect width="220" height="44" class="box red"/>
+    <text x="14" y="27" class="node-title">法务 / 合规 / 财务 / 安全确认</text>
+  </g>
+
+  <path d="M235 204 L360 252" class="line-main"/>
+  <path d="M640 204 L640 252" class="line-main"/>
+  <path d="M1045 204 L920 252" class="line-main"/>
+  <path d="M640 360 L640 392" class="line-main"/>
+  <path d="M232 473 L258 473" class="line-main"/>
+  <path d="M426 473 L452 473" class="line-main"/>
+  <path d="M620 473 L646 473" class="line-main"/>
+  <path d="M814 473 L840 473" class="line-main"/>
+  <path d="M1008 473 L1034 473" class="line-main"/>
+  <path d="M1118 504 L1015 532" class="line-data"/>
+  <path d="M1118 504 L765 532" class="line-data"/>
+  <path d="M1118 504 L515 532" class="line-data"/>
+  <path d="M1118 504 L265 532" class="line-data"/>
+  <path d="M515 586 L155 646" class="line-data"/>
+  <path d="M765 586 L321 646" class="line-data"/>
+  <path d="M1015 586 L957 646" class="line-data"/>
+  <path d="M810 694 L810 616" class="line-rule"/>
+  <path d="M1074 694 L960 360" class="line-rule"/>
+  <path d="M501 694 L501 616" class="line-audit"/>
+
+  <g transform="translate(42,804)">
+    <line x1="0" y1="0" x2="34" y2="0" class="line-main"/>
+    <text x="44" y="4" class="small">业务资金主链路</text>
+    <line x1="170" y1="0" x2="204" y2="0" class="line-data"/>
+    <text x="214" y="4" class="small">事实派生和只读数据</text>
+    <line x1="370" y1="0" x2="404" y2="0" class="line-rule"/>
+    <text x="414" y="4" class="small">外部规则和专业确认</text>
+    <line x1="625" y1="0" x2="659" y2="0" class="line-audit"/>
+    <text x="669" y="4" class="small">审计、安全和职责分离</text>
+  </g>
+</svg>
