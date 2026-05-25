@@ -117,7 +117,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                 "账本交易状态不允许入账，ledgerTransactionSn = {}, status = {}",
                 transaction.getSn(),
                 transaction.getStatus());
-        AssertUtils.isTrue(transaction.getPostingPlans() != null && !transaction.getPostingPlans().isEmpty(),
+        AssertUtils.notEmpty(transaction.getPostingPlans(),
                 "账本交易 postingPlans 不能为空，ledgerTransactionSn = {}", transaction.getSn());
     }
 
@@ -135,7 +135,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                     plan.getPlanId(),
                     transaction.getSn(),
                     plan.getLedgerTransactionSn());
-            AssertUtils.isTrue(plan.getEntries() != null && !plan.getEntries().isEmpty(),
+            AssertUtils.notEmpty(plan.getEntries(),
                     "账务计划 entries 不能为空，planId = {}, ledgerTransactionSn = {}",
                     plan.getPlanId(),
                     plan.getLedgerTransactionSn());
