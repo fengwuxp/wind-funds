@@ -6,6 +6,13 @@ import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.model.route.ImmutableSubjectRef;
+import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitComponentSpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitReferenceSpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitRefundPolicySpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitSnapshotSpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.route.enums.RouteLegType;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
@@ -44,29 +51,29 @@ public final class FundsDslJsonContractVerifier {
     private static final BigInteger LONG_MAX_VALUE = BigInteger.valueOf(Long.MAX_VALUE);
 
     private static final Set<String> RESERVED_BENEFIT_CONTEXT_KEYS = Set.of(
-            "benefitSnapshotId",
-            "benefitSchemaVersion",
-            "benefitGroupSn",
-            "orderAmount",
-            "userPayAmount",
-            "merchantReceivableAmount",
-            "componentSn",
-            "benefitType",
-            "componentType",
-            "closureRole",
-            "amount",
-            "ledgerEffect",
-            "fundingNature",
-            "benefitReference",
-            "refundPolicy",
-            "partialRefundStrategy",
-            "dispositions",
+            ImmutableFundsBenefitSnapshotSpec.Fields.benefitSnapshotId,
+            ImmutableFundsBenefitSnapshotSpec.Fields.benefitSchemaVersion,
+            ImmutableFundsBenefitSnapshotSpec.Fields.benefitGroupSn,
+            ImmutableFundsBenefitSnapshotSpec.Fields.orderAmount,
+            ImmutableFundsBenefitSnapshotSpec.Fields.userPayAmount,
+            ImmutableFundsBenefitSnapshotSpec.Fields.merchantReceivableAmount,
+            ImmutableFundsBenefitComponentSpec.Fields.componentSn,
+            ImmutableFundsBenefitComponentSpec.Fields.benefitType,
+            ImmutableFundsBenefitComponentSpec.Fields.componentType,
+            ImmutableFundsBenefitComponentSpec.Fields.closureRole,
+            ImmutableFundsBenefitComponentSpec.Fields.amount,
+            ImmutableFundsBenefitComponentSpec.Fields.ledgerEffect,
+            ImmutableFundsBenefitComponentSpec.Fields.fundingNature,
+            ImmutableFundsBenefitComponentSpec.Fields.benefitReference,
+            ImmutableFundsBenefitComponentSpec.Fields.refundPolicy,
+            ImmutableFundsBenefitRefundPolicySpec.Fields.partialRefundStrategy,
+            ImmutableFundsBenefitRefundPolicySpec.Fields.dispositions,
             "refundDisposition",
-            "refundableAmount",
-            "nonRefundableAmount",
-            "refundRuleVersion",
-            "refundDecisionId",
-            "ruleVersion",
+            ImmutableFundsBenefitRefundPolicySpec.Fields.refundableAmount,
+            ImmutableFundsBenefitRefundPolicySpec.Fields.nonRefundableAmount,
+            ImmutableFundsBenefitRefundPolicySpec.Fields.refundRuleVersion,
+            ImmutableFundsBenefitRefundPolicySpec.Fields.refundDecisionId,
+            ImmutableFundsBenefitReferenceSpec.Fields.ruleVersion,
             "currentMarketingRule",
             "couponEligibility",
             "couponAvailable",
@@ -111,53 +118,61 @@ public final class FundsDslJsonContractVerifier {
         if (instruction == null) {
             return;
         }
-        verifyEnum(FundsInstructionType.class, instruction, "instructionType", "instruction.instructionType");
-        verifyEnum(FundsTransactionEventType.class, instruction, "eventType", "instruction.eventType");
-        verifyEnum(DefaultFundsTransactionType.class, instruction, "transactionType", "instruction.transactionType");
-        verifyMoney(instruction, "amount", "instruction.amount");
-        verifyMoney(instruction, "originalAmount", "instruction.originalAmount");
-        verifyReference(asNullableMap(instruction.get("reference"), "instruction.reference"));
-        verifyBenefitSnapshot(asNullableMap(instruction.get("benefitSnapshot"), "instruction.benefitSnapshot"));
+        verifyEnum(FundsInstructionType.class, instruction, ImmutableFundsInstructionSpec.Fields.instructionType,
+                "instruction.instructionType");
+        verifyEnum(FundsTransactionEventType.class, instruction, ImmutableFundsInstructionSpec.Fields.eventType,
+                "instruction.eventType");
+        verifyEnum(DefaultFundsTransactionType.class, instruction,
+                ImmutableFundsInstructionSpec.Fields.transactionType, "instruction.transactionType");
+        verifyMoney(instruction, ImmutableFundsInstructionSpec.Fields.amount, "instruction.amount");
+        verifyMoney(instruction, ImmutableFundsInstructionSpec.Fields.originalAmount, "instruction.originalAmount");
+        verifyReference(asNullableMap(instruction.get(ImmutableFundsInstructionSpec.Fields.reference),
+                "instruction.reference"));
+        verifyBenefitSnapshot(asNullableMap(instruction.get(ImmutableFundsInstructionSpec.Fields.benefitSnapshot),
+                "instruction.benefitSnapshot"));
     }
 
     private static void verifyReference(@Nullable Map<String, ?> reference) {
         if (reference == null) {
             return;
         }
-        verifyEnum(FundsInstructionReferenceType.class, reference, "referenceType", "instruction.reference.referenceType");
-        requireText(reference, "referenceSn");
+        verifyEnum(FundsInstructionReferenceType.class, reference,
+                ImmutableFundsInstructionReferenceSpec.Fields.referenceType, "instruction.reference.referenceType");
+        requireText(reference, ImmutableFundsInstructionReferenceSpec.Fields.referenceSn);
     }
 
     private static void verifyBenefitSnapshot(@Nullable Map<String, ?> snapshot) {
         if (snapshot == null) {
             return;
         }
-        requireText(snapshot, "benefitSnapshotId");
-        requireText(snapshot, "benefitGroupSn");
-        Money orderAmount = verifyMoney(snapshot, "orderAmount", "instruction.benefitSnapshot.orderAmount");
-        Money userPayAmount = verifyMoney(snapshot, "userPayAmount", "instruction.benefitSnapshot.userPayAmount",
-                false);
-        verifyMoney(snapshot, "merchantReceivableAmount", "instruction.benefitSnapshot.merchantReceivableAmount",
-                false, false);
+        requireText(snapshot, ImmutableFundsBenefitSnapshotSpec.Fields.benefitSnapshotId);
+        requireText(snapshot, ImmutableFundsBenefitSnapshotSpec.Fields.benefitGroupSn);
+        Money orderAmount = verifyMoney(snapshot, ImmutableFundsBenefitSnapshotSpec.Fields.orderAmount,
+                "instruction.benefitSnapshot.orderAmount");
+        Money userPayAmount = verifyMoney(snapshot, ImmutableFundsBenefitSnapshotSpec.Fields.userPayAmount,
+                "instruction.benefitSnapshot.userPayAmount", false);
+        verifyMoney(snapshot, ImmutableFundsBenefitSnapshotSpec.Fields.merchantReceivableAmount,
+                "instruction.benefitSnapshot.merchantReceivableAmount", false, false);
         List<Map<String, ?>> components = requiredChildObjects(snapshot,
-                "components",
+                ImmutableFundsBenefitSnapshotSpec.Fields.components,
                 "instruction.benefitSnapshot.components");
         Set<String> componentSns = new HashSet<>();
         long orderDiscountAmount = 0L;
         for (Map<String, ?> component : components) {
-            String componentSn = requireText(component, "componentSn");
+            String componentSn = requireText(component, ImmutableFundsBenefitComponentSpec.Fields.componentSn);
             if (!componentSns.add(componentSn)) {
                 throw new IllegalArgumentException("instruction.benefitSnapshot.components.componentSn must be unique");
             }
-            verifyEnum(FundsBenefitType.class, component, "benefitType",
+            verifyEnum(FundsBenefitType.class, component, ImmutableFundsBenefitComponentSpec.Fields.benefitType,
                     "instruction.benefitSnapshot.components.benefitType");
-            verifyEnum(FundsBenefitComponentType.class, component, "componentType",
+            verifyEnum(FundsBenefitComponentType.class, component,
+                    ImmutableFundsBenefitComponentSpec.Fields.componentType,
                     "instruction.benefitSnapshot.components.componentType");
             FundsBenefitAmountClosureRole closureRole = verifyEnum(FundsBenefitAmountClosureRole.class,
                     component,
-                    "closureRole",
+                    ImmutableFundsBenefitComponentSpec.Fields.closureRole,
                     "instruction.benefitSnapshot.components.closureRole");
-            Money componentMoney = verifyMoney(component, "amount",
+            Money componentMoney = verifyMoney(component, ImmutableFundsBenefitComponentSpec.Fields.amount,
                     "instruction.benefitSnapshot.components.amount");
             if (!orderAmount.getCurrency().equals(componentMoney.getCurrency())) {
                 throw new IllegalArgumentException(
@@ -169,37 +184,45 @@ public final class FundsDslJsonContractVerifier {
             }
             FundsBenefitLedgerEffect ledgerEffect = verifyEnum(FundsBenefitLedgerEffect.class,
                     component,
-                    "ledgerEffect",
+                    ImmutableFundsBenefitComponentSpec.Fields.ledgerEffect,
                     "instruction.benefitSnapshot.components.ledgerEffect");
-            verifyEnum(FundsBenefitFundingNature.class, component, "fundingNature",
+            verifyEnum(FundsBenefitFundingNature.class, component,
+                    ImmutableFundsBenefitComponentSpec.Fields.fundingNature,
                     "instruction.benefitSnapshot.components.fundingNature");
-            verifyBenefitSubjectRef(asNullableMap(component.get("bearerSubjectRef"),
+            verifyBenefitSubjectRef(asNullableMap(component.get(
+                            ImmutableFundsBenefitComponentSpec.Fields.bearerSubjectRef),
                             "instruction.benefitSnapshot.components.bearerSubjectRef"),
                     "instruction.benefitSnapshot.components.bearerSubjectRef");
-            verifyBenefitSubjectRef(asNullableMap(component.get("beneficiarySubjectRef"),
+            verifyBenefitSubjectRef(asNullableMap(component.get(
+                            ImmutableFundsBenefitComponentSpec.Fields.beneficiarySubjectRef),
                             "instruction.benefitSnapshot.components.beneficiarySubjectRef"),
                     "instruction.benefitSnapshot.components.beneficiarySubjectRef");
-            verifyBenefitSubjectRef(asNullableMap(component.get("fundingSubjectRef"),
+            verifyBenefitSubjectRef(asNullableMap(component.get(
+                            ImmutableFundsBenefitComponentSpec.Fields.fundingSubjectRef),
                             "instruction.benefitSnapshot.components.fundingSubjectRef"),
                     "instruction.benefitSnapshot.components.fundingSubjectRef");
             if (ledgerEffect == FundsBenefitLedgerEffect.POSTING_REQUIRED
-                    && component.get("fundingSubjectRef") == null
-                    && !isTextValue(component.get("fundingAccountRole"))) {
+                    && component.get(ImmutableFundsBenefitComponentSpec.Fields.fundingSubjectRef) == null
+                    && !isTextValue(component.get(ImmutableFundsBenefitComponentSpec.Fields.fundingAccountRole))) {
                 throw new IllegalArgumentException(
                         "instruction.benefitSnapshot.components funding source is required for POSTING_REQUIRED");
             }
-            if (ledgerEffect == FundsBenefitLedgerEffect.NO_LEDGER && component.get("bearerSubjectRef") == null) {
+            if (ledgerEffect == FundsBenefitLedgerEffect.NO_LEDGER
+                    && component.get(ImmutableFundsBenefitComponentSpec.Fields.bearerSubjectRef) == null) {
                 throw new IllegalArgumentException(
                         "instruction.benefitSnapshot.components.bearerSubjectRef is required for NO_LEDGER");
             }
-            verifyBenefitReference(asNullableMap(component.get("benefitReference"),
+            verifyBenefitReference(asNullableMap(component.get(
+                            ImmutableFundsBenefitComponentSpec.Fields.benefitReference),
                             "instruction.benefitSnapshot.components.benefitReference"),
                     "instruction.benefitSnapshot.components.benefitReference",
                     ledgerEffect);
-            verifyBenefitRefundPolicy(asNullableMap(component.get("refundPolicy"),
+            verifyBenefitRefundPolicy(asNullableMap(component.get(
+                            ImmutableFundsBenefitComponentSpec.Fields.refundPolicy),
                             "instruction.benefitSnapshot.components.refundPolicy"),
                     "instruction.benefitSnapshot.components.refundPolicy");
-            verifyBenefitContext(asNullableMap(component.get("contextVariables"),
+            verifyBenefitContext(asNullableMap(component.get(
+                            ImmutableFundsBenefitComponentSpec.Fields.contextVariables),
                             "instruction.benefitSnapshot.components.contextVariables"),
                     "instruction.benefitSnapshot.components.contextVariables");
         }
@@ -213,10 +236,10 @@ public final class FundsDslJsonContractVerifier {
                     "instruction.benefitSnapshot amount must close: "
                             + "userPayAmount + ORDER_DISCOUNT_CLOSURE components.amount = orderAmount");
         }
-        verifyBenefitRefundPolicy(asNullableMap(snapshot.get("refundPolicy"),
+        verifyBenefitRefundPolicy(asNullableMap(snapshot.get(ImmutableFundsBenefitSnapshotSpec.Fields.refundPolicy),
                         "instruction.benefitSnapshot.refundPolicy"),
                 "instruction.benefitSnapshot.refundPolicy");
-        verifyBenefitContext(asNullableMap(snapshot.get("contextVariables"),
+        verifyBenefitContext(asNullableMap(snapshot.get(ImmutableFundsBenefitSnapshotSpec.Fields.contextVariables),
                         "instruction.benefitSnapshot.contextVariables"),
                 "instruction.benefitSnapshot.contextVariables");
     }
@@ -225,8 +248,8 @@ public final class FundsDslJsonContractVerifier {
         if (subjectRef == null) {
             return;
         }
-        requireText(subjectRef, "subjectType", path + ".subjectType");
-        requireText(subjectRef, "subjectId", path + ".subjectId");
+        requireText(subjectRef, ImmutableSubjectRef.Fields.subjectType, path + ".subjectType");
+        requireText(subjectRef, ImmutableSubjectRef.Fields.subjectId, path + ".subjectId");
     }
 
     private static void verifyBenefitReference(@Nullable Map<String, ?> reference,
@@ -235,15 +258,17 @@ public final class FundsDslJsonContractVerifier {
         if (reference == null) {
             throw new IllegalArgumentException(path + " is required");
         }
-        if (ledgerEffect == FundsBenefitLedgerEffect.HOLD_ONLY && !isTextValue(reference.get("holdId"))) {
+        if (ledgerEffect == FundsBenefitLedgerEffect.HOLD_ONLY
+                && !isTextValue(reference.get(ImmutableFundsBenefitReferenceSpec.Fields.holdId))) {
             throw new IllegalArgumentException(path + ".holdId is required for HOLD_ONLY");
         }
         if (ledgerEffect == FundsBenefitLedgerEffect.RELEASE_ONLY
-                && !isTextValue(reference.get("holdId"))
-                && !isTextValue(reference.get("releaseId"))) {
+                && !isTextValue(reference.get(ImmutableFundsBenefitReferenceSpec.Fields.holdId))
+                && !isTextValue(reference.get(ImmutableFundsBenefitReferenceSpec.Fields.releaseId))) {
             throw new IllegalArgumentException(path + ".holdId or releaseId is required for RELEASE_ONLY");
         }
-        verifyBenefitContext(asNullableMap(reference.get("contextVariables"), path + ".contextVariables"),
+        verifyBenefitContext(asNullableMap(reference.get(ImmutableFundsBenefitReferenceSpec.Fields.contextVariables),
+                        path + ".contextVariables"),
                 path + ".contextVariables");
     }
 
@@ -251,21 +276,26 @@ public final class FundsDslJsonContractVerifier {
         if (policy == null) {
             return;
         }
-        verifyEnum(FundsBenefitPartialRefundStrategy.class, policy, "partialRefundStrategy",
+        verifyEnum(FundsBenefitPartialRefundStrategy.class, policy,
+                ImmutableFundsBenefitRefundPolicySpec.Fields.partialRefundStrategy,
                 path + ".partialRefundStrategy");
-        List<String> dispositions = requiredChildTexts(policy, "dispositions", path + ".dispositions");
+        List<String> dispositions = requiredChildTexts(policy,
+                ImmutableFundsBenefitRefundPolicySpec.Fields.dispositions, path + ".dispositions");
         for (String disposition : dispositions) {
             enumValue(FundsBenefitRefundDisposition.class, disposition, path + ".dispositions");
         }
-        verifyMoney(policy, "refundableAmount", path + ".refundableAmount", false, false);
-        verifyMoney(policy, "nonRefundableAmount", path + ".nonRefundableAmount", false, false);
+        verifyMoney(policy, ImmutableFundsBenefitRefundPolicySpec.Fields.refundableAmount,
+                path + ".refundableAmount", false, false);
+        verifyMoney(policy, ImmutableFundsBenefitRefundPolicySpec.Fields.nonRefundableAmount,
+                path + ".nonRefundableAmount", false, false);
         if (dispositions.contains(FundsBenefitRefundDisposition.NO_REFUND.name())
-                && !isTextValue(policy.get("refundRuleVersion"))
-                && !isTextValue(policy.get("refundDecisionId"))
-                && !isTextValue(policy.get("decisionSource"))) {
+                && !isTextValue(policy.get(ImmutableFundsBenefitRefundPolicySpec.Fields.refundRuleVersion))
+                && !isTextValue(policy.get(ImmutableFundsBenefitRefundPolicySpec.Fields.refundDecisionId))
+                && !isTextValue(policy.get(ImmutableFundsBenefitRefundPolicySpec.Fields.decisionSource))) {
             throw new IllegalArgumentException(path + " NO_REFUND requires rule version or decision reference");
         }
-        verifyBenefitContext(asNullableMap(policy.get("contextVariables"), path + ".contextVariables"),
+        verifyBenefitContext(asNullableMap(policy.get(
+                        ImmutableFundsBenefitRefundPolicySpec.Fields.contextVariables), path + ".contextVariables"),
                 path + ".contextVariables");
     }
 

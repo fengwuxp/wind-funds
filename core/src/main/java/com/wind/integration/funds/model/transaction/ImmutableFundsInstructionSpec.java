@@ -12,6 +12,7 @@ import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -23,6 +24,7 @@ import java.util.Map;
  * 不可变资金指令实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
                                             FundsInstructionType instructionType,
                                             FundsTransactionEventType eventType,

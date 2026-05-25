@@ -4,6 +4,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
@@ -14,6 +15,7 @@ import java.util.Map;
  * 不可变资金指令引用实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableFundsInstructionReferenceSpec(FundsInstructionReferenceType referenceType,
                                                      @Nullable String referenceSn,
                                                      @Nullable String referenceBusinessSn,
