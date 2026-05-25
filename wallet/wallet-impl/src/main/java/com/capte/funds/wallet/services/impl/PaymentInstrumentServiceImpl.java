@@ -104,6 +104,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long changePaymentInstrumentBinding(@NonNull ChangePaymentInstrumentBindingRequest request) {
+        assertBindingChangeAuditContextPresent(request);
         PaymentInstrumentBinding entity = getBindingBySn(request.getTenantId(), request.getBindingSn());
         PaymentInstrumentBinding before = copyBinding(entity);
         PaymentInstrumentBinding after = copyBinding(before);
@@ -125,6 +126,11 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 request.getEffectiveAt(),
                 request.getContextVariables());
         return after.getId();
+    }
+
+    private void assertBindingChangeAuditContextPresent(ChangePaymentInstrumentBindingRequest request) {
+        AssertUtils.isTrue(StringUtils.hasText(request.getOperatorId()), "支付工具绑定变更 operatorId 不能为空");
+        AssertUtils.isTrue(StringUtils.hasText(request.getChangeReason()), "支付工具绑定变更 changeReason 不能为空");
     }
 
     @Override

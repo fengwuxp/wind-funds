@@ -572,6 +572,50 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：运营变更支付工具绑定时缺少审计上下文。
+     * 输入：已存在 ACTIVE 绑定，变更请求分别缺 operatorId 或 changeReason。
+     * 输出：变更被拒绝，绑定当前态和历史证据保持不变。
+     * 红线：支付工具绑定变更必须可追溯，缺操作者或原因时不得写当前态、历史或账本事实。
+     */
+    @Test
+    void testChangePaymentInstrumentBindingShouldRejectMissingAuditContextWithoutHistoryMutation() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setPriority(20)
+                        .setOperatorId("   ")
+                        .setChangeReason("risk review")
+                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
+                .hasMessageContaining("支付工具绑定变更 operatorId 不能为空");
+
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setPriority(20)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("   ")
+                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
+                .hasMessageContaining("支付工具绑定变更 changeReason 不能为空");
+
+        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+        assertThat(binding.getPriority()).isEqualTo(10);
+        assertThat(binding.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(binding.getVersion()).isEqualTo(1);
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testChangePaymentInstrumentBindingShouldAppendHistoryWithoutOverwritingEvidence() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
