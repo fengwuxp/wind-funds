@@ -37,9 +37,10 @@ final class RouteBenefitSnapshotContextSupport {
     static void assertOriginalBenefitSnapshotPresent(FundsInstructionSpec instruction,
                                                      RouteSnapshotSpec routeSnapshot) {
         Map<String, Object> originalContext = routeSnapshot.getContextVariables();
-        boolean hasOriginalSnapshotId = hasTextValue(originalContext, FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID);
-        boolean hasOriginalSnapshotDigest = hasTextValue(originalContext,
-                FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST);
+        Object originalSnapshotId = originalContext.get(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID);
+        Object originalSnapshotDigest = originalContext.get(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST);
+        boolean hasOriginalSnapshotId = originalSnapshotId instanceof String text && StringUtils.hasText(text);
+        boolean hasOriginalSnapshotDigest = originalSnapshotDigest instanceof String text && StringUtils.hasText(text);
         FundsBenefitSnapshotSpec benefitSnapshot = instruction.getBenefitSnapshot();
         if (benefitSnapshot == null && !hasOriginalSnapshotId && !hasOriginalSnapshotDigest) {
             return;
@@ -64,10 +65,5 @@ final class RouteBenefitSnapshotContextSupport {
         if (value != null) {
             target.put(key, value);
         }
-    }
-
-    private static boolean hasTextValue(Map<String, Object> contextVariables, String key) {
-        Object value = contextVariables.get(key);
-        return value instanceof String text && StringUtils.hasText(text);
     }
 }
