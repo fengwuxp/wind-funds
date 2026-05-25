@@ -285,6 +285,26 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
     }
 
+    /**
+     * 场景：企业自定义周期预算缺少周期策略。
+     * 输入：periodType = CUSTOM_CYCLE，periodId 已指定，但 periodPolicy 为空。
+     * 输出：创建被拒绝，不留下预算组或控制账本。
+     * 红线：自定义周期缺少规则版本时不得初始化预算账本，避免后续额度跨周期误用。
+     */
+    @Test
+    void testCreateBudgetGroupShouldRejectCustomCycleWithoutPeriodPolicy() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(customCycleBudgetGroupRequest()
+                .setPeriodId(CUSTOM_PERIOD_ID)
+                .setPeriodPolicy(null)))
+                .hasMessageContaining("自定义周期预算组 periodPolicy 不能为空");
+
+        assertThat(countRows("t_budget_group", "sn", CUSTOM_BUDGET_GROUP_SN)).isZero();
+        assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testCreateBudgetGroupShouldInitializeCustomCycleControlLedgers() {
         Long budgetGroupId = budgetGroupService.createBudgetGroup(
