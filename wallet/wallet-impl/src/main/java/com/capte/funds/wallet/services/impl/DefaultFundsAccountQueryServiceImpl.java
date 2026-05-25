@@ -37,6 +37,7 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -330,7 +331,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
 
     @Nullable
     private String resolvePeriodId(FundsSubjectBalanceQuery balanceQuery) {
-        if (balanceQuery.getPeriodId() != null) {
+        if (StringUtils.hasText(balanceQuery.getPeriodId())) {
             return balanceQuery.getPeriodId();
         }
         return balanceQuery.getPeriodType() == AccountBalancePeriodType.LIFETIME

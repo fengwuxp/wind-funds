@@ -263,6 +263,31 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
     }
 
     /**
+     * 场景：生命周期余额查询显式传入空白 periodId。
+     * 输入：FUNDING_ACCOUNT 已初始化 AVAILABLE / LIFETIME，查询 periodType=LIFETIME、periodId=空白字符串。
+     * 输出：按 LIFETIME 默认周期返回 AVAILABLE 余额桶。
+     * 红线：LIFETIME 查询不得因外部空白 periodId 退化为未初始化，也不得写任何账本事实。
+     */
+    @Test
+    void testQueryCurrentBalancesShouldNormalizeBlankLifetimePeriodIdWithoutLedgerMutation() {
+        insertFundingAccountWithoutLedgers();
+        createLifetimeLedger(UNINITIALIZED_ACCOUNT_SN, LedgerSubjectCode.AVAILABLE);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        FundsSubjectBalanceDTO balance = balanceQueryService.getRequiredCurrentBalance(balanceQuery()
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setPeriodId("   ")
+                .setLedgerSubjectCodes(List.of(LedgerSubjectCode.AVAILABLE)));
+
+        LedgerBalanceBucket bucket = balance.getBalanceBuckets().get(LedgerSubjectCode.AVAILABLE);
+        assertThat(balance.isInitialized()).isTrue();
+        assertThat(bucket.periodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
+        assertThat(bucket.periodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
+        assertThat(countLedgers()).isEqualTo(1);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一资金主体同时存在生命周期余额和月度预算型余额桶。
      * 输入：FUNDING_ACCOUNT 初始化 AVAILABLE / LIFETIME 与 AVAILABLE / MONTHLY / 2026-05。
      * 输出：默认查询只返回 LIFETIME，月度查询只返回指定月份。
