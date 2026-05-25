@@ -196,7 +196,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                                                                         RouteSnapshotSpec routeSnapshot,
                                                                         String transactionSn) {
         List<RouteParticipantSpec> participants = routeSnapshot.getParticipants();
-        AssertUtils.isFalse(participants.isEmpty(),
+        AssertUtils.notEmpty(participants,
                 "RouteSnapshot participants 不能为空");
         List<FundsTransactionDetail> businessDetails = findDetailsByBusinessEvent(instruction, transactionSn);
         if (!businessDetails.isEmpty()) {
@@ -226,7 +226,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                                                                         RouteSnapshotSpec routeSnapshot,
                                                                         String transactionSn) {
         List<RouteParticipantSpec> participants = routeSnapshot.getParticipants();
-        AssertUtils.isFalse(participants.isEmpty(),
+        AssertUtils.notEmpty(participants,
                 "RouteSnapshot participants 不能为空");
         List<FundsTransactionDetail> businessDetails = findDetailsByBusinessEvent(instruction, transactionSn);
         if (!businessDetails.isEmpty()) {
