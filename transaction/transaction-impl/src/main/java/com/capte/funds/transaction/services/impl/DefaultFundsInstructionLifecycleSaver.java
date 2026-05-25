@@ -343,7 +343,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     }
 
     private List<FundsTransactionDetail> findDetailsBySn(List<String> sns) {
-        AssertUtils.isFalse(sns == null || sns.isEmpty(), "资金交易明细流水不能为空");
+        AssertUtils.notEmpty(sns, "资金交易明细流水不能为空");
         List<FundsTransactionDetail> result = new ArrayList<>(sns.size());
         for (String sn : sns) {
             result.add(findDetailBySn(sn));
