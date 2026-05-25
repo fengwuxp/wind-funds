@@ -2,6 +2,7 @@ package com.wind.integration.funds.model.route;
 
 import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -11,6 +12,7 @@ import java.util.Map;
  * 不可变外部账户引用实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableExternalAccountRefSpec(String externalAccountId,
                                               String externalAccountType,
                                               @Nullable String externalAccountNo,

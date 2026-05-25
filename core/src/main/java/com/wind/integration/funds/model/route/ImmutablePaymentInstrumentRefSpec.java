@@ -3,6 +3,7 @@ package com.wind.integration.funds.model.route;
 import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -12,6 +13,7 @@ import java.util.Map;
  * 不可变支付工具引用快照实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutablePaymentInstrumentRefSpec(String instrumentId,
                                                 String instrumentType,
                                                 String instrumentNo,

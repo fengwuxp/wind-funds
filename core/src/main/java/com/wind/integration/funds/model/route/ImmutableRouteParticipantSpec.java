@@ -5,6 +5,7 @@ import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -14,6 +15,7 @@ import java.util.Map;
  * 不可变 RouteParticipant 实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableRouteParticipantSpec(RouteParticipantRole participantRole,
                                             SubjectRef subjectRef,
                                             @Nullable String ledgerProfileCode,

@@ -6,12 +6,14 @@ import com.wind.integration.funds.route.enums.RouteNodeRole;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 
 /**
  * 不可变 Route 节点实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableRouteNodeSpec(RouteNodeType nodeType,
                                      SubjectRef subjectRef,
                                      LedgerSubjectCode ledgerSubjectCode,

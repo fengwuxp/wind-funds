@@ -11,6 +11,7 @@ import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -22,6 +23,7 @@ import java.util.Map;
  * 不可变 RouteSnapshot 实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableRouteSnapshotSpec(@Nullable Long tenantId,
                                          String snapshotId,
                                          String snapshotSchemaVersion,

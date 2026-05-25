@@ -11,6 +11,7 @@ import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
@@ -22,6 +23,7 @@ import java.util.Map;
  * 不可变 RouteLeg 实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableRouteLegSpec(String legId,
                                     int sequence,
                                     RouteLegType legType,

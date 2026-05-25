@@ -18,12 +18,12 @@ import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteSnapshotSpec;
 import com.wind.integration.funds.model.route.ImmutableSubjectRef;
+import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.route.enums.RouteLegType;
 import com.wind.integration.funds.route.enums.RouteNodeType;
 import com.wind.integration.funds.route.enums.RouteNodeRole;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.enums.RouteReplayPolicy;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.integration.funds.route.ref.SubjectRef;
@@ -52,6 +52,10 @@ import java.util.TreeMap;
 
 final class RouteSnapshotJsonSupport {
 
+    private static final String MONEY_AMOUNT = "amount";
+
+    private static final String MONEY_CURRENCY = "currency";
+
     private RouteSnapshotJsonSupport() {
     }
 
@@ -62,93 +66,107 @@ final class RouteSnapshotJsonSupport {
     static RouteSnapshotSpec parseRouteSnapshot(String routeSnapshotJson, LocalDateTime defaultResolvedAt) {
         JSONObject values = JSON.parseObject(routeSnapshotJson);
         return ImmutableRouteSnapshotSpec.builder()
-                .tenantId(values.getLong("tenantId"))
-                .snapshotId(values.getString("snapshotId"))
-                .snapshotSchemaVersion(values.getString("snapshotSchemaVersion"))
-                .routeCode(values.getString("routeCode"))
-                .routeVersion(values.getString("routeVersion"))
-                .businessScene(values.getString("businessScene"))
-                .businessSn(values.getString("businessSn"))
-                .instructionType(FundsInstructionType.valueOf(values.getString("instructionType")))
-                .eventType(FundsTransactionEventType.valueOf(values.getString("eventType")))
-                .transactionType(DefaultFundsTransactionType.valueOf(values.getString("transactionType")))
-                .participants(parseParticipants(values.getJSONArray("participants")))
-                .legs(parseLegs(values.getJSONArray("legs")))
-                .routingDecision(parseRoutingDecision(values.getJSONObject("routingDecision")))
-                .paymentInstrumentRef(parsePaymentInstrumentRef(values.getJSONObject("paymentInstrumentRef")))
-                .externalAccountRef(parseExternalAccountRef(values.getJSONObject("externalAccountRef")))
-                .platformAccounts(parsePlatformAccounts(values.getJSONObject("platformAccounts")))
-                .resolvedAt(parseLocalDateTime(values.getString("resolvedAt"), defaultResolvedAt))
-                .expiresAt(parseLocalDateTime(values.getString("expiresAt"), null))
-                .description(values.getString("description"))
-                .contextVariables(parseObjectMap(values.getJSONObject("contextVariables")))
+                .tenantId(values.getLong(ImmutableRouteSnapshotSpec.Fields.tenantId))
+                .snapshotId(values.getString(ImmutableRouteSnapshotSpec.Fields.snapshotId))
+                .snapshotSchemaVersion(values.getString(ImmutableRouteSnapshotSpec.Fields.snapshotSchemaVersion))
+                .routeCode(values.getString(ImmutableRouteSnapshotSpec.Fields.routeCode))
+                .routeVersion(values.getString(ImmutableRouteSnapshotSpec.Fields.routeVersion))
+                .businessScene(values.getString(ImmutableRouteSnapshotSpec.Fields.businessScene))
+                .businessSn(values.getString(ImmutableRouteSnapshotSpec.Fields.businessSn))
+                .instructionType(FundsInstructionType.valueOf(
+                        values.getString(ImmutableRouteSnapshotSpec.Fields.instructionType)))
+                .eventType(FundsTransactionEventType.valueOf(
+                        values.getString(ImmutableRouteSnapshotSpec.Fields.eventType)))
+                .transactionType(DefaultFundsTransactionType.valueOf(
+                        values.getString(ImmutableRouteSnapshotSpec.Fields.transactionType)))
+                .participants(parseParticipants(values.getJSONArray(ImmutableRouteSnapshotSpec.Fields.participants)))
+                .legs(parseLegs(values.getJSONArray(ImmutableRouteSnapshotSpec.Fields.legs)))
+                .routingDecision(parseRoutingDecision(values.getJSONObject(
+                        ImmutableRouteSnapshotSpec.Fields.routingDecision)))
+                .paymentInstrumentRef(parsePaymentInstrumentRef(values.getJSONObject(
+                        ImmutableRouteSnapshotSpec.Fields.paymentInstrumentRef)))
+                .externalAccountRef(parseExternalAccountRef(values.getJSONObject(
+                        ImmutableRouteSnapshotSpec.Fields.externalAccountRef)))
+                .platformAccounts(parsePlatformAccounts(values.getJSONObject(
+                        ImmutableRouteSnapshotSpec.Fields.platformAccounts)))
+                .resolvedAt(parseLocalDateTime(values.getString(ImmutableRouteSnapshotSpec.Fields.resolvedAt),
+                        defaultResolvedAt))
+                .expiresAt(parseLocalDateTime(values.getString(ImmutableRouteSnapshotSpec.Fields.expiresAt), null))
+                .description(values.getString(ImmutableRouteSnapshotSpec.Fields.description))
+                .contextVariables(parseObjectMap(values.getJSONObject(
+                        ImmutableRouteSnapshotSpec.Fields.contextVariables)))
                 .build();
     }
 
     static Map<String, Object> routeSummary(RouteSnapshotSpec routeSnapshot) {
         Map<String, Object> values = new TreeMap<>();
-        values.put("tenantId", routeSnapshot.getTenantId());
-        values.put("snapshotId", routeSnapshot.getSnapshotId());
-        values.put("snapshotSchemaVersion", routeSnapshot.getSnapshotSchemaVersion());
-        values.put("businessScene", routeSnapshot.getBusinessScene());
-        values.put("businessSn", routeSnapshot.getBusinessSn());
-        values.put("instructionType", routeSnapshot.getInstructionType().name());
-        values.put("eventType", routeSnapshot.getEventType().name());
-        values.put("transactionType", routeSnapshot.getTransactionType().name());
-        values.put("routeCode", routeSnapshot.getRouteCode());
-        values.put("routeVersion", routeSnapshot.getRouteVersion());
-        values.put("resolvedAt", routeSnapshot.getResolvedAt().toString());
-        values.put("expiresAt", routeSnapshot.getExpiresAt() == null ? null : routeSnapshot.getExpiresAt().toString());
-        values.put("description", routeSnapshot.getDescription());
-        values.put("routingDecision", routeSnapshot.getRoutingDecision() == null
+        values.put(ImmutableRouteSnapshotSpec.Fields.tenantId, routeSnapshot.getTenantId());
+        values.put(ImmutableRouteSnapshotSpec.Fields.snapshotId, routeSnapshot.getSnapshotId());
+        values.put(ImmutableRouteSnapshotSpec.Fields.snapshotSchemaVersion, routeSnapshot.getSnapshotSchemaVersion());
+        values.put(ImmutableRouteSnapshotSpec.Fields.businessScene, routeSnapshot.getBusinessScene());
+        values.put(ImmutableRouteSnapshotSpec.Fields.businessSn, routeSnapshot.getBusinessSn());
+        values.put(ImmutableRouteSnapshotSpec.Fields.instructionType, routeSnapshot.getInstructionType().name());
+        values.put(ImmutableRouteSnapshotSpec.Fields.eventType, routeSnapshot.getEventType().name());
+        values.put(ImmutableRouteSnapshotSpec.Fields.transactionType, routeSnapshot.getTransactionType().name());
+        values.put(ImmutableRouteSnapshotSpec.Fields.routeCode, routeSnapshot.getRouteCode());
+        values.put(ImmutableRouteSnapshotSpec.Fields.routeVersion, routeSnapshot.getRouteVersion());
+        values.put(ImmutableRouteSnapshotSpec.Fields.resolvedAt, routeSnapshot.getResolvedAt().toString());
+        values.put(ImmutableRouteSnapshotSpec.Fields.expiresAt,
+                routeSnapshot.getExpiresAt() == null ? null : routeSnapshot.getExpiresAt().toString());
+        values.put(ImmutableRouteSnapshotSpec.Fields.description, routeSnapshot.getDescription());
+        values.put(ImmutableRouteSnapshotSpec.Fields.routingDecision, routeSnapshot.getRoutingDecision() == null
                 ? Map.of()
                 : sortedMap(routeDecisionSummary(routeSnapshot.getRoutingDecision())));
-        values.put("paymentInstrumentRef", instrumentSummary(routeSnapshot.getPaymentInstrumentRef()));
-        values.put("externalAccountRef", externalAccountSummary(routeSnapshot.getExternalAccountRef()));
-        values.put("participants", routeSnapshot.getParticipants()
+        values.put(ImmutableRouteSnapshotSpec.Fields.paymentInstrumentRef,
+                instrumentSummary(routeSnapshot.getPaymentInstrumentRef()));
+        values.put(ImmutableRouteSnapshotSpec.Fields.externalAccountRef,
+                externalAccountSummary(routeSnapshot.getExternalAccountRef()));
+        values.put(ImmutableRouteSnapshotSpec.Fields.participants, routeSnapshot.getParticipants()
                 .stream()
                 .map(RouteSnapshotJsonSupport::participantSummary)
                 .toList());
-        values.put("legs", routeSnapshot.getLegs()
+        values.put(ImmutableRouteSnapshotSpec.Fields.legs, routeSnapshot.getLegs()
                 .stream()
                 .map(RouteSnapshotJsonSupport::legSummary)
                 .toList());
-        values.put("platformAccounts", platformAccountsSummary(routeSnapshot.getPlatformAccounts()));
-        values.put("contextVariables", sortedMap(routeSnapshot.getContextVariables()));
+        values.put(ImmutableRouteSnapshotSpec.Fields.platformAccounts,
+                platformAccountsSummary(routeSnapshot.getPlatformAccounts()));
+        values.put(ImmutableRouteSnapshotSpec.Fields.contextVariables, sortedMap(routeSnapshot.getContextVariables()));
         return values;
     }
 
     private static Map<String, Object> legSummary(RouteLegSpec leg) {
         Map<String, Object> values = new TreeMap<>();
-        values.put("legId", leg.getLegId());
-        values.put("sequence", leg.getSequence());
-        values.put("legType", leg.getLegType().name());
-        values.put("sourceNode", routeNodeSummary(leg.getSourceNode()));
-        values.put("targetNode", routeNodeSummary(leg.getTargetNode()));
-        values.put("amount", moneySummary(leg.getAmount()));
-        values.put("originalAmount", moneySummary(leg.getOriginalAmount()));
-        values.put("exchangeRate", leg.getExchangeRate());
-        values.put("balanceEffectType", leg.getBalanceEffectType().name());
-        values.put("phaseCode", leg.getPhaseCode().name());
-        values.put("periodType", leg.getPeriodType().name());
-        values.put("periodId", leg.getPeriodId());
-        values.put("constraintOverrides", sortedEnumMap(leg.getConstraintOverrides()));
-        values.put("replayPolicy", leg.getReplayPolicy().name());
-        values.put("replayRefLegId", leg.getReplayRefLegId());
-        values.put("description", leg.getDescription());
-        values.put("contextVariables", sortedMap(leg.getContextVariables()));
+        values.put(ImmutableRouteLegSpec.Fields.legId, leg.getLegId());
+        values.put(ImmutableRouteLegSpec.Fields.sequence, leg.getSequence());
+        values.put(ImmutableRouteLegSpec.Fields.legType, leg.getLegType().name());
+        values.put(ImmutableRouteLegSpec.Fields.sourceNode, routeNodeSummary(leg.getSourceNode()));
+        values.put(ImmutableRouteLegSpec.Fields.targetNode, routeNodeSummary(leg.getTargetNode()));
+        values.put(ImmutableRouteLegSpec.Fields.amount, moneySummary(leg.getAmount()));
+        values.put(ImmutableRouteLegSpec.Fields.originalAmount, moneySummary(leg.getOriginalAmount()));
+        values.put(ImmutableRouteLegSpec.Fields.exchangeRate, leg.getExchangeRate());
+        values.put(ImmutableRouteLegSpec.Fields.balanceEffectType, leg.getBalanceEffectType().name());
+        values.put(ImmutableRouteLegSpec.Fields.phaseCode, leg.getPhaseCode().name());
+        values.put(ImmutableRouteLegSpec.Fields.periodType, leg.getPeriodType().name());
+        values.put(ImmutableRouteLegSpec.Fields.periodId, leg.getPeriodId());
+        values.put(ImmutableRouteLegSpec.Fields.constraintOverrides, sortedEnumMap(leg.getConstraintOverrides()));
+        values.put(ImmutableRouteLegSpec.Fields.replayPolicy, leg.getReplayPolicy().name());
+        values.put(ImmutableRouteLegSpec.Fields.replayRefLegId, leg.getReplayRefLegId());
+        values.put(ImmutableRouteLegSpec.Fields.description, leg.getDescription());
+        values.put(ImmutableRouteLegSpec.Fields.contextVariables, sortedMap(leg.getContextVariables()));
         return values;
     }
 
     private static Map<String, Object> participantSummary(RouteParticipantSpec participant) {
         Map<String, Object> values = new TreeMap<>();
-        values.put("participantRole", participant.getParticipantRole().name());
-        values.put("subjectRef", subjectSummary(participant.getSubjectRef()));
-        values.put("ledgerProfileCode", participant.getLedgerProfileCode());
-        values.put("currency", participant.getCurrency());
-        values.put("amount", moneySummary(participant.getAmount()));
-        values.put("description", participant.getDescription());
-        values.put("contextVariables", sortedMap(participant.getContextVariables()));
+        values.put(ImmutableRouteParticipantSpec.Fields.participantRole, participant.getParticipantRole().name());
+        values.put(ImmutableRouteParticipantSpec.Fields.subjectRef, subjectSummary(participant.getSubjectRef()));
+        values.put(ImmutableRouteParticipantSpec.Fields.ledgerProfileCode, participant.getLedgerProfileCode());
+        values.put(ImmutableRouteParticipantSpec.Fields.currency, participant.getCurrency());
+        values.put(ImmutableRouteParticipantSpec.Fields.amount, moneySummary(participant.getAmount()));
+        values.put(ImmutableRouteParticipantSpec.Fields.description, participant.getDescription());
+        values.put(ImmutableRouteParticipantSpec.Fields.contextVariables,
+                sortedMap(participant.getContextVariables()));
         return values;
     }
 
@@ -157,15 +175,19 @@ final class RouteSnapshotJsonSupport {
         if (externalAccountRef == null) {
             return values;
         }
-        values.put("externalAccountId", externalAccountRef.getExternalAccountId());
-        values.put("externalAccountType", externalAccountRef.getExternalAccountType());
-        values.put("externalAccountNo", externalAccountRef.getExternalAccountNo());
-        values.put("providerCode", externalAccountRef.getProviderCode());
-        values.put("channelCode", externalAccountRef.getChannelCode());
-        values.put("currency", externalAccountRef.getCurrency());
-        values.put("countryCode", externalAccountRef.getCountryCode());
-        values.put("description", externalAccountRef.getDescription());
-        values.put("contextVariables", sortedMap(externalAccountRef.getContextVariables()));
+        values.put(ImmutableExternalAccountRefSpec.Fields.externalAccountId,
+                externalAccountRef.getExternalAccountId());
+        values.put(ImmutableExternalAccountRefSpec.Fields.externalAccountType,
+                externalAccountRef.getExternalAccountType());
+        values.put(ImmutableExternalAccountRefSpec.Fields.externalAccountNo,
+                externalAccountRef.getExternalAccountNo());
+        values.put(ImmutableExternalAccountRefSpec.Fields.providerCode, externalAccountRef.getProviderCode());
+        values.put(ImmutableExternalAccountRefSpec.Fields.channelCode, externalAccountRef.getChannelCode());
+        values.put(ImmutableExternalAccountRefSpec.Fields.currency, externalAccountRef.getCurrency());
+        values.put(ImmutableExternalAccountRefSpec.Fields.countryCode, externalAccountRef.getCountryCode());
+        values.put(ImmutableExternalAccountRefSpec.Fields.description, externalAccountRef.getDescription());
+        values.put(ImmutableExternalAccountRefSpec.Fields.contextVariables,
+                sortedMap(externalAccountRef.getContextVariables()));
         return values;
     }
 
@@ -174,43 +196,51 @@ final class RouteSnapshotJsonSupport {
         if (instrumentRef == null) {
             return values;
         }
-        values.put("instrumentId", instrumentRef.getInstrumentId());
-        values.put("instrumentType", instrumentRef.getInstrumentType());
-        values.put("instrumentNo", instrumentRef.getInstrumentNo());
-        values.put("ownerId", instrumentRef.getOwnerId());
-        values.put("ownerType", instrumentRef.getOwnerType());
-        values.put("tenantId", instrumentRef.getTenantId());
-        values.put("currency", instrumentRef.getCurrency());
-        values.put("status", instrumentRef.getStatus());
-        values.put("bindingSnapshot", sortedMap(instrumentRef.getBindingSnapshot()));
-        values.put("description", instrumentRef.getDescription());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.instrumentId, instrumentRef.getInstrumentId());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.instrumentType, instrumentRef.getInstrumentType());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.instrumentNo, instrumentRef.getInstrumentNo());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.ownerId, instrumentRef.getOwnerId());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.ownerType, instrumentRef.getOwnerType());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.tenantId, instrumentRef.getTenantId());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.currency, instrumentRef.getCurrency());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.status, instrumentRef.getStatus());
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.bindingSnapshot,
+                sortedMap(instrumentRef.getBindingSnapshot()));
+        values.put(ImmutablePaymentInstrumentRefSpec.Fields.description, instrumentRef.getDescription());
         return values;
     }
 
     private static Map<String, Object> routeDecisionSummary(RoutingDecisionSpec routingDecision) {
         Map<String, Object> values = new TreeMap<>();
-        values.put("policyCode", routingDecision.getPolicyCode());
-        values.put("matchedRules", routingDecision.getMatchedRules());
-        values.put("selectedProcessor", routingDecision.getSelectedProcessor());
-        values.put("selectedCashFundingAccount", routingDecision.getSelectedCashFundingAccount());
-        values.put("selectedPlatformAccount", routingDecision.getSelectedPlatformAccount());
-        values.put("fundingAllocations", routingDecision.getFundingAllocations()
+        values.put(ImmutableRoutingDecisionSpec.Fields.policyCode, routingDecision.getPolicyCode());
+        values.put(ImmutableRoutingDecisionSpec.Fields.matchedRules, routingDecision.getMatchedRules());
+        values.put(ImmutableRoutingDecisionSpec.Fields.selectedProcessor, routingDecision.getSelectedProcessor());
+        values.put(ImmutableRoutingDecisionSpec.Fields.selectedCashFundingAccount,
+                routingDecision.getSelectedCashFundingAccount());
+        values.put(ImmutableRoutingDecisionSpec.Fields.selectedPlatformAccount,
+                routingDecision.getSelectedPlatformAccount());
+        values.put(ImmutableRoutingDecisionSpec.Fields.fundingAllocations, routingDecision.getFundingAllocations()
                 .stream()
                 .map(RouteSnapshotJsonSupport::fundingAllocationSummary)
                 .toList());
-        values.put("decisionReason", routingDecision.getDecisionReason());
-        values.put("contextVariables", sortedMap(routingDecision.getContextVariables()));
+        values.put(ImmutableRoutingDecisionSpec.Fields.decisionReason, routingDecision.getDecisionReason());
+        values.put(ImmutableRoutingDecisionSpec.Fields.contextVariables,
+                sortedMap(routingDecision.getContextVariables()));
         return values;
     }
 
     private static Map<String, Object> fundingAllocationSummary(FundingAllocationDecisionSpec fundingAllocation) {
         Map<String, Object> values = new TreeMap<>();
-        values.put("allocationId", fundingAllocation.getAllocationId());
-        values.put("subjectRef", subjectSummary(fundingAllocation.getSubjectRef()));
-        values.put("ledgerSubjectCode", enumName(fundingAllocation.getLedgerSubjectCode()));
-        values.put("amount", moneySummary(fundingAllocation.getAmount()));
-        values.put("priority", fundingAllocation.getPriority());
-        values.put("reason", fundingAllocation.getReason());
+        values.put(ImmutableFundingAllocationDecisionSpec.Fields.allocationId,
+                fundingAllocation.getAllocationId());
+        values.put(ImmutableFundingAllocationDecisionSpec.Fields.subjectRef,
+                subjectSummary(fundingAllocation.getSubjectRef()));
+        values.put(ImmutableFundingAllocationDecisionSpec.Fields.ledgerSubjectCode,
+                enumName(fundingAllocation.getLedgerSubjectCode()));
+        values.put(ImmutableFundingAllocationDecisionSpec.Fields.amount,
+                moneySummary(fundingAllocation.getAmount()));
+        values.put(ImmutableFundingAllocationDecisionSpec.Fields.priority, fundingAllocation.getPriority());
+        values.put(ImmutableFundingAllocationDecisionSpec.Fields.reason, fundingAllocation.getReason());
         return values;
     }
 
@@ -219,12 +249,18 @@ final class RouteSnapshotJsonSupport {
         if (platformAccounts == null) {
             return values;
         }
-        values.put("cashFundingAccount", subjectSummary(platformAccounts.getCashFundingAccount()));
-        values.put("prepaymentFundingAccount", subjectSummary(platformAccounts.getPrepaymentFundingAccount()));
-        values.put("clearingFundingAccount", subjectSummary(platformAccounts.getClearingFundingAccount()));
-        values.put("settlementFundingAccount", subjectSummary(platformAccounts.getSettlementFundingAccount()));
-        values.put("feeFundingAccount", subjectSummary(platformAccounts.getFeeFundingAccount()));
-        values.put("adjustmentFundingAccount", subjectSummary(platformAccounts.getAdjustmentFundingAccount()));
+        values.put(ImmutablePlatformAccountsSnapshotSpec.Fields.cashFundingAccount,
+                subjectSummary(platformAccounts.getCashFundingAccount()));
+        values.put(ImmutablePlatformAccountsSnapshotSpec.Fields.prepaymentFundingAccount,
+                subjectSummary(platformAccounts.getPrepaymentFundingAccount()));
+        values.put(ImmutablePlatformAccountsSnapshotSpec.Fields.clearingFundingAccount,
+                subjectSummary(platformAccounts.getClearingFundingAccount()));
+        values.put(ImmutablePlatformAccountsSnapshotSpec.Fields.settlementFundingAccount,
+                subjectSummary(platformAccounts.getSettlementFundingAccount()));
+        values.put(ImmutablePlatformAccountsSnapshotSpec.Fields.feeFundingAccount,
+                subjectSummary(platformAccounts.getFeeFundingAccount()));
+        values.put(ImmutablePlatformAccountsSnapshotSpec.Fields.adjustmentFundingAccount,
+                subjectSummary(platformAccounts.getAdjustmentFundingAccount()));
         return values;
     }
 
@@ -233,10 +269,10 @@ final class RouteSnapshotJsonSupport {
         if (node == null) {
             return values;
         }
-        values.put("nodeType", node.getNodeType().name());
-        values.put("subjectRef", subjectSummary(node.getSubjectRef()));
-        values.put("ledgerSubjectCode", enumName(node.getLedgerSubjectCode()));
-        values.put("nodeRole", node.getNodeRole().name());
+        values.put(ImmutableRouteNodeSpec.Fields.nodeType, node.getNodeType().name());
+        values.put(ImmutableRouteNodeSpec.Fields.subjectRef, subjectSummary(node.getSubjectRef()));
+        values.put(ImmutableRouteNodeSpec.Fields.ledgerSubjectCode, enumName(node.getLedgerSubjectCode()));
+        values.put(ImmutableRouteNodeSpec.Fields.nodeRole, node.getNodeRole().name());
         return values;
     }
 
@@ -245,13 +281,13 @@ final class RouteSnapshotJsonSupport {
         if (subjectRef == null) {
             return values;
         }
-        values.put("subjectId", subjectRef.getSubjectId());
-        values.put("subjectType", subjectRef.getSubjectType().name());
-        values.put("tenantId", subjectRef.getTenantId());
-        values.put("subjectName", subjectRef.getSubjectName());
-        values.put("currency", subjectRef.getCurrency());
-        values.put("ledgerProfileCode", subjectRef.getLedgerProfileCode());
-        values.put("description", subjectRef.getDescription());
+        values.put(ImmutableSubjectRef.Fields.subjectId, subjectRef.getSubjectId());
+        values.put(ImmutableSubjectRef.Fields.subjectType, subjectRef.getSubjectType().name());
+        values.put(ImmutableSubjectRef.Fields.tenantId, subjectRef.getTenantId());
+        values.put(ImmutableSubjectRef.Fields.subjectName, subjectRef.getSubjectName());
+        values.put(ImmutableSubjectRef.Fields.currency, subjectRef.getCurrency());
+        values.put(ImmutableSubjectRef.Fields.ledgerProfileCode, subjectRef.getLedgerProfileCode());
+        values.put(ImmutableSubjectRef.Fields.description, subjectRef.getDescription());
         return values;
     }
 
@@ -260,8 +296,8 @@ final class RouteSnapshotJsonSupport {
         if (money == null) {
             return values;
         }
-        values.put("amount", money.getAmount());
-        values.put("currency", money.getCurrency().name());
+        values.put(MONEY_AMOUNT, money.getAmount());
+        values.put(MONEY_CURRENCY, money.getCurrency().name());
         return values;
     }
 
@@ -287,13 +323,16 @@ final class RouteSnapshotJsonSupport {
         for (Object item : participants) {
             JSONObject value = (JSONObject) item;
             result.add(ImmutableRouteParticipantSpec.builder()
-                    .participantRole(RouteParticipantRole.valueOf(value.getString("participantRole")))
-                    .subjectRef(parseSubjectRef(value.getJSONObject("subjectRef")))
-                    .ledgerProfileCode(value.getString("ledgerProfileCode"))
-                    .currency(value.getString("currency"))
-                    .amount(parseMoney(value.getJSONObject("amount")))
-                    .description(value.getString("description"))
-                    .contextVariables(parseObjectMap(value.getJSONObject("contextVariables")))
+                    .participantRole(RouteParticipantRole.valueOf(
+                            value.getString(ImmutableRouteParticipantSpec.Fields.participantRole)))
+                    .subjectRef(parseSubjectRef(value.getJSONObject(
+                            ImmutableRouteParticipantSpec.Fields.subjectRef)))
+                    .ledgerProfileCode(value.getString(ImmutableRouteParticipantSpec.Fields.ledgerProfileCode))
+                    .currency(value.getString(ImmutableRouteParticipantSpec.Fields.currency))
+                    .amount(parseMoney(value.getJSONObject(ImmutableRouteParticipantSpec.Fields.amount)))
+                    .description(value.getString(ImmutableRouteParticipantSpec.Fields.description))
+                    .contextVariables(parseObjectMap(value.getJSONObject(
+                            ImmutableRouteParticipantSpec.Fields.contextVariables)))
                     .build());
         }
         return result;
@@ -307,23 +346,28 @@ final class RouteSnapshotJsonSupport {
         for (Object item : legs) {
             JSONObject value = (JSONObject) item;
             result.add(ImmutableRouteLegSpec.builder()
-                    .legId(value.getString("legId"))
-                    .sequence(value.getIntValue("sequence"))
-                    .legType(RouteLegType.valueOf(value.getString("legType")))
-                    .sourceNode(parseRouteNode(value.getJSONObject("sourceNode")))
-                    .targetNode(parseRouteNode(value.getJSONObject("targetNode")))
-                    .amount(parseMoney(value.getJSONObject("amount")))
-                    .originalAmount(parseMoney(value.getJSONObject("originalAmount")))
-                    .exchangeRate(value.getBigDecimal("exchangeRate"))
-                    .balanceEffectType(LedgerBalanceEffectType.valueOf(value.getString("balanceEffectType")))
-                    .phaseCode(LedgerPhaseCode.valueOf(value.getString("phaseCode")))
-                    .periodType(AccountBalancePeriodType.valueOf(value.getString("periodType")))
-                    .periodId(value.getString("periodId"))
-                    .constraintOverrides(parseConstraintOverrides(value.getJSONObject("constraintOverrides")))
-                    .replayPolicy(RouteReplayPolicy.valueOf(value.getString("replayPolicy")))
-                    .replayRefLegId(value.getString("replayRefLegId"))
-                    .description(value.getString("description"))
-                    .contextVariables(parseObjectMap(value.getJSONObject("contextVariables")))
+                    .legId(value.getString(ImmutableRouteLegSpec.Fields.legId))
+                    .sequence(value.getIntValue(ImmutableRouteLegSpec.Fields.sequence))
+                    .legType(RouteLegType.valueOf(value.getString(ImmutableRouteLegSpec.Fields.legType)))
+                    .sourceNode(parseRouteNode(value.getJSONObject(ImmutableRouteLegSpec.Fields.sourceNode)))
+                    .targetNode(parseRouteNode(value.getJSONObject(ImmutableRouteLegSpec.Fields.targetNode)))
+                    .amount(parseMoney(value.getJSONObject(ImmutableRouteLegSpec.Fields.amount)))
+                    .originalAmount(parseMoney(value.getJSONObject(ImmutableRouteLegSpec.Fields.originalAmount)))
+                    .exchangeRate(value.getBigDecimal(ImmutableRouteLegSpec.Fields.exchangeRate))
+                    .balanceEffectType(LedgerBalanceEffectType.valueOf(
+                            value.getString(ImmutableRouteLegSpec.Fields.balanceEffectType)))
+                    .phaseCode(LedgerPhaseCode.valueOf(value.getString(ImmutableRouteLegSpec.Fields.phaseCode)))
+                    .periodType(AccountBalancePeriodType.valueOf(value.getString(
+                            ImmutableRouteLegSpec.Fields.periodType)))
+                    .periodId(value.getString(ImmutableRouteLegSpec.Fields.periodId))
+                    .constraintOverrides(parseConstraintOverrides(value.getJSONObject(
+                            ImmutableRouteLegSpec.Fields.constraintOverrides)))
+                    .replayPolicy(RouteReplayPolicy.valueOf(value.getString(
+                            ImmutableRouteLegSpec.Fields.replayPolicy)))
+                    .replayRefLegId(value.getString(ImmutableRouteLegSpec.Fields.replayRefLegId))
+                    .description(value.getString(ImmutableRouteLegSpec.Fields.description))
+                    .contextVariables(parseObjectMap(value.getJSONObject(
+                            ImmutableRouteLegSpec.Fields.contextVariables)))
                     .build());
         }
         return result;
@@ -331,11 +375,13 @@ final class RouteSnapshotJsonSupport {
 
     private static RouteNodeSpec parseRouteNode(JSONObject value) {
         return ImmutableRouteNodeSpec.builder()
-                .nodeType(value.containsKey("nodeType")
-                        ? RouteNodeType.valueOf(value.getString("nodeType")) : RouteNodeType.SUBJECT)
-                .subjectRef(parseSubjectRef(value.getJSONObject("subjectRef")))
-                .ledgerSubjectCode(LedgerSubjectCode.valueOf(value.getString("ledgerSubjectCode")))
-                .nodeRole(RouteNodeRole.valueOf(value.getString("nodeRole")))
+                .nodeType(value.containsKey(ImmutableRouteNodeSpec.Fields.nodeType)
+                        ? RouteNodeType.valueOf(value.getString(ImmutableRouteNodeSpec.Fields.nodeType))
+                        : RouteNodeType.SUBJECT)
+                .subjectRef(parseSubjectRef(value.getJSONObject(ImmutableRouteNodeSpec.Fields.subjectRef)))
+                .ledgerSubjectCode(LedgerSubjectCode.valueOf(value.getString(
+                        ImmutableRouteNodeSpec.Fields.ledgerSubjectCode)))
+                .nodeRole(RouteNodeRole.valueOf(value.getString(ImmutableRouteNodeSpec.Fields.nodeRole)))
                 .build();
     }
 
@@ -344,13 +390,13 @@ final class RouteSnapshotJsonSupport {
             return null;
         }
         return ImmutableSubjectRef.builder()
-                .tenantId(value.getLong("tenantId"))
-                .subjectId(value.getString("subjectId"))
-                .subjectType(FundsSubjectType.valueOf(value.getString("subjectType")))
-                .subjectName(value.getString("subjectName"))
-                .currency(value.getString("currency"))
-                .ledgerProfileCode(value.getString("ledgerProfileCode"))
-                .description(value.getString("description"))
+                .tenantId(value.getLong(ImmutableSubjectRef.Fields.tenantId))
+                .subjectId(value.getString(ImmutableSubjectRef.Fields.subjectId))
+                .subjectType(FundsSubjectType.valueOf(value.getString(ImmutableSubjectRef.Fields.subjectType)))
+                .subjectName(value.getString(ImmutableSubjectRef.Fields.subjectName))
+                .currency(value.getString(ImmutableSubjectRef.Fields.currency))
+                .ledgerProfileCode(value.getString(ImmutableSubjectRef.Fields.ledgerProfileCode))
+                .description(value.getString(ImmutableSubjectRef.Fields.description))
                 .build();
     }
 
@@ -358,7 +404,8 @@ final class RouteSnapshotJsonSupport {
         if (CollectionUtils.isEmpty(value)) {
             return null;
         }
-        return Money.immutable(value.getLongValue("amount"), CurrencyIsoCode.valueOf(value.getString("currency")));
+        return Money.immutable(value.getLongValue(MONEY_AMOUNT),
+                CurrencyIsoCode.valueOf(value.getString(MONEY_CURRENCY)));
     }
 
     private static Map<String, LedgerBalanceConstraintType> parseConstraintOverrides(JSONObject value) {
@@ -377,16 +424,17 @@ final class RouteSnapshotJsonSupport {
             return null;
         }
         return ImmutablePaymentInstrumentRefSpec.builder()
-                .instrumentId(value.getString("instrumentId"))
-                .instrumentType(value.getString("instrumentType"))
-                .instrumentNo(value.getString("instrumentNo"))
-                .ownerId(value.getString("ownerId"))
-                .ownerType(value.getString("ownerType"))
-                .tenantId(value.getLong("tenantId"))
-                .currency(value.getString("currency"))
-                .status(value.getString("status"))
-                .bindingSnapshot(parseObjectMap(value.getJSONObject("bindingSnapshot")))
-                .description(value.getString("description"))
+                .instrumentId(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.instrumentId))
+                .instrumentType(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.instrumentType))
+                .instrumentNo(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.instrumentNo))
+                .ownerId(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.ownerId))
+                .ownerType(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.ownerType))
+                .tenantId(value.getLong(ImmutablePaymentInstrumentRefSpec.Fields.tenantId))
+                .currency(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.currency))
+                .status(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.status))
+                .bindingSnapshot(parseObjectMap(value.getJSONObject(
+                        ImmutablePaymentInstrumentRefSpec.Fields.bindingSnapshot)))
+                .description(value.getString(ImmutablePaymentInstrumentRefSpec.Fields.description))
                 .build();
     }
 
@@ -395,15 +443,16 @@ final class RouteSnapshotJsonSupport {
             return null;
         }
         return ImmutableExternalAccountRefSpec.builder()
-                .externalAccountId(value.getString("externalAccountId"))
-                .externalAccountType(value.getString("externalAccountType"))
-                .externalAccountNo(value.getString("externalAccountNo"))
-                .providerCode(value.getString("providerCode"))
-                .channelCode(value.getString("channelCode"))
-                .currency(value.getString("currency"))
-                .countryCode(value.getString("countryCode"))
-                .description(value.getString("description"))
-                .contextVariables(parseObjectMap(value.getJSONObject("contextVariables")))
+                .externalAccountId(value.getString(ImmutableExternalAccountRefSpec.Fields.externalAccountId))
+                .externalAccountType(value.getString(ImmutableExternalAccountRefSpec.Fields.externalAccountType))
+                .externalAccountNo(value.getString(ImmutableExternalAccountRefSpec.Fields.externalAccountNo))
+                .providerCode(value.getString(ImmutableExternalAccountRefSpec.Fields.providerCode))
+                .channelCode(value.getString(ImmutableExternalAccountRefSpec.Fields.channelCode))
+                .currency(value.getString(ImmutableExternalAccountRefSpec.Fields.currency))
+                .countryCode(value.getString(ImmutableExternalAccountRefSpec.Fields.countryCode))
+                .description(value.getString(ImmutableExternalAccountRefSpec.Fields.description))
+                .contextVariables(parseObjectMap(value.getJSONObject(
+                        ImmutableExternalAccountRefSpec.Fields.contextVariables)))
                 .build();
     }
 
@@ -412,14 +461,18 @@ final class RouteSnapshotJsonSupport {
             return null;
         }
         return ImmutableRoutingDecisionSpec.builder()
-                .policyCode(value.getString("policyCode"))
-                .matchedRules(parseStringList(value.getJSONArray("matchedRules")))
-                .selectedProcessor(value.getString("selectedProcessor"))
-                .selectedCashFundingAccount(value.getString("selectedCashFundingAccount"))
-                .selectedPlatformAccount(value.getString("selectedPlatformAccount"))
-                .fundingAllocations(parseFundingAllocations(value.getJSONArray("fundingAllocations")))
-                .decisionReason(value.getString("decisionReason"))
-                .contextVariables(parseObjectMap(value.getJSONObject("contextVariables")))
+                .policyCode(value.getString(ImmutableRoutingDecisionSpec.Fields.policyCode))
+                .matchedRules(parseStringList(value.getJSONArray(ImmutableRoutingDecisionSpec.Fields.matchedRules)))
+                .selectedProcessor(value.getString(ImmutableRoutingDecisionSpec.Fields.selectedProcessor))
+                .selectedCashFundingAccount(value.getString(
+                        ImmutableRoutingDecisionSpec.Fields.selectedCashFundingAccount))
+                .selectedPlatformAccount(value.getString(
+                        ImmutableRoutingDecisionSpec.Fields.selectedPlatformAccount))
+                .fundingAllocations(parseFundingAllocations(value.getJSONArray(
+                        ImmutableRoutingDecisionSpec.Fields.fundingAllocations)))
+                .decisionReason(value.getString(ImmutableRoutingDecisionSpec.Fields.decisionReason))
+                .contextVariables(parseObjectMap(value.getJSONObject(
+                        ImmutableRoutingDecisionSpec.Fields.contextVariables)))
                 .build();
     }
 
@@ -431,12 +484,14 @@ final class RouteSnapshotJsonSupport {
         for (Object item : values) {
             JSONObject value = (JSONObject) item;
             result.add(ImmutableFundingAllocationDecisionSpec.builder()
-                    .allocationId(value.getString("allocationId"))
-                    .subjectRef(parseSubjectRef(value.getJSONObject("subjectRef")))
-                    .ledgerSubjectCode(parseLedgerSubjectCode(value.getString("ledgerSubjectCode")))
-                    .amount(parseMoney(value.getJSONObject("amount")))
-                    .priority(value.getInteger("priority"))
-                    .reason(value.getString("reason"))
+                    .allocationId(value.getString(ImmutableFundingAllocationDecisionSpec.Fields.allocationId))
+                    .subjectRef(parseSubjectRef(value.getJSONObject(
+                            ImmutableFundingAllocationDecisionSpec.Fields.subjectRef)))
+                    .ledgerSubjectCode(parseLedgerSubjectCode(value.getString(
+                            ImmutableFundingAllocationDecisionSpec.Fields.ledgerSubjectCode)))
+                    .amount(parseMoney(value.getJSONObject(ImmutableFundingAllocationDecisionSpec.Fields.amount)))
+                    .priority(value.getInteger(ImmutableFundingAllocationDecisionSpec.Fields.priority))
+                    .reason(value.getString(ImmutableFundingAllocationDecisionSpec.Fields.reason))
                     .build());
         }
         return List.copyOf(result);
@@ -462,12 +517,18 @@ final class RouteSnapshotJsonSupport {
             return null;
         }
         return ImmutablePlatformAccountsSnapshotSpec.builder()
-                .cashFundingAccount(parseSubjectRef(value.getJSONObject("cashFundingAccount")))
-                .prepaymentFundingAccount(parseSubjectRef(value.getJSONObject("prepaymentFundingAccount")))
-                .clearingFundingAccount(parseSubjectRef(value.getJSONObject("clearingFundingAccount")))
-                .settlementFundingAccount(parseSubjectRef(value.getJSONObject("settlementFundingAccount")))
-                .feeFundingAccount(parseSubjectRef(value.getJSONObject("feeFundingAccount")))
-                .adjustmentFundingAccount(parseSubjectRef(value.getJSONObject("adjustmentFundingAccount")))
+                .cashFundingAccount(parseSubjectRef(value.getJSONObject(
+                        ImmutablePlatformAccountsSnapshotSpec.Fields.cashFundingAccount)))
+                .prepaymentFundingAccount(parseSubjectRef(value.getJSONObject(
+                        ImmutablePlatformAccountsSnapshotSpec.Fields.prepaymentFundingAccount)))
+                .clearingFundingAccount(parseSubjectRef(value.getJSONObject(
+                        ImmutablePlatformAccountsSnapshotSpec.Fields.clearingFundingAccount)))
+                .settlementFundingAccount(parseSubjectRef(value.getJSONObject(
+                        ImmutablePlatformAccountsSnapshotSpec.Fields.settlementFundingAccount)))
+                .feeFundingAccount(parseSubjectRef(value.getJSONObject(
+                        ImmutablePlatformAccountsSnapshotSpec.Fields.feeFundingAccount)))
+                .adjustmentFundingAccount(parseSubjectRef(value.getJSONObject(
+                        ImmutablePlatformAccountsSnapshotSpec.Fields.adjustmentFundingAccount)))
                 .build();
     }
 

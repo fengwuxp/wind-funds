@@ -3,6 +3,7 @@ package com.wind.integration.funds.model.route;
 import com.wind.integration.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.integration.funds.route.spec.RoutingDecisionSpec;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -15,6 +16,7 @@ import java.util.Set;
  * 不可变路径决策说明实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableRoutingDecisionSpec(@Nullable String policyCode,
                                            List<String> matchedRules,
                                            @Nullable String selectedProcessor,
