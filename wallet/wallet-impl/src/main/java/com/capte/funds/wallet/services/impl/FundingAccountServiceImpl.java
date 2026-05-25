@@ -52,6 +52,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createFundingAccount(@NonNull CreateFundingAccountRequest request) {
+        validatePlatformRole(request);
         FundingAccount entity = FundingAccountConverter.INSTANCE.convertToFundingAccount(request);
         fundingAccountMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建资金账户失败");
@@ -120,5 +121,13 @@ public class FundingAccountServiceImpl implements FundingAccountService {
                         .setPeriodId(AccountBalancePeriodType.LIFETIME.name()),
                 DefaultPageQueryOptions.defaults(50)).getRecords().stream()
                 .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, LedgerDTO::getId));
+    }
+
+    private void validatePlatformRole(CreateFundingAccountRequest request) {
+        if (Boolean.TRUE.equals(request.getPlatform())) {
+            AssertUtils.notNull(request.getAccountRoleCode(), "平台资金账户必须指定平台账户角色");
+            return;
+        }
+        AssertUtils.isTrue(request.getAccountRoleCode() == null, "非平台资金账户不得指定平台账户角色");
     }
 }

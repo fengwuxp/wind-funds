@@ -30,6 +30,7 @@ import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.wallet.enums.FundingAccountType;
 import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
@@ -61,6 +63,10 @@ import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSna
 class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String ACCOUNT_SN = "funding_account_service_basic";
+
+    private static final String PLATFORM_ACCOUNT_WITHOUT_ROLE_SN = "platform_account_without_role";
+
+    private static final String NON_PLATFORM_ACCOUNT_WITH_ROLE_SN = "fund_account_with_role";
 
     private static final String OWNER_ID = "owner_fas_basic";
 
@@ -102,6 +108,42 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 .containsExactlyInAnyOrder(LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN,
                         LedgerSubjectCode.AUTHORIZATION);
         assertThat(ledgers).allSatisfy(this::assertFundingBasicLedger);
+    }
+
+    /**
+     * 场景：运营配置平台资金账户时漏填平台账户角色。
+     * 输入：is_platform = true，但 account_role_code 为空。
+     * 输出：创建失败并提示平台资金账户必须指定角色。
+     * 红线：平台账户缺角色时不得写入资金账户、初始化账本或产生账务事实。
+     */
+    @Test
+    void testCreateFundingAccountShouldRejectPlatformAccountWithoutRoleAndKeepFactsUnchanged() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(platformAccountWithoutRoleRequest()))
+                .hasMessageContaining("平台资金账户必须指定平台账户角色");
+
+        assertThat(countFundingAccounts()).isZero();
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：普通资金账户请求伪造平台账户角色。
+     * 输入：is_platform = false，但 account_role_code = FEE。
+     * 输出：创建失败并提示非平台资金账户不得指定平台角色。
+     * 红线：普通账户不得占用平台角色唯一键，也不得被初始化为平台账本 profile。
+     */
+    @Test
+    void testCreateFundingAccountShouldRejectNonPlatformAccountWithRoleAndKeepFactsUnchanged() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(nonPlatformAccountWithRoleRequest()))
+                .hasMessageContaining("非平台资金账户不得指定平台账户角色");
+
+        assertThat(countFundingAccounts()).isZero();
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
@@ -198,8 +240,14 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupFundingAccountServiceTestData() {
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn = ?", ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
+                ACCOUNT_SN,
+                PLATFORM_ACCOUNT_WITHOUT_ROLE_SN,
+                NON_PLATFORM_ACCOUNT_WITH_ROLE_SN);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?)",
+                ACCOUNT_SN,
+                PLATFORM_ACCOUNT_WITHOUT_ROLE_SN,
+                NON_PLATFORM_ACCOUNT_WITH_ROLE_SN);
     }
 
     private CreateFundingAccountRequest createFundingAccountRequest() {
@@ -210,6 +258,31 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setAccountType(FundingAccountType.USER_WALLET.name())
                 .setPlatform(Boolean.FALSE)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
+    }
+
+    private CreateFundingAccountRequest platformAccountWithoutRoleRequest() {
+        return new CreateFundingAccountRequest()
+                .setSn(PLATFORM_ACCOUNT_WITHOUT_ROLE_SN)
+                .setTenantId(TENANT_ID)
+                .setOwnerId("platform")
+                .setOwnerType(FundsAccountOwnerType.PLATFORM)
+                .setAccountType(FundsSubjectType.FUNDING_ACCOUNT.name())
+                .setPlatform(Boolean.TRUE)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_PLATFORM);
+    }
+
+    private CreateFundingAccountRequest nonPlatformAccountWithRoleRequest() {
+        return new CreateFundingAccountRequest()
+                .setSn(NON_PLATFORM_ACCOUNT_WITH_ROLE_SN)
+                .setTenantId(TENANT_ID)
+                .setOwnerId(OWNER_ID)
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setAccountType(FundingAccountType.USER_WALLET.name())
+                .setPlatform(Boolean.FALSE)
+                .setAccountRoleCode(PlatformFundingAccountRole.FEE)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
     }
@@ -230,6 +303,24 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                         .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name())
                         .setCurrency(CurrencyIsoCode.USD),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
+    }
+
+    private long countFundingAccounts() {
+        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_funding_account WHERE sn IN (?, ?, ?)",
+                Long.class,
+                ACCOUNT_SN,
+                PLATFORM_ACCOUNT_WITHOUT_ROLE_SN,
+                NON_PLATFORM_ACCOUNT_WITH_ROLE_SN);
+        return result;
+    }
+
+    private long countLedgers() {
+        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_ledger WHERE subject_id IN (?, ?, ?)",
+                Long.class,
+                ACCOUNT_SN,
+                PLATFORM_ACCOUNT_WITHOUT_ROLE_SN,
+                NON_PLATFORM_ACCOUNT_WITH_ROLE_SN);
+        return result;
     }
 
     private Long createMonthlyAvailableLedger() {
