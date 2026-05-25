@@ -5,6 +5,7 @@ import com.wind.integration.funds.transaction.enums.FundsBenefitPartialRefundStr
 import com.wind.integration.funds.transaction.enums.FundsBenefitRefundDisposition;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
@@ -17,6 +18,7 @@ import java.util.Map;
  * 不可变权益退款策略实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableFundsBenefitRefundPolicySpec(FundsBenefitPartialRefundStrategy partialRefundStrategy,
                                                     List<FundsBenefitRefundDisposition> dispositions,
                                                     @Nullable Money refundableAmount,

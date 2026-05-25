@@ -43,19 +43,22 @@ public final class FundsBenefitSnapshotJsonSupport {
 
     public static @NonNull FundsBenefitSnapshotSpec parseSnapshot(@NonNull Map<String, ?> values) {
         return ImmutableFundsBenefitSnapshotSpec.builder()
-                .benefitSnapshotId(requireText(values, "benefitSnapshotId"))
-                .benefitSchemaVersion(optionalText(values, "benefitSchemaVersion"))
-                .benefitGroupSn(requireText(values, "benefitGroupSn"))
-                .orderSn(optionalText(values, "orderSn"))
-                .pricingSnapshotSn(optionalText(values, "pricingSnapshotSn"))
-                .orderAmount(requiredPositiveMoney(values, "orderAmount"))
-                .userPayAmount(requiredNonNegativeMoney(values, "userPayAmount"))
-                .merchantReceivableAmount(optionalNonNegativeMoney(values, "merchantReceivableAmount"))
-                .components(parseComponents(requiredObjects(values, "components")))
-                .refundPolicy(parseRefundPolicy(optionalObject(values, "refundPolicy")))
-                .decisionSource(optionalText(values, "decisionSource"))
-                .decisionTraceId(optionalText(values, "decisionTraceId"))
-                .contextVariables(contextVariables(values))
+                .benefitSnapshotId(requireText(values, ImmutableFundsBenefitSnapshotSpec.Fields.benefitSnapshotId))
+                .benefitSchemaVersion(optionalText(values,
+                        ImmutableFundsBenefitSnapshotSpec.Fields.benefitSchemaVersion))
+                .benefitGroupSn(requireText(values, ImmutableFundsBenefitSnapshotSpec.Fields.benefitGroupSn))
+                .orderSn(optionalText(values, ImmutableFundsBenefitSnapshotSpec.Fields.orderSn))
+                .pricingSnapshotSn(optionalText(values, ImmutableFundsBenefitSnapshotSpec.Fields.pricingSnapshotSn))
+                .orderAmount(requiredPositiveMoney(values, ImmutableFundsBenefitSnapshotSpec.Fields.orderAmount))
+                .userPayAmount(requiredNonNegativeMoney(values, ImmutableFundsBenefitSnapshotSpec.Fields.userPayAmount))
+                .merchantReceivableAmount(optionalNonNegativeMoney(values,
+                        ImmutableFundsBenefitSnapshotSpec.Fields.merchantReceivableAmount))
+                .components(parseComponents(requiredObjects(values, ImmutableFundsBenefitSnapshotSpec.Fields.components)))
+                .refundPolicy(parseRefundPolicy(optionalObject(values,
+                        ImmutableFundsBenefitSnapshotSpec.Fields.refundPolicy)))
+                .decisionSource(optionalText(values, ImmutableFundsBenefitSnapshotSpec.Fields.decisionSource))
+                .decisionTraceId(optionalText(values, ImmutableFundsBenefitSnapshotSpec.Fields.decisionTraceId))
+                .contextVariables(contextVariables(values, ImmutableFundsBenefitSnapshotSpec.Fields.contextVariables))
                 .build();
     }
 
@@ -69,22 +72,33 @@ public final class FundsBenefitSnapshotJsonSupport {
 
     private static FundsBenefitComponentSpec parseComponent(Map<String, ?> value) {
         return ImmutableFundsBenefitComponentSpec.builder()
-                .componentSn(requireText(value, "componentSn"))
-                .sequence(optionalInt(value, "sequence"))
-                .benefitType(requiredEnum(FundsBenefitType.class, value, "benefitType"))
-                .componentType(requiredEnum(FundsBenefitComponentType.class, value, "componentType"))
-                .closureRole(requiredEnum(FundsBenefitAmountClosureRole.class, value, "closureRole"))
-                .amount(requiredPositiveMoney(value, "amount"))
-                .ledgerEffect(requiredEnum(FundsBenefitLedgerEffect.class, value, "ledgerEffect"))
-                .fundingNature(requiredEnum(FundsBenefitFundingNature.class, value, "fundingNature"))
-                .bearerSubjectRef(parseSubjectRef(optionalObject(value, "bearerSubjectRef")))
-                .beneficiarySubjectRef(parseSubjectRef(optionalObject(value, "beneficiarySubjectRef")))
-                .fundingSubjectRef(parseSubjectRef(optionalObject(value, "fundingSubjectRef")))
-                .fundingAccountRole(optionalText(value, "fundingAccountRole"))
-                .benefitReference(parseReference(requiredObject(value, "benefitReference")))
-                .refundPolicy(parseRefundPolicy(optionalObject(value, "refundPolicy")))
-                .description(optionalText(value, "description"))
-                .contextVariables(contextVariables(value))
+                .componentSn(requireText(value, ImmutableFundsBenefitComponentSpec.Fields.componentSn))
+                .sequence(optionalInt(value, ImmutableFundsBenefitComponentSpec.Fields.sequence))
+                .benefitType(requiredEnum(FundsBenefitType.class, value,
+                        ImmutableFundsBenefitComponentSpec.Fields.benefitType))
+                .componentType(requiredEnum(FundsBenefitComponentType.class, value,
+                        ImmutableFundsBenefitComponentSpec.Fields.componentType))
+                .closureRole(requiredEnum(FundsBenefitAmountClosureRole.class, value,
+                        ImmutableFundsBenefitComponentSpec.Fields.closureRole))
+                .amount(requiredPositiveMoney(value, ImmutableFundsBenefitComponentSpec.Fields.amount))
+                .ledgerEffect(requiredEnum(FundsBenefitLedgerEffect.class, value,
+                        ImmutableFundsBenefitComponentSpec.Fields.ledgerEffect))
+                .fundingNature(requiredEnum(FundsBenefitFundingNature.class, value,
+                        ImmutableFundsBenefitComponentSpec.Fields.fundingNature))
+                .bearerSubjectRef(parseSubjectRef(optionalObject(value,
+                        ImmutableFundsBenefitComponentSpec.Fields.bearerSubjectRef)))
+                .beneficiarySubjectRef(parseSubjectRef(optionalObject(value,
+                        ImmutableFundsBenefitComponentSpec.Fields.beneficiarySubjectRef)))
+                .fundingSubjectRef(parseSubjectRef(optionalObject(value,
+                        ImmutableFundsBenefitComponentSpec.Fields.fundingSubjectRef)))
+                .fundingAccountRole(optionalText(value,
+                        ImmutableFundsBenefitComponentSpec.Fields.fundingAccountRole))
+                .benefitReference(parseReference(requiredObject(value,
+                        ImmutableFundsBenefitComponentSpec.Fields.benefitReference)))
+                .refundPolicy(parseRefundPolicy(optionalObject(value,
+                        ImmutableFundsBenefitComponentSpec.Fields.refundPolicy)))
+                .description(optionalText(value, ImmutableFundsBenefitComponentSpec.Fields.description))
+                .contextVariables(contextVariables(value, ImmutableFundsBenefitComponentSpec.Fields.contextVariables))
                 .build();
     }
 
@@ -93,28 +107,31 @@ public final class FundsBenefitSnapshotJsonSupport {
             return null;
         }
         return ImmutableSubjectRef.builder()
-                .tenantId(optionalLong(value, "tenantId"))
-                .subjectId(requireText(value, "subjectId"))
-                .subjectType(requiredEnum(FundsSubjectType.class, value, "subjectType"))
-                .subjectName(optionalText(value, "subjectName"))
-                .currency(optionalText(value, "currency"))
-                .ledgerProfileCode(optionalText(value, "ledgerProfileCode"))
-                .description(optionalText(value, "description"))
+                .tenantId(optionalLong(value, ImmutableSubjectRef.Fields.tenantId))
+                .subjectId(requireText(value, ImmutableSubjectRef.Fields.subjectId))
+                .subjectType(requiredEnum(FundsSubjectType.class, value, ImmutableSubjectRef.Fields.subjectType))
+                .subjectName(optionalText(value, ImmutableSubjectRef.Fields.subjectName))
+                .currency(optionalText(value, ImmutableSubjectRef.Fields.currency))
+                .ledgerProfileCode(optionalText(value, ImmutableSubjectRef.Fields.ledgerProfileCode))
+                .description(optionalText(value, ImmutableSubjectRef.Fields.description))
                 .build();
     }
 
     private static FundsBenefitReferenceSpec parseReference(Map<String, ?> value) {
         return ImmutableFundsBenefitReferenceSpec.builder()
-                .campaignId(optionalText(value, "campaignId"))
-                .couponId(optionalText(value, "couponId"))
-                .voucherId(optionalText(value, "voucherId"))
-                .benefitInstanceId(optionalText(value, "benefitInstanceId"))
-                .holdId(optionalText(value, "holdId"))
-                .writeOffId(optionalText(value, "writeOffId"))
-                .releaseId(optionalText(value, "releaseId"))
-                .ruleVersion(optionalText(value, "ruleVersion"))
-                .externalDecisionId(optionalText(value, "externalDecisionId"))
-                .contextVariables(contextVariables(value))
+                .campaignId(optionalText(value, ImmutableFundsBenefitReferenceSpec.Fields.campaignId))
+                .couponId(optionalText(value, ImmutableFundsBenefitReferenceSpec.Fields.couponId))
+                .voucherId(optionalText(value, ImmutableFundsBenefitReferenceSpec.Fields.voucherId))
+                .benefitInstanceId(optionalText(value,
+                        ImmutableFundsBenefitReferenceSpec.Fields.benefitInstanceId))
+                .holdId(optionalText(value, ImmutableFundsBenefitReferenceSpec.Fields.holdId))
+                .writeOffId(optionalText(value, ImmutableFundsBenefitReferenceSpec.Fields.writeOffId))
+                .releaseId(optionalText(value, ImmutableFundsBenefitReferenceSpec.Fields.releaseId))
+                .ruleVersion(optionalText(value, ImmutableFundsBenefitReferenceSpec.Fields.ruleVersion))
+                .externalDecisionId(optionalText(value,
+                        ImmutableFundsBenefitReferenceSpec.Fields.externalDecisionId))
+                .contextVariables(contextVariables(value,
+                        ImmutableFundsBenefitReferenceSpec.Fields.contextVariables))
                 .build();
     }
 
@@ -124,16 +141,24 @@ public final class FundsBenefitSnapshotJsonSupport {
         }
         return ImmutableFundsBenefitRefundPolicySpec.builder()
                 .partialRefundStrategy(optionalEnum(FundsBenefitPartialRefundStrategy.class,
-                        value, "partialRefundStrategy"))
-                .dispositions(requiredEnums(FundsBenefitRefundDisposition.class, value, "dispositions"))
-                .refundableAmount(optionalNonNegativeMoney(value, "refundableAmount"))
-                .nonRefundableAmount(optionalNonNegativeMoney(value, "nonRefundableAmount"))
-                .refundRuleVersion(optionalText(value, "refundRuleVersion"))
-                .refundPolicyCode(optionalText(value, "refundPolicyCode"))
-                .refundDecisionId(optionalText(value, "refundDecisionId"))
-                .decisionSource(optionalText(value, "decisionSource"))
-                .decisionTime(optionalLocalDateTime(value, "decisionTime"))
-                .contextVariables(contextVariables(value))
+                        value, ImmutableFundsBenefitRefundPolicySpec.Fields.partialRefundStrategy))
+                .dispositions(requiredEnums(FundsBenefitRefundDisposition.class, value,
+                        ImmutableFundsBenefitRefundPolicySpec.Fields.dispositions))
+                .refundableAmount(optionalNonNegativeMoney(value,
+                        ImmutableFundsBenefitRefundPolicySpec.Fields.refundableAmount))
+                .nonRefundableAmount(optionalNonNegativeMoney(value,
+                        ImmutableFundsBenefitRefundPolicySpec.Fields.nonRefundableAmount))
+                .refundRuleVersion(optionalText(value,
+                        ImmutableFundsBenefitRefundPolicySpec.Fields.refundRuleVersion))
+                .refundPolicyCode(optionalText(value,
+                        ImmutableFundsBenefitRefundPolicySpec.Fields.refundPolicyCode))
+                .refundDecisionId(optionalText(value,
+                        ImmutableFundsBenefitRefundPolicySpec.Fields.refundDecisionId))
+                .decisionSource(optionalText(value, ImmutableFundsBenefitRefundPolicySpec.Fields.decisionSource))
+                .decisionTime(optionalLocalDateTime(value,
+                        ImmutableFundsBenefitRefundPolicySpec.Fields.decisionTime))
+                .contextVariables(contextVariables(value,
+                        ImmutableFundsBenefitRefundPolicySpec.Fields.contextVariables))
                 .build();
     }
 
@@ -155,8 +180,8 @@ public final class FundsBenefitSnapshotJsonSupport {
         return FundsDslMoneyParser.parseNonNegative(value);
     }
 
-    private static Map<String, Object> contextVariables(Map<String, ?> owner) {
-        Object value = owner.get("contextVariables");
+    private static Map<String, Object> contextVariables(Map<String, ?> owner, String fieldName) {
+        Object value = owner.get(fieldName);
         if (value == null) {
             return Map.of();
         }
@@ -170,7 +195,7 @@ public final class FundsBenefitSnapshotJsonSupport {
             }
             return Map.copyOf(result);
         }
-        throw new IllegalArgumentException("contextVariables must be object");
+        throw new IllegalArgumentException(fieldName + " must be object");
     }
 
     private static <E extends Enum<E>> E requiredEnum(Class<E> enumType, Map<String, ?> owner, String fieldName) {

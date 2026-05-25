@@ -2,6 +2,7 @@ package com.wind.integration.funds.model.transaction;
 
 import com.wind.integration.funds.spec.transaction.FundsBenefitReferenceSpec;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -11,6 +12,7 @@ import java.util.Map;
  * 不可变权益外部引用实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableFundsBenefitReferenceSpec(@Nullable String campaignId,
                                                  @Nullable String couponId,
                                                  @Nullable String voucherId,

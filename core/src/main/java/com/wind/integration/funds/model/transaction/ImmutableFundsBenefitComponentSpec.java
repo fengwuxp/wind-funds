@@ -11,6 +11,7 @@ import com.wind.integration.funds.transaction.enums.FundsBenefitLedgerEffect;
 import com.wind.integration.funds.transaction.enums.FundsBenefitType;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
@@ -21,6 +22,7 @@ import java.util.Map;
  * 不可变权益金额组件实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableFundsBenefitComponentSpec(String componentSn,
                                                  int sequence,
                                                  FundsBenefitType benefitType,

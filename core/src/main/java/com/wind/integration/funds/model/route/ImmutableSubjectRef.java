@@ -3,6 +3,7 @@ package com.wind.integration.funds.model.route;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -10,6 +11,7 @@ import org.jspecify.annotations.Nullable;
  * 不可变主体引用实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableSubjectRef(@Nullable Long tenantId,
                                   String subjectId,
                                   FundsSubjectType subjectType,

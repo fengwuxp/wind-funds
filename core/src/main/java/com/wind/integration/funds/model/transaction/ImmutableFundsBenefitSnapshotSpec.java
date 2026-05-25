@@ -6,6 +6,7 @@ import com.wind.integration.funds.spec.transaction.FundsBenefitSnapshotSpec;
 import com.wind.integration.funds.transaction.enums.FundsBenefitAmountClosureRole;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
+import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
@@ -19,6 +20,7 @@ import java.util.Set;
  * 不可变权益结果快照实现。
  */
 @Builder
+@FieldNameConstants
 public record ImmutableFundsBenefitSnapshotSpec(String benefitSnapshotId,
                                                 String benefitSchemaVersion,
                                                 String benefitGroupSn,
