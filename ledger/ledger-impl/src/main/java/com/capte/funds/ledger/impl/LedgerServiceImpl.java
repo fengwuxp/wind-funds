@@ -28,7 +28,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalTime;
 import java.util.Collection;
@@ -141,8 +140,8 @@ public class LedgerServiceImpl implements LedgerService {
     }
 
     private void fillCreateDefaults(Ledger entity, CreateLedgerRequest request) {
-        AssertUtils.isTrue(StringUtils.hasText(entity.getSubjectId()), "账务主体 ID 不能为空");
-        AssertUtils.isTrue(StringUtils.hasText(entity.getSubjectType()), "账务主体类型不能为空");
+        AssertUtils.hasText(entity.getSubjectId(), "账务主体 ID 不能为空");
+        AssertUtils.hasText(entity.getSubjectType(), "账务主体类型不能为空");
         if (entity.getLedgerProfileCode() == null) {
             entity.setLedgerProfileCode(entity.getSubjectType());
         }
