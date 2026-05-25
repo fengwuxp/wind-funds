@@ -38,7 +38,6 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -248,10 +247,10 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     private void assertWithdrawReferenceMatchesAccount(FundsInstructionSpec instruction, FundsAccountId accountId) {
         FundsInstructionReferenceSpec reference = instruction.getReference();
-        AssertUtils.isTrue(reference != null
-                        && reference.getReferenceType() == FundsInstructionReferenceType.FREEZE_ORDER
-                        && StringUtils.hasText(reference.getReferenceSn()),
+        AssertUtils.notNull(reference, "提现必须引用冻结单");
+        AssertUtils.isTrue(reference.getReferenceType() == FundsInstructionReferenceType.FREEZE_ORDER,
                 "提现必须引用冻结单");
+        AssertUtils.hasText(reference.getReferenceSn(), "提现必须引用冻结单");
         Optional<RouteSnapshotSpec> routeSnapshot =
                 fundsTransactionQueryService.findRouteSnapshotByFreezeOrderSn(reference.getReferenceSn());
         AssertUtils.isTrue(routeSnapshot.isPresent(),
