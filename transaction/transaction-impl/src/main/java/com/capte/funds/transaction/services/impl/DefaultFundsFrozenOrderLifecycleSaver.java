@@ -179,8 +179,8 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     }
 
     private FundsFrozenOrder findReferencedFrozenOrder(@Nullable FundsInstructionReferenceSpec reference) {
-        AssertUtils.isTrue(reference != null && StringUtils.hasText(reference.getReferenceSn()),
-                "解冻事件必须引用冻结单");
+        AssertUtils.notNull(reference, "解冻事件必须引用冻结单");
+        AssertUtils.hasText(reference.getReferenceSn(), "解冻事件必须引用冻结单");
         return findFrozenOrderBySn(reference.getReferenceSn());
     }
 
