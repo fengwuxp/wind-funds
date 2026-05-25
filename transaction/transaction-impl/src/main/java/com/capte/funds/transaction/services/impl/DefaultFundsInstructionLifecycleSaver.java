@@ -20,13 +20,18 @@ import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.capte.funds.transaction.support.FundsStableHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
+import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
+import com.wind.integration.funds.model.route.ImmutableRouteSnapshotSpec;
+import com.wind.integration.funds.model.route.ImmutableSubjectRef;
+import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
-import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
+import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
@@ -65,6 +70,18 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             "FUNDS_TRANSACTION_DETAIL", "FTD", 6);
 
     private static final int MAX_ERROR_MESSAGE_LENGTH = 512;
+
+    private static final String HASH_FIELD_CURRENCY = "currency";
+
+    private static final String HASH_FIELD_ORIGINAL_CURRENCY = "originalCurrency";
+
+    private static final String HASH_FIELD_ROUTE = "route";
+
+    private static final String HASH_FIELD_PARTICIPANT = "participant";
+
+    private static final String MONEY_FIELD_AMOUNT = "amount";
+
+    private static final String MONEY_FIELD_CURRENCY = "currency";
 
     private final FundsTransactionMapper fundsTransactionMapper;
 
@@ -570,28 +587,28 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                                             RouteSnapshotSpec routeSnapshot,
                                             RouteParticipantSpec participant) {
         Map<String, Object> values = new TreeMap<>();
-        values.put("tenantId", instruction.getTenantId());
-        values.put("instructionType", instruction.getInstructionType().name());
-        values.put("eventType", instruction.getEventType().name());
-        values.put("transactionType", instruction.getTransactionType().name());
-        values.put("amount", instruction.getAmount().getAmount());
-        values.put("currency", instruction.getAmount().getCurrency().name());
-        values.put("originalAmount", instruction.getOriginalAmount().getAmount());
-        values.put("originalCurrency", instruction.getOriginalAmount().getCurrency().name());
-        values.put("exchangeRate", instruction.getExchangeRate());
-        values.put("businessScene", instruction.getBusinessScene());
-        values.put("businessSn", instruction.getBusinessSn());
-        values.put("reference", referenceSummary(instruction.getReference()));
-        values.put("route", routeRequestHashSummary(routeSnapshot));
-        values.put("participant", participantSummary(participant));
+        values.put(ImmutableFundsInstructionSpec.Fields.tenantId, instruction.getTenantId());
+        values.put(ImmutableFundsInstructionSpec.Fields.instructionType, instruction.getInstructionType().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.eventType, instruction.getEventType().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.transactionType, instruction.getTransactionType().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.amount, instruction.getAmount().getAmount());
+        values.put(HASH_FIELD_CURRENCY, instruction.getAmount().getCurrency().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.originalAmount, instruction.getOriginalAmount().getAmount());
+        values.put(HASH_FIELD_ORIGINAL_CURRENCY, instruction.getOriginalAmount().getCurrency().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.exchangeRate, instruction.getExchangeRate());
+        values.put(ImmutableFundsInstructionSpec.Fields.businessScene, instruction.getBusinessScene());
+        values.put(ImmutableFundsInstructionSpec.Fields.businessSn, instruction.getBusinessSn());
+        values.put(ImmutableFundsInstructionSpec.Fields.reference, referenceSummary(instruction.getReference()));
+        values.put(HASH_FIELD_ROUTE, routeRequestHashSummary(routeSnapshot));
+        values.put(HASH_FIELD_PARTICIPANT, participantSummary(participant));
         return FundsStableHashSupport.sha256Json(values);
     }
 
     private Map<String, Object> routeRequestHashSummary(RouteSnapshotSpec routeSnapshot) {
         Map<String, Object> values = new TreeMap<>(RouteSnapshotJsonSupport.routeSummary(routeSnapshot));
-        values.remove("snapshotId");
-        values.remove("resolvedAt");
-        values.remove("expiresAt");
+        values.remove(ImmutableRouteSnapshotSpec.Fields.snapshotId);
+        values.remove(ImmutableRouteSnapshotSpec.Fields.resolvedAt);
+        values.remove(ImmutableRouteSnapshotSpec.Fields.expiresAt);
         return FundsStableHashSupport.stableHashMap(values);
     }
 
@@ -600,24 +617,29 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (reference == null) {
             return values;
         }
-        values.put("referenceType", reference.getReferenceType().name());
-        values.put("referenceSn", reference.getReferenceSn());
-        values.put("referenceBusinessSn", reference.getReferenceBusinessSn());
-        values.put("referenceLedgerTransactionSn", reference.getReferenceLedgerTransactionSn());
-        values.put("externalTransactionId", reference.getExternalTransactionId());
-        values.put("authCode", reference.getAuthCode());
-        values.put("contextVariables", FundsStableHashSupport.stableHashMap(reference.getContextVariables()));
+        values.put(ImmutableFundsInstructionReferenceSpec.Fields.referenceType, reference.getReferenceType().name());
+        values.put(ImmutableFundsInstructionReferenceSpec.Fields.referenceSn, reference.getReferenceSn());
+        values.put(ImmutableFundsInstructionReferenceSpec.Fields.referenceBusinessSn,
+                reference.getReferenceBusinessSn());
+        values.put(ImmutableFundsInstructionReferenceSpec.Fields.referenceLedgerTransactionSn,
+                reference.getReferenceLedgerTransactionSn());
+        values.put(ImmutableFundsInstructionReferenceSpec.Fields.externalTransactionId,
+                reference.getExternalTransactionId());
+        values.put(ImmutableFundsInstructionReferenceSpec.Fields.authCode, reference.getAuthCode());
+        values.put(ImmutableFundsInstructionReferenceSpec.Fields.contextVariables,
+                FundsStableHashSupport.stableHashMap(reference.getContextVariables()));
         return values;
     }
 
     private Map<String, Object> participantSummary(RouteParticipantSpec participant) {
         Map<String, Object> values = new TreeMap<>();
-        values.put("participantRole", participant.getParticipantRole().name());
-        values.put("subjectRef", subjectSummary(participant.getSubjectRef()));
-        values.put("ledgerProfileCode", participant.getLedgerProfileCode());
-        values.put("currency", participant.getCurrency());
-        values.put("amount", moneySummary(participant.getAmount()));
-        values.put("contextVariables", FundsStableHashSupport.stableHashMap(participant.getContextVariables()));
+        values.put(ImmutableRouteParticipantSpec.Fields.participantRole, participant.getParticipantRole().name());
+        values.put(ImmutableRouteParticipantSpec.Fields.subjectRef, subjectSummary(participant.getSubjectRef()));
+        values.put(ImmutableRouteParticipantSpec.Fields.ledgerProfileCode, participant.getLedgerProfileCode());
+        values.put(ImmutableRouteParticipantSpec.Fields.currency, participant.getCurrency());
+        values.put(ImmutableRouteParticipantSpec.Fields.amount, moneySummary(participant.getAmount()));
+        values.put(ImmutableRouteParticipantSpec.Fields.contextVariables,
+                FundsStableHashSupport.stableHashMap(participant.getContextVariables()));
         return values;
     }
 
@@ -710,11 +732,11 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (subjectRef == null) {
             return values;
         }
-        values.put("subjectId", subjectRef.getSubjectId());
-        values.put("subjectType", subjectRef.getSubjectType().name());
-        values.put("tenantId", subjectRef.getTenantId());
-        values.put("currency", subjectRef.getCurrency());
-        values.put("ledgerProfileCode", subjectRef.getLedgerProfileCode());
+        values.put(ImmutableSubjectRef.Fields.subjectId, subjectRef.getSubjectId());
+        values.put(ImmutableSubjectRef.Fields.subjectType, subjectRef.getSubjectType().name());
+        values.put(ImmutableSubjectRef.Fields.tenantId, subjectRef.getTenantId());
+        values.put(ImmutableSubjectRef.Fields.currency, subjectRef.getCurrency());
+        values.put(ImmutableSubjectRef.Fields.ledgerProfileCode, subjectRef.getLedgerProfileCode());
         return values;
     }
 
@@ -723,8 +745,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (money == null) {
             return values;
         }
-        values.put("amount", money.getAmount());
-        values.put("currency", money.getCurrency().name());
+        values.put(MONEY_FIELD_AMOUNT, money.getAmount());
+        values.put(MONEY_FIELD_CURRENCY, money.getCurrency().name());
         return values;
     }
 

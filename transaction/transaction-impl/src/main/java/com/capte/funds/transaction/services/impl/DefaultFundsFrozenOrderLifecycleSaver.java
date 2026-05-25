@@ -12,6 +12,10 @@ import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.capte.funds.transaction.support.FundsStableHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
+import com.wind.integration.funds.model.route.ImmutableRouteSnapshotSpec;
+import com.wind.integration.funds.model.route.ImmutableSubjectRef;
+import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
@@ -48,6 +52,16 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
             "FUNDS_FROZEN_ORDER", "FO", 6);
 
     private static final String FROZEN_ORDER_REQUEST_HASH = "frozenOrderRequestHash";
+
+    private static final String ACCOUNT_ID = "id";
+
+    private static final String ACCOUNT_TYPE = "type";
+
+    private static final String HASH_FIELD_CURRENCY = "currency";
+
+    private static final String HASH_FIELD_FREEZE_TYPE = "freezeType";
+
+    private static final String HASH_FIELD_ROUTE = "route";
 
     private final FundsFrozenOrderMapper fundsFrozenOrderMapper;
 
@@ -313,7 +327,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
             return routeSnapshot.getParticipants().getFirst().getSubjectRef().getSubjectId();
         }
         Object accountId = instruction.getContextVariables().get(FundsInstructionContextKeys.ACCOUNT_ID);
-        return accountId == null ? null : JSON.parseObject(JSON.toJSONString(accountId)).getString("id");
+        return accountId == null ? null : JSON.parseObject(JSON.toJSONString(accountId)).getString(ACCOUNT_ID);
     }
 
     private String subjectType(FundsInstructionSpec instruction, RouteSnapshotSpec routeSnapshot) {
@@ -321,24 +335,24 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
             return routeSnapshot.getParticipants().getFirst().getSubjectRef().getSubjectType().name();
         }
         Object accountId = instruction.getContextVariables().get(FundsInstructionContextKeys.ACCOUNT_ID);
-        return accountId == null ? null : JSON.parseObject(JSON.toJSONString(accountId)).getString("type");
+        return accountId == null ? null : JSON.parseObject(JSON.toJSONString(accountId)).getString(ACCOUNT_TYPE);
     }
 
     private String computeRequestHash(FundsInstructionSpec instruction, @Nullable RouteSnapshotSpec routeSnapshot) {
         Map<String, Object> values = new TreeMap<>();
-        values.put("tenantId", instruction.getTenantId());
-        values.put("instructionType", instruction.getInstructionType().name());
-        values.put("eventType", instruction.getEventType().name());
-        values.put("transactionType", instruction.getTransactionType().name());
-        values.put("amount", instruction.getAmount().getAmount());
-        values.put("currency", instruction.getAmount().getCurrency().name());
-        values.put("businessScene", instruction.getBusinessScene());
-        values.put("businessSn", instruction.getBusinessSn());
-        values.put("referenceSn", referenceSn(instruction.getReference()));
-        values.put("subjectId", subjectId(instruction, routeSnapshot));
-        values.put("subjectType", subjectType(instruction, routeSnapshot));
-        values.put("freezeType", resolveFreezeType(instruction));
-        values.put("route", routeHashSummary(routeSnapshot));
+        values.put(ImmutableFundsInstructionSpec.Fields.tenantId, instruction.getTenantId());
+        values.put(ImmutableFundsInstructionSpec.Fields.instructionType, instruction.getInstructionType().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.eventType, instruction.getEventType().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.transactionType, instruction.getTransactionType().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.amount, instruction.getAmount().getAmount());
+        values.put(HASH_FIELD_CURRENCY, instruction.getAmount().getCurrency().name());
+        values.put(ImmutableFundsInstructionSpec.Fields.businessScene, instruction.getBusinessScene());
+        values.put(ImmutableFundsInstructionSpec.Fields.businessSn, instruction.getBusinessSn());
+        values.put(ImmutableFundsInstructionReferenceSpec.Fields.referenceSn, referenceSn(instruction.getReference()));
+        values.put(ImmutableSubjectRef.Fields.subjectId, subjectId(instruction, routeSnapshot));
+        values.put(ImmutableSubjectRef.Fields.subjectType, subjectType(instruction, routeSnapshot));
+        values.put(HASH_FIELD_FREEZE_TYPE, resolveFreezeType(instruction));
+        values.put(HASH_FIELD_ROUTE, routeHashSummary(routeSnapshot));
         return FundsStableHashSupport.sha256Json(values);
     }
 
@@ -347,9 +361,9 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
             return Map.of();
         }
         Map<String, Object> values = new TreeMap<>(RouteSnapshotJsonSupport.routeSummary(routeSnapshot));
-        values.remove("snapshotId");
-        values.remove("resolvedAt");
-        values.remove("expiresAt");
+        values.remove(ImmutableRouteSnapshotSpec.Fields.snapshotId);
+        values.remove(ImmutableRouteSnapshotSpec.Fields.resolvedAt);
+        values.remove(ImmutableRouteSnapshotSpec.Fields.expiresAt);
         return FundsStableHashSupport.stableHashMap(values);
     }
 
