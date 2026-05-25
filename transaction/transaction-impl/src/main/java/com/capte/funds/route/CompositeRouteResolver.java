@@ -37,7 +37,7 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
                 .sorted(Comparator.comparingInt(this::orderOf))
                 .filter(delegate -> delegate.supports(instruction))
                 .toList();
-        AssertUtils.isTrue(!candidates.isEmpty(),
+        AssertUtils.notEmpty(candidates,
                 "未找到匹配的 RouteResolver，instructionType = {}, eventType = {}, transactionType = {}",
                 instruction.getInstructionType(), instruction.getEventType(), instruction.getTransactionType());
         AssertUtils.isTrue(candidates.size() == 1,
