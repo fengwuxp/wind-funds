@@ -52,7 +52,7 @@ public final class RouteSpecSupport {
     }
 
     public static void requireParticipants(@NonNull List<RouteParticipantSpec> participants) {
-        AssertUtils.isTrue(!participants.isEmpty(), PARTICIPANTS_REQUIRED_MESSAGE);
+        AssertUtils.notEmpty(participants, PARTICIPANTS_REQUIRED_MESSAGE);
     }
 
     public static void validateResolvedRoute(@NonNull ResolvedRouteSpec route) {
