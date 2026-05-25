@@ -185,7 +185,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
     }
 
     private RouteParticipantSpec resolveParticipant(RouteSnapshotSpec routeSnapshot) {
-        AssertUtils.isFalse(routeSnapshot.getParticipants().isEmpty(), "RouteSnapshot participants 不能为空");
+        AssertUtils.notEmpty(routeSnapshot.getParticipants(), "RouteSnapshot participants 不能为空");
         return routeSnapshot.getParticipants().getFirst();
     }
 
