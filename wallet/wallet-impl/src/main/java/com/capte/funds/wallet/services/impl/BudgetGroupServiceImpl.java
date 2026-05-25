@@ -27,7 +27,6 @@ import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
@@ -74,8 +73,7 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
             AssertUtils.hasText(request.getPeriodId(), "非生命周期账本周期 periodId 不能为空");
         }
         if (periodType == AccountBalancePeriodType.CUSTOM_CYCLE) {
-            AssertUtils.isTrue(StringUtils.hasText(request.getPeriodPolicy()),
-                    "自定义周期预算组 periodPolicy 不能为空");
+            AssertUtils.hasText(request.getPeriodPolicy(), "自定义周期预算组 periodPolicy 不能为空");
         }
     }
 

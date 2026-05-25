@@ -132,8 +132,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     }
 
     private void assertBindingChangeAuditContextPresent(ChangePaymentInstrumentBindingRequest request) {
-        AssertUtils.isTrue(StringUtils.hasText(request.getOperatorId()), "支付工具绑定变更 operatorId 不能为空");
-        AssertUtils.isTrue(StringUtils.hasText(request.getChangeReason()), "支付工具绑定变更 changeReason 不能为空");
+        AssertUtils.hasText(request.getOperatorId(), "支付工具绑定变更 operatorId 不能为空");
+        AssertUtils.hasText(request.getChangeReason(), "支付工具绑定变更 changeReason 不能为空");
     }
 
     @Override
