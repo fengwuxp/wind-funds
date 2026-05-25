@@ -54,7 +54,7 @@ public class DelegatingFundsInstructionLifecycleRecorder implements FundsInstruc
 
     private FundsInstructionLifecycleRecorder requireDelegate(FundsInstructionSpec instruction) {
         List<FundsInstructionLifecycleRecorder> candidates = supportedDelegates(instruction);
-        AssertUtils.isFalse(candidates.isEmpty(),
+        AssertUtils.notEmpty(candidates,
                 "未找到支持的资金指令生命周期记录器，instructionType = {}，eventType = {}",
                 instruction.getInstructionType(), instruction.getEventType());
         AssertUtils.isTrue(candidates.size() == 1,
