@@ -45,6 +45,7 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
             @NonNull CreateSpendSubjectFundingRelationRequest request) {
         FundingAccount fundingAccount = getFundingAccount(request.getTenantId(), request.getFundingAccountId());
         assertFundingAccountCanBind(fundingAccount, request);
+        assertValidityWindow(request);
         assertNoDuplicateActiveDefaultRelation(request);
         assertNoDuplicateActivePriorityRelation(request);
         SpendSubjectFundingRel entity =
@@ -108,6 +109,14 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 "资金账户不可作为资金来源，fundingAccountId = {}", request.getFundingAccountId());
         AssertUtils.equals(fundingAccount.getCurrency(), request.getCurrency(),
                 "资金账户币种与资金来源关系币种不一致，fundingAccountId = {}", request.getFundingAccountId());
+    }
+
+    private void assertValidityWindow(CreateSpendSubjectFundingRelationRequest request) {
+        if (request.getValidFrom() == null || request.getValidTo() == null) {
+            return;
+        }
+        AssertUtils.isTrue(request.getValidFrom().isBefore(request.getValidTo()),
+                "资金来源关系生效时间必须早于失效时间");
     }
 
     private void assertNoDuplicateActiveDefaultRelation(CreateSpendSubjectFundingRelationRequest request) {

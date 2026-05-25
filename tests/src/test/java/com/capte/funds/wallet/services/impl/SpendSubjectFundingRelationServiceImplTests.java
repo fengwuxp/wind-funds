@@ -160,6 +160,32 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     /**
+     * 场景：运营创建资金来源关系时配置了倒置或空的生效窗口。
+     * 输入：validTo 早于或等于 validFrom 的 ACTIVE 资金来源关系。
+     * 输出：创建被拒绝，不留下资金来源候选。
+     * 红线：无效窗口不得进入 route 候选池，也不得写账或污染关系证据。
+     */
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldRejectInvalidValidityWindowWithoutRelation() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setValidFrom(now)
+                .setValidTo(now.minusSeconds(1))))
+                .hasMessageContaining("资金来源关系生效时间必须早于失效时间");
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setValidFrom(now)
+                .setValidTo(now)))
+                .hasMessageContaining("资金来源关系生效时间必须早于失效时间");
+
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一支出主体已经存在一个可用默认资金来源后，再配置第二个默认资金来源。
      * 输入：同租户、同支出主体、同币种、同关系类型，两个 ACTIVE 默认关系。
      * 输出：第二个关系被拒绝，保持原有唯一默认资金来源。
