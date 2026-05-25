@@ -40,6 +40,7 @@ import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -279,7 +280,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static List<RouteParticipantSpec> parseParticipants(JSONArray participants) {
-        if (participants == null || participants.isEmpty()) {
+        if (CollectionUtils.isEmpty(participants)) {
             return List.of();
         }
         List<RouteParticipantSpec> result = new ArrayList<>(participants.size());
@@ -299,7 +300,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static List<RouteLegSpec> parseLegs(JSONArray legs) {
-        if (legs == null || legs.isEmpty()) {
+        if (CollectionUtils.isEmpty(legs)) {
             return List.of();
         }
         List<RouteLegSpec> result = new ArrayList<>(legs.size());
@@ -339,7 +340,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static @Nullable SubjectRef parseSubjectRef(JSONObject value) {
-        if (value == null || value.isEmpty()) {
+        if (CollectionUtils.isEmpty(value)) {
             return null;
         }
         return ImmutableSubjectRef.builder()
@@ -354,14 +355,14 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static @Nullable Money parseMoney(JSONObject value) {
-        if (value == null || value.isEmpty()) {
+        if (CollectionUtils.isEmpty(value)) {
             return null;
         }
         return Money.immutable(value.getLongValue("amount"), CurrencyIsoCode.valueOf(value.getString("currency")));
     }
 
     private static Map<String, LedgerBalanceConstraintType> parseConstraintOverrides(JSONObject value) {
-        if (value == null || value.isEmpty()) {
+        if (CollectionUtils.isEmpty(value)) {
             return Map.of();
         }
         Map<String, LedgerBalanceConstraintType> result = new LinkedHashMap<>();
@@ -372,7 +373,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static PaymentInstrumentRefSpec parsePaymentInstrumentRef(JSONObject value) {
-        if (value == null || value.isEmpty()) {
+        if (CollectionUtils.isEmpty(value)) {
             return null;
         }
         return ImmutablePaymentInstrumentRefSpec.builder()
@@ -390,7 +391,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static ExternalAccountRefSpec parseExternalAccountRef(JSONObject value) {
-        if (value == null || value.isEmpty()) {
+        if (CollectionUtils.isEmpty(value)) {
             return null;
         }
         return ImmutableExternalAccountRefSpec.builder()
@@ -407,7 +408,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static RoutingDecisionSpec parseRoutingDecision(JSONObject value) {
-        if (value == null || value.isEmpty()) {
+        if (CollectionUtils.isEmpty(value)) {
             return null;
         }
         return ImmutableRoutingDecisionSpec.builder()
@@ -423,7 +424,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static List<FundingAllocationDecisionSpec> parseFundingAllocations(JSONArray values) {
-        if (values == null || values.isEmpty()) {
+        if (CollectionUtils.isEmpty(values)) {
             return List.of();
         }
         List<FundingAllocationDecisionSpec> result = new ArrayList<>(values.size());
@@ -442,7 +443,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static List<String> parseStringList(JSONArray values) {
-        if (values == null || values.isEmpty()) {
+        if (CollectionUtils.isEmpty(values)) {
             return List.of();
         }
         List<String> result = new ArrayList<>(values.size());
@@ -457,7 +458,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static PlatformAccountsSnapshotSpec parsePlatformAccounts(JSONObject value) {
-        if (value == null || value.isEmpty()) {
+        if (CollectionUtils.isEmpty(value)) {
             return null;
         }
         return ImmutablePlatformAccountsSnapshotSpec.builder()
@@ -475,7 +476,7 @@ final class RouteSnapshotJsonSupport {
     }
 
     private static Map<String, Object> parseObjectMap(JSONObject value) {
-        return value == null || value.isEmpty() ? Map.of() : Map.copyOf(value);
+        return CollectionUtils.isEmpty(value) ? Map.of() : Map.copyOf(value);
     }
 
 }
