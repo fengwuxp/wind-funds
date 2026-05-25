@@ -363,7 +363,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
             List<LedgerBalanceProjectionService> supported = ledgerBalanceProjectionServices.stream()
                     .filter(delegate -> delegate.supports(accountId))
                     .toList();
-            AssertUtils.isFalse(supported.isEmpty(), "未找到支持的账本余额投影服务，accountId = {}", accountId);
+            AssertUtils.notEmpty(supported, "未找到支持的账本余额投影服务，accountId = {}", accountId);
             AssertUtils.isTrue(supported.size() == 1, "账本余额投影服务不唯一，accountId = {}", accountId);
             result.put(accountId, supported.getFirst());
         }
