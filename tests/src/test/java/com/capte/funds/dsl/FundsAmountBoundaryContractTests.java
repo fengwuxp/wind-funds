@@ -242,6 +242,24 @@ class FundsAmountBoundaryContractTests {
                 .hasMessageContaining("money.minorValue exceeds system limit");
     }
 
+    /**
+     * 场景：权益快照等 DSL 子结构需要表达非负金额。
+     * 预期：显式非负入口允许 0，但仍拒绝负数和非整数。
+     * 红线：不能放宽主资金金额的正数入口。
+     */
+    @Test
+    void testDslJsonMoneyShouldSupportExplicitNonNegativeMinorValue() {
+        Money money = FundsDslMoneyParser.parseNonNegative(Map.of("currency", "USD", "minorValue", 0));
+
+        assertThat(money).isEqualTo(Money.immutable(0L, CURRENCY));
+        assertThatThrownBy(() -> FundsDslMoneyParser.parseNonNegative(Map.of("currency", "USD", "minorValue", -1)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("money.minorValue must not be negative");
+        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", 0)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("money.minorValue must be positive");
+    }
+
     private ImmutableFundsInstructionSpec fundsInstruction(long amount, BigDecimal exchangeRate) {
         return fundsInstruction(amount, Money.immutable(amount, CURRENCY), exchangeRate);
     }

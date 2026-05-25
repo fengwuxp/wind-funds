@@ -22,6 +22,14 @@ public final class FundsDslMoneyParser {
     }
 
     public static @NonNull Money parse(@NonNull Map<String, ?> values) {
+        return parse(values, true);
+    }
+
+    public static @NonNull Money parseNonNegative(@NonNull Map<String, ?> values) {
+        return parse(values, false);
+    }
+
+    private static @NonNull Money parse(@NonNull Map<String, ?> values, boolean positive) {
         Object rawCurrency = values.get(CURRENCY_FIELD);
         if (!(rawCurrency instanceof String currency) || !StringUtils.hasText(currency)) {
             throw new IllegalArgumentException("money.currency is required");
@@ -29,11 +37,11 @@ public final class FundsDslMoneyParser {
         if (!values.containsKey(MINOR_VALUE_FIELD)) {
             throw new IllegalArgumentException("money.minorValue is required");
         }
-        long minorValue = parseMinorValue(values.get(MINOR_VALUE_FIELD));
+        long minorValue = parseMinorValue(values.get(MINOR_VALUE_FIELD), positive);
         return Money.immutable(minorValue, CurrencyIsoCode.valueOf(currency));
     }
 
-    private static long parseMinorValue(Object value) {
+    private static long parseMinorValue(Object value, boolean positive) {
         BigInteger parsed = switch (value) {
             case Byte number -> BigInteger.valueOf(number.longValue());
             case Short number -> BigInteger.valueOf(number.longValue());
@@ -44,8 +52,11 @@ public final class FundsDslMoneyParser {
             case String text when text.matches("-?\\d+") -> new BigInteger(text);
             default -> throw new IllegalArgumentException("money.minorValue must be integer");
         };
-        if (parsed.compareTo(BigInteger.ONE) < 0) {
-            throw new IllegalArgumentException("money.minorValue must be positive");
+        BigInteger minimum = positive ? BigInteger.ONE : BigInteger.ZERO;
+        if (parsed.compareTo(minimum) < 0) {
+            throw new IllegalArgumentException(positive
+                    ? "money.minorValue must be positive"
+                    : "money.minorValue must not be negative");
         }
         if (parsed.compareTo(LONG_MAX_VALUE) > 0) {
             throw new IllegalArgumentException("money.minorValue exceeds system limit");

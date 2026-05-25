@@ -1,5 +1,7 @@
 package com.capte.funds.dsl;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.route.ImmutableSubjectRef;
 import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitComponentSpec;
@@ -25,6 +27,7 @@ import com.wind.integration.funds.transaction.enums.FundsBenefitRefundDispositio
 import com.wind.integration.funds.transaction.enums.FundsBenefitType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.integration.funds.util.FundsBenefitSnapshotJsonSupport;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -295,6 +298,165 @@ class FundsBenefitSnapshotSpecTests {
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("contextVariables must not contain core benefit field");
+    }
+
+    /**
+     * 场景：外部 JSON 解析器先把权益快照解析为 Map，再交给资金 DSL 显式装配。
+     * 预期：装配结果保持不可变模型、嵌套引用和退款策略语义，且稳定摘要可用。
+     * 红线：不能为了 Fastjson/Jackson 反序列化给不可变资金模型开放空构造或字段填充入口。
+     */
+    @Test
+    void testBenefitSnapshotJsonSupportShouldBuildImmutableSnapshotThroughBuilder() {
+        JSONObject values = JSON.parseObject("""
+                {
+                  "benefitSnapshotId": "BS-JSON-001",
+                  "benefitSchemaVersion": "1.0",
+                  "benefitGroupSn": "BG-JSON-001",
+                  "orderSn": "ORDER-JSON-001",
+                  "pricingSnapshotSn": "PRICE-JSON-001",
+                  "orderAmount": { "currency": "USD", "minorValue": 10000 },
+                  "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+                  "merchantReceivableAmount": { "currency": "USD", "minorValue": 8000 },
+                  "components": [{
+                    "componentSn": "BC-JSON-001",
+                    "sequence": 1,
+                    "benefitType": "MERCHANT_COUPON",
+                    "componentType": "MERCHANT_DISCOUNT",
+                    "closureRole": "ORDER_DISCOUNT_CLOSURE",
+                    "amount": { "currency": "USD", "minorValue": 2000 },
+                    "ledgerEffect": "NO_LEDGER",
+                    "fundingNature": "MERCHANT_BORNE",
+                    "bearerSubjectRef": {
+                      "tenantId": 1001,
+                      "subjectId": "FA-MERCHANT-JSON-001",
+                      "subjectType": "FUNDING_ACCOUNT",
+                      "subjectName": "Merchant JSON",
+                      "currency": "USD",
+                      "ledgerProfileCode": "MERCHANT_PAYABLE"
+                    },
+                    "benefitReference": {
+                      "couponId": "COUPON-JSON-001",
+                      "writeOffId": "WRITE-OFF-JSON-001",
+                      "ruleVersion": "merchant-rule-json-v1",
+                      "contextVariables": {}
+                    },
+                    "refundPolicy": {
+                      "partialRefundStrategy": "PROPORTIONAL",
+                      "dispositions": ["NO_REFUND", "REDUCE_MERCHANT_RECEIVABLE"],
+                      "refundRuleVersion": "merchant-refund-json-v1",
+                      "refundDecisionId": "REFUND-DECISION-JSON-001",
+                      "decisionSource": "ORDER_REFUND_ENGINE",
+                      "decisionTime": "2026-05-21T10:00:00",
+                      "contextVariables": {}
+                    },
+                    "description": "merchant coupon",
+                    "contextVariables": {}
+                  }],
+                  "refundPolicy": {
+                    "partialRefundStrategy": "PROPORTIONAL",
+                    "dispositions": ["NO_REFUND", "REDUCE_MERCHANT_RECEIVABLE"],
+                    "refundRuleVersion": "snapshot-refund-json-v1",
+                    "refundDecisionId": "SNAPSHOT-REFUND-JSON-001",
+                    "decisionSource": "ORDER_REFUND_ENGINE",
+                    "contextVariables": {}
+                  },
+                  "decisionSource": "ORDER_PRICING",
+                  "decisionTraceId": "TRACE-JSON-001",
+                  "contextVariables": {}
+                }
+                """);
+
+        FundsBenefitSnapshotSpec snapshot = FundsBenefitSnapshotJsonSupport.parseSnapshot(values);
+
+        assertThat(snapshot).isInstanceOf(ImmutableFundsBenefitSnapshotSpec.class);
+        assertThat(snapshot.getBenefitSnapshotId()).isEqualTo("BS-JSON-001");
+        assertThat(snapshot.getOrderAmount()).isEqualTo(money(10000L));
+        assertThat(snapshot.getUserPayAmount()).isEqualTo(money(8000L));
+        assertThat(snapshot.getComponents()).hasSize(1);
+        assertThat(snapshot.getComponents().getFirst()).isInstanceOf(ImmutableFundsBenefitComponentSpec.class);
+        assertThat(snapshot.getComponents().getFirst().getBearerSubjectRef().getSubjectType())
+                .isEqualTo(FundsSubjectType.FUNDING_ACCOUNT);
+        assertThat(snapshot.getComponents().getFirst().getBearerSubjectRef().getSubjectId())
+                .isEqualTo("FA-MERCHANT-JSON-001");
+        assertThat(snapshot.getComponents().getFirst().getBenefitReference().getRuleVersion())
+                .isEqualTo("merchant-rule-json-v1");
+        assertThat(snapshot.getComponents().getFirst().getRefundPolicy().getDispositions())
+                .containsExactly(FundsBenefitRefundDisposition.NO_REFUND,
+                        FundsBenefitRefundDisposition.REDUCE_MERCHANT_RECEIVABLE);
+        assertThat(snapshot.getRefundPolicy().getRefundDecisionId()).isEqualTo("SNAPSHOT-REFUND-JSON-001");
+        assertThat(snapshot.getStableDigest()).startsWith("sha256:");
+    }
+
+    /**
+     * 场景：外部 JSON 表达全额优惠，用户侧实付为 0。
+     * 预期：显式装配允许权益快照中的零实付，同时组件金额仍按正金额校验。
+     * 红线：JSON/Map 装配路径不能比不可变 Builder 路径更严格。
+     */
+    @Test
+    void testBenefitSnapshotJsonSupportShouldAllowZeroUserPayAmount() {
+        JSONObject values = JSON.parseObject("""
+                {
+                  "benefitSnapshotId": "BS-JSON-ZERO-PAY-001",
+                  "benefitGroupSn": "BG-JSON-ZERO-PAY-001",
+                  "orderAmount": { "currency": "USD", "minorValue": 10000 },
+                  "userPayAmount": { "currency": "USD", "minorValue": 0 },
+                  "components": [{
+                    "componentSn": "BC-JSON-ZERO-PAY-001",
+                    "benefitType": "PLATFORM_COUPON",
+                    "componentType": "PLATFORM_SUBSIDY",
+                    "closureRole": "ORDER_DISCOUNT_CLOSURE",
+                    "amount": { "currency": "USD", "minorValue": 10000 },
+                    "ledgerEffect": "POSTING_REQUIRED",
+                    "fundingNature": "PLATFORM_OWN_FUNDS",
+                    "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
+                    "benefitReference": { "couponId": "COUPON-JSON-ZERO-PAY-001", "ruleVersion": "rule-v1" },
+                    "contextVariables": {}
+                  }],
+                  "contextVariables": {}
+                }
+                """);
+
+        FundsBenefitSnapshotSpec snapshot = FundsBenefitSnapshotJsonSupport.parseSnapshot(values);
+
+        assertThat(snapshot.getUserPayAmount()).isEqualTo(Money.immutable(0L, CURRENCY));
+        assertThat(snapshot.getComponents().getFirst().getAmount()).isEqualTo(money(10000L));
+    }
+
+    /**
+     * 场景：外部 JSON 的权益金额不闭合。
+     * 预期：显式装配最终仍由不可变 Builder 拒绝。
+     * 红线：反序列化路径不能绕过资金 DSL 的金额闭合不变量。
+     */
+    @Test
+    void testBenefitSnapshotJsonSupportShouldRejectUnclosedAmountThroughBuilder() {
+        JSONObject values = JSON.parseObject("""
+                {
+                  "benefitSnapshotId": "BS-JSON-MISMATCH-001",
+                  "benefitGroupSn": "BG-JSON-MISMATCH-001",
+                  "orderAmount": { "currency": "USD", "minorValue": 10000 },
+                  "userPayAmount": { "currency": "USD", "minorValue": 9000 },
+                  "components": [{
+                    "componentSn": "BC-JSON-MISMATCH-001",
+                    "benefitType": "MERCHANT_COUPON",
+                    "componentType": "MERCHANT_DISCOUNT",
+                    "closureRole": "ORDER_DISCOUNT_CLOSURE",
+                    "amount": { "currency": "USD", "minorValue": 2000 },
+                    "ledgerEffect": "NO_LEDGER",
+                    "fundingNature": "MERCHANT_BORNE",
+                    "bearerSubjectRef": {
+                      "subjectId": "FA-MERCHANT-JSON-001",
+                      "subjectType": "FUNDING_ACCOUNT"
+                    },
+                    "benefitReference": { "couponId": "COUPON-JSON-001", "ruleVersion": "rule-v1" },
+                    "contextVariables": {}
+                  }],
+                  "contextVariables": {}
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsBenefitSnapshotJsonSupport.parseSnapshot(values))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ORDER_DISCOUNT_CLOSURE components.amount = orderAmount");
     }
 
     private FundsBenefitSnapshotSpec merchantDiscountSnapshot(long userPayAmount, long componentAmount) {
