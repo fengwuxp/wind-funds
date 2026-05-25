@@ -306,14 +306,14 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     }
 
     private List<RouteLegSpec> selectReplayLegs(RouteSnapshotSpec snapshot, ReplayRequestSpec replayRequest) {
-        AssertUtils.isFalse(snapshot.getLegs().isEmpty(), "RouteSnapshot legs 不能为空");
+        AssertUtils.notEmpty(snapshot.getLegs(), "RouteSnapshot legs 不能为空");
         Set<String> selectedLegIds = Set.copyOf(replayRequest.getReplayLegIds());
         List<RouteLegSpec> result = snapshot.getLegs().stream()
                 .filter(leg -> selectedLegIds.isEmpty() || selectedLegIds.contains(leg.getLegId()))
                 .filter(leg -> leg.getReplayPolicy() != RouteReplayPolicy.NON_REPLAYABLE)
                 .filter(leg -> shouldReplayLeg(leg, replayRequest))
                 .toList();
-        AssertUtils.isFalse(result.isEmpty(), "RouteSnapshot 没有可回放的 RouteLeg");
+        AssertUtils.notEmpty(result, "RouteSnapshot 没有可回放的 RouteLeg");
         AssertUtils.isTrue(selectedLegIds.isEmpty() || result.size() == selectedLegIds.size(),
                 "RouteSnapshot 回放 leg 不存在或不可回放，legIds = {}", selectedLegIds);
         return result;
