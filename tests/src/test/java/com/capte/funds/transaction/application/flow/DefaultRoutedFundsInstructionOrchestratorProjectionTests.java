@@ -233,6 +233,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        var beforeDeclineFacts = ledgerFactSnapshot();
         projectionPublisher.clear();
 
         String authorizationSn = declineAuthorization(user, 60L, "RISK_DECLINED",
@@ -243,6 +244,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeDeclineFacts);
 
         assertThat(singleProjectionContext()).satisfies(context -> {
             assertThat(context.instruction().getBusinessSn()).isEqualTo("PROJECTION_AUTH_DECLINE");
