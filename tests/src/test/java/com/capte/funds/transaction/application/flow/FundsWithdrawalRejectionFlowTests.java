@@ -5,6 +5,7 @@ import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
@@ -81,6 +82,7 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
         assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_FREEZE").getReleasedAmount()).isEqualTo(60L);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_REJECTED_UNFREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        LedgerFactSnapshot afterRejectedFacts = ledgerFactSnapshot();
 
         unfreeze(user, 60L, freezeSn, "WITHDRAW_REJECTED_UNFREEZE");
         BalanceSnapshot afterDuplicateUnfreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -90,6 +92,7 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertPostedTransactions(3);
+        assertLedgerTransactionFactsUnchanged(afterRejectedFacts);
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_REJECTED_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_REJECTED_FREEZE", 0, 0, 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_REJECTED_UNFREEZE", 0, 0, 1, 2);
