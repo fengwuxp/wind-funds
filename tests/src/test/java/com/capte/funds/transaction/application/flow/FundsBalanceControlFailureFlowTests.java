@@ -56,6 +56,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_FREEZE_FAIL_TOPUP", 3, 4);
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_FAIL_FREEZE")).isFalse();
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_FREEZE_FAIL_FREEZE");
     }
@@ -97,6 +98,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_FREEZE_CURRENCY_TOPUP", 3, 4);
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_CURRENCY_FREEZE")).isFalse();
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_FREEZE_CURRENCY_FREEZE");
     }
@@ -138,6 +140,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_FREEZE_ZERO_TOPUP", 3, 4);
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_ZERO_FREEZE")).isFalse();
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_FREEZE_ZERO_FREEZE");
     }
@@ -170,6 +173,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
 
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_FREEZE_IDEMPOTENT_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_FREEZE_IDEMPOTENT_FREEZE", 0, 0, 1, 2);
         assertThat(frozenOrderByBusinessSn("BALANCE_FREEZE_IDEMPOTENT_FREEZE"))
                 .satisfies(order -> {
                     assertThat(order.getSn()).isEqualTo(freezeSn);
@@ -225,6 +230,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_CURRENCY_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_CURRENCY_FREEZE", 0, 0, 1, 2);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_CURRENCY_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_CURRENCY_FREEZE").getReleasedAmount()).isZero();
@@ -277,6 +284,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_MISSING_REF_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_MISSING_REF_FREEZE", 0, 0, 1, 2);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_MISSING_REF_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_MISSING_REF_FREEZE").getReleasedAmount()).isZero();
@@ -330,6 +339,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE", 0, 0, 1, 2);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE").getReleasedAmount()).isZero();
@@ -394,6 +405,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(anotherUser), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
         assertBucket(balance(anotherUser), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ACCOUNT_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE", 0, 0, 1, 2);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE").getReleasedAmount()).isZero();
@@ -447,6 +460,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ZERO_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE", 0, 0, 1, 2);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE").getReleasedAmount()).isZero();
@@ -484,6 +499,9 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 50L, CURRENCY);
 
         assertPostedTransactions(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_IDEMPOTENT_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_IDEMPOTENT_FREEZE", 0, 0, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_UNFREEZE_IDEMPOTENT_RELEASE", 0, 0, 1, 2);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_IDEMPOTENT_FREEZE"))
                 .satisfies(order -> {
                     assertThat(order.getAmount()).isEqualTo(70L);
@@ -539,6 +557,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_ADJUST_ZERO_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_ZERO_ADJUST");
     }
 
@@ -583,6 +602,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_ADJUST_CURRENCY_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_CURRENCY_ADJUST");
     }
 
@@ -632,6 +652,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("CREDIT_LIMIT_ADJUST_INCREASE", 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("CREDIT_LIMIT_ADJUST_DECREASE", 1, 2);
     }
 
     /**
@@ -680,6 +702,8 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BUDGET_LIMIT_ADJUST_INCREASE", 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BUDGET_LIMIT_ADJUST_DECREASE", 1, 2);
     }
 
     /**
@@ -729,6 +753,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("CREDIT_LIMIT_DECREASE_FAIL_INCREASE", 1, 2);
         assertFailedFundsTransactionWithoutLedgerFacts("CREDIT_LIMIT_DECREASE_FAIL_DECREASE");
     }
 
@@ -779,6 +804,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BUDGET_LIMIT_DECREASE_FAIL_INCREASE", 1, 2);
         assertFailedFundsTransactionWithoutLedgerFacts("BUDGET_LIMIT_DECREASE_FAIL_DECREASE");
     }
 
@@ -828,6 +854,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(adjustmentAccount), LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_ADJUST_DECREASE_FAIL_TOPUP", 3, 4);
         assertFailedFundsTransactionWithoutLedgerFacts("BALANCE_ADJUST_DECREASE_FAIL_ADJUST");
     }
 
