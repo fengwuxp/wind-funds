@@ -4,8 +4,11 @@ import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.transaction.enums.FundsEffectType;
+import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import org.junit.jupiter.api.Test;
@@ -167,6 +170,10 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.REFUND.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_FLOW_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_FLOW_PAY", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_FLOW_REFUND", 2, 2);
+        assertFeeRefundFactsWithoutFundsTransaction("FEE_FLOW_FEE_REFUND");
     }
 
     /**
@@ -214,6 +221,8 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_PAY", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_RETURN");
     }
 
@@ -277,6 +286,58 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.FEE_REFUND.name(),
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_PAY", 3, 4);
+        assertFeeRefundFactsWithoutFundsTransaction("FEE_REFUND_EXCEED_FIRST_RETURN");
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_RESERVE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_RESERVE_PAY", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_SECOND_RETURN");
+    }
+
+    private void assertFeeRefundFactsWithoutFundsTransaction(String businessSn) {
+        assertThat(fundsTransactionsByBusinessSn(businessSn))
+                .as("funds transactions for fee refund businessSn %s", businessSn)
+                .isEmpty();
+        var details = fundsTransactionDetailsByBusinessSn(businessSn);
+        assertThat(details)
+                .as("funds transaction details for fee refund businessSn %s", businessSn)
+                .hasSize(2);
+        assertThat(details.stream()
+                .map(detail -> detail.getEventType())
+                .toList())
+                .as("funds transaction detail event types for fee refund businessSn %s", businessSn)
+                .containsOnly(FundsTransactionEventType.FEE_REFUND);
+        assertThat(details.stream()
+                .map(detail -> detail.getFundsEffectType())
+                .toList())
+                .as("funds transaction detail effect types for fee refund businessSn %s", businessSn)
+                .containsOnly(FundsEffectType.RETURN);
+        assertThat(details.stream()
+                .map(detail -> detail.getStatus())
+                .toList())
+                .as("funds transaction detail statuses for fee refund businessSn %s", businessSn)
+                .containsOnly(FundsTransactionDetailStatus.SUCCEEDED);
+        assertThat(details.stream()
+                .map(detail -> detail.getParticipantRole())
+                .toList())
+                .as("funds transaction detail roles for fee refund businessSn %s", businessSn)
+                .containsExactlyInAnyOrder(RouteParticipantRole.PAYER, RouteParticipantRole.FEE_RECEIVER);
+        assertThat(ledgerTransactionsForBusinessSn(businessSn))
+                .as("ledger transactions for fee refund businessSn %s", businessSn)
+                .singleElement()
+                .satisfies(transaction -> {
+                    assertThat(transaction.getEventType())
+                            .isEqualTo(FundsTransactionEventType.FEE_REFUND.name());
+                    assertThat(postingPlansOf(transaction).stream()
+                            .map(LedgerPostingPlan::getPhaseCode)
+                            .toList())
+                            .as("posting plans for fee refund businessSn %s", businessSn)
+                            .containsOnly(LedgerPhaseCode.REFUND.name());
+                    assertThat(entriesByBusinessSn(businessSn).stream()
+                            .map(LedgerEntry::getLedgerSubjectCode)
+                            .toList())
+                            .as("ledger entries for fee refund businessSn %s", businessSn)
+                            .containsExactlyInAnyOrder(LedgerSubjectCode.FEE, LedgerSubjectCode.AVAILABLE);
+                });
     }
 }
