@@ -57,6 +57,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_FAIL_FREEZE")).isFalse();
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_FREEZE_FAIL_FREEZE");
     }
 
     /**
@@ -97,6 +98,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_CURRENCY_FREEZE")).isFalse();
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_FREEZE_CURRENCY_FREEZE");
     }
 
     /**
@@ -137,6 +139,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_FREEZE_ZERO_FREEZE")).isFalse();
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_FREEZE_ZERO_FREEZE");
     }
 
     /**
@@ -226,6 +229,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_CURRENCY_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_CURRENCY_RELEASE")).isFalse();
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_CURRENCY_RELEASE");
     }
 
     /**
@@ -277,6 +281,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_MISSING_REF_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_MISSING_REF_RELEASE")).isFalse();
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_MISSING_REF_RELEASE");
     }
 
     /**
@@ -329,6 +334,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_RELEASE")).isFalse();
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_RELEASE");
     }
 
     /**
@@ -392,6 +398,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_ACCOUNT_RELEASE")).isFalse();
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ACCOUNT_RELEASE");
     }
 
     /**
@@ -444,6 +451,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("BALANCE_UNFREEZE_ZERO_FREEZE").getReleasedAmount()).isZero();
         assertThat(frozenOrderExistsByBusinessSn("BALANCE_UNFREEZE_ZERO_RELEASE")).isFalse();
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_UNFREEZE_ZERO_RELEASE");
     }
 
     /**
@@ -531,6 +539,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_ZERO_ADJUST");
     }
 
     /**
@@ -574,6 +583,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_CURRENCY_ADJUST");
     }
 
     /**
@@ -719,6 +729,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertFailedFundsTransactionWithoutLedgerFacts("CREDIT_LIMIT_DECREASE_FAIL_DECREASE");
     }
 
     /**
@@ -768,6 +779,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertFailedFundsTransactionWithoutLedgerFacts("BUDGET_LIMIT_DECREASE_FAIL_DECREASE");
     }
 
     /**
@@ -816,6 +828,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(adjustmentAccount), LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY);
         assertPostedTransactions(1);
+        assertFailedFundsTransactionWithoutLedgerFacts("BALANCE_ADJUST_DECREASE_FAIL_ADJUST");
     }
 
     /**
@@ -852,6 +865,9 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_AUDIT_MISSING_REASON");
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_AUDIT_MISSING_EVIDENCE");
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_AUDIT_MISSING_APPROVAL");
     }
 
     private static FundsBalanceAdjustRequest balanceAdjustRequest(FundsAccountId accountId, String businessSn) {
