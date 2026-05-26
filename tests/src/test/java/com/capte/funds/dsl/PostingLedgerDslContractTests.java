@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Posting/Ledger DSL 契约测试。
@@ -104,6 +105,38 @@ class PostingLedgerDslContractTests {
     }
 
     /**
+     * 场景：PostingPlan 中出现跨币种账务分录。
+     * 预期：借贷两侧同金额但币种不同不能被判定为平衡；同侧跨币种累计必须显式拒绝。
+     * 红线：错币种账务计划不得进入可入账状态，也不能通过金额数值相等掩盖币种不一致。
+     */
+    @Test
+    void testPostingPlanShouldRejectCrossCurrencyEntries() {
+        LedgerPostingPlanSpec crossCurrencySides = postingPlan("PLAN-CROSS-CURRENCY-SIDES",
+                entry(EntrySide.DEBIT, 100L, CurrencyIsoCode.USD),
+                entry(EntrySide.CREDIT, 100L, CurrencyIsoCode.CNY));
+        LedgerPostingPlanSpec crossCurrencyDebitAggregation = postingPlan("PLAN-CROSS-CURRENCY-DEBIT",
+                entry("FA-DSL-DEBIT-USD",
+                        FundsSubjectType.FUNDING_ACCOUNT.name(),
+                        LedgerSubjectCode.AVAILABLE,
+                        LedgerSubjectCategory.ASSET,
+                        "LE-DSL-001",
+                        EntrySide.DEBIT,
+                        Money.immutable(60L, CurrencyIsoCode.USD)),
+                entry("FA-DSL-DEBIT-CNY",
+                        FundsSubjectType.FUNDING_ACCOUNT.name(),
+                        LedgerSubjectCode.AVAILABLE,
+                        LedgerSubjectCategory.ASSET,
+                        "LE-DSL-001",
+                        EntrySide.DEBIT,
+                        Money.immutable(40L, CurrencyIsoCode.CNY)),
+                entry(EntrySide.CREDIT, 100L, CurrencyIsoCode.USD));
+
+        assertThat(crossCurrencySides.isBalanced()).isFalse();
+        assertThatThrownBy(crossCurrencyDebitAggregation::isBalanced)
+                .hasMessageContaining("currency mismatch");
+    }
+
+    /**
      * 场景：整笔账本交易由多个 PostingPlan 组成。
      * 预期：LedgerTransaction 必须同时满足每个计划独立平衡和整笔交易借贷平衡。
      * 红线：多个不平衡计划互相抵消后，不得把整笔交易误判为平衡。
@@ -136,13 +169,17 @@ class PostingLedgerDslContractTests {
     }
 
     private LedgerEntrySpec entry(EntrySide side, long amount) {
+        return entry(side, amount, CurrencyIsoCode.USD);
+    }
+
+    private LedgerEntrySpec entry(EntrySide side, long amount, CurrencyIsoCode currency) {
         return entry("FA-DSL-" + side.name(),
                 FundsSubjectType.FUNDING_ACCOUNT.name(),
                 LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCategory.ASSET,
                 "LE-DSL-001",
                 side,
-                amount);
+                Money.immutable(amount, currency));
     }
 
     private LedgerEntrySpec entry(String subjectId,
@@ -152,13 +189,29 @@ class PostingLedgerDslContractTests {
                                   String ledgerTransactionSn,
                                   EntrySide side,
                                   long amount) {
-        return new TestLedgerEntrySpec(subjectId,
+        return entry(subjectId,
                 subjectType,
                 ledgerSubjectCode,
                 ledgerSubjectCategory,
                 ledgerTransactionSn,
                 side,
                 Money.immutable(amount, CurrencyIsoCode.USD));
+    }
+
+    private LedgerEntrySpec entry(String subjectId,
+                                  String subjectType,
+                                  LedgerSubjectCode ledgerSubjectCode,
+                                  LedgerSubjectCategory ledgerSubjectCategory,
+                                  String ledgerTransactionSn,
+                                  EntrySide side,
+                                  Money amount) {
+        return new TestLedgerEntrySpec(subjectId,
+                subjectType,
+                ledgerSubjectCode,
+                ledgerSubjectCategory,
+                ledgerTransactionSn,
+                side,
+                amount);
     }
 
     private LedgerTransactionSpec ledgerTransaction(List<LedgerPostingPlanSpec> postingPlans) {
