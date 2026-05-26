@@ -64,11 +64,26 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         FundsAccountId payee = fundingAccount("projection_payee");
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
+        var beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 100L, "PROJECTION_SUCCESS_TOPUP");
+        var afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         projectionPublisher.clear();
 
         String transactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
                 "PROJECTION_SUCCESS_PAY");
+        var afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         FundsTransactionDTO fundsTransaction = fundsTransaction(transactionSn);
         List<FundsTransactionDetailDTO> details = fundsTransactionDetails(transactionSn);
@@ -150,10 +165,23 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
     @Test
     void testAuthorizationHoldProjectionExplanationShouldNotDisplayAsFinalPaymentSuccess() {
         FundsAccountId user = fundingAccount("funding_user");
+        var beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "PROJECTION_AUTH_TOPUP");
+        var afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         projectionPublisher.clear();
 
         String authorizationSn = authorize(user, 60L, true, "PROJECTION_AUTH_AUTHORIZE");
+        var afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_AUTH_AUTHORIZE");
         assertThat(singleProjectionContext()).satisfies(context -> {
@@ -197,11 +225,24 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
     @Test
     void testAuthorizationDeclinedProjectionExplanationShouldExposeDeclineReason() {
         FundsAccountId user = fundingAccount("funding_user");
+        var beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "PROJECTION_AUTH_DECLINE_TOPUP");
+        var afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         projectionPublisher.clear();
 
         String authorizationSn = declineAuthorization(user, 60L, "RISK_DECLINED",
                 "PROJECTION_AUTH_DECLINE");
+        var afterDecline = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterDecline,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         assertThat(singleProjectionContext()).satisfies(context -> {
             assertThat(context.instruction().getBusinessSn()).isEqualTo("PROJECTION_AUTH_DECLINE");
@@ -260,10 +301,23 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
     @Test
     void testFreezeProjectionExplanationShouldNotDisplayAsFinalPaymentSuccess() {
         FundsAccountId user = fundingAccount("funding_user");
+        var beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 100L, "PROJECTION_FREEZE_TOPUP");
+        var afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         projectionPublisher.clear();
 
         String freezeSn = freeze(user, 40L, "PROJECTION_FREEZE_HOLD");
+        var afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_FREEZE_HOLD");
         assertThat(singleProjectionContext()).satisfies(context -> {
@@ -308,11 +362,18 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("projection_failure_payee");
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        var beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 100L, "PROJECTION_FAILURE_TOPUP");
+        var afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         projectionPublisher.clear();
         projectionPublisher.failOnce();
-
-        var beforePay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
 
         String transactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
                 "PROJECTION_FAILURE_PAY");
@@ -323,7 +384,7 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         List<LedgerPostingPlan> postingPlans = postingPlansOf(ledgerTransaction);
         List<LedgerEntry> entries = entriesOf(ledgerTransaction);
 
-        assertOnlyBalanceDeltas(beforePay, afterPay,
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
                 delta(payer, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY),
