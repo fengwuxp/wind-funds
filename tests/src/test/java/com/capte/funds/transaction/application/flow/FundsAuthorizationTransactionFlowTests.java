@@ -42,6 +42,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "AUTH_DECLINE_TOPUP");
         BalanceSnapshot beforeDecline = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeDeclineFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(beforeTopup, beforeDecline,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
@@ -56,6 +57,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeDeclineFacts);
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
         assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
