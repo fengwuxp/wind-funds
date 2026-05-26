@@ -68,6 +68,9 @@ public final class ImmutableReplayRequestSpec implements ReplayRequestSpec {
         if (!StringUtils.hasText(referenceSnapshotId)) {
             throw new IllegalArgumentException("referenceSnapshotId is required for route replay");
         }
+        if (replayType == null) {
+            throw new IllegalArgumentException("replayType is required for route replay");
+        }
         this.replayType = replayType;
         this.eventType = eventType;
         this.businessScene = businessScene;

@@ -92,6 +92,9 @@ class RouteDslContractTests {
         assertThatThrownBy(() -> replayRequest(null, RouteReplayType.REFUND))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("referenceSnapshotId is required for route replay");
+        assertThatThrownBy(() -> replayRequest("RS-PAY-001", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("replayType is required for route replay");
 
         ReplayRequestSpec replayRequest = replayRequest("RS-PAY-001", RouteReplayType.REFUND);
 
