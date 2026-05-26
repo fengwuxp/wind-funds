@@ -163,9 +163,22 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     void testFreezeSameBusinessSnWithDifferentAmountShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 100L, "BALANCE_FREEZE_IDEMPOTENT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String freezeSn = freeze(user, 30L, "BALANCE_FREEZE_IDEMPOTENT_FREEZE");
         BalanceSnapshot afterFirstFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFirstFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> freeze(user, 40L, "BALANCE_FREEZE_IDEMPOTENT_FREEZE"))
@@ -499,10 +512,30 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     void testUnfreezeSameBusinessSnWithDifferentAmountShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 100L, "BALANCE_UNFREEZE_IDEMPOTENT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String freezeSn = freeze(user, 70L, "BALANCE_UNFREEZE_IDEMPOTENT_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         unfreeze(user, 20L, freezeSn, "BALANCE_UNFREEZE_IDEMPOTENT_RELEASE");
         BalanceSnapshot afterFirstUnfreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterFirstUnfreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, 20L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -20L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstUnfreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> unfreeze(user, 30L, freezeSn,
