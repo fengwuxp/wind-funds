@@ -110,6 +110,11 @@ class FundsTransferPayWithdrawChainFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(5);
+        assertSingleFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_TRANSFER", 2, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_PAY", 2, 2);
+        assertFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_FREEZE", 0, 0, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_CONFIRM", 3, 4);
         assertThat(ledgerTransactions().stream()
                 .map(LedgerTransaction::getEventType)
                 .toList())
