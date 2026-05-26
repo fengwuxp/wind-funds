@@ -195,9 +195,22 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     void testWithdrawWithDifferentCurrencyShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 100L, "WITHDRAW_CURRENCY_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String freezeSn = freeze(user, 60L, "WITHDRAW_CURRENCY_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
@@ -250,9 +263,22 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     void testWithdrawWithUnknownReferenceFreezeSnShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 100L, "WITHDRAW_UNKNOWN_REF_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         freeze(user, 60L, "WITHDRAW_UNKNOWN_REF_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(user, 60L, "FREEZE_ORDER_NOT_EXISTS", "WITHDRAW_UNKNOWN_REF_CONFIRM"))
@@ -300,12 +326,51 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         ensureLedger(anotherUser, LedgerSubjectCode.AVAILABLE);
         ensureLedger(anotherUser, LedgerSubjectCode.FROZEN);
 
+        BalanceSnapshot beforeUserTopup = snapshot(balances(user, anotherUser, cashMappingAccount(),
+                prepaymentAccount()));
         topup(user, 100L, "WITHDRAW_ACCOUNT_REF_TOPUP");
+        BalanceSnapshot afterUserTopup = snapshot(balances(user, anotherUser, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeUserTopup, afterUserTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String freezeSn = freeze(user, 60L, "WITHDRAW_ACCOUNT_REF_FREEZE");
+        BalanceSnapshot afterUserFreeze = snapshot(balances(user, anotherUser, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterUserTopup, afterUserFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         topup(anotherUser, 100L, "WITHDRAW_ACCOUNT_REF_ANOTHER_TOPUP");
+        BalanceSnapshot afterAnotherTopup = snapshot(balances(user, anotherUser, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterUserFreeze, afterAnotherTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         freeze(anotherUser, 60L, "WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, anotherUser, cashMappingAccount(),
                 prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterAnotherTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(anotherUser, 60L, freezeSn, "WITHDRAW_ACCOUNT_REF_CONFIRM"))
@@ -364,10 +429,27 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId internalPayee = fundingAccount("withdraw_internal_payee");
         ensureLedger(internalPayee, LedgerSubjectCode.AVAILABLE);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, internalPayee, cashMappingAccount(),
+                prepaymentAccount()));
         topup(user, 100L, "WITHDRAW_INTERNAL_PAYEE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, internalPayee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(internalPayee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String freezeSn = freeze(user, 60L, "WITHDRAW_INTERNAL_PAYEE_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, internalPayee, cashMappingAccount(),
                 prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(internalPayee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
@@ -422,8 +504,23 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     void testWithdrawSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 100L, "WITHDRAW_IDEMPOTENT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String freezeSn = freeze(user, 60L, "WITHDRAW_IDEMPOTENT_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String firstWithdrawSn = directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
                 .setAccountId(user)
                 .setPayeeId(FundsAccountId.immutable("external_bank_001",
@@ -434,6 +531,11 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM")
                 .setDescription("idempotent withdraw"), WindOperator.system());
         BalanceSnapshot afterFirstWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterFirstWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstWithdrawFacts = ledgerFactSnapshot();
 
         String retryWithdrawSn = directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
@@ -447,6 +549,12 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent withdraw"), WindOperator.system());
 
         assertThat(retryWithdrawSn).isEqualTo(firstWithdrawSn);
+        BalanceSnapshot afterRetryWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstWithdraw, afterRetryWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstWithdrawFacts);
         assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
                 .setAccountId(user)
@@ -460,7 +568,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
-        assertOnlyBalanceDeltas(afterFirstWithdraw, afterConflict,
+        assertOnlyBalanceDeltas(afterRetryWithdraw, afterConflict,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
@@ -498,11 +606,38 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     void testWithdrawSameFreezeSourceTwiceShouldRejectEvenWhenAnotherFrozenBalanceExists() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 160L, "WITHDRAW_DUP_SOURCE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 160L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -160L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String firstFreezeSn = freeze(user, 60L, "WITHDRAW_DUP_SOURCE_FREEZE_1");
+        BalanceSnapshot afterFirstFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFirstFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         freeze(user, 70L, "WITHDRAW_DUP_SOURCE_FREEZE_2");
+        BalanceSnapshot afterSecondFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstFreeze, afterSecondFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         withdraw(user, 60L, firstFreezeSn, "WITHDRAW_DUP_SOURCE_CONFIRM_1");
         BalanceSnapshot afterFirstWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterSecondFreeze, afterFirstWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstWithdrawFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(user, 60L, firstFreezeSn, "WITHDRAW_DUP_SOURCE_CONFIRM_2"))
@@ -553,10 +688,30 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     void testWithdrawSameFreezeSourcePartiallyThenExceedRemainingShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 120L, "WITHDRAW_PARTIAL_SOURCE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 120L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -120L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String freezeSn = freeze(user, 90L, "WITHDRAW_PARTIAL_SOURCE_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -90L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 90L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         withdraw(user, 40L, freezeSn, "WITHDRAW_PARTIAL_SOURCE_CONFIRM_1");
         BalanceSnapshot afterFirstWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterFirstWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstWithdrawFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(user, 60L, freezeSn, "WITHDRAW_PARTIAL_SOURCE_CONFIRM_2"))
@@ -602,10 +757,30 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     void testUnfreezeAfterPartialWithdrawExceedingFreezeSourceRemainingShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 120L, "WITHDRAW_PARTIAL_CLOSE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 120L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -120L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String freezeSn = freeze(user, 90L, "WITHDRAW_PARTIAL_CLOSE_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -90L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 90L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         withdraw(user, 40L, freezeSn, "WITHDRAW_PARTIAL_CLOSE_CONFIRM");
         BalanceSnapshot afterWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 40L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterWithdrawFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> unfreeze(user, 60L, freezeSn, "WITHDRAW_PARTIAL_CLOSE_RELEASE"))
@@ -651,10 +826,30 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     void testUnfreezeAfterSuccessfulWithdrawShouldFailAndKeepBalanceUnchanged() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         topup(user, 100L, "WITHDRAW_UNFREEZE_AFTER_SUCCESS_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String freezeSn = freeze(user, 60L, "WITHDRAW_UNFREEZE_AFTER_SUCCESS_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         withdraw(user, 60L, freezeSn, "WITHDRAW_UNFREEZE_AFTER_SUCCESS_CONFIRM");
         BalanceSnapshot afterWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, -60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 60L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterWithdrawFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> unfreeze(user, 60L, freezeSn,
