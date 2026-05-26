@@ -5,6 +5,7 @@ import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
@@ -131,6 +132,7 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
         String freezeSn = freeze(user, 90L, "WITHDRAW_AFTER_RELEASE_FREEZE");
         unfreeze(user, 40L, freezeSn, "WITHDRAW_AFTER_RELEASE_UNFREEZE");
         BalanceSnapshot afterRelease = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterReleaseFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(user, 60L, freezeSn, "WITHDRAW_AFTER_RELEASE_CONFIRM"))
                 .hasMessageContaining("冻结单剩余可提现金额不足");
@@ -166,6 +168,7 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 });
         assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_RELEASE_UNFREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertLedgerTransactionFactsUnchanged(afterReleaseFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_AFTER_RELEASE_CONFIRM");
     }
 
@@ -184,6 +187,7 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
         String freezeSn = freeze(user, 60L, "WITHDRAW_AFTER_FULL_RELEASE_FREEZE");
         unfreeze(user, 60L, freezeSn, "WITHDRAW_AFTER_FULL_RELEASE_UNFREEZE");
         BalanceSnapshot afterRelease = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterReleaseFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(user, 60L, freezeSn, "WITHDRAW_AFTER_FULL_RELEASE_CONFIRM"))
                 .hasMessageContaining("冻结单剩余可提现金额不足");
@@ -219,6 +223,7 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 });
         assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_UNFREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertLedgerTransactionFactsUnchanged(afterReleaseFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_CONFIRM");
     }
 
@@ -267,6 +272,7 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 80L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 40L, CURRENCY);
+        LedgerFactSnapshot afterSecondReleaseFacts = ledgerFactSnapshot();
 
         assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.PARTIALLY_RELEASED);
@@ -290,6 +296,7 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
         assertFundsAndLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_1", 0, 0, 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_2", 0, 0, 1, 2);
         assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getReleasedAmount()).isEqualTo(50L);
+        assertLedgerTransactionFactsUnchanged(afterSecondReleaseFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_EXCEED");
     }
 }
