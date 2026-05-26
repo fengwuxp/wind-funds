@@ -453,6 +453,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.FREEZE.name(),
                         FundsTransactionEventType.WITHDRAW.name());
         assertThat(fundsTransactionDetails(firstWithdrawSn)).hasSize(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM", 3, 4);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_IDEMPOTENT_FREEZE").getReleasedAmount()).isZero();
     }
 
