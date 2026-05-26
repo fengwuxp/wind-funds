@@ -38,15 +38,22 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     void testAuthorizationDeclinedShouldRecordRejectedFactWithoutLedgerPosting() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "AUTH_DECLINE_TOPUP");
-        BalanceSnapshot beforeDecline = snapshot(balances(user, settlementAccount()));
+        BalanceSnapshot beforeDecline = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, beforeDecline,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String authorizationSn = authorize(user, 60L, false, "AUTH_DECLINE_AUTHORIZE");
 
-        BalanceSnapshot afterDecline = snapshot(balances(user, settlementAccount()));
+        BalanceSnapshot afterDecline = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(beforeDecline, afterDecline,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
