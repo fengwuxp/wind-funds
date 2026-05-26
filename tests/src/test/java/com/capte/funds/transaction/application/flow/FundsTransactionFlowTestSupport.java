@@ -711,13 +711,55 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         assertThat(transaction.getFundsTransactionSn()).isNotBlank();
         assertThat(transaction.getBalanced()).isTrue();
         assertThat(transaction.getDebitAmount()).isEqualTo(transaction.getCreditAmount());
-        assertThat(postingPlansOf(transaction))
+        List<LedgerPostingPlan> postingPlans = postingPlansOf(transaction);
+        List<LedgerEntry> entries = entriesOf(transaction);
+        assertThat(postingPlans)
                 .isNotEmpty()
-                .allSatisfy(plan -> {
-                    assertThat(plan.getBalanced()).isTrue();
-                    assertThat(plan.getDebitAmount()).isEqualTo(plan.getCreditAmount());
-                });
-        assertThat(entriesOf(transaction)).isNotEmpty();
+                .allSatisfy(plan -> assertValidPostingPlan(transaction, plan, entries));
+        assertThat(entries)
+                .isNotEmpty()
+                .allSatisfy(entry -> assertValidEntry(transaction, entry));
+        assertThat(sumEntries(entries, EntrySide.DEBIT)).as("transaction debit entries")
+                .isEqualTo(transaction.getDebitAmount());
+        assertThat(sumEntries(entries, EntrySide.CREDIT)).as("transaction credit entries")
+                .isEqualTo(transaction.getCreditAmount());
+        assertThat(entries)
+                .extracting(LedgerEntry::getPostingPlanSn)
+                .containsOnlyElementsOf(postingPlans.stream().map(LedgerPostingPlan::getSn).toList());
+    }
+
+    private void assertValidPostingPlan(LedgerTransaction transaction,
+                                        LedgerPostingPlan postingPlan,
+                                        List<LedgerEntry> entries) {
+        List<LedgerEntry> planEntries = entries.stream()
+                .filter(entry -> postingPlan.getSn().equals(entry.getPostingPlanSn()))
+                .toList();
+        assertThat(postingPlan.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+        assertThat(postingPlan.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
+        assertThat(postingPlan.getCurrency()).isEqualTo(transaction.getCurrency());
+        assertThat(postingPlan.getBalanced()).isTrue();
+        assertThat(postingPlan.getDebitAmount()).isEqualTo(postingPlan.getCreditAmount());
+        assertThat(planEntries).as("posting entries for plan %s", postingPlan.getSn()).isNotEmpty();
+        assertThat(sumEntries(planEntries, EntrySide.DEBIT)).as("posting plan debit entries")
+                .isEqualTo(postingPlan.getDebitAmount());
+        assertThat(sumEntries(planEntries, EntrySide.CREDIT)).as("posting plan credit entries")
+                .isEqualTo(postingPlan.getCreditAmount());
+    }
+
+    private void assertValidEntry(LedgerTransaction transaction, LedgerEntry entry) {
+        assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+        assertThat(entry.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
+        assertThat(entry.getBusinessSn()).isEqualTo(transaction.getBusinessSn());
+        assertThat(entry.getCurrency()).isEqualTo(transaction.getCurrency());
+        assertThat(entry.getAmount()).isNotNull();
+        assertThat(entry.getEntrySide()).isIn(EntrySide.DEBIT, EntrySide.CREDIT);
+    }
+
+    private static long sumEntries(List<LedgerEntry> entries, EntrySide side) {
+        return entries.stream()
+                .filter(entry -> side == entry.getEntrySide())
+                .mapToLong(LedgerEntry::getAmount)
+                .sum();
     }
 
     private static Money amount(long value) {
