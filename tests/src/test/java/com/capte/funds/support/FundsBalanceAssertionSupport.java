@@ -12,6 +12,7 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -86,10 +87,10 @@ public final class FundsBalanceAssertionSupport {
 
     public static LedgerFactSnapshot ledgerFactSnapshot(JdbcTemplate jdbcTemplate) {
         return new LedgerFactSnapshot(
-                countRows(jdbcTemplate, LEDGER_TABLE),
-                countRows(jdbcTemplate, LEDGER_TRANSACTION_TABLE),
-                countRows(jdbcTemplate, LEDGER_POSTING_PLAN_TABLE),
-                countRows(jdbcTemplate, LEDGER_ENTRY_TABLE));
+                queryRows(jdbcTemplate, LEDGER_TABLE),
+                queryRows(jdbcTemplate, LEDGER_TRANSACTION_TABLE),
+                queryRows(jdbcTemplate, LEDGER_POSTING_PLAN_TABLE),
+                queryRows(jdbcTemplate, LEDGER_ENTRY_TABLE));
     }
 
     public static void assertLedgerFactsUnchanged(JdbcTemplate jdbcTemplate, LedgerFactSnapshot expected) {
@@ -104,9 +105,14 @@ public final class FundsBalanceAssertionSupport {
         assertThat(actual.entries()).as("ledger entries").isEqualTo(expected.entries());
     }
 
-    private static long countRows(JdbcTemplate jdbcTemplate, String tableName) {
-        Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
-        return result;
+    private static List<Map<String, Object>> queryRows(JdbcTemplate jdbcTemplate, String tableName) {
+        return immutableRows(jdbcTemplate.queryForList("SELECT * FROM " + tableName + " ORDER BY id ASC"));
+    }
+
+    private static List<Map<String, Object>> immutableRows(List<Map<String, Object>> rows) {
+        return rows.stream()
+                .map(row -> Collections.unmodifiableMap(new LinkedHashMap<>(row)))
+                .toList();
     }
 
     public static void assertOnlyBalanceDeltas(BalanceSnapshot before,
@@ -208,6 +214,16 @@ public final class FundsBalanceAssertionSupport {
                                        String periodId) {
     }
 
-    public record LedgerFactSnapshot(long ledgers, long transactions, long postingPlans, long entries) {
+    public record LedgerFactSnapshot(List<Map<String, Object>> ledgers,
+                                     List<Map<String, Object>> transactions,
+                                     List<Map<String, Object>> postingPlans,
+                                     List<Map<String, Object>> entries) {
+
+        public LedgerFactSnapshot {
+            ledgers = immutableRows(ledgers);
+            transactions = immutableRows(transactions);
+            postingPlans = immutableRows(postingPlans);
+            entries = immutableRows(entries);
+        }
     }
 }
