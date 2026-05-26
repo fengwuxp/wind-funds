@@ -578,6 +578,18 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         transactions.forEach(this::assertValidPostedTransaction);
     }
 
+    protected void assertNoLedgerFactsForFundsTransaction(String fundsTransactionSn) {
+        assertThat(ledgerTransactionsByFundsTransactionSn(fundsTransactionSn))
+                .as("ledger transactions for funds transaction %s", fundsTransactionSn)
+                .isEmpty();
+        assertThat(postingPlansByFundsTransactionSn(fundsTransactionSn))
+                .as("posting plans for funds transaction %s", fundsTransactionSn)
+                .isEmpty();
+        assertThat(entriesByFundsTransactionSn(fundsTransactionSn))
+                .as("ledger entries for funds transaction %s", fundsTransactionSn)
+                .isEmpty();
+    }
+
     protected List<LedgerTransaction> ledgerTransactions() {
         LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
         QueryWrapper wrapper = QueryWrapper.create().from(ref)
@@ -605,6 +617,15 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return result;
     }
 
+    protected List<LedgerTransaction> ledgerTransactionsByFundsTransactionSn(String fundsTransactionSn) {
+        LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.fundsTransactionSn.eq(fundsTransactionSn))
+                .orderBy(ref.id.asc());
+        return ledgerTransactionMapper.selectListByQuery(wrapper);
+    }
+
     protected List<LedgerPostingPlan> postingPlansOf(LedgerTransaction transaction) {
         LedgerPostingPlanNameRefs ref = LedgerPostingPlanNameRefs.ledgerPostingPlan;
         QueryWrapper wrapper = QueryWrapper.create().from(ref)
@@ -614,11 +635,29 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return ledgerPostingPlanMapper.selectListByQuery(wrapper);
     }
 
+    protected List<LedgerPostingPlan> postingPlansByFundsTransactionSn(String fundsTransactionSn) {
+        LedgerPostingPlanNameRefs ref = LedgerPostingPlanNameRefs.ledgerPostingPlan;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.fundsTransactionSn.eq(fundsTransactionSn))
+                .orderBy(ref.id.asc());
+        return ledgerPostingPlanMapper.selectListByQuery(wrapper);
+    }
+
     protected List<LedgerEntry> entriesOf(LedgerTransaction transaction) {
         LedgerEntryNameRefs ref = LedgerEntryNameRefs.ledgerEntry;
         QueryWrapper wrapper = QueryWrapper.create().from(ref)
                 .where(ref.tenantId.eq(TENANT_ID))
                 .and(ref.ledgerTransactionSn.eq(transaction.getSn()))
+                .orderBy(ref.id.asc());
+        return ledgerEntryMapper.selectListByQuery(wrapper);
+    }
+
+    protected List<LedgerEntry> entriesByFundsTransactionSn(String fundsTransactionSn) {
+        LedgerEntryNameRefs ref = LedgerEntryNameRefs.ledgerEntry;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.fundsTransactionSn.eq(fundsTransactionSn))
                 .orderBy(ref.id.asc());
         return ledgerEntryMapper.selectListByQuery(wrapper);
     }

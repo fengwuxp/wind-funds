@@ -71,6 +71,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertNoLedgerFactsForFundsTransaction(authorizationSn);
     }
 
     /**
