@@ -72,6 +72,10 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_FREEZE", 0, 0, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_RELEASE", 0, 0, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_CONFIRM", 3, 4);
         assertThat(ledgerTransactions().stream()
                 .map(LedgerTransaction::getEventType)
                 .toList())
