@@ -130,6 +130,29 @@ class FundsAmountBoundaryContractTests {
     }
 
     /**
+     * 场景：真实资金账户 route leg 与 funding allocation 金额数值相同但币种不同。
+     * 预期：ResolvedRoute 和 RouteSnapshot 构造期必须拒绝错币种闭合。
+     * 红线：不能只按最小单位数值闭合资金来源，跨币种 route 不得进入后续 posting。
+     */
+    @Test
+    void testRouteShouldRejectFundingAccountAllocationCurrencyMismatch() {
+        ImmutableRouteLegSpec cnyLeg = routeLeg("LEG-AMOUNT-CNY", 100L, CurrencyIsoCode.CNY);
+        RoutingDecisionSpec routingDecision = routingDecision(List.of(fundingAllocation("ALLOC-FA-USD",
+                subjectRef("FA-FUNDING-USD"),
+                100L,
+                CurrencyIsoCode.USD,
+                10,
+                "REAL_FUNDING_ACCOUNT")));
+
+        assertThatThrownBy(() -> resolvedRoute(cnyLeg, routingDecision))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+        assertThatThrownBy(() -> routeSnapshot(cnyLeg, routingDecision))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+    }
+
+    /**
      * 场景：共享卡 + 预算组 + 资金账户模型同时带预算控制和真实资金来源。
      * 预期：预算组 allocation 不表达真实资金沉淀，不参与真实资金合计闭合；资金账户必须闭合。
      * 红线：不能把预算组金额当作现金来源来掩盖真实资金账户不闭合。
@@ -284,6 +307,10 @@ class FundsAmountBoundaryContractTests {
         return routeLeg(legId, amount, null, null);
     }
 
+    private ImmutableRouteLegSpec routeLeg(String legId, long amount, CurrencyIsoCode currency) {
+        return routeLeg(legId, amount, currency, null, null);
+    }
+
     private ImmutableRouteLegSpec routeLeg(long amount,
                                            AccountBalancePeriodType periodType,
                                            String periodId) {
@@ -294,13 +321,21 @@ class FundsAmountBoundaryContractTests {
                                            long amount,
                                            AccountBalancePeriodType periodType,
                                            String periodId) {
+        return routeLeg(legId, amount, CURRENCY, periodType, periodId);
+    }
+
+    private ImmutableRouteLegSpec routeLeg(String legId,
+                                           long amount,
+                                           CurrencyIsoCode currency,
+                                           AccountBalancePeriodType periodType,
+                                           String periodId) {
         return ImmutableRouteLegSpec.builder()
                 .legId(legId)
                 .sequence(1)
                 .legType(RouteLegType.CONSUME)
                 .sourceNode(routeNode("FA-SOURCE-001", RouteNodeRole.SOURCE))
                 .targetNode(routeNode("FA-TARGET-001", RouteNodeRole.TARGET))
-                .amount(Money.immutable(amount, CURRENCY))
+                .amount(Money.immutable(amount, currency))
                 .balanceEffectType(LedgerBalanceEffectType.CONSUME)
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .periodType(periodType)
@@ -319,11 +354,20 @@ class FundsAmountBoundaryContractTests {
                                                                      long amount,
                                                                      Integer priority,
                                                                      String reason) {
+        return fundingAllocation(allocationId, subjectRef, amount, CURRENCY, priority, reason);
+    }
+
+    private ImmutableFundingAllocationDecisionSpec fundingAllocation(String allocationId,
+                                                                     SubjectRef subjectRef,
+                                                                     long amount,
+                                                                     CurrencyIsoCode currency,
+                                                                     Integer priority,
+                                                                     String reason) {
         return ImmutableFundingAllocationDecisionSpec.builder()
                 .allocationId(allocationId)
                 .subjectRef(subjectRef)
                 .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
-                .amount(Money.immutable(amount, CURRENCY))
+                .amount(Money.immutable(amount, currency))
                 .priority(priority)
                 .reason(reason)
                 .build();
