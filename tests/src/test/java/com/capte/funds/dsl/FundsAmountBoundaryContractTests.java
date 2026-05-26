@@ -1,5 +1,6 @@
 package com.capte.funds.dsl;
 
+import com.alibaba.fastjson2.JSON;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
@@ -25,7 +26,6 @@ import com.wind.integration.funds.route.spec.RoutingDecisionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.integration.funds.util.FundsDslMoneyParser;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -213,51 +213,34 @@ class FundsAmountBoundaryContractTests {
     }
 
     /**
-     * 场景：DSL JSON 契约把金额表达为币种和最小货币单位。
-     * 预期：只接受整数 minorValue；小数主单位、非正数和超 long 上限必须失败。
-     * 红线：金额解析不能静默截断、四舍五入或让超币种精度输入绕过 DSL 边界。
+     * 场景：JSON 框架读取资金金额对象。
+     * 预期：Fastjson 复用 Money 自身的 Jackson 构造注解完成反序列化。
+     * 红线：资金 DSL 不重复实现 Money 的 JSON 字段解析。
      */
     @Test
-    void testDslJsonMoneyShouldUsePositiveIntegerMinorValue() {
-        Money money = FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", 1));
+    void testMoneyJsonShouldUseMoneyAnnotatedConstructor() {
+        Money money = JSON.parseObject("""
+                { "amount": 1, "currency": "USD" }
+                """, Money.class);
 
         assertThat(money).isEqualTo(Money.immutable(1L, CURRENCY));
-        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "value", "1.001")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("money.minorValue is required");
-        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "amount", "1.001")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("money.minorValue is required");
-        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", 0)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("money.minorValue must be positive");
-        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", new BigDecimal("1.001"))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("money.minorValue must be integer");
-        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", "-9223372036854775809")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("money.minorValue must be positive");
-        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", "9223372036854775808")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("money.minorValue exceeds system limit");
     }
 
     /**
-     * 场景：权益快照等 DSL 子结构需要表达非负金额。
-     * 预期：显式非负入口允许 0，但仍拒绝负数和非整数。
-     * 红线：不能放宽主资金金额的正数入口。
+     * 场景：Money 只表达金额事实，不替资金 DSL 决定业务正负边界。
+     * 预期：Money 可承载 0，资金指令主金额仍由 DSL builder 拒绝非正数。
+     * 红线：删除手写 JSON parser 后不能放宽主资金金额的正数入口。
      */
     @Test
-    void testDslJsonMoneyShouldSupportExplicitNonNegativeMinorValue() {
-        Money money = FundsDslMoneyParser.parseNonNegative(Map.of("currency", "USD", "minorValue", 0));
+    void testMoneyJsonShouldLeavePositiveAmountRuleToDslBuilder() {
+        Money money = JSON.parseObject("""
+                { "amount": 0, "currency": "USD" }
+                """, Money.class);
 
         assertThat(money).isEqualTo(Money.immutable(0L, CURRENCY));
-        assertThatThrownBy(() -> FundsDslMoneyParser.parseNonNegative(Map.of("currency", "USD", "minorValue", -1)))
+        assertThatThrownBy(() -> fundsInstruction(0L, money, BigDecimal.ONE))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("money.minorValue must not be negative");
-        assertThatThrownBy(() -> FundsDslMoneyParser.parse(Map.of("currency", "USD", "minorValue", 0)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("money.minorValue must be positive");
+                .hasMessageContaining("fundsInstruction.amount must be positive");
     }
 
     private ImmutableFundsInstructionSpec fundsInstruction(long amount, BigDecimal exchangeRate) {

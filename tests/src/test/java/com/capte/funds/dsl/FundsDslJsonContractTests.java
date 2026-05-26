@@ -61,7 +61,7 @@ class FundsDslJsonContractTests {
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("instruction.amount")
-                .hasMessageContaining("money.minorValue is required");
+                .hasMessageContaining("money.amount is required");
     }
 
     /**
@@ -77,7 +77,7 @@ class FundsDslJsonContractTests {
                         "instructionType", "AUTHORIZATION_TRANSACTION",
                         "eventType", "AUTHORIZE",
                         "transactionType", "AUTHORIZE",
-                        "amount", Map.of("currency", "USD", "minorValue", 100)));
+                        "amount", Map.of("currency", "USD", "amount", 100)));
 
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -99,19 +99,19 @@ class FundsDslJsonContractTests {
                     "instructionType": "DIRECT_TRANSACTION",
                     "eventType": "PAY",
                     "transactionType": "PAY",
-                    "amount": { "currency": "USD", "minorValue": 8000 },
-                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "amount": { "currency": "USD", "amount": 8000 },
+                    "originalAmount": { "currency": "USD", "amount": 8000 },
                     "benefitSnapshot": {
                       "benefitSnapshotId": "bs_invalid_context_001",
                       "benefitGroupSn": "bg_invalid_context_001",
-                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-                      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+                      "orderAmount": { "currency": "USD", "amount": 10000 },
+                      "userPayAmount": { "currency": "USD", "amount": 8000 },
                       "components": [{
                         "componentSn": "bc_invalid_context_001",
                         "benefitType": "MERCHANT_COUPON",
                         "componentType": "MERCHANT_DISCOUNT",
                         "closureRole": "ORDER_DISCOUNT_CLOSURE",
-                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "amount": { "currency": "USD", "amount": 2000 },
                         "ledgerEffect": "NO_LEDGER",
                         "fundingNature": "MERCHANT_BORNE",
                         "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
@@ -144,19 +144,19 @@ class FundsDslJsonContractTests {
                     "instructionType": "DIRECT_TRANSACTION",
                     "eventType": "PAY",
                     "transactionType": "PAY",
-                    "amount": { "currency": "USD", "minorValue": 8000 },
-                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "amount": { "currency": "USD", "amount": 8000 },
+                    "originalAmount": { "currency": "USD", "amount": 8000 },
                     "benefitSnapshot": {
                       "benefitSnapshotId": "bs_invalid_amount_001",
                       "benefitGroupSn": "bg_invalid_amount_001",
-                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-                      "userPayAmount": { "currency": "USD", "minorValue": 9000 },
+                      "orderAmount": { "currency": "USD", "amount": 10000 },
+                      "userPayAmount": { "currency": "USD", "amount": 9000 },
                       "components": [{
                         "componentSn": "bc_invalid_amount_001",
                         "benefitType": "MERCHANT_COUPON",
                         "componentType": "MERCHANT_DISCOUNT",
                         "closureRole": "ORDER_DISCOUNT_CLOSURE",
-                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "amount": { "currency": "USD", "amount": 2000 },
                         "ledgerEffect": "NO_LEDGER",
                         "fundingNature": "MERCHANT_BORNE",
                         "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
@@ -188,18 +188,18 @@ class FundsDslJsonContractTests {
                     "instructionType": "DIRECT_TRANSACTION",
                     "eventType": "PAY",
                     "transactionType": "PAY",
-                    "amount": { "currency": "USD", "minorValue": 8000 },
-                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "amount": { "currency": "USD", "amount": 8000 },
+                    "originalAmount": { "currency": "USD", "amount": 8000 },
                     "benefitSnapshot": {
                       "benefitSnapshotId": "bs_missing_closure_role_001",
                       "benefitGroupSn": "bg_missing_closure_role_001",
-                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-                      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+                      "orderAmount": { "currency": "USD", "amount": 10000 },
+                      "userPayAmount": { "currency": "USD", "amount": 8000 },
                       "components": [{
                         "componentSn": "bc_missing_closure_role_001",
                         "benefitType": "MERCHANT_COUPON",
                         "componentType": "MERCHANT_DISCOUNT",
-                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "amount": { "currency": "USD", "amount": 2000 },
                         "ledgerEffect": "NO_LEDGER",
                         "fundingNature": "MERCHANT_BORNE",
                         "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
@@ -231,19 +231,19 @@ class FundsDslJsonContractTests {
                     "instructionType": "DIRECT_TRANSACTION",
                     "eventType": "PAY",
                     "transactionType": "PAY",
-                    "amount": { "currency": "USD", "minorValue": 8000 },
-                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "amount": { "currency": "USD", "amount": 8000 },
+                    "originalAmount": { "currency": "USD", "amount": 8000 },
                     "benefitSnapshot": {
                       "benefitSnapshotId": "bs_invalid_closure_role_001",
                       "benefitGroupSn": "bg_invalid_closure_role_001",
-                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-                      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+                      "orderAmount": { "currency": "USD", "amount": 10000 },
+                      "userPayAmount": { "currency": "USD", "amount": 8000 },
                       "components": [{
                         "componentSn": "bc_invalid_closure_role_001",
                         "benefitType": "MERCHANT_COUPON",
                         "componentType": "MERCHANT_DISCOUNT",
                         "closureRole": "MERCHANT_RECEIVABLE_EFFECT",
-                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "amount": { "currency": "USD", "amount": 2000 },
                         "ledgerEffect": "NO_LEDGER",
                         "fundingNature": "MERCHANT_BORNE",
                         "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
@@ -275,19 +275,19 @@ class FundsDslJsonContractTests {
                     "instructionType": "DIRECT_TRANSACTION",
                     "eventType": "PAY",
                     "transactionType": "PAY",
-                    "amount": { "currency": "USD", "minorValue": 8000 },
-                    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+                    "amount": { "currency": "USD", "amount": 8000 },
+                    "originalAmount": { "currency": "USD", "amount": 8000 },
                     "benefitSnapshot": {
                       "benefitSnapshotId": "bs_invalid_recalc_001",
                       "benefitGroupSn": "bg_invalid_recalc_001",
-                      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-                      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
+                      "orderAmount": { "currency": "USD", "amount": 10000 },
+                      "userPayAmount": { "currency": "USD", "amount": 8000 },
                       "components": [{
                         "componentSn": "bc_invalid_recalc_001",
                         "benefitType": "MERCHANT_COUPON",
                         "componentType": "MERCHANT_DISCOUNT",
                         "closureRole": "ORDER_DISCOUNT_CLOSURE",
-                        "amount": { "currency": "USD", "minorValue": 2000 },
+                        "amount": { "currency": "USD", "amount": 2000 },
                         "ledgerEffect": "NO_LEDGER",
                         "fundingNature": "MERCHANT_BORNE",
                         "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },

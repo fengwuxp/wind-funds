@@ -12,8 +12,8 @@
     "transactionType": "PAY",
     "businessScene": "MERCHANT_ORDER_PAY",
     "businessSn": "PAY_BEN_MERCHANT_202605210001",
-    "amount": { "currency": "USD", "minorValue": 8000 },
-    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+    "amount": { "currency": "USD", "amount": 8000 },
+    "originalAmount": { "currency": "USD", "amount": 8000 },
     "exchangeRate": "1",
     "benefitSnapshot": {
       "benefitSnapshotId": "bs_merchant_202605210001",
@@ -21,9 +21,9 @@
       "benefitGroupSn": "bg_order_202605210001",
       "orderSn": "order_10001",
       "pricingSnapshotSn": "price_10001_v3",
-      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "minorValue": 8000 },
+      "orderAmount": { "currency": "USD", "amount": 10000 },
+      "userPayAmount": { "currency": "USD", "amount": 8000 },
+      "merchantReceivableAmount": { "currency": "USD", "amount": 8000 },
       "components": [
         {
           "componentSn": "bc_merchant_discount_001",
@@ -31,7 +31,7 @@
           "benefitType": "MERCHANT_COUPON",
           "componentType": "MERCHANT_DISCOUNT",
           "closureRole": "ORDER_DISCOUNT_CLOSURE",
-          "amount": { "currency": "USD", "minorValue": 2000 },
+          "amount": { "currency": "USD", "amount": 2000 },
           "ledgerEffect": "NO_LEDGER",
           "fundingNature": "MERCHANT_BORNE",
           "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_20001" },

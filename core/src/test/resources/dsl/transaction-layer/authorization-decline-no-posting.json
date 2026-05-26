@@ -12,11 +12,11 @@
     "businessSn": "AUTH_DECLINE_202605140001",
     "amount": {
       "currency": "USD",
-      "minorValue": 12000
+      "amount": 12000
     },
     "originalAmount": {
       "currency": "USD",
-      "minorValue": 12000
+      "amount": 12000
     },
     "exchangeRate": "1",
     "eventTime": "2026-05-14T10:04:00",

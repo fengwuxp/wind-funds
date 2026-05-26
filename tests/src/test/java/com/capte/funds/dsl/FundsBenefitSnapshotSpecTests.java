@@ -301,9 +301,9 @@ class FundsBenefitSnapshotSpecTests {
     }
 
     /**
-     * 场景：外部 JSON 解析器先把权益快照解析为 Map，再交给资金 DSL 显式装配。
+     * 场景：外部 JSON 解析器把原始权益快照对象结构交给资金 DSL 显式装配。
      * 预期：装配结果保持不可变模型、嵌套引用和退款策略语义，且稳定摘要可用。
-     * 红线：不能为了 Fastjson/Jackson 反序列化给不可变资金模型开放空构造或字段填充入口。
+     * 红线：测试不能用 fixture 替生产代码隐式转换 Money；原始 JSON money object 必须穿过生产入口。
      */
     @Test
     void testBenefitSnapshotJsonSupportShouldBuildImmutableSnapshotThroughBuilder() {
@@ -314,16 +314,16 @@ class FundsBenefitSnapshotSpecTests {
                   "benefitGroupSn": "BG-JSON-001",
                   "orderSn": "ORDER-JSON-001",
                   "pricingSnapshotSn": "PRICE-JSON-001",
-                  "orderAmount": { "currency": "USD", "minorValue": 10000 },
-                  "userPayAmount": { "currency": "USD", "minorValue": 8000 },
-                  "merchantReceivableAmount": { "currency": "USD", "minorValue": 8000 },
+                  "orderAmount": { "currency": "USD", "amount": 10000 },
+                  "userPayAmount": { "currency": "USD", "amount": 8000 },
+                  "merchantReceivableAmount": { "currency": "USD", "amount": 8000 },
                   "components": [{
                     "componentSn": "BC-JSON-001",
                     "sequence": 1,
                     "benefitType": "MERCHANT_COUPON",
                     "componentType": "MERCHANT_DISCOUNT",
                     "closureRole": "ORDER_DISCOUNT_CLOSURE",
-                    "amount": { "currency": "USD", "minorValue": 2000 },
+                    "amount": { "currency": "USD", "amount": 2000 },
                     "ledgerEffect": "NO_LEDGER",
                     "fundingNature": "MERCHANT_BORNE",
                     "bearerSubjectRef": {
@@ -390,7 +390,7 @@ class FundsBenefitSnapshotSpecTests {
     /**
      * 场景：外部 JSON 表达全额优惠，用户侧实付为 0。
      * 预期：显式装配允许权益快照中的零实付，同时组件金额仍按正金额校验。
-     * 红线：JSON/Map 装配路径不能比不可变 Builder 路径更严格。
+     * 红线：Map 装配路径不能比不可变 Builder 路径更严格。
      */
     @Test
     void testBenefitSnapshotJsonSupportShouldAllowZeroUserPayAmount() {
@@ -398,14 +398,14 @@ class FundsBenefitSnapshotSpecTests {
                 {
                   "benefitSnapshotId": "BS-JSON-ZERO-PAY-001",
                   "benefitGroupSn": "BG-JSON-ZERO-PAY-001",
-                  "orderAmount": { "currency": "USD", "minorValue": 10000 },
-                  "userPayAmount": { "currency": "USD", "minorValue": 0 },
+                  "orderAmount": { "currency": "USD", "amount": 10000 },
+                  "userPayAmount": { "currency": "USD", "amount": 0 },
                   "components": [{
                     "componentSn": "BC-JSON-ZERO-PAY-001",
                     "benefitType": "PLATFORM_COUPON",
                     "componentType": "PLATFORM_SUBSIDY",
                     "closureRole": "ORDER_DISCOUNT_CLOSURE",
-                    "amount": { "currency": "USD", "minorValue": 10000 },
+                    "amount": { "currency": "USD", "amount": 10000 },
                     "ledgerEffect": "POSTING_REQUIRED",
                     "fundingNature": "PLATFORM_OWN_FUNDS",
                     "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
@@ -433,14 +433,14 @@ class FundsBenefitSnapshotSpecTests {
                 {
                   "benefitSnapshotId": "BS-JSON-MISMATCH-001",
                   "benefitGroupSn": "BG-JSON-MISMATCH-001",
-                  "orderAmount": { "currency": "USD", "minorValue": 10000 },
-                  "userPayAmount": { "currency": "USD", "minorValue": 9000 },
+                  "orderAmount": { "currency": "USD", "amount": 10000 },
+                  "userPayAmount": { "currency": "USD", "amount": 9000 },
                   "components": [{
                     "componentSn": "BC-JSON-MISMATCH-001",
                     "benefitType": "MERCHANT_COUPON",
                     "componentType": "MERCHANT_DISCOUNT",
                     "closureRole": "ORDER_DISCOUNT_CLOSURE",
-                    "amount": { "currency": "USD", "minorValue": 2000 },
+                    "amount": { "currency": "USD", "amount": 2000 },
                     "ledgerEffect": "NO_LEDGER",
                     "fundingNature": "MERCHANT_BORNE",
                     "bearerSubjectRef": {
@@ -457,6 +457,45 @@ class FundsBenefitSnapshotSpecTests {
         assertThatThrownBy(() -> FundsBenefitSnapshotJsonSupport.parseSnapshot(values))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ORDER_DISCOUNT_CLOSURE components.amount = orderAmount");
+    }
+
+    /**
+     * 场景：调用方把原始 JSON 对象直接交给权益快照 Map 装配入口。
+     * 预期：装配入口按 Money 自身 JSON 绑定语义转换金额对象，并继续执行金额闭合不变量。
+     * 红线：测试不得用 fixture 预处理掩盖生产入口的 Money 绑定边界。
+     */
+    @Test
+    void testBenefitSnapshotJsonSupportShouldBindRawJsonMoneyObject() {
+        JSONObject values = JSON.parseObject("""
+                {
+                  "benefitSnapshotId": "BS-JSON-RAW-MONEY-001",
+                  "benefitGroupSn": "BG-JSON-RAW-MONEY-001",
+                  "orderAmount": { "currency": "USD", "amount": 10000 },
+                  "userPayAmount": { "currency": "USD", "amount": 8000 },
+                  "components": [{
+                    "componentSn": "BC-JSON-RAW-MONEY-001",
+                    "benefitType": "MERCHANT_COUPON",
+                    "componentType": "MERCHANT_DISCOUNT",
+                    "closureRole": "ORDER_DISCOUNT_CLOSURE",
+                    "amount": { "currency": "USD", "amount": 2000 },
+                    "ledgerEffect": "NO_LEDGER",
+                    "fundingNature": "MERCHANT_BORNE",
+                    "bearerSubjectRef": {
+                      "subjectId": "FA-MERCHANT-JSON-001",
+                      "subjectType": "FUNDING_ACCOUNT"
+                    },
+                    "benefitReference": { "couponId": "COUPON-JSON-001", "ruleVersion": "rule-v1" },
+                    "contextVariables": {}
+                  }],
+                  "contextVariables": {}
+                }
+                """);
+
+        FundsBenefitSnapshotSpec snapshot = FundsBenefitSnapshotJsonSupport.parseSnapshot(values);
+
+        assertThat(snapshot.getOrderAmount()).isEqualTo(money(10000L));
+        assertThat(snapshot.getUserPayAmount()).isEqualTo(money(8000L));
+        assertThat(snapshot.getComponents().getFirst().getAmount()).isEqualTo(money(2000L));
     }
 
     private FundsBenefitSnapshotSpec merchantDiscountSnapshot(long userPayAmount, long componentAmount) {
@@ -670,4 +709,5 @@ class FundsBenefitSnapshotSpecTests {
     private Money money(long amount) {
         return Money.immutable(amount, CURRENCY);
     }
+
 }

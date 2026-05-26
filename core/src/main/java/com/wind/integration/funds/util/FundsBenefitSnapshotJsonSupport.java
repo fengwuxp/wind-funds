@@ -1,5 +1,6 @@
 package com.wind.integration.funds.util;
 
+import com.alibaba.fastjson2.JSON;
 import com.wind.integration.funds.model.route.ImmutableSubjectRef;
 import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitComponentSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsBenefitReferenceSpec;
@@ -163,21 +164,52 @@ public final class FundsBenefitSnapshotJsonSupport {
     }
 
     private static Money requiredPositiveMoney(Map<String, ?> owner, String fieldName) {
-        Map<String, ?> value = requiredObject(owner, fieldName);
-        return FundsDslMoneyParser.parse(value);
+        Money value = requiredMoney(owner, fieldName);
+        if (value.getAmount() <= 0) {
+            throw new IllegalArgumentException(fieldName + "." + Money.Fields.amount + " must be positive");
+        }
+        return value;
     }
 
     private static Money requiredNonNegativeMoney(Map<String, ?> owner, String fieldName) {
-        Map<String, ?> value = requiredObject(owner, fieldName);
-        return FundsDslMoneyParser.parseNonNegative(value);
+        Money value = requiredMoney(owner, fieldName);
+        if (value.getAmount() < 0) {
+            throw new IllegalArgumentException(fieldName + "." + Money.Fields.amount + " must not be negative");
+        }
+        return value;
     }
 
     private static @Nullable Money optionalNonNegativeMoney(Map<String, ?> owner, String fieldName) {
-        Map<String, ?> value = optionalObject(owner, fieldName);
+        Money value = optionalMoney(owner, fieldName);
         if (value == null) {
             return null;
         }
-        return FundsDslMoneyParser.parseNonNegative(value);
+        if (value.getAmount() < 0) {
+            throw new IllegalArgumentException(fieldName + "." + Money.Fields.amount + " must not be negative");
+        }
+        return value;
+    }
+
+    private static Money requiredMoney(Map<String, ?> owner, String fieldName) {
+        Money result = optionalMoney(owner, fieldName);
+        if (result == null) {
+            throw new IllegalArgumentException(fieldName + " is required");
+        }
+        return result;
+    }
+
+    private static @Nullable Money optionalMoney(Map<String, ?> owner, String fieldName) {
+        Object value = owner.get(fieldName);
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Money money) {
+            return money;
+        }
+        if (value instanceof Map<?, ?>) {
+            return JSON.to(Money.class, value);
+        }
+        throw new IllegalArgumentException(fieldName + " must be Money object");
     }
 
     private static Map<String, Object> contextVariables(Map<String, ?> owner, String fieldName) {

@@ -12,11 +12,11 @@
     "businessSn": "AUTH_202605140001",
     "amount": {
       "currency": "USD",
-      "minorValue": 12000
+      "amount": 12000
     },
     "originalAmount": {
       "currency": "USD",
-      "minorValue": 12000
+      "amount": 12000
     },
     "exchangeRate": "1",
     "eventTime": "2026-05-14T10:03:00",
@@ -84,7 +84,7 @@
         },
         "amount": {
           "currency": "USD",
-          "minorValue": 4000
+          "amount": 4000
         },
         "balanceEffectType": "HOLD",
         "phaseCode": "AUTHORIZATION",
@@ -107,7 +107,7 @@
         },
         "amount": {
           "currency": "USD",
-          "minorValue": 5000
+          "amount": 5000
         },
         "balanceEffectType": "HOLD",
         "phaseCode": "AUTHORIZATION",
@@ -130,7 +130,7 @@
         },
         "amount": {
           "currency": "USD",
-          "minorValue": 3000
+          "amount": 3000
         },
         "balanceEffectType": "HOLD",
         "phaseCode": "AUTHORIZATION",
@@ -156,7 +156,7 @@
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 4000
+              "amount": 4000
             }
           },
           {
@@ -166,7 +166,7 @@
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 4000
+              "amount": 4000
             }
           }
         ]
@@ -186,7 +186,7 @@
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 5000
+              "amount": 5000
             }
           },
           {
@@ -196,7 +196,7 @@
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 5000
+              "amount": 5000
             }
           }
         ]
@@ -216,7 +216,7 @@
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 3000
+              "amount": 3000
             }
           },
           {
@@ -226,7 +226,7 @@
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 3000
+              "amount": 3000
             }
           }
         ]

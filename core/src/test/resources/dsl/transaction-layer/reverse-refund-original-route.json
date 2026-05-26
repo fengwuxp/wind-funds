@@ -12,11 +12,11 @@
     "businessSn": "RF_202605140001",
     "amount": {
       "currency": "USD",
-      "minorValue": 4000
+      "amount": 4000
     },
     "originalAmount": {
       "currency": "USD",
-      "minorValue": 4000
+      "amount": 4000
     },
     "exchangeRate": "1",
     "eventTime": "2026-05-14T10:02:00",
@@ -65,7 +65,7 @@
         },
         "amount": {
           "currency": "USD",
-          "minorValue": 4000
+          "amount": 4000
         },
         "balanceEffectType": "RESTORE",
         "phaseCode": "REFUND",
@@ -92,7 +92,7 @@
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 4000
+              "amount": 4000
             }
           },
           {
@@ -102,7 +102,7 @@
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 4000
+              "amount": 4000
             }
           }
         ]

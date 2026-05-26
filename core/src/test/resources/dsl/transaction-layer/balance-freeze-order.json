@@ -12,11 +12,11 @@
     "businessSn": "FRZ_202605140001",
     "amount": {
       "currency": "USD",
-      "minorValue": 3000
+      "amount": 3000
     },
     "originalAmount": {
       "currency": "USD",
-      "minorValue": 3000
+      "amount": 3000
     },
     "exchangeRate": "1",
     "eventTime": "2026-05-14T10:05:00",
@@ -70,7 +70,7 @@
         },
         "amount": {
           "currency": "USD",
-          "minorValue": 3000
+          "amount": 3000
         },
         "balanceEffectType": "HOLD",
         "phaseCode": "FREEZE",
@@ -96,7 +96,7 @@
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 3000
+              "amount": 3000
             }
           },
           {
@@ -106,7 +106,7 @@
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 3000
+              "amount": 3000
             }
           }
         ]

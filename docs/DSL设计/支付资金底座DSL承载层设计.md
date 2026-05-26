@@ -1248,8 +1248,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "PAY",
     "businessScene": "MERCHANT_ORDER_PAY",
     "businessSn": "PAY_202605180001",
-    "amount": { "currency": "USD", "minorValue": 10000 },
-    "originalAmount": { "currency": "USD", "minorValue": 10000 },
+    "amount": { "currency": "USD", "amount": 10000 },
+    "originalAmount": { "currency": "USD", "amount": 10000 },
     "exchangeRate": "1",
     "contextVariables": {
       "payerAccountId": "fa_user_10001_usd",
@@ -1343,8 +1343,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "PAY",
     "businessScene": "MERCHANT_ORDER_PAY",
     "businessSn": "PAY_BEN_MERCHANT_202605210001",
-    "amount": { "currency": "USD", "minorValue": 8000 },
-    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+    "amount": { "currency": "USD", "amount": 8000 },
+    "originalAmount": { "currency": "USD", "amount": 8000 },
     "exchangeRate": "1",
     "benefitSnapshot": {
       "benefitSnapshotId": "bs_merchant_202605210001",
@@ -1352,16 +1352,16 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "benefitGroupSn": "bg_order_202605210001",
       "orderSn": "order_10001",
       "pricingSnapshotSn": "price_10001_v3",
-      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "minorValue": 8000 },
+      "orderAmount": { "currency": "USD", "amount": 10000 },
+      "userPayAmount": { "currency": "USD", "amount": 8000 },
+      "merchantReceivableAmount": { "currency": "USD", "amount": 8000 },
       "components": [
         {
           "componentSn": "bc_merchant_discount_001",
           "sequence": 1,
           "benefitType": "MERCHANT_COUPON",
           "componentType": "MERCHANT_DISCOUNT",
-          "amount": { "currency": "USD", "minorValue": 2000 },
+          "amount": { "currency": "USD", "amount": 2000 },
           "ledgerEffect": "NO_LEDGER",
           "fundingNature": "MERCHANT_BORNE",
           "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_20001" },
@@ -1402,7 +1402,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
         "fromBucket": "AVAILABLE",
         "toAccountId": "fa_merchant_20001_usd",
         "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "minorValue": 8000 }
+        "amount": { "currency": "USD", "amount": 8000 }
       }
     ],
     "benefitRouteAssertions": [
@@ -1445,24 +1445,24 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "PAY",
     "businessScene": "MERCHANT_ORDER_PAY",
     "businessSn": "PAY_BEN_PLATFORM_202605210001",
-    "amount": { "currency": "USD", "minorValue": 8000 },
-    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+    "amount": { "currency": "USD", "amount": 8000 },
+    "originalAmount": { "currency": "USD", "amount": 8000 },
     "exchangeRate": "1",
     "benefitSnapshot": {
       "benefitSnapshotId": "bs_platform_202605210001",
       "benefitSchemaVersion": "1.0",
       "benefitGroupSn": "bg_order_202605210002",
       "orderSn": "order_10002",
-      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "minorValue": 10000 },
+      "orderAmount": { "currency": "USD", "amount": 10000 },
+      "userPayAmount": { "currency": "USD", "amount": 8000 },
+      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
       "components": [
         {
           "componentSn": "bc_platform_subsidy_001",
           "sequence": 1,
           "benefitType": "PLATFORM_COUPON",
           "componentType": "PLATFORM_DISPLAY_DISCOUNT",
-          "amount": { "currency": "USD", "minorValue": 2000 },
+          "amount": { "currency": "USD", "amount": 2000 },
           "ledgerEffect": "POSTING_REQUIRED",
           "fundingNature": "PLATFORM_OWN_FUNDS",
           "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
@@ -1504,14 +1504,14 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
         "fromBucket": "AVAILABLE",
         "toAccountId": "fa_merchant_20001_usd",
         "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "minorValue": 8000 }
+        "amount": { "currency": "USD", "amount": 8000 }
       },
       {
         "legType": "PLATFORM_SUBSIDY",
         "fromAccountRole": "PLATFORM_SUBSIDY_COST",
         "toAccountId": "fa_merchant_20001_usd",
         "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "minorValue": 2000 },
+        "amount": { "currency": "USD", "amount": 2000 },
         "benefitComponentSn": "bc_platform_subsidy_001"
       }
     ]
@@ -1552,24 +1552,24 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "PAY",
     "businessScene": "MERCHANT_ORDER_PAY",
     "businessSn": "PAY_BEN_PREPAID_202605210001",
-    "amount": { "currency": "USD", "minorValue": 7000 },
-    "originalAmount": { "currency": "USD", "minorValue": 7000 },
+    "amount": { "currency": "USD", "amount": 7000 },
+    "originalAmount": { "currency": "USD", "amount": 7000 },
     "exchangeRate": "1",
     "benefitSnapshot": {
       "benefitSnapshotId": "bs_prepaid_202605210001",
       "benefitSchemaVersion": "1.0",
       "benefitGroupSn": "bg_order_202605210003",
       "orderSn": "order_10003",
-      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-      "userPayAmount": { "currency": "USD", "minorValue": 7000 },
-      "merchantReceivableAmount": { "currency": "USD", "minorValue": 10000 },
+      "orderAmount": { "currency": "USD", "amount": 10000 },
+      "userPayAmount": { "currency": "USD", "amount": 7000 },
+      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
       "components": [
         {
           "componentSn": "bc_prepaid_redeem_001",
           "sequence": 1,
           "benefitType": "PREPAID_VOUCHER",
           "componentType": "PREPAID_REDEEM",
-          "amount": { "currency": "USD", "minorValue": 3000 },
+          "amount": { "currency": "USD", "amount": 3000 },
           "ledgerEffect": "POSTING_REQUIRED",
           "fundingNature": "PREPAID_LIABILITY",
           "fundingSubjectRef": { "subjectType": "PREPAID_LIABILITY_ACCOUNT", "subjectId": "liability_gift_card_usd" },
@@ -1612,14 +1612,14 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
         "fromBucket": "AVAILABLE",
         "toAccountId": "fa_merchant_20001_usd",
         "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "minorValue": 7000 }
+        "amount": { "currency": "USD", "amount": 7000 }
       },
       {
         "legType": "PREPAID_REDEEM",
         "fromSubjectRef": { "subjectType": "PREPAID_LIABILITY_ACCOUNT", "subjectId": "liability_gift_card_usd" },
         "toAccountId": "fa_merchant_20001_usd",
         "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "minorValue": 3000 },
+        "amount": { "currency": "USD", "amount": 3000 },
         "benefitComponentSn": "bc_prepaid_redeem_001"
       }
     ]
@@ -1660,24 +1660,24 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "PAY",
     "businessScene": "CARD_ORDER_AUTH",
     "businessSn": "AUTH_BEN_HOLD_202605210001",
-    "amount": { "currency": "USD", "minorValue": 8000 },
-    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+    "amount": { "currency": "USD", "amount": 8000 },
+    "originalAmount": { "currency": "USD", "amount": 8000 },
     "exchangeRate": "1",
     "benefitSnapshot": {
       "benefitSnapshotId": "bs_auth_hold_202605210001",
       "benefitSchemaVersion": "1.0",
       "benefitGroupSn": "bg_auth_202605210001",
       "orderSn": "order_auth_10001",
-      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "minorValue": 10000 },
+      "orderAmount": { "currency": "USD", "amount": 10000 },
+      "userPayAmount": { "currency": "USD", "amount": 8000 },
+      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
       "components": [
         {
           "componentSn": "bc_auth_hold_001",
           "sequence": 1,
           "benefitType": "PLATFORM_COUPON",
           "componentType": "PLATFORM_SUBSIDY",
-          "amount": { "currency": "USD", "minorValue": 2000 },
+          "amount": { "currency": "USD", "amount": 2000 },
           "ledgerEffect": "HOLD_ONLY",
           "fundingNature": "PLATFORM_OWN_FUNDS",
           "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
@@ -1720,7 +1720,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
         "fromBucket": "AVAILABLE",
         "toAccountId": "fa_user_10001_usd",
         "toBucket": "AUTHORIZATION",
-        "amount": { "currency": "USD", "minorValue": 8000 }
+        "amount": { "currency": "USD", "amount": 8000 }
       }
     ],
     "benefitRouteAssertions": [
@@ -1764,8 +1764,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "REFUND",
     "businessScene": "MERCHANT_ORDER_REFUND",
     "businessSn": "REFUND_BEN_202605210001",
-    "amount": { "currency": "USD", "minorValue": 8000 },
-    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+    "amount": { "currency": "USD", "amount": 8000 },
+    "originalAmount": { "currency": "USD", "amount": 8000 },
     "exchangeRate": "1",
     "reference": {
       "originalBusinessSn": "PAY_BEN_PLATFORM_202605210001",
@@ -1777,16 +1777,16 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "benefitSchemaVersion": "1.0",
       "benefitGroupSn": "bg_order_202605210002",
       "orderSn": "order_10002",
-      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "minorValue": 10000 },
+      "orderAmount": { "currency": "USD", "amount": 10000 },
+      "userPayAmount": { "currency": "USD", "amount": 8000 },
+      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
       "components": [
         {
           "componentSn": "bc_platform_subsidy_001_reversal",
           "sequence": 1,
           "benefitType": "PLATFORM_COUPON",
           "componentType": "SUBSIDY_REVERSAL",
-          "amount": { "currency": "USD", "minorValue": 2000 },
+          "amount": { "currency": "USD", "amount": 2000 },
           "ledgerEffect": "REVERSAL_REQUIRED",
           "fundingNature": "PLATFORM_OWN_FUNDS",
           "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
@@ -1800,8 +1800,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
           "refundPolicy": {
             "partialRefundStrategy": "ORIGINAL_SNAPSHOT",
             "dispositions": ["NO_REFUND", "REVERSE_SUBSIDY"],
-            "refundableAmount": { "currency": "USD", "minorValue": 2000 },
-            "nonRefundableAmount": { "currency": "USD", "minorValue": 0 },
+            "refundableAmount": { "currency": "USD", "amount": 2000 },
+            "nonRefundableAmount": { "currency": "USD", "amount": 0 },
             "refundRuleVersion": "platform_refund_v5",
             "refundPolicyCode": "NO_COUPON_RETURN_REVERSE_SUBSIDY"
           },
@@ -1830,14 +1830,14 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
         "fromBucket": "CLEARING",
         "toAccountId": "fa_user_10001_usd",
         "toBucket": "AVAILABLE",
-        "amount": { "currency": "USD", "minorValue": 8000 }
+        "amount": { "currency": "USD", "amount": 8000 }
       },
       {
         "legType": "SUBSIDY_REVERSAL",
         "fromAccountId": "fa_merchant_20001_usd",
         "fromBucket": "CLEARING",
         "toAccountRole": "PLATFORM_SUBSIDY_COST",
-        "amount": { "currency": "USD", "minorValue": 2000 },
+        "amount": { "currency": "USD", "amount": 2000 },
         "benefitComponentSn": "bc_platform_subsidy_001_reversal"
       }
     ]
@@ -1878,8 +1878,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "REFUND",
     "businessScene": "MERCHANT_ORDER_REFUND",
     "businessSn": "REFUND_BEN_MISSING_202605210001",
-    "amount": { "currency": "USD", "minorValue": 8000 },
-    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+    "amount": { "currency": "USD", "amount": 8000 },
+    "originalAmount": { "currency": "USD", "amount": 8000 },
     "exchangeRate": "1",
     "reference": {
       "originalBusinessSn": "PAY_WITH_BENEFIT_BUT_MISSING_SNAPSHOT",
@@ -1927,24 +1927,24 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "PAY",
     "businessScene": "MERCHANT_ORDER_PAY",
     "businessSn": "PAY_BEN_PLATFORM_NO_SETTLEMENT_202605210001",
-    "amount": { "currency": "USD", "minorValue": 8000 },
-    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+    "amount": { "currency": "USD", "amount": 8000 },
+    "originalAmount": { "currency": "USD", "amount": 8000 },
     "exchangeRate": "1",
     "benefitSnapshot": {
       "benefitSnapshotId": "bs_platform_no_settlement_202605210001",
       "benefitSchemaVersion": "1.0",
       "benefitGroupSn": "bg_order_202605210004",
       "orderSn": "order_10004",
-      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "minorValue": 8000 },
+      "orderAmount": { "currency": "USD", "amount": 10000 },
+      "userPayAmount": { "currency": "USD", "amount": 8000 },
+      "merchantReceivableAmount": { "currency": "USD", "amount": 8000 },
       "components": [
         {
           "componentSn": "bc_platform_display_discount_001",
           "sequence": 1,
           "benefitType": "PLATFORM_COUPON",
           "componentType": "PLATFORM_SUBSIDY",
-          "amount": { "currency": "USD", "minorValue": 2000 },
+          "amount": { "currency": "USD", "amount": 2000 },
           "ledgerEffect": "NO_LEDGER",
           "fundingNature": "NO_FUNDS_TRANSFER",
           "bearerSubjectRef": { "subjectType": "PLATFORM", "subjectId": "platform_default" },
@@ -1987,7 +1987,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
         "fromBucket": "AVAILABLE",
         "toAccountId": "fa_merchant_20001_usd",
         "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "minorValue": 8000 }
+        "amount": { "currency": "USD", "amount": 8000 }
       }
     ],
     "benefitRouteAssertions": [
@@ -2031,8 +2031,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "REFUND",
     "businessScene": "MERCHANT_ORDER_REFUND",
     "businessSn": "REFUND_BEN_RETAIN_202605210001",
-    "amount": { "currency": "USD", "minorValue": 8000 },
-    "originalAmount": { "currency": "USD", "minorValue": 8000 },
+    "amount": { "currency": "USD", "amount": 8000 },
+    "originalAmount": { "currency": "USD", "amount": 8000 },
     "exchangeRate": "1",
     "reference": {
       "originalBusinessSn": "PAY_BEN_PLATFORM_202605210001",
@@ -2044,16 +2044,16 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "benefitSchemaVersion": "1.0",
       "benefitGroupSn": "bg_order_202605210002",
       "orderSn": "order_10002",
-      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "minorValue": 10000 },
+      "orderAmount": { "currency": "USD", "amount": 10000 },
+      "userPayAmount": { "currency": "USD", "amount": 8000 },
+      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
       "components": [
         {
           "componentSn": "bc_platform_subsidy_001_retain",
           "sequence": 1,
           "benefitType": "PLATFORM_COUPON",
           "componentType": "NON_REFUNDABLE_BENEFIT",
-          "amount": { "currency": "USD", "minorValue": 2000 },
+          "amount": { "currency": "USD", "amount": 2000 },
           "ledgerEffect": "PROJECTION_ONLY",
           "fundingNature": "PLATFORM_OWN_FUNDS",
           "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
@@ -2067,7 +2067,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
           "refundPolicy": {
             "partialRefundStrategy": "ORIGINAL_SNAPSHOT",
             "dispositions": ["NO_REFUND", "RETAIN_SUBSIDY"],
-            "nonRefundableAmount": { "currency": "USD", "minorValue": 2000 },
+            "nonRefundableAmount": { "currency": "USD", "amount": 2000 },
             "refundRuleVersion": "platform_refund_v5",
             "refundPolicyCode": "NO_COUPON_RETURN_RETAIN_SUBSIDY"
           },
@@ -2097,7 +2097,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
         "fromBucket": "CLEARING",
         "toAccountId": "fa_user_10001_usd",
         "toBucket": "AVAILABLE",
-        "amount": { "currency": "USD", "minorValue": 8000 }
+        "amount": { "currency": "USD", "amount": 8000 }
       }
     ],
     "benefitRouteAssertions": [
@@ -2141,8 +2141,8 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "transactionType": "REFUND",
     "businessScene": "MERCHANT_ORDER_PARTIAL_REFUND",
     "businessSn": "REFUND_BEN_PARTIAL_202605210001",
-    "amount": { "currency": "USD", "minorValue": 4000 },
-    "originalAmount": { "currency": "USD", "minorValue": 4000 },
+    "amount": { "currency": "USD", "amount": 4000 },
+    "originalAmount": { "currency": "USD", "amount": 4000 },
     "exchangeRate": "1",
     "reference": {
       "originalBusinessSn": "PAY_BEN_PLATFORM_202605210001",
@@ -2154,16 +2154,16 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
       "benefitSchemaVersion": "1.0",
       "benefitGroupSn": "bg_order_202605210002",
       "orderSn": "order_10002",
-      "orderAmount": { "currency": "USD", "minorValue": 10000 },
-      "userPayAmount": { "currency": "USD", "minorValue": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "minorValue": 10000 },
+      "orderAmount": { "currency": "USD", "amount": 10000 },
+      "userPayAmount": { "currency": "USD", "amount": 8000 },
+      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
       "components": [
         {
           "componentSn": "bc_platform_subsidy_001_partial_reversal",
           "sequence": 1,
           "benefitType": "PLATFORM_COUPON",
           "componentType": "SUBSIDY_REVERSAL",
-          "amount": { "currency": "USD", "minorValue": 1000 },
+          "amount": { "currency": "USD", "amount": 1000 },
           "ledgerEffect": "REVERSAL_REQUIRED",
           "fundingNature": "PLATFORM_OWN_FUNDS",
           "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
@@ -2177,7 +2177,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
           "refundPolicy": {
             "partialRefundStrategy": "PROPORTIONAL",
             "dispositions": ["NO_REFUND", "REVERSE_SUBSIDY"],
-            "refundableAmount": { "currency": "USD", "minorValue": 1000 },
+            "refundableAmount": { "currency": "USD", "amount": 1000 },
             "refundRuleVersion": "platform_refund_v5",
             "refundPolicyCode": "PROPORTIONAL_SUBSIDY_REVERSAL"
           },
@@ -2210,14 +2210,14 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
         "fromBucket": "CLEARING",
         "toAccountId": "fa_user_10001_usd",
         "toBucket": "AVAILABLE",
-        "amount": { "currency": "USD", "minorValue": 4000 }
+        "amount": { "currency": "USD", "amount": 4000 }
       },
       {
         "legType": "SUBSIDY_REVERSAL",
         "fromAccountId": "fa_merchant_20001_usd",
         "fromBucket": "CLEARING",
         "toAccountRole": "PLATFORM_SUBSIDY_COST",
-        "amount": { "currency": "USD", "minorValue": 1000 },
+        "amount": { "currency": "USD", "amount": 1000 },
         "benefitComponentSn": "bc_platform_subsidy_001_partial_reversal"
       }
     ]
@@ -2259,11 +2259,11 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
     "benefitSnapshotId": "bs_platform_202605210001",
     "merchantAccountId": "fa_merchant_20001_usd",
     "amountItems": [
-      { "itemType": "ORDER_AMOUNT", "currency": "USD", "minorValue": 10000 },
-      { "itemType": "USER_PAY_AMOUNT", "currency": "USD", "minorValue": 8000 },
-      { "itemType": "PLATFORM_SUBSIDY", "currency": "USD", "minorValue": 2000, "componentSn": "bc_platform_subsidy_001" },
-      { "itemType": "MERCHANT_RECEIVABLE", "currency": "USD", "minorValue": 10000 },
-      { "itemType": "FEE", "currency": "USD", "minorValue": 300 }
+      { "itemType": "ORDER_AMOUNT", "currency": "USD", "amount": 10000 },
+      { "itemType": "USER_PAY_AMOUNT", "currency": "USD", "amount": 8000 },
+      { "itemType": "PLATFORM_SUBSIDY", "currency": "USD", "amount": 2000, "componentSn": "bc_platform_subsidy_001" },
+      { "itemType": "MERCHANT_RECEIVABLE", "currency": "USD", "amount": 10000 },
+      { "itemType": "FEE", "currency": "USD", "amount": 300 }
     ],
     "reconciliationRefs": {
       "marketingWriteOffId": "writeoff_90002",

@@ -12,11 +12,11 @@
     "businessSn": "COMP_202605140001",
     "amount": {
       "currency": "USD",
-      "minorValue": 2500
+      "amount": 2500
     },
     "originalAmount": {
       "currency": "USD",
-      "minorValue": 2500
+      "amount": 2500
     },
     "exchangeRate": "1",
     "eventTime": "2026-05-14T10:00:01",
@@ -73,7 +73,7 @@
         },
         "amount": {
           "currency": "USD",
-          "minorValue": 2500
+          "amount": 2500
         },
         "balanceEffectType": "CONSUME",
         "phaseCode": "TRANSFER",
@@ -99,7 +99,7 @@
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 2500
+              "amount": 2500
             }
           },
           {
@@ -109,7 +109,7 @@
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
-              "minorValue": 2500
+              "amount": 2500
             }
           }
         ]

@@ -35,7 +35,6 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -400,46 +399,37 @@ public final class FundsDslJsonContractVerifier {
     }
 
     private static @NonNull Money parseMoney(@NonNull Map<String, ?> values, boolean positive) {
-        Object rawCurrency = values.get("currency");
+        Object rawCurrency = values.get(Money.Fields.currency);
         if (!(rawCurrency instanceof String currency) || !StringUtils.hasText(currency)) {
             throw new IllegalArgumentException("money.currency is required");
         }
-        if (!values.containsKey("minorValue")) {
-            throw new IllegalArgumentException("money.minorValue is required");
+        if (!values.containsKey(Money.Fields.amount)) {
+            throw new IllegalArgumentException("money.amount is required");
         }
-        long minorValue = parseMinorValue(values.get("minorValue"), positive);
-        return Money.immutable(minorValue, CurrencyIsoCode.valueOf(currency));
+        long amount = parseAmount(values.get(Money.Fields.amount), positive);
+        return Money.immutable(amount, CurrencyIsoCode.valueOf(currency));
     }
 
-    private static long parseMinorValue(Object value, boolean positive) {
+    private static long parseAmount(Object value, boolean positive) {
         BigInteger parsed = switch (value) {
             case Byte number -> BigInteger.valueOf(number.longValue());
             case Short number -> BigInteger.valueOf(number.longValue());
             case Integer number -> BigInteger.valueOf(number.longValue());
             case Long number -> BigInteger.valueOf(number);
             case BigInteger number -> number;
-            case BigDecimal number -> parseIntegerDecimal(number);
             case String text when text.matches("-?\\d+") -> new BigInteger(text);
-            default -> throw new IllegalArgumentException("money.minorValue must be integer");
+            default -> throw new IllegalArgumentException("money.amount must be integer");
         };
         BigInteger minimum = positive ? BigInteger.ONE : BigInteger.ZERO;
         if (parsed.compareTo(minimum) < 0) {
             throw new IllegalArgumentException(positive
-                    ? "money.minorValue must be positive"
-                    : "money.minorValue must not be negative");
+                    ? "money.amount must be positive"
+                    : "money.amount must not be negative");
         }
         if (parsed.compareTo(LONG_MAX_VALUE) > 0) {
-            throw new IllegalArgumentException("money.minorValue exceeds system limit");
+            throw new IllegalArgumentException("money.amount exceeds system limit");
         }
         return parsed.longValue();
-    }
-
-    private static BigInteger parseIntegerDecimal(BigDecimal value) {
-        try {
-            return value.toBigIntegerExact();
-        } catch (ArithmeticException ex) {
-            throw new IllegalArgumentException("money.minorValue must be integer", ex);
-        }
     }
 
     private static <E extends Enum<E>> E verifyEnum(Class<E> enumType,
