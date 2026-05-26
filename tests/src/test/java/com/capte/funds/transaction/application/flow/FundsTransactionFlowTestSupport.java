@@ -678,6 +678,11 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .as("ledger transactions for businessSn %s", businessSn)
                 .singleElement()
                 .satisfies(ledgerTransaction -> {
+                    List<LedgerPostingPlan> postingPlans = postingPlansOf(ledgerTransaction);
+                    List<LedgerEntry> entries = entriesByBusinessSn(businessSn);
+                    List<String> postingPlanSns = postingPlans.stream()
+                            .map(LedgerPostingPlan::getSn)
+                            .toList();
                     assertThat(ledgerTransaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
                     assertThat(details)
                             .as("funds transaction details must point to ledger transaction for businessSn %s",
@@ -686,12 +691,28 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                                 assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
                                 assertThat(detail.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
                             });
-                    assertThat(postingPlansOf(ledgerTransaction))
+                    assertThat(postingPlans)
                             .as("posting plans for businessSn %s", businessSn)
                             .hasSize(expectedPostingPlans);
-                    assertThat(entriesByBusinessSn(businessSn))
+                    assertThat(postingPlans)
+                            .as("posting plans must point to funds transaction for businessSn %s", businessSn)
+                            .allSatisfy(plan -> {
+                                assertThat(plan.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+                                assertThat(plan.getFundsTransactionSn())
+                                        .isEqualTo(ledgerTransaction.getFundsTransactionSn());
+                            });
+                    assertThat(entries)
                             .as("ledger entries for businessSn %s", businessSn)
                             .hasSize(expectedEntries);
+                    assertThat(entries)
+                            .as("ledger entries must point to ledger transaction and posting plans for businessSn %s",
+                                    businessSn)
+                            .allSatisfy(entry -> {
+                                assertThat(entry.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+                                assertThat(entry.getFundsTransactionSn())
+                                        .isEqualTo(ledgerTransaction.getFundsTransactionSn());
+                                assertThat(entry.getPostingPlanSn()).isIn(postingPlanSns);
+                            });
                 });
         if (!fundsTransactions.isEmpty()) {
             assertThat(details)
