@@ -296,6 +296,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, -30L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFirstReversalFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> reverseAuthorization(user, 60L, authorizationSn,
                 "AUTH_REVERSAL_EXCEED_SECOND_CANCEL"))
@@ -326,6 +327,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REVERSAL_EXCEED_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REVERSAL_EXCEED_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_REVERSAL_EXCEED_FIRST_CANCEL", 0, 1, 1, 2);
+        assertLedgerTransactionFactsUnchanged(afterFirstReversalFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_REVERSAL_EXCEED_SECOND_CANCEL");
     }
 
@@ -516,6 +518,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         settleAuthorization(reserveUser, 100L, reserveAuthorizationSn, "AUTH_REFUND_EXCEED_RESERVE_CAPTURE");
 
         BalanceSnapshot beforeFailure = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 30L, CURRENCY);
         assertBucket(balance(reserveUser), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
@@ -561,6 +564,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_RESERVE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_RESERVE_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_RESERVE_CAPTURE", 0, 2, 1, 2);
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_RETURN");
     }
 
