@@ -159,6 +159,7 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 });
         assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_RELEASE_UNFREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_AFTER_RELEASE_CONFIRM");
     }
 
     /**
@@ -208,6 +209,7 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 });
         assertThat(frozenOrderByBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_UNFREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.RELEASED);
+        assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_CONFIRM");
     }
 
     /**
@@ -274,5 +276,6 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertPostedTransactions(4);
         assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getReleasedAmount()).isEqualTo(50L);
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_EXCEED");
     }
 }
