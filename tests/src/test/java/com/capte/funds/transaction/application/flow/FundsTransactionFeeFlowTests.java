@@ -8,6 +8,7 @@ import com.capte.funds.transaction.enums.FundsEffectType;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
@@ -326,14 +327,48 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .as("ledger transactions for fee refund businessSn %s", businessSn)
                 .singleElement()
                 .satisfies(transaction -> {
+                    var postingPlans = postingPlansOf(transaction);
+                    var entries = entriesByBusinessSn(businessSn);
+                    var postingPlanSns = postingPlans.stream()
+                            .map(LedgerPostingPlan::getSn)
+                            .toList();
+                    assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
                     assertThat(transaction.getEventType())
                             .isEqualTo(FundsTransactionEventType.FEE_REFUND.name());
-                    assertThat(postingPlansOf(transaction).stream()
+                    assertThat(details)
+                            .as("funds transaction details must point to fee refund ledger transaction for businessSn %s",
+                                    businessSn)
+                            .allSatisfy(detail -> {
+                                assertThat(detail.getTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
+                                assertThat(detail.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+                            });
+                    assertThat(postingPlans)
+                            .as("posting plans for fee refund businessSn %s", businessSn)
+                            .hasSize(1);
+                    assertThat(postingPlans)
+                            .as("posting plans must point to source funds transaction for fee refund businessSn %s",
+                                    businessSn)
+                            .allSatisfy(plan -> {
+                                assertThat(plan.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+                                assertThat(plan.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
+                            });
+                    assertThat(postingPlans.stream()
                             .map(LedgerPostingPlan::getPhaseCode)
                             .toList())
                             .as("posting plans for fee refund businessSn %s", businessSn)
                             .containsOnly(LedgerPhaseCode.REFUND.name());
-                    assertThat(entriesByBusinessSn(businessSn).stream()
+                    assertThat(entries)
+                            .as("ledger entries for fee refund businessSn %s", businessSn)
+                            .hasSize(2);
+                    assertThat(entries)
+                            .as("ledger entries must point to ledger transaction and posting plan for fee refund businessSn %s",
+                                    businessSn)
+                            .allSatisfy(entry -> {
+                                assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+                                assertThat(entry.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
+                                assertThat(entry.getPostingPlanSn()).isIn(postingPlanSns);
+                            });
+                    assertThat(entries.stream()
                             .map(LedgerEntry::getLedgerSubjectCode)
                             .toList())
                             .as("ledger entries for fee refund businessSn %s", businessSn)
