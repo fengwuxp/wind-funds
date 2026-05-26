@@ -115,6 +115,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                         MONTHLY_PERIOD_ID)));
 
         assertThat(transaction.getPostingPlans()).hasSize(1);
+        assertTransferPostingFacts(transaction, AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID);
         assertThat(ledgerService.queries).hasSize(2).allSatisfy(query -> {
             assertThat(query.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
             assertThat(query.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
@@ -128,6 +129,8 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                         null)));
 
         assertThat(transaction.getPostingPlans()).hasSize(1);
+        assertTransferPostingFacts(transaction, AccountBalancePeriodType.LIFETIME,
+                AccountBalancePeriodType.LIFETIME.name());
         assertThat(ledgerService.queries).hasSize(2).allSatisfy(query -> {
             assertThat(query.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
             assertThat(query.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
@@ -195,6 +198,34 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
             assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
             assertThat(entry.getAmount()).isEqualTo(AMOUNT);
             assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.TRANSFER);
+        });
+        assertThat(plan.getEntries())
+                .extracting(LedgerEntrySpec::getSubjectId, LedgerEntrySpec::getLedgerSubjectCode,
+                        LedgerEntrySpec::getEntryType)
+                .containsExactly(
+                        tuple("source_account", LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT),
+                        tuple("target_account", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT));
+    }
+
+    private void assertTransferPostingFacts(LedgerTransactionSpec transaction,
+                                            AccountBalancePeriodType periodType,
+                                            String periodId) {
+        assertThat(transaction.isBalanced()).isTrue();
+        LedgerPostingPlanSpec plan = transaction.getPostingPlans().getFirst();
+        assertThat(plan.isBalanced()).isTrue();
+        assertThat(plan.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+        assertThat(plan.getRouteLegId()).isEqualTo("LEG-POSTING-PERIOD-001");
+        assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.TRANSFER);
+        assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS);
+        assertThat(plan.getEntries()).hasSize(2).allSatisfy(entry -> {
+            assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+            assertThat(entry.getAmount()).isEqualTo(AMOUNT);
+            assertThat(entry.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+            assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.TRANSFER);
+        });
+        assertThat(ledgerService.queries).hasSize(2).allSatisfy(query -> {
+            assertThat(query.getPeriodType()).isEqualTo(periodType);
+            assertThat(query.getPeriodId()).isEqualTo(periodId);
         });
         assertThat(plan.getEntries())
                 .extracting(LedgerEntrySpec::getSubjectId, LedgerEntrySpec::getLedgerSubjectCode,
