@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 960" width="1500" height="960" role="img" aria-labelledby="title desc">
+  <title id="title">支付资金底座系分架构：分层与事实边界</title>
+  <desc id="desc">展示 wind-funds 从外部输入、契约层、核心语义、实现模块、事实存储到读模型和横切治理的系统分层架构。</desc>
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #111827; }
+    .title { font-size: 28px; font-weight: 700; }
+    .subtitle { font-size: 14px; fill: #6b7280; }
+    .layer { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; rx: 18; ry: 18; }
+    .box { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; rx: 10; ry: 10; }
+    .blue { fill: #eff6ff; stroke: #bfdbfe; }
+    .green { fill: #f0fdf4; stroke: #bbf7d0; }
+    .purple { fill: #faf5ff; stroke: #e9d5ff; }
+    .orange { fill: #fff7ed; stroke: #fed7aa; }
+    .teal { fill: #f0fdfa; stroke: #99f6e4; }
+    .red { fill: #fef2f2; stroke: #fecaca; }
+    .gray { fill: #f8fafc; stroke: #cbd5e1; }
+    .label { font-size: 15px; font-weight: 700; }
+    .sub { font-size: 12px; fill: #4b5563; }
+    .section { font-size: 16px; font-weight: 700; fill: #374151; }
+    .arrow { stroke: #2563eb; stroke-width: 2.4; fill: none; marker-end: url(#arrow-blue); }
+    .data { stroke: #16a34a; stroke-width: 2.4; fill: none; marker-end: url(#arrow-green); }
+    .ops { stroke: #ea580c; stroke-width: 2.4; fill: none; marker-end: url(#arrow-orange); }
+    .guard { stroke: #dc2626; stroke-width: 2.2; fill: none; marker-end: url(#arrow-red); stroke-dasharray: 8 6; }
+    .dash { stroke: #64748b; stroke-width: 2; fill: none; marker-end: url(#arrow-gray); stroke-dasharray: 7 6; }
+  </style>
+  <defs>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#2563eb"/></marker>
+    <marker id="arrow-green" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#16a34a"/></marker>
+    <marker id="arrow-orange" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#ea580c"/></marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#dc2626"/></marker>
+    <marker id="arrow-gray" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#64748b"/></marker>
+  </defs>
+  <rect width="1500" height="960" fill="#ffffff"/>
+  <text x="54" y="56" class="title">支付资金底座系分架构：分层与事实边界</text>
+  <text x="54" y="84" class="subtitle">系统目标：统一钱包、账本、账目、路由、清结算、对账、归档和投影，保持事实不可变、投影只读、运营追加事实</text>
+
+  <rect x="50" y="120" width="1400" height="92" class="layer gray"/>
+  <text x="75" y="154" class="section">外部输入与使用者</text>
+  <rect x="260" y="142" width="170" height="48" class="box blue"/><text x="345" y="171" text-anchor="middle" class="label">业务接入方</text>
+  <rect x="470" y="142" width="190" height="48" class="box orange"/><text x="565" y="171" text-anchor="middle" class="label">运营 / 财务 / 风控</text>
+  <rect x="700" y="142" width="210" height="48" class="box gray"/><text x="805" y="171" text-anchor="middle" class="label">银行 / 通道 / 清算网络</text>
+  <rect x="950" y="142" width="180" height="48" class="box purple"/><text x="1040" y="171" text-anchor="middle" class="label">报表指标模块</text>
+
+  <rect x="50" y="250" width="1400" height="112" class="layer"/>
+  <text x="75" y="284" class="section">契约层：只暴露 face、Request、Query、DTO、Spec</text>
+  <rect x="150" y="305" width="190" height="40" class="box teal"/><text x="245" y="331" text-anchor="middle" class="label">wallet-face</text>
+  <rect x="370" y="305" width="210" height="40" class="box blue"/><text x="475" y="331" text-anchor="middle" class="label">transaction-face</text>
+  <rect x="610" y="305" width="190" height="40" class="box green"/><text x="705" y="331" text-anchor="middle" class="label">ledger-face</text>
+  <rect x="830" y="305" width="210" height="40" class="box orange"/><text x="935" y="331" text-anchor="middle" class="label">reconciliation-face</text>
+  <rect x="1070" y="305" width="210" height="40" class="box purple"/><text x="1175" y="331" text-anchor="middle" class="label">governance port</text>
+
+  <rect x="50" y="400" width="1400" height="104" class="layer purple"/>
+  <text x="75" y="434" class="section">核心语义层：core 不依赖 DAL、Web、MQ 或具体实现</text>
+  <rect x="210" y="452" width="220" height="34" class="box purple"/><text x="320" y="475" text-anchor="middle" class="sub">FundsInstruction / RouteSnapshot</text>
+  <rect x="460" y="452" width="220" height="34" class="box purple"/><text x="570" y="475" text-anchor="middle" class="sub">PostingPlan / LedgerEntry Spec</text>
+  <rect x="710" y="452" width="220" height="34" class="box purple"/><text x="820" y="475" text-anchor="middle" class="sub">SettlementPolicy / Governance Port</text>
+  <rect x="960" y="452" width="220" height="34" class="box purple"/><text x="1070" y="475" text-anchor="middle" class="sub">枚举 / 值对象 / 端口契约</text>
+
+  <rect x="50" y="542" width="1400" height="142" class="layer"/>
+  <text x="75" y="576" class="section">实现模块：实现内聚，规则不扩散</text>
+  <rect x="120" y="602" width="190" height="56" class="box teal"/><text x="215" y="625" text-anchor="middle" class="label">wallet-impl</text><text x="215" y="645" text-anchor="middle" class="sub">账户 / 工具 / 查询</text>
+  <rect x="340" y="602" width="210" height="56" class="box blue"/><text x="445" y="625" text-anchor="middle" class="label">transaction-impl</text><text x="445" y="645" text-anchor="middle" class="sub">转换 / 编排 / 生命周期</text>
+  <rect x="580" y="602" width="190" height="56" class="box green"/><text x="675" y="625" text-anchor="middle" class="label">ledger-impl</text><text x="675" y="645" text-anchor="middle" class="sub">过账 / 分录 / 余额投影</text>
+  <rect x="800" y="602" width="210" height="56" class="box orange"/><text x="905" y="625" text-anchor="middle" class="label">reconciliation-impl</text><text x="905" y="645" text-anchor="middle" class="sub">对账 / 清算 / 出款</text>
+  <rect x="1040" y="602" width="210" height="56" class="box purple"/><text x="1145" y="625" text-anchor="middle" class="label">governance-impl</text><text x="1145" y="645" text-anchor="middle" class="sub">归档 / 重放 / 差异</text>
+
+  <rect x="50" y="722" width="1400" height="118" class="layer"/>
+  <text x="75" y="756" class="section">事实与读模型：事实不可变，读模型可重建</text>
+  <rect x="150" y="782" width="230" height="40" class="box blue"/><text x="265" y="808" text-anchor="middle" class="label">交易事实 / 冻结 / route snapshot</text>
+  <rect x="430" y="782" width="230" height="40" class="box green"/><text x="545" y="808" text-anchor="middle" class="label">账本交易 / ledger entry</text>
+  <rect x="710" y="782" width="230" height="40" class="box orange"/><text x="825" y="808" text-anchor="middle" class="label">批次 / 差错 / 出款 / 追偿</text>
+  <rect x="990" y="782" width="230" height="40" class="box purple"/><text x="1105" y="808" text-anchor="middle" class="label">余额投影 / 交易投影 / 指标输入</text>
+
+  <rect x="50" y="875" width="1400" height="46" class="layer red"/>
+  <text x="75" y="904" class="section">横切门禁：Execution Grant 确认 governance 物理落点、首批 Red、权限审计、脱敏导出、Runbook、边界测试和 git diff --check</text>
+
+  <path d="M 750 212 L 750 250" class="arrow"/>
+  <path d="M 750 362 L 750 400" class="arrow"/>
+  <path d="M 750 504 L 750 542" class="arrow"/>
+  <path d="M 445 658 C 500 710, 525 735, 545 782" class="data"/>
+  <path d="M 675 658 L 545 782" class="data"/>
+  <path d="M 905 658 L 825 782" class="ops"/>
+  <path d="M 1145 658 C 1220 710, 1215 750, 1105 782" class="dash"/>
+  <path d="M 215 658 C 160 715, 175 750, 265 782" class="dash"/>
+  <path d="M 1105 822 L 1105 875" class="guard"/>
+</svg>

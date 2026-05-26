@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 980" width="1500" height="980" role="img" aria-labelledby="title desc">
+  <title id="title">支付资金底座职责边界矩阵</title>
+  <desc id="desc">展示 wallet、transaction、route、ledger、reconciliation、governance、reporting 和 business pack 的职责边界、拥有事实和禁止越界行为。</desc>
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #111827; }
+    .title { font-size: 28px; font-weight: 700; }
+    .subtitle { font-size: 14px; fill: #6b7280; }
+    .header { fill: #111827; }
+    .headText { fill: #ffffff; font-size: 13px; font-weight: 700; }
+    .cellText { font-size: 12px; fill: #111827; }
+    .module { font-size: 13px; font-weight: 700; }
+    .rowA { fill: #ffffff; }
+    .rowB { fill: #f8fafc; }
+    .stroke { stroke: #d1d5db; stroke-width: 1; }
+    .ok { fill: #ecfdf5; }
+    .no { fill: #fef2f2; }
+    .note { font-size: 12px; fill: #4b5563; }
+  </style>
+  <rect width="1500" height="980" fill="#ffffff"/>
+  <text x="54" y="56" class="title">支付资金底座职责边界矩阵</text>
+  <text x="54" y="84" class="subtitle">用于宣讲“谁拥有事实、谁只消费事实、谁不能写事实”，避免钱包、路由、账本、清结算和治理互相越界</text>
+
+  <rect x="50" y="125" width="1400" height="44" class="header"/>
+  <text x="80" y="153" class="headText">能力域</text>
+  <text x="260" y="153" class="headText">拥有事实或模型</text>
+  <text x="575" y="153" class="headText">主要写入职责</text>
+  <text x="880" y="153" class="headText">只读消费</text>
+  <text x="1165" y="153" class="headText">禁止越界</text>
+
+  <g transform="translate(50,169)">
+    <rect width="1400" height="82" class="rowA stroke"/>
+    <text x="30" y="36" class="module">wallet</text><text x="30" y="58" class="cellText">钱包账户域</text>
+    <text x="210" y="28" class="cellText">FundingAccount、CreditAccount、BudgetGroup、</text><text x="210" y="48" class="cellText">平台账户角色、支付工具、绑定历史、资金来源关系</text>
+    <text x="525" y="38" class="cellText">账户建模、显式建账、工具绑定、余额查询</text>
+    <text x="830" y="38" class="cellText">交易结果、账本余额、余额投影</text>
+    <text x="1115" y="28" class="cellText">不写资金交易、route snapshot、ledger entry；</text><text x="1115" y="48" class="cellText">不把工具、信用、预算泛化为 FundingAccount</text>
+  </g>
+
+  <g transform="translate(50,251)">
+    <rect width="1400" height="82" class="rowB stroke"/>
+    <text x="30" y="36" class="module">transaction</text><text x="30" y="58" class="cellText">交易编排域</text>
+    <text x="210" y="28" class="cellText">FundsTransaction、TransactionDetail、FrozenOrder、</text><text x="210" y="48" class="cellText">BalanceAdjustAction、RouteSnapshot</text>
+    <text x="525" y="38" class="cellText">指令转换、幂等、生命周期、路由编排</text>
+    <text x="830" y="38" class="cellText">wallet 主体、ledger 过账、外部归一事实</text>
+    <text x="1115" y="28" class="cellText">不直接改余额投影；不承接完整 VCC、</text><text x="1115" y="48" class="cellText">全球账户或收单业务状态机</text>
+  </g>
+
+  <g transform="translate(50,333)">
+    <rect width="1400" height="82" class="rowA stroke"/>
+    <text x="30" y="36" class="module">route</text><text x="30" y="58" class="cellText">资金路径域</text>
+    <text x="210" y="38" class="cellText">ResolvedRoute、RouteLeg、RoutingDecision、RouteSnapshot</text>
+    <text x="525" y="38" class="cellText">解析参与方、账目、周期、路径快照</text>
+    <text x="830" y="38" class="cellText">钱包账户、支付工具引用、业务指令</text>
+    <text x="1115" y="38" class="cellText">不写交易事实、不写账本事实、不改状态</text>
+  </g>
+
+  <g transform="translate(50,415)">
+    <rect width="1400" height="82" class="rowB stroke"/>
+    <text x="30" y="36" class="module">ledger</text><text x="30" y="58" class="cellText">账本事实域</text>
+    <text x="210" y="28" class="cellText">Ledger、LedgerTransaction、PostingPlan、LedgerEntry、</text><text x="210" y="48" class="cellText">BalanceProjection、BalanceChangedEvent</text>
+    <text x="525" y="38" class="cellText">过账、分录、余额投影、账本查询</text>
+    <text x="830" y="38" class="cellText">资金指令、route snapshot、posting command</text>
+    <text x="1115" y="28" class="cellText">不持有业务交易生命周期；不重新路由；</text><text x="1115" y="48" class="cellText">不让投影反写事实</text>
+  </g>
+
+  <g transform="translate(50,497)">
+    <rect width="1400" height="82" class="rowA stroke"/>
+    <text x="30" y="36" class="module">reconciliation</text><text x="30" y="58" class="cellText">对账清算域</text>
+    <text x="210" y="28" class="cellText">对账批次、匹配结果、差错单、清分批次、</text><text x="210" y="48" class="cellText">清算批次、结算单、出款单、追偿单</text>
+    <text x="525" y="38" class="cellText">运营闭环、差错处理、出款跟踪、审计</text>
+    <text x="830" y="38" class="cellText">交易事实、账本事实、外部资金证据</text>
+    <text x="1115" y="28" class="cellText">不直接改历史分录、余额、交易状态；</text><text x="1115" y="48" class="cellText">补事实必须走白名单命令</text>
+  </g>
+
+  <g transform="translate(50,579)">
+    <rect width="1400" height="82" class="rowB stroke"/>
+    <text x="30" y="36" class="module">governance</text><text x="30" y="58" class="cellText">资金数据治理域</text>
+    <text x="210" y="28" class="cellText">归档申请、Manifest、checkpoint、watermark、</text><text x="210" y="48" class="cellText">重放任务、差异报告、治理审计</text>
+    <text x="525" y="38" class="cellText">归档编排、余额重建校验、投影重放</text>
+    <text x="830" y="38" class="cellText">交易、账本、清结算和投影事实</text>
+    <text x="1115" y="28" class="cellText">不生成资金事实；不推进指标水位；</text><text x="1115" y="48" class="cellText">不替代报表指标模块</text>
+  </g>
+
+  <g transform="translate(50,661)">
+    <rect width="1400" height="82" class="rowA stroke"/>
+    <text x="30" y="36" class="module">reporting</text><text x="30" y="58" class="cellText">报表指标模块</text>
+    <text x="210" y="38" class="cellText">指标模型、指标计算、看板、导出订阅、OLAP 宽表</text>
+    <text x="525" y="38" class="cellText">指标计算和正式报表输出</text>
+    <text x="830" y="38" class="cellText">资金事实、投影和治理导出快照</text>
+    <text x="1115" y="38" class="cellText">不反写资金事实，不替代余额快照或归档 Manifest</text>
+  </g>
+
+  <g transform="translate(50,743)">
+    <rect width="1400" height="82" class="rowB stroke"/>
+    <text x="30" y="36" class="module">business pack</text><text x="30" y="58" class="cellText">VCC / 全球账户 / 收单 / ACH 支撑</text>
+    <text x="210" y="38" class="cellText">业务专项状态、外部规则、轨道引用、风控和证据包</text>
+    <text x="525" y="38" class="cellText">归一资金事实后接入 wind-funds</text>
+    <text x="830" y="38" class="cellText">P0/P1 钱包、账本、对账、清结算、归档</text>
+    <text x="1115" y="38" class="cellText">不新增平行钱包、平行账本、平行清结算</text>
+  </g>
+
+  <rect x="90" y="870" width="1320" height="52" class="no stroke"/>
+  <text x="750" y="893" text-anchor="middle" class="note">红线：客户资金、商户待结算资金、平台自有资金、保证金、补贴资金和手续费收入必须按主体、账目、来源和审计隔离。</text>
+  <text x="750" y="913" text-anchor="middle" class="note">外部规则未确认时只能阻断、降级、contract-only 或人工复核，不能驱动自动资金处理。</text>
+</svg>

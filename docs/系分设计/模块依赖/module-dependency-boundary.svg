@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 940" width="1500" height="940" role="img" aria-labelledby="title desc">
+  <title id="title">支付资金底座模块依赖与禁止方向</title>
+  <desc id="desc">展示 core、face、impl、tests 之间允许的模块依赖方向，以及资金域禁止越界的依赖关系。</desc>
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #111827; }
+    .title { font-size: 28px; font-weight: 700; }
+    .subtitle { font-size: 14px; fill: #6b7280; }
+    .box { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; rx: 10; ry: 10; }
+    .group { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; stroke-dasharray: 8 7; rx: 18; ry: 18; }
+    .blue { fill: #eff6ff; stroke: #bfdbfe; }
+    .green { fill: #f0fdf4; stroke: #bbf7d0; }
+    .purple { fill: #faf5ff; stroke: #e9d5ff; }
+    .orange { fill: #fff7ed; stroke: #fed7aa; }
+    .red { fill: #fef2f2; stroke: #fecaca; }
+    .teal { fill: #f0fdfa; stroke: #99f6e4; }
+    .gray { fill: #f8fafc; stroke: #cbd5e1; }
+    .label { font-size: 15px; font-weight: 700; }
+    .sub { font-size: 12px; fill: #4b5563; }
+    .section { font-size: 16px; font-weight: 700; fill: #374151; }
+    .ok { stroke: #2563eb; stroke-width: 2.4; fill: none; marker-end: url(#arrow-blue); }
+    .read { stroke: #16a34a; stroke-width: 2.2; fill: none; marker-end: url(#arrow-green); }
+    .bad { stroke: #dc2626; stroke-width: 2.2; fill: none; marker-end: url(#arrow-red); stroke-dasharray: 8 6; }
+  </style>
+  <defs>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#2563eb"/></marker>
+    <marker id="arrow-green" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#16a34a"/></marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#dc2626"/></marker>
+  </defs>
+  <rect width="1500" height="940" fill="#ffffff"/>
+  <text x="54" y="56" class="title">支付资金底座模块依赖与禁止方向</text>
+  <text x="54" y="84" class="subtitle">核心原则：face 对外稳定、core 只承载语义、impl 实现内聚、tests 只验证不被生产依赖</text>
+
+  <rect x="80" y="130" width="1340" height="160" class="group purple"/>
+  <text x="105" y="164" class="section">资金语义内核</text>
+  <rect x="500" y="188" width="500" height="62" class="box purple"/>
+  <text x="750" y="214" text-anchor="middle" class="label">core / capte-domain-core</text>
+  <text x="750" y="236" text-anchor="middle" class="sub">DSL、枚举、值对象、Spec、Port；禁止依赖 DAL、Web、MQ、impl、tests</text>
+
+  <rect x="80" y="330" width="1340" height="150" class="group"/>
+  <text x="105" y="364" class="section">对外契约层</text>
+  <rect x="150" y="390" width="220" height="58" class="box teal"/><text x="260" y="415" text-anchor="middle" class="label">wallet-face</text><text x="260" y="436" text-anchor="middle" class="sub">账户 / 工具 / 查询契约</text>
+  <rect x="440" y="390" width="240" height="58" class="box blue"/><text x="560" y="415" text-anchor="middle" class="label">transaction-face</text><text x="560" y="436" text-anchor="middle" class="sub">交易 / 授权 / 余额控制</text>
+  <rect x="750" y="390" width="220" height="58" class="box green"/><text x="860" y="415" text-anchor="middle" class="label">ledger-face</text><text x="860" y="436" text-anchor="middle" class="sub">账本 / 分录 / 过账</text>
+  <rect x="1040" y="390" width="240" height="58" class="box orange"/><text x="1160" y="415" text-anchor="middle" class="label">reconciliation-face</text><text x="1160" y="436" text-anchor="middle" class="sub">对账 / 清分 / 结算</text>
+
+  <rect x="80" y="520" width="1340" height="168" class="group"/>
+  <text x="105" y="554" class="section">实现层</text>
+  <rect x="145" y="585" width="230" height="64" class="box teal"/><text x="260" y="611" text-anchor="middle" class="label">wallet-impl</text><text x="260" y="633" text-anchor="middle" class="sub">依赖 wallet-face / transaction-face / ledger-face / core</text>
+  <rect x="430" y="585" width="260" height="64" class="box blue"/><text x="560" y="611" text-anchor="middle" class="label">transaction-impl</text><text x="560" y="633" text-anchor="middle" class="sub">依赖 transaction-face / ledger-face / core</text>
+  <rect x="745" y="585" width="230" height="64" class="box green"/><text x="860" y="611" text-anchor="middle" class="label">ledger-impl</text><text x="860" y="633" text-anchor="middle" class="sub">依赖 ledger-face / core</text>
+  <rect x="1030" y="585" width="260" height="64" class="box orange"/><text x="1160" y="611" text-anchor="middle" class="label">reconciliation-impl</text><text x="1160" y="633" text-anchor="middle" class="sub">依赖 face / core；补事实走白名单命令</text>
+
+  <rect x="80" y="730" width="1340" height="100" class="group gray"/>
+  <text x="105" y="764" class="section">测试层</text>
+  <rect x="350" y="780" width="800" height="34" class="box gray"/>
+  <text x="750" y="803" text-anchor="middle" class="label">tests：契约测试、服务流程测试、账务断言、H2 schema、架构边界和红线失败测试</text>
+
+  <path d="M 260 390 C 300 330, 520 290, 620 250" class="ok"/>
+  <path d="M 560 390 C 610 330, 690 290, 720 250" class="ok"/>
+  <path d="M 860 390 C 850 330, 800 290, 770 250" class="ok"/>
+  <path d="M 1160 390 C 1110 330, 950 290, 820 250" class="ok"/>
+  <path d="M 260 585 L 260 448" class="ok"/>
+  <path d="M 560 585 L 560 448" class="ok"/>
+  <path d="M 860 585 L 860 448" class="ok"/>
+  <path d="M 1160 585 L 1160 448" class="ok"/>
+  <path d="M 260 585 C 340 535, 455 500, 560 448" class="read"/>
+  <path d="M 260 585 C 480 540, 680 500, 860 448" class="read"/>
+  <path d="M 560 585 C 640 535, 760 500, 860 448" class="read"/>
+  <path d="M 1160 585 C 1090 535, 960 500, 860 448" class="read"/>
+
+  <path d="M 500 260 C 250 470, 220 680, 350 760" class="bad"/>
+  <text x="120" y="865" class="section">禁止方向</text>
+  <rect x="240" y="845" width="980" height="72" class="box red"/>
+  <text x="730" y="864" text-anchor="middle" class="sub">face 不依赖 impl；生产模块不依赖 tests；core 不依赖 DAL/Web/MQ；跨域只通过 face/port，impl 不直接依赖其他 impl</text>
+  <text x="730" y="884" text-anchor="middle" class="sub">wallet 不直接写交易或账本；route 不写事实；ledger 不持有业务生命周期；对账清算补事实必须走白名单命令</text>
+  <text x="730" y="904" text-anchor="middle" class="sub">对账清算不得直接改历史分录、余额投影或交易事实；治理、归档、重放和指标不得反写资金事实</text>
+</svg>

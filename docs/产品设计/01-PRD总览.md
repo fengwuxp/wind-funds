@@ -549,7 +549,7 @@ flowchart LR
 
 ## 8. 产品架构图
 
-新的产品架构采用“业务场景在上、资金内核在中、运营治理在旁、外部规则在外”的结构。三类业务通过场景交易 capability pack 接入，不直接进入账本和清结算；统一内核只处理资金动作、账户约束、路由账务、投影、清结算、对账和归档。可维护 SVG 见 [../图形化/prd-product-architecture-2026.svg](../图形化/prd-product-architecture-2026.svg)。
+新的产品架构采用“业务场景在上、资金内核在中、运营治理在旁、外部规则在外”的结构。三类业务通过场景交易 capability pack 接入，不直接进入账本和清结算；统一内核只处理资金动作、账户约束、路由账务、投影、清结算、对账和归档。可维护 SVG 见 [wind-funds-product-architecture.svg](产品架构图/wind-funds-product-architecture.svg)。
 
 ```mermaid
 flowchart TB

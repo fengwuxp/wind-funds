@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 900" width="1500" height="900" role="img" aria-labelledby="title desc">
+  <title id="title">资金写入主流程：请求到分录和投影</title>
+  <desc id="desc">展示直接交易、授权交易和余额控制从请求、幂等、指令转换、路由解析、账务计划、账本入账到投影和审计的主流程。</desc>
+  <style>
+    text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; fill: #111827; }
+    .title { font-size: 28px; font-weight: 700; }
+    .subtitle { font-size: 14px; fill: #6b7280; }
+    .box { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; rx: 10; ry: 10; }
+    .blue { fill: #eff6ff; stroke: #bfdbfe; }
+    .green { fill: #f0fdf4; stroke: #bbf7d0; }
+    .purple { fill: #faf5ff; stroke: #e9d5ff; }
+    .orange { fill: #fff7ed; stroke: #fed7aa; }
+    .red { fill: #fef2f2; stroke: #fecaca; }
+    .teal { fill: #f0fdfa; stroke: #99f6e4; }
+    .label { font-size: 15px; font-weight: 700; }
+    .sub { font-size: 12px; fill: #4b5563; }
+    .section { font-size: 16px; font-weight: 700; fill: #374151; }
+    .arrow { stroke: #2563eb; stroke-width: 2.6; fill: none; marker-end: url(#arrow-blue); }
+    .data { stroke: #16a34a; stroke-width: 2.6; fill: none; marker-end: url(#arrow-green); }
+    .read { stroke: #9333ea; stroke-width: 2.2; fill: none; marker-end: url(#arrow-purple); }
+    .guard { stroke: #dc2626; stroke-width: 2.3; fill: none; marker-end: url(#arrow-red); stroke-dasharray: 8 6; }
+  </style>
+  <defs>
+    <marker id="arrow-blue" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#2563eb"/></marker>
+    <marker id="arrow-green" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#16a34a"/></marker>
+    <marker id="arrow-purple" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#9333ea"/></marker>
+    <marker id="arrow-red" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto"><polygon points="0 0, 12 4, 0 8" fill="#dc2626"/></marker>
+  </defs>
+  <rect width="1500" height="900" fill="#ffffff"/>
+  <text x="54" y="56" class="title">资金写入主流程：请求到分录和投影</text>
+  <text x="54" y="84" class="subtitle">适用直接交易、授权交易、余额控制；失败路径必须证明无 route、无 posting、无 entry 或余额无副作用</text>
+
+  <rect x="70" y="150" width="170" height="86" class="box blue"/>
+  <text x="155" y="181" text-anchor="middle" class="label">服务请求</text>
+  <text x="155" y="205" text-anchor="middle" class="sub">Request / Operator</text>
+  <text x="155" y="223" text-anchor="middle" class="sub">业务流水 / 幂等键</text>
+
+  <rect x="300" y="150" width="170" height="86" class="box blue"/>
+  <text x="385" y="181" text-anchor="middle" class="label">准入和幂等</text>
+  <text x="385" y="205" text-anchor="middle" class="sub">请求摘要 / 权限</text>
+  <text x="385" y="223" text-anchor="middle" class="sub">重复和冲突判定</text>
+
+  <rect x="530" y="150" width="170" height="86" class="box purple"/>
+  <text x="615" y="181" text-anchor="middle" class="label">资金指令</text>
+  <text x="615" y="205" text-anchor="middle" class="sub">FundsInstruction</text>
+  <text x="615" y="223" text-anchor="middle" class="sub">金额 / 事件 / 引用</text>
+
+  <rect x="760" y="150" width="170" height="86" class="box teal"/>
+  <text x="845" y="181" text-anchor="middle" class="label">账户和工具解析</text>
+  <text x="845" y="205" text-anchor="middle" class="sub">FundingAccount</text>
+  <text x="845" y="223" text-anchor="middle" class="sub">Credit / Budget / Tool Ref</text>
+
+  <rect x="990" y="150" width="170" height="86" class="box blue"/>
+  <text x="1075" y="181" text-anchor="middle" class="label">资金路由</text>
+  <text x="1075" y="205" text-anchor="middle" class="sub">RouteResolver</text>
+  <text x="1075" y="223" text-anchor="middle" class="sub">RouteSnapshot</text>
+
+  <rect x="1230" y="150" width="170" height="86" class="box green"/>
+  <text x="1315" y="181" text-anchor="middle" class="label">账务计划</text>
+  <text x="1315" y="205" text-anchor="middle" class="sub">PostingPlan</text>
+  <text x="1315" y="223" text-anchor="middle" class="sub">平衡 / 币种 / 周期</text>
+
+  <rect x="260" y="360" width="200" height="86" class="box green"/>
+  <text x="360" y="391" text-anchor="middle" class="label">账本过账</text>
+  <text x="360" y="415" text-anchor="middle" class="sub">LedgerTransaction</text>
+  <text x="360" y="433" text-anchor="middle" class="sub">LedgerEntry 不可变</text>
+
+  <rect x="530" y="360" width="200" height="86" class="box purple"/>
+  <text x="630" y="391" text-anchor="middle" class="label">余额投影</text>
+  <text x="630" y="415" text-anchor="middle" class="sub">BalanceProjection</text>
+  <text x="630" y="433" text-anchor="middle" class="sub">delta / bucket / period</text>
+
+  <rect x="800" y="360" width="200" height="86" class="box purple"/>
+  <text x="900" y="391" text-anchor="middle" class="label">交易投影</text>
+  <text x="900" y="415" text-anchor="middle" class="sub">TransactionView</text>
+  <text x="900" y="433" text-anchor="middle" class="sub">账单 / 时间线 / 报表输入</text>
+
+  <rect x="1070" y="360" width="200" height="86" class="box orange"/>
+  <text x="1170" y="391" text-anchor="middle" class="label">审计观测</text>
+  <text x="1170" y="415" text-anchor="middle" class="sub">Trace / Audit / Event</text>
+  <text x="1170" y="433" text-anchor="middle" class="sub">告警 / Runbook</text>
+
+  <rect x="260" y="610" width="280" height="94" class="box red"/>
+  <text x="400" y="642" text-anchor="middle" class="label">必须失败边界</text>
+  <text x="400" y="666" text-anchor="middle" class="sub">外部账户入账 / 直接改余额</text>
+  <text x="400" y="684" text-anchor="middle" class="sub">缺快照逆向 / 授权拒绝入账</text>
+
+  <rect x="620" y="610" width="280" height="94" class="box red"/>
+  <text x="760" y="642" text-anchor="middle" class="label">人工处理边界</text>
+  <text x="760" y="666" text-anchor="middle" class="sub">差错单 / 审批 / 凭证</text>
+  <text x="760" y="684" text-anchor="middle" class="sub">只能追加事实，不能改历史</text>
+
+  <rect x="980" y="610" width="280" height="94" class="box red"/>
+  <text x="1120" y="642" text-anchor="middle" class="label">编码准入</text>
+  <text x="1120" y="666" text-anchor="middle" class="sub">Execution Grant / 首批 Red</text>
+  <text x="1120" y="684" text-anchor="middle" class="sub">验证命令 / Not Done</text>
+
+  <path d="M 240 193 L 300 193" class="arrow"/>
+  <path d="M 470 193 L 530 193" class="arrow"/>
+  <path d="M 700 193 L 760 193" class="arrow"/>
+  <path d="M 930 193 L 990 193" class="arrow"/>
+  <path d="M 1160 193 L 1230 193" class="arrow"/>
+  <path d="M 1315 236 C 1315 310, 485 300, 360 360" class="data"/>
+  <path d="M 460 403 L 530 403" class="data"/>
+  <path d="M 730 403 L 800 403" class="read"/>
+  <path d="M 1000 403 L 1070 403" class="read"/>
+  <path d="M 385 236 C 330 360, 310 500, 400 610" class="guard"/>
+  <path d="M 1075 236 C 1000 390, 850 510, 760 610" class="guard"/>
+  <path d="M 1315 236 C 1330 410, 1260 530, 1120 610" class="guard"/>
+
+  <text x="72" y="790" class="section">关键断言</text>
+  <text x="190" y="790" class="sub">1. 同业务键同摘要复用结果；同键不同摘要冲突失败。</text>
+  <text x="190" y="816" class="sub">2. 交易成功必须以账本过账成功为前提；账本失败不得展示交易成功。</text>
+  <text x="190" y="842" class="sub">3. 余额投影、交易投影和指标输入只读派生，不反写交易事实或账本事实。</text>
+</svg>
