@@ -175,6 +175,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
         assertPostedTransactions(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_WITH_FEE_CONFIRM", 4, 3, 6);
     }
 
     /**
