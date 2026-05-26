@@ -108,6 +108,10 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.REFUND.name());
+
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_REFUND_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_REFUND_PAY", 2, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_REFUND_REFUND", 2, 2);
     }
 
     /**
@@ -153,6 +157,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_INSUFFICIENT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_INSUFFICIENT_PAY", 2, 2);
         assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_REFUND_INSUFFICIENT_REFUND");
     }
 
@@ -190,6 +196,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_SAME_ACCOUNT_TRANSFER_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_SAME_ACCOUNT_TRANSFER");
     }
 
@@ -238,6 +245,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_TRANSFER_CURRENCY_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_CURRENCY");
     }
 
@@ -400,6 +408,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_CURRENCY_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_CURRENCY_PAY");
     }
 
@@ -443,6 +452,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_MISSING_PAYEE_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_MISSING_PAYEE");
     }
 
@@ -496,6 +506,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_MISSING_PAYEE_LEDGER_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_MISSING_PAYEE_LEDGER");
     }
 
@@ -538,6 +549,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_MISSING_LEDGER_TOPUP", 3, 4);
         assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_PAY_MISSING_LEDGER");
     }
 
@@ -584,6 +596,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_EXTERNAL_PAYEE_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_EXTERNAL_PAYEE");
     }
 
@@ -749,6 +762,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TOPUP", 3, 4);
         assertThat(fundsTransactionDetails(firstPaySn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_PAY", 2, 2);
     }
@@ -809,6 +823,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_PARTICIPANT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_PARTICIPANT_ANOTHER_TOPUP", 3, 4);
         assertThat(fundsTransactionDetails(firstPaySn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_PAY_PARTICIPANT", 2, 2);
     }
@@ -876,6 +892,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.TRANSFER.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_TOPUP", 3, 4);
         assertThat(fundsTransactionDetails(firstTransferSn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TRANSFER", 2, 2);
     }
@@ -948,6 +965,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name(),
                         FundsTransactionEventType.REFUND.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND_PAY", 2, 2);
         assertThat(fundsTransactionDetails(firstRefundSn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND", 2, 2);
     }
