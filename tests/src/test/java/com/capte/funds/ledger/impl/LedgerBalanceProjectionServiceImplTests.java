@@ -49,7 +49,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -97,8 +96,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
             throw new IllegalStateException("balance log sink unavailable");
         });
 
-        assertThatCode(() -> projectionService.project(List.of(ledgerEntry(25L))))
-                .doesNotThrowAnyException();
+        projectionService.project(List.of(ledgerEntry(25L)));
 
         LedgerDTO ledger = ledgerService.getLedgerById(availableLedgerId);
         assertThat(eventAttempts).hasValue(1);
