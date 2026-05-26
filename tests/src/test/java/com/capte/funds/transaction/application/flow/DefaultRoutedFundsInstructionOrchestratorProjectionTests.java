@@ -136,6 +136,8 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                     assertThat(detail.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
                 });
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_SUCCESS_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_SUCCESS_PAY", 2, 2);
     }
 
     /**
@@ -181,6 +183,8 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                     .containsEntry("nextAction", "WAIT_FOR_CAPTURE_OR_RELEASE");
         });
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_AUTH_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_AUTH_AUTHORIZE", 1, 2);
     }
 
     /**
@@ -229,6 +233,21 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                     .containsEntry("unavailableReason", "AUTHORIZATION_DECLINED");
         });
         assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_AUTH_DECLINE_TOPUP", 3, 4);
+        assertThat(fundsTransactionsByBusinessSn("PROJECTION_AUTH_DECLINE"))
+                .as("rejected funds transactions for businessSn PROJECTION_AUTH_DECLINE")
+                .singleElement()
+                .satisfies(transaction -> {
+                    assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+                    assertNoLedgerFactsForFundsTransaction(transaction.getSn());
+                });
+        assertThat(fundsTransactionDetailsByBusinessSn("PROJECTION_AUTH_DECLINE"))
+                .as("rejected funds transaction details for businessSn PROJECTION_AUTH_DECLINE")
+                .singleElement()
+                .satisfies(detail -> {
+                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getLedgerTransactionSn()).isNull();
+                });
     }
 
     /**
@@ -273,6 +292,8 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                     .containsEntry("nextAction", "WAIT_FOR_UNFREEZE_OR_CONSUME");
         });
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_FREEZE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("PROJECTION_FREEZE_HOLD", 0, 0, 1, 2);
     }
 
     /**
@@ -350,6 +371,8 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
                         tuple(payer.id(), LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT),
                         tuple(payee.id(), LedgerSubjectCode.SETTLEMENT, EntrySide.CREDIT));
         assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_FAILURE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("PROJECTION_FAILURE_PAY", 2, 2);
     }
 
     @AfterEach
