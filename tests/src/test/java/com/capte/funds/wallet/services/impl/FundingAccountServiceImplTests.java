@@ -73,6 +73,12 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String MONTHLY_PERIOD_ID = "2026-05";
 
+    private static final Map<LedgerSubjectCode, Boolean> EXPECTED_ALLOW_NEGATIVE_RULES = Map.of(
+            LedgerSubjectCode.AVAILABLE, Boolean.TRUE,
+            LedgerSubjectCode.FROZEN, Boolean.FALSE,
+            LedgerSubjectCode.AUTHORIZATION, Boolean.FALSE
+    );
+
     @Autowired
     private FundingAccountService fundingAccountService;
 
@@ -356,6 +362,8 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getLedgerProfileVersion()).isEqualTo(1);
         assertThat(ledger.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.LIABILITY);
         assertThat(ledger.getNormalBalanceSide()).isEqualTo(EntrySide.CREDIT);
+        assertThat(ledger.getAllowNegative())
+                .isEqualTo(EXPECTED_ALLOW_NEGATIVE_RULES.get(ledger.getLedgerSubjectCode()));
         assertThat(ledger.getDebitAmount()).isZero();
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isZero();
