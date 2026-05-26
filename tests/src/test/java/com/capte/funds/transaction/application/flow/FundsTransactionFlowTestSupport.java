@@ -938,6 +938,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     private void assertValidPostedTransaction(LedgerTransaction transaction) {
         assertThat(transaction.getFundsTransactionSn()).isNotBlank();
+        assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
         assertThat(transaction.getBalanced()).isTrue();
         assertThat(transaction.getDebitAmount()).isEqualTo(transaction.getCreditAmount());
         List<LedgerPostingPlan> postingPlans = postingPlansOf(transaction);
