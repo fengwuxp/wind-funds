@@ -190,7 +190,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
-        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_CURRENCY");
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_SAME_ACCOUNT_TRANSFER");
     }
 
     /**
@@ -238,6 +238,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_CURRENCY");
     }
 
     /**
