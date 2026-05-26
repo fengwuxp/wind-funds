@@ -43,6 +43,8 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String SUBJECT_ID = "ledger_period_contract";
 
+    private static final String DEFAULT_SUBJECT_ID = "ledger_defaults_contract";
+
     private static final String MONTHLY_PERIOD_ID = "2026-05";
 
     @Autowired
@@ -98,6 +100,45 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：上层显式初始化账本时只传入必需主体、账目和币种。
+     * 输入：未传 profile、科目分类、正常余额方向、负余额规则、结算策略、切日和周期。
+     * 输出：账本服务补齐默认账本事实，并使用 LIFETIME 周期。
+     * 红线：底层建账默认值必须稳定可追溯，不得产生账务交易、posting plan 或 entry。
+     */
+    @Test
+    void testCreateLedgerShouldFillDefaultLedgerFactsWithoutLedgerTransactionMutation() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        Long ledgerId = ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(DEFAULT_SUBJECT_ID)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name())
+                .setLedgerSubjectCode(LedgerSubjectCode.SUSPENSE)
+                .setCurrency(CurrencyIsoCode.USD));
+
+        LedgerDTO ledger = ledgerService.getLedgerById(ledgerId);
+        assertThat(ledger.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(ledger.getSubjectId()).isEqualTo(DEFAULT_SUBJECT_ID);
+        assertThat(ledger.getSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT.name());
+        assertThat(ledger.getLedgerProfileCode()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT.name());
+        assertThat(ledger.getLedgerProfileVersion()).isEqualTo(1);
+        assertThat(ledger.getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.SUSPENSE);
+        assertThat(ledger.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.MEMO);
+        assertThat(ledger.getNormalBalanceSide()).isEqualTo(EntrySide.DEBIT);
+        assertThat(ledger.getAllowNegative()).isFalse();
+        assertThat(ledger.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+        assertThat(ledger.getDebitAmount()).isZero();
+        assertThat(ledger.getCreditAmount()).isZero();
+        assertThat(ledger.getNormalBalance()).isZero();
+        assertThat(ledger.getSettlementPolicy()).isEqualTo("RT");
+        assertThat(ledger.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
+        assertThat(ledger.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
+        assertThat(ledger.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
+        assertThat(countLedgers(DEFAULT_SUBJECT_ID)).isOne();
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpLedgerServiceTestData() {
         cleanupLedgerServiceTestData();
@@ -109,12 +150,16 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupLedgerServiceTestData() {
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", SUBJECT_ID);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)", SUBJECT_ID, DEFAULT_SUBJECT_ID);
     }
 
     private long countLedgers() {
+        return countLedgers(SUBJECT_ID);
+    }
+
+    private long countLedgers(String subjectId) {
         Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM t_ledger WHERE subject_id = ?",
-                Long.class, SUBJECT_ID);
+                Long.class, subjectId);
         return result;
     }
 
