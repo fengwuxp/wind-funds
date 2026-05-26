@@ -630,6 +630,21 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .isEmpty();
     }
 
+    protected void assertNoFundsOrLedgerFactsForBusinessSn(String businessSn) {
+        assertThat(fundsTransactionsByBusinessSn(businessSn))
+                .as("funds transactions for businessSn %s", businessSn)
+                .isEmpty();
+        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+                .as("funds transaction details for businessSn %s", businessSn)
+                .isEmpty();
+        assertThat(ledgerTransactionsForBusinessSn(businessSn))
+                .as("ledger transactions for businessSn %s", businessSn)
+                .isEmpty();
+        assertThat(entriesByBusinessSn(businessSn))
+                .as("ledger entries for businessSn %s", businessSn)
+                .isEmpty();
+    }
+
     protected List<LedgerTransaction> ledgerTransactions() {
         LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
         QueryWrapper wrapper = QueryWrapper.create().from(ref)

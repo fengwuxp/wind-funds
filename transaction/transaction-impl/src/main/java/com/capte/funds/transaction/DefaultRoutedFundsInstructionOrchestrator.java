@@ -86,17 +86,17 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
                     completedLifecycleResult(lifecycleResult, null), null);
             return lifecycleResult.getTransactionSn();
         }
-        LedgerTransactionSpec transaction = postingAssembler.assemble(instruction, lifecycleResult.getTransactionSn(),
-                resolvedRoute);
         try {
+            LedgerTransactionSpec transaction = postingAssembler.assemble(instruction, lifecycleResult.getTransactionSn(),
+                    resolvedRoute);
             ledgerTransactionPostingService.post(transaction);
             fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, transaction.getSn());
             publishProjection(instruction, resolvedRoute, routeSnapshot,
                     completedLifecycleResult(lifecycleResult, transaction.getSn()), transaction);
             return lifecycleResult.getTransactionSn();
-        } catch (Throwable throwable) {
-            fundsInstructionLifecycleRecorder.markFailed(instruction, lifecycleResult, throwable);
-            throw throwable;
+        } catch (RuntimeException | Error exception) {
+            fundsInstructionLifecycleRecorder.markFailed(instruction, lifecycleResult, exception);
+            throw exception;
         }
     }
 

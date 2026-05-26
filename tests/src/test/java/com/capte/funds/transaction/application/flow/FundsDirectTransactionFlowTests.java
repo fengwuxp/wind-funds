@@ -114,8 +114,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
      * 场景：直接退款出资方余额不足。
      * 输入：付款方充值 100、向收款方付款 70，随后收款方尝试退款 80。
      * 输出：退款失败；付款方、收款方和平台账户余额保持付款后的状态。
-     * 预期：退款出资方余额不足时整体事务回滚，不生成退款交易事实或账务事实。
-     * 红线：退款失败不能留下 route、posting、ledger entry 或余额投影副作用。
+     * 预期：退款出资方余额不足时记录 FAILED 资金交易事实，不生成账务事实。
+     * 红线：退款失败不能留下 posting、ledger entry 或余额投影副作用。
      */
     @Test
     void testRefundWithInsufficientPayerBalanceShouldRejectAndLeaveNoLedgerSideEffects() {
@@ -190,6 +190,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_CURRENCY");
     }
 
     /**
@@ -276,14 +277,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TOPUP_CURRENCY");
     }
 
     /**
      * 场景：付款方可用余额不足时发起系统内转账。
      * 输入：付款方未充值，向收款方转账 10。
      * 输出：请求被拒绝；付款方、收款方和平台账户余额均不变化。
-     * 预期：转账必须受付款方 AVAILABLE 余额约束，余额不足时整体事务回滚。
-     * 红线：转账余额不足不能留下 route、posting、ledger entry 或余额投影副作用。
+     * 预期：转账必须受付款方 AVAILABLE 余额约束，余额不足时记录 FAILED 资金交易事实。
+     * 红线：转账余额不足不能留下 posting、ledger entry 或余额投影副作用。
      */
     @Test
     void testTransferWithInsufficientBalanceShouldRejectAndLeaveNoLedgerSideEffects() {
@@ -312,13 +314,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(0);
+        assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_TRANSFER_INSUFFICIENT");
     }
 
     /**
      * 场景：付款方可用余额不足时发起直接付款。
      * 输入：付款方未充值，向普通收款方付款 10。
      * 输出：请求被拒绝；付款方、收款方和平台账户余额均不变化。
-     * 预期：余额不足失败必须回滚账务写入，不生成 posted ledger transaction。
+     * 预期：余额不足失败必须记录 FAILED 资金交易事实，不生成 posted ledger transaction。
      * 红线：余额不足不能留下半截 posting、ledger entry 或余额投影。
      */
     @Test
@@ -348,6 +351,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(0);
+        assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_INSUFFICIENT_PAY");
     }
 
     /**
@@ -395,6 +399,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_CURRENCY_PAY");
     }
 
     /**
@@ -437,6 +442,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_MISSING_PAYEE");
     }
 
     /**
@@ -489,14 +495,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_MISSING_PAYEE_LEDGER");
     }
 
     /**
      * 场景：直接付款收款主体存在，但目标收款账目未建账。
      * 输入：付款方充值 50，收款资金账户存在但没有 SETTLEMENT 账本。
      * 输出：付款失败；付款方、收款方和平台账户余额保持充值后的状态。
-     * 预期：账务计划缺目标账本时整体事务回滚，不自动建账、不展示交易成功。
-     * 红线：缺账本不能留下资金交易、route、posting、ledger entry 或余额投影副作用。
+     * 预期：账务计划缺目标账本时标记 FAILED 资金交易事实，不自动建账、不展示交易成功。
+     * 红线：缺账本不能留下 posting、ledger entry 或余额投影副作用。
      */
     @Test
     void testPayWithoutPayeeLedgerShouldRejectAndRollbackTransactionFacts() {
@@ -530,6 +537,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_PAY_MISSING_LEDGER");
     }
 
     /**
@@ -575,6 +583,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_EXTERNAL_PAYEE");
     }
 
     /**
@@ -614,6 +623,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_EXTERNAL_PAYER");
     }
 
     /**
