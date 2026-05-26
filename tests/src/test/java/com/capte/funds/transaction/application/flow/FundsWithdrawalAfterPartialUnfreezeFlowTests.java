@@ -147,6 +147,9 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_AFTER_RELEASE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_AFTER_RELEASE_FREEZE", 0, 0, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_AFTER_RELEASE_UNFREEZE", 0, 0, 1, 2);
         assertThat(ledgerTransactions().stream()
                 .map(LedgerTransaction::getEventType)
                 .toList())
@@ -197,6 +200,9 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_FREEZE", 0, 0, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_AFTER_FULL_RELEASE_UNFREEZE", 0, 0, 1, 2);
         assertThat(ledgerTransactions().stream()
                 .map(LedgerTransaction::getEventType)
                 .toList())
@@ -279,6 +285,10 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertPostedTransactions(4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE", 0, 0, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_1", 0, 0, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_RELEASE_2", 0, 0, 1, 2);
         assertThat(frozenOrderByBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE").getReleasedAmount()).isEqualTo(50L);
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_EXCEED");
     }
