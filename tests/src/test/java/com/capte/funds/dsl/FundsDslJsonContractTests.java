@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
@@ -37,9 +36,9 @@ class FundsDslJsonContractTests {
         for (Path sample : samples) {
             JSONObject document = JSON.parseObject(Files.readString(sample));
 
-            assertThatCode(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
-                    .as(sample.getFileName().toString())
-                    .doesNotThrowAnyException();
+            FundsDslJsonContractVerifier.verifyTransactionLayerCase(document);
+            assertThat(document.getString("caseId")).as(sample.getFileName().toString()).isNotBlank();
+            assertThat(document).as(sample.getFileName().toString()).containsKey("instruction");
         }
     }
 

@@ -45,10 +45,10 @@ class FundsInstructionDslContractTests {
         assertThat(instruction.getBusinessScene()).isEqualTo("FUNDS_INSTRUCTION_DSL");
         assertThat(instruction.getBusinessSn()).isEqualTo("BIZ-FI-001");
         assertThat(instruction.getOperator().getAppName()).isEqualTo("wind-funds-tests");
-        assertThat(instruction.getReference()).isNotNull();
-        assertThat(instruction.getReference().getReferenceType())
-                .isEqualTo(FundsInstructionReferenceType.EXTERNAL_TRANSACTION);
-        assertThat(instruction.getReference().getExternalTransactionId()).isEqualTo("EXT-202605200001");
+        assertThat(instruction.getReference()).isInstanceOfSatisfying(FundsInstructionReferenceSpec.class, reference -> {
+            assertThat(reference.getReferenceType()).isEqualTo(FundsInstructionReferenceType.EXTERNAL_TRANSACTION);
+            assertThat(reference.getExternalTransactionId()).isEqualTo("EXT-202605200001");
+        });
     }
 
     /**

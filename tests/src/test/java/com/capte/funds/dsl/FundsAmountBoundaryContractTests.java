@@ -150,7 +150,7 @@ class FundsAmountBoundaryContractTests {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("funding account allocation amount must equal consume route amount");
 
-        resolvedRoute(routeLeg(100L),
+        ImmutableResolvedRouteSpec validRoute = resolvedRoute(routeLeg(100L),
                 routingDecision(List.of(fundingAllocation("ALLOC-BUDGET-002",
                                 subjectRef("BG-002", FundsSubjectType.BUDGET_GROUP),
                                 100L,
@@ -161,6 +161,16 @@ class FundsAmountBoundaryContractTests {
                                 100L,
                                 20,
                                 "REAL_FUNDING_ACCOUNT"))));
+        assertThat(validRoute.getLegs()).singleElement()
+                .satisfies(leg -> assertThat(leg.getAmount()).isEqualTo(Money.immutable(100L, CURRENCY)));
+        assertThat(validRoute.getRoutingDecision()).satisfies(decision -> {
+            assertThat(decision.getFundingAllocations())
+                    .extracting(allocation -> allocation.getSubjectRef().getSubjectType())
+                    .containsExactly(FundsSubjectType.BUDGET_GROUP, FundsSubjectType.FUNDING_ACCOUNT);
+            assertThat(decision.getFundingAllocations())
+                    .extracting(FundingAllocationDecisionSpec::getAmount)
+                    .containsExactly(Money.immutable(100L, CURRENCY), Money.immutable(100L, CURRENCY));
+        });
     }
 
     /**
