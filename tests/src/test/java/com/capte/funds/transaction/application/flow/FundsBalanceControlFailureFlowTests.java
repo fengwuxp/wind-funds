@@ -900,6 +900,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     void testBalanceAdjustWithoutAuditContextShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
         BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
                 "BALANCE_ADJUST_AUDIT_MISSING_REASON"), WindOperator.system()))
@@ -920,6 +921,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(0);
