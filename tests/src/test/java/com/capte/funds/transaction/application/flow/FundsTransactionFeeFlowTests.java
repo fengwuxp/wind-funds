@@ -53,6 +53,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertPostedTransactions(0);
+        assertFailedFundsTransactionWithoutLedgerFacts("FEE_NO_BALANCE_CHARGE");
     }
 
     /**
@@ -213,6 +214,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_RETURN");
     }
 
     /**
@@ -275,5 +277,6 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.FEE_REFUND.name(),
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_SECOND_RETURN");
     }
 }
