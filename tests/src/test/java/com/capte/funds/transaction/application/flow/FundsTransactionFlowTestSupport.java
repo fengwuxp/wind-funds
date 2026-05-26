@@ -588,6 +588,17 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected void assertPostedTransactions(int expectedSize) {
         List<LedgerTransaction> transactions = ledgerTransactions();
+        List<String> transactionSns = transactions.stream()
+                .map(LedgerTransaction::getSn)
+                .toList();
+        assertThat(postingPlans())
+                .as("ledger posting plans must belong to posted ledger transactions")
+                .extracting(LedgerPostingPlan::getLedgerTransactionSn)
+                .containsOnlyElementsOf(transactionSns);
+        assertThat(entries())
+                .as("ledger entries must belong to posted ledger transactions")
+                .extracting(LedgerEntry::getLedgerTransactionSn)
+                .containsOnlyElementsOf(transactionSns);
         assertThat(transactions).hasSize(expectedSize);
         transactions.forEach(this::assertValidPostedTransaction);
     }
@@ -684,6 +695,22 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .where(ref.tenantId.eq(TENANT_ID))
                 .orderBy(ref.id.asc());
         return ledgerTransactionMapper.selectListByQuery(wrapper);
+    }
+
+    protected List<LedgerPostingPlan> postingPlans() {
+        LedgerPostingPlanNameRefs ref = LedgerPostingPlanNameRefs.ledgerPostingPlan;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .orderBy(ref.id.asc());
+        return ledgerPostingPlanMapper.selectListByQuery(wrapper);
+    }
+
+    protected List<LedgerEntry> entries() {
+        LedgerEntryNameRefs ref = LedgerEntryNameRefs.ledgerEntry;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .orderBy(ref.id.asc());
+        return ledgerEntryMapper.selectListByQuery(wrapper);
     }
 
     protected FundsTransactionDTO fundsTransaction(String transactionSn) {
