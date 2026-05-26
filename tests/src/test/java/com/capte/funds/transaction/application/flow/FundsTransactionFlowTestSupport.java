@@ -38,9 +38,17 @@ import com.capte.funds.transaction.converter.FundsAuthorizationInstructionConver
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.capte.funds.transaction.dal.entities.FundsFrozenOrder;
+import com.capte.funds.transaction.dal.entities.FundsTransaction;
+import com.capte.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.capte.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
+import com.capte.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
+import com.capte.funds.transaction.dal.entities.table.FundsTransactionNameRefs;
 import com.capte.funds.transaction.dal.mapper.FundsFrozenOrderMapper;
+import com.capte.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
+import com.capte.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
+import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.ledger.DefaultLedgerPostingAssembler;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
@@ -176,6 +184,12 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     @Autowired
     private FundsFrozenOrderMapper fundsFrozenOrderMapper;
+
+    @Autowired
+    private FundsTransactionMapper fundsTransactionMapper;
+
+    @Autowired
+    private FundsTransactionDetailMapper fundsTransactionDetailMapper;
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
@@ -590,6 +604,32 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .isEmpty();
     }
 
+    protected void assertFailedFundsTransactionWithoutLedgerFacts(String businessSn) {
+        assertThat(fundsTransactionsByBusinessSn(businessSn))
+                .as("failed funds transactions for businessSn %s", businessSn)
+                .singleElement()
+                .satisfies(transaction -> {
+                    assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.FAILED);
+                    assertThat(transaction.getRouteSnapshot()).isNotBlank();
+                    assertNoLedgerFactsForFundsTransaction(transaction.getSn());
+                });
+        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+                .as("funds transaction details for businessSn %s", businessSn)
+                .isNotEmpty()
+                .allSatisfy(detail -> {
+                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.FAILED);
+                    assertThat(detail.getLedgerTransactionSn()).isNull();
+                    assertThat(detail.getErrorCode()).isNotBlank();
+                    assertThat(detail.getErrorMessage()).isNotBlank();
+                });
+        assertThat(ledgerTransactionsForBusinessSn(businessSn))
+                .as("ledger transactions for businessSn %s", businessSn)
+                .isEmpty();
+        assertThat(entriesByBusinessSn(businessSn))
+                .as("ledger entries for businessSn %s", businessSn)
+                .isEmpty();
+    }
+
     protected List<LedgerTransaction> ledgerTransactions() {
         LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
         QueryWrapper wrapper = QueryWrapper.create().from(ref)
@@ -607,6 +647,24 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return fundsTransactionQueryService.queryFundsTransactionDetails(transactionSn);
     }
 
+    protected List<FundsTransaction> fundsTransactionsByBusinessSn(String businessSn) {
+        FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.businessSn.eq(businessSn))
+                .orderBy(ref.id.asc());
+        return fundsTransactionMapper.selectListByQuery(wrapper);
+    }
+
+    protected List<FundsTransactionDetail> fundsTransactionDetailsByBusinessSn(String businessSn) {
+        FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.businessSn.eq(businessSn))
+                .orderBy(ref.id.asc());
+        return fundsTransactionDetailMapper.selectListByQuery(wrapper);
+    }
+
     protected LedgerTransaction ledgerTransactionByBusinessSn(String businessSn) {
         LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
         QueryWrapper wrapper = QueryWrapper.create().from(ref)
@@ -615,6 +673,15 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         LedgerTransaction result = ledgerTransactionMapper.selectOneByQuery(wrapper);
         assertThat(result).as("ledger transaction for businessSn %s", businessSn).isNotNull();
         return result;
+    }
+
+    protected List<LedgerTransaction> ledgerTransactionsForBusinessSn(String businessSn) {
+        LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.businessSn.eq(businessSn))
+                .orderBy(ref.id.asc());
+        return ledgerTransactionMapper.selectListByQuery(wrapper);
     }
 
     protected List<LedgerTransaction> ledgerTransactionsByFundsTransactionSn(String fundsTransactionSn) {
@@ -658,6 +725,15 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         QueryWrapper wrapper = QueryWrapper.create().from(ref)
                 .where(ref.tenantId.eq(TENANT_ID))
                 .and(ref.fundsTransactionSn.eq(fundsTransactionSn))
+                .orderBy(ref.id.asc());
+        return ledgerEntryMapper.selectListByQuery(wrapper);
+    }
+
+    protected List<LedgerEntry> entriesByBusinessSn(String businessSn) {
+        LedgerEntryNameRefs ref = LedgerEntryNameRefs.ledgerEntry;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(TENANT_ID))
+                .and(ref.businessSn.eq(businessSn))
                 .orderBy(ref.id.asc());
         return ledgerEntryMapper.selectListByQuery(wrapper);
     }

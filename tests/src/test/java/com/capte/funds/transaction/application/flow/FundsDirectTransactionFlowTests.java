@@ -153,6 +153,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_REFUND_INSUFFICIENT_REFUND");
     }
 
     /**
