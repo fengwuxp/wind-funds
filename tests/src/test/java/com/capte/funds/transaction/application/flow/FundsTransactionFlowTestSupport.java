@@ -645,6 +645,39 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .isEmpty();
     }
 
+    protected void assertSingleFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedDetails,
+                                                                int expectedPostingPlans, int expectedEntries) {
+        assertFundsAndLedgerFactsForBusinessSn(businessSn, 1, expectedDetails, expectedPostingPlans, expectedEntries);
+    }
+
+    protected void assertFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedTransactions,
+                                                          int expectedDetails, int expectedPostingPlans,
+                                                          int expectedEntries) {
+        assertThat(fundsTransactionsByBusinessSn(businessSn))
+                .as("funds transactions for businessSn %s", businessSn)
+                .hasSize(expectedTransactions);
+        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+                .as("funds transaction details for businessSn %s", businessSn)
+                .hasSize(expectedDetails);
+        assertThat(ledgerTransactionsForBusinessSn(businessSn))
+                .as("ledger transactions for businessSn %s", businessSn)
+                .singleElement()
+                .satisfies(transaction -> {
+                    assertThat(postingPlansOf(transaction))
+                            .as("posting plans for businessSn %s", businessSn)
+                            .hasSize(expectedPostingPlans);
+                    assertThat(entriesByBusinessSn(businessSn))
+                            .as("ledger entries for businessSn %s", businessSn)
+                            .hasSize(expectedEntries);
+                });
+    }
+
+    protected void assertSingleFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedDetails,
+                                                                int expectedEntries) {
+        assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, expectedDetails, expectedEntries / 2,
+                expectedEntries);
+    }
+
     protected List<LedgerTransaction> ledgerTransactions() {
         LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
         QueryWrapper wrapper = QueryWrapper.create().from(ref)

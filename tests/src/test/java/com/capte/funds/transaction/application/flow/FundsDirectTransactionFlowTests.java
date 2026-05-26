@@ -951,20 +951,4 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(fundsTransactionDetails(firstRefundSn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND", 2, 2);
     }
-
-    private void assertSingleFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedDetails,
-                                                              int expectedEntries) {
-        assertThat(fundsTransactionsByBusinessSn(businessSn))
-                .as("funds transactions for businessSn %s", businessSn)
-                .hasSize(1);
-        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
-                .as("funds transaction details for businessSn %s", businessSn)
-                .hasSize(expectedDetails);
-        assertThat(ledgerTransactionsForBusinessSn(businessSn))
-                .as("ledger transactions for businessSn %s", businessSn)
-                .hasSize(1);
-        assertThat(entriesByBusinessSn(businessSn))
-                .as("ledger entries for businessSn %s", businessSn)
-                .hasSize(expectedEntries);
-    }
 }

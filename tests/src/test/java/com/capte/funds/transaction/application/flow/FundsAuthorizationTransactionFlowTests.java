@@ -566,6 +566,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.TOPUP.name(),
                 FundsTransactionEventType.AUTHORIZE.name());
         assertThat(fundsTransactionDetails(authorizationSn)).hasSize(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_AUTHORIZE", 1, 2);
     }
 
     /**
@@ -624,6 +625,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.AUTHORIZE.name());
         assertThat(fundsTransactionDetails(authorizationSn)).hasSize(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_ACCOUNT", 1, 2);
     }
 
     /**
@@ -679,6 +681,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.AUTHORIZE.name(),
                         FundsTransactionEventType.REVERSAL.name());
         assertThat(fundsTransactionDetails(authorizationSn)).hasSize(2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REVERSAL_CANCEL", 0, 1, 1, 2);
     }
 
     /**
@@ -734,6 +737,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.AUTHORIZE.name(),
                         FundsTransactionEventType.SETTLE.name());
         assertThat(fundsTransactionDetails(authorizationSn)).hasSize(3);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_SETTLE_CAPTURE", 0, 2, 1, 2);
     }
 
     /**
@@ -791,5 +795,6 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.SETTLE.name(),
                         FundsTransactionEventType.AUTH_REFUND.name());
         assertThat(fundsTransactionDetails(authorizationSn)).hasSize(5);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REFUND_RETURN", 0, 2, 1, 2);
     }
 }
