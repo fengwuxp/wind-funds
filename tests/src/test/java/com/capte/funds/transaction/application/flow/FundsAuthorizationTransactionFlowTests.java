@@ -510,16 +510,70 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         ensureLedger(reserveUser, LedgerSubjectCode.AVAILABLE);
         ensureLedger(reserveUser, LedgerSubjectCode.AUTHORIZATION);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "AUTH_REFUND_EXCEED_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         String authorizationSn = authorize(user, 80L, true, "AUTH_REFUND_EXCEED_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -80L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         settleAuthorization(user, 50L, authorizationSn, "AUTH_REFUND_EXCEED_CAPTURE");
+        BalanceSnapshot afterSettle = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -50L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 50L, CURRENCY));
 
         topup(reserveUser, 100L, "AUTH_REFUND_EXCEED_RESERVE_TOPUP");
+        BalanceSnapshot afterReserveTopup = snapshot(balances(user, reserveUser, cashMappingAccount(),
+                settlementAccount()));
+        assertOnlyBalanceDeltas(afterSettle, afterReserveTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         String reserveAuthorizationSn = authorize(reserveUser, 100L, true,
                 "AUTH_REFUND_EXCEED_RESERVE_AUTHORIZE");
+        BalanceSnapshot afterReserveAuthorize = snapshot(balances(user, reserveUser, cashMappingAccount(),
+                settlementAccount()));
+        assertOnlyBalanceDeltas(afterReserveTopup, afterReserveAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, -100L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         settleAuthorization(reserveUser, 100L, reserveAuthorizationSn, "AUTH_REFUND_EXCEED_RESERVE_CAPTURE");
 
         BalanceSnapshot beforeFailure = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterReserveAuthorize, beforeFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 100L, CURRENCY));
         LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 30L, CURRENCY);
@@ -581,20 +635,39 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     void testAuthorizeSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "AUTH_IDEMPOTENT_AUTHORIZE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         String authorizationSn = authorize(user, 60L, true, "AUTH_IDEMPOTENT_AUTHORIZE");
         BalanceSnapshot afterFirstAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFirstAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstAuthorizeFacts = ledgerFactSnapshot();
 
         String retryAuthorizationSn = authorize(user, 60L, true, "AUTH_IDEMPOTENT_AUTHORIZE");
+        BalanceSnapshot afterRetryAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
 
         assertThat(retryAuthorizationSn).isEqualTo(authorizationSn);
+        assertOnlyBalanceDeltas(afterFirstAuthorize, afterRetryAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstAuthorizeFacts);
         assertThatThrownBy(() -> authorize(user, 61L, true, "AUTH_IDEMPOTENT_AUTHORIZE"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
-        assertOnlyBalanceDeltas(afterFirstAuthorize, afterConflict,
+        assertOnlyBalanceDeltas(afterRetryAuthorize, afterConflict,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
@@ -619,7 +692,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .toList())
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
-                FundsTransactionEventType.AUTHORIZE.name());
+                        FundsTransactionEventType.AUTHORIZE.name());
         assertThat(fundsTransactionDetails(authorizationSn)).hasSize(1);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_AUTHORIZE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_AUTHORIZE", 1, 2);
@@ -639,11 +712,38 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         ensureLedger(anotherUser, LedgerSubjectCode.AVAILABLE);
         ensureLedger(anotherUser, LedgerSubjectCode.AUTHORIZATION);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, anotherUser, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "AUTH_IDEMPOTENT_ACCOUNT_TOPUP");
+        BalanceSnapshot afterUserTopup = snapshot(balances(user, anotherUser, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterUserTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         topup(anotherUser, 100L, "AUTH_IDEMPOTENT_ACCOUNT_ANOTHER_TOPUP");
+        BalanceSnapshot afterAnotherTopup = snapshot(balances(user, anotherUser, cashMappingAccount(),
+                settlementAccount()));
+        assertOnlyBalanceDeltas(afterUserTopup, afterAnotherTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         String authorizationSn = authorize(user, 60L, true, "AUTH_IDEMPOTENT_ACCOUNT");
         BalanceSnapshot afterFirstAuthorize = snapshot(balances(user, anotherUser, cashMappingAccount(),
                 settlementAccount()));
+        assertOnlyBalanceDeltas(afterAnotherTopup, afterFirstAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstAuthorizeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> authorize(anotherUser, 60L, true, "AUTH_IDEMPOTENT_ACCOUNT"))
@@ -699,24 +799,50 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     void testAuthorizationReversalSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "AUTH_IDEMPOTENT_REVERSAL_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         String authorizationSn = authorize(user, 80L, true, "AUTH_IDEMPOTENT_REVERSAL_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -80L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         String firstReversalSn = reverseAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_REVERSAL_CANCEL");
         BalanceSnapshot afterFirstReversal = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterFirstReversal,
+                delta(user, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstReversalFacts = ledgerFactSnapshot();
 
         String retryReversalSn = reverseAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_REVERSAL_CANCEL");
+        BalanceSnapshot afterRetryReversal = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
 
         assertThat(retryReversalSn).isEqualTo(firstReversalSn);
+        assertOnlyBalanceDeltas(afterFirstReversal, afterRetryReversal,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstReversalFacts);
         assertThatThrownBy(() -> reverseAuthorization(user, 31L, authorizationSn,
                 "AUTH_IDEMPOTENT_REVERSAL_CANCEL"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
-        assertOnlyBalanceDeltas(afterFirstReversal, afterConflict,
+        assertOnlyBalanceDeltas(afterRetryReversal, afterConflict,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
@@ -760,24 +886,50 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     void testAuthorizationSettleSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "AUTH_IDEMPOTENT_SETTLE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         String authorizationSn = authorize(user, 80L, true, "AUTH_IDEMPOTENT_SETTLE_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -80L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         String firstSettleSn = settleAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_SETTLE_CAPTURE");
         BalanceSnapshot afterFirstSettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterFirstSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY));
         LedgerFactSnapshot afterFirstSettleFacts = ledgerFactSnapshot();
 
         String retrySettleSn = settleAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_SETTLE_CAPTURE");
+        BalanceSnapshot afterRetrySettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
 
         assertThat(retrySettleSn).isEqualTo(firstSettleSn);
+        assertOnlyBalanceDeltas(afterFirstSettle, afterRetrySettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstSettleFacts);
         assertThatThrownBy(() -> settleAuthorization(user, 31L, authorizationSn,
                 "AUTH_IDEMPOTENT_SETTLE_CAPTURE"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
-        assertOnlyBalanceDeltas(afterFirstSettle, afterConflict,
+        assertOnlyBalanceDeltas(afterRetrySettle, afterConflict,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
@@ -821,25 +973,58 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     void testAuthorizationRefundSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         topup(user, 100L, "AUTH_IDEMPOTENT_REFUND_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         String authorizationSn = authorize(user, 80L, true, "AUTH_IDEMPOTENT_REFUND_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -80L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
         settleAuthorization(user, 50L, authorizationSn, "AUTH_IDEMPOTENT_REFUND_CAPTURE");
+        BalanceSnapshot afterSettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 50L, CURRENCY));
+
         String firstRefundSn = refundSettledAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_REFUND_RETURN");
         BalanceSnapshot afterFirstRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterSettle, afterFirstRefund,
+                delta(user, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY));
         LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
 
         String retryRefundSn = refundSettledAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_REFUND_RETURN");
+        BalanceSnapshot afterRetryRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
 
         assertThat(retryRefundSn).isEqualTo(firstRefundSn);
+        assertOnlyBalanceDeltas(afterFirstRefund, afterRetryRefund,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
         assertThatThrownBy(() -> refundSettledAuthorization(user, 31L, authorizationSn,
                 "AUTH_IDEMPOTENT_REFUND_RETURN"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
-        assertOnlyBalanceDeltas(afterFirstRefund, afterConflict,
+        assertOnlyBalanceDeltas(afterRetryRefund, afterConflict,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
