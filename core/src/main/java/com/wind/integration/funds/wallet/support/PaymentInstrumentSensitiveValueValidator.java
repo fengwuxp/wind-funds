@@ -3,6 +3,9 @@ package com.wind.integration.funds.wallet.support;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
+import java.util.Locale;
+import java.util.Map;
+
 /**
  * 支付工具敏感值校验器。
  *
@@ -40,5 +43,40 @@ public final class PaymentInstrumentSensitiveValueValidator {
             }
         }
         return true;
+    }
+
+    /**
+     * 判断绑定快照中是否包含敏感支付工具字段。
+     *
+     * @param bindingSnapshot 支付工具绑定快照
+     * @return true 表示快照字段名形似 CVV、token secret 或密钥
+     */
+    public static boolean containsSensitiveBindingSnapshotField(@Nullable Map<String, Object> bindingSnapshot) {
+        if (bindingSnapshot == null || bindingSnapshot.isEmpty()) {
+            return false;
+        }
+        for (String fieldName : bindingSnapshot.keySet()) {
+            if (isSensitiveBindingSnapshotField(fieldName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isSensitiveBindingSnapshotField(String fieldName) {
+        if (!StringUtils.hasText(fieldName)) {
+            return false;
+        }
+        String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+        return "cvv".equals(normalized)
+                || "cvv2".equals(normalized)
+                || "cvc".equals(normalized)
+                || "cvc2".equals(normalized)
+                || "securitycode".equals(normalized)
+                || "cardsecuritycode".equals(normalized)
+                || "tokensecret".equals(normalized)
+                || "secret".equals(normalized)
+                || "secretkey".equals(normalized)
+                || "privatekey".equals(normalized);
     }
 }

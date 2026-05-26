@@ -30,6 +30,10 @@ public record ImmutablePaymentInstrumentRefSpec(String instrumentId,
         if (PaymentInstrumentSensitiveValueValidator.isRawSensitiveInstrumentNo(instrumentNo)) {
             throw new IllegalArgumentException("instrumentNo must be masked or token reference");
         }
+        if (PaymentInstrumentSensitiveValueValidator.containsSensitiveBindingSnapshotField(bindingSnapshot)) {
+            throw new IllegalArgumentException(
+                    "bindingSnapshot must not contain sensitive payment instrument fields");
+        }
         bindingSnapshot = Map.copyOf(bindingSnapshot == null ? Map.of() : bindingSnapshot);
     }
 

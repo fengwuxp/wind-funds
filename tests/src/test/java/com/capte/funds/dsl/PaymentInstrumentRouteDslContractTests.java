@@ -236,6 +236,23 @@ class PaymentInstrumentRouteDslContractTests {
                 .hasMessageContaining("instrumentNo must be masked or token reference");
     }
 
+    /**
+     * 场景：业务侧错误地把 CVV 或 token secret 放入绑定快照。
+     * 预期：构造期拒绝敏感字段名。
+     * 红线：绑定快照会进入 route snapshot、日志、导出和报表，不能承载支付工具敏感原文。
+     */
+    @Test
+    void testPaymentInstrumentSnapshotShouldRejectSensitiveBindingSnapshotFields() {
+        assertThatThrownBy(() -> paymentInstrumentRef("PI-CVV", "**** 4242", Map.of("cvv", "123")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentRef("PI-TOKEN-SECRET",
+                "tok_card_001",
+                Map.of("token_secret", "secret-value")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
+    }
+
     private RouteLegSpec routeLeg(SubjectRef payer, SubjectRef payee) {
         return ImmutableRouteLegSpec.builder()
                 .legId("PAY")
