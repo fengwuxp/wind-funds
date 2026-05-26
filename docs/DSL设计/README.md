@@ -77,7 +77,7 @@ DSL 设计的准入目标是证明产品语义可以被稳定承载，并能继�
 
 ## DSL 与产品、系分、TDD 对齐 CR
 
-本次 CR 结论：DSL 入口能够承接 PRD 的业务目标和资金语义，并能下钻到系分对象、服务边界和 TDD 证据。当前 DSL 可作为 TDD 分析输入；只有 DSL caseId 落到测试资源、被测试读取，并覆盖对应资金断言后，才能声明机器契约通过。
+DSL 评审口径：DSL 入口必须承接 PRD 的业务目标和资金语义，并能下钻到系分对象、服务边界和 TDD 证据。DSL 可作为 TDD 分析输入；只有 DSL caseId 落到测试资源、被测试读取，并覆盖对应资金断言后，才能声明机器契约通过。
 
 | 对齐项 | DSL 承载 | 系分落点 | TDD 证据 | 阻断信号 |
 | --- | --- | --- | --- | --- |
@@ -122,3 +122,41 @@ DSL 文档中的结构、表格和 JSON 示例只有在进入测试资源、被�
 | 在 `tests/src/test/resources/dsl-contract-cases/` 落资金流夹具并被测试读取 | 夹具覆盖范围内的 route、posting、余额、投影或治理断言具备可执行验收入口。 | 已覆盖所有生产路径，除非同步覆盖该路径对应的 AC/TDD/RED、失败无副作用和残余风险。 |
 | 复用已有 DSL 样例 | 复用范围内的语义可作为局部证据。 | 未覆盖差异自动视为已验证。 |
 | 本批次不触碰 DSL 测试资源 | 可以作为文档评审结论。 | 新增 caseId 已具备生产契约通过证据。 |
+
+### DSL caseId 执行化盘点
+
+进入编码前，所有本批次新增、修改或用于验收声明的 `DSL-*` caseId 都必须做执行化盘点。盘点表不要求一次覆盖全部历史 caseId，但必须覆盖 Execution Grant 声明的目标范围和所有被交付说明引用的 caseId。
+
+| 盘点字段 | 填写要求 |
+| --- | --- |
+| `dslCaseId` | 对应 DSL 文档中的稳定 caseId；同一语义不要新起临时编号。 |
+| `acceptanceId` | 对应 PRD 的 `AC-*`、`RED-*` 或业务红线编号；无 PRD 验收时只能声明设计补充。 |
+| `fixturePath` | 对应 `tests/src/test/resources/dsl-contract-cases/` 下的 JSON 或 YAML 夹具路径；没有夹具时填写 `NONE`。 |
+| `fixtureLevel` | 使用 `DOC_ONLY`、`CONTRACT_ONLY`、`FUNDS_FLOW`、`SERVICE_FLOW` 或 `GOVERNANCE_FLOW` 分级。 |
+| `targetTestClass` | 读取该 fixture 或承接该 caseId 的目标测试类；尚未落测试时填写目标类名和 Not Done。 |
+| `coreAssertions` | 必须列出状态、route snapshot、posting plan、ledger entry、余额投影、交易投影、幂等、审计、失败无副作用或治理只读边界中的适用项。 |
+| `notDone` | 未覆盖资金流、服务流、DDL/H2、外部规则、敏感数据、并发、人工处理或生产 NFR 时必须显式写明。 |
+
+`fixtureLevel` 的结论口径如下：
+
+| 级别 | 含义 | 可声明 | 不可声明 |
+| --- | --- | --- | --- |
+| `DOC_ONLY` | 只在 DSL 或 PRD 文档中定义。 | 语义已进入设计基线，可进入系分或 TDD 拆解。 | 机器契约通过、资金流已验证或生产 Done。 |
+| `CONTRACT_ONLY` | 有测试资源，且测试只验证字段结构、枚举、必填或兼容。 | 契约结构可执行。 | route、posting、余额、投影、清结算、对账、归档或治理已验证。 |
+| `FUNDS_FLOW` | fixture 被资金主链路测试读取，并断言 route、posting、entry、余额和幂等中的适用项。 | 夹具覆盖范围内的资金流证据成立。 | 清结算、对账、治理或所有生产路径自动成立。 |
+| `SERVICE_FLOW` | fixture 或等价数据被服务级 H2 流程读取，并覆盖状态机、持久化、查询和失败无副作用。 | 夹具覆盖范围内的服务级行为可作为生产交付证据之一。 | 未覆盖的外部规则、容量、并发、审计和 NFR 自动成立。 |
+| `GOVERNANCE_FLOW` | fixture 被归档、重放、差异报告、人工处理或指标水位隔离测试读取。 | 治理边界内的只读、dry-run/apply、checkpoint 或差异处理证据成立。 | 治理任务可以反写资金事实，或替代账本余额确认。 |
+
+本批次交付说明引用 DSL 证据时，必须同步列出 `dslCaseId -> fixturePath -> targetTestClass -> coreAssertions -> notDone`。未完成盘点时，DSL 只能作为设计依据，不能作为机器契约或生产交付证据。
+
+执行化盘点可以直接使用下列表格作为 Execution Grant 附件：
+
+| dslCaseId | acceptanceId | fixturePath | fixtureLevel | targetTestClass | coreAssertions | notDone |
+| --- | --- | --- | --- | --- | --- | --- |
+| 待填写 | 待填写 | `NONE` 或测试资源路径 | `DOC_ONLY` / `CONTRACT_ONLY` / `FUNDS_FLOW` / `SERVICE_FLOW` / `GOVERNANCE_FLOW` | 待填写 | 状态、route、posting、entry、projection、幂等、审计、无副作用中的适用项 | 未覆盖范围和原因 |
+
+盘点完成后再做三项复核：
+
+1. `fixtureLevel` 是否与可声明结论一致，不能用低等级 fixture 支撑高等级交付结论。
+2. `targetTestClass` 是否真的读取该 fixture 或等价数据，不能只在测试名中引用 caseId。
+3. `coreAssertions` 是否覆盖本批次资金变化的最小证据；缺 route、posting、entry、projection、幂等或审计时，必须在 `notDone` 中说明。
