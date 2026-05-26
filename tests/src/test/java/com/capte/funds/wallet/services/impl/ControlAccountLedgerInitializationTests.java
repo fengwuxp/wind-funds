@@ -44,6 +44,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
@@ -479,6 +480,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isZero();
         assertThat(ledger.getSettlementPolicy()).isEqualTo("RT");
+        assertThat(ledger.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
         assertThat(ledger.getPeriodType()).isEqualTo(periodType);
         assertThat(ledger.getPeriodId()).isEqualTo(periodId);
     }
