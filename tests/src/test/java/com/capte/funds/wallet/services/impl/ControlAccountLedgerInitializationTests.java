@@ -140,6 +140,8 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Test
     void testCreateCreditAccountShouldRejectNonLifetimeWithoutPeriodId() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()
                 .setSn(NON_LIFETIME_CREDIT_ACCOUNT_SN)
                 .setPeriodType(AccountBalancePeriodType.MONTHLY)))
@@ -147,6 +149,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
         assertThat(countRows("t_credit_account", "sn", NON_LIFETIME_CREDIT_ACCOUNT_SN)).isZero();
         assertThat(countRows("t_ledger", "subject_id", NON_LIFETIME_CREDIT_ACCOUNT_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
@@ -291,11 +294,14 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Test
     void testCreateBudgetGroupShouldRejectCustomCycleWithoutPeriodId() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(customCycleBudgetGroupRequest()))
                 .hasMessageContaining("非生命周期账本周期 periodId 不能为空");
 
         assertThat(countRows("t_budget_group", "sn", CUSTOM_BUDGET_GROUP_SN)).isZero();
         assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -346,10 +352,13 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Test
     void testInitializeCustomCycleLedgersShouldRequirePeriodId() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         assertThatThrownBy(() -> subjectLedgerInitializer.initializeRequiredLedgers(customBudgetLedgerRequest()))
                 .hasMessageContaining("非生命周期账本周期 periodId 不能为空");
 
         assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
