@@ -4,6 +4,7 @@ import com.capte.funds.AbstractFundsServiceTest;
 import com.capte.funds.ledger.dto.LedgerDTO;
 import com.capte.funds.ledger.request.CreateLedgerRequest;
 import com.capte.funds.ledger.service.LedgerService;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
@@ -26,6 +27,9 @@ import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 账本服务流程测试。
@@ -55,15 +59,20 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
      */
     @Test
     void testCreateNonLifetimeLedgerShouldRejectMissingPeriodId() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         assertThatThrownBy(() -> ledgerService.createLedger(createLedgerRequest(
                 AccountBalancePeriodType.MONTHLY, null)))
                 .hasMessageContaining("非生命周期账本周期 periodId 不能为空");
 
         assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
     void testCreateNonLifetimeLedgerShouldUseExplicitPeriodId() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         Long ledgerId = ledgerService.createLedger(createLedgerRequest(
                 AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID));
 
@@ -71,6 +80,7 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
         assertThat(ledger.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
         assertThat(countLedgers()).isOne();
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     @BeforeEach

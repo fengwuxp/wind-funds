@@ -5,6 +5,7 @@ import com.capte.funds.ledger.dto.LedgerDTO;
 import com.capte.funds.ledger.request.CreateLedgerRequest;
 import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.service.LedgerService;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.wallet.dal.entities.FundingAccount;
 import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.capte.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
@@ -50,6 +51,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 账本余额投影服务流程测试。
@@ -95,6 +98,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
             eventAttempts.incrementAndGet();
             throw new IllegalStateException("balance log sink unavailable");
         });
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         projectionService.project(List.of(ledgerEntry(25L)));
 
@@ -103,6 +107,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getDebitAmount()).isEqualTo(125L);
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isEqualTo(125L);
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -116,9 +121,11 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
     void testProjectShouldPublishBalanceChangedEventWithSourceEvidence() {
         List<LedgerBalanceChangedEvent> publishedEvents = new ArrayList<>();
         setApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         projectionService.project(List.of(ledgerEntry(25L)));
 
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
         assertThat(publishedEvents).singleElement().satisfies(event -> {
             assertThat(event.getSubjectId()).isEqualTo(ACCOUNT_ID);
             assertThat(event.getSubjectType()).isEqualTo(ACCOUNT_TYPE);
@@ -148,6 +155,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
     @Test
     void testProjectShouldRejectWholeBatchWhenLaterLedgerWouldBeNegative() {
         Long frozenLedgerId = createFrozenLedger(0L);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> projectionService.project(List.of(
                 ledgerEntry(frozenLedgerId, LedgerSubjectCode.FROZEN, EntrySide.CREDIT, 10L),
@@ -158,6 +166,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         LedgerDTO frozenLedger = ledgerService.getLedgerById(frozenLedgerId);
         assertThat(availableLedger.getNormalBalance()).isEqualTo(100L);
         assertThat(frozenLedger.getNormalBalance()).isZero();
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     @BeforeEach
