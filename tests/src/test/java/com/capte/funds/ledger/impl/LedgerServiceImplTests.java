@@ -77,6 +77,21 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
                 AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID));
 
         LedgerDTO ledger = ledgerService.getLedgerById(ledgerId);
+        assertThat(ledger.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(ledger.getSubjectId()).isEqualTo(SUBJECT_ID);
+        assertThat(ledger.getSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT.name());
+        assertThat(ledger.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.FUNDING_BASIC.name());
+        assertThat(ledger.getLedgerProfileVersion()).isEqualTo(1);
+        assertThat(ledger.getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AVAILABLE);
+        assertThat(ledger.getLedgerSubjectCategory()).isEqualTo(LedgerSubjectCategory.ASSET);
+        assertThat(ledger.getNormalBalanceSide()).isEqualTo(EntrySide.DEBIT);
+        assertThat(ledger.getAllowNegative()).isFalse();
+        assertThat(ledger.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+        assertThat(ledger.getDebitAmount()).isZero();
+        assertThat(ledger.getCreditAmount()).isZero();
+        assertThat(ledger.getNormalBalance()).isZero();
+        assertThat(ledger.getSettlementPolicy()).isEqualTo("RT");
+        assertThat(ledger.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
         assertThat(ledger.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
         assertThat(ledger.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
         assertThat(countLedgers()).isOne();
