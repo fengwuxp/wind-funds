@@ -90,6 +90,8 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertPostedTransactions(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_REJECTED_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_REJECTED_FREEZE", 0, 0, 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_REJECTED_UNFREEZE", 0, 0, 1, 2);
     }
 }
