@@ -4,6 +4,7 @@ import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
@@ -577,10 +578,12 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         topup(user, 100L, "AUTH_IDEMPOTENT_AUTHORIZE_TOPUP");
         String authorizationSn = authorize(user, 60L, true, "AUTH_IDEMPOTENT_AUTHORIZE");
         BalanceSnapshot afterFirstAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot afterFirstAuthorizeFacts = ledgerFactSnapshot();
 
         String retryAuthorizationSn = authorize(user, 60L, true, "AUTH_IDEMPOTENT_AUTHORIZE");
 
         assertThat(retryAuthorizationSn).isEqualTo(authorizationSn);
+        assertLedgerTransactionFactsUnchanged(afterFirstAuthorizeFacts);
         assertThatThrownBy(() -> authorize(user, 61L, true, "AUTH_IDEMPOTENT_AUTHORIZE"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
@@ -590,6 +593,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstAuthorizeFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
@@ -634,6 +638,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         String authorizationSn = authorize(user, 60L, true, "AUTH_IDEMPOTENT_ACCOUNT");
         BalanceSnapshot afterFirstAuthorize = snapshot(balances(user, anotherUser, cashMappingAccount(),
                 settlementAccount()));
+        LedgerFactSnapshot afterFirstAuthorizeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> authorize(anotherUser, 60L, true, "AUTH_IDEMPOTENT_ACCOUNT"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
@@ -647,6 +652,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(anotherUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstAuthorizeFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
@@ -692,11 +698,13 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         String firstReversalSn = reverseAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_REVERSAL_CANCEL");
         BalanceSnapshot afterFirstReversal = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot afterFirstReversalFacts = ledgerFactSnapshot();
 
         String retryReversalSn = reverseAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_REVERSAL_CANCEL");
 
         assertThat(retryReversalSn).isEqualTo(firstReversalSn);
+        assertLedgerTransactionFactsUnchanged(afterFirstReversalFacts);
         assertThatThrownBy(() -> reverseAuthorization(user, 31L, authorizationSn,
                 "AUTH_IDEMPOTENT_REVERSAL_CANCEL"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
@@ -707,6 +715,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstReversalFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 50L, CURRENCY);
@@ -750,11 +759,13 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         String firstSettleSn = settleAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_SETTLE_CAPTURE");
         BalanceSnapshot afterFirstSettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot afterFirstSettleFacts = ledgerFactSnapshot();
 
         String retrySettleSn = settleAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_SETTLE_CAPTURE");
 
         assertThat(retrySettleSn).isEqualTo(firstSettleSn);
+        assertLedgerTransactionFactsUnchanged(afterFirstSettleFacts);
         assertThatThrownBy(() -> settleAuthorization(user, 31L, authorizationSn,
                 "AUTH_IDEMPOTENT_SETTLE_CAPTURE"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
@@ -765,6 +776,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstSettleFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 50L, CURRENCY);
@@ -809,11 +821,13 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         String firstRefundSn = refundSettledAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_REFUND_RETURN");
         BalanceSnapshot afterFirstRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
 
         String retryRefundSn = refundSettledAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_REFUND_RETURN");
 
         assertThat(retryRefundSn).isEqualTo(firstRefundSn);
+        assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
         assertThatThrownBy(() -> refundSettledAuthorization(user, 31L, authorizationSn,
                 "AUTH_IDEMPOTENT_REFUND_RETURN"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
@@ -824,6 +838,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 30L, CURRENCY);
