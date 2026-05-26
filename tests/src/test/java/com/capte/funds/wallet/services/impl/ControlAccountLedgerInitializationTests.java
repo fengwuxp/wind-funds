@@ -50,6 +50,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
@@ -113,6 +114,8 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Test
     void testCreateCreditAccountShouldInitializeLifetimeControlLedgers() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         Long accountId = creditAccountService.createCreditAccount(createCreditAccountRequest());
 
         CreditAccountDTO account = creditAccountService.getCreditAccountById(accountId);
@@ -132,6 +135,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 LedgerProfileCode.CREDIT_BASIC,
                 AccountBalancePeriodType.LIFETIME,
                 AccountBalancePeriodType.LIFETIME.name()));
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
@@ -147,6 +151,8 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Test
     void testCreateCreditAccountShouldInitializeMonthlyControlLedgersWhenSpecified() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         Long accountId = creditAccountService.createCreditAccount(createCreditAccountRequest()
                 .setSn(NON_LIFETIME_CREDIT_ACCOUNT_SN)
                 .setPeriodType(AccountBalancePeriodType.MONTHLY)
@@ -167,10 +173,13 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 LedgerProfileCode.CREDIT_BASIC,
                 AccountBalancePeriodType.MONTHLY,
                 MONTHLY_PERIOD_ID));
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
     void testCreateBudgetGroupShouldInitializeLifetimeControlLedgersByDefault() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         Long budgetGroupId = budgetGroupService.createBudgetGroup(createBudgetGroupRequest());
 
         BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
@@ -190,10 +199,13 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 LedgerProfileCode.BUDGET_BASIC,
                 AccountBalancePeriodType.LIFETIME,
                 AccountBalancePeriodType.LIFETIME.name()));
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
     void testCreateBudgetGroupShouldInitializeMonthlyControlLedgersWhenSpecified() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         Long budgetGroupId = budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
                 .setPeriodType(AccountBalancePeriodType.MONTHLY)
                 .setPeriodId(MONTHLY_PERIOD_ID));
@@ -215,6 +227,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 LedgerProfileCode.BUDGET_BASIC,
                 AccountBalancePeriodType.MONTHLY,
                 MONTHLY_PERIOD_ID));
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -307,6 +320,8 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Test
     void testCreateBudgetGroupShouldInitializeCustomCycleControlLedgers() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         Long budgetGroupId = budgetGroupService.createBudgetGroup(
                 customCycleBudgetGroupRequest().setPeriodId(CUSTOM_PERIOD_ID));
 
@@ -326,6 +341,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 LedgerProfileCode.BUDGET_BASIC,
                 AccountBalancePeriodType.CUSTOM_CYCLE,
                 CUSTOM_PERIOD_ID));
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
@@ -338,6 +354,8 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Test
     void testInitializeCustomCycleLedgersShouldUseExplicitPeriodId() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         Map<LedgerSubjectCode, Long> ledgerIds = subjectLedgerInitializer.initializeRequiredLedgers(
                 customBudgetLedgerRequest().setPeriodId(CUSTOM_PERIOD_ID));
         List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.BUDGET_GROUP, CUSTOM_BUDGET_GROUP_SN);
@@ -351,6 +369,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 LedgerProfileCode.BUDGET_BASIC,
                 AccountBalancePeriodType.CUSTOM_CYCLE,
                 CUSTOM_PERIOD_ID));
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     @BeforeEach

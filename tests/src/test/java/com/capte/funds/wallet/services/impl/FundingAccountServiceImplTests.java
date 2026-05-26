@@ -49,6 +49,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
@@ -92,6 +93,8 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
     @Test
     void testCreateFundingAccountShouldInitializeRequiredLedgers() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
         Long accountId = fundingAccountService.createFundingAccount(createFundingAccountRequest());
 
         FundingAccountDTO account = fundingAccountService.getFundingAccountById(accountId);
@@ -108,6 +111,7 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 .containsExactlyInAnyOrder(LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN,
                         LedgerSubjectCode.AUTHORIZATION);
         assertThat(ledgers).allSatisfy(this::assertFundingBasicLedger);
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -150,6 +154,7 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
     void testInitializeRequiredLedgersShouldReuseExistingLedgers() {
         Long accountId = fundingAccountService.createFundingAccount(createFundingAccountRequest());
         FundingAccountDTO account = fundingAccountService.getFundingAccountById(accountId);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Map<LedgerSubjectCode, Long> reusedLedgerIds =
                 subjectLedgerInitializer.initializeRequiredLedgers(initializeSubjectLedgerRequest());
@@ -161,6 +166,7 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 Integer.class,
                 ACCOUNT_SN);
         assertThat(ledgerCount).isEqualTo(3);
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
     /**

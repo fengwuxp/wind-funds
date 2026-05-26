@@ -96,6 +96,14 @@ public final class FundsBalanceAssertionSupport {
         assertThat(ledgerFactSnapshot(jdbcTemplate)).isEqualTo(expected);
     }
 
+    public static void assertLedgerTransactionFactsUnchanged(JdbcTemplate jdbcTemplate,
+                                                             LedgerFactSnapshot expected) {
+        LedgerFactSnapshot actual = ledgerFactSnapshot(jdbcTemplate);
+        assertThat(actual.transactions()).as("ledger transactions").isEqualTo(expected.transactions());
+        assertThat(actual.postingPlans()).as("ledger posting plans").isEqualTo(expected.postingPlans());
+        assertThat(actual.entries()).as("ledger entries").isEqualTo(expected.entries());
+    }
+
     private static long countRows(JdbcTemplate jdbcTemplate, String tableName) {
         Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName, Long.class);
         return result;
