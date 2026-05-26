@@ -226,6 +226,55 @@ flowchart TD
 | 分录入账 | ledger entry。 | 余额事实源唯一，金额为正，币种明确。 |
 | 投影派生 | 余额投影和交易投影。 | 投影只读，不反写交易或账本事实。 |
 
+### 5.1 资金场景借贷平衡与账务期望表
+
+本表是资金场景进入 `PostingPlan` 和 `LedgerEntry` 前的 DSL 权威期望，用于统一产品、系分和 TDD 对“借贷是否平衡、余额桶如何变化、失败是否无副作用”的判断。PRD 中的账务矩阵只表达产品语义；进入编码、测试或交付结论时，以本表的 DSL 口径和对应系分、TDD 承接为准。
+
+表解释规则：
+
+| 规则 | 口径 |
+| --- | --- |
+| 借贷方向 | 借方和贷方是 `EntrySide`，不是简单的来源方和目标方；实现侧必须结合账目 `normalBalanceSide` 和资金移动方向推导。 |
+| 余额增减 | 对 `normalBalanceSide=DEBIT` 的账目，借方增加、贷方减少；对 `normalBalanceSide=CREDIT` 的账目，贷方增加、借方减少。 |
+| 金额表达 | `LedgerEntry.amount` 永远为正；反向、释放、退款、撤销和冲正通过事件、引用、借贷方向和原 route snapshot 表达，不使用负金额。 |
+| 平衡单位 | 每个 `PostingPlan` 必须同币种借贷平衡；整笔 `LedgerTransaction` 的借方合计必须等于贷方合计。 |
+| 余额桶 | `AVAILABLE`、`FROZEN`、`AUTHORIZATION`、`CLEARING`、`SETTLEMENT`、`IN_TRANSIT` 等是账目或余额桶，不是业务单状态。 |
+| 失败边界 | 拒绝、余额不足、缺快照、错币种、规则未确认、权限不足和重复冲突失败时，不得生成 route、posting、ledger entry、外部出款或敏感导出。 |
+| 逆向回放 | 退款、撤销、过期、拒付、出款失败和差错处理优先引用原事实和原 route snapshot；缺少原事实时阻断或转人工，不静默重新选路。 |
+
+主场景借贷平衡与账务期望：
+
+| 场景 | DSL 事件或指令 | 借贷和余额期望 | 平衡与红线 | TDD 锚点 |
+| --- | --- | --- | --- | --- |
+| 用户充值成功 | `DIRECT_TRANSACTION / TOPUP` | 平台现金、备付或预收待付映射与用户 `AVAILABLE` 形成一组平衡 posting；外部通道流水只做引用。 | 外部账户不得成为 `LedgerEntry` 主体；充值确认前不入账。 | `TDD-DIR-*`、`TDD-LEDGER-*`。 |
+| 用户提现申请或提现锁定 | `BALANCE_CONTROL / FREEZE` 或提现锁定场景 | 同主体 `AVAILABLE` 减少，`FROZEN` 或提现锁定桶增加。 | 提现申请不是外部到账成功；冻结只控制可用性，不表达消费。 | `TDD-CTRL-*`、`TDD-DIR-*`。 |
+| 用户提现失败释放 | `BALANCE_CONTROL / UNFREEZE` | 同主体原冻结桶减少，`AVAILABLE` 增加，引用原冻结单或原提现锁定事实。 | 只释放一次；成功和失败不得双终态。 | `TDD-CTRL-*`、`TDD-DIR-*`。 |
+| 系统内转账 | `DIRECT_TRANSACTION / TRANSFER` | 付款方 `AVAILABLE` 减少，收款方 `AVAILABLE` 增加。 | 双方主体、币种、账本周期和金额必须明确；余额不足或错币种失败无副作用。 | `TDD-DIR-*`、`TDD-LEDGER-*`。 |
+| 商户订单收款 | `DIRECT_TRANSACTION / PAY` | 付款方 `AVAILABLE` 减少；商户 `CLEARING` 增加；平台手续费、成本、补贴按独立 leg 或独立 plan 表达。 | 商户款不得直入 `AVAILABLE` 或 `SETTLEMENT`；本金、手续费、成本、补贴不得合成一个净额。 | `TDD-DIR-*`、`TDD-BEN-*`、`TDD-CLS-*`。 |
+| 手续费收取 | `DIRECT_TRANSACTION / FEE` | 费用责任方目标账目减少，平台 `FEE`、收入或成本归集账目增加。 | 必须引用原交易、费用类型、规则版本或审批依据；手续费不得混入本金。 | `TDD-DIR-*`、`TDD-RECON-*`。 |
+| 授权批准占用 | `AUTHORIZATION_TRANSACTION / AUTHORIZE` | 同主体 `AVAILABLE` 或可用额度减少，`AUTHORIZATION` 增加。 | 授权成功不是最终消费；拒绝不得生成 route、posting 或 entry。 | `TDD-AUTH-*`、`TDD-RED-*`。 |
+| 授权完成或部分完成 | `AUTHORIZATION_TRANSACTION / SETTLE` | 原主体 `AUTHORIZATION` 按完成金额减少；商户 `CLEARING`、平台目标账目或责任账目增加。 | 累计完成不得超过原授权金额；必须引用原授权和原 route snapshot。 | `TDD-AUTH-*`、`TDD-DIR-*`。 |
+| 授权撤销 | `AUTHORIZATION_TRANSACTION / REVERSAL` | 同主体 `AUTHORIZATION` 减少，`AVAILABLE` 或可用额度增加。 | 外部撤销或冲正触发；终态为撤销，不得和过期混用。 | `TDD-AUTH-*`。 |
+| 授权过期释放 | `AUTHORIZATION_TRANSACTION / EXPIRE` | 同主体剩余 `AUTHORIZATION` 减少，`AVAILABLE` 或可用额度增加。 | 系统到期触发，只释放剩余占用；必须保留过期原因和规则版本。 | `TDD-AUTH-*`。 |
+| 直接交易退款或授权完成后退款 | `DIRECT_TRANSACTION / REFUND` 或授权链退款事件 | 沿原 route snapshot 反向生成 posting；原收款方、平台补贴方或责任方对应账目减少，付款方或受益方 `AVAILABLE` 增加。 | 不按当前绑定关系重新选路；累计退款不得超过可退金额。 | `TDD-DIR-*`、`TDD-AUTH-*`、`TDD-BEN-*`。 |
+| 争议拒付或追偿 | `AUTHORIZATION_TRANSACTION / CHARGEBACK` 或差错追偿事实 | 责任方 `CLEARING`、`AVAILABLE`、`ADJUSTMENT` 或追偿账目减少；受益方或争议责任账目增加。 | 拒付、追偿和普通退款不得互相吞掉；必须有原事实、证据引用和责任归属。 | `TDD-AUTH-*`、`TDD-RECON-*`。 |
+| 冻结 | `BALANCE_CONTROL / FREEZE` | 同主体、同币种、同周期 `AVAILABLE` 减少，`FROZEN` 增加。 | 冻结不是消费、扣划或授权；不得跨主体、跨币种或跨周期冻结。 | `TDD-CTRL-*`、`TDD-RED-*`。 |
+| 解冻或到期释放 | `BALANCE_CONTROL / UNFREEZE` 或 `EXPIRE` | 同主体原 `FROZEN` 减少，`AVAILABLE` 增加。 | 不得超额释放；已扣划、已出款或已关闭金额不得再次释放。 | `TDD-CTRL-*`。 |
+| 资金账户余额调整 | `BALANCE_CONTROL / ADJUST` | 目标资金账户 `AVAILABLE`、`FROZEN` 或 `ADJUSTMENT` 按审批方向变化，并与平台调整、挂账或责任账目平衡。 | 必须有原因、凭证、审批和审计；不得作为绕过对账差错的人工改余额。 | `TDD-CTRL-*`、`TDD-RECON-*`。 |
+| 信用额度或预算调整 | `BALANCE_CONTROL / LIMIT_ADJUST` | `LIMIT`、`AVAILABLE` 或 `AUTHORIZATION` 按批准方向变化，使用信用账户或预算组账本周期。 | 不表达现金沉淀；周期缺失、超额、越权或重复冲突失败无副作用。 | `TDD-CTRL-*`。 |
+| 清分确认 | `DIRECT_TRANSACTION / CLEARING_CONFIRM` 或清结算 DSL 对象 | 商户 `CLEARING` 按确认金额减少；商户 `AVAILABLE`、风险准备金、费用或扣减账目按规则增加。 | 清分不等于出款；退款中、争议中、风控冻结或重大差错不得进入可清分。 | `TDD-CLS-*`、`TDD-RECON-*`。 |
+| 结算锁定 | `DIRECT_TRANSACTION / SETTLEMENT_LOCK` | 商户 `AVAILABLE` 减少，`SETTLEMENT` 增加。 | `SETTLEMENT` 是出款中或结算处理中余额桶，不等于授权链路 `SETTLE` 事件；锁定后不得重复结算。 | `TDD-SETTLE-*`。 |
+| 外部出款受理或在途 | `DIRECT_TRANSACTION / PAYOUT_SUBMITTED` 或出款状态事实 | 若采用在途桶，商户 `SETTLEMENT` 减少，`IN_TRANSIT` 增加；否则保持 `SETTLEMENT` 并记录外部非终态引用。 | submitted、accepted、message sent 或 processing 不等于到账成功。 | `TDD-SETTLE-*`、`TDD-RAIL-*`。 |
+| 出款成功 | `DIRECT_TRANSACTION / PAYOUT_SUCCEEDED` | 关闭 `SETTLEMENT` 或 `IN_TRANSIT` 中的锁定责任，并锚定平台现金或外部回单引用。 | 不得重复关闭；必须能证明商户结算负债减少和外部付款结果一致。 | `TDD-SETTLE-*`。 |
+| 出款失败或退回 | `DIRECT_TRANSACTION / PAYOUT_FAILED` 或退回事实 | `SETTLEMENT` 或 `IN_TRANSIT` 减少，商户 `AVAILABLE` 增加；异常退回可进入差错或 `ADJUSTMENT`。 | 只回退一次；金额不一致或状态不确定进入差错，不直接改历史分录。 | `TDD-SETTLE-*`、`TDD-RECON-*`。 |
+| 对账误报关闭 | 对账差错处理动作 | 不生成 posting 或 ledger entry，只关闭差错处理单并保留审计。 | 差异不能靠日志或人工备注修复余额。 | `TDD-RECON-*`。 |
+| 对账补事实、冲正、调账或核销 | `DIRECT_TRANSACTION / ADJUSTMENT` 或白名单运营命令 | 责任方、挂账方、平台调整账目、`ADJUSTMENT` 和目标账目按审批结论平衡。 | 必须在 Execution Grant 白名单内，有审批、凭证、原事实引用、幂等键和失败无副作用测试。 | `TDD-RECON-*`、`TDD-CTRL-*`。 |
+| 平台补贴 | `DIRECT_TRANSACTION / PAY` 的权益伴随 leg 或独立伴随指令 | 平台补贴责任、成本、预提或补贴资金账目减少；商户 `CLEARING` 或目标责任账目增加。 | 平台补贴不得和用户实付合成一个净额；零实付也必须有正金额资金来源。 | `TDD-BEN-*`、`TDD-BEN-RED-*`。 |
+| 商户让利或展示优惠 | 权益快照 `NO_LEDGER` 组件 | 通常不生成独立 posting；只影响订单价格、商户应收、清分展示或对账解释。 | 不得误生成平台补贴或储值券核销分录。 | `TDD-BEN-*`。 |
+| 储值券或预付权益核销 | 权益快照 `POSTING_REQUIRED` 组件 | 平台或发行方 `PREPAYMENT` 责任减少；商户 `CLEARING`、订单应收或目标责任账目增加。 | 储值预付口径需专业确认；退款时恢复责任或保留补贴必须由退款处置明确。 | `TDD-BEN-*`、`TDD-BEN-RED-*`。 |
+| 零实付交易 | `DIRECT_TRANSACTION / PAY` 携带权益快照 | 用户现金 `AVAILABLE` 不减少；商户 `CLEARING` 由平台补贴、储值权益或其他承担方的正金额 posting 支撑。 | 不生成零金额分录；不得因为用户实付为 0 就丢失商户应收、补贴责任或审计证据。 | `TDD-BEN-*`、`TDD-DIR-*`。 |
+| 归档、重放、余额快照或交易投影重建 | governance DSL 对象 | 不生成新的 route、posting 或 ledger entry；只读分录、快照、Manifest、checkpoint、watermark 和差异报告。 | 治理任务不得反写资金事实；普通指标快照不得替代账本余额确认。 | `TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-GOV-*`。 |
+
 ## 六、术语与边界
 
 ### 6.1 可入账主体
