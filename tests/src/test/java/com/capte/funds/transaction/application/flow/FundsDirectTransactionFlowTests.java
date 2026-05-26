@@ -5,6 +5,7 @@ import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
@@ -668,6 +669,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
 
         String retryTopupSn = directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setAccountId(account)
@@ -681,6 +683,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent topup"), WindOperator.system());
 
         assertThat(retryTopupSn).isEqualTo(firstTopupSn);
+        assertLedgerTransactionFactsUnchanged(afterFirstTopupFacts);
         assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_idempotent_topup",
@@ -699,6 +702,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstTopupFacts);
 
         assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
@@ -732,11 +736,13 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 "DIRECT_IDEMPOTENT_PAY");
         BalanceSnapshot afterFirstPay = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
+        LedgerFactSnapshot afterFirstPayFacts = ledgerFactSnapshot();
 
         String retryPaySn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
                 "DIRECT_IDEMPOTENT_PAY");
 
         assertThat(retryPaySn).isEqualTo(firstPaySn);
+        assertLedgerTransactionFactsUnchanged(afterFirstPayFacts);
         assertThatThrownBy(() -> pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 41L,
                 "DIRECT_IDEMPOTENT_PAY"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
@@ -749,6 +755,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstPayFacts);
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
@@ -791,6 +798,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 "DIRECT_IDEMPOTENT_PAY_PARTICIPANT");
         BalanceSnapshot afterFirstPay = snapshot(balances(payer, anotherPayer, payee, anotherPayee,
                 cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFirstPayFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> pay(anotherPayer, anotherPayee, LedgerSubjectCode.SETTLEMENT, 40L,
                 "DIRECT_IDEMPOTENT_PAY_PARTICIPANT"))
@@ -807,6 +815,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(anotherPayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstPayFacts);
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(anotherPayer), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
@@ -852,6 +861,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent transfer"), WindOperator.system());
         BalanceSnapshot afterFirstTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
+        LedgerFactSnapshot afterFirstTransferFacts = ledgerFactSnapshot();
 
         String retryTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payer)
@@ -862,6 +872,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent transfer"), WindOperator.system());
 
         assertThat(retryTransferSn).isEqualTo(firstTransferSn);
+        assertLedgerTransactionFactsUnchanged(afterFirstTransferFacts);
         assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payer)
                 .setPayeeAccountId(payee)
@@ -879,6 +890,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstTransferFacts);
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
@@ -922,6 +934,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent refund"), WindOperator.system());
         BalanceSnapshot afterFirstRefund = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
+        LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
 
         String retryRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
@@ -933,6 +946,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent refund"), WindOperator.system());
 
         assertThat(retryRefundSn).isEqualTo(firstRefundSn);
+        assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(payee)
@@ -951,6 +965,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
 
         assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);

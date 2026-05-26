@@ -29,6 +29,8 @@ import com.capte.funds.route.TransferFundsInstructionRouteResolver;
 import com.capte.funds.route.support.PlatformAccountRouteSupport;
 import com.capte.funds.route.support.RouteParticipantFactory;
 import com.capte.funds.route.support.RouteSubjectSupport;
+import com.capte.funds.support.FundsBalanceAssertionSupport;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.capte.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.capte.funds.transaction.application.FundsBalanceControlService;
@@ -614,6 +616,14 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         assertThat(entriesByFundsTransactionSn(fundsTransactionSn))
                 .as("ledger entries for funds transaction %s", fundsTransactionSn)
                 .isEmpty();
+    }
+
+    protected LedgerFactSnapshot ledgerFactSnapshot() {
+        return FundsBalanceAssertionSupport.ledgerFactSnapshot(jdbcTemplate);
+    }
+
+    protected void assertLedgerTransactionFactsUnchanged(LedgerFactSnapshot expected) {
+        FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged(jdbcTemplate, expected);
     }
 
     protected void assertFailedFundsTransactionWithoutLedgerFacts(String businessSn) {
