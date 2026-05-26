@@ -3,6 +3,7 @@ package com.capte.funds.transaction.application.flow;
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
@@ -38,6 +39,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         topup(user, 50L, "BALANCE_FREEZE_FAIL_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
@@ -53,6 +55,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
@@ -75,6 +78,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         topup(user, 50L, "BALANCE_FREEZE_CURRENCY_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
@@ -95,6 +99,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
@@ -117,6 +122,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         topup(user, 50L, "BALANCE_FREEZE_ZERO_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
@@ -137,6 +143,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
@@ -159,6 +166,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         topup(user, 100L, "BALANCE_FREEZE_IDEMPOTENT_TOPUP");
         String freezeSn = freeze(user, 30L, "BALANCE_FREEZE_IDEMPOTENT_FREEZE");
         BalanceSnapshot afterFirstFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFirstFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> freeze(user, 40L, "BALANCE_FREEZE_IDEMPOTENT_FREEZE"))
                 .hasMessageContaining("资金冻结单请求参数不一致");
@@ -169,6 +177,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstFreezeFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 70L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
 
@@ -206,6 +215,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         String freezeSn = freeze(user, 30L, "BALANCE_UNFREEZE_CURRENCY_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(afterTopup, afterFreeze,
                 delta(user, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 30L, CURRENCY),
@@ -227,6 +237,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
         assertPostedTransactions(2);
@@ -261,6 +272,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         freeze(user, 30L, "BALANCE_UNFREEZE_MISSING_REF_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(afterTopup, afterFreeze,
                 delta(user, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 30L, CURRENCY),
@@ -281,6 +293,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
         assertPostedTransactions(2);
@@ -315,6 +328,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         freeze(user, 30L, "BALANCE_UNFREEZE_UNKNOWN_REF_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(afterTopup, afterFreeze,
                 delta(user, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 30L, CURRENCY),
@@ -336,6 +350,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
         assertPostedTransactions(2);
@@ -375,6 +390,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         String freezeSn = freeze(user, 30L, "BALANCE_UNFREEZE_ACCOUNT_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, anotherUser, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(afterTopup, afterFreeze,
                 delta(user, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 30L, CURRENCY),
@@ -400,6 +416,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
         assertBucket(balance(anotherUser), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
@@ -436,6 +453,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         String freezeSn = freeze(user, 30L, "BALANCE_UNFREEZE_ZERO_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(afterTopup, afterFreeze,
                 delta(user, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 30L, CURRENCY),
@@ -457,6 +475,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 30L, CURRENCY);
         assertPostedTransactions(2);
@@ -484,6 +503,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         String freezeSn = freeze(user, 70L, "BALANCE_UNFREEZE_IDEMPOTENT_FREEZE");
         unfreeze(user, 20L, freezeSn, "BALANCE_UNFREEZE_IDEMPOTENT_RELEASE");
         BalanceSnapshot afterFirstUnfreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFirstUnfreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> unfreeze(user, 30L, freezeSn,
                 "BALANCE_UNFREEZE_IDEMPOTENT_RELEASE"))
@@ -495,6 +515,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstUnfreezeFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 50L, CURRENCY);
 
@@ -530,6 +551,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         topup(user, 50L, "BALANCE_ADJUST_ZERO_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
@@ -554,6 +576,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
@@ -575,6 +598,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         topup(user, 50L, "BALANCE_ADJUST_CURRENCY_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
@@ -599,6 +623,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(1);
@@ -722,6 +747,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         adjustBalance(credit, 100L, true, "CREDIT_LIMIT_DECREASE_FAIL_INCREASE");
         BalanceSnapshot afterIncrease = snapshot(balances(credit, funding, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterIncreaseFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(before, afterIncrease,
                 delta(credit, LedgerSubjectCode.LIMIT, 100L, CURRENCY),
                 delta(credit, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
@@ -746,6 +772,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterIncreaseFacts);
         assertBucket(balance(credit), LedgerSubjectCode.LIMIT, 100L, CURRENCY);
         assertBucket(balance(credit), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(balance(credit), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
@@ -773,6 +800,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         adjustBalance(budget, 200L, true, "BUDGET_LIMIT_DECREASE_FAIL_INCREASE");
         BalanceSnapshot afterIncrease = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterIncreaseFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(before, afterIncrease,
                 delta(budget, LedgerSubjectCode.LIMIT, 200L, CURRENCY),
                 delta(budget, LedgerSubjectCode.AVAILABLE, 200L, CURRENCY),
@@ -797,6 +825,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterIncreaseFacts);
         assertBucket(balance(budget), LedgerSubjectCode.LIMIT, 200L, CURRENCY);
         assertBucket(balance(budget), LedgerSubjectCode.AVAILABLE, 200L, CURRENCY);
         assertBucket(balance(budget), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
@@ -824,6 +853,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
 
         topup(user, 50L, "BALANCE_ADJUST_DECREASE_FAIL_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(), adjustmentAccount));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
         assertOnlyBalanceDeltas(before, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
@@ -850,6 +880,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
                 delta(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(adjustmentAccount), LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY);
