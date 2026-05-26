@@ -193,11 +193,30 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("fee_refund_no_src_payee");
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
         topup(payer, 100L, "FEE_REFUND_UNKNOWN_SOURCE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L,
                 "FEE_REFUND_UNKNOWN_SOURCE_PAY");
         BalanceSnapshot afterPay = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
                 prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -75L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterPayFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> refundFee(payer, 5L, "FUNDS_TRANSACTION_NOT_EXISTS",
@@ -247,18 +266,71 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         ensureLedger(reservePayer, LedgerSubjectCode.AVAILABLE);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, reservePayer, feeAccount(),
+                cashMappingAccount(), prepaymentAccount()));
         topup(payer, 100L, "FEE_REFUND_EXCEED_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, reservePayer, feeAccount(),
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(reservePayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L,
                 "FEE_REFUND_EXCEED_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, reservePayer, feeAccount(),
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -75L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(reservePayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String feeSourceTransactionSn = ledgerTransactionByBusinessSn("FEE_REFUND_EXCEED_PAY")
                 .getFundsTransactionSn();
         refundFee(payer, 5L, feeSourceTransactionSn, "FEE_REFUND_EXCEED_FIRST_RETURN");
+        BalanceSnapshot afterFirstFeeRefund = snapshot(balances(payer, payee, reservePayer, feeAccount(),
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterFirstFeeRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 5L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(reservePayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, -5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         topup(reservePayer, 100L, "FEE_REFUND_EXCEED_RESERVE_TOPUP");
+        BalanceSnapshot afterReserveTopup = snapshot(balances(payer, payee, reservePayer, feeAccount(),
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstFeeRefund, afterReserveTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(reservePayer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         payWithFixedFee(reservePayer, payee, LedgerSubjectCode.SETTLEMENT, 10L, 20L,
                 "FEE_REFUND_EXCEED_RESERVE_PAY");
         BalanceSnapshot beforeFailure = snapshot(balances(payer, payee, reservePayer, feeAccount(),
                 cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterReserveTopup, beforeFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 10L, CURRENCY),
+                delta(reservePayer, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 20L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> refundFee(payer, 5L, feeSourceTransactionSn,
