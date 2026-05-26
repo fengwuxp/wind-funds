@@ -95,6 +95,9 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(frozenOrderByBusinessSn("WITHDRAW_SUCCESS_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_SUCCESS_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_SUCCESS_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_SUCCESS_FREEZE", 0, 0, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_SUCCESS_CONFIRM", 3, 4);
     }
 
     /**
@@ -175,6 +178,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
                 delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
         assertPostedTransactions(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_WITH_FEE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_WITH_FEE_FREEZE", 0, 0, 1, 2);
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_WITH_FEE_CONFIRM", 4, 3, 6);
     }
 
@@ -226,6 +231,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(frozenOrderByBusinessSn("WITHDRAW_CURRENCY_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_CURRENCY_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_CURRENCY_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_CURRENCY_FREEZE", 0, 0, 1, 2);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_CURRENCY_CONFIRM");
     }
 
@@ -269,6 +276,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(frozenOrderByBusinessSn("WITHDRAW_UNKNOWN_REF_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_UNKNOWN_REF_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_UNKNOWN_REF_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_UNKNOWN_REF_FREEZE", 0, 0, 1, 2);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_UNKNOWN_REF_CONFIRM");
     }
 
@@ -328,6 +337,10 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_ACCOUNT_REF_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_ACCOUNT_REF_FREEZE", 0, 0, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_ACCOUNT_REF_ANOTHER_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE", 0, 0, 1, 2);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_ACCOUNT_REF_CONFIRM");
     }
 
@@ -384,6 +397,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(frozenOrderByBusinessSn("WITHDRAW_INTERNAL_PAYEE_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_INTERNAL_PAYEE_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_INTERNAL_PAYEE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_INTERNAL_PAYEE_FREEZE", 0, 0, 1, 2);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_INTERNAL_PAYEE_CONFIRM");
     }
 
@@ -454,6 +469,8 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.FREEZE.name(),
                         FundsTransactionEventType.WITHDRAW.name());
         assertThat(fundsTransactionDetails(firstWithdrawSn)).hasSize(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_IDEMPOTENT_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_IDEMPOTENT_FREEZE", 0, 0, 1, 2);
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM", 3, 4);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_IDEMPOTENT_FREEZE").getReleasedAmount()).isZero();
     }
@@ -504,6 +521,10 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(frozenOrderByBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_2").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_2").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_DUP_SOURCE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_1", 0, 0, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_DUP_SOURCE_FREEZE_2", 0, 0, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_DUP_SOURCE_CONFIRM_1", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_DUP_SOURCE_CONFIRM_2");
     }
 
@@ -548,6 +569,9 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_SOURCE_FREEZE").getStatus())
                 .isEqualTo(FundsFrozenOrderStatus.FROZEN);
         assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_SOURCE_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_SOURCE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_SOURCE_FREEZE", 0, 0, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_SOURCE_CONFIRM_1", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_SOURCE_CONFIRM_2");
     }
 
@@ -592,6 +616,9 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(frozenOrderExistsByBusinessSn("WITHDRAW_PARTIAL_CLOSE_RELEASE"))
                 .isFalse();
         assertThat(frozenOrderByBusinessSn("WITHDRAW_PARTIAL_CLOSE_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_CLOSE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_CLOSE_FREEZE", 0, 0, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_CLOSE_CONFIRM", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_PARTIAL_CLOSE_RELEASE");
     }
 
@@ -631,6 +658,9 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .isFalse();
         assertThat(frozenOrderByBusinessSn("WITHDRAW_UNFREEZE_AFTER_SUCCESS_FREEZE").getReleasedAmount())
                 .isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_UNFREEZE_AFTER_SUCCESS_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_UNFREEZE_AFTER_SUCCESS_FREEZE", 0, 0, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_UNFREEZE_AFTER_SUCCESS_CONFIRM", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_UNFREEZE_AFTER_SUCCESS_RELEASE");
     }
 }
