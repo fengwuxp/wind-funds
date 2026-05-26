@@ -128,9 +128,24 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("refund_low_payee");
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 100L, "DIRECT_REFUND_INSUFFICIENT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_INSUFFICIENT_PAY");
         BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterPayFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> refund(payer, payee, LedgerSubjectCode.SETTLEMENT, 80L,
@@ -176,8 +191,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testSameAccountTransferShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId account = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
         topup(account, 100L, "DIRECT_SAME_ACCOUNT_TRANSFER_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(account, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> transfer(account, account, 10L, "DIRECT_SAME_ACCOUNT_TRANSFER"))
@@ -218,8 +239,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("transfer_currency_payee");
         ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 50L, "DIRECT_TRANSFER_CURRENCY_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
@@ -389,8 +417,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("different_currency_payee");
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 50L, "DIRECT_PAY_CURRENCY_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
@@ -438,8 +473,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testPayWithoutPayeeShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId payer = fundingAccount("funding_user");
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 50L, "DIRECT_PAY_MISSING_PAYEE_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
@@ -487,8 +528,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("miss_ledger_payee");
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 50L, "DIRECT_PAY_MISSING_PAYEE_LEDGER_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
         FundsTransactionPayRequest request = new FundsTransactionPayRequest()
@@ -542,8 +590,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("no_payee_ledger");
         ensureFundingAccount(payee);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 50L, "DIRECT_PAY_MISSING_LEDGER_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 10L,
@@ -587,8 +642,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId externalPayee = FundsAccountId.immutable("external_bank_payee",
                 DefaultFundsAccountType.EXTERNAL_BANK);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 50L, "DIRECT_PAY_EXTERNAL_PAYEE_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
@@ -707,6 +768,12 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent topup"), WindOperator.system());
 
         assertThat(retryTopupSn).isEqualTo(firstTopupSn);
+        BalanceSnapshot afterRetryTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstTopup, afterRetryTopup,
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstTopupFacts);
         assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setAccountId(account)
@@ -721,7 +788,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
-        assertOnlyBalanceDeltas(afterFirstTopup, afterConflict,
+        assertOnlyBalanceDeltas(afterRetryTopup, afterConflict,
                 delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
@@ -755,17 +822,40 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("direct_idempotent_payee");
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 100L, "DIRECT_IDEMPOTENT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String firstPaySn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
                 "DIRECT_IDEMPOTENT_PAY");
         BalanceSnapshot afterFirstPay = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFirstPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstPayFacts = ledgerFactSnapshot();
 
         String retryPaySn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
                 "DIRECT_IDEMPOTENT_PAY");
 
         assertThat(retryPaySn).isEqualTo(firstPaySn);
+        BalanceSnapshot afterRetryPay = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstPay, afterRetryPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstPayFacts);
         assertThatThrownBy(() -> pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 41L,
                 "DIRECT_IDEMPOTENT_PAY"))
@@ -773,7 +863,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
-        assertOnlyBalanceDeltas(afterFirstPay, afterConflict,
+        assertOnlyBalanceDeltas(afterRetryPay, afterConflict,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
@@ -816,12 +906,47 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
         ensureLedger(anotherPayee, LedgerSubjectCode.SETTLEMENT);
 
+        BalanceSnapshot beforeFirstTopup = snapshot(balances(payer, anotherPayer, payee, anotherPayee,
+                cashMappingAccount(), prepaymentAccount()));
         topup(payer, 100L, "DIRECT_IDEMPOTENT_PARTICIPANT_TOPUP");
+        BalanceSnapshot afterFirstTopup = snapshot(balances(payer, anotherPayer, payee, anotherPayee,
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeFirstTopup, afterFirstTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherPayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherPayer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(anotherPayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         topup(anotherPayer, 100L, "DIRECT_IDEMPOTENT_PARTICIPANT_ANOTHER_TOPUP");
+        BalanceSnapshot afterSecondTopup = snapshot(balances(payer, anotherPayer, payee, anotherPayee,
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstTopup, afterSecondTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherPayer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(anotherPayer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(anotherPayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String firstPaySn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
                 "DIRECT_IDEMPOTENT_PAY_PARTICIPANT");
         BalanceSnapshot afterFirstPay = snapshot(balances(payer, anotherPayer, payee, anotherPayee,
                 cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterSecondTopup, afterFirstPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(anotherPayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(anotherPayer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY),
+                delta(anotherPayee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstPayFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> pay(anotherPayer, anotherPayee, LedgerSubjectCode.SETTLEMENT, 40L,
@@ -875,7 +1000,16 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("idem_transfer_payee");
         ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 100L, "DIRECT_IDEMPOTENT_TRANSFER_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String firstTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payer)
                 .setPayeeAccountId(payee)
@@ -885,6 +1019,12 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent transfer"), WindOperator.system());
         BalanceSnapshot afterFirstTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFirstTransfer,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTransferFacts = ledgerFactSnapshot();
 
         String retryTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
@@ -896,6 +1036,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent transfer"), WindOperator.system());
 
         assertThat(retryTransferSn).isEqualTo(firstTransferSn);
+        BalanceSnapshot afterRetryTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstTransfer, afterRetryTransfer,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstTransferFacts);
         assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payer)
@@ -908,7 +1056,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
-        assertOnlyBalanceDeltas(afterFirstTransfer, afterConflict,
+        assertOnlyBalanceDeltas(afterRetryTransfer, afterConflict,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
@@ -946,8 +1094,25 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payee = fundingAccount("idem_refund_payee");
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         topup(payer, 100L, "DIRECT_IDEMPOTENT_REFUND_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_IDEMPOTENT_REFUND_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
         String firstRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(payee)
@@ -958,6 +1123,12 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent refund"), WindOperator.system());
         BalanceSnapshot afterFirstRefund = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterFirstRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
 
         String retryRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
@@ -970,6 +1141,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent refund"), WindOperator.system());
 
         assertThat(retryRefundSn).isEqualTo(firstRefundSn);
+        BalanceSnapshot afterRetryRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstRefund, afterRetryRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
@@ -983,7 +1162,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
-        assertOnlyBalanceDeltas(afterFirstRefund, afterConflict,
+        assertOnlyBalanceDeltas(afterRetryRefund, afterConflict,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
