@@ -293,6 +293,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.AUTHORIZE.name(),
                         FundsTransactionEventType.REVERSAL.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_REVERSAL_EXCEED_SECOND_CANCEL");
     }
 
     /**
@@ -514,6 +515,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.AUTHORIZE.name(),
                         FundsTransactionEventType.SETTLE.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_RETURN");
     }
 
     /**
