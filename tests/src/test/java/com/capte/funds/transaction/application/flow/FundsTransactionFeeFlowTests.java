@@ -4,6 +4,7 @@ import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.enums.FundsEffectType;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
@@ -38,6 +39,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         FundsAccountId payer = fundingAccount("funding_user");
         BalanceSnapshot before = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
                 prepaymentAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> fee(payer, 5L, "FEE_NO_BALANCE_CHARGE"))
                 .hasMessageContaining("账本余额不足");
@@ -56,6 +58,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
         assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertPostedTransactions(0);
         assertFailedFundsTransactionWithoutLedgerFacts("FEE_NO_BALANCE_CHARGE");
     }
@@ -195,6 +198,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 "FEE_REFUND_UNKNOWN_SOURCE_PAY");
         BalanceSnapshot afterPay = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
                 prepaymentAccount()));
+        LedgerFactSnapshot afterPayFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> refundFee(payer, 5L, "FUNDS_TRANSACTION_NOT_EXISTS",
                 "FEE_REFUND_UNKNOWN_SOURCE_RETURN"))
@@ -222,6 +226,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertLedgerTransactionFactsUnchanged(afterPayFacts);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_PAY", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_RETURN");
@@ -254,6 +259,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 "FEE_REFUND_EXCEED_RESERVE_PAY");
         BalanceSnapshot beforeFailure = snapshot(balances(payer, payee, reservePayer, feeAccount(),
                 cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> refundFee(payer, 5L, feeSourceTransactionSn,
                 "FEE_REFUND_EXCEED_SECOND_RETURN"))
@@ -287,6 +293,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.FEE_REFUND.name(),
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_PAY", 3, 4);
         assertFeeRefundFactsWithoutFundsTransaction("FEE_REFUND_EXCEED_FIRST_RETURN");
