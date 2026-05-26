@@ -8,6 +8,7 @@ import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
+import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
@@ -197,6 +198,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         topup(user, 100L, "WITHDRAW_CURRENCY_TOPUP");
         String freezeSn = freeze(user, 60L, "WITHDRAW_CURRENCY_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
                 .setAccountId(user)
@@ -215,6 +217,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
@@ -250,6 +253,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         topup(user, 100L, "WITHDRAW_UNKNOWN_REF_TOPUP");
         freeze(user, 60L, "WITHDRAW_UNKNOWN_REF_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(user, 60L, "FREEZE_ORDER_NOT_EXISTS", "WITHDRAW_UNKNOWN_REF_CONFIRM"))
                 .hasMessageContaining("提现引用冻结单不存在");
@@ -260,6 +264,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
@@ -301,6 +306,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         freeze(anotherUser, 60L, "WITHDRAW_ACCOUNT_REF_ANOTHER_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, anotherUser, cashMappingAccount(),
                 prepaymentAccount()));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(anotherUser, 60L, freezeSn, "WITHDRAW_ACCOUNT_REF_CONFIRM"))
                 .hasMessageContaining("提现引用冻结单主体与请求账户不一致");
@@ -314,6 +320,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(anotherUser, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
@@ -361,6 +368,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         String freezeSn = freeze(user, 60L, "WITHDRAW_INTERNAL_PAYEE_FREEZE");
         BalanceSnapshot afterFreeze = snapshot(balances(user, internalPayee, cashMappingAccount(),
                 prepaymentAccount()));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
                 .setAccountId(user)
@@ -380,6 +388,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(internalPayee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
@@ -425,6 +434,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM")
                 .setDescription("idempotent withdraw"), WindOperator.system());
         BalanceSnapshot afterFirstWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFirstWithdrawFacts = ledgerFactSnapshot();
 
         String retryWithdrawSn = directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
                 .setAccountId(user)
@@ -437,6 +447,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setDescription("idempotent withdraw"), WindOperator.system());
 
         assertThat(retryWithdrawSn).isEqualTo(firstWithdrawSn);
+        assertLedgerTransactionFactsUnchanged(afterFirstWithdrawFacts);
         assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
                 .setAccountId(user)
                 .setPayeeId(FundsAccountId.immutable("external_bank_001",
@@ -454,6 +465,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstWithdrawFacts);
 
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
@@ -491,6 +503,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         freeze(user, 70L, "WITHDRAW_DUP_SOURCE_FREEZE_2");
         withdraw(user, 60L, firstFreezeSn, "WITHDRAW_DUP_SOURCE_CONFIRM_1");
         BalanceSnapshot afterFirstWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFirstWithdrawFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(user, 60L, firstFreezeSn, "WITHDRAW_DUP_SOURCE_CONFIRM_2"))
                 .hasMessageContaining("冻结单剩余可提现金额不足");
@@ -501,6 +514,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstWithdrawFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 70L, CURRENCY);
         assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
@@ -543,6 +557,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         String freezeSn = freeze(user, 90L, "WITHDRAW_PARTIAL_SOURCE_FREEZE");
         withdraw(user, 40L, freezeSn, "WITHDRAW_PARTIAL_SOURCE_CONFIRM_1");
         BalanceSnapshot afterFirstWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterFirstWithdrawFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> withdraw(user, 60L, freezeSn, "WITHDRAW_PARTIAL_SOURCE_CONFIRM_2"))
                 .hasMessageContaining("冻结单剩余可提现金额不足");
@@ -553,6 +568,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstWithdrawFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 50L, CURRENCY);
         assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_920L, CURRENCY);
@@ -590,6 +606,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         String freezeSn = freeze(user, 90L, "WITHDRAW_PARTIAL_CLOSE_FREEZE");
         withdraw(user, 40L, freezeSn, "WITHDRAW_PARTIAL_CLOSE_CONFIRM");
         BalanceSnapshot afterWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterWithdrawFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> unfreeze(user, 60L, freezeSn, "WITHDRAW_PARTIAL_CLOSE_RELEASE"))
                 .hasMessageContaining("RouteSnapshot leg 回放累计金额不能大于原 RouteLeg 金额");
@@ -600,6 +617,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterWithdrawFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 50L, CURRENCY);
         assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_920L, CURRENCY);
@@ -637,6 +655,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         String freezeSn = freeze(user, 60L, "WITHDRAW_UNFREEZE_AFTER_SUCCESS_FREEZE");
         withdraw(user, 60L, freezeSn, "WITHDRAW_UNFREEZE_AFTER_SUCCESS_CONFIRM");
         BalanceSnapshot afterWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterWithdrawFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> unfreeze(user, 60L, freezeSn,
                 "WITHDRAW_UNFREEZE_AFTER_SUCCESS_RELEASE"))
@@ -648,6 +667,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterWithdrawFacts);
         assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
