@@ -160,3 +160,17 @@ DSL 文档中的结构、表格和 JSON 示例只有在进入测试资源、被�
 1. `fixtureLevel` 是否与可声明结论一致，不能用低等级 fixture 支撑高等级交付结论。
 2. `targetTestClass` 是否真的读取该 fixture 或等价数据，不能只在测试名中引用 caseId。
 3. `coreAssertions` 是否覆盖本批次资金变化的最小证据；缺 route、posting、entry、projection、幂等或审计时，必须在 `notDone` 中说明。
+
+### A0 DSL 基线核验清单
+
+A0 阶段的 DSL 核验只确认 caseId、字段语义、fixture 等级和可测断言是否足以进入 TDD 分析，不新增测试资源、不修改公共契约、不补生产字段。发现 DSL 不能承接资金事实时，应先回到 PRD 或 DSL 设计补语义，再申请编码授权。
+
+| 核验项 | 必须确认 | 未闭合时处理 |
+| --- | --- | --- |
+| caseId 归属 | 本批引用的 `DSL-*` 都能反查 PRD 验收、系分入口和 TDD 用例。 | 标为 `DOC_ONLY`，不得声明机器契约通过。 |
+| 事实字段 | `instructionType`、`eventType`、`transactionType`、`businessScene`、主体、金额、币种和业务引用稳定。 | 回到 DSL 设计补字段语义或拆分场景。 |
+| 路由和账务 | route snapshot、posting plan、LedgerEntry、余额投影和交易投影的适用断言清楚。 | 不得进入资金流实现；只能作为设计输入。 |
+| fixture 等级 | `DOC_ONLY`、`CONTRACT_ONLY`、`FUNDS_FLOW`、`SERVICE_FLOW`、`GOVERNANCE_FLOW` 与可声明结论一致。 | 降级交付结论，或在 Execution Grant 中补测试资源写入范围。 |
+| 失败边界 | 拒绝、余额不足、错币种、缺快照、权限不足、规则待确认和重复请求的无副作用语义明确。 | 补 must-fail case 或写明 Not Done。 |
+| 敏感和外部证据 | 外部账户、支付工具、规则来源、凭证和审计证据只保留摘要、脱敏值或引用。 | 清理敏感示例；缺规则状态时不得作为生产 Done 证据。 |
+| 测试承接 | `targetTestClass`、核心断言和验证命令能定位；未落测试时 `notDone` 明确。 | 只能进入 TDD 分析或契约草案，不能进入生产交付结论。 |

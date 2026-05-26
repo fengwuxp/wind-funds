@@ -229,6 +229,32 @@ OpenSpec change、Harness Plan 或任务说明可以使用下列字段名承接�
 | 独立授权判定 | 是否触碰清结算/对账、归档/治理、P2 业务能力包、外部规则或敏感数据。 | 命中 B7/B8/P2 时必须切到独立 Execution Grant。 |
 | 验证和停止卡 | 必跑命令、可接受失败、不可接受失败、回滚或回到设计的触发条件。 | 验证命令缺失时只能声明设计输入态。 |
 
+### A0 基线核验卡
+
+A0 是进入编码前的只读核验批次，用于把设计、规格、任务和当前工程状态对齐成同一条 authority baseline。A0 不写生产代码、测试代码、DDL/H2 schema 或运行时配置；发现缺口时只输出差距、扩权建议、首批 Red 建议和停止条件。
+
+| baselineItem | mustCheck | evidence | passCondition | stopCondition |
+| --- | --- | --- | --- | --- |
+| Git 基线和工作树 | 当前分支、最近提交、未提交变更、未跟踪文件和本批允许读取范围。 | `git status --short`、`git rev-parse --short HEAD`、本批次说明。 | 能区分已冻结基线、用户既有变更和本批可触碰范围。 | 工作树存在会影响判断的未知代码或 schema 变更，且无法确认来源。 |
+| 文档基线 | PRD、DSL、系分、TDD 是否都能反查本批 AC、DSL case、服务入口和 Red。 | 四类 README、专题分册、交叉映射表。 | 目标能力没有孤立 PRD、孤立 DSL、孤立系分或孤立测试。 | 任一侧缺失导致无法说明资金事实、系统落点或测试证据。 |
+| OpenSpec / Harness | 是否已有 change、plan、Execution Grant 或等价任务说明。 | OpenSpec/Harness 文件、任务说明、人工确认记录。 | 能写清 `abilityBatch`、`authorityBaseline`、`writeScope`、`noWriteScope` 和 `firstRedSet`。 | 缺 Execution Grant 但准备写代码、测试、schema 或运行时配置。 |
+| 现有代码范围 | 目标模块、公共契约、表结构、测试资产和边界测试是否可定位。 | `core`、`wallet-*`、`transaction-*`、`ledger-*`、`tests` 的只读复核结果。 | 能说明本批只读范围、可改范围和禁止范围。 | 需要改公共契约、状态机或表结构但未授权。 |
+| H2 / DDL 现状 | 本批是否触碰持久化、Mapper、Entity、查询或状态字段。 | `tests/src/test/resources/jdbc-schema.sql` 和目标表设计差距。 | 不触碰数据库时写明不适用；触碰数据库时 DDL/H2 写入范围已授权。 | 生产表或 H2 schema 需要变更但未纳入 `writeScope`。 |
+| 目标测试资产 | 首批 Red、目标测试类、fixture、验证命令和最小资金断言。 | TDD Red 卡、DSL 执行化盘点、现有测试类清单。 | 每个资金变化都有状态、route、posting、entry、projection、幂等和审计断言计划。 | 只能证明接口不报错、状态变化或 entry 数量。 |
+| 验证环境 | JDK、Maven/just、私有仓库、目标测试命令和可接受失败边界。 | `just mvn-version` 或等价命令计划、验证命令清单。 | 能区分代码问题与环境、网络、凭据或缓存问题。 | 验证命令缺失，或失败原因无法归类。 |
+| 独立能力域判定 | 是否触碰 B7 清结算对账、B8 归档治理或 P2 业务能力包。 | 能力域判定、独立授权需求和 Not Done。 | A0-A4 与 B7/B8/P2 边界清楚。 | 交易主线批次需要顺手写清结算、对账、归档、治理或业务专项能力。 |
+
+A0 输出必须形成一页可评审结论，而不是零散检查记录。建议按下列模板写入任务说明或 Execution Grant 附件：
+
+| 输出项 | 填写口径 |
+| --- | --- |
+| `a0Conclusion` | `PASS`、`CONDITIONAL_PASS` 或 `BLOCKED`；只读核验不产生 Done。 |
+| `baselineCommit` | 当前 Git 提交、工作树未提交变更摘要和哪些变更不纳入本批基线。 |
+| `docCoverage` | 本批覆盖的 PRD、DSL、系分、TDD 章节和缺口。 |
+| `writeScopeProposal` | 建议开放的写入范围、禁止范围和是否需要公共契约、DDL/H2 或测试资源授权。 |
+| `firstRedProposal` | 建议首批 Red、目标测试类、核心断言和验证命令。 |
+| `stopReasons` | 需要回到产品、DSL、系分、TDD、外部规则确认或独立 Execution Grant 的触发条件。 |
+
 ### TDD 分析准入卡
 
 进入 TDD 分析不等于进入编码。TDD 分析只允许产出测试资产设计、首批 Red 排序、DDL/H2 范围、服务级测试范围、边界测试、外部规则核验和残余风险矩阵；生产代码、测试代码、DDL/H2 schema 和运行时配置写入仍必须等待 Execution Grant。
@@ -260,6 +286,32 @@ OpenSpec change、Harness Plan 或任务说明可以使用下列字段名承接�
 | 外部规则、合规、税务、会计、轨道和敏感数据 | 已列出待确认项和不覆盖范围。 | 不作为生产启用结论。 | 规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方、确认状态、审计和敏感数据处理方案。 |
 
 首轮编码建议从 A0 基线核验进入：先复核钱包账户、支付工具、账本、账目、余额投影、现有测试资产、工作树和验证环境，再由用户确认 A1 至 A4 的 Execution Grant。A1 至 A4 只覆盖交易主链路、授权、余额控制和 DSL 执行化；B7/B8 仍只进入 TDD 分析和独立授权准备。
+
+### 生产 Done 证据门禁
+
+生产 Done 不是设计结论，而是 Execution Grant 范围内的实现、测试、验证、审计和外部确认共同成立。任一门禁缺失时，交付结论只能写成 Conditional Done、Not Done、设计输入态或 TDD 分析完成。
+
+| 门禁 | Done 必须具备 | 缺失时结论 |
+| --- | --- | --- |
+| Execution Grant 闭合 | `abilityBatch`、`authorityBaseline`、`writeScope`、`noWriteScope`、`firstRedSet`、`verificationAndStop` 均已确认。 | Not Done；只能做设计、差距复核或 TDD 分析。 |
+| 写入范围内实现完成 | 代码、公共契约、状态机、表结构、H2 schema 和运行时配置只在授权范围内变更。 | Not Done；越权变更必须回退、拆分或重新授权。 |
+| 测试资产通过 | 首批 Red 已变绿，服务级测试、契约测试、边界测试和回归命令按范围通过。 | Not Done；未执行时必须说明环境或依赖限制。 |
+| 资金不变量成立 | 状态、主体、账目、币种、route snapshot、posting plan、LedgerEntry、余额投影、幂等和失败无副作用均有证据。 | Not Done；不得用状态或数量断言替代。 |
+| DDL/H2 一致 | 涉及持久化时生产 DDL、H2 schema、Entity/Mapper、唯一键和索引同步闭合。 | Not Done；不涉及时写明不适用。 |
+| 观测审计可解释 | traceId、业务引用、审批号、凭证摘要、差异报告、告警、人工处理入口和脱敏证据可追溯。 | Conditional Done 或 Not Done；触碰真实资金、高危操作或敏感数据时缺失即阻断。 |
+| 外部规则确认 | 通道、银行、卡组织、ACH、PSP、FX、合规、税务、会计或敏感数据规则有确认状态和不覆盖范围。 | Conditional Done；影响资金释放、出款或敏感数据时 Not Done。 |
+| 回滚和 Runbook | 涉及生产行为、批处理、出款、归档 apply 或高危运营动作时，有暂停、重试、补偿、重放、回滚和人工兜底。 | Conditional Done 或 Not Done；无人工兜底的资金写入能力不得上线。 |
+| Not Done 清单 | 未覆盖范围、残余风险、后续批次和阻断条件写清楚。 | 不得声明 Done；交付说明必须降级。 |
+
+批次交付说明应显式给出 Done 判定，避免只列测试结果却不说明生产边界：
+
+| 输出项 | 填写口径 |
+| --- | --- |
+| `deliveryConclusion` | `DONE`、`CONDITIONAL_DONE` 或 `NOT_DONE`。 |
+| `doneScope` | 本结论覆盖的能力、文件、模块、表、测试和验证命令。 |
+| `moneyEvidence` | 资金不变量证据，至少覆盖主体、金额、账目、route、posting、entry、projection、幂等和审计中的适用项。 |
+| `notDoneScope` | 未覆盖能力、未执行验证、未确认外部规则、未落 DDL/H2 或未补 Runbook 的范围。 |
+| `nextGate` | 后续进入 A1-A4、B7、B8 或 P2 的准入条件。 |
 
 ### 跨文档生产证据链
 

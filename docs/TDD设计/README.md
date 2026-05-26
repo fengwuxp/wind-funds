@@ -122,6 +122,31 @@ TDD 设计区分“目标测试资产”和“当前已执行证据”。目标�
 
 任一首批 Red 都必须先写失败断言和停止条件：如果测试只能证明接口不报错、状态变化或 entry 数量，不能进入实现；如果测试需要新增公共契约、状态机、表结构、H2 schema 或运行时配置，必须先回到 Execution Grant 扩权。
 
+### A0 基线核验测试盘点
+
+A0 不写测试代码，但必须把“要写哪些测试、证明什么、怎么停下来”盘点清楚。盘点完成后才能把 A1-A4 或 B7/B8 的首批 Red 写入 Execution Grant。
+
+| 盘点项 | 必须输出 | Not Done 条件 |
+| --- | --- | --- |
+| 目标测试类 | 本批可能新增、恢复或复用的测试类、所属模块和验证命令。 | 找不到真实执行路径或只能依赖内部大范围 Mock。 |
+| 测试层级 | 单元、契约、服务级 H2、业务流程、边界测试、治理测试的适用层级。 | 资金变化只有单元测试或文档样例，没有服务级或契约证据。 |
+| fixture 清单 | 需要读取的 DSL fixture、业务数据、H2 基础数据和外部替身边界。 | fixture 未落地、等级不匹配或不被测试读取。 |
+| 最小断言 | 状态、余额桶、route snapshot、posting plan、ledger transaction、LedgerEntry、projection、幂等和审计。 | 只断言状态、数量、日志或接口不报错。 |
+| 失败无副作用 | 余额不足、拒绝、错币种、规则不唯一、权限不足、重复请求、外部规则未确认的 forbidden facts。 | 失败路径会生成半截 route、posting、entry、外部出款或敏感导出。 |
+| 数据和 schema | 是否需要改 H2 schema、DDL、Entity、Mapper 或测试数据准备。 | 需要改 schema 但 Execution Grant 未授权。 |
+| 回归范围 | A1-A4、B7、B8 或 P2 业务能力包对既有测试的回归影响。 | 只测新增路径，不保护 P0/P1 资金内核。 |
+| 停止条件 | 红灯不符合预期、需要扩公共契约、需要改表、触碰外部规则或跨能力域时如何停止。 | 无停止条件，或把外部规则/资金红线失败当作普通实现缺陷。 |
+
+A0 测试盘点输出建议直接作为首批 Red 评审页：
+
+| 输出项 | 填写口径 |
+| --- | --- |
+| `redCandidateSet` | 本批建议先写的 Red 编号、目标行为和失败断言。 |
+| `targetAssets` | 目标测试类、fixture、H2 数据准备和验证命令。 |
+| `minimumAssertions` | 状态、余额桶、route、posting、entry、projection、幂等、审计和 forbidden facts。 |
+| `schemaNeed` | 是否需要 DDL/H2、Entity、Mapper 或测试资源写入授权。 |
+| `testStopReasons` | 哪些失败必须停止并回到 Execution Grant、系分或外部规则确认。 |
+
 ### 首批 Red 卡模板
 
 每个进入编码的 Red 都要先填 Red 卡，避免测试只表达内部实现步骤。Red 卡可以作为 Execution Grant 附件，也可以作为 TDD 分析产物。
