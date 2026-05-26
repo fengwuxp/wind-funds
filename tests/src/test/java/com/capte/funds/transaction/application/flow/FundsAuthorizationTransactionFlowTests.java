@@ -72,6 +72,21 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
         assertNoLedgerFactsForFundsTransaction(authorizationSn);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DECLINE_TOPUP", 3, 4);
+        assertThat(fundsTransactionsByBusinessSn("AUTH_DECLINE_AUTHORIZE"))
+                .as("rejected funds transactions for businessSn AUTH_DECLINE_AUTHORIZE")
+                .singleElement()
+                .satisfies(rejectedTransaction -> {
+                    assertThat(rejectedTransaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+                    assertNoLedgerFactsForFundsTransaction(rejectedTransaction.getSn());
+                });
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_DECLINE_AUTHORIZE"))
+                .as("rejected funds transaction details for businessSn AUTH_DECLINE_AUTHORIZE")
+                .singleElement()
+                .satisfies(detail -> {
+                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getLedgerTransactionSn()).isNull();
+                });
     }
 
     /**
@@ -140,6 +155,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.REVERSAL.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REVERSAL_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REVERSAL_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REVERSAL_CANCEL", 0, 1, 1, 2);
     }
 
     /**
@@ -229,6 +247,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.SETTLEMENT.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_CANCEL", 0, 1, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_CAPTURE", 0, 2, 1, 2);
     }
 
     /**
@@ -293,6 +315,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.AUTHORIZE.name(),
                         FundsTransactionEventType.REVERSAL.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REVERSAL_EXCEED_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REVERSAL_EXCEED_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_REVERSAL_EXCEED_FIRST_CANCEL", 0, 1, 1, 2);
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_REVERSAL_EXCEED_SECOND_CANCEL");
     }
 
@@ -372,6 +397,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.SETTLEMENT.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_CAPTURE", 0, 2, 1, 2);
     }
 
     /**
@@ -450,6 +478,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.REFUND.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_CAPTURE", 0, 2, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_RETURN", 0, 2, 1, 2);
     }
 
     /**
@@ -515,6 +547,12 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.AUTHORIZE.name(),
                         FundsTransactionEventType.SETTLE.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_CAPTURE", 0, 2, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_RESERVE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_RESERVE_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_RESERVE_CAPTURE", 0, 2, 1, 2);
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_REFUND_EXCEED_RETURN");
     }
 
