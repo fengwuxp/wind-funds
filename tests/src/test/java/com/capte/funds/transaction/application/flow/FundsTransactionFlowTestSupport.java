@@ -94,6 +94,7 @@ import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFeeType;
@@ -664,23 +665,40 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected void assertFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedTransactions,
                                                           int expectedDetails, int expectedPostingPlans,
                                                           int expectedEntries) {
-        assertThat(fundsTransactionsByBusinessSn(businessSn))
+        List<FundsTransaction> fundsTransactions = fundsTransactionsByBusinessSn(businessSn);
+        List<FundsTransactionDetail> details = fundsTransactionDetailsByBusinessSn(businessSn);
+        List<LedgerTransaction> ledgerTransactions = ledgerTransactionsForBusinessSn(businessSn);
+        assertThat(fundsTransactions)
                 .as("funds transactions for businessSn %s", businessSn)
                 .hasSize(expectedTransactions);
-        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+        assertThat(details)
                 .as("funds transaction details for businessSn %s", businessSn)
                 .hasSize(expectedDetails);
-        assertThat(ledgerTransactionsForBusinessSn(businessSn))
+        assertThat(ledgerTransactions)
                 .as("ledger transactions for businessSn %s", businessSn)
                 .singleElement()
-                .satisfies(transaction -> {
-                    assertThat(postingPlansOf(transaction))
+                .satisfies(ledgerTransaction -> {
+                    assertThat(ledgerTransaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
+                    assertThat(details)
+                            .as("funds transaction details must point to ledger transaction for businessSn %s",
+                                    businessSn)
+                            .allSatisfy(detail -> {
+                                assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
+                                assertThat(detail.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+                            });
+                    assertThat(postingPlansOf(ledgerTransaction))
                             .as("posting plans for businessSn %s", businessSn)
                             .hasSize(expectedPostingPlans);
                     assertThat(entriesByBusinessSn(businessSn))
                             .as("ledger entries for businessSn %s", businessSn)
                             .hasSize(expectedEntries);
                 });
+        if (!fundsTransactions.isEmpty()) {
+            assertThat(details)
+                    .as("funds transaction details must belong to funds transactions for businessSn %s", businessSn)
+                    .extracting(FundsTransactionDetail::getTransactionSn)
+                    .containsOnlyElementsOf(fundsTransactions.stream().map(FundsTransaction::getSn).toList());
+        }
     }
 
     protected void assertSingleFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedDetails,
