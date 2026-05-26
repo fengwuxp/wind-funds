@@ -697,6 +697,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerTransaction::getEventType)
                 .toList())
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertThat(fundsTransactionDetails(firstTopupSn)).hasSize(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TOPUP_ONLY", 3, 4);
     }
 
     /**
@@ -748,6 +750,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
         assertThat(fundsTransactionDetails(firstPaySn)).hasSize(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_PAY", 2, 2);
     }
 
     /**
@@ -807,6 +810,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.PAY.name());
         assertThat(fundsTransactionDetails(firstPaySn)).hasSize(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_PAY_PARTICIPANT", 2, 2);
     }
 
     /**
@@ -873,6 +877,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.TRANSFER.name());
         assertThat(fundsTransactionDetails(firstTransferSn)).hasSize(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TRANSFER", 2, 2);
     }
 
     /**
@@ -944,5 +949,22 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.PAY.name(),
                         FundsTransactionEventType.REFUND.name());
         assertThat(fundsTransactionDetails(firstRefundSn)).hasSize(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND", 2, 2);
+    }
+
+    private void assertSingleFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedDetails,
+                                                              int expectedEntries) {
+        assertThat(fundsTransactionsByBusinessSn(businessSn))
+                .as("funds transactions for businessSn %s", businessSn)
+                .hasSize(1);
+        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+                .as("funds transaction details for businessSn %s", businessSn)
+                .hasSize(expectedDetails);
+        assertThat(ledgerTransactionsForBusinessSn(businessSn))
+                .as("ledger transactions for businessSn %s", businessSn)
+                .hasSize(1);
+        assertThat(entriesByBusinessSn(businessSn))
+                .as("ledger entries for businessSn %s", businessSn)
+                .hasSize(expectedEntries);
     }
 }
