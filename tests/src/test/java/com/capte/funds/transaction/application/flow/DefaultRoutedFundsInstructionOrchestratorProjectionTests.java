@@ -1,5 +1,7 @@
 package com.capte.funds.transaction.application.flow;
 
+import com.capte.funds.ledger.dal.entities.LedgerEntry;
+import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
@@ -7,7 +9,14 @@ import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.capte.funds.transaction.projection.FundsTransactionProjectionPublishContext;
 import com.capte.funds.transaction.projection.FundsTransactionProjectionPublisher;
+import com.capte.funds.transaction.support.FundsRouteLegIds;
+import com.wind.integration.funds.ledger.enums.EntrySide;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
+import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.integration.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
@@ -25,6 +34,7 @@ import static com.capte.funds.support.FundsBalanceAssertionSupport.assertOnlyBal
 import static com.capte.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * 交易主链路投影入口服务层流程测试。
@@ -289,6 +299,8 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         var afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         FundsTransactionDTO fundsTransaction = fundsTransaction(transactionSn);
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_FAILURE_PAY");
+        List<LedgerPostingPlan> postingPlans = postingPlansOf(ledgerTransaction);
+        List<LedgerEntry> entries = entriesOf(ledgerTransaction);
 
         assertOnlyBalanceDeltas(beforePay, afterPay,
                 delta(payer, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
@@ -300,8 +312,43 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         assertThat(projectionPublisher.contexts()).isEmpty();
         assertThat(fundsTransaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
         assertThat(ledgerTransaction.getFundsTransactionSn()).isEqualTo(transactionSn);
-        assertThat(entriesOf(ledgerTransaction)).isNotEmpty();
-        assertThat(postingPlansOf(ledgerTransaction)).isNotEmpty();
+        assertThat(ledgerTransaction.getEventType()).isEqualTo(FundsTransactionEventType.PAY.name());
+        assertThat(ledgerTransaction.getBusinessSn()).isEqualTo("PROJECTION_FAILURE_PAY");
+        assertThat(ledgerTransaction.getDebitAmount()).isEqualTo(40L);
+        assertThat(ledgerTransaction.getCreditAmount()).isEqualTo(40L);
+        assertThat(ledgerTransaction.getBalanced()).isTrue();
+        assertThat(postingPlans).singleElement().satisfies(plan -> {
+            assertThat(plan.getFundsTransactionSn()).isEqualTo(transactionSn);
+            assertThat(plan.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+            assertThat(plan.getRouteLegId()).isEqualTo(FundsRouteLegIds.PAY);
+            assertThat(plan.getIntent()).isEqualTo(LedgerPostingIntentType.TRANSFER.name());
+            assertThat(plan.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS.name());
+            assertThat(plan.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME.name());
+            assertThat(plan.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT.name());
+            assertThat(plan.getAmount()).isEqualTo(40L);
+            assertThat(plan.getCurrency()).isEqualTo(CURRENCY);
+            assertThat(plan.getDebitAmount()).isEqualTo(40L);
+            assertThat(plan.getCreditAmount()).isEqualTo(40L);
+            assertThat(plan.getBalanced()).isTrue();
+        });
+        String postingPlanSn = postingPlans.getFirst().getSn();
+        assertThat(entries).hasSize(2).allSatisfy(entry -> {
+            assertThat(entry.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+            assertThat(entry.getPostingPlanSn()).isEqualTo(postingPlanSn);
+            assertThat(entry.getFundsTransactionSn()).isEqualTo(transactionSn);
+            assertThat(entry.getBusinessSn()).isEqualTo("PROJECTION_FAILURE_PAY");
+            assertThat(entry.getAmount()).isEqualTo(40L);
+            assertThat(entry.getCurrency()).isEqualTo(CURRENCY);
+            assertThat(entry.getIntent()).isEqualTo(LedgerPostingIntentType.TRANSFER.name());
+            assertThat(entry.getPostingScope()).isEqualTo(LedgerPostingScope.BETWEEN_SUBJECTS.name());
+            assertThat(entry.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.CONSUME.name());
+            assertThat(entry.getPhaseCode()).isEqualTo(LedgerPhaseCode.SETTLEMENT.name());
+        });
+        assertThat(entries)
+                .extracting(LedgerEntry::getSubjectId, LedgerEntry::getLedgerSubjectCode, LedgerEntry::getEntrySide)
+                .containsExactlyInAnyOrder(
+                        tuple(payer.id(), LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT),
+                        tuple(payee.id(), LedgerSubjectCode.SETTLEMENT, EntrySide.CREDIT));
         assertPostedTransactions(2);
     }
 
