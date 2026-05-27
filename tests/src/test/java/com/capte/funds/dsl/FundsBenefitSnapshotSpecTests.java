@@ -342,6 +342,94 @@ class FundsBenefitSnapshotSpecTests {
     }
 
     /**
+     * 场景：调用方在权益引用构造后继续改写原始嵌套上下文。
+     * 预期：已构造的权益引用保持稳定，不被追加的实时营销规则污染。
+     * 红线：权益引用不能因浅拷贝把当前规则、券包或重算结果带入资金事实。
+     */
+    @Test
+    void testBenefitReferenceShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> decisionTrace = new HashMap<>();
+        decisionTrace.put("decisionId", "benefit-reference-immutable-001");
+        FundsBenefitReferenceSpec reference = ImmutableFundsBenefitReferenceSpec.builder()
+                .campaignId("campaign-immutable-001")
+                .couponId("coupon-immutable-001")
+                .writeOffId("write-off-immutable-001")
+                .ruleVersion("rule-v1")
+                .contextVariables(Map.of("decisionTrace", decisionTrace))
+                .build();
+
+        decisionTrace.put("currentMarketingRule", "discount-now");
+
+        Object traceValue = reference.getContextVariables().get("decisionTrace");
+        assertThat(traceValue).isInstanceOf(Map.class);
+        Map<?, ?> trace = (Map<?, ?>) traceValue;
+        assertThat(trace.get("decisionId")).isEqualTo("benefit-reference-immutable-001");
+        assertThat(trace.containsKey("currentMarketingRule")).isFalse();
+    }
+
+    /**
+     * 场景：调用方在权益组件构造后继续改写原始嵌套上下文。
+     * 预期：已构造的权益组件保持稳定，不被追加的券包或重算结果污染。
+     * 红线：权益组件上下文不能成为核心优惠计算输入的旁路。
+     */
+    @Test
+    void testBenefitComponentShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> componentTrace = new HashMap<>();
+        componentTrace.put("decisionId", "benefit-component-immutable-001");
+        FundsBenefitComponentSpec component = ImmutableFundsBenefitComponentSpec.builder()
+                .componentSn("BC-IMMUTABLE-CONTEXT-001")
+                .sequence(1)
+                .benefitType(FundsBenefitType.MERCHANT_COUPON)
+                .componentType(FundsBenefitComponentType.MERCHANT_DISCOUNT)
+                .closureRole(FundsBenefitAmountClosureRole.ORDER_DISCOUNT_CLOSURE)
+                .amount(money(2000L))
+                .ledgerEffect(FundsBenefitLedgerEffect.NO_LEDGER)
+                .fundingNature(FundsBenefitFundingNature.MERCHANT_BORNE)
+                .bearerSubjectRef(subjectRef("MERCHANT-001"))
+                .beneficiarySubjectRef(subjectRef("USER-001"))
+                .benefitReference(benefitReference())
+                .refundPolicy(merchantRefundPolicy())
+                .contextVariables(Map.of("componentTrace", componentTrace))
+                .build();
+
+        componentTrace.put("userCouponBag", "coupon-bag-now");
+
+        Object traceValue = component.getContextVariables().get("componentTrace");
+        assertThat(traceValue).isInstanceOf(Map.class);
+        Map<?, ?> trace = (Map<?, ?>) traceValue;
+        assertThat(trace.get("decisionId")).isEqualTo("benefit-component-immutable-001");
+        assertThat(trace.containsKey("userCouponBag")).isFalse();
+    }
+
+    /**
+     * 场景：调用方在退款策略构造后继续改写原始嵌套上下文。
+     * 预期：已构造的退款策略保持稳定，不被追加的实时退款处置污染。
+     * 红线：退款策略上下文不能成为退款规则和处置结果的旁路。
+     */
+    @Test
+    void testBenefitRefundPolicyShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> refundTrace = new HashMap<>();
+        refundTrace.put("decisionId", "benefit-refund-immutable-001");
+        FundsBenefitRefundPolicySpec refundPolicy = ImmutableFundsBenefitRefundPolicySpec.builder()
+                .partialRefundStrategy(FundsBenefitPartialRefundStrategy.PROPORTIONAL)
+                .dispositions(List.of(FundsBenefitRefundDisposition.NO_REFUND,
+                        FundsBenefitRefundDisposition.REDUCE_MERCHANT_RECEIVABLE))
+                .refundRuleVersion("merchant-refund-v5")
+                .refundDecisionId("refund-decision-immutable-001")
+                .decisionSource("ORDER_REFUND_ENGINE")
+                .contextVariables(Map.of("refundTrace", refundTrace))
+                .build();
+
+        refundTrace.put("refundDisposition", "REISSUE");
+
+        Object traceValue = refundPolicy.getContextVariables().get("refundTrace");
+        assertThat(traceValue).isInstanceOf(Map.class);
+        Map<?, ?> trace = (Map<?, ?>) traceValue;
+        assertThat(trace.get("decisionId")).isEqualTo("benefit-refund-immutable-001");
+        assertThat(trace.containsKey("refundDisposition")).isFalse();
+    }
+
+    /**
      * 场景：外部 JSON 解析器把原始权益快照对象结构交给资金 DSL 显式装配。
      * 预期：装配结果保持不可变模型、嵌套引用和退款策略语义，且稳定摘要可用。
      * 红线：测试不能用 fixture 替生产代码隐式转换 Money；原始 JSON money object 必须穿过生产入口。
