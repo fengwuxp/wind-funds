@@ -151,6 +151,49 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     /**
+     * 场景：支付工具路由决策上下文被调用方塞入通道密钥或支付工具原文。
+     * 预期：RoutingDecision 构造期立即拒绝。
+     * 红线：路由决策会进入 route snapshot、归档重放和审计链路，不能保存 PAN、CVV、密钥或外部账户原文。
+     */
+    @Test
+    void testRoutingDecisionContextVariablesShouldRejectSensitiveValues() {
+        assertThatThrownBy(() -> routingDecision("SENSITIVE_ROUTING_CONTEXT",
+                List.of(fundingAllocation("ALLOC-SENSITIVE-CONTEXT",
+                        fundingAccount("FA-SENSITIVE-CONTEXT"),
+                        LedgerSubjectCode.AVAILABLE,
+                        10,
+                        "REAL_FUNDING_ACCOUNT")),
+                Map.of("processorPayload", Map.of("secretKey", "secret-value"))))
+                .hasMessageContaining("routingDecision.contextVariables must not contain sensitive fields");
+    }
+
+    /**
+     * 场景：调用方在 RoutingDecision 构造后继续改写原始嵌套上下文。
+     * 预期：已构造的路由决策保持稳定，不被追加的支付工具原文污染。
+     * 红线：路由决策不能因浅拷贝绕过敏感字段校验并污染后续 route snapshot。
+     */
+    @Test
+    void testRoutingDecisionShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> processorPayload = new HashMap<>();
+        processorPayload.put("networkReference", "token:route-decision-001");
+        RoutingDecisionSpec decision = routingDecision("IMMUTABLE_ROUTING_CONTEXT",
+                List.of(fundingAllocation("ALLOC-IMMUTABLE-CONTEXT",
+                        fundingAccount("FA-IMMUTABLE-CONTEXT"),
+                        LedgerSubjectCode.AVAILABLE,
+                        10,
+                        "REAL_FUNDING_ACCOUNT")),
+                Map.of("processorPayload", processorPayload));
+
+        processorPayload.put("pan", "4242424242424242");
+
+        Object payloadValue = decision.getContextVariables().get("processorPayload");
+        assertThat(payloadValue).isInstanceOf(Map.class);
+        Map<?, ?> payload = (Map<?, ?>) payloadValue;
+        assertThat(payload.get("networkReference")).isEqualTo("token:route-decision-001");
+        assertThat(payload.containsKey("pan")).isFalse();
+    }
+
+    /**
      * 场景：支付工具资金来源存在多个候选，但优先级缺失或冲突。
      * 预期：FundingAllocation 必须有确定优先级，RoutingDecision 不允许重复优先级。
      * 红线：多来源命中不得随机选路。
@@ -439,13 +482,19 @@ class PaymentInstrumentRouteDslContractTests {
 
     private RoutingDecisionSpec routingDecision(String policyCode,
                                                 List<FundingAllocationDecisionSpec> fundingAllocations) {
+        return routingDecision(policyCode, fundingAllocations, Map.of("accountModel", policyCode));
+    }
+
+    private RoutingDecisionSpec routingDecision(String policyCode,
+                                                List<FundingAllocationDecisionSpec> fundingAllocations,
+                                                Map<String, Object> contextVariables) {
         return ImmutableRoutingDecisionSpec.builder()
                 .policyCode(policyCode)
                 .matchedRules(List.of("INSTRUMENT_ACTIVE", "DIRECTION_PAY", policyCode))
                 .selectedProcessor("CARD_PROCESSOR")
                 .fundingAllocations(fundingAllocations)
                 .decisionReason(policyCode + "_DECISION")
-                .contextVariables(Map.of("accountModel", policyCode))
+                .contextVariables(contextVariables)
                 .build();
     }
 
