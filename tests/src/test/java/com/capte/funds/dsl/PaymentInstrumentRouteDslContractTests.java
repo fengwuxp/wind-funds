@@ -324,6 +324,25 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     /**
+     * 场景：通道回传外部账户字段名时使用大小写、空格或短横线变体。
+     * 预期：字段名归一化后仍按敏感外部账户字段阻断。
+     * 红线：外部账户号和 routing number 不能因字段命名风格差异进入 route 快照。
+     */
+    @Test
+    void testExternalAccountSnapshotShouldRejectNormalizedSensitiveContextFields() {
+        assertThatThrownBy(() -> externalAccountRef("EA-ACCOUNT-NUMBER-STYLE",
+                "token:external-account-006",
+                Map.of("Account Number", "token:external-account-value")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables must not contain sensitive external account fields");
+        assertThatThrownBy(() -> externalAccountRef("EA-ROUTING-NUMBER-STYLE",
+                "token:external-account-007",
+                Map.of("routing-number", "token:external-routing-value")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables must not contain sensitive external account fields");
+    }
+
+    /**
      * 场景：内部资金交易号以两个字母加数字开头，形态上接近 IBAN 前缀。
      * 预期：上下文允许保存内部交易号引用。
      * 红线：敏感值识别不能误杀内部资金交易号、账本交易号或幂等号，导致授权后续链路不可执行。
