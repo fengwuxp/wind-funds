@@ -350,6 +350,12 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()
                 .setContextVariables(UNQUOTED_PAYMENT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+        assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()
+                .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+                .setContextVariables(UNQUOTED_PAYMENT_CONTEXT_VARIABLES)))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
         assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
                 .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
