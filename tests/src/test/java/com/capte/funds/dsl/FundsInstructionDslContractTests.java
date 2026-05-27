@@ -221,6 +221,56 @@ class FundsInstructionDslContractTests {
         assertThat(payload.containsKey("secretKey")).isFalse();
     }
 
+    /**
+     * 场景：调用方在构造资金指令引用后继续改写原始嵌套上下文。
+     * 预期：已构造的引用上下文保持稳定，不被追加的敏感字段污染。
+     * 红线：资金追溯引用不能因浅拷贝让后续可变对象绕过构造期敏感字段校验。
+     */
+    @Test
+    void testInstructionReferenceShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> channelPayload = new HashMap<>();
+        channelPayload.put("channelTraceId", "CH-TRACE-202605270001");
+        FundsInstructionReferenceSpec reference = ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.EXTERNAL_TRANSACTION)
+                .externalTransactionId("EXT-202605270001")
+                .contextVariables(Map.of("channelPayload", channelPayload))
+                .build();
+
+        channelPayload.put("bankAccountNo", "123456789012");
+
+        Object payloadValue = reference.getContextVariables().get("channelPayload");
+        assertThat(payloadValue).isInstanceOf(Map.class);
+        Map<?, ?> payload = (Map<?, ?>) payloadValue;
+        assertThat(payload.get("channelTraceId")).isEqualTo("CH-TRACE-202605270001");
+        assertThat(payload.containsKey("bankAccountNo")).isFalse();
+    }
+
+    /**
+     * 场景：调用方在构造资金操作人快照后继续改写原始嵌套上下文。
+     * 预期：已构造的操作者上下文保持稳定，不被追加的敏感字段污染。
+     * 红线：审计操作者快照不能因浅拷贝让后续可变对象绕过构造期敏感字段校验。
+     */
+    @Test
+    void testOperationActorShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> auditPayload = new HashMap<>();
+        auditPayload.put("requestId", "REQ-202605270001");
+        ImmutableFundsOperationActorSpec actor = ImmutableFundsOperationActorSpec.builder()
+                .operatorId(1L)
+                .operatorType("SYSTEM")
+                .operatorName("Codex")
+                .appName("wind-funds-tests")
+                .contextVariables(Map.of("auditPayload", auditPayload))
+                .build();
+
+        auditPayload.put("secretKey", "secret-value");
+
+        Object payloadValue = actor.getContextVariables().get("auditPayload");
+        assertThat(payloadValue).isInstanceOf(Map.class);
+        Map<?, ?> payload = (Map<?, ?>) payloadValue;
+        assertThat(payload.get("requestId")).isEqualTo("REQ-202605270001");
+        assertThat(payload.containsKey("secretKey")).isFalse();
+    }
+
     private FundsInstructionSpec validInstruction(FundsInstructionReferenceSpec reference) {
         return validInstruction(reference, Map.of("dslCase", "B1-02"));
     }
