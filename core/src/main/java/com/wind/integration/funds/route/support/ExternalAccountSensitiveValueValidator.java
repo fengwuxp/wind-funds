@@ -54,6 +54,9 @@ public final class ExternalAccountSensitiveValueValidator {
             "routingno",
             "iban");
 
+    private static final Set<String> INTERNAL_REFERENCE_CONTEXT_FIELDS = Set.of(
+            "referencefreezesn");
+
     private ExternalAccountSensitiveValueValidator() {
         throw new AssertionError();
     }
@@ -136,19 +139,24 @@ public final class ExternalAccountSensitiveValueValidator {
     }
 
     private static boolean containsSensitiveField(@Nullable Object value) {
+        return containsSensitiveField(value, null);
+    }
+
+    private static boolean containsSensitiveField(@Nullable Object value, @Nullable String ownerFieldName) {
         if (value instanceof Map<?, ?> values) {
             for (Map.Entry<?, ?> entry : values.entrySet()) {
                 if (entry.getKey() instanceof String fieldName && isSensitiveContextField(fieldName)) {
                     return true;
                 }
-                if (containsSensitiveField(entry.getValue())) {
+                if (containsSensitiveField(entry.getValue(),
+                        entry.getKey() instanceof String fieldName ? fieldName : null)) {
                     return true;
                 }
             }
         }
         if (value instanceof Iterable<?> values) {
             for (Object item : values) {
-                if (containsSensitiveField(item)) {
+                if (containsSensitiveField(item, null)) {
                     return true;
                 }
             }
@@ -156,13 +164,13 @@ public final class ExternalAccountSensitiveValueValidator {
         if (value != null && value.getClass().isArray()) {
             int length = Array.getLength(value);
             for (int i = 0; i < length; i++) {
-                if (containsSensitiveField(Array.get(value, i))) {
+                if (containsSensitiveField(Array.get(value, i), null)) {
                     return true;
                 }
             }
         }
         if (value instanceof CharSequence text) {
-            return isRawIbanValue(text.toString());
+            return !isInternalReferenceContextField(ownerFieldName) && isRawIbanValue(text.toString());
         }
         return false;
     }
@@ -173,6 +181,14 @@ public final class ExternalAccountSensitiveValueValidator {
         }
         String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
         return SENSITIVE_CONTEXT_FIELDS.contains(normalized);
+    }
+
+    private static boolean isInternalReferenceContextField(@Nullable String fieldName) {
+        if (!StringUtils.hasText(fieldName)) {
+            return false;
+        }
+        String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
+        return INTERNAL_REFERENCE_CONTEXT_FIELDS.contains(normalized);
     }
 
     private static boolean containsSensitiveRawContextFragment(String contextVariables) {

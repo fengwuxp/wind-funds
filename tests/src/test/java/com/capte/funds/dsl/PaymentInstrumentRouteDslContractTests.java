@@ -315,6 +315,26 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     /**
+     * 场景：解冻和提现链路把内部冻结单号放入 referenceFreezeSn，冻结单号可能形似有效 IBAN。
+     * 预期：内部冻结单引用允许进入上下文，但相同值放在普通通道字段中仍按敏感 IBAN 阻断。
+     * 红线：敏感值治理不能误杀内部资金生命周期引用，也不能放开普通字段中的真实 IBAN。
+     */
+    @Test
+    void testExternalAccountContextShouldAllowInternalFreezeSnOnlyForReferenceField() {
+        String freezeSn = "FO2026052716000030";
+        ExternalAccountRefSpec externalAccountRef = externalAccountRef("EA-INTERNAL-FREEZE-REF",
+                "token:external-account-004",
+                Map.<String, Object>of("referenceFreezeSn", freezeSn));
+
+        assertThat(externalAccountRef.getContextVariables()).containsEntry("referenceFreezeSn", freezeSn);
+        assertThatThrownBy(() -> externalAccountRef("EA-INTERNAL-FREEZE-RAW",
+                "token:external-account-005",
+                Map.<String, Object>of("processorPayload", Map.of("networkReference", "GB82WEST12345698765432"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables must not contain sensitive external account fields");
+    }
+
+    /**
      * 场景：调用方在支付工具快照构造后继续改写原始嵌套绑定上下文。
      * 预期：已构造的支付工具快照保持稳定，不被追加的卡敏感字段污染。
      * 红线：bindingSnapshot 会进入 route snapshot、日志和报表，不能因浅拷贝绕过构造期敏感字段校验。
