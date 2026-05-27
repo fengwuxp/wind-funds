@@ -1,6 +1,7 @@
 package com.capte.funds.ledger.dto;
 
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -94,5 +95,10 @@ public class LedgerTransactionDTO {
     private Map<String, Object> contextVariables;
 
     private List<LedgerEntryDTO> entries;
+
+    public LedgerTransactionDTO setContextVariables(Map<String, Object> contextVariables) {
+        this.contextVariables = FundsContextVariables.immutableCopy(contextVariables);
+        return this;
+    }
 
 }

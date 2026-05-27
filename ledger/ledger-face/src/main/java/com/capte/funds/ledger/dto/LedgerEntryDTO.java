@@ -10,6 +10,7 @@ import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.ledger.enums.LedgerReconcileStatus;
 import com.wind.integration.funds.ledger.enums.LedgerSettlementStatus;
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -161,5 +162,10 @@ public class LedgerEntryDTO {
 
     @Schema(description = "对账完成时间")
     private LocalDateTime reconciliationCompletedTime;
+
+    public LedgerEntryDTO setContextVariables(Map<String, Object> contextVariables) {
+        this.contextVariables = FundsContextVariables.immutableCopy(contextVariables);
+        return this;
+    }
 
 }
