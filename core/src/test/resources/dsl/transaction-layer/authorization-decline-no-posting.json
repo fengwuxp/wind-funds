@@ -36,7 +36,7 @@
       "授权拒绝可进入交易视图和审计",
       "授权拒绝无 route leg",
       "授权拒绝无 ledger entry",
-      "授权拒绝不累计 chargebackAmount"
+      "授权拒绝不累计 declinedAmount，也不作为 chargeback 事件"
     ],
     "mustFail": [
       "将授权拒绝当成争议拒付",

@@ -129,7 +129,7 @@ OpenSpec 是规格权威源，回答做什么、做到什么程度；Superpowers
 - Spring 服务层流程测试必须优先使用真实内部 Spring Bean 和 H2 表结构，可继承：AbstractFundsServiceTest；账户、平台账户、路由基础数据等测试依赖由 `setup` 或用例显式准备，Mock/Fake/Recording 只用于外部系统、不可控环境或明确的端口边界。PodamUtils 可用于数据模拟
 - 业务组合测试必须每一步都断言余额变化，不能只断言最终余额。
 - 冻结/解冻测试必须证明冻结只做同主体 `AVAILABLE <-> FROZEN` 控制，不表达消费、扣划或跨主体价值转移。
-- 授权拒绝不得生成 route/entry，不得写入 `chargebackAmount`。
+- 授权拒绝不得生成 route/entry，不得写入 `declinedAmount` 或被当作 chargeback 事件。
 - 清结算、对账、归档和报表测试必须证明来源事实、批次、规则版本、审计、重跑幂等和只读投影边界。
 
 测试 backlog 权威入口：`docs/TDD设计/支付资金底座测试驱动设计.md`。
