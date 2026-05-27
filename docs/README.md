@@ -231,7 +231,7 @@ OpenSpec change、Harness Plan 或任务说明可以使用下列字段名承接�
 | `noWriteScope` | 只读范围、禁止范围、不得触碰的资金语义、外部协议、历史事实和 Not Done 结论。 |
 | `physicalLanding` | 复用既有模块、新增 face/impl、暂不落物理模块或 contract-only；依赖方向、端口边界、DTO、Entity、Mapper 和边界测试。 |
 | `firstRedSet` | 首批 Red、必须失败行为、目标测试资产、失败断言、测试层级和验证命令。 |
-| `moneyInvariant` | 金额闭合、主体、账目、币种、周期、route、posting、entry、projection、幂等、失败无副作用和审计断言。 |
+| `moneyInvariant` | 金额闭合、主体、账户类型、`normalBalanceSide`、账目、币种、周期、route、posting、entry、projection、借贷平衡、余额影响、幂等、失败无副作用和审计断言。 |
 | `operationGovernanceGate` | 清结算、对账、出款、归档、重放、指标水位、运营补事实白名单、Manifest、checkpoint、差异报告和人工处理入口。 |
 | `externalRuleStatus` | 规则来源、版本或发布日期、生效日期、适用主体或范围、适用法域、核验日期、确认方和确认状态。 |
 | `verificationAndStop` | 验证命令、失败停止条件、Not Done 条件和回到设计或人工确认的触发器。 |
@@ -246,7 +246,7 @@ OpenSpec change、Harness Plan 或任务说明可以使用下列字段名承接�
 | 范围锁定卡 | `writeScope`、`noWriteScope`、允许修改文件类型、禁止触碰能力、是否允许公共契约或表结构变更。 | 未列入 `writeScope` 的模块只能只读复核。 |
 | DSL 执行化清单 | `dslCaseId -> fixturePath -> fixtureLevel -> targetTestClass -> coreAssertions -> notDone`。 | 未被测试读取的 caseId 只能作为设计依据。 |
 | 首批 Red 卡 | 目标测试类、失败断言、数据准备、真实执行路径、替身边界、验证命令和红变绿停止条件。 | 只断言状态、数量或不报错时不准实现。 |
-| 资金不变量卡 | 主体、账目、币种、账本周期、route、posting、entry、projection、幂等、审计和失败无副作用。 | 金额变化缺任一适用证据时阻断。 |
+| 资金不变量卡 | 主体、账户类型、`normalBalanceSide`、账目、币种、账本周期、route、posting、entry、projection、借贷平衡、余额影响、幂等、审计和失败无副作用。 | 金额变化缺任一适用证据时阻断。 |
 | 数据落点卡 | 表、索引、唯一键、H2 schema、Entity、Mapper、迁移影响、只读不落库原因。 | 涉及持久化但未授权 DDL/H2 时阻断。 |
 | 独立授权判定 | 是否触碰清结算/对账、归档/治理、P2 业务能力包、外部规则或敏感数据。 | 命中 B7/B8/P2 时必须切到独立 Execution Grant。 |
 | 验证和停止卡 | 必跑命令、可接受失败、不可接受失败、回滚或回到设计的触发条件。 | 验证命令缺失时只能声明设计输入态。 |
@@ -264,7 +264,7 @@ A0 是进入编码前的只读核验批次，用于把设计、规格、任务�
 | OpenSpec / Harness | 是否已有 change、plan、Execution Grant 或等价任务说明。 | OpenSpec/Harness 文件、任务说明、人工确认记录。 | 能写清 `abilityBatch`、`authorityBaseline`、`writeScope`、`noWriteScope` 和 `firstRedSet`。 | 缺 Execution Grant 但准备写代码、测试、schema 或运行时配置。 |
 | 现有代码范围 | 目标模块、公共契约、表结构、测试资产和边界测试是否可定位。 | `core`、`wallet-*`、`transaction-*`、`ledger-*`、`tests` 的只读复核结果。 | 能说明本批只读范围、可改范围和禁止范围。 | 需要改公共契约、状态机或表结构但未授权。 |
 | H2 / DDL 现状 | 本批是否触碰持久化、Mapper、Entity、查询或状态字段。 | `tests/src/test/resources/jdbc-schema.sql` 和目标表设计差距。 | 不触碰数据库时写明不适用；触碰数据库时 DDL/H2 写入范围已授权。 | 生产表或 H2 schema 需要变更但未纳入 `writeScope`。 |
-| 目标测试资产 | 首批 Red、目标测试类、fixture、验证命令和最小资金断言。 | TDD Red 卡、DSL 执行化盘点、现有测试类清单。 | 每个资金变化都有状态、route、posting、entry、projection、幂等和审计断言计划。 | 只能证明接口不报错、状态变化或 entry 数量。 |
+| 目标测试资产 | 首批 Red、目标测试类、fixture、验证命令和最小资金断言。 | TDD Red 卡、DSL 执行化盘点、现有测试类清单。 | 每个资金变化都有状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、route、posting、entry、projection、借贷平衡、余额影响、幂等和审计断言计划。 | 只能证明接口不报错、状态变化或 entry 数量。 |
 | 验证环境 | JDK、Maven/just、私有仓库、目标测试命令和可接受失败边界。 | `just mvn-version` 或等价命令计划、验证命令清单。 | 能区分代码问题与环境、网络、凭据或缓存问题。 | 验证命令缺失，或失败原因无法归类。 |
 | 独立能力域判定 | 是否触碰 B7 清结算对账、B8 归档治理或 P2 业务能力包。 | 能力域判定、独立授权需求和 Not Done。 | A0-A4 与 B7/B8/P2 边界清楚。 | 交易主线批次需要顺手写清结算、对账、归档、治理或业务专项能力。 |
 
@@ -320,7 +320,7 @@ A0 输出必须形成一页可评审结论，而不是零散检查记录。建�
 | Execution Grant 闭合 | `abilityBatch`、`authorityBaseline`、`writeScope`、`noWriteScope`、`firstRedSet`、`verificationAndStop` 均已确认。 | Not Done；只能做设计、差距复核或 TDD 分析。 |
 | 写入范围内实现完成 | 代码、公共契约、状态机、表结构、H2 schema 和运行时配置只在授权范围内变更。 | Not Done；越权变更必须回退、拆分或重新授权。 |
 | 测试资产通过 | 首批 Red 已变绿，服务级测试、契约测试、边界测试和回归命令按范围通过。 | Not Done；未执行时必须说明环境或依赖限制。 |
-| 资金不变量成立 | 状态、主体、账目、币种、route snapshot、posting plan、LedgerEntry、余额投影、幂等和失败无副作用均有证据。 | Not Done；不得用状态或数量断言替代。 |
+| 资金不变量成立 | 状态、主体、账户类型、`normalBalanceSide`、账目、币种、route snapshot、posting plan、LedgerEntry、余额投影、借贷平衡、余额影响、幂等和失败无副作用均有证据。 | Not Done；不得用状态或数量断言替代。 |
 | DDL/H2 一致 | 涉及持久化时生产 DDL、H2 schema、Entity/Mapper、唯一键和索引同步闭合。 | Not Done；不涉及时写明不适用。 |
 | 观测审计可解释 | traceId、业务引用、审批号、凭证摘要、差异报告、告警、人工处理入口和脱敏证据可追溯。 | Conditional Done 或 Not Done；触碰真实资金、高危操作或敏感数据时缺失即阻断。 |
 | 外部规则确认 | 通道、银行、卡组织、ACH、PSP、FX、合规、税务、会计或敏感数据规则有确认状态和不覆盖范围。 | Conditional Done；影响资金释放、出款或敏感数据时 Not Done。 |
@@ -333,7 +333,7 @@ A0 输出必须形成一页可评审结论，而不是零散检查记录。建�
 | --- | --- |
 | `deliveryConclusion` | `DONE`、`CONDITIONAL_DONE` 或 `NOT_DONE`。 |
 | `doneScope` | 本结论覆盖的能力、文件、模块、表、测试和验证命令。 |
-| `moneyEvidence` | 资金不变量证据，至少覆盖主体、金额、账目、route、posting、entry、projection、幂等和审计中的适用项。 |
+| `moneyEvidence` | 资金不变量证据，至少覆盖 DSL 借贷表命中行、不适用行、主体、金额、账户类型、`normalBalanceSide`、账目、route、posting、entry、projection、借贷平衡、余额影响、幂等和审计中的适用项。 |
 | `notDoneScope` | 未覆盖能力、未执行验证、未确认外部规则、未落 DDL/H2 或未补 Runbook 的范围。 |
 | `nextGate` | 后续进入 A1-A4、B7、B8 或 P2 的准入条件。 |
 

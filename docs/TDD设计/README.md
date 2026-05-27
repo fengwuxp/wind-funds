@@ -64,7 +64,7 @@ TDD 设计的准入目标是证明设计已经能转成真实测试资产和验�
 | 评估维度 | TDD 侧必须证明 | 阻断信号 |
 | --- | --- | --- |
 | 可用性 | 产品场景能转成可执行或可转化的测试用例，包含输入事实、前置数据、动作和期望结果。 | 场景只能人工理解，无法写测试数据和断言。 |
-| 资金安全 | 有资金变化的用例同时断言状态、余额桶、route snapshot、posting plan、ledger entry、balance projection 和幂等。 | 只断言交易状态、entry 数量或“不报错”。 |
+| 资金安全 | 有资金变化的用例同时断言状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、余额桶、route snapshot、posting plan、ledger entry、balance projection、借贷平衡、余额影响和幂等。 | 只断言交易状态、entry 数量或“不报错”。 |
 | 金融红线 | 外部账户入账、敏感信息泄露、授权拒绝写账、冻结表达消费、投影反写事实、无审批调账等必须失败。 | 红线只写在文档里，没有 TDD-RED 用例或明确不适用原因。 |
 | 易用性 | 用户账单、商户账单、运营时间线、错误原因和审计查询有测试或断言来源。 | 只测后台内部对象，不证明使用者能理解结果。 |
 | 可理解性 | 测试命名、用例 ID、DSL 契约、产品验收和系分服务入口能互相反查。 | `AC-*`、`RED-*`、`DSL-*`、`TDD-*` 之间没有显式映射。 |
@@ -78,7 +78,7 @@ TDD 评审口径：TDD 入口必须承接 PRD 目标、DSL 契约和系分落点
 | 对齐项 | PRD 输入 | DSL 输入 | 系分输入 | TDD 必须产出 | 阻断信号 |
 | --- | --- | --- | --- | --- | --- |
 | 稳定口径 | 产品目标、使用者、规则、红线和验收矩阵。 | 稳定 caseId、字段语义、不变量和失败边界。 | 服务入口、状态机、表设计、事务、观测和安全门禁。 | `AC-*`、`DSL-*`、`TDD-*`、`RED-*` 的映射表和目标测试资产。 | 用例来自过程描述，无法追溯到产品验收、DSL case 或系分入口。 |
-| 可解释、可核对、可重建 | 每笔金额都要可解释、可核对、可重建。 | 主体、账目、金额、币种、route、posting、entry、projection 和审计引用。 | 交易、路由、账本、投影、对账和治理模块落点。 | 同时断言状态、余额桶、route snapshot、posting plan、ledger entry、projection、幂等和审计。 | 只断言交易状态、entry 数量、接口不报错或日志存在。 |
+| 可解释、可核对、可重建 | 每笔金额都要可解释、可核对、可重建。 | 主体、账户类型、`normalBalanceSide`、账目、金额、币种、route、posting、entry、projection、借贷平衡、余额影响和审计引用。 | 交易、路由、账本、投影、对账和治理模块落点。 | 同时断言状态、余额桶、route snapshot、posting plan、ledger entry、projection、借贷平衡、余额影响、幂等和审计。 | 只断言交易状态、entry 数量、接口不报错或日志存在。 |
 | P0 资金内核 | 钱包、账本、账目、余额投影、对账、清分、清算、结算、归档和账本余额快照。 | 统一资金事实和账务对象。 | 账户账本、清结算对象、governance 逻辑边界和横切红线。 | A0-A4 资金主线 Red、B7/B8 独立能力域 Red、余额桶断言、对账差错、归档水位、只读边界和失败无副作用。 | P0 能力未闭合就先验证 P2 业务特殊路径。 |
 | P1 交易入口 | 直接交易、授权交易、余额控制和交易投影。 | instruction、event、route snapshot、posting plan 和 projection case。 | 02 分册的服务契约、状态机、表设计和投影任务。 | 直接交易、授权完成/撤销/过期、冻结解冻、余额调整、退款拒付、交易投影和 route replay 测试。 | 授权拒绝、余额不足或规则不唯一时仍产生 route、posting、entry 或投影。 |
 | P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账边界只作为业务语义和外部轨道输入。 | 归一业务事实、外部引用、状态映射、脱敏证据和规则待确认字段。 | 业务能力包准入卡、P0/P1 回归范围、外部规则确认和 Not Done 红线。 | 业务状态映射、乱序重复、外部引用脱敏、规则待确认、P0/P1 回归和敏感数据 must-fail。 | 业务专项测试绕过统一钱包、账本、清结算、对账或归档链路。 |
@@ -145,7 +145,7 @@ A0 测试盘点输出建议直接作为首批 Red 评审页：
 | --- | --- |
 | `redCandidateSet` | 本批建议先写的 Red 编号、目标行为和失败断言。 |
 | `targetAssets` | 目标测试类、fixture、H2 数据准备和验证命令。 |
-| `minimumAssertions` | 状态、余额桶、route、posting、entry、projection、幂等、审计和 forbidden facts。 |
+| `minimumAssertions` | 状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、余额桶、route、posting、entry、projection、借贷平衡、余额影响、幂等、审计和 forbidden facts。 |
 | `schemaNeed` | 是否需要 DDL/H2、Entity、Mapper 或测试资源写入授权。 |
 | `testStopReasons` | 哪些失败必须停止并回到 Execution Grant、系分或外部规则确认。 |
 
