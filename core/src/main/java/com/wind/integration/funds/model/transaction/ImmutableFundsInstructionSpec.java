@@ -4,12 +4,14 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.integration.funds.operation.FundsOperationActorSpec;
 import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
+import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.spec.transaction.FundsBenefitSnapshotSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
@@ -63,6 +65,9 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
         if (exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("fundsInstruction.exchangeRate must be positive");
         }
+        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
+                        || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables),
+                "fundsInstruction.contextVariables must not contain sensitive fields");
         contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
     }
 

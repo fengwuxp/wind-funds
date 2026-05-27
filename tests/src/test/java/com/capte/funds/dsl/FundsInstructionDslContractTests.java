@@ -123,6 +123,60 @@ class FundsInstructionDslContractTests {
                 .hasMessageContaining("fundsOperationActor.contextVariables must not contain sensitive fields");
     }
 
+    /**
+     * 场景：调用方绕过交易转换器，直接在资金指令扩展上下文塞入通道密钥或外部账户原文。
+     * 预期：资金 DSL 指令构造期立即拒绝。
+     * 红线：资金指令上下文会进入交易事实链路，不能依赖上游适配器单点拦截敏感值。
+     */
+    @Test
+    void testFundsInstructionShouldRejectSensitiveContextVariables() {
+        assertThatThrownBy(() -> ImmutableFundsInstructionSpec.builder()
+                .tenantId(1L)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .amount(Money.immutable(100L, CURRENCY))
+                .originalAmount(Money.immutable(100L, CURRENCY))
+                .exchangeRate(BigDecimal.ONE)
+                .reference(externalTransactionReference())
+                .businessScene("FUNDS_INSTRUCTION_DSL")
+                .businessSn("BIZ-FI-SENSITIVE-001")
+                .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
+                .operator(ImmutableFundsOperationActorSpec.builder()
+                        .operatorId(1L)
+                        .operatorType("SYSTEM")
+                        .operatorName("Codex")
+                        .appName("wind-funds-tests")
+                        .contextVariables(Map.of())
+                        .build())
+                .contextVariables(Map.of("processorPayload", Map.of("cardSecurityCode", "123")))
+                .build())
+                .hasMessageContaining("fundsInstruction.contextVariables must not contain sensitive fields");
+
+        assertThatThrownBy(() -> ImmutableFundsInstructionSpec.builder()
+                .tenantId(1L)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .amount(Money.immutable(100L, CURRENCY))
+                .originalAmount(Money.immutable(100L, CURRENCY))
+                .exchangeRate(BigDecimal.ONE)
+                .reference(externalTransactionReference())
+                .businessScene("FUNDS_INSTRUCTION_DSL")
+                .businessSn("BIZ-FI-SENSITIVE-002")
+                .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
+                .operator(ImmutableFundsOperationActorSpec.builder()
+                        .operatorId(1L)
+                        .operatorType("SYSTEM")
+                        .operatorName("Codex")
+                        .appName("wind-funds-tests")
+                        .contextVariables(Map.of())
+                        .build())
+                .contextVariables(Map.of("processorPayload", Map.of("networkReference", "GB82WEST12345698765432")))
+                .build())
+                .hasMessageContaining("fundsInstruction.contextVariables must not contain sensitive fields");
+    }
+
     private FundsInstructionSpec validInstruction(FundsInstructionReferenceSpec reference) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
