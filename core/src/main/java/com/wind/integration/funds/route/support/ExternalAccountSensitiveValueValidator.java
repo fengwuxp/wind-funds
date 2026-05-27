@@ -5,6 +5,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 外部账户敏感值校验器。
@@ -17,6 +18,19 @@ public final class ExternalAccountSensitiveValueValidator {
     private static final int MIN_RAW_EXTERNAL_ACCOUNT_LENGTH = 8;
 
     private static final int MAX_RAW_EXTERNAL_ACCOUNT_LENGTH = 34;
+
+    private static final String NON_FIELD_NAME_CHARACTER_PATTERN = "[^a-z0-9]";
+
+    private static final Set<String> SENSITIVE_CONTEXT_FIELDS = Set.of(
+            "accountnumber",
+            "accountno",
+            "bankaccountnumber",
+            "bankaccountno",
+            "externalaccountnumber",
+            "externalaccountno",
+            "routingnumber",
+            "routingno",
+            "iban");
 
     private ExternalAccountSensitiveValueValidator() {
         throw new AssertionError();
@@ -80,15 +94,7 @@ public final class ExternalAccountSensitiveValueValidator {
         if (!StringUtils.hasText(fieldName)) {
             return false;
         }
-        String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
-        return "accountnumber".equals(normalized)
-                || "accountno".equals(normalized)
-                || "bankaccountnumber".equals(normalized)
-                || "bankaccountno".equals(normalized)
-                || "externalaccountnumber".equals(normalized)
-                || "externalaccountno".equals(normalized)
-                || "routingnumber".equals(normalized)
-                || "routingno".equals(normalized)
-                || "iban".equals(normalized);
+        String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
+        return SENSITIVE_CONTEXT_FIELDS.contains(normalized);
     }
 }
