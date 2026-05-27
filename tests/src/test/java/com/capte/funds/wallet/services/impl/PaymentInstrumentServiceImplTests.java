@@ -112,6 +112,9 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private static final String RAW_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES =
             "{\"processorPayload\":{\"bankAccountNo\":\"123456789012\"}}";
 
+    private static final String UNQUOTED_SENSITIVE_CONTEXT_VARIABLES =
+            "{processorPayload:{secretKey:\"secret-value\"";
+
     @Autowired
     private PaymentInstrumentService paymentInstrumentService;
 
@@ -185,12 +188,18 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setSn(SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_external_account")
                 .setContextVariables(RAW_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
+                .setSn(SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_unquoted")
+                .setContextVariables(UNQUOTED_SENSITIVE_CONTEXT_VARIABLES)))
+                .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
 
         assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN)).isZero();
         assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_pan_value"))
                 .isZero();
         assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN
                 + "_external_account")).isZero();
+        assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_unquoted"))
+                .isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -928,11 +937,13 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 DUPLICATE_DEFAULT_BINDING_SN,
                 PRIORITY_CONFLICT_BINDING_SN,
                 PRIORITY_ORDER_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
                 RAW_PAYMENT_INSTRUMENT_SN,
                 SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN,
+                SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_pan_value",
                 SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_external_account",
+                SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_unquoted",
                 INVALID_WINDOW_PAYMENT_INSTRUMENT_SN,
                 SUSPENDED_PAYMENT_INSTRUMENT_SN,
                 RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN);
