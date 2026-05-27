@@ -19,6 +19,12 @@ public final class ExternalAccountSensitiveValueValidator {
 
     private static final int MAX_RAW_EXTERNAL_ACCOUNT_LENGTH = 34;
 
+    private static final int MIN_RAW_IBAN_LENGTH = 15;
+
+    private static final int IBAN_COUNTRY_CODE_LENGTH = 2;
+
+    private static final int IBAN_CHECK_DIGIT_LENGTH = 2;
+
     private static final String NON_FIELD_NAME_CHARACTER_PATTERN = "[^a-z0-9]";
 
     private static final Set<String> SENSITIVE_CONTEXT_FIELDS = Set.of(
@@ -40,19 +46,46 @@ public final class ExternalAccountSensitiveValueValidator {
      * 判断输入是否形似原始外部账户号。
      *
      * @param externalAccountNo 外部账户展示号、token 或原始号候选
-     * @return true 表示输入为 8 到 34 位数字，可带空格或短横线分隔
+     * @return true 表示输入为 8 到 34 位数字或形似 IBAN，可带空格或短横线分隔
      */
     public static boolean isRawSensitiveExternalAccountNo(@Nullable String externalAccountNo) {
         if (!StringUtils.hasText(externalAccountNo)) {
             return false;
         }
-        String compactAccountNo = externalAccountNo.replace(" ", "").replace("-", "");
+        String compactAccountNo = externalAccountNo.replace(" ", "").replace("-", "").toUpperCase(Locale.ROOT);
+        return isRawNumericExternalAccountNo(compactAccountNo) || isRawIbanExternalAccountNo(compactAccountNo);
+    }
+
+    private static boolean isRawNumericExternalAccountNo(String compactAccountNo) {
         if (compactAccountNo.length() < MIN_RAW_EXTERNAL_ACCOUNT_LENGTH
                 || compactAccountNo.length() > MAX_RAW_EXTERNAL_ACCOUNT_LENGTH) {
             return false;
         }
         for (int i = 0; i < compactAccountNo.length(); i++) {
             if (!Character.isDigit(compactAccountNo.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isRawIbanExternalAccountNo(String compactAccountNo) {
+        if (compactAccountNo.length() < MIN_RAW_IBAN_LENGTH
+                || compactAccountNo.length() > MAX_RAW_EXTERNAL_ACCOUNT_LENGTH) {
+            return false;
+        }
+        for (int i = 0; i < compactAccountNo.length(); i++) {
+            char character = compactAccountNo.charAt(i);
+            if (i < IBAN_COUNTRY_CODE_LENGTH && !Character.isUpperCase(character)) {
+                return false;
+            }
+            if (i >= IBAN_COUNTRY_CODE_LENGTH
+                    && i < IBAN_COUNTRY_CODE_LENGTH + IBAN_CHECK_DIGIT_LENGTH
+                    && !Character.isDigit(character)) {
+                return false;
+            }
+            if (i >= IBAN_COUNTRY_CODE_LENGTH + IBAN_CHECK_DIGIT_LENGTH
+                    && !Character.isLetterOrDigit(character)) {
                 return false;
             }
         }

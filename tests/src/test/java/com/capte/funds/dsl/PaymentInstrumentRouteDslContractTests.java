@@ -278,6 +278,9 @@ class PaymentInstrumentRouteDslContractTests {
         assertThatThrownBy(() -> externalAccountRef("EA-RAW", "1234567890123456"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("externalAccountNo must be masked or token reference");
+        assertThatThrownBy(() -> externalAccountRef("EA-RAW-IBAN", "GB82WEST12345698765432"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("externalAccountNo must be masked or token reference");
         assertThatThrownBy(() -> externalAccountRef("EA-NESTED-RAW",
                 "token:external-account-001",
                 Map.<String, Object>of("processorPayload", Map.of("accountNumber", "1234567890123456"))))
