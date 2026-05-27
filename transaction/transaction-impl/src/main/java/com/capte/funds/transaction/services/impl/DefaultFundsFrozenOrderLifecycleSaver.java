@@ -327,7 +327,7 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
             return routeSnapshot.getParticipants().getFirst().getSubjectRef().getSubjectId();
         }
         Object accountId = instruction.getContextVariables().get(FundsInstructionContextKeys.ACCOUNT_ID);
-        return accountId == null ? null : JSON.parseObject(JSON.toJSONString(accountId)).getString(ACCOUNT_ID);
+        return accountField(accountId, ACCOUNT_ID);
     }
 
     private String subjectType(FundsInstructionSpec instruction, RouteSnapshotSpec routeSnapshot) {
@@ -335,7 +335,18 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
             return routeSnapshot.getParticipants().getFirst().getSubjectRef().getSubjectType().name();
         }
         Object accountId = instruction.getContextVariables().get(FundsInstructionContextKeys.ACCOUNT_ID);
-        return accountId == null ? null : JSON.parseObject(JSON.toJSONString(accountId)).getString(ACCOUNT_TYPE);
+        return accountField(accountId, ACCOUNT_TYPE);
+    }
+
+    private String accountField(Object accountId, String fieldName) {
+        if (accountId == null) {
+            return null;
+        }
+        if (accountId instanceof Map<?, ?> values) {
+            Object value = values.get(fieldName);
+            return value == null ? null : value.toString();
+        }
+        return JSON.to(JSONObject.class, accountId).getString(fieldName);
     }
 
     private String computeRequestHash(FundsInstructionSpec instruction, @Nullable RouteSnapshotSpec routeSnapshot) {
