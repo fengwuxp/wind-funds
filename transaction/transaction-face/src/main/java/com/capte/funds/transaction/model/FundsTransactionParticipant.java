@@ -1,6 +1,7 @@
 package com.capte.funds.transaction.model;
 
 import com.capte.funds.transaction.enums.FundsEffectType;
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -64,4 +65,9 @@ public class FundsTransactionParticipant implements Serializable {
 
     @Schema(description = "扩展上下文")
     private Map<String, Object> contextVariables = Map.of();
+
+    public FundsTransactionParticipant setContextVariables(Map<String, Object> contextVariables) {
+        this.contextVariables = FundsContextVariables.immutableCopy(contextVariables);
+        return this;
+    }
 }
