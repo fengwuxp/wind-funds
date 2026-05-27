@@ -8,6 +8,8 @@ import org.springframework.util.StringUtils;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 外部账户敏感值校验器。
@@ -34,6 +36,11 @@ public final class ExternalAccountSensitiveValueValidator {
     private static final int DECIMAL_RADIX = 10;
 
     private static final String NON_FIELD_NAME_CHARACTER_PATTERN = "[^a-z0-9]";
+
+    private static final Pattern RAW_FIELD_NAME_PATTERN = Pattern.compile("\"([^\"]+)\"\\s*:");
+
+    private static final Pattern RAW_IBAN_FRAGMENT_PATTERN = Pattern.compile(
+            "(?<![A-Za-z0-9])([A-Za-z]{2}[0-9]{2}[A-Za-z0-9 -]{11,30})(?![A-Za-z0-9])");
 
     private static final Set<String> SENSITIVE_CONTEXT_FIELDS = Set.of(
             "accountnumber",
@@ -123,7 +130,7 @@ public final class ExternalAccountSensitiveValueValidator {
         try {
             return containsSensitiveField(JSON.parse(contextVariables));
         } catch (JSONException ignored) {
-            return false;
+            return containsSensitiveRawContextFragment(contextVariables);
         }
     }
 
@@ -157,6 +164,30 @@ public final class ExternalAccountSensitiveValueValidator {
         }
         String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
         return SENSITIVE_CONTEXT_FIELDS.contains(normalized);
+    }
+
+    private static boolean containsSensitiveRawContextFragment(String contextVariables) {
+        return containsSensitiveRawFieldName(contextVariables) || containsRawIbanFragment(contextVariables);
+    }
+
+    private static boolean containsSensitiveRawFieldName(String contextVariables) {
+        Matcher matcher = RAW_FIELD_NAME_PATTERN.matcher(contextVariables);
+        while (matcher.find()) {
+            if (isSensitiveContextField(matcher.group(1))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsRawIbanFragment(String contextVariables) {
+        Matcher matcher = RAW_IBAN_FRAGMENT_PATTERN.matcher(contextVariables);
+        while (matcher.find()) {
+            if (isRawIbanValue(matcher.group(1))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isRawIbanValue(String value) {

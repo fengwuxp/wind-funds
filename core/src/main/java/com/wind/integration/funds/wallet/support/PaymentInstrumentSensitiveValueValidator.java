@@ -8,6 +8,8 @@ import org.springframework.util.StringUtils;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 支付工具敏感值校验器。
@@ -22,6 +24,11 @@ public final class PaymentInstrumentSensitiveValueValidator {
     private static final int MAX_RAW_PAN_LENGTH = 19;
 
     private static final String NON_FIELD_NAME_CHARACTER_PATTERN = "[^a-z0-9]";
+
+    private static final Pattern RAW_FIELD_NAME_PATTERN = Pattern.compile("\"([^\"]+)\"\\s*:");
+
+    private static final Pattern RAW_PAN_FRAGMENT_PATTERN = Pattern.compile(
+            "(?<![A-Za-z0-9])([0-9][0-9 -]{10,}[0-9])(?![A-Za-z0-9])");
 
     private static final Set<String> SENSITIVE_BINDING_SNAPSHOT_FIELDS = Set.of(
             "pan",
@@ -82,7 +89,7 @@ public final class PaymentInstrumentSensitiveValueValidator {
         try {
             return containsSensitiveField(JSON.parse(contextVariables));
         } catch (JSONException ignored) {
-            return false;
+            return containsSensitiveRawContextFragment(contextVariables);
         }
     }
 
@@ -125,6 +132,30 @@ public final class PaymentInstrumentSensitiveValueValidator {
         }
         String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
         return SENSITIVE_BINDING_SNAPSHOT_FIELDS.contains(normalized);
+    }
+
+    private static boolean containsSensitiveRawContextFragment(String contextVariables) {
+        return containsSensitiveRawFieldName(contextVariables) || containsRawPanFragment(contextVariables);
+    }
+
+    private static boolean containsSensitiveRawFieldName(String contextVariables) {
+        Matcher matcher = RAW_FIELD_NAME_PATTERN.matcher(contextVariables);
+        while (matcher.find()) {
+            if (isSensitiveBindingSnapshotField(matcher.group(1))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsRawPanFragment(String contextVariables) {
+        Matcher matcher = RAW_PAN_FRAGMENT_PATTERN.matcher(contextVariables);
+        while (matcher.find()) {
+            if (isRawPanValue(matcher.group(1))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isRawPanValue(String value) {
