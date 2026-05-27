@@ -156,6 +156,28 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：运营创建真实资金账户时把外部账户号或通道密钥放入扩展上下文。
+     * 输入：contextVariables 含嵌套 bankAccountNo 字段，或嵌套 secretKey 字段。
+     * 输出：创建被拒绝，不留下资金账户、账本或账务事实。
+     * 红线：资金账户管理对象不得成为外部账户号、PAN、CVV 或 token secret 的旁路存储。
+     */
+    @Test
+    void testCreateFundingAccountShouldRejectSensitiveContextVariablesWithoutAccountOrLedger() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setContextVariables("{\"externalAccount\":{\"bankAccountNo\":\"123456789012\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+
+        assertThat(countFundingAccounts()).isZero();
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testInitializeRequiredLedgersShouldReuseExistingLedgers() {
         Long accountId = fundingAccountService.createFundingAccount(createFundingAccountRequest());

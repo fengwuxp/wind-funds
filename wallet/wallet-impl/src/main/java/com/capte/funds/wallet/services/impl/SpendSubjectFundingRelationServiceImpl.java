@@ -43,6 +43,7 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createSpendSubjectFundingRelation(
             @NonNull CreateSpendSubjectFundingRelationRequest request) {
+        WalletContextVariablesValidator.assertNoSensitiveContextVariables(request.getContextVariables());
         FundingAccount fundingAccount = getFundingAccount(request.getTenantId(), request.getFundingAccountId());
         assertFundingAccountCanBind(fundingAccount, request);
         assertValidityWindow(request);

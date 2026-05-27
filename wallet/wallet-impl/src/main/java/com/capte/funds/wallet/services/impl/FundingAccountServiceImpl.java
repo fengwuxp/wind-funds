@@ -52,6 +52,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createFundingAccount(@NonNull CreateFundingAccountRequest request) {
+        WalletContextVariablesValidator.assertNoSensitiveContextVariables(request.getContextVariables());
         validatePlatformRole(request);
         FundingAccount entity = FundingAccountConverter.INSTANCE.convertToFundingAccount(request);
         fundingAccountMapper.insertSelective(entity);

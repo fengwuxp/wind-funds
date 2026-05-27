@@ -325,6 +325,30 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：运营创建信用账户或预算组时把外部账户号、PAN 或通道密钥放入扩展上下文。
+     * 输入：信用账户 contextVariables 含嵌套 IBAN 值；预算组 contextVariables 含嵌套 secretKey 字段。
+     * 输出：创建被拒绝，不留下控制账户、预算组、账本或账务事实。
+     * 红线：控制类钱包对象不得通过扩展上下文保存敏感支付工具或外部账户原文。
+     */
+    @Test
+    void testCreateControlWalletSubjectsShouldRejectSensitiveContextVariablesWithoutLedger() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()
+                .setContextVariables("{\"processorPayload\":{\"networkReference\":\"GB82WEST12345698765432\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+                .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+
+        assertThat(countRows("t_credit_account", "sn", CREDIT_ACCOUNT_SN)).isZero();
+        assertThat(countRows("t_budget_group", "sn", BUDGET_GROUP_SN)).isZero();
+        assertThat(countRows("t_ledger", "subject_id", CREDIT_ACCOUNT_SN)).isZero();
+        assertThat(countRows("t_ledger", "subject_id", BUDGET_GROUP_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testCreateBudgetGroupShouldInitializeCustomCycleControlLedgers() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);

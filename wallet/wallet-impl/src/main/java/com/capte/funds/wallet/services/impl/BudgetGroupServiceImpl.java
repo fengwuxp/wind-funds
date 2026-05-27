@@ -51,6 +51,7 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createBudgetGroup(@NonNull CreateBudgetGroupRequest request) {
+        WalletContextVariablesValidator.assertNoSensitiveContextVariables(request.getContextVariables());
         validatePeriodId(request);
         BudgetGroup entity = BudgetGroupConverter.INSTANCE.convertToBudgetGroup(request);
         budgetGroupMapper.insertSelective(entity);

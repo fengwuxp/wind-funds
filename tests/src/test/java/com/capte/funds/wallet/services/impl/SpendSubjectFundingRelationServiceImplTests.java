@@ -186,6 +186,32 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     /**
+     * 场景：运营创建资金来源关系时把外部账户号或通道密钥放入扩展上下文。
+     * 输入：contextVariables 含嵌套 bankAccountNo 字段，或嵌套 secretKey 字段。
+     * 输出：创建被拒绝，不留下资金来源关系，也不改变资金账户账本或账务事实。
+     * 红线：资金来源关系不得成为外部账户号、PAN、CVV 或 token secret 的旁路存储。
+     */
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldRejectSensitiveContextVariablesWithoutRelation() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        List<LedgerDTO> fundingLedgersBefore = loadFundingAccountLedgers();
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setContextVariables("{\"externalAccount\":{\"bankAccountNo\":\"123456789012\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
+        assertThat(loadFundingAccountLedgers())
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyInAnyOrderElementsOf(fundingLedgersBefore);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一支出主体已经存在一个可用默认资金来源后，再配置第二个默认资金来源。
      * 输入：同租户、同支出主体、同币种、同关系类型，两个 ACTIVE 默认关系。
      * 输出：第二个关系被拒绝，保持原有唯一默认资金来源。

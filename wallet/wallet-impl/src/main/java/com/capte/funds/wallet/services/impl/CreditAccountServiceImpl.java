@@ -51,6 +51,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createCreditAccount(@NonNull CreateCreditAccountRequest request) {
+        WalletContextVariablesValidator.assertNoSensitiveContextVariables(request.getContextVariables());
         validatePeriodId(request);
         CreditAccount entity = CreditAccountConverter.INSTANCE.convertToCreditAccount(request);
         creditAccountMapper.insertSelective(entity);

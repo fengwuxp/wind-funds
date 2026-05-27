@@ -1,5 +1,7 @@
 package com.wind.integration.funds.route.support;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
@@ -100,6 +102,23 @@ public final class ExternalAccountSensitiveValueValidator {
      */
     public static boolean containsSensitiveContextField(@Nullable Map<String, Object> contextVariables) {
         return containsSensitiveField(contextVariables);
+    }
+
+    /**
+     * 判断外部账户上下文 JSON 中是否包含敏感字段。
+     *
+     * @param contextVariables 外部账户上下文 JSON
+     * @return true 表示上下文字段名形似账户号、routing number 或 IBAN，或字段值形似 IBAN
+     */
+    public static boolean containsSensitiveContextVariables(@Nullable String contextVariables) {
+        if (!StringUtils.hasText(contextVariables)) {
+            return false;
+        }
+        try {
+            return containsSensitiveField(JSON.parse(contextVariables));
+        } catch (JSONException ignored) {
+            return false;
+        }
     }
 
     private static boolean containsSensitiveField(@Nullable Object value) {
