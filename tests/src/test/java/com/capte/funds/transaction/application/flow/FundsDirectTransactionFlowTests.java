@@ -12,6 +12,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
+import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
@@ -19,6 +20,8 @@ import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;
@@ -460,6 +463,66 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_CURRENCY_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_CURRENCY_PAY");
+    }
+
+    /**
+     * 场景：直接付款请求把通道 token secret 放入扩展上下文。
+     * 输入：付款方充值 50 后，付款请求的 contextVariables 含嵌套 secretKey 字段。
+     * 输出：请求被拒绝；付款方、收款方和平台账户余额保持充值后的状态。
+     * 预期：请求扩展上下文不得进入资金交易事实、交易明细、route snapshot 或账务事实。
+     * 红线：完整卡号、CVV、密钥和 token secret 不得通过普通交易上下文落库。
+     */
+    @Test
+    void testPayWithSensitiveContextVariablesShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("sensitive_context_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 50L, "DIRECT_PAY_SENSITIVE_CONTEXT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(payer)
+                .setPayeeId(payee)
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                        Map.of("secretKey", "secret-value"))))
+                .setBusinessScene("PAY")
+                .setBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT")
+                .setDescription("pay with sensitive context"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+
+        BalanceSnapshot afterRejectedPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRejectedPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT_TOPUP", 3, 4);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT");
     }
 
     /**

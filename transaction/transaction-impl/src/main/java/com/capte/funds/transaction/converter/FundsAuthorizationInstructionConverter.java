@@ -198,6 +198,7 @@ public class FundsAuthorizationInstructionConverter {
 
     private @NonNull Map<String, Object> mergeContext(@Nullable WritableContextVariables contextVariables,
                                                       @NonNull Map<String, Object> extraContext) {
+        FundsInstructionContextValidator.assertNoSensitiveContextVariables(contextVariables);
         Map<String, Object> result = new LinkedHashMap<>();
         if (contextVariables != null && contextVariables.getContextVariables() != null) {
             result.putAll(contextVariables.getContextVariables());

@@ -74,7 +74,13 @@ public final class PaymentInstrumentSensitiveValueValidator {
         }
     }
 
-    private static boolean containsSensitiveField(@Nullable Object value) {
+    /**
+     * 判断对象树中是否包含敏感支付工具字段。
+     *
+     * @param value Map、Iterable 或普通值
+     * @return true 表示对象树字段名形似 CVV、token secret 或密钥
+     */
+    public static boolean containsSensitiveField(@Nullable Object value) {
         if (value instanceof Map<?, ?> values) {
             for (Map.Entry<?, ?> entry : values.entrySet()) {
                 if (entry.getKey() instanceof String fieldName && isSensitiveBindingSnapshotField(fieldName)) {

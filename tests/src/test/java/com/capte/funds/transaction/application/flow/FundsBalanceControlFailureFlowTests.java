@@ -7,10 +7,13 @@ import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
+import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;
@@ -961,6 +964,41 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_AUDIT_MISSING_REASON");
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_AUDIT_MISSING_EVIDENCE");
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_AUDIT_MISSING_APPROVAL");
+    }
+
+    /**
+     * 场景：余额调账审计字段齐全，但扩展上下文携带原始银行账户号字段。
+     * 输入：调账请求包含原因、凭证、审批引用，并在 contextVariables 中写入 bankAccountNo。
+     * 输出：调账请求被拒绝，余额桶和账务事实不变化。
+     * 预期：请求扩展上下文不得进入资金交易事实、route snapshot 或账务事实。
+     * 红线：原始外部账户号不得通过普通余额控制上下文落库。
+     */
+    @Test
+    void testBalanceAdjustWithSensitiveContextVariablesShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
+                "BALANCE_ADJUST_SENSITIVE_CONTEXT")
+                .setAdjustReason("customer service balance adjust")
+                .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_SENSITIVE_CONTEXT")
+                .setApprovalRef("APPROVAL_BALANCE_ADJUST_SENSITIVE_CONTEXT")
+                .setContextVariables(WritableContextVariables.of(Map.of("externalAccount",
+                        Map.of("bankAccountNo", "123456789012")))), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_SENSITIVE_CONTEXT");
     }
 
     private static FundsBalanceAdjustRequest balanceAdjustRequest(FundsAccountId accountId, String businessSn) {

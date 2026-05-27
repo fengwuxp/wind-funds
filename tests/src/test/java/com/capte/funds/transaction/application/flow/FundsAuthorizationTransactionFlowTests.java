@@ -1,5 +1,6 @@
 package com.capte.funds.transaction.application.flow;
 
+import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
@@ -8,13 +9,18 @@ import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.capte.funds.transaction.model.request.TransactionAmount;
+import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
-import org.junit.jupiter.api.Test;
-
+import com.wind.transaction.core.Money;
 import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -97,6 +103,61 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                     assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
                 });
+    }
+
+    /**
+     * 场景：授权请求把卡组织 CVV 原文字段放入扩展上下文。
+     * 输入：账户充值 100 后，授权请求 contextVariables 含嵌套 cardSecurityCode 字段。
+     * 输出：授权请求被拒绝，AVAILABLE/AUTHORIZATION 和平台账户余额保持充值后状态。
+     * 预期：请求扩展上下文不得进入资金交易事实、route snapshot 或账务事实。
+     * 红线：完整卡号、CVV、密钥和 token secret 不得通过普通授权上下文落库。
+     */
+    @Test
+    void testAuthorizeWithSensitiveContextVariablesShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        topup(user, 100L, "AUTH_SENSITIVE_CONTEXT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> authorizationTransactionService.authorize(
+                new FundsAuthorizationTransactionAuthorizeRequest()
+                        .setAccountId(user)
+                        .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                        .setApproved(true)
+                        .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                                Map.of("cardSecurityCode", "123"))))
+                        .setBusinessScene("AUTHORIZATION")
+                        .setBusinessSn("AUTH_SENSITIVE_CONTEXT_AUTHORIZE")
+                        .setDescription("authorization with sensitive context"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+
+        BalanceSnapshot afterRejectedAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRejectedAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_SENSITIVE_CONTEXT_TOPUP", 3, 4);
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_SENSITIVE_CONTEXT_AUTHORIZE");
     }
 
     /**
