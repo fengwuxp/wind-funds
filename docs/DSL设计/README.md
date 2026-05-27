@@ -86,7 +86,7 @@ DSL 设计的准入目标是证明产品语义可以被稳定承载，并能继�
 | 系分设计 | `LedgerPostingAssembler`、账本写入、`normalBalanceSide` 推导、余额投影和清结算/治理边界如何落地。 |
 | TDD 设计 | 每个资金变化测试应断言哪些 route、posting、entry、account category、projection delta、幂等和 forbidden facts。 |
 
-## DSL 与产品、系分、TDD 对齐 CR
+## DSL 与产品、系分、TDD 对齐口径
 
 DSL 评审口径：DSL 入口必须承接 PRD 的业务目标和资金语义，并能下钻到系分对象、服务边界和 TDD 证据。DSL 可作为 TDD 分析输入；只有 DSL caseId 落到测试资源、被测试读取，并覆盖对应资金断言后，才能声明机器契约通过。
 

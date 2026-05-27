@@ -602,7 +602,7 @@ verificationAndStop:
 
 ### 7.4 清结算、出款和对账
 
-当前结论：设计已具备进入 TDD 分析和专项 Execution Grant 的条件，但不能声明完整生产接入完成。
+准入口径：设计已具备进入 TDD 分析和专项 Execution Grant 的条件，但不能声明完整生产接入完成。
 
 接入方若要接入清结算，必须先补齐：
 
@@ -617,7 +617,7 @@ verificationAndStop:
 
 ### 7.5 归档、余额快照和交易重放
 
-当前结论：设计已具备进入 TDD 分析和专项 Execution Grant 的条件，完整生产接入依赖 governance 物理落点、DDL/H2、服务契约和测试资产落地。
+准入口径：设计已具备进入 TDD 分析和专项 Execution Grant 的条件，完整生产接入依赖 governance 物理落点、DDL/H2、服务契约和测试资产落地。
 
 接入要求：
 
