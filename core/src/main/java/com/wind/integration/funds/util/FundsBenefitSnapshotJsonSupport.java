@@ -206,10 +206,18 @@ public final class FundsBenefitSnapshotJsonSupport {
         if (value instanceof Money money) {
             return money;
         }
-        if (value instanceof Map<?, ?>) {
+        if (value instanceof Map<?, ?> moneyValues) {
+            requireMoneyField(moneyValues, fieldName, Money.Fields.amount);
+            requireMoneyField(moneyValues, fieldName, Money.Fields.currency);
             return JSON.to(Money.class, value);
         }
         throw new IllegalArgumentException(fieldName + " must be Money object");
+    }
+
+    private static void requireMoneyField(Map<?, ?> value, String fieldName, String moneyFieldName) {
+        if (!value.containsKey(moneyFieldName) || value.get(moneyFieldName) == null) {
+            throw new IllegalArgumentException(fieldName + "." + moneyFieldName + " is required");
+        }
     }
 
     private static Map<String, Object> contextVariables(Map<String, ?> owner, String fieldName) {

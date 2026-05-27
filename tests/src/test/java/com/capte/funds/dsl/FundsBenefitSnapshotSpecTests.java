@@ -423,6 +423,40 @@ class FundsBenefitSnapshotSpecTests {
     }
 
     /**
+     * 场景：外部 JSON 把允许为 0 的用户实付金额误写成主单位 value 形态。
+     * 预期：显式装配入口必须拒绝缺少 amount 的 Money 对象，而不是把 long 默认值当作 0。
+     * 红线：JSON.to 绑定不能把错误金额字段静默转换成零金额并绕过权益金额闭合。
+     */
+    @Test
+    void testBenefitSnapshotJsonSupportShouldRejectMajorUnitMoneyShapeForZeroAllowedAmount() {
+        JSONObject values = JSON.parseObject("""
+                {
+                  "benefitSnapshotId": "BS-JSON-MAJOR-UNIT-001",
+                  "benefitGroupSn": "BG-JSON-MAJOR-UNIT-001",
+                  "orderAmount": { "currency": "USD", "amount": 10000 },
+                  "userPayAmount": { "currency": "USD", "value": "0.00" },
+                  "components": [{
+                    "componentSn": "BC-JSON-MAJOR-UNIT-001",
+                    "benefitType": "PLATFORM_COUPON",
+                    "componentType": "PLATFORM_SUBSIDY",
+                    "closureRole": "ORDER_DISCOUNT_CLOSURE",
+                    "amount": { "currency": "USD", "amount": 10000 },
+                    "ledgerEffect": "POSTING_REQUIRED",
+                    "fundingNature": "PLATFORM_OWN_FUNDS",
+                    "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
+                    "benefitReference": { "couponId": "COUPON-JSON-MAJOR-UNIT-001", "ruleVersion": "rule-v1" },
+                    "contextVariables": {}
+                  }],
+                  "contextVariables": {}
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsBenefitSnapshotJsonSupport.parseSnapshot(values))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userPayAmount.amount is required");
+    }
+
+    /**
      * 场景：外部 JSON 的权益金额不闭合。
      * 预期：显式装配最终仍由不可变 Builder 拒绝。
      * 红线：反序列化路径不能绕过资金 DSL 的金额闭合不变量。
