@@ -184,6 +184,79 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接退款请求把敏感账户值放入扩展上下文。
+     * 输入：付款方充值 100 并向收款方付款 70 后，退款 contextVariables 含嵌套 IBAN 值。
+     * 输出：退款请求被拒绝；付款方、收款方和平台账户余额保持付款后的状态。
+     * 预期：退款入口在构造指令前阻断敏感上下文，不生成资金交易事实和账务事实。
+     * 红线：IBAN、完整账户号等敏感值不得通过退款上下文落库。
+     */
+    @Test
+    void testRefundWithSensitiveContextVariablesShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_ctx_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 100L, "DIRECT_REFUND_SENSITIVE_CONTEXT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_SENSITIVE_CONTEXT_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterPayFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                        Map.of("networkReference", "GB82WEST12345698765432"))))
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setDescription("refund with sensitive IBAN value"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+
+        BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterRejectedRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterPayFacts);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_SENSITIVE_CONTEXT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_SENSITIVE_CONTEXT_PAY", 2, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_SENSITIVE_CONTEXT_IBAN_VALUE");
+    }
+
+    /**
      * 场景：同一资金账户向自己发起系统内转账。
      * 输入：充值 100 后，付款方和收款方均为同一账户，转账 10。
      * 输出：请求被拒绝；余额、资金交易事实和账务事实保持充值后的状态。

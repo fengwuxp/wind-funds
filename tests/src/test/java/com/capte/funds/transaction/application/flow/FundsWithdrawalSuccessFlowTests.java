@@ -9,6 +9,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
@@ -16,6 +17,8 @@ import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;
@@ -182,6 +185,76 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_WITH_FEE_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_WITH_FEE_FREEZE", 0, 0, 1, 2);
         assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_WITH_FEE_CONFIRM", 4, 3, 6);
+    }
+
+    /**
+     * 场景：提现确认请求把敏感账户值放入扩展上下文。
+     * 输入：用户充值 100、冻结 60 后，提现 contextVariables 含嵌套 IBAN 值。
+     * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN 和平台账户余额保持冻结后的状态。
+     * 预期：提现入口在构造指令前阻断敏感上下文，不生成资金交易事实和账务事实。
+     * 红线：提现确认不得把 IBAN、完整账户号等敏感值通过普通上下文落库。
+     */
+    @Test
+    void testWithdrawWithSensitiveContextVariablesShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        topup(user, 100L, "WITHDRAW_SENSITIVE_CONTEXT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String freezeSn = freeze(user, 60L, "WITHDRAW_SENSITIVE_CONTEXT_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(user)
+                .setPayeeId(FundsAccountId.immutable("external_bank_001",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn(freezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                        Map.of("networkReference", "GB82WEST12345698765432"))))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setDescription("withdraw with sensitive IBAN value"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+
+        BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterRejectedWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name());
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_FREEZE", 0, 0, 1, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_IBAN_VALUE");
     }
 
     /**
