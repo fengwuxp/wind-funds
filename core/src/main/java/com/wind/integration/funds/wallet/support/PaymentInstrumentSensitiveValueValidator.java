@@ -7,6 +7,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 支付工具敏感值校验器。
@@ -19,6 +20,20 @@ public final class PaymentInstrumentSensitiveValueValidator {
     private static final int MIN_RAW_PAN_LENGTH = 12;
 
     private static final int MAX_RAW_PAN_LENGTH = 19;
+
+    private static final String NON_FIELD_NAME_CHARACTER_PATTERN = "[^a-z0-9]";
+
+    private static final Set<String> SENSITIVE_BINDING_SNAPSHOT_FIELDS = Set.of(
+            "cvv",
+            "cvv2",
+            "cvc",
+            "cvc2",
+            "securitycode",
+            "cardsecuritycode",
+            "tokensecret",
+            "secret",
+            "secretkey",
+            "privatekey");
 
     private PaymentInstrumentSensitiveValueValidator() {
         throw new AssertionError();
@@ -105,16 +120,7 @@ public final class PaymentInstrumentSensitiveValueValidator {
         if (!StringUtils.hasText(fieldName)) {
             return false;
         }
-        String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
-        return "cvv".equals(normalized)
-                || "cvv2".equals(normalized)
-                || "cvc".equals(normalized)
-                || "cvc2".equals(normalized)
-                || "securitycode".equals(normalized)
-                || "cardsecuritycode".equals(normalized)
-                || "tokensecret".equals(normalized)
-                || "secret".equals(normalized)
-                || "secretkey".equals(normalized)
-                || "privatekey".equals(normalized);
+        String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
+        return SENSITIVE_BINDING_SNAPSHOT_FIELDS.contains(normalized);
     }
 }
