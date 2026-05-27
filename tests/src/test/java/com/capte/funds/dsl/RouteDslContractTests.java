@@ -4,6 +4,7 @@ import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.model.route.ImmutableReplayRequestSpec;
+import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
@@ -18,6 +19,7 @@ import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.enums.RouteReplayType;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.ReplayRequestSpec;
+import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
@@ -118,6 +120,9 @@ class RouteDslContractTests {
      */
     @Test
     void testRouteDslContextVariablesShouldRejectSensitiveValues() {
+        assertThatThrownBy(() -> resolvedRoute(Map.of("processorPayload", Map.of("secretKey", "secret-value"))))
+                .hasMessageContaining("resolvedRoute.contextVariables must not contain sensitive fields");
+
         assertThatThrownBy(() -> routeSnapshot(Map.of("processorPayload", Map.of("secretKey", "secret-value"))))
                 .hasMessageContaining("routeSnapshot.contextVariables must not contain sensitive fields");
 
@@ -172,6 +177,17 @@ class RouteDslContractTests {
      */
     @Test
     void testRouteFactsShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> resolvedRouteProcessor = new HashMap<>();
+        resolvedRouteProcessor.put("processorToken", "token:resolved-route-001");
+        ResolvedRouteSpec resolvedRoute = resolvedRoute(Map.of("processorPayload", resolvedRouteProcessor));
+        resolvedRouteProcessor.put("secretKey", "secret-after-build");
+
+        Object resolvedRouteValue = resolvedRoute.getContextVariables().get("processorPayload");
+        assertThat(resolvedRouteValue).isInstanceOf(Map.class);
+        Map<?, ?> resolvedRoutePayload = (Map<?, ?>) resolvedRouteValue;
+        assertThat(resolvedRoutePayload.get("processorToken")).isEqualTo("token:resolved-route-001");
+        assertThat(resolvedRoutePayload.containsKey("secretKey")).isFalse();
+
         Map<String, Object> snapshotProcessor = new HashMap<>();
         snapshotProcessor.put("processorToken", "token:route-snapshot-001");
         RouteSnapshotSpec snapshot = routeSnapshot(Map.of("processorPayload", snapshotProcessor));
@@ -262,6 +278,30 @@ class RouteDslContractTests {
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .replayPolicy(RouteReplayPolicy.FULL_ONLY)
                 .constraintOverrides(Map.of())
+                .contextVariables(contextVariables)
+                .build();
+    }
+
+    private ResolvedRouteSpec resolvedRoute(Map<String, Object> contextVariables) {
+        return ImmutableResolvedRouteSpec.builder()
+                .tenantId(1L)
+                .routeCode("DIRECT_PAY_STANDARD")
+                .routeVersion("1.0")
+                .businessScene("ROUTE_DSL")
+                .businessSn("BIZ-ROUTE-SENSITIVE-001")
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of(routeParticipant(Map.of())))
+                .legs(List.of(routeLeg(routeNode(RouteNodeType.SUBJECT,
+                                fundingAccount("FA-PAYER-RESOLVED"),
+                                LedgerSubjectCode.AVAILABLE,
+                                RouteNodeRole.SOURCE),
+                        routeNode(RouteNodeType.SUBJECT,
+                                fundingAccount("FA-PAYEE-RESOLVED"),
+                                LedgerSubjectCode.SETTLEMENT,
+                                RouteNodeRole.TARGET))))
+                .resolvedAt(LocalDateTime.of(2026, 5, 20, 10, 0))
                 .contextVariables(contextVariables)
                 .build();
     }
