@@ -1,6 +1,7 @@
 package com.wind.integration.funds.ledger;
 
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
 import lombok.Getter;
@@ -17,7 +18,6 @@ import java.util.Map;
  * @date 2026-05-08
  */
 @Getter
-@Builder
 public class LedgerBalanceChangedEvent {
 
     /**
@@ -94,4 +94,37 @@ public class LedgerBalanceChangedEvent {
      * 来源分录上下文。
      */
     private final Map<String, Object> contextVariables;
+
+    @Builder
+    private LedgerBalanceChangedEvent(String subjectId,
+                                      String subjectType,
+                                      Long ledgerId,
+                                      LedgerSubjectCode ledgerSubjectCode,
+                                      CurrencyIsoCode currency,
+                                      Long beforeBalance,
+                                      Long balance,
+                                      Long balanceDelta,
+                                      String ledgerTransactionSn,
+                                      String ledgerEntrySn,
+                                      String ledgerEntryDigest,
+                                      String businessScene,
+                                      String businessSn,
+                                      LocalDateTime transactionTime,
+                                      Map<String, Object> contextVariables) {
+        this.subjectId = subjectId;
+        this.subjectType = subjectType;
+        this.ledgerId = ledgerId;
+        this.ledgerSubjectCode = ledgerSubjectCode;
+        this.currency = currency;
+        this.beforeBalance = beforeBalance;
+        this.balance = balance;
+        this.balanceDelta = balanceDelta;
+        this.ledgerTransactionSn = ledgerTransactionSn;
+        this.ledgerEntrySn = ledgerEntrySn;
+        this.ledgerEntryDigest = ledgerEntryDigest;
+        this.businessScene = businessScene;
+        this.businessSn = businessSn;
+        this.transactionTime = transactionTime;
+        this.contextVariables = FundsContextVariables.immutableCopy(contextVariables);
+    }
 }
