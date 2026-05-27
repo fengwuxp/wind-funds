@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.JSONException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
+import java.lang.reflect.Array;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -113,6 +114,14 @@ public final class PaymentInstrumentSensitiveValueValidator {
         if (value instanceof Iterable<?> values) {
             for (Object item : values) {
                 if (containsSensitiveField(item)) {
+                    return true;
+                }
+            }
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            for (int i = 0; i < length; i++) {
+                if (containsSensitiveField(Array.get(value, i))) {
                     return true;
                 }
             }

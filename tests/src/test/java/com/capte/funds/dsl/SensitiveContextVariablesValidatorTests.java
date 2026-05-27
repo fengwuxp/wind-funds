@@ -42,6 +42,21 @@ class SensitiveContextVariablesValidatorTests {
     }
 
     /**
+     * 场景：调用方把数组值放入 Map 型 contextVariables。
+     * 预期：校验器递归进入数组元素，识别隐藏在普通字段下的 PAN 或 IBAN。
+     * 红线：DSL Map 上下文不能因为 Java 数组不属于 Iterable 而绕过敏感值治理。
+     */
+    @Test
+    void testMapContextVariablesShouldRejectSensitiveArrayValues() {
+        assertThat(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(
+                java.util.Map.of("processorPayload", new String[] {"token-ref", "4242424242424242"})))
+                .isTrue();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextField(
+                java.util.Map.of("processorPayload", new String[] {"token-ref", "GB82WEST12345698765432"})))
+                .isTrue();
+    }
+
+    /**
      * 场景：调用方提交畸形 JSON，但内容不包含敏感字段名或敏感值。
      * 预期：校验器不把所有解析失败都归类为敏感。
      * 红线：敏感值治理要精准阻断旁路存储，不能无差别拒绝无敏感信息的扩展文本。
