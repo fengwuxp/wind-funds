@@ -567,6 +567,74 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：提现确认把完整 IBAN 伪装成外部收款账户引用 ID。
+     * 输入：用户充值并冻结 60 后，提现 payeeId.id 为完整 IBAN。
+     * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN 和平台账户余额保持冻结后的状态。
+     * 预期：外部账户引用快照构造期阻断敏感原文，不释放冻结，不生成出款资金事实或账务事实。
+     * 红线：外部账户引用字段不得保存完整银行账户号、IBAN 或其他敏感原文。
+     */
+    @Test
+    void testWithdrawToRawExternalAccountIdShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        topup(user, 100L, "WITHDRAW_RAW_EXTERNAL_ACCOUNT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String freezeSn = freeze(user, 60L, "WITHDRAW_RAW_EXTERNAL_ACCOUNT_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(user)
+                .setPayeeId(FundsAccountId.immutable("GB82WEST12345698765432",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn(freezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_CONFIRM")
+                .setDescription("withdraw to raw external account id"), WindOperator.system()))
+                .hasMessageContaining("externalAccountNo must be masked or token reference");
+
+        BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterRejectedWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name());
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_FREEZE", 0, 0, 1, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_CONFIRM");
+    }
+
+    /**
      * 场景：提现确认使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
      * 输入：充值 100、冻结 60、提现确认 60，随后同流水同金额重试，再同流水改金额为 61。
      * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次提现后的状态。

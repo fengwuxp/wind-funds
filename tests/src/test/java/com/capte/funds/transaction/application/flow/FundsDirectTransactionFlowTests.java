@@ -403,6 +403,48 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接充值把完整外部账户号伪装成外部账户引用 ID。
+     * 输入：充值资金来源 FundsAccountId.id 为 12 位银行账户号。
+     * 输出：请求被拒绝；用户账户、平台现金和预收款余额均不变化。
+     * 预期：外部账户引用快照构造期阻断敏感原文，不生成资金交易事实和账务事实。
+     * 红线：外部账户引用字段不得保存完整银行账户号、IBAN 或其他敏感原文。
+     */
+    @Test
+    void testTopupWithRawExternalAccountIdShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId account = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setFundsSourceAccountId(FundsAccountId.immutable("123456789012",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_TOPUP_RAW_EXTERNAL_ACCOUNT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_TOPUP_RAW_EXTERNAL_ACCOUNT")
+                .setDescription("topup with raw external account id"), WindOperator.system()))
+                .hasMessageContaining("externalAccountNo must be masked or token reference");
+
+        BalanceSnapshot afterRejectedTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTopup,
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+
+        assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TOPUP_RAW_EXTERNAL_ACCOUNT");
+    }
+
+    /**
      * 场景：直接充值和系统内转账请求把敏感账户值放入扩展上下文。
      * 输入：充值 contextVariables 含嵌套 IBAN 值；有效充值后，转账 contextVariables 含嵌套 IBAN 值。
      * 输出：两次请求均被拒绝；账户和平台余额保持最近一次成功事实后的状态。
