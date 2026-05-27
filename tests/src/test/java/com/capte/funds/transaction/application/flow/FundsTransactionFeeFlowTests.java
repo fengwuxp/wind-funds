@@ -1,5 +1,6 @@
 package com.capte.funds.transaction.application.flow;
 
+import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
@@ -7,13 +8,20 @@ import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.enums.FundsEffectType;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
+import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
+import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
+import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -61,6 +69,102 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertPostedTransactions(0);
         assertFailedFundsTransactionWithoutLedgerFacts("FEE_NO_BALANCE_CHARGE");
+    }
+
+    /**
+     * 场景：独立手续费收取和手续费退回请求把敏感账户值放入扩展上下文。
+     * 输入：手续费扣款 contextVariables 含嵌套 IBAN 值；有效手续费扣款后，退费 contextVariables 含嵌套 IBAN 值。
+     * 输出：两次敏感请求均被拒绝；用户和平台手续费余额保持最近一次成功事实后的状态。
+     * 预期：手续费交易各入口在构造指令前统一阻断敏感上下文，不生成资金交易事实和账务事实。
+     * 红线：IBAN、完整账户号等敏感值不得通过手续费上下文落库。
+     */
+    @Test
+    void testFeeAndFeeRefundWithSensitiveContextVariablesShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(payer, feeAccount(), cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.fee(new FundsTransactionFeeRequest()
+                .setAccountId(payer)
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setFeeType(DefaultFeeType.FEE.getCode())
+                .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                        Map.of("networkReference", "GB82WEST12345698765432"))))
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setDescription("fee with sensitive IBAN value"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+
+        BalanceSnapshot afterRejectedFee = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedFee,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+
+        topup(payer, 50L, "FEE_REFUND_SENSITIVE_CONTEXT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRejectedFee, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        fee(payer, 5L, "FEE_REFUND_SENSITIVE_CONTEXT_SOURCE");
+        BalanceSnapshot afterFee = snapshot(balances(payer, feeAccount(), cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFee,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -5L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFeeFacts = ledgerFactSnapshot();
+
+        String feeSourceTransactionSn = ledgerTransactionByBusinessSn("FEE_REFUND_SENSITIVE_CONTEXT_SOURCE")
+                .getFundsTransactionSn();
+        assertThatThrownBy(() -> directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
+                .setAccountId(payer)
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setFeeSourceTransactionSn(feeSourceTransactionSn)
+                .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                        Map.of("networkReference", "GB82WEST12345698765432"))))
+                .setBusinessScene("FEE_REFUND")
+                .setBusinessSn("FEE_REFUND_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setDescription("fee refund with sensitive IBAN value"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+
+        BalanceSnapshot afterRejectedFeeRefund = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFee, afterRejectedFeeRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFeeFacts);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FEE_CHARGE.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("FEE_SENSITIVE_CONTEXT_IBAN_VALUE");
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_SENSITIVE_CONTEXT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_SENSITIVE_CONTEXT_SOURCE", 2, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_SENSITIVE_CONTEXT_IBAN_VALUE");
     }
 
     /**
