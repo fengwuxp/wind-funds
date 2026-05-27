@@ -1,6 +1,7 @@
 package com.wind.integration.funds.model;
 
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -32,7 +33,7 @@ public final class FundsContextVariables {
         }
         Map<String, Object> copied = new LinkedHashMap<>(contextVariables.size());
         for (Map.Entry<String, Object> entry : contextVariables.entrySet()) {
-            copied.put(entry.getKey(), immutableValue(entry.getValue()));
+            copied.put(requireContextKey(entry.getKey()), immutableValue(entry.getValue()));
         }
         return Map.copyOf(copied);
     }
@@ -50,15 +51,22 @@ public final class FundsContextVariables {
         return value;
     }
 
-    private static Map<Object, Object> immutableMap(Map<?, ?> value) {
+    private static Map<String, Object> immutableMap(Map<?, ?> value) {
         if (value.isEmpty()) {
             return Map.of();
         }
-        Map<Object, Object> copied = new LinkedHashMap<>(value.size());
+        Map<String, Object> copied = new LinkedHashMap<>(value.size());
         for (Map.Entry<?, ?> entry : value.entrySet()) {
-            copied.put(entry.getKey(), immutableValue(entry.getValue()));
+            copied.put(requireContextKey(entry.getKey()), immutableValue(entry.getValue()));
         }
         return Collections.unmodifiableMap(copied);
+    }
+
+    private static String requireContextKey(@Nullable Object key) {
+        if (key instanceof String text && StringUtils.hasText(text)) {
+            return text;
+        }
+        throw new IllegalArgumentException("contextVariables key must be text");
     }
 
     private static Collection<Object> immutableCollection(Collection<?> value) {
