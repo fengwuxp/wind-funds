@@ -1,6 +1,7 @@
 package com.capte.funds.ledger.request;
 
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
+import com.wind.integration.funds.model.FundsContextVariables;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -36,5 +37,10 @@ public class UpdateLedgerTransactionRequest {
 
     @Schema(description = "上下文变量")
     private Map<String, Object> contextVariable;
+
+    public UpdateLedgerTransactionRequest setContextVariable(Map<String, Object> contextVariable) {
+        this.contextVariable = contextVariable == null ? null : FundsContextVariables.immutableCopy(contextVariable);
+        return this;
+    }
 
 }
