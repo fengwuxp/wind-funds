@@ -97,6 +97,32 @@ class FundsInstructionDslContractTests {
         assertThat(reference.getContextVariables()).containsEntry("channel", "test-channel");
     }
 
+    /**
+     * 场景：调用方把操作者扩展上下文当作旁路，塞入通道密钥或外部账户原文。
+     * 预期：资金 DSL 操作者快照构造期立即拒绝。
+     * 红线：操作者上下文会随指令进入审计链路，不能保存完整卡号、CVV、密钥或银行账户原文。
+     */
+    @Test
+    void testOperationActorShouldRejectSensitiveContextVariables() {
+        assertThatThrownBy(() -> ImmutableFundsOperationActorSpec.builder()
+                .operatorId(1L)
+                .operatorType("SYSTEM")
+                .operatorName("Codex")
+                .appName("wind-funds-tests")
+                .contextVariables(Map.of("processorPayload", Map.of("secretKey", "secret-value")))
+                .build())
+                .hasMessageContaining("fundsOperationActor.contextVariables must not contain sensitive fields");
+
+        assertThatThrownBy(() -> ImmutableFundsOperationActorSpec.builder()
+                .operatorId(1L)
+                .operatorType("SYSTEM")
+                .operatorName("Codex")
+                .appName("wind-funds-tests")
+                .contextVariables(Map.of("externalAccount", Map.of("bankAccountNo", "123456789012")))
+                .build())
+                .hasMessageContaining("fundsOperationActor.contextVariables must not contain sensitive fields");
+    }
+
     private FundsInstructionSpec validInstruction(FundsInstructionReferenceSpec reference) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
