@@ -52,18 +52,31 @@ public final class PaymentInstrumentSensitiveValueValidator {
      * @return true 表示快照字段名形似 CVV、token secret 或密钥
      */
     public static boolean containsSensitiveBindingSnapshotField(@Nullable Map<String, Object> bindingSnapshot) {
-        if (bindingSnapshot == null || bindingSnapshot.isEmpty()) {
-            return false;
+        return containsSensitiveField(bindingSnapshot);
+    }
+
+    private static boolean containsSensitiveField(@Nullable Object value) {
+        if (value instanceof Map<?, ?> values) {
+            for (Map.Entry<?, ?> entry : values.entrySet()) {
+                if (entry.getKey() instanceof String fieldName && isSensitiveBindingSnapshotField(fieldName)) {
+                    return true;
+                }
+                if (containsSensitiveField(entry.getValue())) {
+                    return true;
+                }
+            }
         }
-        for (String fieldName : bindingSnapshot.keySet()) {
-            if (isSensitiveBindingSnapshotField(fieldName)) {
-                return true;
+        if (value instanceof Iterable<?> values) {
+            for (Object item : values) {
+                if (containsSensitiveField(item)) {
+                    return true;
+                }
             }
         }
         return false;
     }
 
-    private static boolean isSensitiveBindingSnapshotField(String fieldName) {
+    private static boolean isSensitiveBindingSnapshotField(@Nullable String fieldName) {
         if (!StringUtils.hasText(fieldName)) {
             return false;
         }

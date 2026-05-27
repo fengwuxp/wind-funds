@@ -251,6 +251,11 @@ class PaymentInstrumentRouteDslContractTests {
                 Map.of("token_secret", "secret-value")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentRef("PI-NESTED-SECRET",
+                "tok_card_002",
+                Map.<String, Object>of("processorPayload", Map.of("secretKey", "secret-value"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
     }
 
     private RouteLegSpec routeLeg(SubjectRef payer, SubjectRef payee) {
