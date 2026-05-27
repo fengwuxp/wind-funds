@@ -25,7 +25,7 @@ public record ImmutableRouteParticipantSpec(RouteParticipantRole participantRole
                                             Map<String, Object> contextVariables) implements RouteParticipantSpec {
 
     public ImmutableRouteParticipantSpec {
-        contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+        contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "routeParticipant");
     }
 
     @Override

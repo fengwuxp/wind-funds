@@ -84,7 +84,7 @@ public final class ImmutableReplayRequestSpec implements ReplayRequestSpec {
         this.eventTime = eventTime;
         this.description = description;
         this.operator = operator;
-        this.contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+        this.contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "replayRequest");
     }
 
     @Override

@@ -45,7 +45,7 @@ public record ImmutableResolvedRouteSpec(@Nullable Long tenantId,
         participants = List.copyOf(participants == null ? List.of() : participants);
         legs = List.copyOf(legs == null ? List.of() : legs);
         RouteAmountClosureValidator.validateFundingAccountClosure(legs, routingDecision);
-        contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+        contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "resolvedRoute");
     }
 
     @Override

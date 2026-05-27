@@ -61,7 +61,7 @@ public record ImmutableRouteLegSpec(String legId,
             throw new IllegalArgumentException("routeLeg.periodId is required for non-lifetime period");
         }
         constraintOverrides = Map.copyOf(constraintOverrides == null ? Map.of() : constraintOverrides);
-        contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+        contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "routeLeg");
     }
 
     private static void validateLedgerPostableNode(RouteNodeSpec node, String fieldName) {

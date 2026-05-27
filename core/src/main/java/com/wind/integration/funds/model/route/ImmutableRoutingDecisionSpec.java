@@ -31,7 +31,7 @@ public record ImmutableRoutingDecisionSpec(@Nullable String policyCode,
         matchedRules = List.copyOf(matchedRules == null ? List.of() : matchedRules);
         fundingAllocations = List.copyOf(fundingAllocations == null ? List.of() : fundingAllocations);
         validateFundingAllocations(fundingAllocations);
-        contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+        contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "routingDecision");
     }
 
     private static void validateFundingAllocations(List<FundingAllocationDecisionSpec> fundingAllocations) {

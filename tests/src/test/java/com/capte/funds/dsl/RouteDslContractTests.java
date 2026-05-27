@@ -6,23 +6,31 @@ import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.model.route.ImmutableReplayRequestSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
+import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
+import com.wind.integration.funds.model.route.ImmutableRouteSnapshotSpec;
 import com.wind.integration.funds.model.route.ImmutableSubjectRef;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.route.enums.RouteLegType;
 import com.wind.integration.funds.route.enums.RouteNodeRole;
 import com.wind.integration.funds.route.enums.RouteNodeType;
+import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.enums.RouteReplayType;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.ReplayRequestSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
+import com.wind.integration.funds.route.spec.RouteParticipantSpec;
+import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
+import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,6 +110,40 @@ class RouteDslContractTests {
         assertThat(replayRequest.getReplayType()).isEqualTo(RouteReplayType.REFUND);
     }
 
+    /**
+     * 场景：路由快照、路由分录或参与方扩展上下文被调用方塞入通道密钥或外部账户原文。
+     * 预期：Route DSL 构造期立即拒绝。
+     * 红线：route snapshot 会进入交易事实、账务装配和归档重放链路，不能保存 PAN、CVV、密钥或银行账户原文。
+     */
+    @Test
+    void testRouteDslContextVariablesShouldRejectSensitiveValues() {
+        assertThatThrownBy(() -> routeSnapshot(Map.of("processorPayload", Map.of("secretKey", "secret-value"))))
+                .hasMessageContaining("routeSnapshot.contextVariables must not contain sensitive fields");
+
+        assertThatThrownBy(() -> ImmutableRouteLegSpec.builder()
+                .legId("PAY-SENSITIVE")
+                .sequence(1)
+                .legType(RouteLegType.CONSUME)
+                .sourceNode(routeNode(RouteNodeType.SUBJECT,
+                        fundingAccount("FA-PAYER-SENSITIVE"),
+                        LedgerSubjectCode.AVAILABLE,
+                        RouteNodeRole.SOURCE))
+                .targetNode(routeNode(RouteNodeType.SUBJECT,
+                        fundingAccount("FA-PAYEE-SENSITIVE"),
+                        LedgerSubjectCode.SETTLEMENT,
+                        RouteNodeRole.TARGET))
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
+                .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .contextVariables(Map.of("processorPayload", Map.of("cardSecurityCode", "123")))
+                .build())
+                .hasMessageContaining("routeLeg.contextVariables must not contain sensitive fields");
+
+        assertThatThrownBy(() -> routeParticipant(
+                Map.of("externalAccount", Map.of("bankAccountNo", "123456789012"))))
+                .hasMessageContaining("routeParticipant.contextVariables must not contain sensitive fields");
+    }
+
     private ReplayRequestSpec replayRequest(String referenceSnapshotId, RouteReplayType replayType) {
         return ImmutableReplayRequestSpec.builder()
                 .replayType(replayType)
@@ -131,6 +173,43 @@ class RouteDslContractTests {
                 .replayPolicy(RouteReplayPolicy.FULL_ONLY)
                 .constraintOverrides(Map.of())
                 .contextVariables(Map.of())
+                .build();
+    }
+
+    private RouteSnapshotSpec routeSnapshot(Map<String, Object> contextVariables) {
+        return ImmutableRouteSnapshotSpec.builder()
+                .tenantId(1L)
+                .snapshotId("RS-SENSITIVE-001")
+                .snapshotSchemaVersion("1.0")
+                .routeCode("DIRECT_PAY_STANDARD")
+                .routeVersion("1.0")
+                .businessScene("ROUTE_DSL")
+                .businessSn("BIZ-ROUTE-SENSITIVE-001")
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of(routeParticipant(Map.of())))
+                .legs(List.of(routeLeg(routeNode(RouteNodeType.SUBJECT,
+                                fundingAccount("FA-PAYER-SNAPSHOT"),
+                                LedgerSubjectCode.AVAILABLE,
+                                RouteNodeRole.SOURCE),
+                        routeNode(RouteNodeType.SUBJECT,
+                                fundingAccount("FA-PAYEE-SNAPSHOT"),
+                                LedgerSubjectCode.SETTLEMENT,
+                                RouteNodeRole.TARGET))))
+                .resolvedAt(LocalDateTime.of(2026, 5, 20, 10, 0))
+                .contextVariables(contextVariables)
+                .build();
+    }
+
+    private RouteParticipantSpec routeParticipant(Map<String, Object> contextVariables) {
+        return ImmutableRouteParticipantSpec.builder()
+                .participantRole(RouteParticipantRole.PAYER)
+                .subjectRef(fundingAccount("FA-PARTICIPANT-001"))
+                .ledgerProfileCode("DEFAULT")
+                .currency(CurrencyIsoCode.USD.name())
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .contextVariables(contextVariables)
                 .build();
     }
 
