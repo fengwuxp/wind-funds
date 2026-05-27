@@ -96,7 +96,7 @@ public final class ExternalAccountSensitiveValueValidator {
      * 判断外部账户上下文中是否包含敏感字段。
      *
      * @param contextVariables 外部账户上下文
-     * @return true 表示上下文字段名形似账户号、routing number 或 IBAN
+     * @return true 表示上下文字段名形似账户号、routing number 或 IBAN，或字段值形似 IBAN
      */
     public static boolean containsSensitiveContextField(@Nullable Map<String, Object> contextVariables) {
         return containsSensitiveField(contextVariables);
@@ -120,6 +120,9 @@ public final class ExternalAccountSensitiveValueValidator {
                 }
             }
         }
+        if (value instanceof CharSequence text) {
+            return isRawIbanValue(text.toString());
+        }
         return false;
     }
 
@@ -129,5 +132,13 @@ public final class ExternalAccountSensitiveValueValidator {
         }
         String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
         return SENSITIVE_CONTEXT_FIELDS.contains(normalized);
+    }
+
+    private static boolean isRawIbanValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        String compactValue = value.replace(" ", "").replace("-", "").toUpperCase(Locale.ROOT);
+        return isRawIbanExternalAccountNo(compactValue);
     }
 }

@@ -137,6 +137,17 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         .setBusinessSn("AUTH_SENSITIVE_CONTEXT_AUTHORIZE")
                         .setDescription("authorization with sensitive context"), WindOperator.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+        assertThatThrownBy(() -> authorizationTransactionService.authorize(
+                new FundsAuthorizationTransactionAuthorizeRequest()
+                        .setAccountId(user)
+                        .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                        .setApproved(true)
+                        .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                                Map.of("networkReference", "4242424242424242"))))
+                        .setBusinessScene("AUTHORIZATION")
+                        .setBusinessSn("AUTH_SENSITIVE_CONTEXT_PAN_VALUE")
+                        .setDescription("authorization with sensitive PAN value"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterRejectedAuthorize,
@@ -158,6 +169,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_SENSITIVE_CONTEXT_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_SENSITIVE_CONTEXT_AUTHORIZE");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_SENSITIVE_CONTEXT_PAN_VALUE");
     }
 
     /**

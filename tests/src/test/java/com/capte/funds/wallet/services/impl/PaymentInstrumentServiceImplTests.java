@@ -169,8 +169,14 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setSn(SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN)
                 .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
+                .setSn(SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_pan_value")
+                .setContextVariables("{\"processorPayload\":{\"networkReference\":\"4242424242424242\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
 
         assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN)).isZero();
+        assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_pan_value"))
+                .isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 

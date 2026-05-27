@@ -56,23 +56,14 @@ public final class PaymentInstrumentSensitiveValueValidator {
             return false;
         }
         String compactInstrumentNo = instrumentNo.replace(" ", "").replace("-", "");
-        if (compactInstrumentNo.length() < MIN_RAW_PAN_LENGTH
-                || compactInstrumentNo.length() > MAX_RAW_PAN_LENGTH) {
-            return false;
-        }
-        for (int i = 0; i < compactInstrumentNo.length(); i++) {
-            if (!Character.isDigit(compactInstrumentNo.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
+        return isRawPanCandidate(compactInstrumentNo);
     }
 
     /**
      * 判断绑定快照中是否包含敏感支付工具字段。
      *
      * @param bindingSnapshot 支付工具绑定快照
-     * @return true 表示快照字段名形似 CVV、token secret 或密钥
+     * @return true 表示快照字段名形似 CVV、token secret 或密钥，或字段值形似原始 PAN
      */
     public static boolean containsSensitiveBindingSnapshotField(@Nullable Map<String, Object> bindingSnapshot) {
         return containsSensitiveField(bindingSnapshot);
@@ -82,7 +73,7 @@ public final class PaymentInstrumentSensitiveValueValidator {
      * 判断扩展上下文 JSON 中是否包含敏感支付工具字段。
      *
      * @param contextVariables 扩展上下文 JSON
-     * @return true 表示上下文字段名形似 CVV、token secret 或密钥
+     * @return true 表示上下文字段名形似 CVV、token secret 或密钥，或字段值形似原始 PAN
      */
     public static boolean containsSensitiveContextVariables(@Nullable String contextVariables) {
         if (!StringUtils.hasText(contextVariables)) {
@@ -99,7 +90,7 @@ public final class PaymentInstrumentSensitiveValueValidator {
      * 判断对象树中是否包含敏感支付工具字段。
      *
      * @param value Map、Iterable 或普通值
-     * @return true 表示对象树字段名形似 CVV、token secret 或密钥
+     * @return true 表示对象树字段名形似 CVV、token secret 或密钥，或字段值形似原始 PAN
      */
     public static boolean containsSensitiveField(@Nullable Object value) {
         if (value instanceof Map<?, ?> values) {
@@ -119,6 +110,12 @@ public final class PaymentInstrumentSensitiveValueValidator {
                 }
             }
         }
+        if (value instanceof CharSequence text) {
+            return isRawPanValue(text.toString());
+        }
+        if (value instanceof Number number) {
+            return isRawPanValue(number.toString());
+        }
         return false;
     }
 
@@ -128,5 +125,43 @@ public final class PaymentInstrumentSensitiveValueValidator {
         }
         String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
         return SENSITIVE_BINDING_SNAPSHOT_FIELDS.contains(normalized);
+    }
+
+    private static boolean isRawPanValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        String compactValue = value.replace(" ", "").replace("-", "");
+        return isRawPanCandidate(compactValue) && isLuhnValid(compactValue);
+    }
+
+    private static boolean isRawPanCandidate(String compactInstrumentNo) {
+        if (compactInstrumentNo.length() < MIN_RAW_PAN_LENGTH
+                || compactInstrumentNo.length() > MAX_RAW_PAN_LENGTH) {
+            return false;
+        }
+        for (int i = 0; i < compactInstrumentNo.length(); i++) {
+            if (!Character.isDigit(compactInstrumentNo.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isLuhnValid(String compactInstrumentNo) {
+        int sum = 0;
+        boolean doubleDigit = false;
+        for (int i = compactInstrumentNo.length() - 1; i >= 0; i--) {
+            int digit = compactInstrumentNo.charAt(i) - '0';
+            if (doubleDigit) {
+                digit *= 2;
+                if (digit > 9) {
+                    digit -= 9;
+                }
+            }
+            sum += digit;
+            doubleDigit = !doubleDigit;
+        }
+        return sum % 10 == 0;
     }
 }

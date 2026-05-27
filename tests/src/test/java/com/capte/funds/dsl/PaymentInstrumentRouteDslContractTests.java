@@ -266,6 +266,11 @@ class PaymentInstrumentRouteDslContractTests {
                 Map.<String, Object>of("processorPayload", Map.of("pan", "4242424242424242"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentRef("PI-NESTED-PAN-VALUE",
+                "tok_card_004",
+                Map.<String, Object>of("processorPayload", Map.of("networkReference", "4242424242424242"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
     }
 
     /**
@@ -284,6 +289,11 @@ class PaymentInstrumentRouteDslContractTests {
         assertThatThrownBy(() -> externalAccountRef("EA-NESTED-RAW",
                 "token:external-account-001",
                 Map.<String, Object>of("processorPayload", Map.of("accountNumber", "1234567890123456"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables must not contain sensitive external account fields");
+        assertThatThrownBy(() -> externalAccountRef("EA-NESTED-IBAN-VALUE",
+                "token:external-account-002",
+                Map.<String, Object>of("processorPayload", Map.of("networkReference", "GB82WEST12345698765432"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("contextVariables must not contain sensitive external account fields");
     }
