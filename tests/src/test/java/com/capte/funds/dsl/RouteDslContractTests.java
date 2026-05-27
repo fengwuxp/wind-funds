@@ -165,7 +165,58 @@ class RouteDslContractTests {
         assertThat(account.containsKey("bankAccountNo")).isFalse();
     }
 
+    /**
+     * 场景：调用方在 route snapshot、route leg 和 replay request 构造后继续改写原始嵌套上下文。
+     * 预期：已构造的路由事实和回放请求保持稳定，不被追加的敏感字段污染。
+     * 红线：路由快照、账务分录路径和回放请求都会进入交易事实或重放链路，不能因浅拷贝绕过敏感字段校验。
+     */
+    @Test
+    void testRouteFactsShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> snapshotProcessor = new HashMap<>();
+        snapshotProcessor.put("processorToken", "token:route-snapshot-001");
+        RouteSnapshotSpec snapshot = routeSnapshot(Map.of("processorPayload", snapshotProcessor));
+        snapshotProcessor.put("secretKey", "secret-after-build");
+
+        Object snapshotValue = snapshot.getContextVariables().get("processorPayload");
+        assertThat(snapshotValue).isInstanceOf(Map.class);
+        Map<?, ?> snapshotPayload = (Map<?, ?>) snapshotValue;
+        assertThat(snapshotPayload.get("processorToken")).isEqualTo("token:route-snapshot-001");
+        assertThat(snapshotPayload.containsKey("secretKey")).isFalse();
+
+        Map<String, Object> legProcessor = new HashMap<>();
+        legProcessor.put("processorToken", "token:route-leg-001");
+        RouteLegSpec leg = routeLeg(Map.of("processorPayload", legProcessor));
+        legProcessor.put("cardSecurityCode", "123");
+
+        Object legValue = leg.getContextVariables().get("processorPayload");
+        assertThat(legValue).isInstanceOf(Map.class);
+        Map<?, ?> legPayload = (Map<?, ?>) legValue;
+        assertThat(legPayload.get("processorToken")).isEqualTo("token:route-leg-001");
+        assertThat(legPayload.containsKey("cardSecurityCode")).isFalse();
+
+        Map<String, Object> replayAudit = new HashMap<>();
+        replayAudit.put("snapshotDigest", "digest:route-replay-001");
+        ReplayRequestSpec replayRequest = replayRequest(Map.of("replayAudit", replayAudit));
+        replayAudit.put("bankAccountNo", "123456789012");
+
+        Object replayValue = replayRequest.getContextVariables().get("replayAudit");
+        assertThat(replayValue).isInstanceOf(Map.class);
+        Map<?, ?> replayPayload = (Map<?, ?>) replayValue;
+        assertThat(replayPayload.get("snapshotDigest")).isEqualTo("digest:route-replay-001");
+        assertThat(replayPayload.containsKey("bankAccountNo")).isFalse();
+    }
+
     private ReplayRequestSpec replayRequest(String referenceSnapshotId, RouteReplayType replayType) {
+        return replayRequest(referenceSnapshotId, replayType, Map.of("semanticBoundary", "ROUTE_REPLAY_ONLY"));
+    }
+
+    private ReplayRequestSpec replayRequest(Map<String, Object> contextVariables) {
+        return replayRequest("RS-PAY-001", RouteReplayType.REFUND, contextVariables);
+    }
+
+    private ReplayRequestSpec replayRequest(String referenceSnapshotId,
+                                            RouteReplayType replayType,
+                                            Map<String, Object> contextVariables) {
         return ImmutableReplayRequestSpec.builder()
                 .replayType(replayType)
                 .eventType(FundsTransactionEventType.REFUND)
@@ -177,11 +228,29 @@ class RouteDslContractTests {
                 .originalAmount(Money.immutable(100L, CurrencyIsoCode.USD))
                 .replayLegIds(java.util.List.of("PAY"))
                 .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
-                .contextVariables(Map.of("semanticBoundary", "ROUTE_REPLAY_ONLY"))
+                .contextVariables(contextVariables)
                 .build();
     }
 
     private RouteLegSpec routeLeg(RouteNodeSpec sourceNode, RouteNodeSpec targetNode) {
+        return routeLeg(sourceNode, targetNode, Map.of());
+    }
+
+    private RouteLegSpec routeLeg(Map<String, Object> contextVariables) {
+        return routeLeg(routeNode(RouteNodeType.SUBJECT,
+                        fundingAccount("FA-PAYER-LEG"),
+                        LedgerSubjectCode.AVAILABLE,
+                        RouteNodeRole.SOURCE),
+                routeNode(RouteNodeType.SUBJECT,
+                        fundingAccount("FA-PAYEE-LEG"),
+                        LedgerSubjectCode.SETTLEMENT,
+                        RouteNodeRole.TARGET),
+                contextVariables);
+    }
+
+    private RouteLegSpec routeLeg(RouteNodeSpec sourceNode,
+                                  RouteNodeSpec targetNode,
+                                  Map<String, Object> contextVariables) {
         return ImmutableRouteLegSpec.builder()
                 .legId("PAY")
                 .sequence(1)
@@ -193,7 +262,7 @@ class RouteDslContractTests {
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
                 .replayPolicy(RouteReplayPolicy.FULL_ONLY)
                 .constraintOverrides(Map.of())
-                .contextVariables(Map.of())
+                .contextVariables(contextVariables)
                 .build();
     }
 
