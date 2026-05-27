@@ -80,6 +80,12 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     private static final String OWNER_ID = "owner_control_basic";
 
+    private static final String UNQUOTED_PAYMENT_CONTEXT_VARIABLES =
+            "{processorPayload:{secretKey:\"secret-value\"";
+
+    private static final String UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES =
+            "{externalAccount:{bankAccountNo:\"123456789012\"";
+
     private static final Map<LedgerSubjectCode, EntrySide> EXPECTED_NORMAL_SIDES = Map.of(
             LedgerSubjectCode.LIMIT, EntrySide.DEBIT,
             LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT,
@@ -327,7 +333,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：运营创建信用账户或预算组时把外部账户号、PAN 或通道密钥放入扩展上下文。
-     * 输入：信用账户 contextVariables 含嵌套 IBAN 值；预算组 contextVariables 含嵌套 secretKey 字段。
+     * 输入：contextVariables 含嵌套敏感值、敏感字段名，或坏 JSON 未加引号敏感字段名。
      * 输出：创建被拒绝，不留下控制账户、预算组、账本或账务事实。
      * 红线：控制类钱包对象不得通过扩展上下文保存敏感支付工具或外部账户原文。
      */
@@ -340,6 +346,12 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
         assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
                 .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+        assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()
+                .setContextVariables(UNQUOTED_PAYMENT_CONTEXT_VARIABLES)))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+                .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
 
         assertThat(countRows("t_credit_account", "sn", CREDIT_ACCOUNT_SN)).isZero();
