@@ -38,7 +38,8 @@ public final class ExternalAccountSensitiveValueValidator {
 
     private static final String NON_FIELD_NAME_CHARACTER_PATTERN = "[^a-z0-9]";
 
-    private static final Pattern RAW_FIELD_NAME_PATTERN = Pattern.compile("\"([^\"]+)\"\\s*:");
+    private static final Pattern RAW_FIELD_NAME_PATTERN = Pattern.compile(
+            "(?:\"([^\"]+)\"|(?<![A-Za-z0-9_-])([A-Za-z][A-Za-z0-9_ -]*))\\s*:");
 
     private static final Pattern RAW_IBAN_FRAGMENT_PATTERN = Pattern.compile(
             "(?<![A-Za-z0-9])([A-Za-z]{2}[0-9]{2}[A-Za-z0-9 -]{11,30})(?![A-Za-z0-9])");
@@ -198,7 +199,8 @@ public final class ExternalAccountSensitiveValueValidator {
     private static boolean containsSensitiveRawFieldName(String contextVariables) {
         Matcher matcher = RAW_FIELD_NAME_PATTERN.matcher(contextVariables);
         while (matcher.find()) {
-            if (isSensitiveContextField(matcher.group(1))) {
+            String fieldName = matcher.group(1) == null ? matcher.group(2) : matcher.group(1);
+            if (isSensitiveContextField(fieldName)) {
                 return true;
             }
         }

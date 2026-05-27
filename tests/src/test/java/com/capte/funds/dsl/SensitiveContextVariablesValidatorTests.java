@@ -48,6 +48,27 @@ class SensitiveContextVariablesValidatorTests {
     }
 
     /**
+     * 场景：调用方提交畸形 JSON，敏感字段名未按 JSON 规范加双引号。
+     * 预期：校验器兜底扫描类 JSON 字段名时仍识别敏感字段。
+     * 红线：坏 JSON 不能成为 token secret、卡号字段或外部账户字段旁路存储入口。
+     */
+    @Test
+    void testMalformedContextVariablesShouldRejectUnquotedSensitiveFieldNames() {
+        assertThat(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(
+                "{processorPayload:{secretKey:\"secret-value\""))
+                .isTrue();
+        assertThat(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(
+                "{processorPayload:{card-no:\"token-ref\""))
+                .isTrue();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextVariables(
+                "{externalAccount:{bankAccountNo:\"123456789012\""))
+                .isTrue();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextVariables(
+                "{processorPayload:{routing-number:\"bank-ref\""))
+                .isTrue();
+    }
+
+    /**
      * 场景：调用方提交畸形 JSON，字段名看似普通但值中包含完整 PAN 或有效 IBAN。
      * 预期：校验器按原始片段兜底识别敏感值。
      * 红线：敏感值识别不能只依赖可正常反序列化的对象树。
