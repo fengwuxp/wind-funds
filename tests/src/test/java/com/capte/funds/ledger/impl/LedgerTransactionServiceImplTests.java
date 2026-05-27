@@ -53,6 +53,9 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
 
     private static final LocalDateTime TRANSACTION_TIME = LocalDateTime.of(2026, 5, 27, 10, 0);
 
+    private static final Map<String, Object> SENSITIVE_ITERABLE_CONTEXT_VARIABLES =
+            Map.of("processorPayload", List.of("trace-ref", "4111111111111111"));
+
     @Autowired
     private LedgerTransactionService ledgerTransactionService;
 
@@ -80,6 +83,26 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         LedgerTransactionSpec transaction = ledgerTransaction(
                 Map.of("secretKey", "secret-value"),
+                Map.of(),
+                Map.of());
+
+        assertThatThrownBy(() -> ledgerTransactionService.postLedgerTransaction(transaction))
+                .hasMessageContaining("ledgerTransaction.contextVariables must not contain sensitive fields");
+
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：外部 LedgerTransactionSpec 实现绕过默认 DSL，交易级上下文把原始 PAN 藏入集合值。
+     * 输入：transaction.contextVariables 含 processorPayload 列表，其中一项是原始 PAN。
+     * 输出：账本交易写入被拒绝，且 transaction、posting plan、entry 三类账务事实均不落库。
+     * 红线：账务事实交易上下文不得通过嵌套集合保存原始支付工具号。
+     */
+    @Test
+    void testPostLedgerTransactionShouldRejectSensitiveIterableContextWithoutFacts() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        LedgerTransactionSpec transaction = ledgerTransaction(
+                SENSITIVE_ITERABLE_CONTEXT_VARIABLES,
                 Map.of(),
                 Map.of());
 
