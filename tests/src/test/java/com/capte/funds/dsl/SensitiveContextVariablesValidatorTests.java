@@ -27,6 +27,27 @@ class SensitiveContextVariablesValidatorTests {
     }
 
     /**
+     * 场景：调用方提交畸形 JSON，敏感字段名使用大小写、空格或短横线变体。
+     * 预期：校验器兜底扫描原始字段名时仍执行统一归一化。
+     * 红线：敏感字段治理不能只在可正常解析的对象树中成立。
+     */
+    @Test
+    void testMalformedContextVariablesShouldRejectNormalizedSensitiveFieldNameVariants() {
+        assertThat(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(
+                "{\"processorPayload\":{\"Token Secret\":\"token-ref\""))
+                .isTrue();
+        assertThat(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(
+                "{\"processorPayload\":{\"card-no\":\"token-ref\""))
+                .isTrue();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextVariables(
+                "{\"processorPayload\":{\"routing-number\":\"bank-ref\""))
+                .isTrue();
+        assertThat(ExternalAccountSensitiveValueValidator.containsSensitiveContextVariables(
+                "{\"processorPayload\":{\"Account Number\":\"bank-ref\""))
+                .isTrue();
+    }
+
+    /**
      * 场景：调用方提交畸形 JSON，字段名看似普通但值中包含完整 PAN 或有效 IBAN。
      * 预期：校验器按原始片段兜底识别敏感值。
      * 红线：敏感值识别不能只依赖可正常反序列化的对象树。
