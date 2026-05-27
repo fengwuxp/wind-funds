@@ -79,6 +79,9 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
             LedgerSubjectCode.AUTHORIZATION, Boolean.FALSE
     );
 
+    private static final String UNQUOTED_SENSITIVE_CONTEXT_VARIABLES =
+            "{processorPayload:{secretKey:\"secret-value\"";
+
     @Autowired
     private FundingAccountService fundingAccountService;
 
@@ -171,6 +174,9 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
         assertThatThrownBy(() -> fundingAccountService.createFundingAccount(createFundingAccountRequest()
                 .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setContextVariables(UNQUOTED_SENSITIVE_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
 
         assertThat(countFundingAccounts()).isZero();
