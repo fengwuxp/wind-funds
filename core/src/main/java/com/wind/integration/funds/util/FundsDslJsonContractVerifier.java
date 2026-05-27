@@ -35,6 +35,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
+import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -302,9 +303,29 @@ public final class FundsDslJsonContractVerifier {
         if (contextVariables == null) {
             return;
         }
-        for (String key : contextVariables.keySet()) {
-            if (RESERVED_BENEFIT_CONTEXT_KEYS.contains(key)) {
-                throw new IllegalArgumentException(path + " must not contain core benefit field: " + key);
+        verifyBenefitContextValue(contextVariables, path);
+    }
+
+    private static void verifyBenefitContextValue(@Nullable Object value, String path) {
+        if (value instanceof Map<?, ?> values) {
+            for (Map.Entry<?, ?> entry : values.entrySet()) {
+                if (entry.getKey() instanceof String key && RESERVED_BENEFIT_CONTEXT_KEYS.contains(key)) {
+                    throw new IllegalArgumentException(path + " must not contain core benefit field: " + key);
+                }
+                verifyBenefitContextValue(entry.getValue(), path);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> values) {
+            for (Object item : values) {
+                verifyBenefitContextValue(item, path);
+            }
+            return;
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            for (int index = 0; index < length; index++) {
+                verifyBenefitContextValue(Array.get(value, index), path);
             }
         }
     }

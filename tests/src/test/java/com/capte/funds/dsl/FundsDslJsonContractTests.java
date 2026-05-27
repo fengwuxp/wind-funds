@@ -308,6 +308,56 @@ class FundsDslJsonContractTests {
                 .hasMessageContaining("currentMarketingRule");
     }
 
+    /**
+     * 场景：样例作者把当前营销规则输入藏在权益引用上下文的子对象中。
+     * 预期：JSON 契约校验递归识别核心字段并显式失败。
+     * 红线：文档样例不能通过嵌套 contextVariables 绕过资金底座不重算优惠的事实边界。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectNestedCurrentMarketingRuleInputs() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-BENEFIT-NESTED-RECALC-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 8000 },
+                    "originalAmount": { "currency": "USD", "amount": 8000 },
+                    "benefitSnapshot": {
+                      "benefitSnapshotId": "bs_invalid_nested_recalc_001",
+                      "benefitGroupSn": "bg_invalid_nested_recalc_001",
+                      "orderAmount": { "currency": "USD", "amount": 10000 },
+                      "userPayAmount": { "currency": "USD", "amount": 8000 },
+                      "components": [{
+                        "componentSn": "bc_invalid_nested_recalc_001",
+                        "benefitType": "MERCHANT_COUPON",
+                        "componentType": "MERCHANT_DISCOUNT",
+                        "closureRole": "ORDER_DISCOUNT_CLOSURE",
+                        "amount": { "currency": "USD", "amount": 2000 },
+                        "ledgerEffect": "NO_LEDGER",
+                        "fundingNature": "MERCHANT_BORNE",
+                        "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_001" },
+                        "benefitReference": {
+                          "couponId": "coupon_001",
+                          "ruleVersion": "rule_v1",
+                          "contextVariables": {
+                            "decisionTrace": { "currentMarketingRule": "latest_rule" }
+                          }
+                        },
+                        "contextVariables": {}
+                      }],
+                      "contextVariables": {}
+                    }
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("currentMarketingRule");
+    }
+
     private Path transactionLayerDslDir() {
         return workspaceRoot().resolve("core/src/test/resources/dsl/transaction-layer");
     }
