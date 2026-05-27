@@ -67,6 +67,9 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
     private static final String OWNER_ID = "owner_relation_service";
 
+    private static final String UNQUOTED_SENSITIVE_CONTEXT_VARIABLES =
+            "{processorPayload:{secretKey:\"secret-value\"";
+
     @Autowired
     private FundingAccountService fundingAccountService;
 
@@ -202,6 +205,9 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
                 .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setContextVariables(UNQUOTED_SENSITIVE_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
 
         assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
