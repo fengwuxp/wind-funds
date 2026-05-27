@@ -195,6 +195,29 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：已入账账本交易通过更新接口补充交易上下文，更新请求携带外部账户原文字段。
+     * 输入：UpdateLedgerTransactionRequest.contextVariable 含 externalAccount.bankAccountNo。
+     * 输出：账本交易更新被拒绝，已入账 transaction、posting plan、entry 三类账务事实保持不变。
+     * 红线：账务事实更新入口不得成为外部账户号写入旁路。
+     */
+    @Test
+    void testUpdateLedgerTransactionShouldRejectExternalAccountContextWithoutMutatingFacts() {
+        LedgerTransactionPostResult postResult = ledgerTransactionService.postLedgerTransaction(ledgerTransaction(
+                Map.of("traceId", "TRACE-LEDGER-CONTEXT-002"),
+                Map.of("routeTraceId", "ROUTE-TRACE-002"),
+                Map.of("entryTraceId", "ENTRY-TRACE-002")));
+        assertThat(postResult.isNewlyPosted()).isTrue();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> ledgerTransactionService.updateLedgerTransaction(new UpdateLedgerTransactionRequest()
+                .setId(postResult.getLedgerTransactionId())
+                .setContextVariable(Map.of("externalAccount", Map.of("bankAccountNo", "123456789012")))))
+                .hasMessageContaining("ledgerTransaction.contextVariables must not contain sensitive fields");
+
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
     private LedgerTransactionSpec ledgerTransaction(Map<String, Object> transactionContext,
                                                     Map<String, Object> planContext,
                                                     Map<String, Object> entryContext) {
