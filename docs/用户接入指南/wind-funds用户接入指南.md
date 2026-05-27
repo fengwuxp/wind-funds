@@ -779,7 +779,7 @@ P2 业务能力包的目标是让 VCC、全球账户、ACH 和收单复用资金
 | DSL 证据 | 对应 `FundsInstruction`、route、posting、benefit、settlement 或 governance caseId。 |
 | 系分证据 | 对应服务入口、模块、表、状态机、事务边界和观测指标。 |
 | 测试证据 | 目标测试类、正向用例、失败无副作用用例、幂等用例、并发或重放用例。 |
-| 账务证据 | route snapshot、posting plan、ledger transaction、ledger entry、balance projection。 |
+| 账务证据 | route snapshot、posting plan、ledger transaction、ledger entry、balance projection，以及 DSL 资金场景借贷平衡与账务期望表的命中行、不适用行、账户类型、`normalBalanceSide`、借贷平衡和余额影响。 |
 | 运营证据 | 审批、凭证、操作者、处理单、差异报告、重新对账或人工处理记录。 |
 | 安全证据 | 权限、脱敏、敏感数据禁止项、外部规则核验状态和审计日志。 |
 | 验证结果 | 实际执行命令、通过/失败结果、未执行原因和残余风险。 |
@@ -793,8 +793,8 @@ P2 业务能力包的目标是让 VCC、全球账户、ACH 和收单复用资金
 | 评审项 | 通过口径 |
 | --- | --- |
 | 产品口径 | 目标、非目标、业务事实、用户展示、运营动作、外部规则和验收方明确。 |
-| 资金口径 | 主体、资金归属、金额、币种、余额桶、平台账户角色和账目周期明确。 |
-| DSL 口径 | instruction、route snapshot、posting、ledger entry、projection 和 caseId 能串起来。 |
+| 资金口径 | 主体、资金归属、金额、币种、账户类型、`normalBalanceSide`、余额桶、平台账户角色和账目周期明确。 |
+| DSL 口径 | instruction、route snapshot、posting、ledger entry、projection、caseId 和 DSL 借贷表命中行能串起来。 |
 | 系分口径 | 服务入口、模块边界、事务边界、幂等、错误、审计、观测和回滚明确。 |
 | TDD 口径 | 正向、逆向、失败、并发、幂等、重放、对账差错和金融红线均有用例映射。 |
 | 安全口径 | 权限、敏感数据、脱敏、外部规则核验、审批和审计证据明确。 |
@@ -807,7 +807,7 @@ P2 业务能力包的目标是让 VCC、全球账户、ACH 和收单复用资金
 | 维度 | Done | Not Done |
 | --- | --- | --- |
 | 业务事实 | 业务动作、状态、来源引用、幂等键和展示口径闭合。 | 只有接口诉求、页面动作、审批中状态或外部非终态。 |
-| 资金不变量 | 主体、金额、币种、route、posting、entry、projection、幂等和审计可验证。 | 只能说明交易成功，不能证明余额和账务变化。 |
+| 资金不变量 | 主体、账户类型、`normalBalanceSide`、金额、币种、route、posting、entry、projection、幂等、审计、借贷平衡和余额影响可验证。 | 只能说明交易成功，不能证明余额和账务变化。 |
 | 失败路径 | 准入失败、幂等冲突、路由失败、账务失败、投影失败和对账差错都有处理口径。 | 只定义成功路径，失败靠人工线下判断。 |
 | 系统边界 | wind-funds、业务系统、通道适配层、运营后台、外部机构责任清楚。 | 把外部协议、风控、KYC/KYB/AML 或业务审批沉入资金内核。 |
 | 测试证据 | TDD 用例、目标测试类、验证命令和残余风险清楚。 | 只有开发自测或接口联调通过。 |
