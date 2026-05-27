@@ -246,6 +246,11 @@ class PaymentInstrumentRouteDslContractTests {
         assertThatThrownBy(() -> paymentInstrumentRef("PI-CVV", "**** 4242", Map.of("cvv", "123")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentRef("PI-CARD-NO",
+                "**** 4242",
+                Map.of("cardNumber", "4242424242424242")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
         assertThatThrownBy(() -> paymentInstrumentRef("PI-TOKEN-SECRET",
                 "tok_card_001",
                 Map.of("token_secret", "secret-value")))
@@ -254,6 +259,11 @@ class PaymentInstrumentRouteDslContractTests {
         assertThatThrownBy(() -> paymentInstrumentRef("PI-NESTED-SECRET",
                 "tok_card_002",
                 Map.<String, Object>of("processorPayload", Map.of("secretKey", "secret-value"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentRef("PI-NESTED-PAN",
+                "tok_card_003",
+                Map.<String, Object>of("processorPayload", Map.of("pan", "4242424242424242"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
     }

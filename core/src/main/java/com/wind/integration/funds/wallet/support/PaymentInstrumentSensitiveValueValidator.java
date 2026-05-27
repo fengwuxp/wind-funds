@@ -24,6 +24,12 @@ public final class PaymentInstrumentSensitiveValueValidator {
     private static final String NON_FIELD_NAME_CHARACTER_PATTERN = "[^a-z0-9]";
 
     private static final Set<String> SENSITIVE_BINDING_SNAPSHOT_FIELDS = Set.of(
+            "pan",
+            "cardno",
+            "cardnumber",
+            "fullcardnumber",
+            "primaryaccountnumber",
+            "paymentaccountnumber",
             "cvv",
             "cvv2",
             "cvc",
