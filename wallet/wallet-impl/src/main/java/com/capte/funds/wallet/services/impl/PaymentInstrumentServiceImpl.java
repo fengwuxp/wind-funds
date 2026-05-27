@@ -28,6 +28,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
+import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingChangeType;
 import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingRole;
@@ -502,7 +503,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     }
 
     private void assertNoSensitiveContextVariables(String contextVariables) {
-        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(contextVariables),
+        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(contextVariables)
+                        || ExternalAccountSensitiveValueValidator.containsSensitiveContextVariables(contextVariables),
                 "contextVariables must not contain sensitive payment instrument fields");
     }
 

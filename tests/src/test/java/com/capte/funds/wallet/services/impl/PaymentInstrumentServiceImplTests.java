@@ -109,6 +109,9 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private static final String RAW_PAN_CONTEXT_VARIABLES =
             "{\"processorPayload\":{\"networkReference\":\"" + RAW_PAN_INSTRUMENT_NO + "\"}}";
 
+    private static final String RAW_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES =
+            "{\"processorPayload\":{\"bankAccountNo\":\"123456789012\"}}";
+
     @Autowired
     private PaymentInstrumentService paymentInstrumentService;
 
@@ -162,7 +165,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：运营创建支付工具时把通道 token secret 放入扩展上下文。
-     * 输入：contextVariables 中包含嵌套 secretKey 字段或伪装字段名中的 PAN 值。
+     * 输入：contextVariables 中包含嵌套 secretKey 字段、伪装字段名中的 PAN 值或外部账户原文字段。
      * 输出：创建被拒绝，不留下支付工具引用或账本事实。
      * 红线：token secret、密钥和 CVV 不得进入支付工具普通快照、日志、导出或报表。
      */
@@ -178,10 +181,16 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setSn(SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_pan_value")
                 .setContextVariables(RAW_PAN_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
+                .setSn(SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_external_account")
+                .setContextVariables(RAW_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
+                .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
 
         assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN)).isZero();
         assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_pan_value"))
                 .isZero();
+        assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN
+                + "_external_account")).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -320,7 +329,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：运营创建支付工具绑定时把通道 token secret 放入扩展上下文。
-     * 输入：contextVariables 中包含嵌套 secretKey 字段或伪装字段名中的 PAN 值。
+     * 输入：contextVariables 中包含嵌套 secretKey 字段、伪装字段名中的 PAN 值或外部账户原文字段。
      * 输出：创建被拒绝，不留下绑定候选或历史。
      * 红线：token secret、密钥和 CVV 不得进入支付工具绑定当前态、历史、日志、导出或报表。
      */
@@ -334,6 +343,9 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setContextVariables(RAW_PAN_CONTEXT_VARIABLES)))
+                .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setContextVariables(RAW_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
 
         assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
@@ -776,7 +788,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：运营变更支付工具绑定时把通道 token secret 放入扩展上下文。
-     * 输入：contextVariables 中包含嵌套 secretKey 字段或伪装字段名中的 PAN 值。
+     * 输入：contextVariables 中包含嵌套 secretKey 字段、伪装字段名中的 PAN 值或外部账户原文字段。
      * 输出：变更被拒绝，绑定当前态和历史证据保持不变。
      * 红线：当前态变更入口不得把 token secret、密钥或 CVV 写入绑定历史或 route 候选。
      */
@@ -805,6 +817,16 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                         .setChangeReason("risk review")
                         .setRequestSn(CHANGE_BINDING_REQUEST_SN)
                         .setContextVariables(RAW_PAN_CONTEXT_VARIABLES)))
+                .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setPriority(20)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("risk review")
+                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)
+                        .setContextVariables(RAW_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
 
         PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
@@ -906,10 +928,11 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 DUPLICATE_DEFAULT_BINDING_SN,
                 PRIORITY_CONFLICT_BINDING_SN,
                 PRIORITY_ORDER_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
                 RAW_PAYMENT_INSTRUMENT_SN,
                 SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN,
+                SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN + "_external_account",
                 INVALID_WINDOW_PAYMENT_INSTRUMENT_SN,
                 SUSPENDED_PAYMENT_INSTRUMENT_SN,
                 RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN);
