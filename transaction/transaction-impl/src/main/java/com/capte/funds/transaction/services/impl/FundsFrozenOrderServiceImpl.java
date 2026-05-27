@@ -13,6 +13,8 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
+import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
+import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -87,5 +89,12 @@ public class FundsFrozenOrderServiceImpl implements FundsFrozenOrderService {
         AssertUtils.notNull(request.getAmount(), "冻结金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "冻结金额必须大于 0");
         AssertUtils.notNull(request.getCurrency(), "冻结币种不能为空");
+        assertNoSensitiveContextVariables(request.getContextVariables());
+    }
+
+    private void assertNoSensitiveContextVariables(String contextVariables) {
+        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(contextVariables)
+                        || ExternalAccountSensitiveValueValidator.containsSensitiveContextVariables(contextVariables),
+                "contextVariables must not contain sensitive funds frozen order fields");
     }
 }

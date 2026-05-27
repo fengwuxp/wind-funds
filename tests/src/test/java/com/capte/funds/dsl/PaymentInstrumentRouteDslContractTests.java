@@ -298,6 +298,21 @@ class PaymentInstrumentRouteDslContractTests {
                 .hasMessageContaining("contextVariables must not contain sensitive external account fields");
     }
 
+    /**
+     * 场景：内部资金交易号以两个字母加数字开头，形态上接近 IBAN 前缀。
+     * 预期：上下文允许保存内部交易号引用。
+     * 红线：敏感值识别不能误杀内部资金交易号、账本交易号或幂等号，导致授权后续链路不可执行。
+     */
+    @Test
+    void testExternalAccountContextShouldAllowInternalFundsTransactionSnLikeIbanPrefix() {
+        ExternalAccountRefSpec externalAccountRef = externalAccountRef("EA-INTERNAL-REF",
+                "token:external-account-003",
+                Map.<String, Object>of("processorPayload", Map.of("networkReference", "FT2026052714000062")));
+
+        assertThat(externalAccountRef.getContextVariables())
+                .containsEntry("processorPayload", Map.of("networkReference", "FT2026052714000062"));
+    }
+
     private RouteLegSpec routeLeg(SubjectRef payer, SubjectRef payee) {
         return ImmutableRouteLegSpec.builder()
                 .legId("PAY")

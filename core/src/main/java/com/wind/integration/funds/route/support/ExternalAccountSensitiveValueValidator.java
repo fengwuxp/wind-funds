@@ -27,6 +27,12 @@ public final class ExternalAccountSensitiveValueValidator {
 
     private static final int IBAN_CHECK_DIGIT_LENGTH = 2;
 
+    private static final int IBAN_MODULUS = 97;
+
+    private static final int IBAN_EXPECTED_REMAINDER = 1;
+
+    private static final int DECIMAL_RADIX = 10;
+
     private static final String NON_FIELD_NAME_CHARACTER_PATTERN = "[^a-z0-9]";
 
     private static final Set<String> SENSITIVE_CONTEXT_FIELDS = Set.of(
@@ -55,7 +61,7 @@ public final class ExternalAccountSensitiveValueValidator {
             return false;
         }
         String compactAccountNo = externalAccountNo.replace(" ", "").replace("-", "").toUpperCase(Locale.ROOT);
-        return isRawNumericExternalAccountNo(compactAccountNo) || isRawIbanExternalAccountNo(compactAccountNo);
+        return isRawNumericExternalAccountNo(compactAccountNo) || isValidIbanExternalAccountNo(compactAccountNo);
     }
 
     private static boolean isRawNumericExternalAccountNo(String compactAccountNo) {
@@ -158,6 +164,31 @@ public final class ExternalAccountSensitiveValueValidator {
             return false;
         }
         String compactValue = value.replace(" ", "").replace("-", "").toUpperCase(Locale.ROOT);
-        return isRawIbanExternalAccountNo(compactValue);
+        return isValidIbanExternalAccountNo(compactValue);
+    }
+
+    private static boolean isValidIbanExternalAccountNo(String compactAccountNo) {
+        return isRawIbanExternalAccountNo(compactAccountNo) && ibanMod97(compactAccountNo) == IBAN_EXPECTED_REMAINDER;
+    }
+
+    private static int ibanMod97(String compactAccountNo) {
+        String rearranged = compactAccountNo.substring(IBAN_COUNTRY_CODE_LENGTH + IBAN_CHECK_DIGIT_LENGTH)
+                + compactAccountNo.substring(0, IBAN_COUNTRY_CODE_LENGTH + IBAN_CHECK_DIGIT_LENGTH);
+        int remainder = 0;
+        for (int i = 0; i < rearranged.length(); i++) {
+            char character = rearranged.charAt(i);
+            if (Character.isDigit(character)) {
+                remainder = nextRemainder(remainder, character - '0');
+            } else {
+                int letterValue = character - 'A' + DECIMAL_RADIX;
+                remainder = nextRemainder(remainder, letterValue / DECIMAL_RADIX);
+                remainder = nextRemainder(remainder, letterValue % DECIMAL_RADIX);
+            }
+        }
+        return remainder;
+    }
+
+    private static int nextRemainder(int remainder, int digit) {
+        return (remainder * DECIMAL_RADIX + digit) % IBAN_MODULUS;
     }
 }
