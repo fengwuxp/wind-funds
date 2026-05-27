@@ -45,7 +45,7 @@
 
 ### 1.3 能力承载优先级
 
-DSL 的能力优先级按资金底座的产品定位划分，不按文档编号或代码批次编号划分。批次编号只表示工程拆解和 Execution Grant 范围；能力优先级表示生产交付时必须先证明哪些资金不变量。
+DSL 的能力优先级按资金底座的产品定位划分，不按文档编号或工程任务编号划分。能力优先级表示生产交付时必须先证明哪些资金不变量。
 
 | 优先级 | DSL 必须优先稳定的能力 | 承载边界 |
 | --- | --- | --- |
@@ -150,7 +150,7 @@ DSL 的能力优先级按资金底座的产品定位划分，不按文档编号�
 
 ### 3.2 P2 业务能力包 DSL 准入卡
 
-06、07、08 分册进入 DSL 时，只能以业务能力包形式提供外部事实引用、场景语义和验证红线，不得把业务产品状态机、外部协议字段全集或合规结论固化为资金底座统一 DSL。任何 P2 业务能力包进入编码前，Execution Grant 必须同时引用业务分册验收 ID、DSL 承接字段、系分章节、TDD 专项用例和 P0/P1 回归范围。
+06、07、08 分册进入 DSL 时，只能以业务能力包形式提供外部事实引用、场景语义和验证红线，不得把业务产品状态机、外部协议字段全集或合规结论固化为资金底座统一 DSL。任何 P2 业务能力包进入工程落地前，必须同时引用业务分册验收 ID、DSL 承接字段、系分章节、TDD 专项用例和 P0/P1 回归范围。
 
 | 业务能力包 | 可进入 DSL 的事实 | 不进入 DSL 的内容 | 必须回挂的 TDD | 编码准入补充 |
 | --- | --- | --- | --- | --- |
@@ -158,7 +158,7 @@ DSL 的能力优先级按资金底座的产品定位划分，不按文档编号�
 | 全球账户收付款 | 外部账户引用、VA 或银行流水匹配结果、入金确认、出款前准入、外部受理在途、成功回单、退汇事实、费用和 FX 决策快照。 | 开户、VA 分配、银行协议报文、SWIFT 或本地清算网络原始字段全集、FX 执行、跨境材料采集和合规最终判断。 | `TDD-P2-GA-*`、`TDD-P2-GA-RED-*`、`TDD-RAIL-008`、`TDD-RAIL-009`、`TDD-FX-*`。 | 外部 accepted、message sent 或 processing 不得展示为到账成功；无有效 FX quote 不得静默换汇；银行账户、VA、Nostro/Vostro 只能作为 externalAccountRef。 |
 | 收单业务 | payment attempt、authorization、capture、refund、dispute、chargeback、商户 CLEARING、清分批次、清算批次、结算单和出款结果的归一资金事实。 | 商户入网/KYB、收银台展示、PSP/收单行/卡组织协议、通道路由策略、风控模型和 PCI 最终结论。 | `TDD-P2-ACQ-*`、`TDD-P2-ACQ-RED-*`、`TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`。 | capture 成功只进入待清算，不等于可提现；清分确认不释放可结算；refund 与 chargeback 必须防重复损失；完整 PAN/CVC 不进入资金底座。 |
 | ACH 或银行转账支撑边界 | ACH/银行转账业务解释后的入金确认、出款结果、在途、退回、追偿、外部流水引用、trace number 摘要、文件摘要、回单引用、对账差错、调账核销事实和外部规则核验状态。 | ACH 产品状态机、ACH 指令、Debit 授权、账户验证、ODFI/RDFI 协议、Nacha 规则、SEC code、文件批次、cut-off、return code、NOC、reversal 规则解释和完整银行账户敏感信息。 | `TDD-RAIL-002` 至 `TDD-RAIL-007`、`TDD-RED-030`、`TDD-RED-034`、`TDD-P2-GA-*`、`TDD-P2-ACQ-*`、`TDD-RECON-*`。 | ACH return 和 NOC 必须先由上层业务或适配层解释；外部 submitted、accepted、processing 或 message sent 不等于到账；资金底座不得解析 ACH 协议，不得把 return 静默映射为普通 refund，不得因 NOC 修改原交易资金事实，不得保存完整银行账户敏感信息，不得在规则未确认时作为自动资金处理依据。 |
-| 三类业务共用 | `businessScene`、`reference`、`instrumentRef`、`externalAccountRef`、`originalAmount`、`exchangeRate`、外部规则核验字段、脱敏证据引用和归一资金动作。 | 业务产品完整生命周期、外部规则最终解释、风险模型、商户经营策略、银行或卡组织协议实现。 | 第 05 分册 4.2、TDD 13.4.1 和目标测试资产 P2 专项行。 | 若需要新增公共枚举、Request/DTO、服务入口、表结构或 JSON 夹具，必须在专项 Execution Grant 中逐项授权，并列明 P0/P1 回归测试。 |
+| 三类业务共用 | `businessScene`、`reference`、`instrumentRef`、`externalAccountRef`、`originalAmount`、`exchangeRate`、外部规则核验字段、脱敏证据引用和归一资金动作。 | 业务产品完整生命周期、外部规则最终解释、风险模型、商户经营策略、银行或卡组织协议实现。 | 第 05 分册 4.2、TDD 13.4.1 和目标测试资产 P2 专项行。 | 若需要新增公共枚举、Request/DTO、服务入口、表结构或 JSON 夹具，必须在专项工程任务中逐项授权，并列明 P0/P1 回归测试。 |
 
 ## 四、资金交易结构化描述
 
@@ -326,7 +326,7 @@ flowchart TD
 | 出款成功 | 商户 `SETTLEMENT` 或 `IN_TRANSIT`；平台现金/备付镜像 `CASH` 或外部回单现金映射。 | 商户锁定/在途通常为负债/CREDIT；平台现金为资产/DEBIT。 | 借：商户 `SETTLEMENT` 或 `IN_TRANSIT`；贷：平台 `CASH` 或付款资产镜像。 | 商户结算责任减少；平台现金资产减少；外部付款结果可追溯。 | 不得重复关闭；必须能证明商户结算负债减少和外部付款结果一致。`TDD-SETTLE-*`。 |
 | 出款失败或退回 | 商户 `IN_TRANSIT` 或 `SETTLEMENT`；商户 `AVAILABLE`；异常退回可进 `ADJUSTMENT`。 | 商户余额桶通常为负债/CREDIT；差错挂账按 profile 配置。 | 借：`IN_TRANSIT` 或 `SETTLEMENT`；贷：商户 `AVAILABLE`，金额不一致时贷/借 `ADJUSTMENT` 并转差错。 | 在途或结算锁定减少；可用恢复；异常差额进入差错余额。 | 只回退一次；金额不一致或状态不确定进入差错，不直接改历史分录。`TDD-SETTLE-*`、`TDD-RECON-*`。 |
 | 对账误报关闭 | 对账差错处理单、审计记录。 | 不涉及账目或账户类型。 | 不生成 posting 或 ledger entry。 | 资金余额、账本分录和投影不变化。 | 差异不能靠日志或人工备注修复余额。`TDD-RECON-*`。 |
-| 对账补事实、冲正、调账或核销 | 责任方账户、挂账方账户、平台 `ADJUSTMENT`、目标资金账户。 | 责任、资产、收入、成本或挂账账户按审批结论配置。 | 按审批结论生成一组或多组平衡 plan：借方合计等于贷方合计；冲正优先反向原分录。 | 目标余额、差错挂账、成本、收入或责任余额按审批结果变化。 | 必须在 Execution Grant 白名单内，有审批、凭证、原事实引用、幂等键和失败无副作用测试。`TDD-RECON-*`、`TDD-CTRL-*`。 |
+| 对账补事实、冲正、调账或核销 | 责任方账户、挂账方账户、平台 `ADJUSTMENT`、目标资金账户。 | 责任、资产、收入、成本或挂账账户按审批结论配置。 | 按审批结论生成一组或多组平衡 plan：借方合计等于贷方合计；冲正优先反向原分录。 | 目标余额、差错挂账、成本、收入或责任余额按审批结果变化。 | 必须在工程白名单内，有审批、凭证、原事实引用、幂等键和失败无副作用测试。`TDD-RECON-*`、`TDD-CTRL-*`。 |
 | 平台补贴 | 平台补贴成本或补贴资金账户；商户 `CLEARING` 或订单应收责任账户。 | 平台补贴成本为 EXPENSE/DEBIT；商户 `CLEARING` 通常为负债/CREDIT。 | 借：平台补贴成本、预提或补贴资金来源；贷：商户 `CLEARING` 或目标责任账目。 | 平台补贴成本增加或补贴资金减少；商户待清算增加。 | 平台补贴不得和用户实付合成一个净额；零实付也必须有正金额资金来源。`TDD-BEN-*`、`TDD-BEN-RED-*`。 |
 | 商户让利或展示优惠 | 商户折扣组件、订单金额项、清分展示项。 | 通常不涉及独立账目；影响商户应收计算。 | 默认不生成 posting；商户应收净额在订单收款或清分行中体现。 | 用户应付减少，商户应收减少；资金底座余额不因该组件单独变化。 | 不得误生成平台补贴或储值券核销分录。`TDD-BEN-*`。 |
 | 储值券或预付权益核销 | 平台或发行方 `PREPAYMENT`；商户 `CLEARING`、订单应收或目标责任账户。 | `PREPAYMENT` 通常为负债/CREDIT；商户 `CLEARING` 通常为负债/CREDIT。 | 借：平台或发行方 `PREPAYMENT`；贷：商户 `CLEARING` 或目标责任账目。 | 预收待付责任减少；商户待清算或应收增加。 | 储值预付口径需专业确认；退款时恢复责任或保留补贴必须由退款处置明确。`TDD-BEN-*`、`TDD-BEN-RED-*`。 |
@@ -859,35 +859,27 @@ orderAmount = userPayAmount + sum(ORDER_DISCOUNT_CLOSURE components)
 | `NO_REFUND + REVERSE_SUBSIDY` | 用户侧不返券，但资金侧冲回补贴或减少商户应收。 |
 | `NO_REFUND + RETAIN_SUBSIDY` | 用户侧不返券，资金侧不冲补贴；必须有规则版本和财务、会计或合同确认口径。 |
 
-目标态落地：
+目标态落地边界：
 
-1. Phase 1 只要求 `FundsInstruction` 可携带 `benefitSnapshot`，无权益交易遵循空值语义。
-2. Phase 1 不强制 `RouteSnapshot`、`RouteResolver`、`PostingAssembler` 和表结构立即消费完整权益对象；若进入编码，Execution Grant 必须明确公共契约和枚举授权。
-3. 目标态 `RouteSnapshot` 应固化权益快照或等价摘要，否则权益退款、撤销、授权过期、清结算和对账需要回查原指令，不利于长期回放。
-4. 历史无权益快照但被判断为含权益的交易，逆向处理必须失败或进入人工处理，不按当前营销规则重算。
-5. 本次退款决策可以覆盖原快照默认退款策略，但必须来自业务层或审批链路，并保留决策来源、决策流水、规则版本和审计引用；资金底座不得自行推导“券能不能退”。
+1. `FundsInstruction` 可以携带 `benefitSnapshot`，无权益交易遵循空值语义。
+2. `RouteSnapshot` 应固化权益快照或等价摘要，否则权益退款、撤销、授权过期、清结算和对账需要回查原指令，不利于长期回放。
+3. 历史无权益快照但被判断为含权益的交易，逆向处理必须失败或进入人工处理，不按当前营销规则重算。
+4. 本次退款决策可以覆盖原快照默认退款策略，但必须来自业务层或审批链路，并保留决策来源、决策流水、规则版本和审计引用；资金底座不得自行推导“券能不能退”。
+5. 涉及公共契约、枚举、route snapshot、posting、表结构或夹具等级变更时，必须在工程任务中明确写入范围、禁止范围、测试矩阵和回归范围。
 
-Phase 与编码批次不是同一概念。Phase 描述权益能力从 DSL 承载到生产资金流的能力成熟度；B1、B3、B4、B6、B7 等批次描述 Harness/OpenSpec 的编码授权范围。进入任何编码批次前，都必须用 Execution Grant 把 Phase 能力、允许修改的公共契约、禁止修改的模块和测试矩阵绑定起来。
+权益快照消费能力边界：
 
-| 能力阶段 | 典型批次映射 | 可编码边界 | 不可越界 |
-| --- | --- | --- | --- |
-| Phase 1 契约承载 | B1-10 或等价 contract-only 批次。 | `FundsInstructionSpec`、权益 Spec、枚举、JSON 契约、空值兼容和 contract fixture。 | 不宣称 route、posting、清结算、对账和 replay 已消费权益。 |
-| Phase 2 route/posting 消费 | B3、B4、B6 中被明确授权的 route、transaction、ledger 批次。 | 选择权益快照不可变事实源；选择零实付表达、平台补贴表达和资金流夹具；生成独立 route leg、伴随指令或 posting；幂等摘要纳入权益稳定摘要；若选择独立伴随指令，必须声明主交易和伴随指令的原子性、幂等组、失败补偿和投影合并策略。 | 未选持久化落点、夹具级别、专业确认状态或伴随指令原子性策略时实现生产资金流；把核心字段长期塞进 `contextVariables`。 |
-| Phase 3 replay/清结算/对账/投影/归档消费 | B6、B7、B8 或 replay、清结算、对账、投影、归档、冷热读取、治理重放专项批次。 | 清分金额项、对账差错、归档重放和交易投影按原权益快照追溯；补齐退款分摊、历史无快照处理、补充权益事实模型、专业确认状态、审计证据包、伴随指令原子性消费、使用者解释视图、证据最小化和外部规则核验状态。 | 从当前营销规则、报表汇总、投影或归档结果反推历史权益事实；用 `CONTRACT_ONLY` 夹具声明 replay、清结算、对账、投影、归档、冷热读取或治理重放 Done；视图误导、证据越界或外部规则未核验仍自动放行。 |
-
-生产承接门禁：
-
-| 阶段 | 可声明完成 | 不可声明完成 |
+| 能力范围 | 可声明完成 | 不可声明完成 |
 | --- | --- | --- |
-| Phase 1 契约承载 | `FundsInstructionSpec` 可选携带 `benefitSnapshot`；无权益交易遵循空值语义；JSON、金额闭合、枚举和反序列化契约可测。 | route、posting、replay、清结算或对账已经完整消费权益快照。 |
-| Phase 2 route/posting 消费 | `POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 可生成独立资金路径或明确独立伴随指令；`NO_LEDGER` 不入账。 | 补贴、本金、手续费或代金券净额混记；缺资金来源仍放行。 |
-| Phase 3 replay/清结算/对账/投影/归档消费 | 原 route snapshot 或等价不可变事实能取回 `benefitSnapshotId`、`componentSn`、规则版本、退款策略、决策流水、专业确认状态、审计证据引用、解释视图引用和外部规则核验引用；replay、projection、settlement、reconciliation、archive、cold/hot read 或 governance replay 的资金流夹具按范围声明完成。 | 退款、撤销、授权过期、清结算重跑、对账差错、投影重放、归档读取或治理重放按当前营销规则重算，或缺核验规则仍自动放行。 |
-| 生产链路 Done | 交易事实、route snapshot、posting context、清分金额项、对账差错、交易投影、归档 Manifest 或治理重放差异报告都能追溯权益组件摘要、伴随指令组、补充事实链、脱敏审计证据引用、使用者解释视图和外部规则核验状态。 | 只有请求态对象或文档样例，没有不可变事实存储、幂等校验、逆向回放证据、伴随指令原子性证据、补充事实审计链、审计证据包、视图防误导、证据最小化或规则核验证据。 |
+| 契约承载 | `FundsInstructionSpec` 可选携带 `benefitSnapshot`；无权益交易遵循空值语义；JSON、金额闭合、枚举和反序列化契约可测。 | route、posting、replay、清结算或对账已经完整消费权益快照。 |
+| route/posting 消费 | `POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 可生成独立资金路径或明确独立伴随指令；`NO_LEDGER` 不入账。 | 补贴、本金、手续费或代金券净额混记；缺资金来源仍放行；未选持久化落点、夹具级别、专业确认状态或伴随指令原子性策略时声明生产资金流可用。 |
+| replay/清结算/对账/投影/归档消费 | 原 route snapshot 或等价不可变事实能取回 `benefitSnapshotId`、`componentSn`、规则版本、退款策略、决策流水、专业确认状态、审计证据引用、解释视图引用和外部规则核验引用；清分金额项、对账差错、交易投影、归档和治理重放按原权益快照追溯。 | 退款、撤销、授权过期、清结算重跑、对账差错、投影重放、归档读取或治理重放按当前营销规则重算；从报表汇总、投影或归档结果反推历史权益事实；缺核验规则仍自动放行。 |
+| 生产链路可用 | 交易事实、route snapshot、posting context、清分金额项、对账差错、交易投影、归档 Manifest 或治理重放差异报告都能追溯权益组件摘要、伴随指令组、补充事实链、脱敏审计证据引用、使用者解释视图和外部规则核验状态。 | 只有请求态对象或文档样例，没有不可变事实存储、幂等校验、逆向回放证据、伴随指令原子性证据、补充事实审计链、审计证据包、视图防误导、证据最小化或规则核验证据。 |
 
 Route、Posting 和 Replay 消费顺序：
 
 1. `RouteResolver` 先消费 `benefitSnapshot.components`，按 `ledgerEffect` 和 `fundingNature` 判断是否生成额外 leg、独立伴随指令或仅保存摘要。
-2. `RouteSnapshot` 必须固化权益快照或等价摘要；第一阶段可通过 `contextVariables` 过渡，但生产链路不得只依赖原请求回查。
+2. `RouteSnapshot` 必须固化权益快照或等价摘要；兼容期可通过 `contextVariables` 承载引用或摘要，但生产链路不得只依赖原请求回查。
 3. `LedgerPostingAssembler` 只消费 route leg 和组件账务效果，不理解营销规则；`NO_LEDGER` 不生成 posting，`POSTING_REQUIRED` 必须独立平衡。
 4. 后续退款、撤销、授权过期、拒付、清结算重跑和对账差错先读取原资金事实或原 route snapshot，再取得原权益快照和本次决策，不调用当前营销规则。
 5. `componentSn`、`benefitSnapshotId`、`ruleVersion`、`refundDecisionId` 和 `externalDecisionId` 应进入 route snapshot、posting context、清分金额项、对账差错和交易投影摘要中的至少一个可追溯位置。
@@ -907,19 +899,19 @@ Route、Posting 和 Replay 消费顺序：
 
 使用者解释视图也是 DSL 消费边界的一部分。用户账单、商户账单、运营时间线、财务对账视图和审计导出只能引用事实、快照、投影、证据摘要和外部 reference；不得把授权占用、冻结、待清算、出款受理、补充事实或专业确认状态展示成已完成资金结果。证据包、导出、日志和告警只允许保存最小必要信息；涉及税务、会计、合同、卡组织、银行、通道、KYC/KYB/AML、客户资金、跨境或外汇规则时，DSL 只能承载规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方和确认状态，未确认前不得作为自动资金处理依据。
 
-`contextVariables` 只允许作为 Phase 1 到 Phase 2 的短期迁移通道，且只能承载可追溯引用或稳定摘要，不承载完整资金规则。
+`contextVariables` 只允许作为兼容迁移通道，且只能承载可追溯引用或稳定摘要，不承载完整资金规则。
 
 | 字段类别 | 可否放入 `contextVariables` 过渡 | 说明 |
 | --- | --- | --- |
-| `benefitSnapshotId`、`stableDigest`、`benefitGroupSn` | 可以 | 用于临时追溯和幂等比对，进入 Phase 2 后应迁移到 route snapshot、交易事实快照或等价不可变存储。 |
+| `benefitSnapshotId`、`stableDigest`、`benefitGroupSn` | 可以 | 用于临时追溯和幂等比对，生产链路应迁移到 route snapshot、交易事实快照或等价不可变存储。 |
 | `componentSn` 列表、组件数量、组件摘要哈希 | 可以 | 只能作为摘要，不得替代组件金额、资金责任和退款策略的正式事实源。 |
 | `ruleVersion`、`refundDecisionId`、`externalDecisionId` | 可以 | 用于串联业务决策、审批流水和审计引用。 |
 | 组件金额、价格闭合、`ledgerEffect`、`fundingNature`、退款处置完整内容 | 不可以 | 属于核心权益资金语义，必须进入 `benefitSnapshot`、route snapshot、交易事实快照或等价不可变存储。 |
 | 当前营销规则、券包状态、券可用性判断 | 不可以 | 资金底座不重新计算或推进营销生命周期。 |
 
-阶段落点建议：
+模块落点建议：
 
-| 模块 | Phase 1 | Phase 2 | Phase 3 |
+| 模块 | 基础承载 | 资金流消费 | 治理和运营消费 |
 | --- | --- | --- | --- |
 | `FundsInstructionSpec` | 新增可选 `benefitSnapshot`。 | 保持契约稳定。 | 保持契约稳定，必要时扩展 schema version。 |
 | `RouteSnapshotSpec` | 可先通过摘要或 context 过渡。 | 增加可选 `benefitSnapshot` 或等价不可变摘要。 | 作为退款、撤销、过期、拒付和差错回放来源。 |
@@ -933,14 +925,14 @@ Route、Posting 和 Replay 消费顺序：
 | --- | --- | --- |
 | C01 | `Money` 是否允许 `userPayAmount=0`。 | 决定零实付订单是单指令表达，还是拆成补贴或代金券资金事实；未确认前不得声明零实付生产资金流完成。 |
 | C02 | 平台补贴作为同一资金指令额外 leg，还是独立伴随指令。 | 决定 route resolver、幂等键、交易投影粒度和逆向生命周期；未确认前只能保留 DSL 目标场景。 |
-| C03 | `RouteSnapshotSpec` 是否新增 `getBenefitSnapshot()`。 | 决定 replay 是否需要回查原指令，以及归档后如何回放；Phase 2 开始前必须选择 route snapshot、交易事实快照、独立权益快照表或等价不可变存储之一。 |
-| C04 | 平台补贴账户是否进入 `PlatformAccountsSnapshotSpec`。 | 当前可先用 `fundingSubjectRef` 或 `fundingAccountRole`，目标态需明确平台成本账户角色；未确认前不得把平台补贴与用户本金净额混记。 |
+| C03 | `RouteSnapshotSpec` 是否新增 `getBenefitSnapshot()`。 | 决定 replay 是否需要回查原指令，以及归档后如何回放；生产链路必须选择 route snapshot、交易事实快照、独立权益快照表或等价不可变存储之一。 |
+| C04 | 平台补贴账户是否进入 `PlatformAccountsSnapshotSpec`。 | 可使用 `fundingSubjectRef` 或 `fundingAccountRole` 表达引用，但生产账务口径必须明确平台成本账户角色；未确认前不得把平台补贴与用户本金净额混记。 |
 | C05 | 储值、礼品卡、预付代金券是否纳入当前一期。 | 决定是否需要负债账户、预收待付口径和财务确认；未确认前不得按普通平台券处理。 |
 | C06 | 退款分摊是否必须支持商品行。 | 决定是否需要 `pricingSnapshotSn` 和商品行权益明细；未确认前部分退款只能采用已明确的非商品行策略。 |
 | C07 | 历史无权益快照交易如何逆向处理。 | 决定迁移、人工处理和对账差错策略；未确认前默认失败或进入人工处理，不按当前营销规则重算。 |
 | C08 | 若选择独立伴随指令，主交易和伴随指令是否同事务、同业务组幂等或采用补偿模式。 | 决定部分成功状态、失败补偿、冲正、投影合并和审计解释；未确认前不得声明平台补贴独立伴随指令生产可用。 |
 | C09 | 专业确认在预检通过后、实际入账/退款/清结算/重放前被撤销、过期或范围变更时如何处理。 | 决定 TOCTOU 风险和阻断时机；未确认前必须在最终写入前重新校验确认状态。 |
-| C10 | 历史补充权益事实是否允许进入本阶段。 | 决定是否新增 supplemental benefit fact 或等价不可变存储、撤销关系、审计和重放校验；未确认前缺原快照只能失败、跳过或人工处理。 |
+| C10 | 历史补充权益事实是否允许进入当前工程范围。 | 决定是否新增 supplemental benefit fact 或等价不可变存储、撤销关系、审计和重放校验；未确认前缺原快照只能失败、跳过或人工处理。 |
 
 ### 7.3 Route DSL
 
@@ -1048,7 +1040,7 @@ Replay 语义边界：
 | --- | --- | --- |
 | `BalanceProjection` | `LedgerEntry`、检查点、水位、归档清单。 | 不读交易视图反推余额。 |
 | `TransactionView` | 资金交易事实、路径快照、账本分录摘要。 | 不写账，不修正余额。 |
-| 报表指标输入 | 指标项、业务问题、建议事实来源和口径引用。 | 只作为报表指标模块输入，不反向污染资金事实，不复用归档水位或重放 checkpoint。 |
+| 报表指标输入 | 指标项、业务问题、推荐事实来源和口径引用。 | 只作为报表指标模块输入，不反向污染资金事实，不复用归档水位或重放 checkpoint。 |
 
 ### 7.9 扩展与治理 DSL 边界
 
@@ -1057,7 +1049,7 @@ Replay 语义边界：
 | Spend Controls / 发卡授权控制扩展 | 作为授权前策略结果写入 `contextVariables`、规则版本和拒绝原因。 | 只决定授权是否可进入 `AUTHORIZE`，不生成 route、posting 或 entry；spend-rule window 不等同于账本周期。 |
 | 归档和余额重建 | 通过 `BalanceProjection`、检查点、水位、归档清单、差异报告和人工处理引用承接。 | 只校验、重算或重建投影；人工处理只能审批、补证据、缩小范围、重跑或关闭差异，不改变历史分录。 |
 | 交易投影重放 | 通过 `TransactionView`、重放范围、重放模式、差异报告和人工处理引用承接。 | 只修复只读视图；人工处理不能补写交易事实、账本事实或余额事实。 |
-| 报表指标输入 | 只保留指标项、业务问题、口径引用和建议事实来源。 | 指标采集、计算、调度、存储、展示、导出和订阅由报表指标模块实现，不进入资金主链路，不复用归档、重建或重放控制对象。 |
+| 报表指标输入 | 只保留指标项、业务问题、口径引用和推荐事实来源。 | 指标采集、计算、调度、存储、展示、导出和订阅由报表指标模块实现，不进入资金主链路，不复用归档、重建或重放控制对象。 |
 
 治理类 JSON 契约不是资金指令，不生成 `ResolvedRoute`、`PostingPlan` 或 `LedgerEntry`。它只用于让归档申请、资金归档 Manifest、余额检查点、交易投影重放任务、差异报告、人工处理引用和统一治理流程的状态映射可被测试解析。编码时不得把治理任务 JSON 误接到资金交易编排器，也不得用统一治理任务号替代资金归档 Manifest、余额水位或交易投影重放 checkpoint。
 
@@ -1129,7 +1121,7 @@ Replay 语义边界：
 
 ### 9.1.1 权益金额组件用例族
 
-权益金额组件用例族不替代直接交易、授权交易、清结算或对账主链路，而是给这些链路提供权益快照输入。编码任务拆分时，应先按 Phase 1 契约承载验证，再按 Phase 2 route/posting/replay 消费验证，最后按清结算和对账拆分验证。
+权益金额组件用例族不替代直接交易、授权交易、清结算或对账主链路，而是给这些链路提供权益快照输入。工程任务拆分时，应先验证契约承载，再验证 route/posting/replay 消费，最后验证清结算和对账消费。
 
 | 用例 | 资金交易结构 | 权益 DSL 重点 | 开发承接 | 测试承接 |
 | --- | --- | --- | --- | --- |
@@ -1306,7 +1298,7 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 | 出款失败回退 | 外部出款失败已确认。 | 从 `SETTLEMENT` 或 `IN_TRANSIT` 回退到原口径。 |
 | 对账差错调账 | 差错已审批、凭证已确认。 | 进入 `ADJUSTMENT` 或业务指定口径，必须可审计。 |
 
-清结算与对账的 DSL 交付口径是“产品对象与资金事实边界已定义”，不是“清结算和对账可编码”。进入编码前必须由独立 Execution Grant 明确哪些资金事实允许进入 DSL，哪些对象只停留在产品或系分层。特别是可清分明细、清分批次、清算候选、对账任务、对账匹配、放行矩阵、差错等级、工作台动作和报表导出都不是 route leg、posting plan 或 ledger phase。
+清结算与对账的 DSL 交付口径是“产品对象与资金事实边界已定义”，不是“清结算和对账已具备实现”。工程落地前必须明确哪些资金事实允许进入 DSL，哪些对象只停留在产品或系分层。特别是可清分明细、清分批次、清算候选、对账任务、对账匹配、放行矩阵、差错等级、工作台动作和报表导出都不是 route leg、posting plan 或 ledger phase。
 
 | B7 DSL 门禁 | 必须明确 |
 | --- | --- |
@@ -1325,7 +1317,7 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 3. 对账通过不生成账务；对账差异也不直接改账。只有补事实、冲正、调账或追偿等明确资金事实才生成 DSL 指令。
 4. 有条件放行只影响清结算流程准入，不表达资金转移；若放行后产生资金事实，仍必须由对应资金指令承接。
 5. `SETTLEMENT_LOCK` 作为清结算上下文下的资金事件，使用明确的 `eventType=SETTLEMENT_LOCK`、清结算上下文和结算操作类型区分，不得复用人工调账的审批、权限、报表或差错核销语义。
-6. 运营补事实命令必须由 Execution Grant 白名单授权。白名单至少写清命令名或等价事件、来源单据、审批号、证据引用、幂等键、原事实引用、操作者、原因和可撤销边界；未列入白名单的差错处理、人工复核、归档治理或报表动作只能形成处理单或差异报告，不得生成 `FundsInstruction`。
+6. 运营补事实命令必须由工程白名单授权。白名单至少写清命令名或等价事件、来源单据、审批号、证据引用、幂等键、原事实引用、操作者、原因和可撤销边界；未列入白名单的差错处理、人工复核、归档治理或报表动作只能形成处理单或差异报告，不得生成 `FundsInstruction`。
 7. 使用者解释视图、审计导出、告警和 Runbook 信号只能只读引用资金事实、清结算对象、差错对象、审批和脱敏证据引用；不得因解释字段缺失而默认放行，也不得把敏感证据原文作为普通 DSL 字段传播。
 
 ### 10.5 支付工具、绑定和资金来源
@@ -1413,7 +1405,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-BENEFIT-MERCHANT-DISCOUNT-001` | 商户优惠券不入账。 | `MERCHANT_DISCOUNT / NO_LEDGER / MERCHANT_BORNE`。 | 商户让利进入权益快照和清结算展示，不生成权益 posting。 | 商户让利生成 LedgerEntry、商户应收无法解释。 |
 | `DSL-BENEFIT-PLATFORM-SUBSIDY-001` | 平台补贴券补足商户。 | `PLATFORM_SUBSIDY / POSTING_REQUIRED / PLATFORM_OWN_FUNDS`。 | 补贴形成独立资金影响或独立伴随指令；本金和补贴拆分。 | 补贴与本金净额混记、缺平台资金来源、缺规则版本。 |
 | `DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001` | 平台券不补足商户。 | `PLATFORM_DISPLAY_DISCOUNT / NO_LEDGER / NO_FUNDS_TRANSFER`，平台券降低用户实付和商户应收。 | 不生成平台补贴 leg，不误生成平台补贴成本。 | 展示优惠被误当平台资金支出。 |
-| `DSL-BENEFIT-PREPAID-VOUCHER-001` | 储值、预付或礼品卡代金券。 | `VOUCHER_REDEEM / PREPAID_LIABILITY`。 | 按负债、预收待付或用户权益余额处理；专业口径未确认前不进入 P1 权益资金流生产 Done。 | 储值券按普通优惠券处理、缺负债口径仍入账。 |
+| `DSL-BENEFIT-PREPAID-VOUCHER-001` | 储值、预付或礼品卡代金券。 | `VOUCHER_REDEEM / PREPAID_LIABILITY`。 | 按负债、预收待付或用户权益余额处理；专业口径未确认前不进入权益资金流生产完成口径。 | 储值券按普通优惠券处理、缺负债口径仍入账。 |
 | `DSL-BENEFIT-AUTH-HOLD-001` | 授权时占券、完成时核销。 | `ledgerEffect=HOLD_ONLY`，携带 `holdId`。 | 授权阶段只固化权益占用，完成核销，撤销或过期释放。 | 授权拒绝核销权益、授权阶段进入商户清算。 |
 | `DSL-BENEFIT-REFUND-NO-COUPON-001` | 不退券但冲补贴。 | `NO_REFUND + REVERSE_SUBSIDY`。 | 用户侧不返券，资金侧冲回补贴或减少商户应收。 | 用一个布尔值混淆用户侧和资金侧处置。 |
 | `DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001` | 不退券且不冲补贴。 | `NO_REFUND + RETAIN_SUBSIDY`。 | 保留补贴成本或合同口径，必须有规则版本和专业确认。 | 未确认财务口径仍自动放行。 |
@@ -1432,7 +1424,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 
 ### 11.3 权益快照夹具场景示例
 
-本节是权益快照 DSL 场景示例的权威入口。以下示例可以按 `{caseId}.json` 迁移到 `tests/src/test/resources/dsl-contract-cases/`；B1/B1-10 可先落契约夹具，B3/B4/B6/B7/B8 涉及资金路径、账务、投影、清结算、对账或归档事实时必须升级为资金流夹具。正文示例只表达 DSL 契约、资金预期和验收预期，不表达 Controller 报文、数据库结构或运营页面字段。
+本节是权益快照 DSL 场景示例的权威入口。以下示例可以按 `{caseId}.json` 迁移到 `tests/src/test/resources/dsl-contract-cases/`；只做契约承载时可先落契约夹具，涉及资金路径、账务、投影、清结算、对账或归档事实时必须升级为资金流夹具。正文示例只表达 DSL 契约、资金预期和验收预期，不表达 Controller 报文、数据库结构或运营页面字段。
 
 #### 11.3.1 商户优惠券：不生成权益账务
 
@@ -2404,16 +2396,16 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 
 ### 11.4 夹具落地规则
 
-JSON 夹具分为契约夹具和资金流夹具，二者都应放入 `tests/src/test/resources/dsl-contract-cases/`。若某个批次尚未触碰测试资源，可以先在 Execution Grant 中声明“本批次不新增夹具”，但不得另起临时目录或只把夹具内容留在正文里。
+JSON 夹具分为契约夹具和资金流夹具，二者都应放入 `tests/src/test/resources/dsl-contract-cases/`。若某个工程范围尚未触碰测试资源，可以声明“本次不新增夹具”，但不得另起临时目录或只把夹具内容留在正文里。
 
-契约夹具用于 B1/B1-10 这类 DSL 承载批次，只证明 JSON 可解析、字段语义、枚举、金额闭合和 mustFail 条件，不声明 route、posting、replay、清结算或对账已经生产可用。契约夹具至少包含 `caseId`、`scenarioCode`、`acceptanceIds`、`tddIds`、`systemDesignRefs`、`instruction` 或治理对象，以及 `validation`。
+契约夹具只证明 JSON 可解析、字段语义、枚举、金额闭合和 mustFail 条件，不声明 route、posting、replay、清结算或对账已经生产可用。契约夹具至少包含 `caseId`、`scenarioCode`、`acceptanceIds`、`tddIds`、`systemDesignRefs`、`instruction` 或治理对象，以及 `validation`。
 
-资金流夹具用于 B3/B4/B6/B7/B8 等会产生或消费资金路径、账务、投影、清结算、对账或归档事实的批次。资金流夹具必须在契约字段之外补齐 `expectedRoute`、`expectedPosting`、`balanceAssertions`、`projectionAssertions` 或对应的治理断言。
+资金流夹具用于会产生或消费资金路径、账务、投影、清结算、对账或归档事实的测试。资金流夹具必须在契约字段之外补齐 `expectedRoute`、`expectedPosting`、`balanceAssertions`、`projectionAssertions` 或对应的治理断言。
 
 落地时必须满足：
 
 1. `caseId` 与 TDD 用例、产品验收和系分服务入口可互相反查。
-2. 每个有资金变化或消费既有资金事实的资金流夹具必须声明 `expectedRoute`、`expectedPosting` 和余额断言；B1 契约夹具可显式声明 `fixtureLevel=CONTRACT_ONLY`，并在 `validation` 中说明不覆盖资金路径。
+2. 每个有资金变化或消费既有资金事实的资金流夹具必须声明 `expectedRoute`、`expectedPosting` 和余额断言；契约夹具可显式声明 `fixtureLevel=CONTRACT_ONLY`，并在 `validation` 中说明不覆盖资金路径。
 3. 资金流失败场景必须显式声明 `expectedRouteCreated=false` 或 `shouldCreateRoute=false`，并证明无 route、posting、entry 副作用；`CONTRACT_ONLY` 夹具的 `mustFail` 只说明契约失败原因，不要求声明资金路径副作用。
 4. 治理类、归档类、指标类对象若进入资金流或治理执行夹具，必须声明不生成资金路径和账务分录；若只作为 `CONTRACT_ONLY` 样例，则只证明对象可解析和 validation 语义。
 5. 每个夹具文件名使用 `{caseId}.json`。契约夹具必须包含契约最小字段；资金流夹具必须额外包含 `expectedRoute`、`expectedPosting`、`balanceAssertions` 和必要的投影、对账或治理断言。
@@ -2423,12 +2415,12 @@ JSON 夹具分为契约夹具和资金流夹具，二者都应放入 `tests/src/
 
 | 场景 | 准入口径 |
 | --- | --- |
-| 新增 DSL caseId | 必须新增 `{caseId}.json`，或在 Execution Grant 中声明本批次只做设计、不进入可执行 DSL 夹具验收。 |
-| B1 契约夹具 | 可以只覆盖契约解析、字段语义、枚举和 validation，不得用于声明资金流、route/posting/replay、清结算、对账、投影、归档、冷热读取或治理重放通过。 |
+| 新增 DSL caseId | 必须新增 `{caseId}.json`，或声明本次只做设计、不进入可执行 DSL 夹具验收。 |
+| 契约夹具 | 可以只覆盖契约解析、字段语义、枚举和 validation，不得用于声明资金流、route/posting/replay、清结算、对账、投影、归档、冷热读取或治理重放通过。 |
 | 资金流夹具 | 一旦声明覆盖资金变化，必须补 expectedRoute、expectedPosting、balanceAssertions 和失败无副作用断言。 |
 | 修改已有 DSL caseId | 必须同步更新对应夹具、TDD 映射和产品验收族；不能只改正文描述。 |
 | 复用已有 DSL 样例 | 必须说明复用哪个样例、覆盖哪些 `AC-*` 和 `TDD-*`，以及未覆盖的差异。 |
-| 暂不新增夹具 | 只适用于文档评审或非 DSL 执行批次；不得用于声明该 caseId 已通过机器契约验收。 |
+| 暂不新增夹具 | 只适用于文档评审或非 DSL 执行范围；不得用于声明该 caseId 已通过机器契约验收。 |
 
 ## 十二、DSL 契约验收
 

@@ -154,7 +154,7 @@
   <text x="990" y="872" text-anchor="middle" class="node-title">观测审计</text>
   <text x="990" y="894" text-anchor="middle" class="node-sub">Metric / Trace / Audit / Alert</text>
   <rect x="1130" y="845" width="200" height="62" class="node red"/>
-  <text x="1230" y="872" text-anchor="middle" class="node-title">Execution Grant</text>
+  <text x="1230" y="872" text-anchor="middle" class="node-title">工程任务边界</text>
   <text x="1230" y="894" text-anchor="middle" class="node-sub">契约 / 枚举 / 表结构变更门禁</text>
 
   <path d="M 230 228 L 330 228" class="arrow-main"/>

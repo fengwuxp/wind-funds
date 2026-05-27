@@ -91,9 +91,9 @@
   <text x="760" y="684" text-anchor="middle" class="sub">只能追加事实，不能改历史</text>
 
   <rect x="980" y="610" width="280" height="94" class="box red"/>
-  <text x="1120" y="642" text-anchor="middle" class="label">编码准入</text>
-  <text x="1120" y="666" text-anchor="middle" class="sub">Execution Grant / 首批 Red</text>
-  <text x="1120" y="684" text-anchor="middle" class="sub">验证命令 / Not Done</text>
+  <text x="1120" y="642" text-anchor="middle" class="label">工程落地门禁</text>
+  <text x="1120" y="666" text-anchor="middle" class="sub">任务边界 / Red</text>
+  <text x="1120" y="684" text-anchor="middle" class="sub">验证命令 / 未覆盖范围</text>
 
   <path d="M 240 193 L 300 193" class="arrow"/>
   <path d="M 470 193 L 530 193" class="arrow"/>

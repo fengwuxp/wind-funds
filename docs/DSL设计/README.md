@@ -41,7 +41,7 @@ DSL 设计归属为产品到系分之间的领域承载层，不是产品 PRD，
 | DSL 作为承载层 | 用资金事实和契约对象连接 PRD、系分和 TDD，避免产品语义直接散落到实现细节。 | DSL 不直接定义 Controller 报文、数据库结构或外部协议原文。 |
 | 账本事实优先 | 余额、账单、交易投影和指标都从账本分录或不可变事实派生。 | 投影、日志、报表和治理结果不得反写资金事实。 |
 | route snapshot 固化路径 | 正向交易记录路由决策，逆向、退款、拒付、退费和清结算重跑优先沿用原快照。 | 缺少原事实或快照时只能进入差异、审批、补证据或阻断，不得临时重选路。 |
-| 机器契约分级 | 文档 caseId、契约夹具、资金流夹具和服务级测试分层声明证据等级。 | 文档样例不能直接替代测试资源、服务级测试或生产 Done 证据。 |
+| 机器契约分级 | 文档 caseId、契约夹具、资金流夹具和服务级测试分层声明证据等级。 | 文档样例不能直接替代测试资源、服务级测试或生产完成证据。 |
 | 敏感证据最小化 | 外部账户、支付工具、凭证、规则来源和审计证据只保存摘要、脱敏值或引用。 | DSL 示例不得保存完整卡号、CVV、密钥、证件、token secret 或敏感原文。 |
 
 ## 场景落地口径
@@ -94,7 +94,7 @@ DSL 评审口径：DSL 入口必须承接 PRD 的业务目标和资金语义，�
 | --- | --- | --- | --- | --- |
 | 稳定口径 | DSL 只描述资金事实、指令、route、posting、entry、projection 和审计引用，不描述任务过程。 | 系分只按 DSL 不变量设计服务、状态、表和观测。 | TDD 只从稳定 caseId、字段语义和失败边界生成用例。 | DSL caseId 只是说明文字，无法落到测试输入或断言。 |
 | 可解释、可核对、可重建 | 每笔资金事实必须有主体、金额、币种、账目、业务引用、规则来源和审计引用。 | 交易、路由、账本、投影、对账和治理分层承接。 | 测试同时断言状态、route snapshot、posting plan、ledger entry、projection、幂等和审计。 | 只有交易状态或错误码，无法证明金额来源和资金路径。 |
-| P0 统一内核 | 钱包、账本、账目、余额投影、对账、清结算和归档使用统一资金事实与账务对象。 | 02、03、04 分册分别落账户账本、对账清算对象和治理对象。 | P0 首批 Red 优先证明账户、账目、余额桶、对账差错、归档水位和只读边界。 | P2 业务在 DSL 中定义平行钱包、账本、清结算、对账或归档对象。 |
+| P0 统一内核 | 钱包、账本、账目、余额投影、对账、清结算和归档使用统一资金事实与账务对象。 | 02、03、04 分册分别落账户账本、对账清算对象和治理对象。 | P0 Red 优先证明账户、账目、余额桶、对账差错、归档水位和只读边界。 | P2 业务在 DSL 中定义平行钱包、账本、清结算、对账或归档对象。 |
 | P1 交易入口 | 直接交易、授权交易、余额控制、交易投影通过 instruction/event/route/posting 组合表达。 | 02 分册落服务入口、状态机、表设计、投影和 route replay。 | TDD 覆盖直接交易、授权完成/撤销/过期、冻结解冻、退款拒付、重复请求和余额不足。 | 授权拒绝生成 route/entry，冻结表达消费，逆向不按原 route snapshot 回放。 |
 | P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账只传入归一业务事实、外部引用、状态映射和待确认规则。 | 业务能力包通过准入卡接入统一资金内核，不改变 P0/P1 边界。 | TDD 覆盖业务状态映射、乱序重复、外部引用脱敏、规则待确认和 P0/P1 回归。 | 业务轨道协议、外部账户、卡组织/银行原始规则或敏感原文沉入资金内核。 |
 | 清结算与对账 | 对账差异、清分、清算、结算、出款和追偿必须保留批次、来源事实、规则和处理证据。 | 03 分册落对象状态机、服务 API、表设计、审批审计和补偿策略。 | `CLS-GATE-*`、`TDD-B7-RED-*`、服务级 H2 流程、并发重跑和失败无副作用测试。 | 对账差异直接改账，出款绕过结算锁定或外部规则核验。 |
@@ -132,11 +132,11 @@ DSL 文档中的结构、表格和 JSON 示例只有在进入测试资源、被�
 | 在 `tests/src/test/resources/dsl-contract-cases/` 落契约夹具并被测试读取 | DSL 契约具备可执行验收入口。 | 已覆盖资金流、route/posting/replay、清结算、对账、投影、归档、冷热读取或治理重放，除非夹具显式包含资金流断言并同步覆盖对应 AC/TDD/RED。 |
 | 在 `tests/src/test/resources/dsl-contract-cases/` 落资金流夹具并被测试读取 | 夹具覆盖范围内的 route、posting、余额、投影或治理断言具备可执行验收入口。 | 已覆盖所有生产路径，除非同步覆盖该路径对应的 AC/TDD/RED、失败无副作用和残余风险。 |
 | 复用已有 DSL 样例 | 复用范围内的语义可作为局部证据。 | 未覆盖差异自动视为已验证。 |
-| 本批次不触碰 DSL 测试资源 | 可以作为文档评审结论。 | 新增 caseId 已具备生产契约通过证据。 |
+| 工程任务范围不触碰 DSL 测试资源 | 可以作为文档评审结论。 | 新增 caseId 已具备生产契约通过证据。 |
 
 ### DSL caseId 执行化盘点
 
-进入编码前，所有本批次新增、修改或用于验收声明的 `DSL-*` caseId 都必须做执行化盘点。盘点表不要求一次覆盖全部历史 caseId，但必须覆盖 Execution Grant 声明的目标范围和所有被交付说明引用的 caseId。
+工程落地前，所有新增、修改或用于验收声明的 `DSL-*` caseId 都必须做执行化盘点。盘点表不要求一次覆盖全部历史 caseId，但必须覆盖工程任务声明的目标范围和所有被交付说明引用的 caseId。
 
 | 盘点字段 | 填写要求 |
 | --- | --- |
@@ -144,7 +144,7 @@ DSL 文档中的结构、表格和 JSON 示例只有在进入测试资源、被�
 | `acceptanceId` | 对应 PRD 的 `AC-*`、`RED-*` 或业务红线编号；无 PRD 验收时只能声明设计补充。 |
 | `fixturePath` | 对应 `tests/src/test/resources/dsl-contract-cases/` 下的 JSON 或 YAML 夹具路径；没有夹具时填写 `NONE`。 |
 | `fixtureLevel` | 使用 `DOC_ONLY`、`CONTRACT_ONLY`、`FUNDS_FLOW`、`SERVICE_FLOW` 或 `GOVERNANCE_FLOW` 分级。 |
-| `targetTestClass` | 读取该 fixture 或承接该 caseId 的目标测试类；尚未落测试时填写目标类名和 Not Done。 |
+| `targetTestClass` | 读取该 fixture 或承接该 caseId 的目标测试类；尚未落测试时填写目标类名和未覆盖说明。 |
 | `coreAssertions` | 必须列出状态、route snapshot、posting plan、ledger entry、余额投影、交易投影、幂等、审计、失败无副作用或治理只读边界中的适用项。 |
 | `notDone` | 未覆盖资金流、服务流、DDL/H2、外部规则、敏感数据、并发、人工处理或生产 NFR 时必须显式写明。 |
 
@@ -152,36 +152,35 @@ DSL 文档中的结构、表格和 JSON 示例只有在进入测试资源、被�
 
 | 级别 | 含义 | 可声明 | 不可声明 |
 | --- | --- | --- | --- |
-| `DOC_ONLY` | 只在 DSL 或 PRD 文档中定义。 | 语义已进入设计基线，可进入系分或 TDD 拆解。 | 机器契约通过、资金流已验证或生产 Done。 |
+| `DOC_ONLY` | 只在 DSL 或 PRD 文档中定义。 | 语义已进入设计基线，可进入系分或 TDD 拆解。 | 机器契约通过、资金流已验证或生产完成。 |
 | `CONTRACT_ONLY` | 有测试资源，且测试只验证字段结构、枚举、必填或兼容。 | 契约结构可执行。 | route、posting、余额、投影、清结算、对账、归档或治理已验证。 |
 | `FUNDS_FLOW` | fixture 被资金主链路测试读取，并断言 route、posting、entry、余额和幂等中的适用项。 | 夹具覆盖范围内的资金流证据成立。 | 清结算、对账、治理或所有生产路径自动成立。 |
 | `SERVICE_FLOW` | fixture 或等价数据被服务级 H2 流程读取，并覆盖状态机、持久化、查询和失败无副作用。 | 夹具覆盖范围内的服务级行为可作为生产交付证据之一。 | 未覆盖的外部规则、容量、并发、审计和 NFR 自动成立。 |
 | `GOVERNANCE_FLOW` | fixture 被归档、重放、差异报告、人工处理或指标水位隔离测试读取。 | 治理边界内的只读、dry-run/apply、checkpoint 或差异处理证据成立。 | 治理任务可以反写资金事实，或替代账本余额确认。 |
 
-本批次交付说明引用 DSL 证据时，必须同步列出 `dslCaseId -> fixturePath -> targetTestClass -> coreAssertions -> notDone`。未完成盘点时，DSL 只能作为设计依据，不能作为机器契约或生产交付证据。
+交付说明引用 DSL 证据时，必须同步列出 `dslCaseId -> fixturePath -> targetTestClass -> coreAssertions -> notDone`。未完成盘点时，DSL 只能作为设计依据，不能作为机器契约或生产交付证据。
 
-执行化盘点可以直接使用下列表格作为 Execution Grant 附件：
+执行化盘点使用下列表头作为工程任务附件：
 
 | dslCaseId | acceptanceId | fixturePath | fixtureLevel | targetTestClass | coreAssertions | notDone |
 | --- | --- | --- | --- | --- | --- | --- |
-| 待填写 | 待填写 | `NONE` 或测试资源路径 | `DOC_ONLY` / `CONTRACT_ONLY` / `FUNDS_FLOW` / `SERVICE_FLOW` / `GOVERNANCE_FLOW` | 待填写 | 状态、route、posting、entry、projection、幂等、审计、无副作用中的适用项 | 未覆盖范围和原因 |
 
 盘点完成后再做三项复核：
 
 1. `fixtureLevel` 是否与可声明结论一致，不能用低等级 fixture 支撑高等级交付结论。
 2. `targetTestClass` 是否真的读取该 fixture 或等价数据，不能只在测试名中引用 caseId。
-3. `coreAssertions` 是否覆盖本批次资金变化的最小证据；缺 route、posting、entry、projection、幂等或审计时，必须在 `notDone` 中说明。
+3. `coreAssertions` 是否覆盖目标资金变化的最小证据；缺 route、posting、entry、projection、幂等或审计时，必须在 `notDone` 中说明。
 
-### A0 DSL 基线核验清单
+### DSL 基线核验清单
 
-A0 阶段的 DSL 核验只确认 caseId、字段语义、fixture 等级和可测断言是否足以进入 TDD 分析，不新增测试资源、不修改公共契约、不补生产字段。发现 DSL 不能承接资金事实时，应先回到 PRD 或 DSL 设计补语义，再申请编码授权。
+DSL 基线核验只确认 caseId、字段语义、fixture 等级和可测断言是否足以进入 TDD 分析，不新增测试资源、不修改公共契约、不补生产字段。发现 DSL 不能承接资金事实时，应先回到 PRD 或 DSL 设计补语义，再进入工程落地评审。
 
 | 核验项 | 必须确认 | 未闭合时处理 |
 | --- | --- | --- |
-| caseId 归属 | 本批引用的 `DSL-*` 都能反查 PRD 验收、系分入口和 TDD 用例。 | 标为 `DOC_ONLY`，不得声明机器契约通过。 |
+| caseId 归属 | 交付引用的 `DSL-*` 都能反查 PRD 验收、系分入口和 TDD 用例。 | 标为 `DOC_ONLY`，不得声明机器契约通过。 |
 | 事实字段 | `instructionType`、`eventType`、`transactionType`、`businessScene`、主体、金额、币种和业务引用稳定。 | 回到 DSL 设计补字段语义或拆分场景。 |
 | 路由和账务 | route snapshot、posting plan、LedgerEntry、余额投影和交易投影的适用断言清楚。 | 不得进入资金流实现；只能作为设计输入。 |
-| fixture 等级 | `DOC_ONLY`、`CONTRACT_ONLY`、`FUNDS_FLOW`、`SERVICE_FLOW`、`GOVERNANCE_FLOW` 与可声明结论一致。 | 降级交付结论，或在 Execution Grant 中补测试资源写入范围。 |
-| 失败边界 | 拒绝、余额不足、错币种、缺快照、权限不足、规则待确认和重复请求的无副作用语义明确。 | 补 must-fail case 或写明 Not Done。 |
-| 敏感和外部证据 | 外部账户、支付工具、规则来源、凭证和审计证据只保留摘要、脱敏值或引用。 | 清理敏感示例；缺规则状态时不得作为生产 Done 证据。 |
+| fixture 等级 | `DOC_ONLY`、`CONTRACT_ONLY`、`FUNDS_FLOW`、`SERVICE_FLOW`、`GOVERNANCE_FLOW` 与可声明结论一致。 | 降级交付结论，或在工程任务中补测试资源写入范围。 |
+| 失败边界 | 拒绝、余额不足、错币种、缺快照、权限不足、规则待确认和重复请求的无副作用语义明确。 | 补 must-fail case 或写明未覆盖范围。 |
+| 敏感和外部证据 | 外部账户、支付工具、规则来源、凭证和审计证据只保留摘要、脱敏值或引用。 | 清理敏感示例；缺规则状态时不得作为生产完成证据。 |
 | 测试承接 | `targetTestClass`、核心断言和验证命令能定位；未落测试时 `notDone` 明确。 | 只能进入 TDD 分析或契约草案，不能进入生产交付结论。 |
