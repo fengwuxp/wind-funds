@@ -1,5 +1,6 @@
 package com.wind.integration.funds.model.route;
 
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.integration.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import lombok.Builder;
@@ -34,7 +35,7 @@ public record ImmutablePaymentInstrumentRefSpec(String instrumentId,
             throw new IllegalArgumentException(
                     "bindingSnapshot must not contain sensitive payment instrument fields");
         }
-        bindingSnapshot = Map.copyOf(bindingSnapshot == null ? Map.of() : bindingSnapshot);
+        bindingSnapshot = FundsContextVariables.immutableCopy(bindingSnapshot);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.wind.integration.funds.model.transaction;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
@@ -39,7 +40,7 @@ public record ImmutableFundsInstructionReferenceSpec(FundsInstructionReferenceTy
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
                         || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables),
                 "fundsInstruction.reference.contextVariables must not contain sensitive fields");
-        contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+        contextVariables = FundsContextVariables.immutableCopy(contextVariables);
     }
 
     @Override

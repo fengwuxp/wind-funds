@@ -26,6 +26,7 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -311,6 +312,50 @@ class PaymentInstrumentRouteDslContractTests {
 
         assertThat(externalAccountRef.getContextVariables())
                 .containsEntry("processorPayload", Map.of("networkReference", "FT2026052714000062"));
+    }
+
+    /**
+     * 场景：调用方在支付工具快照构造后继续改写原始嵌套绑定上下文。
+     * 预期：已构造的支付工具快照保持稳定，不被追加的卡敏感字段污染。
+     * 红线：bindingSnapshot 会进入 route snapshot、日志和报表，不能因浅拷贝绕过构造期敏感字段校验。
+     */
+    @Test
+    void testPaymentInstrumentSnapshotShouldDefensivelyCopyNestedBindingSnapshot() {
+        Map<String, Object> processorPayload = new HashMap<>();
+        processorPayload.put("networkReference", "tok_card_005");
+        PaymentInstrumentRefSpec instrumentRef = paymentInstrumentRef("PI-IMMUTABLE",
+                "tok_card_005",
+                Map.of("processorPayload", processorPayload));
+
+        processorPayload.put("pan", "4242424242424242");
+
+        Object payloadValue = instrumentRef.getBindingSnapshot().get("processorPayload");
+        assertThat(payloadValue).isInstanceOf(Map.class);
+        Map<?, ?> payload = (Map<?, ?>) payloadValue;
+        assertThat(payload.get("networkReference")).isEqualTo("tok_card_005");
+        assertThat(payload.containsKey("pan")).isFalse();
+    }
+
+    /**
+     * 场景：调用方在外部账户快照构造后继续改写原始嵌套上下文。
+     * 预期：已构造的外部账户快照保持稳定，不被追加的账户原文污染。
+     * 红线：外部账户快照不能因浅拷贝让银行账号原文进入普通 route 上下文。
+     */
+    @Test
+    void testExternalAccountSnapshotShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> processorPayload = new HashMap<>();
+        processorPayload.put("networkReference", "token:external-account-004");
+        ExternalAccountRefSpec externalAccountRef = externalAccountRef("EA-IMMUTABLE",
+                "token:external-account-004",
+                Map.of("processorPayload", processorPayload));
+
+        processorPayload.put("accountNumber", "1234567890123456");
+
+        Object payloadValue = externalAccountRef.getContextVariables().get("processorPayload");
+        assertThat(payloadValue).isInstanceOf(Map.class);
+        Map<?, ?> payload = (Map<?, ?>) payloadValue;
+        assertThat(payload.get("networkReference")).isEqualTo("token:external-account-004");
+        assertThat(payload.containsKey("accountNumber")).isFalse();
     }
 
     private RouteLegSpec routeLeg(SubjectRef payer, SubjectRef payee) {

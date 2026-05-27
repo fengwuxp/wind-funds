@@ -1,5 +1,6 @@
 package com.wind.integration.funds.model.route;
 
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import lombok.Builder;
@@ -32,7 +33,7 @@ public record ImmutableExternalAccountRefSpec(String externalAccountId,
         if (ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables)) {
             throw new IllegalArgumentException("contextVariables must not contain sensitive external account fields");
         }
-        contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+        contextVariables = FundsContextVariables.immutableCopy(contextVariables);
     }
 
     @Override

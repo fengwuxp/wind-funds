@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -199,7 +200,33 @@ class FundsInstructionDslContractTests {
                 .hasMessageContaining("fundsInstruction.contextVariables must not contain sensitive fields");
     }
 
+    /**
+     * 场景：调用方在构造资金指令后继续改写原始嵌套上下文。
+     * 预期：已构造的资金指令上下文保持稳定，不被追加的敏感字段污染。
+     * 红线：资金指令是交易事实入口，不能因浅拷贝让后续可变对象绕过构造期敏感字段校验。
+     */
+    @Test
+    void testFundsInstructionShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> processorPayload = new HashMap<>();
+        processorPayload.put("networkReference", "FT2026052714000062");
+        FundsInstructionSpec instruction = validInstruction(externalTransactionReference(),
+                Map.of("processorPayload", processorPayload));
+
+        processorPayload.put("secretKey", "secret-value");
+
+        Object payloadValue = instruction.getContextVariables().get("processorPayload");
+        assertThat(payloadValue).isInstanceOf(Map.class);
+        Map<?, ?> payload = (Map<?, ?>) payloadValue;
+        assertThat(payload.get("networkReference")).isEqualTo("FT2026052714000062");
+        assertThat(payload.containsKey("secretKey")).isFalse();
+    }
+
     private FundsInstructionSpec validInstruction(FundsInstructionReferenceSpec reference) {
+        return validInstruction(reference, Map.of("dslCase", "B1-02"));
+    }
+
+    private FundsInstructionSpec validInstruction(FundsInstructionReferenceSpec reference,
+                                                  Map<String, Object> contextVariables) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -219,7 +246,7 @@ class FundsInstructionDslContractTests {
                         .appName("wind-funds-tests")
                         .contextVariables(Map.of())
                         .build())
-                .contextVariables(Map.of("dslCase", "B1-02"))
+                .contextVariables(contextVariables)
                 .build();
     }
 

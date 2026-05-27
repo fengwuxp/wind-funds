@@ -1,5 +1,6 @@
 package com.wind.integration.funds.model.transaction;
 
+import com.wind.integration.funds.model.FundsContextVariables;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
@@ -53,7 +54,7 @@ final class FundsBenefitSpecValidators {
     }
 
     static Map<String, Object> immutableContext(Map<String, Object> contextVariables, String owner) {
-        Map<String, Object> copied = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+        Map<String, Object> copied = FundsContextVariables.immutableCopy(contextVariables);
         for (String key : copied.keySet()) {
             if (RESERVED_CONTEXT_KEYS.contains(key)) {
                 throw new IllegalArgumentException(owner + ".contextVariables must not contain core benefit field: " + key);

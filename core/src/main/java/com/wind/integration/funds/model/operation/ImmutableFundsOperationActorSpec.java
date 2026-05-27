@@ -1,6 +1,7 @@
 package com.wind.integration.funds.model.operation;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.integration.funds.operation.FundsOperationActorSpec;
 import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
@@ -28,7 +29,7 @@ public record ImmutableFundsOperationActorSpec(Long operatorId,
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
                         || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables),
                 "fundsOperationActor.contextVariables must not contain sensitive fields");
-        contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+        contextVariables = FundsContextVariables.immutableCopy(contextVariables);
     }
 
     @Override

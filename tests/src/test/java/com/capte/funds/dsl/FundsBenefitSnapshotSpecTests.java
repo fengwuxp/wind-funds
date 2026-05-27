@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -298,6 +299,33 @@ class FundsBenefitSnapshotSpecTests {
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("contextVariables must not contain core benefit field");
+    }
+
+    /**
+     * 场景：调用方在权益快照构造后继续改写原始嵌套上下文。
+     * 预期：已构造的权益快照保持稳定，不被追加的实时营销规则污染。
+     * 红线：权益 DSL 快照不能因浅拷贝把当前规则、券包或重算结果带入资金事实。
+     */
+    @Test
+    void testBenefitSnapshotShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> pricingTrace = new HashMap<>();
+        pricingTrace.put("decisionId", "pricing-decision-immutable-001");
+        FundsBenefitSnapshotSpec snapshot = ImmutableFundsBenefitSnapshotSpec.builder()
+                .benefitSnapshotId("BS-IMMUTABLE-001")
+                .benefitGroupSn("BG-IMMUTABLE-001")
+                .orderAmount(money(10000L))
+                .userPayAmount(money(8000L))
+                .components(List.of(merchantDiscountComponent("BC-IMMUTABLE-001", 2000L)))
+                .contextVariables(Map.of("pricingTrace", pricingTrace))
+                .build();
+
+        pricingTrace.put("currentMarketingRule", "discount-now");
+
+        Object traceValue = snapshot.getContextVariables().get("pricingTrace");
+        assertThat(traceValue).isInstanceOf(Map.class);
+        Map<?, ?> trace = (Map<?, ?>) traceValue;
+        assertThat(trace.get("decisionId")).isEqualTo("pricing-decision-immutable-001");
+        assertThat(trace.containsKey("currentMarketingRule")).isFalse();
     }
 
     /**

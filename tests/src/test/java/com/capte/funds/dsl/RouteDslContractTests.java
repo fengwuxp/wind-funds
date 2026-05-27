@@ -30,6 +30,7 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -142,6 +143,26 @@ class RouteDslContractTests {
         assertThatThrownBy(() -> routeParticipant(
                 Map.of("externalAccount", Map.of("bankAccountNo", "123456789012"))))
                 .hasMessageContaining("routeParticipant.contextVariables must not contain sensitive fields");
+    }
+
+    /**
+     * 场景：调用方在 route participant 构造后继续改写原始嵌套上下文。
+     * 预期：已构造的路由参与方上下文保持稳定，不被追加的外部账户原文污染。
+     * 红线：route snapshot 会进入交易事实和归档重放，不能因浅拷贝绕过敏感字段校验。
+     */
+    @Test
+    void testRouteDslShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> externalAccount = new HashMap<>();
+        externalAccount.put("accountToken", "token:external-account-001");
+        RouteParticipantSpec participant = routeParticipant(Map.of("externalAccount", externalAccount));
+
+        externalAccount.put("bankAccountNo", "123456789012");
+
+        Object accountValue = participant.getContextVariables().get("externalAccount");
+        assertThat(accountValue).isInstanceOf(Map.class);
+        Map<?, ?> account = (Map<?, ?>) accountValue;
+        assertThat(account.get("accountToken")).isEqualTo("token:external-account-001");
+        assertThat(account.containsKey("bankAccountNo")).isFalse();
     }
 
     private ReplayRequestSpec replayRequest(String referenceSnapshotId, RouteReplayType replayType) {
