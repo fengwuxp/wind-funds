@@ -315,6 +315,44 @@ class FundsBenefitSnapshotSpecTests {
     }
 
     /**
+     * 场景：调用方把当前营销规则藏入嵌套权益上下文。
+     * 预期：模型构造阶段递归识别并失败。
+     * 红线：实时权益规则不能通过嵌套 contextVariables 绕过资金 DSL 一等字段边界。
+     */
+    @Test
+    void testBenefitContextShouldRejectNestedCurrentMarketingRuleInputs() {
+        assertThatThrownBy(() -> ImmutableFundsBenefitReferenceSpec.builder()
+                .campaignId("campaign-nested-001")
+                .couponId("coupon-nested-001")
+                .writeOffId("write-off-nested-001")
+                .ruleVersion("rule-v1")
+                .contextVariables(Map.of("decisionTrace",
+                        Map.of("currentMarketingRule", "discount-now")))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables must not contain core benefit field: currentMarketingRule");
+    }
+
+    /**
+     * 场景：调用方把实时券包信息藏入权益上下文数组。
+     * 预期：模型构造阶段递归识别并失败。
+     * 红线：集合或数组不能成为权益核心规则字段的旁路。
+     */
+    @Test
+    void testBenefitContextShouldRejectReservedFieldsInsideArrayValues() {
+        assertThatThrownBy(() -> ImmutableFundsBenefitReferenceSpec.builder()
+                .campaignId("campaign-array-001")
+                .couponId("coupon-array-001")
+                .writeOffId("write-off-array-001")
+                .ruleVersion("rule-v1")
+                .contextVariables(Map.of("decisionTraces",
+                        new Object[] {Map.of("userCouponBag", "coupon-bag-now")}))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables must not contain core benefit field: userCouponBag");
+    }
+
+    /**
      * 场景：调用方在权益快照构造后继续改写原始嵌套上下文。
      * 预期：已构造的权益快照保持稳定，不被追加的实时营销规则污染。
      * 红线：权益 DSL 快照不能因浅拷贝把当前规则、券包或重算结果带入资金事实。

@@ -4,6 +4,7 @@ import com.wind.integration.funds.model.FundsContextVariables;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
+import java.lang.reflect.Array;
 import java.util.Map;
 import java.util.Set;
 
@@ -55,11 +56,32 @@ final class FundsBenefitSpecValidators {
 
     static Map<String, Object> immutableContext(Map<String, Object> contextVariables, String owner) {
         Map<String, Object> copied = FundsContextVariables.immutableCopy(contextVariables);
-        for (String key : copied.keySet()) {
-            if (RESERVED_CONTEXT_KEYS.contains(key)) {
-                throw new IllegalArgumentException(owner + ".contextVariables must not contain core benefit field: " + key);
+        rejectReservedContextKeys(copied, owner);
+        return copied;
+    }
+
+    private static void rejectReservedContextKeys(@Nullable Object value, String owner) {
+        if (value instanceof Map<?, ?> values) {
+            for (Map.Entry<?, ?> entry : values.entrySet()) {
+                if (entry.getKey() instanceof String key && RESERVED_CONTEXT_KEYS.contains(key)) {
+                    throw new IllegalArgumentException(
+                            owner + ".contextVariables must not contain core benefit field: " + key);
+                }
+                rejectReservedContextKeys(entry.getValue(), owner);
+            }
+            return;
+        }
+        if (value instanceof Iterable<?> values) {
+            for (Object item : values) {
+                rejectReservedContextKeys(item, owner);
+            }
+            return;
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            for (int index = 0; index < length; index++) {
+                rejectReservedContextKeys(Array.get(value, index), owner);
             }
         }
-        return copied;
     }
 }
