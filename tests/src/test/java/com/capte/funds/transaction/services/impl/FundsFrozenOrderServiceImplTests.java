@@ -36,6 +36,12 @@ class FundsFrozenOrderServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String BUSINESS_SN = "FROZEN_ORDER_SERVICE_SENSITIVE";
 
+    private static final String UNQUOTED_PAYMENT_CONTEXT_VARIABLES =
+            "{processorPayload:{secretKey:\"secret-value\"";
+
+    private static final String UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES =
+            "{externalAccount:{bankAccountNo:\"123456789012\"";
+
     @Autowired
     private FundsFrozenOrderService fundsFrozenOrderService;
 
@@ -44,7 +50,7 @@ class FundsFrozenOrderServiceImplTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：运营手工创建冻结单时把外部账户号或通道密钥放入扩展上下文。
-     * 输入：contextVariables 含嵌套 bankAccountNo 字段，或嵌套 secretKey 字段。
+     * 输入：contextVariables 含嵌套敏感字段，或坏 JSON 未加引号敏感字段名。
      * 输出：创建被拒绝，不留下冻结单、账本或账务事实。
      * 红线：冻结单管理对象不得成为外部账户号、PAN、CVV 或 token secret 的旁路存储。
      */
@@ -57,6 +63,12 @@ class FundsFrozenOrderServiceImplTests extends AbstractFundsServiceTest {
                 .hasMessageContaining("contextVariables must not contain sensitive funds frozen order fields");
         assertThatThrownBy(() -> fundsFrozenOrderService.createFundsFrozenOrder(createFrozenOrderRequest()
                 .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive funds frozen order fields");
+        assertThatThrownBy(() -> fundsFrozenOrderService.createFundsFrozenOrder(createFrozenOrderRequest()
+                .setContextVariables(UNQUOTED_PAYMENT_CONTEXT_VARIABLES)))
+                .hasMessageContaining("contextVariables must not contain sensitive funds frozen order fields");
+        assertThatThrownBy(() -> fundsFrozenOrderService.createFundsFrozenOrder(createFrozenOrderRequest()
+                .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive funds frozen order fields");
 
         assertThat(countFrozenOrders()).isZero();
