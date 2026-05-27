@@ -56,6 +56,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String RAW_PAYMENT_INSTRUMENT_SN = "pi_service_raw_card";
 
+    private static final String SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN = "pi_service_sensitive_context_card";
+
     private static final String INVALID_WINDOW_PAYMENT_INSTRUMENT_SN = "pi_service_invalid_window_card";
 
     private static final String SUSPENDED_PAYMENT_INSTRUMENT_SN = "pi_service_suspended_card";
@@ -150,6 +152,25 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .hasMessageContaining("instrumentNo must be masked or token reference");
 
         assertThat(countRows("t_payment_instrument", "sn", RAW_PAYMENT_INSTRUMENT_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：运营创建支付工具时把通道 token secret 放入扩展上下文。
+     * 输入：contextVariables 中包含嵌套 secretKey 字段。
+     * 输出：创建被拒绝，不留下支付工具引用或账本事实。
+     * 红线：token secret、密钥和 CVV 不得进入支付工具普通快照、日志、导出或报表。
+     */
+    @Test
+    void testCreatePaymentInstrumentShouldRejectSensitiveContextVariables() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
+                .setSn(SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN)
+                .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
+
+        assertThat(countRows("t_payment_instrument", "sn", SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -806,9 +827,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 DUPLICATE_DEFAULT_BINDING_SN,
                 PRIORITY_CONFLICT_BINDING_SN,
                 PRIORITY_ORDER_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
                 RAW_PAYMENT_INSTRUMENT_SN,
+                SENSITIVE_CONTEXT_PAYMENT_INSTRUMENT_SN,
                 INVALID_WINDOW_PAYMENT_INSTRUMENT_SN,
                 SUSPENDED_PAYMENT_INSTRUMENT_SN,
                 RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN);

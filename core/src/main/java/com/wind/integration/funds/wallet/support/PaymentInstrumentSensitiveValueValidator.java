@@ -1,5 +1,7 @@
 package com.wind.integration.funds.wallet.support;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
@@ -53,6 +55,23 @@ public final class PaymentInstrumentSensitiveValueValidator {
      */
     public static boolean containsSensitiveBindingSnapshotField(@Nullable Map<String, Object> bindingSnapshot) {
         return containsSensitiveField(bindingSnapshot);
+    }
+
+    /**
+     * 判断扩展上下文 JSON 中是否包含敏感支付工具字段。
+     *
+     * @param contextVariables 扩展上下文 JSON
+     * @return true 表示上下文字段名形似 CVV、token secret 或密钥
+     */
+    public static boolean containsSensitiveContextVariables(@Nullable String contextVariables) {
+        if (!StringUtils.hasText(contextVariables)) {
+            return false;
+        }
+        try {
+            return containsSensitiveField(JSON.parse(contextVariables));
+        } catch (JSONException ignored) {
+            return false;
+        }
     }
 
     private static boolean containsSensitiveField(@Nullable Object value) {

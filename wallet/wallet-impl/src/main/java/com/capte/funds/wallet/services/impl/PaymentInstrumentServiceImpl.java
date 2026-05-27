@@ -73,6 +73,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createPaymentInstrument(@NonNull CreatePaymentInstrumentRequest request) {
         assertNoRawSensitiveInstrumentNo(request);
+        assertNoSensitiveContextVariables(request);
         assertPaymentInstrumentValidityWindow(request.getValidFrom(), request.getValidTo());
         PaymentInstrument entity = PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrument(request);
         paymentInstrumentMapper.insertSelective(entity);
@@ -492,6 +493,12 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.isRawSensitiveInstrumentNo(
                         request.getInstrumentNo()),
                 "instrumentNo must be masked or token reference");
+    }
+
+    private void assertNoSensitiveContextVariables(CreatePaymentInstrumentRequest request) {
+        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(
+                        request.getContextVariables()),
+                "contextVariables must not contain sensitive payment instrument fields");
     }
 
     private void applyCurrentEffectiveWindow(QueryWrapper wrapper,
