@@ -84,6 +84,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createPaymentInstrumentBinding(@NonNull CreatePaymentInstrumentBindingRequest request) {
+        assertNoSensitiveContextVariables(request.getContextVariables());
         PaymentInstrument instrument = getInstrumentBySn(request.getTenantId(), request.getInstrumentSn());
         assertInstrumentCanBind(instrument, request);
         PaymentInstrumentBinding entity =
@@ -108,6 +109,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long changePaymentInstrumentBinding(@NonNull ChangePaymentInstrumentBindingRequest request) {
         assertBindingChangeAuditContextPresent(request);
+        assertNoSensitiveContextVariables(request.getContextVariables());
         PaymentInstrumentBinding entity = getBindingBySn(request.getTenantId(), request.getBindingSn());
         PaymentInstrumentBinding before = copyBinding(entity);
         PaymentInstrumentBinding after = copyBinding(before);
@@ -496,8 +498,11 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     }
 
     private void assertNoSensitiveContextVariables(CreatePaymentInstrumentRequest request) {
-        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(
-                        request.getContextVariables()),
+        assertNoSensitiveContextVariables(request.getContextVariables());
+    }
+
+    private void assertNoSensitiveContextVariables(String contextVariables) {
+        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(contextVariables),
                 "contextVariables must not contain sensitive payment instrument fields");
     }
 

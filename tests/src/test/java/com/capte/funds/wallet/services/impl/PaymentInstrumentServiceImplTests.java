@@ -308,6 +308,26 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：运营创建支付工具绑定时把通道 token secret 放入扩展上下文。
+     * 输入：contextVariables 中包含嵌套 secretKey 字段。
+     * 输出：创建被拒绝，不留下绑定候选或历史。
+     * 红线：token secret、密钥和 CVV 不得进入支付工具绑定当前态、历史、日志、导出或报表。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldRejectSensitiveContextVariablesWithoutRouteCandidate() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
+
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：运营创建支付工具绑定时配置了倒置或空的生效窗口。
      * 输入：validTo 早于或等于 validFrom 的 ACTIVE 绑定关系。
      * 输出：创建被拒绝，不留下绑定候选或历史。
@@ -736,6 +756,41 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThat(binding.getVersion()).isEqualTo(1);
         assertThat(binding.getValidFrom()).isNull();
         assertThat(binding.getValidTo()).isNull();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：运营变更支付工具绑定时把通道 token secret 放入扩展上下文。
+     * 输入：contextVariables 中包含嵌套 secretKey 字段。
+     * 输出：变更被拒绝，绑定当前态和历史证据保持不变。
+     * 红线：当前态变更入口不得把 token secret、密钥或 CVV 写入绑定历史或 route 候选。
+     */
+    @Test
+    void testChangePaymentInstrumentBindingShouldRejectSensitiveContextVariablesWithoutHistoryMutation() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setPriority(20)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("risk review")
+                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)
+                        .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
+                .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
+
+        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+        assertThat(binding.getPriority()).isEqualTo(10);
+        assertThat(binding.getVersion()).isEqualTo(1);
+        assertThat(binding.getContextVariables()).isNull();
         assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
