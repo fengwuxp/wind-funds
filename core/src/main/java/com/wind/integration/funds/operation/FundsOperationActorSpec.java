@@ -12,6 +12,10 @@ import java.util.Map;
  */
 public interface FundsOperationActorSpec {
 
+    String OPERATOR_TYPE_SYSTEM = "SYSTEM";
+
+    String OPERATOR_TYPE_RISK_CONTROL = "RISK_CONTROL";
+
     @NonNull
     Long getOperatorId();
 
@@ -28,6 +32,7 @@ public interface FundsOperationActorSpec {
     Map<String, Object> getContextVariables();
 
     default boolean isSystem() {
-        return "SYSTEM".equals(getOperatorType()) || "RISK_CONTROL".equals(getOperatorType());
+        String operatorType = getOperatorType();
+        return OPERATOR_TYPE_SYSTEM.equals(operatorType) || OPERATOR_TYPE_RISK_CONTROL.equals(operatorType);
     }
 }
