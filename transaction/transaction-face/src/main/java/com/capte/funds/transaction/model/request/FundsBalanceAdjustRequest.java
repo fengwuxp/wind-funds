@@ -59,4 +59,9 @@ public class FundsBalanceAdjustRequest {
 
     @Schema(description = "上下文变量")
     private WritableContextVariables contextVariables;
+
+    public FundsBalanceAdjustRequest setContextVariables(WritableContextVariables contextVariables) {
+        this.contextVariables = FundsRequestContextVariables.snapshot(contextVariables);
+        return this;
+    }
 }

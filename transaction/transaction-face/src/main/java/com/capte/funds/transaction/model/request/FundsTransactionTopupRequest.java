@@ -62,4 +62,9 @@ public class FundsTransactionTopupRequest {
     @Schema(description = "上下文变量")
     private WritableContextVariables contextVariables;
 
+    public FundsTransactionTopupRequest setContextVariables(WritableContextVariables contextVariables) {
+        this.contextVariables = FundsRequestContextVariables.snapshot(contextVariables);
+        return this;
+    }
+
 }

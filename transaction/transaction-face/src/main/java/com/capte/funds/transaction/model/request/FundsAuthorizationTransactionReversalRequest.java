@@ -57,4 +57,9 @@ public class FundsAuthorizationTransactionReversalRequest {
 
     @Schema(description = "上下文变量")
     private WritableContextVariables contextVariables;
+
+    public FundsAuthorizationTransactionReversalRequest setContextVariables(WritableContextVariables contextVariables) {
+        this.contextVariables = FundsRequestContextVariables.snapshot(contextVariables);
+        return this;
+    }
 }

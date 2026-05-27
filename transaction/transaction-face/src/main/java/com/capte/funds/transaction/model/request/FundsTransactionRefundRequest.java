@@ -68,4 +68,9 @@ public class FundsTransactionRefundRequest {
 
     @Schema(description = "上下文变量")
     private WritableContextVariables contextVariables;
+
+    public FundsTransactionRefundRequest setContextVariables(WritableContextVariables contextVariables) {
+        this.contextVariables = FundsRequestContextVariables.snapshot(contextVariables);
+        return this;
+    }
 }
