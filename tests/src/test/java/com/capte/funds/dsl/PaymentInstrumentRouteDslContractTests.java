@@ -275,6 +275,30 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     /**
+     * 场景：通道回传字段名可能携带大小写、空格、短横线或下划线。
+     * 预期：字段名归一化后仍按敏感字段阻断。
+     * 红线：不能因字段命名风格差异让完整卡号、token secret 或密钥进入绑定快照。
+     */
+    @Test
+    void testPaymentInstrumentSnapshotShouldRejectNormalizedSensitiveBindingSnapshotFields() {
+        assertThatThrownBy(() -> paymentInstrumentRef("PI-CARD-NO-STYLE",
+                "**** 4242",
+                Map.of("card-no", "4242424242424242")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentRef("PI-PRIMARY-ACCOUNT-STYLE",
+                "**** 4242",
+                Map.of("PRIMARY ACCOUNT NUMBER", "4242424242424242")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
+        assertThatThrownBy(() -> paymentInstrumentRef("PI-TOKEN-SECRET-STYLE",
+                "tok_card_006",
+                Map.of("Token Secret", "secret-value")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
+    }
+
+    /**
      * 场景：业务侧错误地把外部银行账户原文放入 route external account 快照。
      * 预期：构造期拒绝外部账户原始账号和上下文敏感字段。
      * 红线：外部账户、VA、卡或通道 token 的敏感原文不得进入普通快照、日志、导出或报表。
