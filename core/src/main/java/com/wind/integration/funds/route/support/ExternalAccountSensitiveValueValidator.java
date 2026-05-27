@@ -1,0 +1,94 @@
+package com.wind.integration.funds.route.support;
+
+import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
+
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * 外部账户敏感值校验器。
+ *
+ * <p>用于阻断银行账户原文、IBAN 等敏感字段进入 route 快照、日志或报表链路。
+ * 允许使用脱敏展示号、token 或外部稳定引用。</p>
+ */
+public final class ExternalAccountSensitiveValueValidator {
+
+    private static final int MIN_RAW_EXTERNAL_ACCOUNT_LENGTH = 8;
+
+    private static final int MAX_RAW_EXTERNAL_ACCOUNT_LENGTH = 34;
+
+    private ExternalAccountSensitiveValueValidator() {
+        throw new AssertionError();
+    }
+
+    /**
+     * 判断输入是否形似原始外部账户号。
+     *
+     * @param externalAccountNo 外部账户展示号、token 或原始号候选
+     * @return true 表示输入为 8 到 34 位数字，可带空格或短横线分隔
+     */
+    public static boolean isRawSensitiveExternalAccountNo(@Nullable String externalAccountNo) {
+        if (!StringUtils.hasText(externalAccountNo)) {
+            return false;
+        }
+        String compactAccountNo = externalAccountNo.replace(" ", "").replace("-", "");
+        if (compactAccountNo.length() < MIN_RAW_EXTERNAL_ACCOUNT_LENGTH
+                || compactAccountNo.length() > MAX_RAW_EXTERNAL_ACCOUNT_LENGTH) {
+            return false;
+        }
+        for (int i = 0; i < compactAccountNo.length(); i++) {
+            if (!Character.isDigit(compactAccountNo.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 判断外部账户上下文中是否包含敏感字段。
+     *
+     * @param contextVariables 外部账户上下文
+     * @return true 表示上下文字段名形似账户号、routing number 或 IBAN
+     */
+    public static boolean containsSensitiveContextField(@Nullable Map<String, Object> contextVariables) {
+        return containsSensitiveField(contextVariables);
+    }
+
+    private static boolean containsSensitiveField(@Nullable Object value) {
+        if (value instanceof Map<?, ?> values) {
+            for (Map.Entry<?, ?> entry : values.entrySet()) {
+                if (entry.getKey() instanceof String fieldName && isSensitiveContextField(fieldName)) {
+                    return true;
+                }
+                if (containsSensitiveField(entry.getValue())) {
+                    return true;
+                }
+            }
+        }
+        if (value instanceof Iterable<?> values) {
+            for (Object item : values) {
+                if (containsSensitiveField(item)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isSensitiveContextField(@Nullable String fieldName) {
+        if (!StringUtils.hasText(fieldName)) {
+            return false;
+        }
+        String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+        return "accountnumber".equals(normalized)
+                || "accountno".equals(normalized)
+                || "bankaccountnumber".equals(normalized)
+                || "bankaccountno".equals(normalized)
+                || "externalaccountnumber".equals(normalized)
+                || "externalaccountno".equals(normalized)
+                || "routingnumber".equals(normalized)
+                || "routingno".equals(normalized)
+                || "iban".equals(normalized);
+    }
+}

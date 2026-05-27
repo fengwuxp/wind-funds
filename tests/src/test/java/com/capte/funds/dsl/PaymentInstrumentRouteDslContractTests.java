@@ -258,6 +258,23 @@ class PaymentInstrumentRouteDslContractTests {
                 .hasMessageContaining("bindingSnapshot must not contain sensitive payment instrument fields");
     }
 
+    /**
+     * 场景：业务侧错误地把外部银行账户原文放入 route external account 快照。
+     * 预期：构造期拒绝外部账户原始账号和上下文敏感字段。
+     * 红线：外部账户、VA、卡或通道 token 的敏感原文不得进入普通快照、日志、导出或报表。
+     */
+    @Test
+    void testExternalAccountSnapshotShouldRejectSensitiveAccountValues() {
+        assertThatThrownBy(() -> externalAccountRef("EA-RAW", "1234567890123456"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("externalAccountNo must be masked or token reference");
+        assertThatThrownBy(() -> externalAccountRef("EA-NESTED-RAW",
+                "token:external-account-001",
+                Map.<String, Object>of("processorPayload", Map.of("accountNumber", "1234567890123456"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("contextVariables must not contain sensitive external account fields");
+    }
+
     private RouteLegSpec routeLeg(SubjectRef payer, SubjectRef payee) {
         return ImmutableRouteLegSpec.builder()
                 .legId("PAY")
@@ -351,6 +368,14 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     private ExternalAccountRefSpec externalAccountRef(String externalAccountId, String externalAccountNo) {
+        return externalAccountRef(externalAccountId,
+                externalAccountNo,
+                Map.of("externalAccountVersion", 2));
+    }
+
+    private ExternalAccountRefSpec externalAccountRef(String externalAccountId,
+                                                      String externalAccountNo,
+                                                      Map<String, Object> contextVariables) {
         return ImmutableExternalAccountRefSpec.builder()
                 .externalAccountId(externalAccountId)
                 .externalAccountType("BANK_ACCOUNT")
@@ -359,7 +384,7 @@ class PaymentInstrumentRouteDslContractTests {
                 .channelCode("ACH")
                 .currency(CurrencyIsoCode.USD.name())
                 .countryCode("US")
-                .contextVariables(Map.of("externalAccountVersion", 2))
+                .contextVariables(contextVariables)
                 .build();
     }
 }

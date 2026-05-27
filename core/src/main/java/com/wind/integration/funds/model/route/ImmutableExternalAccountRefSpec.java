@@ -1,6 +1,7 @@
 package com.wind.integration.funds.model.route;
 
 import com.wind.integration.funds.route.ref.ExternalAccountRefSpec;
+import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
@@ -25,6 +26,12 @@ public record ImmutableExternalAccountRefSpec(String externalAccountId,
         implements ExternalAccountRefSpec {
 
     public ImmutableExternalAccountRefSpec {
+        if (ExternalAccountSensitiveValueValidator.isRawSensitiveExternalAccountNo(externalAccountNo)) {
+            throw new IllegalArgumentException("externalAccountNo must be masked or token reference");
+        }
+        if (ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables)) {
+            throw new IllegalArgumentException("contextVariables must not contain sensitive external account fields");
+        }
         contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
     }
 
