@@ -5,6 +5,7 @@ import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.service.LedgerService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.spring.SpringEventPublishUtils;
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.integration.funds.wallet.FundsAccountBalanceView;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.FundsAccountQueryService;
@@ -130,7 +131,7 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
                     .businessScene(entry.getBusinessScene())
                     .businessSn(entry.getBusinessSn())
                     .transactionTime(entry.getTransactionTime())
-                    .contextVariables(Map.copyOf(entry.getContextVariables()))
+                    .contextVariables(FundsContextVariables.immutableCopy(entry.getContextVariables()))
                     .build();
         publishBalanceChangedEvent(event, entry, ledger, accountId);
     }

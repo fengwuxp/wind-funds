@@ -45,6 +45,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -142,6 +143,35 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
             assertThat(event.getBusinessSn()).isEqualTo("BALANCE_LOG_BOUNDARY_001");
             assertThat(event.getTransactionTime()).isEqualTo(LocalDateTime.of(2026, 5, 19, 12, 0));
             assertThat(event.getContextVariables()).containsEntry("ledgerEntrySn", "LE-BALANCE-LOG-001");
+        });
+    }
+
+    /**
+     * 场景：余额变更观察事件发布后，调用方继续改写原始分录的嵌套上下文。
+     * 输入：分录上下文携带可追溯的 processor payload，事件发布后原始 payload 被追加敏感字段。
+     * 输出：已发布事件中的上下文保持发布时快照，不包含后续追加的敏感字段。
+     * 预期：余额变更事件是可追溯观察事实，发布后上下文不可被外部引用回写污染。
+     * 红线：余额观察事件不得因浅拷贝让 PAN、密钥或外部账户原文进入后续监听、日志或报表。
+     */
+    @Test
+    void testProjectShouldPublishBalanceChangedEventWithImmutableNestedContext() {
+        List<LedgerBalanceChangedEvent> publishedEvents = new ArrayList<>();
+        setApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
+        Map<String, Object> processorPayload = new HashMap<>();
+        processorPayload.put("networkReference", "token:balance-event-001");
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        projectionService.project(List.of(ledgerEntry(25L,
+                Map.of("processorPayload", processorPayload))));
+        processorPayload.put("pan", "PAN_AFTER_BALANCE_EVENT_SHOULD_NOT_LEAK");
+
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+        assertThat(publishedEvents).singleElement().satisfies(event -> {
+            Object payloadValue = event.getContextVariables().get("processorPayload");
+            assertThat(payloadValue).isInstanceOf(Map.class);
+            Map<?, ?> payload = (Map<?, ?>) payloadValue;
+            assertThat(payload.get("networkReference")).isEqualTo("token:balance-event-001");
+            assertThat(payload.containsKey("pan")).isFalse();
         });
     }
 
@@ -257,10 +287,26 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         return ledgerEntry(availableLedgerId, LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT, amount);
     }
 
+    private LedgerEntrySpec ledgerEntry(long amount, Map<String, Object> contextVariables) {
+        return ledgerEntry(availableLedgerId, LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT, amount, contextVariables);
+    }
+
     private LedgerEntrySpec ledgerEntry(Long ledgerId,
                                         LedgerSubjectCode ledgerSubjectCode,
                                         EntrySide entrySide,
                                         long amount) {
+        return ledgerEntry(ledgerId,
+                ledgerSubjectCode,
+                entrySide,
+                amount,
+                Map.of("ledgerEntrySn", "LE-BALANCE-LOG-001"));
+    }
+
+    private LedgerEntrySpec ledgerEntry(Long ledgerId,
+                                        LedgerSubjectCode ledgerSubjectCode,
+                                        EntrySide entrySide,
+                                        long amount,
+                                        Map<String, Object> contextVariables) {
         return TestLedgerEntrySpec.builder()
                 .subjectId(ACCOUNT_ID)
                 .subjectType(ACCOUNT_TYPE)
@@ -277,7 +323,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                 .exchangeRate(BigDecimal.ONE)
                 .transactionTime(LocalDateTime.of(2026, 5, 19, 12, 0))
                 .description("balance log boundary")
-                .contextVariables(Map.of("ledgerEntrySn", "LE-BALANCE-LOG-001"))
+                .contextVariables(contextVariables)
                 .sha256("sha256-balance-log-001")
                 .balanceConstraintType(LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE)
                 .build();
