@@ -132,7 +132,7 @@ final class FundsBenefitStableDigest {
             return;
         }
         append(joiner, prefix + ".currency", money.getCurrency().name());
-        append(joiner, prefix + ".minorValue", money.getAmount());
+        append(joiner, prefix + ".amount", money.getAmount());
     }
 
     private static void appendLocalDateTime(StringJoiner joiner,

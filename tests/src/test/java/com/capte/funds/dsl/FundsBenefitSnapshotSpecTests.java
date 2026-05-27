@@ -265,6 +265,19 @@ class FundsBenefitSnapshotSpecTests {
     }
 
     /**
+     * 场景：Money JSON 契约已统一为 amount/currency，权益稳定摘要也必须使用同一字段口径。
+     * 预期：稳定摘要样本值按 amount 标签生成，而不是沿用已废弃的旧字段标签。
+     * 红线：幂等、重放、补录和审计摘要不能继续携带已废弃的 Money 字段语义。
+     */
+    @Test
+    void testStableDigestShouldUseAmountFieldNameForMoneyContract() {
+        FundsBenefitSnapshotSpec snapshot = merchantDiscountSnapshot(8000L, 2000L);
+
+        assertThat(snapshot.getStableDigest())
+                .isEqualTo("sha256:92ffcd34287906bf304a3e88a94368b19d32a9e75270cb31b371b60555ae345c");
+    }
+
+    /**
      * 场景：实现者试图把权益核心金额、规则版本或退款处置放入 contextVariables。
      * 预期：模型构造阶段显式失败。
      * 红线：contextVariables 只能承载非关键扩展信息。
