@@ -330,6 +330,93 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接充值和系统内转账请求把敏感账户值放入扩展上下文。
+     * 输入：充值 contextVariables 含嵌套 IBAN 值；有效充值后，转账 contextVariables 含嵌套 IBAN 值。
+     * 输出：两次请求均被拒绝；账户和平台余额保持最近一次成功事实后的状态。
+     * 预期：直接交易各入口在构造指令前统一阻断敏感上下文，不生成资金交易事实和账务事实。
+     * 红线：IBAN、完整账户号等敏感值不得通过普通交易上下文落库。
+     */
+    @Test
+    void testTopupAndTransferWithSensitiveContextVariablesShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("ctx_transfer_payee");
+        ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
+
+        BalanceSnapshot before = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(payer)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_sensitive_context_topup",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_TOPUP_SENSITIVE_CONTEXT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(50L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                        Map.of("networkReference", "GB82WEST12345698765432"))))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_TOPUP_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setDescription("topup with sensitive IBAN value"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+
+        BalanceSnapshot afterRejectedTopup = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+
+        topup(payer, 50L, "DIRECT_TRANSFER_SENSITIVE_CONTEXT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRejectedTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                        Map.of("networkReference", "GB82WEST12345698765432"))))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_TRANSFER_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setDescription("transfer with sensitive IBAN value"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+
+        BalanceSnapshot afterRejectedTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRejectedTransfer,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TOPUP_SENSITIVE_CONTEXT_IBAN_VALUE");
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_TRANSFER_SENSITIVE_CONTEXT_TOPUP", 3, 4);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_SENSITIVE_CONTEXT_IBAN_VALUE");
+    }
+
+    /**
      * 场景：付款方可用余额不足时发起系统内转账。
      * 输入：付款方未充值，向收款方转账 10。
      * 输出：请求被拒绝；付款方、收款方和平台账户余额均不变化。
