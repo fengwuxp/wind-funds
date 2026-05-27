@@ -30,10 +30,12 @@ import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
 import com.wind.integration.funds.ledger.enums.LedgerReconcileStatus;
 import com.wind.integration.funds.ledger.enums.LedgerSettlementStatus;
+import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPhaseSpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
+import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
@@ -127,6 +129,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull LedgerTransactionPostResult postLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
+        assertNoSensitiveContextVariables(transaction);
         LedgerTransaction entity = LedgerConverter.INSTANCE.convertToLedgerTransaction(transaction);
         entity.setDebitAmount(transaction.getTotalDebitAmount().getAmount());
         entity.setCreditAmount(transaction.getTotalCreditAmount().getAmount());
@@ -244,6 +247,24 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         AssertUtils.notNull(ledgerEntry.getId(), "创建账户账本条目失败");
     }
 
+    private void assertNoSensitiveContextVariables(LedgerTransactionSpec transaction) {
+        assertNoSensitiveContextVariables(transaction.getContextVariables(), "ledgerTransaction.contextVariables");
+        for (LedgerPostingPlanSpec plan : transaction.getPostingPlans()) {
+            assertNoSensitiveContextVariables(plan.getContextVariables(), "ledgerPostingPlan.contextVariables");
+            for (LedgerPostingPhaseSpec phase : plan.getPostingPhases()) {
+                for (LedgerEntrySpec entry : phase.getEntries()) {
+                    assertNoSensitiveContextVariables(entry.getContextVariables(), "ledgerEntry.contextVariables");
+                }
+            }
+        }
+    }
+
+    private void assertNoSensitiveContextVariables(Map<String, Object> contextVariables, String fieldName) {
+        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
+                        || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables),
+                "{} must not contain sensitive fields", fieldName);
+    }
+
 
     @Override
     public void updateLedgerTransaction(@NonNull UpdateLedgerTransactionRequest request) {
@@ -251,6 +272,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         entity.setStatus(request.getStatus());
         entity.setDescription(request.getDescription());
         if (request.getContextVariable() != null) {
+            assertNoSensitiveContextVariables(request.getContextVariable(), "ledgerTransaction.contextVariables");
             entity.setContextVariables(JSON.toJSONString(request.getContextVariable()));
         }
         AssertUtils.isTrue(ledgerTransactionMapper.update(entity) == 1, "更新账户账本交易信息失败");
