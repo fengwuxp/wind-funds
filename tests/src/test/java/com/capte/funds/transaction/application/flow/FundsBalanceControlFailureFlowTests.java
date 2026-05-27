@@ -987,6 +987,14 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setContextVariables(WritableContextVariables.of(Map.of("externalAccount",
                         Map.of("bankAccountNo", "123456789012")))), WindOperator.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+        assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
+                "BALANCE_ADJUST_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setAdjustReason("customer service balance adjust")
+                .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setApprovalRef("APPROVAL_BALANCE_ADJUST_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                        Map.of("networkReference", "GB82WEST12345698765432")))), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterFailure,
@@ -999,6 +1007,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         assertBucket(balance(user), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
         assertPostedTransactions(0);
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_SENSITIVE_CONTEXT");
+        assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_SENSITIVE_CONTEXT_IBAN_VALUE");
     }
 
     private static FundsBalanceAdjustRequest balanceAdjustRequest(FundsAccountId accountId, String businessSn) {
