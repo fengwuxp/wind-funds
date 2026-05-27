@@ -35,7 +35,7 @@
 | 输入 | 使用方式 |
 | --- | --- |
 | docs/产品设计 | 作为业务目标、概念边界、产品流程、验收用例和红线的权威输入。 |
-| docs/DSL设计 | 作为资金指令、路由、账务计划、账本分录、投影和 JSON 契约场景的承载层输入。 |
+| docs/DSL设计 | 作为资金指令、路由、账务计划、账本分录、投影和 JSON 契约场景的承载层输入；其中资金场景借贷平衡与账务期望表是账务实现、余额投影和测试断言承接的权威输入。 |
 | 现有模块和接口 | 作为系分落地边界：core、wallet-face、wallet-impl、transaction-face、transaction-impl、ledger-face、ledger-impl、tests。 |
 | tests/src/test/resources/jdbc-schema.sql | 作为现有交易、账户、冻结、账本和分录测试表结构参考；清结算、归档和重放以本目录稳定表设计为准，进入数据库级落地前必须同步 DDL 和 H2 schema；指标实现由报表指标模块承接。 |
 
