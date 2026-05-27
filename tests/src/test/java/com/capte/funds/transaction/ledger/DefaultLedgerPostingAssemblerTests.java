@@ -57,6 +57,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -207,6 +208,54 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                         tuple("target_account", LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT));
     }
 
+    /**
+     * 场景：自定义 ResolvedRouteSpec/RouteLegSpec 绕过默认不可变 DSL，装配后继续改写原始嵌套上下文。
+     * 预期：已生成的账务计划和分录事实保持稳定，不被追加的敏感字段污染。
+     * 红线：账务事实不能因 route 上下文浅拷贝让 PAN、密钥或外部账户原文进入落库链路。
+     */
+    @Test
+    void testAssembleShouldDefensivelyCopyNestedRouteContextVariables() {
+        Map<String, Object> routeProcessorPayload = new HashMap<>();
+        routeProcessorPayload.put("routeTraceId", "ROUTE-TRACE-202605270001");
+        Map<String, Object> legProcessorPayload = new HashMap<>();
+        legProcessorPayload.put("legTraceId", "LEG-TRACE-202605270001");
+        RouteLegSpec leg = routeLeg(AccountBalancePeriodType.LIFETIME,
+                null,
+                "LEG-POSTING-CONTEXT-001",
+                Map.of("legProcessorPayload", legProcessorPayload));
+        LedgerTransactionSpec transaction = assembler.assemble(
+                instruction(),
+                "FUNDS_TX_CONTEXT_001",
+                resolvedRoute(leg, Map.of("routeProcessorPayload", routeProcessorPayload)));
+
+        routeProcessorPayload.put("secretKey", "secret-after-assemble");
+        legProcessorPayload.put("pan", "PAN_AFTER_ASSEMBLE_SHOULD_NOT_LEAK");
+
+        LedgerPostingPlanSpec plan = transaction.getPostingPlans().getFirst();
+        assertRoutePayloadSafe(plan.getContextVariables());
+        assertLegPayloadSafe(plan.getContextVariables());
+        plan.getEntries().forEach(entry -> {
+            assertRoutePayloadSafe(entry.getContextVariables());
+            assertLegPayloadSafe(entry.getContextVariables());
+        });
+    }
+
+    private void assertRoutePayloadSafe(Map<String, Object> contextVariables) {
+        Object payloadValue = contextVariables.get("routeProcessorPayload");
+        assertThat(payloadValue).isInstanceOf(Map.class);
+        Map<?, ?> payload = (Map<?, ?>) payloadValue;
+        assertThat(payload.get("routeTraceId")).isEqualTo("ROUTE-TRACE-202605270001");
+        assertThat(payload.containsKey("secretKey")).isFalse();
+    }
+
+    private void assertLegPayloadSafe(Map<String, Object> contextVariables) {
+        Object payloadValue = contextVariables.get("legProcessorPayload");
+        assertThat(payloadValue).isInstanceOf(Map.class);
+        Map<?, ?> payload = (Map<?, ?>) payloadValue;
+        assertThat(payload.get("legTraceId")).isEqualTo("LEG-TRACE-202605270001");
+        assertThat(payload.containsKey("pan")).isFalse();
+    }
+
     private void assertTransferPostingFacts(LedgerTransactionSpec transaction,
                                             AccountBalancePeriodType periodType,
                                             String periodId) {
@@ -280,6 +329,10 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     }
 
     private ResolvedRouteSpec resolvedRoute(RouteLegSpec leg) {
+        return resolvedRoute(leg, Map.of());
+    }
+
+    private ResolvedRouteSpec resolvedRoute(RouteLegSpec leg, Map<String, Object> contextVariables) {
         return ImmutableResolvedRouteSpec.builder()
                 .tenantId(TENANT_ID)
                 .routeCode("POSTING_PERIOD_ROUTE")
@@ -292,7 +345,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .participants(List.of())
                 .legs(List.of(leg))
                 .resolvedAt(EVENT_TIME)
-                .contextVariables(Map.of())
+                .contextVariables(contextVariables)
                 .build();
     }
 
@@ -318,6 +371,13 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
     }
 
     private RouteLegSpec routeLeg(AccountBalancePeriodType periodType, String periodId, String legId) {
+        return routeLeg(periodType, periodId, legId, Map.of());
+    }
+
+    private RouteLegSpec routeLeg(AccountBalancePeriodType periodType,
+                                  String periodId,
+                                  String legId,
+                                  Map<String, Object> contextVariables) {
         return new TestRouteLegSpec(
                 legId,
                 routeNode("source_account", FundsSubjectType.FUNDING_ACCOUNT, RouteNodeRole.SOURCE),
@@ -325,7 +385,8 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 periodType,
                 periodId,
                 LedgerBalanceEffectType.CONSUME,
-                LedgerPhaseCode.TRANSFER
+                LedgerPhaseCode.TRANSFER,
+                contextVariables
         );
     }
 
@@ -345,7 +406,8 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 AccountBalancePeriodType.LIFETIME,
                 null,
                 increase ? LedgerBalanceEffectType.INCREASE : LedgerBalanceEffectType.DECREASE,
-                LedgerPhaseCode.ADJUSTMENT
+                LedgerPhaseCode.ADJUSTMENT,
+                Map.of()
         );
     }
 
@@ -379,7 +441,8 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                                     AccountBalancePeriodType periodType,
                                     String periodId,
                                     LedgerBalanceEffectType balanceEffectType,
-                                    LedgerPhaseCode phaseCode) implements RouteLegSpec {
+                                    LedgerPhaseCode phaseCode,
+                                    Map<String, Object> contextVariables) implements RouteLegSpec {
 
         @Override
         public String getLegId() {
@@ -429,6 +492,11 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         @Override
         public Map<String, LedgerBalanceConstraintType> getConstraintOverrides() {
             return Map.of();
+        }
+
+        @Override
+        public Map<String, Object> getContextVariables() {
+            return contextVariables;
         }
     }
 

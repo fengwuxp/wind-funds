@@ -17,6 +17,7 @@ import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
 import com.wind.integration.funds.ledger.enums.LedgerSettlementStatus;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.integration.funds.route.ref.SubjectRef;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
@@ -345,7 +346,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             result.put("replayRefLegId", leg.getReplayRefLegId());
         }
         result.put("replayPolicy", leg.getReplayPolicy().name());
-        return Map.copyOf(result);
+        return FundsContextVariables.immutableCopy(result);
     }
 
     private enum MovementDirection {
