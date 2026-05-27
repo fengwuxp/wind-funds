@@ -7,6 +7,7 @@ import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
+import com.wind.integration.funds.model.FundsContextVariables;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPhaseSpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
@@ -206,7 +207,7 @@ public final class LedgerTransactionSpecFactory {
             this.transactionTime = transactionTime;
             this.description = description;
             this.postingPlans = List.copyOf(postingPlans == null ? List.of() : postingPlans);
-            this.contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
+            this.contextVariables = FundsContextVariables.immutableCopy(contextVariables);
         }
 
         @Override

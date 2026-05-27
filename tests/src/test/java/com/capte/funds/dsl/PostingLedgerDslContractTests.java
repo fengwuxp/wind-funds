@@ -1,5 +1,6 @@
 package com.capte.funds.dsl;
 
+import com.capte.funds.transaction.ledger.LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerPostingIntentType;
@@ -12,6 +13,7 @@ import com.wind.integration.funds.spec.ledger.LedgerPostingPhaseSpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -19,6 +21,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -159,6 +162,44 @@ class PostingLedgerDslContractTests {
         assertThat(offsetButInvalid.isBalanced()).isFalse();
         assertThat(emptyTransaction.isBalanced()).isFalse();
         assertThat(balancedTransaction.isBalanced()).isTrue();
+    }
+
+    /**
+     * 场景：外部调用方直接构造 LedgerTransactionSpec，随后继续改写原始嵌套上下文。
+     * 预期：已构造的账本交易事实保持稳定，不被追加的支付工具原文字段污染。
+     * 红线：账本交易事实不能因浅拷贝让 PAN、密钥或外部账户原文进入落库链路。
+     */
+    @Test
+    void testLedgerTransactionShouldDefensivelyCopyNestedContextVariables() {
+        Map<String, Object> processorPayload = new HashMap<>();
+        processorPayload.put("traceId", "LEDGER-TX-CONTEXT-001");
+        LedgerTransactionSpec transaction = DefaultLedgerTransactionSpec.builder()
+                .sn("LE-DSL-CONTEXT-001")
+                .tenantId(1L)
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .fundsTransactionSn("FUNDS-TX-CONTEXT-001")
+                .eventType(FundsTransactionEventType.TRANSFER)
+                .transactionType(DefaultFundsTransactionType.TRANSFER)
+                .status(LedgerTransactionStatus.POSTED)
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .originalAmount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .exchangeRate(BigDecimal.ONE)
+                .businessSn("BIZ-POSTING-DSL-001")
+                .businessScene("POSTING_LEDGER_DSL")
+                .transactionTime(TRANSACTION_TIME)
+                .postingPlans(List.of(postingPlan("PLAN-CONTEXT-BALANCED",
+                        entry(EntrySide.DEBIT, 100L),
+                        entry(EntrySide.CREDIT, 100L))))
+                .contextVariables(Map.of("processorPayload", processorPayload))
+                .build();
+
+        processorPayload.put("pan", "PAN_AFTER_LEDGER_TRANSACTION_SHOULD_NOT_LEAK");
+
+        Object payloadValue = transaction.getContextVariables().get("processorPayload");
+        assertThat(payloadValue).isInstanceOf(Map.class);
+        Map<?, ?> payload = (Map<?, ?>) payloadValue;
+        assertThat(payload.get("traceId")).isEqualTo("LEDGER-TX-CONTEXT-001");
+        assertThat(payload.containsKey("pan")).isFalse();
     }
 
     private LedgerPostingPlanSpec postingPlan(String planId, LedgerEntrySpec... entries) {
