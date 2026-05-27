@@ -93,6 +93,26 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：外部 LedgerTransactionSpec 实现绕过默认 DSL，交易级上下文携带外部账户原文字段。
+     * 输入：transaction.contextVariables 含 externalAccount.bankAccountNo。
+     * 输出：账本交易写入被拒绝，且 transaction、posting plan、entry 三类账务事实均不落库。
+     * 红线：账务事实交易上下文不得持久化外部账户号。
+     */
+    @Test
+    void testPostLedgerTransactionShouldRejectExternalAccountTransactionContextWithoutFacts() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        LedgerTransactionSpec transaction = ledgerTransaction(
+                Map.of("externalAccount", Map.of("bankAccountNo", "123456789012")),
+                Map.of(),
+                Map.of());
+
+        assertThatThrownBy(() -> ledgerTransactionService.postLedgerTransaction(transaction))
+                .hasMessageContaining("ledgerTransaction.contextVariables must not contain sensitive fields");
+
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：外部 LedgerTransactionSpec 实现绕过默认 DSL，交易级上下文把原始 PAN 藏入集合值。
      * 输入：transaction.contextVariables 含 processorPayload 列表，其中一项是原始 PAN。
      * 输出：账本交易写入被拒绝，且 transaction、posting plan、entry 三类账务事实均不落库。
