@@ -500,6 +500,17 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT")
                 .setDescription("pay with sensitive context"), WindOperator.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
+        assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(payer)
+                .setPayeeId(payee)
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
+                        Map.of("networkReference", "GB82WEST12345698765432"))))
+                .setBusinessScene("PAY")
+                .setBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT_IBAN_VALUE")
+                .setDescription("pay with sensitive IBAN value"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterRejectedPay,
@@ -523,6 +534,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .containsExactly(FundsTransactionEventType.TOPUP.name());
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT");
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT_IBAN_VALUE");
     }
 
     /**
