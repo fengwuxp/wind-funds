@@ -1,8 +1,10 @@
 package com.wind.integration.funds.model.transaction;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
+import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
@@ -34,6 +36,9 @@ public record ImmutableFundsInstructionReferenceSpec(FundsInstructionReferenceTy
                 && !StringUtils.hasText(authCode)) {
             throw new IllegalArgumentException("fundsInstruction.reference identifier is required");
         }
+        AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
+                        || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables),
+                "fundsInstruction.reference.contextVariables must not contain sensitive fields");
         contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
     }
 

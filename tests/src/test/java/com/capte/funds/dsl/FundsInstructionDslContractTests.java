@@ -98,6 +98,28 @@ class FundsInstructionDslContractTests {
     }
 
     /**
+     * 场景：外部交易引用上下文被调用方塞入通道密钥或外部账户原文。
+     * 预期：资金指令引用 DSL 构造期立即拒绝。
+     * 红线：资金指令引用会进入交易生命周期、回放和审计链路，不能保存完整卡号、密钥或银行账户原文。
+     */
+    @Test
+    void testInstructionReferenceShouldRejectSensitiveContextVariables() {
+        assertThatThrownBy(() -> ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.EXTERNAL_TRANSACTION)
+                .externalTransactionId("EXT-SENSITIVE-001")
+                .contextVariables(Map.of("processorPayload", Map.of("secretKey", "secret-value")))
+                .build())
+                .hasMessageContaining("fundsInstruction.reference.contextVariables must not contain sensitive fields");
+
+        assertThatThrownBy(() -> ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.EXTERNAL_TRANSACTION)
+                .externalTransactionId("EXT-SENSITIVE-002")
+                .contextVariables(Map.of("externalAccount", Map.of("iban", "GB82WEST12345698765432")))
+                .build())
+                .hasMessageContaining("fundsInstruction.reference.contextVariables must not contain sensitive fields");
+    }
+
+    /**
      * 场景：调用方把操作者扩展上下文当作旁路，塞入通道密钥或外部账户原文。
      * 预期：资金 DSL 操作者快照构造期立即拒绝。
      * 红线：操作者上下文会随指令进入审计链路，不能保存完整卡号、CVV、密钥或银行账户原文。
