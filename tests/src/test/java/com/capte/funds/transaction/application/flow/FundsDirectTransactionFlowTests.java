@@ -1478,6 +1478,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectFactsShareBusinessScene(businessSn);
         assertDirectFactsShareTransactionIdentity(businessSn);
         assertDirectEntriesFollowPostingPlans(businessSn);
+        assertDirectFactsCarryAuditTrail(businessSn);
     }
 
     private void assertDirectPostingPlansUseRouteSnapshotLegs(String businessSn) {
@@ -1543,6 +1544,47 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(entry.getAmount()).isEqualTo(plan.getAmount());
                     assertThat(entry.getCurrency()).isEqualTo(plan.getCurrency());
                 }));
+    }
+
+    private void assertDirectFactsCarryAuditTrail(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+
+        assertThat(transaction.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(transaction.getGmtCreate()).isNotNull();
+        assertThat(transaction.getGmtModified()).isAfterOrEqualTo(transaction.getGmtCreate());
+        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+                .as("funds transaction details must carry audit fields for %s", businessSn)
+                .allSatisfy(detail -> {
+                    assertThat(detail.getTenantId()).isEqualTo(TENANT_ID);
+                    assertThat(detail.getGmtCreate()).isNotNull();
+                    assertThat(detail.getGmtModified()).isAfterOrEqualTo(detail.getGmtCreate());
+                    assertThat(detail.getRequestHash()).isNotBlank();
+                });
+        assertThat(ledgerTransaction.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(ledgerTransaction.getGmtCreate()).isNotNull();
+        assertThat(ledgerTransaction.getGmtModified()).isAfterOrEqualTo(ledgerTransaction.getGmtCreate());
+        assertThat(ledgerTransaction.getTransactionTime()).isNotNull();
+        assertThat(ledgerTransaction.getSha256()).isNotBlank();
+        assertThat(postingPlansOf(ledgerTransaction))
+                .as("posting plans must carry audit fields for direct transaction %s", businessSn)
+                .allSatisfy(plan -> {
+                    assertThat(plan.getTenantId()).isEqualTo(TENANT_ID);
+                    assertThat(plan.getGmtCreate()).isNotNull();
+                    assertThat(plan.getGmtModified()).isAfterOrEqualTo(plan.getGmtCreate());
+                    assertThat(plan.getSha256()).isNotBlank();
+                });
+        assertThat(entriesOf(ledgerTransaction))
+                .as("ledger entries must carry audit fields for direct transaction %s", businessSn)
+                .allSatisfy(entry -> {
+                    assertThat(entry.getTenantId()).isEqualTo(TENANT_ID);
+                    assertThat(entry.getGmtCreate()).isNotNull();
+                    assertThat(entry.getGmtModified()).isAfterOrEqualTo(entry.getGmtCreate());
+                    assertThat(entry.getTransactionTime()).isEqualTo(ledgerTransaction.getTransactionTime());
+                    assertThat(entry.getSha256()).isNotBlank();
+                    assertThat(entry.getSettlementStatus()).isNotNull();
+                    assertThat(entry.getReconcileStatus()).isNotNull();
+                });
     }
 
     private void assertDirectFactsShareBusinessScene(String businessSn) {
