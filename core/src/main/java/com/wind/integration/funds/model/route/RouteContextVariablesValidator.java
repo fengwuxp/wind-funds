@@ -1,7 +1,7 @@
 package com.wind.integration.funds.model.route;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.model.FundsContextVariables;
+import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 
@@ -19,6 +19,6 @@ final class RouteContextVariablesValidator {
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
                         || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables),
                 owner + ".contextVariables must not contain sensitive fields");
-        return FundsContextVariables.immutableCopy(contextVariables);
+        return FundsBenefitSpecValidators.immutableInstructionContext(contextVariables, owner);
     }
 }

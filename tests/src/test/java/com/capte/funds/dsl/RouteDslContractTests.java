@@ -3,12 +3,14 @@ package com.capte.funds.dsl;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.integration.funds.model.route.ImmutableReplayRequestSpec;
 import com.wind.integration.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
 import com.wind.integration.funds.model.route.ImmutableRouteSnapshotSpec;
+import com.wind.integration.funds.model.route.ImmutableRoutingDecisionSpec;
 import com.wind.integration.funds.model.route.ImmutableSubjectRef;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.route.enums.RouteLegType;
@@ -18,12 +20,14 @@ import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.enums.RouteReplayPolicy;
 import com.wind.integration.funds.route.enums.RouteReplayType;
 import com.wind.integration.funds.route.ref.SubjectRef;
+import com.wind.integration.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.integration.funds.route.spec.ReplayRequestSpec;
 import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
+import com.wind.integration.funds.route.spec.RoutingDecisionSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
@@ -148,6 +152,67 @@ class RouteDslContractTests {
         assertThatThrownBy(() -> routeParticipant(
                 Map.of("externalAccount", Map.of("bankAccountNo", "123456789012"))))
                 .hasMessageContaining("routeParticipant.contextVariables must not contain sensitive fields");
+    }
+
+    /**
+     * 场景：调用方把权益金额、资金责任或当前营销规则藏入 route 事实链上下文。
+     * 预期：Route DSL 构造期显式失败，但仍允许只放权益快照引用和稳定摘要。
+     * 红线：route snapshot、route leg、route participant、routing decision 和 replay request 不能承载权益核心事实。
+     */
+    @Test
+    void testRouteDslContextShouldRejectCoreBenefitFactsButAllowSummaryRefs() {
+        assertThatThrownBy(() -> resolvedRoute(Map.of("benefitPayload", Map.of(
+                "amount", Money.immutable(2000L, CurrencyIsoCode.USD),
+                "fundingNature", "PLATFORM_BORNE"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("resolvedRoute.contextVariables must not contain core benefit field");
+
+        assertThatThrownBy(() -> routeSnapshot(Map.of("benefitDecisionTrace",
+                new Object[] {Map.of("currentMarketingRule", "latest-rule")})))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("routeSnapshot.contextVariables must not contain core benefit field: "
+                        + "currentMarketingRule");
+
+        assertThatThrownBy(() -> routeLeg(Map.of("benefitPayload", Map.of("fundingNature", "PLATFORM_BORNE"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("routeLeg.contextVariables must not contain core benefit field: fundingNature");
+
+        assertThatThrownBy(() -> routeParticipant(Map.of("benefitPayload", Map.of(
+                "refundDisposition", "REFUND_TO_PLATFORM"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "routeParticipant.contextVariables must not contain core benefit field: refundDisposition");
+
+        assertThatThrownBy(() -> routingDecision(Map.of("benefitDecisionTrace",
+                List.of(Map.of("userCouponBag", "latest-bag")))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("routingDecision.contextVariables must not contain core benefit field: "
+                        + "userCouponBag");
+
+        assertThatThrownBy(() -> replayRequest(Map.of("benefitReplayPayload", Map.of(
+                "nonRefundableAmount", Money.immutable(100L, CurrencyIsoCode.USD)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "replayRequest.contextVariables must not contain core benefit field: nonRefundableAmount");
+
+        Map<String, Object> summaryRefs = Map.of(
+                "benefitSnapshotId", "BS-ROUTE-SUMMARY-001",
+                "stableDigest", "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+                "benefitGroupSn", "BG-ROUTE-SUMMARY-001",
+                "componentSn", "COMP-ROUTE-SUMMARY-001",
+                "ruleVersion", "rule-v1",
+                "refundDecisionId", "refund-decision-001",
+                "externalDecisionId", "pricing-decision-001");
+
+        assertThat(routeSnapshot(summaryRefs).getContextVariables())
+                .containsEntry("benefitSnapshotId", "BS-ROUTE-SUMMARY-001")
+                .containsEntry("stableDigest",
+                        "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd")
+                .containsEntry("benefitGroupSn", "BG-ROUTE-SUMMARY-001")
+                .containsEntry("componentSn", "COMP-ROUTE-SUMMARY-001")
+                .containsEntry("ruleVersion", "rule-v1")
+                .containsEntry("refundDecisionId", "refund-decision-001")
+                .containsEntry("externalDecisionId", "pricing-decision-001");
     }
 
     /**
@@ -340,6 +405,27 @@ class RouteDslContractTests {
                 .currency(CurrencyIsoCode.USD.name())
                 .amount(Money.immutable(100L, CurrencyIsoCode.USD))
                 .contextVariables(contextVariables)
+                .build();
+    }
+
+    private RoutingDecisionSpec routingDecision(Map<String, Object> contextVariables) {
+        return ImmutableRoutingDecisionSpec.builder()
+                .policyCode("ROUTE_BENEFIT_CONTEXT")
+                .matchedRules(List.of("DIRECT_PAY", "REAL_FUNDING_ACCOUNT"))
+                .fundingAllocations(List.of(fundingAllocation()))
+                .decisionReason("REAL_FUNDING_ACCOUNT")
+                .contextVariables(contextVariables)
+                .build();
+    }
+
+    private FundingAllocationDecisionSpec fundingAllocation() {
+        return ImmutableFundingAllocationDecisionSpec.builder()
+                .allocationId("ALLOC-ROUTE-BENEFIT-CONTEXT")
+                .subjectRef(fundingAccount("FA-ROUTE-BENEFIT-CONTEXT"))
+                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .priority(1)
+                .reason("REAL_FUNDING_ACCOUNT")
                 .build();
     }
 
