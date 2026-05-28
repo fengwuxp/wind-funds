@@ -121,6 +121,57 @@ class FundsInstructionDslContractTests {
     }
 
     /**
+     * 场景：调用方把权益金额、资金责任或当前营销规则藏入资金指令引用上下文。
+     * 预期：资金指令引用构造阶段显式失败，但仍允许只放权益快照引用和稳定摘要。
+     * 红线：资金指令引用 contextVariables 不能绕过资金指令顶层守门承载权益核心事实。
+     */
+    @Test
+    void testInstructionReferenceContextShouldRejectCoreBenefitFactsButAllowSummaryRefs() {
+        assertThatThrownBy(() -> ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.EXTERNAL_TRANSACTION)
+                .externalTransactionId("EXT-BENEFIT-REF-001")
+                .contextVariables(Map.of("benefitPayload", Map.of(
+                        "amount", Money.immutable(2000L, CURRENCY),
+                        "fundingNature", "PLATFORM_BORNE")))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsInstruction.reference.contextVariables must not contain core benefit field");
+
+        assertThatThrownBy(() -> ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.EXTERNAL_TRANSACTION)
+                .externalTransactionId("EXT-BENEFIT-REF-002")
+                .contextVariables(Map.of("benefitDecisionTrace",
+                        new Object[] {Map.of("currentMarketingRule", "latest-rule")}))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsInstruction.reference.contextVariables must not contain core benefit field: "
+                        + "currentMarketingRule");
+
+        FundsInstructionReferenceSpec reference = ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.EXTERNAL_TRANSACTION)
+                .externalTransactionId("EXT-BENEFIT-REF-003")
+                .contextVariables(Map.of(
+                        "benefitSnapshotId", "BS-REFERENCE-SUMMARY-001",
+                        "stableDigest", "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+                        "benefitGroupSn", "BG-REFERENCE-SUMMARY-001",
+                        "componentSn", "COMP-REFERENCE-SUMMARY-001",
+                        "ruleVersion", "rule-v1",
+                        "refundDecisionId", "refund-decision-001",
+                        "externalDecisionId", "pricing-decision-001"))
+                .build();
+
+        assertThat(reference.getContextVariables())
+                .containsEntry("benefitSnapshotId", "BS-REFERENCE-SUMMARY-001")
+                .containsEntry("stableDigest",
+                        "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210")
+                .containsEntry("benefitGroupSn", "BG-REFERENCE-SUMMARY-001")
+                .containsEntry("componentSn", "COMP-REFERENCE-SUMMARY-001")
+                .containsEntry("ruleVersion", "rule-v1")
+                .containsEntry("refundDecisionId", "refund-decision-001")
+                .containsEntry("externalDecisionId", "pricing-decision-001");
+    }
+
+    /**
      * 场景：调用方把操作者扩展上下文当作旁路，塞入通道密钥或外部账户原文。
      * 预期：资金 DSL 操作者快照构造期立即拒绝。
      * 红线：操作者上下文会随指令进入审计链路，不能保存完整卡号、CVV、密钥或银行账户原文。
