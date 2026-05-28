@@ -1477,6 +1477,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectPostingPlansUseRouteSnapshotLegs(businessSn);
         assertDirectFactsShareBusinessScene(businessSn);
         assertDirectFactsShareTransactionIdentity(businessSn);
+        assertDirectEntriesFollowPostingPlans(businessSn);
     }
 
     private void assertDirectPostingPlansUseRouteSnapshotLegs(String businessSn) {
@@ -1523,6 +1524,25 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .filter(routeLeg -> routeLeg.getLegId().equals(routeLegId))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("route leg not found: " + routeLegId));
+    }
+
+    private void assertDirectEntriesFollowPostingPlans(String businessSn) {
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+        List<LedgerEntry> entries = entriesOf(ledgerTransaction);
+
+        postingPlansOf(ledgerTransaction).forEach(plan -> assertThat(entries.stream()
+                .filter(entry -> plan.getSn().equals(entry.getPostingPlanSn()))
+                .toList())
+                .as("ledger entries must follow posting plan for direct transaction %s", businessSn)
+                .isNotEmpty()
+                .allSatisfy(entry -> {
+                    assertThat(entry.getIntent()).isEqualTo(plan.getIntent());
+                    assertThat(entry.getPostingScope()).isEqualTo(plan.getPostingScope());
+                    assertThat(entry.getBalanceEffectType()).isEqualTo(plan.getBalanceEffectType());
+                    assertThat(entry.getPhaseCode()).isEqualTo(plan.getPhaseCode());
+                    assertThat(entry.getAmount()).isEqualTo(plan.getAmount());
+                    assertThat(entry.getCurrency()).isEqualTo(plan.getCurrency());
+                }));
     }
 
     private void assertDirectFactsShareBusinessScene(String businessSn) {
