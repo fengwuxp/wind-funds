@@ -79,6 +79,7 @@ just verify-cad
 - [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线。当前设计和任务基线提交点为 `9456ab6 docs: 对齐 A0 准入与代码基线`，代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`；后续生产编码仍需用户按 MVP 任务切片单独授予 Execution Grant。
 - [x] 代码基线已复核至当前 Git 基线 `77bc9f4`，并纳入 B1-10 权益快照 DSL 契约承载实现和测试：B1 覆盖索引的 DSL 契约测试已存在；B2 覆盖索引下支付工具、绑定历史、资金来源关系、显式建账、预算组默认周期 `LIFETIME`、账务计划装配器长 ID 追溯、余额日志证据、余额投影、上下文敏感字段阻断和防御性拷贝已有局部基线；B3 至 B6 覆盖索引已有部分直接交易、授权、余额控制、Route Replay、交易投影、稳定摘要、解释摘要、权益回放摘要、路由事实边界、主链路事实红线、敏感上下文阻断和投影重放差异校验测试；B7 已有 reconciliation-* 模块骨架和出款前准入候选实现，已通过专项服务测试验证，可作为后续候选输入但未纳入清结算、对账或出款生命周期 Done 基线；B8 已有 governance-* 交易投影重放骨架、范围/来源事实/差异项校验和局部边界测试。上述都只作为局部代码和验证门禁基线，不表示对应覆盖索引全量完成或可跳过 Execution Grant。
 - [x] 完成 A0 只读核验证据登记：Java 21 运行时、编译门禁、A1 直接交易主链路、posting 装配和余额投影回归测试已通过；embedded Redis 由测试基础设施自动启动和使用，未触发额外人工确认。A0 通过只作为下一步单一 MVP Execution Grant 输入，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
+- [x] 补齐 A1 直接交易事实红线候选准入卡：`docs/TDD设计/A1-直接交易事实红线准入卡.md` 已整理候选授权、覆盖验收、写入边界、Red 集合、验证命令和停止条件；该卡仍需用户确认后才成为实际 Execution Grant。
 
 ### 5.1 设计、代码、任务对齐矩阵
 
@@ -561,11 +562,26 @@ NFR 假设：本历史授权只做契约承载，不触碰生产并发、容量�
 | 后续基线收敛 | 请求摘要、稳定摘要支撑、账务计划装配器长 ID、预算组默认周期 `LIFETIME`、账务事实断言、钱包/交易/治理边界、CAD 完整验证门禁、出款准入规则核验证据、编码准入设计冻结、提现/解冻红线、余额日志证据、路由事实边界、交易投影解释、权益回放摘要、治理重放差异校验、资金事实红线、敏感上下文阻断、上下文不可变、防御性拷贝、外部账户原文阻断、MVP/归档边界和设计交付口径已在后续提交中收敛，当前设计和任务基线提交点为 `9456ab6`，代码能力基线截至 `77bc9f4`。 | `75b46ef` 至 `5901265` 的历史基线证据，`5901265..77bc9f4` 的资金事实红线、敏感上下文和设计交付口径收敛证据，以及 `9456ab6` 的 A0 准入与代码基线对齐证据。 |
 | 残余风险 | 只能声明 `B1-10 契约承载 Done`。 | route、posting、replay、授权占券、清结算、对账、投影、归档、冷热读取和治理重放消费仍在 B3/B4/B6/B7/B8 后续 MVP 任务；解释视图、证据最小化和外部规则核验仍在 B6/B7/B8 后续 MVP 任务。 |
 
-## 13. B2 建议 Execution Grant
+## 13. A1 建议 Execution Grant
+
+A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线。A1 的完整候选授权卡见 `docs/TDD设计/A1-直接交易事实红线准入卡.md`；该卡只作为下一步确认输入，不因写入本 Harness Plan 而自动授权编码。
+
+| 项 | 候选口径 |
+| --- | --- |
+| 任务切片 | A1 直接交易事实红线。 |
+| 业务问题 | 直接交易成功或失败后，是否能解释状态、金额、route、posting、ledger entry、余额投影、幂等和审计证据。 |
+| 首批 Red | `A1-RED-001` 成功链路事实完整性；必要时补 `A1-RED-002` 失败无副作用和幂等冲突。 |
+| 目标测试资产 | `FundsDirectTransactionFlowTests`、`DefaultLedgerPostingAssemblerTests`、`LedgerBalanceProjectionServiceImplTests`。 |
+| 默认写入范围 | 先写 A1 目标测试资产；Red 证明缺口后，只允许在 `transaction-impl`、`ledger-impl` 做最小修复。 |
+| 默认禁止范围 | face/core 公共契约、DDL/H2 schema、A2/A3/A4、B7/B8、P2、生产配置、外部协议和敏感数据处理。 |
+| 验证命令 | `just mvn-version`、`just compile`、`just test-one FundsDirectTransactionFlowTests tests`，必要时 `just test-transaction`、`just test-business-flow`、`just test-boundary`，提交前 `just pmd` 和 `git diff --check`。 |
+| 当前状态 | 候选准入卡已补齐；仍需用户确认后才成为实际 Execution Grant。 |
+
+## 14. B2 建议 Execution Grant
 
 B2 是后续直接交易、授权交易、余额控制、退款和权益资金流进入真实组合验证前的基础门禁。建议对应 MVP 任务只处理钱包账户、账本、余额投影和支付工具基础能力，不进入直接交易、授权交易或权益生产消费链路。
 
-### 13.1 Round 0 开工核验
+### 14.1 Round 0 开工核验
 
 B2 开工前先做 Round 0，只核验不写入。Round 0 的输出是“是否建议进入 B2 Execution Grant”，不是代码完成结论。
 
@@ -577,7 +593,7 @@ B2 开工前先做 Round 0，只核验不写入。Round 0 的输出是“是否�
 | 写入边界 | B2 只允许 wallet、ledger 和 tests 范围；`transaction-*`、权益消费、清结算、对账、归档和指标实现保持禁止写入。 | 需要越界时重新确认 Execution Grant。 |
 | 验证环境 | `just mvn-version`、`just compile`、`just test-ledger`、`just test-boundary`、`just pmd` 可作为目标门禁。 | Maven/JDK/私服问题需记录环境限制，不能写成代码失败。 |
 
-### 13.2 B2 最小 Red 包
+### 14.2 B2 最小 Red 包
 
 | Red ID | 目标行为 | 目标测试资产 | 验证 |
 | --- | --- | --- | --- |
@@ -588,7 +604,7 @@ B2 开工前先做 Round 0，只核验不写入。Round 0 的输出是“是否�
 | B2-RED-005 | posting 不平衡、分录缺周期、投影失败回滚账本事实或日志失败回滚投影必须失败。 | `PostingLedgerDslContractTests`、`DefaultLedgerPostingAssemblerTests`、`LedgerBalanceProjectionServiceImplTests`。 | `just test-one LedgerBalanceProjectionServiceImplTests tests`、`just test-ledger`。 |
 | B2-RED-006 | wallet 直接创建资金交易、route snapshot 或 ledger entry 必须失败。 | `WalletLayerBoundaryTests`、`RouteResolverFactBoundaryTests`。 | `just test-boundary`。 |
 
-### 13.3 B2 Done / Not Done 口径
+### 14.3 B2 Done / Not Done 口径
 
 | 项 | Done | Not Done |
 | --- | --- | --- |
