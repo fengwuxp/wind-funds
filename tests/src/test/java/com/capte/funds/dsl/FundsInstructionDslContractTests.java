@@ -198,6 +198,63 @@ class FundsInstructionDslContractTests {
     }
 
     /**
+     * 场景：调用方把权益金额、资金责任或当前营销规则藏入资金操作人上下文。
+     * 预期：资金操作人快照构造阶段显式失败，但仍允许只放权益快照引用和稳定摘要。
+     * 红线：操作者审计上下文不能绕过指令和引用守门承载权益核心事实。
+     */
+    @Test
+    void testOperationActorContextShouldRejectCoreBenefitFactsButAllowSummaryRefs() {
+        assertThatThrownBy(() -> ImmutableFundsOperationActorSpec.builder()
+                .operatorId(1L)
+                .operatorType("SYSTEM")
+                .operatorName("Codex")
+                .appName("wind-funds-tests")
+                .contextVariables(Map.of("benefitPayload", Map.of(
+                        "amount", Money.immutable(2000L, CURRENCY),
+                        "fundingNature", "PLATFORM_BORNE")))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsOperationActor.contextVariables must not contain core benefit field");
+
+        assertThatThrownBy(() -> ImmutableFundsOperationActorSpec.builder()
+                .operatorId(1L)
+                .operatorType("SYSTEM")
+                .operatorName("Codex")
+                .appName("wind-funds-tests")
+                .contextVariables(Map.of("benefitDecisionTrace",
+                        new Object[] {Map.of("currentMarketingRule", "latest-rule")}))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsOperationActor.contextVariables must not contain core benefit field: "
+                        + "currentMarketingRule");
+
+        ImmutableFundsOperationActorSpec actor = ImmutableFundsOperationActorSpec.builder()
+                .operatorId(1L)
+                .operatorType("SYSTEM")
+                .operatorName("Codex")
+                .appName("wind-funds-tests")
+                .contextVariables(Map.of(
+                        "benefitSnapshotId", "BS-ACTOR-SUMMARY-001",
+                        "stableDigest", "sha256:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+                        "benefitGroupSn", "BG-ACTOR-SUMMARY-001",
+                        "componentSn", "COMP-ACTOR-SUMMARY-001",
+                        "ruleVersion", "rule-v1",
+                        "refundDecisionId", "refund-decision-001",
+                        "externalDecisionId", "pricing-decision-001"))
+                .build();
+
+        assertThat(actor.getContextVariables())
+                .containsEntry("benefitSnapshotId", "BS-ACTOR-SUMMARY-001")
+                .containsEntry("stableDigest",
+                        "sha256:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+                .containsEntry("benefitGroupSn", "BG-ACTOR-SUMMARY-001")
+                .containsEntry("componentSn", "COMP-ACTOR-SUMMARY-001")
+                .containsEntry("ruleVersion", "rule-v1")
+                .containsEntry("refundDecisionId", "refund-decision-001")
+                .containsEntry("externalDecisionId", "pricing-decision-001");
+    }
+
+    /**
      * 场景：调用方绕过交易转换器，直接在资金指令扩展上下文塞入通道密钥或外部账户原文。
      * 预期：资金 DSL 指令构造期立即拒绝。
      * 红线：资金指令上下文会进入交易事实链路，不能依赖上游适配器单点拦截敏感值。

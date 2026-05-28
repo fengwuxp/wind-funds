@@ -11,7 +11,7 @@ import java.util.Set;
 /**
  * 权益 DSL 契约校验工具。
  */
-final class FundsBenefitSpecValidators {
+public final class FundsBenefitSpecValidators {
 
     private static final Set<String> RESERVED_CONTEXT_KEYS = Set.of(
             ImmutableFundsBenefitSnapshotSpec.Fields.benefitSnapshotId,
@@ -81,7 +81,7 @@ final class FundsBenefitSpecValidators {
         return copied;
     }
 
-    static Map<String, Object> immutableInstructionContext(Map<String, Object> contextVariables, String owner) {
+    public static Map<String, Object> immutableInstructionContext(Map<String, Object> contextVariables, String owner) {
         Map<String, Object> copied = FundsContextVariables.immutableCopy(contextVariables);
         rejectReservedInstructionContextKeys(copied, owner);
         return copied;
