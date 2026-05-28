@@ -82,6 +82,7 @@ just verify-cad
 - [x] 完成 CAD 完整门禁验证登记：`WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 已通过，覆盖 Java 运行时、编译、核心契约、账本、交易、余额控制、业务流、架构边界、治理重放和 PMD；该结果仍只作为下一步 Execution Grant 输入，不替代生产 Done。
 - [x] 补齐 A1 直接交易事实红线候选准入卡：`docs/TDD设计/A1-直接交易事实红线准入卡.md` 已整理候选授权、覆盖验收、写入边界、Red 集合、验证命令和停止条件；该卡仍需用户确认后才成为实际 Execution Grant。
 - [x] 完成 A1 现有覆盖扫描登记：`52f116f docs: 记录 A1 现有覆盖扫描` 已记录 `A1-RED-001`、`A1-RED-002` 既有回归覆盖和 `FundsDirectTransactionFlowTests` 22 个用例通过证据；该结果只作为 Execution Grant 输入，不替代生产 Done。
+- [x] 完成 A1 证据链同步后完整门禁复核：`97bc25d docs: 同步 A1 覆盖扫描证据` 后执行 `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 并通过，覆盖编译、测试和 PMD；该结果只证明当前候选准入证据链与工程基线一致，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 
 ### 5.1 设计、代码、任务对齐矩阵
 
