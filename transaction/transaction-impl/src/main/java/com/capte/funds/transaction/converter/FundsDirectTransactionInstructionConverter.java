@@ -13,7 +13,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.wind.common.exception.AssertUtils;
-import com.wind.core.WritableContextVariables;
+import com.wind.core.ReadonlyContextVariables;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.route.ImmutableExternalAccountRefSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
@@ -283,7 +283,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .build();
     }
 
-    private @NonNull Map<String, Object> mergeContext(@Nullable WritableContextVariables contextVariables,
+    private @NonNull Map<String, Object> mergeContext(@Nullable ReadonlyContextVariables contextVariables,
                                                       @NonNull Map<String, Object> extraContext) {
         FundsInstructionContextValidator.assertNoSensitiveContextVariables(contextVariables);
         Map<String, Object> result = new LinkedHashMap<>();

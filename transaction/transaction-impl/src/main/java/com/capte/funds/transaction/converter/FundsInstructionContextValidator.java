@@ -1,7 +1,7 @@
 package com.capte.funds.transaction.converter;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.core.WritableContextVariables;
+import com.wind.core.ReadonlyContextVariables;
 import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import org.jspecify.annotations.Nullable;
@@ -20,7 +20,7 @@ final class FundsInstructionContextValidator {
         throw new AssertionError();
     }
 
-    static void assertNoSensitiveContextVariables(@Nullable WritableContextVariables contextVariables) {
+    static void assertNoSensitiveContextVariables(@Nullable ReadonlyContextVariables contextVariables) {
         Map<String, Object> variables = contextVariables == null ? null : contextVariables.getContextVariables();
         AssertUtils.isFalse(variables != null
                         && (PaymentInstrumentSensitiveValueValidator.containsSensitiveField(variables)

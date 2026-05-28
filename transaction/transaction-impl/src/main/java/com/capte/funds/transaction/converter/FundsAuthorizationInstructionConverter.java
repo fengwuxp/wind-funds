@@ -9,7 +9,7 @@ import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionCh
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
-import com.wind.core.WritableContextVariables;
+import com.wind.core.ReadonlyContextVariables;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
@@ -196,7 +196,7 @@ public class FundsAuthorizationInstructionConverter {
                 .build();
     }
 
-    private @NonNull Map<String, Object> mergeContext(@Nullable WritableContextVariables contextVariables,
+    private @NonNull Map<String, Object> mergeContext(@Nullable ReadonlyContextVariables contextVariables,
                                                       @NonNull Map<String, Object> extraContext) {
         FundsInstructionContextValidator.assertNoSensitiveContextVariables(contextVariables);
         Map<String, Object> result = new LinkedHashMap<>();

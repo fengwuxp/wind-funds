@@ -1,6 +1,6 @@
 package com.capte.funds.transaction.model.request;
 
-import com.wind.core.WritableContextVariables;
+import com.wind.core.ReadonlyContextVariables;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.InternationalRegionCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -65,10 +65,5 @@ public class FundsAuthorizationTransactionAuthorizeRequest {
     private String declineReason;
 
     @Schema(description = "上下文变量")
-    private WritableContextVariables contextVariables;
-
-    public FundsAuthorizationTransactionAuthorizeRequest setContextVariables(WritableContextVariables contextVariables) {
-        this.contextVariables = FundsRequestContextVariables.snapshot(contextVariables);
-        return this;
-    }
+    private ReadonlyContextVariables contextVariables;
 }

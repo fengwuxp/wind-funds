@@ -1,6 +1,6 @@
 package com.capte.funds.transaction.model.request;
 
-import com.wind.core.WritableContextVariables;
+import com.wind.core.ReadonlyContextVariables;
 import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
@@ -52,10 +52,5 @@ public class FundsTransactionPayRequest {
     private String description;
 
     @Schema(description = "上下文变量")
-    private WritableContextVariables contextVariables;
-
-    public FundsTransactionPayRequest setContextVariables(WritableContextVariables contextVariables) {
-        this.contextVariables = FundsRequestContextVariables.snapshot(contextVariables);
-        return this;
-    }
+    private ReadonlyContextVariables contextVariables;
 }

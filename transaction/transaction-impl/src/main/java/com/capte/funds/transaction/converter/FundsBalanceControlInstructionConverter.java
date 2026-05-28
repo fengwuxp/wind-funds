@@ -8,7 +8,7 @@ import com.capte.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.capte.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
 import com.wind.common.exception.AssertUtils;
-import com.wind.core.WritableContextVariables;
+import com.wind.core.ReadonlyContextVariables;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
@@ -158,7 +158,7 @@ public class FundsBalanceControlInstructionConverter {
                 .build();
     }
 
-    private @NonNull Map<String, Object> mergeContext(@Nullable WritableContextVariables contextVariables,
+    private @NonNull Map<String, Object> mergeContext(@Nullable ReadonlyContextVariables contextVariables,
                                                       @NonNull Map<String, Object> extraContext) {
         FundsInstructionContextValidator.assertNoSensitiveContextVariables(contextVariables);
         Map<String, Object> result = new LinkedHashMap<>();

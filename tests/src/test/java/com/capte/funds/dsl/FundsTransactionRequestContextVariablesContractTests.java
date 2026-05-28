@@ -15,10 +15,9 @@ import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionWithdrawRequest;
-import com.wind.core.WritableContextVariables;
+import com.wind.core.ReadonlyContextVariables;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -31,55 +30,54 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FundsTransactionRequestContextVariablesContractTests {
 
     /**
-     * 场景：调用方构造资金交易请求后，继续改写原始 WritableContextVariables 或其嵌套 Map。
-     * 预期：请求对象持有设置时快照，不被外部可变对象污染。
-     * 红线：交易请求不得因浅拷贝让 PAN、密钥或外部账户原文进入资金指令事实。
+     * 场景：调用方传入交易请求上下文。
+     * 预期：请求对象以 ReadonlyContextVariables 承载当前阶段的上下文变量。
      */
     @Test
-    void testTransactionRequestsShouldDefensivelyCopyNestedContextVariables() {
-        assertDefensiveCopy(new FundsTransactionTopupRequest(),
+    void testTransactionRequestsShouldStoreReadonlyContextVariables() {
+        assertReadonlyContextStored(new FundsTransactionTopupRequest(),
                 FundsTransactionTopupRequest::setContextVariables,
                 FundsTransactionTopupRequest::getContextVariables);
-        assertDefensiveCopy(new FundsTransactionPayRequest(),
+        assertReadonlyContextStored(new FundsTransactionPayRequest(),
                 FundsTransactionPayRequest::setContextVariables,
                 FundsTransactionPayRequest::getContextVariables);
-        assertDefensiveCopy(new FundsTransactionTransferRequest(),
+        assertReadonlyContextStored(new FundsTransactionTransferRequest(),
                 FundsTransactionTransferRequest::setContextVariables,
                 FundsTransactionTransferRequest::getContextVariables);
-        assertDefensiveCopy(new FundsTransactionRefundRequest(),
+        assertReadonlyContextStored(new FundsTransactionRefundRequest(),
                 FundsTransactionRefundRequest::setContextVariables,
                 FundsTransactionRefundRequest::getContextVariables);
-        assertDefensiveCopy(new FundsTransactionWithdrawRequest(),
+        assertReadonlyContextStored(new FundsTransactionWithdrawRequest(),
                 FundsTransactionWithdrawRequest::setContextVariables,
                 FundsTransactionWithdrawRequest::getContextVariables);
-        assertDefensiveCopy(new FundsTransactionFeeRequest(),
+        assertReadonlyContextStored(new FundsTransactionFeeRequest(),
                 FundsTransactionFeeRequest::setContextVariables,
                 FundsTransactionFeeRequest::getContextVariables);
-        assertDefensiveCopy(new FundsTransactionFeeRefundRequest(),
+        assertReadonlyContextStored(new FundsTransactionFeeRefundRequest(),
                 FundsTransactionFeeRefundRequest::setContextVariables,
                 FundsTransactionFeeRefundRequest::getContextVariables);
-        assertDefensiveCopy(new FundsAuthorizationTransactionAuthorizeRequest(),
+        assertReadonlyContextStored(new FundsAuthorizationTransactionAuthorizeRequest(),
                 FundsAuthorizationTransactionAuthorizeRequest::setContextVariables,
                 FundsAuthorizationTransactionAuthorizeRequest::getContextVariables);
-        assertDefensiveCopy(new FundsAuthorizationTransactionSettleRequest(),
+        assertReadonlyContextStored(new FundsAuthorizationTransactionSettleRequest(),
                 FundsAuthorizationTransactionSettleRequest::setContextVariables,
                 FundsAuthorizationTransactionSettleRequest::getContextVariables);
-        assertDefensiveCopy(new FundsAuthorizationTransactionReversalRequest(),
+        assertReadonlyContextStored(new FundsAuthorizationTransactionReversalRequest(),
                 FundsAuthorizationTransactionReversalRequest::setContextVariables,
                 FundsAuthorizationTransactionReversalRequest::getContextVariables);
-        assertDefensiveCopy(new FundsAuthorizationTransactionRefundRequest(),
+        assertReadonlyContextStored(new FundsAuthorizationTransactionRefundRequest(),
                 FundsAuthorizationTransactionRefundRequest::setContextVariables,
                 FundsAuthorizationTransactionRefundRequest::getContextVariables);
-        assertDefensiveCopy(new FundsAuthorizationTransactionChargebackRequest(),
+        assertReadonlyContextStored(new FundsAuthorizationTransactionChargebackRequest(),
                 FundsAuthorizationTransactionChargebackRequest::setContextVariables,
                 FundsAuthorizationTransactionChargebackRequest::getContextVariables);
-        assertDefensiveCopy(new FundsBalanceFreezeRequest(),
+        assertReadonlyContextStored(new FundsBalanceFreezeRequest(),
                 FundsBalanceFreezeRequest::setContextVariables,
                 FundsBalanceFreezeRequest::getContextVariables);
-        assertDefensiveCopy(new FundsBalanceUnfreezeRequest(),
+        assertReadonlyContextStored(new FundsBalanceUnfreezeRequest(),
                 FundsBalanceUnfreezeRequest::setContextVariables,
                 FundsBalanceUnfreezeRequest::getContextVariables);
-        assertDefensiveCopy(new FundsBalanceAdjustRequest(),
+        assertReadonlyContextStored(new FundsBalanceAdjustRequest(),
                 FundsBalanceAdjustRequest::setContextVariables,
                 FundsBalanceAdjustRequest::getContextVariables);
     }
@@ -137,32 +135,23 @@ class FundsTransactionRequestContextVariablesContractTests {
                 FundsBalanceAdjustRequest::getContextVariables);
     }
 
-    private static <T> void assertDefensiveCopy(T request,
-                                                BiFunction<T, WritableContextVariables, T> setter,
-                                                Function<T, WritableContextVariables> getter) {
-        Map<String, Object> processorPayload = new HashMap<>();
-        processorPayload.put("networkReference", "token:transaction-request-context-001");
-        WritableContextVariables source = WritableContextVariables.of(
-                Map.of("processorPayload", processorPayload));
+    private static <T> void assertReadonlyContextStored(T request,
+                                                        BiFunction<T, ReadonlyContextVariables, T> setter,
+                                                        Function<T, ReadonlyContextVariables> getter) {
+        ReadonlyContextVariables source = ReadonlyContextVariables.of(Map.of(
+                "networkReference", "token:transaction-request-context-001"));
 
         setter.apply(request, source);
 
-        source.putVariable("pan", "PAN_AFTER_TRANSACTION_REQUEST_SHOULD_NOT_LEAK");
-        processorPayload.put("pan", "PAN_AFTER_TRANSACTION_REQUEST_PAYLOAD_SHOULD_NOT_LEAK");
-
-        WritableContextVariables stored = getter.apply(request);
-        assertThat(stored).isNotSameAs(source);
-        assertThat(stored.getContextVariables()).doesNotContainKey("pan");
-        Object payloadValue = stored.getContextVariables().get("processorPayload");
-        assertThat(payloadValue).isInstanceOf(Map.class);
-        Map<?, ?> payload = (Map<?, ?>) payloadValue;
-        assertThat(payload.get("networkReference")).isEqualTo("token:transaction-request-context-001");
-        assertThat(payload.containsKey("pan")).isFalse();
+        ReadonlyContextVariables stored = getter.apply(request);
+        assertThat(stored).isNotNull();
+        assertThat(stored.getContextVariables())
+                .containsEntry("networkReference", "token:transaction-request-context-001");
     }
 
     private static <T> void assertNullContextPreserved(T request,
-                                                       BiFunction<T, WritableContextVariables, T> setter,
-                                                       Function<T, WritableContextVariables> getter) {
+                                                       BiFunction<T, ReadonlyContextVariables, T> setter,
+                                                       Function<T, ReadonlyContextVariables> getter) {
         setter.apply(request, null);
 
         assertThat(getter.apply(request)).isNull();
