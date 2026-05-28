@@ -56,6 +56,7 @@ public final class ExternalAccountSensitiveValueValidator {
             "iban");
 
     private static final Set<String> INTERNAL_REFERENCE_CONTEXT_FIELDS = Set.of(
+            "authorizationtransactionsn",
             "referencefreezesn");
 
     private ExternalAccountSensitiveValueValidator() {

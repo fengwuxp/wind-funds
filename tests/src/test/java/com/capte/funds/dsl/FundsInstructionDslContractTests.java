@@ -309,6 +309,20 @@ class FundsInstructionDslContractTests {
     }
 
     /**
+     * 场景：授权撤销、结算、退款或拒付指令在上下文中携带原授权交易号。
+     * 预期：内部授权交易号即使形似有效 IBAN，也不能被误判为外部账户原文。
+     * 红线：敏感值校验不得阻断资金交易内部引用链路。
+     */
+    @Test
+    void testFundsInstructionShouldAllowInternalAuthorizationTransactionReference() {
+        FundsInstructionSpec instruction = validInstruction(externalTransactionReference(),
+                Map.of("authorizationTransactionSn", "FT2026052812000061"));
+
+        assertThat(instruction.getContextVariables())
+                .containsEntry("authorizationTransactionSn", "FT2026052812000061");
+    }
+
+    /**
      * 场景：调用方把权益核心金额、资金责任或当前营销规则藏入资金指令顶层上下文。
      * 预期：资金指令构造阶段显式失败，但仍允许过渡期只放权益快照引用和稳定摘要。
      * 红线：资金指令 contextVariables 不能替代权益快照、route snapshot 或交易事实快照。
