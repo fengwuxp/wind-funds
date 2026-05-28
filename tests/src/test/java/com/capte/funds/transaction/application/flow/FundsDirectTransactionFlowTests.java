@@ -7,6 +7,7 @@ import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.dal.entities.FundsTransaction;
+import com.capte.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
@@ -1474,6 +1475,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                                                                 int expectedEntries) {
         super.assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, expectedDetails, expectedEntries);
         assertDirectPostingPlansUseRouteSnapshotLegs(businessSn);
+        assertDirectFactsShareBusinessScene(businessSn);
     }
 
     private void assertDirectPostingPlansUseRouteSnapshotLegs(String businessSn) {
@@ -1497,5 +1499,26 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                                     .map(RouteLegSpec::getLegId)
                                     .toList());
                 });
+    }
+
+    private void assertDirectFactsShareBusinessScene(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+
+        assertThat(ledgerTransaction.getBusinessScene())
+                .as("ledger transaction businessScene must follow funds transaction for %s", businessSn)
+                .isEqualTo(transaction.getBusinessScene());
+        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+                .as("funds transaction detail businessScene must follow funds transaction for %s", businessSn)
+                .extracting(FundsTransactionDetail::getBusinessScene)
+                .containsOnly(transaction.getBusinessScene());
+        assertThat(entriesOf(ledgerTransaction))
+                .as("ledger entry businessScene must follow funds transaction for %s", businessSn)
+                .extracting(LedgerEntry::getBusinessScene)
+                .containsOnly(transaction.getBusinessScene());
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+                .as("route snapshot businessScene must follow funds transaction for %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getBusinessScene())
+                        .isEqualTo(transaction.getBusinessScene()));
     }
 }
