@@ -19,6 +19,7 @@ import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
+import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
@@ -1531,21 +1532,36 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     private void assertDirectEntriesFollowPostingPlans(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
         List<LedgerEntry> entries = entriesOf(ledgerTransaction);
 
-        postingPlansOf(ledgerTransaction).forEach(plan -> assertThat(entries.stream()
-                .filter(entry -> plan.getSn().equals(entry.getPostingPlanSn()))
-                .toList())
-                .as("ledger entries must follow posting plan for direct transaction %s", businessSn)
-                .isNotEmpty()
-                .allSatisfy(entry -> {
-                    assertThat(entry.getIntent()).isEqualTo(plan.getIntent());
-                    assertThat(entry.getPostingScope()).isEqualTo(plan.getPostingScope());
-                    assertThat(entry.getBalanceEffectType()).isEqualTo(plan.getBalanceEffectType());
-                    assertThat(entry.getPhaseCode()).isEqualTo(plan.getPhaseCode());
-                    assertThat(entry.getAmount()).isEqualTo(plan.getAmount());
-                    assertThat(entry.getCurrency()).isEqualTo(plan.getCurrency());
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+                .as("route snapshot for direct transaction %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> postingPlansOf(ledgerTransaction).forEach(plan -> {
+                    RouteLegSpec routeLeg = directRouteLegById(routeSnapshot.getLegs(), plan.getRouteLegId());
+                    List<LedgerEntry> planEntries = entries.stream()
+                            .filter(entry -> plan.getSn().equals(entry.getPostingPlanSn()))
+                            .toList();
+
+                    assertThat(planEntries)
+                            .as("ledger entries must follow posting plan for direct transaction %s", businessSn)
+                            .hasSize(2);
+                    assertThat(planEntries.stream()
+                            .map(DirectRouteNodeKey::from)
+                            .toList())
+                            .as("ledger entries must follow route leg nodes for direct transaction %s", businessSn)
+                            .containsExactlyInAnyOrder(
+                                    DirectRouteNodeKey.from(routeLeg.getSourceNode()),
+                                    DirectRouteNodeKey.from(routeLeg.getTargetNode()));
+                    assertThat(planEntries).allSatisfy(entry -> {
+                        assertThat(entry.getIntent()).isEqualTo(plan.getIntent());
+                        assertThat(entry.getPostingScope()).isEqualTo(plan.getPostingScope());
+                        assertThat(entry.getBalanceEffectType()).isEqualTo(plan.getBalanceEffectType());
+                        assertThat(entry.getPhaseCode()).isEqualTo(plan.getPhaseCode());
+                        assertThat(entry.getAmount()).isEqualTo(plan.getAmount());
+                        assertThat(entry.getCurrency()).isEqualTo(plan.getCurrency());
+                    });
                 }));
     }
 
@@ -1660,6 +1676,21 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(routeSnapshot.getTransactionType()).isEqualTo(transaction.getTransactionType());
                     assertThat(routeSnapshot.getEventType().name()).isEqualTo(ledgerTransaction.getEventType());
                 });
+    }
+
+    private record DirectRouteNodeKey(String subjectId,
+                                      String subjectType,
+                                      LedgerSubjectCode ledgerSubjectCode) {
+
+        private static DirectRouteNodeKey from(RouteNodeSpec node) {
+            return new DirectRouteNodeKey(node.getSubjectRef().getSubjectId(),
+                    node.getSubjectRef().getSubjectType().name(), node.getLedgerSubjectCode());
+        }
+
+        private static DirectRouteNodeKey from(LedgerEntry entry) {
+            return new DirectRouteNodeKey(entry.getSubjectId(), entry.getSubjectType(),
+                    entry.getLedgerSubjectCode());
+        }
     }
 
     private record DirectBalanceKey(String subjectId,
