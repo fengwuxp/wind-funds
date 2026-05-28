@@ -1519,6 +1519,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectFactsShareBusinessScene(businessSn);
         assertDirectFactsShareTransactionIdentity(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
+        assertDirectDetailsKeepRequestFactsOutOfContext(businessSn);
         assertDirectEntriesFollowPostingPlans(businessSn);
         assertDirectLedgerContextsKeepPostingEvidenceOnly(businessSn);
         assertDirectFactsCarryAuditTrail(businessSn);
@@ -1532,6 +1533,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectRouteSnapshotCarriesMetadata(businessSn);
         assertDirectRouteSnapshotKeepsContextMinimal(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
+        assertDirectDetailsKeepRequestFactsOutOfContext(businessSn);
     }
 
     private void assertDirectRouteSnapshotCarriesMetadata(String businessSn) {
@@ -1678,6 +1680,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         .containsExactlyInAnyOrderElementsOf(routeSnapshot.getParticipants().stream()
                                 .map(DirectRouteParticipantKey::from)
                                 .toList()));
+    }
+
+    private void assertDirectDetailsKeepRequestFactsOutOfContext(String businessSn) {
+        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+                .as("direct detail contexts for %s", businessSn)
+                .isNotEmpty()
+                .allSatisfy(detail -> assertThat(contextVariablesOf(detail.getContextVariables()).keySet())
+                        .as("direct detail context must not carry request context variables for %s", businessSn)
+                        .doesNotContainAnyElementsOf(DIRECT_REQUEST_CONTEXT_KEYS));
     }
 
     private void assertDirectEntriesFollowPostingPlans(String businessSn) {

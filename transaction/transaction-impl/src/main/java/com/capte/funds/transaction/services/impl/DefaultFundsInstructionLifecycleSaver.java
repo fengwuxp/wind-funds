@@ -689,7 +689,10 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     }
 
     private Map<String, Object> mergedContext(FundsInstructionSpec instruction, RouteParticipantSpec participant) {
-        Map<String, Object> result = new LinkedHashMap<>(instruction.getContextVariables());
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (instruction.getInstructionType() != FundsInstructionType.DIRECT_TRANSACTION) {
+            result.putAll(instruction.getContextVariables());
+        }
         result.putAll(participant.getContextVariables());
         return result;
     }
