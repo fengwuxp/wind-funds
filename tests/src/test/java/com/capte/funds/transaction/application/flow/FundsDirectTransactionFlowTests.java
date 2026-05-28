@@ -1561,6 +1561,9 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         assertThat(entry.getPhaseCode()).isEqualTo(plan.getPhaseCode());
                         assertThat(entry.getAmount()).isEqualTo(plan.getAmount());
                         assertThat(entry.getCurrency()).isEqualTo(plan.getCurrency());
+                        assertThat(entry.getOriginalAmount()).isEqualTo(routeLeg.getOriginalAmount().getAmount());
+                        assertThat(entry.getOriginalCurrency()).isEqualTo(routeLeg.getOriginalAmount().getCurrency());
+                        assertThat(entry.getExchangeRate()).isEqualByComparingTo(routeLeg.getExchangeRate());
                     });
                 }));
     }
