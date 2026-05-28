@@ -5,17 +5,17 @@ import com.capte.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.capte.funds.ledger.service.LedgerService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.spring.SpringEventPublishUtils;
-import com.wind.integration.funds.model.FundsContextVariables;
-import com.wind.integration.funds.wallet.FundsAccountBalanceView;
-import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.integration.funds.ledger.LedgerBalanceBucket;
 import com.wind.integration.funds.ledger.LedgerBalanceChangedEvent;
 import com.wind.integration.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
+import com.wind.integration.funds.wallet.FundsAccountBalanceView;
+import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.FundsAccountQueryService;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +53,7 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
         if (entries.isEmpty()) {
             return;
         }
+        assertNoCoreBenefitContextVariables(entries);
         FundsAccountId accountId = requireSingleFundsAccount(entries);
         // 按照 ledger_id 分组，避免同一科目在不同周期账本间串账。
         Map<Long, List<LedgerEntrySpec>> groups = entries.stream()
@@ -131,9 +132,15 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
                     .businessScene(entry.getBusinessScene())
                     .businessSn(entry.getBusinessSn())
                     .transactionTime(entry.getTransactionTime())
-                    .contextVariables(FundsContextVariables.immutableCopy(entry.getContextVariables()))
+                    .contextVariables(entry.getContextVariables())
                     .build();
         publishBalanceChangedEvent(event, entry, ledger, accountId);
+    }
+
+    private void assertNoCoreBenefitContextVariables(List<LedgerEntrySpec> entries) {
+        entries.forEach(entry -> FundsBenefitSpecValidators.immutableInstructionContext(
+                entry.getContextVariables(),
+                "ledgerBalanceProjection.entry"));
     }
 
     private void publishBalanceChangedEvent(LedgerBalanceChangedEvent event,

@@ -176,6 +176,34 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：直接调用余额投影入口时，分录上下文携带权益金额和资金责任等核心事实。
+     * 输入：entry.contextVariables 的嵌套 payload 中包含 amount、fundingNature。
+     * 输出：投影请求在余额写入前被拒绝；AVAILABLE 余额保持期初 100，未发布余额变更事件。
+     * 预期：权益核心事实只能由权益 DSL 承载，不得滞留在账本分录扩展上下文。
+     * 红线：余额投影不能先写余额，再依赖余额变更观察事件发现权益核心字段。
+     */
+    @Test
+    void testProjectShouldRejectCoreBenefitEntryContextBeforeBalanceMutation() {
+        List<LedgerBalanceChangedEvent> publishedEvents = new ArrayList<>();
+        setApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> projectionService.project(List.of(ledgerEntry(25L,
+                Map.of("benefitPayload",
+                        Map.of(
+                                "amount", Money.immutable(2000L, CURRENCY),
+                                "fundingNature", "PLATFORM_BORNE"))))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "ledgerBalanceProjection.entry.contextVariables must not contain core benefit field");
+
+        LedgerDTO ledger = ledgerService.getLedgerById(availableLedgerId);
+        assertThat(ledger.getNormalBalance()).isEqualTo(100L);
+        assertThat(publishedEvents).isEmpty();
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一资金账户的一批投影同时命中多个余额桶，其中后一个桶余额不足。
      * 输入：先给 FROZEN 桶加 10，再从 AVAILABLE 桶扣 200；AVAILABLE 期初只有 100。
      * 输出：请求被拒绝；AVAILABLE 和 FROZEN 均保持期初余额。
