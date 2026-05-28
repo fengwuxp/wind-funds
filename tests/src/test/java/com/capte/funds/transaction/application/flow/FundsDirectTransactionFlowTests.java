@@ -18,8 +18,10 @@ import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.route.spec.RouteNodeSpec;
+import com.wind.integration.funds.route.spec.RouteParticipantSpec;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
@@ -1481,6 +1483,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectPostingPlansUseRouteSnapshotLegs(businessSn);
         assertDirectFactsShareBusinessScene(businessSn);
         assertDirectFactsShareTransactionIdentity(businessSn);
+        assertDirectDetailsFollowRouteParticipants(businessSn);
         assertDirectEntriesFollowPostingPlans(businessSn);
         assertDirectFactsCarryAuditTrail(businessSn);
         assertDirectBalancesMatchLedgerEntries();
@@ -1530,6 +1533,20 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .filter(routeLeg -> routeLeg.getLegId().equals(routeLegId))
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("route leg not found: " + routeLegId));
+    }
+
+    private void assertDirectDetailsFollowRouteParticipants(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+        List<FundsTransactionDetail> details = fundsTransactionDetailsByBusinessSn(businessSn);
+
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+                .as("route snapshot participants must explain funds transaction details for %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> assertThat(details.stream()
+                        .map(DirectRouteParticipantKey::from)
+                        .toList())
+                        .containsExactlyInAnyOrderElementsOf(routeSnapshot.getParticipants().stream()
+                                .map(DirectRouteParticipantKey::from)
+                                .toList()));
     }
 
     private void assertDirectEntriesFollowPostingPlans(String businessSn) {
@@ -1690,6 +1707,25 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(routeSnapshot.getTransactionType()).isEqualTo(transaction.getTransactionType());
                     assertThat(routeSnapshot.getEventType().name()).isEqualTo(ledgerTransaction.getEventType());
                 });
+    }
+
+    private record DirectRouteParticipantKey(String subjectId,
+                                             String subjectType,
+                                             RouteParticipantRole participantRole,
+                                             Long amount,
+                                             CurrencyIsoCode currency) {
+
+        private static DirectRouteParticipantKey from(RouteParticipantSpec participant) {
+            Money amount = participant.getAmount();
+            return new DirectRouteParticipantKey(participant.getSubjectRef().getSubjectId(),
+                    participant.getSubjectRef().getSubjectType().name(), participant.getParticipantRole(),
+                    amount == null ? null : amount.getAmount(), amount == null ? null : amount.getCurrency());
+        }
+
+        private static DirectRouteParticipantKey from(FundsTransactionDetail detail) {
+            return new DirectRouteParticipantKey(detail.getSubjectId(), detail.getSubjectType(),
+                    detail.getParticipantRole(), detail.getAmount(), detail.getCurrency());
+        }
     }
 
     private record DirectRouteNodeKey(String subjectId,
