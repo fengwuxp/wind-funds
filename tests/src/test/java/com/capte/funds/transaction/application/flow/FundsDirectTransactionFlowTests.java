@@ -1550,10 +1550,11 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(planEntries.stream()
                             .map(DirectRouteNodeKey::from)
                             .toList())
-                            .as("ledger entries must follow route leg nodes for direct transaction %s", businessSn)
+                            .as("ledger entries must follow route leg nodes and sides for direct transaction %s",
+                                    businessSn)
                             .containsExactlyInAnyOrder(
-                                    DirectRouteNodeKey.from(routeLeg.getSourceNode()),
-                                    DirectRouteNodeKey.from(routeLeg.getTargetNode()));
+                                    DirectRouteNodeKey.from(routeLeg.getSourceNode(), EntrySide.DEBIT),
+                                    DirectRouteNodeKey.from(routeLeg.getTargetNode(), EntrySide.CREDIT));
                     assertThat(planEntries).allSatisfy(entry -> {
                         assertThat(entry.getIntent()).isEqualTo(plan.getIntent());
                         assertThat(entry.getPostingScope()).isEqualTo(plan.getPostingScope());
@@ -1683,16 +1684,17 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
     private record DirectRouteNodeKey(String subjectId,
                                       String subjectType,
-                                      LedgerSubjectCode ledgerSubjectCode) {
+                                      LedgerSubjectCode ledgerSubjectCode,
+                                      EntrySide entrySide) {
 
-        private static DirectRouteNodeKey from(RouteNodeSpec node) {
+        private static DirectRouteNodeKey from(RouteNodeSpec node, EntrySide entrySide) {
             return new DirectRouteNodeKey(node.getSubjectRef().getSubjectId(),
-                    node.getSubjectRef().getSubjectType().name(), node.getLedgerSubjectCode());
+                    node.getSubjectRef().getSubjectType().name(), node.getLedgerSubjectCode(), entrySide);
         }
 
         private static DirectRouteNodeKey from(LedgerEntry entry) {
             return new DirectRouteNodeKey(entry.getSubjectId(), entry.getSubjectType(),
-                    entry.getLedgerSubjectCode());
+                    entry.getLedgerSubjectCode(), entry.getEntrySide());
         }
     }
 
