@@ -93,7 +93,12 @@ import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.integration.funds.ledger.LedgerBalanceBucket;
 import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.integration.funds.ledger.enums.EntrySide;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceConstraintType;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
+import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.integration.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
@@ -124,6 +129,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 /**
  * 资金交易流程测试基座。
@@ -971,11 +977,17 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     private void assertValidPostedTransaction(LedgerTransaction transaction) {
         assertThat(transaction.getFundsTransactionSn()).isNotBlank();
+        assertThat(transaction.getEventType()).isNotBlank();
+        assertThat(transaction.getInstructionType()).isNotBlank();
+        assertThat(transaction.getTransactionType()).isNotBlank();
+        assertThat(transaction.getBusinessScene()).isNotBlank();
+        assertThat(transaction.getBusinessSn()).isNotBlank();
         assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
         assertThat(transaction.getAmount()).isPositive();
         assertThat(transaction.getOriginalAmount()).isPositive();
         assertThat(transaction.getBalanced()).isTrue();
         assertThat(transaction.getDebitAmount()).isEqualTo(transaction.getCreditAmount());
+        assertThat(transaction.getSha256()).isNotBlank();
         List<LedgerPostingPlan> postingPlans = postingPlansOf(transaction);
         List<LedgerEntry> entries = entriesOf(transaction);
         assertThat(postingPlans)
@@ -1001,10 +1013,17 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .toList();
         assertThat(postingPlan.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
         assertThat(postingPlan.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
+        assertThat(postingPlan.getRouteLegId()).isNotBlank();
         assertThat(postingPlan.getCurrency()).isEqualTo(transaction.getCurrency());
         assertThat(postingPlan.getAmount()).isPositive();
+        assertKnownEnumName(LedgerPostingIntentType.class, postingPlan.getIntent(), "posting plan intent");
+        assertKnownEnumName(LedgerPostingScope.class, postingPlan.getPostingScope(), "posting plan scope");
+        assertKnownEnumName(LedgerBalanceEffectType.class, postingPlan.getBalanceEffectType(),
+                "posting plan balance effect");
+        assertKnownEnumName(LedgerPhaseCode.class, postingPlan.getPhaseCode(), "posting plan phase");
         assertThat(postingPlan.getBalanced()).isTrue();
         assertThat(postingPlan.getDebitAmount()).isEqualTo(postingPlan.getCreditAmount());
+        assertThat(postingPlan.getSha256()).isNotBlank();
         assertThat(planEntries).as("posting entries for plan %s", postingPlan.getSn()).isNotEmpty();
         assertThat(sumEntries(planEntries, EntrySide.DEBIT)).as("posting plan debit entries")
                 .isEqualTo(postingPlan.getDebitAmount());
@@ -1014,12 +1033,36 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     private void assertValidEntry(LedgerTransaction transaction, LedgerEntry entry) {
         assertThat(entry.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
+        assertThat(entry.getPostingPlanSn()).isNotBlank();
         assertThat(entry.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
+        assertThat(entry.getLedgerId()).isNotNull();
+        assertThat(entry.getSubjectId()).isNotBlank();
+        assertKnownEnumName(FundsSubjectType.class, entry.getSubjectType(), "ledger entry subject type");
+        assertThat(entry.getLedgerSubjectCode()).isNotNull();
+        assertThat(entry.getLedgerSubjectCategory()).isNotNull();
         assertThat(entry.getBusinessSn()).isEqualTo(transaction.getBusinessSn());
         assertThat(entry.getCurrency()).isEqualTo(transaction.getCurrency());
         assertThat(entry.getAmount()).isNotNull();
         assertThat(entry.getAmount()).isPositive();
+        assertThat(entry.getOriginalAmount()).isPositive();
+        assertThat(entry.getOriginalCurrency()).isEqualTo(transaction.getCurrency());
+        assertThat(entry.getExchangeRate()).isPositive();
         assertThat(entry.getEntrySide()).isIn(EntrySide.DEBIT, EntrySide.CREDIT);
+        assertKnownEnumName(LedgerBalanceConstraintType.class, entry.getBalanceConstraintType(),
+                "ledger entry balance constraint");
+        assertKnownEnumName(LedgerPostingIntentType.class, entry.getIntent(), "ledger entry intent");
+        assertKnownEnumName(LedgerPostingScope.class, entry.getPostingScope(), "ledger entry scope");
+        assertKnownEnumName(LedgerBalanceEffectType.class, entry.getBalanceEffectType(),
+                "ledger entry balance effect");
+        assertKnownEnumName(LedgerPhaseCode.class, entry.getPhaseCode(), "ledger entry phase");
+        assertThat(entry.getSha256()).isNotBlank();
+    }
+
+    private static <E extends Enum<E>> void assertKnownEnumName(Class<E> enumType, String value, String description) {
+        assertThat(value).as(description).isNotBlank();
+        assertThatCode(() -> Enum.valueOf(enumType, value))
+                .as(description)
+                .doesNotThrowAnyException();
     }
 
     private static long sumEntries(List<LedgerEntry> entries, EntrySide side) {
