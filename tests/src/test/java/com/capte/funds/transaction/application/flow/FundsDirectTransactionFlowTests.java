@@ -1492,7 +1492,44 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     @Override
     protected void assertFailedFundsTransactionWithoutLedgerFacts(String businessSn) {
         super.assertFailedFundsTransactionWithoutLedgerFacts(businessSn);
+        assertFailedDirectFactsCarryIdentityAndAudit(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
+    }
+
+    private void assertFailedDirectFactsCarryIdentityAndAudit(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+        List<FundsTransactionDetail> details = fundsTransactionDetailsByBusinessSn(businessSn);
+
+        assertThat(transaction.getTenantId()).isEqualTo(TENANT_ID);
+        assertThat(transaction.getGmtCreate()).isNotNull();
+        assertThat(transaction.getGmtModified()).isAfterOrEqualTo(transaction.getGmtCreate());
+        assertThat(details)
+                .as("failed direct details must carry identity and audit fields for %s", businessSn)
+                .allSatisfy(detail -> {
+                    assertThat(detail.getTenantId()).isEqualTo(TENANT_ID);
+                    assertThat(detail.getTransactionSn()).isEqualTo(transaction.getSn());
+                    assertThat(detail.getBusinessScene()).isEqualTo(transaction.getBusinessScene());
+                    assertThat(detail.getBusinessSn()).isEqualTo(transaction.getBusinessSn());
+                    assertThat(detail.getTransactionType()).isEqualTo(transaction.getTransactionType());
+                    assertThat(detail.getAmount()).isEqualTo(transaction.getAmount());
+                    assertThat(detail.getCurrency()).isEqualTo(transaction.getCurrency());
+                    assertThat(detail.getGmtCreate()).isNotNull();
+                    assertThat(detail.getGmtModified()).isAfterOrEqualTo(detail.getGmtCreate());
+                    assertThat(detail.getRequestHash()).isNotBlank();
+                });
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+                .as("failed direct route snapshot identity must follow transaction for %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> {
+                    assertThat(routeSnapshot.getTenantId()).isEqualTo(TENANT_ID);
+                    assertThat(routeSnapshot.getBusinessScene()).isEqualTo(transaction.getBusinessScene());
+                    assertThat(routeSnapshot.getBusinessSn()).isEqualTo(transaction.getBusinessSn());
+                    assertThat(routeSnapshot.getTransactionType()).isEqualTo(transaction.getTransactionType());
+                    assertThat(routeSnapshot.getResolvedAt()).isNotNull();
+                    assertThat(details)
+                            .as("failed direct details must share route event type for %s", businessSn)
+                            .extracting(FundsTransactionDetail::getEventType)
+                            .containsOnly(routeSnapshot.getEventType());
+                });
     }
 
     private void assertDirectPostingPlansUseRouteSnapshotLegs(String businessSn) {
