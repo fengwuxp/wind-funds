@@ -627,15 +627,22 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     }
 
     protected void assertFailedFundsTransactionWithoutLedgerFacts(String businessSn) {
-        assertThat(fundsTransactionsByBusinessSn(businessSn))
+        List<FundsTransaction> fundsTransactions = fundsTransactionsByBusinessSn(businessSn);
+        List<FundsTransactionDetail> details = fundsTransactionDetailsByBusinessSn(businessSn);
+        assertThat(fundsTransactions)
                 .as("failed funds transactions for businessSn %s", businessSn)
                 .singleElement()
                 .satisfies(transaction -> {
                     assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.FAILED);
                     assertThat(transaction.getRouteSnapshot()).isNotBlank();
                     assertNoLedgerFactsForFundsTransaction(transaction.getSn());
+                    assertThat(details)
+                            .as("failed funds transaction details must belong to transaction for businessSn %s",
+                                    businessSn)
+                            .extracting(FundsTransactionDetail::getTransactionSn)
+                            .containsOnly(transaction.getSn());
                 });
-        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+        assertThat(details)
                 .as("funds transaction details for businessSn %s", businessSn)
                 .isNotEmpty()
                 .allSatisfy(detail -> {
