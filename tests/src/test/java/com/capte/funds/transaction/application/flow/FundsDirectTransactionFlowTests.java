@@ -14,6 +14,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
+import com.capte.funds.transaction.support.FundsRouteCodes;
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
@@ -1481,6 +1482,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                                                                 int expectedEntries) {
         super.assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, expectedDetails, expectedEntries);
         assertDirectPostingPlansUseRouteSnapshotLegs(businessSn);
+        assertDirectRouteSnapshotCarriesMetadata(businessSn);
         assertDirectFactsShareBusinessScene(businessSn);
         assertDirectFactsShareTransactionIdentity(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
@@ -1493,7 +1495,36 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     protected void assertFailedFundsTransactionWithoutLedgerFacts(String businessSn) {
         super.assertFailedFundsTransactionWithoutLedgerFacts(businessSn);
         assertFailedDirectFactsCarryIdentityAndAudit(businessSn);
+        assertDirectRouteSnapshotCarriesMetadata(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
+    }
+
+    private void assertDirectRouteSnapshotCarriesMetadata(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+                .as("direct route snapshot metadata for %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> {
+                    assertThat(routeSnapshot.getTenantId()).isEqualTo(TENANT_ID);
+                    assertThat(routeSnapshot.getSnapshotId()).isEqualTo(businessSn + "_ROUTE");
+                    assertThat(routeSnapshot.getSnapshotSchemaVersion())
+                            .isEqualTo(FundsRouteCodes.CURRENT_ROUTE_VERSION);
+                    assertThat(routeSnapshot.getRouteCode()).isEqualTo(expectedDirectRouteCode(transaction));
+                    assertThat(routeSnapshot.getRouteVersion()).isEqualTo(FundsRouteCodes.CURRENT_ROUTE_VERSION);
+                    assertThat(routeSnapshot.getBusinessSn()).isEqualTo(transaction.getBusinessSn());
+                    assertThat(routeSnapshot.getResolvedAt()).isNotNull();
+                });
+    }
+
+    private String expectedDirectRouteCode(FundsTransaction transaction) {
+        return switch (transaction.getTransactionType()) {
+            case TOPUP -> FundsRouteCodes.TOPUP_STANDARD;
+            case TRANSFER -> FundsRouteCodes.INTERNAL_TRANSFER_STANDARD;
+            case PAY -> FundsRouteCodes.DIRECT_PAY_STANDARD;
+            case REFUND -> FundsRouteCodes.DIRECT_REFUND_STANDARD;
+            default -> throw new AssertionError("unsupported direct transaction type: "
+                    + transaction.getTransactionType());
+        };
     }
 
     private void assertFailedDirectFactsCarryIdentityAndAudit(String businessSn) {
