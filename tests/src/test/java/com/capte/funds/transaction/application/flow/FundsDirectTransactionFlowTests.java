@@ -6,6 +6,7 @@ import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.capte.funds.transaction.dal.entities.FundsTransaction;
 import com.capte.funds.transaction.enums.FundsTransactionChannel;
 import com.capte.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionRefundRequest;
@@ -15,11 +16,13 @@ import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -1464,5 +1467,35 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND_PAY", 2, 2);
         assertThat(fundsTransactionDetails(firstRefundSn)).hasSize(2);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND", 2, 2);
+    }
+
+    @Override
+    protected void assertSingleFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedDetails,
+                                                                int expectedEntries) {
+        super.assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, expectedDetails, expectedEntries);
+        assertDirectPostingPlansUseRouteSnapshotLegs(businessSn);
+    }
+
+    private void assertDirectPostingPlansUseRouteSnapshotLegs(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+        List<String> postingRouteLegIds = postingPlansOf(ledgerTransaction).stream()
+                .map(LedgerPostingPlan::getRouteLegId)
+                .toList();
+
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+                .as("route snapshot for direct transaction %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> {
+                    assertThat(routeSnapshot.getBusinessSn()).isEqualTo(businessSn);
+                    assertThat(routeSnapshot.getLegs())
+                            .as("route snapshot legs for direct transaction %s", businessSn)
+                            .isNotEmpty();
+                    assertThat(postingRouteLegIds)
+                            .as("posting routeLegId must come from route snapshot for direct transaction %s",
+                                    businessSn)
+                            .containsExactlyInAnyOrderElementsOf(routeSnapshot.getLegs().stream()
+                                    .map(RouteLegSpec::getLegId)
+                                    .toList());
+                });
     }
 }
