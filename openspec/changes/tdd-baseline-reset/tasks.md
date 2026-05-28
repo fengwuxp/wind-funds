@@ -406,6 +406,7 @@ B8 首批 Red 集必须在 B8-01 至 B8-09 任一 Green 实现前完成：`TDD-B
 18. 平台补贴、储值券、预付券、礼品卡、客户资金、商户待结算资金、负债、备付或收入成本口径进入 B3/B7 生产资金流前，必须在 Execution Grant 中登记财务、税务、会计、合规或法务确认状态；未确认时只能保留为契约或设计验证，不得进入生产 Done 结论。
 19. 含权益 MVP 任务进入 Phase 2 或 Phase 3 前，Execution Grant 必须选择 Phase 能力边界、JSON 夹具级别、权益快照事实源、零实付表达、平台补贴表达、独立伴随指令原子性、储值/预付口径、退款分摊粒度、退款分摊确定性规则版本、分摊依据、稳定组件顺序、舍入模式、尾差归属、组件剩余额度版本、历史无权益快照处理策略、补充权益事实模型、专业确认状态、审计证据包、使用者解释视图、证据最小化和外部规则核验状态；缺任一项时只能执行 contract-only、设计验证或失败用例，不得实现生产资金流。
 20. `contextVariables` 只允许作为短期迁移通道，且只能承载 `benefitSnapshotId`、`stableDigest`、`benefitGroupSn`、`componentSn` 摘要、`ruleVersion`、`refundDecisionId`、`externalDecisionId` 等追溯引用；组件金额、资金责任、退款处置完整内容和当前营销规则不得放入 `contextVariables` 作为生产事实。
+21. `com.capte.funds.transaction.model.request` 下的交易 Request 只能以 `ReadonlyContextVariables` 承载扩展上下文；不得恢复 `WritableContextVariables` 字段或 `FundsRequestContextVariables` request 专属快照工具。后续若扩展核心资金语义，必须使用一等字段或不可变事实快照，并在 Execution Grant 中列明公共契约范围、请求摘要和敏感上下文回归测试。
 
 ## 9. 覆盖索引到设计 ID 映射
 
