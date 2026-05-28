@@ -22,7 +22,7 @@ final class RouteBenefitSnapshotContextSupport {
     }
 
     static Map<String, Object> mergeBenefitSnapshotSummary(FundsInstructionSpec instruction) {
-        Map<String, Object> result = new LinkedHashMap<>(instruction.getContextVariables());
+        Map<String, Object> result = new LinkedHashMap<>();
         FundsBenefitSnapshotSpec benefitSnapshot = instruction.getBenefitSnapshot();
         if (benefitSnapshot == null) {
             return Map.copyOf(result);

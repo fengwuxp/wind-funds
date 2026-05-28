@@ -1497,6 +1497,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         super.assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, expectedDetails, expectedEntries);
         assertDirectPostingPlansUseRouteSnapshotLegs(businessSn);
         assertDirectRouteSnapshotCarriesMetadata(businessSn);
+        assertDirectRouteSnapshotKeepsContextMinimal(businessSn);
         assertDirectFactsShareBusinessScene(businessSn);
         assertDirectFactsShareTransactionIdentity(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
@@ -1510,6 +1511,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         super.assertFailedFundsTransactionWithoutLedgerFacts(businessSn);
         assertFailedDirectFactsCarryIdentityAndAudit(businessSn);
         assertDirectRouteSnapshotCarriesMetadata(businessSn);
+        assertDirectRouteSnapshotKeepsContextMinimal(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
     }
 
@@ -1535,6 +1537,17 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .as("direct route snapshot must not be rewritten for idempotent businessSn %s", businessSn)
                 .isEqualTo(expectedRouteSnapshot);
         assertDirectRouteSnapshotCarriesMetadata(businessSn);
+        assertDirectRouteSnapshotKeepsContextMinimal(businessSn);
+    }
+
+    private void assertDirectRouteSnapshotKeepsContextMinimal(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+                .as("direct route snapshot context for %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getContextVariables())
+                        .as("direct route snapshot must not carry request context variables for %s", businessSn)
+                        .isEmpty());
     }
 
     private String routeSnapshotJson(String businessSn) {
