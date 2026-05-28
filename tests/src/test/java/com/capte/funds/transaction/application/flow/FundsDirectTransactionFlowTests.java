@@ -25,6 +25,7 @@ import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -1666,6 +1667,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(ledgerTransaction.getCurrency())
                 .as("ledger transaction currency must follow funds transaction for %s", businessSn)
                 .isEqualTo(transaction.getCurrency());
+        assertThat(ledgerTransaction.getOriginalAmount())
+                .as("direct ledger transaction original amount must equal amount for %s", businessSn)
+                .isEqualTo(transaction.getAmount());
+        assertThat(ledgerTransaction.getOriginalCurrency())
+                .as("direct ledger transaction original currency must equal currency for %s", businessSn)
+                .isEqualTo(transaction.getCurrency());
+        assertThat(ledgerTransaction.getExchangeRate())
+                .as("direct ledger transaction exchange rate must be one for %s", businessSn)
+                .isEqualByComparingTo(BigDecimal.ONE);
         assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
                 .as("funds transaction details must share transaction identity for %s", businessSn)
                 .allSatisfy(detail -> {
