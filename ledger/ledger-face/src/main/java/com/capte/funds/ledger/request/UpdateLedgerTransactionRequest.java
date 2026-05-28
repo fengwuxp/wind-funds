@@ -1,7 +1,7 @@
 package com.capte.funds.ledger.request;
 
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
-import com.wind.integration.funds.model.FundsContextVariables;
+import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -39,7 +39,12 @@ public class UpdateLedgerTransactionRequest {
     private Map<String, Object> contextVariable;
 
     public UpdateLedgerTransactionRequest setContextVariable(Map<String, Object> contextVariable) {
-        this.contextVariable = contextVariable == null ? null : FundsContextVariables.immutableCopy(contextVariable);
+        if (contextVariable == null) {
+            this.contextVariable = null;
+            return this;
+        }
+        this.contextVariable = FundsBenefitSpecValidators.immutableInstructionContext(
+                contextVariable, "updateLedgerTransactionRequest");
         return this;
     }
 

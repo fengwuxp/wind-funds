@@ -293,7 +293,7 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
     /**
      * 场景：已入账账本交易通过更新接口补充交易上下文，更新请求携带权益金额和资金责任。
      * 输入：UpdateLedgerTransactionRequest.contextVariable 含 amount、fundingNature。
-     * 输出：账本交易更新被拒绝，已入账 transaction、posting plan、entry 三类账务事实保持不变。
+     * 输出：更新请求构造即被拒绝，已入账 transaction、posting plan、entry 三类账务事实保持不变。
      * 红线：账务事实更新入口不得成为权益核心事实写入旁路。
      */
     @Test
@@ -309,7 +309,8 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
                 .setId(postResult.getLedgerTransactionId())
                 .setContextVariable(CORE_BENEFIT_CONTEXT_VARIABLES)))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("ledgerTransaction.contextVariables must not contain core benefit field");
+                .hasMessageContaining(
+                        "updateLedgerTransactionRequest.contextVariables must not contain core benefit field");
 
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }

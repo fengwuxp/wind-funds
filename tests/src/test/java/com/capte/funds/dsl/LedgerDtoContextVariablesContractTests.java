@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 账务对外 DTO 上下文契约测试。
@@ -64,5 +65,35 @@ class LedgerDtoContextVariablesContractTests {
         Map<?, ?> payload = (Map<?, ?>) payloadValue;
         assertThat(payload.get("networkReference")).isEqualTo("token:ledger-entry-dto-001");
         assertThat(payload.containsKey("pan")).isFalse();
+    }
+
+    /**
+     * 场景：服务层转换账本交易 DTO 时，交易上下文携带权益金额和资金责任。
+     * 预期：DTO 构造被拒绝，避免账务响应事实承载权益核心事实。
+     * 红线：账本交易 DTO 上下文不得成为权益核心事实的旁路承载。
+     */
+    @Test
+    void testLedgerTransactionDtoShouldRejectCoreBenefitContextVariables() {
+        assertThatThrownBy(() -> new LedgerTransactionDTO()
+                .setContextVariables(Map.of(
+                        "amount", "100.00",
+                        "fundingNature", "COUPON")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ledgerTransactionDto.contextVariables must not contain core benefit field");
+    }
+
+    /**
+     * 场景：服务层转换账本分录 DTO 时，分录上下文嵌套携带实时营销规则。
+     * 预期：DTO 构造被拒绝，避免账务分录响应事实承载实时权益决策事实。
+     * 红线：账本分录 DTO 上下文不得成为权益核心事实的旁路承载。
+     */
+    @Test
+    void testLedgerEntryDtoShouldRejectNestedCoreBenefitContextVariables() {
+        assertThatThrownBy(() -> new LedgerEntryDTO()
+                .setContextVariables(Map.of(
+                        "benefitDecisionTrace", Map.of("currentMarketingRule", "RULE-DTO-001"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ledgerEntryDto.contextVariables must not contain core benefit field: "
+                        + "currentMarketingRule");
     }
 }

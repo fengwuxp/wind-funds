@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 账务对外请求上下文契约测试。
@@ -49,5 +50,21 @@ class LedgerRequestContextVariablesContractTests {
                 .setContextVariable(null);
 
         assertThat(request.getContextVariable()).isNull();
+    }
+
+    /**
+     * 场景：调用方构造账本交易更新请求时，上下文携带权益金额和资金责任。
+     * 预期：请求构造被拒绝，避免更新入口成为权益核心事实的旁路承载。
+     * 红线：账本交易更新请求上下文不得承载权益核心事实。
+     */
+    @Test
+    void testUpdateLedgerTransactionRequestShouldRejectCoreBenefitContextVariable() {
+        assertThatThrownBy(() -> new UpdateLedgerTransactionRequest()
+                .setContextVariable(Map.of(
+                        "amount", "100.00",
+                        "fundingNature", "COUPON")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(
+                        "updateLedgerTransactionRequest.contextVariables must not contain core benefit field");
     }
 }
