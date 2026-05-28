@@ -681,6 +681,16 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         assertThat(fundsTransactions)
                 .as("funds transactions for businessSn %s", businessSn)
                 .hasSize(expectedTransactions);
+        if (!fundsTransactions.isEmpty()) {
+            assertThat(fundsTransactions)
+                    .as("successful funds transactions must have stable status and route snapshot for businessSn %s",
+                            businessSn)
+                    .allSatisfy(transaction -> {
+                        assertThat(transaction.getStatus())
+                                .isIn(FundsTransactionStatus.OPEN, FundsTransactionStatus.CLOSED);
+                        assertThat(transaction.getRouteSnapshot()).isNotBlank();
+                    });
+        }
         assertThat(details)
                 .as("funds transaction details for businessSn %s", businessSn)
                 .hasSize(expectedDetails);
@@ -694,6 +704,12 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                             .map(LedgerPostingPlan::getSn)
                             .toList();
                     assertThat(ledgerTransaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
+                    if (!fundsTransactions.isEmpty()) {
+                        assertThat(ledgerTransaction.getFundsTransactionSn())
+                                .as("ledger transaction must point to funds transaction for businessSn %s",
+                                        businessSn)
+                                .isIn(fundsTransactions.stream().map(FundsTransaction::getSn).toList());
+                    }
                     assertThat(details)
                             .as("funds transaction details must point to ledger transaction for businessSn %s",
                                     businessSn)
