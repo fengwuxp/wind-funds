@@ -85,6 +85,9 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
     private static final String UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES =
             "{externalAccount:{bankAccountNo:\"123456789012\"";
 
+    private static final String UNQUOTED_CORE_BENEFIT_CONTEXT_VARIABLES =
+            "{benefitPayload:{currentMarketingRule:\"RULE-WALLET-001\"";
+
     @Autowired
     private FundingAccountService fundingAccountService;
 
@@ -184,6 +187,29 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> fundingAccountService.createFundingAccount(createFundingAccountRequest()
                 .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
+
+        assertThat(countFundingAccounts()).isZero();
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：运营创建真实资金账户时把权益实时规则或资金责任放入扩展上下文。
+     * 输入：contextVariables 含 fundingNature 或当前营销规则，包含标准 JSON 和坏 JSON 两类输入。
+     * 输出：创建被拒绝，不留下资金账户、账本或账务事实。
+     * 红线：资金账户管理对象不得成为权益核心事实的旁路存储。
+     */
+    @Test
+    void testCreateFundingAccountShouldRejectCoreBenefitContextVariablesWithoutAccountOrLedger() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setContextVariables("{\"benefitPayload\":{\"fundingNature\":\"COUPON\"}}")))
+                .hasMessageContaining("wallet.contextVariables must not contain core benefit field: fundingNature");
+        assertThatThrownBy(() -> fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setContextVariables(UNQUOTED_CORE_BENEFIT_CONTEXT_VARIABLES)))
+                .hasMessageContaining(
+                        "wallet.contextVariables must not contain core benefit field: currentMarketingRule");
 
         assertThat(countFundingAccounts()).isZero();
         assertThat(countLedgers()).isZero();

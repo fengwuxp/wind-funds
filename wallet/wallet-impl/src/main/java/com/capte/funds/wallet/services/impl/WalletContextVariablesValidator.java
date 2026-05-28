@@ -1,6 +1,7 @@
 package com.capte.funds.wallet.services.impl;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import org.jspecify.annotations.Nullable;
@@ -22,5 +23,6 @@ final class WalletContextVariablesValidator {
                 PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(contextVariables)
                         || ExternalAccountSensitiveValueValidator.containsSensitiveContextVariables(contextVariables),
                 SENSITIVE_CONTEXT_MESSAGE);
+        FundsBenefitSpecValidators.rejectInstructionContextVariables(contextVariables, "wallet");
     }
 }
