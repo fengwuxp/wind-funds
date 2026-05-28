@@ -30,6 +30,7 @@ import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerPostingScope;
 import com.wind.integration.funds.ledger.enums.LedgerReconcileStatus;
 import com.wind.integration.funds.ledger.enums.LedgerSettlementStatus;
+import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.integration.funds.spec.ledger.LedgerPostingPhaseSpec;
@@ -249,11 +250,14 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
 
     private void assertNoSensitiveContextVariables(LedgerTransactionSpec transaction) {
         assertNoSensitiveContextVariables(transaction.getContextVariables(), "ledgerTransaction.contextVariables");
+        assertNoCoreBenefitContextVariables(transaction.getContextVariables(), "ledgerTransaction");
         for (LedgerPostingPlanSpec plan : transaction.getPostingPlans()) {
             assertNoSensitiveContextVariables(plan.getContextVariables(), "ledgerPostingPlan.contextVariables");
+            assertNoCoreBenefitContextVariables(plan.getContextVariables(), "ledgerPostingPlan");
             for (LedgerPostingPhaseSpec phase : plan.getPostingPhases()) {
                 for (LedgerEntrySpec entry : phase.getEntries()) {
                     assertNoSensitiveContextVariables(entry.getContextVariables(), "ledgerEntry.contextVariables");
+                    assertNoCoreBenefitContextVariables(entry.getContextVariables(), "ledgerEntry");
                 }
             }
         }
@@ -265,6 +269,10 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
                 "{} must not contain sensitive fields", fieldName);
     }
 
+    private void assertNoCoreBenefitContextVariables(Map<String, Object> contextVariables, String owner) {
+        FundsBenefitSpecValidators.immutableInstructionContext(contextVariables, owner);
+    }
+
 
     @Override
     public void updateLedgerTransaction(@NonNull UpdateLedgerTransactionRequest request) {
@@ -273,6 +281,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         entity.setDescription(request.getDescription());
         if (request.getContextVariable() != null) {
             assertNoSensitiveContextVariables(request.getContextVariable(), "ledgerTransaction.contextVariables");
+            assertNoCoreBenefitContextVariables(request.getContextVariable(), "ledgerTransaction");
             entity.setContextVariables(JSON.toJSONString(request.getContextVariable()));
         }
         AssertUtils.isTrue(ledgerTransactionMapper.update(entity) == 1, "更新账户账本交易信息失败");

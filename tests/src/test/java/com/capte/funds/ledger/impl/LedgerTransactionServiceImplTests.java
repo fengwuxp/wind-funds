@@ -56,6 +56,14 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
     private static final Map<String, Object> SENSITIVE_ITERABLE_CONTEXT_VARIABLES =
             Map.of("processorPayload", List.of("trace-ref", "4111111111111111"));
 
+    private static final Map<String, Object> CORE_BENEFIT_CONTEXT_VARIABLES =
+            Map.of("benefitPayload", Map.of(
+                    "amount", Money.immutable(2000L, CurrencyIsoCode.USD),
+                    "fundingNature", "PLATFORM_BORNE"));
+
+    private static final Map<String, Object> CORE_BENEFIT_ITERABLE_CONTEXT_VARIABLES =
+            Map.of("benefitDecisionTrace", List.of(Map.of("currentMarketingRule", "latest-rule")));
+
     @Autowired
     private LedgerTransactionService ledgerTransactionService;
 
@@ -173,6 +181,70 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：外部 LedgerTransactionSpec 实现绕过默认 DSL，交易级上下文携带权益金额和资金责任。
+     * 输入：transaction.contextVariables 含 amount、fundingNature。
+     * 输出：账本交易写入被拒绝，且 transaction、posting plan、entry 三类账务事实均不落库。
+     * 红线：账务事实交易上下文不得成为权益核心事实的旁路承载。
+     */
+    @Test
+    void testPostLedgerTransactionShouldRejectCoreBenefitTransactionContextWithoutFacts() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        LedgerTransactionSpec transaction = ledgerTransaction(
+                CORE_BENEFIT_CONTEXT_VARIABLES,
+                Map.of(),
+                Map.of());
+
+        assertThatThrownBy(() -> ledgerTransactionService.postLedgerTransaction(transaction))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ledgerTransaction.contextVariables must not contain core benefit field");
+
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：外部 LedgerPostingPlanSpec 实现绕过默认 DSL，计划级上下文携带实时营销规则。
+     * 输入：plan.contextVariables 含 benefitDecisionTrace.currentMarketingRule。
+     * 输出：账本交易写入被拒绝，且 transaction、posting plan、entry 三类账务事实均不落库。
+     * 红线：posting plan 合并上下文不得承载实时权益规则或权益金额。
+     */
+    @Test
+    void testPostLedgerTransactionShouldRejectCoreBenefitPostingPlanContextWithoutFacts() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        LedgerTransactionSpec transaction = ledgerTransaction(
+                Map.of(),
+                CORE_BENEFIT_ITERABLE_CONTEXT_VARIABLES,
+                Map.of());
+
+        assertThatThrownBy(() -> ledgerTransactionService.postLedgerTransaction(transaction))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ledgerPostingPlan.contextVariables must not contain core benefit field: "
+                        + "currentMarketingRule");
+
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：外部 LedgerEntrySpec 实现绕过默认 DSL，分录级上下文携带权益金额和资金责任。
+     * 输入：entry.contextVariables 含 amount、fundingNature。
+     * 输出：账本交易写入被拒绝，且 transaction、posting plan、entry 三类账务事实均不落库。
+     * 红线：账本分录上下文不得承载权益核心事实。
+     */
+    @Test
+    void testPostLedgerTransactionShouldRejectCoreBenefitLedgerEntryContextWithoutFacts() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        LedgerTransactionSpec transaction = ledgerTransaction(
+                Map.of(),
+                Map.of(),
+                CORE_BENEFIT_CONTEXT_VARIABLES);
+
+        assertThatThrownBy(() -> ledgerTransactionService.postLedgerTransaction(transaction))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ledgerEntry.contextVariables must not contain core benefit field");
+
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：已入账账本交易通过更新接口补充交易上下文，更新请求携带敏感字段。
      * 输入：UpdateLedgerTransactionRequest.contextVariable 含 secretKey。
      * 输出：账本交易更新被拒绝，已入账 transaction、posting plan、entry 三类账务事实保持不变。
@@ -214,6 +286,30 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
                 .setId(postResult.getLedgerTransactionId())
                 .setContextVariable(Map.of("externalAccount", Map.of("bankAccountNo", "123456789012")))))
                 .hasMessageContaining("ledgerTransaction.contextVariables must not contain sensitive fields");
+
+        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：已入账账本交易通过更新接口补充交易上下文，更新请求携带权益金额和资金责任。
+     * 输入：UpdateLedgerTransactionRequest.contextVariable 含 amount、fundingNature。
+     * 输出：账本交易更新被拒绝，已入账 transaction、posting plan、entry 三类账务事实保持不变。
+     * 红线：账务事实更新入口不得成为权益核心事实写入旁路。
+     */
+    @Test
+    void testUpdateLedgerTransactionShouldRejectCoreBenefitContextWithoutMutatingFacts() {
+        LedgerTransactionPostResult postResult = ledgerTransactionService.postLedgerTransaction(ledgerTransaction(
+                Map.of("traceId", "TRACE-LEDGER-CONTEXT-003"),
+                Map.of("routeTraceId", "ROUTE-TRACE-003"),
+                Map.of("entryTraceId", "ENTRY-TRACE-003")));
+        assertThat(postResult.isNewlyPosted()).isTrue();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> ledgerTransactionService.updateLedgerTransaction(new UpdateLedgerTransactionRequest()
+                .setId(postResult.getLedgerTransactionId())
+                .setContextVariable(CORE_BENEFIT_CONTEXT_VARIABLES)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ledgerTransaction.contextVariables must not contain core benefit field");
 
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
