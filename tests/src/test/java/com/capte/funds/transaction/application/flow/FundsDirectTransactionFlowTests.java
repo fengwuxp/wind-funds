@@ -1498,7 +1498,30 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                             .containsExactlyInAnyOrderElementsOf(routeSnapshot.getLegs().stream()
                                     .map(RouteLegSpec::getLegId)
                                     .toList());
+                    postingPlansOf(ledgerTransaction).forEach(plan -> {
+                        RouteLegSpec routeLeg = directRouteLegById(routeSnapshot.getLegs(), plan.getRouteLegId());
+                        assertThat(plan.getAmount())
+                                .as("posting amount must follow route leg for direct transaction %s", businessSn)
+                                .isEqualTo(routeLeg.getAmount().getAmount());
+                        assertThat(plan.getCurrency())
+                                .as("posting currency must follow route leg for direct transaction %s", businessSn)
+                                .isEqualTo(routeLeg.getAmount().getCurrency());
+                        assertThat(plan.getBalanceEffectType())
+                                .as("posting balance effect must follow route leg for direct transaction %s",
+                                        businessSn)
+                                .isEqualTo(routeLeg.getBalanceEffectType().name());
+                        assertThat(plan.getPhaseCode())
+                                .as("posting phase must follow route leg for direct transaction %s", businessSn)
+                                .isEqualTo(routeLeg.getPhaseCode().name());
+                    });
                 });
+    }
+
+    private RouteLegSpec directRouteLegById(List<RouteLegSpec> routeLegs, String routeLegId) {
+        return routeLegs.stream()
+                .filter(routeLeg -> routeLeg.getLegId().equals(routeLegId))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("route leg not found: " + routeLegId));
     }
 
     private void assertDirectFactsShareBusinessScene(String businessSn) {
