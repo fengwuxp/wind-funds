@@ -1476,6 +1476,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         super.assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, expectedDetails, expectedEntries);
         assertDirectPostingPlansUseRouteSnapshotLegs(businessSn);
         assertDirectFactsShareBusinessScene(businessSn);
+        assertDirectFactsShareTransactionIdentity(businessSn);
     }
 
     private void assertDirectPostingPlansUseRouteSnapshotLegs(String businessSn) {
@@ -1543,5 +1544,37 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .as("route snapshot businessScene must follow funds transaction for %s", businessSn)
                 .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getBusinessScene())
                         .isEqualTo(transaction.getBusinessScene()));
+    }
+
+    private void assertDirectFactsShareTransactionIdentity(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+
+        assertThat(ledgerTransaction.getFundsTransactionSn())
+                .as("ledger transaction must point to funds transaction for %s", businessSn)
+                .isEqualTo(transaction.getSn());
+        assertThat(ledgerTransaction.getTransactionType())
+                .as("ledger transaction type must follow funds transaction for %s", businessSn)
+                .isEqualTo(transaction.getTransactionType().name());
+        assertThat(ledgerTransaction.getAmount())
+                .as("ledger transaction amount must follow funds transaction for %s", businessSn)
+                .isEqualTo(transaction.getAmount());
+        assertThat(ledgerTransaction.getCurrency())
+                .as("ledger transaction currency must follow funds transaction for %s", businessSn)
+                .isEqualTo(transaction.getCurrency());
+        assertThat(fundsTransactionDetailsByBusinessSn(businessSn))
+                .as("funds transaction details must share transaction identity for %s", businessSn)
+                .allSatisfy(detail -> {
+                    assertThat(detail.getTransactionType()).isEqualTo(transaction.getTransactionType());
+                    assertThat(detail.getEventType().name()).isEqualTo(ledgerTransaction.getEventType());
+                    assertThat(detail.getAmount()).isEqualTo(transaction.getAmount());
+                    assertThat(detail.getCurrency()).isEqualTo(transaction.getCurrency());
+                });
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+                .as("route snapshot identity must follow funds transaction for %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> {
+                    assertThat(routeSnapshot.getTransactionType()).isEqualTo(transaction.getTransactionType());
+                    assertThat(routeSnapshot.getEventType().name()).isEqualTo(ledgerTransaction.getEventType());
+                });
     }
 }
