@@ -42,6 +42,9 @@ class FundsFrozenOrderServiceImplTests extends AbstractFundsServiceTest {
     private static final String UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES =
             "{externalAccount:{bankAccountNo:\"123456789012\"";
 
+    private static final String UNQUOTED_CORE_BENEFIT_CONTEXT_VARIABLES =
+            "{benefitPayload:{currentMarketingRule:\"RULE-FROZEN-001\"";
+
     @Autowired
     private FundsFrozenOrderService fundsFrozenOrderService;
 
@@ -70,6 +73,29 @@ class FundsFrozenOrderServiceImplTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> fundsFrozenOrderService.createFundsFrozenOrder(createFrozenOrderRequest()
                 .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive funds frozen order fields");
+
+        assertThat(countFrozenOrders()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：运营手工创建冻结单时把权益实时规则或资金责任放入扩展上下文。
+     * 输入：contextVariables 含当前营销规则或 fundingNature，包含标准 JSON 和坏 JSON 两类输入。
+     * 输出：创建被拒绝，不留下冻结单、账本或账务事实。
+     * 红线：冻结单管理对象不得成为权益核心事实的旁路存储。
+     */
+    @Test
+    void testCreateFundsFrozenOrderShouldRejectCoreBenefitContextVariablesWithoutFrozenOrderFacts() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundsFrozenOrderService.createFundsFrozenOrder(createFrozenOrderRequest()
+                .setContextVariables("{\"benefitPayload\":{\"fundingNature\":\"COUPON\"}}")))
+                .hasMessageContaining(
+                        "fundsFrozenOrder.contextVariables must not contain core benefit field: fundingNature");
+        assertThatThrownBy(() -> fundsFrozenOrderService.createFundsFrozenOrder(createFrozenOrderRequest()
+                .setContextVariables(UNQUOTED_CORE_BENEFIT_CONTEXT_VARIABLES)))
+                .hasMessageContaining(
+                        "fundsFrozenOrder.contextVariables must not contain core benefit field: currentMarketingRule");
 
         assertThat(countFrozenOrders()).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);

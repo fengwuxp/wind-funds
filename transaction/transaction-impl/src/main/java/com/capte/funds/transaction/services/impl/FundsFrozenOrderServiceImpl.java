@@ -13,6 +13,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
+import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
@@ -96,5 +97,6 @@ public class FundsFrozenOrderServiceImpl implements FundsFrozenOrderService {
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveContextVariables(contextVariables)
                         || ExternalAccountSensitiveValueValidator.containsSensitiveContextVariables(contextVariables),
                 "contextVariables must not contain sensitive funds frozen order fields");
+        FundsBenefitSpecValidators.rejectInstructionContextVariables(contextVariables, "fundsFrozenOrder");
     }
 }
