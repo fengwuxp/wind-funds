@@ -972,6 +972,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     private void assertValidPostedTransaction(LedgerTransaction transaction) {
         assertThat(transaction.getFundsTransactionSn()).isNotBlank();
         assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
+        assertThat(transaction.getAmount()).isPositive();
+        assertThat(transaction.getOriginalAmount()).isPositive();
         assertThat(transaction.getBalanced()).isTrue();
         assertThat(transaction.getDebitAmount()).isEqualTo(transaction.getCreditAmount());
         List<LedgerPostingPlan> postingPlans = postingPlansOf(transaction);
@@ -1000,6 +1002,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         assertThat(postingPlan.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
         assertThat(postingPlan.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
         assertThat(postingPlan.getCurrency()).isEqualTo(transaction.getCurrency());
+        assertThat(postingPlan.getAmount()).isPositive();
         assertThat(postingPlan.getBalanced()).isTrue();
         assertThat(postingPlan.getDebitAmount()).isEqualTo(postingPlan.getCreditAmount());
         assertThat(planEntries).as("posting entries for plan %s", postingPlan.getSn()).isNotEmpty();
@@ -1015,6 +1018,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         assertThat(entry.getBusinessSn()).isEqualTo(transaction.getBusinessSn());
         assertThat(entry.getCurrency()).isEqualTo(transaction.getCurrency());
         assertThat(entry.getAmount()).isNotNull();
+        assertThat(entry.getAmount()).isPositive();
         assertThat(entry.getEntrySide()).isIn(EntrySide.DEBIT, EntrySide.CREDIT);
     }
 
