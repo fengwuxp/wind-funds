@@ -29,6 +29,7 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 | 顺序 | 文档 | 作用 |
 | --- | --- | --- |
 | 1 | [支付资金底座测试驱动设计.md](支付资金底座测试驱动设计.md) | 定义测试驱动设计原则、模块测试矩阵、场景用例、红线用例、目标测试资产和执行门禁。 |
+| 2 | [A0-编码准入基线核验.md](A0-编码准入基线核验.md) | 固化进入编码前的只读核验页，说明 authority baseline、code baseline、target assets、schemaNeed、首批 Red 候选和下一步 Execution Grant 建议。 |
 
 ## 契约输入
 
@@ -131,6 +132,27 @@ TDD 设计区分“目标测试资产”和“当前已执行证据”。目标�
 
 任一 Red 都必须先写失败断言和停止条件：如果测试只能证明接口不报错、状态变化或 entry 数量，不能进入实现；如果测试需要新增公共契约、状态机、表结构、H2 schema 或运行时配置，必须先回到工程任务确认写入范围。
 
+### 业务驱动 Red 裁剪规则
+
+首批 Red 不能从模块覆盖率或目标态清单反推，而要从一个业务问题和一个资金不变量开始。每个 Red 都必须能回答：哪个使用者会看到什么结果，哪些资金事实必须发生，哪些事实绝不能发生。
+
+| 裁剪规则 | 必须满足 | 不满足时处理 |
+| --- | --- | --- |
+| 一个 Red 对应一个业务问题 | 能反查 `businessQuestion`、`mvpScenario`、产品验收 ID 和 DSL caseId。 | 回到产品或 DSL，不写测试。 |
+| 一个 Red 证明一个最小资金不变量 | 至少覆盖适用的主体、账户类型、`normalBalanceSide`、账目、金额、币种、route、posting、entry、projection、幂等和审计。 | 缩小场景或补资金事实表。 |
+| 失败路径必须有 forbidden facts | 明确不允许半截 route、posting、entry、投影、外部出款、敏感导出、治理反写或重复资金副作用。 | 先补失败无副作用断言。 |
+| 不把能力域混在一起 | A1-A4、B7、B8、P2 只能单独授权；清结算深水区、归档治理、业务专项不得混入交易主线 Red。 | 拆成独立 Red 候选和独立 Execution Grant。 |
+| 测试资产要真实可落地 | 指定目标测试类、真实执行路径、fixture/H2 数据、替身边界和验证命令。 | 只能做 TDD 分析或 contract-only。 |
+| 停止条件先写清 | 红灯不符合预期、公共契约/表结构越界、外部规则未确认、生产风险升高时如何停止。 | 不进入 Green 实现。 |
+
+首批 Red 最小输出表：
+
+| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
+
+A0 基线核验阶段不写测试代码，但必须输出 `redCandidateSet`、`targetAssets`、`schemaNeed`、`minimumAssertions` 和 `testStopReasons`。只有用户确认单一 Execution Grant 后，才把候选 Red 转成实际测试写入。
+
 ### MVP 任务测试卡
 
 每个 MVP 任务进入实现前，TDD 需要输出一张最小测试卡，避免任务被测试范围反向放大。
@@ -167,6 +189,17 @@ TDD 设计区分“目标测试资产”和“当前已执行证据”。目标�
 | `minimumAssertions` | 状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、余额桶、route、posting、entry、projection、借贷平衡、余额影响、幂等、审计和 forbidden facts。 |
 | `schemaNeed` | 是否需要 DDL/H2、Entity、Mapper 或测试资源写入授权。 |
 | `testStopReasons` | 哪些失败必须停止并回到工程任务、系分或外部规则确认。 |
+
+### 代码基线到 Red 的承接口径
+
+当前代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`。TDD 可以把该提交之前已验证的上下文不可变、敏感字段阻断、权益核心字段不得旁路和局部服务测试作为回归资产，但不得把它们外推为后续能力已完成。
+
+| 基线项 | 可复用测试资产 | 后续 Red 触发条件 |
+| --- | --- | --- |
+| 交易 Request 只读上下文 | `FundsTransactionRequestContextVariablesContractTests` 和交易流程敏感上下文测试。 | 新增或修改 `com.capte.funds.transaction.model.request` 字段、请求摘要、转换器或上下文合并逻辑时，必须补请求契约和敏感上下文回归。 |
+| 钱包管理对象上下文红线 | `FundingAccountServiceImplTests`、`PaymentInstrumentServiceImplTests`、`ControlAccountLedgerInitializationTests` 等。 | 账户、支付工具、资金来源关系或平台账户新增 `contextVariables` 写入入口时，必须证明敏感字段和权益核心字段失败且不落账户、支付工具或账本事实。 |
+| route/ledger/transaction 上下文红线 | DSL 契约测试、账务服务测试、交易流程测试和投影重放测试。 | route snapshot、posting plan、ledger entry、交易参与方、冻结单、余额投影或重放上下文新增字段时，必须证明核心资金事实不经普通上下文旁路。 |
+| 未覆盖资金流 | 含权益 route/posting/replay、清结算、对账、归档、冷热读取、治理重放和 P2 业务专项仍为目标资产。 | 任一任务要声明生产资金流 Done，必须新增对应服务级或治理级 Red、H2/fixture 证据和验证命令。 |
 
 ### Red 卡模板
 

@@ -190,3 +190,18 @@ DSL 基线核验只确认 caseId、字段语义、fixture 等级和可测断言�
 | 失败边界 | 拒绝、余额不足、错币种、缺快照、权限不足、规则待确认和重复请求的无副作用语义明确。 | 补 must-fail case 或写明未覆盖范围。 |
 | 敏感和外部证据 | 外部账户、支付工具、规则来源、凭证和审计证据只保留摘要、脱敏值或引用。 | 清理敏感示例；缺规则状态时不得作为生产完成证据。 |
 | 测试承接 | `targetTestClass`、核心断言和验证命令能定位；未落测试时 `notDone` 明确。 | 只能进入 TDD 分析或契约草案，不能进入生产交付结论。 |
+
+### A0 DSL 准入输出
+
+A0 阶段的 DSL 只负责把产品侧业务问题转成资金事实和机器契约候选，不写测试资源、不改公共契约、不补生产字段。当前代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`，其中 `contextVariables` 已形成只读、敏感字段阻断和权益核心字段不得旁路承载的局部代码基线；后续若要扩展核心资金语义，必须进入一等字段、route snapshot、交易事实快照或等价不可变存储。
+
+| 输出项 | DSL 填写口径 | 不满足时处理 |
+| --- | --- | --- |
+| `dslCaseId` | 本轮复用或新增的稳定 `DSL-*` caseId；没有 caseId 时只能写 `DOC_ONLY`。 | 回到 DSL 设计补资金事实，不进入测试写入。 |
+| `moneyAction` | 直接交易、授权交易、余额控制、清结算、治理或业务专项的归一资金动作。 | 回到 PRD 拆业务场景或明确非资金能力。 |
+| `accountingAnchor` | 主体、账户类型、`normalBalanceSide`、账目 bucket、借贷平衡表行、余额桶影响和失败红线。 | 不得声明可进入资金流实现。 |
+| `fixtureLevel` | `DOC_ONLY`、`CONTRACT_ONLY`、`FUNDS_FLOW`、`SERVICE_FLOW` 或 `GOVERNANCE_FLOW`。 | 降级交付结论；低等级 fixture 不支撑高等级 Done。 |
+| `contextVariablesBoundary` | 只允许补充上下文或短期追溯引用；敏感字段、外部账户原文、组件金额、资金责任、退款处置完整内容和当前营销规则不得进入。 | 阻断，改为一等字段、不可变快照或补设计。 |
+| `dslNotDone` | 未覆盖 route/posting/replay、服务流、清结算、对账、归档、冷热读取、治理重放、外部规则或敏感数据的范围。 | 写入 TDD 和 Execution Grant 的 Not Done。 |
+
+A0 DSL 输出必须能被 `docs/TDD设计/A0-编码准入基线核验.md` 的 `targetAssets` 和 `firstRedCandidateSet` 反查；否则只能作为设计说明，不得作为机器契约或生产交付证据。

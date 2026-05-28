@@ -130,6 +130,15 @@ A0 系分复核只确认产品场景能否落到现有系统边界和测试入�
 
 系分通过不等于任务写入范围通过。A0 复核若命中 B7、B8、P2、外部规则、敏感数据、表结构或公共契约变更，必须在下一步 Execution Grant 中单独列明；未列明时只能继续做设计、TDD 分析、contract-only 或 dry-run。
 
+当前代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`。系分侧只能把它声明为局部代码和测试基线：交易 Request 已统一为 `ReadonlyContextVariables`，`FundsRequestContextVariables` 已移除，钱包/交易/路由/账务管理对象的敏感上下文和权益核心字段阻断已有局部测试保护；但这不表示含权益 route/posting/replay、清结算、对账、归档、治理重放或 P2 业务生产流已经闭合。
+
+| 基线能力 | 系分可引用结论 | 不得外推 |
+| --- | --- | --- |
+| 请求上下文不可变 | `com.capte.funds.transaction.model.request` 下的交易 Request 只以 `ReadonlyContextVariables` 承载扩展上下文，空值表达无额外上下文。 | 不得恢复 `WritableContextVariables` 字段、Request 专属快照工具或在 setter 中补默认资金事实。 |
+| 敏感上下文阻断 | 支付工具、外部账户、卡号、密钥、完整银行账户等敏感字段已在多类入口形成局部红线测试。 | 不得把完整敏感原文写入 route、ledger、投影、日志、导出或审计普通链路。 |
+| 权益核心字段阻断 | `fundingNature`、`currentMarketingRule` 等权益核心事实不得通过普通 `contextVariables` 旁路进入钱包、交易、路由或账务事实。 | 不得把该阻断等同于含权益资金流消费已完成；核心权益语义仍需一等字段或不可变事实源。 |
+| 局部测试资产 | 现有 DSL、wallet、transaction、ledger、projection、reconciliation、governance 测试可作为 A0 差距复核输入。 | 不得跳过单一 Execution Grant、首批 Red、DDL/H2 范围和验证命令。 |
+
 ### 编码准入证据包
 
 系分交给编码前，必须把 A0 复核结论整理成编码准入证据包。证据包只证明“本轮可以开始写哪一小块”，不证明目标态全部能力可以同时落地。

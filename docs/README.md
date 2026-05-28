@@ -239,6 +239,41 @@ flowchart LR
 
 首批任务不追求一次落完目标态，先用最小可验证切片证明现有资金内核的状态、金额、账户类型、`normalBalanceSide`、route、posting、entry、projection、借贷平衡、余额影响、幂等和审计证据链。每个任务只选择下表一个切片；清结算、对账、归档和治理属于独立能力域，必须拿到独立 Execution Grant 后再进入写入范围，不能混入交易主线任务。
 
+#### 业务驱动 A0 准入链
+
+A0 不是泛化的代码摸底，而是把一个业务问题压缩成可执行任务封面。进入 A1 至 A4、B7、B8 或 P2 之前，先按下列链路确认“为什么做、证明什么、写到哪里、先红什么”。任一环节缺失时，不能把目标态设计包当作编码授权。
+
+| 顺序 | 准入动作 | 必须产出 | 未闭合时处理 |
+| --- | --- | --- | --- |
+| 1 | 产品选场景 | `productGoal`、`mvpScenario`、使用者、业务事实、可见结果、成功终态、失败终态、明确不做范围。 | 回到产品设计补业务目标、验收 ID 或非目标。 |
+| 2 | DSL 定资金事实 | DSL caseId、资金动作、主体、账户类型、`normalBalanceSide`、账目 bucket、借贷平衡表行、失败红线。 | 回到 DSL 设计补资金事实和机器契约等级。 |
+| 3 | 系分定落点 | 服务入口、模块边界、状态机、表/H2 schema 需求、事务边界、幂等键、观测审计和禁止写入范围。 | 回到系分设计补服务、状态、数据和边界证据。 |
+| 4 | TDD 定首批 Red | `firstRedSet`、目标测试资产、最小断言、forbidden facts、验证命令和停止条件。 | 回到 TDD 设计补 Red 卡，不直接实现。 |
+| 5 | Execution Grant 锁范围 | `writeScope`、`noWriteScope`、允许读取的未提交变更、外部规则状态、验证和 Not Done 条件。 | 只能做 Round 0、差距复核、contract-only 或 dry-run。 |
+
+A0 只读核验页至少输出下列字段：
+
+| 输出项 | 填写口径 |
+| --- | --- |
+| `authorityBaseline` | 本轮采用的 docs、OpenSpec、Harness Plan、Git 提交点和未提交变更清单。 |
+| `codeBaseline` | 现有代码、测试、H2 schema、DDL、公共契约和运行时配置是否能承接目标场景。 |
+| `targetAssets` | 可能新增、恢复或复用的测试类、fixture、H2 数据准备、服务入口和验证命令。 |
+| `schemaNeed` | 是否需要新增或修改表、索引、唯一键、Entity、Mapper、H2 schema 或测试资源。 |
+| `firstRedCandidateSet` | 建议进入 A1 至 A4、B7、B8 或 P2 的首批 Red 候选及失败断言。 |
+| `noWriteScope` | A0 不写生产代码、测试代码、DDL/H2 schema、运行时配置；未授权能力只读复核。 |
+| `nextExecutionGrantRequest` | 如果继续编码，下一步需要用户确认的单一任务切片、写入范围、验证命令和停止条件。 |
+
+本设计包的 A0 标准输出页见 [TDD设计/A0-编码准入基线核验.md](TDD设计/A0-编码准入基线核验.md)。后续进入编码时，应先以该页复核当前工作树、代码能力、测试资产、H2 schema、验证环境和首批 Red，再由用户确认单一 Execution Grant。
+
+A0 的跨层字段承接如下。任一字段在 PRD、DSL、系分、TDD 或 OpenSpec 中找不到落点时，当前轮次只能继续补设计或做差距复核。
+
+| A0 字段 | PRD 承接 | DSL 承接 | 系分承接 | TDD 和任务承接 |
+| --- | --- | --- | --- | --- |
+| `productGoal` / `businessQuestion` | 使用者问题、业务收益、成功标准和非目标。 | 判断是否属于资金事实；非资金能力不得下沉。 | 判断是否已有服务入口和查询解释。 | 作为 Red 的业务来源，不从模块覆盖率反推。 |
+| `moneyFact` | 主体、金额、币种、资金动作、可见结果和失败终态。 | `dslCaseId`、资金动作、账户类型、`normalBalanceSide`、账目 bucket 和借贷平衡表行。 | 模块、服务、状态机、事务、幂等、数据落点和审计。 | `moneyInvariant`、`expectedFacts`、`forbiddenFacts` 和最小断言。 |
+| `codeBaseline` | 不声明生产完成，只作为产品验收的实现差距输入。 | `fixtureLevel` 和机器契约等级不越级。 | 当前代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`；文档提交前仍是草稿基线。 | 目标测试资产、回归资产、schemaNeed 和验证命令。 |
+| `noWriteScope` / `notDone` | 产品未覆盖范围、外部规则待确认和专业确认边界。 | 未覆盖 route/posting/replay、服务流、清结算、对账、归档和治理的范围。 | 禁止触碰的模块、公共契约、表、H2 schema、运行配置、外部协议和敏感数据。 | Execution Grant 停止条件和 Not Done 判定。 |
+
 | 推荐切片 | 目标 | 最小必须证明 | 不纳入本任务 |
 | --- | --- | --- | --- |
 | A0 基线核验 | 复核工作树、OpenSpec/Harness、现有测试资产、H2 schema 和验证环境。 | 能说明本任务 authority baseline、可写范围、只读范围、验证命令和停止条件。 | 不写生产代码、测试代码、DDL/H2 schema 或运行时配置。 |
@@ -258,6 +293,7 @@ OpenSpec change、Harness Plan 或任务说明可以使用下列字段名承接�
 
 | 字段 | 对应准入内容 |
 | --- | --- |
+| `businessAdmission` | 产品目标、使用者、业务事实、可见结果、资金动作、成功/失败终态、验收 ID 和明确不做范围。 |
 | `mvpScenario` | 本任务服务的使用者、资金事实、最小闭环、成功终态、失败终态和不得声明的扩展能力。 |
 | `abilityBatch` | MVP 任务目标、能力域、PRD 验收 ID、DSL caseId、系分章节、TDD 用例和红线编号。 |
 | `authorityBaseline` | docs、OpenSpec、Harness Plan、Git 提交点、未提交变更清单和允许读取文件。 |

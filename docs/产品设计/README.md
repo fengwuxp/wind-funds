@@ -234,6 +234,21 @@ flowchart TB
 
 产品交接证据包缺失时，下游只能继续做设计澄清或 contract-only 验证，不应进入资金写入、DDL/H2 schema、生产配置或上线准备。
 
+### A0 产品准入输出
+
+A0 编码准入前，产品侧必须先把一个业务问题收敛成可执行任务封面。该封面不授权编码，只给 DSL、系分、TDD 和 OpenSpec 提供同一份业务输入。当前代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`，本轮文档和任务计划提交前仍属于评审输入，不能直接作为新的冻结编码基线。
+
+| 输出项 | 产品侧填写口径 | 下游承接 |
+| --- | --- | --- |
+| `productGoal` | 本轮要解决的使用者问题、业务收益和成功标准。 | DSL 判断是否需要新增或复用资金事实；系分判断服务入口；TDD 判断验收目标。 |
+| `businessQuestion` | 一个可被验证的问题，例如“支付成功后是否能解释余额、账务和审计证据”。 | 作为 `firstRedSet` 的业务来源，不能从模块覆盖率反推 Red。 |
+| `mvpScenario` | 入口动作、成功终态、失败终态、人工处理入口和明确不做范围。 | 进入 A1-A4、B7、B8 或 P2 单一任务切片。 |
+| `moneyFact` | 主体、金额、币种、资金动作、账户类型、账目 bucket、余额桶和外部 reference。 | 交给 DSL 命中 caseId、借贷平衡表行和失败红线。 |
+| `acceptanceMap` | `AC-*`、`RED-*`、`CLS-GATE-*`、`GOV-GATE-*` 或业务分册验收 ID。 | 交给 TDD 建立 `AC/DSL/系分/TDD/RED` 映射。 |
+| `productNotDone` | 本轮不能声明的清结算深水区、归档治理、P2 业务生产流、外部协议全集、上线合规结论和未确认规则。 | 写入 Execution Grant 的 `noWriteScope`、`stopCondition` 和 Not Done。 |
+
+产品侧若无法给出 `productGoal`、`businessQuestion`、`mvpScenario`、`moneyFact` 和 `acceptanceMap`，A0 只能继续做产品澄清；不得进入 DSL 执行化、系分落点或测试写入。
+
 ### 业务驱动 MVP 场景选择卡
 
 产品侧进入系分或 TDD 前，先用一张 MVP 场景选择卡把“业务上为什么要做”说清楚。P0/P1/P2 是能力优先级，不是编码授权级别；即使是 P0 能力，也必须先证明本轮场景、资金事实、验收边界和不做范围闭合。
