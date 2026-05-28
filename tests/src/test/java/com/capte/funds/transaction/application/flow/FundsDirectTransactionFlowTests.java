@@ -1,5 +1,7 @@
 package com.capte.funds.transaction.application.flow;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
@@ -32,6 +34,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -46,6 +49,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 直接交易业务流测试。
  */
 class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
+
+    private static final Set<String> DIRECT_LEDGER_CONTEXT_KEYS = Set.of(
+            "routeLegId", "replayRefLegId", "replayPolicy");
+
+    private static final Set<String> DIRECT_REQUEST_CONTEXT_KEYS = Set.of(
+            "accountId",
+            "payerAccountId",
+            "payeeAccountId",
+            "payerId",
+            "payeeId",
+            "payerLedgerSubjectCode",
+            "payeeLedgerSubjectCode",
+            "channelCode",
+            "externalTransactionId",
+            "feeSpec");
 
     /**
      * 场景：用户充值后向普通收款方付款，随后收款方发起部分退款。
@@ -1502,6 +1520,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectFactsShareTransactionIdentity(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
         assertDirectEntriesFollowPostingPlans(businessSn);
+        assertDirectLedgerContextsKeepPostingEvidenceOnly(businessSn);
         assertDirectFactsCarryAuditTrail(businessSn);
         assertDirectBalancesMatchLedgerEntries();
     }
@@ -1697,6 +1716,53 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         assertThat(entry.getExchangeRate()).isEqualByComparingTo(routeLeg.getExchangeRate());
                     });
                 }));
+    }
+
+    private void assertDirectLedgerContextsKeepPostingEvidenceOnly(String businessSn) {
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+        List<LedgerEntry> entries = entriesOf(ledgerTransaction);
+
+        postingPlansOf(ledgerTransaction).forEach(plan -> {
+            JSONObject planContext = contextVariablesOf(plan.getContextVariables());
+            assertThat(planContext)
+                    .as("posting plan context must retain route evidence for direct transaction %s", businessSn)
+                    .containsEntry("routeLegId", plan.getRouteLegId())
+                    .containsKey("replayPolicy");
+            assertThat(planContext.keySet())
+                    .as("posting plan context must not carry request context for direct transaction %s", businessSn)
+                    .isSubsetOf(DIRECT_LEDGER_CONTEXT_KEYS)
+                    .doesNotContainAnyElementsOf(DIRECT_REQUEST_CONTEXT_KEYS);
+
+            List<LedgerEntry> planEntries = entries.stream()
+                    .filter(entry -> plan.getSn().equals(entry.getPostingPlanSn()))
+                    .toList();
+            assertThat(planEntries)
+                    .as("posting entries must exist for direct transaction %s", businessSn)
+                    .isNotEmpty()
+                    .allSatisfy(entry -> assertLedgerEntryContextKeepsPostingEvidenceOnly(
+                            businessSn, plan, entry));
+        });
+    }
+
+    private void assertLedgerEntryContextKeepsPostingEvidenceOnly(String businessSn,
+                                                                  LedgerPostingPlan plan,
+                                                                  LedgerEntry entry) {
+        JSONObject entryContext = contextVariablesOf(entry.getContextVariables());
+        assertThat(entryContext)
+                .as("ledger entry context must retain route evidence for direct transaction %s", businessSn)
+                .containsEntry("routeLegId", plan.getRouteLegId())
+                .containsKey("replayPolicy");
+        assertThat(entryContext.keySet())
+                .as("ledger entry context must not carry request context for direct transaction %s", businessSn)
+                .isSubsetOf(DIRECT_LEDGER_CONTEXT_KEYS)
+                .doesNotContainAnyElementsOf(DIRECT_REQUEST_CONTEXT_KEYS);
+    }
+
+    private JSONObject contextVariablesOf(String contextVariables) {
+        if (contextVariables == null || contextVariables.isBlank()) {
+            return new JSONObject();
+        }
+        return JSON.parseObject(contextVariables);
     }
 
     private void assertDirectFactsCarryAuditTrail(String businessSn) {

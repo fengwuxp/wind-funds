@@ -49,7 +49,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -144,7 +143,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         ledgerTransactionMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建账户账本交易失败");
         for (LedgerPostingPlanSpec plan : transaction.getPostingPlans()) {
-            String postingPlanSn = createPostingPlan(entity, transaction, plan);
+            String postingPlanSn = createPostingPlan(entity, plan);
             for (LedgerPostingPhaseSpec phase : plan.getPostingPhases()) {
                 for (LedgerEntrySpec entry : phase.getEntries()) {
                     createLedgerEntry(entity, plan, phase, postingPlanSn, entry);
@@ -172,9 +171,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
                 .setNewlyPosted(newlyPosted);
     }
 
-    private String createPostingPlan(LedgerTransaction transaction,
-                                     LedgerTransactionSpec transactionSpec,
-                                     LedgerPostingPlanSpec plan) {
+    private String createPostingPlan(LedgerTransaction transaction, LedgerPostingPlanSpec plan) {
         String postingPlanSn = plan.getPlanId();
         Money amount = plan.getAmount();
         String phaseCode = resolvePhaseCode(plan);
@@ -194,17 +191,11 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         entity.setCreditAmount(plan.getTotalCreditAmount().getAmount());
         entity.setBalanced(plan.isBalanced());
         entity.setDescription(defaultIfBlank(plan.getDescription(), transaction.getDescription()));
-        entity.setContextVariables(JSON.toJSONString(mergeContextVariables(transactionSpec, plan)));
+        entity.setContextVariables(JSON.toJSONString(plan.getContextVariables()));
         entity.setSha256(WindObjectDigestUtils.sha256WithNames(entity, LEDGER_POSTING_PLAN_SHA256_FIELDS));
         ledgerPostingPlanMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建账户账本记账计划失败");
         return postingPlanSn;
-    }
-
-    private Map<String, Object> mergeContextVariables(LedgerTransactionSpec transactionSpec, LedgerPostingPlanSpec plan) {
-        Map<String, Object> contextVariables = new LinkedHashMap<>(transactionSpec.getContextVariables());
-        contextVariables.putAll(plan.getContextVariables());
-        return contextVariables;
     }
 
     private String resolvePhaseCode(LedgerPostingPlanSpec plan) {
