@@ -45,6 +45,27 @@ final class FundsBenefitSpecValidators {
             "activityRules",
             "userCouponBag");
 
+    private static final Set<String> RESERVED_INSTRUCTION_CONTEXT_KEYS = Set.of(
+            ImmutableFundsBenefitSnapshotSpec.Fields.orderAmount,
+            ImmutableFundsBenefitSnapshotSpec.Fields.userPayAmount,
+            ImmutableFundsBenefitSnapshotSpec.Fields.merchantReceivableAmount,
+            ImmutableFundsBenefitComponentSpec.Fields.amount,
+            ImmutableFundsBenefitComponentSpec.Fields.ledgerEffect,
+            ImmutableFundsBenefitComponentSpec.Fields.fundingNature,
+            ImmutableFundsBenefitComponentSpec.Fields.refundPolicy,
+            ImmutableFundsBenefitRefundPolicySpec.Fields.partialRefundStrategy,
+            ImmutableFundsBenefitRefundPolicySpec.Fields.dispositions,
+            "refundDisposition",
+            ImmutableFundsBenefitRefundPolicySpec.Fields.refundableAmount,
+            ImmutableFundsBenefitRefundPolicySpec.Fields.nonRefundableAmount,
+            "currentMarketingRule",
+            "couponEligibility",
+            "couponAvailable",
+            "recalculatedDiscount",
+            "bestCoupon",
+            "activityRules",
+            "userCouponBag");
+
     private FundsBenefitSpecValidators() {
     }
 
@@ -60,27 +81,41 @@ final class FundsBenefitSpecValidators {
         return copied;
     }
 
+    static Map<String, Object> immutableInstructionContext(Map<String, Object> contextVariables, String owner) {
+        Map<String, Object> copied = FundsContextVariables.immutableCopy(contextVariables);
+        rejectReservedInstructionContextKeys(copied, owner);
+        return copied;
+    }
+
     private static void rejectReservedContextKeys(@Nullable Object value, String owner) {
+        rejectReservedContextKeys(value, owner, RESERVED_CONTEXT_KEYS);
+    }
+
+    private static void rejectReservedInstructionContextKeys(@Nullable Object value, String owner) {
+        rejectReservedContextKeys(value, owner, RESERVED_INSTRUCTION_CONTEXT_KEYS);
+    }
+
+    private static void rejectReservedContextKeys(@Nullable Object value, String owner, Set<String> reservedKeys) {
         if (value instanceof Map<?, ?> values) {
             for (Map.Entry<?, ?> entry : values.entrySet()) {
-                if (entry.getKey() instanceof String key && RESERVED_CONTEXT_KEYS.contains(key)) {
+                if (entry.getKey() instanceof String key && reservedKeys.contains(key)) {
                     throw new IllegalArgumentException(
                             owner + ".contextVariables must not contain core benefit field: " + key);
                 }
-                rejectReservedContextKeys(entry.getValue(), owner);
+                rejectReservedContextKeys(entry.getValue(), owner, reservedKeys);
             }
             return;
         }
         if (value instanceof Iterable<?> values) {
             for (Object item : values) {
-                rejectReservedContextKeys(item, owner);
+                rejectReservedContextKeys(item, owner, reservedKeys);
             }
             return;
         }
         if (value != null && value.getClass().isArray()) {
             int length = Array.getLength(value);
             for (int index = 0; index < length; index++) {
-                rejectReservedContextKeys(Array.get(value, index), owner);
+                rejectReservedContextKeys(Array.get(value, index), owner, reservedKeys);
             }
         }
     }

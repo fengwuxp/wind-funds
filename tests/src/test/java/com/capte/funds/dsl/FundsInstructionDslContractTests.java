@@ -201,6 +201,43 @@ class FundsInstructionDslContractTests {
     }
 
     /**
+     * 场景：调用方把权益核心金额、资金责任或当前营销规则藏入资金指令顶层上下文。
+     * 预期：资金指令构造阶段显式失败，但仍允许过渡期只放权益快照引用和稳定摘要。
+     * 红线：资金指令 contextVariables 不能替代权益快照、route snapshot 或交易事实快照。
+     */
+    @Test
+    void testFundsInstructionContextShouldRejectCoreBenefitFactsButAllowSummaryRefs() {
+        assertThatThrownBy(() -> validInstruction(externalTransactionReference(),
+                Map.of("benefitPayload", Map.of(
+                        "amount", Money.immutable(2000L, CURRENCY),
+                        "fundingNature", "MERCHANT_BORNE"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsInstruction.contextVariables must not contain core benefit field");
+
+        assertThatThrownBy(() -> validInstruction(externalTransactionReference(),
+                Map.of("benefitDecisionTrace",
+                        new Object[] {Map.of("currentMarketingRule", "latest-rule")})))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsInstruction.contextVariables must not contain core benefit field: "
+                        + "currentMarketingRule");
+
+        FundsInstructionSpec instruction = validInstruction(externalTransactionReference(), Map.of(
+                "benefitSnapshotId", "BS-CONTEXT-SUMMARY-001",
+                "stableDigest", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "ruleVersion", "rule-v1",
+                "refundDecisionId", "refund-decision-001",
+                "externalDecisionId", "pricing-decision-001"));
+
+        assertThat(instruction.getContextVariables())
+                .containsEntry("benefitSnapshotId", "BS-CONTEXT-SUMMARY-001")
+                .containsEntry("stableDigest",
+                        "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+                .containsEntry("ruleVersion", "rule-v1")
+                .containsEntry("refundDecisionId", "refund-decision-001")
+                .containsEntry("externalDecisionId", "pricing-decision-001");
+    }
+
+    /**
      * 场景：调用方在构造资金指令后继续改写原始嵌套上下文。
      * 预期：已构造的资金指令上下文保持稳定，不被追加的敏感字段污染。
      * 红线：资金指令是交易事实入口，不能因浅拷贝让后续可变对象绕过构造期敏感字段校验。
