@@ -1489,6 +1489,12 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectBalancesMatchLedgerEntries();
     }
 
+    @Override
+    protected void assertFailedFundsTransactionWithoutLedgerFacts(String businessSn) {
+        super.assertFailedFundsTransactionWithoutLedgerFacts(businessSn);
+        assertDirectDetailsFollowRouteParticipants(businessSn);
+    }
+
     private void assertDirectPostingPlansUseRouteSnapshotLegs(String businessSn) {
         FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
