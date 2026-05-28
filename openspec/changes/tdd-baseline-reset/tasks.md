@@ -81,6 +81,7 @@ just verify-cad
 - [x] 完成 A0 只读核验证据登记：Java 21 运行时、编译门禁、A1 直接交易主链路、posting 装配和余额投影回归测试已通过；embedded Redis 由测试基础设施自动启动和使用，未触发额外人工确认。A0 通过只作为下一步单一 MVP Execution Grant 输入，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 - [x] 完成 CAD 完整门禁验证登记：`WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 已通过，覆盖 Java 运行时、编译、核心契约、账本、交易、余额控制、业务流、架构边界、治理重放和 PMD；该结果仍只作为下一步 Execution Grant 输入，不替代生产 Done。
 - [x] 补齐 A1 直接交易事实红线候选准入卡：`docs/TDD设计/A1-直接交易事实红线准入卡.md` 已整理候选授权、覆盖验收、写入边界、Red 集合、验证命令和停止条件；该卡仍需用户确认后才成为实际 Execution Grant。
+- [x] 完成 A1 现有覆盖扫描登记：`52f116f docs: 记录 A1 现有覆盖扫描` 已记录 `A1-RED-001`、`A1-RED-002` 既有回归覆盖和 `FundsDirectTransactionFlowTests` 22 个用例通过证据；该结果只作为 Execution Grant 输入，不替代生产 Done。
 
 ### 5.1 设计、代码、任务对齐矩阵
 
@@ -576,7 +577,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | 默认写入范围 | 先写 A1 目标测试资产；Red 证明缺口后，只允许在 `transaction-impl`、`ledger-impl` 做最小修复。 |
 | 默认禁止范围 | face/core 公共契约、DDL/H2 schema、A2/A3/A4、B7/B8、P2、生产配置、外部协议和敏感数据处理。 |
 | 验证命令 | `just mvn-version`、`just compile`、`just test-one FundsDirectTransactionFlowTests tests`，必要时 `just test-transaction`、`just test-business-flow`、`just test-boundary`，提交前 `just pmd` 和 `git diff --check`。 |
-| 当前状态 | 候选准入卡已补齐；仍需用户确认后才成为实际 Execution Grant。 |
+| 当前状态 | 候选准入卡已补齐，并已记录现有覆盖扫描；仍需用户确认后才成为实际 Execution Grant。 |
 
 ## 14. B2 建议 Execution Grant
 
