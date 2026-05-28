@@ -1,7 +1,7 @@
 package com.wind.integration.funds.ledger;
 
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.integration.funds.model.FundsContextVariables;
+import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.Builder;
 import lombok.Getter;
@@ -125,6 +125,7 @@ public class LedgerBalanceChangedEvent {
         this.businessScene = businessScene;
         this.businessSn = businessSn;
         this.transactionTime = transactionTime;
-        this.contextVariables = FundsContextVariables.immutableCopy(contextVariables);
+        this.contextVariables = FundsBenefitSpecValidators.immutableInstructionContext(
+                contextVariables, "ledgerBalanceChangedEvent");
     }
 }
