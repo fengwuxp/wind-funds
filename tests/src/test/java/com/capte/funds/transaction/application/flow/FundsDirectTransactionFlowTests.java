@@ -15,6 +15,7 @@ import com.capte.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.core.WritableContextVariables;
+import com.wind.integration.funds.ledger.enums.EntrySide;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.route.spec.RouteLegSpec;
@@ -23,6 +24,7 @@ import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -1479,6 +1481,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectFactsShareTransactionIdentity(businessSn);
         assertDirectEntriesFollowPostingPlans(businessSn);
         assertDirectFactsCarryAuditTrail(businessSn);
+        assertDirectBalancesMatchLedgerEntries();
     }
 
     private void assertDirectPostingPlansUseRouteSnapshotLegs(String businessSn) {
@@ -1587,6 +1590,25 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 });
     }
 
+    private void assertDirectBalancesMatchLedgerEntries() {
+        Map<DirectBalanceKey, Long> deltas = new LinkedHashMap<>();
+        entries().forEach(entry -> deltas.merge(DirectBalanceKey.from(entry), signedEntryAmount(entry), Long::sum));
+
+        deltas.forEach((key, amountDelta) -> assertBucket(balance(key.accountId()), key.ledgerSubjectCode(),
+                initialBalance(key) + amountDelta, key.currency()));
+    }
+
+    private long signedEntryAmount(LedgerEntry entry) {
+        return entry.getEntrySide() == EntrySide.CREDIT ? entry.getAmount() : -entry.getAmount();
+    }
+
+    private long initialBalance(DirectBalanceKey key) {
+        if (cashMappingAccount().id().equals(key.subjectId()) && key.ledgerSubjectCode() == LedgerSubjectCode.CASH) {
+            return 10_000L;
+        }
+        return 0L;
+    }
+
     private void assertDirectFactsShareBusinessScene(String businessSn) {
         FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
@@ -1638,5 +1660,20 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(routeSnapshot.getTransactionType()).isEqualTo(transaction.getTransactionType());
                     assertThat(routeSnapshot.getEventType().name()).isEqualTo(ledgerTransaction.getEventType());
                 });
+    }
+
+    private record DirectBalanceKey(String subjectId,
+                                    String subjectType,
+                                    LedgerSubjectCode ledgerSubjectCode,
+                                    CurrencyIsoCode currency) {
+
+        private static DirectBalanceKey from(LedgerEntry entry) {
+            return new DirectBalanceKey(entry.getSubjectId(), entry.getSubjectType(), entry.getLedgerSubjectCode(),
+                    entry.getCurrency());
+        }
+
+        private FundsAccountId accountId() {
+            return FundsAccountId.immutable(subjectId, subjectType);
+        }
     }
 }
