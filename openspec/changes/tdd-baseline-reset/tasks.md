@@ -578,7 +578,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | 默认写入范围 | 先写 A1 目标测试资产；Red 证明缺口后，只允许在 `transaction-impl`、`ledger-impl` 做最小修复。 |
 | 默认禁止范围 | face/core 公共契约、DDL/H2 schema、A2/A3/A4、B7/B8、P2、生产配置、外部协议和敏感数据处理。 |
 | 验证命令 | `just mvn-version`、`just compile`、`just test-one FundsDirectTransactionFlowTests tests`，必要时 `just test-transaction`、`just test-business-flow`、`just test-boundary`，提交前 `just pmd` 和 `git diff --check`。 |
-| 当前状态 | 候选准入卡已补齐，并已记录现有覆盖扫描；仍需用户确认后才成为实际 Execution Grant。 |
+| 当前状态 | 候选准入卡已补齐，并已记录现有覆盖扫描与完整门禁复核；仍需用户确认后才成为实际 Execution Grant。 |
 
 ## 14. B2 建议 Execution Grant
 
