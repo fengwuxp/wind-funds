@@ -169,7 +169,9 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.FEE_CHARGE.name());
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_SENSITIVE_CONTEXT_IBAN_VALUE");
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_SENSITIVE_CONTEXT_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_SENSITIVE_CONTEXT_TOPUP");
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_SENSITIVE_CONTEXT_SOURCE", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_SENSITIVE_CONTEXT_SOURCE");
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_SENSITIVE_CONTEXT_IBAN_VALUE");
     }
 
@@ -285,8 +287,11 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .toList())
                 .containsOnly(LedgerPhaseCode.REFUND.name());
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_FLOW_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_FLOW_TOPUP");
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_FLOW_PAY", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_FLOW_PAY");
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_FLOW_REFUND", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("FEE_FLOW_REFUND");
         assertFeeRefundFactsWithFundsTransaction("FEE_FLOW_FEE_REFUND", feeSourceTransactionSn);
     }
 
@@ -357,7 +362,9 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.PAY.name());
         assertLedgerTransactionFactsUnchanged(afterPayFacts);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_UNKNOWN_SOURCE_TOPUP");
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_PAY", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_UNKNOWN_SOURCE_PAY");
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_UNKNOWN_SOURCE_RETURN");
     }
 
@@ -477,10 +484,14 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                         FundsTransactionEventType.PAY.name());
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_EXCEED_TOPUP");
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_PAY", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_EXCEED_PAY");
         assertFeeRefundFactsWithFundsTransaction("FEE_REFUND_EXCEED_FIRST_RETURN", feeSourceTransactionSn);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_RESERVE_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_EXCEED_RESERVE_TOPUP");
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_RESERVE_PAY", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_EXCEED_RESERVE_PAY");
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_SECOND_RETURN");
     }
 
