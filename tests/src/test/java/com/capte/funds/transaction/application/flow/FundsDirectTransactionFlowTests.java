@@ -1540,6 +1540,12 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectDetailsKeepRequestFactsOutOfContext(businessSn);
     }
 
+    @Override
+    protected void assertNoFundsOrLedgerFactsForBusinessSn(String businessSn) {
+        super.assertNoFundsOrLedgerFactsForBusinessSn(businessSn);
+        assertDirectBalancesMatchLedgerEntries();
+    }
+
     private void assertDirectRouteSnapshotCarriesMetadata(String businessSn) {
         FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
 
