@@ -200,6 +200,9 @@ Capte 业务会覆盖 VCC 发卡、全球收付款、收单、平台内部交易
 | 信用账户 | 承载授信额度和授权占用的控制账户，也是可记账主体。 | 不是现金账户；额度不是钱；可记录 LIMIT、AVAILABLE、AUTHORIZATION 等额度账目，已消费进入交易视图和报表，不新增账务 CONSUMED。 |
 | 预算组 | 承载预算总量、可用预算和预算占用的控制账户，也是可记账主体。 | 不是资金池；预算不是现金沉淀；可记录 LIMIT、AVAILABLE、AUTHORIZATION 等预算账目，预算超用和预算调减要进入报表或治理流程。 |
 | Spend Controls / 发卡授权控制扩展 | 发卡、VCC、企业卡或员工卡场景中，授权发生前用于判断某次支出是否允许的可选扩展能力，例如单笔金额、MCC、商户、国家、入卡方式、CVV/AVS、次数和周期窗口。 | 它决定“能不能进入授权占用”，不是资金底座核心主链路、不是账本、不是路由、不是清结算；未启用发卡授权控制时，普通资金交易和授权交易不依赖该能力。 |
+| VCC 卡 / 虚拟卡 / 卡 token | 发卡业务中的支付工具和路由输入。 | 只进入支付工具引用、绑定快照、授权上下文和 route snapshot；真正入账主体必须解析为资金账户、信用账户、预算组或平台账户角色。 |
+| 预付卡 | 如果属于卡组织或发卡体系下的 prepaid virtual card，则是 VCC 卡产品的一种资金模式。 | 卡本体仍是支付工具；预付资金、预收待付责任或用户权益余额必须另行解析为内部责任主体。若是储值券、礼品卡或预付代金券，则按权益和预收待付语义处理，不默认归入 VCC。 |
+| 共享卡 | VCC、企业卡或员工卡中的使用和绑定模式。 | 同一支付工具可以绑定多个使用人、部门、项目或预算关系；授权时必须固化使用人、绑定版本、预算组、资金来源和规则版本。共享卡不是资金账户，也不是账本主体。 |
 | 账本 | 某主体、币种和账本 Profile 下的账务事实容器。 | 缺账本不得自动入账；账本不是钱包、业务订单或报表。 |
 | 账本周期 | 同一主体、币种、账目下按生命周期、天、小时、周、月、季、年或自定义周期切分的账本 bucket。 | 不是清结算账期、报表周期或归档水位；非 LIFETIME 周期必须有明确 periodId 和周期策略，不能跨周期串账。 |
 | 账目 | 账本里的余额桶或科目，例如 AVAILABLE、FROZEN、AUTHORIZATION。 | 账目不是账户主体；它表达账户内某类余额状态。 |
@@ -414,6 +417,7 @@ mindmap
 | 信用账户 | 额度、可用额度和授权占用控制账户。 | `CreditAccount`、`CreditAccountService`。 | 是。 | 额度不是现金；不得压入 `FundingAccount`。 |
 | 预算组 | 预算总量、可用预算和预算占用控制账户。 | `BudgetGroup`、`BudgetGroupService`。 | 是。 | 预算不是资金池；不得压入 `FundingAccount`。 |
 | 支付工具 | 支付、收款或识别入口。 | `PaymentInstrument`、`PaymentInstrumentBinding`、`PaymentInstrumentRefSpec`。 | 否。 | 只做路由输入、绑定和快照；不得作为 LedgerEntry 主体。 |
+| VCC 卡 / 预付卡 / 共享卡 | VCC 业务中的支付工具、资金模式或使用模式组合。 | `PaymentInstrument`、`PaymentInstrumentBinding`、`PaymentInstrumentRefSpec`、`FundingAllocationDecision`、VCC capability pack。 | 否。 | VCC 卡是工具；预付卡是资金模式；共享卡是绑定和使用模式。入账前必须解析到资金账户、信用账户、预算组或平台账户角色。 |
 | 可记账主体 | 可进入 route leg、posting plan、LedgerEntry 和余额投影的主体。 | `SubjectRef`、`FundsSubjectType`。 | 是。 | 当前只允许资金账户、信用账户、预算组和解析后的平台资金账户。 |
 | 账本 / 账目 | 账务事实容器和余额 bucket。 | `Ledger`、`LedgerTransaction`、`LedgerPostingPlan`、`LedgerEntry`、`LedgerSubjectCode`。 | 不适用。 | 账本不是钱包或报表；账目不是账户主体。 |
 | 余额投影 | 由分录派生的余额读模型。 | `LedgerBalanceProjectionService`、`LedgerBalanceView`、`FundsSubjectBalanceQueryService`。 | 否。 | 可重建，不反写分录。 |

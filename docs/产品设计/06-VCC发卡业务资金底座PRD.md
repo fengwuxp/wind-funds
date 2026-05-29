@@ -94,6 +94,49 @@ VCC 发卡业务的核心不是“发一张虚拟卡”，而是企业、团队�
 | wind-funds | 资金动作、钱包、账本、投影、清结算对账。 | 负责统一资金内核和运营资金闭环。 | 失败无账务副作用，支持幂等重试。 | route snapshot、posting plan、ledger entry、对账批次。 |
 | 财务/合规/安全 | 外部规则、资金模式、敏感数据、会计口径。 | 负责专业确认。 | 未确认时不进入生产启用范围。 | 规则来源、版本、适用范围、核验日期和确认方。 |
 
+### 3.4 VCC 卡、预付卡和共享卡定性
+
+VCC 设计必须同时区分业务能力、支付工具、资金模式和使用模式。`wind-funds` 可以承接卡交易带来的资金事实，但不把卡产品、卡号、持卡人或卡组变成新的账本主体。
+
+| 对象或模式 | 产品定性 | wind-funds 承接方式 | 不能做什么 |
+| --- | --- | --- | --- |
+| VCC 发卡业务 | 发卡业务能力包，覆盖授权、撤销、清算、退款、拒付、费用和卡账单解释。 | 通过 VCC capability pack 把外部卡事件归一为资金动作、拒绝事实、外部引用和审计上下文。 | 不把发卡处理商、卡组织协议、PAN/CVC、HSM 或完整企业卡生命周期放进资金内核。 |
+| VCC 卡 / 虚拟卡 / 卡 token | 支付工具和路由输入。 | 进入 `PaymentInstrumentRef`、工具快照、绑定快照和 route snapshot；最终入账主体必须解析为资金账户、信用账户、预算组或平台账户角色。 | 不作为 `LedgerEntry` 主体、余额投影主体或 `FundingAccount`。 |
+| 预付卡 | VCC 卡产品的一种资金模式，前提是它属于卡组织或发卡体系下的 prepaid virtual card。 | 卡本体仍是支付工具；资金来源必须解析到预付资金账户、预收待付责任、用户权益余额或其他经财务确认的内部责任主体。 | 不等同储值券、礼品卡或预付代金券；不得用卡号表达预付余额，也不得绕过财务、合同和合规确认直接入账。 |
+| 共享卡 | VCC 卡产品的一种使用和绑定模式。 | 同一支付工具可以通过绑定关系、预算组、资金来源关系和规则版本服务多个员工、部门、项目或系统代理；授权时固化工具、使用人、绑定版本、预算和资金来源快照。 | 不单独创建“共享卡资金账户”；持卡人、部门、卡组和外部卡号都不是账本主体。 |
+
+产品维度矩阵：
+
+| 维度 | 示例 | 资金责任主体 | 可记账主体 | 快照要求 |
+| --- | --- | --- | --- | --- |
+| 信用卡 / charge card | 企业信用额度或账期后还款。 | 企业、授信账户、平台或发卡合作方确认的责任主体。 | 信用账户、资金账户或平台账户角色。 | credit line、账期、授权占用、还款或账单引用。 |
+| debit card | 直接使用已有现金余额。 | 企业或用户的真实资金账户。 | 资金账户。 | 工具、绑定、资金账户和授权金额快照。 |
+| prepaid virtual card | 先预存或预付再授权使用。 | 预付资金账户、预收待付责任或用户权益余额，具体由财务和合同确认。 | 资金账户、平台责任账户或经确认的可记账主体。 | 预付资金来源、规则版本、余额责任和退款处置快照。 |
+| shared card | 多人、部门、预算或项目共享同一卡工具。 | 交易当时解析出的企业、部门、预算组、资金账户或信用账户。 | 预算组、信用账户、资金账户或平台账户角色。 | 使用人、卡工具、绑定版本、预算组、资金来源和授权规则快照。 |
+
+卡产品接入判定卡：
+
+| 判定问题 | 是 | 否或不确定 | wind-funds 处理 |
+| --- | --- | --- | --- |
+| 是否来自发卡业务、发卡处理商、卡组织或企业卡产品体系。 | 可进入 VCC capability pack。 | 不能按 VCC 入账。 | 只保留支付工具、外部引用或权益边界评审，不进入 VCC 生产资金流。 |
+| 是否只是卡号、虚拟卡、token、钱包标识或外部工具引用。 | 归入支付工具。 | 继续判断是否为内部可记账主体。 | 进入 `PaymentInstrumentRef`、绑定快照和 route snapshot，不成为账本主体。 |
+| 是否承载真实资金余额、预付责任、平台责任或授信额度。 | 必须解析到内部责任主体。 | 不得入账。 | 由资金账户、信用账户、预算组、平台账户角色或权益/预收待付语义承接。 |
+| 是否是 prepaid virtual card。 | 先确认预付资金来源、退款处置和财务口径。 | 不能因名称“预付卡”直接入 VCC。 | 未确认前只能 contract-only；确认后卡仍是工具，责任主体才可入账。 |
+| 是否是 shared card。 | 先确认使用人、绑定版本、预算组、资金来源关系和规则版本。 | 不允许共享卡生产自动授权。 | 授权时固化绑定快照；逆向事件沿原 route snapshot，不读取当前绑定。 |
+| 是否需要保存完整 PAN、CVV、HSM 密钥、卡组织原始报文或外部协议全集。 | 不进入 wind-funds。 | 可继续评估脱敏引用。 | 只保存 token reference、掩码号、摘要、外部引用和审计引用。 |
+
+接入结论必须落到“支付工具引用、内部可记账主体、资金来源关系、权益/预收待付语义、外部规则待确认或不接入”之一。无法落到上述任一结论时，不进入编码准入。
+
+VCC 场景下的内部能力使用口径：
+
+| VCC 业务问题 | 先使用什么 | 再解析到什么 | 使用说明 |
+| --- | --- | --- | --- |
+| 卡本体、虚拟卡、卡 token、一次性卡、共享卡。 | 支付工具。 | 绑定快照和 route snapshot。 | 只表达“用什么工具发起授权”，不表达钱、额度或预算在哪里。 |
+| 预付卡的预付资金责任。 | 支付工具 + 资金来源关系。 | 经确认的资金账户、平台责任账户、预收待付或权益责任主体。 | prepaid virtual card 不自动等于 `FundingAccount`；只有责任主体可入账。 |
+| 企业卡或 charge card 的授信额度。 | 信用账户。 | `LIMIT`、`AVAILABLE`、`AUTHORIZATION`。 | 信用账户承载额度和授权占用，不承载卡本体。 |
+| 员工、部门、项目或卡组的消费控制。 | 预算组。 | 预算周期、预算可用和预算授权占用。 | 预算组控制能不能花，不表达真实资金沉淀。 |
+| 卡交易最终扣谁的钱。 | `FundingAllocationDecision`。 | 资金账户、信用账户、预算组或平台账户角色。 | 由工具绑定、资金来源关系、账户能力、规则版本和外部确认共同决定。 |
+
 ## 4. 能力地图
 
 ```mermaid
@@ -149,7 +192,7 @@ mindmap
 | VCC Authorization | authorizationId、cardRef、cardholderRef、merchant、amount、currency、decision、declineReason、externalRef。 | REQUESTED、APPROVED、DECLINED、REVERSED、EXPIRED、SETTLED、PARTIALLY_SETTLED、DISPUTED。 | 授权批准只占用 AUTHORIZATION，不代表入账。 |
 | VCC Clearing Event | originalAuthorizationRef、presentmentRef、amount、currency、fee、businessDate、networkRef。 | RECEIVED、MATCHED、POSTING_READY、POSTED、EXCEPTION。 | 必须回指原授权或说明 forced post。 |
 | VCC Dispute Case | originalTransactionRef、reasonCode、evidenceRef、amount、deadline、result。 | OPEN、EVIDENCE_REQUIRED、SUBMITTED、WON、LOST、CLOSED。 | 不得混同 refund 和 chargeback。 |
-| VCC Funds Account | fundingAccountId、creditAccountId、budgetGroupId、currency、period。 | ACTIVE、FROZEN、CLOSED。 | 卡、持卡人、外部卡号不是账本主体。 |
+| VCC Funding Relation | paymentInstrumentRef、fundingAccountId、creditAccountId、budgetGroupId、cardholderRef、bindingVersion、currency、period。 | ACTIVE、SUSPENDED、CLOSED。 | 只解释某张卡在某次交易中如何解析到内部资金责任主体；卡、持卡人、卡组和外部卡号不是账本主体。 |
 | VCC Statement Projection | company、cardholder、cardRef、authorization、clearing、fee、refund、dispute、ledgerRefs。 | 可重建只读视图。 | 投影不反写交易事实或账本事实。 |
 
 ### 5.2 状态机
@@ -204,6 +247,8 @@ flowchart LR
 | VCC-R003 | 卡不作为账本主体 | Card / Ledger | 生成资金动作。 | cardRef 只能作为 instrumentRef。 | 解析到资金账户、信用账户或预算组。 | P0 | 随 VCC 场景规则确认。 | ledger entry 主体不出现 cardRef。 |
 | VCC-R004 | 原路径回放 | Refund / Reversal / Chargeback | 逆向事件发生。 | 必须存在原 route snapshot。 | 基于原快照处理。 | P0 | 随 VCC 场景规则确认。 | 卡换绑后退款仍按原路径。 |
 | VCC-R005 | 敏感数据最小化 | Card Data | 接收外部卡事件。 | PAN/CVC 不进入 wind-funds。 | 仅保存脱敏引用和摘要。 | P0 | 随 VCC 场景规则确认。 | 日志、导出和投影无完整 PAN/CVC。 |
+| VCC-R006 | 预付卡资金模式隔离 | Prepaid Card | prepaid virtual card 发起授权、清算、退款或拒付。 | 卡本体仍是支付工具，资金来源必须解析到经确认的预付资金责任主体。 | 固化预付资金来源、规则版本和退款处置。 | P0 | 财务、合同和合规确认后启用。 | 预付卡不会被当作储值券或普通优惠券，也不会被写成 `FundingAccount`。 |
+| VCC-R007 | 共享卡绑定快照 | Shared Card | 多使用人、部门、项目或预算共享同一卡工具。 | 每次授权必须确定唯一资金来源和预算/额度约束。 | 固化使用人、绑定版本、预算组、资金来源关系和规则版本。 | P0 | 随 VCC 场景规则确认。 | 共享卡换绑后，退款、撤销、过期和拒付仍按原快照解释。 |
 
 ## 8. 运营后台、数据、报表和审计
 
@@ -229,7 +274,9 @@ flowchart LR
 
 | 风险 | 影响 | 处理原则 |
 | --- | --- | --- |
-| VCC 资金模式未确认 | credit、debit、prepaid、charge card 对账务影响不同。 | 进入编码前必须确认资金模式和责任主体。 |
+| VCC 资金模式未确认 | credit、debit、prepaid、charge card 对账务影响不同。 | 进入编码前必须确认资金模式、责任主体、预付资金来源和退款处置。 |
+| 预付卡和储值权益混用 | 卡产品资金模式、储值券、礼品卡或预付代金券被混成一种对象。 | 预付卡只在卡组织或发卡体系下作为 VCC 资金模式；储值、礼品卡和预付代金券仍走权益或预收待付资金语义。 |
+| 共享卡被误建为资金账户 | 卡组、部门或持卡人被写成资金账户或账本主体。 | 共享卡只表达工具使用和绑定模式；资金责任必须解析到预算组、信用账户、资金账户或平台账户角色。 |
 | PCI 边界不清 | 敏感卡数据泄露或合规越界。 | wind-funds 不保存完整 PAN/CVC，只保留引用和摘要。 |
 | 授权和清算混用 | 用户余额、账本和账单失真。 | 授权、清算、结算、退款、拒付分层表达。 |
 | 争议与退款混用 | 重复扣回或重复退款。 | dispute case 独立建模，并与原交易链路关联。 |
@@ -246,6 +293,8 @@ flowchart LR
 | 待确认项 | 影响章节 | 风险等级 | 确认方 | 未确认前默认处理 |
 | --- | --- | --- | --- | --- |
 | VCC 实际资金模式和资金责任主体。 | 3、5、7、8 | 高 | 业务、财务、法务、发卡合作方 | 不进入具体账务编码。 |
+| 预付卡是否属于 VCC prepaid virtual card，还是储值、礼品卡或预付代金券。 | 3、5、7、10 | 高 | 业务、财务、法务、合规、发卡合作方 | 未确认前不把预付卡入账为 VCC 资金模式。 |
+| 共享卡的使用人、部门、预算组、资金来源关系和规则版本如何绑定。 | 3、5、7、10 | 中 | 发卡产品、企业管理、风控、财务 | 只保留设计边界，不开放生产自动授权。 |
 | 卡组织 clearing、chargeback、费用和证据时限。 | 6、7、8、9 | 高 | 通道、法务、合规 | 仅按待确认设计，不承诺 SLA。 |
 | PAN/CVC、token、脱敏展示和日志边界。 | 2、3、8、9 | 高 | 安全、合规、PCI 负责人 | 不保存敏感明文。 |
 | Spend Controls 是否纳入本期。 | 3、4、7 | 中 | 发卡产品、风控 | 只保留资金准入引用。 |
@@ -260,6 +309,8 @@ flowchart LR
 | VCC-AC-004 | clearing 完成入账 | clearing 匹配原授权。 | 授权占用核销，生成实际账务影响。 | 部分清算、金额容差待确认。 | 找不到原授权进入异常。 |
 | VCC-AC-005 | 退款沿原路径 | 已清算交易退款。 | 基于原 route snapshot 回放。 | 部分退款。 | 累计退款超额失败。 |
 | VCC-AC-006 | chargeback 独立处理 | 已清算交易发生拒付。 | 生成 dispute case、扣回或追偿资金动作。 | 争议费、部分拒付。 | 与退款碰撞时防重复损失。 |
+| VCC-AC-007 | 预付卡授权资金来源 | prepaid virtual card 授权请求。 | 卡作为支付工具，预付资金责任主体解析后 `AVAILABLE -> AUTHORIZATION`。 | 预付资金来源缺失、财务口径待确认。 | 不得把预付卡当储值券或 `FundingAccount`。 |
+| VCC-AC-008 | 共享卡授权绑定快照 | 共享卡由员工、部门、项目或系统代理发起授权。 | 固化使用人、工具、绑定版本、预算组、资金来源关系和规则版本；账务主体不出现 cardholder 或 cardRef。 | 工具换绑、预算组变更、资金来源多命中。 | 缺唯一资金来源或缺绑定版本时失败无账务副作用。 |
 | VCC-RED-001 | 完整 PAN/CVC 不得入库或日志 | 外部卡事件含敏感字段。 | 拒绝或脱敏，只保留引用摘要。 | 导出、投影、审计。 | 明文出现即阻断。 |
 
 ## 11. 与资金底座主线的关系

@@ -189,7 +189,7 @@ DDL/H2 schema 变化：
 | A0 至 A4 | P0/P1 条件准入。 | 仅在 Execution Grant 写清 `mvpScenario`、AC/DSL/系分/TDD/RED、写入范围、测试和验证命令后逐任务进入；不得一次性授权整个 02 目标态。B1 至 B6 只作为覆盖索引。 |
 | B7 | P0 未准入。 | 出款前准入候选实现只能作为差距复核输入；清结算、对账和出款生命周期必须独立 OpenSpec change 后再授权，并确认 `CLS-GATE-*`、首批 Red、模块/表/接口、DDL/H2 schema、服务级测试、运营补事实白名单和职责分离边界。 |
 | B8 | P0/P1 未准入。 | governance 交易投影重放局部基线不能替代归档、余额快照、差异报告、异常人工处理和指标水位隔离；进入编码前必须另补 Execution Grant，并确认 `GOV-GATE-*`、治理物理落点、依赖方向、DDL/H2 schema、边界测试、指标水位隔离测试和大数据归档承接边界。 |
-| P2 业务能力包 | 不开放默认编码准入。 | VCC、全球账户和收单必须按业务专项 PRD、DSL 准入卡、系分承接卡和 `TDD-P2-*` 用例另起 Execution Grant；授权前只能做设计、契约草案或 contract-only 验证，不得把业务 pack 当作 P0/P1 默认实现范围。 |
+| P2 业务能力包 | 不开放默认编码准入。 | VCC、全球账户和收单必须按业务专项 PRD、DSL 准入卡、系分承接卡和 `TDD-P2-*` 用例另起 Execution Grant；VCC 预付/共享卡还必须声明 `PaymentInstrument`、绑定快照、资金来源关系、禁止新增账户/账本主体和 P0/P1 回归范围；授权前只能做设计、契约草案或 contract-only 验证，不得把业务 pack 当作 P0/P1 默认实现范围。 |
 | 本轮生产代码、测试代码、DDL/H2 schema 和运行时配置 | 不授权写入。 | 本轮只做设计和任务基线优化；编码开始前另行确认 Execution Grant、Git 策略、人工确认点和停止条件。 |
 
 ### 5.5 编码阶段 Execution Grant 对齐模板
@@ -233,7 +233,7 @@ DDL/H2 schema 变化：
 | M0 基线重置 | 作废历史基线、删除旧测试源码、保留 resources、重建 OpenSpec/Harness。 | 本文件第 0 节全部完成。 | 已完成。 |
 | M1 P0 资金底座内核 | 先把钱包、账本、账目、余额投影、对账、清分、清算、结算、大数据归档和账本余额快照的不变量证明清楚。对应 B1、B2、B7、B8 的 P0 覆盖索引。 | P0 任务按各自 Execution Grant 通过，真实服务层测试、余额断言、账务平衡、清结算对账阻断、归档 Manifest、余额快照和失败隔离闭合。 | 优先级最高；可按独立授权分任务推进，不要求把 03/04 视为低优先级后置能力。 |
 | M2 P1 交易与读模型扩展 | 在 P0 主体、账目、账本、余额和治理边界上，落直接交易、授权交易、余额控制、Route Replay、交易投影和权益资金流。对应 B3 至 B6 覆盖索引。 | P1 任务通过，交易入口具备状态、route、posting、entry、projection、幂等和审计断言；含权益场景补齐解释视图、证据最小化和规则核验断言。 | 依赖已确认的 P0 基础事实；不得反向改变 P0 资金口径。 |
-| M3 P2 业务模式能力包 | 按专项 PRD/DSL/系分/TDD 支撑 VCC 发卡、全球账户收付款和收单业务。 | 业务专项能证明归一资金事实、外部引用脱敏、外部规则核验、轨道边界、`TDD-P2-*` 专项用例和 P0/P1 回归闭合，不把业务协议沉入资金内核。ACH 或银行转账仅作为上层业务或外部轨道输入，资金底座只承接归一资金事实、外部引用、对账差错、追偿、调账核销和审计；若专项使用 ACH 或银行转账，必须回挂 `ACH-BOUNDARY-001` 至 `ACH-BOUNDARY-006`、`AC-RAIL-002A` 至 `AC-RAIL-007`、`TDD-RAIL-002` 至 `TDD-RAIL-007`。 | 依赖 P0/P1 可复用能力和业务专项 Execution Grant；未授权前不得进入生产代码、测试代码、DDL/H2 schema 或运行配置写入。 |
+| M3 P2 业务模式能力包 | 按专项 PRD/DSL/系分/TDD 支撑 VCC 发卡、全球账户收付款和收单业务。 | 业务专项能证明归一资金事实、外部引用脱敏、外部规则核验、轨道边界、`TDD-P2-*` 专项用例和 P0/P1 回归闭合，不把业务协议沉入资金内核。VCC 专项必须证明 VCC 卡/虚拟卡/卡 token 是 `PaymentInstrument`，prepaid virtual card 是资金模式，shared card 是绑定/使用模式，并回挂 `VCC-AC-007`、`VCC-AC-008`、`DSL-PAYMENT-INSTRUMENT-PREPAID-CARD-001`、`DSL-PAYMENT-INSTRUMENT-SHARED-CARD-001`、`TDD-RAIL-001A`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011`。ACH 或银行转账仅作为上层业务或外部轨道输入，资金底座只承接归一资金事实、外部引用、对账差错、追偿、调账核销和审计；若专项使用 ACH 或银行转账，必须回挂 `ACH-BOUNDARY-001` 至 `ACH-BOUNDARY-006`、`AC-RAIL-002A` 至 `AC-RAIL-007`、`TDD-RAIL-002` 至 `TDD-RAIL-007`。 | 依赖 P0/P1 可复用能力和业务专项 Execution Grant；未授权前不得进入生产代码、测试代码、DDL/H2 schema 或运行配置写入。 |
 
 ## 7. 覆盖索引明细
 
