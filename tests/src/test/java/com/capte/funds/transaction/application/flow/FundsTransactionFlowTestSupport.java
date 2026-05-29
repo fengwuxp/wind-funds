@@ -103,6 +103,8 @@ import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.integration.funds.route.spec.RouteLegSpec;
+import com.wind.integration.funds.route.spec.RouteNodeSpec;
 import com.wind.integration.funds.spec.transaction.FeeSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.wallet.FundsAccountId;
@@ -767,6 +769,44 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 expectedEntries);
     }
 
+    protected void assertLedgerFactsFollowRouteSnapshot(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+        List<LedgerPostingPlan> postingPlans = postingPlansOf(ledgerTransaction);
+        List<LedgerEntry> entries = entriesOf(ledgerTransaction);
+
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))
+                .as("route snapshot must explain ledger facts for businessSn %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> {
+                    assertThat(routeSnapshot.getBusinessSn()).isEqualTo(businessSn);
+                    assertThat(postingPlans)
+                            .as("posting plan route legs for businessSn %s", businessSn)
+                            .extracting(LedgerPostingPlan::getRouteLegId)
+                            .containsExactlyInAnyOrderElementsOf(routeSnapshot.getLegs().stream()
+                                    .map(RouteLegSpec::getLegId)
+                                    .toList());
+                    postingPlans.forEach(plan -> {
+                        RouteLegSpec routeLeg = routeLegById(routeSnapshot.getLegs(), plan.getRouteLegId());
+                        List<LedgerEntry> planEntries = entries.stream()
+                                .filter(entry -> plan.getSn().equals(entry.getPostingPlanSn()))
+                                .toList();
+
+                        assertThat(plan.getAmount()).isEqualTo(routeLeg.getAmount().getAmount());
+                        assertThat(plan.getCurrency()).isEqualTo(routeLeg.getAmount().getCurrency());
+                        assertThat(plan.getBalanceEffectType()).isEqualTo(routeLeg.getBalanceEffectType().name());
+                        assertThat(plan.getPhaseCode()).isEqualTo(routeLeg.getPhaseCode().name());
+                        assertThat(planEntries.stream()
+                                .map(RouteNodeLedgerEntryKey::from)
+                                .toList())
+                                .as("ledger entries must follow route leg nodes and sides for businessSn %s",
+                                        businessSn)
+                                .containsExactlyInAnyOrder(
+                                        RouteNodeLedgerEntryKey.from(routeLeg.getSourceNode(), EntrySide.DEBIT),
+                                        RouteNodeLedgerEntryKey.from(routeLeg.getTargetNode(), EntrySide.CREDIT));
+                    });
+                });
+    }
+
     protected List<LedgerTransaction> ledgerTransactions() {
         LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
         QueryWrapper wrapper = QueryWrapper.create().from(ref)
@@ -1074,6 +1114,29 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     private static Money amount(long value) {
         return Money.immutable(value, CURRENCY);
+    }
+
+    private RouteLegSpec routeLegById(List<RouteLegSpec> routeLegs, String routeLegId) {
+        return routeLegs.stream()
+                .filter(routeLeg -> routeLeg.getLegId().equals(routeLegId))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("route leg not found: " + routeLegId));
+    }
+
+    private record RouteNodeLedgerEntryKey(String subjectId,
+                                           String subjectType,
+                                           LedgerSubjectCode ledgerSubjectCode,
+                                           EntrySide entrySide) {
+
+        private static RouteNodeLedgerEntryKey from(RouteNodeSpec node, EntrySide entrySide) {
+            return new RouteNodeLedgerEntryKey(node.getSubjectRef().getSubjectId(),
+                    node.getSubjectRef().getSubjectType().name(), node.getLedgerSubjectCode(), entrySide);
+        }
+
+        private static RouteNodeLedgerEntryKey from(LedgerEntry entry) {
+            return new RouteNodeLedgerEntryKey(entry.getSubjectId(), entry.getSubjectType(),
+                    entry.getLedgerSubjectCode(), entry.getEntrySide());
+        }
     }
 
     @Configuration

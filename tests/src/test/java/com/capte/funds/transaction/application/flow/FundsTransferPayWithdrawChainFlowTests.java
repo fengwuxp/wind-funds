@@ -111,10 +111,14 @@ class FundsTransferPayWithdrawChainFlowTests extends FundsTransactionFlowTestSup
 
         assertPostedTransactions(5);
         assertSingleFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("CHAIN_TRANSFER_PAY_WITHDRAW_TOPUP");
         assertSingleFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_TRANSFER", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("CHAIN_TRANSFER_PAY_WITHDRAW_TRANSFER");
         assertSingleFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_PAY", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("CHAIN_TRANSFER_PAY_WITHDRAW_PAY");
         assertFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_FREEZE", 0, 0, 1, 2);
         assertSingleFundsAndLedgerFactsForBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_CONFIRM", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("CHAIN_TRANSFER_PAY_WITHDRAW_CONFIRM");
         assertThat(ledgerTransactions().stream()
                 .map(LedgerTransaction::getEventType)
                 .toList())
