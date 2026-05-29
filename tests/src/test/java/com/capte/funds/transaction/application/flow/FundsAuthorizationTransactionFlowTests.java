@@ -6,6 +6,7 @@ import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.capte.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.capte.funds.transaction.enums.FundsEffectType;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
@@ -505,6 +506,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.SETTLEMENT.name());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FULL_SETTLE_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceDetailSn)
+                .toList())
+                .containsOnly(authorizationSn);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_CAPTURE", 0, 2, 1, 2);
@@ -586,6 +591,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.REFUND.name());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FULL_REFUND_RETURN").stream()
+                .map(FundsTransactionDetail::getReferenceDetailSn)
+                .toList())
+                .containsOnly(authorizationSn);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_CAPTURE", 0, 2, 1, 2);
