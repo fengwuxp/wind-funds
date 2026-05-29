@@ -1181,6 +1181,90 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接充值使用相同业务流水重复通知，第二次请求更换非易变业务上下文字段。
+     * 输入：充值 40 使用业务流水 `DIRECT_IDEMPOTENT_TOPUP_CONTEXT`，首请求 context 为 RULE-A，重试同 context 后改为 RULE-B。
+     * 输出：同 context 重试返回同一资金交易流水；业务上下文变化被摘要冲突拒绝。
+     * 预期：非易变 contextVariables 字段必须参与资金请求摘要，不能像 traceId 一样被过滤。
+     * 红线：同业务流水不同业务上下文不得静默复用原交易，也不得新增 route、posting、ledger entry 或污染余额。
+     */
+    @Test
+    void testDirectTopupSameBusinessSnWithDifferentBusinessContextShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId account = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+
+        String firstTopupSn = directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_context_topup",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT")
+                .setDescription("idempotent topup with business context"), WindOperator.system());
+        BalanceSnapshot afterFirstTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFirstTopup,
+                delta(account, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
+        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_TOPUP_CONTEXT");
+
+        String retryTopupSn = directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_context_topup",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT")
+                .setDescription("idempotent topup with business context"), WindOperator.system());
+
+        assertThat(retryTopupSn).isEqualTo(firstTopupSn);
+        BalanceSnapshot afterRetryTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstTopup, afterRetryTopup,
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstTopupFacts);
+        assertDirectRouteSnapshotUnchanged("DIRECT_IDEMPOTENT_TOPUP_CONTEXT", firstRouteSnapshot);
+
+        assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_context_topup",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT")
+                .setDescription("idempotent topup with business context"), WindOperator.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRetryTopup, afterConflict,
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstTopupFacts);
+        assertDirectRouteSnapshotUnchanged("DIRECT_IDEMPOTENT_TOPUP_CONTEXT", firstRouteSnapshot);
+
+        assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertThat(fundsTransactionDetails(firstTopupSn)).hasSize(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT", 3, 4);
+    }
+
+    /**
      * 场景：直接付款使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
      * 输入：充值 100，付款 40 使用业务流水 `DIRECT_IDEMPOTENT_PAY`，随后同流水同金额重试，再同流水改金额为 41。
      * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次付款后的状态。
