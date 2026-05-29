@@ -79,6 +79,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private static final String HASH_FIELD_PARTICIPANT = "participant";
 
+    private static final String HASH_FIELD_CONTEXT_VARIABLES = "contextVariables";
+
     private static final String MONEY_FIELD_AMOUNT = "amount";
 
     private static final String MONEY_FIELD_CURRENCY = "currency";
@@ -607,6 +609,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put(ImmutableFundsInstructionSpec.Fields.businessScene, instruction.getBusinessScene());
         values.put(ImmutableFundsInstructionSpec.Fields.businessSn, instruction.getBusinessSn());
         values.put(ImmutableFundsInstructionSpec.Fields.reference, referenceSummary(instruction.getReference()));
+        values.put(HASH_FIELD_CONTEXT_VARIABLES,
+                FundsStableHashSupport.stableHashMap(instruction.getContextVariables()));
         values.put(HASH_FIELD_ROUTE, routeRequestHashSummary(routeSnapshot));
         values.put(HASH_FIELD_PARTICIPANT, participantSummary(participant));
         return FundsStableHashSupport.sha256Json(values);

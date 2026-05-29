@@ -120,6 +120,104 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
+     * 场景：授权拒绝使用相同业务流水重复提交，第二次请求摘要一致时复用原拒绝交易，拒绝原因变化时拒绝。
+     * 输入：账户充值 100 后，授权拒绝 60，拒绝原因为 RISK_DECLINED；随后同流水同原因重试，再改为 LIMIT_DECLINED。
+     * 输出：同摘要重试返回同一授权交易流水；摘要冲突抛错；余额和账务事实保持首次拒绝后的状态。
+     * 预期：授权拒绝幂等必须保护拒绝金额、授权主体和拒绝原因。
+     * 红线：同业务流水不同拒绝原因不得静默复用原交易，也不得生成 route、posting、ledger entry 或污染拒绝事实。
+     */
+    @Test
+    void testAuthorizationDeclineSameBusinessSnWithDifferentReasonShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        topup(user, 100L, "AUTH_IDEMPOTENT_DECLINE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
+
+        String declinedSn = declineAuthorization(user, 60L, "RISK_DECLINED", "AUTH_IDEMPOTENT_DECLINE");
+        BalanceSnapshot afterFirstDecline = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFirstDecline,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
+
+        String retryDeclinedSn = declineAuthorization(user, 60L, "RISK_DECLINED", "AUTH_IDEMPOTENT_DECLINE");
+        BalanceSnapshot afterRetryDecline = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        assertThat(retryDeclinedSn).isEqualTo(declinedSn);
+        assertOnlyBalanceDeltas(afterFirstDecline, afterRetryDecline,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
+        assertThatThrownBy(() -> declineAuthorization(user, 60L, "LIMIT_DECLINED", "AUTH_IDEMPOTENT_DECLINE"))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterRetryDecline, afterConflict,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+
+        FundsTransactionDTO transaction = fundsTransaction(declinedSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+        assertThat(transaction.getAuthorizedAmount()).isZero();
+        assertThat(transaction.getReversedAmount()).isZero();
+        assertThat(transaction.getSettledAmount()).isZero();
+        assertThat(transaction.getRefundedAmount()).isZero();
+        assertThat(transaction.getDeclinedAmount()).isZero();
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(declinedSn))
+                .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getLegs()).isEmpty());
+
+        assertThat(fundsTransactionDetails(declinedSn))
+                .singleElement()
+                .satisfies(detail -> {
+                    assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
+                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getLedgerTransactionSn()).isNull();
+                    assertThat(detail.getContextVariables())
+                            .contains("RISK_DECLINED")
+                            .doesNotContain("LIMIT_DECLINED");
+                });
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_DECLINE_TOPUP", 3, 4);
+        assertThat(fundsTransactionsByBusinessSn("AUTH_IDEMPOTENT_DECLINE"))
+                .singleElement()
+                .satisfies(rejectedTransaction -> {
+                    assertThat(rejectedTransaction.getSn()).isEqualTo(declinedSn);
+                    assertThat(rejectedTransaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+                    assertNoLedgerFactsForFundsTransaction(rejectedTransaction.getSn());
+                });
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_DECLINE"))
+                .singleElement()
+                .satisfies(detail -> {
+                    assertThat(detail.getTransactionSn()).isEqualTo(declinedSn);
+                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
+                    assertThat(detail.getLedgerTransactionSn()).isNull();
+                });
+    }
+
+    /**
      * 场景：授权请求把卡组织 CVV 原文字段放入扩展上下文。
      * 输入：账户充值 100 后，授权请求 contextVariables 含嵌套 cardSecurityCode 字段。
      * 输出：授权请求被拒绝，AVAILABLE/AUTHORIZATION 和平台账户余额保持充值后状态。
