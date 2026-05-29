@@ -75,8 +75,15 @@ public final class LedgerTransactionSpecFactory {
                 .transactionTime(instruction.getEventTime())
                 .description(instruction.getDescription())
                 .postingPlans(factory.apply(sn))
-                .contextVariables(instruction.getContextVariables())
+                .contextVariables(ledgerTransactionContext(instruction))
                 .build();
+    }
+
+    private static Map<String, Object> ledgerTransactionContext(FundsInstructionSpec instruction) {
+        if (instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION) {
+            return Map.of();
+        }
+        return instruction.getContextVariables();
     }
 
     @NonNull

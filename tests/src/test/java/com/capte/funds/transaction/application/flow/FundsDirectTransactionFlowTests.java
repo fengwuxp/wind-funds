@@ -1521,6 +1521,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectDetailsFollowRouteParticipants(businessSn);
         assertDirectDetailsKeepRequestFactsOutOfContext(businessSn);
         assertDirectEntriesFollowPostingPlans(businessSn);
+        assertDirectLedgerTransactionKeepsContextMinimal(businessSn);
         assertDirectLedgerContextsKeepPostingEvidenceOnly(businessSn);
         assertDirectFactsCarryAuditTrail(businessSn);
         assertDirectBalancesMatchLedgerEntries();
@@ -1753,6 +1754,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     .allSatisfy(entry -> assertLedgerEntryContextKeepsPostingEvidenceOnly(
                             businessSn, plan, entry));
         });
+    }
+
+    private void assertDirectLedgerTransactionKeepsContextMinimal(String businessSn) {
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+        JSONObject transactionContext = contextVariablesOf(ledgerTransaction.getContextVariables());
+
+        assertThat(transactionContext.keySet())
+                .as("direct ledger transaction context must not carry request context for %s", businessSn)
+                .doesNotContainAnyElementsOf(DIRECT_REQUEST_CONTEXT_KEYS);
     }
 
     private void assertLedgerEntryContextKeepsPostingEvidenceOnly(String businessSn,
