@@ -51,9 +51,8 @@ final class RouteBenefitSnapshotContextSupport {
                 benefitSnapshot == null ? null : benefitSnapshot.getBenefitSnapshotId());
     }
 
-    static Map<String, Object> mergeOriginalBenefitSnapshotSummary(Map<String, Object> contextVariables,
-                                                                   RouteSnapshotSpec routeSnapshot) {
-        Map<String, Object> result = new LinkedHashMap<>(contextVariables);
+    static Map<String, Object> originalBenefitSnapshotSummary(RouteSnapshotSpec routeSnapshot) {
+        Map<String, Object> result = new LinkedHashMap<>();
         copyIfPresent(result, routeSnapshot.getContextVariables(), FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID);
         copyIfPresent(result, routeSnapshot.getContextVariables(),
                 FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST);

@@ -275,11 +275,11 @@ class DefaultRouteReplayServiceTests {
     }
 
     /**
-     * 场景：含权益退款回放引用原 RouteSnapshot，当前请求也携带了新的权益快照。
-     * 输入：原 RouteSnapshot context 只保存原权益快照 ID 和稳定摘要，当前请求携带另一份权益快照。
+     * 场景：含权益退款回放引用原 RouteSnapshot，当前请求也携带了新的权益快照和请求上下文。
+     * 输入：原 RouteSnapshot context 只保存原权益快照 ID 和稳定摘要，当前请求携带另一份权益快照和 accountId。
      * 输出：回放成功，ResolvedRoute context 继承原权益快照摘要。
-     * 预期：回放结果不使用当前请求的权益摘要覆盖原路径事实。
-     * 红线：Route Replay 只读原权益快照摘要，不能按当前营销或退款请求重新生成历史权益事实。
+     * 预期：回放结果不使用当前请求的权益摘要覆盖原路径事实，也不扩散当前请求上下文。
+     * 红线：Route Replay 只读原权益快照摘要，不能按当前营销或退款请求重新生成历史权益事实或携带临时请求字段。
      */
     @Test
     void testResolveBenefitReplayShouldReuseOriginalBenefitSnapshotSummary() {
@@ -296,7 +296,8 @@ class DefaultRouteReplayServiceTests {
         ResolvedRouteSpec resolvedRoute = replayService.resolve(replayInstruction(reference,
                 paymentInstrumentRef("CARD-NEW", "new-binding"),
                 null,
-                currentBenefitSnapshot));
+                currentBenefitSnapshot,
+                Map.of(FundsInstructionContextKeys.ACCOUNT_ID, "PAYER-CURRENT", "requestChannel", "mobile")));
 
         assertThat(resolvedRoute.getContextVariables())
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, "BS-ORIGINAL-001")
@@ -305,7 +306,8 @@ class DefaultRouteReplayServiceTests {
         assertThat(resolvedRoute.getContextVariables())
                 .doesNotContainEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, "BS-CURRENT-001")
                 .doesNotContainEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST,
-                        currentBenefitSnapshot.getStableDigest());
+                        currentBenefitSnapshot.getStableDigest())
+                .doesNotContainKeys(FundsInstructionContextKeys.ACCOUNT_ID, "requestChannel");
     }
 
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference) {
@@ -327,6 +329,14 @@ class DefaultRouteReplayServiceTests {
                                                    PaymentInstrumentRefSpec instrumentRef,
                                                    ExternalAccountRefSpec externalAccountRef,
                                                    FundsBenefitSnapshotSpec benefitSnapshot) {
+        return replayInstruction(reference, instrumentRef, externalAccountRef, benefitSnapshot, Map.of());
+    }
+
+    private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference,
+                                                   PaymentInstrumentRefSpec instrumentRef,
+                                                   ExternalAccountRefSpec externalAccountRef,
+                                                   FundsBenefitSnapshotSpec benefitSnapshot,
+                                                   Map<String, Object> contextVariables) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -345,7 +355,7 @@ class DefaultRouteReplayServiceTests {
                         .operatorType("SYSTEM")
                         .appName("wind-funds-tests")
                         .build())
-                .contextVariables(Map.of())
+                .contextVariables(contextVariables)
                 .build();
     }
 

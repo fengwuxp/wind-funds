@@ -11,11 +11,15 @@ import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
+import com.capte.funds.transaction.support.FundsRouteCodes;
 import com.wind.core.WritableContextVariables;
+import com.wind.integration.funds.ledger.enums.EntrySide;
+import com.wind.integration.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
+import com.wind.integration.funds.route.spec.RouteLegSpec;
 import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
@@ -523,6 +527,11 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .satisfies(transaction -> {
                     var postingPlans = postingPlansOf(transaction);
                     var entries = entriesByBusinessSn(businessSn);
+                    var routeSnapshot = fundsTransactionQueryService
+                            .findRouteSnapshotByTransactionSn(transaction.getFundsTransactionSn())
+                            .orElseThrow(() -> new AssertionError("fee refund route snapshot not found: "
+                                    + businessSn));
+                    var replayLegs = routeSnapshot.getLegs();
                     var postingPlanSns = postingPlans.stream()
                             .map(LedgerPostingPlan::getSn)
                             .toList();
@@ -530,6 +539,24 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(transaction.getFundsTransactionSn()).isEqualTo(transactionSn);
                     assertThat(transaction.getEventType())
                             .isEqualTo(FundsTransactionEventType.FEE_REFUND.name());
+                    assertThat(routeSnapshot.getRouteCode()).isEqualTo(FundsRouteCodes.DIRECT_REFUND_REPLAY);
+                    assertThat(routeSnapshot.getSnapshotId()).isEqualTo(businessSn + "_ROUTE");
+                    assertThat(routeSnapshot.getSnapshotSchemaVersion())
+                            .isEqualTo(FundsRouteCodes.CURRENT_ROUTE_VERSION);
+                    assertThat(routeSnapshot.getBusinessSn()).isEqualTo(businessSn);
+                    assertThat(routeSnapshot.getEventType()).isEqualTo(FundsTransactionEventType.FEE_REFUND);
+                    assertThat(routeSnapshot.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
+                    assertThat(routeSnapshot.getContextVariables())
+                            .as("fee refund route snapshot must not carry request context for %s", businessSn)
+                            .isEmpty();
+                    assertThat(replayLegs)
+                            .as("fee refund must replay only source fee leg for %s", businessSn)
+                            .singleElement()
+                            .satisfies(leg -> {
+                                assertThat(leg.getReplayRefLegId()).isEqualTo("FEE");
+                                assertThat(leg.getPhaseCode()).isEqualTo(LedgerPhaseCode.REFUND);
+                                assertThat(leg.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RESTORE);
+                            });
                     assertThat(details)
                             .as("funds transaction details must point to fee refund ledger transaction for businessSn %s",
                                     businessSn)
@@ -540,12 +567,25 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(postingPlans)
                             .as("posting plans for fee refund businessSn %s", businessSn)
                             .hasSize(1);
+                    assertThat(postingPlans.stream()
+                            .map(LedgerPostingPlan::getRouteLegId)
+                            .toList())
+                            .as("fee refund posting must use replay route leg for businessSn %s", businessSn)
+                            .containsExactlyElementsOf(replayLegs.stream()
+                                    .map(RouteLegSpec::getLegId)
+                                    .toList());
                     assertThat(postingPlans)
                             .as("posting plans must point to source funds transaction for fee refund businessSn %s",
                                     businessSn)
                             .allSatisfy(plan -> {
                                 assertThat(plan.getLedgerTransactionSn()).isEqualTo(transaction.getSn());
                                 assertThat(plan.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
+                                RouteLegSpec replayLeg = replayLegs.getFirst();
+                                assertThat(plan.getAmount()).isEqualTo(replayLeg.getAmount().getAmount());
+                                assertThat(plan.getCurrency()).isEqualTo(replayLeg.getAmount().getCurrency());
+                                assertThat(plan.getBalanceEffectType())
+                                        .isEqualTo(replayLeg.getBalanceEffectType().name());
+                                assertThat(plan.getPhaseCode()).isEqualTo(replayLeg.getPhaseCode().name());
                             });
                     assertThat(postingPlans.stream()
                             .map(LedgerPostingPlan::getPhaseCode)
@@ -563,11 +603,38 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                                 assertThat(entry.getFundsTransactionSn()).isEqualTo(transaction.getFundsTransactionSn());
                                 assertThat(entry.getPostingPlanSn()).isIn(postingPlanSns);
                             });
+                    RouteLegSpec replayLeg = replayLegs.getFirst();
+                    assertThat(entries.stream()
+                            .map(entry -> new FeeRefundRouteNodeKey(entry.getSubjectId(), entry.getSubjectType(),
+                                    entry.getLedgerSubjectCode(), entry.getEntrySide()))
+                            .toList())
+                            .as("fee refund entries must follow replay route leg nodes for businessSn %s", businessSn)
+                            .containsExactlyInAnyOrder(
+                                    FeeRefundRouteNodeKey.debit(replayLeg),
+                                    FeeRefundRouteNodeKey.credit(replayLeg));
                     assertThat(entries.stream()
                             .map(LedgerEntry::getLedgerSubjectCode)
                             .toList())
                             .as("ledger entries for fee refund businessSn %s", businessSn)
                             .containsExactlyInAnyOrder(LedgerSubjectCode.FEE, LedgerSubjectCode.AVAILABLE);
                 });
+    }
+
+    private record FeeRefundRouteNodeKey(String subjectId,
+                                         String subjectType,
+                                         LedgerSubjectCode ledgerSubjectCode,
+                                         EntrySide entrySide) {
+
+        private static FeeRefundRouteNodeKey debit(RouteLegSpec routeLeg) {
+            return new FeeRefundRouteNodeKey(routeLeg.getSourceNode().getSubjectRef().getSubjectId(),
+                    routeLeg.getSourceNode().getSubjectRef().getSubjectType().name(),
+                    routeLeg.getSourceNode().getLedgerSubjectCode(), EntrySide.DEBIT);
+        }
+
+        private static FeeRefundRouteNodeKey credit(RouteLegSpec routeLeg) {
+            return new FeeRefundRouteNodeKey(routeLeg.getTargetNode().getSubjectRef().getSubjectId(),
+                    routeLeg.getTargetNode().getSubjectRef().getSubjectType().name(),
+                    routeLeg.getTargetNode().getLedgerSubjectCode(), EntrySide.CREDIT);
+        }
     }
 }

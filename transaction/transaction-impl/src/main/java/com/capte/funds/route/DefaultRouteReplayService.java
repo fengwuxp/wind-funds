@@ -93,8 +93,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         RouteSnapshotSpec snapshot = requireReplaySnapshot(instruction);
         RouteBenefitSnapshotContextSupport.assertOriginalBenefitSnapshotPresent(instruction, snapshot);
         Map<String, Object> replayContext =
-                RouteBenefitSnapshotContextSupport.mergeOriginalBenefitSnapshotSummary(
-                        instruction.getContextVariables(), snapshot);
+                RouteBenefitSnapshotContextSupport.originalBenefitSnapshotSummary(snapshot);
         ReplayRequestSpec replayRequest = ImmutableReplayRequestSpec.builder()
                 .replayType(resolveReplayType(instruction.getEventType()))
                 .eventType(instruction.getEventType())
