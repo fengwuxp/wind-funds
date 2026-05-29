@@ -72,11 +72,16 @@ public final class LedgerTransactionSpecFactory {
                 .exchangeRate(instruction.getExchangeRate())
                 .businessScene(instruction.getBusinessScene())
                 .businessSn(instruction.getBusinessSn())
+                .referenceLedgerTransactionSn(resolveReferenceLedgerTransactionSn(instruction))
                 .transactionTime(instruction.getEventTime())
                 .description(instruction.getDescription())
                 .postingPlans(factory.apply(sn))
                 .contextVariables(ledgerTransactionContext(instruction))
                 .build();
+    }
+
+    private static String resolveReferenceLedgerTransactionSn(FundsInstructionSpec instruction) {
+        return instruction.getReference() == null ? null : instruction.getReference().getReferenceLedgerTransactionSn();
     }
 
     private static Map<String, Object> ledgerTransactionContext(FundsInstructionSpec instruction) {

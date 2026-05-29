@@ -2,6 +2,9 @@ package com.capte.funds.transaction.converter;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
+import com.capte.funds.ledger.dto.LedgerTransactionDTO;
+import com.capte.funds.ledger.query.LedgerTransactionQuery;
+import com.capte.funds.ledger.service.LedgerTransactionService;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
@@ -9,6 +12,8 @@ import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionCh
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
+import com.wind.common.exception.AssertUtils;
+import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
@@ -28,6 +33,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -38,9 +44,13 @@ public class FundsAuthorizationInstructionConverter {
 
     private final FundsInstructionAmountSupport amountSupport;
 
+    private final LedgerTransactionService ledgerTransactionService;
+
     @Autowired
-    public FundsAuthorizationInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService) {
+    public FundsAuthorizationInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService,
+                                                  @NonNull LedgerTransactionService ledgerTransactionService) {
         this.amountSupport = new FundsInstructionAmountSupport(fundsAccountQueryService);
+        this.ledgerTransactionService = ledgerTransactionService;
     }
 
     public @NonNull FundsInstructionSpec convertToAuthorizeInstruction(
@@ -88,8 +98,7 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .reference(reference(FundsInstructionReferenceType.AUTHORIZATION,
-                        request.getAuthorizationTransactionSn()))
+                .reference(authorizationReference(request.getAuthorizationTransactionSn()))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getReversalTime()))
@@ -114,8 +123,7 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .reference(reference(FundsInstructionReferenceType.AUTHORIZATION,
-                        request.getAuthorizationTransactionSn()))
+                .reference(authorizationReference(request.getAuthorizationTransactionSn()))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getSettleTime()))
@@ -140,8 +148,7 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .reference(reference(FundsInstructionReferenceType.AUTHORIZATION,
-                        request.getAuthorizationTransactionSn()))
+                .reference(authorizationReference(request.getAuthorizationTransactionSn()))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getRefundTime()))
@@ -169,8 +176,7 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .reference(reference(FundsInstructionReferenceType.AUTHORIZATION,
-                        request.getAuthorizationTransactionSn()))
+                .reference(authorizationReference(request.getAuthorizationTransactionSn()))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getChargebackTime()))
@@ -187,11 +193,30 @@ public class FundsAuthorizationInstructionConverter {
         return eventTime == null ? LocalDateTime.now() : eventTime;
     }
 
+    private @NonNull FundsInstructionReferenceSpec authorizationReference(@NonNull String authorizationTransactionSn) {
+        return reference(FundsInstructionReferenceType.AUTHORIZATION, authorizationTransactionSn,
+                authorizationLedgerTransactionSn(authorizationTransactionSn));
+    }
+
+    private @NonNull String authorizationLedgerTransactionSn(@NonNull String authorizationTransactionSn) {
+        LedgerTransactionQuery query = new LedgerTransactionQuery()
+                .setFundsTransactionSn(authorizationTransactionSn)
+                .setEventType(FundsTransactionEventType.AUTHORIZE.name());
+        List<LedgerTransactionDTO> records = ledgerTransactionService
+                .queryAccountLedgerTransactions(query, DefaultPageQueryOptions.defaults(2))
+                .getRecords();
+        AssertUtils.isTrue(records.size() == 1, "授权原账本交易不存在或不唯一，authorizationTransactionSn = {}",
+                authorizationTransactionSn);
+        return records.getFirst().getSn();
+    }
+
     private @NonNull FundsInstructionReferenceSpec reference(@NonNull FundsInstructionReferenceType referenceType,
-                                                             @NonNull String referenceSn) {
+                                                             @NonNull String referenceSn,
+                                                             @Nullable String referenceLedgerTransactionSn) {
         return ImmutableFundsInstructionReferenceSpec.builder()
                 .referenceType(referenceType)
                 .referenceSn(referenceSn)
+                .referenceLedgerTransactionSn(referenceLedgerTransactionSn)
                 .contextVariables(Map.of())
                 .build();
     }

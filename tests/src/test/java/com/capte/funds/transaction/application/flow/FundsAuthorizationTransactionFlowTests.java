@@ -253,7 +253,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.AUTHORIZE.name(),
                         FundsTransactionEventType.REVERSAL.name());
 
+        LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn("AUTH_FULL_REVERSAL_AUTHORIZE");
         LedgerTransaction reversalTransaction = ledgerTransactionByBusinessSn("AUTH_FULL_REVERSAL_CANCEL");
+        assertThat(reversalTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
         assertThat(entriesOf(reversalTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
@@ -266,6 +268,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
                 .containsOnly(authorizationSn);
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FULL_REVERSAL_CANCEL").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REVERSAL_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REVERSAL_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REVERSAL_CANCEL", 0, 1, 1, 2);
@@ -337,8 +343,11 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.REVERSAL.name(),
                         FundsTransactionEventType.SETTLE.name());
 
+        LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn(
+                "AUTH_PARTIAL_REVERSAL_SETTLE_AUTHORIZE");
         LedgerTransaction reversalTransaction = ledgerTransactionByBusinessSn(
                 "AUTH_PARTIAL_REVERSAL_SETTLE_CANCEL");
+        assertThat(reversalTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
         assertThat(entriesOf(reversalTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
@@ -351,9 +360,14 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
                 .containsOnly(authorizationSn);
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_CANCEL").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
 
         LedgerTransaction settleTransaction = ledgerTransactionByBusinessSn(
                 "AUTH_PARTIAL_REVERSAL_SETTLE_CAPTURE");
+        assertThat(settleTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
         assertThat(entriesOf(settleTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
@@ -366,6 +380,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
                 .containsOnly(authorizationSn);
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_CANCEL", 0, 1, 1, 2);
@@ -503,6 +521,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .containsOnly(LedgerPhaseCode.AUTHORIZATION.name());
 
         LedgerTransaction settleTransaction = ledgerTransactionByBusinessSn("AUTH_FULL_SETTLE_CAPTURE");
+        assertThat(settleTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
         List<LedgerPostingPlan> settlePostingPlans = postingPlansOf(settleTransaction);
         assertThat(entriesOf(settleTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
@@ -522,6 +541,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
                 .containsOnly(authorizationSn);
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FULL_SETTLE_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_CAPTURE", 0, 2, 1, 2);
@@ -594,7 +617,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.SETTLE.name(),
                         FundsTransactionEventType.AUTH_REFUND.name());
 
+        LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn("AUTH_FULL_REFUND_AUTHORIZE");
         LedgerTransaction refundTransaction = ledgerTransactionByBusinessSn("AUTH_FULL_REFUND_RETURN");
+        assertThat(refundTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
         assertThat(entriesOf(refundTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
@@ -607,6 +632,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
                 .containsOnly(authorizationSn);
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FULL_REFUND_RETURN").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_CAPTURE", 0, 2, 1, 2);
@@ -991,6 +1020,15 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
                 .containsOnly(authorizationSn);
+        LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn(
+                "AUTH_IDEMPOTENT_REVERSAL_AUTHORIZE");
+        assertThat(ledgerTransactionByBusinessSn("AUTH_IDEMPOTENT_REVERSAL_CANCEL")
+                .getReferenceLedgerTransactionSn())
+                .isEqualTo(authorizationTransaction.getSn());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_REVERSAL_CANCEL").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REVERSAL_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REVERSAL_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REVERSAL_CANCEL", 0, 1, 1, 2);
@@ -1082,6 +1120,15 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
                 .containsOnly(authorizationSn);
+        LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn(
+                "AUTH_IDEMPOTENT_SETTLE_AUTHORIZE");
+        assertThat(ledgerTransactionByBusinessSn("AUTH_IDEMPOTENT_SETTLE_CAPTURE")
+                .getReferenceLedgerTransactionSn())
+                .isEqualTo(authorizationTransaction.getSn());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_SETTLE_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_SETTLE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_SETTLE_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_SETTLE_CAPTURE", 0, 2, 1, 2);
@@ -1186,6 +1233,22 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(FundsTransactionDetail::getReferenceDetailSn)
                 .toList())
                 .containsOnly(authorizationSn);
+        LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn(
+                "AUTH_IDEMPOTENT_REFUND_AUTHORIZE");
+        assertThat(ledgerTransactionByBusinessSn("AUTH_IDEMPOTENT_REFUND_CAPTURE")
+                .getReferenceLedgerTransactionSn())
+                .isEqualTo(authorizationTransaction.getSn());
+        assertThat(ledgerTransactionByBusinessSn("AUTH_IDEMPOTENT_REFUND_RETURN")
+                .getReferenceLedgerTransactionSn())
+                .isEqualTo(authorizationTransaction.getSn());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_REFUND_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_REFUND_RETURN").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REFUND_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REFUND_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REFUND_CAPTURE", 0, 2, 1, 2);
