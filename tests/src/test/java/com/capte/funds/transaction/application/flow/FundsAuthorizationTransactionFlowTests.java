@@ -12,6 +12,7 @@ import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.core.WritableContextVariables;
@@ -749,6 +750,114 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_CAPTURE", 0, 2, 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_RETURN", 0, 2, 1, 2);
+    }
+
+    /**
+     * 场景：已完成授权发生拒付，业务侧使用现有 chargeback 入口承接争议扣回。
+     * 输入：充值 100、授权 60、完成 60、拒付 40，并携带拒付原因和凭证引用。
+     * 输出：用户 AVAILABLE 恢复 40，平台 SETTLEMENT 释放 40，拒付原因和凭证进入资金明细和账本交易。
+     * 预期：拒付按原授权 route snapshot 回放为 CHARGEBACK 事实，可与授权拒绝、普通退款区分。
+     * 红线：拒付不得被压缩成授权拒绝，不得丢失原授权账本引用、原因、凭证和外部争议引用。
+     */
+    @Test
+    void testAuthorizationChargebackShouldReplaySettlePathAndPreserveAuditContext() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        topup(user, 100L, "AUTH_CHARGEBACK_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        String authorizationSn = authorize(user, 60L, true, "AUTH_CHARGEBACK_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        settleAuthorization(user, 60L, authorizationSn, "AUTH_CHARGEBACK_CAPTURE");
+        BalanceSnapshot afterSettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY));
+
+        authorizationTransactionService.chargeback(new FundsAuthorizationTransactionChargebackRequest()
+                .setAccountId(user)
+                .setAmount(Money.immutable(40L, CURRENCY))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setBusinessScene("AUTHORIZATION_CHARGEBACK")
+                .setBusinessSn("AUTH_CHARGEBACK_RETURN")
+                .setDescription("authorization chargeback")
+                .setContextVariables(WritableContextVariables.of(Map.of(
+                        "chargebackReason", "CARDHOLDER_DISPUTE",
+                        "evidenceRef", "CHARGEBACK_EVIDENCE_202605290001",
+                        "externalDisputeRef", "CHARGEBACK_CASE_202605290001"))), WindOperator.system());
+        BalanceSnapshot afterChargeback = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterSettle, afterChargeback,
+                delta(user, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, -40L, CURRENCY));
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
+        assertThat(transaction.getSettledAmount()).isEqualTo(60L);
+        assertThat(transaction.getRefundedAmount()).isZero();
+        assertThat(transaction.getDeclinedAmount()).isEqualTo(40L);
+
+        assertPostedTransactions(4);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.AUTHORIZE.name(),
+                        FundsTransactionEventType.SETTLE.name(),
+                        FundsTransactionEventType.CHARGEBACK.name());
+
+        LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn("AUTH_CHARGEBACK_AUTHORIZE");
+        LedgerTransaction chargebackTransaction = ledgerTransactionByBusinessSn("AUTH_CHARGEBACK_RETURN");
+        assertThat(chargebackTransaction.getBusinessScene()).isEqualTo("AUTHORIZATION_CHARGEBACK");
+        assertThat(chargebackTransaction.getEventType()).isEqualTo(FundsTransactionEventType.CHARGEBACK.name());
+        assertThat(chargebackTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
+        assertThat(chargebackTransaction.getContextVariables())
+                .contains("CARDHOLDER_DISPUTE", "CHARGEBACK_EVIDENCE_202605290001",
+                        "CHARGEBACK_CASE_202605290001");
+        assertThat(entriesOf(chargebackTransaction).stream()
+                .map(LedgerEntry::getLedgerSubjectCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
+        assertThat(postingPlansOf(chargebackTransaction).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsOnly(LedgerPhaseCode.CHARGEBACK.name());
+
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_CHARGEBACK_RETURN"))
+                .allSatisfy(detail -> {
+                    assertThat(detail.getBusinessScene()).isEqualTo("AUTHORIZATION_CHARGEBACK");
+                    assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.CHARGEBACK);
+                    assertThat(detail.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
+                    assertThat(detail.getFundsEffectType()).isEqualTo(FundsEffectType.RETURN);
+                    assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
+                    assertThat(detail.getReferenceDetailSn()).isEqualTo(authorizationSn);
+                    assertThat(detail.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
+                    assertThat(detail.getContextVariables())
+                            .contains("CARDHOLDER_DISPUTE", "CHARGEBACK_EVIDENCE_202605290001",
+                                    "CHARGEBACK_CASE_202605290001")
+                            .doesNotContain("declineReason");
+                });
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_CAPTURE", 0, 2, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_RETURN", 0, 2, 1, 2);
     }
 
     /**
