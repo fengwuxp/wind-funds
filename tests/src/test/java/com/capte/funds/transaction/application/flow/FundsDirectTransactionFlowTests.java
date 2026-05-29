@@ -1538,6 +1538,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectTransactionKeepsContextMinimal(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
         assertDirectDetailsKeepRequestFactsOutOfContext(businessSn);
+        assertDirectBalancesMatchLedgerEntries();
     }
 
     @Override
