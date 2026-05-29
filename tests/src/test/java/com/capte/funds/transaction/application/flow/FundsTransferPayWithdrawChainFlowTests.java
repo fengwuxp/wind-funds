@@ -149,6 +149,20 @@ class FundsTransferPayWithdrawChainFlowTests extends FundsTransactionFlowTestSup
                 .toList())
                 .containsOnly(LedgerPhaseCode.SETTLEMENT.name());
 
+        LedgerTransaction freezeTransaction = ledgerTransactionByBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_FREEZE");
+        assertThat(entriesOf(freezeTransaction).stream()
+                .map(LedgerEntry::getLedgerSubjectCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN);
+        assertThat(entriesOf(freezeTransaction).stream()
+                .map(LedgerEntry::getSubjectId)
+                .toList())
+                .containsOnly(accountB.id());
+        assertThat(postingPlansOf(freezeTransaction).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsOnly(LedgerPhaseCode.FREEZE.name());
+
         LedgerTransaction withdrawTransaction = ledgerTransactionByBusinessSn("CHAIN_TRANSFER_PAY_WITHDRAW_CONFIRM");
         assertThat(entriesOf(withdrawTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
