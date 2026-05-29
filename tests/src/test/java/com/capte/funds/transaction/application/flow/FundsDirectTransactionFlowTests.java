@@ -1516,6 +1516,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertDirectPostingPlansUseRouteSnapshotLegs(businessSn);
         assertDirectRouteSnapshotCarriesMetadata(businessSn);
         assertDirectRouteSnapshotKeepsContextMinimal(businessSn);
+        assertDirectTransactionKeepsContextMinimal(businessSn);
         assertDirectFactsShareBusinessScene(businessSn);
         assertDirectFactsShareTransactionIdentity(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
@@ -1533,6 +1534,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertFailedDirectFactsCarryIdentityAndAudit(businessSn);
         assertDirectRouteSnapshotCarriesMetadata(businessSn);
         assertDirectRouteSnapshotKeepsContextMinimal(businessSn);
+        assertDirectTransactionKeepsContextMinimal(businessSn);
         assertDirectDetailsFollowRouteParticipants(businessSn);
         assertDirectDetailsKeepRequestFactsOutOfContext(businessSn);
     }
@@ -1574,6 +1576,15 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
     private String routeSnapshotJson(String businessSn) {
         return fundsTransactionsByBusinessSn(businessSn).getFirst().getRouteSnapshot();
+    }
+
+    private void assertDirectTransactionKeepsContextMinimal(String businessSn) {
+        FundsTransaction transaction = fundsTransactionsByBusinessSn(businessSn).getFirst();
+        JSONObject transactionContext = contextVariablesOf(transaction.getContextVariables());
+
+        assertThat(transactionContext.keySet())
+                .as("direct transaction context must not carry request context for %s", businessSn)
+                .doesNotContainAnyElementsOf(DIRECT_REQUEST_CONTEXT_KEYS);
     }
 
     private String expectedDirectRouteCode(FundsTransaction transaction) {

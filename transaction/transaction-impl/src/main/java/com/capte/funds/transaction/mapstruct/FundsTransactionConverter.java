@@ -7,12 +7,15 @@ import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.integration.funds.transaction.enums.FundsInstructionType;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
+
+import java.util.Map;
 
 /**
  * 资金交易模型转换器。
@@ -38,7 +41,7 @@ public interface FundsTransactionConverter {
     @Mapping(target = "amount", expression = "java(instruction.getAmount().getAmount())")
     @Mapping(target = "currency", expression = "java(instruction.getAmount().getCurrency())")
     @Mapping(target = "routeSnapshot", ignore = true)
-    @Mapping(target = "contextVariables", expression = "java(JSON.toJSONString(instruction.getContextVariables()))")
+    @Mapping(target = "contextVariables", expression = "java(JSON.toJSONString(transactionContext(instruction)))")
     FundsTransaction convertToFundsTransaction(FundsInstructionSpec instruction);
 
     /**
@@ -91,5 +94,12 @@ public interface FundsTransactionConverter {
         entity.setRefundedAmount(0L);
         entity.setDeclinedAmount(0L);
         entity.setFeeAmount(0L);
+    }
+
+    default Map<String, Object> transactionContext(FundsInstructionSpec instruction) {
+        if (instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION) {
+            return Map.of();
+        }
+        return instruction.getContextVariables();
     }
 }
