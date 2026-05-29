@@ -1641,6 +1641,99 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：系统内转账使用相同业务流水重复提交，第二次请求更换非易变业务上下文字段。
+     * 输入：充值 100，转账 40 使用业务流水 `DIRECT_IDEMPOTENT_TRANSFER_CONTEXT`，首请求 context 为 RULE-A，重试同 context 后改为 RULE-B。
+     * 输出：同 context 重试返回同一资金交易流水；业务上下文变化被摘要冲突拒绝。
+     * 预期：转账幂等摘要必须覆盖非易变 contextVariables 字段，不能只覆盖金额和参与主体。
+     * 红线：同业务流水不同业务上下文不得静默复用原交易，也不得新增 route、posting、ledger entry 或污染余额。
+     */
+    @Test
+    void testDirectTransferSameBusinessSnWithDifferentBusinessContextShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("idem_transfer_ctx_payee");
+        ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 100L, "DIRECT_IDEMPOTENT_TRANSFER_CONTEXT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String firstTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT")
+                .setDescription("idempotent transfer with business context"), WindOperator.system());
+        BalanceSnapshot afterFirstTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFirstTransfer,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFirstTransferFacts = ledgerFactSnapshot();
+        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT");
+
+        String retryTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT")
+                .setDescription("idempotent transfer with business context"), WindOperator.system());
+
+        assertThat(retryTransferSn).isEqualTo(firstTransferSn);
+        BalanceSnapshot afterRetryTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstTransfer, afterRetryTransfer,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstTransferFacts);
+        assertDirectRouteSnapshotUnchanged("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT", firstRouteSnapshot);
+
+        assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT")
+                .setDescription("idempotent transfer with business context"), WindOperator.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRetryTransfer, afterConflict,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstTransferFacts);
+        assertDirectRouteSnapshotUnchanged("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT", firstRouteSnapshot);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertThat(fundsTransactionDetails(firstTransferSn)).hasSize(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT", 2, 2);
+    }
+
+    /**
      * 场景：直接退款使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
      * 输入：充值 100、付款 70、退款 30，随后同流水同金额重试，再同流水改金额为 31。
      * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额和账务事实保持第一次退款后的状态。
