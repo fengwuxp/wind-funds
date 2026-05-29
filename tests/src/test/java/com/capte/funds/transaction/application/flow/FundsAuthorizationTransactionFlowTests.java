@@ -262,6 +262,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.REVERSAL.name());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FULL_REVERSAL_CANCEL").stream()
+                .map(FundsTransactionDetail::getReferenceDetailSn)
+                .toList())
+                .containsOnly(authorizationSn);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REVERSAL_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REVERSAL_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REVERSAL_CANCEL", 0, 1, 1, 2);
@@ -343,6 +347,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.REVERSAL.name());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_CANCEL").stream()
+                .map(FundsTransactionDetail::getReferenceDetailSn)
+                .toList())
+                .containsOnly(authorizationSn);
 
         LedgerTransaction settleTransaction = ledgerTransactionByBusinessSn(
                 "AUTH_PARTIAL_REVERSAL_SETTLE_CAPTURE");
@@ -354,6 +362,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.SETTLEMENT.name());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceDetailSn)
+                .toList())
+                .containsOnly(authorizationSn);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_REVERSAL_SETTLE_CANCEL", 0, 1, 1, 2);
