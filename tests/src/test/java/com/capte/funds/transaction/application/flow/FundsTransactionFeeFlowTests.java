@@ -8,6 +8,7 @@ import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.enums.FundsEffectType;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.capte.funds.transaction.model.request.FundsTransactionFeeRequest;
 import com.wind.core.WritableContextVariables;
@@ -16,6 +17,7 @@ import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.integration.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.integration.funds.route.enums.RouteParticipantRole;
 import com.wind.integration.funds.transaction.enums.DefaultFeeType;
+import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
@@ -281,7 +283,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_FLOW_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_FLOW_PAY", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_FLOW_REFUND", 2, 2);
-        assertFeeRefundFactsWithoutFundsTransaction("FEE_FLOW_FEE_REFUND");
+        assertFeeRefundFactsWithFundsTransaction("FEE_FLOW_FEE_REFUND", feeSourceTransactionSn);
     }
 
     /**
@@ -472,16 +474,25 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_PAY", 3, 4);
-        assertFeeRefundFactsWithoutFundsTransaction("FEE_REFUND_EXCEED_FIRST_RETURN");
+        assertFeeRefundFactsWithFundsTransaction("FEE_REFUND_EXCEED_FIRST_RETURN", feeSourceTransactionSn);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_RESERVE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_RESERVE_PAY", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_SECOND_RETURN");
     }
 
-    private void assertFeeRefundFactsWithoutFundsTransaction(String businessSn) {
-        assertThat(fundsTransactionsByBusinessSn(businessSn))
+    private void assertFeeRefundFactsWithFundsTransaction(String businessSn, String sourceTransactionSn) {
+        var transactions = fundsTransactionsByBusinessSn(businessSn);
+        assertThat(transactions)
                 .as("funds transactions for fee refund businessSn %s", businessSn)
-                .isEmpty();
+                .singleElement()
+                .satisfies(transaction -> {
+                    assertThat(transaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
+                    assertThat(transaction.getStatus())
+                            .isIn(FundsTransactionStatus.OPEN, FundsTransactionStatus.CLOSED);
+                    assertThat(transaction.getReferenceTransactionSn()).isEqualTo(sourceTransactionSn);
+                    assertThat(transaction.getRouteSnapshot()).isNotBlank();
+                });
+        String transactionSn = transactions.getFirst().getSn();
         var details = fundsTransactionDetailsByBusinessSn(businessSn);
         assertThat(details)
                 .as("funds transaction details for fee refund businessSn %s", businessSn)
@@ -516,6 +527,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                             .map(LedgerPostingPlan::getSn)
                             .toList();
                     assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
+                    assertThat(transaction.getFundsTransactionSn()).isEqualTo(transactionSn);
                     assertThat(transaction.getEventType())
                             .isEqualTo(FundsTransactionEventType.FEE_REFUND.name());
                     assertThat(details)

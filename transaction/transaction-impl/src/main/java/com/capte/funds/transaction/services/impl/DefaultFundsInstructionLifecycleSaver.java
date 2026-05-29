@@ -181,6 +181,9 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     }
 
     private FundsTransaction findReferenceTransaction(FundsInstructionSpec instruction) {
+        if (requiresStandaloneTransaction(instruction)) {
+            return null;
+        }
         FundsInstructionReferenceSpec reference = instruction.getReference();
         if (reference == null
                 || !StringUtils.hasText(reference.getReferenceSn())
@@ -188,6 +191,11 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             return null;
         }
         return findTransactionBySnNullable(reference.getReferenceSn());
+    }
+
+    private boolean requiresStandaloneTransaction(FundsInstructionSpec instruction) {
+        return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION
+                && instruction.getEventType() == FundsTransactionEventType.FEE_REFUND;
     }
 
     private boolean isFundsTransactionReference(FundsInstructionReferenceType referenceType) {
