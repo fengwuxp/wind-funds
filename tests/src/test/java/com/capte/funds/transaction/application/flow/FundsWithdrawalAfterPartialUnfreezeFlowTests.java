@@ -86,11 +86,29 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                         FundsTransactionEventType.UNFREEZE.name(),
                         FundsTransactionEventType.WITHDRAW.name());
 
+        LedgerTransaction freezeTransaction = ledgerTransactionByBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_FREEZE");
+        assertThat(entriesOf(freezeTransaction).stream()
+                .map(LedgerEntry::getLedgerSubjectCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN);
+        assertThat(entriesOf(freezeTransaction).stream()
+                .map(LedgerEntry::getSubjectId)
+                .toList())
+                .containsOnly(user.id());
+        assertThat(postingPlansOf(freezeTransaction).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsOnly(LedgerPhaseCode.FREEZE.name());
+
         LedgerTransaction releaseTransaction = ledgerTransactionByBusinessSn("WITHDRAW_PARTIAL_UNFREEZE_RELEASE");
         assertThat(entriesOf(releaseTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
                 .containsExactlyInAnyOrder(LedgerSubjectCode.FROZEN, LedgerSubjectCode.AVAILABLE);
+        assertThat(entriesOf(releaseTransaction).stream()
+                .map(LedgerEntry::getSubjectId)
+                .toList())
+                .containsOnly(user.id());
         assertThat(postingPlansOf(releaseTransaction).stream()
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
