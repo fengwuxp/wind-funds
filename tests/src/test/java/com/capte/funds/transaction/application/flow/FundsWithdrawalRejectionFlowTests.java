@@ -69,11 +69,29 @@ class FundsWithdrawalRejectionFlowTests extends FundsTransactionFlowTestSupport 
                 .toList())
                 .doesNotContain(FundsTransactionEventType.WITHDRAW.name());
 
+        LedgerTransaction freezeTransaction = ledgerTransactionByBusinessSn("WITHDRAW_REJECTED_FREEZE");
+        assertThat(entriesOf(freezeTransaction).stream()
+                .map(LedgerEntry::getLedgerSubjectCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN);
+        assertThat(entriesOf(freezeTransaction).stream()
+                .map(LedgerEntry::getSubjectId)
+                .toList())
+                .containsOnly(user.id());
+        assertThat(postingPlansOf(freezeTransaction).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsOnly(LedgerPhaseCode.FREEZE.name());
+
         LedgerTransaction releaseTransaction = ledgerTransactionByBusinessSn("WITHDRAW_REJECTED_UNFREEZE");
         assertThat(entriesOf(releaseTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
                 .containsExactlyInAnyOrder(LedgerSubjectCode.FROZEN, LedgerSubjectCode.AVAILABLE);
+        assertThat(entriesOf(releaseTransaction).stream()
+                .map(LedgerEntry::getSubjectId)
+                .toList())
+                .containsOnly(user.id());
         assertThat(postingPlansOf(releaseTransaction).stream()
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
