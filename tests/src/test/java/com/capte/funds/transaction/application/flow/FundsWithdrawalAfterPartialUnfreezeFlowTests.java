@@ -330,6 +330,10 @@ class FundsWithdrawalAfterPartialUnfreezeFlowTests extends FundsTransactionFlowT
                 delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 80L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 40L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_880L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
         assertPostedTransactions(4);
         assertSingleFundsAndLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("BALANCE_MULTI_UNFREEZE_FREEZE", 0, 0, 1, 2);
