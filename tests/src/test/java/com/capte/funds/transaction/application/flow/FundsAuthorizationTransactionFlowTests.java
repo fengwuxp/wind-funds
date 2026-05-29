@@ -1612,4 +1612,143 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REFUND_CAPTURE", 0, 2, 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_REFUND_RETURN", 0, 2, 1, 2);
     }
+
+    /**
+     * 场景：授权完成后拒付使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
+     * 输入：充值 100、授权批准 80、完成 50、拒付 30，随后同流水同金额重试，再同流水改金额为 31。
+     * 输出：同摘要重试返回同一授权交易流水；摘要冲突抛错；余额和账务事实保持第一次拒付后的状态。
+     * 预期：授权拒付幂等必须保护原授权引用、拒付金额、拒付原因和原完成路径回放摘要。
+     * 红线：同业务流水不同拒付请求不得重复回补 AVAILABLE、不得重复扣减 SETTLEMENT 或污染 declinedAmount。
+     */
+    @Test
+    void testAuthorizationChargebackSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        topup(user, 100L, "AUTH_IDEMPOTENT_CHARGEBACK_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        String authorizationSn = authorize(user, 80L, true, "AUTH_IDEMPOTENT_CHARGEBACK_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -80L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        settleAuthorization(user, 50L, authorizationSn, "AUTH_IDEMPOTENT_CHARGEBACK_CAPTURE");
+        BalanceSnapshot afterSettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 50L, CURRENCY));
+
+        String firstChargebackSn = chargebackAuthorization(user, 30L, authorizationSn,
+                "AUTH_IDEMPOTENT_CHARGEBACK_RETURN");
+        BalanceSnapshot afterFirstChargeback = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterSettle, afterFirstChargeback,
+                delta(user, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY));
+        LedgerFactSnapshot afterFirstChargebackFacts = ledgerFactSnapshot();
+
+        String retryChargebackSn = chargebackAuthorization(user, 30L, authorizationSn,
+                "AUTH_IDEMPOTENT_CHARGEBACK_RETURN");
+        BalanceSnapshot afterRetryChargeback = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        assertThat(retryChargebackSn).isEqualTo(firstChargebackSn);
+        assertOnlyBalanceDeltas(afterFirstChargeback, afterRetryChargeback,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstChargebackFacts);
+        assertThatThrownBy(() -> chargebackAuthorization(user, 31L, authorizationSn,
+                "AUTH_IDEMPOTENT_CHARGEBACK_RETURN"))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterRetryChargeback, afterConflict,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstChargebackFacts);
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 30L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 20L, CURRENCY);
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
+        assertThat(transaction.getReversedAmount()).isZero();
+        assertThat(transaction.getSettledAmount()).isEqualTo(50L);
+        assertThat(transaction.getRefundedAmount()).isZero();
+        assertThat(transaction.getDeclinedAmount()).isEqualTo(30L);
+
+        assertPostedTransactions(4);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.AUTHORIZE.name(),
+                        FundsTransactionEventType.SETTLE.name(),
+                        FundsTransactionEventType.CHARGEBACK.name());
+        assertThat(fundsTransactionDetails(authorizationSn)).hasSize(5);
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceDetailSn)
+                .toList())
+                .containsOnly(authorizationSn);
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_RETURN").stream()
+                .map(FundsTransactionDetail::getReferenceDetailSn)
+                .toList())
+                .containsOnly(authorizationSn);
+        LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn(
+                "AUTH_IDEMPOTENT_CHARGEBACK_AUTHORIZE");
+        assertThat(ledgerTransactionByBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_CAPTURE")
+                .getReferenceLedgerTransactionSn())
+                .isEqualTo(authorizationTransaction.getSn());
+        assertThat(ledgerTransactionByBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_RETURN")
+                .getReferenceLedgerTransactionSn())
+                .isEqualTo(authorizationTransaction.getSn());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_RETURN").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnly(authorizationTransaction.getSn());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_CAPTURE", 0, 2, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_RETURN", 0, 2, 1, 2);
+    }
+
+    private String chargebackAuthorization(FundsAccountId accountId,
+                                           long amount,
+                                           String authorizationTransactionSn,
+                                           String businessSn) {
+        return authorizationTransactionService.chargeback(new FundsAuthorizationTransactionChargebackRequest()
+                .setAccountId(accountId)
+                .setAmount(Money.immutable(amount, CURRENCY))
+                .setAuthorizationTransactionSn(authorizationTransactionSn)
+                .setBusinessScene("AUTHORIZATION_CHARGEBACK")
+                .setBusinessSn(businessSn)
+                .setDescription("authorization chargeback")
+                .setContextVariables(WritableContextVariables.of(Map.of(
+                        "chargebackReason", "CARDHOLDER_DISPUTE",
+                        "evidenceRef", "CHARGEBACK_EVIDENCE_IDEMPOTENT_202605290001"))),
+                WindOperator.system());
+    }
 }
