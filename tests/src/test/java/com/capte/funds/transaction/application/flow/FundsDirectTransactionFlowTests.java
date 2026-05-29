@@ -1513,6 +1513,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     protected void assertSingleFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedDetails,
                                                                 int expectedEntries) {
         super.assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, expectedDetails, expectedEntries);
+        assertLedgerFactsFollowRouteSnapshot(businessSn);
         assertDirectPostingPlansUseRouteSnapshotLegs(businessSn);
         assertDirectRouteSnapshotCarriesMetadata(businessSn);
         assertDirectRouteSnapshotKeepsContextMinimal(businessSn);
