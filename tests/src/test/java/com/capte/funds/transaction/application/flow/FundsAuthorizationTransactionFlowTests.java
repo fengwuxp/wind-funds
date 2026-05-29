@@ -6,6 +6,7 @@ import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.capte.funds.transaction.enums.FundsEffectType;
 import com.capte.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
@@ -14,6 +15,7 @@ import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
@@ -94,12 +96,21 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .singleElement()
                 .satisfies(rejectedTransaction -> {
                     assertThat(rejectedTransaction.getStatus()).isEqualTo(FundsTransactionStatus.REJECTED);
+                    assertThat(rejectedTransaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
+                    assertThat(rejectedTransaction.getAuthorizedAmount()).isZero();
+                    assertThat(rejectedTransaction.getReversedAmount()).isZero();
+                    assertThat(rejectedTransaction.getSettledAmount()).isZero();
+                    assertThat(rejectedTransaction.getRefundedAmount()).isZero();
+                    assertThat(rejectedTransaction.getDeclinedAmount()).isZero();
                     assertNoLedgerFactsForFundsTransaction(rejectedTransaction.getSn());
                 });
         assertThat(fundsTransactionDetailsByBusinessSn("AUTH_DECLINE_AUTHORIZE"))
                 .as("rejected funds transaction details for businessSn AUTH_DECLINE_AUTHORIZE")
                 .singleElement()
                 .satisfies(detail -> {
+                    assertThat(detail.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
+                    assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
+                    assertThat(detail.getFundsEffectType()).isEqualTo(FundsEffectType.HOLD);
                     assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
                 });
