@@ -861,6 +861,146 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
+     * 场景：用户授权 80 后只完成 50，平台结算户另有充足余额时尝试拒付 60。
+     * 输入：A 充值并授权 80、完成 50；B 另完成 100 使平台 SETTLEMENT 余额充足；A 拒付 60。
+     * 输出：A 拒付请求失败，A/B/平台余额、交易累计和账务事实保持失败前状态。
+     * 预期：拒付以本交易已完成可回退金额为上限，不以授权金额或平台总余额为上限。
+     * 红线：失败拒付不得借用其他交易沉淀在 SETTLEMENT 的余额，不得写入 CHARGEBACK 账务事实。
+     */
+    @Test
+    void testAuthorizationChargebackExceedingSettledAmountShouldLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId reserveUser = fundingAccount("settlement_reserve_user");
+        ensureLedger(reserveUser, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(reserveUser, LedgerSubjectCode.AUTHORIZATION);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        topup(user, 100L, "AUTH_CHARGEBACK_EXCEED_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        String authorizationSn = authorize(user, 80L, true, "AUTH_CHARGEBACK_EXCEED_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, reserveUser, cashMappingAccount(),
+                settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -80L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        settleAuthorization(user, 50L, authorizationSn, "AUTH_CHARGEBACK_EXCEED_CAPTURE");
+        BalanceSnapshot afterSettle = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -50L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 50L, CURRENCY));
+
+        topup(reserveUser, 100L, "AUTH_CHARGEBACK_EXCEED_RESERVE_TOPUP");
+        BalanceSnapshot afterReserveTopup = snapshot(balances(user, reserveUser, cashMappingAccount(),
+                settlementAccount()));
+        assertOnlyBalanceDeltas(afterSettle, afterReserveTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        String reserveAuthorizationSn = authorize(reserveUser, 100L, true,
+                "AUTH_CHARGEBACK_EXCEED_RESERVE_AUTHORIZE");
+        BalanceSnapshot afterReserveAuthorize = snapshot(balances(user, reserveUser, cashMappingAccount(),
+                settlementAccount()));
+        assertOnlyBalanceDeltas(afterReserveTopup, afterReserveAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, -100L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        settleAuthorization(reserveUser, 100L, reserveAuthorizationSn,
+                "AUTH_CHARGEBACK_EXCEED_RESERVE_CAPTURE");
+
+        BalanceSnapshot beforeFailure = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterReserveAuthorize, beforeFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, -100L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 100L, CURRENCY));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 30L, CURRENCY);
+        assertBucket(balance(reserveUser), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(reserveUser), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 150L, CURRENCY);
+
+        assertThatThrownBy(() -> authorizationTransactionService.chargeback(
+                new FundsAuthorizationTransactionChargebackRequest()
+                        .setAccountId(user)
+                        .setAmount(Money.immutable(60L, CURRENCY))
+                        .setAuthorizationTransactionSn(authorizationSn)
+                        .setBusinessScene("AUTHORIZATION_CHARGEBACK")
+                        .setBusinessSn("AUTH_CHARGEBACK_EXCEED_RETURN")
+                        .setDescription("authorization chargeback exceed")
+                        .setContextVariables(WritableContextVariables.of(Map.of(
+                                "chargebackReason", "CARDHOLDER_DISPUTE",
+                                "evidenceRef", "CHARGEBACK_EVIDENCE_EXCEED_202605290001"))),
+                WindOperator.system()))
+                .hasMessageContaining("资金交易已结算可回退金额不足");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(reserveUser, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
+        assertThat(transaction.getSettledAmount()).isEqualTo(50L);
+        assertThat(transaction.getRefundedAmount()).isZero();
+        assertThat(transaction.getReversedAmount()).isZero();
+        assertThat(transaction.getDeclinedAmount()).isZero();
+
+        assertPostedTransactions(6);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.AUTHORIZE.name(),
+                        FundsTransactionEventType.SETTLE.name(),
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.AUTHORIZE.name(),
+                        FundsTransactionEventType.SETTLE.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_CAPTURE", 0, 2, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_RESERVE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_RESERVE_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_RESERVE_CAPTURE", 0, 2, 1, 2);
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_RETURN");
+    }
+
+    /**
      * 场景：用户授权 80 后只完成 50，平台结算户另有充足余额时尝试退款 60。
      * 输入：A 充值并授权 80、完成 50；B 另完成 100 使平台 SETTLEMENT 余额充足；A 退款 60。
      * 输出：A 退款请求失败，A/B/平台余额、交易累计和账务事实保持失败前状态。
