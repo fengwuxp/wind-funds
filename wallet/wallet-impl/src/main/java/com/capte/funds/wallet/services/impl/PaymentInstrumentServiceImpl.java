@@ -92,6 +92,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         assertInstrumentCanBind(instrument, request);
         assertFundingSubjectBindingTargetsFundingAccount(request);
         assertCreditSubjectBindingTargetsCreditAccount(request);
+        assertBudgetSubjectBindingTargetsBudgetGroup(request);
         PaymentInstrumentBinding entity =
                 PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBinding(request);
         assertBindingValidityWindow(entity);
@@ -295,6 +296,16 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         }
         AssertUtils.isTrue(request.getSubjectType() == FundsSubjectType.CREDIT_ACCOUNT,
                 "信用控制主体绑定必须指向信用账户，bindingSn = {}, subjectType = {}",
+                request.getSn(),
+                request.getSubjectType());
+    }
+
+    private void assertBudgetSubjectBindingTargetsBudgetGroup(CreatePaymentInstrumentBindingRequest request) {
+        if (request.getBindingRole() != PaymentInstrumentBindingRole.BUDGET_SUBJECT) {
+            return;
+        }
+        AssertUtils.isTrue(request.getSubjectType() == FundsSubjectType.BUDGET_GROUP,
+                "预算控制主体绑定必须指向预算组，bindingSn = {}, subjectType = {}",
                 request.getSn(),
                 request.getSubjectType());
     }
