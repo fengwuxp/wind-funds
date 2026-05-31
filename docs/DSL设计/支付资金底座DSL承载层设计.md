@@ -141,13 +141,15 @@ A0 阶段的 DSL 只把 PRD 的业务问题转成资金事实和机器契约候�
 
 支付工具入口不是新的账务主体类型，而是产品输入到 DSL 的转译阶段。卡、VA、钱包标识、VCC、共享卡和通道 token 进入 DSL 时，最多形成 `PaymentInstrumentRef`、`ExternalAccountRef`、`RoutingDecision`、`FundingAllocationDecision`、预算组 / Spend Rule 控制快照和审计上下文；route leg、posting plan、ledger entry 和余额投影仍只能使用解析后的资金账户、信用账户或平台账户角色解析后的平台资金账户。
 
+产品或应用层可以在请求中传入业务入口参数，但 DSL 内核不把业务入口参数当成账务主体，也不要求所有入口都转成 `PaymentInstrumentRef`。内部余额钱包和商户钱包解析为 `SubjectRef(FundingAccount)`，信用额度解析为 `SubjectRef(CreditAccount)`，返利或权益按资金责任账户或 `BenefitSnapshot` 承接；只有卡、VA、外部银行账户、外部钱包端点、通道 token 等外部工具才形成 `PaymentInstrumentRef` 或 `ExternalAccountRef`。
+
 | 场景 | DSL 输入层 | DSL 内核层 | 必须固化的快照 | 禁止项 |
 | --- | --- | --- | --- | --- |
-| 直接交易 | 已确认资金账户、信用账户或平台账户角色；支付工具可作为引用补充。 | `FundsInstruction`、`SubjectRef`、`ResolvedRoute`。 | 业务事实、原交易引用、外部账户或支付工具脱敏引用。 | 按当前工具绑定重算历史退款路径。 |
+| 直接交易 | 已确认资金账户、信用账户或平台账户角色；业务入口参数可作为选择来源，支付工具可作为引用补充。 | `FundsInstruction`、`SubjectRef`、`ResolvedRoute`。 | 业务事实、原交易引用、业务入口选择来源、外部账户或支付工具脱敏引用。 | 把内部余额钱包、信用额度、返利钱包或商户钱包强行包装成支付工具；按当前工具绑定重算历史退款路径。 |
 | 授权交易 | 优先允许从 `PaymentInstrumentRef` 或等价工具引用进入应用准入。 | 批准后必须解析为 `SubjectRef` 和 `FundingAllocationDecision`。 | 工具状态、绑定版本、使用主体、预算组、Spend Rule、资金责任决策、拒绝原因或授权占用路径。 | 支付工具、预算组或 Spend Rule 成为 ledger subject；授权拒绝生成 route 或 entry。 |
 | 余额控制 | 账户主体、冻结来源、调整来源或预算控制对象。 | 资金账户余额桶、信用账户额度桶或预算型 Spend Rule 控制视图。 | 审批、凭证、原因、规则版本、控制窗口。 | 用工具号冻结余额，或用余额控制表达跨主体价值转移。 |
 
-后续如新增支付工具型授权应用入口，DSL 契约必须证明“入口按工具、内核按主体”的转换关系：工具校验和规则决策失败时不生成 route；批准时 `PaymentInstrumentRef` 与 `FundingAllocationDecision` 同时进入 route snapshot；后续撤销、完成、退款和拒付只回放原 route snapshot，不读取当前绑定重新选路。
+后续如新增 `authorizeByInstrument` 或其他支付工具型 application facade，DSL 契约必须证明“应用入口先解析、内核按主体”的转换关系：内部入口解析为 `SubjectRef` 或 `BenefitSnapshot`，外部工具解析为 `PaymentInstrumentRef` 或 `ExternalAccountRef`；工具校验、入口解析或规则决策失败时不生成 route；批准或放行时 `PaymentInstrumentRef`、`FundingAllocationDecision` 或权益快照按需进入 route snapshot；后续撤销、完成、退款和拒付只回放原 route snapshot，不读取当前绑定重新选路。
 
 ### 3.1 能力域到 DSL 承载和契约证据矩阵
 

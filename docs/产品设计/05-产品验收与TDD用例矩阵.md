@@ -517,7 +517,7 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | AC-ROUTE-004 | RouteSnapshot 平台角色、expectedRoute.legs | 平台费用、预收待付、现金映射和调整账户必须解析到唯一平台资金账户；缺失或多命中时不入账。 |
 | AC-ROUTE-005 | expectedRouteCreated=false、expectedPostingCreated=false | 账户缺失、币种不一致、余额不足、周期缺失、规则不唯一或外部账户误用时，失败不生成 route、posting、entry。 |
 | AC-ROUTE-006 | AUTHORIZATION_TRANSACTION / AUTHORIZE、DSL-AUTH-LIFECYCLE-001 | 授权占用保存主体、账目、账本周期和授权快照；释放和结算必须回到原周期。 |
-| AC-PI-001 至 AC-PI-010 | PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、RouteSnapshotSpec、BindingHistory、PaymentInstrumentCapabilityApplicationService、FundingResponsibilityResolutionApplicationService、AuthorizationAdmissionApplicationService | 支付工具只做路由输入和快照引用；工具绑定、方向、状态、资金责任决策、账户能力、钱包标识解析、绑定历史审计和授权应用入口准入必须可解释；逆向交易按原快照回放；`FundingAccount` 只表示真实资金账户；AC-PI-010 只能新增外层 `authorizeByInstrument` 或等价 facade，不改变账户主体型交易内核。 |
+| AC-PI-001 至 AC-PI-010 | PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、RouteSnapshotSpec、BindingHistory、PaymentInstrumentCapabilityApplicationService、FundingResponsibilityResolutionApplicationService、AuthorizationAdmissionApplicationService | 业务入口参数只做产品或应用层选择口径；支付工具只做路由输入和快照引用；工具绑定、方向、状态、资金责任决策、账户能力、钱包标识解析、绑定历史审计和授权应用入口准入必须可解释；逆向交易按原快照回放；`FundingAccount` 只表示真实资金账户；AC-PI-010 只能新增外层 `authorizeByInstrument` 或等价 facade，不改变账户主体型交易内核。 |
 | AC-AUTH-011 | AUTHORIZATION_TRANSACTION / SETTLE 强制完成模式、DSL-AUTH-FORCE-CAPTURE-001 | 无前置授权的外部消费结果通过 settle 承接，不伪造授权占用；策略、上限、原因和审计必填。 |
 | AC-AUTH-012 | AUTHORIZATION_TRANSACTION / AUTH_REFUND 无授权退款模式、DSL-AUTH-REFUND-001 | 无前置授权但有外部原消费、原完成或差错凭证时通过 settleRefund 承接；不得补造授权占用或静默退款。 |
 | RED-043 | expectedRouteCreated=false | 多个账户、账目、平台角色或规则同时命中时，不能随机选择路径继续入账。 |

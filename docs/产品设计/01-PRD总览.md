@@ -417,7 +417,7 @@ mindmap
 | 资金账户 / FundingAccount | 真实资金或平台责任余额账户。 | `FundingAccount`、`FundingAccountService`、`FundingAccountType`、`PlatformFundingAccountRole`。 | 是。 | 只表达真实资金账户；不得承载信用、预算、支付工具或钱包标识。 |
 | 信用账户 | 额度、可用额度和授权占用控制账户。 | `CreditAccount`、`CreditAccountService`。 | 是。 | 额度不是现金；不得压入 `FundingAccount`。 |
 | 预算组 | 预算归属范围、支出控制对象和预算视图。 | `BudgetGroup`、`BudgetGroupService`；预算型 Spend Rule。 | 否。 | 预算不是资金池，也不是核心资金账务主体；不得压入 `FundingAccount` 或作为 LedgerEntry 主体。 |
-| 支付工具 | 支付、收款或识别入口。 | `PaymentInstrument`、`PaymentInstrumentBinding`、`PaymentInstrumentRefSpec`。 | 否。 | 只做路由输入、绑定和快照；不得作为 LedgerEntry 主体。 |
+| 支付工具 | 支付、收款或识别入口中的外部工具、外部端点、卡、VA、钱包标识或通道 token。 | `PaymentInstrument`、`PaymentInstrumentBinding`、`PaymentInstrumentRefSpec`。 | 否。 | 只做路由输入、绑定和快照；不得作为 LedgerEntry 主体；内部余额钱包、信用额度账户、返利钱包和商户账户本身不强制包装成支付工具。 |
 | Spend Rule / Spend Controls | 授权前支出控制规则，覆盖预算额度、MCC、商户、国家、金额、次数和窗口。 | 发卡授权控制扩展、预算型规则、规则版本和审计。 | 否。 | 只决定是否允许继续授权，不直接写 route、posting、LedgerEntry 或清结算。 |
 | VCC 卡 / 预付卡 / 共享卡 | VCC 业务中的支付工具、资金模式或使用模式组合。 | `PaymentInstrument`、`PaymentInstrumentBinding`、`PaymentInstrumentRefSpec`、`FundingAllocationDecision`、VCC capability pack。 | 否。 | VCC 卡是工具；预付卡是资金模式；共享卡是绑定和使用模式。入账前必须解析到资金账户（含平台角色解析后的平台资金账户）或信用账户，预算组和 Spend Rule 只做控制快照。 |
 | 核心资金账务主体 | 可进入 route leg、posting plan、LedgerEntry 和余额投影的主体。 | `SubjectRef`、`FundsSubjectType`。 | 是。 | 当前只允许资金账户、信用账户和解析后的平台资金账户。预算组、支付工具、业务主体和外部账户不得直接入账。 |

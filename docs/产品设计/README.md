@@ -321,7 +321,7 @@ A0 编码准入前，产品侧必须先把一个业务问题收敛成可执行�
 | --- | --- | --- | --- |
 | 核心记账主体 | `FundingAccount` 承载真实资金或平台责任资金；`CreditAccount` 承载授信额度和授权占用。 | 系分和 OpenSpec 中所有 “route participant / posting / ledger entry 可解析到预算组” 的旧口径需要改为资金账户、信用账户或平台角色解析后的平台资金账户。 | 需要 `资深架构师` 联动确认 `SubjectRef`、`FundsSubjectType`、posting assembler、余额投影和兼容迁移范围。 |
 | 预算组和 Spend Rule | 预算组是预算 scope、owner、展示和审计边界；Spend Rule 是授权前控制规则，可统一承接预算额度、MCC、时间、商户、频控和限额窗口。 | 系分中的预算组表、支出主体资金责任解析关系、余额控制 adjust、VCC shared card 绑定和 TDD 目标资产，需要从“预算组入账/余额桶”改为“预算控制上下文和规则快照”。 | 需要确认是否保留历史 `BUDGET_GROUP` 类型作兼容枚举、迁移别名或只读查询过滤条件；现有 `SpendSubjectFundingRelation` 名称只作为兼容命名，不表示预算组或 Spend Rule 是资金来源。 |
-| 支付工具和外部账户 | VCC、VA、内部钱包、电子钱包、银行卡、外部账户只能作为 `PaymentInstrumentRef` 或 `ExternalAccountRef`，不得成为 ledger subject。 | 系分和 OpenSpec 中钱包标识、工具绑定、资金责任决策和 route replay 描述，需要保持“工具先快照、再解析核心记账主体”。 | 需要验证敏感数据脱敏、绑定历史、原路径回放和换绑后逆向交易不重路由。 |
+| 支付工具和外部账户 | VCC、VA、外部电子钱包端点、银行卡和外部账户只能作为 `PaymentInstrumentRef` 或 `ExternalAccountRef`，不得成为 ledger subject；内部余额钱包、信用额度、返利钱包和商户钱包只能作为业务入口参数或内部主体解析来源。 | 系分和 OpenSpec 中钱包标识、工具绑定、资金责任决策和 route replay 描述，需要保持“工具先快照、内部入口先解析核心记账主体”。 | 需要验证敏感数据脱敏、绑定历史、原路径回放、换绑后逆向交易不重路由，以及内部钱包不被强制包装为支付工具。 |
 | 平台账户角色 | 平台账户角色不是独立主体，必须按租户、币种和角色解析到平台资金账户后才能入账。 | 系分中的平台账户角色、缺失/不唯一失败、路由参与方和对账清结算平台责任账户描述需要统一。 | 需要补平台资金账户初始化、缺失失败、不唯一失败和历史角色变更后 replay 的测试入口。 |
 | P2 业务能力包 | prepaid/shared/VCC/全球账户/收单不新增账本主体；只通过工具快照、绑定快照、资金责任决策、预算控制证据和外部规则引用进入资金底座。 | 06、07、08 已按产品口径收敛；系分和 OpenSpec 的 P2 任务、业务 pack 和目标测试资产仍需逐项回挂。 | 未完成卡组织、银行、PSP、ACH、FX、PCI、合规和财务确认前，不得声明生产资金流 Done。 |
 
@@ -332,7 +332,7 @@ A0 编码准入前，产品侧必须先把一个业务问题收敛成可执行�
 | 对齐主题 | PRD 口径 | DSL 口径 | 系分口径 | TDD 口径 |
 | --- | --- | --- | --- | --- |
 | 可入账主体 | 只有资金账户、信用账户和平台角色解析后的平台资金账户能承接资金或额度责任。 | `SubjectRef` / 可入账 `FundsSubjectType` 只承载 `FUNDING_ACCOUNT`、`CREDIT_ACCOUNT` 和平台角色解析后的资金账户。 | route participant、posting plan、ledger entry 和余额投影不得直接落到预算组、Spend Rule、支付工具或外部账户。 | 红线测试必须覆盖预算组、Spend Rule、支付工具、外部账户和业务单据直接入账失败且无账务副作用。 |
-| 支付工具 | VCC、VA、内部钱包、电子钱包账户、银行卡和外部账户只暴露资金能力和外部引用。 | 使用 `PaymentInstrumentRef`、`ExternalAccountRef`、binding snapshot 和 route snapshot。 | `PaymentInstrumentService` 管工具和绑定，route resolver 只消费快照并解析最终责任主体。 | 覆盖工具换绑、原路径回放、敏感信息脱敏和工具不得拥有余额或 ledger entry。 |
+| 支付工具 | VCC、VA、外部电子钱包端点、银行卡和外部账户只暴露工具能力和外部引用；内部余额钱包、信用额度、返利钱包和商户钱包不归入支付工具。 | 外部工具使用 `PaymentInstrumentRef`、`ExternalAccountRef`、binding snapshot 和 route snapshot；内部入口解析为 `SubjectRef`、权益快照或资金责任决策。 | `PaymentInstrumentService` 管工具和绑定，route resolver 只消费快照并解析最终责任主体。 | 覆盖工具换绑、原路径回放、敏感信息脱敏、工具不得拥有余额或 ledger entry，以及内部入口不得被误建成 `PaymentInstrument`。 |
 | 预算组和 Spend Rule | 预算组表达预算 scope、owner、展示和审计；Spend Rule 统一表达预算额度、MCC、商户、频控和时间窗口等授权前规则。 | 使用 BudgetGroup 上下文、Spend Rule 快照、规则决策日志和预算控制投影，不新增账本余额桶。 | `BudgetGroupService` 和 Spend Rule 控制视图只管理控制证据；资金责任解析关系解析到资金账户、信用账户或平台账户角色。 | 覆盖预算创建不初始化 ledger、规则拒绝不生成 route/entry、预算控制占用/释放只更新控制证据。 |
 | 资金责任解析关系 | 产品上回答“本次支出最终由哪个内部资金或额度主体承担”，可由工具、使用主体、预算组、Spend Rule 等上下文参与筛选。 | DSL 保留 `FundingAllocationDecision` 表达最终责任主体、账目、优先级、选择原因和规则版本；兼容名称“资金来源关系”不得扩展为预算资金池。 | `SpendSubjectFundingRelationService` 可保留现有命名，但输出必须是资金账户、信用账户或平台账户角色解析后的平台资金账户；预算组和 Spend Rule 只作为控制上下文。 | 覆盖缺失、不唯一、错币种、默认关系冲突、预算组或 Spend Rule 被当作资金来源时失败且无账务副作用。 |
 | 交易投影 | 交易投影是统一只读读模型，不归属于支付工具子模块。 | 投影只消费资金事实、route snapshot、ledger entry、工具快照和控制日志，不生成新事实。 | 查询服务可按工具、资金账户、信用账户、预算组和 Spend Rule 建索引，但不得反写交易、账本或余额。 | 覆盖多维查询、投影重放只读、预算/规则视图不生成资金交易记录。 |
