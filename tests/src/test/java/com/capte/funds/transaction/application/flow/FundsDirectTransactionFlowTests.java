@@ -1844,6 +1844,112 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND", 2, 2);
     }
 
+    /**
+     * 场景：直接退款使用相同业务流水重复提交，第二次请求更换非易变业务上下文字段。
+     * 输入：充值 100、付款 70、退款 30 使用业务流水 `DIRECT_IDEMPOTENT_REFUND_CONTEXT`，首请求 context 为 RULE-A，重试同 context 后改为 RULE-B。
+     * 输出：同 context 重试返回同一资金交易流水；业务上下文变化被摘要冲突拒绝。
+     * 预期：退款幂等摘要必须覆盖非易变 contextVariables 字段，不能只覆盖退款账户、出资账户、出资账目和金额。
+     * 红线：同业务流水不同业务上下文不得静默复用原退款，也不得新增 route、posting、ledger entry 或污染余额。
+     */
+    @Test
+    void testDirectRefundSameBusinessSnWithDifferentBusinessContextShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("idem_refund_ctx_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 100L, "DIRECT_IDEMPOTENT_REFUND_CONTEXT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_IDEMPOTENT_REFUND_CONTEXT_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String firstRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT")
+                .setDescription("idempotent refund with business context"), WindOperator.system());
+        BalanceSnapshot afterFirstRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterFirstRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
+        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_REFUND_CONTEXT");
+
+        String retryRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT")
+                .setDescription("idempotent refund with business context"), WindOperator.system());
+
+        assertThat(retryRefundSn).isEqualTo(firstRefundSn);
+        BalanceSnapshot afterRetryRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstRefund, afterRetryRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
+        assertDirectRouteSnapshotUnchanged("DIRECT_IDEMPOTENT_REFUND_CONTEXT", firstRouteSnapshot);
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT")
+                .setDescription("idempotent refund with business context"), WindOperator.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRetryRefund, afterConflict,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
+        assertDirectRouteSnapshotUnchanged("DIRECT_IDEMPOTENT_REFUND_CONTEXT", firstRouteSnapshot);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertThat(fundsTransactionDetails(firstRefundSn)).hasSize(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT_PAY", 2, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT", 2, 2);
+    }
+
     @Override
     protected void assertSingleFundsAndLedgerFactsForBusinessSn(String businessSn, int expectedDetails,
                                                                 int expectedEntries) {
