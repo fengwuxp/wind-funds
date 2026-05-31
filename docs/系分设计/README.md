@@ -54,6 +54,21 @@
 | 现有模块和接口 | 作为系分落地边界：core、wallet-face、wallet-impl、transaction-face、transaction-impl、ledger-face、ledger-impl、tests。 |
 | tests/src/test/resources/jdbc-schema.sql | 作为现有交易、账户、冻结、账本和分录测试表结构参考；清结算、归档和重放以本目录稳定表设计为准，数据库级落地时必须同步 DDL 和 H2 schema；指标实现由报表指标模块承接。 |
 
+## 核心系统骨架
+
+本骨架用于把产品概念、系统模块和架构分层一次性对齐。进入任一编码或 TDD 任务前，必须能说明目标能力落在哪个模块、哪一层、拥有哪些事实、只消费哪些事实，以及哪些写入被禁止。
+
+| 设计对象 | 系统承接模块 | 所属架构层 | 拥有事实 | 禁止职责 |
+| --- | --- | --- | --- | --- |
+| 资金语义和 DSL | `core` | 资金语义内核、契约层 | Spec、枚举、值对象、端口契约。 | 依赖 DAL、Web、MQ、impl 或 tests。 |
+| 钱包账户域 | `wallet-face`、`wallet-impl` | 契约层、应用层、领域服务层 | 资金账户、信用账户、预算组、Spend Rule 配置、支付工具、绑定历史、资金责任解析关系和余额查询入口。 | 写资金交易事实、ledger entry、交易投影事实；把 `FundingAccount` 扩大为信用账户、预算组、Spend Rule、支付工具或钱包标识的统一父类。 |
+| 钱包应用服务 | `wallet-face` / 后续确认的 application 包 | 应用层 use-case facade | 开户、账户能力查询、工具能力准入、资金责任解析、授权准入输入快照。 | 让调用方长期绕过 facade 拼装资源服务完成交易准入；返回完整敏感凭证；直接过账。 |
+| 交易编排域 | `transaction-face`、`transaction-impl` | 契约层、应用编排层、事实端口层 | 资金交易、交易明细、请求摘要、生命周期、余额控制事实、route snapshot 和投影编排事件。 | 持有完整业务订单状态、直接拼 ledger entry、绕过 route/ledger 改余额。 |
+| 账本事实域 | `ledger-face`、`ledger-impl` | 领域服务层、事实存储层、读模型层 | 账本、账本交易、posting plan、ledger entry、余额投影。 | 反向持有业务交易生命周期；按交易投影、报表或运营工单修余额。 |
+| 对账清算域 | `reconciliation-face`、`reconciliation-impl` 或确认后的等价模块 | 应用层、事实存储层、运营闭环层 | 对账任务、匹配结果、差错单、清分/清算/结算/出款/追偿对象和审计。 | 直接写分录、直接改历史余额、绕过交易白名单补事实。 |
+| 资金治理域 | `governance-face`、`governance-impl` 或确认后的等价模块 | 治理控制面、读模型重放层 | 归档申请、Manifest、checkpoint/watermark 引用、重放任务、差异报告。 | 改变事实身份、推进无证据水位、实现指标计算、让数仓绕过治理读取冷事实。 |
+| 只读投影和指标输入 | transaction projection、ledger projection、reporting input boundary | 读模型层 | 用户账单、商户账单、运营时间线、财务核对视图和指标项输入。 | 反写交易、route、ledger、余额、Manifest 或指标水位。 |
+
 ## 系分交付结构索引
 
 本目录按完整系统设计交付物组织。评审时先用下表确认需求背景、目标边界、概要设计、详细设计、状态流程、非功能和测试设计是否都能定位到权威章节，再进入具体分册评审。
