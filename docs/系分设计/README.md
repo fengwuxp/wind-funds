@@ -61,7 +61,7 @@
 | 设计对象 | 系统承接模块 | 所属架构层 | 拥有事实 | 禁止职责 |
 | --- | --- | --- | --- | --- |
 | 资金语义和 DSL | `core` | 资金语义内核、契约层 | Spec、枚举、值对象、端口契约。 | 依赖 DAL、Web、MQ、impl 或 tests。 |
-| 钱包账户域 | `wallet-face`、`wallet-impl` | 契约层、应用层、领域服务层 | 资金账户、信用账户、预算组、Spend Rule 配置、支付工具、绑定历史、资金责任解析关系和余额查询入口。 | 写资金交易事实、ledger entry、交易投影事实；把 `FundingAccount` 扩大为信用账户、预算组、Spend Rule、支付工具或钱包标识的统一父类。 |
+| 钱包账户域 | `wallet-face`、`wallet-impl` | 契约层、应用层、领域服务层 | 资金账户、信用账户、预算组、Spend Rule 配置、支付工具、绑定历史、资金责任解析关系和余额查询入口。 | 写资金交易事实、ledger entry、交易投影事实；把 `FundingAccount` 扩大为信用账户、预算组、Spend Rule、支付工具或内部钱包入口的统一父类。 |
 | 钱包应用服务 | `wallet-face` / 后续确认的 application 包 | 应用层 use-case facade | 开户、账户能力查询、工具能力准入、资金责任解析、授权准入输入快照。 | 让调用方长期绕过 facade 拼装资源服务完成交易准入；返回完整敏感凭证；直接过账。 |
 | 交易编排域 | `transaction-face`、`transaction-impl` | 契约层、应用编排层、事实端口层 | 资金交易、交易明细、请求摘要、生命周期、余额控制事实、route snapshot 和投影编排事件。 | 持有完整业务订单状态、直接拼 ledger entry、绕过 route/ledger 改余额。 |
 | 账本事实域 | `ledger-face`、`ledger-impl` | 领域服务层、事实存储层、读模型层 | 账本、账本交易、posting plan、ledger entry、余额投影。 | 反向持有业务交易生命周期；按交易投影、报表或运营工单修余额。 |

@@ -139,9 +139,9 @@ A0 阶段的 DSL 只把 PRD 的业务问题转成资金事实和机器契约候�
 
 #### 3.0.1 支付工具入口和账户主体内核转译
 
-支付工具入口不是新的账务主体类型，而是产品输入到 DSL 的转译阶段。卡、VA、钱包标识、VCC、共享卡和通道 token 进入 DSL 时，最多形成 `PaymentInstrumentRef`、`ExternalAccountRef`、`RoutingDecision`、`FundingAllocationDecision`、预算组 / Spend Rule 控制快照和审计上下文；route leg、posting plan、ledger entry 和余额投影仍只能使用解析后的资金账户、信用账户或平台账户角色解析后的平台资金账户。
+支付工具入口不是新的账务主体类型，而是产品输入到 DSL 的转译阶段。卡、VA、外部钱包端点、VCC、共享卡和通道 token 进入 DSL 时，最多形成 `PaymentInstrumentRef`、`ExternalAccountRef`、`RoutingDecision`、`FundingAllocationDecision`、预算组 / Spend Rule 控制快照和审计上下文；内部余额钱包、商户钱包、平台钱包、返利钱包或信用额度入口则先解析为 `SubjectRef`、`BenefitSnapshot` 或等价不可变快照。route leg、posting plan、ledger entry 和余额投影仍只能使用解析后的资金账户、信用账户或平台账户角色解析后的平台资金账户。
 
-产品或应用层可以在请求中传入业务入口参数，但 DSL 内核不把业务入口参数当成账务主体，也不要求所有入口都转成 `PaymentInstrumentRef`。内部余额钱包和商户钱包解析为 `SubjectRef(FundingAccount)`，信用额度解析为 `SubjectRef(CreditAccount)`，返利或权益按资金责任账户或 `BenefitSnapshot` 承接；只有卡、VA、外部银行账户、外部钱包端点、通道 token 等外部工具才形成 `PaymentInstrumentRef` 或 `ExternalAccountRef`。
+产品或应用层可以在请求中传入业务入口参数，但 DSL 内核不把业务入口参数当成账务主体，也不要求所有入口都转成 `PaymentInstrumentRef`。内部余额钱包、平台钱包和商户钱包解析为 `SubjectRef(FundingAccount)`，信用额度解析为 `SubjectRef(CreditAccount)`，返利或权益按资金责任账户或 `BenefitSnapshot` 承接；只有卡、VA、外部银行账户、外部钱包端点、通道 token 等外部工具才形成 `PaymentInstrumentRef` 或 `ExternalAccountRef`。
 
 | 场景 | DSL 输入层 | DSL 内核层 | 必须固化的快照 | 禁止项 |
 | --- | --- | --- | --- | --- |
@@ -157,7 +157,7 @@ A0 阶段的 DSL 只把 PRD 的业务问题转成资金事实和机器契约候�
 
 | 优先级 | PRD 能力域 | DSL 承载对象 | 必须表达的事实 | JSON / TDD 证据 | 禁止漂移 |
 | --- | --- | --- | --- | --- | --- |
-| P0 | 钱包账户 | `SubjectRef`、`PaymentInstrumentRef`、`ExternalAccountRef`、平台账户角色、资金责任决策、预算控制上下文。 | 可入账主体、支付工具引用、钱包标识引用、脱敏展示号、绑定快照、资金责任解析关系、预算范围、Spend Rule 快照、账户能力和币种。 | `DSL-PAYMENT-INSTRUMENT-*`；`TDD-WALLET-*`、`TDD-ROUTE-*`。 | 把卡、VA、外部账户、支付工具、钱包标识、业务经营主体、信用账户、预算组或 Spend Rule 都泛化成 `FundingAccount` 后直接入账；或把预算组、Spend Rule 当作 ledger subject。 |
+| P0 | 钱包账户 | `SubjectRef`、`PaymentInstrumentRef`、`ExternalAccountRef`、平台账户角色、资金责任决策、预算控制上下文。 | 可入账主体、外部支付工具引用、内部钱包入口解析快照、脱敏展示号、绑定快照、资金责任解析关系、预算范围、Spend Rule 快照、账户能力和币种。 | `DSL-PAYMENT-INSTRUMENT-*`；`TDD-WALLET-*`、`TDD-ROUTE-*`。 | 把卡、VA、外部账户、支付工具、钱包标识、业务经营主体、信用账户、预算组或 Spend Rule 都泛化成 `FundingAccount` 后直接入账；或把内部钱包入口强制包装成 `PaymentInstrument`；或把预算组、Spend Rule 当作 ledger subject。 |
 | P0 | 账本账目 | `PostingPlan`、`LedgerTransaction`、`LedgerEntry`、`periodType`、`periodId`、`periodPolicy`。 | posting plan 独立平衡、entry 金额为正、借贷方向、账本周期、来源指令和 route leg。 | `DSL-DIRECT-PAY-FEE-001`、`DSL-BALANCE-CONTROL-LIMIT-BUDGET-001`；`TDD-LEDGER-*`。 | 用负金额表达反向、缺账本自动建账、用清算账期或报表周期替代账本周期。 |
 | P0 | 余额投影 | `BalanceProjection`、账本余额快照引用、余额日志只读引用。 | 余额桶、分录来源、账本周期、投影 checkpoint、覆盖模式和只读边界。 | `DSL-GOVERNANCE-BALANCE-SNAPSHOT-001`；`TDD-VIEW-*`、`TDD-ARCH-006*`。 | 余额投影或余额日志反写事实、修正余额或替代账本分录。 |
 | P0 | 清结算与对账 | `SettlementPolicySpec`、清结算 DSL 对象、差错和调账引用。 | 清分明细、清算候选、清算批次、结算锁定、出款结果、对账差异、审批和核销。 | `DSL-SETTLEMENT-*`、`DSL-BENEFIT-CLEARING-RECONCILIATION-001`；`TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`。 | 清分候选直接入账、对账差异直接改历史分录、结算锁定当出款成功。 |
@@ -365,7 +365,7 @@ flowchart TD
 | `CREDIT_ACCOUNT` | 承载授信额度、可用额度和授权占用的控制账户。 | `LIMIT`、`AVAILABLE`、`AUTHORIZATION` |
 | BudgetGroup 上下文 | 预算范围、负责人、展示、规则归属和审计维度；不作为 `LedgerEntry` 主体，也不作为可入账 `FundsSubjectType` 使用。 | 预算型 Spend Rule、控制窗口、规则版本和占用证据 |
 
-`FUNDING_ACCOUNT` 只表示真实资金账户或平台责任资金账户，不是所有钱包账户的统一父类。需要统一表达核心账务主体时，`SubjectRef` / `FundsSubjectType` / 可入账主体抽象只能承载资金账户、信用账户，以及平台账户角色解析后的平台资金账户；需要表达预算范围和支出控制时，使用 BudgetGroup 上下文、Spend Rule 快照和控制证据；需要统一表达前台支付方式、卡、VA、钱包标识和通道 token 时，使用 `PaymentInstrumentRef` 或 `ExternalAccountRef`。不得把信用额度、预算控制、钱包标识或支付工具写成 `FUNDING_ACCOUNT` 来绕过主体类型校验，也不得把预算组或 Spend Rule 写成 `LedgerEntry` 主体。
+`FUNDING_ACCOUNT` 只表示真实资金账户或平台责任资金账户，不是所有钱包账户的统一父类。需要统一表达核心账务主体时，`SubjectRef` / `FundsSubjectType` / 可入账主体抽象只能承载资金账户、信用账户，以及平台账户角色解析后的平台资金账户；需要表达预算范围和支出控制时，使用 BudgetGroup 上下文、Spend Rule 快照和控制证据；需要表达前台支付方式时，内部钱包入口先解析为 `SubjectRef`、`BenefitSnapshot` 或等价不可变快照，卡、VA、外部钱包端点和通道 token 才使用 `PaymentInstrumentRef` 或 `ExternalAccountRef`。不得把信用额度、预算控制、钱包标识或支付工具写成 `FUNDING_ACCOUNT` 来绕过主体类型校验，也不得把预算组或 Spend Rule 写成 `LedgerEntry` 主体。
 
 内部主体能力语义：
 
@@ -374,7 +374,7 @@ flowchart TD
 | `FUNDING_ACCOUNT` | 真实资金余额、商户待清算、平台现金、预收待付、手续费、差错责任和受控负余额。 | 信用额度、预算控制、支付工具、卡本体、VA 或外部银行账户。 | 付款、收款、转账、提现、退款、清算、结算、费用、调账。 |
 | `CREDIT_ACCOUNT` | 授信额度、可用额度、授权占用和额度调增/调减。 | 真实现金、外部卡、商户待结算或预算周期。 | 企业额度、charge card 额度、授权占用、撤销释放。 |
 | BudgetGroup 上下文 | 预算归属、预算范围、使用人或项目上下文、Spend Rule 归属和控制证据。 | 真实资金池、卡工具本体、信用授信责任、可入账 `FundsSubjectType` 或 `LedgerEntry` 主体。 | 部门预算、项目预算、员工卡预算、共享卡预算约束。 |
-| `PaymentInstrumentRef` | 卡、VCC、prepaid virtual card、shared card、VA、钱包标识或通道 token 的脱敏工具快照。 | 入账主体、余额主体或账本周期主体。 | 授权、付款、提现、入金识别、退款和拒付的工具追溯。 |
+| `PaymentInstrumentRef` | 卡、VCC、prepaid virtual card、shared card、VA、外部钱包端点或通道 token 的脱敏工具快照。 | 入账主体、余额主体、内部钱包主体或账本周期主体。 | 授权、付款、提现、入金识别、退款和拒付的工具追溯。 |
 
 VCC、prepaid virtual card 和 shared card 的 DSL 处理顺序是：先用 `PaymentInstrumentRef` 表达工具，再用 binding snapshot、BudgetGroup 上下文、Spend Rule 快照和 `FundingAllocationDecision` 解析责任主体与控制结果，最后把账务影响落到 `FUNDING_ACCOUNT`、`CREDIT_ACCOUNT` 或平台账户角色解析后的平台资金账户。不得反向从卡产品形态推导主体类型，不得把 BudgetGroup 或 Spend Rule 当成入账主体。
 
@@ -388,18 +388,19 @@ VCC、prepaid virtual card 和 shared card 的 DSL 处理顺序是：先用 `Pay
 | 信用卡账户 / charge card 额度 | 如果承载授信额度，归入 `CREDIT_ACCOUNT`；卡本身只是工具引用。 |
 | 预算组 | 归入预算控制上下文，只表达预算范围、规则归属、展示和审计，不表达真实资金沉淀，也不作为 `LedgerEntry` 主体。 |
 | 钱包账户域 | 产品层和服务层的上位能力域，不是 DSL 主体类型；进入 DSL 时必须拆成 `SubjectRef`、`PaymentInstrumentRef`、`FundingAllocationDecision` 或余额查询条件。 |
-| 钱包标识 | 只能作为支付工具引用、外部钱包端点引用或前台支付方式引用；最终必须解析到 `SubjectRef` 才能入账。 |
+| 钱包标识 | 需要先分类：内部余额钱包、平台钱包和商户钱包解析为 `SubjectRef`，返利钱包或权益入口解析为 `BenefitSnapshot` 或等价快照，第三方钱包端点或通道 token 才作为 `PaymentInstrumentRef` / `ExternalAccountRef`。 |
 | 支付工具、VA、银行卡、外部银行账户 | 只能作为引用或快照，不直接入账。 |
 | 用户、商户、企业、租户 | 是经营主体或归属主体，不等同于账务主体。 |
 
 主体归属判定顺序：
 
-1. 先判断对象是否是外部工具、卡、token、VA、钱包标识或外部账户；若是，只能进入 `PaymentInstrumentRef` 或 `ExternalAccountRef`。
-2. 再判断对象是否是内部可记账主体；只有真实资金责任、授信额度或平台账户角色解析后的平台资金账户可以进入 `SubjectRef`。
-3. 如果对象是 prepaid virtual card，卡本体仍为 `PaymentInstrumentRef`，预付资金责任必须经外部确认后解析为内部责任主体；确认缺失时不得生成 route、posting 或 entry。
-4. 如果对象是 shared card，卡本体仍为 `PaymentInstrumentRef`，共享关系必须通过 binding snapshot、使用人上下文、预算组、Spend Rule 快照和 `FundingAllocationDecision` 表达；后续事件必须沿原 route snapshot 回放。
-5. 如果对象是储值券、礼品卡、预付代金券或平台补贴权益，先进入权益快照、预收待付或补贴责任语义，不因名称包含“卡”自动进入 VCC。
-6. 任何无法在上述路径中确定唯一内部可记账主体的对象，都只能形成拒绝、待确认或 contract-only 结果。
+1. 先判断对象是否是内部入口：内部余额钱包、平台钱包和商户钱包必须解析为 `SubjectRef`，返利钱包或权益入口必须解析为 `BenefitSnapshot` 或等价不可变快照。
+2. 再判断对象是否是外部工具、卡、token、VA、第三方钱包端点或外部账户；若是，只能进入 `PaymentInstrumentRef` 或 `ExternalAccountRef`。
+3. 再判断对象是否是内部可记账主体；只有真实资金责任、授信额度或平台账户角色解析后的平台资金账户可以进入 `SubjectRef`。
+4. 如果对象是 prepaid virtual card，卡本体仍为 `PaymentInstrumentRef`，预付资金责任必须经外部确认后解析为内部责任主体；确认缺失时不得生成 route、posting 或 entry。
+5. 如果对象是 shared card，卡本体仍为 `PaymentInstrumentRef`，共享关系必须通过 binding snapshot、使用人上下文、预算组、Spend Rule 快照和 `FundingAllocationDecision` 表达；后续事件必须沿原 route snapshot 回放。
+6. 如果对象是储值券、礼品卡、预付代金券或平台补贴权益，先进入权益快照、预收待付或补贴责任语义，不因名称包含“卡”自动进入 VCC。
+7. 任何无法在上述路径中确定唯一内部可记账主体的对象，都只能形成拒绝、待确认或 contract-only 结果。
 
 ### 6.2 账目与余额桶
 
@@ -486,7 +487,7 @@ FX 边界：
 | 对象 | 用途 | 入账边界 |
 | --- | --- | --- |
 | `SubjectRef` | 指向可入账主体。 | 只有 `FUNDING_ACCOUNT`、`CREDIT_ACCOUNT` 可进入分录；平台账户角色必须先解析成具体 `FUNDING_ACCOUNT`；BudgetGroup 和 Spend Rule 只能作为控制上下文和规则快照。 |
-| `PaymentInstrumentRef` | 记录卡、VA、银行卡、钱包标识、通道 token 或其他支付工具快照。 | 不直接入账；钱包标识也必须先解析为 `SubjectRef`。 |
+| `PaymentInstrumentRef` | 记录卡、VA、银行卡、外部钱包端点、通道 token 或其他外部支付工具快照。 | 不直接入账；内部钱包标识必须先解析为 `SubjectRef`、`BenefitSnapshot` 或等价不可变快照。 |
 | `ExternalAccountRef` | 记录外部银行、通道、托管户等外部端点。 | 不直接入账。 |
 | `Reference` | 记录退款、撤销、结算、拒付、退费、解冻等后续事件引用的原事实。 | 缺引用时不得回放。 |
 

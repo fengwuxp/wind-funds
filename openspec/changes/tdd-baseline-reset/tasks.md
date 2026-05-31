@@ -16,6 +16,7 @@
 - [x] 2026-05-31 完成代码 CR 任务基线对齐：当前已提交设计和任务对齐输入推进至 `f99800b docs: 对齐代码 CR 任务基线`；`5a78f02 docs: 明确核心设计骨架` 继续作为核心设计骨架修复证据。
 - [x] 2026-05-31 完成本轮编码准入复核：当前已提交设计和任务对齐输入推进至 `4a7ef12 docs: 固化代码准入 CR 基线`；`f99800b docs: 对齐代码 CR 任务基线` 保留为上一轮代码 CR 任务基线证据。复核未发现新代码事实变化，A1 仍是唯一可推进到用户确认态的单一 Execution Grant 候选；未确认前不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 - [x] 2026-05-31 完成 B2/B4 编码准入口径修复：系分已明确外部支付工具和工具快照才使用 `PaymentInstrumentRef`，内部余额钱包、信用额度、返利钱包和商户钱包等业务入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照；`PaymentInstrumentCapabilityApplicationService` 只做工具能力准入、读取工具与绑定历史、生成准入快照，不注册工具、不变更绑定；TDD 映射表已显式纳入 `AC-AUTH-000` 授权入口分层。该修复只关闭 B2/B4 进入独立 Round 0 或单一 Execution Grant 前的文档阻断，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
+- [x] 2026-05-31 完成钱包入口二次收敛：PRD、DSL、系分、TDD、VCC 分册和 OpenSpec 已把内部余额钱包、平台钱包、商户钱包、返利钱包、信用额度入口与外部钱包端点、通道 token、卡、VA 等支付工具分开；内部入口只作为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照解析来源，外部工具才使用 `PaymentInstrumentRef` / `ExternalAccountRef`。该修复仍为文档准入口径，不授权新增 facade、Request/DTO、DDL/H2 schema 或测试资产。
 
 ## 1. MVP 任务写入范围
 
