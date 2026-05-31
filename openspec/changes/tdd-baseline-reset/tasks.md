@@ -290,8 +290,9 @@ DDL/H2 schema 变化：
 | B4-07 | 明确 chargeback 不落 `FundsAuthorizationTransactionService#chargeback`。 | `docs`、`openspec`、后续授权测试 | 用户补充口径、拒付业务事实。 | 测试或任务强制要求调用 `chargeback` 服务入口，或把拒付结果只保存成无法区分的普通退款。 | 拒付作为争议/扣回语义，通过 `settleRefund` 的原因、上下文、凭证和审计承接；如代码已有 `chargeback`，本轮不扩展为目标态主入口；查询、投影和审计必须能区分普通退款与拒付承接。 | `just test-transaction` |
 | B4-08 | 固化授权并发竞争红线。 | `transaction-*`、`core`、`tests/src/test/java` | TDD 13.5、授权生命周期。 | 同一授权的完成、撤销、过期、退款并发导致重复入账、重复释放或剩余为负。 | 通过幂等键、状态版本、唯一约束或锁定策略确保同一授权同一时刻只有合法迁移生效，失败方无副作用。 | `just test-business-flow` |
 | B4-09 | 固化授权占券和权益生命周期边界。 | `transaction-*`、`core`、`tests/src/test/java` | `DSL-BENEFIT-AUTH-HOLD-001`、`TDD-BEN-AUTH-*`、`TDD-BEN-ENTRY-003`、`TDD-BEN-ENTRY-004`、`RED-053`。 | 授权拒绝、工具准入失败或余额不足后仍核销权益；授权完成和过期并发导致同一权益重复核销或释放；完成时按当前券规则重算；新增授权权益专用服务入口或授权后续事件接收当前权益结果。 | 不新增授权权益专用服务入口；`authorize` 可在对应 Execution Grant 确认后扩展可选 `benefitSnapshot` 或等价字段固化占用引用；`reversal`、`expire`、`settle` 和 `settleRefund` 读取原授权事实和原权益快照；授权阶段只固化占用引用，完成按原快照核销，撤销或过期释放剩余占用；失败事件无 route/posting/entry 副作用。 | `just test-business-flow` |
+| B4-10 | 固化授权支付工具应用入口。 | `transaction-face`、`wallet-face`、`transaction-impl`、`wallet-impl`、`tests/src/test/java`，具体写入范围由 Execution Grant 决定 | 产品 `AC-PI-010`、`AC-AUTH-000`、DSL 支付工具入口到账户主体内核转译、系分 4.1.2。 | 外部业务必须传内部 `FundsAccountId` 才能授权；工具状态、绑定、预算组、Spend Rule 或资金责任缺失仍进入内核；工具准入失败生成 route/posting/entry；批准后 route leg 使用支付工具、预算组或 Spend Rule 作为主体。 | 新增或调整 application facade，先完成工具、绑定、使用主体、预算组、Spend Rule、资金责任和账户能力校验；批准后委派账户主体型授权内核；拒绝只记录拒绝事实和原因；PaymentInstrumentRef、BindingSnapshot、FundingAllocationDecision 和拒绝原因进入快照或审计。 | `just test-transaction`、`just test-boundary` |
 
-人工确认点：`EXPIRE` 枚举、`expire` 服务入口、`settle` 强制完成请求契约、`settleRefund` 无授权退款引用和审计字段、授权占券字段和权益 hold/release/write-off 外部引用；VCC / Spend Controls 默认只做边界测试，只有明确启用发卡产品才进入实现范围。
+人工确认点：`EXPIRE` 枚举、`expire` 服务入口、`settle` 强制完成请求契约、`settleRefund` 无授权退款引用和审计字段、授权占券字段和权益 hold/release/write-off 外部引用、授权支付工具应用入口的服务命名 / Request / DTO / 幂等摘要和快照字段；VCC / Spend Controls 默认只做边界测试，只有明确启用发卡产品才进入实现范围。
 
 ### B5 覆盖索引：余额控制
 
@@ -410,6 +411,7 @@ B8 首批 Red 集必须在 B8-01 至 B8-09 任一 Green 实现前完成：`TDD-B
 14. 金额临界值按 TDD 5.1 作为所有资金变化测试的公共前置矩阵；并发竞争按 TDD 13.5 分散到授权、余额控制、清结算、对账和归档相关 MVP 任务承接，不得只用顺序用例代替。
 15. 权益快照按三段落地：B1 只做 `core` DSL 契约和 JSON 空值语义；B3、B4、B6 才进入直接交易、授权和 replay 的 route/posting 消费；B7 才进入清结算与对账拆分；B8 才进入归档、冷热读取和治理重放消费。未完成后段前，不得宣称含权益资金流已完整闭合；涉及独立伴随指令、补充权益事实、审计证据包、使用者解释视图、证据最小化或外部规则核验时，还必须在对应 MVP 任务的 Execution Grant 中登记原子性、补录载体、最终重校验、视图防误导、脱敏边界、规则核验和失败处理。
 16. 直接交易和授权交易不因权益快照新增权益专用服务方法；后续如需扩展 `FundsTransactionPayRequest`、`FundsTransactionRefundRequest`、`FundsAuthorizationTransactionAuthorizeRequest` 或授权后续事件 Request，必须由对应 MVP 任务的 Execution Grant 明确允许。授权过期 `expire` 是 B4-03 既有授权生命周期缺口，不属于权益设计新增入口。
+16A. 授权交易允许新增支付工具型 application facade，但不得把现有账户主体型内核请求直接替换为工具引用字段。Execution Grant 必须声明服务命名、公共契约、Request/DTO、是否新增 application 包、是否调整 transaction-* 对 wallet-face 的依赖、幂等摘要、PaymentInstrumentRef / BindingSnapshot / FundingAllocationDecision / 拒绝原因的快照位置、敏感上下文回归和目标测试资产。
 17. 券能不能退由业务层、订单层、营销权益系统或运营审批链路决策；资金底座只承接原权益快照和本次退款决策引用，不调用当前营销规则、不读取当前券包状态、不自行判断退券可行性。
 18. 平台补贴、储值券、预付券、礼品卡、客户资金、商户待结算资金、负债、备付或收入成本口径进入 B3/B7 生产资金流前，必须在 Execution Grant 中登记财务、税务、会计、合规或法务确认状态；未确认时只能保留为契约或设计验证，不得进入生产 Done 结论。
 19. 含权益 MVP 任务进入 Phase 2 或 Phase 3 前，Execution Grant 必须选择 Phase 能力边界、JSON 夹具级别、权益快照事实源、零实付表达、平台补贴表达、独立伴随指令原子性、储值/预付口径、退款分摊粒度、退款分摊确定性规则版本、分摊依据、稳定组件顺序、舍入模式、尾差归属、组件剩余额度版本、历史无权益快照处理策略、补充权益事实模型、专业确认状态、审计证据包、使用者解释视图、证据最小化和外部规则核验状态；缺任一项时只能执行 contract-only、设计验证或失败用例，不得实现生产资金流。
