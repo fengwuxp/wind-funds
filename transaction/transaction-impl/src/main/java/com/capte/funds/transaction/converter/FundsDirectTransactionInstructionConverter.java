@@ -90,6 +90,12 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToTransferInstruction(@NonNull FundsTransactionTransferRequest request,
                                                                       @NonNull WindOperator operator) {
+        AssertUtils.notNull(request.getPayerAccountId(), "系统内转账付款账户不能为空");
+        AssertUtils.notNull(request.getPayeeAccountId(), "系统内转账收款账户不能为空");
+        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getPayerAccountId()),
+                "系统内转账付款账户不能是外部账户");
+        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getPayeeAccountId()),
+                "系统内转账收款账户不能是外部账户");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getPayerAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.PAYER_ACCOUNT_ID, request.getPayerAccountId());

@@ -332,6 +332,101 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：系统内转账把外部账户作为收款主体。
+     * 输入：付款方充值 50 后，提交外部银行账户作为 payeeAccountId。
+     * 输出：请求被拒绝；付款方和平台账户余额保持充值后的状态。
+     * 预期：外部账户只能作为出入金引用或快照，不能成为系统内转账的 ledger subject。
+     * 红线：外部账户不得生成 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testTransferToExternalAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId externalPayee = FundsAccountId.immutable("external_bank_transfer_payee",
+                DefaultFundsAccountType.EXTERNAL_BANK);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 50L, "DIRECT_TRANSFER_EXTERNAL_PAYEE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(externalPayee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_TRANSFER_EXTERNAL_PAYEE")
+                .setDescription("transfer to external payee"), WindOperator.system()))
+                .hasMessageContaining("系统内转账收款账户不能是外部账户");
+
+        BalanceSnapshot afterRejectedTransfer = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRejectedTransfer,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_TRANSFER_EXTERNAL_PAYEE_TOPUP", 3, 4);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_EXTERNAL_PAYEE");
+    }
+
+    /**
+     * 场景：系统内转账把外部账户作为付款主体。
+     * 输入：外部银行账户作为 payerAccountId，向普通资金账户转账 10。
+     * 输出：请求被拒绝；收款方和平台账户余额均不变化。
+     * 预期：外部账户只能作为出入金引用或快照，不能成为系统内转账的 ledger subject。
+     * 红线：外部账户不得生成 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testTransferFromExternalAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId externalPayer = FundsAccountId.immutable("external_bank_transfer_payer",
+                DefaultFundsAccountType.EXTERNAL_BANK);
+        FundsAccountId payee = fundingAccount("external_transfer_payee");
+        ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
+
+        BalanceSnapshot before = snapshot(balances(payee, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(externalPayer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_TRANSFER_EXTERNAL_PAYER")
+                .setDescription("transfer from external payer"), WindOperator.system()))
+                .hasMessageContaining("系统内转账付款账户不能是外部账户");
+
+        BalanceSnapshot afterRejectedTransfer = snapshot(balances(payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTransfer,
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+
+        assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_EXTERNAL_PAYER");
+    }
+
+    /**
      * 场景：USD 资金账户发起 CNY 系统内转账。
      * 输入：付款方充值 50 USD，随后向收款方转账 10 CNY。
      * 输出：请求被拒绝；付款方、收款方和平台账户余额保持充值后的状态。
