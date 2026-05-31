@@ -11,7 +11,8 @@
 - [x] 校准 TDD 文档中“旧测试资产复用”表述。
 - [x] 冻结当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果，作为进入编码前的独立检查点；上一已冻结设计交付提交点为 30b1a00 docs: 冻结权益快照设计基线，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。
 - [x] 完成设计、代码、任务三方基线对齐：`eabd672` 纳入编码准备包，`6be9c99` 完成 B1-10 权益快照 DSL 契约承载，`75b46ef` 和 `9db3eba` 收敛请求摘要与稳定摘要支撑，`434f8a2` 校准账务计划装配器长 ID 测试规范，`5bad4b7` 对齐权益资金流编码基线，`42100dc` 固化权益生产准入门禁，`555a943` 至 `db766fa` 完成权益准入任务基线、架构师工程约规、CAD 自动推进约规、测试最佳实践、预算组默认周期 `LIFETIME`、账务事实断言、钱包/交易/治理边界、CAD 完整验证门禁和出款准入规则核验证据收敛，`f386ed0a` 至 `5901265` 完成编码准入设计冻结、出款准入设计冻结、提现/解冻红线、余额日志证据、路由事实边界、交易投影解释、权益回放摘要和治理重放范围/来源/差异项校验收敛，`5901265..77bc9f4` 完成资金事实红线、敏感上下文阻断、上下文不可变、防御性拷贝、外部账户原文阻断、MVP/归档边界和设计交付口径收敛；任务以本 Harness Plan 和 OpenSpec spec 为准。
-- [x] 2026-05-31 完成 PRD、DSL、系分、TDD、OpenSpec、代码和任务基线的只读对齐：当前已提交设计和任务对齐输入已推进至 `8e4a801 docs: 对齐最新设计任务基线`，代码能力基线仍截至 `77bc9f4`；本轮把历史“资金来源关系”统一校准为资金责任解析关系，明确支付工具只承载交易投影和 route 快照，BudgetGroup 与 Spend Rule 只作为预算 scope、控制规则、规则快照和审计上下文；`3ef522c`、`a7d3fc9` 和 `8e4a801` 分别固化授权支付工具外层入口、钱包 application facade、兼容缺口 CR 和最新设计任务基线索引。既有测试文件变更保持隔离，未纳入本轮设计基线。
+- [x] 2026-05-31 完成 PRD、DSL、系分、TDD、OpenSpec、代码和任务基线的只读对齐：该轮已提交设计和任务对齐输入推进至 `8e4a801 docs: 对齐最新设计任务基线`，代码能力基线仍截至 `77bc9f4`；本轮把历史“资金来源关系”统一校准为资金责任解析关系，明确支付工具只承载交易投影和 route 快照，BudgetGroup 与 Spend Rule 只作为预算 scope、控制规则、规则快照和审计上下文；`3ef522c`、`a7d3fc9` 和 `8e4a801` 分别固化授权支付工具外层入口、钱包 application facade、兼容缺口 CR 和最新设计任务基线索引。既有测试文件变更保持隔离，未纳入本轮设计基线。
+- [x] 2026-05-31 完成核心设计骨架修复：当前已提交设计和任务对齐输入已推进至 `5a78f02 docs: 明确核心设计骨架`；`8e4a801 docs: 对齐最新设计任务基线` 继续作为上一轮任务索引证据。核心设计骨架进一步明确可入账主体、产品能力、系统模块、架构分层和能力地图，作为本轮代码 CR 差异复核输入。
 
 ## 1. MVP 任务写入范围
 
@@ -77,13 +78,14 @@ just verify-cad
 - [x] Harness 已重新对齐：以本文件作为 MVP 任务计划、覆盖索引、写入范围、只读范围、禁止事项、人工确认点和交付记录入口。
 - [x] 旧测试源码已移除，测试 resources 保留。
 - [x] 当前基线支持在用户明确授权后进入 CAD 自动提交模式；进入生产编码前仍需用户按 MVP 任务切片授予 Execution Grant，且每轮交付必须声明专项验证或 `just verify-cad` 完整门禁结果。
-- [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线。当前已提交设计和任务对齐输入已推进至 `8e4a801 docs: 对齐最新设计任务基线`，上一 A0/code baseline 冻结点为 `9456ab6 docs: 对齐 A0 准入与代码基线`，代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`；后续生产编码仍需用户按 MVP 任务切片单独授予 Execution Grant。
+- [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线。当前已提交设计和任务对齐输入已推进至 `5a78f02 docs: 明确核心设计骨架`，上一 A0/code baseline 冻结点为 `9456ab6 docs: 对齐 A0 准入与代码基线`，代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`；后续生产编码仍需用户按 MVP 任务切片单独授予 Execution Grant。
 - [x] 代码基线已复核至当前 Git 基线 `77bc9f4`，并纳入 B1-10 权益快照 DSL 契约承载实现和测试：B1 覆盖索引的 DSL 契约测试已存在；B2 覆盖索引下支付工具、绑定历史、资金责任解析关系（历史代码命名仍可能为 funding relation）、显式建账、预算组默认周期 `LIFETIME`、账务计划装配器长 ID 追溯、余额日志证据、余额投影、上下文敏感字段阻断和防御性拷贝已有局部基线；B3 至 B6 覆盖索引已有部分直接交易、授权、余额控制、Route Replay、交易投影、稳定摘要、解释摘要、权益回放摘要、路由事实边界、主链路事实红线、敏感上下文阻断和投影重放差异校验测试；B7 已有 reconciliation-* 模块骨架和出款前准入候选实现，已通过专项服务测试验证，可作为后续候选输入但未纳入清结算、对账或出款生命周期 Done 基线；B8 已有 governance-* 交易投影重放骨架、范围/来源事实/差异项校验和局部边界测试。上述都只作为局部代码和验证门禁基线，不表示对应覆盖索引全量完成或可跳过 Execution Grant。
 - [x] 完成 A0 只读核验证据登记：Java 21 运行时、编译门禁、A1 直接交易主链路、posting 装配和余额投影回归测试已通过；embedded Redis 由测试基础设施自动启动和使用，未触发额外人工确认。A0 通过只作为下一步单一 MVP Execution Grant 输入，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 - [x] 完成 CAD 完整门禁验证登记：`WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 已通过，覆盖 Java 运行时、编译、核心契约、账本、交易、余额控制、业务流、架构边界、治理重放和 PMD；该结果仍只作为下一步 Execution Grant 输入，不替代生产 Done。
 - [x] 补齐 A1 直接交易事实红线候选准入卡：`docs/TDD设计/A1-直接交易事实红线准入卡.md` 已整理候选授权、覆盖验收、写入边界、Red 集合、验证命令和停止条件；该卡仍需用户确认后才成为实际 Execution Grant。
 - [x] 完成 A1 现有覆盖扫描登记：`52f116f docs: 记录 A1 现有覆盖扫描` 已记录 `A1-RED-001`、`A1-RED-002` 既有回归覆盖和 `FundsDirectTransactionFlowTests` 22 个用例通过证据；该结果只作为 Execution Grant 输入，不替代生产 Done。
 - [x] 完成 A1 证据链同步后完整门禁复核：`97bc25d docs: 同步 A1 覆盖扫描证据` 后执行 `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 并通过，覆盖编译、测试和 PMD；该结果只证明当前候选准入证据链与工程基线一致，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
+- [x] 完成 2026-05-31 代码 CR 和设计差异复核：以 `5a78f02 docs: 明确核心设计骨架` 为最新设计任务修复点，重新对比 PRD、DSL、系分、TDD 与代码事实。结论是交易内核仍应保持账户主体型 canonical 入参，支付工具型入口只允许落 application facade；主要差异集中在 B2/B4/B5/B6 任务基线：钱包 application facade 尚未落地，资金责任关系目标字段仍偏 `fundingAccountId`，预算组仍有 ledger subject、ledger profile、route leg、posting 和余额查询兼容路径，部分 DSL/route 测试仍在保护旧预算组主体语义。本轮只更新任务基线，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 
 ### 5.1 设计、代码、任务对齐矩阵
 
@@ -92,6 +94,7 @@ just verify-cad
 | `02-交易路由钱包账目与投影` | DSL 契约、支付工具、钱包账户、部分直接交易、授权、余额控制、Route Replay、余额投影和交易投影已有局部测试与实现。 | 按 P0/P1 拆解补齐覆盖索引：B1、B2 对应 DSL、钱包、账本、账目和余额投影；B3 至 B6 对应直接交易、授权交易、余额控制和交易投影。已存在能力只作为局部基线，进入编码时必须再裁剪成 A0 至 A4 或等价 MVP 任务，按 TDD 证明目标 AC/DSL/RED。 |
 | `03-清结算与对账` | 冻结基线中 `reconciliation-face`、`reconciliation-impl` 已有模块骨架和出款前准入候选实现，已覆盖准入解释状态、完整外部规则核验证据和只读无账务事实断言，但仍缺完整出款生命周期、表结构和数据库级服务闭环。 | 清结算与对账继续编码前必须另起独立 OpenSpec change，并确认模块、表、状态机、接口、是否扩展出款前准入候选能力和验证命令。 |
 | B8 资金数据治理边界 | `governance-face`、`governance-impl` 已有交易投影重放骨架和局部边界测试；产品 04 已降级为拆分索引。 | B8 是 P0/P1 治理闭环覆盖索引，不因编号排在 B7 后而降低优先级；Manifest、账本余额快照、普通指标快照、交易投影重放和水位隔离仍需独立 Execution Grant，并以产品 02、03、05 和已确认事实边界为输入。 |
+| 2026-05-31 代码 CR 差异 | 账户主体型交易内核请求与最新设计一致；`FundsTransactionPayRequest`、`FundsAuthorizationTransactionAuthorizeRequest`、`FundsBalanceFreezeRequest` 仍以 `FundsAccountId` 入参，`ImmutableResolvedRouteSpec` 已有 `PaymentInstrumentRefSpec` 快照位。主要缺口在钱包应用层 facade、资金责任目标字段和 BudgetGroup 账务主体化兼容路径；代码证据包括 `FundsSubjectType.BUDGET_GROUP`、`DefaultFundsAccountQueryServiceImpl` 解析预算组、`BudgetGroupServiceImpl` 初始化预算组 ledger、`DefaultLedgerProfileServiceImpl` 的 `BUDGET_BASIC` profile、`DefaultLedgerTransactionPostingServiceImpl` 允许 `BUDGET_GROUP` 入账、`RouteSubjectSupport` 和 `DefaultRouteReplayService` 将预算组解析成 route participant，以及 `FundsBalanceControlInstructionConverter` 把预算组当额度调整对象。 | 这些差异必须进入 B2/B4/B5/B6 后续 Execution Grant：先做 wallet application facade 与资金责任字段决策，再处理 BudgetGroup 兼容策略和 Red/Green 证据；未确认前不得把预算组 route leg、posting、LedgerEntry、ledger 初始化、余额查询或旧 DSL 测试通过作为目标态 Done。 |
 | 导出附件 | 若工作树存在 `docs/*.zip` 等导出包，只能作为评审附件。 | 导出包不作为规格、任务或验收 Source of Truth；是否纳入版本库需用户单独确认。 |
 
 ### 5.2 生产交付判定
@@ -265,8 +268,8 @@ DDL/H2 schema 变化：
 | B2-03 | 固化账本周期和 posting 平衡。 | `ledger-*`、`tests/src/test/java` | 账本周期语义矩阵、账务规则矩阵。 | 周期混用、借贷不平、entry 字段缺失。 | 补齐周期隔离、posting plan 平衡和分录完整性。 | `just test-ledger` |
 | B2-04 | 固化余额投影边界。 | `ledger-*`、`tests/src/test/java` | 余额投影、余额日志。 | 投影失败误回滚事实、余额日志被当事实源。 | 保持事实追加、投影可重建、日志只读辅助。 | `just test-boundary` |
 | B2-05 | 建立余额断言支撑。 | `tests/src/test/java` | TDD 资金断言红线。 | 只断言状态、不断言余额桶。 | 补公共断言支撑，后续 MVP 任务复用。 | `just test-boundary` |
-| B2-06 | 固化支付工具、绑定和资金责任解析关系。 | `wallet-*`、`tests/src/test/java` | 产品 `AC-PI-*`、系分支付工具状态与路由准入、`GAP-PI-001`、`GAP-WALLET-001`、`GAP-WALLET-002`。 | 工具状态不可用、方向不匹配、资金责任缺失或不唯一、账户能力不足仍进入 route；敏感信息未脱敏；绑定历史被覆盖；预算组或 Spend Rule 被输出为最终资金责任主体；调用方绕过 application facade 拼装资源服务完成工具准入或资金责任解析。 | 补 `PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests`、`PaymentInstrumentCapabilityApplicationService` / `FundingResponsibilityResolutionApplicationService` 等价测试，证明工具只做引用、绑定只做候选、资金责任解析关系不扣款不写账，最终只解析到资金账户、信用账户或平台账户角色解析后的平台资金账户；若支持信用账户或平台账户角色作为目标责任主体，必须把 `fundingAccountId` 兼容字段演进为目标主体引用或在 Execution Grant 中声明只支持资金账户。 | `just test-boundary` |
-| B2-07 | 收敛预算组账务主体化兼容缺口。 | `wallet-*`、`ledger-*`、`transaction-*`、`tests/src/test/java`，具体写入范围由 Execution Grant 决定 | 产品预算组 / Spend Rule 边界、DSL BudgetGroup 上下文、系分账户服务边界、`GAP-WALLET-003`。 | `FundsSubjectType.BUDGET_GROUP`、预算组余额查询或预算组 ledger 初始化被当作目标态可记账主体；预算组成为 route leg、posting 或 LedgerEntry 主体；预算组额度调整绕过 Spend Rule 控制视图。 | 明确 `BUDGET_GROUP` 是兼容枚举、迁移别名、只读查询过滤条件还是待删除目标；补预算组不初始化 ledger bucket、不作为 LedgerEntry 主体、预算控制只走 Spend Rule 控制视图的 Red/Green 证据。 | `just test-ledger`、`just test-boundary` |
+| B2-06 | 固化支付工具、绑定和资金责任解析关系。 | `wallet-*`、`tests/src/test/java` | 产品 `AC-PI-*`、系分支付工具状态与路由准入、`GAP-PI-001`、`GAP-WALLET-001`、`GAP-WALLET-002`。 | 工具状态不可用、方向不匹配、资金责任缺失或不唯一、账户能力不足仍进入 route；敏感信息未脱敏；绑定历史被覆盖；预算组或 Spend Rule 被输出为最终资金责任主体；调用方绕过 application facade 拼装资源服务完成工具准入或资金责任解析；继续把关系目标长期限制为 `fundingAccountId`，却在产品或 DSL 中声明可解析到信用账户或平台账户角色。 | 补 `PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests`、`PaymentInstrumentCapabilityApplicationService` / `FundingResponsibilityResolutionApplicationService` 等价测试，证明工具只做引用、绑定只做候选、资金责任解析关系不扣款不写账，最终只解析到资金账户、信用账户或平台账户角色解析后的平台资金账户；若支持信用账户或平台账户角色作为目标责任主体，必须把 `fundingAccountId` 兼容字段演进为 `targetSubjectType + targetSubjectId` 或在 Execution Grant 中声明只支持资金账户，并同步 DTO、Entity、H2 schema、摘要和测试。 | `just test-boundary` |
+| B2-07 | 收敛预算组账务主体化兼容缺口。 | `wallet-*`、`ledger-*`、`transaction-*`、`tests/src/test/java`，具体写入范围由 Execution Grant 决定 | 产品预算组 / Spend Rule 边界、DSL BudgetGroup 上下文、系分账户服务边界、`GAP-WALLET-003`、本轮代码 CR。 | `FundsSubjectType.BUDGET_GROUP`、预算组余额查询或预算组 ledger 初始化被当作目标态可记账主体；预算组成为 route leg、posting 或 LedgerEntry 主体；预算组额度调整绕过 Spend Rule 控制视图；`FundsAmountBoundaryContractTests`、`PaymentInstrumentRouteDslContractTests`、`ControlAccountLedgerInitializationTests` 或交易 flow support 继续把预算组入账路径当目标态保护。 | 明确 `BUDGET_GROUP` 是兼容枚举、迁移别名、只读查询过滤条件还是待删除目标；补预算组不初始化 ledger bucket、不作为 LedgerEntry 主体、预算控制只走 Spend Rule 控制视图的 Red/Green 证据；同步收敛 `DefaultFundsAccountQueryServiceImpl`、`BudgetGroupServiceImpl`、`DefaultLedgerProfileServiceImpl`、`DefaultLedgerTransactionPostingServiceImpl`、`RouteSubjectSupport`、`DefaultRouteReplayService`、`FundsBalanceControlInstructionConverter` 和相关测试中的旧语义，或在 Execution Grant 中明确哪些路径只是兼容验证。 | `just test-ledger`、`just test-boundary` |
 
 ### B3 覆盖索引：直接交易
 
@@ -396,7 +399,7 @@ B8 首批 Red 集必须在 B8-01 至 B8-09 任一 Green 实现前完成：`TDD-B
 
 ## 8. 依赖、门禁与设计反馈
 
-1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线，当前已提交设计和任务对齐输入为 `8e4a801 docs: 对齐最新设计任务基线`，上一 A0/code baseline 冻结点为 `9456ab6 docs: 对齐 A0 准入与代码基线`，代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`；后续具体 MVP 编码任务仍必须通过 Execution Grant 明确授权。
+1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线，当前已提交设计和任务对齐输入为 `5a78f02 docs: 明确核心设计骨架`，上一 A0/code baseline 冻结点为 `9456ab6 docs: 对齐 A0 准入与代码基线`，代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`；后续具体 MVP 编码任务仍必须通过 Execution Grant 明确授权。
 2. 当前执行优先级固定为：P0 资金底座内核优先，P1 交易与读模型扩展次之，P2 业务模式能力包按专项授权接入；文档编号和覆盖索引编号不代表能力优先级。
 3. B1、B2 承接 P0 的 DSL、钱包、账本、账目和余额投影基础；B3 至 B6 承接 P1 的直接交易、授权交易、余额控制、Route Replay 与交易投影；B7、B8 分别承接 P0 清结算对账和 P0/P1 治理闭环。
 4. B1 覆盖索引是后续所有交易、账本和授权测试的前置门禁。
@@ -416,6 +419,8 @@ B8 首批 Red 集必须在 B8-01 至 B8-09 任一 Green 实现前完成：`TDD-B
 16B. 钱包模块 application facade 进入编码前，必须先确认 `PaymentInstrumentCapabilityApplicationService`、`FundingResponsibilityResolutionApplicationService`、`WalletAccountApplicationService` 或等价命名，以及资源服务能否继续作为管理接口暴露；调用方不得长期绕过 application facade 拼装 `FundingAccountService`、`PaymentInstrumentService`、`SpendSubjectFundingRelationService` 完成交易准入。
 16C. 支出主体资金责任解析关系进入编码前，必须确认目标责任字段策略：迁移为 `targetSubjectType + targetSubjectId`，或保留 `fundingAccountId` 兼容字段且仅支持资金账户。若声明支持信用账户或平台账户角色作为最终责任主体，DTO、DDL/H2 schema、service、摘要和测试必须同步。
 16D. 预算组兼容缺口进入编码前，必须确认 `FundsSubjectType.BUDGET_GROUP` 是兼容枚举、迁移别名、只读查询过滤条件还是待删除目标。未确认前不得把预算组 ledger 初始化、预算组 route leg、预算组 posting 或预算组 LedgerEntry 作为目标态 Done 证据。
+16E. 交易内核 canonical 请求继续以已解析账户主体作为入参。直接交易、授权内核、余额控制、退款、撤销、重放和余额查询不得直接替换为支付工具引用；支付工具引用只允许进入 wallet/transaction application facade、route snapshot、审计和只读投影。若 B4-10 新增 `authorizeByInstrument` 或等价入口，必须先解析支付工具、绑定、Spend Rule、预算上下文和资金责任，再委派账户主体型内核。
+16F. 本轮代码 CR 发现的预算组旧语义必须作为 B2-07 的首要准入风险处理：`FundsSubjectType.BUDGET_GROUP` 枚举、`BUDGET_BASIC` profile、预算组 ledger 初始化、预算组余额查询、route participant、route replay、posting postable subject、余额控制 limit adjust 和测试 fixture 中的预算组主体断言都不得在未确认兼容策略时继续扩大。若因兼容保留，Execution Grant 必须写明兼容场景、禁止新写入、迁移退出条件和回归测试。
 17. 券能不能退由业务层、订单层、营销权益系统或运营审批链路决策；资金底座只承接原权益快照和本次退款决策引用，不调用当前营销规则、不读取当前券包状态、不自行判断退券可行性。
 18. 平台补贴、储值券、预付券、礼品卡、客户资金、商户待结算资金、负债、备付或收入成本口径进入 B3/B7 生产资金流前，必须在 Execution Grant 中登记财务、税务、会计、合规或法务确认状态；未确认时只能保留为契约或设计验证，不得进入生产 Done 结论。
 19. 含权益 MVP 任务进入 Phase 2 或 Phase 3 前，Execution Grant 必须选择 Phase 能力边界、JSON 夹具级别、权益快照事实源、零实付表达、平台补贴表达、独立伴随指令原子性、储值/预付口径、退款分摊粒度、退款分摊确定性规则版本、分摊依据、稳定组件顺序、舍入模式、尾差归属、组件剩余额度版本、历史无权益快照处理策略、补充权益事实模型、专业确认状态、审计证据包、使用者解释视图、证据最小化和外部规则核验状态；缺任一项时只能执行 contract-only、设计验证或失败用例，不得实现生产资金流。
@@ -569,7 +574,7 @@ NFR 假设：本历史授权只做契约承载，不触碰生产并发、容量�
 | DSL 红线 | `fixtureLevel=CONTRACT_ONLY` 必须显式登记，避免把请求态样例误判为生产 Done。 | `FundsDslJsonContractVerifier` 增加 `fixtureLevel`、`scenarioCode`、`acceptanceIds`、`tddIds`、`systemDesignRefs` 和 `validation` 元数据校验。 |
 | TDD 用例 | 已补稳定摘要、字段顺序、请求态样例、生产 Done 误判、闭合角色边界等契约测试。 | `FundsBenefitSnapshotSpecTests` 12 个用例通过；`FundsDslJsonContractTests` 8 个用例通过。 |
 | 验证命令 | Java 21 下编译、目标测试、PMD 和空白检查通过。 | `just mvn-version`；`just compile`；`just test-one FundsBenefitSnapshotSpecTests tests`；`just test-one FundsDslJsonContractTests tests`；`just pmd`；`git diff --check`。 |
-| 后续基线收敛 | 请求摘要、稳定摘要支撑、账务计划装配器长 ID、预算组默认周期 `LIFETIME`、账务事实断言、钱包/交易/治理边界、CAD 完整验证门禁、出款准入规则核验证据、编码准入设计冻结、提现/解冻红线、余额日志证据、路由事实边界、交易投影解释、权益回放摘要、治理重放差异校验、资金事实红线、敏感上下文阻断、上下文不可变、防御性拷贝、外部账户原文阻断、MVP/归档边界和设计交付口径已在后续提交中收敛，上一 A0/code baseline 冻结点为 `9456ab6`，当前已提交设计和任务对齐输入已推进至 `8e4a801`，代码能力基线截至 `77bc9f4`。 | `75b46ef` 至 `5901265` 的历史基线证据，`5901265..77bc9f4` 的资金事实红线、敏感上下文和设计交付口径收敛证据，`9456ab6` 的 A0 准入与代码基线对齐证据，`3ef522c`、`a7d3fc9` 的授权支付工具入口和钱包应用层 CR 证据，以及 `8e4a801` 的最新设计任务基线索引证据。 |
+| 后续基线收敛 | 请求摘要、稳定摘要支撑、账务计划装配器长 ID、预算组默认周期 `LIFETIME`、账务事实断言、钱包/交易/治理边界、CAD 完整验证门禁、出款准入规则核验证据、编码准入设计冻结、提现/解冻红线、余额日志证据、路由事实边界、交易投影解释、权益回放摘要、治理重放差异校验、资金事实红线、敏感上下文阻断、上下文不可变、防御性拷贝、外部账户原文阻断、MVP/归档边界和设计交付口径已在后续提交中收敛，上一 A0/code baseline 冻结点为 `9456ab6`，当前已提交设计和任务对齐输入已推进至 `5a78f02`，代码能力基线截至 `77bc9f4`。 | `75b46ef` 至 `5901265` 的历史基线证据，`5901265..77bc9f4` 的资金事实红线、敏感上下文和设计交付口径收敛证据，`9456ab6` 的 A0 准入与代码基线对齐证据，`3ef522c`、`a7d3fc9` 的授权支付工具入口和钱包应用层 CR 证据，`8e4a801` 的最新设计任务基线索引证据，以及 `5a78f02` 的核心设计骨架修复证据。 |
 | 残余风险 | 只能声明 `B1-10 契约承载 Done`。 | route、posting、replay、授权占券、清结算、对账、投影、归档、冷热读取和治理重放消费仍在 B3/B4/B6/B7/B8 后续 MVP 任务；解释视图、证据最小化和外部规则核验仍在 B6/B7/B8 后续 MVP 任务。 |
 
 ## 13. A1 建议 Execution Grant
@@ -631,7 +636,7 @@ B2 开工前先做 Round 0，只核验不写入。Round 0 的输出是“是否�
 禁止写入范围：transaction-* 业务实现；直接交易、授权交易、余额控制交易编排；Route Resolver、Posting Assembler、Route Replay；权益 route/posting/replay 消费；清结算、对账、归档、指标实现；生产配置；外部通道适配
 必须覆盖的 TDD 用例：TDD-WALLET-*、TDD-WALLET-018、TDD-WALLET-019、TDD-ROUTE-011、TDD-ROUTE-012、TDD-LEDGER-*、TDD-VIEW-003、B2-RED-003A
 必须覆盖的 AC/DSL/GAP ID：AC-PI-001、AC-PI-002、AC-PI-003、AC-PI-004、AC-PI-005、AC-PI-006、AC-PI-007、AC-PI-008、AC-PI-009、AC-PI-010、AC-CTRL-009、AC-CTRL-010、AC-CTRL-011、AC-BALLOG-001、RED-036、RED-046、RED-047、RED-049、RED-067、GAP-WALLET-001、GAP-WALLET-002、GAP-WALLET-003
-基线是否已冻结：已冻结；当前已提交设计和任务对齐输入为 8e4a801，上一 A0/code baseline 冻结点为 9456ab6，代码能力基线截至 77bc9f4；本任务启动前必须复核工作树状态
+基线是否已冻结：已冻结；当前已提交设计和任务对齐输入为 5a78f02，上一 A0/code baseline 冻结点为 9456ab6，代码能力基线截至 77bc9f4；本任务启动前必须复核工作树状态
 工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
 允许修改公共契约：待用户确认；建议默认不删除、不改写既有 face/core 字段，只允许为账户、账本、支付工具基础能力做非破坏性新增或校验补齐
 公共契约允许修改范围：如确需变更，只限 wallet/ledger face 中账户角色、账本创建、账期、支付工具绑定和资金账户关系的目标态字段；不得调整交易指令、权益快照、直接交易或授权交易请求语义

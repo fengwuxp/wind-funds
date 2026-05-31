@@ -287,7 +287,7 @@ A0 的跨层字段承接如下。任一字段在 PRD、DSL、系分、TDD 或 Op
 | --- | --- | --- | --- | --- |
 | `productGoal` / `businessQuestion` | 使用者问题、业务收益、成功标准和非目标。 | 判断是否属于资金事实；非资金能力不得下沉。 | 判断是否已有服务入口和查询解释。 | 作为 Red 的业务来源，不从模块覆盖率反推。 |
 | `moneyFact` | 主体、金额、币种、资金动作、可见结果和失败终态。 | `dslCaseId`、资金动作、账户类型、`normalBalanceSide`、账目 bucket 和借贷平衡表行。 | 模块、服务、状态机、事务、幂等、数据落点和审计。 | `moneyInvariant`、`expectedFacts`、`forbiddenFacts` 和最小断言。 |
-| `codeBaseline` | 不声明生产完成，只作为产品验收的实现差距输入。 | `fixtureLevel` 和机器契约等级不越级。 | 当前已提交设计和任务对齐输入为 `8e4a801 docs: 对齐最新设计任务基线`；上一 A0/code baseline 冻结点为 `9456ab6 docs: 对齐 A0 准入与代码基线`；代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`。 | 目标测试资产、回归资产、schemaNeed 和验证命令。 |
+| `codeBaseline` | 不声明生产完成，只作为产品验收的实现差距输入。 | `fixtureLevel` 和机器契约等级不越级。 | 当前已提交设计和任务对齐输入为 `5a78f02 docs: 明确核心设计骨架`；上一 A0/code baseline 冻结点为 `9456ab6 docs: 对齐 A0 准入与代码基线`；代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`。 | 目标测试资产、回归资产、schemaNeed 和验证命令。 |
 | `noWriteScope` / `notDone` | 产品未覆盖范围、外部规则待确认和专业确认边界。 | 未覆盖 route/posting/replay、服务流、清结算、对账、归档和治理的范围。 | 禁止触碰的模块、公共契约、表、H2 schema、运行配置、外部协议和敏感数据。 | Execution Grant 停止条件和 Not Done 判定。 |
 
 | 推荐切片 | 目标 | 最小必须证明 | 不纳入本任务 |
