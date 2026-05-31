@@ -176,6 +176,214 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：独立手续费使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
+     * 输入：充值 50、手续费 5 使用业务流水 `FEE_IDEMPOTENT_CHARGE`，随后同流水同金额重试，再同流水改金额为 6。
+     * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额、route 和账务事实保持第一次手续费后的状态。
+     * 预期：独立手续费和直接交易主流程一样受 `tenantId + businessScene + businessSn + requestHash` 保护。
+     * 红线：同业务流水不同手续费请求不得重复扣款、重写 route、追加 posting 或污染余额投影。
+     */
+    @Test
+    void testStandaloneFeeSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        topup(payer, 50L, "FEE_IDEMPOTENT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String firstFeeSn = directTransactionService.fee(new FundsTransactionFeeRequest()
+                .setAccountId(payer)
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setFeeType(DefaultFeeType.FEE.getCode())
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_IDEMPOTENT_CHARGE")
+                .setDescription("idempotent fee"), WindOperator.system());
+        BalanceSnapshot afterFirstFee = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFirstFee,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -5L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFirstFeeFacts = ledgerFactSnapshot();
+        String firstRouteSnapshot = routeSnapshotJson("FEE_IDEMPOTENT_CHARGE");
+
+        String retryFeeSn = directTransactionService.fee(new FundsTransactionFeeRequest()
+                .setAccountId(payer)
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setFeeType(DefaultFeeType.FEE.getCode())
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_IDEMPOTENT_CHARGE")
+                .setDescription("idempotent fee"), WindOperator.system());
+
+        assertThat(retryFeeSn).isEqualTo(firstFeeSn);
+        BalanceSnapshot afterRetryFee = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstFee, afterRetryFee,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstFeeFacts);
+        assertRouteSnapshotUnchanged("FEE_IDEMPOTENT_CHARGE", firstRouteSnapshot);
+
+        assertThatThrownBy(() -> directTransactionService.fee(new FundsTransactionFeeRequest()
+                .setAccountId(payer)
+                .setAmount(Money.immutable(6L, CURRENCY))
+                .setFeeType(DefaultFeeType.FEE.getCode())
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_IDEMPOTENT_CHARGE")
+                .setDescription("idempotent fee"), WindOperator.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRetryFee, afterConflict,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstFeeFacts);
+        assertRouteSnapshotUnchanged("FEE_IDEMPOTENT_CHARGE", firstRouteSnapshot);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FEE_CHARGE.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_IDEMPOTENT_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_IDEMPOTENT_TOPUP");
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_IDEMPOTENT_CHARGE", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("FEE_IDEMPOTENT_CHARGE");
+    }
+
+    /**
+     * 场景：手续费退回使用相同业务流水重复提交，第二次请求摘要一致时复用原退费，摘要不一致时拒绝。
+     * 输入：充值 100、付款 70 并收取手续费 5，退费 5 使用业务流水 `FEE_REFUND_IDEMPOTENT_RETURN` 后重试，再把规则上下文从 RULE-A 改为 RULE-B。
+     * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额、route 和账务事实保持第一次退费后的状态。
+     * 预期：`refundFee` 按原 FEE leg 回放，同时由请求摘要保护幂等。
+     * 红线：同业务流水不同退费请求不得重复退费、重写 route、追加 posting 或污染余额投影。
+     */
+    @Test
+    void testFeeRefundSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("fee_refund_idem_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        topup(payer, 100L, "FEE_REFUND_IDEMPOTENT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        payWithFixedFee(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, 5L,
+                "FEE_REFUND_IDEMPOTENT_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -75L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String feeSourceTransactionSn = ledgerTransactionByBusinessSn("FEE_REFUND_IDEMPOTENT_PAY")
+                .getFundsTransactionSn();
+        String firstFeeRefundSn = refundFeeWithContext(payer, 5L, feeSourceTransactionSn,
+                "FEE_REFUND_IDEMPOTENT_RETURN", "RULE-A");
+        BalanceSnapshot afterFirstFeeRefund = snapshot(balances(payer, payee, feeAccount(),
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterFirstFeeRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 5L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, -5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFirstFeeRefundFacts = ledgerFactSnapshot();
+        String firstRouteSnapshot = routeSnapshotJson("FEE_REFUND_IDEMPOTENT_RETURN");
+
+        String retryFeeRefundSn = refundFeeWithContext(payer, 5L, feeSourceTransactionSn,
+                "FEE_REFUND_IDEMPOTENT_RETURN", "RULE-A");
+
+        assertThat(retryFeeRefundSn).isEqualTo(firstFeeRefundSn);
+        BalanceSnapshot afterRetryFeeRefund = snapshot(balances(payer, payee, feeAccount(),
+                cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstFeeRefund, afterRetryFeeRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstFeeRefundFacts);
+        assertRouteSnapshotUnchanged("FEE_REFUND_IDEMPOTENT_RETURN", firstRouteSnapshot);
+
+        assertThatThrownBy(() -> refundFeeWithContext(payer, 5L, feeSourceTransactionSn,
+                "FEE_REFUND_IDEMPOTENT_RETURN", "RULE-B"))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRetryFeeRefund, afterConflict,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstFeeRefundFacts);
+        assertRouteSnapshotUnchanged("FEE_REFUND_IDEMPOTENT_RETURN", firstRouteSnapshot);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(3);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name(),
+                        FundsTransactionEventType.FEE_REFUND.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_IDEMPOTENT_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_IDEMPOTENT_TOPUP");
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_IDEMPOTENT_PAY", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_IDEMPOTENT_PAY");
+        assertFeeRefundFactsWithFundsTransaction("FEE_REFUND_IDEMPOTENT_RETURN", feeSourceTransactionSn);
+    }
+
+    /**
      * 场景：用户充值后付款并收取手续费，随后发起本金退款，再单独退回手续费。
      * 输入：充值 100、付款 70、固定手续费 5、本金退款 30、手续费退回 5。
      * 输出：付款方 AVAILABLE、收款方 SETTLEMENT、平台 FEE/CASH/PREPAYMENT 余额快照和账务事实。
@@ -493,6 +701,31 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_RESERVE_PAY", 3, 4);
         assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_EXCEED_RESERVE_PAY");
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_SECOND_RETURN");
+    }
+
+    private void assertRouteSnapshotUnchanged(String businessSn, String expectedRouteSnapshot) {
+        assertThat(routeSnapshotJson(businessSn))
+                .as("fee route snapshot must not be rewritten for idempotent businessSn %s", businessSn)
+                .isEqualTo(expectedRouteSnapshot);
+    }
+
+    private String routeSnapshotJson(String businessSn) {
+        return fundsTransactionsByBusinessSn(businessSn).getFirst().getRouteSnapshot();
+    }
+
+    private String refundFeeWithContext(FundsAccountId accountId,
+                                        long amount,
+                                        String feeSourceTransactionSn,
+                                        String businessSn,
+                                        String ruleVersion) {
+        return directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
+                .setAccountId(accountId)
+                .setAmount(Money.immutable(amount, CURRENCY))
+                .setFeeSourceTransactionSn(feeSourceTransactionSn)
+                .setContextVariables(WritableContextVariables.of(Map.of("ruleVersion", ruleVersion)))
+                .setBusinessScene("FEE_REFUND")
+                .setBusinessSn(businessSn)
+                .setDescription("idempotent fee refund"), WindOperator.system());
     }
 
     private void assertFeeRefundFactsWithFundsTransaction(String businessSn, String sourceTransactionSn) {
