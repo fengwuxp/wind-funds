@@ -695,6 +695,70 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：系统内转账第一次余额不足生成 FAILED 事实后，付款方补足余额并用相同业务流水重试。
+     * 输入：同一 `businessSn` 首次转账 10 失败，随后充值 20 后再次提交同一转账。
+     * 输出：重试被拒绝；原 FAILED 资金交易事实不被改写成成功，补账后的余额和账务事实保持不变。
+     * 预期：失败事实是稳定审计事实；调用方必须使用新的业务流水表达新的资金交易。
+     * 红线：同业务流水重试不得污染原失败事实，不得补生成 route、posting、ledger entry 或余额变化。
+     */
+    @Test
+    void testFailedTransferRetryAfterFundingShouldRejectAndKeepFailedFacts() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("failed_retry_payee");
+        ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
+
+        BalanceSnapshot before = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> transfer(payer, payee, 10L, "DIRECT_TRANSFER_FAILED_RETRY"))
+                .hasMessageContaining("账本余额不足");
+
+        BalanceSnapshot afterFirstFailure = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFirstFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertPostedTransactions(0);
+        assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_TRANSFER_FAILED_RETRY");
+        String firstFailedRouteSnapshot = routeSnapshotJson("DIRECT_TRANSFER_FAILED_RETRY");
+
+        topup(payer, 20L, "DIRECT_TRANSFER_FAILED_RETRY_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> transfer(payer, payee, 10L, "DIRECT_TRANSFER_FAILED_RETRY"))
+                .hasMessageContaining("资金交易已失败");
+
+        BalanceSnapshot afterRetry = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterRetry,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterTopupFacts);
+        assertDirectRouteSnapshotUnchanged("DIRECT_TRANSFER_FAILED_RETRY", firstFailedRouteSnapshot);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 20L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_980L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_TRANSFER_FAILED_RETRY");
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_TRANSFER_FAILED_RETRY_TOPUP", 3, 4);
+    }
+
+    /**
      * 场景：付款方可用余额不足时发起直接付款。
      * 输入：付款方未充值，向普通收款方付款 10。
      * 输出：请求被拒绝；付款方、收款方和平台账户余额均不变化。

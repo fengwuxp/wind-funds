@@ -104,6 +104,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         FundsTransaction transaction = findOrCreateTransaction(instruction, routeSnapshot);
         List<FundsTransactionDetail> existingDetails = findExistingTransactionDetails(instruction, routeSnapshot,
                 transaction.getSn());
+        assertFailedDirectTransactionCannotBeReposted(instruction, transaction, existingDetails);
         if (!existingDetails.isEmpty() && existingDetails.stream().allMatch(this::isCompletedDetail)) {
             return lifecycleResult(transaction.getSn(), existingDetails);
         }
@@ -111,6 +112,18 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         List<FundsTransactionDetail> details = findOrCreateTransactionDetails(instruction, routeSnapshot,
                 transaction.getSn());
         return lifecycleResult(transaction.getSn(), details);
+    }
+
+    private void assertFailedDirectTransactionCannotBeReposted(FundsInstructionSpec instruction,
+                                                               FundsTransaction transaction,
+                                                               List<FundsTransactionDetail> existingDetails) {
+        if (instruction.getInstructionType() != FundsInstructionType.DIRECT_TRANSACTION
+                || existingDetails.isEmpty()) {
+            return;
+        }
+        AssertUtils.isFalse(transaction.getStatus() == FundsTransactionStatus.FAILED,
+                "资金交易已失败，businessSn = {}，transactionSn = {}",
+                instruction.getBusinessSn(), transaction.getSn());
     }
 
     private FundsInstructionLifecycleResult lifecycleResult(String transactionSn, List<FundsTransactionDetail> details) {
