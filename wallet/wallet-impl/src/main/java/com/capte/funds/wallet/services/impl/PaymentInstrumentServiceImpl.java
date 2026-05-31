@@ -29,6 +29,7 @@ import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
+import com.wind.integration.funds.route.enums.FundsSubjectType;
 import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
 import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingChangeType;
@@ -89,6 +90,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         assertNoSensitiveContextVariables(request.getContextVariables());
         PaymentInstrument instrument = getInstrumentBySn(request.getTenantId(), request.getInstrumentSn());
         assertInstrumentCanBind(instrument, request);
+        assertFundingSubjectBindingTargetsFundingAccount(request);
         PaymentInstrumentBinding entity =
                 PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBinding(request);
         assertBindingValidityWindow(entity);
@@ -274,6 +276,16 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         AssertUtils.isTrue(supportsBindingRole(instrument.getInstrumentDirection(), request.getBindingRole()),
                 "支付工具方向不支持绑定角色，instrumentSn = {}",
                 request.getInstrumentSn());
+    }
+
+    private void assertFundingSubjectBindingTargetsFundingAccount(CreatePaymentInstrumentBindingRequest request) {
+        if (request.getBindingRole() != PaymentInstrumentBindingRole.FUNDING_SUBJECT) {
+            return;
+        }
+        AssertUtils.isTrue(request.getSubjectType() == FundsSubjectType.FUNDING_ACCOUNT,
+                "真实资金主体绑定必须指向资金账户，bindingSn = {}, subjectType = {}",
+                request.getSn(),
+                request.getSubjectType());
     }
 
     private void assertPaymentInstrumentValidityWindow(LocalDateTime validFrom, LocalDateTime validTo) {

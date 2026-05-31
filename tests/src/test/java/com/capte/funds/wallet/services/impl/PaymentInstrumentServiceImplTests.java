@@ -362,6 +362,26 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：运营把支付工具的真实资金主体绑定误配置为预算组。
+     * 输入：bindingRole = FUNDING_SUBJECT，但 subjectType = BUDGET_GROUP。
+     * 输出：创建被拒绝，不留下绑定候选或历史。
+     * 红线：预算组只能作为预算控制上下文，不得被支付工具绑定包装成最终真实资金主体。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldRejectBudgetGroupAsFundingSubject() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setSubjectType(FundsSubjectType.BUDGET_GROUP)))
+                .hasMessageContaining("真实资金主体绑定必须指向资金账户");
+
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testCreatePaymentInstrumentBindingShouldRejectCurrencyMismatchWithoutRouteCandidate() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
