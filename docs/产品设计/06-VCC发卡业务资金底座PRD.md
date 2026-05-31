@@ -192,7 +192,7 @@ mindmap
 | VCC Authorization | authorizationId、cardRef、cardholderRef、merchant、amount、currency、decision、declineReason、externalRef。 | REQUESTED、APPROVED、DECLINED、REVERSED、EXPIRED、SETTLED、PARTIALLY_SETTLED、DISPUTED。 | 授权批准只占用 AUTHORIZATION，不代表入账。 |
 | VCC Clearing Event | originalAuthorizationRef、presentmentRef、amount、currency、fee、businessDate、networkRef。 | RECEIVED、MATCHED、POSTING_READY、POSTED、EXCEPTION。 | 必须回指原授权或说明 forced post。 |
 | VCC Dispute Case | originalTransactionRef、reasonCode、evidenceRef、amount、deadline、result。 | OPEN、EVIDENCE_REQUIRED、SUBMITTED、WON、LOST、CLOSED。 | 不得混同 refund 和 chargeback。 |
-| VCC Funding Relation | paymentInstrumentRef、fundingAccountId、creditAccountId、budgetGroupId、cardholderRef、bindingVersion、currency、period。 | ACTIVE、SUSPENDED、CLOSED。 | 只解释某张卡在某次交易中如何解析到内部资金责任主体；卡、持卡人、卡组和外部卡号不是账本主体。 |
+| VCC Funding Relation | paymentInstrumentRef、targetSubjectType、targetSubjectId、budgetGroupRef、spendRuleRef、cardholderRef、bindingVersion、fundingDecisionRef、currency、period。 | ACTIVE、SUSPENDED、CLOSED。 | 只解释某张卡在某次交易中如何解析到内部资金或额度责任主体；最终责任主体只能是资金账户、信用账户或平台角色解析后的平台资金账户，预算组和 Spend Rule 只作为控制上下文和审计快照。 |
 | VCC Statement Projection | company、cardholder、cardRef、authorization、clearing、fee、refund、dispute、ledgerRefs。 | 可重建只读视图。 | 投影不反写交易事实或账本事实。 |
 
 ### 5.2 状态机
