@@ -1283,12 +1283,23 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 
 支付工具 DSL 的核心不是“给工具记余额”，而是证明工具如何参与路径选择、如何固化快照、失败时如何无副作用、逆向交易如何不受当前绑定变化影响。
 
+支付工具动作能力在 DSL 层表达为工具准入事实，不表达内部账户能力。`PaymentInstrumentCapability` 或等价字段只回答工具能否承接 RECEIVE、PAY、AUTHORIZE、REFUND、WITHDRAW 等动作；解析出的资金账户、信用账户或平台角色仍需独立校验 `FundsAccountCapability`、余额、额度、账本周期和 route 规则。
+
+| 工具动作能力 | DSL 承接动作 | DSL 失败边界 |
+| --- | --- | --- |
+| RECEIVE | 入金识别、收款、VA 到账匹配。 | 缺能力时不生成入金 route；外部回单只能停留在待处理或差错上下文。 |
+| PAY | 主动付款、钱包支付、外部工具扣款。 | 缺能力时付款失败无 route、posting、entry。 |
+| AUTHORIZE | VCC、虚拟卡、共享卡或卡 token 授权。 | 缺能力时只能记录授权拒绝或失败事实，不生成账务路径。 |
+| REFUND | 原路退款、撤销、退费、拒付回放。 | 缺原快照或原工具快照时不得按当前绑定重选路。 |
+| WITHDRAW | 提现、出款、商户结算出款端点。 | 缺能力时出款门禁失败，不生成出款资金事实。 |
+
 | 用例 | 资金交易结构 | 资金链路重点 | 开发承接 | 测试承接 |
 | --- | --- | --- | --- | --- |
 | 支付工具付款成功 | `DIRECT_TRANSACTION / PAY` 或 `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | 工具只进入 `PaymentInstrumentRef`；route leg 最终落到资金账户、信用账户或平台角色解析后的平台资金账户。 | 工具状态、方向、绑定、资金责任、预算控制和账户能力校验通过后生成 `RoutingDecision`。 | `DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`TDD-ROUTE-011`、`TDD-WALLET-010`。 |
+| 支付工具动作能力匹配 | `DIRECT_TRANSACTION`、`AUTHORIZATION_TRANSACTION` 或出款/入金事实按动作选择能力。 | 工具能力只做准入；账户能力、余额、额度和周期仍由后续链路独立判断。 | application facade 一次性校验工具状态、方向、动作能力、币种、有效期、绑定版本和敏感字段，输出不可变工具准入快照。 | `DSL-PAYMENT-INSTRUMENT-CAPABILITY-001`、`TDD-WALLET-018`、`TDD-ROUTE-012`。 |
 | prepaid virtual card 授权 | `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | 预付卡只进入工具快照；预付资金责任通过 `FundingAllocationDecision` 解析为内部主体。 | 缺预付资金责任、缺财务确认引用或资金模式待确认时拒绝或 contract-only。 | `DSL-PAYMENT-INSTRUMENT-PREPAID-CARD-001`、`TDD-P2-VCC-004`、`TDD-WALLET-010`。 |
 | shared card 授权 | `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | 共享卡只表达工具和使用模式；预算组和 Spend Rule 只表达控制上下文；route leg 最终落到信用账户、资金账户或平台账户角色解析后的平台资金账户。 | 固化使用人、绑定版本、预算组、Spend Rule、资金责任解析关系和规则版本；多责任主体不唯一时失败无副作用。 | `DSL-PAYMENT-INSTRUMENT-SHARED-CARD-001`、`TDD-P2-VCC-005`、`TDD-AUTH-008`、`TDD-AUTH-009`。 |
-| 支付工具准入失败 | 不生成资金路径。 | 工具不可用、方向不匹配、资金责任不唯一、账户能力不足。 | 失败返回可解释原因或授权拒绝；不生成 route、posting、entry。 | `DSL-PAYMENT-INSTRUMENT-FAIL-001`、`TDD-ROUTE-012`、`TDD-RED-035`。 |
+| 支付工具准入失败 | 不生成资金路径。 | 工具不可用、方向不匹配、动作能力缺失、资金责任不唯一、账户能力不足。 | 失败返回可解释原因或授权拒绝；不生成 route、posting、entry。 | `DSL-PAYMENT-INSTRUMENT-FAIL-001`、`TDD-ROUTE-012`、`TDD-RED-035`。 |
 | 工具换绑后原路退款 | `DIRECT_TRANSACTION / REFUND` 或授权链退款。 | 使用原 `RouteSnapshot`、原 `PaymentInstrumentRef` 和原 `RoutingDecision`。 | route replay 不读取当前默认绑定或当前资金责任关系。 | `DSL-PAYMENT-INSTRUMENT-REPLAY-001`、`TDD-ROUTE-013`、`TDD-RED-036`。 |
 | 敏感信息治理 | 所有含工具引用的指令和快照。 | 只保存掩码号、别名或安全 token reference。 | 完整 PAN、CVV、密钥、token secret 和银行账户敏感号不得进入快照、日志、导出或报表。 | `TDD-WALLET-011`、`TDD-RED-034`。 |
 
@@ -1383,7 +1394,8 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 | --- | --- | --- | --- |
 | 工具付款成功 | `DIRECT_TRANSACTION / PAY`。 | 工具引用 -> 绑定关系 -> 资金责任解析关系 / Spend Rule 控制 -> 内部可记账主体。 | `PaymentInstrumentRef` 和 `ExternalAccountRef` 只进快照；LedgerEntry 主体只能是资金账户、信用账户或平台角色解析后的平台资金账户。 |
 | 工具授权成功 | `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | VCC、卡或 token 只作为工具快照；内部资金主体 `AVAILABLE -> AUTHORIZATION`。 | spend controls 通过不等于资金占用成功，仍需通过余额、额度、预算、周期和 route 校验。 |
-| 工具准入失败 | 无入账指令。 | 无 route、posting、entry。 | 状态、方向、币种、账户能力、资金责任缺失或不唯一时失败；授权场景可记录拒绝事实。 |
+| 工具动作能力匹配 | 按 RECEIVE、PAY、AUTHORIZE、REFUND、WITHDRAW 匹配对应动作。 | 工具准入只产生可审计的准入结果或工具快照，不直接产生账务路径。 | 工具能力通过不代表账户能力通过；账户能力、余额、额度、周期和资金责任仍需独立校验。 |
+| 工具准入失败 | 无入账指令。 | 无 route、posting、entry。 | 状态、方向、动作能力、币种、账户能力、资金责任缺失或不唯一时失败；授权场景可记录拒绝事实。 |
 | 工具换绑后退款 | `DIRECT_TRANSACTION / REFUND` 或 `AUTHORIZATION_TRANSACTION / AUTH_REFUND`。 | 使用原 route snapshot 反向。 | 不读取当前绑定、当前默认资金责任或当前费率重新选路；累计退款不超过原可退金额。 |
 | 敏感信息治理 | 所有含工具引用的 DSL 对象。 | 只保存掩码号、别名、安全 token reference 和审计摘要。 | 完整 PAN、CVV、密钥、token secret、银行账户敏感号不得进入普通快照、日志、导出或报表。 |
 
