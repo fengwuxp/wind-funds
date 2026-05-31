@@ -382,6 +382,31 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：运营把支付工具的信用控制主体绑定误配置为资金账户或预算组。
+     * 输入：bindingRole = CREDIT_SUBJECT，但 subjectType 不是 CREDIT_ACCOUNT。
+     * 输出：创建被拒绝，不留下绑定候选或历史。
+     * 红线：信用控制主体只能指向信用账户，不能用资金账户或预算组替代额度责任主体。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldRejectNonCreditAccountAsCreditSubject() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setBindingRole(PaymentInstrumentBindingRole.CREDIT_SUBJECT)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)))
+                .hasMessageContaining("信用控制主体绑定必须指向信用账户");
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setBindingRole(PaymentInstrumentBindingRole.CREDIT_SUBJECT)
+                .setSubjectType(FundsSubjectType.BUDGET_GROUP)))
+                .hasMessageContaining("信用控制主体绑定必须指向信用账户");
+
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testCreatePaymentInstrumentBindingShouldRejectCurrencyMismatchWithoutRouteCandidate() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
