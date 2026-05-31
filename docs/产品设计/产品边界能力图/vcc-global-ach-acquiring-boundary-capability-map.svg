@@ -18,7 +18,7 @@ text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsof
 <rect x="465" y="310" width="220" height="100" rx="8" ry="8" fill="#fff" stroke="#bbf7d0" stroke-width="1.5"/>
 
 <text x="481" y="338" class="node-title">钱包账户域</text>
-<text x="481" y="362" class="node-text" text-anchor="start"><tspan x="481" dy="0">FundingAccount</tspan><tspan x="481" dy="17">信用账户 / 预算组</tspan><tspan x="481" dy="17">平台账户角色</tspan></text>
+<text x="481" y="362" class="node-text" text-anchor="start"><tspan x="481" dy="0">FundingAccount / 信用账户</tspan><tspan x="481" dy="17">平台资金账户角色解析</tspan><tspan x="481" dy="17">预算组 / Spend Rule 控制视图</tspan></text>
 </g><g>
 <rect x="705" y="310" width="220" height="100" rx="8" ry="8" fill="#fff" stroke="#bbf7d0" stroke-width="1.5"/>
 

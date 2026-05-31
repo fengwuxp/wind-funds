@@ -19,9 +19,9 @@
 
 | 能力域 | 常见问题 | 正确理解 | 易错风险 |
 | --- | --- | --- | --- |
-| 钱包账户和内部主体能力 | 钱包是不是支付工具。 | 钱包账户域管理 FundingAccount、CreditAccount、BudgetGroup、平台账户角色、支付工具绑定和余额查询；支付工具只是路由和外部引用。 | 把卡、VA、银行账户、钱包标识或 token 当账本主体。 |
+| 钱包账户和内部主体能力 | 钱包是不是支付工具。 | 钱包账户域管理 FundingAccount、CreditAccount、平台账户角色、BudgetGroup、Spend Rule、支付工具绑定和余额查询；BudgetGroup 和 Spend Rule 只做支出控制上下文，支付工具只是路由和外部引用。 | 把卡、VA、银行账户、钱包标识、预算组、Spend Rule 或 token 当账本主体。 |
 | 支付工具 | 外部账户能不能入账。 | 外部账户只能做脱敏引用、工具或 route 输入。 | 外部账户直接成为 ledger subject。 |
-| VCC 预付卡和共享卡 | 预付卡或共享卡是不是账户。 | VCC 卡、prepaid virtual card 和 shared card 都先是 PaymentInstrument；预付资金责任、授信额度、预算约束或资金来源另行解析到内部主体。 | 因 prepaid/shared 名称自动创建 FundingAccount、CreditAccount、BudgetGroup 或账本主体。 |
+| VCC 预付卡和共享卡 | 预付卡或共享卡是不是账户。 | VCC 卡、prepaid virtual card 和 shared card 都先是 PaymentInstrument；预付资金责任、授信额度、预算约束或资金来源另行解析到内部主体，预算约束由 BudgetGroup + Spend Rule 控制视图解释。 | 因 prepaid/shared 名称自动创建 FundingAccount、CreditAccount、BudgetGroup 或账本主体。 |
 | 直接交易 | capture 成功是不是商户可提现。 | capture 只表示收款资金事实成立，仍需清分、清算、结算和出款门禁。 | 把待清分或待清算展示成可提现。 |
 | 授权交易 | 授权成功是不是消费完成。 | 授权成功只是占用；完成、撤销、过期、退款和拒付必须按原事实链路处理。 | 授权拒绝生成 route 或 ledger entry。 |
 | 余额控制 | 冻结是不是扣款。 | 冻结只做同主体 AVAILABLE 与 FROZEN 控制。 | 把冻结当消费、扣划或跨主体转移。 |
@@ -76,7 +76,7 @@
 | 授权拒绝后要不要记录账务。 | 不应生成 route、posting 或 ledger entry；可保留请求审计和拒绝原因。 | 测试 must-fail：授权拒绝无资金副作用。 |
 | 冻结后确认提现，能不能把冻结单状态改成扣款。 | 不建议。冻结是控制事实，扣划或出款确认应形成独立资金事实并引用原冻结单。 | 检查原冻结单引用和出款结果终态。 |
 | VCC 预付卡是不是 FundingAccount。 | 不是。prepaid virtual card 是卡产品资金模式，卡本体仍是 PaymentInstrument；只有经财务、合同或合规确认的预付资金责任主体才可能解析为 FundingAccount、平台责任账户、预收待付或权益责任。 | 检查工具注册、预付资金来源、财务确认引用和 `TDD-WALLET-015`。 |
-| 共享卡是不是 CreditAccount。 | 不是。shared card 是使用和绑定模式，信用额度、预算约束或资金来源要通过 CreditAccount、BudgetGroup、FundingAccount 或平台账户角色分别表达。 | 检查绑定版本、预算组、资金来源关系、唯一 FundingAllocationDecision 和 `TDD-WALLET-016`。 |
+| 共享卡是不是 CreditAccount。 | 不是。shared card 是使用和绑定模式，信用额度、预算约束或资金责任要通过 CreditAccount、BudgetGroup、FundingAccount 或平台账户角色分别表达。 | 检查绑定版本、预算组、资金责任解析关系、唯一 FundingAllocationDecision 和 `TDD-WALLET-016`。 |
 | 能不能按卡产品形态自动创建账户。 | 不能。账户类型只能按真实资金、授信额度、预算控制或支付工具四类需求选择。 | 检查内部能力选择结论和 `TDD-WALLET-017`。 |
 | 对账差错发现少记了一笔，能不能直接补一条分录。 | 不能绕过白名单和审批。应生成差错单，走补事实、冲正、调账、追偿或核销流程。 | 检查处理单、审批、证据和重新对账。 |
 | 归档后发现投影不一致，重放能不能修账。 | 不能。重放只能重建投影或输出差异报告，不生成资金事实。 | 检查 Manifest、checkpoint、watermark 和差异报告。 |
@@ -109,7 +109,7 @@
 | --- | --- | --- |
 | 谁的钱、当前归属、最终归属说不清。 | 资金主体不清会导致误扣、误付、误结算。 | 产品设计和资金事实说明卡。 |
 | 外部账户、支付工具或业务订单直接入账。 | 账本主体错误会破坏资金事实源。 | 概念映射和账户建模。 |
-| VCC 预付卡、共享卡、卡组或持卡人被自动建成资金账户、信用账户或预算组。 | 工具层和内部责任主体混用会导致余额、额度、预算和历史回放不可解释。 | 内部能力选择、支付工具绑定、资金来源关系和 VCC 分册。 |
+| VCC 预付卡、共享卡、卡组或持卡人被自动建成资金账户、信用账户或预算组。 | 工具层和内部责任主体混用会导致余额、额度、预算和历史回放不可解释。 | 内部能力选择、支付工具绑定、资金责任解析关系和 VCC 分册。 |
 | 外部非终态被展示为成功。 | 用户、商户和财务看到错误资金状态。 | 展示状态和外部结果处理。 |
 | 授权、冻结、清算、结算、出款状态混用。 | 不同资金语义被混成同一种成功。 | 状态机和使用者解释视图。 |
 | 对账差错直接改账。 | 破坏审计链路和重新对账能力。 | 差错单、审批、白名单补事实。 |

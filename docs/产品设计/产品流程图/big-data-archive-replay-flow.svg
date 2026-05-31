@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1350 790" width="1350" height="790" role="img" aria-label="大数据归档与重放产品流程图">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1350 790" width="1350" height="790" role="img" aria-label="资金数据治理与重放产品流程图">
 <style>
 text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
 .title { font-size: 24px; font-weight: 700; fill: #111827; }
@@ -12,7 +12,7 @@ text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsof
 </style>
 <defs><marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/></marker><marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#16a34a"/></marker><marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/></marker><marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#9333ea"/></marker><marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/></marker><marker id="arrow-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth"><polygon points="0 0, 10 3.5, 0 7" fill="#6b7280"/></marker></defs>
 <rect width="1350" height="790" fill="#ffffff"/>
-<text x="40" y="46" class="title">大数据归档与重放产品流程图</text>
+<text x="40" y="46" class="title">资金数据治理与重放产品流程图</text>
 <text x="40" y="72" class="subtitle">归档、余额重建、交易投影重放和指标项输入共同保证历史资金事实可证明、可重建、可审计</text>
 <g>
 <rect x="50" y="150" width="175" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>

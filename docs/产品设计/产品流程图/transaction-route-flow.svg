@@ -28,7 +28,7 @@ text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsof
 <rect x="360" y="150" width="220" height="100" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
 
 <text x="376" y="178" class="node-title">主体和账户定位</text>
-<text x="376" y="202" class="node-text" text-anchor="start"><tspan x="376" dy="0">业务主体 -&gt; 可记账主体</tspan><tspan x="376" dy="17">FundingAccount / 信用账户</tspan><tspan x="376" dy="17">预算组 / 平台账户角色</tspan></text>
+<text x="376" y="202" class="node-text" text-anchor="start"><tspan x="376" dy="0">业务主体 -&gt; 核心资金主体</tspan><tspan x="376" dy="17">资金账户 / 信用账户</tspan><tspan x="376" dy="17">预算组 / Spend Rule 快照</tspan></text>
 </g><g>
 <rect x="650" y="150" width="220" height="100" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
 
