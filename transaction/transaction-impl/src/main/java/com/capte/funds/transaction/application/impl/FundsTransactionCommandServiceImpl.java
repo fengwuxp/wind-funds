@@ -86,6 +86,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String withdraw(FundsTransactionWithdrawRequest request, WindOperator operator) {
+        AssertUtils.notNull(request.getPayeeId(), "提现外部收款方不能为空");
         AssertUtils.isTrue(DefaultFundsAccountType.isExternalAccount(request.getPayeeId()),
                 "withdraw payee must external account");
         return execute(directTransactionInstructionConverter.convertToWithdrawInstruction(request, operator));

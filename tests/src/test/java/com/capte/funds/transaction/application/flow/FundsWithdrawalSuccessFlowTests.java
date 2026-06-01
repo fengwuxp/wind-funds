@@ -325,6 +325,72 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：提现确认缺少外部收款方。
+     * 输入：用户充值 100、冻结 60 后，提现确认未传 payeeId。
+     * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN 和平台账户余额保持冻结后的状态。
+     * 预期：提现确认必须明确外部出款对象，缺外部收款方不能进入 route 和 ledger。
+     * 红线：缺外部收款方不能以 NPE 或半截账务事实形式泄露到生产链路。
+     */
+    @Test
+    void testWithdrawWithoutPayeeShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        topup(user, 100L, "WITHDRAW_MISSING_PAYEE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String freezeSn = freeze(user, 60L, "WITHDRAW_MISSING_PAYEE_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(user)
+                .setReferenceFreezeSn(freezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_MISSING_PAYEE_CONFIRM")
+                .setDescription("withdraw without payee"), WindOperator.system()))
+                .hasMessageContaining("提现外部收款方不能为空");
+
+        BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterRejectedWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name());
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_PAYEE_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_MISSING_PAYEE_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_PAYEE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_MISSING_PAYEE_FREEZE", 0, 0, 1, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_MISSING_PAYEE_CONFIRM");
+    }
+
+    /**
      * 场景：USD 资金账户冻结后收到 CNY 提现确认。
      * 输入：充值 100 USD、冻结 60 USD，随后用同一冻结流水确认提现 60 CNY。
      * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN、平台 CASH/PREPAYMENT 保持冻结后的状态。
