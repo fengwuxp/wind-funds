@@ -151,6 +151,8 @@ A0 阶段的 DSL 只把 PRD 的业务问题转成资金事实和机器契约候�
 
 后续如新增 `authorizeByInstrument` 或其他支付工具型 application facade，DSL 契约必须证明“应用入口先解析、内核按主体”的转换关系：内部入口解析为 `SubjectRef` 或 `BenefitSnapshot`，外部工具解析为 `PaymentInstrumentRef` 或 `ExternalAccountRef`；工具校验、入口解析或规则决策失败时不生成 route；批准或放行时 `PaymentInstrumentRef`、`FundingAllocationDecision` 或权益快照按需进入 route snapshot；后续撤销、完成、退款和拒付只回放原 route snapshot，不读取当前绑定重新选路。
 
+资金责任目标字段进入 DSL fixture、Spec 或公共字段变更前，必须先在 `funding-account-only` 与 `targetSubjectType + targetSubjectId` 中二选一。选择 `funding-account-only` 时，`FundingAllocationDecision` 只能声明解析到资金账户；选择目标主体迁移时，才允许声明信用账户和平台角色解析后的平台资金账户也可作为责任主体，并必须同步 TDD、DDL/H2、摘要、route snapshot 和回放断言。
+
 ### 3.1 能力域到 DSL 承载和契约证据矩阵
 
 本矩阵用于逐项检查 PRD 能力地图是否已经落到 DSL。若能力域没有稳定 DSL 对象、契约样例、验收字段或禁止项，不能进入系统设计和编码。
@@ -1082,7 +1084,7 @@ Replay 语义边界：
 | 投影 | 来源 | 禁止 |
 | --- | --- | --- |
 | `BalanceProjection` | `LedgerEntry`、检查点、水位、归档清单。 | 不读交易视图反推余额。 |
-| `TransactionView` | 资金交易事实、路径快照、账本分录摘要、支付工具快照、预算控制快照和规则决策日志。 | 不写账，不修正余额，不把支付工具、预算组或 Spend Rule 提升为资金事实源。 |
+| `TransactionView` | 资金交易事实、冻结单、路径快照、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本分录摘要、授权拒绝事实、清结算和对账差错。 | 不写账，不修正余额，不把支付工具、预算组或 Spend Rule 提升为资金事实源；授权拒绝只形成拒绝解释，不生成资金事实。 |
 | 报表指标输入 | 指标项、业务问题、推荐事实来源和口径引用。 | 只作为报表指标模块输入，不反向污染资金事实，不复用归档水位或重放 checkpoint。 |
 
 `TransactionView` 的多维查询字段只表达视图索引和解释维度：

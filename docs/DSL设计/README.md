@@ -119,6 +119,8 @@ ScenarioFundsOperationContext
 
 支付工具与 Spend Rule 若要从 DSL 评审进入工程 Round 0，使用 [../TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](../TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) 作为准入输入。该卡只允许验证支付工具准入、资金责任解析、授权 application facade、Spend Rule 控制事实和只读投影边界；未获授权前，DSL 不新增 `InstrumentTransaction`、支付工具账务主体、预算组账本主体或 Spend Rule 资金交易事实。
 
+B2-FR 进入 DSL fixture、Spec 或公共字段变更前，必须先在 `funding-account-only` 与 `targetSubjectType + targetSubjectId` 中二选一。选择 `funding-account-only` 时，DSL 只能声明支付工具或支出主体解析到资金账户；选择目标主体迁移时，DSL 才能声明信用账户和平台角色解析后的平台资金账户也可作为资金责任结果，并必须同步 TDD、DDL/H2、摘要和回放断言。
+
 ### 支付工具和账户能力重定性后的 DSL CR 基线
 
 本节用于复核支付工具、资金账户和信用账户重新定性后，DSL 约定、路由规则、账目平衡、余额投影和交易投影是否仍然闭合。后续触碰这些对象时，必须先按本表检查；不满足时只能进入设计修正、TDD 分析或单一 Execution Grant，不得顺手改公共契约、测试资源、DDL/H2 schema 或生产代码。
@@ -129,7 +131,7 @@ ScenarioFundsOperationContext
 | 路由规则 | route resolver 可以消费支付工具快照、绑定快照、`FundingAllocationDecision`、预算组上下文和 Spend Rule 决策，但 route leg participant 必须是最终可入账主体。 | 工具不可用、资金责任不唯一、错币种、预算或规则拒绝时不生成 route；退款、撤销、拒付、退费和重放优先沿原 route snapshot。 | B2、B4、B6 必须独立授权；不得借 A1 直接交易红线附带改支付工具入口或路由回放规则。 |
 | 账目平衡 | `PostingPlan` 只从已解析 route 生成；`LedgerEntry.subject` 只能是资金账户、信用账户或平台角色解析后的平台资金账户；每个 posting plan 按同币种独立平衡。 | 预算组、Spend Rule、支付工具、外部账户和交易投影不得生成 ledger bucket；预算控制只生成控制证据、规则证据或只读投影视图。 | 触碰 posting assembler、账本 DSL 或账务表行时，必须补借贷平衡、`normalBalanceSide`、余额桶和 forbidden facts 断言。 |
 | 余额投影 | 账本余额投影只从 ledger entry 派生，面向资金账户、信用账户和平台角色解析后的平台资金账户；余额日志只作为观察证据。 | 不从支付工具、预算组、Spend Rule、交易投影或业务轨道事件直接投影账本余额；预算控制可有独立控制视图，但不等于账本余额。 | BudgetGroup 兼容策略、预算控制视图和余额查询迁移必须放入 B2/B5 独立授权。 |
-| 交易投影 | 交易投影是只读查询模型，从交易事实、route snapshot、账本摘要、支付工具快照和控制日志生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance。 | B6/B8 必须独立授权；不得用交易投影通过来声明账务事实、余额投影或生产 Done。 |
+| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实。 | B6/B8 必须独立授权；不得用交易投影通过来声明账务事实、余额投影或生产 Done。 |
 
 ### DSL 易用性和误用防护
 

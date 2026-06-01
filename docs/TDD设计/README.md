@@ -99,6 +99,8 @@ TDD 评审口径：TDD 入口必须承接 PRD 目标、DSL 契约和系分落点
 
 支付工具与 Spend Rule 的生产可用性评审先读 [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md)。该卡把 `R0-PI-001`、`R0-FR-001`、`R0-AUTH-001`、`R0-SR-001`、`R0-SR-002` 和 `R0-PI-002` 拆成独立切片；未确认对应 Execution Grant 前，TDD 只能继续做 Round 0、差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 
+其中 B2-FR 必须先选择 `funding-account-only` 或 `targetSubjectType + targetSubjectId`。前者只能证明资金账户责任解析，后者才允许声明信用账户或平台角色责任主体，并必须同步 DTO、DDL/H2、摘要、fixture、route snapshot 和回放断言。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产 Done。
+
 ## 生产验证准入口径
 
 TDD 设计区分“目标测试资产”和“当前已执行证据”。目标测试资产只说明生产交付需要哪些测试；只有测试代码存在、数据准备完整、验证命令执行通过，并且交付说明列出覆盖范围后，才能作为生产完成证据。

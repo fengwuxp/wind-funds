@@ -339,6 +339,8 @@ A0 编码准入前，产品侧必须先把一个业务问题收敛成可执行�
 | 预算组和 Spend Rule | 预算组表达预算 scope、owner、展示和审计；Spend Rule 统一表达预算额度、MCC、商户、频控和时间窗口等授权前规则。 | 使用 BudgetGroup 上下文、Spend Rule 快照、规则决策日志和预算控制投影，不新增账本余额桶。 | `BudgetGroupService` 和 Spend Rule 控制视图只管理控制证据；资金责任解析关系解析到资金账户、信用账户或平台账户角色。 | 覆盖预算创建不初始化 ledger、规则拒绝不生成 route/entry、预算控制占用/释放只更新控制证据。 |
 | 资金责任解析关系 | 产品上回答“本次支出最终由哪个内部资金或额度主体承担”，可由工具、使用主体、预算组、Spend Rule 等上下文参与筛选。 | DSL 保留 `FundingAllocationDecision` 表达最终责任主体、账目、优先级、选择原因和规则版本；兼容名称“资金来源关系”不得扩展为预算资金池。 | `SpendSubjectFundingRelationService` 可保留现有命名，但输出必须是资金账户、信用账户或平台账户角色解析后的平台资金账户；预算组和 Spend Rule 只作为控制上下文。 | 覆盖缺失、不唯一、错币种、默认关系冲突、预算组或 Spend Rule 被当作资金来源时失败且无账务副作用。 |
 | 交易投影 | 交易投影是统一只读读模型，不归属于支付工具子模块。 | 投影只消费资金事实、route snapshot、ledger entry、工具快照和控制日志，不生成新事实。 | 查询服务可按工具、资金账户、信用账户、预算组和 Spend Rule 建索引，但不得反写交易、账本或余额。 | 覆盖多维查询、投影重放只读、预算/规则视图不生成资金交易记录。 |
+| 资金责任目标字段 | 生产可用性验收前必须在 `funding-account-only` 和 `targetSubjectType + targetSubjectId` 中二选一；前者只声明解析到资金账户，后者才声明信用账户和平台角色责任主体。 | DSL fixture、Spec 或公共字段变更前必须先选策略；目标主体迁移必须同步摘要、route snapshot 和回放断言。 | 系分 02 的资金责任 Round 0 裁决表是工程裁决入口；若迁移目标字段，DTO、DDL/H2、Entity、Mapper、service 和审计必须同步。 | B2-FR 必须覆盖字段策略、缺失/不唯一/错币种/预算组或 Spend Rule 被当最终主体失败；不得在 `fundingAccountId` 仍是唯一字段时声明多责任主体生产可用。 |
+| 交易投影输入 | 交易投影只读消费交易事实、冻结单、route snapshot、支付工具快照、资金责任决策、Spend Rule 决策/活动、账本摘要、授权拒绝事实、清结算和对账差错。 | `TransactionView` 不生成 `ResolvedRoute`、`PostingPlan`、`LedgerEntry` 或余额事实。 | 系分 02 的交易投影输入矩阵是系统承接入口；B6/B8 只允许只读投影和有范围重放。 | 覆盖多维查询、拒绝事实解释、重放只读和不反写 route/posting/entry/balance；不得把交易投影通过写成生产 Done。 |
 | 进入实现 | 产品定性只证明语义和验收边界成立。 | DSL caseId 必须能落到稳定字段、不变量和失败边界。 | 系分必须给出服务、状态、表、事务、幂等、审计和安全边界。 | 编码前必须明确目标 Red、断言事实和验证命令；没有 Execution Grant 不进入代码。 |
 
 ## 跨文档术语提醒

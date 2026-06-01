@@ -30,6 +30,15 @@
 | `firstRedSet` | `R0-PI-001`、`R0-FR-001` 优先；若选择 B4 再补 `R0-AUTH-001`；若选择 B5/B6/B8 再补 `R0-SR-001`、`R0-SR-002`、`R0-PI-002`。 |
 | `currentEvidence` | 三个既有测试命令通过证据只能作为回归资产和局部代码基线；Round 0 新 Red 必须证明当前缺口或确认已有实现已覆盖，不能直接把既有通过测试升级为生产可用。 |
 
+### 3.1 fundingResponsibilityDecision
+
+B2-FR 进入 Execution Grant 前必须先选择资金责任目标字段策略，且一次 Grant 只能选择一个策略。
+
+| 策略 | 允许声明 | 必须验证 | 不允许声明 |
+| --- | --- | --- | --- |
+| `funding-account-only` | 支付工具、使用主体、预算组或 Spend Rule 上下文只能解析到资金账户。 | `fundingAccountId` 语义明确、关系唯一、币种一致、失败无 route/posting/entry；信用账户、平台角色、预算组和 Spend Rule 不会被塞进 `fundingAccountId`。 | 不声明信用账户、平台角色解析后的平台资金账户或多责任主体已经生产可用。 |
+| `targetSubjectType + targetSubjectId` | 资金责任结果可以是资金账户、信用账户或平台角色解析后的平台资金账户。 | Request/DTO、DDL/H2 schema、Entity、Mapper、摘要、route snapshot、TDD fixture、回放和审计同步；`fundingAccountId` 只作为兼容字段或派生字段。 | 不允许只改文档或测试断言，代码仍长期只接受 `fundingAccountId`。 |
+
 ## 4. 场景裁剪
 
 | 场景 | 本卡允许进入 Round 0 的内容 | 本卡不允许声明 |
@@ -49,6 +58,7 @@
 | 生产实现 | 只有 Red 证明真实缺口后，才允许在 `wallet-face`、`wallet-impl`、必要的 `transaction-face` application facade 契约或 `transaction-impl` 授权准入适配层做最小实现；具体模块必须由 Execution Grant 指定。 |
 | 公共契约 | 默认不允许破坏既有 face/core 请求字段；如必须新增 `PaymentInstrumentCapabilityApplicationService`、`AuthorizationAdmissionApplicationService`、Request/DTO 或动作能力字段，必须在 Execution Grant 明确命名、依赖方向和兼容策略。 |
 | DDL/H2 schema | 默认不允许修改；如 Spend Rule 规则定义、决策日志、控制活动或预算控制投影需要表结构，必须单独扩权到 B5/B6/B8。 |
+| 资金责任目标字段 | 默认不允许混合策略；B2-FR 必须选择 `funding-account-only` 或 `targetSubjectType + targetSubjectId`。若选择目标主体迁移，Execution Grant 必须显式允许 DTO、DDL/H2、Entity、Mapper、摘要、fixture 和回放断言同步修改。 |
 
 ## 6. noWriteScope
 
@@ -60,13 +70,14 @@
 | P2 业务轨道实现 | 不实现卡组织、ACH/Nacha、SWIFT/local rail、PSP、银行协议、FX 执行或完整外部回单。 |
 | 清结算、对账和治理 | 不新增清分、清算、结算、出款、对账差错、归档、Manifest、checkpoint、watermark 或正式重投影 apply。 |
 | 敏感数据 | 不引入完整 PAN、CVV、token secret、银行账户敏感号、证件原文或生产通道配置。 |
+| 资金责任策略混用 | 不允许一边保留 `fundingAccountId` 作为唯一写入字段，一边在 Done 结论中声明信用账户或平台角色责任主体已生产可用。 |
 
 ## 7. redCandidateSet
 
 | redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `R0-PI-001` | 支付工具是否真正具备当前动作能力。 | 工具能力只能作为准入快照，不能替代账户能力、余额、额度、预算或账本周期。 | 非 ACTIVE、方向不匹配、缺动作能力、过期、错币种、敏感原文或绑定版本失效时返回可解释失败或授权拒绝。 | 不得生成 route、posting、LedgerEntry；不得返回完整敏感凭证。 | 状态、方向、能力、币种、有效期、绑定版本、脱敏字段、失败原因、无账务副作用。 | `PaymentInstrumentServiceImplTests`、新 application facade 测试。 | `just test-one PaymentInstrumentServiceImplTests tests`、`just test-boundary`。 | 需要新增动作能力枚举、DTO、表字段但未授权。 |
-| `R0-FR-001` | 支付工具、使用主体、预算组或 Spend Rule 能否解析到唯一最终责任主体。 | 最终责任主体只能是资金账户、信用账户或平台角色解析后的平台资金账户。 | 缺失、不唯一、错币种、优先级冲突或预算组/Spend Rule 被当最终主体时失败。 | 不得随机选路，不得让预算组或 Spend Rule 入账。 | 决策主体类型、主体 ID、币种、优先级、规则版本、选择原因、失败无 route/posting/entry。 | `SpendSubjectFundingRelationServiceImplTests`、`PaymentInstrumentRouteDslContractTests`。 | `just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-boundary`。 | 目标态要求信用账户或平台角色，但字段仍只允许 `fundingAccountId` 且未授权迁移。 |
+| `R0-FR-001` | 支付工具、使用主体、预算组或 Spend Rule 能否解析到唯一最终责任主体。 | 最终责任主体只能是资金账户、信用账户或平台角色解析后的平台资金账户；若选择 `funding-account-only`，本轮最终责任主体只能是资金账户。 | 缺失、不唯一、错币种、优先级冲突或预算组/Spend Rule 被当最终主体时失败。 | 不得随机选路，不得让预算组或 Spend Rule 入账；不得混用 `fundingAccountId` 和目标主体迁移策略。 | 决策主体类型、主体 ID、币种、优先级、规则版本、选择原因、字段策略、失败无 route/posting/entry。 | `SpendSubjectFundingRelationServiceImplTests`、`PaymentInstrumentRouteDslContractTests`。 | `just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-boundary`。 | 目标态要求信用账户或平台角色，但字段仍只允许 `fundingAccountId` 且未授权迁移。 |
 | `R0-AUTH-001` | 授权支付工具入口是否只作为 application facade 委派账户主体型内核。 | 授权内核仍以已解析账户主体为 canonical 入参；拒绝无资金事实。 | `authorizeByInstrument` 或等价入口完成工具准入、绑定快照、Spend Rule、资金责任和账户能力后构造 canonical 授权请求。 | 不得直接替换 `FundsAuthorizationTransactionAuthorizeRequest.accountId`；不得让工具、预算组或 Spend Rule 成为 route leg。 | 准入步骤、委派请求、拒绝事实、route snapshot、幂等摘要、无副作用、敏感上下文阻断。 | 授权 application facade 测试、`FundsAuthorizationTransactionFlowTests` 回归。 | `just test-transaction`、`just test-boundary`。 | 需要改变授权内核公共契约或状态机但未授权。 |
 | `R0-SR-001` | Spend Rule 拒绝是否能留下可审计决策而无账务副作用。 | 规则拒绝只能生成决策证据或拒绝事实，不生成资金事实。 | MCC、商户、时间窗、频控、限额或规则版本拒绝时记录规则决策和拒绝原因。 | 不得生成 route、posting、LedgerEntry；不得把规则通过等同于资金可用。 | 规则版本、命中条件、拒绝原因、使用主体、工具快照、无账务副作用。 | 新 Spend Rule 控制测试；未授权前可为 contract-only。 | 由 Execution Grant 指定；默认不写测试。 | 缺规则模型或表结构授权。 |
 | `R0-SR-002` | 预算预留、释放和调整是否只更新控制活动和只读视图。 | 预算控制不等于账本余额，不得生成资金交易记录。 | 授权预留、撤销、过期、部分完成或退款释放写控制活动和预算控制投影。 | 不得写 LedgerEntry、账本余额桶或资金交易明细；不得无幂等并发更新预算可用。 | 控制活动类型、幂等键、前后预留量、规则版本、并发保护、投影只读。 | 新预算控制测试；未授权前可为 contract-only。 | 由 Execution Grant 指定；默认不写测试。 | 需要新增 Spend Control Activity 或预算投影表。 |
@@ -77,7 +88,7 @@
 | 切片 | 优先级 | 目标 | 首批 Red | 允许写入建议 | 不适合混入 |
 | --- | --- | --- | --- | --- | --- |
 | B2-PI-CAP | 1 | 支付工具能力准入 application facade。 | `R0-PI-001`。 | wallet-face/impl 的 facade 契约和测试；必要的 DTO。 | 授权状态机、Spend Rule 表、交易投影。 |
-| B2-FR | 2 | 资金责任目标主体解析。 | `R0-FR-001`。 | 资金责任关系契约和测试；是否迁移目标主体字段由授权决定。 | 直接交易、清结算、P2 轨道。 |
+| B2-FR | 2 | 资金责任目标主体解析。 | `R0-FR-001`。 | 资金责任关系契约和测试；必须先选择 `funding-account-only` 或 `targetSubjectType + targetSubjectId`，迁移目标主体字段需单独授权 DTO、DDL/H2、摘要和 fixture。 | 直接交易、清结算、P2 轨道、混合字段策略。 |
 | B4-AUTH-PI | 3 | 授权支付工具 application facade。 | `R0-AUTH-001`。 | 授权准入 facade、委派适配和边界测试。 | 替换授权内核请求、完整 VCC 发卡。 |
 | B5-SR-CONTROL | 4 | Spend Rule 决策日志和预算预留释放。 | `R0-SR-001`、`R0-SR-002`。 | 规则定义、控制活动、预算控制投影，需单独 DDL/H2 授权。 | A1、B2 基础能力、P2 轨道。 |
 | B6/B8-PI-VIEW | 5 | 支付工具流水、预算控制视图、规则命中时间线和重放。 | `R0-PI-002`。 | 只读投影、重放范围和差异报告，需单独授权。 | 事实反写、正式治理 apply。 |
@@ -106,7 +117,7 @@ Execution Grant：B2/B4 支付工具与 Spend Rule Round 0
 确认基线：确认时 Git HEAD；若本轮文档尚未提交，需显式纳入 authorityBaseline
 选择切片：B2-PI-CAP / B2-FR / B4-AUTH-PI / B5-SR-CONTROL / B6-B8-PI-VIEW 之一
 允许写入：仅限所选切片的测试资产和最小 application facade / DTO / 适配实现；DDL/H2 默认不允许
-禁止写入：交易 canonical 请求替换、统一 InstrumentTransactionService、预算组账务主体、清结算对账、治理 apply、P2 轨道协议、敏感原文
+禁止写入：交易 canonical 请求替换、统一 InstrumentTransactionService、预算组账务主体、资金责任字段策略混用、清结算对账、治理 apply、P2 轨道协议、敏感原文
 首批 Red：按所选切片选择 R0-PI-001、R0-FR-001、R0-AUTH-001、R0-SR-001、R0-SR-002 或 R0-PI-002
 验证命令：just test-one PaymentInstrumentServiceImplTests tests；just test-one SpendSubjectFundingRelationServiceImplTests tests；just test-one PaymentInstrumentRouteDslContractTests tests；必要时 just test-transaction / just test-boundary；提交前 git diff --check 和 just pmd
 停止条件：公共契约、表结构、外部规则、P2 轨道、清结算对账、治理、敏感数据或工作树冲突越界即停止
