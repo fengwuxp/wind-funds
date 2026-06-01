@@ -669,7 +669,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         LedgerFactSnapshot afterTopupFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> transfer(account, account, 10L, "DIRECT_SAME_ACCOUNT_TRANSFER"))
-                .hasMessageContaining("付款账号和收款账户不能一致");
+                .hasMessageContaining("付款账户和收款账户不能一致");
 
         BalanceSnapshot afterRejectedTransfer = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterRejectedTransfer,

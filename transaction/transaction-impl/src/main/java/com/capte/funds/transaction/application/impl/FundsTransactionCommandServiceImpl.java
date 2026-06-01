@@ -70,7 +70,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         AssertUtils.notNull(request.getPayerAccountId(), "系统内转账付款账户不能为空");
         AssertUtils.notNull(request.getPayeeAccountId(), "系统内转账收款账户不能为空");
         AssertUtils.isFalse(Objects.equals(request.getPayeeAccountId(), request.getPayerAccountId()),
-                "付款账号和收款账户不能一致");
+                "付款账户和收款账户不能一致");
         return execute(directTransactionInstructionConverter.convertToTransferInstruction(request, operator));
     }
 
