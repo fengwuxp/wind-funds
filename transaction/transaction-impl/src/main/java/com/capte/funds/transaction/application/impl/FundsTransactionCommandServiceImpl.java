@@ -60,7 +60,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         AssertUtils.notNull(request.getAccountId(), "直接充值入账账户不能为空");
         AssertUtils.notNull(request.getFundsSourceAccountId(), "直接充值资金来源账户不能为空");
         AssertUtils.isTrue(DefaultFundsAccountType.isExternalAccount(request.getFundsSourceAccountId()),
-                "top-up funds source must external account");
+                "直接充值资金来源账户必须是外部账户");
         return execute(directTransactionInstructionConverter.convertToTopupInstruction(request, operator));
     }
 
