@@ -429,6 +429,79 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接退款把外部账户作为退款出资主体。
+     * 输入：付款方充值 100 并向收款方付款 70 后，退款出资主体为外部银行账户。
+     * 输出：退款请求被拒绝；付款方、收款方和平台账户余额保持付款后的状态。
+     * 预期：外部账户只能作为出入金引用或快照，不能成为退款出资 ledger subject。
+     * 红线：外部账户不得生成退款 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testRefundFromExternalPayerShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_ext_payer_payee");
+        FundsAccountId externalPayer = FundsAccountId.immutable("external_refund_payer",
+                DefaultFundsAccountType.EXTERNAL_BANK);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 100L, "DIRECT_REFUND_EXTERNAL_PAYER_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_EXTERNAL_PAYER_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterPayFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(externalPayer)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_EXTERNAL_PAYER")
+                .setDescription("refund from external payer"), WindOperator.system()))
+                .hasMessageContaining("直接退款出资主体不能是外部账户");
+
+        BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterRejectedRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterPayFacts);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_EXTERNAL_PAYER_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_EXTERNAL_PAYER_PAY", 2, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_EXTERNAL_PAYER");
+    }
+
+    /**
      * 场景：直接退款缺少退款出资主体。
      * 输入：付款方充值 100 并向收款方付款 70 后，退款请求不传 payerId。
      * 输出：退款请求被拒绝；付款方、收款方和平台账户余额保持付款后的状态。
