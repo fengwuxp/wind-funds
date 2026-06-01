@@ -190,6 +190,7 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToWithdrawInstruction(@NonNull FundsTransactionWithdrawRequest request,
                                                                       @NonNull WindOperator operator) {
+        AssertUtils.notNull(request.getAccountId(), "提现账户不能为空");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
