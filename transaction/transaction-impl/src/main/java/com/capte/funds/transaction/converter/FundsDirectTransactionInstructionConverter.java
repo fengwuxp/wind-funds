@@ -152,6 +152,7 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToRefundInstruction(@NonNull FundsTransactionRefundRequest request,
                                                                     @NonNull WindOperator operator) {
+        AssertUtils.notNull(request.getPayerId(), "直接退款出资主体不能为空");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.PAYER_ID, request.getPayerId());
