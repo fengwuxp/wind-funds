@@ -90,7 +90,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Transactional(rollbackFor = Exception.class)
     public String withdraw(FundsTransactionWithdrawRequest request, WindOperator operator) {
         AssertUtils.notNull(request.getAccountId(), "提现账户不能为空");
-        AssertUtils.notNull(request.getReferenceFreezeSn(), "提现冻结流水号不能为空");
+        AssertUtils.hasText(request.getReferenceFreezeSn(), "提现冻结流水号不能为空");
         AssertUtils.notNull(request.getPayeeId(), "提现外部收款方不能为空");
         AssertUtils.isTrue(DefaultFundsAccountType.isExternalAccount(request.getPayeeId()),
                 "提现外部收款方必须是外部账户");

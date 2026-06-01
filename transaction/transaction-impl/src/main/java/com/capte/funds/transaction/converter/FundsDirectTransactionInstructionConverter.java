@@ -202,7 +202,7 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.notNull(request.getAccountId(), "提现账户不能为空");
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
                 "提现账户不能是外部账户");
-        AssertUtils.notNull(request.getReferenceFreezeSn(), "提现冻结流水号不能为空");
+        AssertUtils.hasText(request.getReferenceFreezeSn(), "提现冻结流水号不能为空");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();

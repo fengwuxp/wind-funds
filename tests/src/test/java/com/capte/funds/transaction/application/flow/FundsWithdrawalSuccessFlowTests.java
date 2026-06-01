@@ -391,7 +391,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
     /**
      * 场景：提现确认缺少原冻结流水号。
-     * 输入：用户充值 100、冻结 60 后，提现确认未传 referenceFreezeSn。
+     * 输入：用户充值 100、冻结 60 后，提现确认传入空白 referenceFreezeSn。
      * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN 和平台账户余额保持冻结后的状态。
      * 预期：提现确认必须明确消费哪一笔冻结单，缺冻结流水不能进入 route 和 ledger。
      * 红线：缺冻结流水不能泄露到底层 reference 构造异常，不得释放冻结或生成提现账务事实。
@@ -420,6 +420,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
                 .setAccountId(user)
+                .setReferenceFreezeSn("   ")
                 .setPayeeId(FundsAccountId.immutable("external_bank_missing_withdraw_freeze_ref",
                         DefaultFundsAccountType.EXTERNAL_BANK))
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
