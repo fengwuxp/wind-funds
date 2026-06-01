@@ -66,6 +66,8 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String transfer(FundsTransactionTransferRequest request, WindOperator operator) {
+        AssertUtils.notNull(request.getPayerAccountId(), "系统内转账付款账户不能为空");
+        AssertUtils.notNull(request.getPayeeAccountId(), "系统内转账收款账户不能为空");
         AssertUtils.isFalse(Objects.equals(request.getPayeeAccountId(), request.getPayerAccountId()),
                 "付款账号和收款账户不能一致");
         return execute(directTransactionInstructionConverter.convertToTransferInstruction(request, operator));

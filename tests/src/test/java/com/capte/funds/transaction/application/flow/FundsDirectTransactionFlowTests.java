@@ -694,6 +694,38 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：系统内转账缺少付款和收款账户。
+     * 输入：转账请求未传 payerAccountId 和 payeeAccountId。
+     * 输出：请求被拒绝；平台现金和预收款余额均不变化。
+     * 预期：系统内转账必须先明确付款主体，不能把两个缺失主体误判成同账户转账。
+     * 红线：缺主体不能生成 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testTransferWithoutAccountsShouldRejectAndLeaveNoLedgerSideEffects() {
+        BalanceSnapshot before = snapshot(balances(cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_TRANSFER_MISSING_ACCOUNTS")
+                .setDescription("transfer without accounts"), WindOperator.system()))
+                .hasMessageContaining("系统内转账付款账户不能为空");
+
+        BalanceSnapshot afterRejectedTransfer = snapshot(balances(cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTransfer,
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_MISSING_ACCOUNTS");
+    }
+
+    /**
      * 场景：资金账户向自己发起直接付款。
      * 输入：充值 100 后，付款账户和收款主体均为同一账户，收款账目为 SETTLEMENT。
      * 输出：请求被拒绝；账户和平台账户余额保持充值后的状态，且不生成付款事实。
