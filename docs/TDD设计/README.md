@@ -31,6 +31,7 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 | 1 | [支付资金底座测试驱动设计.md](支付资金底座测试驱动设计.md) | 定义测试驱动设计原则、模块测试矩阵、场景用例、红线用例、目标测试资产和执行门禁。 |
 | 2 | [A0-编码准入基线核验.md](A0-编码准入基线核验.md) | 固化进入编码前的只读核验页，说明 authority baseline、code baseline、target assets、schemaNeed、首批 Red 候选和下一步 Execution Grant 建议。 |
 | 3 | [A1-直接交易事实红线准入卡.md](A1-直接交易事实红线准入卡.md) | 收敛 A1 直接交易事实红线的候选 Execution Grant，说明候选授权、覆盖验收、写入边界、Red 集合、验证命令和停止条件。 |
+| 4 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 收敛支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的 Round 0 候选卡；只作为 B2/B4/B5/B6/B8 独立 Execution Grant 输入。 |
 
 ## 契约输入
 
@@ -93,6 +94,10 @@ TDD 评审口径：TDD 入口必须承接 PRD 目标、DSL 契约和系分落点
 | P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账边界只作为业务语义和外部轨道输入；VCC 卡、prepaid virtual card、shared card 只验证支付工具、绑定快照、资金责任解析关系和资金动作映射。 | 归一业务事实、外部引用、状态映射、脱敏证据、规则待确认字段、`PaymentInstrumentRef`、`FundingAllocationDecision` 和 route snapshot。 | 业务能力包准入卡、P0/P1 回归范围、外部规则确认、未覆盖红线、`TDD-RAIL-001A`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011`、`TDD-WALLET-015` 至 `TDD-WALLET-019`。 | 业务状态映射、乱序重复、外部引用脱敏、规则待确认、P0/P1 回归、敏感数据 must-fail、预付资金责任、共享卡绑定快照、应用 facade 准入和内部主体能力选择。 | 业务专项测试绕过统一钱包应用层、账本、清结算、对账或归档链路，或把卡工具/共享卡/预付模式测试成新的账户余额、信用账户或预算主体。 |
 | 清结算与对账 | 清分、清算、结算、出款、对账、差错、调账核销和追偿。 | 批次、来源事实、规则、差异、审批、凭证和处理动作。 | 03 分册对象状态机、服务 API、表设计、补偿和审计。 | `CLS-GATE-*`、`TDD-B7-RED-*`、服务级 H2 流程、重跑幂等、并发锁、权限审计和差异闭环。 | 清结算、对账或出款只有设计，没有 DDL/H2、服务级流程测试或外部规则确认。 |
 | 归档、重放和指标边界 | 归档、余额重建、交易投影重放、异常人工处理和指标只读边界。 | Manifest、checkpoint、watermark、差异报告、处理动作和指标输入边界。 | 04 分册 governance 逻辑边界、物理落点候选、只读边界和人工处理入口。 | `GOV-GATE-*`、`TDD-B8-RED-*`、dry-run/apply、范围锁、回滚/续跑、指标水位隔离和治理边界测试。 | 用普通指标快照替代余额确认，或让治理任务反写资金事实。 |
+
+授权支付工具入口只允许测试 application facade 的准入、解析、快照和委派，不允许把账户主体型 `FundsAuthorizationTransactionService.authorize` 请求替换为支付工具引用。P2 场景如 VCC 预付卡充值、共享卡调额、VA 收款、全球账户付款和 ACH/银行转账事件，必须先经业务能力包解释成归一资金事实，再复用 P1/P0 测试资产。
+
+支付工具与 Spend Rule 的生产可用性评审先读 [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md)。该卡把 `R0-PI-001`、`R0-FR-001`、`R0-AUTH-001`、`R0-SR-001`、`R0-SR-002` 和 `R0-PI-002` 拆成独立切片；未确认对应 Execution Grant 前，TDD 只能继续做 Round 0、差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 
 ## 生产验证准入口径
 

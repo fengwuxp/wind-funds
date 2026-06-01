@@ -18,6 +18,11 @@
 - [x] 2026-05-31 完成 B2/B4 编码准入口径修复：系分已明确外部支付工具和工具快照才使用 `PaymentInstrumentRef`，内部余额钱包、信用额度、返利钱包和商户钱包等业务入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照；`PaymentInstrumentCapabilityApplicationService` 只做工具能力准入、读取工具与绑定历史、生成准入快照，不注册工具、不变更绑定；TDD 映射表已显式纳入 `AC-AUTH-000` 授权入口分层。该修复只关闭 B2/B4 进入独立 Round 0 或单一 Execution Grant 前的文档阻断，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 - [x] 2026-05-31 完成钱包入口二次收敛：PRD、DSL、系分、TDD、VCC 分册和 OpenSpec 已把内部余额钱包、平台钱包、商户钱包、返利钱包、信用额度入口与外部钱包端点、通道 token、卡、VA 等支付工具分开；内部入口只作为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照解析来源，外部工具才使用 `PaymentInstrumentRef` / `ExternalAccountRef`。该修复仍为文档准入口径，不授权新增 facade、Request/DTO、DDL/H2 schema 或测试资产。
 - [x] 2026-05-31 完成 CAD Round 0 准入刷新：上一完整 CAD 验证证据提交为 `270122e docs: 刷新 CAD 准入基线`，工作树在刷新前为 clean；`77bc9f4` 保留为上一冻结代码能力基线，`98ec7cc..81a7ecb` 的直接交易、授权后继、失败无副作用、费用幂等、外部账户主体阻断、支付工具绑定约束和 B2/B4/钱包入口文档收敛纳入当前准入复核输入，`270122e` 后已执行 `just verify-cad` 完整门禁并通过。该刷新只更新基线、授权卡和任务计划引用，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入；后续 Execution Grant 必须以确认时 Git HEAD 作为 `authorityBaseline`。
+- [x] 2026-06-01 固化支付工具入口交付基线：`FundsAuthorizationTransactionService.authorize`、直接交易和余额控制的 canonical 请求继续以已解析账户主体为入参；支付工具入口只位于 application facade，例如 `authorizeByInstrument` 或等价入口，负责支付工具准入、绑定快照、资金责任解析、Spend Rule 决策和账户能力校验，再委派账户主体型内核。VCC 预付卡充值、系统内余额钱包充值、共享卡调额、VA 收款、全球账户付款和 ACH/银行转账事件不抽象为统一支付工具交易服务，必须先由 P2 业务能力包解释为归一资金事实，再映射到 P1/P0 直接交易、授权交易、余额控制、清结算、对账调账或归档能力。本条只记录 PRD、DSL、系分、TDD 和任务基线，不授权新增 Java 包、公共契约、测试代码、DDL/H2 schema 或运行配置。
+- [x] 2026-06-01 完成本轮编码准入对齐：产品和架构口径一致，A1 直接交易事实红线仍是唯一可推进到用户确认态的单一 Execution Grant 候选；B2 钱包 application facade / 资金责任目标字段 / BudgetGroup 兼容策略、B4 授权支付工具 application facade、B5/B6 预算控制和路由回放、B7/B8/P2 均不得作为本轮附带写入。若后续基于本轮未提交设计变更开工，Execution Grant 必须在 `authorityBaseline` 中显式纳入本轮文档变更或等待其提交后引用确认时 Git HEAD；未授权前不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
+- [x] 2026-06-01 完成支付工具、资金账户和信用账户重定性后的 DSL、路由、账务、余额投影和交易投影 CR：DSL 主体只允许资金账户、信用账户和平台角色解析后的平台资金账户入账；支付工具、外部账户、预算组、Spend Rule 和交易投影只作为输入、快照、控制视图、查询维度或审计上下文。route 可以消费工具和规则快照，但 route leg、posting、LedgerEntry 和账本余额投影必须落到已解析可入账主体；交易投影只读，不反写 route、posting、entry 或 balance。该 CR 关闭设计口径歧义，不授权公共契约、测试资源、DDL/H2 schema 或生产代码写入。
+- [x] 2026-06-01 完成支付工具与 Spend Rule 生产可用性 CR：支付工具资源管理和绑定历史可作为 B2 局部代码基线，但支付工具应用准入、资金责任目标主体、Spend Rule 规则定义/版本/决策日志/控制活动、预算控制投影和授权准入组合仍未达到生产可用闭环。当前结论为设计可用、生产条件不足；下一步只能准备 B2/B4/B5/B6/B8 Round 0 或单一 Execution Grant，不新增统一 `InstrumentTransactionService`，不替换 canonical 交易请求，不把预算组或 Spend Rule 写成资金交易事实或账本主体。
+- [x] 2026-06-01 补齐 B2/B4 支付工具与 Spend Rule Round 0 准入卡：新增 `docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md`，把 `R0-PI-001`、`R0-FR-001`、`R0-AUTH-001`、`R0-SR-001`、`R0-SR-002`、`R0-PI-002` 拆成 B2-PI-CAP、B2-FR、B4-AUTH-PI、B5-SR-CONTROL、B6/B8-PI-VIEW 五个候选切片。该卡只作为 Round 0 和独立 Execution Grant 输入，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 
 ## 1. MVP 任务写入范围
 
@@ -101,6 +106,9 @@ just verify-cad
 | `03-清结算与对账` | 冻结基线中 `reconciliation-face`、`reconciliation-impl` 已有模块骨架和出款前准入候选实现，已覆盖准入解释状态、完整外部规则核验证据和只读无账务事实断言，但仍缺完整出款生命周期、表结构和数据库级服务闭环。 | 清结算与对账继续编码前必须另起独立 OpenSpec change，并确认模块、表、状态机、接口、是否扩展出款前准入候选能力和验证命令。 |
 | B8 资金数据治理边界 | `governance-face`、`governance-impl` 已有交易投影重放骨架和局部边界测试；产品 04 已降级为拆分索引。 | B8 是 P0/P1 治理闭环覆盖索引，不因编号排在 B7 后而降低优先级；Manifest、账本余额快照、普通指标快照、交易投影重放和水位隔离仍需独立 Execution Grant，并以产品 02、03、05 和已确认事实边界为输入。 |
 | 2026-05-31 代码准入 CR | 账户主体型交易内核请求与最新设计一致；`FundsTransactionPayRequest`、`FundsAuthorizationTransactionAuthorizeRequest`、`FundsBalanceFreezeRequest` 仍以 `FundsAccountId` 入参，`ImmutableResolvedRouteSpec` 已有 `PaymentInstrumentRefSpec` 快照位。代码现状不阻断 A1 直接交易事实红线按单一 Execution Grant 开工，但阻断“泛化地直接编码钱包/授权/预算组目标态”。主要缺口在钱包应用层 facade、资金责任目标字段和 BudgetGroup 账务主体化兼容路径；代码证据包括 `FundsSubjectType.BUDGET_GROUP`、`CreateSpendSubjectFundingRelationRequest.fundingAccountId`、`SpendSubjectFundingRelationServiceImpl#getFundingAccount` 只校验真实资金账户、`DefaultFundsAccountQueryServiceImpl` 解析预算组、`BudgetGroupServiceImpl` 初始化预算组 ledger、`DefaultLedgerProfileServiceImpl` 的 `BUDGET_BASIC` profile、`DefaultLedgerTransactionPostingServiceImpl` 允许 `BUDGET_GROUP` 入账、`RouteSubjectSupport` 和 `DefaultRouteReplayService` 将预算组解析成 route participant，以及 `FundsBalanceControlInstructionConverter` 把预算组当额度调整对象。 | 这些差异必须进入 B2/B4/B5/B6 后续 Execution Grant：先做 wallet application facade 与资金责任字段决策，再处理 BudgetGroup 兼容策略和 Red/Green 证据；未确认前不得把预算组 route leg、posting、LedgerEntry、ledger 初始化、余额查询或旧 DSL 测试通过作为目标态 Done。下一步若要编码，推荐只确认 A1 或 B2/B4/B5/B6 中一个最小切片；若未确认，继续做授权卡和只读差距复核。 |
+| 2026-06-01 DSL/路由/账务/投影 CR | `SubjectRef`、route leg participant、posting subject、LedgerEntry subject 和账本余额投影主体必须统一到资金账户、信用账户或平台角色解析后的平台资金账户；`PaymentInstrumentRef`、`ExternalAccountRef`、预算组、Spend Rule 和交易投影不得被解释为账务主体。 | A1 可以继续按账户主体型直接交易事实红线准备确认；B2/B4/B5/B6/B8 若要触碰支付工具 application facade、预算控制视图、route replay、交易投影或 BudgetGroup 兼容策略，必须独立 Execution Grant。 |
+| 2026-06-01 支付工具与 Spend Rule 生产可用性 CR | `PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests` 和 `PaymentInstrumentRouteDslContractTests` 已证明资源服务、现有资金责任关系和 DSL 契约局部基线；尚未证明 `PaymentInstrumentCapabilityApplicationService`、`AuthorizationAdmissionApplicationService`、Spend Rule 决策日志、Spend Control Activity、预算控制投影或 `authorizeByInstrument` 生产链路。 | B2 先做支付工具能力准入和资金责任目标主体 Round 0；B4 做授权准入组合；B5 做预算预留释放控制；B6/B8 做只读投影和重放。未授权前不得新增统一支付工具交易服务、Spend Rule 表或投影表，也不得把资源服务测试通过等同于生产可用。 |
+| 2026-06-01 B2/B4 Round 0 准入卡 | 已新增 `docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md`，作为支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的共同准入输入。 | 后续只能选择其中一个候选切片进入 Execution Grant；不得一次性授权 B2、B4、B5、B6 和 B8 的全部目标态。 |
 | 导出附件 | 若工作树存在 `docs/*.zip` 等导出包，只能作为评审附件。 | 导出包不作为规格、任务或验收 Source of Truth；是否纳入版本库需用户单独确认。 |
 
 ### 5.2 生产交付判定
@@ -301,6 +309,8 @@ DDL/H2 schema 变化：
 | B4-08 | 固化授权并发竞争红线。 | `transaction-*`、`core`、`tests/src/test/java` | TDD 13.5、授权生命周期。 | 同一授权的完成、撤销、过期、退款并发导致重复入账、重复释放或剩余为负。 | 通过幂等键、状态版本、唯一约束或锁定策略确保同一授权同一时刻只有合法迁移生效，失败方无副作用。 | `just test-business-flow` |
 | B4-09 | 固化授权占券和权益生命周期边界。 | `transaction-*`、`core`、`tests/src/test/java` | `DSL-BENEFIT-AUTH-HOLD-001`、`TDD-BEN-AUTH-*`、`TDD-BEN-ENTRY-003`、`TDD-BEN-ENTRY-004`、`RED-053`。 | 授权拒绝、工具准入失败或余额不足后仍核销权益；授权完成和过期并发导致同一权益重复核销或释放；完成时按当前券规则重算；新增授权权益专用服务入口或授权后续事件接收当前权益结果。 | 不新增授权权益专用服务入口；`authorize` 可在对应 Execution Grant 确认后扩展可选 `benefitSnapshot` 或等价字段固化占用引用；`reversal`、`expire`、`settle` 和 `settleRefund` 读取原授权事实和原权益快照；授权阶段只固化占用引用，完成按原快照核销，撤销或过期释放剩余占用；失败事件无 route/posting/entry 副作用。 | `just test-business-flow` |
 | B4-10 | 固化授权支付工具应用入口。 | `transaction-face`、`wallet-face`、`transaction-impl`、`wallet-impl`、`tests/src/test/java`，具体写入范围由 Execution Grant 决定 | 产品 `AC-PI-010`、`AC-AUTH-000`、DSL 支付工具入口到账户主体内核转译、系分 4.1.2、`GAP-AUTH-005`。 | 外部业务必须传内部 `FundsAccountId` 才能授权；工具状态、绑定、预算组、Spend Rule 或资金责任缺失仍进入内核；工具准入失败生成 route/posting/entry；批准后 route leg 使用支付工具、预算组或 Spend Rule 作为主体；直接把现有 canonical `authorize` 请求改成支付工具引用字段。 | 新增 `authorizeByInstrument` 或等价 application facade，先完成工具、绑定、使用主体、预算组、Spend Rule、资金责任和账户能力校验；批准后委派账户主体型授权内核；拒绝只记录拒绝事实和原因；PaymentInstrumentRef、BindingSnapshot、FundingAllocationDecision 和拒绝原因进入快照或审计；保留账户主体型授权内核作为 canonical 入口。 | `just test-transaction`、`just test-boundary` |
+
+B4-10 边界：后续 Execution Grant 只能选择新增外层 `authorizeByInstrument`、`AuthorizationAdmissionApplicationService` 或等价 facade，并必须保留账户主体型授权内核；不得用支付工具引用替换 canonical 请求字段。
 
 人工确认点：`EXPIRE` 枚举、`expire` 服务入口、`settle` 强制完成请求契约、`settleRefund` 无授权退款引用和审计字段、授权占券字段和权益 hold/release/write-off 外部引用、授权支付工具应用入口的服务命名 / Request / DTO / 幂等摘要和快照字段、钱包 application facade 命名、资金责任目标字段是否从 `fundingAccountId` 演进为目标主体引用、`FundsSubjectType.BUDGET_GROUP` 兼容策略；VCC / Spend Controls 默认只做边界测试，只有明确启用发卡产品才进入实现范围。
 
@@ -609,6 +619,19 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | B4 授权支付工具入口 | `BLOCKED_UNTIL_GRANT`。可以设计 `authorizeByInstrument` 或等价 application facade，但不能替换账户主体型授权内核请求。 | 独立确认公共契约、Request/DTO、幂等摘要、route snapshot、拒绝事实和敏感上下文回归。 |
 | B5/B6 余额控制和路由回放 | `BLOCKED_UNTIL_GRANT`。预算控制投影、BudgetGroup 兼容路径和交易投影重放仍需单独切片。 | 先决定预算组兼容策略和投影事实边界，再确认 Red 包和写入范围。 |
 | B7/B8/P2 | `TDD_ANALYSIS_ONLY`。清结算对账、资金数据治理和业务能力包仍未打开默认编码。 | 继续独立 OpenSpec、Execution Grant 和 TDD 分析准备；不得作为 A1 或 B2 附带写入。 |
+
+### 13.2 本轮编码准入对齐（2026-06-01）
+
+本轮在 PRD、DSL、系分、TDD 和任务基线已固化支付工具入口后，再做一次编码准入裁决。该裁决只更新开工判断和授权边界，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
+
+| 能力域 | 准入状态 | 对齐结论 |
+| --- | --- | --- |
+| A1 直接交易事实红线 | `READY_TO_CONFIRM_NOT_AUTHORIZED`。 | 仍是当前唯一可推进到用户确认态的单一 Execution Grant 候选；A1 不包含支付工具 application facade、VCC/VA/ACH/P2 场景交易入口或交易内核入参调整。 |
+| B2 钱包账户、支付工具和资金责任基础 | `BLOCKED_UNTIL_GRANT`。 | 可准备独立 Round 0 或授权卡；必须先决定 application facade 命名、资金责任目标字段、BudgetGroup 兼容策略、Request/DTO 和边界测试。 |
+| B4 授权支付工具入口 | `BLOCKED_UNTIL_GRANT`。 | 可设计 `authorizeByInstrument` 或等价 application facade；必须保留账户主体型授权内核，禁止把 canonical `authorize` 请求整体改为支付工具引用。 |
+| B5/B6 余额控制、预算控制和路由回放 | `BLOCKED_UNTIL_GRANT`。 | 预算组不作为账务主体、预算控制投影、交易投影重放和换绑后原路径回放需要单独 Red 和写入范围。 |
+| B7/B8/P2 | `TDD_ANALYSIS_ONLY`。 | 清结算对账、资金数据治理、VCC、全球账户、ACH、收单等只可继续做 TDD 分析、contract-only 或独立 Execution Grant 准备。 |
+| 本轮未提交设计变更 | `BASELINE_ATTACHMENT_REQUIRED`。 | 若在提交前进入下一步 Execution Grant，必须在 `authorityBaseline` 中列出本轮文档变更；否则必须先提交本轮设计和任务基线，再以确认时 Git HEAD 开工。 |
 
 ## 14. B2 建议 Execution Grant
 
