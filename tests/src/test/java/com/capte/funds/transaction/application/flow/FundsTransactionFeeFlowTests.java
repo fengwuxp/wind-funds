@@ -119,6 +119,59 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：独立手续费缺少手续费类型。
+     * 输入：用户充值 50 后，提交独立手续费 5 但不传 feeType。
+     * 输出：请求被拒绝；用户 AVAILABLE/FROZEN 和平台 FEE 余额保持充值后的状态。
+     * 预期：独立手续费必须明确费用类型，缺类型不能进入 route 和 ledger。
+     * 红线：缺手续费类型不能泄露为底层 Map 构造异常，不得生成手续费资金事实或账务事实。
+     */
+    @Test
+    void testStandaloneFeeWithoutFeeTypeShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+
+        topup(payer, 50L, "FEE_MISSING_TYPE_TOPUP");
+        BalanceSnapshot beforeFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, beforeFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.fee(new FundsTransactionFeeRequest()
+                .setAccountId(payer)
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_MISSING_TYPE_CHARGE")
+                .setDescription("fee without type"), WindOperator.system()))
+                .hasMessageContaining("手续费类型不能为空");
+
+        BalanceSnapshot afterFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertPostedTransactions(1);
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_MISSING_TYPE_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_MISSING_TYPE_TOPUP");
+        assertNoFundsOrLedgerFactsForBusinessSn("FEE_MISSING_TYPE_CHARGE");
+    }
+
+    /**
      * 场景：独立手续费收取和手续费退回请求把敏感账户值放入扩展上下文。
      * 输入：手续费扣款 contextVariables 含嵌套 IBAN 值；有效手续费扣款后，退费 contextVariables 含嵌套 IBAN 值。
      * 输出：两次敏感请求均被拒绝；用户和平台手续费余额保持最近一次成功事实后的状态。
