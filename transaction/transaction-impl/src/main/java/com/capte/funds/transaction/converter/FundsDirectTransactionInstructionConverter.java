@@ -227,6 +227,8 @@ public class FundsDirectTransactionInstructionConverter {
     public @NonNull FundsInstructionSpec convertToFeeInstruction(@NonNull FundsTransactionFeeRequest request,
                                                                  @NonNull WindOperator operator) {
         AssertUtils.notNull(request.getAccountId(), "手续费支出账户不能为空");
+        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
+                "手续费支出账户不能是外部账户");
         AssertUtils.notNull(request.getFeeType(), "手续费类型不能为空");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
@@ -252,6 +254,8 @@ public class FundsDirectTransactionInstructionConverter {
                                                                        @NonNull WindOperator operator) {
         AssertUtils.notNull(request.getFeeSourceTransactionSn(), "手续费退回原费用交易流水不能为空");
         AssertUtils.notNull(request.getAccountId(), "手续费退回到账账户不能为空");
+        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
+                "手续费退回到账账户不能是外部账户");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())

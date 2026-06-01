@@ -24,6 +24,7 @@ import com.wind.integration.funds.transaction.enums.DefaultFeeType;
 import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
 
@@ -116,6 +117,47 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertPostedTransactions(0);
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_MISSING_ACCOUNT_CHARGE");
+    }
+
+    /**
+     * 场景：独立手续费把外部账户作为支出账户。
+     * 输入：业务侧提交手续费 5，但 accountId 是外部银行账户。
+     * 输出：请求被拒绝；平台 FEE/CASH/PREPAYMENT 余额均不变化。
+     * 预期：外部账户只能作为出入金引用或快照，不能成为手续费 ledger subject。
+     * 红线：外部账户不得生成手续费 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testStandaloneFeeFromExternalAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId externalAccount = FundsAccountId.immutable("external_fee_account",
+                DefaultFundsAccountType.EXTERNAL_BANK);
+        BalanceSnapshot before = snapshot(balances(externalAccount, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.fee(new FundsTransactionFeeRequest()
+                .setAccountId(externalAccount)
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setFeeType(DefaultFeeType.FEE.getCode())
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_EXTERNAL_ACCOUNT_CHARGE")
+                .setDescription("fee from external account"), WindOperator.system()))
+                .hasMessageContaining("手续费支出账户不能是外部账户");
+
+        BalanceSnapshot afterFailure = snapshot(balances(externalAccount, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFailure,
+                delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("FEE_EXTERNAL_ACCOUNT_CHARGE");
     }
 
     /**
@@ -334,6 +376,78 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_MISSING_ACCOUNT_SOURCE", 2, 2);
         assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_MISSING_ACCOUNT_SOURCE");
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_MISSING_ACCOUNT_RETURN");
+    }
+
+    /**
+     * 场景：手续费退回把外部账户作为到账账户。
+     * 输入：充值 50、独立手续费 5，随后退回手续费 5 但 accountId 是外部银行账户。
+     * 输出：退费请求被拒绝；用户 AVAILABLE/FROZEN 和平台 FEE 余额保持原手续费后的状态。
+     * 预期：手续费退回到账账户必须是内部可入账主体，外部账户不能成为 ledger subject。
+     * 红线：外部账户不得生成退费 route replay、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testFeeRefundToExternalAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId externalAccount = FundsAccountId.immutable("external_fee_refund_account",
+                DefaultFundsAccountType.EXTERNAL_BANK);
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, externalAccount, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+
+        topup(payer, 50L, "FEE_REFUND_EXTERNAL_ACCOUNT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, externalAccount, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        fee(payer, 5L, "FEE_REFUND_EXTERNAL_ACCOUNT_SOURCE");
+        BalanceSnapshot beforeFailure = snapshot(balances(payer, externalAccount, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, beforeFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -5L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+        String feeSourceTransactionSn = ledgerTransactionByBusinessSn("FEE_REFUND_EXTERNAL_ACCOUNT_SOURCE")
+                .getFundsTransactionSn();
+
+        assertThatThrownBy(() -> directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
+                .setAccountId(externalAccount)
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setFeeSourceTransactionSn(feeSourceTransactionSn)
+                .setBusinessScene("FEE_REFUND")
+                .setBusinessSn("FEE_REFUND_EXTERNAL_ACCOUNT_RETURN")
+                .setDescription("fee refund to external account"), WindOperator.system()))
+                .hasMessageContaining("手续费退回到账账户不能是外部账户");
+
+        BalanceSnapshot afterFailure = snapshot(balances(payer, externalAccount, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXTERNAL_ACCOUNT_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_EXTERNAL_ACCOUNT_TOPUP");
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_EXTERNAL_ACCOUNT_SOURCE", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_EXTERNAL_ACCOUNT_SOURCE");
+        assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_EXTERNAL_ACCOUNT_RETURN");
     }
 
     /**
