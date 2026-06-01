@@ -155,6 +155,8 @@ public class FundsDirectTransactionInstructionConverter {
     public @NonNull FundsInstructionSpec convertToRefundInstruction(@NonNull FundsTransactionRefundRequest request,
                                                                     @NonNull WindOperator operator) {
         AssertUtils.notNull(request.getAccountId(), "直接退款到账账户不能为空");
+        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
+                "直接退款到账账户不能是外部账户");
         AssertUtils.notNull(request.getPayerId(), "直接退款出资主体不能为空");
         AssertUtils.notNull(request.getPayerLedgerCode(), "直接退款出资账目不能为空");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
