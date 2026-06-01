@@ -864,7 +864,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_INTERNAL_PAYEE_CONFIRM")
                 .setDescription("withdraw to internal account"), WindOperator.system()))
-                .hasMessageContaining("withdraw payee must external account");
+                .hasMessageContaining("提现外部收款方必须是外部账户");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, internalPayee, cashMappingAccount(),
                 prepaymentAccount()));

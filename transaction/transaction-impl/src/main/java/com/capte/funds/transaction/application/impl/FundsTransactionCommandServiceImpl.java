@@ -93,7 +93,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         AssertUtils.notNull(request.getReferenceFreezeSn(), "提现冻结流水号不能为空");
         AssertUtils.notNull(request.getPayeeId(), "提现外部收款方不能为空");
         AssertUtils.isTrue(DefaultFundsAccountType.isExternalAccount(request.getPayeeId()),
-                "withdraw payee must external account");
+                "提现外部收款方必须是外部账户");
         return execute(directTransactionInstructionConverter.convertToWithdrawInstruction(request, operator));
     }
 
