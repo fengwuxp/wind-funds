@@ -794,6 +794,42 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接充值缺少入账账户。
+     * 输入：充值请求未传 accountId。
+     * 输出：请求被拒绝；平台现金和预收款余额均不变化。
+     * 预期：直接充值必须明确入账账户，缺主体不能进入 route 和 ledger。
+     * 红线：缺入账账户不能以 NPE 或半截账务事实形式泄露到生产链路。
+     */
+    @Test
+    void testTopupWithoutAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        BalanceSnapshot before = snapshot(balances(cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_missing_topup_account",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_TOPUP_MISSING_ACCOUNT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_TOPUP_MISSING_ACCOUNT")
+                .setDescription("topup without account"), WindOperator.system()))
+                .hasMessageContaining("直接充值入账账户不能为空");
+
+        BalanceSnapshot afterRejectedTopup = snapshot(balances(cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTopup,
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TOPUP_MISSING_ACCOUNT");
+    }
+
+    /**
      * 场景：直接充值把完整外部账户号伪装成外部账户引用 ID。
      * 输入：充值资金来源 FundsAccountId.id 为 12 位银行账户号。
      * 输出：请求被拒绝；用户账户、平台现金和预收款余额均不变化。
