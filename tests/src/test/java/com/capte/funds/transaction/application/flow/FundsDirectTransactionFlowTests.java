@@ -2027,6 +2027,74 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：同一业务键首次为直接充值，重试请求被错误改成系统内转账。
+     * 输入：充值 40 使用业务流水 `DIRECT_IDEMPOTENT_TOPUP_EVENT`，随后用相同 businessScene/businessSn 发起转账 10。
+     * 输出：第二次请求被摘要冲突拒绝；余额和账务事实保持第一次充值后的状态。
+     * 预期：直接交易幂等必须保护事件类型和交易类型，不能把不同资金动作追加到同一交易聚合。
+     * 红线：同业务键不同事件不得新增 detail、route、posting、ledger entry 或污染余额。
+     */
+    @Test
+    void testDirectSameBusinessSnWithDifferentEventShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("idem_event_payee");
+        BalanceSnapshot before = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+
+        String firstTopupSn = directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(payer)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_idempotent_event_topup",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_EVENT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_EVENT")
+                .setDescription("idempotent topup event"), WindOperator.system());
+        BalanceSnapshot afterFirstTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFirstTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
+        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_TOPUP_EVENT");
+
+        assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_EVENT")
+                .setDescription("idempotent event mismatch transfer"), WindOperator.system()))
+                .hasMessageContaining("资金交易请求参数不一致");
+
+        BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFirstTopup, afterConflict,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstTopupFacts);
+        assertDirectRouteSnapshotUnchanged("DIRECT_IDEMPOTENT_TOPUP_EVENT", firstRouteSnapshot);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertThat(balance(payee).isInitialized())
+                .as("rejected transfer should not initialize payee ledger")
+                .isFalse();
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_960L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertThat(fundsTransactionDetails(firstTopupSn)).hasSize(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_IDEMPOTENT_TOPUP_EVENT", 3, 4);
+    }
+
+    /**
      * 场景：直接充值使用相同业务流水重复通知，第二次请求只更换 traceId。
      * 输入：充值 40 使用业务流水 `DIRECT_IDEMPOTENT_TOPUP_TRACE`，首请求 traceId 为 TRACE-1，重试 traceId 为 TRACE-2。
      * 输出：重试返回同一资金交易流水；余额和账务事实保持第一次充值后的状态。

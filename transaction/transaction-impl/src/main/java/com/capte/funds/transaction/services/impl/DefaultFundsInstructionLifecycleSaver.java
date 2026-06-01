@@ -190,9 +190,30 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         String mainBusinessSn = resolveMainBusinessSn(instruction);
         result = findTransactionByBusiness(instruction, mainBusinessSn);
         if (result != null) {
+            assertTransactionRequestIdentity(instruction, result);
             return result;
         }
         return createTransaction(instruction, routeSnapshot, mainBusinessSn);
+    }
+
+    private void assertTransactionRequestIdentity(FundsInstructionSpec instruction, FundsTransaction transaction) {
+        AssertUtils.isTrue(transaction.getTransactionMode() == resolveTransactionMode(instruction.getInstructionType())
+                        && transaction.getTransactionType() == instruction.getTransactionType(),
+                "资金交易请求参数不一致，transactionSn = {}，businessSn = {}",
+                transaction.getSn(), instruction.getBusinessSn());
+
+        RouteSnapshotSpec routeSnapshot = parseRouteSnapshot(transaction);
+        AssertUtils.isTrue(routeSnapshot.getInstructionType() == instruction.getInstructionType()
+                        && routeSnapshot.getEventType() == instruction.getEventType()
+                        && routeSnapshot.getTransactionType() == instruction.getTransactionType(),
+                "资金交易请求参数不一致，transactionSn = {}，businessSn = {}",
+                transaction.getSn(), instruction.getBusinessSn());
+    }
+
+    private RouteSnapshotSpec parseRouteSnapshot(FundsTransaction transaction) {
+        AssertUtils.hasText(transaction.getRouteSnapshot(),
+                "资金交易缺少 RouteSnapshot，transactionSn = {}", transaction.getSn());
+        return RouteSnapshotJsonSupport.parseRouteSnapshot(transaction.getRouteSnapshot(), transaction.getGmtCreate());
     }
 
     private FundsTransaction findReferenceTransaction(FundsInstructionSpec instruction) {
