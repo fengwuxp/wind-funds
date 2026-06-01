@@ -106,6 +106,8 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String refundFee(FundsTransactionFeeRefundRequest request, WindOperator operator) {
+        AssertUtils.notNull(request.getFeeSourceTransactionSn(), "手续费退回原费用交易流水不能为空");
+        AssertUtils.notNull(request.getAccountId(), "手续费退回到账账户不能为空");
         return execute(directTransactionInstructionConverter.convertToFeeRefundInstruction(request, operator));
     }
 
