@@ -898,6 +898,86 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：提现确认把外部账户作为被冻结和出款的账户主体。
+     * 输入：用户充值并冻结 60 后，提现确认 accountId 使用外部银行账户，referenceFreezeSn 使用用户冻结单。
+     * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN 和平台账户余额保持冻结后的状态。
+     * 预期：提现账户必须是内部可记账主体，外部账户只能作为外部收款方引用。
+     * 红线：外部账户不得成为提现 route、posting、ledger entry 或余额投影主体。
+     */
+    @Test
+    void testWithdrawFromExternalAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId externalAccount = FundsAccountId.immutable("external_bank_withdraw_account",
+                DefaultFundsAccountType.EXTERNAL_BANK);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(user, externalAccount, cashMappingAccount(),
+                prepaymentAccount()));
+        topup(user, 100L, "WITHDRAW_EXTERNAL_ACCOUNT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, externalAccount, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String freezeSn = freeze(user, 60L, "WITHDRAW_EXTERNAL_ACCOUNT_FREEZE");
+        BalanceSnapshot afterFreeze = snapshot(balances(user, externalAccount, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterFreeze,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 60L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterFreezeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.withdraw(new FundsTransactionWithdrawRequest()
+                .setAccountId(externalAccount)
+                .setPayeeId(FundsAccountId.immutable("external_bank_withdraw_payee",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setReferenceFreezeSn(freezeSn)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
+                .setBusinessScene("WITHDRAW")
+                .setBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_CONFIRM")
+                .setDescription("withdraw from external account"), WindOperator.system()))
+                .hasMessageContaining("提现账户不能是外部账户");
+
+        BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, externalAccount, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterFreeze, afterRejectedWithdraw,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFreezeFacts);
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.FROZEN, 60L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.FREEZE.name());
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_FREEZE").getStatus())
+                .isEqualTo(FundsFrozenOrderStatus.FROZEN);
+        assertThat(frozenOrderByBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_FREEZE").getReleasedAmount()).isZero();
+        assertSingleFundsAndLedgerFactsForBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_FREEZE", 0, 0, 1, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_CONFIRM");
+    }
+
+    /**
      * 场景：提现确认把完整 IBAN 伪装成外部收款账户引用 ID。
      * 输入：用户充值并冻结 60 后，提现 payeeId.id 为完整 IBAN。
      * 输出：提现请求被拒绝；用户 AVAILABLE/FROZEN 和平台账户余额保持冻结后的状态。

@@ -942,6 +942,48 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接充值把外部账户作为入账主体。
+     * 输入：外部银行账户作为 accountId，外部银行账户作为资金来源。
+     * 输出：请求被拒绝；平台账户余额不变化。
+     * 预期：充值入账主体必须是内部可记账主体，外部账户只能作为资金来源引用。
+     * 红线：外部账户不得生成充值 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testTopupToExternalAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId externalAccount = FundsAccountId.immutable("external_bank_topup_account",
+                DefaultFundsAccountType.EXTERNAL_BANK);
+        BalanceSnapshot before = snapshot(balances(externalAccount, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(externalAccount)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_topup_source",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_TOPUP_EXTERNAL_ACCOUNT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_TOPUP_EXTERNAL_ACCOUNT")
+                .setDescription("topup to external account"), WindOperator.system()))
+                .hasMessageContaining("直接充值入账账户不能是外部账户");
+
+        BalanceSnapshot afterRejectedTopup = snapshot(balances(externalAccount, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTopup,
+                delta(externalAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(externalAccount, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TOPUP_EXTERNAL_ACCOUNT");
+    }
+
+    /**
      * 场景：USD 资金账户发起 CNY 系统内转账。
      * 输入：付款方充值 50 USD，随后向收款方转账 10 CNY。
      * 输出：请求被拒绝；付款方、收款方和平台账户余额保持充值后的状态。
