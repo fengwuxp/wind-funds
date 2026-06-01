@@ -69,6 +69,10 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private static final String REPLAY_REFERENCE_REQUIRED_MESSAGE = "RouteSnapshot 回放事件缺少原路径引用";
 
+    private static final String REPLAY_LEG_REQUIRED_MESSAGE = "RouteSnapshot 没有可回放的 RouteLeg";
+
+    private static final String FEE_REFUND_REPLAY_LEG_REQUIRED_MESSAGE = "手续费退回原交易没有可回放费用路径";
+
     private static final String FREEZE_ORDER_SUBJECT_MISMATCH_MESSAGE =
             "冻结单引用主体与请求账户不一致";
 
@@ -312,10 +316,17 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .filter(leg -> leg.getReplayPolicy() != RouteReplayPolicy.NON_REPLAYABLE)
                 .filter(leg -> shouldReplayLeg(leg, replayRequest))
                 .toList();
-        AssertUtils.notEmpty(result, "RouteSnapshot 没有可回放的 RouteLeg");
+        AssertUtils.notEmpty(result, replayLegRequiredMessage(replayRequest));
         AssertUtils.isTrue(selectedLegIds.isEmpty() || result.size() == selectedLegIds.size(),
                 "RouteSnapshot 回放 leg 不存在或不可回放，legIds = {}", selectedLegIds);
         return result;
+    }
+
+    private String replayLegRequiredMessage(ReplayRequestSpec replayRequest) {
+        if (replayRequest.getReplayType() == RouteReplayType.FEE_REFUND) {
+            return FEE_REFUND_REPLAY_LEG_REQUIRED_MESSAGE;
+        }
+        return REPLAY_LEG_REQUIRED_MESSAGE;
     }
 
     private boolean shouldReplayLeg(RouteLegSpec leg, ReplayRequestSpec replayRequest) {
