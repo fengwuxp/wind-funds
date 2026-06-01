@@ -61,6 +61,8 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     private static final String SAME_PAY_ACCOUNT_MESSAGE = "付款账户和收款主体不能一致";
 
+    private static final String SAME_REFUND_ACCOUNT_MESSAGE = "退款到账账户和退款出资主体不能一致";
+
     private static final String UNSUPPORTED_ADJUSTMENT_MESSAGE = "adjustment must handled by balance-control resolver";
 
     private final RouteParticipantFactory routeParticipantFactory;
@@ -189,6 +191,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 FundsInstructionContextKeys.PAYER_LEDGER_SUBJECT_CODE);
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionContextKeys.ACCOUNT_ID);
+        AssertUtils.isFalse(accountId.equals(payerId), SAME_REFUND_ACCOUNT_MESSAGE);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(FundsRouteLegIds.REFUND, 1, RouteLegType.RESTORE, instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerId), payerLedgerSubjectCode))

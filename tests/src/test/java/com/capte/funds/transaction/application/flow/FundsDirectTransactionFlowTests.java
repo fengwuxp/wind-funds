@@ -383,6 +383,76 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：资金账户向自己发起直接退款。
+     * 输入：付款方充值 100 并向目标账户付款 40 后，目标账户把自己作为退款到账账户和退款出资主体。
+     * 输出：请求被拒绝；付款方、目标账户和平台账户余额保持付款后的状态，且不生成退款事实。
+     * 预期：直接退款必须表达跨主体逆向价值转移，同主体账目修正应走余额控制或调账能力。
+     * 红线：不能用普通退款把同主体 SETTLEMENT -> AVAILABLE 伪装成跨主体退款。
+     */
+    @Test
+    void testRefundToSameAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId account = fundingAccount("same_refund_account");
+        ensureLedger(account, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(account, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, account, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 100L, "DIRECT_SAME_ACCOUNT_REFUND_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        pay(payer, account, LedgerSubjectCode.SETTLEMENT, 40L, "DIRECT_SAME_ACCOUNT_REFUND_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -40L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterPayFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> refund(account, account, LedgerSubjectCode.SETTLEMENT, 10L,
+                "DIRECT_SAME_ACCOUNT_REFUND"))
+                .hasMessageContaining("退款到账账户和退款出资主体不能一致");
+
+        BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, account, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterRejectedRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterPayFacts);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(account), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.PAY.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_SAME_ACCOUNT_REFUND_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_SAME_ACCOUNT_REFUND_PAY", 2, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_SAME_ACCOUNT_REFUND");
+    }
+
+    /**
      * 场景：系统内转账把外部账户作为收款主体。
      * 输入：付款方充值 50 后，提交外部银行账户作为 payeeAccountId。
      * 输出：请求被拒绝；付款方和平台账户余额保持充值后的状态。
