@@ -63,6 +63,7 @@ public class FundsDirectTransactionInstructionConverter {
     public @NonNull FundsInstructionSpec convertToTopupInstruction(@NonNull FundsTransactionTopupRequest request,
                                                                    @NonNull WindOperator operator) {
         AssertUtils.notNull(request.getAccountId(), "直接充值入账账户不能为空");
+        AssertUtils.notNull(request.getChannel(), "直接充值资金通道不能为空");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
