@@ -1284,11 +1284,11 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
-     * 场景：直接充值缺少渠道交易流水。
+     * 场景：直接充值缺少通道交易流水。
      * 输入：充值请求未传 channelTransactionSn。
      * 输出：请求被拒绝；用户账户、平台现金和预收款余额均不变化。
      * 预期：直接充值必须明确外部通道交易流水，缺流水不能进入 route 和 ledger。
-     * 红线：缺渠道交易流水不能以 NPE 或半截账务事实形式泄露到生产链路。
+     * 红线：缺通道交易流水不能以 NPE 或半截账务事实形式泄露到生产链路。
      */
     @Test
     void testTopupWithoutChannelTransactionSnShouldRejectAndLeaveNoLedgerSideEffects() {
@@ -1305,7 +1305,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_MISSING_CHANNEL_SN")
                 .setDescription("topup without channel transaction sn"), WindOperator.system()))
-                .hasMessageContaining("直接充值渠道交易流水不能为空");
+                .hasMessageContaining("直接充值通道交易流水不能为空");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterRejectedTopup,
