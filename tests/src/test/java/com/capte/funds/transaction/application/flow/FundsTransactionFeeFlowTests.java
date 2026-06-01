@@ -78,6 +78,47 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：独立手续费缺少支出账户。
+     * 输入：业务侧提交手续费 5，但不传 accountId。
+     * 输出：请求被拒绝；用户 AVAILABLE/FROZEN 和平台 FEE 余额均不变化。
+     * 预期：独立手续费必须明确支出账户，缺主体不能进入 route 和 ledger。
+     * 红线：缺支出账户不能以底层账户查询异常或半截账务事实形式泄露到生产链路。
+     */
+    @Test
+    void testStandaloneFeeWithoutAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.fee(new FundsTransactionFeeRequest()
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setFeeType(DefaultFeeType.FEE.getCode())
+                .setBusinessScene("FEE")
+                .setBusinessSn("FEE_MISSING_ACCOUNT_CHARGE")
+                .setDescription("fee without account"), WindOperator.system()))
+                .hasMessageContaining("手续费支出账户不能为空");
+
+        BalanceSnapshot afterFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("FEE_MISSING_ACCOUNT_CHARGE");
+    }
+
+    /**
      * 场景：独立手续费收取和手续费退回请求把敏感账户值放入扩展上下文。
      * 输入：手续费扣款 contextVariables 含嵌套 IBAN 值；有效手续费扣款后，退费 contextVariables 含嵌套 IBAN 值。
      * 输出：两次敏感请求均被拒绝；用户和平台手续费余额保持最近一次成功事实后的状态。

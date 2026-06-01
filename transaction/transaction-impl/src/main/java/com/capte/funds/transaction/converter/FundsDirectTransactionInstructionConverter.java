@@ -224,6 +224,7 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToFeeInstruction(@NonNull FundsTransactionFeeRequest request,
                                                                  @NonNull WindOperator operator) {
+        AssertUtils.notNull(request.getAccountId(), "手续费支出账户不能为空");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
