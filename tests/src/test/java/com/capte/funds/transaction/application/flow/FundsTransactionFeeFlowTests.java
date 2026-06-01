@@ -217,6 +217,73 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：手续费退回缺少到账账户。
+     * 输入：充值 50、独立手续费 5，随后退回手续费 5 但不传 accountId。
+     * 输出：退费请求被拒绝；用户 AVAILABLE/FROZEN 和平台 FEE 余额保持原手续费后的状态。
+     * 预期：手续费退回必须明确到账账户，缺主体不能进入 route replay 和 ledger。
+     * 红线：缺到账账户不能以底层账户查询异常或半截账务事实形式泄露到生产链路。
+     */
+    @Test
+    void testFeeRefundWithoutAccountShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+
+        topup(payer, 50L, "FEE_REFUND_MISSING_ACCOUNT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -50L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        fee(payer, 5L, "FEE_REFUND_MISSING_ACCOUNT_SOURCE");
+        BalanceSnapshot beforeFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, beforeFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -5L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+        String feeSourceTransactionSn = ledgerTransactionByBusinessSn("FEE_REFUND_MISSING_ACCOUNT_SOURCE")
+                .getFundsTransactionSn();
+
+        assertThatThrownBy(() -> directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setFeeSourceTransactionSn(feeSourceTransactionSn)
+                .setBusinessScene("FEE_REFUND")
+                .setBusinessSn("FEE_REFUND_MISSING_ACCOUNT_RETURN")
+                .setDescription("fee refund without account"), WindOperator.system()))
+                .hasMessageContaining("手续费退回到账账户不能为空");
+
+        BalanceSnapshot afterFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 45L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(feeAccount()), LedgerSubjectCode.FEE, 5L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_950L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_MISSING_ACCOUNT_TOPUP", 3, 4);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_MISSING_ACCOUNT_TOPUP");
+        assertSingleFundsAndLedgerFactsForBusinessSn("FEE_REFUND_MISSING_ACCOUNT_SOURCE", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("FEE_REFUND_MISSING_ACCOUNT_SOURCE");
+        assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_MISSING_ACCOUNT_RETURN");
+    }
+
+    /**
      * 场景：独立手续费使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
      * 输入：充值 50、手续费 5 使用业务流水 `FEE_IDEMPOTENT_CHARGE`，随后同流水同金额重试，再同流水改金额为 6。
      * 输出：同摘要重试返回同一资金交易流水；摘要冲突抛错；余额、route 和账务事实保持第一次手续费后的状态。
