@@ -57,6 +57,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String topup(FundsTransactionTopupRequest request, WindOperator operator) {
+        AssertUtils.notNull(request.getFundsSourceAccountId(), "直接充值资金来源账户不能为空");
         AssertUtils.isTrue(DefaultFundsAccountType.isExternalAccount(request.getFundsSourceAccountId()),
                 "top-up funds source must external account");
         return execute(directTransactionInstructionConverter.convertToTopupInstruction(request, operator));

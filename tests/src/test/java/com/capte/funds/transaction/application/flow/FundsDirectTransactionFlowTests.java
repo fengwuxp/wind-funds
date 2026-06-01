@@ -830,6 +830,46 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接充值缺少资金来源账户。
+     * 输入：充值请求未传 fundsSourceAccountId。
+     * 输出：请求被拒绝；用户账户、平台现金和预收款余额均不变化。
+     * 预期：直接充值必须明确外部资金来源，缺来源不能进入 route 和 ledger。
+     * 红线：缺外部资金来源不能以 NPE 或半截账务事实形式泄露到生产链路。
+     */
+    @Test
+    void testTopupWithoutFundsSourceShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId account = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_TOPUP_MISSING_SOURCE_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_TOPUP_MISSING_SOURCE")
+                .setDescription("topup without funds source"), WindOperator.system()))
+                .hasMessageContaining("直接充值资金来源账户不能为空");
+
+        BalanceSnapshot afterRejectedTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTopup,
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(account, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+
+        assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(account), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TOPUP_MISSING_SOURCE");
+    }
+
+    /**
      * 场景：直接充值把完整外部账户号伪装成外部账户引用 ID。
      * 输入：充值资金来源 FundsAccountId.id 为 12 位银行账户号。
      * 输出：请求被拒绝；用户账户、平台现金和预收款余额均不变化。
