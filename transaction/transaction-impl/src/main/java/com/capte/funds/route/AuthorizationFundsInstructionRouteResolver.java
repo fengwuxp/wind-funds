@@ -6,6 +6,7 @@ import com.capte.funds.route.support.RouteSpecSupport;
 import com.capte.funds.route.support.RouteSubjectSupport;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.capte.funds.transaction.support.FundsRouteCodes;
 import com.capte.funds.transaction.support.FundsRouteLegIds;
@@ -59,7 +60,8 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return instruction.getInstructionType() == FundsInstructionType.AUTHORIZATION_TRANSACTION
-                && instruction.getEventType() == FundsTransactionEventType.AUTHORIZE;
+                && (instruction.getEventType() == FundsTransactionEventType.AUTHORIZE
+                || (instruction.getEventType() == FundsTransactionEventType.SETTLE && isForceSettle(instruction)));
     }
 
     @Override
@@ -67,7 +69,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         return switch (instruction.getEventType()) {
             case AUTHORIZE -> resolveAuthorize(instruction);
             case REVERSAL -> resolveReversal(instruction);
-            case SETTLE -> resolveSettle(instruction);
+            case SETTLE -> isForceSettle(instruction) ? resolveForceSettle(instruction) : resolveSettle(instruction);
             case AUTH_REFUND -> resolveSettleRefund(instruction);
             default -> throw new IllegalArgumentException(UNSUPPORTED_EVENT_TYPE_MESSAGE
                     + instruction.getEventType());
@@ -115,6 +117,20 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         List<RouteLegSpec> legs = captureLegs(authorizationSubjects, settlementAccount, instruction);
         PlatformAccountsSnapshotSpec snapshot = platformAccountRouteSupport.createSettlementSnapshot(settlementAccount);
         return route(instruction, FundsRouteCodes.AUTHORIZATION_SETTLE_STANDARD, participants, legs, snapshot);
+    }
+
+    private ResolvedRouteSpec resolveForceSettle(FundsInstructionSpec instruction) {
+        FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
+                FundsInstructionContextKeys.ACCOUNT_ID);
+        FundsAccountId settlementAccount = platformAccountRouteSupport.requireAccount(
+                instruction.getAmount().getCurrency(), PlatformFundingAccountRole.SETTLEMENT);
+        List<RouteParticipantSpec> participants = List.of(
+                subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
+                        instruction),
+                platformParticipant(RouteParticipantRole.PAYEE, settlementAccount, instruction));
+        List<RouteLegSpec> legs = forceSettleLegs(accountId, settlementAccount, instruction);
+        PlatformAccountsSnapshotSpec snapshot = platformAccountRouteSupport.createSettlementSnapshot(settlementAccount);
+        return route(instruction, FundsRouteCodes.AUTHORIZATION_FORCE_SETTLE_STANDARD, participants, legs, snapshot);
     }
 
     private ResolvedRouteSpec resolveSettleRefund(FundsInstructionSpec instruction) {
@@ -216,6 +232,25 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         return result;
     }
 
+    private List<RouteLegSpec> forceSettleLegs(FundsAccountId accountId,
+                                               FundsAccountId settlementAccount,
+                                               FundsInstructionSpec instruction) {
+        SubjectRef settlementSubject = platformAccountRouteSupport.createSubjectRef(settlementAccount);
+        LedgerSubjectCode settlementLedgerSubjectCode = platformAccountRouteSupport.resolveLedgerSubjectCode(
+                PlatformFundingAccountRole.SETTLEMENT);
+        RouteLegSpec leg = routeLeg(FundsRouteLegIds.FORCE_SETTLEMENT_PREFIX + 1, 1, RouteLegType.CONSUME,
+                instruction)
+                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId),
+                        LedgerSubjectCode.AVAILABLE))
+                .targetNode(targetNode(settlementSubject, settlementLedgerSubjectCode))
+                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
+                .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .replayPolicy(RouteReplayPolicy.NON_REPLAYABLE)
+                .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
+                .build();
+        return List.of(leg);
+    }
+
     private List<RouteLegSpec> refundLegs(List<FundsAccountId> authorizationSubjects,
                                           FundsAccountId settlementAccount,
                                           FundsInstructionSpec instruction) {
@@ -302,6 +337,12 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 platformAccountRouteSupport.createSubjectRef(accountId),
                 platformAccountRouteSupport.resolveLedgerProfileCode(PlatformFundingAccountRole.SETTLEMENT).name(),
                 instruction.getAmount(), instruction.getDescription(), Map.of());
+    }
+
+    private boolean isForceSettle(FundsInstructionSpec instruction) {
+        String settleMode = FundsInstructionContextReader.getValue(instruction,
+                FundsInstructionContextKeys.SETTLE_MODE, String.class);
+        return FundsAuthorizationTransactionSettleRequest.SETTLE_MODE_FORCE.equalsIgnoreCase(settleMode);
     }
 
     @Override

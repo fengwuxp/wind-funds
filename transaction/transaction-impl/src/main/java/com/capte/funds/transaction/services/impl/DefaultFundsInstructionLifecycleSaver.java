@@ -16,6 +16,7 @@ import com.capte.funds.transaction.enums.FundsTransactionStatus;
 import com.capte.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.capte.funds.transaction.model.FundsTransactionParticipant;
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.capte.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.capte.funds.transaction.support.FundsStableHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -426,7 +427,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             }
             case REVERSAL -> applyReversedSummary(transaction, amount);
             case EXPIRE -> applyExpiredSummary(transaction, amount);
-            case SETTLE -> applySettledSummary(transaction, amount);
+            case SETTLE -> applySettledSummary(transaction, primaryDetail, amount);
             case TOPUP, TRANSFER, PAY, WITHDRAW, FEE_CHARGE -> applyPostedSummary(transaction, primaryDetail, details);
             case AUTH_REFUND, REFUND -> applyRefundedSummary(transaction, amount);
             case FEE_REFUND -> applyFeeRefundedSummary(transaction, amount);
@@ -488,9 +489,11 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 : FundsTransactionStatus.OPEN);
     }
 
-    private void applySettledSummary(FundsTransaction transaction, long amount) {
+    private void applySettledSummary(FundsTransaction transaction,
+                                     FundsTransactionDetail detail,
+                                     long amount) {
         transaction.setSettledAmount(transaction.getSettledAmount() + amount);
-        transaction.setStatus(isAuthorizationClosed(transaction) ? FundsTransactionStatus.CLOSED
+        transaction.setStatus(isForceSettle(detail) || isAuthorizationClosed(transaction) ? FundsTransactionStatus.CLOSED
                 : FundsTransactionStatus.OPEN);
     }
 
@@ -592,6 +595,15 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         }
         JSONObject values = JSON.parseObject(detail.getContextVariables());
         return values.getBoolean(FundsInstructionContextKeys.APPROVED);
+    }
+
+    private boolean isForceSettle(FundsTransactionDetail detail) {
+        if (!StringUtils.hasText(detail.getContextVariables())) {
+            return false;
+        }
+        JSONObject values = JSON.parseObject(detail.getContextVariables());
+        return FundsAuthorizationTransactionSettleRequest.SETTLE_MODE_FORCE.equalsIgnoreCase(
+                values.getString(FundsInstructionContextKeys.SETTLE_MODE));
     }
 
     private boolean isStableTransactionStatus(FundsTransactionStatus status) {

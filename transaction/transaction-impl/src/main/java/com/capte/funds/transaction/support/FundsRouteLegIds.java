@@ -35,6 +35,8 @@ public final class FundsRouteLegIds {
 
     public static final String AUTHORIZATION_SETTLEMENT_PREFIX = "AUTHORIZATION_SETTLEMENT_";
 
+    public static final String FORCE_SETTLEMENT_PREFIX = "FORCE_SETTLEMENT_";
+
     public static final String SETTLE_REFUND_PREFIX = "SETTLE_REFUND_";
 
     private FundsRouteLegIds() {

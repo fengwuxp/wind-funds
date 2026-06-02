@@ -37,6 +37,18 @@ public final class FundsInstructionContextKeys {
 
     public static final String AUTHORIZATION_TRANSACTION_SN = "authorizationTransactionSn";
 
+    public static final String SETTLE_MODE = "settleMode";
+
+    public static final String FORCE_SETTLE_POLICY_CODE = "forceSettlePolicyCode";
+
+    public static final String FORCE_SETTLE_LIMIT_AMOUNT = "forceSettleLimitAmount";
+
+    public static final String FORCE_SETTLE_REASON = "forceSettleReason";
+
+    public static final String EXTERNAL_ORIGINAL_FACT_REF = "externalOriginalFactRef";
+
+    public static final String FORCE_SETTLE_VOUCHER_REF = "forceSettleVoucherRef";
+
     public static final String LINKED_FUNDING_ACCOUNT_ID = "linkedFundingAccountId";
 
     public static final String LINKED_BUDGET_GROUP_ID = "linkedBudgetGroupId";

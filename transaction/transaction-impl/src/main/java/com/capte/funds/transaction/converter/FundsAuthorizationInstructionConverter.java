@@ -31,6 +31,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -145,6 +146,29 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull FundsAuthorizationTransactionSettleRequest request,
             @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
+        FundsInstructionReferenceSpec reference = null;
+        if (request.isForceSettle()) {
+            validateForceSettleRequest(request, amount);
+            context.put(FundsInstructionContextKeys.SETTLE_MODE,
+                    FundsAuthorizationTransactionSettleRequest.SETTLE_MODE_FORCE);
+            context.put(FundsInstructionContextKeys.FORCE_SETTLE_POLICY_CODE,
+                    request.getForceSettlePolicyCode());
+            context.put(FundsInstructionContextKeys.FORCE_SETTLE_LIMIT_AMOUNT,
+                    request.getForceSettleLimitAmount());
+            context.put(FundsInstructionContextKeys.FORCE_SETTLE_REASON, request.getForceSettleReason());
+            context.put(FundsInstructionContextKeys.EXTERNAL_ORIGINAL_FACT_REF,
+                    request.getExternalOriginalFactRef());
+            context.put(FundsInstructionContextKeys.FORCE_SETTLE_VOUCHER_REF,
+                    request.getForceSettleVoucherRef());
+        } else {
+            AssertUtils.hasText(request.getAuthorizationTransactionSn(),
+                    "authorizationTransactionSn must not be blank");
+            reference = authorizationReference(request.getAuthorizationTransactionSn());
+            context.put(FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
+                    request.getAuthorizationTransactionSn());
+        }
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
@@ -153,16 +177,13 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .reference(authorizationReference(request.getAuthorizationTransactionSn()))
+                .reference(reference)
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getSettleTime()))
                 .description(request.getDescription())
                 .operator(operationActor(operator))
-                .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
-                        FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
-                        request.getAuthorizationTransactionSn())))
+                .contextVariables(mergeContext(request.getContextVariables(), context))
                 .build();
     }
 
@@ -221,6 +242,21 @@ public class FundsAuthorizationInstructionConverter {
 
     private @NonNull LocalDateTime eventTime(@Nullable LocalDateTime eventTime) {
         return eventTime == null ? LocalDateTime.now() : eventTime;
+    }
+
+    private void validateForceSettleRequest(@NonNull FundsAuthorizationTransactionSettleRequest request,
+                                            @NonNull ConvertedAmount amount) {
+        AssertUtils.isFalse(StringUtils.hasText(request.getAuthorizationTransactionSn()),
+                "force settle must not carry authorizationTransactionSn");
+        AssertUtils.hasText(request.getForceSettlePolicyCode(), "forceSettlePolicyCode must not be blank");
+        AssertUtils.notNull(request.getForceSettleLimitAmount(), "forceSettleLimitAmount must not be null");
+        AssertUtils.isTrue(request.getForceSettleLimitAmount() > 0,
+                "forceSettleLimitAmount must be greater than 0");
+        AssertUtils.isTrue(amount.amount().getAmount() <= request.getForceSettleLimitAmount(),
+                "forceSettleLimitAmount must be greater than or equal to transaction amount");
+        AssertUtils.hasText(request.getForceSettleReason(), "forceSettleReason must not be blank");
+        AssertUtils.hasText(request.getExternalOriginalFactRef(), "externalOriginalFactRef must not be blank");
+        AssertUtils.hasText(request.getForceSettleVoucherRef(), "forceSettleVoucherRef must not be blank");
     }
 
     private @NonNull FundsInstructionReferenceSpec authorizationReference(@NonNull String authorizationTransactionSn) {

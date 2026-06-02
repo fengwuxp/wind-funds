@@ -14,6 +14,7 @@ import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.core.WritableContextVariables;
 import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
@@ -766,6 +767,127 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_CAPTURE", 0, 2, 1, 2);
+    }
+
+    /**
+     * 场景：外部已经完成扣款但本系统没有内部授权事实，运营按授权后继能力发起强制完成。
+     * 输入：充值 100、强制完成 60、策略上限 60、外部原始事实引用和凭证引用齐备。
+     * 输出：用户 AVAILABLE 直接扣减，平台 SETTLEMENT 增加，AUTHORIZATION 不变，账务事实保留强制完成审计上下文。
+     * 预期：强制完成不伪造 authorizationTransactionSn，也不消费 AUTHORIZATION 桶。
+     * 红线：没有内部授权事实时，普通完成路径不得被复用成“查不到授权”的失败，也不得绕过策略、原因和外部证据。
+     */
+    @Test
+    void testForceSettleWithoutAuthorizationShouldConsumeAvailableBalanceAndPreserveAuditContext() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        topup(user, 100L, "AUTH_FORCE_SETTLE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        String forceSettleSn = forceSettleAuthorization(user, 60L, "AUTH_FORCE_SETTLE_CAPTURE");
+
+        BalanceSnapshot afterForceSettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterForceSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY));
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY);
+
+        FundsTransactionDTO transaction = fundsTransaction(forceSettleSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(transaction.getAuthorizedAmount()).isZero();
+        assertThat(transaction.getSettledAmount()).isEqualTo(60L);
+        assertThat(transaction.getReversedAmount()).isZero();
+        assertThat(transaction.getRefundedAmount()).isZero();
+
+        assertPostedTransactions(2);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.SETTLE.name());
+
+        LedgerTransaction settleTransaction = ledgerTransactionByBusinessSn("AUTH_FORCE_SETTLE_CAPTURE");
+        assertThat(settleTransaction.getReferenceLedgerTransactionSn()).isNull();
+        List<LedgerPostingPlan> settlePostingPlans = postingPlansOf(settleTransaction);
+        assertThat(entriesOf(settleTransaction).stream()
+                .map(LedgerEntry::getLedgerSubjectCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.SETTLEMENT);
+        assertThat(settlePostingPlans)
+                .singleElement()
+                .satisfies(plan -> {
+                    assertThat(plan.getSn()).hasSizeLessThanOrEqualTo(64);
+                    assertThat(plan.getRouteLegId()).isEqualTo("FORCE_SETTLEMENT_1");
+                });
+        assertThat(settlePostingPlans.stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsOnly(LedgerPhaseCode.SETTLEMENT.name());
+
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FORCE_SETTLE_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceDetailSn)
+                .toList())
+                .containsOnlyNulls();
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FORCE_SETTLE_CAPTURE").stream()
+                .map(FundsTransactionDetail::getReferenceLedgerTransactionSn)
+                .toList())
+                .containsOnlyNulls();
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FORCE_SETTLE_CAPTURE"))
+                .allSatisfy(detail -> assertThat(detail.getContextVariables())
+                        .contains("\"settleMode\":\"FORCE\"")
+                        .contains("\"forceSettlePolicyCode\":\"B4_FORCE_SETTLE_OPS\"")
+                        .contains("\"externalOriginalFactRef\":\"processor_settlement_202606020001\"")
+                        .contains("\"forceSettleVoucherRef\":\"ops_voucher_202606020001\""));
+        assertLedgerFactsFollowRouteSnapshot("AUTH_FORCE_SETTLE_CAPTURE");
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_TOPUP", 3, 4);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_CAPTURE", 1, 2, 1, 2);
+    }
+
+    /**
+     * 场景：强制完成请求缺少策略编码或金额超过策略上限。
+     * 输入：充值 100，分别提交缺策略、超上限的强制完成请求。
+     * 输出：请求在交易事实创建前被拒绝，余额、账务事实和交易事实不变化。
+     * 预期：强制完成必须显式携带策略、原因、外部原始事实、凭证和金额上限。
+     * 红线：缺少授权事实的完成不得降级成普通完成，不得在参数非法时留下 FAILED 资金交易或半成功账务。
+     */
+    @Test
+    void testForceSettleMissingPolicyOrExceedingLimitShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_FORCE_SETTLE_REJECT_TOPUP");
+        BalanceSnapshot beforeFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> authorizationTransactionService.settle(forceSettleRequest(user, 60L,
+                "AUTH_FORCE_SETTLE_MISSING_POLICY")
+                .setForceSettlePolicyCode(null), WindOperator.system()))
+                .hasMessageContaining("forceSettlePolicyCode");
+        assertThatThrownBy(() -> authorizationTransactionService.settle(forceSettleRequest(user, 60L,
+                "AUTH_FORCE_SETTLE_EXCEED_LIMIT")
+                .setForceSettleLimitAmount(50L), WindOperator.system()))
+                .hasMessageContaining("forceSettleLimitAmount");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_REJECT_TOPUP", 3, 4);
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_MISSING_POLICY");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_EXCEED_LIMIT");
     }
 
     /**
@@ -1966,5 +2088,27 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         "chargebackReason", "CARDHOLDER_DISPUTE",
                         "evidenceRef", "CHARGEBACK_EVIDENCE_IDEMPOTENT_202605290001"))),
                 WindOperator.system());
+    }
+
+    private String forceSettleAuthorization(FundsAccountId accountId, long amount, String businessSn) {
+        return authorizationTransactionService.settle(forceSettleRequest(accountId, amount, businessSn),
+                WindOperator.system());
+    }
+
+    private FundsAuthorizationTransactionSettleRequest forceSettleRequest(FundsAccountId accountId,
+                                                                          long amount,
+                                                                          String businessSn) {
+        return new FundsAuthorizationTransactionSettleRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
+                .setSettleMode("FORCE")
+                .setForceSettlePolicyCode("B4_FORCE_SETTLE_OPS")
+                .setForceSettleLimitAmount(amount)
+                .setForceSettleReason("external settlement accepted without internal authorization")
+                .setExternalOriginalFactRef("processor_settlement_202606020001")
+                .setForceSettleVoucherRef("ops_voucher_202606020001")
+                .setBusinessScene("AUTHORIZATION_FORCE_SETTLE")
+                .setBusinessSn(businessSn)
+                .setDescription("authorization force settle");
     }
 }
