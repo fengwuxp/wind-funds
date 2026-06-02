@@ -35,6 +35,7 @@
 - [x] 2026-06-02 收敛 B4-NO-AUTH-REFUND 首轮候选契约字段：`docs/TDD设计/B4-授权后继能力Round0准入卡.md` 已补充 `noAuthRefundContractCandidate`，把后续 Grant 必须显式确认的字段限定为 `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要的 `originalFactAmount/originalFactCurrency`、`operator/contextVariables` 或等价命名；普通授权链退款继续要求 `authorizationTransactionSn`，NO_AUTH 模式不得携带内部授权流水、不得查询原授权账本交易。该收敛只作为 B4-NO-AUTH-REFUND Execution Grant 输入，不授权 Java 代码、测试代码、DDL/H2 schema、支付工具 facade、VCC、force settle 返工、拒付增强、清结算对账或治理写入。
 - [x] 2026-06-02 对齐 B4-NO-AUTH-REFUND 主文档口径：PRD、DSL、系分、TDD、B4 准入卡和 OpenSpec 已统一到 `NO_AUTH` 或等价模式、外部原事实引用、外部原事实类型、退款原因、退款凭证、操作者/审计、必要原事实金额摘要、普通授权链退款兼容和无授权退款不得携带或查询内部授权流水；`TDD-RED-017A` 作为缺模式、缺原事实类型、缺原因、缺凭证、缺审计、携带内部授权流水和失败无副作用的红线入口。该对齐仍是 docs-only 准入，不授权代码、测试、DDL/H2 schema 或运行时配置。
 - [x] 2026-06-02 完成 B4-NO-AUTH-REFUND GSD-CAD 准入复核：以 `e937395 docs: 对齐 B4 无授权退款主文档口径` 为已提交基线，B4-NO-AUTH-REFUND 状态定为 `READY_TO_CONFIRM_NOT_AUTHORIZED`。GSD 层确认下一候选是单一 B4-NO-AUTH-REFUND 切片；CAD 层只有在用户确认 `Execution Grant：B4-NO-AUTH-REFUND` 后，才允许从 `B4-NAR-RED-001` 开始写目标 Red。未确认前不写 Java、测试代码、DDL/H2 schema、支付工具 facade、VCC、force settle 返工、chargeback 独立入口、清结算对账、治理、生产配置、外部协议或敏感数据处理。
+- [x] 2026-06-02 补齐 B4-NO-AUTH-REFUND Grant 可执行包：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#82-grantexecutionpackagecandidate2026-06-02` 已把下一轮候选收敛为 `B4-NAR-CAD-001` 原子任务包，状态仍为 `READY_TO_CONFIRM_NOT_AUTHORIZED`。该包明确首轮只写 `B4-NAR-RED-001`，必要时再补 `B4-NAR-RED-002`；允许范围限定为授权退款 flow 测试、`FundsAuthorizationTransactionRefundRequest` 显式列名兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复；`tests/src/test/resources/jdbc-schema.sql`、ledger 公共契约、core 枚举状态、支付工具 facade、钱包 application facade、VCC、Spend Rule、chargeback case、清结算追偿、治理、生产配置、外部协议和敏感数据处理均保持禁止。该补强仍是 docs-only Grant 包，不授权 Java、测试、DDL/H2 schema 或运行时配置写入；后续用户确认 Execution Grant 时必须以确认时 Git HEAD 为 `authorityBaseline`。
 
 ## 1. MVP 任务写入范围
 
@@ -654,9 +655,12 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | 能力域 | 准入状态 | 对齐结论 |
 | --- | --- | --- |
 | B4-NO-AUTH-REFUND | `READY_TO_CONFIRM_NOT_AUTHORIZED`。 | 设计、PRD、DSL、系分、TDD、B4 准入卡和 OpenSpec 已对齐；可进入用户确认态，但未确认前不得写 Red 或生产代码。 |
+| 原子任务包 | `B4-NAR-CAD-001`。 | Grant 可执行包已补齐到 B4 准入卡 8.2；用户确认后只消费该单一任务包，不消费整个 B4 Roadmap。 |
 | 首轮 CAD Pick | `B4-NAR-RED-001`。 | 用户确认 Execution Grant 后，先证明无前置授权但有外部原事实的 `settleRefund` 当前无法形成可追溯退款资金事实；若 Red 未失败，暂停判断已有实现覆盖或 Red 写错。 |
 | 必须列名字段 | `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要原事实金额币种、`operator/contextVariables`。 | Grant 必须说明字段名、类型、必填规则、摘要字段、普通授权链退款兼容策略和 NO_AUTH 模式不得携带或查询内部授权流水。 |
+| 允许写入上限 | `PENDING_GRANT`。 | 先写授权退款 flow 测试；Red 证明缺口后只允许 `FundsAuthorizationTransactionRefundRequest` 显式列名兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复。 |
 | 禁止混入 | `BLOCKED_BY_SCOPE`。 | 不混入 force settle 返工、chargeback 独立入口、支付工具 facade、VCC 生命周期、Spend Rule、DDL/H2、清结算对账、治理 apply、生产配置、外部协议或敏感数据处理。 |
+| 停止条件 | `BLOCKED_BY_SCOPE`。 | 需要 DDL/H2、core 枚举或状态、ledger 公共契约、新依赖、外部规则、支付工具 facade、钱包 application facade、VCC、chargeback case、清结算追偿、敏感数据处理、公有方法超过 5 个参数或工作树冲突时停止。 |
 | 验证命令 | `PENDING_GRANT`。 | 编码后必须执行 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；docs-only 阶段只需文档门禁和 diff 检查。 |
 
 ## 14. B2 建议 Execution Grant

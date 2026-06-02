@@ -165,6 +165,65 @@
 | 首轮禁止事项 | 不改 DDL/H2 schema，不新增支付工具 facade，不新增 chargeback 独立入口，不实现 VCC 生命周期，不接入外部协议或敏感数据处理。 | 任一项成为必要条件时，停止并重新确认授权范围。 |
 | 验证闭环 | docs-only 阶段只跑文档门禁；编码阶段必须跑 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`。 | 若验证因环境失败，必须区分环境问题和代码问题；未验证不得自动提交代码。 |
 
+### 8.2 grantExecutionPackageCandidate（2026-06-02）
+
+本节把 B4-NO-AUTH-REFUND 收敛成可确认的 GSD-CAD 原子任务包。它仍然不是 Execution Grant；只有用户明确确认本节或第 11 节等价授权文本后，才允许写测试或生产代码。
+
+| 产品准入项 | 口径 |
+| --- | --- |
+| 业务目标 / 用户价值 | 在没有内部授权流水但外部原消费、原完成或差错凭证已确认时，支持运营和财务发起可追溯的退款回补；用户价值是退款结果、原因、凭证和账务影响可解释。 |
+| 非目标 | 不做完整退款运营后台、不做 chargeback case、不做清结算追偿、不做外部卡组织规则实现、不做 VCC 或支付工具 facade。 |
+| 业务流程 / 主流程 | 主流程是运营或系统拿到外部原事实 -> 发起 `NO_AUTH` 无授权退款 -> 系统校验原事实引用、类型、原因、凭证、操作者和金额币种 -> 生成退款交易事实、route snapshot、账务事实和投影。 |
+| 异常流程 / 人工兜底 | 缺模式、缺原事实、缺凭证、缺原因、缺操作者、携带内部授权流水、敏感上下文或金额币种不可审计时失败且无资金副作用；是否转人工差错候选由后续独立 Grant 确认。 |
+| 运营后台 / 数据口径 | 首轮不新增运营后台页面或报表；但交易事实、请求摘要、外部原事实摘要、退款原因、退款凭证、操作者、ledger transaction、projection 和审计上下文必须足以支撑后续查询、指标、报表和差错复核。 |
+
+| 授权包字段 | 候选内容 |
+| --- | --- |
+| `taskId` | `B4-NAR-CAD-001`。 |
+| `stage` / `wave` | B4 授权后继能力 / Wave 1 账户主体型 canonical 内核补强。 |
+| `status` | `READY_TO_CONFIRM_NOT_AUTHORIZED`。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选基线至少包含 `b0666ba`、`f99f3a3`、`616dac1`、`3825466`、`e937395` 和 `fe40d4a`。 |
+| `mvpScenario` | 无前置内部授权流水，但已存在外部原消费、原完成或差错凭证，需要在账户主体型交易内核中形成可追溯退款资金事实。 |
+| `businessAdmission` | 产品验收锚点为 `AC-AUTH-012` 和 `TDD-RED-017A`；DSL 锚点为 `DSL-AUTH-REFUND-001`；系分锚点为授权交易 `settleRefund`、route replay、账务计划和投影解释。 |
+| `firstRedSet` | 首轮只写 `B4-NAR-RED-001`。若 Red 未按预期失败，先暂停判断已有实现覆盖或 Red 资产错误。 |
+| `secondRedSet` | 首轮 Green 后再补 `B4-NAR-RED-002` 失败矩阵；若首轮 Red 必须同时证明失败无副作用，可以在同一测试类内增加最小负向样例，但不得扩大到 chargeback 或清结算。 |
+| `gitStrategy` | 仅在用户确认 `auto_commit` 且目标验证通过时提交；验证失败、环境不可判定或越界时转为 `summary_only`。 |
+
+| 边界项 | 候选裁决 |
+| --- | --- |
+| `writeScope` | 先写 `tests/src/test/java/com/capte/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java` 中 B4-NAR 目标 Red；若测试类体量明显失控，允许新增授权无授权退款 flow 测试类。Red 证明缺口后，允许最小修改 `transaction/transaction-face` 的 `FundsAuthorizationTransactionRefundRequest` 兼容字段，以及 `transaction/transaction-impl` 的 converter、command service、lifecycle saver、route replay 和请求摘要。 |
+| `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/*`、现有 `transaction-*`、`ledger-*`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| `publicContractGate` | 只有 Grant 显式列名 `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要原事实金额币种和 `operator/contextVariables` 时，才允许扩展 `FundsAuthorizationTransactionRefundRequest`。不允许破坏普通授权链退款的 `authorizationTransactionSn` 兼容语义。 |
+| `ledgerGate` | 默认不修改 `ledger-face`、`ledger-impl` 公共能力。若 route replay 或 posting 装配证明必须改 ledger 侧公共契约、账务计划语义或 projection 表达，立即停止并扩权确认。 |
+| `schemaGate` | `tests/src/test/resources/jdbc-schema.sql`、生产 DDL、Entity 字段、Mapper 表字段和数据库唯一约束均只读；任何表结构需求都触发停止。 |
+| `noWriteScope` | 不写支付工具 facade、钱包 application facade、VCC 生命周期、Spend Rule 表、force settle 返工、chargeback 独立入口、dispute case、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理和 P2 业务能力包。 |
+
+| `B4-NAR-RED-001` 断言包 | 必须证明的事实 |
+| --- | --- |
+| 请求事实 | 请求显式声明 `NO_AUTH` 或等价模式，携带外部原事实引用、外部原事实类型、退款原因、退款凭证、必要原事实金额币种、操作者和白名单上下文；不得携带 `authorizationTransactionSn`。 |
+| 交易事实 | 成功后生成退款资金交易事实，请求摘要能区分普通授权链退款和无授权退款；外部原事实摘要可追溯，内部授权流水不被伪造。 |
+| 路由事实 | 不按当前绑定重新选路，不构造 `AUTHORIZATION` reference，不查询原授权账本交易；route snapshot 或 replay 结果能解释退款资金路径。 |
+| 账务事实 | posting plan 平衡，ledger transaction、ledger entry 和 projection 可追溯；金额、币种和余额桶变化符合退款语义。 |
+| 幂等事实 | 同 `businessSn` 同摘要重试幂等；同 `businessSn` 不同摘要拒绝且不污染原事实。 |
+| 失败副作用 | 若首轮 Red 同时带最小负向样例，失败时不得产生 route、posting、ledger transaction、ledger entry、projection 或余额变化。 |
+
+| `B4-NAR-RED-002` 失败矩阵 | 停止或失败口径 |
+| --- | --- |
+| 缺模式或空白模式 | 不进入无授权退款，不回退到普通授权链退款。 |
+| 缺外部原事实引用或类型 | 失败且无资金副作用；不得把内部授权流水当外部原事实。 |
+| 缺退款原因、凭证或操作者 | 失败且无资金副作用；不得从普通 `contextVariables` 暗含核心资金事实。 |
+| 携带 `authorizationTransactionSn` | `NO_AUTH` 模式必须失败或转人工差错候选；不得查询原授权账本交易。 |
+| 原事实金额币种不可信 | 若 Grant 启用金额上限断言，超出原事实金额、币种不一致或金额摘要不可审计时失败。 |
+| 敏感上下文 | 继续沿用敏感上下文 validator，敏感字段不得进入请求摘要、审计上下文或日志。 |
+
+| 验证与提交 | 候选要求 |
+| --- | --- |
+| Red 验证 | `just test-one FundsAuthorizationTransactionFlowTests tests` 必须先失败在 B4-NAR 目标缺口；若失败点偏离无授权退款契约，先修 Red，不改生产。 |
+| Green 验证 | `just test-one FundsAuthorizationTransactionFlowTests tests` 通过，且普通授权链 authorize、settle、expire、force settle 和 settleRefund 回归不退化。 |
+| 回归验证 | `just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
+| 提交条件 | 工作树只包含本 Grant 范围内变更，目标验证和回归验证通过，且未触发停止条件时才允许 `git add` 和 `git commit`。 |
+| 停止条件 | 需要 DDL/H2、core 枚举或状态、新依赖、外部规则、支付工具 facade、VCC、chargeback case、清结算追偿、ledger 公共契约扩展、公有方法超过 5 个参数、敏感数据处理或工作树冲突时立即停止。 |
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
@@ -203,15 +262,15 @@ Git 策略：auto_commit
 
 ```text
 Execution Grant：B4-NO-AUTH-REFUND
-确认基线：确认时 Git HEAD（至少包含 b0666ba / f99f3a3 / 616dac1 / 3825466）
+确认基线：确认时 Git HEAD（至少包含 b0666ba / f99f3a3 / 616dac1 / 3825466 / e937395 / fe40d4a / 本 Grant 可执行包提交）
 允许写入：先写 tests 中 B4-NAR 目标 Red；Red 证明缺口后允许 transaction-face 的 FundsAuthorizationTransactionRefundRequest 兼容字段、transaction-impl converter/command/lifecycle/route replay、TDD tests 最小修复
 允许契约字段：refundMode 或 noAuthRefundMode、externalOriginalFactRef、externalOriginalFactType、refundReason、refundVoucherRef、originalFactAmount/originalFactCurrency、operator/contextVariables 或等价命名；允许把 `authorizationTransactionSn` 调整为普通授权链退款必填、NO_AUTH 模式不携带且不查询原授权账本交易；字段名、类型、必填规则、摘要字段和兼容策略以本次 Grant 为准
 审计最小集：WindOperator、refundReason、externalOriginalFactRef、externalOriginalFactType、refundVoucherRef 和必要原事实金额摘要；contextVariables 只作为白名单补充，不承载核心资金事实或敏感数据
-禁止写入：支付工具 facade、VCC 生命周期、DDL/H2 schema、Spend Rule 表结构、force settle、chargeback 独立入口、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理
+禁止写入：支付工具 facade、钱包 application facade、VCC 生命周期、DDL/H2 schema、ledger 公共契约、core 枚举状态、Spend Rule 表结构、force settle、chargeback 独立入口、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理
 首批 Red：B4-NAR-RED-001；必要时补 B4-NAR-RED-002
 验证命令：just test-one FundsAuthorizationTransactionFlowTests tests；just test-transaction；just test-business-flow；just test-boundary；just compile；提交前 just pmd 和 git diff --check
 Git 策略：auto_commit
-停止条件：公共契约扩展未列名、表结构、外部规则、清结算对账、P2、敏感数据或工作树冲突越界即停止
+停止条件：公共契约扩展未列名、表结构、ledger 公共契约、外部规则、清结算对账、P2、敏感数据或工作树冲突越界即停止
 ```
 
 确认模板前，本文档只作为 Round 0 准入卡和 TDD 分析产物，不进入编码。
