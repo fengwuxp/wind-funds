@@ -125,6 +125,8 @@ B2-FR 进入 DSL fixture、Spec 或公共字段变更前，必须先在 `funding
 
 本节用于复核支付工具、资金账户和信用账户重新定性后，DSL 约定、路由规则、账目平衡、余额投影和交易投影是否仍然闭合。后续触碰这些对象时，必须先按本表检查；不满足时只能进入设计修正、TDD 分析或单一 Execution Grant，不得顺手改公共契约、测试资源、DDL/H2 schema 或生产代码。
 
+Highnote 公开发卡文档中的 financial account、ledger、ledger entry、payment card 和 financial account activity 分层，可作为本 DSL 的外部参考确认：资金和账本落在账户，卡只是访问工具，账户活动和交易事件承担卡维度归因。wind-funds DSL 因此坚持“账户入账、工具归因、控制留痕、投影查询”：`SubjectRef` 决定可入账主体，`PaymentInstrumentRef` 和 binding snapshot 决定工具归因，Spend Rule / 预算控制只产出控制证据和只读投影输入。
+
 | CR 面 | 对齐裁决 | 必须保持 | 编码准入影响 |
 | --- | --- | --- | --- |
 | DSL 主体约定 | `SubjectRef` 只承载资金账户、信用账户和平台角色解析后的平台资金账户；`PaymentInstrumentRef`、`ExternalAccountRef` 只承载工具、外部账户和脱敏引用；预算组和 Spend Rule 只承载 scope、规则快照、控制窗口和审计上下文。 | 不新增 `InstrumentTransaction`、`PaymentInstrumentTransaction` 或支付工具账务主体；内部余额钱包、平台钱包、商户钱包、返利钱包和信用额度入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照。 | 触碰 `core` 枚举、Spec、fixture 或公共 DSL 字段时，必须显式声明公共契约授权和 `fixtureLevel`。 |

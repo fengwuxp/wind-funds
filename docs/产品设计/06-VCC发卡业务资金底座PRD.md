@@ -324,3 +324,216 @@ flowchart LR
 | 03-清结算与对账 | 补充 VCC clearing、费用、chargeback、卡组织文件对账和争议证据。 |
 | 02/03/05 资金数据治理拆分承接 | 02 补充 VCC 授权、企业账单和支付工具流水投影重放；03 补充 VCC 清算、争议和对账批次视图重放；05 补充治理门禁和指标只读边界。 |
 | 05-产品验收与TDD用例矩阵 | 补充 VCC-AC 和 VCC-RED 用例矩阵。 |
+
+## 12. 支撑 fincone-issuing 的落地边界
+
+`fincone-issuing` 负责 VCC 发卡业务、发卡行资源、发卡路由、服务计划、开卡订单、开卡任务、卡生命周期、发卡行 Webhook 和 `vcc-sdk` 调用。`wind-funds` 不承接这些业务对象的生命周期，只承接它们归一后的资金事实、支付工具引用、资金责任决策、授权交易、账本、投影、清结算、对账和治理证据。
+
+### 12.1 两项目能力分工
+
+| 业务问题 | fincone-issuing 承接 | wind-funds 承接 | 不允许的实现 |
+| --- | --- | --- | --- |
+| 开卡和卡生命周期 | Program、逻辑 BIN、Physical BIN Candidate、持卡人、开卡订单、开卡任务、卡状态同步和 issuer webhook。 | 仅在开卡费用、首次充值、资金冻结、退款或资金责任需要时提供账户、交易和余额能力。 | 在 `wind-funds` 内实现 Program、BIN、Card、Cardholder 或 issuer 协议。 |
+| 支付工具注册 | 创建、激活、暂停、关闭 VCC 卡，并保存 issuer / processor 安全引用。 | 保存 `PaymentInstrumentRef`、脱敏展示、工具状态、方向、币种、能力和绑定版本。 | 把卡、卡 token、持卡人、卡组或外部卡账户建成账本主体。 |
+| 资金责任解析 | 按服务计划、托管模式、业务审批、预算策略和预付责任提供上下文。 | 用 `FundingAllocationDecision` 解析到资金账户、信用账户或平台角色解析后的平台资金账户；预算组和 Spend Rule 只作为控制上下文。 | 用卡产品形态反推出账户类型，或把预算组、Spend Rule 写入 ledger subject。 |
+| 授权交易 | 接收授权请求，做来源校验、脱敏、幂等、规则上下文、商户/MCC/地区等场景归一。 | 提供 `authorizeByInstrument` 或等价 application facade，完成工具准入、绑定快照、资金责任解析、账户能力校验，再委派账户主体型授权内核。 | 把 `FundsAuthorizationTransactionService` 的 canonical 请求整体改成支付工具入参，或新增统一支付工具交易内核。 |
+| 清算、退款和拒付 | 归一 clearing、partial clearing、force capture、refund、chargeback、fee 和外部规则确认。 | 按原授权和原 route snapshot 完成 settle、release、expire、refund、差错、费用、追偿、对账和投影。 | 按当前卡绑定重新选路，或让 VCC 表替代资金交易、账本、清结算、对账事实。 |
+| 卡账单和运营视图 | 提供卡、持卡人、企业、服务计划和 issuer 侧解释字段。 | 通过统一交易投影按 `PaymentInstrumentRef`、绑定版本、预算组、Spend Rule 和资金责任决策生成只读视图。 | 给卡建立独立账本、独立余额或独立资金流水事实源。 |
+
+### 12.2 fincone-issuing 接入 wind-funds 的业务链路
+
+1. 接入准备：`fincone-issuing` 完成服务计划、逻辑 BIN、真实 BIN 候选、发卡行账户模式、卡功能能力和托管模式确认；`wind-funds` 只接收资金主体、支付工具和规则快照的安全引用。
+2. 开卡订单：`fincone-issuing` 校验服务计划、费用、首充金额、卡段路由和持卡人；涉及付款、冻结、退款或充值时调用 `wind-funds` 账户主体型交易或余额控制能力。
+3. 开卡成功：`fincone-issuing` 保存卡和 issuer 执行结果，向 `wind-funds` 注册或更新 `PaymentInstrumentRef`，并建立工具绑定、预算控制和资金责任解析关系。
+4. 授权请求：`fincone-issuing` 把 issuer / processor 授权事件归一为安全的授权上下文，调用 `wind-funds` 支付工具授权 application facade；拒绝只能形成拒绝事实和解释，不生成 route、posting 或 ledger entry。
+5. 清算和逆向：`fincone-issuing` 把 clearing、reversal、expire、refund、chargeback 和费用归一后提交，`wind-funds` 基于原授权、原 route snapshot 和原绑定版本回放。
+6. 账单和对账：`fincone-issuing` 展示卡维度业务账单和 issuer 解释，`wind-funds` 提供账户余额、账本分录、交易投影、对账批次、差错和归档证据。
+
+### 12.3 wind-funds 支撑切片
+
+| 切片 | 目标 | 首批准入问题 | 允许落地点 | 不混入 |
+| --- | --- | --- | --- | --- |
+| A0 契约冻结 | 冻结 VCC 接入 DTO 语义、幂等键、requestDigest、敏感字段、错误类别和外部引用。 | VCC 输入是否都能映射为安全引用、支付工具、资金责任、授权或清算动作。 | PRD、DSL、系分、TDD、OpenSpec、接口伪契约。 | 生产代码、DDL、真实资金写入。 |
+| B2-PI-CAP | 支付工具能力准入。 | 工具状态、方向、币种、动作能力、绑定版本和敏感字段是否可判定。 | wallet application facade、DTO、契约测试。 | 授权状态机、Spend Rule 表、清结算。 |
+| B2-FR | 资金责任目标主体解析。 | 本轮选择 `funding-account-only` 还是 `targetSubjectType + targetSubjectId`。 | 资金责任关系契约、route snapshot、TDD fixture。 | 字段策略混用、直接交易、清结算、P2 轨道协议。 |
+| B4-AUTH-PI | 支付工具授权入口。 | `authorizeByInstrument` 是否只做 application facade 并委派账户主体型内核。 | 授权准入 facade、委派适配、拒绝无副作用测试。 | 替换授权内核 canonical 请求、完整 VCC 发卡。 |
+| B5-SR-CONTROL | Spend Rule 决策和预算预留释放。 | 拒绝是否可审计且无账务副作用，预算控制是否只写控制事实和只读视图。 | 规则决策、控制活动、预算控制投影；需要单独 DDL/H2 授权。 | 预算组账务主体化、资金交易事实反写。 |
+| B6/B8-PI-VIEW | 卡账单、规则时间线和重放。 | 换绑后逆向交易是否按原工具快照、绑定版本和 route snapshot 解释。 | 交易投影、重放 dry-run、差异报告。 | 投影反写事实、正式治理 apply。 |
+
+### 12.4 生产准入基线
+
+| 准入项 | 进入编码前要求 | 未满足时处理 |
+| --- | --- | --- |
+| 资金责任字段策略 | 明确本轮只做 `funding-account-only`，或明确迁移到 `targetSubjectType + targetSubjectId` 并同步 DTO、DDL/H2、摘要、fixture、route snapshot 和回放断言。 | 不允许声明信用账户、平台角色或多责任主体生产可用。 |
+| 支付工具授权入口 | 明确 facade 名称、入参、错误类别、幂等键、委派账户主体型授权内核的边界。 | 只能 contract-only，不改授权内核公共请求。 |
+| 敏感字段边界 | 完整 PAN、CVV、CVC、token secret、密钥、完整磁道和完整外部账户号 must-fail 或脱敏阻断。 | 不进入沙箱闭环和生产资金流。 |
+| 外部规则确认 | 清算、部分清算、force capture、refund、chargeback、费用、FX、预付资金责任和 PCI 边界要记录来源、版本、适用范围、核验日期、确认方和状态。 | 只能阻断、人工复核、只读影子或 contract-only。 |
+| 账务副作用 | 授权拒绝、规则拒绝、敏感字段拒绝、资金责任不唯一、工具不可用时无 route、posting、LedgerEntry。 | 不允许进入自动授权或自动清算。 |
+| 平行链路检查 | VCC 表和 fincone-issuing 表只承载业务生命周期、外部事件、脱敏引用、幂等和解释字段。 | 发现平行钱包、平行账本、平行清结算或平行归档时停止。 |
+
+## 13. Highnote 参考下的共享卡与预付卡资金交易层设计
+
+Highnote 官方文档把卡产品、支付卡、financial account、ledgers、spend rules、on-demand funding 和 card transaction activity report 分层表达。可借鉴的核心不是具体 API，而是对象边界：卡是支付和授权入口，账户和 ledger 承载资金事实，spend rules 是授权控制，交易活动报表是卡维度投影。
+
+结合 `wind-funds` 已有设计，本节给出共享卡和预付卡进入资金交易层的最终口径。它只补充 VCC 场景资金能力，不改变直接交易、授权交易和余额控制的 canonical 账户主体入参。
+
+### 13.1 设计结论
+
+| 结论 | 说明 | 对 wind-funds 的要求 |
+| --- | --- | --- |
+| 不新增卡账本主体 | VCC 卡、预付卡、共享卡、卡组、Cardholder 和外部卡账户都不是 `LedgerEntry` 主体。 | 账务分录主体只能落到资金账户、信用账户或平台角色解析后的平台资金账户；卡只进 `PaymentInstrumentRef` 和快照。 |
+| 不替换账户主体型交易内核 | 直接交易、授权交易、余额控制仍以已解析的资金账户、信用账户或资金主体引用作为 canonical 入参。 | 可新增支付工具 application facade，但 facade 必须先解析工具、绑定、资金责任、规则版本，再委派账户主体型交易服务。 |
+| 共享卡是绑定和归因模式 | 一张或多张共享卡可绑定同一资金账户或信用账户，也可按使用人、部门、项目、预算组和 Spend Rule 做授权控制。 | 每次授权必须固化工具、使用人、绑定版本、预算组、Spend Rule、资金责任决策和 route snapshot。 |
+| 预付卡是资金模式 | prepaid virtual card 表达先有预付资金责任再允许消费，不等于储值券、礼品卡或单卡余额。 | 预付资金必须先落到经确认的资金账户、平台责任账户或财务确认的责任主体，再由卡工具发起授权。 |
+| 卡账单来自交易投影 | 卡维度流水、持卡人账单、共享卡分摊视图和预付卡资金历史都应从交易投影、绑定快照和账本事实生成。 | 允许按支付工具引用过滤和重放投影，不允许卡表反写资金交易、账本或余额。 |
+
+### 13.2 支付工具 application facade
+
+VCC 场景可以增加面向支付工具的 application facade，用于承接上层发卡业务调用。facade 是用例层入口，不是新的交易内核。
+
+| facade 能力 | 入口语义 | 内部委派 | 红线 |
+| --- | --- | --- | --- |
+| authorizeByInstrument | 用 VCC 卡、共享卡或预付卡发起授权。 | 支付工具准入、绑定快照、Spend Rule 和预算控制、资金责任解析、账户能力校验后，委派账户主体型授权服务。 | 不把 `FundsAuthorizationTransactionService` 的 canonical 请求整体改成支付工具入参。 |
+| settleInstrumentAuthorization | 对原授权做 clearing、部分 clearing、费用或受控强制完成。 | 基于原授权、原 route snapshot 和原资金责任决策完成 settle。 | 不按当前卡绑定重新选路。 |
+| releaseInstrumentAuthorization | 对 reversal、void、expire 做授权释放。 | 基于原授权释放 AUTHORIZATION。 | 不释放已清算金额，不跨主体转移价值。 |
+| refundInstrumentTransaction | 对已清算交易做退款。 | 基于原 route snapshot 回放退款。 | 不把退款按当前卡绑定、当前预算或当前 Spend Rule 重算。 |
+| postPrepaidFunding | 记录预付资金充值、系统钱包转入或外部确认入金。 | 转换为账户主体型直接交易、充值或内部转账。 | 外部未确认入金不得增加可用余额。 |
+| unloadPrepaidFunding | 记录预付资金提现、退回或转出。 | 转换为账户主体型提现、退款或内部转账。 | 发卡侧卡余额变化不等于资金底座可直接扣款，必须有确认事件和幂等引用。 |
+
+facade 的最小输入必须包含：支付工具引用、业务动作、金额、币种、使用人或系统代理、商户或对手方上下文、外部事件引用、幂等键、请求摘要、规则版本、风控/控制结论、资金责任上下文和敏感字段检查结果。
+
+VCC 业务对接建议优先依赖钱包 application facade，而不是直接调用多个资源型服务或交易内核。工程落点如下，具体 Request/DTO 和错误码以 Execution Grant 为准。
+
+| 产品能力 | 建议接口 | 建议包 | 说明 |
+| --- | --- | --- | --- |
+| 工具能力准入 | `PaymentInstrumentCapabilityApplicationService` | `com.capte.funds.wallet.application.instrument` | VCC、共享卡、预付卡动作前置准入，输出工具准入快照。 |
+| 资金责任决策 | `FundingResponsibilityResolutionApplicationService` | `com.capte.funds.wallet.application.funding` | 从卡、使用人、预算组、Spend Rule、预付责任和平台角色解析最终资金或额度责任主体。 |
+| 授权准入 | `AuthorizationAdmissionApplicationService` | `com.capte.funds.wallet.application.instrument` | `authorizeByInstrument` 或等价入口；批准后委派账户主体型授权内核。 |
+| 清算/释放/逆向 | `InstrumentTransactionLifecycleApplicationService` | `com.capte.funds.wallet.application.instrument` | settlement、release、refund、chargeback 按原授权和原 route snapshot 回放。 |
+| 预付资金处理 | `VccPrepaidFundingApplicationService` | `com.capte.funds.wallet.application.vcc` | 外部确认入金、系统内充值、退卡或转出；不创建卡账本。 |
+| 共享卡场景编排 | `VccSharedCardTransactionApplicationService` | `com.capte.funds.wallet.application.vcc` | 共享卡授权、清算和逆向的 VCC 场景编排；卡维度账单来自交易投影。 |
+
+交易层仍需继续完善账户主体型能力，包括授权过期、受控强制完成、无授权退款、拒付/争议扣回、余额控制调账审计和原路径回放。VCC facade 可以触发或委派这些能力，但不得把它们包装成统一支付工具交易内核，也不得让卡、卡组、预算组或 Spend Rule 成为账务主体。
+
+#### 13.2.1 预付卡、共享卡交易服务能力包
+
+本能力包面向 `fincone-issuing`、发卡运营、风控、财务和客服暴露“可解释的 VCC 资金交易服务”。它不是新的卡处理系统，也不是统一支付工具交易内核；所有写账能力最终仍委派到账户主体型直接交易、授权交易、余额控制、清结算、对账和投影能力。
+
+| 能力组 | 产品服务能力 | 使用场景 | 输出结果 | 不做什么 |
+| --- | --- | --- | --- | --- |
+| 工具准入 | 校验 VCC、共享卡或预付卡工具是否可用于当前动作。 | 授权、清算、退款、入金、退卡、提现前置准入。 | 工具准入快照、拒绝原因、敏感字段阻断结果。 | 不生成 route、posting、LedgerEntry。 |
+| 资金责任决策 | 从卡、使用人、部门、项目、预算组、Spend Rule、预付责任和托管模式解析唯一内部责任主体。 | 共享卡授权、预付卡授权、充值、退款、退卡。 | `FundingAllocationDecision`、责任主体、规则版本和审计原因。 | 不把预算组、卡、持卡人或 issuer 账户写成账本主体。 |
+| 授权准入 | 使用支付工具引用发起授权，并委派账户主体型授权内核。 | VCC 消费授权、共享卡多使用人授权、预付卡消费授权。 | 授权批准、授权拒绝、授权占用或拒绝事实。 | 不改 `FundsAuthorizationTransactionService.authorize` 的 canonical 入参。 |
+| 清算处理 | 对原授权做全额清算、部分清算、容差内 overcapture、费用入账或受控强制完成。 | 卡网络 clearing、processor presentment、费用文件。 | 清算交易、授权核销、费用分录、差错候选。 | 不按当前绑定重新选路，不用清算文件反推新授权。 |
+| 授权释放 | 处理 reversal、void、expire、未使用金额释放。 | 商户撤销、授权过期、部分清算后剩余释放。 | 同主体 `AUTHORIZATION -> AVAILABLE` 释放。 | 不表达消费、扣款、跨主体转移或退款。 |
+| 逆向与争议 | 处理 refund、chargeback、representment、费用扣回和追偿。 | 商户退款、拒付、争议败诉/胜诉、费用回补。 | 原路径退款、争议扣回、追偿或人工差错。 | 不把 chargeback 当普通 refund，不允许重复损失。 |
+| 预付资金入金 | 处理外部确认入金、系统内钱包充值、平台责任确认。 | prepaid virtual card 首充、充值、on-demand funding 回补。 | 目标责任主体可用余额增加或内部转账完成。 | 未确认外部事件不得增加可用余额。 |
+| 预付资金退回 | 处理退卡余额、提现、资金退回、余额转出。 | 卡关闭、合同终止、外部退回、用户申请退卡。 | 原责任主体转出、提现或退款事实。 | issuer 卡余额摘要不能直接触发扣款。 |
+| 交易投影 | 生成卡账单、使用人账单、预算视图、预付资金历史和拒绝原因时间线。 | 客服查询、企业账单、财务核对、运营排查。 | 只读投影和重放结果。 | 投影不得反写资金事实、账本事实或余额。 |
+
+#### 13.2.2 能力边界和首期范围
+
+首期建议只交付“授权最小闭环 + 预付入金确认 + 只读投影种子”，避免一次把清算、争议、退卡和生产对账全部铺开。
+
+| 范围 | 首期纳入 | 首期不纳入 |
+| --- | --- | --- |
+| 共享卡 | 工具准入、绑定快照、资金责任解析、授权批准/拒绝、卡维度投影输入。 | 共享卡自动分摊结算、复杂预算释放、跨账户分账、完整企业账单导出。 |
+| 预付卡 | 预付责任确认、外部入金确认、系统内充值、授权批准/拒绝、未确认入金阻断。 | 通用储值账户、自由转账、跨币种充值、自动退卡提现、税务/会计自动结转。 |
+| 清算和逆向 | 仅定义原路径回放、快照字段和差错入口。 | 生产 clearing 文件处理、chargeback 全生命周期、费用和 FX 自动入账。 |
+| 对账投影 | 定义卡维度、账户维度和责任主体维度查询口径。 | 报表生产、归档治理 apply、批量重放自动修复。 |
+
+服务能力的产品验收必须同时覆盖四类证据：
+
+1. 业务证据：外部事件引用、卡工具引用、使用人、商户、MCC、币种、金额和业务动作可追溯。
+2. 控制证据：Spend Rule、预算组、风控结论、规则版本、拒绝原因和人工复核记录可追溯。
+3. 资金证据：最终责任主体、route snapshot、ledger transaction、ledger entry、余额桶变化和幂等摘要可追溯。
+4. 安全证据：完整 PAN、CVV/CVC、token secret、密钥、完整外部账户号和超范围个人信息未进入资金底座普通链路。
+
+### 13.3 共享卡资金交易层设计
+
+共享卡的核心是“多个使用上下文共享一个支付工具或一个资金责任池”，而不是“多张卡共享一个卡余额”。共享卡交易必须把账户账务和卡维度归因拆开。
+
+| 场景 | 资金交易层动作 | 账务主体 | 投影归因 | 失败处理 |
+| --- | --- | --- | --- | --- |
+| 一张共享卡绑定同一资金账户 | 授权时解析到同一资金账户，批准后 `AVAILABLE -> AUTHORIZATION`。 | 资金账户。 | 按 cardRef、cardholderRef、departmentRef、budgetGroupRef 和 spendRuleRef 生成卡维度视图。 | 工具不可用、绑定缺失、规则拒绝或余额不足时无 route、posting、entry。 |
+| 多张共享卡绑定同一资金账户 | 每张卡独立形成工具快照和授权链路，最终落到同一资金账户。 | 资金账户。 | 账户账务合并，卡账单和使用人账单按工具快照拆分。 | 多卡并发必须通过账户余额、授权占用和幂等控制防止超用。 |
+| 共享卡绑定信用账户 | 授权占用信用账户额度，清算后形成信用消费或账单应收。 | 信用账户。 | 卡维度展示信用授权、账单和可用额度变化。 | 信用额度、账期或外部授信状态不明确时阻断。 |
+| 共享卡叠加预算组 | 预算组只做消费范围和控制视图，资金或额度仍落到资金账户或信用账户。 | 资金账户或信用账户。 | 投影保留预算组、预算预留、释放和规则版本。 | 预算不足或规则拒绝不得生成账务副作用。 |
+| 共享卡换绑后退款 | 退款按原 route snapshot 和原绑定版本回放。 | 原交易账务主体。 | 当前绑定只用于展示提示，不参与退款选路。 | 原快照缺失时进入差错，不自动按当前绑定处理。 |
+
+共享卡必须满足三个可核对口径：
+
+1. 账户侧：同一资金账户或信用账户能解释整体授权占用、清算、退款、费用和余额。
+2. 卡侧：同一账户下不同共享卡能生成卡维度交易投影和账单。
+3. 使用侧：同一卡下不同使用人、部门、项目或系统代理能生成归因投影，但不生成新的账本主体。
+
+### 13.4 预付卡资金交易层设计
+
+预付卡的关键是“资金先确认、后授权使用”。预付资金不能挂在卡本体上，而要落到可审计的内部责任主体。
+
+| 事件 | 触发来源 | 资金交易层动作 | 账务主体 | 验收口径 |
+| --- | --- | --- | --- | --- |
+| 外部入金确认 | 发卡行、处理商、银行转账或对账文件确认。 | `postPrepaidFunding` 转换为充值、入金或平台责任确认。 | 资金账户或平台责任账户。 | 未确认入金不得增加 `AVAILABLE`；确认事件必须有外部引用和幂等键。 |
+| 系统内余额钱包充值 | 用户或企业用内部钱包给预付卡资金责任主体充值。 | 账户主体型内部转账或直接交易。 | 来源资金账户和目标预付责任资金账户。 | 转账两侧分录平衡，卡只作为充值目标的工具引用。 |
+| 预付卡授权 | 卡工具发起消费授权。 | 工具 facade 解析到预付资金责任主体，批准后占用 AUTHORIZATION。 | 预付资金责任账户。 | 资金责任缺失或余额不足时拒绝且无账务副作用。 |
+| 清算入账 | clearing 匹配原授权。 | 核销授权占用并生成实际消费、费用或待清算分录。 | 原预付资金责任账户。 | 清算不能超过授权容差；费用和本金分离。 |
+| 退款回补 | 商户或网络退款。 | 基于原 route snapshot 回补原预付责任主体。 | 原预付资金责任账户。 | 不按当前卡状态或当前绑定重算。 |
+| 预付资金提现或退回 | 用户退卡、卡关闭、外部卡余额退回或业务退款。 | `unloadPrepaidFunding` 转换为提现、退款或转出。 | 原预付资金责任账户和目标账户。 | 必须有发卡侧确认事件、可退余额和审批审计。 |
+
+预付卡首期不承诺支持所有外部 prepaid 形态。只有满足以下条件才允许进入自动资金流：
+
+- 已确认 prepaid virtual card 属于 VCC 发卡体系，而不是储值券、礼品卡、优惠券或非卡权益。
+- 已确认资金来源、客户资金归属、退款处置、费用归属和合同口径。
+- 已确认外部入金、清算、退款和退卡事件的幂等引用。
+- 已确认敏感卡数据不进入资金底座。
+
+### 13.5 事件到资金动作矩阵
+
+| VCC 事件 | 共享卡处理 | 预付卡处理 | 共同账务红线 |
+| --- | --- | --- | --- |
+| authorization approved | 固化使用人、绑定版本、预算组、Spend Rule 和资金责任决策。 | 固化预付责任主体、预付资金来源和余额责任。 | 批准只占用 AUTHORIZATION，不代表清算入账。 |
+| authorization declined | 记录拒绝原因、规则版本和使用人归因。 | 记录余额不足、资金责任缺失或规则拒绝。 | 拒绝无 route、posting、LedgerEntry。 |
+| reversal / expire | 按原授权释放剩余占用。 | 按原授权释放预付责任主体占用。 | 只能同主体 `AUTHORIZATION -> AVAILABLE`，不表达消费或转账。 |
+| clearing / presentment | 按原快照核销授权并生成实际入账。 | 按原预付责任主体核销授权并生成消费。 | 无原授权、超额或规则未确认时进入差错。 |
+| refund | 退款归回原资金或信用主体，卡侧只生成投影。 | 退款归回原预付责任主体。 | 退款必须原路径回放。 |
+| chargeback | 形成独立争议、扣回、费用或追偿。 | 形成预付责任主体上的争议扣回或追偿。 | chargeback 不等同 refund，防重复损失。 |
+| fee | 共享卡费用按服务计划、责任主体和费用快照处理。 | 预付卡费用按资金责任主体和费用规则处理。 | 本金、费用、税费、FX 差额分离。 |
+
+### 13.6 交易投影、账单和对账
+
+`wind-funds` 对共享卡和预付卡不提供卡余额账本，而提供三类只读投影：
+
+| 投影 | 生成来源 | 用途 | 不允许 |
+| --- | --- | --- | --- |
+| 卡交易投影 | 授权交易、route snapshot、PaymentInstrumentRef、VCC 外部事件。 | 卡维度交易流水、授权通过率、拒绝原因、清算状态和争议状态。 | 投影反写授权事实或账本事实。 |
+| 使用人/部门/项目归因投影 | BindingSnapshot、cardholderRef、departmentRef、projectRef、budgetGroupRef、Spend Rule 决策。 | 共享卡按使用人、部门、项目和预算拆分。 | 把归因维度建成账本主体。 |
+| 预付资金投影 | 预付入金、充值、授权、清算、退款、提现和费用事件。 | 解释预付资金来源、占用、消费、回补和退回。 | 把卡本体当成资金账户或余额桶。 |
+
+对账必须同时能从卡维度和账户维度下钻：
+
+- 卡维度：cardRef、authorizationRef、clearingRef、refundRef、disputeRef、merchant、MCC、使用人、规则版本。
+- 账户维度：资金账户或信用账户、ledger transaction、ledger entry、余额桶、对账批次、结算批次。
+- 链接维度：route snapshot、bindingVersion、FundingAllocationDecision、外部事件幂等键和 requestDigest。
+
+### 13.7 编码准入和 TDD 种子
+
+本节仍是设计基线，不自动授予编码权限。进入编码前必须有单独 Execution Grant，并选择一个最小切片。
+
+| 切片 | TDD 种子 | 必须证明 |
+| --- | --- | --- |
+| B2-PI-CAP | VCC 工具注册、状态不可用、方向不匹配、敏感字段阻断。 | 卡只作为工具，不生成账户或账本主体。 |
+| B2-FR | 共享卡多绑定、预付责任主体、资金责任不唯一。 | `FundingAllocationDecision` 唯一、可回放、可进入 route snapshot。 |
+| B4-AUTH-PI | `authorizeByInstrument` 批准、拒绝、幂等、同键不同摘要冲突。 | facade 委派账户主体型授权内核；拒绝无账务副作用。 |
+| B5-SR-CONTROL | MCC、金额、次数、时间窗、预算不足、规则版本变更。 | Spend Rule 和预算只生成控制事实和投影，不写账本主体。 |
+| B6/B8-PI-VIEW | 同账户多共享卡投影、换绑后退款、预付充值后授权、未确认入金拒绝。 | 账户账务合并，卡和使用人视图从投影生成。 |
+
+### 13.8 Highnote 参考核验
+
+本节引用 Highnote 公开文档作为产品和系统设计参考，不构成卡组织、发卡行、PCI、法律、税务、会计或合规最终规则。真实生产启用仍需法务、合规、财务、安全、发卡行、处理商和卡组织确认。
+
+| 参考来源 | 版本或发布日期 | 适用法域或适用范围 | 适用主体 | 生效日期 | 核验日期 | 确认方 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Highnote Using Ledgers，`https://docs.highnote.com/docs/issuing/accounts/funding/using-ledgers` | 页面 `dateModified=2026-02-15` | financial account、ledger、ledger entry、account balance 设计参考。 | `wind-funds` 资金账户、账本和投影设计参考。 | 不适用，本地设计参考。 | 2026-06-02 | 产品、架构；待法务/合规/财务/安全确认生产适用性。 | 已核验公开页面，不作为上线规则。 |
+| Highnote On-demand Funding，`https://docs.highnote.com/docs/issuing/accounts/funding/on-demand-funding` | 页面 `dateModified=2026-03-27` | source financial account、zero-balance / pseudo balance / pseudo limit 设计参考。 | 共享卡、预付卡和按需供资设计参考。 | 不适用，本地设计参考。 | 2026-06-02 | 产品、架构；待法务/合规/财务/发卡合作方确认生产适用性。 | 已核验公开页面，不作为上线规则。 |
+| Highnote Spend Rules，`https://docs.highnote.com/docs/issuing/spend-controls/spend-rules` | 页面 `dateModified=2026-05-19` | amount、MCC、merchant、country 等授权控制设计参考。 | Spend Rule 和预算控制设计参考。 | 不适用，本地设计参考。 | 2026-06-02 | 产品、风控、架构；待合规/卡组织/处理商确认生产适用性。 | 已核验公开页面，不作为上线规则。 |
+| Highnote Card Transaction Activity Report，`https://docs.highnote.com/docs/issuing/reporting/card-transaction-activity-report` | 页面 `dateModified=2026-02-15` | card transaction event activity、financial event、transaction lifecycle 报表设计参考。 | 卡交易投影、共享卡归因和对账字段设计参考。 | 不适用，本地设计参考。 | 2026-06-02 | 产品、财务、架构；待发卡合作方和数据合规确认生产适用性。 | 已核验公开页面，不作为上线规则。 |
