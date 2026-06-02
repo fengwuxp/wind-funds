@@ -663,6 +663,21 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | 停止条件 | `BLOCKED_BY_SCOPE`。 | 需要 DDL/H2、core 枚举或状态、ledger 公共契约、新依赖、外部规则、支付工具 facade、钱包 application facade、VCC、chargeback case、清结算追偿、敏感数据处理、公有方法超过 5 个参数或工作树冲突时停止。 |
 | 验证命令 | `PENDING_GRANT`。 | 编码后必须执行 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；docs-only 阶段只需文档门禁和 diff 检查。 |
 
+### 13.4 当前 GSD-CAD 恢复入口（2026-06-02）
+
+本节记录 `8e1ec76 docs: 补齐 B4 无授权退款 Grant 执行包` 之后的当前恢复入口。13.1 和 13.2 中 “A1 仍是唯一可推进到用户确认态的单一 Execution Grant 候选” 是 2026-05-31 和 2026-06-01 的历史裁决；当前可恢复的最新候选已经切换为 B4-NO-AUTH-REFUND，但仍未获得编码授权。
+
+| 恢复项 | 当前口径 |
+| --- | --- |
+| 当前 Git 基线 | `8e1ec76 docs: 补齐 B4 无授权退款 Grant 执行包` 及之后确认时 Git HEAD。 |
+| 当前 GSD 候选 | `B4-NO-AUTH-REFUND`，只处理 `settleRefund` 无授权退款模式。 |
+| 当前 CAD 原子任务包 | `B4-NAR-CAD-001`，入口为 `docs/TDD设计/B4-授权后继能力Round0准入卡.md#82-grantexecutionpackagecandidate2026-06-02`。 |
+| 当前准入状态 | `READY_TO_CONFIRM_NOT_AUTHORIZED`；用户未确认前不写 Red、不写生产代码、不写 DDL/H2 schema、不改运行配置。 |
+| 首轮 Pick | `B4-NAR-RED-001`，证明无前置授权但有外部原事实时，当前 `settleRefund` 不能形成可追溯无授权退款资金事实。 |
+| 必须确认的 Grant 字段 | `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要原事实金额币种、`operator/contextVariables`、普通授权链退款兼容策略、NO_AUTH 模式不得携带或查询内部授权流水。 |
+| 当前禁止范围 | 支付工具 facade、钱包 application facade、VCC 生命周期、DDL/H2 schema、ledger 公共契约、core 枚举状态、Spend Rule、force settle 返工、chargeback case、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理。 |
+| 下一步入口 | 用户确认第 13.4 与 B4 准入卡第 11 节的 `Execution Grant：B4-NO-AUTH-REFUND` 后，才能进入 Red -> Green -> Review -> Verify -> Commit。 |
+
 ## 14. B2 建议 Execution Grant
 
 B2 是后续直接交易、授权交易、余额控制、退款和权益资金流进入真实组合验证前的基础门禁。建议对应 MVP 任务只处理钱包账户、账本、余额投影和支付工具基础能力，不进入直接交易、授权交易或权益生产消费链路。

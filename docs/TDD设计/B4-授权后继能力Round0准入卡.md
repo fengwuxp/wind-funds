@@ -182,7 +182,7 @@
 | `taskId` | `B4-NAR-CAD-001`。 |
 | `stage` / `wave` | B4 授权后继能力 / Wave 1 账户主体型 canonical 内核补强。 |
 | `status` | `READY_TO_CONFIRM_NOT_AUTHORIZED`。 |
-| `authorityBaseline` | 确认时 Git HEAD；当前候选基线至少包含 `b0666ba`、`f99f3a3`、`616dac1`、`3825466`、`e937395` 和 `fe40d4a`。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选基线至少包含 `b0666ba`、`f99f3a3`、`616dac1`、`3825466`、`e937395`、`fe40d4a` 和 `8e1ec76`。 |
 | `mvpScenario` | 无前置内部授权流水，但已存在外部原消费、原完成或差错凭证，需要在账户主体型交易内核中形成可追溯退款资金事实。 |
 | `businessAdmission` | 产品验收锚点为 `AC-AUTH-012` 和 `TDD-RED-017A`；DSL 锚点为 `DSL-AUTH-REFUND-001`；系分锚点为授权交易 `settleRefund`、route replay、账务计划和投影解释。 |
 | `firstRedSet` | 首轮只写 `B4-NAR-RED-001`。若 Red 未按预期失败，先暂停判断已有实现覆盖或 Red 资产错误。 |
