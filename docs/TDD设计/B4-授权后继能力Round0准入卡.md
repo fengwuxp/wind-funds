@@ -84,6 +84,16 @@
 | `B4-CB-RED-001` | 已完成授权发生争议、拒付或扣回时，系统是否能与普通退款、授权拒绝区分。 | 拒付是争议/扣回语义，累计退款和拒付不得超过已完成金额，且必须沿原完成或原 route snapshot。 | settleRefund 携带拒付原因、外部引用、凭证和审计上下文；查询和投影能区分普通退款与拒付承接。 | 不得把授权拒绝记成拒付；不得要求独立 `chargeback` 服务入口作为目标态；不得把拒付压缩成不可区分的普通退款。 | 拒付原因、凭证、外部引用、原完成引用、累计金额、route replay、projection 可区分、失败无副作用。 | `FundsAuthorizationTransactionFlowTests`、交易投影相关测试。 | `just test-transaction`、必要时 `just test-business-flow`。 | 需要新增 dispute case 模型、清结算追偿或 chargeback 独立状态机。 |
 | `B4-RACE-RED-001` | 同一授权的完成、撤销、过期、退款并发竞争是否会重复入账、重复释放或剩余为负。 | 同一授权同一时刻只有合法迁移生效；失败方不得产生资金副作用。 | 通过幂等键、状态版本、唯一约束、锁定策略或等价机制保证完成、撤销、过期、退款金额闭合。 | 不得重复释放 AUTHORIZATION；不得累计完成超授权；不得出现负 remaining；不得生成重复 ledger entry。 | 并发结果、最终状态、授权剩余、ledger entry 唯一性、余额桶、幂等摘要、失败无副作用。 | 授权并发 flow 测试或 service-level 并发测试。 | `just test-business-flow`、必要时 `just test-transaction`。 | 需要新增数据库唯一约束、锁字段、版本字段或 H2 schema。 |
 
+### 7.1 existingCoverageScan（2026-06-02）
+
+本节记录 B4-FORCE-SETTLE 编码授权前的只读覆盖扫描。扫描只读取现有生产代码、测试代码和设计文档，不修改生产代码、测试代码、DDL/H2 schema 或运行时配置；结论只作为下一轮 Execution Grant 的失败点和写入边界输入。
+
+| redId | 既有覆盖资产 | 当前覆盖判断 | 下一轮 Red 预期失败点 |
+| --- | --- | --- | --- |
+| `B4-FS-RED-001` | `FundsAuthorizationTransactionSettleRequest`、`FundsAuthorizationInstructionConverter#convertToSettleInstruction`、`AuthorizationFundsInstructionRouteResolver#resolveSettle`、`FundsAuthorizationTransactionFlowTests` 中普通 settle、部分 settle、settle 后 expire 和 settle 幂等用例。 | 普通授权完成链路覆盖充分：请求必须有 `authorizationTransactionSn`，converter 无条件构造 `AUTHORIZATION` reference 并查询原授权账本交易，route resolver 依赖原授权主体解析，测试断言 AVAILABLE/AUTHORIZATION/SETTLEMENT、route、ledger transaction、entry、projection 和幂等。当前代码没有 FORCE 模式、强制完成策略编码、上限、原因、凭证或无前置授权外部事实引用字段。 | 如果直接写无前置授权强制完成 Red，应先失败在 Request 契约和 converter：`authorizationTransactionSn` 必填且 `authorizationLedgerTransactionSn` 会要求原授权账本交易存在。Red 应证明缺策略、缺上限、缺原因、缺审计或缺外部事实引用不得入账，且成功路径不得伪造授权占用。 |
+| `B4-FS-RED-002` | `FundsAuthorizationTransactionFlowTests#testAuthorizationSettleSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects`、`DefaultFundsInstructionLifecycleSaver` 的请求摘要和状态累计逻辑。 | 同业务流水同摘要重试、不同摘要拒绝、余额和账务事实保持不变已有普通完成覆盖；但覆盖对象仍是基于原授权的普通 settle，不覆盖无策略、超上限、缺审计或缺外部事实引用的强制完成失败路径。 | Red 应沿用现有幂等和失败无副作用断言结构，但需要先扩展目标 Request 字段或等价上下文字段；若未扩权，测试不得落地。 |
+| `B4-CB-RED-001` | `FundsAuthorizationTransactionFlowTests` 已有拒付幂等和余额断言，`FundsAuthorizationTransactionService#chargeback` 仍是现有方法。 | 既有测试证明代码可用 `CHARGEBACK` 事件承接一类拒付资金影响；但目标态文档要求拒付不强制落独立 `chargeback` 入口，并能通过 `settleRefund` 的原因、凭证和审计上下文表达。该差异属于后续语义校准，不应混入 B4-FORCE-SETTLE。 | 如选择 B4-DISPUTE-CHARGEBACK，应单独确认是保留兼容方法并补投影区分，还是收敛到 `settleRefund` 语义；不得在 force settle 切片内处理。 |
+
 ## 8. suggestedGrantSlices
 
 | 切片 | 优先级 | 目标 | 首批 Red | 允许写入建议 | 不适合混入 |
