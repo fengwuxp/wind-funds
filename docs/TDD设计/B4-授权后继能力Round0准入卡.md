@@ -94,6 +94,20 @@
 | `B4-FS-RED-002` | `FundsAuthorizationTransactionFlowTests#testAuthorizationSettleSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects`、`DefaultFundsInstructionLifecycleSaver` 的请求摘要和状态累计逻辑。 | 同业务流水同摘要重试、不同摘要拒绝、余额和账务事实保持不变已有普通完成覆盖；但覆盖对象仍是基于原授权的普通 settle，不覆盖无策略、超上限、缺审计或缺外部事实引用的强制完成失败路径。 | Red 应沿用现有幂等和失败无副作用断言结构，但需要先扩展目标 Request 字段或等价上下文字段；若未扩权，测试不得落地。 |
 | `B4-CB-RED-001` | `FundsAuthorizationTransactionFlowTests` 已有拒付幂等和余额断言，`FundsAuthorizationTransactionService#chargeback` 仍是现有方法。 | 既有测试证明代码可用 `CHARGEBACK` 事件承接一类拒付资金影响；但目标态文档要求拒付不强制落独立 `chargeback` 入口，并能通过 `settleRefund` 的原因、凭证和审计上下文表达。该差异属于后续语义校准，不应混入 B4-FORCE-SETTLE。 | 如选择 B4-DISPUTE-CHARGEBACK，应单独确认是保留兼容方法并补投影区分，还是收敛到 `settleRefund` 语义；不得在 force settle 切片内处理。 |
 
+### 7.2 forceSettleContractCandidate
+
+本节只定义 B4-FORCE-SETTLE 首轮编码候选契约，不等于授权改公共契约。字段名、类型和必填规则必须在后续 Execution Grant 中最终确认；未确认前不得写 Java 代码或测试代码。
+
+| 候选字段 | 语义 | 首轮建议 | Red 断言 | 不纳入本轮 |
+| --- | --- | --- | --- | --- |
+| `settleMode` | 区分普通授权完成和无授权强制完成。 | 必须显式为 `FORCE` 或等价枚举/字符串；普通完成默认仍走现有 `authorizationTransactionSn`。 | 缺 FORCE 模式不得走无授权完成；普通完成语义不变。 | 不新增复杂 processor 状态机。 |
+| `forceSettlePolicyCode` | 说明为什么允许无授权消费入账。 | 必填，进入请求摘要和审计上下文。 | 缺策略失败且无 route、posting、entry 或 projection。 | 不实现策略引擎、规则表或外部规则计算。 |
+| `forceSettleLimitAmount` | 单笔强制完成可接受上限。 | 必填，币种沿 `transactionAmount`；金额不得超过上限。 | 超上限失败且无资金副作用。 | 不实现额度窗口、日/月累计控制。 |
+| `forceSettleReason` | 业务原因，例如 forced post、late clearing 或差错完成。 | 必填，保存到上下文和审计摘要。 | 缺原因失败。 | 不定义卡组织最终原因码全集。 |
+| `externalOriginalFactRef` | 外部已确认消费事实引用。 | 必填，可为脱敏外部流水、clearing/presentment 引用或等价结构。 | 缺引用失败；不得使用内部授权流水伪造。 | 不保存完整原始报文、PAN、CVV 或生产凭证原文。 |
+| `forceSettleVoucherRef` | 凭证或审批引用。 | 首轮建议必填，可为摘要、文件编号、审批号或外部 reference。 | 缺凭证失败。 | 不落完整凭证文件，不做运营审批系统。 |
+| `operator` / `contextVariables` | 操作者和审计上下文。 | 复用现有 `WindOperator` 和 `ReadonlyContextVariables`，敏感字段继续由 validator 阻断。 | 缺操作者、缺审计上下文或敏感上下文按现有规则失败/阻断。 | 不新增权限系统，不引入生产配置。 |
+
 ## 8. suggestedGrantSlices
 
 | 切片 | 优先级 | 目标 | 首批 Red | 允许写入建议 | 不适合混入 |
@@ -129,8 +143,9 @@
 ```text
 Execution Grant：B4-FORCE-SETTLE
 确认基线：确认时 Git HEAD（至少包含 b0666ba / f99f3a3）
-允许写入：先写 tests 中 B4-FS 目标 Red；Red 证明缺口后允许 transaction-face、transaction-impl、route replay、TDD tests 最小修复
-禁止写入：支付工具 facade、VCC 预付卡充值、共享卡调额、DDL/H2 schema、Spend Rule 表结构、no-auth refund、chargeback 增强、清结算对账、治理 apply、生产配置、外部协议、敏感数据处理
+允许写入：先写 tests 中 B4-FS 目标 Red；Red 证明缺口后允许 transaction-face 的 FundsAuthorizationTransactionSettleRequest 兼容字段、transaction-impl converter/command/lifecycle/route replay、TDD tests 最小修复
+允许契约字段：settleMode、forceSettlePolicyCode、forceSettleLimitAmount、forceSettleReason、externalOriginalFactRef、forceSettleVoucherRef、operator/contextVariables 或等价命名；字段名、类型和必填规则以本次 Grant 为准
+禁止写入：支付工具 facade、VCC 预付卡充值、共享卡调额、DDL/H2 schema、Spend Rule 表结构、策略引擎、规则表、processor 生命周期、no-auth refund、chargeback 增强、清结算对账、治理 apply、生产配置、外部协议、敏感数据处理
 首批 Red：B4-FS-RED-001；必要时补 B4-FS-RED-002
 验证命令：just test-one FundsAuthorizationTransactionFlowTests tests；just test-transaction；just test-business-flow；just test-boundary；just compile；提交前 just pmd 和 git diff --check
 Git 策略：auto_commit
