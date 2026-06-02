@@ -152,6 +152,19 @@
 
 推荐下一轮编码候选改为 B4-NO-AUTH-REFUND。它延续 B4-TRX-EXPIRE 和 B4-FORCE-SETTLE 的账户主体型 canonical 授权内核，但只有用户单独确认 Execution Grant 后，才允许把 `B4-NAR-RED-001` 和 `B4-NAR-RED-002` 写入测试资产。
 
+### 8.1 gsdCadAdmissionDecision（2026-06-02）
+
+本节记录以 `e937395 docs: 对齐 B4 无授权退款主文档口径` 为当前已提交基线的 GSD-CAD 准入结论。GSD 负责确认阶段、切片、上下文和任务状态；CAD 只能在用户确认单一 Execution Grant 后执行 Red -> Green -> Review -> Verify -> Commit。
+
+| 准入项 | 当前结论 | 进入 CAD 编码所需条件 |
+| --- | --- | --- |
+| 当前状态 | `READY_TO_CONFIRM_NOT_AUTHORIZED`。B4-NO-AUTH-REFUND 是下一轮优先候选，但尚未获得测试或生产代码写入授权。 | 用户确认 `Execution Grant：B4-NO-AUTH-REFUND`，并以确认时 Git HEAD 作为 `authorityBaseline`。 |
+| GSD 切片 | 单一切片为 B4-NO-AUTH-REFUND，只处理 `settleRefund` 无授权退款模式。 | 不与 force settle 返工、chargeback 独立入口、支付工具 facade、VCC、Spend Rule、清结算对账或治理任务混跑。 |
+| CAD 首轮 Pick | 首轮只允许 `B4-NAR-RED-001`，目标是证明无前置授权但有外部原事实时当前代码无法形成可追溯退款资金事实。 | 若 Red 未按预期失败，必须暂停判断已有实现覆盖或 Red 写错，不能直接改生产代码。 |
+| 必须列名字段 | `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要原事实金额币种、`operator/contextVariables`。 | Grant 必须说明字段名、类型、必填规则、摘要字段和普通授权链退款兼容策略。 |
+| 首轮禁止事项 | 不改 DDL/H2 schema，不新增支付工具 facade，不新增 chargeback 独立入口，不实现 VCC 生命周期，不接入外部协议或敏感数据处理。 | 任一项成为必要条件时，停止并重新确认授权范围。 |
+| 验证闭环 | docs-only 阶段只跑文档门禁；编码阶段必须跑 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`。 | 若验证因环境失败，必须区分环境问题和代码问题；未验证不得自动提交代码。 |
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
