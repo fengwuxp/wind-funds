@@ -262,7 +262,7 @@ Git 策略：auto_commit
 
 ```text
 Execution Grant：B4-NO-AUTH-REFUND
-确认基线：确认时 Git HEAD（至少包含 b0666ba / f99f3a3 / 616dac1 / 3825466 / e937395 / fe40d4a / 本 Grant 可执行包提交）
+确认基线：确认时 Git HEAD（至少包含 b0666ba / f99f3a3 / 616dac1 / 3825466 / e937395 / fe40d4a / 8e1ec76 / 51e86e3）
 允许写入：先写 tests 中 B4-NAR 目标 Red；Red 证明缺口后允许 transaction-face 的 FundsAuthorizationTransactionRefundRequest 兼容字段、transaction-impl converter/command/lifecycle/route replay、TDD tests 最小修复
 允许契约字段：refundMode 或 noAuthRefundMode、externalOriginalFactRef、externalOriginalFactType、refundReason、refundVoucherRef、originalFactAmount/originalFactCurrency、operator/contextVariables 或等价命名；允许把 `authorizationTransactionSn` 调整为普通授权链退款必填、NO_AUTH 模式不携带且不查询原授权账本交易；字段名、类型、必填规则、摘要字段和兼容策略以本次 Grant 为准
 审计最小集：WindOperator、refundReason、externalOriginalFactRef、externalOriginalFactType、refundVoucherRef 和必要原事实金额摘要；contextVariables 只作为白名单补充，不承载核心资金事实或敏感数据
