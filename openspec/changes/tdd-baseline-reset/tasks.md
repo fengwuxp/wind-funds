@@ -665,11 +665,11 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 
 ### 13.4 当前 GSD-CAD 恢复入口（2026-06-02）
 
-本节记录 `51e86e3 docs: 固化 B4 无授权退款恢复入口` 之后的当前恢复入口。13.1 和 13.2 中 “A1 仍是唯一可推进到用户确认态的单一 Execution Grant 候选” 是 2026-05-31 和 2026-06-01 的历史裁决；当前可恢复的最新候选已经切换为 B4-NO-AUTH-REFUND，但仍未获得编码授权。
+本节记录 `51e86e3 docs: 固化 B4 无授权退款恢复入口` 和 `3e5ec76 docs: 对齐 B4 无授权退款确认基线` 之后的当前恢复入口。13.1 和 13.2 中 “A1 仍是唯一可推进到用户确认态的单一 Execution Grant 候选” 是 2026-05-31 和 2026-06-01 的历史裁决；当前可恢复的最新候选已经切换为 B4-NO-AUTH-REFUND，但仍未获得编码授权。
 
 | 恢复项 | 当前口径 |
 | --- | --- |
-| 当前 Git 基线 | `51e86e3 docs: 固化 B4 无授权退款恢复入口` 及之后确认时 Git HEAD；该基线包含 `8e1ec76 docs: 补齐 B4 无授权退款 Grant 执行包`。 |
+| 当前 Git 基线 | 确认时 Git HEAD；必须包含 `8e1ec76 docs: 补齐 B4 无授权退款 Grant 执行包`、`51e86e3 docs: 固化 B4 无授权退款恢复入口` 和 `3e5ec76 docs: 对齐 B4 无授权退款确认基线`，后续 docs-only 提交无需逐条追写到本行。 |
 | 当前 GSD 候选 | `B4-NO-AUTH-REFUND`，只处理 `settleRefund` 无授权退款模式。 |
 | 当前 CAD 原子任务包 | `B4-NAR-CAD-001`，入口为 `docs/TDD设计/B4-授权后继能力Round0准入卡.md#82-grantexecutionpackagecandidate2026-06-02`。 |
 | 当前准入状态 | `READY_TO_CONFIRM_NOT_AUTHORIZED`；用户未确认前不写 Red、不写生产代码、不写 DDL/H2 schema、不改运行配置。 |
