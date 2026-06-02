@@ -293,7 +293,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private RouteReplayType resolveReplayType(FundsTransactionEventType eventType) {
         return switch (eventType) {
-            case REVERSAL -> RouteReplayType.RELEASE_HOLD;
+            case REVERSAL, EXPIRE -> RouteReplayType.RELEASE_HOLD;
             case SETTLE -> RouteReplayType.AUTHORIZATION_SETTLEMENT;
             case AUTH_REFUND -> RouteReplayType.AUTHORIZATION_REFUND;
             case REFUND -> RouteReplayType.REFUND;
@@ -599,7 +599,9 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private String resolveRouteCode(ReplayRequestSpec replayRequest) {
         return switch (replayRequest.getReplayType()) {
-            case RELEASE_HOLD -> FundsRouteCodes.AUTHORIZATION_REVERSAL_REPLAY;
+            case RELEASE_HOLD -> replayRequest.getEventType() == FundsTransactionEventType.EXPIRE
+                    ? FundsRouteCodes.AUTHORIZATION_EXPIRE_REPLAY
+                    : FundsRouteCodes.AUTHORIZATION_REVERSAL_REPLAY;
             case AUTHORIZATION_SETTLEMENT -> FundsRouteCodes.AUTHORIZATION_SETTLE_REPLAY;
             case AUTHORIZATION_REFUND -> FundsRouteCodes.AUTHORIZATION_REFUND_REPLAY;
             case REFUND, FEE_REFUND -> FundsRouteCodes.DIRECT_REFUND_REPLAY;

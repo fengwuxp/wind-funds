@@ -25,6 +25,7 @@ public enum FundsTransactionEventType implements DescriptiveEnum {
 
     AUTHORIZE("funds.authorization.authorize", "授权"),
     REVERSAL("funds.authorization.reversal", "撤销/冲正"),
+    EXPIRE("funds.authorization.expire", "授权过期"),
     SETTLE("funds.authorization.settle", "结算"),
     AUTH_REFUND("funds.authorization.refund", "授权链退款"),
     CHARGEBACK("funds.authorization.chargeback", "拒付/争议"),

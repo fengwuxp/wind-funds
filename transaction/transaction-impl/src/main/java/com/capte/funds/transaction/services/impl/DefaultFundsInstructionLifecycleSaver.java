@@ -425,6 +425,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 transaction.setStatus(FundsTransactionStatus.OPEN);
             }
             case REVERSAL -> applyReversedSummary(transaction, amount);
+            case EXPIRE -> applyExpiredSummary(transaction, amount);
             case SETTLE -> applySettledSummary(transaction, amount);
             case TOPUP, TRANSFER, PAY, WITHDRAW, FEE_CHARGE -> applyPostedSummary(transaction, primaryDetail, details);
             case AUTH_REFUND, REFUND -> applyRefundedSummary(transaction, amount);
@@ -445,6 +446,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 }
             }
             case CHARGEBACK -> assertSettledReversibleAmountSufficient(transaction, amount);
+            case EXPIRE -> assertAuthorizationReleaseAmountSufficient(transaction, amount);
             default -> {
             }
         }
@@ -460,6 +462,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 }
             }
             case CHARGEBACK -> assertSettledReversibleAmountSufficient(transaction, amount);
+            case EXPIRE -> assertAuthorizationReleaseAmountSufficient(transaction, amount);
             default -> {
             }
         }
@@ -476,6 +479,12 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     private void applyReversedSummary(FundsTransaction transaction, long amount) {
         transaction.setReversedAmount(transaction.getReversedAmount() + amount);
         transaction.setStatus(isAuthorizationClosed(transaction) ? FundsTransactionStatus.CLOSED
+                : FundsTransactionStatus.OPEN);
+    }
+
+    private void applyExpiredSummary(FundsTransaction transaction, long amount) {
+        transaction.setReversedAmount(transaction.getReversedAmount() + amount);
+        transaction.setStatus(isAuthorizationClosed(transaction) ? FundsTransactionStatus.EXPIRED
                 : FundsTransactionStatus.OPEN);
     }
 
@@ -530,6 +539,14 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 transaction.getSn(), remainingAmount, amount);
     }
 
+    private void assertAuthorizationReleaseAmountSufficient(FundsTransaction transaction, long amount) {
+        long remainingAmount = transaction.getAuthorizedAmount() - transaction.getSettledAmount()
+                - transaction.getReversedAmount();
+        AssertUtils.isTrue(amount <= remainingAmount,
+                "资金交易剩余授权可释放金额不足，sn = {}，remainingAmount = {}，amount = {}",
+                transaction.getSn(), remainingAmount, amount);
+    }
+
     private boolean shouldAssertSettledReversibleAmount(FundsTransaction transaction) {
         return transaction.getTransactionType() != DefaultFundsTransactionType.REFUND;
     }
@@ -580,6 +597,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     private boolean isStableTransactionStatus(FundsTransactionStatus status) {
         return status == FundsTransactionStatus.OPEN
                 || status == FundsTransactionStatus.CLOSED
+                || status == FundsTransactionStatus.EXPIRED
                 || status == FundsTransactionStatus.REJECTED;
     }
 
@@ -594,7 +612,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     private FundsEffectType resolveFundsEffectType(FundsInstructionSpec instruction) {
         return switch (instruction.getEventType()) {
             case AUTHORIZE, FREEZE -> FundsEffectType.HOLD;
-            case REVERSAL, UNFREEZE -> FundsEffectType.RELEASE;
+            case REVERSAL, EXPIRE, UNFREEZE -> FundsEffectType.RELEASE;
             case SETTLE, WITHDRAW -> FundsEffectType.CONSUME;
             case AUTH_REFUND, REFUND, CHARGEBACK, FEE_REFUND -> FundsEffectType.RETURN;
             case BALANCE_ADJUST, LIMIT_ADJUST -> FundsEffectType.ADJUST;

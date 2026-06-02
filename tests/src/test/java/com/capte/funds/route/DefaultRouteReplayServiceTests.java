@@ -230,6 +230,40 @@ class DefaultRouteReplayServiceTests {
     }
 
     /**
+     * 场景：授权过期释放按原授权 RouteSnapshot 回放。
+     * 输入：原授权路径为 AVAILABLE -> AUTHORIZATION，本次请求事件为 EXPIRE。
+     * 输出：回放路径复用释放 leg，但 routeCode 和 eventType 保留过期语义。
+     * 预期：生成 AUTHORIZATION_EXPIRE_REPLAY，释放 AUTHORIZATION -> AVAILABLE。
+     * 红线：授权过期不能退化成 REVERSAL 事件或普通撤销 routeCode。
+     */
+    @Test
+    void testResolveAuthorizationExpireReplayShouldKeepExpireEventAndRouteCode() {
+        FundsInstructionReferenceSpec reference = ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.AUTHORIZATION)
+                .referenceSn("FT-AUTH-EXPIRE-001")
+                .build();
+        DefaultRouteReplayService replayService = new DefaultRouteReplayService(
+                new SnapshotFundsTransactionQueryService(authorizationRouteSnapshot()));
+
+        ResolvedRouteSpec resolvedRoute = replayService.resolve(authorizationExpireInstruction(reference));
+
+        assertThat(resolvedRoute.getRouteCode()).isEqualTo(FundsRouteCodes.AUTHORIZATION_EXPIRE_REPLAY);
+        assertThat(resolvedRoute.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION_TRANSACTION);
+        assertThat(resolvedRoute.getEventType()).isEqualTo(FundsTransactionEventType.EXPIRE);
+        assertThat(resolvedRoute.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
+        assertThat(resolvedRoute.getLegs()).singleElement()
+                .satisfies(leg -> {
+                    assertThat(leg.getLegType()).isEqualTo(RouteLegType.RELEASE);
+                    assertThat(leg.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RELEASE);
+                    assertThat(leg.getPhaseCode()).isEqualTo(LedgerPhaseCode.REVERSAL);
+                    assertThat(leg.getReplayRefLegId()).isEqualTo("AUTHORIZATION_1");
+                    assertThat(leg.getAmount()).isEqualTo(Money.immutable(50L, CurrencyIsoCode.USD));
+                    assertThat(leg.getSourceNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AUTHORIZATION);
+                    assertThat(leg.getTargetNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AVAILABLE);
+                });
+    }
+
+    /**
      * 场景：含权益原交易发起退款回放，但原 RouteSnapshot 没有原权益快照摘要。
      * 输入：退款指令携带业务层本次退款决策引用的 benefitSnapshot，原路径快照 context 为空。
      * 输出：解析器拒绝回放。
@@ -359,6 +393,63 @@ class DefaultRouteReplayServiceTests {
                 .build();
     }
 
+    private FundsInstructionSpec authorizationExpireInstruction(FundsInstructionReferenceSpec reference) {
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(1L)
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
+                .eventType(FundsTransactionEventType.EXPIRE)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .amount(Money.immutable(50L, CurrencyIsoCode.USD))
+                .reference(reference)
+                .businessScene("AUTHORIZATION_EXPIRE")
+                .businessSn("AUTHORIZATION_EXPIRE_REPLAY")
+                .eventTime(LocalDateTime.of(2026, 5, 19, 0, 0))
+                .operator(ImmutableFundsOperationActorSpec.builder()
+                        .operatorId(1L)
+                        .operatorType("SYSTEM")
+                        .appName("wind-funds-tests")
+                        .build())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private RouteSnapshotSpec authorizationRouteSnapshot() {
+        SubjectRef payer = fundingAccount("PAYER-001");
+        return ImmutableRouteSnapshotSpec.builder()
+                .tenantId(1L)
+                .snapshotId("AUTH-SNAPSHOT-202605190001")
+                .snapshotSchemaVersion(FundsRouteCodes.CURRENT_ROUTE_VERSION)
+                .routeCode(FundsRouteCodes.AUTHORIZATION_STANDARD)
+                .routeVersion(FundsRouteCodes.CURRENT_ROUTE_VERSION)
+                .businessScene("AUTHORIZATION")
+                .businessSn("AUTHORIZATION_AUTHORIZE")
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
+                .eventType(FundsTransactionEventType.AUTHORIZE)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of(participant(RouteParticipantRole.PAYER, payer)))
+                .legs(List.of(authorizationHoldLeg(payer)))
+                .routingDecision(routingDecision("ALLOC-AUTH", payer, Money.immutable(80L, CurrencyIsoCode.USD)))
+                .resolvedAt(LocalDateTime.of(2026, 5, 18, 12, 0))
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private ImmutableRouteLegSpec authorizationHoldLeg(SubjectRef payer) {
+        return ImmutableRouteLegSpec.builder()
+                .legId("AUTHORIZATION_1")
+                .sequence(1)
+                .legType(RouteLegType.HOLD)
+                .sourceNode(routeNode(payer, RouteNodeRole.SOURCE, LedgerSubjectCode.AVAILABLE))
+                .targetNode(routeNode(payer, RouteNodeRole.TARGET, LedgerSubjectCode.AUTHORIZATION))
+                .amount(Money.immutable(80L, CurrencyIsoCode.USD))
+                .balanceEffectType(LedgerBalanceEffectType.HOLD)
+                .phaseCode(LedgerPhaseCode.AUTHORIZATION)
+                .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
+                .constraintOverrides(Map.of())
+                .contextVariables(Map.of())
+                .build();
+    }
+
     private RouteSnapshotSpec routeSnapshot(PaymentInstrumentRefSpec paymentInstrumentRef) {
         return routeSnapshot(paymentInstrumentRef, null, routingDecision("ALLOC-DEFAULT", fundingAccount("PAYER-001")));
     }
@@ -414,10 +505,16 @@ class DefaultRouteReplayServiceTests {
     }
 
     private ImmutableRouteNodeSpec routeNode(SubjectRef subjectRef, RouteNodeRole nodeRole) {
+        return routeNode(subjectRef, nodeRole, LedgerSubjectCode.AVAILABLE);
+    }
+
+    private ImmutableRouteNodeSpec routeNode(SubjectRef subjectRef,
+                                             RouteNodeRole nodeRole,
+                                             LedgerSubjectCode ledgerSubjectCode) {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
                 .subjectRef(subjectRef)
-                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .ledgerSubjectCode(ledgerSubjectCode)
                 .nodeRole(nodeRole)
                 .build();
     }
@@ -470,6 +567,10 @@ class DefaultRouteReplayServiceTests {
     }
 
     private RoutingDecisionSpec routingDecision(String allocationId, SubjectRef fundingAccount) {
+        return routingDecision(allocationId, fundingAccount, Money.immutable(10L, CurrencyIsoCode.USD));
+    }
+
+    private RoutingDecisionSpec routingDecision(String allocationId, SubjectRef fundingAccount, Money amount) {
         return ImmutableRoutingDecisionSpec.builder()
                 .policyCode("PAYMENT_INSTRUMENT_SNAPSHOT_POLICY")
                 .matchedRules(List.of("original-default-funding-source"))
@@ -479,7 +580,7 @@ class DefaultRouteReplayServiceTests {
                         .allocationId(allocationId)
                         .subjectRef(fundingAccount)
                         .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
-                        .amount(Money.immutable(10L, CurrencyIsoCode.USD))
+                        .amount(amount)
                         .priority(1)
                         .reason("original funding allocation snapshot")
                         .build()))

@@ -55,6 +55,7 @@ import com.capte.funds.transaction.ledger.DefaultLedgerPostingAssembler;
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
@@ -570,6 +571,20 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setDescription("authorization reversal"), WindOperator.system());
     }
 
+    protected String expireAuthorization(FundsAccountId accountId,
+                                         long amount,
+                                         String authorizationTransactionSn,
+                                         String businessSn) {
+        return authorizationTransactionService.expire(new FundsAuthorizationTransactionExpireRequest()
+                .setAccountId(accountId)
+                .setAmount(amount(amount))
+                .setAuthorizationTransactionSn(authorizationTransactionSn)
+                .setBusinessScene("AUTHORIZATION_EXPIRE")
+                .setBusinessSn(businessSn)
+                .setExpireReason("AUTHORIZATION_EXPIRED")
+                .setDescription("authorization expired"), WindOperator.system());
+    }
+
     protected void unfreeze(FundsAccountId accountId, long amount, String referenceFreezeSn, String businessSn) {
         balanceControlService.unfreeze(new FundsBalanceUnfreezeRequest()
                 .setAccountId(accountId)
@@ -702,7 +717,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                             businessSn)
                     .allSatisfy(transaction -> {
                         assertThat(transaction.getStatus())
-                                .isIn(FundsTransactionStatus.OPEN, FundsTransactionStatus.CLOSED);
+                                .isIn(FundsTransactionStatus.OPEN, FundsTransactionStatus.CLOSED,
+                                        FundsTransactionStatus.EXPIRED);
                         assertThat(transaction.getRouteSnapshot()).isNotBlank();
                     });
         }

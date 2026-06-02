@@ -39,6 +39,8 @@ public final class FundsRouteCodes {
 
     public static final String AUTHORIZATION_REVERSAL_REPLAY = "AUTHORIZATION_REVERSAL_REPLAY";
 
+    public static final String AUTHORIZATION_EXPIRE_REPLAY = "AUTHORIZATION_EXPIRE_REPLAY";
+
     public static final String AUTHORIZATION_SETTLE_REPLAY = "AUTHORIZATION_SETTLE_REPLAY";
 
     public static final String AUTHORIZATION_REFUND_REPLAY = "AUTHORIZATION_REFUND_REPLAY";

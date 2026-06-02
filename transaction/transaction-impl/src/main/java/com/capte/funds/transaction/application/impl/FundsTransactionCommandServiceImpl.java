@@ -3,6 +3,7 @@ package com.capte.funds.transaction.application.impl;
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
@@ -139,6 +140,12 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Transactional(rollbackFor = Exception.class)
     public String reversal(FundsAuthorizationTransactionReversalRequest request, WindOperator operator) {
         return execute(authorizationInstructionConverter.convertToReversalInstruction(request, operator));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator operator) {
+        return execute(authorizationInstructionConverter.convertToExpireInstruction(request, operator));
     }
 
     @Override

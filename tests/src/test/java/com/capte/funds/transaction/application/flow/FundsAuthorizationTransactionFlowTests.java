@@ -378,6 +378,124 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
+     * 场景：用户充值后授权批准，先完成部分金额，再由系统过期释放剩余授权。
+     * 输入：充值 100、授权批准 80、完成 30、授权过期释放 50。
+     * 输出：AVAILABLE/AUTHORIZATION/SETTLEMENT 余额变化、过期明细和原 route replay 账务事实。
+     * 预期：过期只释放剩余授权占用，终态为 EXPIRED，事件语义为 EXPIRE。
+     * 红线：授权过期不得复用 reversal 终态和事件，不得释放已完成金额。
+     */
+    @Test
+    void testAuthorizationPartialSettleThenExpireShouldReleaseOnlyRemainingAuthorizationBalance() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        topup(user, 100L, "AUTH_PARTIAL_SETTLE_EXPIRE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        String authorizationSn = authorize(user, 80L, true, "AUTH_PARTIAL_SETTLE_EXPIRE_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -80L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 80L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        settleAuthorization(user, 30L, authorizationSn, "AUTH_PARTIAL_SETTLE_EXPIRE_CAPTURE");
+        BalanceSnapshot afterSettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY));
+
+        expireAuthorization(user, 50L, authorizationSn, "AUTH_PARTIAL_SETTLE_EXPIRE_EXPIRE");
+        BalanceSnapshot afterExpire = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterSettle, afterExpire,
+                delta(user, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -50L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 70L, CURRENCY);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY);
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.EXPIRED);
+        assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
+        assertThat(transaction.getSettledAmount()).isEqualTo(30L);
+        assertThat(transaction.getReversedAmount()).isEqualTo(50L);
+
+        assertPostedTransactions(4);
+        assertThat(ledgerTransactions().stream()
+                .map(LedgerTransaction::getEventType)
+                .toList())
+                .containsExactly(
+                        FundsTransactionEventType.TOPUP.name(),
+                        FundsTransactionEventType.AUTHORIZE.name(),
+                        FundsTransactionEventType.SETTLE.name(),
+                        FundsTransactionEventType.EXPIRE.name());
+
+        LedgerTransaction authorizationTransaction = ledgerTransactionByBusinessSn(
+                "AUTH_PARTIAL_SETTLE_EXPIRE_AUTHORIZE");
+        LedgerTransaction expireTransaction = ledgerTransactionByBusinessSn("AUTH_PARTIAL_SETTLE_EXPIRE_EXPIRE");
+        assertThat(expireTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
+        assertThat(entriesOf(expireTransaction).stream()
+                .map(LedgerEntry::getLedgerSubjectCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCode.AVAILABLE);
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_PARTIAL_SETTLE_EXPIRE_EXPIRE").stream()
+                .map(FundsTransactionDetail::getEventType)
+                .toList())
+                .containsOnly(FundsTransactionEventType.EXPIRE);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_SETTLE_EXPIRE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_SETTLE_EXPIRE_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_SETTLE_EXPIRE_CAPTURE", 0, 2, 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_PARTIAL_SETTLE_EXPIRE_EXPIRE", 0, 1, 1, 2);
+    }
+
+    /**
+     * 场景：用户授权批准后已完成部分金额，系统收到超过剩余授权金额的过期释放请求。
+     * 输入：充值 100、授权批准 80、完成 30、尝试过期释放 80。
+     * 输出：过期释放失败，不生成本次过期资金事实、账本交易和分录。
+     * 预期：原授权交易仍保持 OPEN，已完成金额不被过期释放，余额不变。
+     * 红线：授权过期只能释放剩余授权占用，不得释放已完成金额。
+     */
+    @Test
+    void testAuthorizationExpireMoreThanRemainingShouldFailWithoutExpireFacts() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "AUTH_EXPIRE_EXCEED_TOPUP");
+        String authorizationSn = authorize(user, 80L, true, "AUTH_EXPIRE_EXCEED_AUTHORIZE");
+        settleAuthorization(user, 30L, authorizationSn, "AUTH_EXPIRE_EXCEED_CAPTURE");
+        BalanceSnapshot beforeExpire = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        assertThatThrownBy(() -> expireAuthorization(user, 80L, authorizationSn, "AUTH_EXPIRE_EXCEED_EXPIRE"))
+                .hasMessageContaining("资金交易剩余授权可释放金额不足")
+                .hasMessageContaining("remainingAmount = 50")
+                .hasMessageContaining("amount = 80");
+
+        BalanceSnapshot afterExpire = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeExpire, afterExpire,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.OPEN);
+        assertThat(transaction.getAuthorizedAmount()).isEqualTo(80L);
+        assertThat(transaction.getSettledAmount()).isEqualTo(30L);
+        assertThat(transaction.getReversedAmount()).isZero();
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_EXPIRE_EXCEED_EXPIRE");
+    }
+
+    /**
      * 场景：用户充值后授权批准，先部分撤销，再完成剩余授权金额。
      * 输入：充值 100、授权批准 80、部分撤销 30、剩余完成 50。
      * 输出：每一步 AVAILABLE/AUTHORIZATION/SETTLEMENT 余额变化和账务事实。

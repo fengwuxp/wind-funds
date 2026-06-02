@@ -17,6 +17,7 @@ public enum FundsTransactionStatus implements DescriptiveEnum {
     PROCESSING("处理中"),
     OPEN("处理中但生命周期未关闭"),
     CLOSED("已关闭"),
+    EXPIRED("已过期"),
     FAILED("失败"),
     REJECTED("已拒绝");
 

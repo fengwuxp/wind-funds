@@ -26,6 +26,11 @@ public final class FundsInstructionContextKeys {
      */
     public static final String DECLINE_REASON = "declineReason";
 
+    /**
+     * 授权过期释放原因，仅用于系统到期释放剩余授权占用，不表示外部撤销或结算后争议。
+     */
+    public static final String EXPIRE_REASON = "expireReason";
+
     public static final String MERCHANT_INFO = "merchantInfo";
 
     public static final String TRANSACTION_COUNTRY = "transactionCountry";

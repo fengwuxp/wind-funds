@@ -3,6 +3,7 @@ package com.capte.funds.transaction.application;
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
@@ -51,6 +52,18 @@ public interface FundsAuthorizationTransactionService {
      * @return 交易流水号
      */
     String reversal(FundsAuthorizationTransactionReversalRequest request, WindOperator operator);
+
+    /**
+     * 账户交易授权过期释放。
+     *
+     * <p>用于系统按授权有效期释放剩余授权占用；底层账务路径可复用释放路径，
+     * 但事件、终态、原因和审计必须保留过期语义。</p>
+     *
+     * @param request  授权交易过期释放请求
+     * @param operator 操作者
+     * @return 交易流水号
+     */
+    String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator operator);
 
     /**
      * 交易完成（结算）

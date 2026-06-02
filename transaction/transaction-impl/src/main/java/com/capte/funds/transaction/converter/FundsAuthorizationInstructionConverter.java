@@ -9,6 +9,7 @@ import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.capte.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
@@ -108,6 +109,35 @@ public class FundsAuthorizationInstructionConverter {
                         FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
                         FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
                         request.getAuthorizationTransactionSn())))
+                .build();
+    }
+
+    public @NonNull FundsInstructionSpec convertToExpireInstruction(
+            @NonNull FundsAuthorizationTransactionExpireRequest request,
+            @NonNull WindOperator operator) {
+        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
+        context.put(FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
+                request.getAuthorizationTransactionSn());
+        if (request.getExpireReason() != null) {
+            context.put(FundsInstructionContextKeys.EXPIRE_REASON, request.getExpireReason());
+        }
+        return ImmutableFundsInstructionSpec.builder()
+                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
+                .eventType(FundsTransactionEventType.EXPIRE)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .amount(amount.amount())
+                .originalAmount(amount.originalAmount())
+                .exchangeRate(amount.exchangeRate())
+                .reference(authorizationReference(request.getAuthorizationTransactionSn()))
+                .businessScene(request.getBusinessScene())
+                .businessSn(request.getBusinessSn())
+                .eventTime(eventTime(request.getExpiredTime()))
+                .description(request.getDescription())
+                .operator(operationActor(operator))
+                .contextVariables(mergeContext(request.getContextVariables(), context))
                 .build();
     }
 

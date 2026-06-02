@@ -141,7 +141,7 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
         return switch (instruction.getEventType()) {
             case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn) ? FACT_STATUS_HELD : FACT_STATUS_REJECTED;
             case FREEZE -> FACT_STATUS_HELD;
-            case REVERSAL, UNFREEZE -> FACT_STATUS_RELEASED;
+            case REVERSAL, EXPIRE, UNFREEZE -> FACT_STATUS_RELEASED;
             default -> StringUtils.hasText(ledgerTransactionSn)
                     ? FACT_STATUS_POSTED
                     : FACT_STATUS_COMPLETED_NO_LEDGER;
@@ -157,7 +157,7 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
                     ? DISPLAY_STATUS_AUTHORIZED_HOLD
                     : DISPLAY_STATUS_DECLINED;
             case FREEZE -> DISPLAY_STATUS_FROZEN;
-            case REVERSAL, UNFREEZE -> DISPLAY_STATUS_RELEASED;
+            case REVERSAL, EXPIRE, UNFREEZE -> DISPLAY_STATUS_RELEASED;
             default -> DISPLAY_STATUS_SUCCEEDED;
         };
     }
@@ -199,7 +199,7 @@ public record FundsTransactionProjectionPublishContext(@NonNull FundsInstruction
                     ? STATUS_MEANING_AUTHORIZATION_HELD_NOT_CAPTURED
                     : STATUS_MEANING_AUTHORIZATION_DECLINED_NO_FUNDS_POSTED;
             case FREEZE -> STATUS_MEANING_BALANCE_FROZEN_NOT_CONSUMED;
-            case REVERSAL, UNFREEZE -> STATUS_MEANING_FUNDS_RELEASED;
+            case REVERSAL, EXPIRE, UNFREEZE -> STATUS_MEANING_FUNDS_RELEASED;
             default -> StringUtils.hasText(ledgerTransactionSn)
                     ? STATUS_MEANING_FUNDS_POSTED
                     : STATUS_MEANING_COMPLETED_WITHOUT_LEDGER;
