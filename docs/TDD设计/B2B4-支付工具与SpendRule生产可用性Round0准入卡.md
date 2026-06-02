@@ -73,7 +73,7 @@ Request/DTO 默认落 `com.capte.funds.wallet.model.request` 和 `com.capte.fund
 
 | 交易层能力 | 是否可后续完善 | 典型写入范围 | 禁止混入 |
 | --- | --- | --- | --- |
-| 授权过期释放 | 可以，B4 独立切片。 | `FundsAuthorizationTransactionService`、授权请求/事件、transaction-impl、授权流测试。 | 支付工具主体入参、卡账本、预算组入账。 |
+| 授权过期释放 | 已完成 B4-TRX-EXPIRE 基础能力，后续只作为回归基线或扩展切片。 | `FundsAuthorizationTransactionService#expire`、`FundsAuthorizationTransactionExpireRequest`、`EXPIRE` 事件、transaction-impl、route replay、授权流测试已由 `b0666ba` 闭合。 | 支付工具主体入参、卡账本、预算组入账；不得借过期释放扩展强制完成、无授权退款或 VCC 生命周期。 |
 | 受控强制完成 | 可以，B4 独立切片。 | settle 请求、策略字段、审计字段、金额边界测试。 | 用强制完成伪造授权占用或绕过原路径。 |
 | 无授权直接退款 | 可以，B3/B4 独立切片。 | refund 请求、外部原事实引用、审计和失败测试。 | 无原事实静默退款、按当前工具绑定选路。 |
 | 拒付和争议扣回 | 可以，B4 或 P2-VCC-LIFECYCLE 切片。 | chargeback 或等价逆向请求、原因/凭证/阶段、重复损失防护测试。 | 与授权拒绝或普通 refund 混同。 |

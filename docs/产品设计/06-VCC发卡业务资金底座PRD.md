@@ -413,7 +413,7 @@ VCC 业务对接建议优先依赖钱包 application facade，而不是直接调
 | 预付资金处理 | `VccPrepaidFundingApplicationService` | `com.capte.funds.wallet.application.vcc` | 外部确认入金、系统内充值、退卡或转出；不创建卡账本。 |
 | 共享卡场景编排 | `VccSharedCardTransactionApplicationService` | `com.capte.funds.wallet.application.vcc` | 共享卡授权、清算和逆向的 VCC 场景编排；卡维度账单来自交易投影。 |
 
-交易层仍需继续完善账户主体型能力，包括授权过期、受控强制完成、无授权退款、拒付/争议扣回、余额控制调账审计和原路径回放。VCC facade 可以触发或委派这些能力，但不得把它们包装成统一支付工具交易内核，也不得让卡、卡组、预算组或 Spend Rule 成为账务主体。
+交易层已补齐账户主体型授权过期释放基础能力，仍需继续完善受控强制完成、无授权退款、拒付/争议扣回、余额控制调账审计和原路径回放。VCC facade 可以触发或委派这些能力，但不得把它们包装成统一支付工具交易内核，也不得让卡、卡组、预算组或 Spend Rule 成为账务主体。
 
 #### 13.2.1 预付卡、共享卡交易服务能力包
 
