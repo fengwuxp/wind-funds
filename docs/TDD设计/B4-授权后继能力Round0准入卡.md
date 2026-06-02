@@ -2,7 +2,7 @@
 
 ## 1. 文档定位
 
-本文档是 B4 授权后继能力的 Round 0 候选准入卡。它把 B4-TRX-EXPIRE 已完成后的剩余授权交易缺口收敛为账户主体型 canonical 内核的候选 Execution Grant 输入页。
+本文档是 B4 授权后继能力的 Round 0 候选准入卡。它把 B4-TRX-EXPIRE 和 B4-FORCE-SETTLE 已完成后的剩余授权交易缺口收敛为账户主体型 canonical 内核的候选 Execution Grant 输入页。
 
 本文档不授权修改生产代码、测试代码、DDL/H2 schema 或运行时配置。只有用户确认本页或确认经调整后的单一 MVP Execution Grant 后，才允许把本文档中的 Red 候选转成实际测试写入。
 
@@ -28,18 +28,18 @@
 | `moneyFact` | 强制完成是已确认外部消费结果的资金事实；无授权退款是基于外部原消费、原完成或差错凭证的逆向资金事实；拒付是争议/扣回语义，不是授权拒绝，也不能被压缩成不可区分的普通退款。 |
 | `userVisibleResult` | 用户或商户看到账单、退款、扣回或失败原因；运营和财务能追溯原事实引用、原因、凭证、策略、上限、route snapshot、ledger transaction、projection 和审计上下文。 |
 | `productNotDone` | 不声明完整 VCC 发卡、完整 chargeback case 管理、完整清结算追偿、外部卡组织规则、Spend Rule 引擎、支付工具 facade 或治理重放生产能力。 |
-| `firstRedSet` | 建议先选 `B4-FS-RED-001` 强制完成必填策略和无伪造授权；再按授权确认选择 `B4-NAR-RED-001`、`B4-CB-RED-001` 或 `B4-RACE-RED-001`。 |
+| `firstRedSet` | B4-FORCE-SETTLE 首轮已闭合；下一轮建议先选 `B4-NAR-RED-001` 无授权退款成功路径，再按结果补 `B4-NAR-RED-002`、`B4-CB-RED-001` 或 `B4-RACE-RED-001`。 |
 | `currentEvidence` | `b0666ba` 已证明授权过期释放基础能力闭合；`616dac1` 和 `3825466` 已证明 B4-FORCE-SETTLE 首轮 canonical 能力与策略红线闭合。剩余 B4-NO-AUTH-REFUND、B4-DISPUTE-CHARGEBACK 和 B4-AUTH-RACE 仍是设计和任务候选，不因 B4-TRX-EXPIRE 或 B4-FORCE-SETTLE 通过而自动获得编码授权。 |
 
 ### 3.1 architectureReviewMap
 
 | 架构审查项 | 本卡落点 |
 | --- | --- |
-| 背景、目标、非目标、成功标准 | 背景是 B4-TRX-EXPIRE 已闭合但授权后继能力仍缺 Round 0 输入；目标是拆出可授权的最小 Red；非目标是不混入支付工具 facade、VCC、Spend Rule、清结算对账或治理；成功标准是候选切片能追溯到 AC、DSL、TDD、写入范围和停止条件。 |
-| 核心决策、职责边界和取舍 | 核心决策是只推进账户主体型 canonical 授权内核；支付工具、VCC、Spend Rule 和清结算能力保持独立授权；取舍是优先 B4-FORCE-SETTLE，暂不一次性打开全部授权后继状态。 |
-| 接口契约、入参、错误码、幂等和兼容 | Execution Grant 必须显式列名 settle 强制完成策略字段、settleRefund 原事实引用、凭证、原因、审计、错误码和幂等摘要；还必须声明 `authorizationTransactionSn` 的条件化规则：普通完成必填并查询原授权，首轮 FORCE 模式不得依赖内部授权流水或查询原授权账本交易，必须改由外部原事实引用和受信策略/审批快照承接；未列名时不得修改公共契约。 |
+| 背景、目标、非目标、成功标准 | 背景是 B4-TRX-EXPIRE 和 B4-FORCE-SETTLE 已闭合，但无授权退款、拒付/争议和授权并发仍缺 Round 0 输入；目标是拆出可授权的最小 Red；非目标是不混入支付工具 facade、VCC、Spend Rule、清结算对账或治理；成功标准是候选切片能追溯到 AC、DSL、TDD、写入范围和停止条件。 |
+| 核心决策、职责边界和取舍 | 核心决策是只推进账户主体型 canonical 授权内核；支付工具、VCC、Spend Rule 和清结算能力保持独立授权；B4-FORCE-SETTLE 首轮已闭合，下一步取舍是优先准备 B4-NO-AUTH-REFUND，不一次性打开全部授权后继状态。 |
+| 接口契约、入参、错误码、幂等和兼容 | B4-FORCE-SETTLE 的字段和 `authorizationTransactionSn` 条件化规则已作为回归基线；后续 Execution Grant 必须显式列名 `settleRefund` 原事实引用、凭证、原因、审计、错误码和幂等摘要，未列名时不得修改公共契约。 |
 | 数据方案、事务边界、一致性和补偿 | Red 必须证明 route snapshot、posting plan、ledger transaction、ledger entry、projection、余额桶和失败无副作用；并发切片若需要唯一约束、锁字段、版本字段或补偿路径，必须扩权确认。 |
-| 可靠性、安全、权限、审计和告警 | 本卡不授权生产发布、外部协议或敏感数据；所有强制完成、退款和拒付切片都必须保留原因、凭证、外部引用、脱敏审计和失败可解释性；强制完成的审计最小集为 `WindOperator`、`forceSettleReason`、`externalOriginalFactRef`、`forceSettleVoucherRef` 和受信策略/审批快照引用，`contextVariables` 只能作为白名单补充，不承接核心资金事实；权限和告警只作为后续 Execution Grant 待确认项。 |
+| 可靠性、安全、权限、审计和告警 | 本卡不授权生产发布、外部协议或敏感数据；所有退款和拒付切片都必须保留原因、凭证、外部引用、脱敏审计和失败可解释性；强制完成的审计最小集已作为 B4-FORCE-SETTLE 回归基线，后续无授权退款审计不得把核心资金事实塞进普通 `contextVariables`；权限和告警只作为后续 Execution Grant 待确认项。 |
 | 验证方案、测试、静态检查和回归 | 每个切片先写目标 Red，再跑 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check` 中的授权命令。 |
 | 发布、灰度、回滚、风险和待确认 | 本卡不进入生产发布；若后续编码触碰公共契约、DDL/H2、外部规则、清结算追偿或敏感数据，必须停止并补待确认项、风险说明、灰度和回滚策略。 |
 
@@ -86,13 +86,22 @@
 
 ### 7.1 existingCoverageScan（2026-06-02）
 
-本节记录 B4-FORCE-SETTLE 编码授权前的只读覆盖扫描。扫描只读取现有生产代码、测试代码和设计文档，不修改生产代码、测试代码、DDL/H2 schema 或运行时配置；结论只作为下一轮 Execution Grant 的失败点和写入边界输入。
+本节记录 B4-FORCE-SETTLE 编码授权前的历史只读覆盖扫描。扫描当时只读取生产代码、测试代码和设计文档，不修改生产代码、测试代码、DDL/H2 schema 或运行时配置；结论已由 `616dac1` 和 `3825466` 消费为实现与回归证据，后续只作为时间线留痕。
 
 | redId | 既有覆盖资产 | 当前覆盖判断 | 下一轮 Red 预期失败点 |
 | --- | --- | --- | --- |
-| `B4-FS-RED-001` | `FundsAuthorizationTransactionSettleRequest`、`FundsAuthorizationInstructionConverter#convertToSettleInstruction`、`AuthorizationFundsInstructionRouteResolver#resolveSettle`、`FundsAuthorizationTransactionFlowTests` 中普通 settle、部分 settle、settle 后 expire 和 settle 幂等用例。 | 普通授权完成链路覆盖充分：请求必须有 `authorizationTransactionSn`，converter 无条件构造 `AUTHORIZATION` reference 并查询原授权账本交易，route resolver 依赖原授权主体解析，测试断言 AVAILABLE/AUTHORIZATION/SETTLEMENT、route、ledger transaction、entry、projection 和幂等。当前代码没有 FORCE 模式、`authorizationTransactionSn` 条件化、强制完成策略编码、上限、原因、凭证或无前置授权外部事实引用字段。 | 如果直接写无前置授权强制完成 Red，应先失败在 Request 契约和 converter：`authorizationTransactionSn` 必填且 `authorizationLedgerTransactionSn` 会要求原授权账本交易存在。Red 应证明 FORCE 模式不依赖内部授权流水、缺策略、缺上限、缺原因、缺审计或缺外部事实引用不得入账，且成功路径不得伪造授权占用。 |
-| `B4-FS-RED-002` | `FundsAuthorizationTransactionFlowTests#testAuthorizationSettleSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects`、`DefaultFundsInstructionLifecycleSaver` 的请求摘要和状态累计逻辑。 | 同业务流水同摘要重试、不同摘要拒绝、余额和账务事实保持不变已有普通完成覆盖；但覆盖对象仍是基于原授权的普通 settle，不覆盖无策略、超上限、缺审计或缺外部事实引用的强制完成失败路径。 | Red 应沿用现有幂等和失败无副作用断言结构，但需要先扩展目标 Request 字段或等价上下文字段；若未扩权，测试不得落地。 |
+| `B4-FS-RED-001` | `FundsAuthorizationTransactionSettleRequest`、`FundsAuthorizationInstructionConverter#convertToSettleInstruction`、`AuthorizationFundsInstructionRouteResolver#resolveSettle`、`FundsAuthorizationTransactionFlowTests` 中普通 settle、部分 settle、settle 后 expire 和 settle 幂等用例。 | 扫描时普通授权完成链路覆盖充分：请求必须有 `authorizationTransactionSn`，converter 无条件构造 `AUTHORIZATION` reference 并查询原授权账本交易，route resolver 依赖原授权主体解析，测试断言 AVAILABLE/AUTHORIZATION/SETTLEMENT、route、ledger transaction、entry、projection 和幂等。扫描时代码没有 FORCE 模式、`authorizationTransactionSn` 条件化、强制完成策略编码、上限、原因、凭证或无前置授权外部事实引用字段；该缺口后续已由 `616dac1` 和 `3825466` 闭合。 | 历史 Red 预期失败点已消费；后续只有返工或扩展 FORCE 策略引擎、审批快照、额度窗口、带原授权 overcapture 时才需要重新打开。 |
+| `B4-FS-RED-002` | `FundsAuthorizationTransactionFlowTests#testAuthorizationSettleSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects`、`DefaultFundsInstructionLifecycleSaver` 的请求摘要和状态累计逻辑。 | 扫描时同业务流水同摘要重试、不同摘要拒绝、余额和账务事实保持不变已有普通完成覆盖；但覆盖对象仍是基于原授权的普通 settle，不覆盖无策略、超上限、缺审计或缺外部事实引用的强制完成失败路径。该失败路径后续已由 `3825466` 加固。 | 历史 Red 预期失败点已消费；后续只作为授权交易回归基线。 |
 | `B4-CB-RED-001` | `FundsAuthorizationTransactionFlowTests` 已有拒付幂等和余额断言，`FundsAuthorizationTransactionService#chargeback` 仍是现有方法。 | 既有测试证明代码可用 `CHARGEBACK` 事件承接一类拒付资金影响；但目标态文档要求拒付不强制落独立 `chargeback` 入口，并能通过 `settleRefund` 的原因、凭证和审计上下文表达。该差异属于后续语义校准，不应混入 B4-FORCE-SETTLE。 | 如选择 B4-DISPUTE-CHARGEBACK，应单独确认是保留兼容方法并补投影区分，还是收敛到 `settleRefund` 语义；不得在 force settle 切片内处理。 |
+
+### 7.1.1 noAuthRefundCoverageScan（2026-06-02）
+
+本节记录 B4-NO-AUTH-REFUND 编码授权前的只读覆盖扫描。扫描只读取现有生产代码、测试代码和设计文档，不修改生产代码、测试代码、DDL/H2 schema 或运行时配置；结论只作为后续 B4-NO-AUTH-REFUND Execution Grant 的失败点和写入边界输入。
+
+| redId | 既有覆盖资产 | 当前覆盖判断 | 下一轮 Red 预期失败点 |
+| --- | --- | --- | --- |
+| `B4-NAR-RED-001` | `FundsAuthorizationTransactionRefundRequest`、`FundsAuthorizationInstructionConverter#convertToSettleRefundInstruction`、`AuthorizationFundsInstructionRouteResolver#resolveSettleRefund`、`DefaultRouteReplayService#resolveReplayType`、`FundsAuthorizationTransactionFlowTests#testFundingAuthorizationFullSettleThenFullRefundShouldRestoreAvailableBalance`、`FundsAuthorizationTransactionFlowTests#testAuthorizationDisputeRefundShouldUseSettleRefundAndPreserveAuditContext`。 | 已完成授权后的 `settleRefund` 覆盖充分：请求必须携带 `authorizationTransactionSn`，converter 无条件构造 `AUTHORIZATION` reference 并把 `AUTHORIZATION_TRANSACTION_SN` 写入上下文；route resolver 基于原授权主体和平台 SETTLEMENT 生成退款路径，route replay 使用 `AUTHORIZATION_REFUND` 回放原完成路径；测试已断言余额、ledger transaction、entry、posting plan、projection、幂等和争议上下文。当前代码没有无授权退款模式、外部原消费/原完成/差错凭证引用、退款凭证、退款原因一等字段或 no-auth refund 审计最小集，也不能在不携带内部授权流水时进入成功路径。 | 如果直接写无前置授权退款 Red，应先失败在 Request 契约和 converter：`authorizationTransactionSn` 必填且 `authorizationReference(...)` 会要求内部授权流水；route replay 也缺少外部原事实驱动的退款路径。Red 应证明 no-auth refund 不补造授权占用、不按当前绑定重新选路、必须携带外部原事实引用、凭证、原因和审计，成功后生成可追溯 AUTH_REFUND 或等价退款资金事实。 |
+| `B4-NAR-RED-002` | `FundsAuthorizationTransactionFlowTests#testAuthorizationRefundExceedingSettledAmountShouldLeaveNoSideEffects`、`FundsAuthorizationTransactionFlowTests#testAuthorizationRefundSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects`、`DefaultFundsInstructionLifecycleSaver` 的请求摘要和状态累计逻辑。 | 已完成授权后的失败无副作用覆盖充分：超出已完成可退金额、同业务流水不同摘要会失败并保持余额、ledger transaction、posting、entry 和资金事实不变。但覆盖对象仍是“有内部授权和完成事实”的退款失败，不覆盖无原事实、无凭证、无原因或无审计的无授权退款失败。 | Red 应沿用现有余额和事实快照断言结构，新增缺原事实、缺凭证、缺原因、缺审计和敏感上下文阻断用例；若 Execution Grant 未明确允许扩展 Request/DTO、错误码或 route replay 契约，测试不得落地。 |
 
 ### 7.2 forceSettleContractCandidate
 
