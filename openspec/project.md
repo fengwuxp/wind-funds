@@ -74,7 +74,7 @@ OpenSpec / Superpowers / Harness 在本项目中的定位：
 | P0/P1 资金数据治理 | 可进入 TDD 分析；编码不开放。 | TDD 分析必须产出 `GOV-GATE-*`、`TDD-B8-RED-*`、治理物理落点候选、Manifest/H2 范围、dry-run/apply、指标水位隔离、治理导出和大数据消费边界测试矩阵；只有独立 Execution Grant 明确 Manifest、checkpoint、watermark、差异报告、人工处理、回滚/续跑和边界测试后，才能进入编码态。 |
 | 本轮代码写入 | 不授权。 | 当前任务只允许优化并提交设计和任务准入基线；生产代码、测试代码、DDL/H2 schema、运行时配置均不纳入本轮写入范围。 |
 
-首轮编码推荐路径：先做 A0 基线核验，确认钱包账户、支付工具、账本、账目、余额投影和现有测试资产可承接，再由用户按 A1 至 A4 中的单一 MVP 任务切片确认 Execution Grant。B1 至 B8 只作为覆盖索引和历史任务编号，不作为新的默认开工授权；B7/B8 仍需独立 TDD 分析和 Execution Grant。A0 标准输出页见 `docs/TDD设计/A0-编码准入基线核验.md`，后续 Execution Grant 应引用该页的 `authorityBaseline`、`codeBaseline`、`targetAssets`、`schemaNeed`、`firstRedCandidateSet` 和 `nextExecutionGrantRequest`。
+首轮编码推荐路径：先做 A0 基线核验，确认钱包账户、支付工具、账本、账目、余额投影和现有测试资产可承接，再由用户按 A1 至 A4 中的单一 MVP 任务切片确认 Execution Grant。B1 至 B8 只作为覆盖索引和历史任务编号，不作为新的默认开工授权；B7/B8 仍需独立 TDD 分析和 Execution Grant。A0 标准输出页见 `docs/TDD设计/A0-编码准入基线核验.md`，后续 Execution Grant 应引用该页的 `authorityBaseline`、`codeBaseline`、`targetAssets`、`schemaNeed`、`firstRedCandidateSet` 和 `nextExecutionGrantRequest`。截至 2026-06-02，B4-TRX-EXPIRE 和 B4-FORCE-SETTLE 已进入代码基线，当前 GSD-CAD 核心决策和恢复入口改为 `B4-NO-AUTH-REFUND` / `B4-NAR-CAD-001`；该入口仍必须等待用户确认独立 Execution Grant，未确认前不授权 Java、测试、DDL/H2 schema 或运行时配置写入。
 
 ### 3.4 Execution Grant 最小字段
 
