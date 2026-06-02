@@ -44,6 +44,10 @@ import java.util.Map;
 @Component
 public class FundsAuthorizationInstructionConverter {
 
+    private static final String TRUSTED_FORCE_SETTLE_POLICY_CODE = "B4_FORCE_SETTLE_OPS";
+
+    private static final long TRUSTED_FORCE_SETTLE_LIMIT_AMOUNT = 60L;
+
     private final FundsInstructionAmountSupport amountSupport;
 
     private final LedgerTransactionService ledgerTransactionService;
@@ -249,9 +253,13 @@ public class FundsAuthorizationInstructionConverter {
         AssertUtils.isFalse(StringUtils.hasText(request.getAuthorizationTransactionSn()),
                 "force settle must not carry authorizationTransactionSn");
         AssertUtils.hasText(request.getForceSettlePolicyCode(), "forceSettlePolicyCode must not be blank");
+        AssertUtils.isTrue(TRUSTED_FORCE_SETTLE_POLICY_CODE.equals(request.getForceSettlePolicyCode()),
+                "forceSettlePolicyCode must be trusted");
         AssertUtils.notNull(request.getForceSettleLimitAmount(), "forceSettleLimitAmount must not be null");
         AssertUtils.isTrue(request.getForceSettleLimitAmount() > 0,
                 "forceSettleLimitAmount must be greater than 0");
+        AssertUtils.isTrue(request.getForceSettleLimitAmount() == TRUSTED_FORCE_SETTLE_LIMIT_AMOUNT,
+                "forceSettleLimitAmount must match trusted policy limit");
         AssertUtils.isTrue(amount.amount().getAmount() <= request.getForceSettleLimitAmount(),
                 "forceSettleLimitAmount must be greater than or equal to transaction amount");
         AssertUtils.hasText(request.getForceSettleReason(), "forceSettleReason must not be blank");

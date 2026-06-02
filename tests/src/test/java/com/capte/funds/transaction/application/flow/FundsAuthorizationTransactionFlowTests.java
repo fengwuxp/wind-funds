@@ -874,9 +874,33 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setForceSettlePolicyCode(null), WindOperator.system()))
                 .hasMessageContaining("forceSettlePolicyCode");
         assertThatThrownBy(() -> authorizationTransactionService.settle(forceSettleRequest(user, 60L,
+                "AUTH_FORCE_SETTLE_UNKNOWN_POLICY")
+                .setForceSettlePolicyCode("UNKNOWN_FORCE_SETTLE_POLICY"), WindOperator.system()))
+                .hasMessageContaining("forceSettlePolicyCode");
+        assertThatThrownBy(() -> authorizationTransactionService.settle(forceSettleRequest(user, 60L,
                 "AUTH_FORCE_SETTLE_EXCEED_LIMIT")
                 .setForceSettleLimitAmount(50L), WindOperator.system()))
                 .hasMessageContaining("forceSettleLimitAmount");
+        assertThatThrownBy(() -> authorizationTransactionService.settle(forceSettleRequest(user, 60L,
+                "AUTH_FORCE_SETTLE_LIMIT_MISMATCH")
+                .setForceSettleLimitAmount(99L), WindOperator.system()))
+                .hasMessageContaining("forceSettleLimitAmount");
+        assertThatThrownBy(() -> authorizationTransactionService.settle(forceSettleRequest(user, 60L,
+                "AUTH_FORCE_SETTLE_WITH_AUTH_SN")
+                .setAuthorizationTransactionSn("FT_SHOULD_NOT_BE_ACCEPTED"), WindOperator.system()))
+                .hasMessageContaining("authorizationTransactionSn");
+        assertThatThrownBy(() -> authorizationTransactionService.settle(forceSettleRequest(user, 60L,
+                "AUTH_FORCE_SETTLE_MISSING_REASON")
+                .setForceSettleReason("   "), WindOperator.system()))
+                .hasMessageContaining("forceSettleReason");
+        assertThatThrownBy(() -> authorizationTransactionService.settle(forceSettleRequest(user, 60L,
+                "AUTH_FORCE_SETTLE_MISSING_EXTERNAL_FACT")
+                .setExternalOriginalFactRef("   "), WindOperator.system()))
+                .hasMessageContaining("externalOriginalFactRef");
+        assertThatThrownBy(() -> authorizationTransactionService.settle(forceSettleRequest(user, 60L,
+                "AUTH_FORCE_SETTLE_MISSING_VOUCHER")
+                .setForceSettleVoucherRef("   "), WindOperator.system()))
+                .hasMessageContaining("forceSettleVoucherRef");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(beforeFailure, afterFailure,
@@ -887,7 +911,13 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_REJECT_TOPUP", 3, 4);
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_MISSING_POLICY");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_UNKNOWN_POLICY");
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_EXCEED_LIMIT");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_LIMIT_MISMATCH");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_WITH_AUTH_SN");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_MISSING_REASON");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_MISSING_EXTERNAL_FACT");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_MISSING_VOUCHER");
     }
 
     /**
