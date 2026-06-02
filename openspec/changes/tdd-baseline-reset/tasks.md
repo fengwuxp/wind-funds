@@ -25,6 +25,7 @@
 - [x] 2026-06-01 补齐 B2/B4 支付工具与 Spend Rule Round 0 准入卡：新增 `docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md`，把 `R0-PI-001`、`R0-FR-001`、`R0-AUTH-001`、`R0-SR-001`、`R0-SR-002`、`R0-PI-002` 拆成 B2-PI-CAP、B2-FR、B4-AUTH-PI、B5-SR-CONTROL、B6/B8-PI-VIEW 五个候选切片。该卡只作为 Round 0 和独立 Execution Grant 输入，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 - [x] 2026-06-02 固化 Highnote 参考模式对 wind-funds 的确认点：Highnote financial account / ledger / payment card / financial account activity 分层只作为外部设计参考，用于确认账户入账、工具归因、控制留痕、投影查询。wind-funds 不照搬对象名，不新增卡账本、支付工具账务主体或统一支付工具交易内核；共享卡或多卡共享账户通过同一内部责任主体、多工具绑定、控制快照和交易投影过滤区分卡账单，只有独立资金池、独立授信、独立账期、独立还款或独立资金责任成立时才创建独立资金账户或信用账户。本条只更新 PRD、DSL、系分、TDD 和 OpenSpec 设计基线，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 - [x] 2026-06-02 完成 B4-TRX-EXPIRE 授权过期释放 canonical 能力：`b0666ba feat: 补齐授权过期释放 canonical 能力` 新增 `EXPIRE` 事件、`EXPIRED` 状态、`FundsAuthorizationTransactionExpireRequest`、`FundsAuthorizationTransactionService#expire`、授权过期转换、route replay、ledger posting 复用 release 路径和生命周期金额校验；`FundsAuthorizationTransactionFlowTests` 覆盖 `TDD-AUTH-011`、`TDD-ROUTE-008`、`TDD-RED-016`，`DefaultRouteReplayServiceTests` 覆盖 `AUTHORIZATION_EXPIRE_REPLAY`。已验证 `just test-one DefaultRouteReplayServiceTests tests`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-boundary`、`just compile`、`git diff --check`、`just pmd` 全部通过。该提交关闭 B4-03 授权过期基础缺口；强制完成、无授权直接退款、拒付承接、授权支付工具 facade、VCC 生命周期、Spend Rule 控制和并发竞争仍需独立 Execution Grant。
+- [x] 2026-06-02 补齐 B4 授权后继能力 Round 0 准入卡：新增 `docs/TDD设计/B4-授权后继能力Round0准入卡.md`，把 B4-TRX-EXPIRE 后剩余的 `settle` 强制完成、`settleRefund` 无授权退款、拒付/争议承接和授权并发竞争拆成 B4-FORCE-SETTLE、B4-NO-AUTH-REFUND、B4-DISPUTE-CHARGEBACK、B4-AUTH-RACE 四个候选切片。该卡只作为账户主体型 canonical 授权内核的 Round 0 和独立 Execution Grant 输入，不授权生产代码、测试代码、DDL/H2 schema、支付工具 facade、VCC 生命周期、Spend Rule 控制、清结算对账或治理写入。
 
 ## 1. MVP 任务写入范围
 
@@ -37,7 +38,7 @@
 | B1 | P0 共享承载 | `tests/src/test/java/com/capte/funds/dsl`、`tests/src/test/resources/dsl-contract-cases`、必要的 `core/src/main/java` DSL/枚举/Spec、Route DSL、PaymentInstrument DSL、RoutingDecision/FundingAllocation DSL、Posting/Ledger DSL、SettlementPolicy。 |
 | B2 | P0 基础事实 | `wallet-*`、`ledger-*`、`tests/src/test/java` 中账户、支付工具、绑定关系、支出主体资金责任解析关系、账本、投影相关测试和最小实现。 |
 | B3 | P1 直接交易 | `transaction-*`、`tests/src/test/java` 中直接交易测试和最小实现。 |
-| B4 | P1 授权交易 | `transaction-*`、`core`、`tests/src/test/java` 中授权交易、无授权直接退款测试和最小实现。 |
+| B4 | P1 授权交易 | `transaction-*`、`core`、`tests/src/test/java` 中授权交易、无授权直接退款测试和最小实现；强制完成、无授权退款、拒付承接和并发竞争的候选授权输入见 `docs/TDD设计/B4-授权后继能力Round0准入卡.md`。 |
 | B5 | P1 余额控制 | `transaction-*`、`tests/src/test/java` 中余额控制测试和最小实现。 |
 | B6 | P1 路由回放与交易投影 | `transaction-*`、`ledger-*`、`tests/src/test/java` 中 Route Replay、余额日志、交易投影测试和最小实现。 |
 | B7 | P0 运营账务闭环 | 清结算、对账相关模块或包，需先确认；冻结基线已有 `reconciliation-*` 模块骨架和出款前准入候选实现，已完成专项验证，但未纳入清结算、对账或出款生命周期 Done 基线，目标态对象、表、状态机和测试未闭环。 |

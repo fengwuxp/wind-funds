@@ -297,12 +297,13 @@ A0 的跨层字段承接如下。任一字段在 PRD、DSL、系分、TDD 或 Op
 | A2 授权交易 | 在 A1 证据链稳定后推进授权完成、撤销、过期、部分完成、退款和拒付。 | 授权拒绝不写 route/entry；累计完成不超授权；撤销和过期释放剩余占用；逆向沿原 route snapshot。 | 不引入 P2 业务特殊链路，不把商户结算单或出款单混入授权完成。 |
 | A3 余额控制 | 单独证明冻结、解冻、调整和失败路径不改变资金语义。 | 冻结只做同主体 `AVAILABLE <-> FROZEN` 控制；解冻不产生跨主体转移；余额不足、规则不唯一和重复请求无副作用。 | 不把冻结表达为消费；不把对账差错调账混入余额控制，除非独立授权。 |
 | A4 DSL caseId 执行化 | 把本任务新增或变更的 DSL caseId 盘点到 fixture 和测试资产。 | 每个 caseId 标注 `fixtureLevel`、fixture 路径、目标测试类、核心断言和 Not Done；只有被测试读取并断言通过后才声明机器契约通过。 | 不把文档 JSON、`CONTRACT_ONLY` 或未读取 fixture 当生产 Done 证据。 |
+| B4 授权后继能力 Round 0 | 验证 B4-TRX-EXPIRE 后剩余强制完成、无授权退款、拒付承接和授权并发竞争是否具备进入独立 Execution Grant 的条件。 | [TDD设计/B4-授权后继能力Round0准入卡.md](TDD设计/B4-授权后继能力Round0准入卡.md)、B4-FS/B4-NAR/B4-CB/B4-RACE、既有授权交易和 route replay 回归。 | 不混入支付工具 facade、VCC 生命周期、Spend Rule 表、清结算对账、治理 apply 或 P2 轨道协议。 |
 | B2/B4 支付工具与 Spend Rule Round 0 | 验证支付工具能力准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影是否具备进入独立 Execution Grant 的条件。 | [TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md)、R0-PI/R0-FR/R0-AUTH/R0-SR、既有支付工具和资金责任测试回归。 | 不替换交易 canonical 请求，不新增统一支付工具交易服务，不把预算组或 Spend Rule 做成账务主体，不混入清结算对账、治理 apply 或 P2 轨道协议。 |
 | B7 清结算与对账 | 独立开启清分、清算、结算、出款、对账和差错闭环落地。 | 独立 OpenSpec change、独立 Execution Grant、`CLS-GATE-*`、`TDD-B7-RED-*`、DDL/H2 范围、服务级 H2 流程、并发重跑、权限审计和外部规则核验。 | 不混入 A0-A4；未授权不得新增清结算或对账生产写入。 |
 | B8 资金数据治理 | 独立开启事实留存、重放、余额快照、差异报告和指标只读边界落地。 | 独立 Execution Grant、`GOV-GATE-*`、`TDD-B8-RED-*`、治理物理落点、Manifest、checkpoint、watermark、dry-run/apply、范围锁和指标水位隔离测试。 | 不混入 A0-A4；未授权不得创建空壳治理模块或让治理任务反写资金事实。 |
 | P2 业务能力包 | 在 P0/P1 主链路回归稳定后承接 VCC、全球账户、ACH 或收单业务。 | 只补场景交易 capability pack、外部引用、状态映射、脱敏证据、规则待确认和 P0/P1 回归矩阵。 | 不新增平行钱包、平行账本、平行清结算、平行对账或平行归档。 |
 
-首轮编码入口统一为 A0 至 A4。历史权益 DSL 契约承载基线不默认重开；如本轮触碰权益金额组件，必须在 A4 中列明本任务 caseId、fixture 级别、事实源、退款分摊、解释视图、证据最小化和外部规则状态。B2/B4 支付工具与 Spend Rule 生产可用性先按 Round 0 准入卡拆成独立切片；B7/B8 只做 TDD 分析和独立授权准备，未获得独立 Execution Grant 前不得进入写入范围。
+首轮编码入口统一为 A0 至 A4。历史权益 DSL 契约承载基线不默认重开；如本轮触碰权益金额组件，必须在 A4 中列明本任务 caseId、fixture 级别、事实源、退款分摊、解释视图、证据最小化和外部规则状态。B4 授权后继能力、B2/B4 支付工具与 Spend Rule 生产可用性都必须先按各自 Round 0 准入卡拆成独立切片；B7/B8 只做 TDD 分析和独立授权准备，未获得独立 Execution Grant 前不得进入写入范围。
 
 ### Execution Grant 字段映射
 
