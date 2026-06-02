@@ -10,8 +10,8 @@
 
 | 基线项 | 当前口径 |
 | --- | --- |
-| 代码和文档基线 | 以确认时 Git HEAD 为准；当前已提交 B4-TRX-EXPIRE 实现基线为 `b0666ba feat: 补齐授权过期释放 canonical 能力`，证据回填基线为 `f99f3a3 docs: 回填授权过期释放完成证据`，B4-FORCE-SETTLE 候选契约收敛基线为 `107218a docs: 收敛 B4 强制完成契约候选`。 |
-| 已关闭能力 | B4-03 授权过期释放：已新增 `EXPIRE` 事件、`EXPIRED` 状态、`FundsAuthorizationTransactionExpireRequest`、`FundsAuthorizationTransactionService#expire`、route replay、ledger posting 释放路径和生命周期金额校验。 |
+| 代码和文档基线 | 以确认时 Git HEAD 为准；当前已提交 B4-TRX-EXPIRE 实现基线为 `b0666ba feat: 补齐授权过期释放 canonical 能力`，证据回填基线为 `f99f3a3 docs: 回填授权过期释放完成证据`，B4-FORCE-SETTLE 候选契约收敛基线为 `107218a docs: 收敛 B4 强制完成契约候选`，首轮实现基线为 `616dac1 feat: 补齐授权强制完成能力`，策略红线加固基线为 `3825466 fix: 收紧授权强制完成策略红线`。 |
+| 已关闭能力 | B4-03 授权过期释放：已新增 `EXPIRE` 事件、`EXPIRED` 状态、`FundsAuthorizationTransactionExpireRequest`、`FundsAuthorizationTransactionService#expire`、route replay、ledger posting 释放路径和生命周期金额校验。B4-FORCE-SETTLE 首轮账户主体型 canonical 能力：已新增 FORCE 完成模式、强制完成策略/上限/原因/外部事实/凭证字段、普通完成与 FORCE 分支隔离、`AVAILABLE -> SETTLEMENT` 路由和受信策略红线。 |
 | 产品入口 | `docs/产品设计/05-产品验收与TDD用例矩阵.md` 的 `AC-AUTH-011` 无授权强制完成、`AC-AUTH-012` 无授权直接退款、授权拒绝与拒付区分、原路径回放和授权并发红线。 |
 | DSL 入口 | `docs/DSL设计/支付资金底座DSL承载层设计.md` 的 `DSL-AUTH-FORCE-CAPTURE-001`、`DSL-AUTH-REFUND-001`、`AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式和拒付语义承接口径。 |
 | 系分入口 | `docs/系分设计/02-交易路由钱包账目与投影系分设计.md` 的授权交易服务契约、状态流转、route replay、投影解释和资金红线。 |
@@ -29,7 +29,7 @@
 | `userVisibleResult` | 用户或商户看到账单、退款、扣回或失败原因；运营和财务能追溯原事实引用、原因、凭证、策略、上限、route snapshot、ledger transaction、projection 和审计上下文。 |
 | `productNotDone` | 不声明完整 VCC 发卡、完整 chargeback case 管理、完整清结算追偿、外部卡组织规则、Spend Rule 引擎、支付工具 facade 或治理重放生产能力。 |
 | `firstRedSet` | 建议先选 `B4-FS-RED-001` 强制完成必填策略和无伪造授权；再按授权确认选择 `B4-NAR-RED-001`、`B4-CB-RED-001` 或 `B4-RACE-RED-001`。 |
-| `currentEvidence` | `b0666ba` 已证明授权过期释放基础能力闭合；剩余后继能力仍是设计和任务候选，不因 B4-TRX-EXPIRE 通过而自动获得编码授权。 |
+| `currentEvidence` | `b0666ba` 已证明授权过期释放基础能力闭合；`616dac1` 和 `3825466` 已证明 B4-FORCE-SETTLE 首轮 canonical 能力与策略红线闭合。剩余 B4-NO-AUTH-REFUND、B4-DISPUTE-CHARGEBACK 和 B4-AUTH-RACE 仍是设计和任务候选，不因 B4-TRX-EXPIRE 或 B4-FORCE-SETTLE 通过而自动获得编码授权。 |
 
 ### 3.1 architectureReviewMap
 
@@ -96,7 +96,7 @@
 
 ### 7.2 forceSettleContractCandidate
 
-本节只定义 B4-FORCE-SETTLE 首轮编码候选契约，不等于授权改公共契约。字段名、类型和必填规则必须在后续 Execution Grant 中最终确认；未确认前不得写 Java 代码或测试代码。
+本节记录 B4-FORCE-SETTLE 首轮编码候选契约的准入来源。该候选已由 `616dac1` 和 `3825466` 消费并闭合为当前代码基线；后续不得再把本节解释为默认编码授权。若要扩展生产策略引擎、审批快照、额度窗口、带原授权 overcapture、外部清算文件或运营审批系统，必须另起独立 Execution Grant。
 
 | 候选字段 | 语义 | 首轮建议 | Red 断言 | 不纳入本轮 |
 | --- | --- | --- | --- | --- |
@@ -108,16 +108,26 @@
 | `forceSettleVoucherRef` | 凭证或审批引用。 | 首轮建议必填，可为摘要、文件编号、审批号或外部 reference。 | 缺凭证失败。 | 不落完整凭证文件，不做运营审批系统。 |
 | `operator` / `contextVariables` | 操作者和审计上下文。 | 审计最小集使用现有 `WindOperator`、`forceSettleReason`、`externalOriginalFactRef`、`forceSettleVoucherRef` 和受信策略/审批快照引用；`ReadonlyContextVariables` 只承接白名单补充字段，敏感字段继续由 validator 阻断。 | 缺操作者、缺原因、缺外部引用、缺凭证、缺受信策略来源或敏感上下文按现有规则失败/阻断。 | 不新增权限系统，不引入生产配置；不把核心资金事实塞进普通上下文。 |
 
+### 7.3 forceSettleCompletionEvidence（2026-06-02）
+
+| 证据 | 结论 |
+| --- | --- |
+| 实现提交 | `616dac1 feat: 补齐授权强制完成能力` 新增 FORCE 完成请求字段、转换和路由分支；普通 settle 继续引用原授权流水，FORCE 不构造 `AUTHORIZATION` reference、不查询原授权账本交易，路由从 `AVAILABLE` 直接进入 `SETTLEMENT`。 |
+| 红线加固提交 | `3825466 fix: 收紧授权强制完成策略红线` 把 `forceSettlePolicyCode` 和 `forceSettleLimitAmount` 收敛到内部受信策略校验；未知策略、策略上限不匹配、缺原因、缺外部事实、缺凭证、携带 `authorizationTransactionSn` 等失败路径均要求无资金副作用。 |
+| 覆盖 Red | `B4-FS-RED-001` 和 `B4-FS-RED-002` 首轮已转为回归基线；成功路径覆盖 FORCE 入账和普通完成分支隔离，失败路径覆盖缺策略、超上限/上限不匹配、缺原因、缺外部事实、缺凭证、携带内部授权流水和幂等差异。 |
+| 验证证据 | 已通过 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
+| 剩余边界 | 未实现生产策略引擎、审批流、额度窗口、带原授权 overcapture、外部清算文件、无授权退款、拒付/争议增强或授权后继事件并发竞争；这些能力仍需独立授权。 |
+
 ## 8. suggestedGrantSlices
 
 | 切片 | 优先级 | 目标 | 首批 Red | 允许写入建议 | 不适合混入 |
 | --- | --- | --- | --- | --- | --- |
-| B4-FORCE-SETTLE | 1 | 补齐 settle 强制完成模式的策略、上限、原因、审计和无伪造授权占用。 | `B4-FS-RED-001`、`B4-FS-RED-002`。 | `tests` 授权 flow、`transaction-face` 请求契约、`transaction-impl` 编排和 route/posting 最小修复。 | 无授权退款、拒付、支付工具 facade、Spend Rule、VCC。 |
-| B4-NO-AUTH-REFUND | 2 | 补齐 settleRefund 无授权退款模式的原事实引用、凭证、原因、审计和失败无副作用。 | `B4-NAR-RED-001`、`B4-NAR-RED-002`。 | `tests` 授权退款 flow、必要请求契约和 route replay 最小修复。 | force settle、chargeback case 全生命周期、清结算追偿。 |
+| B4-FORCE-SETTLE | Done | 首轮账户主体型 canonical 能力已闭合，后续只作为授权交易回归基线。 | `B4-FS-RED-001`、`B4-FS-RED-002` 已回归化。 | 仅在返工或扩展 FORCE 策略引擎、审批快照、额度窗口、overcapture 时另起 Grant。 | 无授权退款、拒付、支付工具 facade、Spend Rule、VCC。 |
+| B4-NO-AUTH-REFUND | 1 | 补齐 settleRefund 无授权退款模式的原事实引用、凭证、原因、审计和失败无副作用。 | `B4-NAR-RED-001`、`B4-NAR-RED-002`。 | `tests` 授权退款 flow、必要请求契约和 route replay 最小修复。 | force settle、chargeback case 全生命周期、清结算追偿。 |
 | B4-DISPUTE-CHARGEBACK | 3 | 固化拒付/争议扣回语义与普通退款、授权拒绝的可区分性。 | `B4-CB-RED-001`。 | 交易 flow、投影解释、原因/凭证/外部引用字段的最小补强。 | 独立 dispute system、VCC processor、清结算追偿单。 |
 | B4-AUTH-RACE | 4 | 固化授权完成、撤销、过期、退款并发竞争红线。 | `B4-RACE-RED-001`。 | 授权 flow 并发测试、状态迁移保护和必要幂等/锁策略。 | DDL/H2 默认不允许，除非 Execution Grant 显式扩权。 |
 
-推荐下一轮编码起点为 B4-FORCE-SETTLE。它延续 B4-TRX-EXPIRE 的账户主体型 canonical 授权内核，不需要先打开支付工具 facade、VCC 生命周期、Spend Rule 表结构或清结算追偿。
+推荐下一轮编码候选改为 B4-NO-AUTH-REFUND。它延续 B4-TRX-EXPIRE 和 B4-FORCE-SETTLE 的账户主体型 canonical 授权内核，但只有用户单独确认 Execution Grant 后，才允许把 `B4-NAR-RED-001` 和 `B4-NAR-RED-002` 写入测试资产。
 
 ## 9. verificationPlan
 
@@ -140,9 +150,11 @@
 
 ## 11. confirmationTemplate
 
+历史模板，已由 `616dac1` 和 `3825466` 消费；后续不再作为默认下一轮授权模板，除非用户明确要求返工或扩展 FORCE 策略能力：
+
 ```text
 Execution Grant：B4-FORCE-SETTLE
-确认基线：确认时 Git HEAD（至少包含 b0666ba / f99f3a3 / 107218a）
+确认基线：确认时 Git HEAD（至少包含 b0666ba / f99f3a3 / 107218a / 616dac1 / 3825466）
 允许写入：先写 tests 中 B4-FS 目标 Red；Red 证明缺口后允许 transaction-face 的 FundsAuthorizationTransactionSettleRequest 兼容字段、transaction-impl converter/command/lifecycle/route replay、TDD tests 最小修复
 允许契约字段：settleMode、forceSettlePolicyCode、forceSettleLimitAmount、forceSettleReason、externalOriginalFactRef、forceSettleVoucherRef、operator/contextVariables 或等价命名；允许把 `authorizationTransactionSn` 调整为普通完成必填、首轮 FORCE 模式不携带且不查询原授权账本交易；字段名、类型、必填规则、摘要字段和兼容策略以本次 Grant 为准
 策略与审计：forceSettlePolicyCode 和 forceSettleLimitAmount 必须来自本次 Grant 声明的内部白名单、审批结果或受信策略快照；审计最小集为 WindOperator、forceSettleReason、externalOriginalFactRef、forceSettleVoucherRef 和受信策略/审批快照引用，contextVariables 只作为白名单补充
@@ -155,7 +167,7 @@ Git 策略：auto_commit
 
 ```text
 Execution Grant：B4-NO-AUTH-REFUND
-确认基线：确认时 Git HEAD（至少包含 b0666ba / f99f3a3）
+确认基线：确认时 Git HEAD（至少包含 b0666ba / f99f3a3 / 616dac1 / 3825466）
 允许写入：先写 tests 中 B4-NAR 目标 Red；Red 证明缺口后允许 transaction-face、transaction-impl、route replay、TDD tests 最小修复
 禁止写入：支付工具 facade、VCC 生命周期、DDL/H2 schema、Spend Rule 表结构、force settle、chargeback 独立入口、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理
 首批 Red：B4-NAR-RED-001；必要时补 B4-NAR-RED-002
