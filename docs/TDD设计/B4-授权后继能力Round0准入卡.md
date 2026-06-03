@@ -182,7 +182,7 @@
 | `taskId` | `B4-NAR-CAD-001`。 |
 | `stage` / `wave` | B4 授权后继能力 / Wave 1 账户主体型 canonical 内核补强。 |
 | `status` | `READY_TO_CONFIRM_NOT_AUTHORIZED`。 |
-| `authorityBaseline` | 确认时 Git HEAD；必须包含 B4 过期释放、强制完成、无授权退款主文档口径、Grant 可执行包和恢复入口相关提交，当前已知最小提交集为 `b0666ba`、`f99f3a3`、`616dac1`、`3825466`、`e937395`、`fe40d4a`、`8e1ec76`、`51e86e3` 和 `3e5ec76`。 |
+| `authorityBaseline` | 确认时 Git HEAD；必须包含 B4 过期释放、强制完成、无授权退款主文档口径、Grant 可执行包和恢复入口相关提交，当前已知最小提交集为 `b0666ba`、`f99f3a3`、`616dac1`、`3825466`、`e937395`、`fe40d4a`、`8e1ec76`、`51e86e3` 和 `3e5ec76`；后续 docs-only 索引、恢复入口或确认基线校准提交以确认时 Git HEAD 自然纳入，无需在本行逐条追写。 |
 | `mvpScenario` | 无前置内部授权流水，但已存在外部原消费、原完成或差错凭证，需要在账户主体型交易内核中形成可追溯退款资金事实。 |
 | `businessAdmission` | 产品验收锚点为 `AC-AUTH-012` 和 `TDD-RED-017A`；DSL 锚点为 `DSL-AUTH-REFUND-001`；系分锚点为授权交易 `settleRefund`、route replay、账务计划和投影解释。 |
 | `firstRedSet` | 首轮只写 `B4-NAR-RED-001`。若 Red 未按预期失败，先暂停判断已有实现覆盖或 Red 资产错误。 |
@@ -262,7 +262,7 @@ Git 策略：auto_commit
 
 ```text
 Execution Grant：B4-NO-AUTH-REFUND
-确认基线：确认时 Git HEAD；必须包含 B4 过期释放、强制完成、无授权退款主文档口径、Grant 可执行包和恢复入口相关提交，当前已知最小提交集为 b0666ba / f99f3a3 / 616dac1 / 3825466 / e937395 / fe40d4a / 8e1ec76 / 51e86e3 / 3e5ec76
+确认基线：确认时 Git HEAD；必须包含 B4 过期释放、强制完成、无授权退款主文档口径、Grant 可执行包和恢复入口相关提交，当前已知最小提交集为 b0666ba / f99f3a3 / 616dac1 / 3825466 / e937395 / fe40d4a / 8e1ec76 / 51e86e3 / 3e5ec76；后续 docs-only 索引、恢复入口或确认基线校准提交以确认时 Git HEAD 自然纳入，无需在模板中逐条追写
 允许写入：先写 tests 中 B4-NAR 目标 Red；Red 证明缺口后允许 transaction-face 的 FundsAuthorizationTransactionRefundRequest 兼容字段、transaction-impl converter/command/lifecycle/route replay、TDD tests 最小修复
 允许契约字段：refundMode 或 noAuthRefundMode、externalOriginalFactRef、externalOriginalFactType、refundReason、refundVoucherRef、originalFactAmount/originalFactCurrency、operator/contextVariables 或等价命名；允许把 `authorizationTransactionSn` 调整为普通授权链退款必填、NO_AUTH 模式不携带且不查询原授权账本交易；字段名、类型、必填规则、摘要字段和兼容策略以本次 Grant 为准
 审计最小集：WindOperator、refundReason、externalOriginalFactRef、externalOriginalFactType、refundVoucherRef 和必要原事实金额摘要；contextVariables 只作为白名单补充，不承载核心资金事实或敏感数据
