@@ -46,6 +46,18 @@ public class FundsAuthorizationTransactionRefundRequest {
     @Schema(description = "退款原因，无授权退款时必填")
     private String refundReason;
 
+    @Schema(description = "争议/拒付模式，已完成授权后的争议类退款填写，例如 CHARGEBACK")
+    private String disputeMode;
+
+    @Schema(description = "争议/拒付原因，争议类退款时必填")
+    private String disputeReason;
+
+    @Schema(description = "争议/拒付凭证引用，争议类退款时必填，不承载完整原始报文或敏感数据")
+    private String disputeVoucherRef;
+
+    @Schema(description = "外部争议/拒付引用流水，争议类退款时必填")
+    private String externalDisputeRef;
+
     @Schema(description = "退款时间")
     private LocalDateTime refundTime;
 
@@ -57,5 +69,12 @@ public class FundsAuthorizationTransactionRefundRequest {
 
     public boolean isNoAuthRefund() {
         return authorizationTransactionSn == null || authorizationTransactionSn.isBlank();
+    }
+
+    public boolean isDisputeRefund() {
+        return disputeMode != null
+                || disputeReason != null
+                || disputeVoucherRef != null
+                || externalDisputeRef != null;
     }
 }

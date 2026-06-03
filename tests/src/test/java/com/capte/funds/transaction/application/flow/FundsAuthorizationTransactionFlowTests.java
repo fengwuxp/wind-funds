@@ -1222,13 +1222,15 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setAccountId(user)
                 .setAmount(Money.immutable(40L, CURRENCY))
                 .setAuthorizationTransactionSn(authorizationSn)
+                .setDisputeMode("CHARGEBACK")
+                .setDisputeReason("CARDHOLDER_DISPUTE")
+                .setDisputeVoucherRef("DISPUTE_EVIDENCE_202605290001")
+                .setExternalDisputeRef("DISPUTE_CASE_202605290001")
                 .setBusinessScene("AUTHORIZATION_DISPUTE_REFUND")
                 .setBusinessSn("AUTH_DISPUTE_REFUND_RETURN")
                 .setDescription("authorization dispute refund")
                 .setContextVariables(WritableContextVariables.of(Map.of(
-                        "disputeReason", "DISPUTE_CHARGEBACK",
-                        "evidenceRef", "DISPUTE_EVIDENCE_202605290001",
-                        "externalDisputeRef", "DISPUTE_CASE_202605290001"))), WindOperator.system());
+                        "caseOwner", "ops-team-a"))), WindOperator.system());
         BalanceSnapshot afterDisputeRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(afterSettle, afterDisputeRefund,
                 delta(user, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
@@ -1259,8 +1261,13 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThat(disputeRefundTransaction.getEventType()).isEqualTo(FundsTransactionEventType.AUTH_REFUND.name());
         assertThat(disputeRefundTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
         assertThat(disputeRefundTransaction.getContextVariables())
-                .contains("DISPUTE_CHARGEBACK", "DISPUTE_EVIDENCE_202605290001",
-                        "DISPUTE_CASE_202605290001");
+                .contains("\"refundMode\":\"DISPUTE\"")
+                .contains("\"disputeMode\":\"CHARGEBACK\"")
+                .contains("\"disputeReason\":\"CARDHOLDER_DISPUTE\"")
+                .contains("\"disputeVoucherRef\":\"DISPUTE_EVIDENCE_202605290001\"")
+                .contains("\"externalDisputeRef\":\"DISPUTE_CASE_202605290001\"")
+                .contains("\"caseOwner\":\"ops-team-a\"")
+                .doesNotContain("declineReason");
         assertThat(entriesOf(disputeRefundTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
@@ -1269,6 +1276,22 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsOnly(LedgerPhaseCode.REFUND.name());
+        assertThat(postingPlansOf(disputeRefundTransaction))
+                .allSatisfy(plan -> assertThat(plan.getContextVariables())
+                        .contains("\"refundMode\":\"DISPUTE\"")
+                        .contains("\"disputeMode\":\"CHARGEBACK\"")
+                        .contains("\"disputeReason\":\"CARDHOLDER_DISPUTE\"")
+                        .contains("\"disputeVoucherRef\":\"DISPUTE_EVIDENCE_202605290001\"")
+                        .contains("\"externalDisputeRef\":\"DISPUTE_CASE_202605290001\"")
+                        .contains("\"caseOwner\":\"ops-team-a\""));
+        assertThat(entriesOf(disputeRefundTransaction))
+                .allSatisfy(entry -> assertThat(entry.getContextVariables())
+                        .contains("\"refundMode\":\"DISPUTE\"")
+                        .contains("\"disputeMode\":\"CHARGEBACK\"")
+                        .contains("\"disputeReason\":\"CARDHOLDER_DISPUTE\"")
+                        .contains("\"disputeVoucherRef\":\"DISPUTE_EVIDENCE_202605290001\"")
+                        .contains("\"externalDisputeRef\":\"DISPUTE_CASE_202605290001\"")
+                        .contains("\"caseOwner\":\"ops-team-a\""));
 
         assertThat(fundsTransactionDetailsByBusinessSn("AUTH_DISPUTE_REFUND_RETURN"))
                 .allSatisfy(detail -> {
@@ -1280,14 +1303,98 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                     assertThat(detail.getReferenceDetailSn()).isEqualTo(authorizationSn);
                     assertThat(detail.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
                     assertThat(detail.getContextVariables())
-                            .contains("DISPUTE_CHARGEBACK", "DISPUTE_EVIDENCE_202605290001",
-                                    "DISPUTE_CASE_202605290001")
+                            .contains("\"refundMode\":\"DISPUTE\"")
+                            .contains("\"disputeMode\":\"CHARGEBACK\"")
+                            .contains("\"disputeReason\":\"CARDHOLDER_DISPUTE\"")
+                            .contains("\"disputeVoucherRef\":\"DISPUTE_EVIDENCE_202605290001\"")
+                            .contains("\"externalDisputeRef\":\"DISPUTE_CASE_202605290001\"")
+                            .contains("\"caseOwner\":\"ops-team-a\"")
                             .doesNotContain("declineReason");
+                    assertThat(detail.getRequestHash()).isNotBlank();
                 });
+        BalanceSnapshot beforeIdempotencyConflict = snapshot(balances(user, cashMappingAccount(),
+                settlementAccount()));
+        LedgerFactSnapshot beforeIdempotencyConflictFacts = ledgerFactSnapshot();
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(
+                new FundsAuthorizationTransactionRefundRequest()
+                        .setAccountId(user)
+                        .setAmount(Money.immutable(40L, CURRENCY))
+                        .setAuthorizationTransactionSn(authorizationSn)
+                        .setDisputeMode("CHARGEBACK")
+                        .setDisputeReason("CARDHOLDER_DISPUTE")
+                        .setDisputeVoucherRef("DISPUTE_EVIDENCE_202605290001")
+                        .setExternalDisputeRef("DISPUTE_CASE_CHANGED")
+                        .setBusinessScene("AUTHORIZATION_DISPUTE_REFUND")
+                        .setBusinessSn("AUTH_DISPUTE_REFUND_RETURN")
+                        .setDescription("authorization dispute refund")
+                        .setContextVariables(WritableContextVariables.of(Map.of(
+                                "caseOwner", "ops-team-a"))), WindOperator.system()))
+                .hasMessageContaining("资金交易明细请求参数不一致");
+        BalanceSnapshot afterIdempotencyConflict = snapshot(balances(user, cashMappingAccount(),
+                settlementAccount()));
+        assertOnlyBalanceDeltas(beforeIdempotencyConflict, afterIdempotencyConflict,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeIdempotencyConflictFacts);
+
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_CAPTURE", 0, 2, 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_RETURN", 0, 2, 1, 2);
+    }
+
+    /**
+     * 场景：争议类授权退款缺少模式、原因、凭证或外部争议引用。
+     * 输入：已完成授权后分别提交 dispute 审计字段半填或空白的退款请求。
+     * 输出：请求在交易事实创建前失败，余额、账务事实和资金事实均不变化。
+     * 预期：争议类退款必须完整携带模式、原因、凭证和外部争议引用。
+     * 红线：争议类退款不得半填审计字段后退化成普通退款。
+     */
+    @Test
+    void testAuthorizationDisputeRefundMissingRequiredAuditFieldsShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_DISPUTE_REFUND_REJECT_TOPUP");
+        String authorizationSn = authorize(user, 60L, true, "AUTH_DISPUTE_REFUND_REJECT_AUTHORIZE");
+        settleAuthorization(user, 60L, authorizationSn, "AUTH_DISPUTE_REFUND_REJECT_CAPTURE");
+        BalanceSnapshot beforeFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(disputeRefundRequest(user, 40L,
+                authorizationSn, "AUTH_DISPUTE_REFUND_MISSING_MODE")
+                .setDisputeMode("   "), WindOperator.system()))
+                .hasMessageContaining("disputeMode");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(disputeRefundRequest(user, 40L,
+                authorizationSn, "AUTH_DISPUTE_REFUND_MISSING_REASON")
+                .setDisputeReason("   "), WindOperator.system()))
+                .hasMessageContaining("disputeReason");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(disputeRefundRequest(user, 40L,
+                authorizationSn, "AUTH_DISPUTE_REFUND_MISSING_VOUCHER")
+                .setDisputeVoucherRef("   "), WindOperator.system()))
+                .hasMessageContaining("disputeVoucherRef");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(disputeRefundRequest(user, 40L,
+                authorizationSn, "AUTH_DISPUTE_REFUND_MISSING_EXTERNAL_REF")
+                .setExternalDisputeRef(null), WindOperator.system()))
+                .hasMessageContaining("externalDisputeRef");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_REJECT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_REJECT_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_REJECT_CAPTURE", 0, 2, 1, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_MISSING_MODE");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_MISSING_REASON");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_MISSING_VOUCHER");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_MISSING_EXTERNAL_REF");
     }
 
     /**
@@ -2310,5 +2417,22 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setBusinessScene("AUTHORIZATION_FORCE_SETTLE")
                 .setBusinessSn(businessSn)
                 .setDescription("authorization force settle");
+    }
+
+    private FundsAuthorizationTransactionRefundRequest disputeRefundRequest(FundsAccountId accountId,
+                                                                            long amount,
+                                                                            String authorizationTransactionSn,
+                                                                            String businessSn) {
+        return new FundsAuthorizationTransactionRefundRequest()
+                .setAccountId(accountId)
+                .setAmount(Money.immutable(amount, CURRENCY))
+                .setAuthorizationTransactionSn(authorizationTransactionSn)
+                .setDisputeMode("CHARGEBACK")
+                .setDisputeReason("CARDHOLDER_DISPUTE")
+                .setDisputeVoucherRef("DISPUTE_EVIDENCE_202605290001")
+                .setExternalDisputeRef("DISPUTE_CASE_202605290001")
+                .setBusinessScene("AUTHORIZATION_DISPUTE_REFUND")
+                .setBusinessSn(businessSn)
+                .setDescription("authorization dispute refund");
     }
 }

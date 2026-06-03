@@ -212,6 +212,7 @@ public class FundsAuthorizationInstructionConverter {
             reference = authorizationReference(request.getAuthorizationTransactionSn());
             context.put(FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
                     request.getAuthorizationTransactionSn());
+            putDisputeRefundContext(request, context);
         }
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
@@ -287,6 +288,23 @@ public class FundsAuthorizationInstructionConverter {
                 "no-auth refund must not carry authorizationTransactionSn");
         AssertUtils.hasText(request.getExternalReferenceSn(), "externalReferenceSn must not be blank");
         AssertUtils.hasText(request.getRefundReason(), "refundReason must not be blank");
+    }
+
+    private void putDisputeRefundContext(@NonNull FundsAuthorizationTransactionRefundRequest request,
+                                         @NonNull Map<String, Object> context) {
+        if (!request.isDisputeRefund()) {
+            return;
+        }
+        AssertUtils.hasText(request.getDisputeMode(), "disputeMode must not be blank");
+        AssertUtils.hasText(request.getDisputeReason(), "disputeReason must not be blank");
+        AssertUtils.hasText(request.getDisputeVoucherRef(), "disputeVoucherRef must not be blank");
+        AssertUtils.hasText(request.getExternalDisputeRef(), "externalDisputeRef must not be blank");
+        context.put(FundsInstructionContextKeys.REFUND_MODE,
+                FundsInstructionContextKeys.REFUND_MODE_DISPUTE);
+        context.put(FundsInstructionContextKeys.DISPUTE_MODE, request.getDisputeMode());
+        context.put(FundsInstructionContextKeys.DISPUTE_REASON, request.getDisputeReason());
+        context.put(FundsInstructionContextKeys.DISPUTE_VOUCHER_REF, request.getDisputeVoucherRef());
+        context.put(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF, request.getExternalDisputeRef());
     }
 
     private @NonNull FundsInstructionReferenceSpec authorizationReference(@NonNull String authorizationTransactionSn) {

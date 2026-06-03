@@ -53,9 +53,19 @@ public final class FundsInstructionContextKeys {
 
     public static final String REFUND_MODE_NO_AUTH = "NO_AUTH";
 
+    public static final String REFUND_MODE_DISPUTE = "DISPUTE";
+
     public static final String EXTERNAL_REFERENCE_SN = "externalReferenceSn";
 
     public static final String REFUND_REASON = "refundReason";
+
+    public static final String DISPUTE_MODE = "disputeMode";
+
+    public static final String DISPUTE_REASON = "disputeReason";
+
+    public static final String DISPUTE_VOUCHER_REF = "disputeVoucherRef";
+
+    public static final String EXTERNAL_DISPUTE_REF = "externalDisputeRef";
 
     public static final String LINKED_FUNDING_ACCOUNT_ID = "linkedFundingAccountId";
 

@@ -96,8 +96,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     public @NonNull ResolvedRouteSpec resolve(@NonNull FundsInstructionSpec instruction) {
         RouteSnapshotSpec snapshot = requireReplaySnapshot(instruction);
         RouteBenefitSnapshotContextSupport.assertOriginalBenefitSnapshotPresent(instruction, snapshot);
-        Map<String, Object> replayContext =
-                RouteBenefitSnapshotContextSupport.originalBenefitSnapshotSummary(snapshot);
+        Map<String, Object> replayContext = replayContext(instruction, snapshot);
         ReplayRequestSpec replayRequest = ImmutableReplayRequestSpec.builder()
                 .replayType(resolveReplayType(instruction.getEventType()))
                 .eventType(instruction.getEventType())
@@ -115,6 +114,29 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .build();
         assertReplayLegAmountNotOverConsumed(instruction.getReference(), snapshot, replayRequest);
         return replay(snapshot, replayRequest);
+    }
+
+    private Map<String, Object> replayContext(@NonNull FundsInstructionSpec instruction,
+                                              @NonNull RouteSnapshotSpec snapshot) {
+        Map<String, Object> result = new LinkedHashMap<>(
+                RouteBenefitSnapshotContextSupport.originalBenefitSnapshotSummary(snapshot));
+        if (shouldPropagateDisputeRefundContext(instruction)) {
+            result.putAll(disputeRefundContext(instruction));
+        }
+        return Map.copyOf(result);
+    }
+
+    private boolean shouldPropagateDisputeRefundContext(@NonNull FundsInstructionSpec instruction) {
+        return instruction.getEventType() == FundsTransactionEventType.AUTH_REFUND
+                && Objects.equals(instruction.getContextVariables().get(FundsInstructionContextKeys.REFUND_MODE),
+                FundsInstructionContextKeys.REFUND_MODE_DISPUTE);
+    }
+
+    private Map<String, Object> disputeRefundContext(@NonNull FundsInstructionSpec instruction) {
+        Map<String, Object> result = new LinkedHashMap<>(instruction.getContextVariables());
+        result.remove(FundsInstructionContextKeys.ACCOUNT_ID);
+        result.remove(FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN);
+        return result;
     }
 
     public @NonNull ResolvedRouteSpec replay(@NonNull RouteSnapshotSpec snapshot,
