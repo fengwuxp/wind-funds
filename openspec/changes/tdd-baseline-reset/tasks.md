@@ -695,6 +695,19 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | 验证命令 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
 | 下一动作 | 用户显式确认 `Execution Grant：B4-NO-AUTH-REFUND` 后，才进入 Red -> Green -> Review -> Verify -> Commit。 |
 
+### 13.6 B4-NAR 首轮 Red 触点扫描（2026-06-03）
+
+本节记录当前 Git 基线上的只读代码扫描结论，作为 `B4-NAR-CAD-001` 获得 Execution Grant 后写首轮 Red 的执行输入。该扫描不授权写 Java、测试、DDL/H2 schema 或运行时配置。
+
+| 触点 | 只读扫描事实 | 执行含义 |
+| --- | --- | --- |
+| Request | `FundsAuthorizationTransactionRefundRequest.authorizationTransactionSn` 仍为 `@NotNull`，且无 `NO_AUTH` 模式、外部原事实引用、原事实类型、原因、凭证或原事实金额币种字段。 | `B4-NAR-RED-001` 应先证明现有 `settleRefund` 无法表达无授权退款。 |
+| Converter | `convertToSettleRefundInstruction` 无条件构造 `AUTHORIZATION` reference，并把 `AUTHORIZATION_TRANSACTION_SN` 放入上下文。 | NO_AUTH Green 只能在 Grant 范围内最小切开普通授权链退款和无授权退款，不得让无授权退款携带或查询内部授权流水。 |
+| Ledger reference | `authorizationReference(...)` 会查找原授权 `AUTHORIZE` ledger transaction 并要求唯一。 | 首轮 Red 的预期失败点应与内部授权流水和原授权账本依赖有关；若 Red 未失败，先暂停判断已有实现覆盖或 Red 写错。 |
+| Command service | `FundsTransactionCommandServiceImpl#settleRefund` 当前只是委派 converter。 | Green 不应优先在 command service 堆叠分支，除非 Red 证明 command 入口必须承载额外 guard。 |
+| Test support | `refundSettledAuthorization(...)` 总是传入普通授权链 `authorizationTransactionSn`。 | 获得 Grant 后需新增 no-auth refund 专用测试构造，并保持普通授权链 helper 回归不退化。 |
+| 当前状态 | `GRANT_READY_NOT_CONFIRMED`。 | 用户确认 `Execution Grant：B4-NO-AUTH-REFUND` 前，下一步仍只能做 read-only 或 docs-only 准备。 |
+
 ## 14. B2 建议 Execution Grant
 
 B2 是后续直接交易、授权交易、余额控制、退款和权益资金流进入真实组合验证前的基础门禁。建议对应 MVP 任务只处理钱包账户、账本、余额投影和支付工具基础能力，不进入直接交易、授权交易或权益生产消费链路。

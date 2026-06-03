@@ -238,6 +238,19 @@
 | 验证闭环 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
 | 准入结论 | `GRANT_READY_NOT_CONFIRMED`；用户确认 `Execution Grant：B4-NO-AUTH-REFUND` 前仍不得写 Red、生产代码、DDL/H2 schema 或运行时配置。 |
 
+### 8.4 noAuthRefundImplementationScan（2026-06-03）
+
+本节记录进入首轮 Red 前的只读代码触点扫描。扫描只读取 Java 和测试资产，不修改生产代码、测试代码、DDL/H2 schema 或运行时配置。
+
+| 扫描项 | 当前事实 | 对 `B4-NAR-RED-001` 的含义 |
+| --- | --- | --- |
+| 请求契约 | `FundsAuthorizationTransactionRefundRequest.authorizationTransactionSn` 仍是 `@NotNull`，当前没有 `refundMode`、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef` 或原事实金额币种字段。 | 无授权退款无法通过现有请求表达；首轮 Red 应证明必须新增或兼容扩展显式列名字段。 |
+| 指令转换 | `FundsAuthorizationInstructionConverter#convertToSettleRefundInstruction` 无条件调用 `authorizationReference(request.getAuthorizationTransactionSn())`，并把 `AUTHORIZATION_TRANSACTION_SN` 写入上下文。 | NO_AUTH 路径当前会被内部授权流水绑定，不能满足“不携带或查询内部授权流水”。 |
+| 原授权账本查询 | `authorizationReference(...)` 会查询原授权 `AUTHORIZE` ledger transaction，并要求唯一。 | 没有内部授权流水时当前路径会失败在原授权账本引用，而不是形成外部原事实退款。 |
+| 命令入口 | `FundsTransactionCommandServiceImpl#settleRefund` 直接委派 converter。 | 首轮 Green 若获授权，修复点应优先落在 request、converter、lifecycle、route replay 和请求摘要的最小范围内，不在 command service 扩大业务分支。 |
+| 测试资产 | `FundsTransactionFlowTestSupport#refundSettledAuthorization` 只支持普通授权链退款并总是传入 `authorizationTransactionSn`。 | 首轮 Red 需要新增 no-auth refund 专用构造或测试 helper，并证明普通授权链 helper 不退化。 |
+| 准入结论 | `GRANT_READY_NOT_CONFIRMED`。 | 该扫描只作为编码前 handoff；未确认 `Execution Grant：B4-NO-AUTH-REFUND` 前仍不得写 Red 或代码。 |
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
