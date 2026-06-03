@@ -6,6 +6,7 @@ import com.capte.funds.route.support.RouteSpecSupport;
 import com.capte.funds.route.support.RouteSubjectSupport;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
+import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.capte.funds.transaction.support.FundsRouteCodes;
@@ -61,7 +62,9 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return instruction.getInstructionType() == FundsInstructionType.AUTHORIZATION_TRANSACTION
                 && (instruction.getEventType() == FundsTransactionEventType.AUTHORIZE
-                || (instruction.getEventType() == FundsTransactionEventType.SETTLE && isForceSettle(instruction)));
+                || (instruction.getEventType() == FundsTransactionEventType.SETTLE && isForceSettle(instruction))
+                || (instruction.getEventType() == FundsTransactionEventType.AUTH_REFUND
+                && isNoAuthRefund(instruction)));
     }
 
     @Override
@@ -70,7 +73,8 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
             case AUTHORIZE -> resolveAuthorize(instruction);
             case REVERSAL -> resolveReversal(instruction);
             case SETTLE -> isForceSettle(instruction) ? resolveForceSettle(instruction) : resolveSettle(instruction);
-            case AUTH_REFUND -> resolveSettleRefund(instruction);
+            case AUTH_REFUND -> isNoAuthRefund(instruction) ? resolveNoAuthRefund(instruction)
+                    : resolveSettleRefund(instruction);
             default -> throw new IllegalArgumentException(UNSUPPORTED_EVENT_TYPE_MESSAGE
                     + instruction.getEventType());
         };
@@ -148,6 +152,20 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         List<RouteLegSpec> legs = refundLegs(authorizationSubjects, settlementAccount, instruction);
         PlatformAccountsSnapshotSpec snapshot = platformAccountRouteSupport.createSettlementSnapshot(settlementAccount);
         return route(instruction, FundsRouteCodes.AUTHORIZATION_SETTLE_REFUND_STANDARD, participants, legs, snapshot);
+    }
+
+    private ResolvedRouteSpec resolveNoAuthRefund(FundsInstructionSpec instruction) {
+        FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
+                FundsInstructionContextKeys.ACCOUNT_ID);
+        FundsAccountId settlementAccount = platformAccountRouteSupport.requireAccount(
+                instruction.getAmount().getCurrency(), PlatformFundingAccountRole.SETTLEMENT);
+        List<RouteParticipantSpec> participants = List.of(
+                platformParticipant(RouteParticipantRole.PAYER, settlementAccount, instruction),
+                subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, false), accountId,
+                        instruction));
+        List<RouteLegSpec> legs = refundLegs(List.of(accountId), settlementAccount, instruction);
+        PlatformAccountsSnapshotSpec snapshot = platformAccountRouteSupport.createSettlementSnapshot(settlementAccount);
+        return route(instruction, FundsRouteCodes.AUTHORIZATION_NO_AUTH_REFUND_STANDARD, participants, legs, snapshot);
     }
 
     private List<FundsAccountId> resolveAuthorizationSubjects(FundsInstructionSpec instruction,
@@ -343,6 +361,12 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         String settleMode = FundsInstructionContextReader.getValue(instruction,
                 FundsInstructionContextKeys.SETTLE_MODE, String.class);
         return FundsAuthorizationTransactionSettleRequest.SETTLE_MODE_FORCE.equalsIgnoreCase(settleMode);
+    }
+
+    private boolean isNoAuthRefund(FundsInstructionSpec instruction) {
+        String refundMode = FundsInstructionContextReader.getValue(instruction,
+                FundsInstructionContextKeys.REFUND_MODE, String.class);
+        return FundsAuthorizationTransactionRefundRequest.REFUND_MODE_NO_AUTH.equalsIgnoreCase(refundMode);
     }
 
     @Override

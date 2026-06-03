@@ -23,6 +23,7 @@ import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import java.util.List;
 import java.util.Map;
 
@@ -1010,6 +1011,173 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_CAPTURE", 0, 2, 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_REFUND_RETURN", 0, 2, 1, 2);
+    }
+
+    /**
+     * 场景：外部原消费或原完成事实存在，但本系统没有内部授权流水，运营发起无授权直接退款。
+     * 输入：用户充值 100 后向平台结算户付款 70 形成可退结算余额；随后按 `NO_AUTH` 模式退款 40。
+     * 输出：用户 AVAILABLE 恢复 40，平台 SETTLEMENT 扣减 40，退款资金事实保留外部原事实和凭证摘要。
+     * 预期：无授权退款不携带内部授权流水，不查询原授权账本交易，也不补造 AUTHORIZATION 占用。
+     * 红线：无授权退款不得按普通授权链退款回放，不得把外部事实伪装成内部授权或原交易聚合。
+     */
+    @Test
+    void testNoAuthRefundShouldCreateStandaloneRefundFactAndPreserveExternalOriginalFact() {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        topup(user, 100L, "AUTH_NO_AUTH_REFUND_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        pay(user, settlementAccount(), LedgerSubjectCode.SETTLEMENT, 70L, "AUTH_NO_AUTH_REFUND_EXTERNAL_CAPTURE");
+        BalanceSnapshot afterExternalCapture = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterExternalCapture,
+                delta(user, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY));
+
+        String noAuthRefundSn = refundWithoutAuthorization(user, 40L, 70L, "AUTH_NO_AUTH_REFUND_RETURN");
+        BalanceSnapshot afterNoAuthRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterExternalCapture, afterNoAuthRefund,
+                delta(user, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, -40L, CURRENCY));
+
+        FundsTransactionDTO transaction = fundsTransaction(noAuthRefundSn);
+        assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+        assertThat(transaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
+        assertThat(transaction.getAuthorizedAmount()).isZero();
+        assertThat(transaction.getSettledAmount()).isZero();
+        assertThat(transaction.getRefundedAmount()).isEqualTo(40L);
+        assertThat(transaction.getReferenceTransactionSn()).isNull();
+
+        LedgerTransaction refundTransaction = ledgerTransactionByBusinessSn("AUTH_NO_AUTH_REFUND_RETURN");
+        assertThat(refundTransaction.getReferenceLedgerTransactionSn()).isNull();
+        assertThat(entriesOf(refundTransaction).stream()
+                .map(LedgerEntry::getLedgerSubjectCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
+        assertThat(postingPlansOf(refundTransaction).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsOnly(LedgerPhaseCode.REFUND.name());
+
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_NO_AUTH_REFUND_RETURN"))
+                .allSatisfy(detail -> {
+                    assertThat(detail.getReferenceDetailSn()).isNull();
+                    assertThat(detail.getReferenceLedgerTransactionSn()).isNull();
+                    assertThat(detail.getContextVariables())
+                            .contains("\"refundMode\":\"NO_AUTH\"")
+                            .contains("\"externalOriginalFactRef\":\"processor_capture_202606030001\"")
+                            .contains("\"externalOriginalFactType\":\"PROCESSOR_CAPTURE\"")
+                            .contains("\"refundVoucherRef\":\"ops_refund_voucher_202606030001\"")
+                            .doesNotContain("authorizationTransactionSn");
+                });
+        assertThat(fundsTransactionsByBusinessSn("AUTH_NO_AUTH_REFUND_RETURN"))
+                .singleElement()
+                .satisfies(refund -> assertThat(refund.getRouteSnapshot())
+                        .contains("AUTHORIZATION_NO_AUTH_REFUND_STANDARD")
+                        .doesNotContain("AUTHORIZATION_REFUND_REPLAY"));
+        assertLedgerFactsFollowRouteSnapshot("AUTH_NO_AUTH_REFUND_RETURN");
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_EXTERNAL_CAPTURE", 2, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_RETURN", 1, 2, 1, 2);
+    }
+
+    /**
+     * 场景：无授权退款缺少模式、外部原事实、原事实类型、原因、凭证或错误携带内部授权流水。
+     * 输入：平台结算户已有可退余额，分别提交非法 no-auth refund 请求。
+     * 输出：请求在交易事实创建前失败，余额、账务事实和资金事实均不变化。
+     * 预期：`NO_AUTH` 模式必须显式且审计字段齐备，且不得携带 `authorizationTransactionSn`。
+     * 红线：无授权退款不得回退成普通授权链退款，不得查询原授权账本交易或留下半成功事实。
+     */
+    @Test
+    void testNoAuthRefundMissingRequiredAuditFieldsShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_NO_AUTH_REFUND_REJECT_TOPUP");
+        pay(user, settlementAccount(), LedgerSubjectCode.SETTLEMENT, 70L,
+                "AUTH_NO_AUTH_REFUND_REJECT_EXTERNAL_CAPTURE");
+        BalanceSnapshot beforeFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_MISSING_MODE").setRefundMode(null), WindOperator.system()))
+                .hasMessageContaining("authorizationTransactionSn");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_MISSING_EXTERNAL_FACT")
+                .setExternalOriginalFactRef("   "), WindOperator.system()))
+                .hasMessageContaining("externalOriginalFactRef");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_MISSING_FACT_TYPE")
+                .setExternalOriginalFactType("   "), WindOperator.system()))
+                .hasMessageContaining("externalOriginalFactType");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_MISSING_REASON").setRefundReason("   "), WindOperator.system()))
+                .hasMessageContaining("refundReason");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_MISSING_VOUCHER").setRefundVoucherRef("   "), WindOperator.system()))
+                .hasMessageContaining("refundVoucherRef");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_WITH_AUTH_SN")
+                .setAuthorizationTransactionSn("FT202606030000000001"), WindOperator.system()))
+                .hasMessageContaining("authorizationTransactionSn");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_MISSING_ORIGINAL_AMOUNT")
+                .setOriginalFactAmount(null), WindOperator.system()))
+                .hasMessageContaining("originalFactAmount");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 30L,
+                "AUTH_NO_AUTH_REFUND_OVER_ORIGINAL_AMOUNT"), WindOperator.system()))
+                .hasMessageContaining("originalFactAmount");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_MISSING_ORIGINAL_CURRENCY")
+                .setOriginalFactCurrency("   "), WindOperator.system()))
+                .hasMessageContaining("originalFactCurrency");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_ORIGINAL_CURRENCY_MISMATCH")
+                .setOriginalFactCurrency(CurrencyIsoCode.CNY.name()), WindOperator.system()))
+                .hasMessageContaining("originalFactCurrency");
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_REFUND_CURRENCY_MISMATCH")
+                .setOriginalFactAmount(Money.immutable(70L, CurrencyIsoCode.CNY))
+                .setOriginalFactCurrency(CurrencyIsoCode.CNY.name()), WindOperator.system()))
+                .hasMessageContaining("originalFactCurrency");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_REJECT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_REJECT_EXTERNAL_CAPTURE", 2, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_MODE");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_EXTERNAL_FACT");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_FACT_TYPE");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_REASON");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_VOUCHER");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_WITH_AUTH_SN");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_ORIGINAL_AMOUNT");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_OVER_ORIGINAL_AMOUNT");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_ORIGINAL_CURRENCY");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_ORIGINAL_CURRENCY_MISMATCH");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_REFUND_CURRENCY_MISMATCH");
     }
 
     /**

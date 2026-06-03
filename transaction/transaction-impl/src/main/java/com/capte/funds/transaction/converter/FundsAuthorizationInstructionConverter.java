@@ -195,6 +195,30 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull FundsAuthorizationTransactionRefundRequest request,
             @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
+        FundsInstructionReferenceSpec reference;
+        if (request.isNoAuthRefund()) {
+            validateNoAuthRefundRequest(request, amount);
+            reference = noAuthRefundReference(request);
+            context.put(FundsInstructionContextKeys.REFUND_MODE,
+                    FundsAuthorizationTransactionRefundRequest.REFUND_MODE_NO_AUTH);
+            context.put(FundsInstructionContextKeys.EXTERNAL_ORIGINAL_FACT_REF,
+                    request.getExternalOriginalFactRef());
+            context.put(FundsInstructionContextKeys.EXTERNAL_ORIGINAL_FACT_TYPE,
+                    request.getExternalOriginalFactType());
+            context.put(FundsInstructionContextKeys.REFUND_REASON, request.getRefundReason());
+            context.put(FundsInstructionContextKeys.REFUND_VOUCHER_REF, request.getRefundVoucherRef());
+            context.put(FundsInstructionContextKeys.ORIGINAL_FACT_AMOUNT,
+                    request.getOriginalFactAmount().getAmount());
+            context.put(FundsInstructionContextKeys.ORIGINAL_FACT_CURRENCY, request.getOriginalFactCurrency());
+        } else {
+            AssertUtils.hasText(request.getAuthorizationTransactionSn(),
+                    "authorizationTransactionSn must not be blank");
+            reference = authorizationReference(request.getAuthorizationTransactionSn());
+            context.put(FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
+                    request.getAuthorizationTransactionSn());
+        }
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
@@ -203,16 +227,13 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .reference(authorizationReference(request.getAuthorizationTransactionSn()))
+                .reference(reference)
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getRefundTime()))
                 .description(request.getDescription())
                 .operator(operationActor(operator))
-                .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
-                        FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
-                        request.getAuthorizationTransactionSn())))
+                .contextVariables(mergeContext(request.getContextVariables(), context))
                 .build();
     }
 
@@ -267,9 +288,42 @@ public class FundsAuthorizationInstructionConverter {
         AssertUtils.hasText(request.getForceSettleVoucherRef(), "forceSettleVoucherRef must not be blank");
     }
 
+    private void validateNoAuthRefundRequest(@NonNull FundsAuthorizationTransactionRefundRequest request,
+                                             @NonNull ConvertedAmount amount) {
+        AssertUtils.isFalse(StringUtils.hasText(request.getAuthorizationTransactionSn()),
+                "no-auth refund must not carry authorizationTransactionSn");
+        AssertUtils.hasText(request.getExternalOriginalFactRef(), "externalOriginalFactRef must not be blank");
+        AssertUtils.hasText(request.getExternalOriginalFactType(), "externalOriginalFactType must not be blank");
+        AssertUtils.hasText(request.getRefundReason(), "refundReason must not be blank");
+        AssertUtils.hasText(request.getRefundVoucherRef(), "refundVoucherRef must not be blank");
+        AssertUtils.notNull(request.getOriginalFactAmount(), "originalFactAmount must not be null");
+        AssertUtils.hasText(request.getOriginalFactCurrency(), "originalFactCurrency must not be blank");
+        AssertUtils.isTrue(request.getOriginalFactAmount().getAmount() >= amount.amount().getAmount(),
+                "originalFactAmount must be greater than or equal to refund amount");
+        AssertUtils.isTrue(request.getOriginalFactAmount().getCurrency().name().equals(request.getOriginalFactCurrency()),
+                "originalFactCurrency must match originalFactAmount currency");
+        AssertUtils.isTrue(request.getOriginalFactAmount().getCurrency() == amount.amount().getCurrency(),
+                "originalFactCurrency must match refund currency");
+    }
+
     private @NonNull FundsInstructionReferenceSpec authorizationReference(@NonNull String authorizationTransactionSn) {
         return reference(FundsInstructionReferenceType.AUTHORIZATION, authorizationTransactionSn,
                 authorizationLedgerTransactionSn(authorizationTransactionSn));
+    }
+
+    private @NonNull FundsInstructionReferenceSpec noAuthRefundReference(
+            @NonNull FundsAuthorizationTransactionRefundRequest request) {
+        return ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.EXTERNAL_TRANSACTION)
+                .externalTransactionId(request.getExternalOriginalFactRef())
+                .contextVariables(Map.of(
+                        FundsInstructionContextKeys.EXTERNAL_ORIGINAL_FACT_TYPE,
+                        request.getExternalOriginalFactType(),
+                        FundsInstructionContextKeys.ORIGINAL_FACT_AMOUNT,
+                        request.getOriginalFactAmount().getAmount(),
+                        FundsInstructionContextKeys.ORIGINAL_FACT_CURRENCY,
+                        request.getOriginalFactCurrency()))
+                .build();
     }
 
     private @NonNull String authorizationLedgerTransactionSn(@NonNull String authorizationTransactionSn) {

@@ -519,6 +519,11 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private void applyRefundedSummary(FundsTransaction transaction, long amount) {
         transaction.setRefundedAmount(transaction.getRefundedAmount() + amount);
+        if (transaction.getTransactionType() == DefaultFundsTransactionType.REFUND
+                && transaction.getSettledAmount() == 0) {
+            transaction.setStatus(FundsTransactionStatus.CLOSED);
+            return;
+        }
         transaction.setStatus(resolveSettledReversibleStatus(transaction));
     }
 

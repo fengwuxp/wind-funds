@@ -49,6 +49,18 @@ public final class FundsInstructionContextKeys {
 
     public static final String FORCE_SETTLE_VOUCHER_REF = "forceSettleVoucherRef";
 
+    public static final String REFUND_MODE = "refundMode";
+
+    public static final String EXTERNAL_ORIGINAL_FACT_TYPE = "externalOriginalFactType";
+
+    public static final String REFUND_REASON = "refundReason";
+
+    public static final String REFUND_VOUCHER_REF = "refundVoucherRef";
+
+    public static final String ORIGINAL_FACT_AMOUNT = "originalFactAmount";
+
+    public static final String ORIGINAL_FACT_CURRENCY = "originalFactCurrency";
+
     public static final String LINKED_FUNDING_ACCOUNT_ID = "linkedFundingAccountId";
 
     public static final String LINKED_BUDGET_GROUP_ID = "linkedBudgetGroupId";
