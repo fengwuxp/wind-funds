@@ -1,6 +1,7 @@
 package com.capte.funds.transaction.application.flow;
 
 import com.capte.domain.core.operator.WindOperator;
+import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.funds.ledger.dal.entities.LedgerEntry;
 import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.capte.funds.ledger.dal.entities.LedgerTransaction;
@@ -25,6 +26,13 @@ import com.wind.integration.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.Test;
 
@@ -648,7 +656,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertThatThrownBy(() -> reverseAuthorization(user, 60L, authorizationSn,
                 "AUTH_REVERSAL_EXCEED_SECOND_CANCEL"))
-                .hasMessageContaining("回放累计金额不能大于原 RouteLeg 金额");
+                .hasMessageContaining("资金交易剩余授权可释放金额不足");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(afterFirstReversal, afterFailure,
@@ -767,6 +775,113 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FULL_SETTLE_CAPTURE", 0, 2, 1, 2);
+    }
+
+    /**
+     * 场景：同一笔授权在并发窗口内同时收到完成和撤销。
+     * 输入：充值 100、授权批准 60，两个线程同时发起完成 60 和撤销 60。
+     * 输出：只有一个后继事件成功落账，输家业务流水不留下任何交易或账务事实。
+     * 预期：授权金额闭合、状态合法，route/posting/ledger/projection/余额均不会重复或漏记。
+     * 红线：失败方不得产生资金事实；授权后继并发不能突破 AUTHORIZATION 桶或重复写平台 SETTLEMENT。
+     */
+    @Test
+    void testAuthorizationSettleAndReversalRaceShouldAllowOnlyOneWinner() throws Exception {
+        FundsAccountId user = fundingAccount("funding_user");
+        BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        topup(user, 100L, "AUTH_RACE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(before, afterTopup,
+                delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        String authorizationSn = authorize(user, 60L, true, "AUTH_RACE_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
+                delta(user, LedgerSubjectCode.AVAILABLE, -60L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<RaceOutcome> settleFuture = executor.submit(() -> raceCommand(ready, start,
+                    "AUTH_RACE_CAPTURE", FundsTransactionEventType.SETTLE,
+                    () -> settleAuthorization(user, 60L, authorizationSn, "AUTH_RACE_CAPTURE")));
+            Future<RaceOutcome> reversalFuture = executor.submit(() -> raceCommand(ready, start,
+                    "AUTH_RACE_REVERSAL", FundsTransactionEventType.REVERSAL,
+                    () -> reverseAuthorization(user, 60L, authorizationSn, "AUTH_RACE_REVERSAL")));
+
+            assertThat(ready.await(5, TimeUnit.SECONDS))
+                    .as("race commands are ready")
+                    .isTrue();
+            start.countDown();
+
+            List<RaceOutcome> outcomes = List.of(awaitOutcome(settleFuture), awaitOutcome(reversalFuture));
+            List<RaceOutcome> successes = outcomes.stream().filter(RaceOutcome::succeeded).toList();
+            List<RaceOutcome> failures = outcomes.stream().filter(outcome -> !outcome.succeeded()).toList();
+            assertThat(successes)
+                    .as("race outcomes: %s", outcomes)
+                    .hasSize(1);
+            assertThat(failures)
+                    .as("race outcomes: %s", outcomes)
+                    .hasSize(1);
+
+            RaceOutcome winner = successes.getFirst();
+            RaceOutcome loser = failures.getFirst();
+            assertThat(loser.failure())
+                    .as("losing authorization event should be rejected and rolled back")
+                    .isNotNull();
+            assertThat(winner.eventType()).isIn(FundsTransactionEventType.SETTLE, FundsTransactionEventType.REVERSAL);
+
+            BalanceSnapshot afterRace = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+            FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+            assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+            assertThat(transaction.getAuthorizedAmount()).isEqualTo(60L);
+            assertThat(transaction.getRefundedAmount()).isZero();
+            assertThat(transaction.getDeclinedAmount()).isZero();
+
+            if (winner.eventType() == FundsTransactionEventType.SETTLE) {
+                assertOnlyBalanceDeltas(afterAuthorize, afterRace,
+                        delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                        delta(user, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY),
+                        delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                        delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY));
+                assertThat(transaction.getSettledAmount()).isEqualTo(60L);
+                assertThat(transaction.getReversedAmount()).isZero();
+                assertFundsAndLedgerFactsForBusinessSn(winner.businessSn(), 0, 2, 1, 2);
+            } else {
+                assertOnlyBalanceDeltas(afterAuthorize, afterRace,
+                        delta(user, LedgerSubjectCode.AVAILABLE, 60L, CURRENCY),
+                        delta(user, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY),
+                        delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                        delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+                assertThat(transaction.getSettledAmount()).isZero();
+                assertThat(transaction.getReversedAmount()).isEqualTo(60L);
+                assertFundsAndLedgerFactsForBusinessSn(winner.businessSn(), 0, 1, 1, 2);
+            }
+
+            assertPostedTransactions(3);
+            assertThat(ledgerTransactions().stream()
+                    .map(LedgerTransaction::getEventType)
+                    .toList())
+                    .containsExactly(
+                            FundsTransactionEventType.TOPUP.name(),
+                            FundsTransactionEventType.AUTHORIZE.name(),
+                            winner.eventType().name());
+            assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_RACE_TOPUP", 3, 4);
+            assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_RACE_AUTHORIZE", 1, 2);
+            assertNoFundsOrLedgerFactsForBusinessSn(loser.businessSn());
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(5, TimeUnit.SECONDS))
+                    .as("race executor stopped")
+                    .isTrue();
+        }
     }
 
     /**
@@ -2414,6 +2529,67 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_AUTHORIZE", 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_CAPTURE", 0, 2, 1, 2);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_IDEMPOTENT_CHARGEBACK_RETURN", 0, 2, 1, 2);
+    }
+
+    private RaceOutcome raceCommand(CountDownLatch ready,
+                                    CountDownLatch start,
+                                    String businessSn,
+                                    FundsTransactionEventType eventType,
+                                    RaceCommand command) {
+        try {
+            ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
+            ready.countDown();
+            awaitLatch(start);
+            return RaceOutcome.success(businessSn, eventType, command.execute());
+        } catch (Throwable failure) {
+            return RaceOutcome.failure(businessSn, eventType, failure);
+        } finally {
+            ThreadContextTenantIdHolder.remove();
+        }
+    }
+
+    private static void awaitLatch(CountDownLatch latch) {
+        try {
+            assertThat(latch.await(5, TimeUnit.SECONDS))
+                    .as("race start signal received")
+                    .isTrue();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(exception);
+        }
+    }
+
+    private static RaceOutcome awaitOutcome(Future<RaceOutcome> future)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        return future.get(10, TimeUnit.SECONDS);
+    }
+
+    @FunctionalInterface
+    private interface RaceCommand {
+
+        String execute();
+    }
+
+    private record RaceOutcome(String businessSn,
+                               FundsTransactionEventType eventType,
+                               String transactionSn,
+                               Throwable failure) {
+
+        private static RaceOutcome success(String businessSn,
+                                           FundsTransactionEventType eventType,
+                                           String transactionSn) {
+            return new RaceOutcome(businessSn, eventType, transactionSn, null);
+        }
+
+        private static RaceOutcome failure(String businessSn,
+                                           FundsTransactionEventType eventType,
+                                           Throwable failure) {
+            return new RaceOutcome(businessSn, eventType, null, failure);
+        }
+
+        private boolean succeeded() {
+            return failure == null;
+        }
     }
 
     private String chargebackAuthorization(FundsAccountId accountId,

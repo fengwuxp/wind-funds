@@ -3,6 +3,8 @@ package com.capte.funds.transaction.dal.mapper;
 import com.capte.funds.transaction.dal.entities.FundsTransaction;
 import com.mybatisflex.core.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 /**
  * 资金交易主事实 Mapper。
@@ -16,4 +18,13 @@ import org.apache.ibatis.annotations.Mapper;
  */
 @Mapper
 public interface FundsTransactionMapper extends BaseMapper<FundsTransaction> {
+
+    @Select("""
+            SELECT *
+            FROM t_funds_transaction
+            WHERE tenant_id = #{tenantId}
+              AND sn = #{sn}
+            FOR UPDATE
+            """)
+    FundsTransaction selectBySnForUpdate(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 }

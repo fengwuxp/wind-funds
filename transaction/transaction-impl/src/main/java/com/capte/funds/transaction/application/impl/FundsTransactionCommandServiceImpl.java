@@ -1,6 +1,9 @@
 package com.capte.funds.transaction.application.impl;
 
+import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
+import com.capte.funds.transaction.dal.entities.FundsTransaction;
+import com.capte.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
@@ -24,6 +27,9 @@ import com.capte.funds.transaction.converter.FundsAuthorizationInstructionConver
 import com.capte.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.capte.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.wind.common.exception.AssertUtils;
+import com.wind.common.locks.JdkLockFactory;
+import com.wind.common.locks.LockFactory;
+import com.wind.common.locks.WindLock;
 import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.integration.funds.transaction.FundsInstructionOrchestrator;
@@ -33,8 +39,12 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Objects;
+import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 /**
  * 资金交易命令服务实现。
@@ -47,6 +57,10 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         FundsBalanceControlService,
         FundsAuthorizationTransactionService {
 
+    private static final String AUTHORIZATION_TRANSACTION_LOCK_PREFIX = "funds:authorization-transaction:";
+
+    private static final LockFactory AUTHORIZATION_TRANSACTION_LOCK_FACTORY = new JdkLockFactory();
+
     private final FundsDirectTransactionInstructionConverter directTransactionInstructionConverter;
 
     private final FundsBalanceControlInstructionConverter balanceControlInstructionConverter;
@@ -54,6 +68,8 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     private final FundsAuthorizationInstructionConverter authorizationInstructionConverter;
 
     private final FundsInstructionOrchestrator<FundsInstructionSpec> fundsInstructionOrchestrator;
+
+    private final FundsTransactionMapper fundsTransactionMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -139,34 +155,112 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String reversal(FundsAuthorizationTransactionReversalRequest request, WindOperator operator) {
-        return execute(authorizationInstructionConverter.convertToReversalInstruction(request, operator));
+        return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
+                () -> authorizationInstructionConverter.convertToReversalInstruction(request, operator),
+                this::assertAuthorizationRemainingAmountSufficient);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator operator) {
-        return execute(authorizationInstructionConverter.convertToExpireInstruction(request, operator));
+        return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
+                () -> authorizationInstructionConverter.convertToExpireInstruction(request, operator),
+                this::assertAuthorizationRemainingAmountSufficient);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String settle(FundsAuthorizationTransactionSettleRequest request, WindOperator operator) {
-        return execute(authorizationInstructionConverter.convertToSettleInstruction(request, operator));
+        return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
+                () -> authorizationInstructionConverter.convertToSettleInstruction(request, operator),
+                this::assertAuthorizationRemainingAmountSufficient);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String settleRefund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator) {
-        return execute(authorizationInstructionConverter.convertToSettleRefundInstruction(request, operator));
+        return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
+                () -> authorizationInstructionConverter.convertToSettleRefundInstruction(request, operator));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String chargeback(FundsAuthorizationTransactionChargebackRequest request, WindOperator operator) {
-        return execute(authorizationInstructionConverter.convertToChargebackInstruction(request, operator));
+        return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
+                () -> authorizationInstructionConverter.convertToChargebackInstruction(request, operator));
     }
 
     private @NonNull String execute(@NonNull FundsInstructionSpec instruction) {
         return fundsInstructionOrchestrator.execute(instruction);
+    }
+
+    private @NonNull String executeAuthorizationSuccessor(
+            String authorizationTransactionSn,
+            Supplier<FundsInstructionSpec> instructionSupplier) {
+        return executeAuthorizationSuccessor(authorizationTransactionSn, instructionSupplier, (transaction, instruction) -> {
+        });
+    }
+
+    private @NonNull String executeAuthorizationSuccessor(
+            String authorizationTransactionSn,
+            Supplier<FundsInstructionSpec> instructionSupplier,
+            BiConsumer<FundsTransaction, FundsInstructionSpec> precondition) {
+        if (authorizationTransactionSn == null || authorizationTransactionSn.isBlank()) {
+            return execute(instructionSupplier.get());
+        }
+        WindLock lock = AUTHORIZATION_TRANSACTION_LOCK_FACTORY.apply(authorizationTransactionLockKey(
+                authorizationTransactionSn));
+        lock.lock();
+        boolean unlockImmediately = true;
+        try {
+            unlockImmediately = !registerTransactionCompletionUnlock(lock);
+            FundsTransaction authorizationTransaction = lockAuthorizationTransaction(authorizationTransactionSn);
+            FundsInstructionSpec instruction = instructionSupplier.get();
+            precondition.accept(authorizationTransaction, instruction);
+            return execute(instruction);
+        } finally {
+            if (unlockImmediately) {
+                lock.unlock();
+            }
+        }
+    }
+
+    private static String authorizationTransactionLockKey(String authorizationTransactionSn) {
+        return AUTHORIZATION_TRANSACTION_LOCK_PREFIX
+                + ThreadContextTenantIdHolder.requireTenantId()
+                + ":"
+                + authorizationTransactionSn;
+    }
+
+    private static boolean registerTransactionCompletionUnlock(WindLock lock) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return false;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                lock.unlock();
+            }
+        });
+        return true;
+    }
+
+    private FundsTransaction lockAuthorizationTransaction(String authorizationTransactionSn) {
+        Long tenantId = ThreadContextTenantIdHolder.requireTenantId();
+        FundsTransaction authorizationTransaction = fundsTransactionMapper.selectBySnForUpdate(tenantId,
+                authorizationTransactionSn);
+        AssertUtils.notNull(authorizationTransaction,
+                "授权交易不存在，authorizationTransactionSn = {}", authorizationTransactionSn);
+        return authorizationTransaction;
+    }
+
+    private void assertAuthorizationRemainingAmountSufficient(FundsTransaction transaction,
+                                                              FundsInstructionSpec instruction) {
+        long amount = instruction.getAmount().getAmount();
+        long remainingAmount = transaction.getAuthorizedAmount() - transaction.getSettledAmount()
+                - transaction.getReversedAmount();
+        AssertUtils.isTrue(amount <= remainingAmount,
+                "资金交易剩余授权可释放金额不足，sn = {}，remainingAmount = {}，amount = {}",
+                transaction.getSn(), remainingAmount, amount);
     }
 }
