@@ -168,6 +168,48 @@ Request/DTO 默认落 `com.capte.funds.wallet.model.request` 和 `com.capte.fund
 | Grant 必须列明 | application facade 名称、Request/DTO、错误码、幂等摘要、拒绝事实、route snapshot / audit 快照位置、敏感上下文白名单、目标测试资产和验证命令。 |
 | 禁止混入 | 不新增统一 `InstrumentTransactionService`；不把支付工具、预算组或 Spend Rule 作为账务主体；不混入完整 VCC、Spend Rule 引擎、清结算对账、治理 apply、P2 轨道或敏感原文。 |
 
+### 8.2 authInstrumentGrantCandidate（2026-06-03）
+
+本节把 8.1 的只读扫描推进为可确认的单一 Execution Grant 候选。它仍不授权写 Java、测试、DDL/H2 schema、公共契约或运行时配置；只有用户确认本节的 `Execution Grant：B4-AUTH-PI` 后，才允许进入首批 Red。
+
+| 授权包字段 | 候选内容 |
+| --- | --- |
+| `taskId` | `B4-AUTH-PI-CAD-001`。 |
+| `stage` / `wave` | B4 授权交易 / Wave 2 支付工具授权 application facade 准入。 |
+| `status` | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| `owner` | 资深架构师负责工程执行；产品架构专家只负责支付工具、资金主体、Spend Rule 和拒绝原因的业务语义复核。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `f7815ad docs: 补齐 B4 支付工具授权准入候选`。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
+| `mvpScenario` | 业务方提交支付工具引用、使用主体、金额币种、业务流水、业务场景、预算或 Spend Rule 上下文；系统在 application facade 中完成支付工具能力、绑定快照、资金责任、Spend Rule 和账户能力准入。批准时构造账户主体型授权请求并委派 `FundsAuthorizationTransactionService#authorize`；拒绝时只留下拒绝事实、原因和审计，不生成资金事实。 |
+| `businessAdmission` | 产品锚点为 `AC-PI-010` 和 `AC-AUTH-000`；DSL 锚点为支付工具入口到账户主体授权内核转译；系分锚点为 `AuthorizationAdmissionApplicationService`、支付工具能力应用服务、资金责任解析和账户能力查询；TDD 锚点为 `R0-AUTH-001`。 |
+| `firstRedSet` | `R0-AUTH-001`：绕过工具准入、绑定快照、Spend Rule、资金责任或账户能力直接调用授权内核必须失败；拒绝路径无 route、posting、LedgerEntry、projection 和敏感上下文副作用；批准路径只委派账户主体型授权内核。 |
+| `secondRedSet` | 最小失败矩阵：工具非 ACTIVE、方向或动作能力不匹配、绑定缺失或版本失效、资金责任缺失或不唯一、Spend Rule 拒绝、账户能力不支持、币种不一致、敏感上下文出现时失败且无资金副作用。 |
+| `writeScope` | 先写 `tests/src/test/java/com/capte/funds/wallet/application/instrument/AuthorizationAdmissionApplicationServiceTests.java` 或等价授权 application facade 测试；Red 证明缺口后，仅允许在 `wallet-face` 新增 application facade 契约、Request/DTO，在 `wallet-impl` 新增最小 facade 实现和委派适配，并按需补 `FundsAuthorizationTransactionFlowTests` 回归。 |
+| `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md`、既有 `wallet-*`、`transaction-*`、`core`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| `harnessScopeIndex` | 标准 Harness 字段索引：写入范围为授权 application facade 目标 Red、`wallet-face` application 契约和 Request/DTO、`wallet-impl` 最小实现、必要的授权 flow 回归；写入文件先限定新授权准入测试，Red 证明缺口后才进入上列生产触点；只读范围和只读参考为 PRD、DSL、系分、TDD、OpenSpec、既有 wallet/transaction/core 和 H2 schema。 |
+| `publicContractGate` | 只允许非破坏性新增 wallet application facade、Request/DTO 和返回 DTO；不得修改或替换 `FundsAuthorizationTransactionAuthorizeRequest.accountId`、`FundsAuthorizationTransactionService#authorize`、交易状态机、core 枚举或 ledger 公共契约。 |
+| `dependencyGate` | `wallet-face` 不依赖 `transaction-face` 或任何 impl；`wallet-impl` 可依赖 `wallet-face`、`transaction-face` 和 core；`transaction-impl` 不反向依赖 wallet 资源服务或 wallet impl。违反依赖方向时立即停止。 |
+| `schemaGate` | 默认不修改 `tests/src/test/resources/jdbc-schema.sql`、生产 DDL、Entity 字段、Mapper 表字段、索引或唯一约束；若准入快照、拒绝事实或 Spend Rule 决策需要落表，必须重新确认 B5/B6/B8 或独立 Grant。 |
+| `noWriteScope` | 不新增统一 `InstrumentTransactionService`；不把支付工具、预算组或 Spend Rule 写成 route leg、posting、LedgerEntry 或账本余额主体；不实现完整 VCC、Spend Rule 引擎、预算控制投影、交易投影、清结算对账、治理 apply、P2 轨道、外部协议、PCI/PAN/CVV 或敏感原文处理。 |
+| `verificationCommand` | 首轮 `just test-one AuthorizationAdmissionApplicationServiceTests tests`；Green 后按触点补 `just test-one PaymentInstrumentServiceImplTests tests`、`just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests`、`just test-transaction`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`。 |
+| `gitStrategy` | 若用户确认本 Grant 并保持 GSD-CAD 自动模式，目标验证通过且未触发停止条件时按 `auto_commit` 提交；验证失败、环境不可判定或越界时转 `summary_only`。 |
+| `stopCondition` | 需要修改 transaction canonical 请求、core 枚举或状态、ledger 公共契约、DDL/H2 schema、目标主体字段迁移、Spend Rule 表、预算控制投影、完整 VCC、清结算对账、治理、外部规则、敏感数据、跨模块依赖反转、公有方法超过 5 个参数或工作树冲突时停止。 |
+| `handoff` | 本候选包的恢复入口为 `B4-AUTH-PI-CAD-001`。用户确认 `Execution Grant：B4-AUTH-PI` 后进入首批 Red；未确认时只保留为 Round 0 / summary_only。若用户改选 B2-PI-CAP、B2-FR、B5-SR-CONTROL 或其他任务包，本候选只作为只读参考和残余风险记录。 |
+
+```text
+Execution Grant：B4-AUTH-PI
+确认基线：确认时 Git HEAD；至少包含 f7815ad docs: 补齐 B4 支付工具授权准入候选；若确认前有未提交文档变更，必须先提交或列入 authorityBaseline
+任务包：B4-AUTH-PI-CAD-001
+目标：新增 authorizeByInstrument 或等价 AuthorizationAdmissionApplicationService application facade，完成支付工具、绑定、Spend Rule、资金责任和账户能力准入；批准后委派账户主体型 FundsAuthorizationTransactionService#authorize；拒绝无 route、posting、LedgerEntry、projection 或敏感上下文副作用
+允许写入：先写 tests 中授权 application facade 目标 Red；Red 证明缺口后允许 wallet-face application facade 契约、Request/DTO、wallet-impl 最小实现、委派适配和必要授权 flow 回归
+允许公共契约：仅允许非破坏性新增 wallet application facade、Request/DTO 和返回 DTO；不得修改 FundsAuthorizationTransactionAuthorizeRequest.accountId 或 FundsAuthorizationTransactionService#authorize
+首批 Red：R0-AUTH-001；必要时补工具状态、绑定、资金责任、Spend Rule、账户能力、币种和敏感上下文失败矩阵
+验证命令：just test-one AuthorizationAdmissionApplicationServiceTests tests；just test-one PaymentInstrumentServiceImplTests tests；just test-one SpendSubjectFundingRelationServiceImplTests tests；just test-one PaymentInstrumentRouteDslContractTests tests；just test-transaction；just test-boundary；just compile；提交前 just pmd 和 git diff --check
+禁止写入：交易 canonical 请求替换、统一 InstrumentTransactionService、支付工具或预算组或 Spend Rule 入账主体化、DDL/H2 schema、core 枚举状态、ledger 公共契约、完整 VCC、Spend Rule 引擎、预算控制投影、清结算对账、治理 apply、P2 轨道、外部协议、PCI/PAN/CVV 或敏感原文
+Git 策略：auto_commit
+停止条件：公共契约越界、表结构、依赖方向反转、外部规则、敏感数据、P2/清结算/治理越界、验证无法解释失败或工作树冲突即停止
+交接：确认后从 B4-AUTH-PI-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置
+```
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |

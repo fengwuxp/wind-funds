@@ -46,6 +46,7 @@
 - [x] 2026-06-03 完成 B4-AUTH-RACE GSD-CAD Round 0：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#813-authraceround0scan2026-06-03` 已记录授权后续事件并发竞争的只读扫描，现有顺序金额闭合、幂等摘要和失败无副作用覆盖充分，但当时未发现同一授权 settle / reversal / expire / settleRefund 并发竞争专用 Red；`#814-authracegrantcandidate2026-06-03` 已把候选收敛为 `B4-AUTH-RACE` 原子任务包，历史状态为 `ROUND0_READY_NOT_CODE_AUTHORIZED`。该准备态后续已由 `47c5269 fix(transaction): 串行化授权后继并发竞争` 消费并闭合，不再作为新的自动编码授权。
 - [x] 2026-06-03 完成 B4-AUTH-RACE 首轮 CAD 闭环：`47c5269 fix(transaction): 串行化授权后继并发竞争` 已把 `B4-RACE-RED-001` 转为回归基线，新增同一授权 settle / expire / reversal 并发竞争测试，证明只有一个合法金额迁移获胜，失败方不生成 route、posting、ledger entry、projection 或余额副作用；实现层对授权后继命令增加事务完成前持有的 JVM 锁，并在读取授权原交易时使用 `FOR UPDATE` 行锁，同时保留完成、撤销和过期金额上限校验。已验证 `git diff --check`、`just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary` 和 `just pmd` 通过。本闭环不声明 DDL/H2 schema、公共契约、core 枚举状态、ledger 公共契约、支付工具 facade、钱包 application facade、VCC、Spend Rule、完整 dispute/chargeback case、清结算对账或治理完成。
 - [x] 2026-06-03 完成 B4-AUTH-PI GSD-CAD Round 0 只读准入：本轮把下一候选收敛为 `B4-AUTH-INSTRUMENT-APPLICATION` / `B4-AUTH-PI` 授权支付工具应用入口；代码扫描确认 `FundsAuthorizationTransactionService#authorize` 和 `FundsAuthorizationTransactionAuthorizeRequest.accountId` 仍是账户主体型 canonical 内核，`wallet-face` 只有 `PaymentInstrumentService`、`SpendSubjectFundingRelationService` 等资源服务，未发现 `AuthorizationAdmissionApplicationService` 或 `authorizeByInstrument` 生产入口。当前状态为 `ROUND0_READY_NOT_CODE_AUTHORIZED`，后续若确认新的单一 Execution Grant，首批 Red 为 `R0-AUTH-001`；未确认前不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
+- [x] 2026-06-03 补齐 B4-AUTH-PI Grant 可执行包：`docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md#82-authinstrumentgrantcandidate2026-06-03` 已把下一轮候选收敛为 `B4-AUTH-PI-CAD-001` 原子任务包；该包明确首轮只写授权 application facade 目标 Red，Red 证明缺口后才允许 wallet-face application facade 契约、Request/DTO、wallet-impl 最小实现、委派适配和必要授权 flow 回归。当前状态为 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`；未确认 `Execution Grant：B4-AUTH-PI` 前仍不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
 
 ## 1. MVP 任务写入范围
 
@@ -850,6 +851,26 @@ A0 只读核验通过后，曾建议优先确认 A1 直接交易事实红线。A
 | 当前禁止范围 | 不替换 `FundsAuthorizationTransactionAuthorizeRequest.accountId`；不新增统一 `InstrumentTransactionService`；不让支付工具、预算组或 Spend Rule 成为 route leg、posting、LedgerEntry 或账本余额主体；不混入完整 VCC 发卡、Spend Rule 引擎、B5/B6/B8、清结算对账、治理 apply、DDL/H2 schema、外部协议或敏感原文。 |
 | 建议验证命令 | Round 0 / docs-only：`git diff --check`。获得 Grant 后建议按写入范围运行 `just test-one PaymentInstrumentServiceImplTests tests`、`just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests`、`just test-transaction`、`just test-boundary`、`just compile` 和 `just pmd`。 |
 | handoff | `B4-AUTH-PI` 已可作为下一次单一 Execution Grant 的确认输入；未确认前继续保持 `summary_only` / Round 0，不自动进入 Red 或实现。 |
+
+### 13.16 B4-AUTH-PI Grant 可执行包（2026-06-03）
+
+本节把第 13.15 的 Round 0 候选推进为可确认的单一 Execution Grant 包。该包仍处于待确认状态；用户确认 `Execution Grant：B4-AUTH-PI` 前，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 项 | 当前口径 |
+| --- | --- |
+| 当前状态 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| Task ID | `B4-AUTH-PI-CAD-001`。 |
+| Owner / 角色 | 资深架构师负责 Red、Green、Review、Refactor、Verify 和提交；产品架构专家负责支付工具、资金主体、Spend Rule、拒绝原因和 Not Done 语义复核。 |
+| authority baseline | 确认时 Git HEAD；至少包含 `f7815ad docs: 补齐 B4 支付工具授权准入候选` 和本节候选包提交。未提交文档变更必须先提交或列入 Grant 附件。 |
+| 写入范围 | 先写 `AuthorizationAdmissionApplicationServiceTests` 或等价授权 application facade 目标 Red；Red 证明缺口后，仅允许 `wallet-face` 新增 application facade 契约、Request/DTO，`wallet-impl` 新增最小实现和委派适配，并按需补授权 flow 回归。 |
+| 只读范围 | PRD、DSL、系分、TDD、OpenSpec、既有 wallet/transaction/core、H2 schema 和资源服务测试。 |
+| 首批 Red | `R0-AUTH-001`：支付工具授权入口必须先完成工具、绑定、Spend Rule、资金责任和账户能力准入；批准后委派账户主体型授权内核；拒绝无 route、posting、LedgerEntry、projection 或敏感上下文副作用。 |
+| 验证命令 | `just test-one AuthorizationAdmissionApplicationServiceTests tests`、`just test-one PaymentInstrumentServiceImplTests tests`、`just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests`、`just test-transaction`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
+| Superpowers / CAD 纪律 | TDD 先 Red 后 Green；Review 检查资金语义、模块依赖、公共契约和无副作用；Refactor 只限测试保护下最小触点；AI 产物复核必须证明没有替换 canonical 授权请求或新增工具交易内核。 |
+| Git 策略 | 若用户确认 Grant 并保持自动模式，验证通过且未触发停止条件时按 `auto_commit` 提交；否则转 `summary_only`。 |
+| 禁止事项 | 不替换 `FundsAuthorizationTransactionAuthorizeRequest.accountId`；不新增统一 `InstrumentTransactionService`；不让支付工具、预算组或 Spend Rule 成为 route leg、posting、LedgerEntry 或账本余额主体；不混入 DDL/H2 schema、core 枚举、ledger 公共契约、完整 VCC、Spend Rule 引擎、清结算对账、治理 apply、P2 轨道、外部协议或敏感原文。 |
+| 停止条件 / 人工确认 | 需要公共契约越界、表结构、目标主体字段迁移、依赖方向反转、外部规则、PCI/PAN/CVV、敏感数据、P2/清结算/治理越界、验证无法解释失败或工作树冲突时停止。 |
+| handoff | 候选包已具备 CAD 候选结构；下一步只能等待用户确认 `Execution Grant：B4-AUTH-PI` 后进入 Red，或继续选择其他 Round 0。 |
 
 ## 14. B2 建议 Execution Grant
 
