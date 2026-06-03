@@ -264,6 +264,20 @@
 | 可回退金额校验 | `AUTH_REFUND` 和 `REFUND` 成功前会检查可回退金额；只有交易类型为 `DefaultFundsTransactionType.REFUND` 的聚合跳过 settled reversible amount 校验。 | Green 不能绕过金额约束；若 NO_AUTH 是独立退款交易，需要用外部原事实金额/币种和退款累计规则替代内部 settled amount 校验，并用测试证明失败无副作用。 |
 | 请求摘要 | 明细 `requestHash` 当前纳入 instruction reference、contextVariables、route summary 和 participant summary。 | NO_AUTH 的模式、外部原事实、原因、凭证和原事实金额币种必须进入摘要或等价不可变事实，避免同一 `businessSn` 不同原事实被幂等误合并。 |
 
+### 8.6 firstRedAssertionPack（2026-06-03）
+
+本节记录 `B4-NAR-RED-001` 获得 Execution Grant 后的首轮 Red 断言包。该断言包只定义测试目标，不授权写测试。
+
+| 断言层 | 首轮 Red 必须表达 | 可复用测试资产 |
+| --- | --- | --- |
+| 请求事实 | no-auth refund 请求显式声明 `NO_AUTH` 或等价模式，携带外部原事实引用、原事实类型、原因、凭证、原事实金额币种和操作者；不得携带 `authorizationTransactionSn`。 | `FundsAuthorizationTransactionFlowTests` 新增目标用例；`FundsTransactionFlowTestSupport` 新增 no-auth refund 专用请求构造。 |
+| 余额事实 | 成功后用户 `AVAILABLE` 增加退款金额，平台 `SETTLEMENT` 减少退款金额；`AUTHORIZATION` 不增加、不释放、不伪造占用。 | `snapshot(...)`、`assertOnlyBalanceDeltas(...)`、`assertBucket(...)`。 |
+| 交易事实 | 生成一笔可追溯退款资金事实，能区分普通授权链退款和 no-auth refund；不得把外部原事实映射成内部授权交易聚合。 | `fundsTransactionsByBusinessSn(...)`、`fundsTransactionDetailsByBusinessSn(...)`、`assertSingleFundsAndLedgerFactsForBusinessSn(...)`。 |
+| 账务事实 | ledger transaction、posting plan、ledger entry 与 route snapshot 对齐，phase 为退款语义，entry 覆盖 `SETTLEMENT` 和 `AVAILABLE`。 | `ledgerTransactionByBusinessSn(...)`、`postingPlansOf(...)`、`entriesOf(...)`、`assertLedgerFactsFollowRouteSnapshot(...)`。 |
+| 审计与摘要 | 外部原事实引用、原事实类型、原因、凭证、金额币种进入交易上下文、ledger context 或等价不可变摘要；同 `businessSn` 不同原事实必须失败且无新增账务事实。 | 现有幂等冲突样例、`assertLedgerTransactionFactsUnchanged(...)`、`assertNoFundsOrLedgerFactsForBusinessSn(...)`。 |
+| 普通退款回归 | 现有授权链 full refund、dispute refund、chargeback 和幂等退款回归不退化。 | `testFundingAuthorizationFullSettleThenFullRefundShouldRestoreAvailableBalance`、`testAuthorizationDisputeRefundShouldUseSettleRefundAndPreserveAuditContext`、现有 refund idempotent 场景。 |
+| 预期 Red 失败点 | 当前基线应失败在 request 契约、converter 内部授权 reference、原授权 ledger transaction 查询或 route resolver 不支持 no-auth 路径之一。 | 若 Red 不失败，立即暂停判断已有实现覆盖或 Red 写错，不进入 Green。 |
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |

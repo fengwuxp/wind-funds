@@ -721,6 +721,20 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | Idempotency summary | `requestHash` 纳入 reference、contextVariables、route summary 和 participant summary。 | `refundMode`、外部原事实引用、原事实类型、原因、凭证和原事实金额币种必须进入摘要或等价不可变事实，避免幂等误合并。 |
 | Boundary tests | `DefaultRouteReplayServiceTests` 已覆盖 replay 不依赖当前 route selection port。 | Grant 后除了 flow Red，还应保留或补充 route replay 边界测试；若修改 resolver 支持矩阵，必须跑 `just test-one DefaultRouteReplayServiceTests tests` 或纳入 `just test-transaction`。 |
 
+### 13.8 B4-NAR 首轮 Red 断言包（2026-06-03）
+
+本节把 `B4-NAR-RED-001` 的测试断言收敛成可执行包。该包只作为 Grant 后写 Red 的输入，不授权当前写测试。
+
+| 断言层 | Grant 后 Red 目标 | 执行停止点 |
+| --- | --- | --- |
+| Request | no-auth refund 必须显式 `NO_AUTH` 或等价模式，带外部原事实引用、原事实类型、原因、凭证、原事实金额币种和操作者，且不带 `authorizationTransactionSn`。 | 现有 Request 无法表达字段时，Red 可先失败在编译或构造层；未经 Grant 不提前改契约。 |
+| Money fact | 成功路径应证明用户 `AVAILABLE` 增加、平台 `SETTLEMENT` 减少，`AUTHORIZATION` 不增加、不释放、不伪造授权占用。 | 测试只能断状态或返回值时停止，补齐余额、route、posting、entry 和投影断言。 |
+| Funds fact | no-auth refund 应形成独立且可解释的退款资金事实，不能复用内部授权交易聚合。 | 如果实现只能通过内部 `AUTHORIZATION` reference 成功，必须停止并修正 Green 方向。 |
+| Ledger fact | ledger transaction、posting plan、ledger entry 必须跟 route snapshot 对齐，退款 phase 覆盖 `SETTLEMENT` 和 `AVAILABLE`。 | route snapshot 不可解释或 posting/entry 与 route leg 不一致时不得提交。 |
+| Audit/idempotency | 外部原事实、原事实类型、原因、凭证、金额币种进入摘要或等价不可变事实；同 `businessSn` 不同原事实失败且无新增账务事实。 | 若摘要无法区分 no-auth 和普通授权链退款，先修摘要，不扩大到 DDL/H2 或治理。 |
+| Regression | 普通授权链 full refund、dispute refund、chargeback 和 refund idempotent 场景不退化。 | 任一普通授权链回归失败，先判断是否越界破坏原语义，不继续扩展 no-auth。 |
+| Expected Red | 当前基线预期失败在 Request 契约、converter 内部授权 reference、原授权 ledger transaction 查询或 route resolver 不支持 no-auth 路径。 | Red 未失败时暂停，不进入 Green。 |
+
 ## 14. B2 建议 Execution Grant
 
 B2 是后续直接交易、授权交易、余额控制、退款和权益资金流进入真实组合验证前的基础门禁。建议对应 MVP 任务只处理钱包账户、账本、余额投影和支付工具基础能力，不进入直接交易、授权交易或权益生产消费链路。
