@@ -286,6 +286,8 @@ public class FundsAuthorizationInstructionConverter {
     private void validateNoAuthRefundRequest(@NonNull FundsAuthorizationTransactionRefundRequest request) {
         AssertUtils.isFalse(StringUtils.hasText(request.getAuthorizationTransactionSn()),
                 "no-auth refund must not carry authorizationTransactionSn");
+        AssertUtils.isFalse(request.isDisputeRefund(),
+                "no-auth refund must not carry dispute fields");
         AssertUtils.hasText(request.getExternalReferenceSn(), "externalReferenceSn must not be blank");
         AssertUtils.hasText(request.getRefundReason(), "refundReason must not be blank");
     }

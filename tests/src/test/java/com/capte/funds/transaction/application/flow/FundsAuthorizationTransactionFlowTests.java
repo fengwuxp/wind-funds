@@ -1183,6 +1183,42 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
+     * 场景：无授权退款请求错误携带争议/拒付字段。
+     * 输入：无内部原授权流水的退款请求，同时携带 disputeMode、disputeReason、disputeVoucherRef 和 externalDisputeRef。
+     * 输出：请求在交易事实创建前失败，余额、账务事实和资金事实均不变化。
+     * 预期：NO_AUTH 退款与已完成授权后的争议退款互斥，不能静默丢弃争议审计字段。
+     * 红线：无授权退款不得被带争议字段的请求伪装成争议退款，也不得在忽略争议字段后成功入账。
+     */
+    @Test
+    void testNoAuthRefundWithDisputeFieldsShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_NO_AUTH_REFUND_DISPUTE_REJECT_TOPUP");
+        pay(user, settlementAccount(), LedgerSubjectCode.SETTLEMENT, 70L,
+                "AUTH_NO_AUTH_REFUND_DISPUTE_REJECT_EXTERNAL_CAPTURE");
+        BalanceSnapshot beforeFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L,
+                "AUTH_NO_AUTH_REFUND_WITH_DISPUTE")
+                .setDisputeMode("CHARGEBACK")
+                .setDisputeReason("CARDHOLDER_DISPUTE")
+                .setDisputeVoucherRef("DISPUTE_EVIDENCE_NO_AUTH")
+                .setExternalDisputeRef("DISPUTE_CASE_NO_AUTH"), WindOperator.system()))
+                .hasMessageContaining("dispute");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_DISPUTE_REJECT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_DISPUTE_REJECT_EXTERNAL_CAPTURE", 2, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_WITH_DISPUTE");
+    }
+
+    /**
      * 场景：已完成授权发生外部争议，业务侧通过授权链退款承接争议退回。
      * 输入：充值 100、授权 60、完成 60、争议类退款 40，并携带争议原因和凭证引用。
      * 输出：用户 AVAILABLE 恢复 40，平台 SETTLEMENT 释放 40，资金明细和账本交易保留争议审计上下文。
