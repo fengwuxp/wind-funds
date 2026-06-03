@@ -39,28 +39,28 @@ public class FundsAuthorizationTransactionRefundRequest {
     @NotNull
     private String businessSn;
 
-    @Schema(description = "原授权资金交易号，普通授权链退款必填，refundMode=NO_AUTH 时为空")
+    @Schema(description = "原授权资金交易号，普通授权链退款必填；为空表示无内部授权事实的直接退款")
     private String authorizationTransactionSn;
 
-    @Schema(description = "退款模式，NO_AUTH 表示无内部授权事实的直接退款")
+    @Schema(description = "退款模式，NO_AUTH 表示无内部授权事实的直接退款；为空时按原授权资金交易号是否为空判断")
     private String refundMode;
 
-    @Schema(description = "外部原始事实引用，refundMode=NO_AUTH 时必填，不承载完整原始报文或敏感数据")
+    @Schema(description = "外部原始事实引用，无授权退款时必填，不承载完整原始报文或敏感数据")
     private String externalOriginalFactRef;
 
-    @Schema(description = "外部原始事实类型，refundMode=NO_AUTH 时必填")
+    @Schema(description = "外部原始事实类型，无授权退款时必填")
     private String externalOriginalFactType;
 
-    @Schema(description = "退款原因，refundMode=NO_AUTH 时必填")
+    @Schema(description = "退款原因，无授权退款时必填")
     private String refundReason;
 
-    @Schema(description = "退款凭证引用，refundMode=NO_AUTH 时必填")
+    @Schema(description = "退款凭证引用，无授权退款时必填")
     private String refundVoucherRef;
 
-    @Schema(description = "外部原始事实金额，refundMode=NO_AUTH 时必填，币种与 originalFactCurrency 一致")
+    @Schema(description = "外部原始事实金额，无授权退款时必填，币种与 originalFactCurrency 一致")
     private Money originalFactAmount;
 
-    @Schema(description = "外部原始事实币种，refundMode=NO_AUTH 时必填")
+    @Schema(description = "外部原始事实币种，无授权退款时必填")
     private String originalFactCurrency;
 
     @Schema(description = "退款时间")
@@ -73,6 +73,6 @@ public class FundsAuthorizationTransactionRefundRequest {
     private ReadonlyContextVariables contextVariables;
 
     public boolean isNoAuthRefund() {
-        return refundMode != null && !refundMode.isBlank() && REFUND_MODE_NO_AUTH.equalsIgnoreCase(refundMode);
+        return authorizationTransactionSn == null || authorizationTransactionSn.isBlank();
     }
 }

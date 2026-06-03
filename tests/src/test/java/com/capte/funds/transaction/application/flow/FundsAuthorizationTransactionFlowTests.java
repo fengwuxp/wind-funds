@@ -1091,10 +1091,51 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
-     * 场景：无授权退款缺少模式、外部原事实、原事实类型、原因、凭证或错误携带内部授权流水。
+     * 场景：调用方未显式传入 NO_AUTH 模式，但未携带内部原授权流水。
+     * 输入：平台结算户已有外部原消费沉淀余额，提交无 authorizationTransactionSn 的退款请求。
+     * 输出：系统按无授权退款处理，仍补充 NO_AUTH 上下文标签并保留外部原事实审计。
+     * 预期：无授权退款判定以内部原授权流水是否为空为准，refundMode 只作为归类标签。
+     * 红线：缺 refundMode 不应回退成普通授权链退款，也不得查询内部原授权账本交易。
+     */
+    @Test
+    void testNoAuthRefundShouldInferModeWhenAuthorizationTransactionSnIsBlank() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "AUTH_NO_AUTH_REFUND_INFER_TOPUP");
+        pay(user, settlementAccount(), LedgerSubjectCode.SETTLEMENT, 70L,
+                "AUTH_NO_AUTH_REFUND_INFER_EXTERNAL_CAPTURE");
+        BalanceSnapshot beforeRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+
+        String refundSn = authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
+                "AUTH_NO_AUTH_REFUND_INFER_RETURN").setRefundMode(null), WindOperator.system());
+
+        BalanceSnapshot afterRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeRefund, afterRefund,
+                delta(user, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, -40L, CURRENCY));
+
+        assertThat(fundsTransaction(refundSn).getReferenceTransactionSn()).isNull();
+        assertThat(fundsTransactionDetailsByBusinessSn("AUTH_NO_AUTH_REFUND_INFER_RETURN"))
+                .allSatisfy(detail -> assertThat(detail.getContextVariables())
+                        .contains("\"refundMode\":\"NO_AUTH\"")
+                        .contains("\"externalOriginalFactRef\":\"processor_capture_202606030001\"")
+                        .contains("\"externalOriginalFactType\":\"PROCESSOR_CAPTURE\"")
+                        .contains("\"refundVoucherRef\":\"ops_refund_voucher_202606030001\"")
+                        .doesNotContain("authorizationTransactionSn"));
+        assertThat(fundsTransactionsByBusinessSn("AUTH_NO_AUTH_REFUND_INFER_RETURN"))
+                .singleElement()
+                .satisfies(refund -> assertThat(refund.getRouteSnapshot())
+                        .contains("AUTHORIZATION_NO_AUTH_REFUND_STANDARD")
+                        .doesNotContain("AUTHORIZATION_REFUND_REPLAY"));
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_INFER_RETURN", 1, 2, 1, 2);
+    }
+
+    /**
+     * 场景：无授权退款缺少外部原事实、原事实类型、原因、凭证或错误携带内部授权流水。
      * 输入：平台结算户已有可退余额，分别提交非法 no-auth refund 请求。
      * 输出：请求在交易事实创建前失败，余额、账务事实和资金事实均不变化。
-     * 预期：`NO_AUTH` 模式必须显式且审计字段齐备，且不得携带 `authorizationTransactionSn`。
+     * 预期：无内部授权流水的退款必须携带外部原事实审计字段，且不得携带 `authorizationTransactionSn`。
      * 红线：无授权退款不得回退成普通授权链退款，不得查询原授权账本交易或留下半成功事实。
      */
     @Test
@@ -1105,10 +1146,6 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 "AUTH_NO_AUTH_REFUND_REJECT_EXTERNAL_CAPTURE");
         BalanceSnapshot beforeFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
-
-        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
-                "AUTH_NO_AUTH_REFUND_MISSING_MODE").setRefundMode(null), WindOperator.system()))
-                .hasMessageContaining("authorizationTransactionSn");
 
         assertThatThrownBy(() -> authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L, 70L,
                 "AUTH_NO_AUTH_REFUND_MISSING_EXTERNAL_FACT")
@@ -1167,7 +1204,6 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_REJECT_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_REJECT_EXTERNAL_CAPTURE", 2, 2);
-        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_MODE");
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_EXTERNAL_FACT");
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_FACT_TYPE");
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_MISSING_REASON");
