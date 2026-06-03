@@ -708,6 +708,19 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | Test support | `refundSettledAuthorization(...)` 总是传入普通授权链 `authorizationTransactionSn`。 | 获得 Grant 后需新增 no-auth refund 专用测试构造，并保持普通授权链 helper 回归不退化。 |
 | 当前状态 | `GRANT_READY_NOT_CONFIRMED`。 | 用户确认 `Execution Grant：B4-NO-AUTH-REFUND` 前，下一步仍只能做 read-only 或 docs-only 准备。 |
 
+### 13.7 B4-NAR 最小 Green 地图（2026-06-03）
+
+本节把后续实现触点继续压缩成 Grant 后的最小 Green 约束。该地图只服务 `B4-NAR-CAD-001`，不授权写入。
+
+| 触点 | 当前扫描事实 | Grant 后执行约束 |
+| --- | --- | --- |
+| Resolver selection | `RouteReplaySupport` 不把 `EXTERNAL_TRANSACTION` 当 route snapshot reference；`AuthorizationFundsInstructionRouteResolver#supports` 目前不支持普通 `AUTH_REFUND`。 | NO_AUTH 不能通过伪造内部 authorization reference 进入 replay；若要走非 replay 路径，必须显式证明不按当前绑定关系静默重选路。 |
+| Replay guard | `DefaultRouteReplayService` 已有缺 reference、缺 route snapshot、当前工具换绑、当前资金来源变化不影响 replay 的边界测试。 | Green 不得削弱 replay 红线；新增 no-auth 路径时要保留这些测试，并补对应路由解释断言。 |
+| Lifecycle aggregate | `DefaultFundsInstructionLifecycleSaver#findReferenceTransaction` 会复用内部交易 reference；`EXTERNAL_TRANSACTION` 不复用内部交易聚合。 | NO_AUTH 应形成独立且可追溯的退款交易事实，或显式定义外部原事实聚合策略；不能把外部事实映射成内部授权交易。 |
+| Amount control | `AUTH_REFUND` / `REFUND` 默认校验已结算可回退金额，交易类型为 `REFUND` 的聚合会跳过内部 settled reversible amount 校验。 | 若 NO_AUTH 使用独立退款聚合，必须由外部原事实金额币种和退款累计规则兜住金额红线，不能只依赖当前跳过逻辑。 |
+| Idempotency summary | `requestHash` 纳入 reference、contextVariables、route summary 和 participant summary。 | `refundMode`、外部原事实引用、原事实类型、原因、凭证和原事实金额币种必须进入摘要或等价不可变事实，避免幂等误合并。 |
+| Boundary tests | `DefaultRouteReplayServiceTests` 已覆盖 replay 不依赖当前 route selection port。 | Grant 后除了 flow Red，还应保留或补充 route replay 边界测试；若修改 resolver 支持矩阵，必须跑 `just test-one DefaultRouteReplayServiceTests tests` 或纳入 `just test-transaction`。 |
+
 ## 14. B2 建议 Execution Grant
 
 B2 是后续直接交易、授权交易、余额控制、退款和权益资金流进入真实组合验证前的基础门禁。建议对应 MVP 任务只处理钱包账户、账本、余额投影和支付工具基础能力，不进入直接交易、授权交易或权益生产消费链路。

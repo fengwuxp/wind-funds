@@ -251,6 +251,19 @@
 | 测试资产 | `FundsTransactionFlowTestSupport#refundSettledAuthorization` 只支持普通授权链退款并总是传入 `authorizationTransactionSn`。 | 首轮 Red 需要新增 no-auth refund 专用构造或测试 helper，并证明普通授权链 helper 不退化。 |
 | 准入结论 | `GRANT_READY_NOT_CONFIRMED`。 | 该扫描只作为编码前 handoff；未确认 `Execution Grant：B4-NO-AUTH-REFUND` 前仍不得写 Red 或代码。 |
 
+### 8.5 noAuthRefundMinimalGreenMap（2026-06-03）
+
+本节记录 `B4-NAR-RED-001` 获得 Execution Grant 后的最小 Green 判断地图。该地图来自只读扫描，不授权编码。
+
+| 触点 | 当前事实 | 最小 Green 约束 |
+| --- | --- | --- |
+| Route resolver 命中 | `DefaultRouteReplayService` 只在 replay event 且 reference type 为 `ORIGINAL_TRANSACTION`、`AUTHORIZATION`、`REFUND`、`FEE` 或 `FREEZE_ORDER` 时命中；`EXTERNAL_TRANSACTION` 明确不是 route snapshot reference。`AuthorizationFundsInstructionRouteResolver#supports` 当前只支持 `AUTHORIZE` 和 FORCE `SETTLE`。 | NO_AUTH 退款不能伪装成内部授权 replay；若基于外部原事实生成 route，必须显式切出可解释路径，不能让当前绑定关系静默重选路。 |
+| Route replay 红线 | `DefaultRouteReplayService` 缺 reference 或缺 route snapshot 时明确失败，并有边界测试证明不得依赖当前支付工具、资金来源关系或 resolver 重算路径。 | Green 不能为通过 Red 而放宽 replay reference 要求；若 NO_AUTH 使用新路径，应保持原 replay 红线不退化。 |
+| 授权退款 route 形态 | 现有 `resolveSettleRefund` 可生成 SETTLEMENT -> AVAILABLE 的退款 leg，但该方法不是当前普通 `AUTH_REFUND` 的主要命中入口，且依赖账户上下文和平台 SETTLEMENT 账户。 | 若复用该 route 形态，必须由 NO_AUTH 明确校验外部原事实、金额币种和账户主体，不得借内部 `AUTHORIZATION_TRANSACTION_SN` 进入。 |
+| 生命周期聚合 | `DefaultFundsInstructionLifecycleSaver#findReferenceTransaction` 会在 reference type 为 `AUTHORIZATION`、`ORIGINAL_TRANSACTION`、`REFUND` 或 `FEE` 时复用引用交易；`EXTERNAL_TRANSACTION` 不复用。 | NO_AUTH 若使用外部原事实引用，应避免复用内部授权交易聚合；交易聚合、明细和请求摘要必须能区分普通授权链退款与 no-auth refund。 |
+| 可回退金额校验 | `AUTH_REFUND` 和 `REFUND` 成功前会检查可回退金额；只有交易类型为 `DefaultFundsTransactionType.REFUND` 的聚合跳过 settled reversible amount 校验。 | Green 不能绕过金额约束；若 NO_AUTH 是独立退款交易，需要用外部原事实金额/币种和退款累计规则替代内部 settled amount 校验，并用测试证明失败无副作用。 |
+| 请求摘要 | 明细 `requestHash` 当前纳入 instruction reference、contextVariables、route summary 和 participant summary。 | NO_AUTH 的模式、外部原事实、原因、凭证和原事实金额币种必须进入摘要或等价不可变事实，避免同一 `businessSn` 不同原事实被幂等误合并。 |
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
