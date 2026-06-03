@@ -560,26 +560,20 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected String refundWithoutAuthorization(FundsAccountId accountId,
                                                 long amount,
-                                                long originalFactAmount,
                                                 String businessSn) {
         return authorizationTransactionService.settleRefund(noAuthRefundRequest(accountId, amount,
-                originalFactAmount, businessSn), WindOperator.system());
+                businessSn), WindOperator.system());
     }
 
     protected FundsAuthorizationTransactionRefundRequest noAuthRefundRequest(FundsAccountId accountId,
                                                                              long amount,
-                                                                             long originalFactAmount,
                                                                              String businessSn) {
         return new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(accountId)
                 .setAmount(amount(amount))
                 .setRefundMode(FundsAuthorizationTransactionRefundRequest.REFUND_MODE_NO_AUTH)
-                .setExternalOriginalFactRef("processor_capture_202606030001")
-                .setExternalOriginalFactType("PROCESSOR_CAPTURE")
+                .setExternalReferenceSn("processor_capture_202606030001")
                 .setRefundReason("external capture refunded without internal authorization")
-                .setRefundVoucherRef("ops_refund_voucher_202606030001")
-                .setOriginalFactAmount(amount(originalFactAmount))
-                .setOriginalFactCurrency(CURRENCY.name())
                 .setBusinessScene("AUTHORIZATION_NO_AUTH_REFUND")
                 .setBusinessSn(businessSn)
                 .setDescription("authorization no-auth refund");

@@ -45,23 +45,11 @@ public class FundsAuthorizationTransactionRefundRequest {
     @Schema(description = "退款模式，NO_AUTH 表示无内部授权事实的直接退款；为空时按原授权资金交易号是否为空判断")
     private String refundMode;
 
-    @Schema(description = "外部原始事实引用，无授权退款时必填，不承载完整原始报文或敏感数据")
-    private String externalOriginalFactRef;
-
-    @Schema(description = "外部原始事实类型，无授权退款时必填")
-    private String externalOriginalFactType;
+    @Schema(description = "外部引用流水号，无授权退款时必填，不承载完整原始报文或敏感数据")
+    private String externalReferenceSn;
 
     @Schema(description = "退款原因，无授权退款时必填")
     private String refundReason;
-
-    @Schema(description = "退款凭证引用，无授权退款时必填")
-    private String refundVoucherRef;
-
-    @Schema(description = "外部原始事实金额，无授权退款时必填，币种与 originalFactCurrency 一致")
-    private Money originalFactAmount;
-
-    @Schema(description = "外部原始事实币种，无授权退款时必填")
-    private String originalFactCurrency;
 
     @Schema(description = "退款时间")
     private LocalDateTime refundTime;

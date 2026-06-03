@@ -231,7 +231,7 @@ B4 拒付/争议准入口径：`B4-DISPUTE-SEMANTIC-ALIGNMENT` 当前是 `READY_
 | AC-AUTH-006 | 授权部分完成 | 原授权存在，完成金额小于剩余授权。 | 占用减少，商户或平台目标增加，剩余授权可释放。 | 不写 AUTHORIZATION -> LIMIT，不新增账务 CONSUMED。 |
 | AC-AUTH-007 | 授权完成后退款 | 原完成交易存在。 | 基于原完成快照回补。 | 累计退款和争议不得超过已完成金额；退款不得按当前绑定重新选路。 |
 | AC-AUTH-011 | 无授权强制完成 | 外部没有前置授权，但确认发生了必须入账的消费结果。 | 使用 settle 的强制完成模式入账。 | 不伪造授权占用；必须有 FORCE 模式、受信策略或审批快照、上限、外部原事实引用、凭证、原因和审计；不得把普通完成的原授权流水当作强制完成凭证；不得污染授权生命周期。 |
-| AC-AUTH-012 | 无授权直接退款 | 无前置授权，但存在外部原消费、原完成或差错凭证。 | 使用 settleRefund 的无授权退款模式回补。 | 不补造原授权；必须显式 `NO_AUTH` 或等价模式，并保留外部原事实引用、外部原事实类型、退款原因、退款凭证、操作者和审计；不得携带或查询内部授权流水；无原事实、无原事实类型、无原因、无凭证或无审计不得静默退款。 |
+| AC-AUTH-012 | 无授权直接退款 | 无前置授权，但存在可追溯外部引用。 | 使用 settleRefund 的无授权退款模式回补。 | 不补造原授权；以空原授权流水进入 no-auth 语义，保留 `externalReferenceSn`、退款原因、操作者和审计；不得携带或查询内部授权流水；缺外部引用、无原因或无审计不得静默退款。 |
 | AC-AUTH-008 | 发卡扩展：支出规则命中拒绝 | 授权请求命中禁用 MCC、商户、国家、POS、PAN entry mode、CVV/AVS 或金额规则。 | 授权拒绝，返回可解释原因。 | 记录命中规则、规则版本和审计信息；不生成 route、LedgerEntry 或 chargeback。 |
 | AC-AUTH-009 | 发卡扩展：周期限额命中拒绝 | 授权请求超过日、周、月或自定义周期内的金额或次数窗口。 | 授权拒绝，累计窗口不被错误推进。 | 周期窗口口径明确；不得用清算账期、报表周期或归档水位替代支出窗口。 |
 | AC-AUTH-010 | 发卡扩展：支出规则通过后授权占用 | 卡状态、支出规则、风控、预算和资金或信用可用性均通过。 | 进入资金路由并生成资金或信用主体 AVAILABLE -> AUTHORIZATION。 | 支出规则只做前置决策，账务变化仍由 route 和 ledger 负责；预算组和 Spend Rule 只进快照和审计。 |
@@ -523,7 +523,7 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | AC-PI-001 至 AC-PI-010 | PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、RouteSnapshotSpec、BindingHistory、PaymentInstrumentCapabilityApplicationService、FundingResponsibilityResolutionApplicationService、AuthorizationAdmissionApplicationService | 业务入口参数只做产品或应用层选择口径；外部支付工具只做路由输入和快照引用；工具绑定、方向、状态、资金责任决策、账户能力、内部钱包入口解析、绑定历史审计和授权应用入口准入必须可解释；逆向交易按原快照回放；`FundingAccount` 只表示真实资金账户；AC-PI-010 只能新增外层 `authorizeByInstrument` 或等价 facade，不改变账户主体型交易内核。 |
 | AC-AUTH-007 | AUTHORIZATION_TRANSACTION / AUTH_REFUND、DSL-AUTH-REFUND-001 | 已完成授权退款和争议类退款均沿原完成路径反向回放；拒付/争议首轮默认由 `settleRefund` 携带原因、凭证、外部引用和审计上下文承接，查询、投影和审计不得压缩成不可区分的普通退款。 |
 | AC-AUTH-011 | AUTHORIZATION_TRANSACTION / SETTLE 强制完成模式、DSL-AUTH-FORCE-CAPTURE-001 | 无前置授权的外部消费结果通过 settle 承接，不伪造授权占用；FORCE 模式、受信策略或审批快照、上限、外部原事实引用、凭证、原因和审计必填。 |
-| AC-AUTH-012 | AUTHORIZATION_TRANSACTION / AUTH_REFUND 无授权退款模式、DSL-AUTH-REFUND-001 | 无前置授权但有外部原消费、原完成或差错凭证时通过 settleRefund 承接；必须显式 `NO_AUTH` 或等价模式，携带外部原事实引用、外部原事实类型、退款原因、退款凭证、操作者和审计；不得补造授权占用、携带或查询内部授权流水，也不得静默退款。 |
+| AC-AUTH-012 | AUTHORIZATION_TRANSACTION / AUTH_REFUND 无授权退款模式、DSL-AUTH-REFUND-001 | 无前置授权但有可追溯外部引用时通过 settleRefund 承接；以空原授权流水进入 no-auth 语义，携带 `externalReferenceSn`、退款原因、操作者和审计；不得补造授权占用、携带或查询内部授权流水，也不得静默退款。 |
 | RED-043 | expectedRouteCreated=false | 多个账户、账目、平台角色或规则同时命中时，不能随机选择路径继续入账。 |
 | RED-044 | expectedRouteCreated=false、expectedPostingCreated=false | 路由失败不能自动换路径试入账，也不能写账本事实或余额投影。 |
 | RED-045 | DIRECT_TRANSACTION / PAY 普通支付路由变体 | 非商户订单收款不得被默认套入商户清算链路。 |

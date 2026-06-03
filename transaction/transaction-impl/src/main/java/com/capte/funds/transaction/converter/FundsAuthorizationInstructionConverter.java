@@ -199,19 +199,13 @@ public class FundsAuthorizationInstructionConverter {
         context.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         FundsInstructionReferenceSpec reference;
         if (request.isNoAuthRefund()) {
-            validateNoAuthRefundRequest(request, amount);
+            validateNoAuthRefundRequest(request);
             reference = noAuthRefundReference(request);
             context.put(FundsInstructionContextKeys.REFUND_MODE,
                     FundsAuthorizationTransactionRefundRequest.REFUND_MODE_NO_AUTH);
-            context.put(FundsInstructionContextKeys.EXTERNAL_ORIGINAL_FACT_REF,
-                    request.getExternalOriginalFactRef());
-            context.put(FundsInstructionContextKeys.EXTERNAL_ORIGINAL_FACT_TYPE,
-                    request.getExternalOriginalFactType());
+            context.put(FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN,
+                    request.getExternalReferenceSn());
             context.put(FundsInstructionContextKeys.REFUND_REASON, request.getRefundReason());
-            context.put(FundsInstructionContextKeys.REFUND_VOUCHER_REF, request.getRefundVoucherRef());
-            context.put(FundsInstructionContextKeys.ORIGINAL_FACT_AMOUNT,
-                    request.getOriginalFactAmount().getAmount());
-            context.put(FundsInstructionContextKeys.ORIGINAL_FACT_CURRENCY, request.getOriginalFactCurrency());
         } else {
             AssertUtils.hasText(request.getAuthorizationTransactionSn(),
                     "authorizationTransactionSn must not be blank");
@@ -288,22 +282,11 @@ public class FundsAuthorizationInstructionConverter {
         AssertUtils.hasText(request.getForceSettleVoucherRef(), "forceSettleVoucherRef must not be blank");
     }
 
-    private void validateNoAuthRefundRequest(@NonNull FundsAuthorizationTransactionRefundRequest request,
-                                             @NonNull ConvertedAmount amount) {
+    private void validateNoAuthRefundRequest(@NonNull FundsAuthorizationTransactionRefundRequest request) {
         AssertUtils.isFalse(StringUtils.hasText(request.getAuthorizationTransactionSn()),
                 "no-auth refund must not carry authorizationTransactionSn");
-        AssertUtils.hasText(request.getExternalOriginalFactRef(), "externalOriginalFactRef must not be blank");
-        AssertUtils.hasText(request.getExternalOriginalFactType(), "externalOriginalFactType must not be blank");
+        AssertUtils.hasText(request.getExternalReferenceSn(), "externalReferenceSn must not be blank");
         AssertUtils.hasText(request.getRefundReason(), "refundReason must not be blank");
-        AssertUtils.hasText(request.getRefundVoucherRef(), "refundVoucherRef must not be blank");
-        AssertUtils.notNull(request.getOriginalFactAmount(), "originalFactAmount must not be null");
-        AssertUtils.hasText(request.getOriginalFactCurrency(), "originalFactCurrency must not be blank");
-        AssertUtils.isTrue(request.getOriginalFactAmount().getAmount() >= amount.amount().getAmount(),
-                "originalFactAmount must be greater than or equal to refund amount");
-        AssertUtils.isTrue(request.getOriginalFactAmount().getCurrency().name().equals(request.getOriginalFactCurrency()),
-                "originalFactCurrency must match originalFactAmount currency");
-        AssertUtils.isTrue(request.getOriginalFactAmount().getCurrency() == amount.amount().getCurrency(),
-                "originalFactCurrency must match refund currency");
     }
 
     private @NonNull FundsInstructionReferenceSpec authorizationReference(@NonNull String authorizationTransactionSn) {
@@ -315,14 +298,8 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull FundsAuthorizationTransactionRefundRequest request) {
         return ImmutableFundsInstructionReferenceSpec.builder()
                 .referenceType(FundsInstructionReferenceType.EXTERNAL_TRANSACTION)
-                .externalTransactionId(request.getExternalOriginalFactRef())
-                .contextVariables(Map.of(
-                        FundsInstructionContextKeys.EXTERNAL_ORIGINAL_FACT_TYPE,
-                        request.getExternalOriginalFactType(),
-                        FundsInstructionContextKeys.ORIGINAL_FACT_AMOUNT,
-                        request.getOriginalFactAmount().getAmount(),
-                        FundsInstructionContextKeys.ORIGINAL_FACT_CURRENCY,
-                        request.getOriginalFactCurrency()))
+                .externalTransactionId(request.getExternalReferenceSn())
+                .contextVariables(Map.of())
                 .build();
     }
 
