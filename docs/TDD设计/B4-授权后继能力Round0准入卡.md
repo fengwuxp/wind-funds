@@ -278,6 +278,19 @@
 | 普通退款回归 | 现有授权链 full refund、dispute refund、chargeback 和幂等退款回归不退化。 | `testFundingAuthorizationFullSettleThenFullRefundShouldRestoreAvailableBalance`、`testAuthorizationDisputeRefundShouldUseSettleRefundAndPreserveAuditContext`、现有 refund idempotent 场景。 |
 | 预期 Red 失败点 | 当前基线应失败在 request 契约、converter 内部授权 reference、原授权 ledger transaction 查询或 route resolver 不支持 no-auth 路径之一。 | 若 Red 不失败，立即暂停判断已有实现覆盖或 Red 写错，不进入 Green。 |
 
+### 8.7 grantPreflightSaturation（2026-06-03）
+
+本节记录 `B4-NO-AUTH-REFUND` 在未获 Execution Grant 前的准备饱和度结论。该结论用于恢复入口，不授权写 Red 或代码。
+
+| 准备项 | 状态 | 结论 |
+| --- | --- | --- |
+| 任务包 | `DONE`。 | `B4-NAR-CAD-001` 已收敛为单一原子任务包。 |
+| 触点扫描 | `DONE`。 | Request、converter、原授权账本查询、command service 和测试 helper 的首轮阻断点已记录。 |
+| 最小 Green 地图 | `DONE`。 | route resolver、route replay、lifecycle 聚合、金额控制和请求摘要的最小修复边界已记录。 |
+| 首轮 Red 断言包 | `DONE`。 | 请求事实、余额事实、交易事实、账务事实、审计摘要、普通退款回归和预期 Red 失败点已记录。 |
+| 文档门禁 | `DONE`。 | 架构师和产品专家交付检查、`git diff --check` 已在 docs-only 提交中通过。 |
+| 当前阻断 | `WAITING_GRANT`。 | 继续 read-only 扫描的边际价值已很低；下一步必须由用户显式确认 `Execution Grant：B4-NO-AUTH-REFUND`，否则只能停止在 docs-only 准备态。 |
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |

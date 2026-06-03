@@ -735,6 +735,18 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | Regression | 普通授权链 full refund、dispute refund、chargeback 和 refund idempotent 场景不退化。 | 任一普通授权链回归失败，先判断是否越界破坏原语义，不继续扩展 no-auth。 |
 | Expected Red | 当前基线预期失败在 Request 契约、converter 内部授权 reference、原授权 ledger transaction 查询或 route resolver 不支持 no-auth 路径。 | Red 未失败时暂停，不进入 Green。 |
 
+### 13.9 B4-NAR Grant 前准备饱和度（2026-06-03）
+
+本节记录 `B4-NAR-CAD-001` 在未获 Execution Grant 前的最后恢复入口。该记录不授权写 Java、测试、DDL/H2 schema 或运行时配置。
+
+| 准备面 | 状态 | 说明 |
+| --- | --- | --- |
+| Grant 可执行包 | `DONE`。 | 第 13.5 已确认授权正文、写入上限、禁止范围、验证命令和下一动作。 |
+| 首轮触点扫描 | `DONE`。 | 第 13.6 已记录 Request、converter、ledger reference、command service 和 test support 的当前事实。 |
+| 最小 Green 地图 | `DONE`。 | 第 13.7 已记录 resolver selection、replay guard、lifecycle aggregate、amount control、idempotency summary 和 boundary tests 的执行约束。 |
+| 首轮 Red 断言包 | `DONE`。 | 第 13.8 已记录 Request、Money fact、Funds fact、Ledger fact、Audit/idempotency、Regression 和 Expected Red。 |
+| 当前状态 | `WAITING_GRANT`。 | Grant 前继续扫描只会重复既有结论；下一步必须显式确认 `Execution Grant：B4-NO-AUTH-REFUND` 后才能进入 Red -> Green -> Review -> Verify -> Commit。 |
+
 ## 14. B2 建议 Execution Grant
 
 B2 是后续直接交易、授权交易、余额控制、退款和权益资金流进入真实组合验证前的基础门禁。建议对应 MVP 任务只处理钱包账户、账本、余额投影和支付工具基础能力，不进入直接交易、授权交易或权益生产消费链路。
