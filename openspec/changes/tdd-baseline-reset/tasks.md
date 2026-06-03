@@ -29,15 +29,15 @@
 - [x] 2026-06-02 完成 B4-TRX-EXPIRE 授权过期释放 canonical 能力：`b0666ba feat: 补齐授权过期释放 canonical 能力` 新增 `EXPIRE` 事件、`EXPIRED` 状态、`FundsAuthorizationTransactionExpireRequest`、`FundsAuthorizationTransactionService#expire`、授权过期转换、route replay、ledger posting 复用 release 路径和生命周期金额校验；`FundsAuthorizationTransactionFlowTests` 覆盖 `TDD-AUTH-011`、`TDD-ROUTE-008`、`TDD-RED-016`，`DefaultRouteReplayServiceTests` 覆盖 `AUTHORIZATION_EXPIRE_REPLAY`。已验证 `just test-one DefaultRouteReplayServiceTests tests`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-boundary`、`just compile`、`git diff --check`、`just pmd` 全部通过。该提交关闭 B4-03 授权过期基础缺口；强制完成、无授权直接退款、拒付承接、授权支付工具 facade、VCC 生命周期、Spend Rule 控制和并发竞争仍需独立 Execution Grant。
 - [x] 2026-06-02 补齐 B4 授权后继能力 Round 0 准入卡：新增 `docs/TDD设计/B4-授权后继能力Round0准入卡.md`，把 B4-TRX-EXPIRE 后剩余的 `settle` 强制完成、`settleRefund` 无授权退款、拒付/争议承接和授权并发竞争拆成 B4-FORCE-SETTLE、B4-NO-AUTH-REFUND、B4-DISPUTE-CHARGEBACK、B4-AUTH-RACE 四个候选切片。该卡只作为账户主体型 canonical 授权内核的 Round 0 和独立 Execution Grant 输入，不授权生产代码、测试代码、DDL/H2 schema、支付工具 facade、VCC 生命周期、Spend Rule 控制、清结算对账或治理写入。
 - [x] 2026-06-02 完成 B4-FORCE-SETTLE 只读覆盖扫描：现有普通 `settle` 请求强制携带 `authorizationTransactionSn`，converter 无条件构造 `AUTHORIZATION` reference 并查询原授权账本交易，route resolver 依赖原授权主体解析；`FundsAuthorizationTransactionFlowTests` 已覆盖普通完成、部分完成、完成后过期、完成幂等和拒付幂等，但没有 FORCE 模式、强制完成策略、上限、原因、凭证或无前置授权外部事实引用字段。扫描结果已回填 `docs/TDD设计/B4-授权后继能力Round0准入卡.md#71-existingcoveragescan2026-06-02`；该扫描当时只作为 B4-FORCE-SETTLE Execution Grant 输入，后续已由 `616dac1` 和 `3825466` 消费为实现和回归证据。
-- [x] 2026-06-02 收敛 B4-FORCE-SETTLE 首轮候选契约字段：`docs/TDD设计/B4-授权后继能力Round0准入卡.md` 已补充 `forceSettleContractCandidate`，把首轮字段限定为 `settleMode`、`forceSettlePolicyCode`、`forceSettleLimitAmount`、`forceSettleReason`、`externalOriginalFactRef`、`forceSettleVoucherRef`、`operator/contextVariables` 或后续 Grant 明确确认的等价命名。该收敛当时只降低 B4-FORCE-SETTLE Execution Grant 歧义，后续已纳入 `616dac1` 和 `3825466` 的实现基线；未覆盖的策略引擎、规则表、processor 生命周期、支付工具 facade、VCC、无授权退款、拒付增强、清结算对账或治理写入仍需独立授权。
+- [x] 2026-06-02 收敛 B4-FORCE-SETTLE 首轮候选契约字段：`docs/TDD设计/B4-授权后继能力Round0准入卡.md` 已补充 `forceSettleContractCandidate`，把首轮字段限定为 `settleMode`、`forceSettlePolicyCode`、`forceSettleLimitAmount`、`forceSettleReason`、`externalOriginalFactRef`、`forceSettleVoucherRef`、`operator/contextVariables` 或后续 Grant 明确确认的等价命名。该收敛当时只降低 B4-FORCE-SETTLE Execution Grant 歧义，后续已纳入 `616dac1` 和 `3825466` 的实现基线；未覆盖的策略引擎、规则表、processor 生命周期、支付工具 facade、VCC、拒付增强、清结算对账或治理写入仍需独立授权。无授权退款后续已由 `006bcaa` 独立闭合首轮 canonical 能力。
 - [x] 2026-06-02 完成 B4-FORCE-SETTLE 编码前契约边界加固：PRD、DSL、系分、OpenSpec spec/design 和 `docs/TDD设计/B4-授权后继能力Round0准入卡.md` 已统一补强普通完成与 FORCE 完成的差异。普通完成继续依赖 `authorizationTransactionSn` 和原授权账本交易；首轮 FORCE 模式必须声明 `settleMode=FORCE` 或等价模式，且不得依赖内部原授权流水、不得构造 `AUTHORIZATION` reference 或查询原授权账本交易。强制完成策略和上限必须来自 Execution Grant 声明的内部白名单、审批结果或受信策略快照；审计最小集为 `WindOperator`、`forceSettleReason`、`externalOriginalFactRef`、`forceSettleVoucherRef` 和受信策略/审批快照引用，`contextVariables` 只能作为白名单补充。该加固当时为 docs-only 准入对齐，后续已被 B4-FORCE-SETTLE 代码基线消费；剩余扩展仍需单独授权。
 - [x] 2026-06-02 完成 B4-FORCE-SETTLE 授权强制完成 canonical 能力：`616dac1 feat: 补齐授权强制完成能力` 新增 FORCE 完成请求字段、转换和路由分支，普通完成仍走原授权流水，FORCE 不构造 `AUTHORIZATION` reference、不查询原授权账本交易，路由从 `AVAILABLE` 直接进入 `SETTLEMENT`。目标测试覆盖强制完成成功、普通完成回归、幂等和失败无副作用；已验证 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile` 和 `git diff --check` 通过。
 - [x] 2026-06-02 完成 B4-FORCE-SETTLE 策略红线加固：`3825466 fix: 收紧授权强制完成策略红线` 将 `forceSettlePolicyCode` 和 `forceSettleLimitAmount` 收敛到内部受信策略校验，补齐未知策略、上限不匹配、缺原因、缺外部事实、缺凭证、携带内部授权流水等失败路径无资金副作用断言；已验证 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check` 通过。B4-FORCE-SETTLE 首轮闭合后，B4-NO-AUTH-REFUND、B4-DISPUTE-CHARGEBACK 和 B4-AUTH-RACE 仍需独立 Execution Grant。
 - [x] 2026-06-02 完成 B4-NO-AUTH-REFUND 只读覆盖扫描：现有 `settleRefund` 已覆盖已完成授权后的全额退款、争议类退款、超已完成金额失败无副作用和幂等摘要冲突；但 `FundsAuthorizationTransactionRefundRequest` 仍要求 `authorizationTransactionSn`，converter 无条件构造 `AUTHORIZATION` reference 并写入 `AUTHORIZATION_TRANSACTION_SN`，route resolver 和 route replay 依赖原授权/原完成路径。扫描结果已回填 `docs/TDD设计/B4-授权后继能力Round0准入卡.md#711-noauthrefundcoveragescan2026-06-02`；该扫描只作为后续 B4-NO-AUTH-REFUND Execution Grant 输入，不授权 Java 代码、测试代码、DDL/H2 schema、支付工具 facade、VCC、拒付增强、清结算对账或治理写入。
 - [x] 2026-06-02 收敛 B4-NO-AUTH-REFUND 首轮候选契约字段：`docs/TDD设计/B4-授权后继能力Round0准入卡.md` 已补充 `noAuthRefundContractCandidate`，把后续 Grant 必须显式确认的字段限定为 `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要的 `originalFactAmount/originalFactCurrency`、`operator/contextVariables` 或等价命名；普通授权链退款继续要求 `authorizationTransactionSn`，NO_AUTH 模式不得携带内部授权流水、不得查询原授权账本交易。该收敛只作为 B4-NO-AUTH-REFUND Execution Grant 输入，不授权 Java 代码、测试代码、DDL/H2 schema、支付工具 facade、VCC、force settle 返工、拒付增强、清结算对账或治理写入。
 - [x] 2026-06-02 对齐 B4-NO-AUTH-REFUND 主文档口径：PRD、DSL、系分、TDD、B4 准入卡和 OpenSpec 已统一到 `NO_AUTH` 或等价模式、外部原事实引用、外部原事实类型、退款原因、退款凭证、操作者/审计、必要原事实金额摘要、普通授权链退款兼容和无授权退款不得携带或查询内部授权流水；`TDD-RED-017A` 作为缺模式、缺原事实类型、缺原因、缺凭证、缺审计、携带内部授权流水和失败无副作用的红线入口。该对齐仍是 docs-only 准入，不授权代码、测试、DDL/H2 schema 或运行时配置。
-- [x] 2026-06-02 完成 B4-NO-AUTH-REFUND GSD-CAD 准入复核：最初以 `e937395 docs: 对齐 B4 无授权退款主文档口径` 为已提交基线，后续 docs-only 索引、恢复入口和确认基线校准提交以用户确认 Execution Grant 时的 Git HEAD 自然纳入；B4-NO-AUTH-REFUND 状态定为 `READY_TO_CONFIRM_NOT_AUTHORIZED`。GSD 层确认下一候选是单一 B4-NO-AUTH-REFUND 切片；CAD 层只有在用户确认 `Execution Grant：B4-NO-AUTH-REFUND` 后，才允许从 `B4-NAR-RED-001` 开始写目标 Red。未确认前不写 Java、测试代码、DDL/H2 schema、支付工具 facade、VCC、force settle 返工、chargeback 独立入口、清结算对账、治理、生产配置、外部协议或敏感数据处理。
-- [x] 2026-06-02 补齐 B4-NO-AUTH-REFUND Grant 可执行包：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#82-grantexecutionpackagecandidate2026-06-02` 已把下一轮候选收敛为 `B4-NAR-CAD-001` 原子任务包，状态仍为 `READY_TO_CONFIRM_NOT_AUTHORIZED`。该包明确首轮只写 `B4-NAR-RED-001`，必要时再补 `B4-NAR-RED-002`；允许范围限定为授权退款 flow 测试、`FundsAuthorizationTransactionRefundRequest` 显式列名兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复；`tests/src/test/resources/jdbc-schema.sql`、ledger 公共契约、core 枚举状态、支付工具 facade、钱包 application facade、VCC、Spend Rule、chargeback case、清结算追偿、治理、生产配置、外部协议和敏感数据处理均保持禁止。该补强仍是 docs-only Grant 包，不授权 Java、测试、DDL/H2 schema 或运行时配置写入；后续用户确认 Execution Grant 时必须以确认时 Git HEAD 为 `authorityBaseline`。
+- [x] 2026-06-02 完成 B4-NO-AUTH-REFUND GSD-CAD 准入复核：最初以 `e937395 docs: 对齐 B4 无授权退款主文档口径` 为已提交基线，后续 docs-only 索引、恢复入口和确认基线校准提交以用户确认 Execution Grant 时的 Git HEAD 自然纳入；当时 B4-NO-AUTH-REFUND 进入待确认态。GSD 层确认下一候选是单一 B4-NO-AUTH-REFUND 切片；CAD 层只有在用户确认 `Execution Grant：B4-NO-AUTH-REFUND` 后，才允许从 `B4-NAR-RED-001` 开始写目标 Red。该准备态后续已由 `006bcaa feat: 补齐无授权退款 canonical 能力` 消费并闭合。
+- [x] 2026-06-02 补齐 B4-NO-AUTH-REFUND Grant 可执行包：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#82-grantexecutionpackagecandidate2026-06-02` 已把下一轮候选收敛为 `B4-NAR-CAD-001` 原子任务包，当时仍为待确认态。该包明确首轮只写 `B4-NAR-RED-001`，必要时再补 `B4-NAR-RED-002`；允许范围限定为授权退款 flow 测试、`FundsAuthorizationTransactionRefundRequest` 显式列名兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复；`tests/src/test/resources/jdbc-schema.sql`、ledger 公共契约、core 枚举状态、支付工具 facade、钱包 application facade、VCC、Spend Rule、chargeback case、清结算追偿、治理、生产配置、外部协议和敏感数据处理均保持禁止。该补强后续已由 `006bcaa` 消费为代码闭环；不再作为新的自动编码授权。
 
 ## 1. MVP 任务写入范围
 
@@ -50,7 +50,7 @@
 | B1 | P0 共享承载 | `tests/src/test/java/com/capte/funds/dsl`、`tests/src/test/resources/dsl-contract-cases`、必要的 `core/src/main/java` DSL/枚举/Spec、Route DSL、PaymentInstrument DSL、RoutingDecision/FundingAllocation DSL、Posting/Ledger DSL、SettlementPolicy。 |
 | B2 | P0 基础事实 | `wallet-*`、`ledger-*`、`tests/src/test/java` 中账户、支付工具、绑定关系、支出主体资金责任解析关系、账本、投影相关测试和最小实现。 |
 | B3 | P1 直接交易 | `transaction-*`、`tests/src/test/java` 中直接交易测试和最小实现。 |
-| B4 | P1 授权交易 | `transaction-*`、`core`、`tests/src/test/java` 中授权交易、无授权直接退款测试和最小实现；授权过期和强制完成首轮账户主体型 canonical 能力已闭合，无授权退款、拒付承接和并发竞争的候选授权输入见 `docs/TDD设计/B4-授权后继能力Round0准入卡.md`。 |
+| B4 | P1 授权交易 | `transaction-*`、`core`、`tests/src/test/java` 中授权交易测试和最小实现；授权过期、强制完成和无授权直接退款首轮账户主体型 canonical 能力已闭合，拒付承接、授权并发、授权支付工具应用入口和授权权益生命周期的候选授权输入见 `docs/TDD设计/B4-授权后继能力Round0准入卡.md`。 |
 | B5 | P1 余额控制 | `transaction-*`、`tests/src/test/java` 中余额控制测试和最小实现。 |
 | B6 | P1 路由回放与交易投影 | `transaction-*`、`ledger-*`、`tests/src/test/java` 中 Route Replay、余额日志、交易投影测试和最小实现。 |
 | B7 | P0 运营账务闭环 | 清结算、对账相关模块或包，需先确认；冻结基线已有 `reconciliation-*` 模块骨架和出款前准入候选实现，已完成专项验证，但未纳入清结算、对账或出款生命周期 Done 基线，目标态对象、表、状态机和测试未闭环。 |
@@ -123,7 +123,7 @@ just verify-cad
 | 2026-05-31 代码准入 CR | 账户主体型交易内核请求与最新设计一致；`FundsTransactionPayRequest`、`FundsAuthorizationTransactionAuthorizeRequest`、`FundsBalanceFreezeRequest` 仍以 `FundsAccountId` 入参，`ImmutableResolvedRouteSpec` 已有 `PaymentInstrumentRefSpec` 快照位。代码现状不阻断 A1 直接交易事实红线按单一 Execution Grant 开工，但阻断“泛化地直接编码钱包/授权/预算组目标态”。主要缺口在钱包应用层 facade、资金责任目标字段和 BudgetGroup 账务主体化兼容路径；代码证据包括 `FundsSubjectType.BUDGET_GROUP`、`CreateSpendSubjectFundingRelationRequest.fundingAccountId`、`SpendSubjectFundingRelationServiceImpl#getFundingAccount` 只校验真实资金账户、`DefaultFundsAccountQueryServiceImpl` 解析预算组、`BudgetGroupServiceImpl` 初始化预算组 ledger、`DefaultLedgerProfileServiceImpl` 的 `BUDGET_BASIC` profile、`DefaultLedgerTransactionPostingServiceImpl` 允许 `BUDGET_GROUP` 入账、`RouteSubjectSupport` 和 `DefaultRouteReplayService` 将预算组解析成 route participant，以及 `FundsBalanceControlInstructionConverter` 把预算组当额度调整对象。 | 这些差异必须进入 B2/B4/B5/B6 后续 Execution Grant：先做 wallet application facade 与资金责任字段决策，再处理 BudgetGroup 兼容策略和 Red/Green 证据；未确认前不得把预算组 route leg、posting、LedgerEntry、ledger 初始化、余额查询或旧 DSL 测试通过作为目标态 Done。下一步若要编码，推荐只确认 A1 或 B2/B4/B5/B6 中一个最小切片；若未确认，继续做授权卡和只读差距复核。 |
 | 2026-06-01 DSL/路由/账务/投影 CR | `SubjectRef`、route leg participant、posting subject、LedgerEntry subject 和账本余额投影主体必须统一到资金账户、信用账户或平台角色解析后的平台资金账户；`PaymentInstrumentRef`、`ExternalAccountRef`、预算组、Spend Rule 和交易投影不得被解释为账务主体；交易投影输入只能来自交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错。 | A1 可以继续按账户主体型直接交易事实红线准备确认；B2/B4/B5/B6/B8 若要触碰支付工具 application facade、预算控制视图、route replay、交易投影或 BudgetGroup 兼容策略，必须独立 Execution Grant。B6/B8 不得把交易投影通过写成账务事实、余额事实或生产 Done。 |
 | 2026-06-01 支付工具与 Spend Rule 生产可用性 CR | `PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests` 和 `PaymentInstrumentRouteDslContractTests` 已证明资源服务、现有资金责任关系和 DSL 契约局部基线；尚未证明 `PaymentInstrumentCapabilityApplicationService`、`AuthorizationAdmissionApplicationService`、Spend Rule 决策日志、Spend Control Activity、预算控制投影或 `authorizeByInstrument` 生产链路；资金责任关系字段仍需在 `funding-account-only` 与 `targetSubjectType + targetSubjectId` 中二选一。 | B2 先做支付工具能力准入和资金责任目标主体 Round 0；若保留 `fundingAccountId`，只能声明资金账户责任解析；若声明信用账户或平台角色责任主体可用，必须同步 DTO、DDL/H2、Entity、Mapper、摘要、fixture 和回放断言。B4 做授权准入组合；B5 做预算预留释放控制；B6/B8 做只读投影和重放。未授权前不得新增统一支付工具交易服务、Spend Rule 表或投影表，也不得把资源服务测试通过等同于生产可用。 |
-| 2026-06-02 支付工具接口落包与交易层能力裁决 | 支付工具型入口统一落钱包 application facade：`com.capte.funds.wallet.application.instrument` 承接工具准入、授权准入和授权后生命周期，`com.capte.funds.wallet.application.funding` 承接资金责任解析，`com.capte.funds.wallet.application.vcc` 承接 VCC 预付资金和共享卡场景编排；Request/DTO 默认落 `com.capte.funds.wallet.model.request` 和 `com.capte.funds.wallet.model.dto`。交易层已补齐账户主体型授权过期释放和强制完成首轮 canonical 能力；无授权退款、拒付/争议、余额控制调账和原路径回放仍需后续独立补强。交易层不新增统一 `InstrumentTransactionService`，不新增顶层 `com.capte.funds.instrument`，不让 `transaction-impl` 反向依赖钱包资源服务。 | 后续编码必须拆成两类 Execution Grant：B2/B4/P2 的 wallet application facade 切片，以及 B3/B4/B5/B6 的 transaction canonical 内核补强切片。两类切片可以通过接口委派协作，但不得在同一轮混合改包、改交易请求、改状态机、改 DDL/H2 和改投影。 |
+| 2026-06-02 支付工具接口落包与交易层能力裁决 | 支付工具型入口统一落钱包 application facade：`com.capte.funds.wallet.application.instrument` 承接工具准入、授权准入和授权后生命周期，`com.capte.funds.wallet.application.funding` 承接资金责任解析，`com.capte.funds.wallet.application.vcc` 承接 VCC 预付资金和共享卡场景编排；Request/DTO 默认落 `com.capte.funds.wallet.model.request` 和 `com.capte.funds.wallet.model.dto`。交易层已补齐账户主体型授权过期释放、强制完成和 B4-NO-AUTH-REFUND 首轮 canonical 能力；拒付/争议、余额控制调账、原路径回放、支付工具授权应用入口和授权并发仍需后续独立补强。交易层不新增统一 `InstrumentTransactionService`，不新增顶层 `com.capte.funds.instrument`，不让 `transaction-impl` 反向依赖钱包资源服务。 | 后续编码必须拆成两类 Execution Grant：B2/B4/P2 的 wallet application facade 切片，以及 B3/B4/B5/B6 的 transaction canonical 内核补强切片。两类切片可以通过接口委派协作，但不得在同一轮混合改包、改交易请求、改状态机、改 DDL/H2 和改投影。 |
 | 2026-06-01 B2/B4 Round 0 准入卡 | 已新增 `docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md`，作为支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的共同准入输入。 | 后续只能选择其中一个候选切片进入 Execution Grant；不得一次性授权 B2、B4、B5、B6 和 B8 的全部目标态。 |
 | 导出附件 | 若工作树存在 `docs/*.zip` 等导出包，只能作为评审附件。 | 导出包不作为规格、任务或验收 Source of Truth；是否纳入版本库需用户单独确认。 |
 
@@ -319,7 +319,7 @@ DDL/H2 schema 变化：
 | B4-02 | 重建撤销、完成、退款和拒付承接。 | `transaction-*`、`tests/src/test/java` | 授权组合场景、账务矩阵。 | 撤销后错误完成、完成后错误释放、多次清算/退款累计错误、拒付被当成授权拒绝或普通退款。 | 校准状态机、授权释放、实际扣款、退款/拒付承接和累计金额闭合；即使拒付底层复用退款终态，也必须保留拒付原因、凭证、外部引用、审计上下文和投影可区分性。 | `just test-business-flow` |
 | B4-03 | 补授权过期独立语义。 | `transaction-*`、`core`、`tests/src/test/java` | `GAP-AUTH-001`、`TDD-AUTH-011`、`TDD-ROUTE-008`、`TDD-RED-016`。 | `EXPIRE` 与 `REVERSAL` 混用，过期释放已完成金额。 | 已由 `b0666ba` 完成：新增 `EXPIRE` 事件、`EXPIRED` 状态、`expire` 服务入口、请求模型、route replay、生命周期金额校验和授权流程测试；后续只做回归维护或另行授权扩展。 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-one DefaultRouteReplayServiceTests tests`、`just test-transaction`、`just test-boundary`、`just compile`、`just pmd` |
 | B4-04 | 校准 `settle` 强制完成模式。 | `transaction-*`、`tests/src/test/java` | `GAP-AUTH-002`、force settle 设计。 | 无前置授权完成缺少 FORCE 模式、受信策略或审批快照、原因、上限、外部原事实、凭证或审计；FORCE 模式回退普通授权完成路径。 | 已由 `616dac1` 和 `3825466` 完成首轮：普通完成继续要求 `authorizationTransactionSn`，FORCE 模式不依赖内部原授权流水，走外部原事实引用和受信策略校验；后续只做回归维护或另行授权扩展策略引擎、审批快照、额度窗口或 overcapture。 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` |
-| B4-05 | 校准 `settleRefund` 无授权退款模式。 | `transaction-*`、`tests/src/test/java`，必要时涉及请求契约 | `GAP-AUTH-004`、`AC-AUTH-012`、`TDD-AUTH-006`、`TDD-RED-017A`、B4 准入卡 `noAuthRefundContractCandidate`。 | 无前置授权但有外部原消费、原完成或差错凭证时无法退款；缺 `NO_AUTH` 模式、无原事实、缺原事实类型、缺凭证、缺原因、缺审计、携带内部授权流水或敏感上下文仍静默退款；实现为了退款补造授权占用或按当前绑定重选路。 | 人工确认后补充或校准 `refundMode`、外部原事实引用、外部原事实类型、原因、凭证、操作者/审计字段和必要原事实金额摘要；普通授权链退款继续要求 `authorizationTransactionSn`，NO_AUTH 模式不得携带内部授权流水、不得查询原授权账本交易；查询、投影和审计能说明无授权退款来源。 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` |
+| B4-05 | 校准 `settleRefund` 无授权退款模式。 | `transaction-*`、`tests/src/test/java`，必要时涉及请求契约 | `GAP-AUTH-004`、`AC-AUTH-012`、`TDD-AUTH-006`、`TDD-RED-017A`、B4 准入卡 `noAuthRefundContractCandidate`。 | 无前置授权但有外部原消费、原完成或差错凭证时无法退款；缺 `NO_AUTH` 模式、无原事实、缺原事实类型、缺凭证、缺原因、缺审计、携带内部授权流水或敏感上下文仍静默退款；实现为了退款补造授权占用或按当前绑定重选路。 | 已由 `006bcaa` 完成首轮：新增 `refundMode=NO_AUTH`、外部原事实引用、外部原事实类型、原因、凭证、必要原事实金额币种和审计上下文；普通授权链退款继续要求 `authorizationTransactionSn`，NO_AUTH 模式不得携带内部授权流水、不得查询原授权账本交易；独立退款事实、route snapshot、ledger transaction、posting、entry、余额变化和失败无副作用已进入目标测试。后续运营审批、人工差错、累计退款跨请求聚合控制、查询投影解释或外部规则需另起 Grant。 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` |
 | B4-06 | 固化 VCC / Spend Controls 扩展边界。 | `transaction-*`、`tests/src/test/java` | Spend Controls 为扩展能力。 | 将 spend controls 当成资金主链路 P0。 | 默认只保留边界测试；未明确启用发卡产品时不做实现。 | `just test-boundary` |
 | B4-07 | 明确 chargeback 不落 `FundsAuthorizationTransactionService#chargeback`。 | `docs`、`openspec`、后续授权测试 | 用户补充口径、拒付业务事实。 | 测试或任务强制要求调用 `chargeback` 服务入口，或把拒付结果只保存成无法区分的普通退款。 | 拒付作为争议/扣回语义，通过 `settleRefund` 的原因、上下文、凭证和审计承接；如代码已有 `chargeback`，本轮不扩展为目标态主入口；查询、投影和审计必须能区分普通退款与拒付承接。 | `just test-transaction` |
 | B4-08 | 固化授权并发竞争红线。 | `transaction-*`、`core`、`tests/src/test/java` | TDD 13.5、授权生命周期。 | 同一授权的完成、撤销、过期、退款并发导致重复入账、重复释放或剩余为负。 | 通过幂等键、状态版本、唯一约束或锁定策略确保同一授权同一时刻只有合法迁移生效，失败方无副作用。 | `just test-business-flow` |
@@ -328,7 +328,7 @@ DDL/H2 schema 变化：
 
 B4-10 边界：后续 Execution Grant 只能选择新增外层 `authorizeByInstrument`、`AuthorizationAdmissionApplicationService` 或等价 facade，并必须保留账户主体型授权内核；不得用支付工具引用替换 canonical 请求字段。
 
-人工确认点：`settleRefund` 无授权退款的 `NO_AUTH` 模式、外部原事实引用、外部原事实类型、退款原因、退款凭证、操作者/审计字段和内部授权流水禁用规则，授权占券字段和权益 hold/release/write-off 外部引用，授权支付工具应用入口的服务命名 / Request / DTO / 幂等摘要和快照字段，钱包 application facade 命名，资金责任目标字段是否从 `fundingAccountId` 演进为目标主体引用，`FundsSubjectType.BUDGET_GROUP` 兼容策略；`EXPIRE` 枚举和 `expire` 服务入口已由 B4-TRX-EXPIRE 完成，强制完成首轮请求契约、`authorizationTransactionSn` 条件化规则、策略/上限受信来源和审计最小集已由 B4-FORCE-SETTLE 完成，后续只在扩展策略引擎、审批快照、额度窗口、overcapture、并发、投影解释或 facade 生命周期时重新确认。VCC / Spend Controls 默认只做边界测试，只有明确启用发卡产品才进入实现范围。
+人工确认点：授权占券字段和权益 hold/release/write-off 外部引用，授权支付工具应用入口的服务命名 / Request / DTO / 幂等摘要和快照字段，钱包 application facade 命名，资金责任目标字段是否从 `fundingAccountId` 演进为目标主体引用，`FundsSubjectType.BUDGET_GROUP` 兼容策略；`EXPIRE` 枚举和 `expire` 服务入口已由 B4-TRX-EXPIRE 完成，强制完成首轮请求契约、`authorizationTransactionSn` 条件化规则、策略/上限受信来源和审计最小集已由 B4-FORCE-SETTLE 完成，`settleRefund` 无授权退款的 `NO_AUTH` 模式、外部原事实引用、外部原事实类型、退款原因、退款凭证、操作者/审计字段和内部授权流水禁用规则已由 B4-NO-AUTH-REFUND / `006bcaa` 首轮完成；后续只在扩展策略引擎、审批快照、额度窗口、overcapture、累计退款控制、并发、投影解释或 facade 生命周期时重新确认。VCC / Spend Controls 默认只做边界测试，只有明确启用发卡产品才进入实现范围。
 
 ### B5 覆盖索引：余额控制
 
@@ -656,63 +656,63 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 
 | 能力域 | 准入状态 | 对齐结论 |
 | --- | --- | --- |
-| B4-NO-AUTH-REFUND | `GRANT_READY_NOT_CONFIRMED`。 | 设计、PRD、DSL、系分、TDD、B4 准入卡和 OpenSpec 已对齐；计划内 Execution Grant 任务包已补齐，可进入用户确认态，但未确认前不得写 Red 或生产代码。 |
-| 原子任务包 | `B4-NAR-CAD-001`。 | Grant 可执行包已补齐到 B4 准入卡 8.2；用户确认后只消费该单一任务包，不消费整个 B4 Roadmap。 |
-| 首轮 CAD Pick | `B4-NAR-RED-001`。 | 用户确认 Execution Grant 后，先证明无前置授权但有外部原事实的 `settleRefund` 当前无法形成可追溯退款资金事实；若 Red 未失败，暂停判断已有实现覆盖或 Red 写错。 |
+| B4-NO-AUTH-REFUND | `CLOSED_BY_006BCAA`。 | 设计、PRD、DSL、系分、TDD、B4 准入卡、OpenSpec、Red/Green 测试和最小实现已对齐；本任务包不再作为下一轮默认候选。 |
+| 原子任务包 | `B4-NAR-CAD-001`。 | 已由 `006bcaa feat: 补齐无授权退款 canonical 能力` 消费；后续只作为回归和 CR 依据。 |
+| 首轮 CAD Pick | `B4-NAR-RED-001`。 | 已回归化；成功路径和失败无副作用矩阵已进入 `FundsAuthorizationTransactionFlowTests`。 |
 | 必须列名字段 | `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要原事实金额币种、`operator/contextVariables`。 | Grant 必须说明字段名、类型、必填规则、摘要字段、普通授权链退款兼容策略和 NO_AUTH 模式不得携带或查询内部授权流水。 |
-| 允许写入上限 | `PENDING_GRANT`。 | 先写授权退款 flow 测试；Red 证明缺口后只允许 `FundsAuthorizationTransactionRefundRequest` 显式列名兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复。 |
+| 允许写入上限 | `CONSUMED_BY_006BCAA`。 | 实际写入范围为退款请求兼容字段、指令上下文 key、converter、authorization route resolver、lifecycle saver、route code、授权交易 flow 和 no-auth refund helper；未扩展 DDL/H2、ledger 公共契约、core 枚举状态、wallet facade 或支付工具 facade。 |
 | 禁止混入 | `BLOCKED_BY_SCOPE`。 | 不混入 force settle 返工、chargeback 独立入口、支付工具 facade、VCC 生命周期、Spend Rule、DDL/H2、清结算对账、治理 apply、生产配置、外部协议或敏感数据处理。 |
 | 停止条件 | `BLOCKED_BY_SCOPE`。 | 需要 DDL/H2、core 枚举或状态、ledger 公共契约、新依赖、外部规则、支付工具 facade、钱包 application facade、VCC、chargeback case、清结算追偿、敏感数据处理、公有方法超过 5 个参数或工作树冲突时停止。 |
-| 验证命令 | `PENDING_GRANT`。 | 编码后必须执行 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；docs-only 阶段只需文档门禁和 diff 检查。 |
+| 验证命令 | `PASSED`。 | `006bcaa` 前已通过 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check` 和 `git diff --cached --check`；2026-06-03 追加 `just test-business-flow` 通过 106 tests。 |
 
 ### 13.4 当前 GSD-CAD 恢复入口（2026-06-02）
 
-本节记录 `51e86e3 docs: 固化 B4 无授权退款恢复入口` 和 `3e5ec76 docs: 对齐 B4 无授权退款确认基线` 之后的当前恢复入口。13.1 和 13.2 中 “A1 仍是唯一可推进到用户确认态的单一 Execution Grant 候选” 是 2026-05-31 和 2026-06-01 的历史裁决；当前可恢复的最新候选已经切换为 B4-NO-AUTH-REFUND，但仍未获得编码授权。
+本节记录 `51e86e3 docs: 固化 B4 无授权退款恢复入口` 和 `3e5ec76 docs: 对齐 B4 无授权退款确认基线` 之后的历史恢复入口。13.1 和 13.2 中 “A1 仍是唯一可推进到用户确认态的单一 Execution Grant 候选” 是 2026-05-31 和 2026-06-01 的历史裁决；B4-NO-AUTH-REFUND 后续已获得用户授权并由 `006bcaa` 闭合，本节不再作为当前恢复入口。
 
 | 恢复项 | 当前口径 |
 | --- | --- |
 | 当前 Git 基线 | 确认时 Git HEAD；必须包含 `8e1ec76 docs: 补齐 B4 无授权退款 Grant 执行包`、`51e86e3 docs: 固化 B4 无授权退款恢复入口` 和 `3e5ec76 docs: 对齐 B4 无授权退款确认基线`，后续 docs-only 提交无需逐条追写到本行。 |
-| 当前 GSD 候选 | `B4-NO-AUTH-REFUND`，只处理 `settleRefund` 无授权退款模式。 |
-| 当前 CAD 原子任务包 | `B4-NAR-CAD-001`，入口为 `docs/TDD设计/B4-授权后继能力Round0准入卡.md#82-grantexecutionpackagecandidate2026-06-02`。 |
-| 当前准入状态 | `READY_TO_CONFIRM_NOT_AUTHORIZED`；用户未确认前不写 Red、不写生产代码、不写 DDL/H2 schema、不改运行配置。 |
-| 首轮 Pick | `B4-NAR-RED-001`，证明无前置授权但有外部原事实时，当前 `settleRefund` 不能形成可追溯无授权退款资金事实。 |
+| 当前 GSD 候选 | 历史候选 `B4-NO-AUTH-REFUND` 已闭合；当前没有新的默认编码候选。 |
+| 当前 CAD 原子任务包 | 历史任务包 `B4-NAR-CAD-001` 已由 `006bcaa` 消费。 |
+| 当前准入状态 | `CLOSED_BY_006BCAA`；下一轮必须重新选择并确认单一 Execution Grant。 |
+| 首轮 Pick | 历史 Pick `B4-NAR-RED-001` 已回归化。 |
 | 必须确认的 Grant 字段 | `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要原事实金额币种、`operator/contextVariables`、普通授权链退款兼容策略、NO_AUTH 模式不得携带或查询内部授权流水。 |
 | 当前禁止范围 | 支付工具 facade、钱包 application facade、VCC 生命周期、DDL/H2 schema、ledger 公共契约、core 枚举状态、Spend Rule、force settle 返工、chargeback case、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理。 |
-| 下一步入口 | 用户确认第 13.4 与 B4 准入卡第 11 节的 `Execution Grant：B4-NO-AUTH-REFUND` 后，才能进入 Red -> Green -> Review -> Verify -> Commit。 |
+| 下一步入口 | 另行确认 B4-DISPUTE-CHARGEBACK、B4-AUTH-RACE、B4-AUTH-INSTRUMENT-APPLICATION、B4-BENEFIT-AUTH 或 A1/B2/B5/B6 中一个单一 Execution Grant。 |
 
 ### 13.5 Execution Grant 准备完成记录（2026-06-03）
 
-本节关闭计划内 “为编码做准备，完成 Execution Grant 任务” 的 docs-only 准备项。该记录不授权编码，只确认 B4-NO-AUTH-REFUND 的授权包已经可被用户直接确认。
+本节关闭计划内 “为编码做准备，完成 Execution Grant 任务” 的 docs-only 准备项，并记录其后续被 `006bcaa` 消费为代码闭环。该记录不授权新的编码，只作为 B4-NO-AUTH-REFUND 历史授权包、执行边界和回归依据。
 
 | 项 | 当前口径 |
 | --- | --- |
-| 任务状态 | `GRANT_READY_NOT_CONFIRMED`。 |
-| 单一任务包 | `B4-NAR-CAD-001`，只处理 `settleRefund` 无授权退款模式。 |
-| 授权正文 | 以 `docs/TDD设计/B4-授权后继能力Round0准入卡.md` 第 11 节 `Execution Grant：B4-NO-AUTH-REFUND` 为确认文本。 |
-| 首批 Red | `B4-NAR-RED-001`；必要时补 `B4-NAR-RED-002`。 |
-| 写入上限 | 先写授权退款 flow 测试；Red 证明缺口后，仅允许 `FundsAuthorizationTransactionRefundRequest` 兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复。 |
+| 任务状态 | `CLOSED_BY_006BCAA`。 |
+| 单一任务包 | `B4-NAR-CAD-001`，只处理 `settleRefund` 无授权退款模式，已由 `006bcaa` 消费。 |
+| 授权正文 | 历史确认文本为 `docs/TDD设计/B4-授权后继能力Round0准入卡.md` 第 11 节 `Execution Grant：B4-NO-AUTH-REFUND`。 |
+| 首批 Red | `B4-NAR-RED-001` 和最小 `B4-NAR-RED-002` 失败矩阵已回归化。 |
+| 写入上限 | 历史上限为先写授权退款 flow 测试；Red 证明缺口后，仅允许 `FundsAuthorizationTransactionRefundRequest` 兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复。实际闭环未新增 DDL/H2、ledger 公共契约、core 枚举状态、wallet facade 或支付工具 facade。 |
 | 禁止范围 | 支付工具 facade、钱包 application facade、VCC 生命周期、DDL/H2 schema、ledger 公共契约、core 枚举状态、Spend Rule、force settle 返工、chargeback case、清结算追偿、治理 apply、生产配置、外部协议和敏感数据处理。 |
 | 验证命令 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
-| 下一动作 | 用户显式确认 `Execution Grant：B4-NO-AUTH-REFUND` 后，才进入 Red -> Green -> Review -> Verify -> Commit。 |
+| 下一动作 | B4-NO-AUTH-REFUND 不再作为下一动作；需要重新确认一个新的单一 Execution Grant。 |
 
 ### 13.6 B4-NAR 首轮 Red 触点扫描（2026-06-03）
 
-本节记录当前 Git 基线上的只读代码扫描结论，作为 `B4-NAR-CAD-001` 获得 Execution Grant 后写首轮 Red 的执行输入。该扫描不授权写 Java、测试、DDL/H2 schema 或运行时配置。
+本节记录 Grant 前 Git 基线上的只读代码扫描结论，作为 `B4-NAR-CAD-001` 写首轮 Red 的历史执行输入。当前缺口已由 `006bcaa` 关闭；下表保留为执行 provenance，不代表当前代码状态。
 
-| 触点 | 只读扫描事实 | 执行含义 |
+| 触点 | Grant 前扫描事实 | 执行含义 |
 | --- | --- | --- |
 | Request | `FundsAuthorizationTransactionRefundRequest.authorizationTransactionSn` 仍为 `@NotNull`，且无 `NO_AUTH` 模式、外部原事实引用、原事实类型、原因、凭证或原事实金额币种字段。 | `B4-NAR-RED-001` 应先证明现有 `settleRefund` 无法表达无授权退款。 |
 | Converter | `convertToSettleRefundInstruction` 无条件构造 `AUTHORIZATION` reference，并把 `AUTHORIZATION_TRANSACTION_SN` 放入上下文。 | NO_AUTH Green 只能在 Grant 范围内最小切开普通授权链退款和无授权退款，不得让无授权退款携带或查询内部授权流水。 |
 | Ledger reference | `authorizationReference(...)` 会查找原授权 `AUTHORIZE` ledger transaction 并要求唯一。 | 首轮 Red 的预期失败点应与内部授权流水和原授权账本依赖有关；若 Red 未失败，先暂停判断已有实现覆盖或 Red 写错。 |
 | Command service | `FundsTransactionCommandServiceImpl#settleRefund` 当前只是委派 converter。 | Green 不应优先在 command service 堆叠分支，除非 Red 证明 command 入口必须承载额外 guard。 |
 | Test support | `refundSettledAuthorization(...)` 总是传入普通授权链 `authorizationTransactionSn`。 | 获得 Grant 后需新增 no-auth refund 专用测试构造，并保持普通授权链 helper 回归不退化。 |
-| 当前状态 | `GRANT_READY_NOT_CONFIRMED`。 | 用户确认 `Execution Grant：B4-NO-AUTH-REFUND` 前，下一步仍只能做 read-only 或 docs-only 准备。 |
+| 当前状态 | `CLOSED_BY_006BCAA`。 | 后续扩展需重新扫描当前代码并另起 Grant。 |
 
 ### 13.7 B4-NAR 最小 Green 地图（2026-06-03）
 
-本节把后续实现触点继续压缩成 Grant 后的最小 Green 约束。该地图只服务 `B4-NAR-CAD-001`，不授权写入。
+本节把实现触点压缩成 Grant 后的最小 Green 约束。该地图已服务 `B4-NAR-CAD-001` 并由 `006bcaa` 消费，后续作为 CR 依据保留。
 
-| 触点 | 当前扫描事实 | Grant 后执行约束 |
+| 触点 | Grant 前扫描事实 | Grant 后执行约束 |
 | --- | --- | --- |
 | Resolver selection | `RouteReplaySupport` 不把 `EXTERNAL_TRANSACTION` 当 route snapshot reference；`AuthorizationFundsInstructionRouteResolver#supports` 目前不支持普通 `AUTH_REFUND`。 | NO_AUTH 不能通过伪造内部 authorization reference 进入 replay；若要走非 replay 路径，必须显式证明不按当前绑定关系静默重选路。 |
 | Replay guard | `DefaultRouteReplayService` 已有缺 reference、缺 route snapshot、当前工具换绑、当前资金来源变化不影响 replay 的边界测试。 | Green 不得削弱 replay 红线；新增 no-auth 路径时要保留这些测试，并补对应路由解释断言。 |
@@ -723,7 +723,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 
 ### 13.8 B4-NAR 首轮 Red 断言包（2026-06-03）
 
-本节把 `B4-NAR-RED-001` 的测试断言收敛成可执行包。该包只作为 Grant 后写 Red 的输入，不授权当前写测试。
+本节把 `B4-NAR-RED-001` 的测试断言收敛成可执行包。该包已被 `006bcaa` 消费，后续作为回归和 CR 依据保留。
 
 | 断言层 | Grant 后 Red 目标 | 执行停止点 |
 | --- | --- | --- |
@@ -737,7 +737,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 
 ### 13.9 B4-NAR Grant 前准备饱和度（2026-06-03）
 
-本节记录 `B4-NAR-CAD-001` 在未获 Execution Grant 前的最后恢复入口。该记录不授权写 Java、测试、DDL/H2 schema 或运行时配置。
+本节记录 `B4-NAR-CAD-001` 在未获 Execution Grant 前的最后恢复入口。该入口已由用户确认并被 `006bcaa` 消费；当前仅作为历史恢复入口和执行 provenance，不授权写 Java、测试、DDL/H2 schema 或运行时配置。
 
 | 准备面 | 状态 | 说明 |
 | --- | --- | --- |
@@ -745,7 +745,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | 首轮触点扫描 | `DONE`。 | 第 13.6 已记录 Request、converter、ledger reference、command service 和 test support 的当前事实。 |
 | 最小 Green 地图 | `DONE`。 | 第 13.7 已记录 resolver selection、replay guard、lifecycle aggregate、amount control、idempotency summary 和 boundary tests 的执行约束。 |
 | 首轮 Red 断言包 | `DONE`。 | 第 13.8 已记录 Request、Money fact、Funds fact、Ledger fact、Audit/idempotency、Regression 和 Expected Red。 |
-| 当前状态 | `WAITING_GRANT`。 | Grant 前继续扫描只会重复既有结论；下一步必须显式确认 `Execution Grant：B4-NO-AUTH-REFUND` 后才能进入 Red -> Green -> Review -> Verify -> Commit。 |
+| 当前状态 | `CLOSED_BY_006BCAA`。 | Grant 已消费；下一步必须重新确认新的单一 Execution Grant，不能继续沿用 B4-NO-AUTH-REFUND 授权。 |
 
 ## 14. B2 建议 Execution Grant
 
