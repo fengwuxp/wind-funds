@@ -147,7 +147,7 @@
 | --- | --- | --- | --- | --- | --- |
 | B4-FORCE-SETTLE | Done | 首轮账户主体型 canonical 能力已闭合，后续只作为授权交易回归基线。 | `B4-FS-RED-001`、`B4-FS-RED-002` 已回归化。 | 仅在返工或扩展 FORCE 策略引擎、审批快照、额度窗口、overcapture 时另起 Grant。 | 无授权退款、拒付、支付工具 facade、Spend Rule、VCC。 |
 | B4-NO-AUTH-REFUND | Done | 已由 `006bcaa feat: 补齐无授权退款 canonical 能力` 补齐 settleRefund 无授权退款模式、外部原事实引用、外部原事实类型、凭证、原因、必要原事实金额币种、操作者/审计和失败无副作用。 | `B4-NAR-RED-001`、`B4-NAR-RED-002`、`TDD-RED-017A` 已回归化。 | 后续仅在扩展运营审批、人工差错、累计退款控制、查询投影解释或外部规则时另起 Grant。 | force settle、chargeback case 全生命周期、清结算追偿。 |
-| B4-DISPUTE-CHARGEBACK | 3 | 固化拒付/争议扣回语义与普通退款、授权拒绝的可区分性。 | `B4-CB-RED-001`。 | 交易 flow、投影解释、原因/凭证/外部引用字段的最小补强。 | 独立 dispute system、VCC processor、清结算追偿单。 |
+| B4-DISPUTE-CHARGEBACK | R0-Decision | 固化拒付/争议扣回语义与普通退款、授权拒绝的可区分性。 | `B4-CB-RED-001` 需先完成目标入口语义裁决。 | 当前只允许只读扫描和准入裁决；编码 Grant 需明确 `settleRefund` 语义承接与既有 `chargeback` 入口的关系。 | 独立 dispute system、VCC processor、清结算追偿单、未确认的 `chargeback` 目标态主入口。 |
 | B4-AUTH-RACE | 4 | 固化授权完成、撤销、过期、退款并发竞争红线。 | `B4-RACE-RED-001`。 | 授权 flow 并发测试、状态迁移保护和必要幂等/锁策略。 | DDL/H2 默认不允许，除非 Execution Grant 显式扩权。 |
 
 B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> Review -> Verify -> Commit 闭环，并由 `006bcaa` 进入代码基线。后续 B4-DISPUTE-CHARGEBACK、B4-AUTH-RACE、授权支付工具应用入口、授权占券和权益生命周期仍必须各自单独确认 Execution Grant，不能借本轮已完成 Grant 自动扩权。
@@ -305,6 +305,22 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 | 目标验证 | `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 24 tests；`just test-transaction` 通过 92 tests；`just test-boundary` 通过 126 tests；`just compile`、`just pmd`、`git diff --check`、`git diff --cached --check` 均通过。 |
 | 追加回归 | 2026-06-03 追加执行 `just test-business-flow` 通过 106 tests，覆盖业务流程回归。 |
 | 后续 Not Done | no-auth refund 的运营审批、人工差错单、累计退款跨请求聚合控制、查询投影解释和外部规则核验不是 `006bcaa` 的 Done 范围；需要时另起 Execution Grant。 |
+
+### 8.9 disputeChargebackAdmissionDecision（2026-06-03）
+
+本节记录 B4-NO-AUTH-REFUND 闭合后的下一候选只读复核。该复核只更新准入裁决，不授权 Java 代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 准入项 | 当前结论 |
+| --- | --- |
+| 当前候选 | `B4-DISPUTE-CHARGEBACK-R0`，只处理已完成授权后的争议、拒付或扣回语义裁决。 |
+| 准入状态 | `SEMANTIC_DECISION_REQUIRED_NOT_CODE_AUTHORIZED`。现有代码和测试证明已有一条独立 `chargeback` 资金路径，但目标设计更偏向通过 `settleRefund` 携带拒付原因、外部引用、凭证和审计上下文承接争议语义。 |
+| 代码证据 | `FundsAuthorizationTransactionService#chargeback`、`FundsAuthorizationTransactionChargebackRequest`、`CHARGEBACK` eventType、route replay `CHARGEBACK` phase 和 `FundsAuthorizationTransactionFlowTests` 中 chargeback 成功、超额失败、同业务流水不同摘要失败无副作用等测试已存在。 |
+| 目标语义证据 | PRD、DSL、系分和本卡 `B4-CB-RED-001` 均要求拒付与普通退款、授权拒绝可区分；但不要求把独立 `chargeback` 服务入口作为目标态主入口，默认可由 `settleRefund` 携带拒付原因、凭证、外部引用和审计上下文承接。 |
+| 当前差异 | 现有 `chargeback` 能力强于目标态最小要求，但不能反推出目标态必须以 `chargeback` 为 canonical API。若直接开编码，容易把实现入口当产品语义，和“拒付不强制落独立 `chargeback` 入口”的设计红线冲突。 |
+| 本轮测试证据 | 2026-06-03 执行 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 24 tests，说明授权交易主流程、无授权退款和既有 chargeback 回归当前未破坏。 |
+| 推荐裁决 | 下一轮先确认 `settleRefund` 为拒付/争议承接的目标态主入口，既有 `chargeback` 保留为兼容、显式事件或内部适配入口；若产品/架构明确要把 `chargeback` 升级为一等目标态 API，必须另起独立 Grant 说明公共契约、投影、查询、状态和清结算追偿边界。 |
+| 首批 Red 候选 | 若确认 `settleRefund` 为主入口，首批 Red 应证明争议退款在查询、投影、审计和幂等摘要上可与普通授权链退款、无授权退款区分，且不把授权拒绝记为拒付；不应优先新增独立 dispute case、清结算追偿或外部卡组织规则。 |
+| 停止条件 | 需要新增 `chargeback` 公共目标态、dispute case、清结算追偿、DDL/H2、core 枚举/状态、ledger 公共契约、支付工具 facade、VCC、外部协议或敏感数据处理时停止并重新确认 Execution Grant。 |
 
 ## 9. verificationPlan
 
