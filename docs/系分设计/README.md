@@ -145,7 +145,7 @@ A0 系分复核只确认产品场景能否落到现有系统边界和测试入�
 
 系分通过不等于任务写入范围通过。A0 复核若命中 B7、B8、P2、外部规则、敏感数据、表结构或公共契约变更，必须在下一步 Execution Grant 中单独列明；未列明时只能继续做设计、TDD 分析、contract-only 或 dry-run。
 
-当前代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`。系分侧只能把它声明为局部代码和测试基线：交易 Request 已统一为 `ReadonlyContextVariables`，`FundsRequestContextVariables` 已移除，钱包/交易/路由/账务管理对象的敏感上下文和权益核心字段阻断已有局部测试保护；但这不表示含权益 route/posting/replay、清结算、对账、归档、治理重放或 P2 业务生产流已经闭合。
+当前系分编码准入以确认时 Git HEAD、OpenSpec 和 Harness 最新任务账本为准。`77bc9f4 fix: 阻断钱包上下文权益核心事实` 只保留为局部代码和测试基线证据：交易 Request 已统一为 `ReadonlyContextVariables`，`FundsRequestContextVariables` 已移除，钱包/交易/路由/账务管理对象的敏感上下文和权益核心字段阻断已有局部测试保护；但这不表示含权益 route/posting/replay、清结算、对账、归档、治理重放或 P2 业务生产流已经闭合。
 
 | 基线能力 | 系分可引用结论 | 不得外推 |
 | --- | --- | --- |

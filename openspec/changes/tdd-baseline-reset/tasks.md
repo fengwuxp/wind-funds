@@ -13,15 +13,15 @@
 - [x] 校准 TDD 文档中“旧测试资产复用”表述。
 - [x] 冻结当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果，作为进入编码前的独立检查点；上一已冻结设计交付提交点为 30b1a00 docs: 冻结权益快照设计基线，上一冻结点为 620b5a5 docs: 精简并加固资金底座设计交付文档。
 - [x] 完成设计、代码、任务三方基线对齐：`eabd672` 纳入编码准备包，`6be9c99` 完成 B1-10 权益快照 DSL 契约承载，`75b46ef` 和 `9db3eba` 收敛请求摘要与稳定摘要支撑，`434f8a2` 校准账务计划装配器长 ID 测试规范，`5bad4b7` 对齐权益资金流编码基线，`42100dc` 固化权益生产准入门禁，`555a943` 至 `db766fa` 完成权益准入任务基线、架构师工程约规、CAD 自动推进约规、测试最佳实践、预算组默认周期 `LIFETIME`、账务事实断言、钱包/交易/治理边界、CAD 完整验证门禁和出款准入规则核验证据收敛，`f386ed0a` 至 `5901265` 完成编码准入设计冻结、出款准入设计冻结、提现/解冻红线、余额日志证据、路由事实边界、交易投影解释、权益回放摘要和治理重放范围/来源/差异项校验收敛，`5901265..77bc9f4` 完成资金事实红线、敏感上下文阻断、上下文不可变、防御性拷贝、外部账户原文阻断、MVP/归档边界和设计交付口径收敛；任务以本 Harness Plan 和 OpenSpec spec 为准。
-- [x] 2026-05-31 完成 PRD、DSL、系分、TDD、OpenSpec、代码和任务基线的只读对齐：该轮已提交设计和任务对齐输入推进至 `8e4a801 docs: 对齐最新设计任务基线`，代码能力基线仍截至 `77bc9f4`；本轮把历史“资金来源关系”统一校准为资金责任解析关系，明确支付工具只承载交易投影和 route 快照，BudgetGroup 与 Spend Rule 只作为预算 scope、控制规则、规则快照和审计上下文；`3ef522c`、`a7d3fc9` 和 `8e4a801` 分别固化授权支付工具外层入口、钱包 application facade、兼容缺口 CR 和最新设计任务基线索引。既有测试文件变更保持隔离，未纳入本轮设计基线。
+- [x] 2026-05-31 完成 PRD、DSL、系分、TDD、OpenSpec、代码和任务基线的只读对齐：该轮已提交设计和任务对齐输入推进至 `8e4a801 docs: 对齐最新设计任务基线`；当时的代码能力基线为 `77bc9f4`，现仅作为历史局部保护证据。本轮把历史“资金来源关系”统一校准为资金责任解析关系，明确支付工具只承载交易投影和 route 快照，BudgetGroup 与 Spend Rule 只作为预算 scope、控制规则、规则快照和审计上下文；`3ef522c`、`a7d3fc9` 和 `8e4a801` 分别固化授权支付工具外层入口、钱包 application facade、兼容缺口 CR 和最新设计任务基线索引。既有测试文件变更保持隔离，未纳入本轮设计基线。
 - [x] 2026-05-31 完成核心设计骨架修复：该轮已提交设计和任务对齐输入推进至 `5a78f02 docs: 明确核心设计骨架`；`8e4a801 docs: 对齐最新设计任务基线` 继续作为上一轮任务索引证据。核心设计骨架进一步明确可入账主体、产品能力、系统模块、架构分层和能力地图，作为本轮代码 CR 差异复核输入。
 - [x] 2026-05-31 完成代码 CR 任务基线对齐：当前已提交设计和任务对齐输入推进至 `f99800b docs: 对齐代码 CR 任务基线`；`5a78f02 docs: 明确核心设计骨架` 继续作为核心设计骨架修复证据。
-- [x] 2026-05-31 完成本轮编码准入复核：当轮已提交设计和任务对齐输入推进至 `4a7ef12 docs: 固化代码准入 CR 基线`；`f99800b docs: 对齐代码 CR 任务基线` 保留为上一轮代码 CR 任务基线证据。复核未发现新代码事实变化，A1 仍是唯一可推进到用户确认态的单一 Execution Grant 候选；未确认前不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
+- [x] 2026-05-31 完成本轮编码准入复核：当轮已提交设计和任务对齐输入推进至 `4a7ef12 docs: 固化代码准入 CR 基线`；`f99800b docs: 对齐代码 CR 任务基线` 保留为历史代码 CR 任务基线证据。复核未发现新代码事实变化，A1 当时是单一 Execution Grant 候选；该裁决已降级为历史记录，未重新确认前不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 - [x] 2026-05-31 完成 B2/B4 编码准入口径修复：系分已明确外部支付工具和工具快照才使用 `PaymentInstrumentRef`，内部余额钱包、信用额度、返利钱包和商户钱包等业务入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照；`PaymentInstrumentCapabilityApplicationService` 只做工具能力准入、读取工具与绑定历史、生成准入快照，不注册工具、不变更绑定；TDD 映射表已显式纳入 `AC-AUTH-000` 授权入口分层。该修复只关闭 B2/B4 进入独立 Round 0 或单一 Execution Grant 前的文档阻断，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 - [x] 2026-05-31 完成钱包入口二次收敛：PRD、DSL、系分、TDD、VCC 分册和 OpenSpec 已把内部余额钱包、平台钱包、商户钱包、返利钱包、信用额度入口与外部钱包端点、通道 token、卡、VA 等支付工具分开；内部入口只作为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照解析来源，外部工具才使用 `PaymentInstrumentRef` / `ExternalAccountRef`。该修复仍为文档准入口径，不授权新增 facade、Request/DTO、DDL/H2 schema 或测试资产。
 - [x] 2026-05-31 完成 CAD Round 0 准入刷新：上一完整 CAD 验证证据提交为 `270122e docs: 刷新 CAD 准入基线`，工作树在刷新前为 clean；`77bc9f4` 保留为上一冻结代码能力基线，`98ec7cc..81a7ecb` 的直接交易、授权后继、失败无副作用、费用幂等、外部账户主体阻断、支付工具绑定约束和 B2/B4/钱包入口文档收敛纳入当前准入复核输入，`270122e` 后已执行 `just verify-cad` 完整门禁并通过。该刷新只更新基线、授权卡和任务计划引用，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入；后续 Execution Grant 必须以确认时 Git HEAD 作为 `authorityBaseline`。
 - [x] 2026-06-01 固化支付工具入口交付基线：`FundsAuthorizationTransactionService.authorize`、直接交易和余额控制的 canonical 请求继续以已解析账户主体为入参；支付工具入口只位于 application facade，例如 `authorizeByInstrument` 或等价入口，负责支付工具准入、绑定快照、资金责任解析、Spend Rule 决策和账户能力校验，再委派账户主体型内核。VCC 预付卡充值、系统内余额钱包充值、共享卡调额、VA 收款、全球账户付款和 ACH/银行转账事件不抽象为统一支付工具交易服务，必须先由 P2 业务能力包解释为归一资金事实，再映射到 P1/P0 直接交易、授权交易、余额控制、清结算、对账调账或归档能力。本条只记录 PRD、DSL、系分、TDD 和任务基线，不授权新增 Java 包、公共契约、测试代码、DDL/H2 schema 或运行配置。
-- [x] 2026-06-01 完成本轮编码准入对齐：产品和架构口径一致，A1 直接交易事实红线仍是唯一可推进到用户确认态的单一 Execution Grant 候选；B2 钱包 application facade / 资金责任目标字段 / BudgetGroup 兼容策略、B4 授权支付工具 application facade、B5/B6 预算控制和路由回放、B7/B8/P2 均不得作为本轮附带写入。若后续基于本轮未提交设计变更开工，Execution Grant 必须在 `authorityBaseline` 中显式纳入本轮文档变更或等待其提交后引用确认时 Git HEAD；未授权前不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
+- [x] 2026-06-01 完成本轮编码准入对齐：产品和架构口径一致，A1 直接交易事实红线当时是单一 Execution Grant 候选；B2 钱包 application facade / 资金责任目标字段 / BudgetGroup 兼容策略、B4 授权支付工具 application facade、B5/B6 预算控制和路由回放、B7/B8/P2 均不得作为本轮附带写入。该裁决已降级为历史记录；后续开工必须引用确认时 Git HEAD 或在 Execution Grant 的 `authorityBaseline` 中显式纳入允许的未提交文档变更；未授权前不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 - [x] 2026-06-01 完成支付工具、资金账户和信用账户重定性后的 DSL、路由、账务、余额投影和交易投影 CR：DSL 主体只允许资金账户、信用账户和平台角色解析后的平台资金账户入账；支付工具、外部账户、预算组、Spend Rule 和交易投影只作为输入、快照、控制视图、查询维度或审计上下文。route 可以消费工具和规则快照，但 route leg、posting、LedgerEntry 和账本余额投影必须落到已解析可入账主体；交易投影只读，不反写 route、posting、entry 或 balance。该 CR 关闭设计口径歧义，不授权公共契约、测试资源、DDL/H2 schema 或生产代码写入。
 - [x] 2026-06-01 完成支付工具与 Spend Rule 生产可用性 CR：支付工具资源管理和绑定历史可作为 B2 局部代码基线，但支付工具应用准入、资金责任目标主体、Spend Rule 规则定义/版本/决策日志/控制活动、预算控制投影和授权准入组合仍未达到生产可用闭环。当前结论为设计可用、生产条件不足；下一步只能准备 B2/B4/B5/B6/B8 Round 0 或单一 Execution Grant，不新增统一 `InstrumentTransactionService`，不替换 canonical 交易请求，不把预算组或 Spend Rule 写成资金交易事实或账本主体。
 - [x] 2026-06-01 补齐 B2/B4 支付工具与 Spend Rule Round 0 准入卡：新增 `docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md`，把 `R0-PI-001`、`R0-FR-001`、`R0-AUTH-001`、`R0-SR-001`、`R0-SR-002`、`R0-PI-002` 拆成 B2-PI-CAP、B2-FR、B4-AUTH-PI、B5-SR-CONTROL、B6/B8-PI-VIEW 五个候选切片。该卡只作为 Round 0 和独立 Execution Grant 输入，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
@@ -39,7 +39,7 @@
 - [x] 2026-06-02 完成 B4-NO-AUTH-REFUND GSD-CAD 准入复核：最初以 `e937395 docs: 对齐 B4 无授权退款主文档口径` 为已提交基线，后续 docs-only 索引、恢复入口和确认基线校准提交以用户确认 Execution Grant 时的 Git HEAD 自然纳入；当时 B4-NO-AUTH-REFUND 进入待确认态。GSD 层确认下一候选是单一 B4-NO-AUTH-REFUND 切片；CAD 层只有在用户确认 `Execution Grant：B4-NO-AUTH-REFUND` 后，才允许从 `B4-NAR-RED-001` 开始写目标 Red。该准备态后续已由 `006bcaa feat: 补齐无授权退款 canonical 能力` 消费并闭合。
 - [x] 2026-06-02 补齐 B4-NO-AUTH-REFUND Grant 可执行包：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#82-grantexecutionpackagecandidate2026-06-02` 已把下一轮候选收敛为 `B4-NAR-CAD-001` 原子任务包，当时仍为待确认态。该包明确首轮只写 `B4-NAR-RED-001`，必要时再补 `B4-NAR-RED-002`；允许范围限定为授权退款 flow 测试、`FundsAuthorizationTransactionRefundRequest` 显式列名兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复；`tests/src/test/resources/jdbc-schema.sql`、ledger 公共契约、core 枚举状态、支付工具 facade、钱包 application facade、VCC、Spend Rule、chargeback case、清结算追偿、治理、生产配置、外部协议和敏感数据处理均保持禁止。该补强后续已由 `006bcaa` 消费为代码闭环；不再作为新的自动编码授权。
 - [x] 2026-06-03 完成 B4-DISPUTE-CHARGEBACK 只读准入裁决：现有代码已有 `FundsAuthorizationTransactionService#chargeback`、`CHARGEBACK` eventType、route replay chargeback phase 和授权交易 flow 成功/超额失败/幂等冲突测试；但 PRD、DSL、系分和 B4 准入卡目标语义仍要求拒付/争议默认通过 `settleRefund` 携带原因、凭证、外部引用和审计上下文承接，不强制把独立 `chargeback` 服务入口作为目标态主入口。本轮裁决为 `SEMANTIC_DECISION_REQUIRED_NOT_CODE_AUTHORIZED`，只同步任务和准入状态，不写 Java、测试、DDL/H2 schema、公共契约或运行时配置；已验证 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 24 tests。
-- [x] 2026-06-03 补齐 B4-DISPUTE-SEMANTIC-ALIGNMENT Grant 候选包：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#810-disputesemanticalignmentgrantcandidate2026-06-03` 已把下一轮候选收敛为 `B4-DISPUTE-SEMANTIC-ALIGNMENT` 原子任务包，状态为 `READY_TO_CONFIRM_NOT_AUTHORIZED`。该包默认以 `settleRefund` 为拒付/争议目标态主入口，既有 `chargeback` 入口只作为兼容、显式事件或内部适配资产；首批 Red 聚焦争议退款与普通授权链退款、NO_AUTH 退款、授权拒绝的查询、投影、审计和幂等摘要可区分性。本记录仍不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入。
+- [x] 2026-06-03 补齐 B4-DISPUTE-SEMANTIC-ALIGNMENT Grant 候选包：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#810-disputesemanticalignmentgrantcandidate2026-06-03` 当时把下一轮候选收敛为 `B4-DISPUTE-SEMANTIC-ALIGNMENT` 原子任务包；该候选后续已由 `949b24a fix(transaction): 对齐授权争议退款审计语义` 消费并闭合。该包默认以 `settleRefund` 为拒付/争议目标态主入口，既有 `chargeback` 入口只作为兼容、显式事件或内部适配资产；首批 Red 聚焦争议退款与普通授权链退款、NO_AUTH 退款、授权拒绝的查询、投影、审计和幂等摘要可区分性。本记录只作历史 provenance，不再作为新的自动编码授权。
 - [x] 2026-06-03 对齐 B4-DISPUTE-SEMANTIC-ALIGNMENT 主文档入口：PRD、DSL、系分和 TDD 主文档已统一为 `settleRefund / AUTH_REFUND` 默认承接拒付/争议语义，独立 `chargeback` 只保留兼容、显式事件、内部适配或后续专项候选口径；同步新增 `TDD-RED-017B` 作为后续授权后的争议退款可区分性红线。本记录仍是文档准入闭环，不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入。
 - [x] 2026-06-03 刷新 B4 GSD-CAD 候选结构校验入口：`818da34 fix(transaction): 移除授权退款请求模式字段` 已把 no-auth refund 请求契约进一步收口为“请求无 `refundMode`、`NO_AUTH` 仅为内部上下文标签”，同轮 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 25 tests；B4 准入卡第 8.10 已补充标准 Harness `harnessScopeIndex`，用于让 CAD 候选结构校验识别写入范围、写入文件、只读范围和只读参考。本记录只刷新 docs/OpenSpec 任务入口，不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入。
 - [x] 2026-06-03 完成 B4-DISPUTE-SEMANTIC-ALIGNMENT 首轮 CAD 闭环：`949b24a fix(transaction): 对齐授权争议退款审计语义` 已让 `settleRefund / AUTH_REFUND` 通过 `disputeMode`、`disputeReason`、`disputeVoucherRef`、`externalDisputeRef` 一等字段承接争议/拒付语义，请求侧仍不恢复 `refundMode`，`DISPUTE` 只作为资金指令内部上下文标签；route replay 只在 `AUTH_REFUND + DISPUTE` 场景传播争议审计上下文，避免普通退款、NO_AUTH 退款和 fee refund 被请求上下文污染。已验证 `just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just pmd` 和 `git diff --check` 通过。本闭环只关闭 `B4-CB-RED-001A / TDD-RED-017B` 首个 canonical 可区分性切片，不声明完整 dispute case、独立 chargeback 一等 API、清结算追偿、VCC processor、DDL/H2 schema、core 枚举状态或 ledger 公共契约完成。
@@ -108,7 +108,7 @@ just verify-cad
 - [x] Harness 已重新对齐：以本文件作为 MVP 任务计划、覆盖索引、写入范围、只读范围、禁止事项、人工确认点和交付记录入口。
 - [x] 旧测试源码已移除，测试 resources 保留。
 - [x] 当前基线支持在用户明确授权后进入 CAD 自动提交模式；进入生产编码前仍需用户按 MVP 任务切片授予 Execution Grant，且每轮交付必须声明专项验证或 `just verify-cad` 完整门禁结果。
-- [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线。最新已提交设计和任务对齐输入以后续确认时 Git HEAD 为准，上一完整 CAD 验证证据提交为 `270122e docs: 刷新 CAD 准入基线`；`81a7ecb docs: 收敛钱包入口与支付工具口径`、`4a7ef12 docs: 固化代码准入 CR 基线`、`f99800b docs: 对齐代码 CR 任务基线` 和 `9456ab6 docs: 对齐 A0 准入与代码基线` 保留为历史准入证据；上一冻结代码能力基线为 `77bc9f4 fix: 阻断钱包上下文权益核心事实`，当前准入复核输入包含 `98ec7cc..81a7ecb` 的后续代码、测试和文档收敛；后续生产编码仍需用户按 MVP 任务切片单独授予 Execution Grant。
+- [x] 已冻结设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线。最新已提交设计和任务对齐输入以后续确认时 Git HEAD、OpenSpec 和 Harness 最新任务账本为准；`270122e`、`81a7ecb`、`4a7ef12`、`f99800b`、`9456ab6` 和 `77bc9f4` 保留为历史准入与局部保护证据；后续生产编码仍需用户按 MVP 任务切片单独授予 Execution Grant。
 - [x] 代码基线已从上一冻结点 `77bc9f4` 复核到 `81a7ecb`，并在 `270122e` 后完成 CAD 准入刷新和完整门禁复核：B1 覆盖索引的 DSL 契约测试已存在；B2 覆盖索引下支付工具、绑定历史、资金责任解析关系（历史代码命名仍可能为 funding relation）、显式建账、预算组默认周期 `LIFETIME`、账务计划装配器长 ID 追溯、余额日志证据、余额投影、上下文敏感字段阻断、防御性拷贝、支付工具绑定对象约束和钱包入口文档口径已有局部基线；B3 至 B6 覆盖索引已有部分直接交易、授权、余额控制、Route Replay、交易投影、稳定摘要、解释摘要、权益回放摘要、路由事实边界、主链路事实红线、敏感上下文阻断、投影重放差异校验、失败无副作用、费用幂等和外部账户主体阻断测试；B7 已有 reconciliation-* 模块骨架和出款前准入候选实现，已通过专项服务测试验证，可作为后续候选输入但未纳入清结算、对账或出款生命周期 Done 基线；B8 已有 governance-* 交易投影重放骨架、范围/来源事实/差异项校验和局部边界测试。上述都只作为局部代码和验证门禁基线，不表示对应覆盖索引全量完成或可跳过 Execution Grant。
 - [x] 完成 A0 只读核验证据登记：Java 21 运行时、编译门禁、A1 直接交易主链路、posting 装配和余额投影回归测试已通过；embedded Redis 由测试基础设施自动启动和使用，未触发额外人工确认。A0 通过只作为下一步单一 MVP Execution Grant 输入，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 - [x] 完成 CAD 完整门禁验证登记：`WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 已通过，覆盖 Java 运行时、编译、核心契约、账本、交易、余额控制、业务流、架构边界、治理重放和 PMD；该结果仍只作为下一步 Execution Grant 输入，不替代生产 Done。
@@ -436,7 +436,7 @@ B8 首批 Red 集必须在 B8-01 至 B8-09 任一 Green 实现前完成：`TDD-B
 
 ## 8. 依赖、门禁与设计反馈
 
-1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；上一设计冻结点为 30b1a00 docs: 冻结权益快照设计基线，最新已提交设计和任务对齐输入以确认时 Git HEAD 为准，`270122e docs: 刷新 CAD 准入基线` 是上一完整 CAD 验证证据提交，`81a7ecb docs: 收敛钱包入口与支付工具口径`、`4a7ef12 docs: 固化代码准入 CR 基线`、`f99800b docs: 对齐代码 CR 任务基线` 和 `9456ab6 docs: 对齐 A0 准入与代码基线` 保留为历史准入证据，上一冻结代码能力基线为 `77bc9f4 fix: 阻断钱包上下文权益核心事实`；后续具体 MVP 编码任务仍必须通过 Execution Grant 明确授权。
+1. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先冻结为独立检查点；当前任务准入以确认时 Git HEAD、OpenSpec 和 Harness 最新任务账本为准；30b1a00、270122e、81a7ecb、4a7ef12、f99800b、9456ab6 和 77bc9f4 只保留为历史准入与局部保护证据；后续具体 MVP 编码任务仍必须通过 Execution Grant 明确授权。
 2. 当前执行优先级固定为：P0 资金底座内核优先，P1 交易与读模型扩展次之，P2 业务模式能力包按专项授权接入；文档编号和覆盖索引编号不代表能力优先级。
 3. B1、B2 承接 P0 的 DSL、钱包、账本、账目和余额投影基础；B3 至 B6 承接 P1 的直接交易、授权交易、余额控制、Route Replay 与交易投影；B7、B8 分别承接 P0 清结算对账和 P0/P1 治理闭环。
 4. B1 覆盖索引是后续所有交易、账本和授权测试的前置门禁。
@@ -612,12 +612,12 @@ NFR 假设：本历史授权只做契约承载，不触碰生产并发、容量�
 | DSL 红线 | `fixtureLevel=CONTRACT_ONLY` 必须显式登记，避免把请求态样例误判为生产 Done。 | `FundsDslJsonContractVerifier` 增加 `fixtureLevel`、`scenarioCode`、`acceptanceIds`、`tddIds`、`systemDesignRefs` 和 `validation` 元数据校验。 |
 | TDD 用例 | 已补稳定摘要、字段顺序、请求态样例、生产 Done 误判、闭合角色边界等契约测试。 | `FundsBenefitSnapshotSpecTests` 12 个用例通过；`FundsDslJsonContractTests` 8 个用例通过。 |
 | 验证命令 | Java 21 下编译、目标测试、PMD 和空白检查通过。 | `just mvn-version`；`just compile`；`just test-one FundsBenefitSnapshotSpecTests tests`；`just test-one FundsDslJsonContractTests tests`；`just pmd`；`git diff --check`。 |
-| 后续基线收敛 | 请求摘要、稳定摘要支撑、账务计划装配器长 ID、预算组默认周期 `LIFETIME`、账务事实断言、钱包/交易/治理边界、CAD 完整验证门禁、出款准入规则核验证据、编码准入设计冻结、提现/解冻红线、余额日志证据、路由事实边界、交易投影解释、权益回放摘要、治理重放差异校验、资金事实红线、敏感上下文阻断、上下文不可变、防御性拷贝、外部账户原文阻断、MVP/归档边界、设计交付口径、代码 CR 任务基线、代码准入 CR 基线、B2/B4 准入口径和钱包入口收敛已在后续提交中收敛，上一 A0/code baseline 冻结点为 `9456ab6`，准入复核输入已推进至 `81a7ecb`，上一完整 CAD 验证证据提交为 `270122e`，上一冻结代码能力基线为 `77bc9f4`。 | `75b46ef` 至 `5901265` 的历史基线证据，`5901265..77bc9f4` 的资金事实红线、敏感上下文和设计交付口径收敛证据，`9456ab6` 的 A0 准入与代码基线对齐证据，`3ef522c`、`a7d3fc9` 的授权支付工具入口和钱包应用层 CR 证据，`8e4a801` 的最新设计任务基线索引证据，`5a78f02` 的核心设计骨架修复证据，`f99800b` 的代码 CR 任务基线证据，`4a7ef12` 的代码准入 CR 基线证据，`98ec7cc..81a7ecb` 的后续资金红线、支付工具约束和文档准入口径收敛证据，以及 `270122e` 的 CAD 准入刷新和完整门禁通过证据。 |
+| 后续基线收敛 | 请求摘要、稳定摘要支撑、账务计划装配器长 ID、预算组默认周期 `LIFETIME`、账务事实断言、钱包/交易/治理边界、CAD 完整验证门禁、出款准入规则核验证据、编码准入设计冻结、提现/解冻红线、余额日志证据、路由事实边界、交易投影解释、权益回放摘要、治理重放差异校验、资金事实红线、敏感上下文阻断、上下文不可变、防御性拷贝、外部账户原文阻断、MVP/归档边界、设计交付口径、代码 CR 任务基线、代码准入 CR 基线、B2/B4 准入口径和钱包入口收敛已在后续提交中收敛；`9456ab6`、`81a7ecb`、`270122e` 和 `77bc9f4` 只作历史准入与局部保护证据。 | `75b46ef` 至 `5901265` 的历史基线证据，`5901265..77bc9f4` 的资金事实红线、敏感上下文和设计交付口径收敛证据，`9456ab6` 的 A0 准入与代码基线对齐证据，`3ef522c`、`a7d3fc9` 的授权支付工具入口和钱包应用层 CR 证据，`8e4a801` 的设计任务基线索引证据，`5a78f02` 的核心设计骨架修复证据，`f99800b` 的代码 CR 任务基线证据，`4a7ef12` 的代码准入 CR 基线证据，`98ec7cc..81a7ecb` 的后续资金红线、支付工具约束和文档准入口径收敛证据，以及 `270122e` 的 CAD 准入刷新和完整门禁通过证据。 |
 | 残余风险 | 只能声明 `B1-10 契约承载 Done`。 | route、posting、replay、授权占券、清结算、对账、投影、归档、冷热读取和治理重放消费仍在 B3/B4/B6/B7/B8 后续 MVP 任务；解释视图、证据最小化和外部规则核验仍在 B6/B7/B8 后续 MVP 任务。 |
 
 ## 13. A1 建议 Execution Grant
 
-A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线。A1 的完整候选授权卡见 `docs/TDD设计/A1-直接交易事实红线准入卡.md`；该卡只作为下一步确认输入，不因写入本 Harness Plan 而自动授权编码。
+A0 只读核验通过后，曾建议优先确认 A1 直接交易事实红线。A1 的完整候选授权卡见 `docs/TDD设计/A1-直接交易事实红线准入卡.md`；该卡仍可作为后续确认输入，但不再是当前默认恢复入口，也不因写入本 Harness Plan 而自动授权编码。
 
 | 项 | 候选口径 |
 | --- | --- |
@@ -628,7 +628,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | 默认写入范围 | 先写 A1 目标测试资产；Red 证明缺口后，只允许在 `transaction-impl`、`ledger-impl` 做最小修复。 |
 | 默认禁止范围 | face/core 公共契约、DDL/H2 schema、A2/A3/A4、B7/B8、P2、生产配置、外部协议和敏感数据处理。 |
 | 验证命令 | `just mvn-version`、`just compile`、`just test-one FundsDirectTransactionFlowTests tests`，必要时 `just test-transaction`、`just test-business-flow`、`just test-boundary`，提交前 `just pmd` 和 `git diff --check`。 |
-| 当前状态 | 候选准入卡已补齐，并已记录现有覆盖扫描与完整门禁复核；仍需用户确认后才成为实际 Execution Grant。 |
+| 当前状态 | 候选准入卡已补齐，并已记录现有覆盖扫描与完整门禁复核；后续如选择 A1，仍需用户重新确认后才成为实际 Execution Grant。 |
 
 ### 13.1 本轮编码准入复核（2026-05-31）
 
@@ -636,7 +636,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 
 | 能力域 | 本轮结论 | 后续动作 |
 | --- | --- | --- |
-| A1 直接交易事实红线 | `READY_TO_CONFIRM_NOT_AUTHORIZED`。A1 仍是当前唯一可推进到用户确认态的单一 Execution Grant 候选。 | 用户确认 A1 模板后，先写或恢复目标 Red，再做最小 Green；未确认前只保留为准入卡。 |
+| A1 直接交易事实红线 | `HISTORICAL_READY_TO_CONFIRM`。A1 曾是当轮最接近可确认的单一 Execution Grant 候选。 | 后续如选择 A1，需按最新 Git HEAD 和当前任务账本重新确认模板；未确认前只保留为准入卡。 |
 | B2 钱包账户、支付工具和资金责任基础 | `BLOCKED_UNTIL_GRANT`。钱包 application facade、资金责任目标字段和 BudgetGroup 兼容策略仍需独立 Round 0 或授权卡。 | 不与 A1 混合编码；先确认 facade 命名、`targetSubjectType + targetSubjectId` 或 funding-account-only 策略、BudgetGroup 兼容/迁移策略。 |
 | B4 授权支付工具入口 | `BLOCKED_UNTIL_GRANT`。可以设计 `authorizeByInstrument` 或等价 application facade，但不能替换账户主体型授权内核请求。 | 独立确认公共契约、Request/DTO、幂等摘要、route snapshot、拒绝事实和敏感上下文回归。 |
 | B5/B6 余额控制和路由回放 | `BLOCKED_UNTIL_GRANT`。预算控制投影、BudgetGroup 兼容路径和交易投影重放仍需单独切片。 | 先决定预算组兼容策略和投影事实边界，再确认 Red 包和写入范围。 |
@@ -648,12 +648,12 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 
 | 能力域 | 准入状态 | 对齐结论 |
 | --- | --- | --- |
-| A1 直接交易事实红线 | `READY_TO_CONFIRM_NOT_AUTHORIZED`。 | 仍是当前唯一可推进到用户确认态的单一 Execution Grant 候选；A1 不包含支付工具 application facade、VCC/VA/ACH/P2 场景交易入口或交易内核入参调整。 |
+| A1 直接交易事实红线 | `HISTORICAL_READY_TO_CONFIRM`。 | A1 曾是当轮单一 Execution Grant 候选；后续如重新选择 A1，必须按最新基线复核，不包含支付工具 application facade、VCC/VA/ACH/P2 场景交易入口或交易内核入参调整。 |
 | B2 钱包账户、支付工具和资金责任基础 | `BLOCKED_UNTIL_GRANT`。 | 可准备独立 Round 0 或授权卡；必须先决定 application facade 命名、资金责任目标字段、BudgetGroup 兼容策略、Request/DTO 和边界测试。 |
 | B4 授权支付工具入口 | `BLOCKED_UNTIL_GRANT`。 | 可设计 `authorizeByInstrument` 或等价 application facade；必须保留账户主体型授权内核，禁止把 canonical `authorize` 请求整体改为支付工具引用。 |
 | B5/B6 余额控制、预算控制和路由回放 | `BLOCKED_UNTIL_GRANT`。 | 预算组不作为账务主体、预算控制投影、交易投影重放和换绑后原路径回放需要单独 Red 和写入范围。 |
 | B7/B8/P2 | `TDD_ANALYSIS_ONLY`。 | 清结算对账、资金数据治理、VCC、全球账户、ACH、收单等只可继续做 TDD 分析、contract-only 或独立 Execution Grant 准备。 |
-| 本轮未提交设计变更 | `BASELINE_ATTACHMENT_REQUIRED`。 | 若在提交前进入下一步 Execution Grant，必须在 `authorityBaseline` 中列出本轮文档变更；否则必须先提交本轮设计和任务基线，再以确认时 Git HEAD 开工。 |
+| 本轮未提交设计变更 | `HISTORICAL_BASELINE_ATTACHMENT_REQUIRED`。 | 该限制属于当轮未提交状态；后续开工统一以确认时 Git HEAD 和最新任务账本为准。 |
 
 ### 13.3 B4-NO-AUTH-REFUND GSD-CAD 准入复核（2026-06-02）
 
@@ -672,7 +672,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 
 ### 13.4 当前 GSD-CAD 恢复入口（2026-06-02）
 
-本节记录 `51e86e3 docs: 固化 B4 无授权退款恢复入口` 和 `3e5ec76 docs: 对齐 B4 无授权退款确认基线` 之后的历史恢复入口。13.1 和 13.2 中 “A1 仍是唯一可推进到用户确认态的单一 Execution Grant 候选” 是 2026-05-31 和 2026-06-01 的历史裁决；B4-NO-AUTH-REFUND 后续已获得用户授权并由 `006bcaa` 闭合，B4-DISPUTE-SEMANTIC-ALIGNMENT 后续已由 `949b24a` 闭合，本节不再作为当前恢复入口。
+本节记录 `51e86e3 docs: 固化 B4 无授权退款恢复入口` 和 `3e5ec76 docs: 对齐 B4 无授权退款确认基线` 之后的历史恢复入口。13.1 和 13.2 中的 A1 直接交易事实红线是 2026-05-31 和 2026-06-01 的历史裁决；B4-NO-AUTH-REFUND 后续已获得用户授权并由 `006bcaa` 闭合，B4-DISPUTE-SEMANTIC-ALIGNMENT 后续已由 `949b24a` 闭合，本节不再作为当前恢复入口。
 
 | 恢复项 | 当前口径 |
 | --- | --- |
@@ -754,18 +754,18 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 
 ### 13.10 B4-DISPUTE-CHARGEBACK 只读准入裁决（2026-06-03）
 
-本节记录 B4-NO-AUTH-REFUND 闭环后的 GSD-CAD 下一候选复核。该复核只写任务账本和准入裁决，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置。
+本节记录 B4-NO-AUTH-REFUND 闭环后的 GSD-CAD 下一候选复核。该复核后续已推进为第 13.11 的 `B4-DISPUTE-SEMANTIC-ALIGNMENT` 候选，并由 `949b24a` 消费；本节只保留历史准入裁决，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置。
 
 | 检查项 | 当前结论 |
 | --- | --- |
-| 单一候选 | `B4-DISPUTE-CHARGEBACK-R0`。目标是裁决拒付/争议承接的 canonical 入口语义，而不是立刻实现完整 chargeback case。 |
-| 当前状态 | `SEMANTIC_DECISION_REQUIRED_NOT_CODE_AUTHORIZED`。 |
+| 历史候选 | `B4-DISPUTE-CHARGEBACK-R0`。目标是裁决拒付/争议承接的 canonical 入口语义，而不是立刻实现完整 chargeback case。 |
+| 当前状态 | `SUPERSEDED_BY_949B24A`；当时状态为 `SEMANTIC_DECISION_REQUIRED_NOT_CODE_AUTHORIZED`。 |
 | 现有代码事实 | 代码已有 `FundsAuthorizationTransactionService#chargeback`、`FundsAuthorizationTransactionChargebackRequest`、`CHARGEBACK` eventType、route replay `CHARGEBACK` phase 和生命周期金额校验。 |
 | 现有测试事实 | `FundsAuthorizationTransactionFlowTests` 已覆盖争议退款走 `settleRefund` 并保留审计上下文、独立 `chargeback` 成功、chargeback 超已完成金额失败无副作用、同业务流水不同摘要失败无副作用。 |
 | 目标设计事实 | PRD、DSL、系分和 B4 准入卡要求拒付与普通退款、授权拒绝可区分；但目标态不要求强制调用独立 `chargeback` 服务入口，默认可通过 `settleRefund` 携带拒付原因、凭证、外部引用和审计上下文承接。 |
-| 差异定性 | 现有 `chargeback` 是比目标态最小语义更强的实现资产，不能直接作为下一轮 canonical API 目标。下一轮若编码，应先证明 `settleRefund` 争议语义在查询、投影、审计和幂等摘要上可区分，而不是先扩展独立 `chargeback` 入口。 |
+| 差异定性 | 现有 `chargeback` 是比目标态最小语义更强的实现资产，不能直接作为下一轮 canonical API 目标。当轮判断是先证明 `settleRefund` 争议语义在查询、投影、审计和幂等摘要上可区分，而不是先扩展独立 `chargeback` 入口。 |
 | 验证证据 | 2026-06-03 执行 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 24 tests。 |
-| 建议下一步 | 若用户确认，可形成 `Execution Grant：B4-DISPUTE-SEMANTIC-ALIGNMENT`，首批 Red 聚焦 `settleRefund` 争议退款与普通授权链退款、NO_AUTH 退款、授权拒绝的可区分性；既有 `chargeback` 保留兼容或内部适配口径需在 Grant 中明确。 |
+| 建议下一步 | 已由 `949b24a` 闭合首轮 `B4-DISPUTE-SEMANTIC-ALIGNMENT`；后续完整 dispute/chargeback case 或独立 `chargeback` 一等 API 仍需新的 Execution Grant。 |
 | 禁止混入 | 不新增 dispute case、清结算追偿、VCC processor、外部卡组织规则、DDL/H2、core 枚举或状态、ledger 公共契约、支付工具 facade、生产配置、外部协议或敏感数据处理。 |
 
 ### 13.11 B4-DISPUTE-SEMANTIC-ALIGNMENT Grant 候选包（2026-06-03）
@@ -844,7 +844,7 @@ B2 开工前先做 Round 0，只核验不写入。Round 0 的输出是“是否�
 禁止写入范围：transaction-* 业务实现；直接交易、授权交易、余额控制交易编排；Route Resolver、Posting Assembler、Route Replay；权益 route/posting/replay 消费；清结算、对账、归档、指标实现；生产配置；外部通道适配
 必须覆盖的 TDD 用例：TDD-WALLET-*、TDD-WALLET-018、TDD-WALLET-019、TDD-ROUTE-011、TDD-ROUTE-012、TDD-LEDGER-*、TDD-VIEW-003、B2-RED-003A
 必须覆盖的 AC/DSL/GAP ID：AC-PI-001、AC-PI-002、AC-PI-003、AC-PI-004、AC-PI-005、AC-PI-006、AC-PI-007、AC-PI-008、AC-PI-009、AC-PI-010、AC-CTRL-009、AC-CTRL-010、AC-CTRL-011、AC-BALLOG-001、RED-036、RED-046、RED-047、RED-049、RED-067、GAP-WALLET-001、GAP-WALLET-001A、GAP-WALLET-002、GAP-WALLET-003
-基线是否已冻结：已冻结；最新已提交设计和任务对齐输入以确认时 Git HEAD 为准，270122e 是上一完整 CAD 验证证据提交，81a7ecb、4a7ef12、f99800b 和 9456ab6 保留为历史准入证据，上一冻结代码能力基线为 77bc9f4；本任务启动前必须复核工作树状态
+基线是否已冻结：已冻结；以确认时 Git HEAD、OpenSpec 和 Harness 最新任务账本为准，270122e、81a7ecb、4a7ef12、f99800b、9456ab6 和 77bc9f4 只作为历史准入与局部保护证据；本任务启动前必须复核工作树状态
 工作树状态：执行前必须复核；dirty 时未列入允许纳入范围的变更不得作为 Done 证据
 允许修改公共契约：待用户确认；建议默认不删除、不改写既有 face/core 字段，只允许为账户、账本、支付工具基础能力做非破坏性新增或校验补齐
 公共契约允许修改范围：如确需变更，只限 wallet/ledger face 中账户角色、账本创建、账期、支付工具绑定和资金账户关系的目标态字段；不得调整交易指令、权益快照、直接交易或授权交易请求语义

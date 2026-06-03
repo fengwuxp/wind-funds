@@ -65,7 +65,7 @@ flowchart LR
 
 编码准入补充口径：
 
-当前代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`。该基线只能作为产品验收差距和 A0 准入输入：已形成交易 Request 上下文只读、敏感上下文阻断、权益核心字段不得通过 `contextVariables` 旁路的局部代码与测试资产；不得外推为含权益 route/posting/replay、清结算、对账、归档、治理重放或 P2 生产资金流已完成。
+当前 PRD 编码准入以确认时 Git HEAD、OpenSpec 和 Harness 最新任务账本为准。`77bc9f4 fix: 阻断钱包上下文权益核心事实` 只能作为产品验收差距和 A0 历史准入输入：已形成交易 Request 上下文只读、敏感上下文阻断、权益核心字段不得通过 `contextVariables` 旁路的局部代码与测试资产；不得外推为含权益 route/posting/replay、清结算、对账、归档、治理重放或 P2 生产资金流已完成。
 
 后续每个 MVP 开工前，PRD 必须先给出 `productGoal`、`businessQuestion`、`mvpScenario`、资金事实、使用者可见结果、成功/失败终态、验收 ID 和明确不做范围，再交给 DSL、系分和 TDD 裁剪。
 

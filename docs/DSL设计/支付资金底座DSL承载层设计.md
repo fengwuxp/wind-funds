@@ -94,7 +94,7 @@ DSL 的能力优先级按资金底座的产品定位划分，不按文档编号�
 
 A0 阶段的 DSL 只把 PRD 的业务问题转成资金事实和机器契约候选，不写测试资源、不改公共契约、不补生产字段。A0 输出必须至少包含 `dslCaseId`、`moneyAction`、`accountingAnchor`、`fixtureLevel`、`contextVariablesBoundary` 和明确不做范围，并能被 TDD 的 `targetAssets` 与 `firstRedCandidateSet` 反查。
 
-当前代码能力基线截至 `77bc9f4 fix: 阻断钱包上下文权益核心事实`。该基线说明 `contextVariables` 已有只读承载、敏感字段阻断和权益核心字段不得旁路的局部保护；若后续扩展核心资金语义，必须进入一等字段、route snapshot、交易事实快照或等价不可变存储，不能把组件金额、资金责任、退款处置完整内容、当前营销规则或外部账户敏感原文放回普通上下文。
+当前 DSL 编码准入以确认时 Git HEAD、`openspec/project.md` 和 Harness 最新任务账本为准；`77bc9f4 fix: 阻断钱包上下文权益核心事实` 只保留为历史局部保护证据。`contextVariables` 已有只读承载、敏感字段阻断和权益核心字段不得旁路的回归资产；若后续扩展核心资金语义，必须进入一等字段、route snapshot、交易事实快照或等价不可变存储，不能把组件金额、资金责任、退款处置完整内容、当前营销规则或外部账户敏感原文放回普通上下文。
 
 ## 二、设计目标与非目标
 
@@ -1200,7 +1200,7 @@ VCC 交易是授权交易的典型接入场景，但 VCC 卡、卡号、token、
 
 预付卡和共享卡不引入新的 DSL 主体类型。prepaid virtual card 仍通过 `instrumentRef` 表达卡工具，通过资金责任解析关系、route participant 或外部确认引用表达预付资金责任；共享卡仍通过 `instrumentRef`、binding snapshot、cardholder/department/project 上下文、BudgetGroup 上下文、Spend Rule 快照和 `FundingAllocationDecision` 表达使用模式。储值券、礼品卡或预付代金券属于权益或预收待付语义，继续使用权益快照，不自动归入 VCC DSL。
 
-B4-DISPUTE-SEMANTIC-ALIGNMENT 准入口径：当前仅形成可确认但未授权的 DSL 候选，不新增 Java、测试、DDL/H2 schema 或公共契约。若后续确认该 Grant，首批 Red 应围绕 `DSL-AUTH-REFUND-001 / B4-CB-RED-001A` 展开：`settleRefund` 的争议退款必须在 reason、external reference、voucher、audit、projection 和 idempotency digest 上区分普通授权链退款、`NO_AUTH` 退款和授权拒绝；独立 `chargeback` 只能作为兼容、显式事件或内部适配资产，不能反向要求成为目标态主入口。
+B4-DISPUTE-SEMANTIC-ALIGNMENT 闭合口径：首轮 DSL 候选已被 `settleRefund / AUTH_REFUND` 的争议退款实现消费，`disputeMode`、`disputeReason`、`disputeVoucherRef`、`externalDisputeRef`、audit、projection 和 idempotency digest 已用于区分普通授权链退款、`NO_AUTH` 退款和授权拒绝；请求侧不恢复 `refundMode`，`DISPUTE` 只作为资金指令内部上下文标签。独立 `chargeback` 只能作为兼容、显式事件或内部适配资产，不能反向要求成为目标态主入口；完整 dispute/chargeback case 或外部规则仍需新的 Execution Grant。
 
 VCC 授权接入口径：
 
