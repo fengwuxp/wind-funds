@@ -43,6 +43,7 @@
 - [x] 2026-06-03 对齐 B4-DISPUTE-SEMANTIC-ALIGNMENT 主文档入口：PRD、DSL、系分和 TDD 主文档已统一为 `settleRefund / AUTH_REFUND` 默认承接拒付/争议语义，独立 `chargeback` 只保留兼容、显式事件、内部适配或后续专项候选口径；同步新增 `TDD-RED-017B` 作为后续授权后的争议退款可区分性红线。本记录仍是文档准入闭环，不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入。
 - [x] 2026-06-03 刷新 B4 GSD-CAD 候选结构校验入口：`818da34 fix(transaction): 移除授权退款请求模式字段` 已把 no-auth refund 请求契约进一步收口为“请求无 `refundMode`、`NO_AUTH` 仅为内部上下文标签”，同轮 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 25 tests；B4 准入卡第 8.10 已补充标准 Harness `harnessScopeIndex`，用于让 CAD 候选结构校验识别写入范围、写入文件、只读范围和只读参考。本记录只刷新 docs/OpenSpec 任务入口，不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入。
 - [x] 2026-06-03 完成 B4-DISPUTE-SEMANTIC-ALIGNMENT 首轮 CAD 闭环：`949b24a fix(transaction): 对齐授权争议退款审计语义` 已让 `settleRefund / AUTH_REFUND` 通过 `disputeMode`、`disputeReason`、`disputeVoucherRef`、`externalDisputeRef` 一等字段承接争议/拒付语义，请求侧仍不恢复 `refundMode`，`DISPUTE` 只作为资金指令内部上下文标签；route replay 只在 `AUTH_REFUND + DISPUTE` 场景传播争议审计上下文，避免普通退款、NO_AUTH 退款和 fee refund 被请求上下文污染。已验证 `just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just pmd` 和 `git diff --check` 通过。本闭环只关闭 `B4-CB-RED-001A / TDD-RED-017B` 首个 canonical 可区分性切片，不声明完整 dispute case、独立 chargeback 一等 API、清结算追偿、VCC processor、DDL/H2 schema、core 枚举状态或 ledger 公共契约完成。
+- [x] 2026-06-03 完成 B4-AUTH-RACE GSD-CAD Round 0：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#813-authraceround0scan2026-06-03` 已记录授权后续事件并发竞争的只读扫描，现有顺序金额闭合、幂等摘要和失败无副作用覆盖充分，但未发现同一授权 settle / reversal / expire / settleRefund 并发竞争专用 Red；`#814-authracegrantcandidate2026-06-03` 已把下一轮候选收敛为 `B4-AUTH-RACE` 原子任务包，状态为 `ROUND0_READY_NOT_CODE_AUTHORIZED`。本记录不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入；若用户确认 `Execution Grant：B4-AUTH-RACE`，CAD 从 `B4-RACE-RED-001` 开始。
 
 ## 1. MVP 任务写入范围
 
@@ -799,6 +800,22 @@ A0 只读核验通过后，曾建议优先确认 A1 直接交易事实红线。A
 | 验证矩阵 | `just compile` 通过；`just test-one FundsAuthorizationTransactionFlowTests tests` 通过 26 tests；`just test-transaction` 通过 94 tests；`just test-business-flow` 通过 108 tests；`just test-boundary` 通过 126 tests；`just pmd` 通过；`git diff --check` 通过。Spring 测试在沙箱内因 embedded Redis 端口绑定触发 `Operation not permitted`，已按权限规则非沙箱重跑并通过。 |
 | 残余风险 | 完整 dispute case、独立 `chargeback` 一等目标 API、清结算追偿、VCC processor、外部卡组织规则、运营审批、查询投影解释增强和合规/会计最终口径仍未完成。 |
 | handoff | 下一轮不能继续消费第 13.11；必须在 B4-AUTH-RACE、授权支付工具应用入口、授权权益生命周期、完整 dispute/chargeback case 或其他经过 Round 0 的单一任务包中重新确认 Execution Grant。 |
+
+### 13.13 B4-AUTH-RACE Round 0 与 Grant 候选（2026-06-03）
+
+本节记录 B4-DISPUTE-SEMANTIC-ALIGNMENT 闭环后的下一轮 GSD-CAD 只读准入。该准入只读取当前代码、测试和任务材料，不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
+
+| 项 | 当前口径 |
+| --- | --- |
+| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 单一任务包 | `B4-AUTH-RACE`，只处理同一授权后续事件的并发竞争红线。 |
+| 现有覆盖 | `FundsAuthorizationTransactionFlowTests` 已覆盖部分完成后过期、过期超剩余失败、撤销超剩余失败、退款/chargeback 超已完成失败，以及 reversal、settle、refund、chargeback 幂等摘要冲突；这些只证明顺序路径和幂等，不证明并发竞争。 |
+| 只读实现观察 | `DefaultFundsInstructionLifecycleSaver#markSucceeded` 以普通读取、内存累计和 `update(transaction)` 更新授权聚合金额；当前扫描未见同一原授权后续事件的状态版本、行锁、唯一约束或串行化测试证据。 |
+| 首批 Red | `B4-RACE-RED-001`：同一授权的 settle 与 expire、settle 与 reversal，必要时 settle 与 settleRefund 并发竞争时，只能有一个合法金额迁移获胜，失败方无 route、posting、ledger entry、projection 或余额变化。 |
+| 允许写入建议 | 用户确认后先写 `FundsAuthorizationTransactionFlowTests` 或同包新增 `FundsAuthorizationTransactionRaceFlowTests`；Red 证明缺口后只允许在 `transaction-impl` 生命周期保存、编排串行化或等价最小锁策略内修复。 |
+| 禁止混入 | 公共请求字段、core 枚举/状态、ledger 公共契约、DDL/H2 schema、支付工具 facade、钱包 application facade、VCC、Spend Rule、完整 dispute/chargeback case、清结算追偿、治理 apply、生产配置、外部协议或敏感数据处理。 |
+| 验证命令 | `just test-one FundsAuthorizationTransactionFlowTests tests` 或 `just test-one FundsAuthorizationTransactionRaceFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
+| handoff | 下一轮若用户确认 `Execution Grant：B4-AUTH-RACE`，CAD 从 `B4-RACE-RED-001` 开始；未确认前只能继续只读 CR、文档对齐或任务计划。 |
 
 ## 14. B2 建议 Execution Grant
 

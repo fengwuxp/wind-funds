@@ -145,7 +145,7 @@
 | B4-FORCE-SETTLE | Done | 首轮账户主体型 canonical 能力已闭合，后续只作为授权交易回归基线。 | `B4-FS-RED-001`、`B4-FS-RED-002` 已回归化。 | 仅在返工或扩展 FORCE 策略引擎、审批快照、额度窗口、overcapture 时另起 Grant。 | 无授权退款、拒付、支付工具 facade、Spend Rule、VCC。 |
 | B4-NO-AUTH-REFUND | Done | 已补齐 settleRefund 无授权退款模式；当前资金层契约收缩为 `authorizationTransactionSn` 空值判定、`externalReferenceSn` 外部追溯引用、`refundReason` 原因、操作者/审计和失败无副作用。 | `B4-NAR-RED-001`、`B4-NAR-RED-002`、`TDD-RED-017A` 已回归化。 | 后续仅在扩展运营审批、人工差错、累计退款控制、查询投影解释或外部规则时另起 Grant。 | force settle、chargeback case 全生命周期、清结算追偿。 |
 | B4-DISPUTE-SEMANTIC-ALIGNMENT | Done | 首轮固化 `settleRefund / AUTH_REFUND` 争议退款与普通退款、NO_AUTH 退款、授权拒绝的可区分性。 | `B4-CB-RED-001A` / `TDD-RED-017B` 已回归化。 | 后续仅在扩展完整 dispute/chargeback case、独立 `chargeback` 一等目标 API、清结算追偿、外部规则或查询投影解释时另起 Grant。 | 独立 dispute system、VCC processor、清结算追偿单、未确认的 `chargeback` 目标态主入口。 |
-| B4-AUTH-RACE | 4 | 固化授权完成、撤销、过期、退款并发竞争红线。 | `B4-RACE-RED-001`。 | 授权 flow 并发测试、状态迁移保护和必要幂等/锁策略。 | DDL/H2 默认不允许，除非 Execution Grant 显式扩权。 |
+| B4-AUTH-RACE | Current candidate | 固化授权完成、撤销、过期、退款并发竞争红线。 | `B4-RACE-RED-001`。 | 授权 flow 并发测试、状态迁移保护和必要幂等/锁策略；已完成 2026-06-03 Round 0 只读扫描，可作为下一轮单一 Execution Grant 确认输入。 | DDL/H2 默认不允许，除非 Execution Grant 显式扩权。 |
 
 B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> Review -> Verify -> Commit 闭环，并由 `006bcaa` 进入代码基线。B4-DISPUTE-SEMANTIC-ALIGNMENT 已由 `949b24a` 进入代码基线。后续完整 dispute/chargeback case、B4-AUTH-RACE、授权支付工具应用入口、授权占券和权益生命周期仍必须各自单独确认 Execution Grant，不能借前述已完成 Grant 自动扩权。
 
@@ -386,6 +386,37 @@ Git 策略：auto_commit
 | Not Done | 完整 dispute case、独立 chargeback 一等目标 API、清结算追偿、VCC processor、外部卡组织规则、DDL/H2 schema、core 枚举状态、ledger 公共契约、支付工具 facade、钱包 application facade、Spend Rule、治理 apply 和生产配置仍未打开。 |
 | 后续入口 | 下一轮必须重新确认单一 Execution Grant。可选候选包括 B4-AUTH-RACE、授权支付工具应用入口、授权权益生命周期、完整 dispute/chargeback case，或其他经过 Round 0 的单一任务包。 |
 
+### 8.13 authRaceRound0Scan（2026-06-03）
+
+本节记录 B4-DISPUTE-SEMANTIC-ALIGNMENT 闭环后的下一轮 GSD-CAD Round 0。扫描只读取现有 Java、测试和任务材料，不修改生产代码、测试代码、DDL/H2 schema 或运行时配置；结论用于把 `B4-AUTH-RACE` 收敛成可确认的单一 Execution Grant 候选。
+
+| 扫描项 | 当前事实 | 对 `B4-RACE-RED-001` 的含义 |
+| --- | --- | --- |
+| 现有顺序覆盖 | `FundsAuthorizationTransactionFlowTests` 已覆盖部分完成后过期、过期超剩余失败、撤销超剩余失败、退款超已完成失败、chargeback 超已完成失败，以及 reversal、settle、refund、chargeback 的同业务流水幂等和不同摘要拒绝。 | 顺序金额闭合和幂等摘要已有较强回归资产；下一轮 Red 不应重复证明顺序路径，而要证明并发竞争下仍不重复入账、释放或回退。 |
+| 现有并发覆盖 | 未发现专门覆盖同一授权 settle、reversal、expire、settleRefund 并发竞争的授权 flow 或 service-level 并发测试。 | `B4-RACE-RED-001` 首批 Red 应使用真实 Spring Bean、H2 表和授权 flow helper 构造同一原授权的并发后续事件，断言最终状态、剩余金额、ledger entry、posting plan、余额桶和失败无副作用。 |
+| 生命周期更新触点 | `DefaultFundsInstructionLifecycleSaver#markSucceeded` 读取 transaction 和 detail 后更新明细，再按内存态累计 `settledAmount`、`reversedAmount`、`refundedAmount`、`declinedAmount` 并普通 `update(transaction)`。当前扫描未见授权生命周期专用状态版本、行锁、唯一约束或同授权后续事件串行化证据。 | 现有实现可能在并发更新时出现 lost update 或双通过校验风险；Red 预期应先失败或暴露不稳定。若最小 Green 需要版本字段、唯一索引、H2 schema 或数据库锁，必须停止并扩展 Grant。 |
+| 命令入口和事务 | `FundsTransactionCommandServiceImpl` 的 authorize、reversal、expire、settle、settleRefund 都是单方法事务，最终委派 converter 和 orchestrator。 | 首轮写入应优先落在目标测试；Red 证明缺口后，只允许在 transaction-impl 生命周期、编排串行化或等价最小锁策略内修复，不扩大到支付工具 facade、VCC、清结算或治理。 |
+| 测试工具基础 | `AbstractFundsServiceTest` 已提供真实 Spring Bean、H2、`LockTemplate` 测试基础设施；`FundsTransactionFlowTestSupport` 已有 authorize、settle、reversal、expire、refund helper。 | Red 可复用现有 helper，必要时新增专用并发 helper；测试不得只断言“不报错”或交易状态，必须断言余额、route/posting/entry/projection、幂等摘要和失败方无副作用。 |
+| 准入裁决 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 | 可进入用户确认态的候选是 `B4-AUTH-RACE` 单一任务包；未确认 Execution Grant 前不写 Red、不改生产代码、不改 DDL/H2 schema。 |
+
+### 8.14 authRaceGrantCandidate（2026-06-03）
+
+本节把 `B4-AUTH-RACE` 收敛为下一轮可确认的 GSD-CAD 原子任务包。它只处理账户主体型授权内核的并发竞争红线，不包含授权支付工具 application facade、授权占券和权益生命周期、完整 dispute/chargeback case、VCC、Spend Rule、清结算对账或治理 apply。
+
+| 项 | 当前口径 |
+| --- | --- |
+| Task ID | `B4-AUTH-RACE`。 |
+| Execution Grant 关联 | `待用户确认`；本节只作为 Grant 候选，不授权写入。 |
+| mvpScenario | 同一已批准授权在完成、撤销、过期和退款等后续事件并发到达时，资金底座必须保证金额闭合、状态合法、route/ledger/projection 不重复、不遗漏，失败方无资金副作用。 |
+| 首批 Red | `B4-RACE-RED-001`：同一授权的 settle 与 expire 或 settle 与 reversal 并发竞争时，只能有一个合法金额迁移获胜，失败方不得产生 route、posting、ledger entry、projection 或余额变化；必要时扩展 settle 与 settleRefund 并发。 |
+| 允许写入范围 | 先写 `tests/src/test/java/com/capte/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java` 或新增同包 `FundsAuthorizationTransactionRaceFlowTests.java` 的目标 Red；Red 证明缺口后，只允许在 `transaction-impl` 的生命周期保存、编排串行化或等价最小锁策略内修复。 |
+| 只读参考范围 | `transaction-face` 请求契约、`FundsAuthorizationInstructionConverter`、`DefaultFundsInstructionLifecycleSaver`、route replay、ledger posting 装配、`tests/src/test/resources/jdbc-schema.sql` 和现有 B4 授权 flow 测试。 |
+| 默认禁止范围 | 不改公共请求字段、core 枚举/状态、ledger 公共契约、DDL/H2 schema、支付工具 facade、钱包 application facade、VCC、Spend Rule、完整 dispute/chargeback case、清结算追偿、治理 apply、生产配置、外部协议或敏感数据处理。 |
+| 扩权停止条件 | 若最小 Green 需要数据库唯一约束、锁字段、版本字段、H2 schema、公共契约、状态机或错误码变更，立即停止并要求新的 Execution Grant 明确授权。 |
+| 验证命令 | `just test-one FundsAuthorizationTransactionFlowTests tests` 或新增并发测试类的 `just test-one <TestClass> tests`；回归 `just test-transaction`、`just test-business-flow`、`just test-boundary`；提交前 `just compile`、`just pmd`、`git diff --check`。 |
+| Git 策略 | 候选建议 `auto_commit`，但只有用户确认 Execution Grant 且工具权限可用时生效。 |
+| handoff | 若用户确认本 Grant，下一轮 CAD 从 `B4-RACE-RED-001` 开始；若用户选择授权支付工具应用入口、授权权益生命周期或完整 dispute/chargeback case，则必须另起 Round 0，不复用本候选写入范围。 |
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
@@ -436,3 +467,15 @@ Git 策略：auto_commit
 ```
 
 B4-NO-AUTH-REFUND 模板已由 `006bcaa` 消费；后续只作为历史授权样例和回归范围参考，不作为新的自动编码授权。
+
+```text
+Execution Grant：B4-AUTH-RACE
+确认基线：确认时 Git HEAD；必须包含 B4 授权过期释放、强制完成、无授权退款、争议退款可区分性和本轮 B4-AUTH-RACE Round 0 候选包相关提交
+允许写入：先写 tests 中 B4-RACE 目标 Red；Red 证明缺口后允许 transaction-impl 生命周期保存、编排串行化或等价最小锁策略修复
+允许测试资产：FundsAuthorizationTransactionFlowTests 或同包新增 FundsAuthorizationTransactionRaceFlowTests；必须使用真实 Spring Bean、H2 表和现有授权 flow helper
+禁止写入：公共请求字段、core 枚举或状态、ledger 公共契约、DDL/H2 schema、支付工具 facade、钱包 application facade、VCC、Spend Rule、完整 dispute/chargeback case、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理
+首批 Red：B4-RACE-RED-001
+验证命令：just test-one FundsAuthorizationTransactionFlowTests tests 或 just test-one FundsAuthorizationTransactionRaceFlowTests tests；just test-transaction；just test-business-flow；just test-boundary；just compile；提交前 just pmd 和 git diff --check
+Git 策略：auto_commit
+停止条件：需要 DDL/H2、数据库唯一约束、锁字段、版本字段、公共契约、状态机、错误码、外部规则、清结算对账、P2、敏感数据或工作树冲突越界即停止
+```
