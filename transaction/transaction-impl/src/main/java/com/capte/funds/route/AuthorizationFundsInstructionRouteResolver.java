@@ -6,7 +6,6 @@ import com.capte.funds.route.support.RouteSpecSupport;
 import com.capte.funds.route.support.RouteSubjectSupport;
 import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
-import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.capte.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.capte.funds.transaction.support.FundsInstructionContextReader;
 import com.capte.funds.transaction.support.FundsRouteCodes;
@@ -366,7 +365,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
     private boolean isNoAuthRefund(FundsInstructionSpec instruction) {
         String refundMode = FundsInstructionContextReader.getValue(instruction,
                 FundsInstructionContextKeys.REFUND_MODE, String.class);
-        return FundsAuthorizationTransactionRefundRequest.REFUND_MODE_NO_AUTH.equalsIgnoreCase(refundMode);
+        return FundsInstructionContextKeys.REFUND_MODE_NO_AUTH.equalsIgnoreCase(refundMode);
     }
 
     @Override

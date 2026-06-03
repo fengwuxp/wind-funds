@@ -51,6 +51,8 @@ public final class FundsInstructionContextKeys {
 
     public static final String REFUND_MODE = "refundMode";
 
+    public static final String REFUND_MODE_NO_AUTH = "NO_AUTH";
+
     public static final String EXTERNAL_REFERENCE_SN = "externalReferenceSn";
 
     public static final String REFUND_REASON = "refundReason";

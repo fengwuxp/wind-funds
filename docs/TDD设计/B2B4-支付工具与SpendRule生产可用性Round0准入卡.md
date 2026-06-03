@@ -100,7 +100,7 @@ Request/DTO 默认落 `com.capte.funds.wallet.model.request` 和 `com.capte.fund
 | --- | --- | --- | --- |
 | 授权过期释放 | 已完成 B4-TRX-EXPIRE 基础能力，后续只作为回归基线或扩展切片。 | `FundsAuthorizationTransactionService#expire`、`FundsAuthorizationTransactionExpireRequest`、`EXPIRE` 事件、transaction-impl、route replay、授权流测试已由 `b0666ba` 闭合。 | 支付工具主体入参、卡账本、预算组入账；不得借过期释放扩展强制完成、无授权退款或 VCC 生命周期。 |
 | 受控强制完成 | 可以，B4 独立切片。 | settle 请求、策略字段、审计字段、金额边界测试。 | 用强制完成伪造授权占用或绕过原路径。 |
-| 无授权直接退款 | 可以，B3/B4 独立切片。 | `authorizationTransactionSn` 空值语义、`refundMode=NO_AUTH` 内部标签或等价模式、`externalReferenceSn`、退款原因、操作者/审计和失败无副作用测试。 | 缺外部引用、缺原因或缺审计仍静默退款，携带内部授权流水，或按当前工具绑定选路。 |
+| 无授权直接退款 | 可以，B3/B4 独立切片。 | `authorizationTransactionSn` 空值语义、`externalReferenceSn`、退款原因、操作者/审计、`NO_AUTH` 内部上下文标签和失败无副作用测试。 | 缺外部引用、缺原因或缺审计仍静默退款，携带内部授权流水，或按当前工具绑定选路。 |
 | 拒付和争议扣回 | 可以，B4 或 P2-VCC-LIFECYCLE 切片。 | chargeback 或等价逆向请求、原因/凭证/阶段、重复损失防护测试。 | 与授权拒绝或普通 refund 混同。 |
 | 余额控制调账审计 | 可以，B5 独立切片。 | `FundsBalanceControlService`、adjust 请求、审批/差错/凭证字段和测试。 | 用支付工具或预算组作为余额主体。 |
 | 原路径回放和投影解释 | 可以，B6/B8 独立切片。 | route replay、transaction projection、查询 DTO 和重放测试。 | 投影反写事实或替代 route/posting/ledger。 |

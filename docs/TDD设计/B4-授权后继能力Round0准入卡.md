@@ -37,7 +37,7 @@
 | --- | --- |
 | 背景、目标、非目标、成功标准 | 背景是 B4-TRX-EXPIRE、B4-FORCE-SETTLE 和 B4-NO-AUTH-REFUND 已闭合，但拒付/争议、授权并发、授权支付工具应用入口和授权权益生命周期仍缺独立 Execution Grant；目标是保留可授权的最小 Red 选择依据；非目标是不混入支付工具 facade、VCC、Spend Rule、清结算对账或治理；成功标准是候选切片能追溯到 AC、DSL、TDD、写入范围和停止条件。 |
 | 核心决策、职责边界和取舍 | 核心决策是只推进账户主体型 canonical 授权内核；支付工具、VCC、Spend Rule 和清结算能力保持独立授权；B4-FORCE-SETTLE 与 B4-NO-AUTH-REFUND 首轮已闭合，下一步取舍必须重新确认一个单一授权后继切片，不一次性打开全部授权后继状态。 |
-| 接口契约、入参、错误码、幂等和兼容 | B4-FORCE-SETTLE 的字段和 `authorizationTransactionSn` 条件化规则已作为回归基线；B4-NO-AUTH-REFUND 的 `authorizationTransactionSn` 空值语义、`refundMode=NO_AUTH` 内部归类标签、`externalReferenceSn`、退款原因、操作者/审计和普通授权链退款兼容策略已作为回归基线。后续任何新增或调整接口契约、错误码、幂等摘要、查询解释字段或投影字段，都必须在新 Execution Grant 中显式列名。 |
+| 接口契约、入参、错误码、幂等和兼容 | B4-FORCE-SETTLE 的字段和 `authorizationTransactionSn` 条件化规则已作为回归基线；B4-NO-AUTH-REFUND 的请求契约收敛为 `authorizationTransactionSn` 空值语义、`externalReferenceSn`、退款原因、操作者/审计和普通授权链退款兼容策略，`NO_AUTH` 只由 converter 写入资金指令内部上下文。后续任何新增或调整接口契约、错误码、幂等摘要、查询解释字段或投影字段，都必须在新 Execution Grant 中显式列名。 |
 | 数据方案、事务边界、一致性和补偿 | Red 必须证明 route snapshot、posting plan、ledger transaction、ledger entry、projection、余额桶和失败无副作用；并发切片若需要唯一约束、锁字段、版本字段或补偿路径，必须扩权确认。 |
 | 可靠性、安全、权限、审计和告警 | 本卡不授权生产发布、外部协议或敏感数据；退款和拒付切片都必须按各自语义保留原因、外部引用、脱敏审计和失败可解释性；强制完成的审计最小集已作为 B4-FORCE-SETTLE 回归基线，无授权退款审计最小集已收缩为 `externalReferenceSn`、退款原因和操作者；权限和告警只作为后续 Execution Grant 待确认项。 |
 | 验证方案、测试、静态检查和回归 | 每个切片先写目标 Red，再跑 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check` 中的授权命令。 |
@@ -58,7 +58,7 @@
 | --- | --- |
 | 目标测试资产 | 优先允许写 `tests/src/test/java/com/capte/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java`；必要时允许新增 B4 后继能力专用 flow 测试类或补 `DefaultRouteReplayServiceTests`。 |
 | 生产实现 | 只有 Red 证明真实缺口后，才允许在 `transaction-face`、`transaction-impl`、route replay 和必要的 ledger posting 装配最小范围修复。 |
-| 公共契约 | 默认不允许破坏既有请求；B4-FORCE-SETTLE 字段和 `authorizationTransactionSn` 条件化规则已作为回归基线；B4-NO-AUTH-REFUND 当前只保留 `authorizationTransactionSn` 空值语义、`refundMode` 内部标签、`externalReferenceSn`、原因和操作者/审计。若后续必须新增运营审批、人工差错、累计控制、查询解释或外部规则字段，Execution Grant 必须显式列名、说明普通授权链退款和无授权退款的兼容策略，并明确无授权退款不得携带内部授权流水、不得查询原授权账本交易。 |
+| 公共契约 | 默认不允许破坏既有请求；B4-FORCE-SETTLE 字段和 `authorizationTransactionSn` 条件化规则已作为回归基线；B4-NO-AUTH-REFUND 当前请求侧只保留 `authorizationTransactionSn` 空值语义、`externalReferenceSn`、原因和操作者/审计，`NO_AUTH` 仅作为内部上下文标签。若后续必须新增运营审批、人工差错、累计控制、查询解释或外部规则字段，Execution Grant 必须显式列名、说明普通授权链退款和无授权退款的兼容策略，并明确无授权退款不得携带内部授权流水、不得查询原授权账本交易。 |
 | core 枚举和状态 | 默认不新增独立 `CHARGEBACK` 事件；若需要新增状态、事件或错误码，必须单独确认。 |
 | H2 schema | 默认不允许修改 `tests/src/test/resources/jdbc-schema.sql`；若需要新增字段、表、索引或唯一约束，立即停止并扩权确认。 |
 
@@ -79,7 +79,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `B4-FS-RED-001` | 外部没有前置授权但确认发生消费结果时，系统是否能按受控强制完成入账。 | 强制完成只能表达已确认外部消费事实，不得伪造授权占用或污染授权生命周期。 | settle 强制完成请求必须携带强制完成模式、受信策略或审批快照、上限、原因、审计和外部事实引用；首轮 FORCE 模式不得依赖 `authorizationTransactionSn`，不得构造 `AUTHORIZATION` reference 或查询原授权账本交易；成功后生成可追溯资金交易、route snapshot、posting plan、ledger transaction、ledger entry 和 projection。 | 不得先创建虚假授权；不得无策略或超上限入账；不得缺原因、缺审计或缺外部事实引用仍成功；不得把普通完成的 `authorizationTransactionSn` 兼容字段当作强制完成凭证。 | 状态、策略来源、上限、原因、审计、外部引用、`authorizationTransactionSn` 条件化、route snapshot、posting plan 平衡、ledger entry、余额投影、幂等和失败无副作用。 | `FundsAuthorizationTransactionFlowTests` 或新 B4 force settle flow 测试。 | `just test-one FundsAuthorizationTransactionFlowTests tests`、必要时 `just test-transaction`、`just test-boundary`。 | 需要新增公共契约字段、错误码、状态或 H2 schema 但未授权。 |
 | `B4-FS-RED-002` | 无策略、超上限、缺审计或 FORCE 模式仍携带内部授权流水时是否被阻断。 | 失败必须无资金副作用，不生成半截 route、posting、entry 或 projection。 | 返回可解释失败原因，原授权或外部事实不被污染。 | 不得生成 FAILED 以外的资金事实；不得产生 ledger transaction、posting plan 或 balance projection；不得在 FORCE 模式下回退到普通授权完成路径。 | 失败状态、失败原因、无 route/posting/entry/projection、余额不变、幂等冲突不污染原事实、普通完成与 FORCE 完成请求摘要可区分。 | `FundsAuthorizationTransactionFlowTests`。 | `just test-one FundsAuthorizationTransactionFlowTests tests`。 | 失败语义需要产品重新确认，或与现有失败事实记录口径冲突。 |
-| `B4-NAR-RED-001` | 无前置授权但存在可追溯外部引用时，系统是否能直接退款回补。 | 无授权退款以 `authorizationTransactionSn` 为空进入 no-auth 语义，并引用 `externalReferenceSn`、原因和操作者/审计；不补造授权占用，不携带或查询内部授权流水，不按当前绑定重新选路。 | settleRefund 无授权退款请求不携带内部授权流水，携带 `externalReferenceSn`、退款原因和操作者/审计；成功后形成退款资金事实和可解释投影，`refundMode` 只作为内部归类标签。 | 无外部引用、无原因或无操作者/审计不得静默退款；不得创建内部授权占用；不得按当前工具绑定重选路；不得把内部 `authorizationTransactionSn` 当成 no-auth refund 凭证。 | 原授权流水空值语义、外部引用、原因、操作者/审计、route、ledger entry、projection、幂等、失败无副作用。 | `FundsAuthorizationTransactionFlowTests` 或新 no-auth refund flow 测试。 | `just test-one FundsAuthorizationTransactionFlowTests tests`、必要时 `just test-transaction`。 | 需要扩展 settleRefund Request/DTO 或 route replay 公共契约但未授权。 |
+| `B4-NAR-RED-001` | 无前置授权但存在可追溯外部引用时，系统是否能直接退款回补。 | 无授权退款以 `authorizationTransactionSn` 为空进入 no-auth 语义，并引用 `externalReferenceSn`、原因和操作者/审计；不补造授权占用，不携带或查询内部授权流水，不按当前绑定重新选路。 | settleRefund 无授权退款请求不携带内部授权流水，携带 `externalReferenceSn`、退款原因和操作者/审计；成功后形成退款资金事实和可解释投影，`NO_AUTH` 只作为资金指令内部归类标签。 | 无外部引用、无原因或无操作者/审计不得静默退款；不得创建内部授权占用；不得按当前工具绑定重选路；不得把内部 `authorizationTransactionSn` 当成 no-auth refund 凭证。 | 原授权流水空值语义、外部引用、原因、操作者/审计、route、ledger entry、projection、幂等、失败无副作用。 | `FundsAuthorizationTransactionFlowTests` 或新 no-auth refund flow 测试。 | `just test-one FundsAuthorizationTransactionFlowTests tests`、必要时 `just test-transaction`。 | 需要扩展 settleRefund Request/DTO 或 route replay 公共契约但未授权。 |
 | `B4-NAR-RED-002` | 缺外部引用、缺原因、缺审计或携带内部授权流水的无授权退款是否失败且无副作用。 | 不存在最小可追溯来源或审计最小集时不能生成退款资金事实。 | 返回可解释失败或进入差错候选，不产生 ledger transaction。 | 不得静默退款；不得把普通上下文暗含为核心资金事实；不得写入不可核对投影。 | 失败原因、无 route/posting/entry/projection、余额不变、审计上下文脱敏、敏感上下文阻断。 | `FundsAuthorizationTransactionFlowTests`。 | `just test-one FundsAuthorizationTransactionFlowTests tests`。 | 产品要求转人工差错而不是直接失败，需要先确认状态和数据落点。 |
 | `B4-CB-RED-001` / `TDD-RED-017B` | 已完成授权发生争议、拒付或扣回时，系统是否能与普通退款、授权拒绝区分。 | 拒付是争议/扣回语义，累计退款和拒付不得超过已完成金额，且必须沿原完成或原 route snapshot。 | settleRefund 携带拒付原因、外部引用、凭证和审计上下文；查询、投影、审计和幂等摘要能区分普通退款、NO_AUTH 退款、拒付承接和授权拒绝。 | 不得把授权拒绝记成拒付；不得要求独立 `chargeback` 服务入口作为目标态；不得把拒付压缩成不可区分的普通退款。 | 拒付原因、凭证、外部引用、原完成引用、累计金额、route replay、projection 可区分、失败无副作用。 | `FundsAuthorizationTransactionFlowTests`、交易投影相关测试。 | `just test-transaction`、必要时 `just test-business-flow`。 | 需要新增 dispute case 模型、清结算追偿或 chargeback 独立状态机。 |
 | `B4-RACE-RED-001` | 同一授权的完成、撤销、过期、退款并发竞争是否会重复入账、重复释放或剩余为负。 | 同一授权同一时刻只有合法迁移生效；失败方不得产生资金副作用。 | 通过幂等键、状态版本、唯一约束、锁定策略或等价机制保证完成、撤销、过期、退款金额闭合。 | 不得重复释放 AUTHORIZATION；不得累计完成超授权；不得出现负 remaining；不得生成重复 ledger entry。 | 并发结果、最终状态、授权剩余、ledger entry 唯一性、余额桶、幂等摘要、失败无副作用。 | 授权并发 flow 测试或 service-level 并发测试。 | `just test-business-flow`、必要时 `just test-transaction`。 | 需要新增数据库唯一约束、锁字段、版本字段或 H2 schema。 |
@@ -131,9 +131,9 @@
 
 本节记录 B4-NO-AUTH-REFUND 首轮编码候选契约的准入来源。该候选已由 `006bcaa` 消费并进入回归基线；后续 CR 将资金层契约收缩为 `authorizationTransactionSn` 空值判定、`externalReferenceSn` 外部追溯引用和 `refundReason` 轻量原因。下表保留为字段语义、必填、摘要、审计和失败无副作用规则的 CR 依据，不授权新的 Java 代码、测试代码、DDL/H2 schema 或外部协议写入。
 
-| 候选字段 | 语义 | 首轮建议 | Red 断言 | 不纳入本轮 |
+| 契约项 | 语义 | 首轮建议 | Red 断言 | 不纳入本轮 |
 | --- | --- | --- | --- | --- |
-| `refundMode` | 资金指令内部归类标签。 | 请求侧按 `authorizationTransactionSn` 是否为空判定无授权退款；converter 在无授权退款指令上下文补充 `NO_AUTH` 标签；普通授权链退款仍要求 `authorizationTransactionSn`。 | 缺 `refundMode` 但无内部授权流水时仍进入无授权退款；携带内部授权流水时不能进入 no-auth refund。 | 不重构普通退款服务入口；不新增统一退款事件体系。 |
+| `NO_AUTH` 内部标签 | 资金指令内部归类标签，不是 `FundsAuthorizationTransactionRefundRequest` 请求字段。 | 请求侧按 `authorizationTransactionSn` 是否为空判定无授权退款；converter 在无授权退款指令上下文补充 `NO_AUTH` 标签；普通授权链退款仍要求 `authorizationTransactionSn`。 | 请求不携带退款模式字段但无内部授权流水时仍进入无授权退款；携带内部授权流水时不能进入 no-auth refund。 | 不重构普通退款服务入口；不新增统一退款事件体系；不恢复请求侧 `refundMode` 字段。 |
 | `externalReferenceSn` | 外部引用流水号，只用于资金事实追溯。 | 必填，可为脱敏外部流水、presentment/clearing 引用、差错单号或等价引用；进入请求摘要和审计。 | 缺引用失败且无 route、posting、entry 或 projection；不得用内部授权流水伪造外部引用。 | 不保存完整原始报文、PAN、CVV、外部凭证原文或敏感支付数据；不解释外部事实类型。 |
 | `refundReason` | 无授权退款的业务原因。 | 必填，进入请求摘要、交易上下文和审计解释。 | 缺原因或空白原因失败。 | 不定义最终争议/拒付 reason code 全集。 |
 | `operator` / `contextVariables` | 操作者和白名单审计上下文。 | 审计最小集使用现有 `WindOperator`、`refundReason` 和 `externalReferenceSn`；`ReadonlyContextVariables` 只承接白名单补充字段，敏感字段继续由 validator 阻断。 | 缺操作者、缺原因、缺外部引用或敏感上下文时失败/阻断；不得把核心资金事实塞进普通上下文。 | 不新增权限系统，不引入生产配置；不把外部协议报文、运营凭证或外部事实分类作为资金层一等字段。 |
@@ -158,7 +158,7 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 | 当前状态 | `DONE_BY_006BCAA`。B4-NO-AUTH-REFUND 已按用户确认的 Execution Grant 完成并提交。 | 后续只作为 B4 授权后继能力回归基线；新增能力、扩展字段、表结构、外部规则或运营流程必须另起 Grant。 |
 | GSD 切片 | 单一切片为 B4-NO-AUTH-REFUND，只处理 `settleRefund` 无授权退款模式。 | 不与 force settle 返工、chargeback 独立入口、支付工具 facade、VCC、Spend Rule、清结算对账或治理任务混跑。 |
 | CAD 首轮 Pick | `B4-NAR-RED-001` 已被消费并回归化，目标缺口已由 `006bcaa` 关闭。 | 若后续补充失败矩阵或查询投影解释，只能在新 Grant 中重新定义 Red 和写入范围。 |
-| 必须列名字段 | `authorizationTransactionSn` 空值语义、`refundMode` 内部标签或等价模式、`externalReferenceSn`、`refundReason`、`operator/contextVariables`。 | Grant 必须说明字段名、类型、必填规则、摘要字段、普通授权链退款兼容策略和 NO_AUTH 模式不得携带或查询内部授权流水。 |
+| 必须列名契约 | 请求字段为 `authorizationTransactionSn` 空值语义、`externalReferenceSn`、`refundReason`、`operator/contextVariables`；`NO_AUTH` 为内部上下文标签。 | Grant 必须说明字段名、类型、必填规则、摘要字段、普通授权链退款兼容策略，并说明 NO_AUTH 内部标签不得由请求侧传入，且不得携带或查询内部授权流水。 |
 | 首轮禁止事项 | 不改 DDL/H2 schema，不新增支付工具 facade，不新增 chargeback 独立入口，不实现 VCC 生命周期，不接入外部协议或敏感数据处理。 | 任一项成为必要条件时，停止并重新确认授权范围。 |
 | 验证闭环 | 本轮编码闭环已执行 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`、`git diff --cached --check`；2026-06-03 追加回归 `just test-business-flow` 通过 106 tests。 | 后续新 Grant 仍需按各自写入范围重新执行目标验证和回归验证。 |
 
@@ -183,14 +183,14 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 | `mvpScenario` | 无前置内部授权流水，但已存在可追溯外部引用，需要在账户主体型交易内核中形成可追溯退款资金事实。 |
 | `businessAdmission` | 产品验收锚点为 `AC-AUTH-012` 和 `TDD-RED-017A`；DSL 锚点为 `DSL-AUTH-REFUND-001`；系分锚点为授权交易 `settleRefund`、route replay、账务计划和投影解释。 |
 | `firstRedSet` | `B4-NAR-RED-001` 已消费并回归化，成功路径证明 no-auth refund 生成独立可追溯退款资金事实。 |
-| `secondRedSet` | `B4-NAR-RED-002` 最小失败矩阵已随目标 flow 覆盖缺外部引用、缺原因、携带内部授权流水等失败无副作用；缺 `refundMode` 但无内部授权流水时按 no-auth refund 处理。 |
+| `secondRedSet` | `B4-NAR-RED-002` 最小失败矩阵已随目标 flow 覆盖缺外部引用、缺原因、携带内部授权流水等失败无副作用；请求不携带退款模式字段但无内部授权流水时按 no-auth refund 处理。 |
 | `gitStrategy` | 仅在用户确认 `auto_commit` 且目标验证通过时提交；验证失败、环境不可判定或越界时转为 `summary_only`。 |
 
 | 边界项 | 候选裁决 |
 | --- | --- |
 | `writeScope` | 历史授权范围为先写 `tests/src/test/java/com/capte/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java` 中 B4-NAR 目标 Red；Red 证明缺口后，允许最小修改 `transaction/transaction-face` 的 `FundsAuthorizationTransactionRefundRequest` 兼容字段，以及 `transaction/transaction-impl` 的 converter、command service、lifecycle saver、route replay 和请求摘要。实际闭环未新增独立测试类，未修改 DDL/H2、ledger 公共契约、core 枚举状态或 wallet facade。 |
 | `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/*`、现有 `transaction-*`、`ledger-*`、`tests/src/test/resources/jdbc-schema.sql`。 |
-| `publicContractGate` | 只有 Grant 显式列名 `authorizationTransactionSn` 空值语义、`refundMode` 内部标签或等价模式、`externalReferenceSn`、`refundReason` 和 `operator/contextVariables` 时，才允许扩展 `FundsAuthorizationTransactionRefundRequest`。不允许破坏普通授权链退款的 `authorizationTransactionSn` 兼容语义。 |
+| `publicContractGate` | 只有 Grant 显式列名 `authorizationTransactionSn` 空值语义、`externalReferenceSn`、`refundReason` 和 `operator/contextVariables` 时，才允许扩展 `FundsAuthorizationTransactionRefundRequest`；`NO_AUTH` 仅可作为内部上下文标签，不作为请求字段。不得破坏普通授权链退款的 `authorizationTransactionSn` 兼容语义。 |
 | `ledgerGate` | 默认不修改 `ledger-face`、`ledger-impl` 公共能力。若 route replay 或 posting 装配证明必须改 ledger 侧公共契约、账务计划语义或 projection 表达，立即停止并扩权确认。 |
 | `schemaGate` | `tests/src/test/resources/jdbc-schema.sql`、生产 DDL、Entity 字段、Mapper 表字段和数据库唯一约束均只读；任何表结构需求都触发停止。 |
 | `noWriteScope` | 不写支付工具 facade、钱包 application facade、VCC 生命周期、Spend Rule 表、force settle 返工、chargeback 独立入口、dispute case、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理和 P2 业务能力包。 |
@@ -206,7 +206,7 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 
 | `B4-NAR-RED-002` 失败矩阵 | 停止或失败口径 |
 | --- | --- |
-| 缺模式或空白模式 | 不影响 no-auth 判定；请求未携带内部授权流水时仍按无授权退款处理，并在内部摘要补充 `NO_AUTH` 归类标签。 |
+| 请求不携带模式字段 | 不影响 no-auth 判定；请求未携带内部授权流水时仍按无授权退款处理，并在内部摘要补充 `NO_AUTH` 归类标签。 |
 | 缺外部引用 | 失败且无资金副作用；不得把内部授权流水当外部引用。 |
 | 缺退款原因或操作者 | 失败且无资金副作用；不得从普通 `contextVariables` 暗含核心资金事实。 |
 | 携带 `authorizationTransactionSn` | `NO_AUTH` 模式必须失败或转人工差错候选；不得查询原授权账本交易。 |
@@ -241,7 +241,7 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 
 | 扫描项 | Grant 前事实 | 对 `B4-NAR-RED-001` 的含义 |
 | --- | --- | --- |
-| 请求契约 | Grant 前 `FundsAuthorizationTransactionRefundRequest.authorizationTransactionSn` 仍是 `@NotNull`，当时没有 `refundMode`、`externalReferenceSn`、`refundReason` 等字段。 | 无授权退款无法通过现有请求表达；首轮 Red 应证明必须新增或兼容扩展显式列名字段。 |
+| 请求契约 | Grant 前 `FundsAuthorizationTransactionRefundRequest.authorizationTransactionSn` 仍是 `@NotNull`，当时没有 no-auth 空值语义、`externalReferenceSn`、`refundReason` 等请求契约。 | 无授权退款无法通过现有请求表达；首轮 Red 应证明必须新增或兼容扩展显式列名字段。 |
 | 指令转换 | `FundsAuthorizationInstructionConverter#convertToSettleRefundInstruction` 无条件调用 `authorizationReference(request.getAuthorizationTransactionSn())`，并把 `AUTHORIZATION_TRANSACTION_SN` 写入上下文。 | NO_AUTH 路径当前会被内部授权流水绑定，不能满足“不携带或查询内部授权流水”。 |
 | 原授权账本查询 | `authorizationReference(...)` 会查询原授权 `AUTHORIZE` ledger transaction，并要求唯一。 | 没有内部授权流水时当前路径会失败在原授权账本引用，而不是形成外部原事实退款。 |
 | 命令入口 | `FundsTransactionCommandServiceImpl#settleRefund` 直接委派 converter。 | 首轮 Green 若获授权，修复点应优先落在 request、converter、lifecycle、route replay 和请求摘要的最小范围内，不在 command service 扩大业务分支。 |
@@ -259,7 +259,7 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 | 授权退款 route 形态 | 现有 `resolveSettleRefund` 可生成 SETTLEMENT -> AVAILABLE 的退款 leg，但该方法不是当前普通 `AUTH_REFUND` 的主要命中入口，且依赖账户上下文和平台 SETTLEMENT 账户。 | 若复用该 route 形态，必须由 NO_AUTH 明确校验外部引用、原因和账户主体，不得借内部 `AUTHORIZATION_TRANSACTION_SN` 进入。 |
 | 生命周期聚合 | `DefaultFundsInstructionLifecycleSaver#findReferenceTransaction` 会在 reference type 为 `AUTHORIZATION`、`ORIGINAL_TRANSACTION`、`REFUND` 或 `FEE` 时复用引用交易；`EXTERNAL_TRANSACTION` 不复用。 | NO_AUTH 若使用外部引用，应避免复用内部授权交易聚合；交易聚合、明细和请求摘要必须能区分普通授权链退款与 no-auth refund。 |
 | 可回退金额校验 | `AUTH_REFUND` 和 `REFUND` 成功前会检查可回退金额；只有交易类型为 `DefaultFundsTransactionType.REFUND` 的聚合跳过 settled reversible amount 校验。 | NO_AUTH 首轮不使用调用方自报金额作为资金层上限；可退资金由平台结算账户余额和账务平衡约束，累计退款控制、外部事实登记或清算批次限额另起 Grant。 |
-| 请求摘要 | 明细 `requestHash` 当前纳入 instruction reference、contextVariables、route summary 和 participant summary。 | NO_AUTH 的模式、`externalReferenceSn` 和原因必须进入摘要或等价不可变事实，避免同一 `businessSn` 不同外部引用被幂等误合并。 |
+| 请求摘要 | 明细 `requestHash` 当前纳入 instruction reference、contextVariables、route summary 和 participant summary。 | `NO_AUTH` 内部标签、`externalReferenceSn` 和原因必须进入摘要或等价不可变事实，避免同一 `businessSn` 不同外部引用被幂等误合并。 |
 
 ### 8.6 firstRedAssertionPack（2026-06-03）
 
@@ -267,7 +267,7 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 
 | 断言层 | 首轮 Red 必须表达 | 可复用测试资产 |
 | --- | --- | --- |
-| 请求事实 | no-auth refund 请求不携带 `authorizationTransactionSn`，携带 `externalReferenceSn`、原因和操作者；`refundMode` 只作为内部归类标签，不决定分支。 | `FundsAuthorizationTransactionFlowTests` 新增目标用例；`FundsTransactionFlowTestSupport` 新增 no-auth refund 专用请求构造。 |
+| 请求事实 | no-auth refund 请求不携带 `authorizationTransactionSn` 和 `refundMode`，携带 `externalReferenceSn`、原因和操作者；`NO_AUTH` 只作为内部归类标签，不决定分支。 | `FundsAuthorizationTransactionFlowTests` 新增目标用例；`FundsTransactionFlowTestSupport` 新增 no-auth refund 专用请求构造。 |
 | 余额事实 | 成功后用户 `AVAILABLE` 增加退款金额，平台 `SETTLEMENT` 减少退款金额；`AUTHORIZATION` 不增加、不释放、不伪造占用。 | `snapshot(...)`、`assertOnlyBalanceDeltas(...)`、`assertBucket(...)`。 |
 | 交易事实 | 生成一笔可追溯退款资金事实，能区分普通授权链退款和 no-auth refund；不得把外部引用映射成内部授权交易聚合。 | `fundsTransactionsByBusinessSn(...)`、`fundsTransactionDetailsByBusinessSn(...)`、`assertSingleFundsAndLedgerFactsForBusinessSn(...)`。 |
 | 账务事实 | ledger transaction、posting plan、ledger entry 与 route snapshot 对齐，phase 为退款语义，entry 覆盖 `SETTLEMENT` 和 `AVAILABLE`。 | `ledgerTransactionByBusinessSn(...)`、`postingPlansOf(...)`、`entriesOf(...)`、`assertLedgerFactsFollowRouteSnapshot(...)`。 |
@@ -298,7 +298,7 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 | 闭环提交 | `006bcaa feat: 补齐无授权退款 canonical 能力`。 |
 | 写入范围 | `transaction-face` 的退款请求兼容字段和指令上下文 key，`transaction-impl` 的 converter、authorization route resolver、lifecycle saver 和 route code，`tests` 的授权交易 flow 和 no-auth refund helper。 |
 | 未触碰范围 | 未修改 DDL/H2 schema、ledger 公共契约、core 枚举状态、wallet facade、支付工具 facade、VCC、Spend Rule、force settle、chargeback 独立入口、生产配置、外部协议或敏感数据处理。 |
-| 核心语义 | 普通授权链退款继续要求 `authorizationTransactionSn`；无授权退款以 `authorizationTransactionSn` 为空作为分支判定，使用 `externalReferenceSn`、退款原因和操作者/审计形成独立退款事实，`refundMode=NO_AUTH` 只作为内部归类标签，不构造 `AUTHORIZATION` reference，不查询内部原授权账本交易。 |
+| 核心语义 | 普通授权链退款继续要求 `authorizationTransactionSn`；无授权退款以 `authorizationTransactionSn` 为空作为分支判定，使用 `externalReferenceSn`、退款原因和操作者/审计形成独立退款事实，`NO_AUTH` 只作为内部归类标签，不构造 `AUTHORIZATION` reference，不查询内部原授权账本交易。 |
 | 目标验证 | `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 24 tests；`just test-transaction` 通过 92 tests；`just test-boundary` 通过 126 tests；`just compile`、`just pmd`、`git diff --check`、`git diff --cached --check` 均通过。 |
 | 追加回归 | 2026-06-03 追加执行 `just test-business-flow` 通过 106 tests，覆盖业务流程回归。 |
 | 后续 Not Done | no-auth refund 的运营审批、人工差错单、累计退款跨请求聚合控制、查询投影解释和外部规则核验不是 `006bcaa` 的 Done 范围；需要时另起 Execution Grant。 |
@@ -410,7 +410,7 @@ Git 策略：auto_commit
 Execution Grant：B4-NO-AUTH-REFUND
 确认基线：确认时 Git HEAD；必须包含 B4 过期释放、强制完成、无授权退款主文档口径、Grant 可执行包和恢复入口相关提交，当前已知最小提交集为 b0666ba / f99f3a3 / 616dac1 / 3825466 / e937395 / fe40d4a / 8e1ec76 / 51e86e3 / 3e5ec76；后续 docs-only 索引、恢复入口或确认基线校准提交以确认时 Git HEAD 自然纳入，无需在模板中逐条追写
 允许写入：先写 tests 中 B4-NAR 目标 Red；Red 证明缺口后允许 transaction-face 的 FundsAuthorizationTransactionRefundRequest 兼容字段、transaction-impl converter/command/lifecycle/route replay、TDD tests 最小修复
-允许契约字段：authorizationTransactionSn 空值语义、refundMode 或 noAuthRefundMode 内部标签、externalReferenceSn、refundReason、operator/contextVariables 或等价命名；允许把 `authorizationTransactionSn` 调整为普通授权链退款必填、NO_AUTH 模式不携带且不查询原授权账本交易；字段名、类型、必填规则、摘要字段和兼容策略以本次 Grant 为准
+允许契约字段：authorizationTransactionSn 空值语义、externalReferenceSn、refundReason、operator/contextVariables 或等价命名；允许内部补充 NO_AUTH 归类标签；允许把 `authorizationTransactionSn` 调整为普通授权链退款必填、NO_AUTH 模式不携带且不查询原授权账本交易；字段名、类型、必填规则、摘要字段和兼容策略以本次 Grant 为准
 审计最小集：WindOperator、refundReason、externalReferenceSn；contextVariables 只作为白名单补充，不承载核心资金事实、外部协议报文、运营凭证或敏感数据
 禁止写入：支付工具 facade、钱包 application facade、VCC 生命周期、DDL/H2 schema、ledger 公共契约、core 枚举状态、Spend Rule 表结构、force settle、chargeback 独立入口、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理
 首批 Red：B4-NAR-RED-001；必要时补 B4-NAR-RED-002

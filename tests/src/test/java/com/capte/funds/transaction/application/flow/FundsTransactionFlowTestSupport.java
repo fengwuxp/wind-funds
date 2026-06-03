@@ -571,7 +571,6 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(accountId)
                 .setAmount(amount(amount))
-                .setRefundMode(FundsAuthorizationTransactionRefundRequest.REFUND_MODE_NO_AUTH)
                 .setExternalReferenceSn("processor_capture_202606030001")
                 .setRefundReason("external capture refunded without internal authorization")
                 .setBusinessScene("AUTHORIZATION_NO_AUTH_REFUND")

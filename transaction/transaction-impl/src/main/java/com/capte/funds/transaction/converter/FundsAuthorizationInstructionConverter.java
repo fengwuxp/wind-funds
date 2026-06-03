@@ -202,7 +202,7 @@ public class FundsAuthorizationInstructionConverter {
             validateNoAuthRefundRequest(request);
             reference = noAuthRefundReference(request);
             context.put(FundsInstructionContextKeys.REFUND_MODE,
-                    FundsAuthorizationTransactionRefundRequest.REFUND_MODE_NO_AUTH);
+                    FundsInstructionContextKeys.REFUND_MODE_NO_AUTH);
             context.put(FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN,
                     request.getExternalReferenceSn());
             context.put(FundsInstructionContextKeys.REFUND_REASON, request.getRefundReason());

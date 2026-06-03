@@ -21,8 +21,6 @@ import java.time.LocalDateTime;
 @Schema(description = "钱包授权交易退款")
 public class FundsAuthorizationTransactionRefundRequest {
 
-    public static final String REFUND_MODE_NO_AUTH = "NO_AUTH";
-
     @Schema(description = "账户 id")
     @NotNull
     private FundsAccountId accountId;
@@ -41,9 +39,6 @@ public class FundsAuthorizationTransactionRefundRequest {
 
     @Schema(description = "原授权资金交易号，普通授权链退款必填；为空表示无内部授权事实的直接退款")
     private String authorizationTransactionSn;
-
-    @Schema(description = "退款模式，NO_AUTH 表示无内部授权事实的直接退款；为空时按原授权资金交易号是否为空判断")
-    private String refundMode;
 
     @Schema(description = "外部引用流水号，无授权退款时必填，不承载完整原始报文或敏感数据")
     private String externalReferenceSn;

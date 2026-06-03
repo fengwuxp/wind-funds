@@ -1094,11 +1094,11 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
-     * 场景：调用方未显式传入 NO_AUTH 模式，但未携带内部原授权流水。
-     * 输入：平台结算户已有外部原消费沉淀余额，提交无 authorizationTransactionSn 的退款请求。
+     * 场景：调用方不再传入退款模式字段，且未携带内部原授权流水。
+     * 输入：平台结算户已有外部原消费沉淀余额，提交无 authorizationTransactionSn、无退款模式入参的请求。
      * 输出：系统按无授权退款处理，仍补充 NO_AUTH 上下文标签并保留外部引用审计。
-     * 预期：无授权退款判定以内部原授权流水是否为空为准，refundMode 只作为归类标签。
-     * 红线：缺 refundMode 不应回退成普通授权链退款，也不得查询内部原授权账本交易。
+     * 预期：无授权退款判定以内部原授权流水是否为空为准，refundMode 只作为资金指令内部归类标签。
+     * 红线：请求侧没有 refundMode 时不得回退成普通授权链退款，也不得查询内部原授权账本交易。
      */
     @Test
     void testNoAuthRefundShouldInferModeWhenAuthorizationTransactionSnIsBlank() {
@@ -1109,7 +1109,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         BalanceSnapshot beforeRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
 
         String refundSn = authorizationTransactionService.settleRefund(noAuthRefundRequest(user, 40L,
-                "AUTH_NO_AUTH_REFUND_INFER_RETURN").setRefundMode(null), WindOperator.system());
+                "AUTH_NO_AUTH_REFUND_INFER_RETURN"), WindOperator.system());
 
         BalanceSnapshot afterRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(beforeRefund, afterRefund,
