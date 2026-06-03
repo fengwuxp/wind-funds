@@ -70,6 +70,7 @@ tests
 - `wallet` 作为产品门面，只编排资金指令，不直接写交易事实或账本事实。
 - `route` 只解析资金路径，不直接写交易事实或账本事实。
 - `ledger` 只维护账本事实和账本投影，不反向持有业务交易生命周期状态。
+- 资金域 Java 包名和源码路径统一使用 `com.wind.funds` / `com/wind/funds`；不得恢复历史 Capte funds 包根或旧 Wind integration funds 包根。`com.capte.domain` 仍是外部领域依赖边界，可按模块依赖约束保留。
 
 编码约规：
 

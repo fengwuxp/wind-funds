@@ -71,6 +71,29 @@ class FundsModuleDependencyBoundaryTests {
             "governance/governance-face/src/main/java",
             "governance/governance-impl/src/main/java");
 
+    private static final List<String> PACKAGE_GUARD_SCAN_PATHS = List.of(
+            "AGENTS.md",
+            "core/src/main/java",
+            "ledger/ledger-face/src/main/java",
+            "ledger/ledger-impl/src/main/java",
+            "transaction/transaction-face/src/main/java",
+            "transaction/transaction-impl/src/main/java",
+            "wallet/wallet-face/src/main/java",
+            "wallet/wallet-impl/src/main/java",
+            "reconciliation/reconciliation-face/src/main/java",
+            "reconciliation/reconciliation-impl/src/main/java",
+            "governance/governance-face/src/main/java",
+            "governance/governance-impl/src/main/java",
+            "tests/src/test/java",
+            "docs",
+            "openspec");
+
+    private static final List<String> LEGACY_FUNDS_PACKAGE_TOKENS = List.of(
+            String.join(".", "com", "capte", "funds"),
+            String.join("/", "com", "capte", "funds"),
+            String.join(".", "com", "wind", "integration", "funds"),
+            String.join("/", "com", "wind", "integration", "funds"));
+
     private static final List<String> BALANCE_CHANGED_EVENT_LISTENER_PATTERNS = List.of(
             "@EventListener",
             "@TransactionalEventListener",
@@ -125,6 +148,28 @@ class FundsModuleDependencyBoundaryTests {
 
         assertThat(violations)
                 .as("production modules must not depend on tests module")
+                .isEmpty();
+    }
+
+    /**
+     * 场景：资金域包根已经统一为 `com.wind.funds`。
+     * 预期：源码、测试、规格和项目级指令不再引入旧资金域包根。
+     * 红线：不得恢复历史 Capte funds 包根或旧 Wind integration funds 资金域包根。
+     */
+    @Test
+    void testFundsPackageRootShouldStayUnderWindFunds() throws Exception {
+        List<String> violations = new ArrayList<>();
+        for (Path textFile : packageGuardTextFiles()) {
+            String content = Files.readString(textFile);
+            for (String legacyToken : LEGACY_FUNDS_PACKAGE_TOKENS) {
+                if (content.contains(legacyToken)) {
+                    violations.add(workspaceRoot().relativize(textFile) + " contains " + legacyToken);
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("funds package root must stay under com.wind.funds")
                 .isEmpty();
     }
 
@@ -192,6 +237,37 @@ class FundsModuleDependencyBoundaryTests {
             }
         }
         return sourceFiles;
+    }
+
+    private List<Path> packageGuardTextFiles() throws IOException {
+        List<Path> textFiles = new ArrayList<>();
+        Path root = workspaceRoot();
+        for (String scanPath : PACKAGE_GUARD_SCAN_PATHS) {
+            Path path = root.resolve(scanPath);
+            if (!Files.exists(path)) {
+                continue;
+            }
+            if (Files.isRegularFile(path)) {
+                textFiles.add(path);
+                continue;
+            }
+            try (Stream<Path> files = Files.walk(path)) {
+                files.filter(Files::isRegularFile)
+                        .filter(this::isPackageGuardTextFile)
+                        .forEach(textFiles::add);
+            }
+        }
+        return textFiles;
+    }
+
+    private boolean isPackageGuardTextFile(Path path) {
+        String fileName = path.getFileName().toString();
+        return fileName.endsWith(".java")
+                || fileName.endsWith(".md")
+                || fileName.endsWith(".xml")
+                || fileName.endsWith(".yml")
+                || fileName.endsWith(".yaml")
+                || fileName.endsWith(".properties");
     }
 
     private Path workspaceRoot() {
