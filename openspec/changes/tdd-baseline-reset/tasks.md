@@ -41,6 +41,7 @@
 - [x] 2026-06-03 完成 B4-DISPUTE-CHARGEBACK 只读准入裁决：现有代码已有 `FundsAuthorizationTransactionService#chargeback`、`CHARGEBACK` eventType、route replay chargeback phase 和授权交易 flow 成功/超额失败/幂等冲突测试；但 PRD、DSL、系分和 B4 准入卡目标语义仍要求拒付/争议默认通过 `settleRefund` 携带原因、凭证、外部引用和审计上下文承接，不强制把独立 `chargeback` 服务入口作为目标态主入口。本轮裁决为 `SEMANTIC_DECISION_REQUIRED_NOT_CODE_AUTHORIZED`，只同步任务和准入状态，不写 Java、测试、DDL/H2 schema、公共契约或运行时配置；已验证 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 24 tests。
 - [x] 2026-06-03 补齐 B4-DISPUTE-SEMANTIC-ALIGNMENT Grant 候选包：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#810-disputesemanticalignmentgrantcandidate2026-06-03` 已把下一轮候选收敛为 `B4-DISPUTE-SEMANTIC-ALIGNMENT` 原子任务包，状态为 `READY_TO_CONFIRM_NOT_AUTHORIZED`。该包默认以 `settleRefund` 为拒付/争议目标态主入口，既有 `chargeback` 入口只作为兼容、显式事件或内部适配资产；首批 Red 聚焦争议退款与普通授权链退款、NO_AUTH 退款、授权拒绝的查询、投影、审计和幂等摘要可区分性。本记录仍不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入。
 - [x] 2026-06-03 对齐 B4-DISPUTE-SEMANTIC-ALIGNMENT 主文档入口：PRD、DSL、系分和 TDD 主文档已统一为 `settleRefund / AUTH_REFUND` 默认承接拒付/争议语义，独立 `chargeback` 只保留兼容、显式事件、内部适配或后续专项候选口径；同步新增 `TDD-RED-017B` 作为后续授权后的争议退款可区分性红线。本记录仍是文档准入闭环，不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入。
+- [x] 2026-06-03 刷新 B4 GSD-CAD 候选结构校验入口：`818da34 fix(transaction): 移除授权退款请求模式字段` 已把 no-auth refund 请求契约进一步收口为“请求无 `refundMode`、`NO_AUTH` 仅为内部上下文标签”，同轮 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 25 tests；B4 准入卡第 8.10 已补充标准 Harness `harnessScopeIndex`，用于让 CAD 候选结构校验识别写入范围、写入文件、只读范围和只读参考。本记录只刷新 docs/OpenSpec 任务入口，不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入。
 
 ## 1. MVP 任务写入范围
 
@@ -778,6 +779,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | 首批 Red | `B4-CB-RED-001A`：争议退款通过 `settleRefund` 承接时，查询、投影、审计上下文和幂等摘要必须能区分普通授权链退款、NO_AUTH 退款、拒付承接和授权拒绝。 |
 | 可选第二 Red | `B4-CB-RED-001B`：授权拒绝不得生成拒付事实；缺拒付原因、缺凭证、缺外部引用或超已完成可回退金额时失败且无资金副作用。 |
 | 写入上限 | 先写授权交易 flow 目标 Red；Red 证明缺口后，仅允许授权退款请求兼容字段、transaction converter/lifecycle/route replay/request summary、交易投影解释和 TDD tests 最小修复。 |
+| Harness 范围索引 | 标准 Harness 字段已回填到 B4 准入卡第 8.10：写入范围和写入文件先限授权交易 flow 目标 Red，Red 证明缺口后才进入 transaction-face 授权退款请求兼容字段、transaction-impl converter/lifecycle/route replay/request summary 和交易投影解释；只读范围和只读参考为 PRD、DSL、系分、TDD、OpenSpec、既有 `transaction-*`、`ledger-*` 和 H2 schema。 |
 | 禁止范围 | 完整 dispute case、chargeback case 生命周期、清结算追偿、VCC processor、支付工具 facade、钱包 application facade、Spend Rule、DDL/H2 schema、core 枚举状态、ledger 公共契约、治理 apply、生产配置、外部协议和敏感数据处理。 |
 | 验证命令 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
 | 下一动作 | 等待用户按第 13.11 或 B4 准入卡第 8.10 确认 Execution Grant；未确认前只能继续做只读 CR、文档对齐或任务计划。 |
