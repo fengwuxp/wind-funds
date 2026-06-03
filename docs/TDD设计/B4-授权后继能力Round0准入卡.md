@@ -181,7 +181,7 @@
 | --- | --- |
 | `taskId` | `B4-NAR-CAD-001`。 |
 | `stage` / `wave` | B4 授权后继能力 / Wave 1 账户主体型 canonical 内核补强。 |
-| `status` | `READY_TO_CONFIRM_NOT_AUTHORIZED`。 |
+| `status` | `GRANT_READY_NOT_CONFIRMED`。Execution Grant 任务包已补齐，等待用户显式确认后才能写 Red 或代码。 |
 | `authorityBaseline` | 确认时 Git HEAD；必须包含 B4 过期释放、强制完成、无授权退款主文档口径、Grant 可执行包和恢复入口相关提交，当前已知最小提交集为 `b0666ba`、`f99f3a3`、`616dac1`、`3825466`、`e937395`、`fe40d4a`、`8e1ec76`、`51e86e3` 和 `3e5ec76`；后续 docs-only 索引、恢复入口或确认基线校准提交以确认时 Git HEAD 自然纳入，无需在本行逐条追写。 |
 | `mvpScenario` | 无前置内部授权流水，但已存在外部原消费、原完成或差错凭证，需要在账户主体型交易内核中形成可追溯退款资金事实。 |
 | `businessAdmission` | 产品验收锚点为 `AC-AUTH-012` 和 `TDD-RED-017A`；DSL 锚点为 `DSL-AUTH-REFUND-001`；系分锚点为授权交易 `settleRefund`、route replay、账务计划和投影解释。 |
@@ -223,6 +223,20 @@
 | 回归验证 | `just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
 | 提交条件 | 工作树只包含本 Grant 范围内变更，目标验证和回归验证通过，且未触发停止条件时才允许 `git add` 和 `git commit`。 |
 | 停止条件 | 需要 DDL/H2、core 枚举或状态、新依赖、外部规则、支付工具 facade、VCC、chargeback case、清结算追偿、ledger 公共契约扩展、公有方法超过 5 个参数、敏感数据处理或工作树冲突时立即停止。 |
+
+### 8.3 grantReadinessRecord（2026-06-03）
+
+本节记录计划内 Execution Grant 准备任务的完成态。该完成态只表示 B4-NO-AUTH-REFUND 的授权包已经达到可确认状态，不表示用户已经授权编码。
+
+| 检查项 | 结论 |
+| --- | --- |
+| 任务包 | `B4-NAR-CAD-001` 已选定为单一 GSD-CAD 原子任务包，只处理 `settleRefund` 无授权退款模式。 |
+| 授权正文 | 第 11 节 `Execution Grant：B4-NO-AUTH-REFUND` 可直接作为用户确认文本；确认基线以确认时 Git HEAD 为准。 |
+| 首轮 Red | `B4-NAR-RED-001`；首轮 Green 后再补 `B4-NAR-RED-002` 失败矩阵。 |
+| 写入范围 | 先写授权退款 flow 测试；Red 证明缺口后仅允许 `FundsAuthorizationTransactionRefundRequest` 兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复。 |
+| 禁止范围 | 支付工具 facade、钱包 application facade、VCC 生命周期、DDL/H2 schema、ledger 公共契约、core 枚举状态、Spend Rule、force settle 返工、chargeback case、清结算追偿、治理 apply、生产配置、外部协议和敏感数据处理。 |
+| 验证闭环 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
+| 准入结论 | `GRANT_READY_NOT_CONFIRMED`；用户确认 `Execution Grant：B4-NO-AUTH-REFUND` 前仍不得写 Red、生产代码、DDL/H2 schema 或运行时配置。 |
 
 ## 9. verificationPlan
 

@@ -656,7 +656,7 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 
 | 能力域 | 准入状态 | 对齐结论 |
 | --- | --- | --- |
-| B4-NO-AUTH-REFUND | `READY_TO_CONFIRM_NOT_AUTHORIZED`。 | 设计、PRD、DSL、系分、TDD、B4 准入卡和 OpenSpec 已对齐；可进入用户确认态，但未确认前不得写 Red 或生产代码。 |
+| B4-NO-AUTH-REFUND | `GRANT_READY_NOT_CONFIRMED`。 | 设计、PRD、DSL、系分、TDD、B4 准入卡和 OpenSpec 已对齐；计划内 Execution Grant 任务包已补齐，可进入用户确认态，但未确认前不得写 Red 或生产代码。 |
 | 原子任务包 | `B4-NAR-CAD-001`。 | Grant 可执行包已补齐到 B4 准入卡 8.2；用户确认后只消费该单一任务包，不消费整个 B4 Roadmap。 |
 | 首轮 CAD Pick | `B4-NAR-RED-001`。 | 用户确认 Execution Grant 后，先证明无前置授权但有外部原事实的 `settleRefund` 当前无法形成可追溯退款资金事实；若 Red 未失败，暂停判断已有实现覆盖或 Red 写错。 |
 | 必须列名字段 | `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要原事实金额币种、`operator/contextVariables`。 | Grant 必须说明字段名、类型、必填规则、摘要字段、普通授权链退款兼容策略和 NO_AUTH 模式不得携带或查询内部授权流水。 |
@@ -679,6 +679,21 @@ A0 只读核验通过后，当前建议优先确认 A1 直接交易事实红线�
 | 必须确认的 Grant 字段 | `refundMode` 或等价模式、`externalOriginalFactRef`、`externalOriginalFactType`、`refundReason`、`refundVoucherRef`、必要原事实金额币种、`operator/contextVariables`、普通授权链退款兼容策略、NO_AUTH 模式不得携带或查询内部授权流水。 |
 | 当前禁止范围 | 支付工具 facade、钱包 application facade、VCC 生命周期、DDL/H2 schema、ledger 公共契约、core 枚举状态、Spend Rule、force settle 返工、chargeback case、清结算追偿、治理 apply、生产配置、外部协议、敏感数据处理。 |
 | 下一步入口 | 用户确认第 13.4 与 B4 准入卡第 11 节的 `Execution Grant：B4-NO-AUTH-REFUND` 后，才能进入 Red -> Green -> Review -> Verify -> Commit。 |
+
+### 13.5 Execution Grant 准备完成记录（2026-06-03）
+
+本节关闭计划内 “为编码做准备，完成 Execution Grant 任务” 的 docs-only 准备项。该记录不授权编码，只确认 B4-NO-AUTH-REFUND 的授权包已经可被用户直接确认。
+
+| 项 | 当前口径 |
+| --- | --- |
+| 任务状态 | `GRANT_READY_NOT_CONFIRMED`。 |
+| 单一任务包 | `B4-NAR-CAD-001`，只处理 `settleRefund` 无授权退款模式。 |
+| 授权正文 | 以 `docs/TDD设计/B4-授权后继能力Round0准入卡.md` 第 11 节 `Execution Grant：B4-NO-AUTH-REFUND` 为确认文本。 |
+| 首批 Red | `B4-NAR-RED-001`；必要时补 `B4-NAR-RED-002`。 |
+| 写入上限 | 先写授权退款 flow 测试；Red 证明缺口后，仅允许 `FundsAuthorizationTransactionRefundRequest` 兼容字段、transaction converter/command/lifecycle/route replay/request summary 最小修复。 |
+| 禁止范围 | 支付工具 facade、钱包 application facade、VCC 生命周期、DDL/H2 schema、ledger 公共契约、core 枚举状态、Spend Rule、force settle 返工、chargeback case、清结算追偿、治理 apply、生产配置、外部协议和敏感数据处理。 |
+| 验证命令 | `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just compile`、`just pmd`、`git diff --check`。 |
+| 下一动作 | 用户显式确认 `Execution Grant：B4-NO-AUTH-REFUND` 后，才进入 Red -> Green -> Review -> Verify -> Commit。 |
 
 ## 14. B2 建议 Execution Grant
 
