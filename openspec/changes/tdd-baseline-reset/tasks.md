@@ -45,6 +45,7 @@
 - [x] 2026-06-03 完成 B4-DISPUTE-SEMANTIC-ALIGNMENT 首轮 CAD 闭环：`949b24a fix(transaction): 对齐授权争议退款审计语义` 已让 `settleRefund / AUTH_REFUND` 通过 `disputeMode`、`disputeReason`、`disputeVoucherRef`、`externalDisputeRef` 一等字段承接争议/拒付语义，请求侧仍不恢复 `refundMode`，`DISPUTE` 只作为资金指令内部上下文标签；route replay 只在 `AUTH_REFUND + DISPUTE` 场景传播争议审计上下文，避免普通退款、NO_AUTH 退款和 fee refund 被请求上下文污染。已验证 `just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just pmd` 和 `git diff --check` 通过。本闭环只关闭 `B4-CB-RED-001A / TDD-RED-017B` 首个 canonical 可区分性切片，不声明完整 dispute case、独立 chargeback 一等 API、清结算追偿、VCC processor、DDL/H2 schema、core 枚举状态或 ledger 公共契约完成。
 - [x] 2026-06-03 完成 B4-AUTH-RACE GSD-CAD Round 0：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#813-authraceround0scan2026-06-03` 已记录授权后续事件并发竞争的只读扫描，现有顺序金额闭合、幂等摘要和失败无副作用覆盖充分，但当时未发现同一授权 settle / reversal / expire / settleRefund 并发竞争专用 Red；`#814-authracegrantcandidate2026-06-03` 已把候选收敛为 `B4-AUTH-RACE` 原子任务包，历史状态为 `ROUND0_READY_NOT_CODE_AUTHORIZED`。该准备态后续已由 `47c5269 fix(transaction): 串行化授权后继并发竞争` 消费并闭合，不再作为新的自动编码授权。
 - [x] 2026-06-03 完成 B4-AUTH-RACE 首轮 CAD 闭环：`47c5269 fix(transaction): 串行化授权后继并发竞争` 已把 `B4-RACE-RED-001` 转为回归基线，新增同一授权 settle / expire / reversal 并发竞争测试，证明只有一个合法金额迁移获胜，失败方不生成 route、posting、ledger entry、projection 或余额副作用；实现层对授权后继命令增加事务完成前持有的 JVM 锁，并在读取授权原交易时使用 `FOR UPDATE` 行锁，同时保留完成、撤销和过期金额上限校验。已验证 `git diff --check`、`just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary` 和 `just pmd` 通过。本闭环不声明 DDL/H2 schema、公共契约、core 枚举状态、ledger 公共契约、支付工具 facade、钱包 application facade、VCC、Spend Rule、完整 dispute/chargeback case、清结算对账或治理完成。
+- [x] 2026-06-03 完成 B4-AUTH-PI GSD-CAD Round 0 只读准入：本轮把下一候选收敛为 `B4-AUTH-INSTRUMENT-APPLICATION` / `B4-AUTH-PI` 授权支付工具应用入口；代码扫描确认 `FundsAuthorizationTransactionService#authorize` 和 `FundsAuthorizationTransactionAuthorizeRequest.accountId` 仍是账户主体型 canonical 内核，`wallet-face` 只有 `PaymentInstrumentService`、`SpendSubjectFundingRelationService` 等资源服务，未发现 `AuthorizationAdmissionApplicationService` 或 `authorizeByInstrument` 生产入口。当前状态为 `ROUND0_READY_NOT_CODE_AUTHORIZED`，后续若确认新的单一 Execution Grant，首批 Red 为 `R0-AUTH-001`；未确认前不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
 
 ## 1. MVP 任务写入范围
 
@@ -832,6 +833,23 @@ A0 只读核验通过后，曾建议优先确认 A1 直接交易事实红线。A
 | 验证矩阵 | `git diff --check` 通过；`just compile` 通过；`just test-one FundsAuthorizationTransactionFlowTests tests` 通过 28 tests；`just test-transaction` 通过 96 tests；`just test-business-flow` 通过 110 tests；`just test-boundary` 通过 126 tests；`just pmd` 通过。 |
 | 残余风险 | 仅证明当前单 JVM/H2/Spring 事务测试边界下的首轮授权后继并发串行化；跨节点分布式锁、数据库唯一约束、版本字段、完整 dispute/chargeback case、支付工具授权 application facade、授权权益生命周期、清结算追偿、VCC processor、Spend Rule 和治理 apply 仍未完成。 |
 | handoff | 下一轮不能继续消费第 13.13 或本节；必须在授权支付工具应用入口、授权权益生命周期、完整 dispute/chargeback case、余额控制调账、原路径回放或其他经过 Round 0 的单一任务包中重新确认 Execution Grant。 |
+
+### 13.15 B4-AUTH-PI Round 0 与 Grant 候选（2026-06-03）
+
+本节记录 B4-AUTH-RACE 闭环后的 GSD-CAD 自动推进结果。该轮只读复核 PRD、DSL、系分、TDD、OpenSpec、当前代码和既有测试资产，把下一候选收敛为授权支付工具应用入口；本节不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 项 | 当前口径 |
+| --- | --- |
+| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 单一任务包 | `B4-AUTH-INSTRUMENT-APPLICATION` / `B4-AUTH-PI`，只处理 `authorizeByInstrument` 或等价 application facade 的授权前准入、拒绝无副作用和委派账户主体型授权内核。 |
+| 业务问题 | 业务方以卡、VCC、共享卡、外部钱包端点、通道 token 或等价工具引用发起授权时，系统能否解释工具、绑定、使用主体、Spend Rule、资金责任和账户能力为什么通过或拒绝，并保证资金影响仍落到已解析账户主体。 |
+| 代码扫描事实 | `FundsAuthorizationTransactionService#authorize` 接收 `FundsAuthorizationTransactionAuthorizeRequest`；该请求以 `FundsAccountId accountId` 作为账户主体型 canonical 入参。`PaymentInstrumentService` 只管理工具和绑定，`SpendSubjectFundingRelationService` 只维护资金责任关系；当前未发现 `AuthorizationAdmissionApplicationService`、`PaymentInstrumentCapabilityApplicationService` 生产实现或 `authorizeByInstrument` 入口。 |
+| 现有测试证据 | `PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests` 和 `PaymentInstrumentRouteDslContractTests` 可作为资源服务、资金责任关系和 route DSL 局部回归；它们不证明授权支付工具 application facade 生产链路已可用。 |
+| 首批 Red | `R0-AUTH-001`：绕过工具准入、绑定快照、Spend Rule、资金责任或账户能力直接调用授权内核必须失败；拒绝路径不得生成 route、posting、LedgerEntry、projection 或敏感上下文副作用；批准路径只能构造账户主体型 `FundsAuthorizationTransactionAuthorizeRequest` 并委派 `FundsAuthorizationTransactionService#authorize`。 |
+| 候选写入上限 | 只有在用户确认新的单一 Execution Grant 后，才允许新增 wallet application facade 契约、Request/DTO、最小 impl、授权准入组合测试和必要的授权 flow 回归。任何公共契约、幂等摘要、route snapshot、敏感上下文或 DTO 字段都必须在 Grant 中列名。 |
+| 当前禁止范围 | 不替换 `FundsAuthorizationTransactionAuthorizeRequest.accountId`；不新增统一 `InstrumentTransactionService`；不让支付工具、预算组或 Spend Rule 成为 route leg、posting、LedgerEntry 或账本余额主体；不混入完整 VCC 发卡、Spend Rule 引擎、B5/B6/B8、清结算对账、治理 apply、DDL/H2 schema、外部协议或敏感原文。 |
+| 建议验证命令 | Round 0 / docs-only：`git diff --check`。获得 Grant 后建议按写入范围运行 `just test-one PaymentInstrumentServiceImplTests tests`、`just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests`、`just test-transaction`、`just test-boundary`、`just compile` 和 `just pmd`。 |
+| handoff | `B4-AUTH-PI` 已可作为下一次单一 Execution Grant 的确认输入；未确认前继续保持 `summary_only` / Round 0，不自动进入 Red 或实现。 |
 
 ## 14. B2 建议 Execution Grant
 

@@ -17,6 +17,7 @@
 | TDD 入口 | `docs/TDD设计/支付资金底座测试驱动设计.md` 的 TDD-WALLET-018、TDD-WALLET-019、12.2 Round 0 Red 集合。 |
 | OpenSpec 入口 | `openspec/specs/payment-funds-foundation/spec.md` 的支付工具交易入口、支付工具与 Spend Rule 生产可用性、支出主体资金责任解析关系术语；`openspec/changes/tdd-baseline-reset/tasks.md` 的 2026-06-01 生产可用性 CR。 |
 | 现有代码证据 | `PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests`、`PaymentInstrumentRouteDslContractTests` 已作为局部基线；只证明资源服务、现有资金责任关系和 DSL 契约，不证明生产交易入口可用。 |
+| B4 授权内核基线 | 截至 `47c5269`，账户主体型授权后继并发竞争已闭合；`FundsAuthorizationTransactionService#authorize` 和 `FundsAuthorizationTransactionAuthorizeRequest.accountId` 仍是 canonical 授权内核。当前未发现 `AuthorizationAdmissionApplicationService` 或 `authorizeByInstrument` 生产入口，B4-AUTH-PI 只能作为 Round 0 / Grant 候选。 |
 | 外部参考确认 | Highnote 的 financial account / ledger / payment card / transaction feed 分层只作为设计参考：账户入账、工具归因、activity 或 projection 做卡维度流水。wind-funds 不照搬对象名，不新增卡账本或工具交易内核。 |
 
 ## 3. grantCandidate
@@ -152,6 +153,20 @@ Request/DTO 默认落 `com.capte.funds.wallet.model.request` 和 `com.capte.fund
 | P2-VCC-LIFECYCLE | 5 | 共享卡和预付卡清算、释放、退款、拒付原路径回放。 | `R0-VCC-LC-001`。 | 授权生命周期 facade、route replay、差错入口和重复损失防护。 | 完整 clearing 文件处理、chargeback 全生命周期、FX 和费用自动入账。 |
 | B5-SR-CONTROL | 6 | Spend Rule 决策日志和预算预留释放。 | `R0-SR-001`、`R0-SR-002`。 | 规则定义、控制活动、预算控制投影，需单独 DDL/H2 授权。 | A1、B2 基础能力、P2 轨道。 |
 | B6/B8-PI-VIEW | 7 | 支付工具流水、预算控制视图、规则命中时间线和重放。 | `R0-PI-002`。 | 只读投影、重放范围和差异报告，需单独授权。 | 事实反写、正式治理 apply。 |
+
+### 8.1 B4-AUTH-PI Round 0 扫描（2026-06-03）
+
+本节是 GSD-CAD 自动推进后的只读扫描结论。它把 `B4-AUTH-PI` 从候选列表推进到可确认的单一 Execution Grant 输入，但不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 扫描项 | 结论 |
+| --- | --- |
+| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| canonical 内核 | `FundsAuthorizationTransactionService#authorize` 仍接收 `FundsAuthorizationTransactionAuthorizeRequest`，请求以 `FundsAccountId accountId` 作为已解析账户主体入参；B4-AUTH-PI 不应替换该请求字段。 |
+| 钱包资源服务 | `PaymentInstrumentService` 负责工具和绑定管理；`SpendSubjectFundingRelationService` 负责资金责任关系维护；两者不是授权准入 application facade。 |
+| 缺口 | 未发现 `AuthorizationAdmissionApplicationService`、`PaymentInstrumentCapabilityApplicationService` 生产实现或 `authorizeByInstrument` 入口；既有测试未证明工具准入、绑定快照、Spend Rule、资金责任和账户能力组合后委派授权内核。 |
+| 首批 Red | `R0-AUTH-001`：支付工具授权入口必须先做工具、绑定、Spend Rule、资金责任和账户能力准入；拒绝无 route、posting、LedgerEntry、projection 或敏感上下文副作用；批准后只委派账户主体型授权内核。 |
+| Grant 必须列明 | application facade 名称、Request/DTO、错误码、幂等摘要、拒绝事实、route snapshot / audit 快照位置、敏感上下文白名单、目标测试资产和验证命令。 |
+| 禁止混入 | 不新增统一 `InstrumentTransactionService`；不把支付工具、预算组或 Spend Rule 作为账务主体；不混入完整 VCC、Spend Rule 引擎、清结算对账、治理 apply、P2 轨道或敏感原文。 |
 
 ## 9. verificationPlan
 
