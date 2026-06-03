@@ -280,7 +280,7 @@ flowchart TD
 | 授权撤销 | `AUTHORIZATION_TRANSACTION / REVERSAL`。 |
 | 授权过期释放 | `AUTHORIZATION_TRANSACTION / EXPIRE`。 |
 | 直接交易退款或授权完成后退款 | `DIRECT_TRANSACTION / REFUND` 或授权链退款事件。 |
-| 争议拒付或追偿 | `AUTHORIZATION_TRANSACTION / CHARGEBACK` 或差错追偿事实。 |
+| 争议拒付或追偿 | 首轮默认通过 `AUTHORIZATION_TRANSACTION / AUTH_REFUND` 携带拒付或争议原因、凭证、外部引用和审计上下文承接；差错追偿事实或独立 `CHARGEBACK` 入口只在后续专项 Grant 中确认。 |
 | 冻结 | `BALANCE_CONTROL / FREEZE`。 |
 | 解冻或到期释放 | `BALANCE_CONTROL / UNFREEZE` 或 `EXPIRE`。 |
 | 资金账户余额调整 | `BALANCE_CONTROL / ADJUST`。 |
@@ -1200,6 +1200,8 @@ VCC 交易是授权交易的典型接入场景，但 VCC 卡、卡号、token、
 
 预付卡和共享卡不引入新的 DSL 主体类型。prepaid virtual card 仍通过 `instrumentRef` 表达卡工具，通过资金责任解析关系、route participant 或外部确认引用表达预付资金责任；共享卡仍通过 `instrumentRef`、binding snapshot、cardholder/department/project 上下文、BudgetGroup 上下文、Spend Rule 快照和 `FundingAllocationDecision` 表达使用模式。储值券、礼品卡或预付代金券属于权益或预收待付语义，继续使用权益快照，不自动归入 VCC DSL。
 
+B4-DISPUTE-SEMANTIC-ALIGNMENT 准入口径：当前仅形成可确认但未授权的 DSL 候选，不新增 Java、测试、DDL/H2 schema 或公共契约。若后续确认该 Grant，首批 Red 应围绕 `DSL-AUTH-REFUND-001 / B4-CB-RED-001A` 展开：`settleRefund` 的争议退款必须在 reason、external reference、voucher、audit、projection 和 idempotency digest 上区分普通授权链退款、`NO_AUTH` 退款和授权拒绝；独立 `chargeback` 只能作为兼容、显式事件或内部适配资产，不能反向要求成为目标态主入口。
+
 VCC 授权接入口径：
 
 | VCC 交易信息 | DSL 承接位置 | 资金底座含义 | 红线 |
@@ -1461,7 +1463,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-REVERSE-REFUND-FEE-001` | 原路径退款与手续费退回。 | `REFUND`、`FEE_REFUND` 引用原交易、原 route snapshot 和原费用 leg。 | 退款和退费沿原路径反向，累计金额不超过原可退金额。 | 工具换绑后按当前关系重选路、累计退款超额、退费无原费用 leg。 |
 | `DSL-AUTH-LIFECYCLE-001` | 授权批准、完成、撤销、过期和拒绝。 | `AUTHORIZATION_TRANSACTION` 的 `AUTHORIZE/SETTLE/REVERSAL/EXPIRE/DECLINE`。 | 批准占用 `AUTHORIZATION`；完成进入收款方或商户 `CLEARING`；撤销/过期释放剩余占用；拒绝不生成 route/posting/entry。 | 完成金额超过剩余授权、拒绝写账、过期释放已完成金额。 |
 | `DSL-AUTH-FORCE-CAPTURE-001` | 无授权强制完成。 | `SETTLE` 强制完成模式，必须带受信策略或审批快照、上限、原因、外部原事实引用、凭证和审计；首轮 FORCE 模式不得依赖内部原授权流水。 | 不伪造授权占用；按强制完成策略生成明确资金事实；普通完成和 FORCE 完成请求摘要可区分。 | 无策略强制完成、超上限完成、缺外部原事实、缺凭证、缺审计、FORCE 模式回退普通授权完成路径。 |
-| `DSL-AUTH-REFUND-001` | 授权链退款、无授权直接退款和争议类退款原因承接。 | 普通授权链退款引用原授权完成事实和完成路径；无授权退款必须显式 `NO_AUTH` 或等价模式，携带外部原事实引用、外部原事实类型、退款原因、退款凭证、操作者和审计；争议类退款必须保留拒付/争议原因。 | 已完成金额内退款沿完成 route snapshot 反向；无授权退款不补造授权占用，基于外部原事实反向回补；查询和投影能区分普通退款、无授权退款和争议类退款。 | 按当前绑定关系退款、退款超过已完成金额、无授权退款缺模式/原事实类型/原因/凭证/审计仍入账，或无授权退款携带内部授权流水。 |
+| `DSL-AUTH-REFUND-001` | 授权链退款、无授权直接退款和争议类退款原因承接。 | 普通授权链退款引用原授权完成事实和完成路径；无授权退款必须显式 `NO_AUTH` 或等价模式，携带外部原事实引用、外部原事实类型、退款原因、退款凭证、操作者和审计；争议类退款必须保留拒付/争议原因、外部引用、凭证和审计上下文。 | 已完成金额内退款沿完成 route snapshot 反向；无授权退款不补造授权占用，基于外部原事实反向回补；查询、投影、审计和幂等摘要能区分普通退款、无授权退款、争议类退款和授权拒绝。 | 按当前绑定关系退款、退款超过已完成金额、无授权退款缺模式/原事实类型/原因/凭证/审计仍入账、无授权退款携带内部授权流水，或把争议退款压缩成不可区分的普通退款。 |
 | `DSL-AUTHORIZATION-CONTROL-SPEND-RULE-DECLINE-001` | 发卡授权控制扩展的支出规则拒绝。 | `contextVariables.authorizationControlDecision`、拒绝原因、命中规则和规则版本。 | 只记录授权前控制拒绝事实；不生成 route、posting、entry；spend-rule window 不等同于账本周期。 | 规则拒绝后仍入账、缺规则版本或拒绝原因、把支出规则窗口当作账本周期。 |
 | `DSL-BALANCE-CONTROL-FREEZE-001` | 冻结、部分解冻、冻结到期释放。 | `BALANCE_CONTROL` 只在同主体 bucket 内移动。 | `AVAILABLE <-> FROZEN`，不表达消费或跨主体价值转移。 | 冻结写成交易消费、跨主体冻结、解冻超过冻结剩余。 |
 | `DSL-BALANCE-CONTROL-ADJUST-001` | 资金账户余额调整、信用账户额度调整和预算控制额度 / 窗口调整。 | `BALANCE_CONTROL / BALANCE_ADJUST`、`LIMIT_ADJUST` 或预算控制视图调整，具备调整来源、审批、凭证或规则版本。 | 资金账户目标账目、信用账户 LIMIT/AVAILABLE 或预算控制视图受控变化；不破坏已授权占用；预算不是现金池。 | 无来源直接改余额、跨主体价值转移、缺审批凭证、错币种、预算当现金池、预算组或 Spend Rule 入账。 |
