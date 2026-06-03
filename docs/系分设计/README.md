@@ -149,7 +149,7 @@ A0 系分复核只确认产品场景能否落到现有系统边界和测试入�
 
 | 基线能力 | 系分可引用结论 | 不得外推 |
 | --- | --- | --- |
-| 请求上下文不可变 | `com.capte.funds.transaction.model.request` 下的交易 Request 只以 `ReadonlyContextVariables` 承载扩展上下文，空值表达无额外上下文。 | 不得恢复 `WritableContextVariables` 字段、Request 专属快照工具或在 setter 中补默认资金事实。 |
+| 请求上下文不可变 | `com.wind.funds.transaction.model.request` 下的交易 Request 只以 `ReadonlyContextVariables` 承载扩展上下文，空值表达无额外上下文。 | 不得恢复 `WritableContextVariables` 字段、Request 专属快照工具或在 setter 中补默认资金事实。 |
 | 敏感上下文阻断 | 支付工具、外部账户、卡号、密钥、完整银行账户等敏感字段已在多类入口形成局部红线测试。 | 不得把完整敏感原文写入 route、ledger、投影、日志、导出或审计普通链路。 |
 | 权益核心字段阻断 | `fundingNature`、`currentMarketingRule` 等权益核心事实不得通过普通 `contextVariables` 旁路进入钱包、交易、路由或账务事实。 | 不得把该阻断等同于含权益资金流消费已完成；核心权益语义仍需一等字段或不可变事实源。 |
 | 局部测试资产 | 现有 DSL、wallet、transaction、ledger、projection、reconciliation、governance 测试可作为 A0 差距复核输入。 | 不得跳过单一 Execution Grant、首批 Red、DDL/H2 范围和验证命令。 |

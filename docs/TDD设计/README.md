@@ -207,7 +207,7 @@ A0 基线核验阶段不写测试代码，但必须输出 `redCandidateSet`、`t
 
 | 基线项 | 可复用测试资产 | 后续 Red 触发条件 |
 | --- | --- | --- |
-| 交易 Request 只读上下文 | `FundsTransactionRequestContextVariablesContractTests` 和交易流程敏感上下文测试。 | 新增或修改 `com.capte.funds.transaction.model.request` 字段、请求摘要、转换器或上下文合并逻辑时，必须补请求契约和敏感上下文回归。 |
+| 交易 Request 只读上下文 | `FundsTransactionRequestContextVariablesContractTests` 和交易流程敏感上下文测试。 | 新增或修改 `com.wind.funds.transaction.model.request` 字段、请求摘要、转换器或上下文合并逻辑时，必须补请求契约和敏感上下文回归。 |
 | 钱包管理对象上下文红线 | `FundingAccountServiceImplTests`、`PaymentInstrumentServiceImplTests`、`ControlAccountLedgerInitializationTests` 等。 | 账户、支付工具、资金责任解析关系或平台账户新增 `contextVariables` 写入入口时，必须证明敏感字段和权益核心字段失败且不落账户、支付工具或账本事实。 |
 | route/ledger/transaction 上下文红线 | DSL 契约测试、账务服务测试、交易流程测试和投影重放测试。 | route snapshot、posting plan、ledger entry、交易参与方、冻结单、余额投影或重放上下文新增字段时，必须证明核心资金事实不经普通上下文旁路。 |
 | 未覆盖资金流 | 含权益 route/posting/replay、清结算、对账、归档、冷热读取、治理重放和 P2 业务专项仍为目标资产。 | 任一任务要声明生产资金流 Done，必须新增对应服务级或治理级 Red、H2/fixture 证据和验证命令。 |

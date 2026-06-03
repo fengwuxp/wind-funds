@@ -56,7 +56,7 @@
 
 | 范围 | 候选授权 |
 | --- | --- |
-| 目标测试资产 | 优先允许写 `tests/src/test/java/com/capte/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java`；必要时允许新增 B4 后继能力专用 flow 测试类或补 `DefaultRouteReplayServiceTests`。 |
+| 目标测试资产 | 优先允许写 `tests/src/test/java/com/wind/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java`；必要时允许新增 B4 后继能力专用 flow 测试类或补 `DefaultRouteReplayServiceTests`。 |
 | 生产实现 | 只有 Red 证明真实缺口后，才允许在 `transaction-face`、`transaction-impl`、route replay 和必要的 ledger posting 装配最小范围修复。 |
 | 公共契约 | 默认不允许破坏既有请求；B4-FORCE-SETTLE 字段和 `authorizationTransactionSn` 条件化规则已作为回归基线；B4-NO-AUTH-REFUND 当前请求侧只保留 `authorizationTransactionSn` 空值语义、`externalReferenceSn`、原因和操作者/审计，`NO_AUTH` 仅作为内部上下文标签。若后续必须新增运营审批、人工差错、累计控制、查询解释或外部规则字段，Execution Grant 必须显式列名、说明普通授权链退款和无授权退款的兼容策略，并明确无授权退款不得携带内部授权流水、不得查询原授权账本交易。 |
 | core 枚举和状态 | 默认不新增独立 `CHARGEBACK` 事件；若需要新增状态、事件或错误码，必须单独确认。 |
@@ -188,7 +188,7 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 
 | 边界项 | 候选裁决 |
 | --- | --- |
-| `writeScope` | 历史授权范围为先写 `tests/src/test/java/com/capte/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java` 中 B4-NAR 目标 Red；Red 证明缺口后，允许最小修改 `transaction/transaction-face` 的 `FundsAuthorizationTransactionRefundRequest` 兼容字段，以及 `transaction/transaction-impl` 的 converter、command service、lifecycle saver、route replay 和请求摘要。实际闭环未新增独立测试类，未修改 DDL/H2、ledger 公共契约、core 枚举状态或 wallet facade。 |
+| `writeScope` | 历史授权范围为先写 `tests/src/test/java/com/wind/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java` 中 B4-NAR 目标 Red；Red 证明缺口后，允许最小修改 `transaction/transaction-face` 的 `FundsAuthorizationTransactionRefundRequest` 兼容字段，以及 `transaction/transaction-impl` 的 converter、command service、lifecycle saver、route replay 和请求摘要。实际闭环未新增独立测试类，未修改 DDL/H2、ledger 公共契约、core 枚举状态或 wallet facade。 |
 | `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/*`、现有 `transaction-*`、`ledger-*`、`tests/src/test/resources/jdbc-schema.sql`。 |
 | `publicContractGate` | 只有 Grant 显式列名 `authorizationTransactionSn` 空值语义、`externalReferenceSn`、`refundReason` 和 `operator/contextVariables` 时，才允许扩展 `FundsAuthorizationTransactionRefundRequest`；`NO_AUTH` 仅可作为内部上下文标签，不作为请求字段。不得破坏普通授权链退款的 `authorizationTransactionSn` 兼容语义。 |
 | `ledgerGate` | 默认不修改 `ledger-face`、`ledger-impl` 公共能力。若 route replay 或 posting 装配证明必须改 ledger 侧公共契约、账务计划语义或 projection 表达，立即停止并扩权确认。 |
@@ -334,7 +334,7 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 | `canonicalDecision` | 首轮默认确认 `settleRefund` 为拒付/争议承接目标态主入口；既有 `FundsAuthorizationTransactionService#chargeback` 只作为兼容、显式事件或内部适配入口保留，不在本轮扩展为目标态主入口。若用户选择相反方向，必须新建 `chargeback` 一等 API Grant。 |
 | `firstRedSet` | `B4-CB-RED-001A` / `TDD-RED-017B`：争议退款通过 `settleRefund` 承接时，查询、投影、审计上下文和幂等摘要必须能区分普通授权链退款、NO_AUTH 退款、拒付承接和授权拒绝。 |
 | `secondRedSet` | `B4-CB-RED-001B`：授权拒绝不得生成拒付事实；缺拒付原因、缺凭证、缺外部引用或超已完成可回退金额时失败且无资金副作用。 |
-| `writeScope` | 先写 `tests/src/test/java/com/capte/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java` 中 B4-CB 目标 Red；Red 证明缺口后，仅允许在 `transaction-face` 的授权退款请求兼容字段、`transaction-impl` converter/lifecycle/route replay/request summary 和交易投影解释最小范围修复。 |
+| `writeScope` | 先写 `tests/src/test/java/com/wind/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java` 中 B4-CB 目标 Red；Red 证明缺口后，仅允许在 `transaction-face` 的授权退款请求兼容字段、`transaction-impl` converter/lifecycle/route replay/request summary 和交易投影解释最小范围修复。 |
 | `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md`、既有 `transaction-*`、`ledger-*`、`tests/src/test/resources/jdbc-schema.sql`。 |
 | `harnessScopeIndex` | 标准 Harness 字段索引：写入范围为授权交易 flow 目标 Red、transaction-face 授权退款请求兼容字段、transaction-impl converter/lifecycle/route replay/request summary 和交易投影解释；写入文件先限定 `FundsAuthorizationTransactionFlowTests.java`，Red 证明缺口后才进入上列最小生产触点；只读范围和只读参考为 PRD、DSL、系分、TDD、OpenSpec、既有 `transaction-*`、`ledger-*` 和 H2 schema。 |
 | `publicContractGate` | 若需要新增或调整 `settleRefund` 上的一等字段，Grant 必须显式列名，例如 `disputeMode`、`disputeReason`、`disputeVoucherRef`、`externalDisputeRef`、`disputeAuditContext` 或等价命名；普通授权链退款和 NO_AUTH 退款兼容语义不得破坏。 |
@@ -380,7 +380,7 @@ Git 策略：auto_commit
 | --- | --- |
 | 执行提交 | `949b24a fix(transaction): 对齐授权争议退款审计语义`。 |
 | 已完成语义 | `FundsAuthorizationTransactionRefundRequest` 新增 `disputeMode`、`disputeReason`、`disputeVoucherRef` 和 `externalDisputeRef`；请求侧不恢复 `refundMode`。converter 在争议字段出现时要求原因、凭证、外部引用和争议模式完整，并向资金指令内部上下文写入 `refundMode=DISPUTE`、争议字段和用户审计上下文。route replay 只在 `AUTH_REFUND + DISPUTE` 场景传播争议审计上下文，避免普通退款、NO_AUTH 退款或 fee refund route snapshot 被请求上下文污染。 |
-| 实际写入范围 | `transaction/transaction-face/src/main/java/com/capte/funds/transaction/model/request/FundsAuthorizationTransactionRefundRequest.java`、`transaction/transaction-face/src/main/java/com/capte/funds/transaction/constant/FundsInstructionContextKeys.java`、`transaction/transaction-impl/src/main/java/com/capte/funds/transaction/converter/FundsAuthorizationInstructionConverter.java`、`transaction/transaction-impl/src/main/java/com/capte/funds/route/DefaultRouteReplayService.java`、`tests/src/test/java/com/capte/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java`。 |
+| 实际写入范围 | `transaction/transaction-face/src/main/java/com/wind/funds/transaction/model/request/FundsAuthorizationTransactionRefundRequest.java`、`transaction/transaction-face/src/main/java/com/wind/funds/transaction/constant/FundsInstructionContextKeys.java`、`transaction/transaction-impl/src/main/java/com/wind/funds/transaction/converter/FundsAuthorizationInstructionConverter.java`、`transaction/transaction-impl/src/main/java/com/wind/funds/route/DefaultRouteReplayService.java`、`tests/src/test/java/com/wind/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java`。 |
 | 测试清单项 | 覆盖 `B4-CB-RED-001A` / `TDD-RED-017B`：争议退款通过 `settleRefund` 承接后，ledger transaction、posting plan、ledger entry、details、route replay context、请求摘要和幂等冲突都能与普通退款、NO_AUTH 退款和授权拒绝区分；补充缺争议原因、凭证、外部引用或模式时失败且无余额和账务副作用。 |
 | 验证证据 | `just compile` 通过；`just test-one FundsAuthorizationTransactionFlowTests tests` 通过 26 tests；`just test-transaction` 通过 94 tests；`just test-business-flow` 通过 108 tests；`just test-boundary` 通过 126 tests；`just pmd` 通过；`git diff --check` 通过。Spring 测试在沙箱内触发 embedded Redis 端口绑定 `Operation not permitted`，已按工具权限规则非沙箱重跑并通过，定性为环境权限问题，不是代码失败。 |
 | Not Done | 完整 dispute case、独立 chargeback 一等目标 API、清结算追偿、VCC processor、外部卡组织规则、DDL/H2 schema、core 枚举状态、ledger 公共契约、支付工具 facade、钱包 application facade、Spend Rule、治理 apply 和生产配置仍未打开。 |
@@ -409,7 +409,7 @@ Git 策略：auto_commit
 | Execution Grant 关联 | 已消费；历史状态曾为 `待用户确认`。 |
 | mvpScenario | 同一已批准授权在完成、撤销、过期和退款等后续事件并发到达时，资金底座必须保证金额闭合、状态合法、route/ledger/projection 不重复、不遗漏，失败方无资金副作用。 |
 | 首批 Red | `B4-RACE-RED-001`：同一授权的 settle 与 expire 或 settle 与 reversal 并发竞争时，只能有一个合法金额迁移获胜，失败方不得产生 route、posting、ledger entry、projection 或余额变化；必要时扩展 settle 与 settleRefund 并发。该 Red 已由 `47c5269` 回归化。 |
-| 允许写入范围 | 历史候选曾允许先写 `tests/src/test/java/com/capte/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java` 或新增同包 `FundsAuthorizationTransactionRaceFlowTests.java` 的目标 Red；Red 证明缺口后，只允许在 `transaction-impl` 的生命周期保存、编排串行化或等价最小锁策略内修复。该范围已消费。 |
+| 允许写入范围 | 历史候选曾允许先写 `tests/src/test/java/com/wind/funds/transaction/application/flow/FundsAuthorizationTransactionFlowTests.java` 或新增同包 `FundsAuthorizationTransactionRaceFlowTests.java` 的目标 Red；Red 证明缺口后，只允许在 `transaction-impl` 的生命周期保存、编排串行化或等价最小锁策略内修复。该范围已消费。 |
 | 只读参考范围 | `transaction-face` 请求契约、`FundsAuthorizationInstructionConverter`、`DefaultFundsInstructionLifecycleSaver`、route replay、ledger posting 装配、`tests/src/test/resources/jdbc-schema.sql` 和现有 B4 授权 flow 测试。 |
 | 默认禁止范围 | 不改公共请求字段、core 枚举/状态、ledger 公共契约、DDL/H2 schema、支付工具 facade、钱包 application facade、VCC、Spend Rule、完整 dispute/chargeback case、清结算追偿、治理 apply、生产配置、外部协议或敏感数据处理。 |
 | 扩权停止条件 | 若最小 Green 需要数据库唯一约束、锁字段、版本字段、H2 schema、公共契约、状态机或错误码变更，立即停止并要求新的 Execution Grant 明确授权。 |

@@ -1,10 +1,10 @@
 package com.wind.funds.ledger.impl;
 
-import com.capte.funds.AbstractFundsServiceTest;
+import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.dto.LedgerTransactionPostResult;
 import com.wind.funds.ledger.request.UpdateLedgerTransactionRequest;
 import com.wind.funds.ledger.service.LedgerTransactionService;
-import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
@@ -36,8 +36,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
-import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

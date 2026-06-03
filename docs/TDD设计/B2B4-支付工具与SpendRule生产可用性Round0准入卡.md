@@ -84,14 +84,14 @@ B2-FR 进入 Execution Grant 前必须先选择资金责任目标字段策略，
 
 | 能力 | 候选接口 | face 包 | impl 包 | 准入切片 |
 | --- | --- | --- | --- | --- |
-| 支付工具能力准入 | `PaymentInstrumentCapabilityApplicationService` | `com.capte.funds.wallet.application.instrument` | `com.capte.funds.wallet.application.instrument.impl` | B2-PI-CAP |
-| 资金责任解析 | `FundingResponsibilityResolutionApplicationService` | `com.capte.funds.wallet.application.funding` | `com.capte.funds.wallet.application.funding.impl` | B2-FR |
-| 授权支付工具入口 | `AuthorizationAdmissionApplicationService` | `com.capte.funds.wallet.application.instrument` | `com.capte.funds.wallet.application.instrument.impl` | B4-AUTH-PI |
-| 授权后清算/释放/逆向 | `InstrumentTransactionLifecycleApplicationService` | `com.capte.funds.wallet.application.instrument` | `com.capte.funds.wallet.application.instrument.impl` | P2-VCC-LIFECYCLE |
-| VCC 预付资金处理 | `VccPrepaidFundingApplicationService` | `com.capte.funds.wallet.application.vcc` | `com.capte.funds.wallet.application.vcc.impl` | P2-VCC-PREPAID |
-| VCC 共享卡场景编排 | `VccSharedCardTransactionApplicationService` | `com.capte.funds.wallet.application.vcc` | `com.capte.funds.wallet.application.vcc.impl` | P2-VCC-LIFECYCLE |
+| 支付工具能力准入 | `PaymentInstrumentCapabilityApplicationService` | `com.wind.funds.wallet.application.instrument` | `com.wind.funds.wallet.application.instrument.impl` | B2-PI-CAP |
+| 资金责任解析 | `FundingResponsibilityResolutionApplicationService` | `com.wind.funds.wallet.application.funding` | `com.wind.funds.wallet.application.funding.impl` | B2-FR |
+| 授权支付工具入口 | `AuthorizationAdmissionApplicationService` | `com.wind.funds.wallet.application.instrument` | `com.wind.funds.wallet.application.instrument.impl` | B4-AUTH-PI |
+| 授权后清算/释放/逆向 | `InstrumentTransactionLifecycleApplicationService` | `com.wind.funds.wallet.application.instrument` | `com.wind.funds.wallet.application.instrument.impl` | P2-VCC-LIFECYCLE |
+| VCC 预付资金处理 | `VccPrepaidFundingApplicationService` | `com.wind.funds.wallet.application.vcc` | `com.wind.funds.wallet.application.vcc.impl` | P2-VCC-PREPAID |
+| VCC 共享卡场景编排 | `VccSharedCardTransactionApplicationService` | `com.wind.funds.wallet.application.vcc` | `com.wind.funds.wallet.application.vcc.impl` | P2-VCC-LIFECYCLE |
 
-Request/DTO 默认落 `com.capte.funds.wallet.model.request` 和 `com.capte.funds.wallet.model.dto`；若模型数量超过单一切片需要，可在 Execution Grant 中允许增加 `instrument`、`funding` 或 `vcc` 子包。禁止新增顶层 `com.capte.funds.instrument`，禁止让 `transaction-impl` 反向依赖钱包资源服务。
+Request/DTO 默认落 `com.wind.funds.wallet.model.request` 和 `com.wind.funds.wallet.model.dto`；若模型数量超过单一切片需要，可在 Execution Grant 中允许增加 `instrument`、`funding` 或 `vcc` 子包。禁止新增顶层 `com.wind.funds.instrument`，禁止让 `transaction-impl` 反向依赖钱包资源服务。
 
 ## 4.2 transactionLayerCandidate
 
@@ -183,7 +183,7 @@ Request/DTO 默认落 `com.capte.funds.wallet.model.request` 和 `com.capte.fund
 | `businessAdmission` | 产品锚点为 `AC-PI-010` 和 `AC-AUTH-000`；DSL 锚点为支付工具入口到账户主体授权内核转译；系分锚点为 `AuthorizationAdmissionApplicationService`、支付工具能力应用服务、资金责任解析和账户能力查询；TDD 锚点为 `R0-AUTH-001`。 |
 | `firstRedSet` | `R0-AUTH-001`：绕过工具准入、绑定快照、Spend Rule、资金责任或账户能力直接调用授权内核必须失败；拒绝路径无 route、posting、LedgerEntry、projection 和敏感上下文副作用；批准路径只委派账户主体型授权内核。 |
 | `secondRedSet` | 最小失败矩阵：工具非 ACTIVE、方向或动作能力不匹配、绑定缺失或版本失效、资金责任缺失或不唯一、Spend Rule 拒绝、账户能力不支持、币种不一致、敏感上下文出现时失败且无资金副作用。 |
-| `writeScope` | 先写 `tests/src/test/java/com/capte/funds/wallet/application/instrument/AuthorizationAdmissionApplicationServiceTests.java` 或等价授权 application facade 测试；Red 证明缺口后，仅允许在 `wallet-face` 新增 application facade 契约、Request/DTO，在 `wallet-impl` 新增最小 facade 实现和委派适配，并按需补 `FundsAuthorizationTransactionFlowTests` 回归。 |
+| `writeScope` | 先写 `tests/src/test/java/com/wind/funds/wallet/application/instrument/AuthorizationAdmissionApplicationServiceTests.java` 或等价授权 application facade 测试；Red 证明缺口后，仅允许在 `wallet-face` 新增 application facade 契约、Request/DTO，在 `wallet-impl` 新增最小 facade 实现和委派适配，并按需补 `FundsAuthorizationTransactionFlowTests` 回归。 |
 | `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md`、既有 `wallet-*`、`transaction-*`、`core`、`tests/src/test/resources/jdbc-schema.sql`。 |
 | `harnessScopeIndex` | 标准 Harness 字段索引：写入范围为授权 application facade 目标 Red、`wallet-face` application 契约和 Request/DTO、`wallet-impl` 最小实现、必要的授权 flow 回归；写入文件先限定新授权准入测试，Red 证明缺口后才进入上列生产触点；只读范围和只读参考为 PRD、DSL、系分、TDD、OpenSpec、既有 wallet/transaction/core 和 H2 schema。 |
 | `publicContractGate` | 只允许非破坏性新增 wallet application facade、Request/DTO 和返回 DTO；不得修改或替换 `FundsAuthorizationTransactionAuthorizeRequest.accountId`、`FundsAuthorizationTransactionService#authorize`、交易状态机、core 枚举或 ledger 公共契约。 |

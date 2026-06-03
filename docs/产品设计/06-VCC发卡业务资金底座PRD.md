@@ -406,12 +406,12 @@ VCC 业务对接建议优先依赖钱包 application facade，而不是直接调
 
 | 产品能力 | 建议接口 | 建议包 | 说明 |
 | --- | --- | --- | --- |
-| 工具能力准入 | `PaymentInstrumentCapabilityApplicationService` | `com.capte.funds.wallet.application.instrument` | VCC、共享卡、预付卡动作前置准入，输出工具准入快照。 |
-| 资金责任决策 | `FundingResponsibilityResolutionApplicationService` | `com.capte.funds.wallet.application.funding` | 从卡、使用人、预算组、Spend Rule、预付责任和平台角色解析最终资金或额度责任主体。 |
-| 授权准入 | `AuthorizationAdmissionApplicationService` | `com.capte.funds.wallet.application.instrument` | `authorizeByInstrument` 或等价入口；批准后委派账户主体型授权内核。 |
-| 清算/释放/逆向 | `InstrumentTransactionLifecycleApplicationService` | `com.capte.funds.wallet.application.instrument` | settlement、release、refund、chargeback 按原授权和原 route snapshot 回放。 |
-| 预付资金处理 | `VccPrepaidFundingApplicationService` | `com.capte.funds.wallet.application.vcc` | 外部确认入金、系统内充值、退卡或转出；不创建卡账本。 |
-| 共享卡场景编排 | `VccSharedCardTransactionApplicationService` | `com.capte.funds.wallet.application.vcc` | 共享卡授权、清算和逆向的 VCC 场景编排；卡维度账单来自交易投影。 |
+| 工具能力准入 | `PaymentInstrumentCapabilityApplicationService` | `com.wind.funds.wallet.application.instrument` | VCC、共享卡、预付卡动作前置准入，输出工具准入快照。 |
+| 资金责任决策 | `FundingResponsibilityResolutionApplicationService` | `com.wind.funds.wallet.application.funding` | 从卡、使用人、预算组、Spend Rule、预付责任和平台角色解析最终资金或额度责任主体。 |
+| 授权准入 | `AuthorizationAdmissionApplicationService` | `com.wind.funds.wallet.application.instrument` | `authorizeByInstrument` 或等价入口；批准后委派账户主体型授权内核。 |
+| 清算/释放/逆向 | `InstrumentTransactionLifecycleApplicationService` | `com.wind.funds.wallet.application.instrument` | settlement、release、refund、chargeback 按原授权和原 route snapshot 回放。 |
+| 预付资金处理 | `VccPrepaidFundingApplicationService` | `com.wind.funds.wallet.application.vcc` | 外部确认入金、系统内充值、退卡或转出；不创建卡账本。 |
+| 共享卡场景编排 | `VccSharedCardTransactionApplicationService` | `com.wind.funds.wallet.application.vcc` | 共享卡授权、清算和逆向的 VCC 场景编排；卡维度账单来自交易投影。 |
 
 交易层已补齐账户主体型授权过期释放基础能力，仍需继续完善受控强制完成、无授权退款、拒付/争议扣回、余额控制调账审计和原路径回放。VCC facade 可以触发或委派这些能力，但不得把它们包装成统一支付工具交易内核，也不得让卡、卡组、预算组或 Spend Rule 成为账务主体。
 

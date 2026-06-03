@@ -1,14 +1,14 @@
 package com.wind.funds.ledger.impl;
 
-import com.capte.funds.AbstractFundsServiceTest;
+import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.service.LedgerService;
-import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
-import com.capte.funds.wallet.dal.entities.FundingAccount;
-import com.capte.funds.wallet.dal.mapper.FundingAccountMapper;
-import com.capte.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.wallet.dal.entities.FundingAccount;
+import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
+import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.common.spring.SpringEventPublishUtils;
 import com.wind.funds.ledger.LedgerBalanceChangedEvent;
 import com.wind.funds.ledger.LedgerBalanceProjectionService;
@@ -51,8 +51,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
-import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 账本余额投影服务流程测试。

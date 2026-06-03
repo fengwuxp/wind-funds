@@ -561,19 +561,19 @@ default FundsBenefitSnapshotSpec getBenefitSnapshot() {
 包结构建议保持现有 `spec` / `model` / `enums` 分层风格：
 
 ```text
-core/src/main/java/com/wind/integration/funds/spec/transaction/
+core/src/main/java/com/wind/funds/spec/transaction/
   FundsBenefitSnapshotSpec.java
   FundsBenefitComponentSpec.java
   FundsBenefitReferenceSpec.java
   FundsBenefitRefundPolicySpec.java
 
-core/src/main/java/com/wind/integration/funds/model/transaction/
+core/src/main/java/com/wind/funds/model/transaction/
   ImmutableFundsBenefitSnapshotSpec.java
   ImmutableFundsBenefitComponentSpec.java
   ImmutableFundsBenefitReferenceSpec.java
   ImmutableFundsBenefitRefundPolicySpec.java
 
-core/src/main/java/com/wind/integration/funds/transaction/enums/
+core/src/main/java/com/wind/funds/transaction/enums/
   FundsBenefitType.java
   FundsBenefitComponentType.java
   FundsBenefitAmountClosureRole.java

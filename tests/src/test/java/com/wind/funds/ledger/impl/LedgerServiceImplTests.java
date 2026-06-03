@@ -1,10 +1,10 @@
 package com.wind.funds.ledger.impl;
 
-import com.capte.funds.AbstractFundsServiceTest;
+import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
-import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -27,9 +27,9 @@ import java.time.LocalTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
-import static com.capte.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
-import static com.capte.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
  * 账本服务流程测试。
