@@ -2,8 +2,8 @@ package com.capte.funds.transaction.converter;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
-import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
+import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
+import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Map;

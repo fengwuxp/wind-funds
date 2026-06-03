@@ -1,8 +1,8 @@
 package com.capte.funds.wallet.model.query;
 
-import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
-import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
+import com.wind.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

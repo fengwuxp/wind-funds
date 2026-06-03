@@ -1,9 +1,9 @@
 package com.capte.funds.route.support;
 
-import com.wind.integration.funds.model.route.ImmutableRouteParticipantSpec;
-import com.wind.integration.funds.route.enums.RouteParticipantRole;
-import com.wind.integration.funds.route.ref.SubjectRef;
-import com.wind.integration.funds.route.spec.RouteParticipantSpec;
+import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
+import com.wind.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.route.ref.SubjectRef;
+import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;

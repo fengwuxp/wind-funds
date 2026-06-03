@@ -1,10 +1,10 @@
 package com.capte.funds.wallet.services.impl;
 
 import com.capte.funds.AbstractFundsServiceTest;
-import com.capte.funds.ledger.dto.LedgerDTO;
-import com.capte.funds.ledger.impl.LedgerServiceImpl;
-import com.capte.funds.ledger.query.LedgerQuery;
-import com.capte.funds.ledger.service.LedgerService;
+import com.wind.funds.ledger.dto.LedgerDTO;
+import com.wind.funds.ledger.impl.LedgerServiceImpl;
+import com.wind.funds.ledger.query.LedgerQuery;
+import com.wind.funds.ledger.service.LedgerService;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
 import com.capte.funds.wallet.model.query.SpendSubjectFundingRelationQuery;
@@ -13,12 +13,12 @@ import com.capte.funds.wallet.model.request.CreateSpendSubjectFundingRelationReq
 import com.capte.funds.wallet.service.FundingAccountService;
 import com.capte.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
-import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.wind.integration.funds.wallet.enums.FundingAccountType;
-import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
-import com.wind.integration.funds.wallet.enums.SpendSubjectFundingRelationType;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.enums.FundingAccountType;
+import com.wind.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

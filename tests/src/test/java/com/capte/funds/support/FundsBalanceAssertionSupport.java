@@ -1,12 +1,12 @@
 package com.capte.funds.support;
 
 import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
-import com.wind.integration.funds.ledger.LedgerBalanceBucket;
-import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.integration.funds.spec.ledger.LedgerPostingPlanSpec;
-import com.wind.integration.funds.spec.ledger.LedgerTransactionSpec;
-import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.funds.ledger.LedgerBalanceBucket;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.spec.ledger.LedgerPostingPlanSpec;
+import com.wind.funds.spec.ledger.LedgerTransactionSpec;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.springframework.jdbc.core.JdbcTemplate;

@@ -1,11 +1,11 @@
 package com.capte.funds.wallet;
 
-import com.wind.integration.funds.wallet.FundsAccount;
-import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.wallet.FundsAccountOwner;
-import com.wind.integration.funds.wallet.enums.FundsAccountCapability;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.wallet.FundsAccount;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountOwner;
+import com.wind.funds.wallet.enums.FundsAccountCapability;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

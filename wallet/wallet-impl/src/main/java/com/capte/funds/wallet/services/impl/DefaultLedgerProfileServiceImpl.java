@@ -1,17 +1,17 @@
 package com.capte.funds.wallet.services.impl;
 
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.capte.funds.wallet.model.dto.LedgerProfileDTO;
 import com.capte.funds.wallet.model.dto.LedgerProfileItemDTO;
 import com.capte.funds.wallet.model.dto.NegativeAvailablePolicyDTO;
 import com.capte.funds.wallet.service.LedgerProfileService;
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.integration.funds.ledger.enums.EntrySide;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.integration.funds.spec.ledger.SettlementPolicySpec;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerSubjectCategory;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.spec.ledger.SettlementPolicySpec;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 

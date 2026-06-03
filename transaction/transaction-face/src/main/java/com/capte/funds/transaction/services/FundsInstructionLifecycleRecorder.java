@@ -1,9 +1,9 @@
 package com.capte.funds.transaction.services;
 
 import com.capte.funds.transaction.model.dto.FundsInstructionLifecycleResult;
-import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
-import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
-import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 

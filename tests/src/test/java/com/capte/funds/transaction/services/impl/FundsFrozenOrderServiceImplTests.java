@@ -4,7 +4,7 @@ import com.capte.funds.AbstractFundsServiceTest;
 import com.capte.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.capte.funds.transaction.model.request.CreateFundsFrozenOrderRequest;
 import com.capte.funds.transaction.services.FundsFrozenOrderService;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -2,7 +2,7 @@ package com.capte.funds.transaction.model.query;
 
 import com.capte.funds.transaction.enums.FundsTransactionMode;
 import com.capte.funds.transaction.enums.FundsTransactionStatus;
-import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

@@ -1,9 +1,9 @@
 package com.capte.funds.wallet.services.impl;
 
-import com.capte.funds.ledger.dto.LedgerDTO;
-import com.capte.funds.ledger.query.LedgerQuery;
-import com.capte.funds.ledger.request.CreateLedgerRequest;
-import com.capte.funds.ledger.service.LedgerService;
+import com.wind.funds.ledger.dto.LedgerDTO;
+import com.wind.funds.ledger.query.LedgerQuery;
+import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.service.LedgerService;
 import com.capte.funds.wallet.model.dto.LedgerProfileDTO;
 import com.capte.funds.wallet.model.dto.LedgerProfileItemDTO;
 import com.capte.funds.wallet.model.request.InitializeSubjectLedgerRequest;
@@ -11,8 +11,8 @@ import com.capte.funds.wallet.service.LedgerProfileService;
 import com.capte.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
-import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;

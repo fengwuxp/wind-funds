@@ -1,9 +1,9 @@
 package com.capte.funds.route;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.route.RouteResolver;
-import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
-import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.route.RouteResolver;
+import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;

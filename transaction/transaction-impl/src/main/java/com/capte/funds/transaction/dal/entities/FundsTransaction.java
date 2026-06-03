@@ -7,7 +7,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
-import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;

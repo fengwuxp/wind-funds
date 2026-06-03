@@ -1,14 +1,14 @@
 package com.capte.funds.transaction.application.flow;
 
-import com.capte.funds.ledger.dal.entities.LedgerEntry;
-import com.capte.funds.ledger.dal.entities.LedgerPostingPlan;
-import com.capte.funds.ledger.dal.entities.LedgerTransaction;
+import com.wind.funds.ledger.dal.entities.LedgerEntry;
+import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
+import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
-import com.wind.integration.funds.ledger.enums.LedgerPhaseCode;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.wallet.FundsAccountId;
 import org.junit.jupiter.api.Test;
 
 import static com.capte.funds.support.FundsBalanceAssertionSupport.assertBucket;

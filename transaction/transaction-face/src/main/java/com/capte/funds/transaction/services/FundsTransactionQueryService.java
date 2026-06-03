@@ -2,8 +2,8 @@ package com.capte.funds.transaction.services;
 
 import com.capte.funds.transaction.model.dto.FundsTransactionDTO;
 import com.capte.funds.transaction.model.dto.FundsTransactionDetailDTO;
-import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;

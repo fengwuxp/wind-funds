@@ -1,13 +1,13 @@
 package com.capte.funds.route.support;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
-import com.wind.integration.funds.model.route.ImmutableSubjectRef;
-import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
-import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.wallet.enums.DefaultFundsAccountType;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.wind.integration.funds.route.enums.RouteParticipantRole;
-import com.wind.integration.funds.route.ref.SubjectRef;
+import com.wind.funds.model.route.ImmutableSubjectRef;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.route.ref.SubjectRef;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 

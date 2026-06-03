@@ -1,10 +1,10 @@
 package com.capte.funds.route;
 
-import com.wind.integration.funds.model.route.ImmutableRouteSnapshotSpec;
+import com.wind.funds.model.route.ImmutableRouteSnapshotSpec;
 import com.capte.funds.transaction.support.FundsRouteCodes;
-import com.wind.integration.funds.route.RouteSnapshotFactory;
-import com.wind.integration.funds.route.spec.ResolvedRouteSpec;
-import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.route.RouteSnapshotFactory;
+import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 

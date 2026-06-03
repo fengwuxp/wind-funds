@@ -6,7 +6,7 @@ import com.capte.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
-import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountId;
 import org.jspecify.annotations.NonNull;
 
 /**

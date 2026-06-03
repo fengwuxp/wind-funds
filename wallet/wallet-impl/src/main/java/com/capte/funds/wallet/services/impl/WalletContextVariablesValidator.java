@@ -1,9 +1,9 @@
 package com.capte.funds.wallet.services.impl;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
-import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
-import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
+import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
+import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
+import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import org.jspecify.annotations.Nullable;
 
 /**

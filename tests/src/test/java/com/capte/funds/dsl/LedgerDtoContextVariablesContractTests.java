@@ -1,7 +1,7 @@
 package com.capte.funds.dsl;
 
-import com.capte.funds.ledger.dto.LedgerEntryDTO;
-import com.capte.funds.ledger.dto.LedgerTransactionDTO;
+import com.wind.funds.ledger.dto.LedgerEntryDTO;
+import com.wind.funds.ledger.dto.LedgerTransactionDTO;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;

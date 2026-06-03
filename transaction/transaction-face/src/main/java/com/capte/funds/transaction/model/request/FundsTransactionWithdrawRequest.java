@@ -1,8 +1,8 @@
 package com.capte.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.integration.funds.spec.transaction.FeeSpec;
-import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.funds.spec.transaction.FeeSpec;
+import com.wind.funds.wallet.FundsAccountId;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;

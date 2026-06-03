@@ -1,6 +1,6 @@
 package com.capte.funds.dsl;
 
-import com.capte.funds.ledger.request.UpdateLedgerTransactionRequest;
+import com.wind.funds.ledger.request.UpdateLedgerTransactionRequest;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;

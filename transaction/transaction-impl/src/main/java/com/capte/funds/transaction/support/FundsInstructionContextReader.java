@@ -1,9 +1,9 @@
 package com.capte.funds.transaction.support;
 
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 

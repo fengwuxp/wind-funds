@@ -1,8 +1,8 @@
 package com.capte.funds.wallet.model.dto;
 
-import com.wind.integration.funds.ledger.LedgerBalanceBucket;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.funds.ledger.LedgerBalanceBucket;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

@@ -8,7 +8,7 @@ import com.capte.funds.wallet.model.dto.PaymentInstrumentBindingHistoryDTO;
 import com.capte.funds.wallet.model.dto.PaymentInstrumentDTO;
 import com.capte.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.capte.funds.wallet.model.request.CreatePaymentInstrumentRequest;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;

@@ -1,6 +1,6 @@
 package com.capte.funds.wallet.model.dto;
 
-import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingChangeType;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

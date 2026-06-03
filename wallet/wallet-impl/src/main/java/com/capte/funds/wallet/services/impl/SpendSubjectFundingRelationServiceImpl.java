@@ -16,7 +16,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;

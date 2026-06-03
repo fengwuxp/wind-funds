@@ -1,10 +1,10 @@
 package com.capte.funds.fx;
 
-import com.wind.integration.funds.fx.FxRate;
-import com.wind.integration.funds.fx.FxRateProvider;
-import com.wind.integration.funds.fx.FxRequest;
-import com.wind.integration.funds.fx.FxResult;
-import com.wind.integration.funds.fx.FxService;
+import com.wind.funds.fx.FxRate;
+import com.wind.funds.fx.FxRateProvider;
+import com.wind.funds.fx.FxRequest;
+import com.wind.funds.fx.FxResult;
+import com.wind.funds.fx.FxService;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

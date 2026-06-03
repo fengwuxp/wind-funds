@@ -1,13 +1,13 @@
 package com.capte.funds.wallet.dal.entities;
 
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingRole;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;

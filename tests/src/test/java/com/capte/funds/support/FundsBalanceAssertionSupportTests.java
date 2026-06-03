@@ -2,11 +2,11 @@ package com.capte.funds.support;
 
 import com.capte.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.capte.funds.wallet.model.dto.FundsSubjectBalanceDTO;
-import com.wind.integration.funds.ledger.LedgerBalanceBucket;
-import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.funds.ledger.LedgerBalanceBucket;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;

@@ -1,9 +1,9 @@
 package com.capte.funds.wallet.model.request;
 
-import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
-import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
-import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;

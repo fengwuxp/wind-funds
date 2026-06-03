@@ -1,7 +1,7 @@
 package com.capte.funds.wallet.service;
 
-import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 

@@ -5,7 +5,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
-import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingChangeType;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 

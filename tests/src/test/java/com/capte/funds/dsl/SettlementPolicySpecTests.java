@@ -1,6 +1,6 @@
 package com.capte.funds.dsl;
 
-import com.wind.integration.funds.spec.ledger.SettlementPolicySpec;
+import com.wind.funds.spec.ledger.SettlementPolicySpec;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;

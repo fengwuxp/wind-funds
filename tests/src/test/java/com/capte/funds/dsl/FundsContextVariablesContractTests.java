@@ -1,6 +1,6 @@
 package com.capte.funds.dsl;
 
-import com.wind.integration.funds.model.FundsContextVariables;
+import com.wind.funds.model.FundsContextVariables;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;

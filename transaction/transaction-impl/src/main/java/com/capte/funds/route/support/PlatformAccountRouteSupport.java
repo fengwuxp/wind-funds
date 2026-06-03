@@ -1,16 +1,16 @@
 package com.capte.funds.route.support;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
-import com.wind.integration.funds.model.route.ImmutablePlatformAccountsSnapshotSpec;
-import com.wind.integration.funds.model.route.ImmutableSubjectRef;
-import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.integration.funds.wallet.enums.PlatformFundingAccountRole;
+import com.wind.funds.model.route.ImmutablePlatformAccountsSnapshotSpec;
+import com.wind.funds.model.route.ImmutableSubjectRef;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.capte.funds.wallet.service.PlatformFundingAccountService;
-import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.wind.integration.funds.route.ref.SubjectRef;
-import com.wind.integration.funds.route.spec.PlatformAccountsSnapshotSpec;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.ref.SubjectRef;
+import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;

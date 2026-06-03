@@ -2,8 +2,8 @@ package com.capte.funds.wallet.service;
 
 import com.capte.funds.wallet.model.dto.LedgerProfileDTO;
 import com.capte.funds.wallet.model.dto.LedgerProfileItemDTO;
-import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import org.jspecify.annotations.NonNull;
 
 /**

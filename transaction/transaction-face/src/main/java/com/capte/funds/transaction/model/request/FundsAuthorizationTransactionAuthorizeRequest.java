@@ -1,7 +1,7 @@
 package com.capte.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
-import com.wind.integration.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.InternationalRegionCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;

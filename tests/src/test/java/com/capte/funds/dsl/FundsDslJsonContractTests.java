@@ -2,7 +2,7 @@ package com.capte.funds.dsl;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.wind.integration.funds.util.FundsDslJsonContractVerifier;
+import com.wind.funds.util.FundsDslJsonContractVerifier;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.StringUtils;
 

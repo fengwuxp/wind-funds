@@ -2,9 +2,9 @@ package com.capte.funds.route;
 
 import com.capte.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.route.spec.RouteSnapshotSpec;
-import com.wind.integration.funds.spec.transaction.FundsBenefitSnapshotSpec;
-import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.spec.transaction.FundsBenefitSnapshotSpec;
+import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;

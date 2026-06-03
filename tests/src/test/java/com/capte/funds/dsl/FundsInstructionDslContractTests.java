@@ -1,14 +1,14 @@
 package com.capte.funds.dsl;
 
-import com.wind.integration.funds.model.operation.ImmutableFundsOperationActorSpec;
-import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
-import com.wind.integration.funds.model.transaction.ImmutableFundsInstructionSpec;
-import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
-import com.wind.integration.funds.transaction.enums.DefaultFundsTransactionType;
-import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
-import com.wind.integration.funds.transaction.enums.FundsInstructionType;
-import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
+import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
+import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
+import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
+import com.wind.funds.transaction.enums.FundsInstructionType;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;

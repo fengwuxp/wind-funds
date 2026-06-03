@@ -3,7 +3,7 @@ package com.capte.funds.wallet.mapstruct;
 import com.capte.funds.wallet.dal.entities.SpendSubjectFundingRel;
 import com.capte.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
 import com.capte.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;

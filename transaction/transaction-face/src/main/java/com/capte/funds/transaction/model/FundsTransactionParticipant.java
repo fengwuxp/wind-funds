@@ -2,10 +2,10 @@ package com.capte.funds.transaction.model;
 
 import com.capte.funds.transaction.enums.FundsEffectType;
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.model.transaction.FundsBenefitSpecValidators;
-import com.wind.integration.funds.route.enums.RouteParticipantRole;
-import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
-import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
+import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
+import com.wind.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
+import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;

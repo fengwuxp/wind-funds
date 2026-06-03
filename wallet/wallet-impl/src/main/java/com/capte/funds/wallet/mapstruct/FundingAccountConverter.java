@@ -1,11 +1,11 @@
 package com.capte.funds.wallet.mapstruct;
 
 import com.capte.funds.wallet.dal.entities.FundingAccount;
-import com.wind.integration.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.capte.funds.wallet.model.dto.FundingAccountDTO;
 import com.capte.funds.wallet.model.request.CreateFundingAccountRequest;
-import com.wind.integration.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

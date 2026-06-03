@@ -2,7 +2,7 @@ package com.capte.funds.dsl;
 
 import com.capte.funds.transaction.enums.FundsEffectType;
 import com.capte.funds.transaction.model.FundsTransactionParticipant;
-import com.wind.integration.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;

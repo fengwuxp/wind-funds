@@ -1,7 +1,7 @@
 package com.capte.funds.wallet.service;
 
 import com.capte.funds.wallet.model.request.InitializeSubjectLedgerRequest;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Map;

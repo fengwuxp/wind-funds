@@ -1,8 +1,8 @@
 package com.capte.funds.wallet.model.request;
 
-import com.wind.integration.funds.route.enums.FundsSubjectType;
-import com.wind.integration.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.integration.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;

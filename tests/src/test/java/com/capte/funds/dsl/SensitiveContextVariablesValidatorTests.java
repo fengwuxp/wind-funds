@@ -1,7 +1,7 @@
 package com.capte.funds.dsl;
 
-import com.wind.integration.funds.route.support.ExternalAccountSensitiveValueValidator;
-import com.wind.integration.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
+import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
+import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

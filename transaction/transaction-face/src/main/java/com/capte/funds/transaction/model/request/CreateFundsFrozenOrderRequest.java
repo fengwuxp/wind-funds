@@ -1,7 +1,7 @@
 package com.capte.funds.transaction.model.request;
 
 import com.capte.funds.transaction.enums.FundsFrozenOrderStatus;
-import com.wind.integration.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;

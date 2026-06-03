@@ -2,8 +2,8 @@ package com.capte.funds.transaction.converter;
 
 import com.capte.funds.transaction.model.request.TransactionAmount;
 import com.wind.common.exception.AssertUtils;
-import com.wind.integration.funds.wallet.FundsAccountId;
-import com.wind.integration.funds.wallet.FundsAccountQueryService;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;

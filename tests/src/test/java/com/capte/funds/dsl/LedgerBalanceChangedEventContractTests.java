@@ -1,7 +1,7 @@
 package com.capte.funds.dsl;
 
-import com.wind.integration.funds.ledger.LedgerBalanceChangedEvent;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.LedgerBalanceChangedEvent;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;

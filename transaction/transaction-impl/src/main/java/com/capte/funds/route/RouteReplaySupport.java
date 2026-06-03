@@ -1,9 +1,9 @@
 package com.capte.funds.route;
 
-import com.wind.integration.funds.spec.transaction.FundsInstructionReferenceSpec;
-import com.wind.integration.funds.spec.transaction.FundsInstructionSpec;
-import com.wind.integration.funds.transaction.enums.FundsInstructionReferenceType;
-import com.wind.integration.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
+import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import org.jspecify.annotations.NonNull;
 import org.springframework.util.StringUtils;
 

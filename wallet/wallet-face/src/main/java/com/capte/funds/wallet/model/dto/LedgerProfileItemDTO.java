@@ -1,9 +1,9 @@
 package com.capte.funds.wallet.model.dto;
 
-import com.wind.integration.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.integration.funds.ledger.enums.EntrySide;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCategory;
-import com.wind.integration.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerSubjectCategory;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
