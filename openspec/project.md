@@ -12,6 +12,8 @@ OpenSpec / Superpowers / Harness 在本项目中的定位：
 
 项目决策和协作结论必须回到 `docs/`、`openspec/`、Harness Plan、Git 提交点或用户确认，不依赖外部记忆层作为编码准入或验收依据。
 
+产品架构准入锚点：业务目标是让支付资金底座的后续编码只消费已确认的资金事实、对象、流程、规则和验收口径；用户价值是让产品、运营、财务和研发能从同一份规格基线判断当前任务是否可进入单一 Execution Grant。业务对象、对象模型、字段口径、生命周期和状态以产品设计、DSL、系分和 TDD 为准；业务流程必须区分主流程、异常流程和人工兜底。规则矩阵必须写清触发条件、判断逻辑、优先级、版本、审计和验收来源。
+
 ## 二、历史内容处理
 
 历史 OpenSpec specs、changes、Superpowers/Harness 计划和旧测试代码均已作废。后续开发不得引用旧规格、旧任务拆分或旧测试断言作为通过依据。
@@ -65,7 +67,7 @@ OpenSpec / Superpowers / Harness 在本项目中的定位：
 | --- | --- | --- |
 | 设计基线 | 最新已提交设计和任务对齐输入以确认时 Git HEAD 为准；`270122e` 是上一完整 CAD 验证证据提交；`81a7ecb`、`4a7ef12`、`f99800b` 和 `9456ab6` 保留为历史准入证据。 | 后续 MVP 编码任务若要采用资金责任解析、支付工具投影、授权支付工具应用入口、钱包 DDD 应用层、资金责任目标字段、BudgetGroup/Spend Rule 控制上下文、核心设计骨架、代码 CR 差异、B2/B4 准入口径和钱包入口收敛，必须引用确认时 Git HEAD，或在 Execution Grant 的 `authorityBaseline` 中显式列为基线附件。 |
 | A0 至 A4 MVP 基础任务 | 可在 Execution Grant 下进入。 | 每个任务必须写明 `mvpScenario`、产品验收、DSL caseId、系分章节、TDD 用例、红线编号、写入范围、验证命令和 Not Done 条件；B1 至 B6 只作为覆盖索引，不作为一次性授权范围。 |
-| 2026-05-31 代码准入 CR | `A1 直接交易事实红线` 仍是当前最接近可确认的单一 Execution Grant；交易 canonical 入口保持账户主体型，当前不需要改为支付工具引用。B2/B4/B5/B6 只能先做独立 Round 0 或单一 Execution Grant：钱包 application facade、资金责任目标字段、BudgetGroup 兼容策略和预算控制投影不能混成一次写入。 | 若用户只说“继续编码”但未确认具体 Execution Grant，默认不得写生产代码、测试代码、DDL/H2 schema 或运行时配置；可继续完善授权卡、做只读差距复核，或请用户确认 A1/B2/B4/B5/B6 中一个最小切片。 |
+| 2026-05-31 代码准入 CR | 历史裁决中 `A1 直接交易事实红线` 曾是当时最接近可确认的单一 Execution Grant；交易 canonical 入口保持账户主体型，不需要改为支付工具引用。B2/B4/B5/B6 只能先做独立 Round 0 或单一 Execution Grant：钱包 application facade、资金责任目标字段、BudgetGroup 兼容策略和预算控制投影不能混成一次写入。当前恢复入口已切换为 2026-06-02 的 `B4-NO-AUTH-REFUND` / `B4-NAR-CAD-001`。 | 若用户只说“继续编码”但未确认具体 Execution Grant，默认不得写生产代码、测试代码、DDL/H2 schema 或运行时配置；可继续完善授权卡、做只读差距复核，或请用户确认当前恢复入口 `B4-NO-AUTH-REFUND`，也可另行确认 A1/B2/B4/B5/B6 中一个最小切片。 |
 | 2026-05-31 B2/B4 准入口径修复 | 支付工具、钱包 application facade 和授权支付工具入口的文档阻断已关闭：外部工具和工具快照才使用 `PaymentInstrumentRef`，内部余额钱包、信用额度、返利钱包和商户钱包等业务入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照；`PaymentInstrumentCapabilityApplicationService` 只做能力准入和快照，不承接注册或绑定变更；TDD 显式纳入 `AC-AUTH-000`。 | 该修复允许 B2/B4 进入独立 Round 0 或单一 Execution Grant 准备，但仍不等于编码授权；后续若新增 application facade、Request/DTO、幂等摘要、H2/DDL 或测试资产，Execution Grant 必须单独列明写入范围和验证命令。 |
 | 2026-05-31 钱包入口二次收敛 | 内部余额钱包、平台钱包、商户钱包、返利钱包和信用额度入口不再按“钱包标识=支付工具”读取；内部入口解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照，外部钱包端点、通道 token、卡、VA 和外部账户才使用 `PaymentInstrumentRef` / `ExternalAccountRef`。 | 该收敛只消除 PRD/DSL/系分/TDD/OpenSpec 读法分叉，不新增编码授权；若后续要实现钱包入口 facade、工具准入快照或请求模型，仍必须走 B2/B4 的单一 Execution Grant。 |
 | 2026-05-31 本轮编码准入复核 | 工作树在复核起点为 clean，上一完整 CAD 验证证据提交为 `270122e`。本轮只刷新准入引用：钱包/交易 application facade 仍未落地，资金责任关系仍以 `fundingAccountId` 兼容字段为主，BudgetGroup 兼容路径仍存在，交易 canonical 请求仍是账户主体型；支付工具绑定对象约束和钱包入口文档口径已进入局部基线。 | 可把 A1 推进到“用户确认态”，但不能把本轮复核解释为 A1 自动授权；B2/B4/B5/B6 仍需各自 Round 0 或单一 Execution Grant；B7/B8/P2 仍只进入 TDD 分析和独立授权准备。 |
