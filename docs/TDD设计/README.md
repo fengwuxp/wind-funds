@@ -33,7 +33,7 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 | 1 | [支付资金底座测试驱动设计.md](支付资金底座测试驱动设计.md) | 定义测试驱动设计原则、模块测试矩阵、场景用例、红线用例、目标测试资产和执行门禁。 |
 | 2 | [A0-编码准入基线核验.md](A0-编码准入基线核验.md) | 固化进入编码前的只读核验页，说明 authority baseline、code baseline、target assets、schemaNeed、首批 Red 候选和下一步 Execution Grant 建议。 |
 | 3 | [A1-直接交易事实红线准入卡.md](A1-直接交易事实红线准入卡.md) | 收敛 A1 直接交易事实红线的候选 Execution Grant，说明候选授权、覆盖验收、写入边界、Red 集合、验证命令和停止条件。 |
-| 4 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 收敛 B4-TRX-EXPIRE、B4-FORCE-SETTLE 和 B4-NO-AUTH-REFUND 已闭合后的授权后继能力基线；后续拒付承接、授权并发竞争、授权支付工具应用入口、授权占券和权益生命周期必须重新确认独立 Execution Grant 后才允许写 Red 或代码。 |
+| 4 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 收敛 B4-TRX-EXPIRE、B4-FORCE-SETTLE、B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT 和 B4-AUTH-RACE 已闭合后的授权后继能力基线；后续完整 dispute/chargeback case、授权支付工具应用入口、授权占券和权益生命周期必须重新确认独立 Execution Grant 后才允许写 Red 或代码。 |
 | 5 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 收敛支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的 Round 0 候选卡；只作为 B2/B4/B5/B6/B8 独立 Execution Grant 输入。 |
 
 ## 契约输入
