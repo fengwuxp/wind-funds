@@ -51,7 +51,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Locale;
 import java.util.Set;
@@ -116,7 +115,8 @@ public abstract class AbstractFundsServiceTest {
             ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
             new SpringApplicationContextUtils().setApplicationContext(applicationContext);
             SpringApplicationContextUtils.markStarted();
-            mockPublishEvent();
+            setTestApplicationEventPublisher(event -> {
+            });
             AuditManager.setAuditEnable(true);
             AuditManager.setMessageCollector(auditMessage -> SQL_LOG.info("{}, {}ms",
                     auditMessage.getFullSql(), auditMessage.getElapsedTime()));
@@ -217,15 +217,13 @@ public abstract class AbstractFundsServiceTest {
         }
     }
 
-    private static void mockPublishEvent() {
-        ApplicationEventPublisher publisher = event -> {
-        };
+    protected static void setTestApplicationEventPublisher(ApplicationEventPublisher publisher) {
         try {
             Method method = SpringEventPublishUtils.class.getDeclaredMethod("setApplicationEventPublisher",
                     ApplicationEventPublisher.class);
             method.setAccessible(true);
             method.invoke(null, publisher);
-        } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+        } catch (ReflectiveOperationException e) {
             throw new IllegalStateException("Failed to initialize test application event publisher", e);
         }
     }

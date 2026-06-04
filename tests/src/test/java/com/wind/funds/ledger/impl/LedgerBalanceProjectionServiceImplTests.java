@@ -9,7 +9,6 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
-import com.wind.common.spring.SpringEventPublishUtils;
 import com.wind.funds.ledger.LedgerBalanceChangedEvent;
 import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
@@ -31,7 +30,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -39,7 +37,6 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -94,7 +91,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
     @Test
     void testProjectShouldKeepLedgerBalanceUpdateWhenBalanceChangedEventPublishFails() {
         AtomicInteger eventAttempts = new AtomicInteger();
-        setApplicationEventPublisher(event -> {
+        setTestApplicationEventPublisher(event -> {
             eventAttempts.incrementAndGet();
             throw new IllegalStateException("balance log sink unavailable");
         });
@@ -120,7 +117,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
     @Test
     void testProjectShouldPublishBalanceChangedEventWithSourceEvidence() {
         List<LedgerBalanceChangedEvent> publishedEvents = new ArrayList<>();
-        setApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
+        setTestApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         projectionService.project(List.of(ledgerEntry(25L)));
@@ -155,7 +152,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
     @Test
     void testProjectShouldPublishBalanceChangedEventWithImmutableNestedContext() {
         List<LedgerBalanceChangedEvent> publishedEvents = new ArrayList<>();
-        setApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
+        setTestApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
         Map<String, Object> processorPayload = new HashMap<>();
         processorPayload.put("networkReference", "token:balance-event-001");
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
@@ -184,7 +181,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
     @Test
     void testProjectShouldRejectCoreBenefitEntryContextBeforeBalanceMutation() {
         List<LedgerBalanceChangedEvent> publishedEvents = new ArrayList<>();
-        setApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
+        setTestApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> projectionService.project(List.of(ledgerEntry(25L,
@@ -235,7 +232,7 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
 
     @AfterEach
     void tearDownProjectionServiceTestData() {
-        setApplicationEventPublisher(event -> {
+        setTestApplicationEventPublisher(event -> {
         });
         cleanupProjectionServiceTestData();
     }
@@ -360,18 +357,6 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         return ledgerSubjectCode == LedgerSubjectCode.AVAILABLE
                 ? LedgerSubjectCategory.ASSET
                 : LedgerSubjectCategory.LIABILITY;
-    }
-
-    private static void setApplicationEventPublisher(ApplicationEventPublisher publisher) {
-        try {
-            Method method = SpringEventPublishUtils.class.getDeclaredMethod(
-                    "setApplicationEventPublisher",
-                    ApplicationEventPublisher.class);
-            method.setAccessible(true);
-            method.invoke(null, publisher);
-        } catch (ReflectiveOperationException ex) {
-            throw new IllegalStateException("设置 Spring 事件发布器失败", ex);
-        }
     }
 
     @Configuration
