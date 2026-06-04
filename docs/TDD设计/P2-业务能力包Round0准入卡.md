@@ -2,11 +2,11 @@
 
 ## 1. 文档定位
 
-本文档收敛 VCC、全球账户、收单等 P2 业务专项进入资金底座前的 Round 0 准入规则。P2 业务能力是专项能力包，不属于默认 P0/P1 编码开工范围；只有用户确认单一 Execution Grant 后，才允许进入 Red、Green、Review、Verify 和自动提交闭环。
+本文档收敛 VCC、全球账户、收单等 P2 业务专项进入资金底座前的 Round 0 准入规则。P2 业务能力是专项能力包，不属于默认 P0/P1 编码开工范围；只有用户确认单一 Execution Grant 后，才允许进入 Red、Green、Review、Verify 和自动提交闭环。当前全局任务优先级为账本账目 > 钱包 > 交易层 > 支付工具支持 > VCC/全球账户支持；收单能力仅做设计和边界复核，不做实现。
 
 本卡只把已经归一化、脱敏、确认过的业务资金动作映射回统一的钱包、交易、账本、清结算、对账和归档能力。它不建设银行核心、全球账户开户、外部清算网络、FX 执行、跨境合规管理、收单通道、卡组织或外部协议栈。
 
-当前 VCC 预付资金和授权后生命周期候选已在 [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) 中形成；本文档承接非支付工具轴的全球账户和收单候选包。本文档只记录 Execution Grant 候选，不授权写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
+当前 VCC 预付资金和授权后生命周期候选已在 [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) 中形成；本文档承接非支付工具轴的全球账户候选包，以及收单设计-only 边界包。本文档只记录 P2 后置支持候选和设计差距，不授权写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
 
 ## 2. P2 通用不写入范围
 
@@ -21,13 +21,13 @@
 
 ## 3. 候选切片总览
 
-| 候选切片 | 优先级 | 首批 Red | 本轮允许讨论的上限 | 不混入范围 |
+| 候选切片 | P2 局部顺位 | 首批 Red | 本轮允许讨论的上限 | 不混入范围 |
 | --- | --- | --- | --- | --- |
 | P2-GA-INBOUND | 1 | R0-GA-IN-001 | 全球账户入金 facade、contract-only DTO、外部引用脱敏、外部非终态和未匹配不入账 Red。 | 不混入出款、退汇、FX 执行、完整清结算、外部协议和运营后台。 |
 | P2-GA-OUTBOUND | 2 | R0-GA-OUT-001 | 全球账户出款预校验、外部已受理在途、成功回执和退汇候选。 | 不混入入金匹配、FX 执行和完整对账。 |
 | P2-GA-FX-FEE | 3 | R0-GA-FX-001 | FX quote 引用、费用分离、错币种阻断和专业确认字段候选。 | 不做 FX 执行，不做汇率平台，不承诺跨境合规完成。 |
-| P2-ACQ-CAPTURE | 4 | R0-ACQ-CAP-001 | 收单 capture 归一、商户 CLEARING 与待清算边界候选。 | 不做通道接入、卡组织清算文件、清分清算结算全链路、出款、退款或拒付。 |
-| P2-ACQ-DISPUTE | 5 | R0-ACQ-DSP-001 | 收单 dispute/chargeback 事件语义和证据引用候选。 | 不混普通退款，不做证据文件存储和卡组织争议系统。 |
+| P2-ACQ-CAPTURE | design-only | R0-ACQ-CAP-001 | 收单 capture 归一、商户 CLEARING、待清算和 PCI/外部规则边界设计。 | 不做实现、不写 Red 测试、不确认 Execution Grant、不做通道接入、卡组织清算文件、清分清算结算全链路、出款、退款或拒付。 |
+| P2-ACQ-DISPUTE | design-only | R0-ACQ-DSP-001 | 收单 dispute/chargeback 事件语义和证据引用设计。 | 不混普通退款，不做证据文件存储、卡组织争议系统或实现候选。 |
 
 ## 4. P2-GA-INBOUND Round 0 扫描（2026-06-04）
 
@@ -150,7 +150,7 @@ FX 决策：same-currency-only / fx-quote-backed
 Git 策略：auto_commit
 ```
 
-也可以选择 `P2-GA-OUTBOUND`、`P2-GA-FX-FEE` 或 `P2-ACQ-CAPTURE`，但必须使用各自独立的 Execution Grant 模板。`P2-ACQ-DISPUTE` 仍需先补独立 Round 0 扫描和 Grant 候选包。
+也可以选择 `P2-GA-OUTBOUND` 或 `P2-GA-FX-FEE`，但必须使用各自独立的 Execution Grant 模板，并说明为什么越过账本账目、钱包和交易层优先队列。`P2-ACQ-CAPTURE` 和 `P2-ACQ-DISPUTE` 当前仅 design-only，不得作为编码 Grant 选择。
 
 ## 10. P2-GA-OUTBOUND Round 0 扫描（2026-06-04）
 
@@ -320,7 +320,7 @@ FX 执行决策：默认 no-fx-execution；quote 校验需 quote-validation-only
 
 ## 14. P2-ACQ-CAPTURE Round 0 扫描（2026-06-04）
 
-状态：ROUND0_READY_NOT_CODE_AUTHORIZED。
+状态：DESIGN_ONLY_NOT_CODE_CANDIDATE。
 
 产品基线：收单产品、支付网关或通道适配层负责 Merchant、Payment Order、Payment Attempt、Capture、支付方式、PSP/收单行和卡组织事件的协议归一、风险判断和敏感数据隔离。资金底座只接收已经归一、脱敏、具备外部终态或待处理口径的 capture 资金动作；capture 或支付成功只能增加商户 `CLEARING` 或待清算事实，不得直接增加 `AVAILABLE`、`SETTLEMENT`、可提现余额或 payout-ready 状态。清分、清算、结算、出款、退款和拒付必须保持分层，不得把 capture 成功、清分确认、结算锁定、银行出款回执和拒付追偿混成一个状态。
 
@@ -330,7 +330,7 @@ FX 执行决策：默认 no-fx-execution；quote 校验需 quote-validation-only
 
 语义决策：capture 事件必须先由收单产品、网关或通道适配层归一和脱敏。资金服务只接收 `captureId`、`paymentAttemptId`、商户引用、内部商户资金账户决策、金额币种、外部 capture 引用、脱敏支付方式或工具引用、PSP/收单行/渠道引用、外部状态、规则核验状态、幂等键、请求摘要、操作者和审计引用。外部状态非终态、缺 capture confirmation、缺商户资金账户决策、金额币种不一致、商户不唯一、幂等同键不同摘要、携带完整 PAN/CVC/token secret/3DS 原文或 PSP 原始报文时，必须失败、挂起、差错或人工处理，不得写 route、posting、LedgerEntry、projection、清分候选或可提现结果。
 
-实现决策需要在授权时二选一：
+若未来重新打开收单实现优先级，新的授权实现决策需要重新二选一：
 
 | 决策 | 说明 |
 | --- | --- |
@@ -351,51 +351,46 @@ FX 执行决策：默认 no-fx-execution；quote 校验需 quote-validation-only
 | R0-ACQ-CAP-001B | 完整 PAN、CVC、token secret、3DS 原始数据、完整 PSP payload 或生产敏感配置进入日志、上下文、投影、导出、异常消息或测试夹具。 |
 | R0-ACQ-CAP-001C | 外部状态非终态、缺 capture confirmation、缺商户资金账户决策、缺幂等键、商户不唯一或同一外部 capture 引用不同摘要时，系统仍写 route、posting、LedgerEntry、projection、清分候选或可提现结果。 |
 
-Execution Grant 必须列明收单业务章节、`ACQ-AC-001`、`ACQ-RED-001`、`ACQ-RED-002`、`ACQ-R001`、`ACQ-R005`、DSL/TDD 不变量、实现决策、清分批次决策、结算释放决策、敏感数据决策、外部规则核验状态、商户资金账户解析、外部引用字段、目标测试资产、P0/P1 回归范围和 DDL/H2 schema 是否允许修改。
+若未来重新打开实现，新的 Execution Grant 必须列明收单业务章节、`ACQ-AC-001`、`ACQ-RED-001`、`ACQ-RED-002`、`ACQ-R001`、`ACQ-R005`、DSL/TDD 不变量、实现决策、清分批次决策、结算释放决策、敏感数据决策、外部规则核验状态、商户资金账户解析、外部引用字段、目标测试资产、P0/P1 回归范围和 DDL/H2 schema 是否允许修改。当前仅登记为设计差距，不允许确认。
 
 不得混入商户开户/KYB、checkout 或支付页、PSP/收单行/卡组织协议接入、PAN/CVC/token vault/3DS 原始认证数据、风控评分、完整清分清算结算、出款、退款、拒付/chargeback、对账归档、运营后台、生产配置或合规上线结论。
 
-## 15. P2-ACQ-CAPTURE Grant 候选（2026-06-04）
+## 15. P2-ACQ-CAPTURE 设计-only 保留项（2026-06-04）
 
 | 字段 | 内容 |
 | --- | --- |
-| Task ID | P2-ACQ-CAPTURE-CAD-001 |
+| Design ID | P2-ACQ-CAPTURE-DESIGN-001 |
 | 阶段切片 | P2 收单 / Wave 1 capture 归一、商户 CLEARING 和敏感数据边界 |
-| 状态 | READY_TO_CONFIRM_NOT_CODE_AUTHORIZED |
+| 状态 | DESIGN_ONLY_NOT_CODE_CANDIDATE |
 | Owner | 产品架构专家负责收单 capture、商户资金语义、外部状态、PSP/收单行/卡组织/PCI 外部规则和 Not Done 语义；资深架构师负责工程边界、TDD、Review、Refactor、验证命令和代码落地。 |
-| authorityBaseline | 用户确认时 Git HEAD，且至少包含 `a1133e4 docs: 补齐全球账户 FX 费用候选包` 与本次 P2-ACQ-CAPTURE 候选包提交。 |
+| authorityBaseline | 最新已提交文档和任务账本；本节只作为设计差距，不作为实现授权基线。 |
 | MVP 场景 | 收单产品、支付网关或通道适配层提交已确认 capture 事件，携带 capture/payment attempt 引用、商户资金账户决策、金额币种、外部 capture 引用、脱敏支付方式引用、PSP/收单行/渠道引用、外部状态、外部规则核验状态、幂等键和操作者。系统证明 capture 成功只进入商户 `CLEARING` 或待清算，不释放 `AVAILABLE/SETTLEMENT`；重复通知幂等；缺确认、缺商户账户、非终态、同键不同摘要或敏感原文都无资金副作用。 |
 | 业务验收映射 | 产品 `ACQ-AC-001`、`ACQ-RED-001`、`ACQ-RED-002`、`ACQ-R001`、`ACQ-R005`；DSL 收单 capture 只进入待清算、支付成功不等于可提现、敏感卡数据不进入资金底座；系分 P2 能力包、商户 CLEARING、外部引用、敏感边界和外部规则核验；TDD `TDD-P2-ACQ`、`TDD-RED-007`、`TDD-RED-018`、`TDD-RED-020`、`TDD-RED-023`、`TDD-RED-025`。 |
-| implementationDecision | 必须二选一：`contract-only` 或 `canonical-clearing-backed`。默认建议从 `contract-only` 开始。 |
-| clearingDecision | 默认 `no-clearing-batch-write`；选择 `clearing-batch-backed` 必须显式授权 clearable item、clearing batch、pre-reconciliation、DDL/H2 schema 和 B7 回归范围。 |
-| settlementDecision | 默认 `no-settlement-release`；本候选不得释放 `SETTLEMENT`、`IN_TRANSIT`、`PAID` 或 payout-ready。 |
-| sensitiveDecision | 默认 `masked-reference-only`；完整 PAN/CVC/token secret/3DS 原文/PSP 原始报文不得落入资金底座。 |
+| implementationDecision | 当前不选择；收单只做设计。若未来重新打开，必须另起 Round 0 和新的单一 Execution Grant。 |
+| clearingDecision | 设计默认 `no-clearing-batch-write`；不得写 clearable item、clearing batch、pre-reconciliation、DDL/H2 schema 或 B7 回归实现。 |
+| settlementDecision | 设计默认 `no-settlement-release`；不得释放 `SETTLEMENT`、`IN_TRANSIT`、`PAID` 或 payout-ready。 |
+| sensitiveDecision | 设计默认 `masked-reference-only`；完整 PAN/CVC/token secret/3DS 原文/PSP 原始报文不得落入资金底座。 |
 | 首批 Red | `R0-ACQ-CAP-001A`：capture/payment success 不得直接增加 `AVAILABLE`、`SETTLEMENT`、可提现余额或 payout-ready。 |
 | 次批 Red | `R0-ACQ-CAP-001B`：敏感卡和 PSP 原文不得入资金底座；`R0-ACQ-CAP-001C`：非终态、缺确认、缺商户账户、缺幂等或同引用不同摘要不得写资金事实。 |
-| 写入范围 | 首轮只允许 `tests/src/test/java/com/wind/funds/wallet/application/acquiring/AcquiringCaptureClearingTests.java` 或等价 P2-ACQ capture Red。Red 成立后，`contract-only` 只允许 wallet acquiring facade Request/DTO、返回 DTO、拒绝路径、脱敏审计和解释状态候选；`canonical-clearing-backed` 才允许显式授权的商户 CLEARING 资金事实、费用引用和 P0/P1 回归。 |
-| 写入文件 | 未确认 Execution Grant 前，本候选包只允许写文档和索引；确认后写入文件必须按 Grant 中列出的测试、facade、Request/DTO、实现、资金事实或 schema 范围执行。 |
+| 写入范围 | 仅允许文档、OpenSpec、Harness tasks、设计索引和边界差距登记。不得写 `AcquiringCaptureClearingTests`、facade、Request/DTO、实现、资金事实或 schema。 |
+| 写入文件 | 只允许文档和索引。 |
 | 只读范围 | `docs/产品设计/08-收单业务资金底座PRD.md`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec` spec/tasks、`wallet`、`transaction`、`ledger`、`reconciliation`、`core`、`tests/src/test/resources/jdbc-schema.sql`。 |
 | 只读参考 | 收单 PRD、DSL、系分、TDD、OpenSpec、现有 `FundsAuthorizationTransactionService`、`MerchantInfoSpec`、`LedgerSubjectCode.CLEARING/SETTLEMENT`、`SettlementPolicySpec`、敏感上下文测试、wallet/transaction/ledger/reconciliation/core 代码和 H2 schema 只作为参考，不等于编码授权。 |
-| 公共契约门禁 | 只允许非破坏性的 P2-ACQ capture facade、Request/DTO、返回 DTO、脱敏审计 payload 和解释字段。不得修改 transaction canonical request、ledger 公共契约、reconciliation clearing/payout 契约、core ledger subject 或 route replay 公共契约，除非 Grant 显式列出。 |
-| Schema 门禁 | 未显式授权前不得修改 `jdbc-schema.sql`、DDL、Entity、Mapper 或迁移脚本。若需要 capture event、merchant clearing item、clearable item、clearing batch、幂等、差错或投影表，必须先确认 DDL/H2 范围。 |
+| 公共契约门禁 | 当前不允许新增 P2-ACQ capture facade、Request/DTO、返回 DTO、脱敏审计 payload 或解释字段；不得修改 transaction canonical request、ledger 公共契约、reconciliation clearing/payout 契约、core ledger subject 或 route replay 公共契约。 |
+| Schema 门禁 | 当前不得修改 `jdbc-schema.sql`、DDL、Entity、Mapper 或迁移脚本；capture event、merchant clearing item、clearable item、clearing batch、幂等、差错或投影表只保留为设计差距。 |
 | 禁止事项 | 不写商户开户/KYB、checkout、支付网关、PSP/收单行/卡组织协议栈、PAN/CVC/token vault/3DS 原始认证、风控评分、完整清分清算结算、出款、退款、拒付/chargeback、完整对账、运营后台、敏感原文、生产配置或合规结论。 |
 | 外部规则门禁 | 只记录外部规则和 PCI 安全边界完整性状态，必须保留规则来源、版本或发布日期、适用法域或范围、核验日期、确认方和确认状态；未完成法务、合规、安全、财务、PSP、收单行、卡组织、银行和支付方式确认前，不得声明生产 Done。 |
-| 验证命令 | 首轮 `just test-one AcquiringCaptureClearingTests tests`；触碰敏感边界时追加 `just test-one AcquiringSensitiveDataBoundaryTests tests`；contract-only 触碰 wallet facade 时追加 `just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；canonical-clearing-backed 追加直接交易、账本、交易模块、清结算边界和业务 flow 回归。 |
-| Git 策略 | auto_commit，前提是验证通过、只包含本候选包授权范围且工具权限允许。 |
-| 停止条件 | 缺 implementationDecision、clearingDecision、settlementDecision、sensitiveDecision 或外部规则状态；需要 DDL/H2 但未授权；需要修改 transaction/ledger/reconciliation/core 公共契约；需要 PSP/卡组织协议、PCI 原文、完整清分清算结算、出款、退款、拒付或生产通道；出现敏感原文、依赖反转、公有方法超过 5 个参数或工作树冲突。 |
-| 交接 | 回写 Harness tasks、OpenSpec project/spec、TDD 索引、验证矩阵和残余风险；说明是否仍为 READY_TO_CONFIRM_NOT_CODE_AUTHORIZED。 |
+| 验证命令 | 文档级验证：`git diff --check`、Harness plan 结构检查、外部规则字段完整性检查和索引一致性检索；不运行收单 Java 测试。 |
+| Git 策略 | docs-only auto_commit，前提是只包含文档和索引。 |
+| 停止条件 | 用户要求实现收单、需要写 Java/test/DDL/H2/schema/公共契约、需要 PSP/卡组织协议、PCI 原文、完整清分清算结算、出款、退款、拒付或生产通道时停止并重新确认优先级。 |
+| 交接 | 回写 Harness tasks、OpenSpec project/spec、TDD 索引、验证矩阵和残余风险；说明当前为 `DESIGN_ONLY_NOT_CODE_CANDIDATE`。 |
 
 ```text
-Execution Grant：P2-ACQ-CAPTURE
+Design-only：P2-ACQ-CAPTURE
 
-Task ID：P2-ACQ-CAPTURE-CAD-001
-Git 策略：auto_commit
-实现决策：contract-only 或 canonical-clearing-backed（二选一）
-清分决策：默认 no-clearing-batch-write；清分批次需 clearing-batch-backed
-结算决策：默认 no-settlement-release；不得释放可结算或出款状态
-敏感数据决策：默认 masked-reference-only
-外部规则决策：默认 external-rules-incomplete-blocking
-首批 Red：R0-ACQ-CAP-001A
-次批 Red：R0-ACQ-CAP-001B / R0-ACQ-CAP-001C
-撤销方式：用户说“暂停/停止/撤销 P2-ACQ-CAPTURE”即停止自动推进
+Design ID：P2-ACQ-CAPTURE-DESIGN-001
+状态：DESIGN_ONLY_NOT_CODE_CANDIDATE
+范围：收单 capture、商户 CLEARING、待清算、敏感数据和外部规则设计差距
+禁止：不得写 Java、测试、DDL/H2 schema、公共契约、facade、Request/DTO 或实现
+重新打开条件：用户明确要求重新打开收单实现优先级，并重新补 Round 0 与单一 Execution Grant
 ```

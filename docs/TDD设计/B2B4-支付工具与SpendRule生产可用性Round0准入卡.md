@@ -145,7 +145,9 @@ Request/DTO 默认落 `com.wind.funds.wallet.model.request` 和 `com.wind.funds.
 
 ## 8. suggestedGrantSlices
 
-| 切片 | 优先级 | 目标 | 首批 Red | 允许写入建议 | 不适合混入 |
+本节只表示支付工具与 Spend Rule 支持能力内部的局部候选顺位，不覆盖全局任务优先级。全局恢复入口仍按账本账目 > 钱包 > 交易层 > 支付工具支持 > VCC/全球账户支持；收单仅 design-only。
+
+| 切片 | 局部支持顺位 | 目标 | 首批 Red | 允许写入建议 | 不适合混入 |
 | --- | --- | --- | --- | --- | --- |
 | B2-PI-CAP | 1 | 支付工具能力准入 application facade。 | `R0-PI-001`。 | wallet-face/impl 的 facade 契约和测试；必要的 DTO。 | 授权状态机、Spend Rule 表、交易投影。 |
 | B2-FR | 2 | 资金责任目标主体解析。 | `R0-FR-001`。 | 资金责任关系契约和测试；必须先选择 `funding-account-only` 或 `targetSubjectType + targetSubjectId`，迁移目标主体字段需单独授权 DTO、DDL/H2、摘要和 fixture。 | 直接交易、清结算、P2 轨道、混合字段策略。 |
@@ -214,7 +216,7 @@ Git 策略：auto_commit
 
 ### 8.3 B2-PI-CAP Round 0 扫描（2026-06-04）
 
-本节把优先级最高的 `B2-PI-CAP` 支付工具能力准入切片推进到可确认输入。它只做只读扫描和候选授权包收敛，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+本节把支付工具支持队列中的 `B2-PI-CAP` 支付工具能力准入切片推进到可确认输入。它只做只读扫描和候选授权包收敛，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入；全局恢复顺位仍服从账本账目 > 钱包 > 交易层 > 支付工具支持。
 
 | 扫描项 | 结论 |
 | --- | --- |

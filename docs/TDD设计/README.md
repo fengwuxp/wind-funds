@@ -34,8 +34,8 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 | 2 | [A0-编码准入基线核验.md](A0-编码准入基线核验.md) | 固化进入编码前的只读核验页，说明 authority baseline、code baseline、target assets、schemaNeed、首批 Red 候选和下一步 Execution Grant 建议。 |
 | 3 | [A1-直接交易事实红线准入卡.md](A1-直接交易事实红线准入卡.md) | 收敛 A1 直接交易事实红线的候选 Execution Grant，说明候选授权、覆盖验收、写入边界、Red 集合、验证命令和停止条件。 |
 | 4 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 收敛 B4-TRX-EXPIRE、B4-FORCE-SETTLE、B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT 和 B4-AUTH-RACE 已闭合后的授权后继能力基线；后续完整 dispute/chargeback case、授权支付工具应用入口、授权占券和权益生命周期必须重新确认独立 Execution Grant 后才允许写 Red 或代码。 |
-| 5 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 收敛支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的 Round 0 候选卡；只作为 B2/B4/B5/B6/B8 独立 Execution Grant 输入。 |
-| 6 | [P2-业务能力包Round0准入卡.md](P2-业务能力包Round0准入卡.md) | 收敛全球账户、收单等 P2 业务专项进入资金底座前的 Round 0 候选卡；当前形成 `P2-GA-INBOUND-CAD-001`，只作为全球账户入金单切片 Execution Grant 输入。 |
+| 5 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 收敛支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的 Round 0 候选卡；只作为支付工具及周边支持队列的独立 Execution Grant 输入，不覆盖账本账目、钱包和交易层优先级。 |
+| 6 | [P2-业务能力包Round0准入卡.md](P2-业务能力包Round0准入卡.md) | 收敛全球账户等 P2 业务专项进入资金底座前的 Round 0 候选卡，并保留收单 design-only 边界；全球账户和 VCC 支持放到最后，收单能力仅做设计不做实现。 |
 
 ## 契约输入
 
@@ -101,7 +101,7 @@ TDD 评审口径：TDD 入口必须承接 PRD 目标、DSL 契约和系分落点
 
 授权支付工具入口只允许测试 application facade 的准入、解析、快照和委派，不允许把账户主体型 `FundsAuthorizationTransactionService.authorize` 请求替换为支付工具引用。P2 场景如 VCC 预付卡充值、共享卡调额、VA 收款、全球账户付款和 ACH/银行转账事件，必须先经业务能力包解释成归一资金事实，再复用 P1/P0 测试资产。
 
-授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核先读 [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md)，该卡把 `B4-FS-RED-*`、`B4-NAR-RED-*`、`B4-CB-RED-*` 和 `B4-RACE-RED-*` 拆成强制完成、无授权退款、拒付承接和并发竞争独立切片；其中强制完成、无授权退款、争议退款可区分性和授权并发竞争已进入回归基线，当前不再默认恢复 `B4-NAR-CAD-001`、`B4-DISPUTE-SEMANTIC-ALIGNMENT` 或 `B4-AUTH-RACE`。支付工具与 Spend Rule 的生产可用性评审再读 [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md)，该卡把 `R0-PI-001`、`R0-FR-001`、`R0-AUTH-001`、`R0-SR-001`、`R0-SR-002` 和 `R0-PI-002` 拆成独立切片；截至 2026-06-04、`88d80c7` 索引基线和 `7b49684` 候选门禁证据，`B4-AUTH-PI-CAD-001` 已具备 Round 0 / Grant 候选输入并通过 `cad-candidate` 结构检查，但不等于授权支付工具 application facade 代码完成或编码授权。未确认对应 Execution Grant 前，TDD 只能继续做 Round 0、差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
+授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核先读 [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md)，该卡把 `B4-FS-RED-*`、`B4-NAR-RED-*`、`B4-CB-RED-*` 和 `B4-RACE-RED-*` 拆成强制完成、无授权退款、拒付承接和并发竞争独立切片；其中强制完成、无授权退款、争议退款可区分性和授权并发竞争已进入回归基线，当前不再默认恢复 `B4-NAR-CAD-001`、`B4-DISPUTE-SEMANTIC-ALIGNMENT` 或 `B4-AUTH-RACE`。支付工具与 Spend Rule 的生产可用性评审再读 [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md)，该卡把 `R0-PI-001`、`R0-FR-001`、`R0-AUTH-001`、`R0-SR-001`、`R0-SR-002` 和 `R0-PI-002` 拆成独立切片；这些切片只属于支付工具及周边支持队列，整体排在账本账目、钱包基础能力和交易层之后。未确认对应 Execution Grant 前，TDD 只能继续做 Round 0、差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置；收单能力仅做设计和边界复核，不写 Red 测试或实现。
 
 其中 B2-FR 必须先选择 `funding-account-only` 或 `targetSubjectType + targetSubjectId`。前者只能证明资金账户责任解析，后者才允许声明信用账户或平台角色责任主体，并必须同步 DTO、DDL/H2、摘要、fixture、route snapshot 和回放断言。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产 Done。
 
