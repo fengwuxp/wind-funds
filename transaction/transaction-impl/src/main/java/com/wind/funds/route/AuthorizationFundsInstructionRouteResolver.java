@@ -23,8 +23,10 @@ import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
+import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.FundsInstructionType;
+import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -364,7 +366,19 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
     private boolean isNoAuthRefund(FundsInstructionSpec instruction) {
         String refundMode = FundsInstructionContextReader.getValue(instruction,
                 FundsInstructionContextKeys.REFUND_MODE, String.class);
-        return FundsInstructionContextKeys.REFUND_MODE_NO_AUTH.equalsIgnoreCase(refundMode);
+        if (FundsInstructionContextKeys.REFUND_MODE_NO_AUTH.equalsIgnoreCase(refundMode)) {
+            return true;
+        }
+        if (refundMode != null) {
+            return false;
+        }
+        return isExternalTransactionReference(instruction);
+    }
+
+    private boolean isExternalTransactionReference(FundsInstructionSpec instruction) {
+        FundsInstructionReferenceSpec reference = instruction.getReference();
+        return reference != null
+                && reference.getReferenceType() == FundsInstructionReferenceType.EXTERNAL_TRANSACTION;
     }
 
     @Override
