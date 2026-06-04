@@ -179,7 +179,7 @@ Request/DTO 默认落 `com.wind.funds.wallet.model.request` 和 `com.wind.funds.
 | `status` | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
 | `cadCandidateStructureCheck` | 2026-06-04 已用资深架构师 Harness checker 以 `cad-candidate` 模式检查本卡和 Harness tasks，结果均为 `OK harness plan check: kind=cad-candidate`；该检查只证明候选包字段结构完整，不等于编码授权、测试通过或生产审批。 |
 | `owner` | 资深架构师负责工程执行；产品架构专家只负责支付工具、资金主体、Spend Rule 和拒绝原因的业务语义复核。 |
-| `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `88d80c7 docs: 收敛授权后继索引基线` 及本节后续基线校准提交，确保 `967586c` 无授权退款路由回退、`47c5269` 授权并发闭环和 `B4-AUTH-PI-CAD-001` 恢复入口均已纳入确认语境。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `88d80c7 docs: 收敛授权后继索引基线`、`7b49684 docs: 记录授权支付工具候选门禁`、`be3df9f docs: 同步授权工具候选索引`、`c58431e docs: 同步 TDD 授权工具候选索引` 和 `226dfc2 docs: 回写授权工具索引流水`，确保 `967586c` 无授权退款路由回退、`47c5269` 授权并发闭环、`B4-AUTH-PI-CAD-001` 结构门禁、索引同步和恢复入口均已纳入确认语境。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
 | `mvpScenario` | 业务方提交支付工具引用、使用主体、金额币种、业务流水、业务场景、预算或 Spend Rule 上下文；系统在 application facade 中完成支付工具能力、绑定快照、资金责任、Spend Rule 和账户能力准入。批准时构造账户主体型授权请求并委派 `FundsAuthorizationTransactionService#authorize`；拒绝时只留下拒绝事实、原因和审计，不生成资金事实。 |
 | `businessAdmission` | 产品锚点为 `AC-PI-010` 和 `AC-AUTH-000`；DSL 锚点为支付工具入口到账户主体授权内核转译；系分锚点为 `AuthorizationAdmissionApplicationService`、支付工具能力应用服务、资金责任解析和账户能力查询；TDD 锚点为 `R0-AUTH-001`。 |
 | `firstRedSet` | `R0-AUTH-001`：绕过工具准入、绑定快照、Spend Rule、资金责任或账户能力直接调用授权内核必须失败；拒绝路径无 route、posting、LedgerEntry、projection 和敏感上下文副作用；批准路径只委派账户主体型授权内核。 |
@@ -198,7 +198,7 @@ Request/DTO 默认落 `com.wind.funds.wallet.model.request` 和 `com.wind.funds.
 
 ```text
 Execution Grant：B4-AUTH-PI
-确认基线：确认时 Git HEAD；至少包含 88d80c7 docs: 收敛授权后继索引基线及本节后续基线校准提交；若确认前有未提交文档变更，必须先提交或列入 authorityBaseline
+确认基线：确认时 Git HEAD；至少包含 88d80c7 docs: 收敛授权后继索引基线、7b49684 docs: 记录授权支付工具候选门禁、be3df9f docs: 同步授权工具候选索引、c58431e docs: 同步 TDD 授权工具候选索引和 226dfc2 docs: 回写授权工具索引流水；若确认前有未提交文档变更，必须先提交或列入 authorityBaseline
 任务包：B4-AUTH-PI-CAD-001
 目标：新增 authorizeByInstrument 或等价 AuthorizationAdmissionApplicationService application facade，完成支付工具、绑定、Spend Rule、资金责任和账户能力准入；批准后委派账户主体型 FundsAuthorizationTransactionService#authorize；拒绝无 route、posting、LedgerEntry、projection 或敏感上下文副作用
 允许写入：先写 tests 中授权 application facade 目标 Red；Red 证明缺口后允许 wallet-face application facade 契约、Request/DTO、wallet-impl 最小实现、委派适配和必要授权 flow 回归
