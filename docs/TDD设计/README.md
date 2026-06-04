@@ -35,6 +35,7 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 | 3 | [A1-直接交易事实红线准入卡.md](A1-直接交易事实红线准入卡.md) | 收敛 A1 直接交易事实红线的候选 Execution Grant，说明候选授权、覆盖验收、写入边界、Red 集合、验证命令和停止条件。 |
 | 4 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 收敛 B4-TRX-EXPIRE、B4-FORCE-SETTLE、B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT 和 B4-AUTH-RACE 已闭合后的授权后继能力基线；后续完整 dispute/chargeback case、授权支付工具应用入口、授权占券和权益生命周期必须重新确认独立 Execution Grant 后才允许写 Red 或代码。 |
 | 5 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 收敛支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的 Round 0 候选卡；只作为 B2/B4/B5/B6/B8 独立 Execution Grant 输入。 |
+| 6 | [P2-业务能力包Round0准入卡.md](P2-业务能力包Round0准入卡.md) | 收敛全球账户、收单等 P2 业务专项进入资金底座前的 Round 0 候选卡；当前形成 `P2-GA-INBOUND-CAD-001`，只作为全球账户入金单切片 Execution Grant 输入。 |
 
 ## 契约输入
 
