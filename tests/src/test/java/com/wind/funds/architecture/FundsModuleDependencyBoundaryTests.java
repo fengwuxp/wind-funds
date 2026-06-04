@@ -13,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,11 +77,27 @@ class FundsModuleDependencyBoundaryTests {
             "docs",
             "openspec");
 
+    private static final List<String> FUNDS_JAVA_PACKAGE_SCAN_PATHS = List.of(
+            "core/src/main/java",
+            "ledger/ledger-face/src/main/java",
+            "ledger/ledger-impl/src/main/java",
+            "transaction/transaction-face/src/main/java",
+            "transaction/transaction-impl/src/main/java",
+            "wallet/wallet-face/src/main/java",
+            "wallet/wallet-impl/src/main/java",
+            "reconciliation/reconciliation-face/src/main/java",
+            "reconciliation/reconciliation-impl/src/main/java",
+            "governance/governance-face/src/main/java",
+            "governance/governance-impl/src/main/java",
+            "tests/src/test/java");
+
     private static final List<String> LEGACY_FUNDS_PACKAGE_TOKENS = List.of(
             String.join(".", "com", "capte", "funds"),
             String.join("/", "com", "capte", "funds"),
             String.join(".", "com", "wind", "integration", "funds"),
             String.join("/", "com", "wind", "integration", "funds"));
+
+    private static final Pattern PACKAGE_DECLARATION = Pattern.compile("(?m)^package\\s+([^;]+);");
 
     /**
      * 场景：core 承载资金 DSL、枚举、值对象和端口契约。
@@ -154,6 +172,31 @@ class FundsModuleDependencyBoundaryTests {
                 .isEmpty();
     }
 
+    /**
+     * 场景：资金域 Java 包根已经从历史包迁移到 `com.wind.funds`。
+     * 预期：源码和测试的 Java `package` 声明均使用 `com.wind.funds` 包根。
+     * 红线：不得只靠禁止旧包名文本，遗漏新文件落入其他资金域包根。
+     */
+    @Test
+    void testFundsJavaPackageDeclarationsShouldUseWindFundsRoot() throws Exception {
+        List<String> violations = new ArrayList<>();
+        for (Path javaFile : fundsJavaSourceFiles()) {
+            Matcher matcher = PACKAGE_DECLARATION.matcher(Files.readString(javaFile));
+            if (!matcher.find()) {
+                violations.add(workspaceRoot().relativize(javaFile) + " misses package declaration");
+                continue;
+            }
+            String packageName = matcher.group(1).trim();
+            if (!"com.wind.funds".equals(packageName) && !packageName.startsWith("com.wind.funds.")) {
+                violations.add(workspaceRoot().relativize(javaFile) + " declares " + packageName);
+            }
+        }
+
+        assertThat(violations)
+                .as("funds Java package declarations must stay under com.wind.funds")
+                .isEmpty();
+    }
+
     private List<String> dependencyArtifactIds(Path pomPath)
             throws ParserConfigurationException, IOException, SAXException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -197,6 +240,23 @@ class FundsModuleDependencyBoundaryTests {
             }
         }
         return textFiles;
+    }
+
+    private List<Path> fundsJavaSourceFiles() throws IOException {
+        List<Path> javaFiles = new ArrayList<>();
+        Path root = workspaceRoot();
+        for (String scanPath : FUNDS_JAVA_PACKAGE_SCAN_PATHS) {
+            Path path = root.resolve(scanPath);
+            if (!Files.exists(path)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.walk(path)) {
+                files.filter(Files::isRegularFile)
+                        .filter(javaFile -> javaFile.getFileName().toString().endsWith(".java"))
+                        .forEach(javaFiles::add);
+            }
+        }
+        return javaFiles;
     }
 
     private boolean isPackageGuardTextFile(Path path) {
