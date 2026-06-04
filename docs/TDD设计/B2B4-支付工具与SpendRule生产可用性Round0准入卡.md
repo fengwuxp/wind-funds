@@ -504,6 +504,72 @@ Git 策略：auto_commit
 交接：确认后从 P2-VCC-PREPAID-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置，也不得把 P2 业务 pack 当作 P0/P1 默认编码授权
 ```
 
+### 8.13 P2-VCC-LIFECYCLE Round 0 扫描（2026-06-04）
+
+本节把 `P2-VCC-LIFECYCLE` 共享卡和预付卡授权后生命周期回放切片推进到可确认输入。它属于 P2 VCC 业务专项能力包，不属于 B2/B4/B5/B6-B8 默认编码队列；本节只做只读扫描和候选授权包收敛，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 扫描项 | 结论 |
+| --- | --- |
+| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 业务设计基线 | PRD、DSL、系分和 OpenSpec 已统一：共享卡或预付卡的清算、释放、退款和争议/拒付后继事件必须引用原授权、原 route snapshot、原工具快照、原绑定版本和原资金责任决策；当前卡绑定、当前预算组、当前 Spend Rule 或当前默认资金责任不得改变历史资金路径。 |
+| 局部代码基线 | 交易层已有账户主体型授权生命周期局部能力，包括授权、完成、过期释放、撤销、无授权退款、争议退款可区分性、route replay 和交易投影回归；但未发现 `InstrumentTransactionLifecycleApplicationService`、`VccSharedCardTransactionApplicationService`、VCC lifecycle request model 或面向共享卡/预付卡的 application facade。 |
+| 目标缺口 | 现有 canonical 生命周期能力不能证明 VCC 产品侧事件已完成原授权引用、原快照引用、绑定版本、资金责任决策、外部事件幂等、部分清算/释放金额闭合和争议/普通退款分流。因此 P2-VCC-LIFECYCLE 只能作为业务专项 Grant 候选，不得从交易层生命周期测试直接升级为 VCC 生产可用。 |
+| 语义裁决 | VCC 后继事件只做产品侧编排和原路径回放准入；资金事实仍应委派账户主体型 canonical 生命周期能力。缺原授权、缺原 route snapshot、缺原工具快照、缺原资金责任决策、缺外部事件引用、金额超过原授权剩余额度或绑定版本不匹配时必须失败或进入差错/人工入口，不得按当前绑定重新选路。 |
+| implementationDecision | 进入编码前必须在 `contract-only` 与 `canonical-lifecycle-backed` 中二选一。`contract-only` 只允许新增 facade 契约、Request/DTO、目标 Red 和失败型/校验型最小适配；`canonical-lifecycle-backed` 才允许委派 `FundsAuthorizationTransactionService` 的账户主体型 settle、reversal、expire、settleRefund 或 Grant 明确列名的等价生命周期入口，并必须补 route、posting、entry、projection、幂等、金额闭合和失败无副作用断言。 |
+| snapshotDecision | 默认 `original-snapshot-required`；原授权引用、原 route snapshot、原工具快照、原绑定版本和原资金责任决策缺失时进入差错/人工入口或可解释失败，不允许使用当前绑定、当前预算组、当前 Spend Rule 或当前默认资金责任补算。 |
+| disputeDecision | 默认 `settleRefund-dispute-semantic`，即争议/拒付首轮通过授权退款语义携带 dispute 字段、凭证、外部引用和审计上下文保持可区分；独立 chargeback 公共入口、完整 case 管理、卡组织 representment 和追偿生命周期不属于默认写入范围，除非 Grant 显式扩权。 |
+| 首批 Red | `R0-VCC-LC-001A`：共享卡换绑、预算或资金责任关系变化后，历史清算、释放、退款或争议事件若按当前绑定、当前默认资金责任、当前预算组或当前 Spend Rule 重新选路必须失败；失败无 route、posting、LedgerEntry、余额投影或交易投影副作用。 |
+| 次批 Red | `R0-VCC-LC-001B`：缺原授权、缺原 route snapshot、缺原工具快照、缺原资金责任决策、外部事件重复同键不同摘要、普通退款与争议/拒付合并不可区分、清算或释放金额超过剩余额度时必须失败或进入差错/人工入口。 |
+| Grant 必须列明 | VCC 业务分册、业务验收 ID、implementationDecision、snapshotDecision、disputeDecision、原授权引用字段、原 route snapshot 引用字段、原工具快照引用字段、原资金责任决策引用字段、外部事件脱敏引用、幂等摘要、金额闭合规则、差错/人工入口、P0/P1 回归范围、DDL/H2 是否允许和验证命令。 |
+| 禁止混入 | 不实现完整 clearing 文件处理、完整 dispute/chargeback case、representment、chargeback 追偿、FX 和费用自动入账、processor/PAN/CVV/PCI、卡余额账本、卡账户、全球账户、收单、ACH/SWIFT/FX、清结算对账或治理 apply。 |
+
+### 8.14 vccLifecycleGrantCandidate（2026-06-04）
+
+本节把 8.13 的只读扫描推进为可确认的单一 Execution Grant 候选。它仍不授权写 Java、测试、DDL/H2 schema、公共契约或运行时配置；只有用户确认本节的 `Execution Grant：P2-VCC-LIFECYCLE`，并选择 implementationDecision、snapshotDecision 与 disputeDecision 后，才允许进入首批 Red。
+
+| 授权包字段 | 候选内容 |
+| --- | --- |
+| `taskId` | `P2-VCC-LIFECYCLE-CAD-001`。 |
+| `stage` / `wave` | P2 VCC 业务模式能力包 / Wave 2 共享卡和预付卡授权后生命周期回放准入。 |
+| `status` | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| `owner` | 产品架构专家负责 VCC 清算、释放、退款、争议/拒付、外部规则和 Not Done 口径复核；资深架构师负责工程边界、接口、测试、验证和提交闭环。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `4012233 docs: 补齐预付卡资金候选包` 及本节提交点。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
+| `mvpScenario` | 业务方提交已授权 VCC shared/prepaid card 的清算、释放、退款或争议事件，携带原授权引用、原 route snapshot 引用、原工具快照引用、原绑定版本、原资金责任决策引用、外部事件引用、金额币种、幂等键和操作者；系统验证后按 implementationDecision 返回 contract-only 结果或委派账户主体型 canonical 生命周期能力。失败时只返回可解释原因并保留差错/审计，不生成资金事实。 |
+| `businessAdmission` | 产品锚点为 `VCC-AC-003`、`VCC-AC-004`、`VCC-AC-005`、`VCC-AC-006`、`VCC-AC-008`；DSL 锚点为 VCC 后继事件沿原 route snapshot 回放、不按当前绑定重选路、争议退款保持可区分；系分锚点为 `SettleInstrumentAuthorization`、`ReleaseInstrumentAuthorization`、`RefundInstrumentTransaction`、`DisputeInstrumentRefund` 或等价 VCC lifecycle facade；TDD 锚点为 `R0-VCC-LC-001` 和被本 Grant 明确选中的 `TDD-P2-VCC-*` 子集。 |
+| `implementationDecision` | 待确认，必须二选一：`contract-only` 或 `canonical-lifecycle-backed`。默认不得委派资金生命周期实现；若选择 `canonical-lifecycle-backed`，Grant 必须列明可委派的账户主体型 canonical 方法、请求字段映射、P0/P1 回归测试和金额闭合断言。 |
+| `snapshotDecision` | 默认 `original-snapshot-required`；若任何原授权、原 route snapshot、原工具快照、原绑定版本或原资金责任决策缺失，不得当前补算，只能失败或进入差错/人工入口。 |
+| `disputeDecision` | 默认 `settleRefund-dispute-semantic`；首轮只允许通过授权退款语义表达争议/拒付可区分字段。独立 chargeback 公共入口、完整 case、representment 或追偿链路必须另行扩权。 |
+| `firstRedSet` | `R0-VCC-LC-001A`：换绑、解绑、预算或资金责任变化后，历史清算、释放、退款或争议事件按当前绑定、当前默认责任主体、当前预算组或当前 Spend Rule 重新选路必须失败；失败无 route、posting、LedgerEntry、余额投影或交易投影副作用。 |
+| `secondRedSet` | `R0-VCC-LC-001B`：缺原授权、缺原 route snapshot、缺原工具快照、缺原资金责任决策、外部事件重复同键不同摘要、普通退款和争议/拒付不可区分、部分清算/释放金额不闭合或超剩余额度时必须失败或进入差错/人工入口。 |
+| `writeScope` | 先写 `tests/src/test/java/com/wind/funds/wallet/application/vcc/VccInstrumentLifecycleApplicationServiceTests.java` 或等价 VCC lifecycle 目标 Red；Red 证明缺口后，`contract-only` 只允许在 `wallet/wallet-face` 新增 facade 契约、Request/DTO、返回 DTO，并在 `wallet/wallet-impl` 新增校验型或拒绝型最小实现；`canonical-lifecycle-backed` 还必须由 Grant 显式授权账户主体型 canonical 生命周期委派和必要 P0/P1 回归。 |
+| `readOnlyScope` | `docs/产品设计/06-VCC发卡业务资金底座PRD.md`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md`、既有 `wallet`、`transaction`、`ledger`、`core`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| `publicContractGate` | 只允许非破坏性新增 wallet VCC lifecycle application facade、Request/DTO、返回 DTO 和脱敏审计载荷；不得修改交易 canonical 请求、授权状态机、core 交易枚举、ledger 公共契约、route replay 公共契约、支付工具资源服务语义或资金责任关系资源服务语义，除非 Grant 显式列名。 |
+| `schemaGate` | 未显式授权前，不修改 `tests/src/test/resources/jdbc-schema.sql`、生产 DDL、Entity 字段、Mapper 表字段、索引或唯一约束；若需要 VCC lifecycle event fact、差错表、case 表、幂等表或投影表，必须重新确认 DDL/H2 范围。 |
+| `dependencyGate` | `wallet/wallet-face` 不依赖任何 impl；`wallet/wallet-impl` 可依赖 `wallet/wallet-face`、`transaction-face`、`ledger-face` 和 core；`transaction`、`ledger` 不反向依赖 wallet impl。违反依赖方向时立即停止。 |
+| `noWriteScope` | 不按当前绑定、当前预算组、当前 Spend Rule 或当前默认资金责任重新选路；不新增独立 chargeback 公共入口、完整 case 管理、representment、追偿生命周期、卡余额账本、卡账户、完整 clearing 文件处理、processor/PAN/CVV/PCI、FX/费用自动入账、清结算对账、治理 apply、全球账户、收单、ACH/SWIFT/FX 或敏感原文。 |
+| `verificationCommand` | 首轮 `just test-one VccInstrumentLifecycleApplicationServiceTests tests`；`contract-only` 触碰 wallet facade 时补 `just test-one PaymentInstrumentServiceImplTests tests`、`just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-one DefaultRouteReplayServiceTests tests`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；`canonical-lifecycle-backed` 还必须补 `just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction` 和必要业务 flow 回归。 |
+| `gitStrategy` | 若用户确认本 Grant、选择 implementationDecision、snapshotDecision、disputeDecision 并保持 GSD-CAD 自动模式，目标验证通过且未触发停止条件时按 `auto_commit` 提交；验证失败、环境不可判定或越界时转 `summary_only`。 |
+| `stopCondition` | 未选择 implementationDecision、snapshotDecision 或 disputeDecision，原快照引用策略不清，外部规则核验状态缺失，需要表结构但未获 DDL/H2 授权，需要修改交易 canonical 请求、授权状态机、route replay 公共契约、ledger 公共契约、完整 chargeback case、清结算对账、治理、外部协议、敏感数据、依赖方向反转、公有方法超过 5 个参数或工作树冲突时停止。 |
+| `handoff` | 本候选包的恢复入口为 `P2-VCC-LIFECYCLE-CAD-001`。用户确认 `Execution Grant：P2-VCC-LIFECYCLE`、选择 `contract-only` 或 `canonical-lifecycle-backed`、确认 `original-snapshot-required` 或等价快照策略，并确认 disputeDecision 后进入首批 Red；未确认时只保留为 P2 业务专项 Round 0 / summary_only。 |
+
+```text
+Execution Grant：P2-VCC-LIFECYCLE
+确认基线：确认时 Git HEAD；至少包含 4012233 docs: 补齐预付卡资金候选包及本节提交点；若确认前有未提交文档变更，必须先提交或列入 authorityBaseline
+任务包：P2-VCC-LIFECYCLE-CAD-001
+目标：新增 VccInstrumentLifecycleApplicationService 或等价 application facade，完成 VCC shared/prepaid card 清算、释放、退款和争议事件的原授权引用、原 route snapshot、原工具快照、原绑定版本、原资金责任决策、外部事件引用、金额币种、幂等摘要和审计准入；后继事件必须沿原路径回放，不按当前绑定或当前规则重新选路
+implementationDecision：必须选择 contract-only 或 canonical-lifecycle-backed；未选择前不写 Java、测试、DDL/H2 schema 或运行时配置
+snapshotDecision：默认 original-snapshot-required；缺原授权、原 route snapshot、原工具快照、原绑定版本或原资金责任决策时不得当前补算，只能失败或进入差错/人工入口
+disputeDecision：默认 settleRefund-dispute-semantic；独立 chargeback 公共入口、完整 case、representment 和追偿链路不在首轮范围内
+允许写入：先写 tests 中 VCC lifecycle 目标 Red；Red 证明缺口后按 implementationDecision 允许 wallet-face VCC lifecycle application facade 契约、Request/DTO、wallet-impl 校验型或拒绝型最小实现；只有 canonical-lifecycle-backed 才允许账户主体型 canonical 生命周期委派和必要 P0/P1 回归
+允许公共契约：仅允许非破坏性新增 wallet VCC lifecycle application facade、Request/DTO、返回 DTO 和脱敏审计载荷；不得修改交易 canonical 请求、授权状态机、route replay 公共契约、ledger 公共契约、支付工具资源服务语义或资金责任关系资源服务语义
+首批 Red：R0-VCC-LC-001A；必要时补 R0-VCC-LC-001B，覆盖换绑后逆向、原快照缺失、外部事件幂等冲突、退款与争议可区分、金额闭合和失败无副作用
+验证命令：just test-one VccInstrumentLifecycleApplicationServiceTests tests；just test-one DefaultRouteReplayServiceTests tests；若 canonical-lifecycle-backed 则补 just test-one FundsAuthorizationTransactionFlowTests tests 和 just test-transaction；just test-one PaymentInstrumentServiceImplTests tests；just test-one SpendSubjectFundingRelationServiceImplTests tests；just test-boundary；just compile；提交前 just pmd 和 git diff --check
+禁止写入：当前绑定重选路、独立 chargeback 公共入口、完整 case 管理、representment、追偿生命周期、完整 clearing 文件处理、卡余额账本、processor/PAN/CVV/PCI、FX/费用自动入账、清结算对账、治理 apply、外部协议或敏感原文
+Git 策略：auto_commit
+停止条件：implementationDecision、snapshotDecision 或 disputeDecision 未确认，原快照引用策略不清，外部规则核验缺失，表结构未授权，依赖方向反转，外部协议或敏感数据越界，P0/P1 回归无法解释失败或工作树冲突即停止
+交接：确认后从 P2-VCC-LIFECYCLE-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置，也不得把 P2 业务 pack 当作 P0/P1 默认编码授权
+```
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
@@ -523,16 +589,17 @@ Git 策略：auto_commit
 6. B5-SR-CONTROL 需要 DDL/H2 schema、Entity、Mapper、索引或投影表，但 Execution Grant 未明确选择 `ddl-backed`。
 7. B6/B8-PI-VIEW 需要 DDL/H2 schema、Entity、Mapper、索引、checkpoint、影子表或正式投影表，但 Execution Grant 未明确选择 `projection-store-backed`。
 8. P2-VCC-PREPAID 未确认 implementationDecision、责任主体策略、外部规则核验状态或 DDL/H2 范围，却开始写 VCC prepaid funding 生产代码、测试代码、公共契约、表结构或运行时配置。
+9. P2-VCC-LIFECYCLE 未确认 implementationDecision、snapshotDecision、disputeDecision、原快照引用策略、外部规则核验状态或 DDL/H2 范围，却开始写 VCC lifecycle 生产代码、测试代码、公共契约、表结构或运行时配置。
 
 ## 11. confirmationTemplate
 
 ```text
 Execution Grant：B2/B4/P2 支付工具与 Spend Rule Round 0
 确认基线：确认时 Git HEAD；若本轮文档尚未提交，需显式纳入 authorityBaseline
-选择切片：B2-PI-CAP / B2-FR / B4-AUTH-PI / P2-VCC-PREPAID / B5-SR-CONTROL / B6-B8-PI-VIEW 之一
-允许写入：仅限所选切片的测试资产和最小 application facade / DTO / 适配实现；DDL/H2 默认不允许；若选择 P2-VCC-PREPAID，必须同步选择 contract-only 或 funding-flow-backed 以及责任主体策略；若选择 B5-SR-CONTROL，必须同步选择 contract-only 或 ddl-backed；若选择 B6-B8-PI-VIEW，必须同步选择 query-contract-only 或 projection-store-backed
+选择切片：B2-PI-CAP / B2-FR / B4-AUTH-PI / P2-VCC-PREPAID / P2-VCC-LIFECYCLE / B5-SR-CONTROL / B6-B8-PI-VIEW 之一
+允许写入：仅限所选切片的测试资产和最小 application facade / DTO / 适配实现；DDL/H2 默认不允许；若选择 P2-VCC-PREPAID，必须同步选择 contract-only 或 funding-flow-backed 以及责任主体策略；若选择 P2-VCC-LIFECYCLE，必须同步选择 contract-only 或 canonical-lifecycle-backed、原快照策略和 disputeDecision；若选择 B5-SR-CONTROL，必须同步选择 contract-only 或 ddl-backed；若选择 B6-B8-PI-VIEW，必须同步选择 query-contract-only 或 projection-store-backed
 禁止写入：交易 canonical 请求替换、统一 InstrumentTransactionService、预算组账务主体、资金责任字段策略混用、清结算对账、治理 apply、P2 轨道协议、敏感原文
-首批 Red：按所选切片选择 R0-PI-001、R0-FR-001、R0-AUTH-001、R0-VCC-PREPAID-001、R0-SR-001、R0-SR-002 或 R0-PI-002
+首批 Red：按所选切片选择 R0-PI-001、R0-FR-001、R0-AUTH-001、R0-VCC-PREPAID-001、R0-VCC-LC-001、R0-SR-001、R0-SR-002 或 R0-PI-002
 验证命令：just test-one PaymentInstrumentServiceImplTests tests；just test-one SpendSubjectFundingRelationServiceImplTests tests；just test-one PaymentInstrumentRouteDslContractTests tests；必要时 just test-transaction / just test-boundary；提交前 git diff --check 和 just pmd
 停止条件：公共契约、表结构、外部规则、P2 轨道、清结算对账、治理、敏感数据或工作树冲突越界即停止
 ```
