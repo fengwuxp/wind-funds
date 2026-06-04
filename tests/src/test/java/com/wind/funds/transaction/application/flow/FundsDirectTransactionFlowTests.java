@@ -25,6 +25,7 @@ import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
@@ -1446,7 +1447,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(beforeFacts);
         assertPostedTransactions(0);
         assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_TRANSFER_FAILED_RETRY");
-        String firstFailedRouteSnapshot = routeSnapshotJson("DIRECT_TRANSFER_FAILED_RETRY");
+        RouteSnapshotSpec firstFailedRouteSnapshot = routeSnapshot("DIRECT_TRANSFER_FAILED_RETRY");
 
         topup(payer, 20L, "DIRECT_TRANSFER_FAILED_RETRY_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -1879,7 +1880,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_TOPUP_ONLY");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TOPUP_ONLY");
 
         String retryTopupSn = directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setAccountId(account)
@@ -1967,7 +1968,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_TOPUP_EVENT");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TOPUP_EVENT");
 
         assertThatThrownBy(() -> directTransactionService.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payer)
@@ -2034,7 +2035,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_TOPUP_TRACE");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TOPUP_TRACE");
 
         String retryTopupSn = directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setAccountId(account)
@@ -2096,7 +2097,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -40L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTopupFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_TOPUP_CONTEXT");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TOPUP_CONTEXT");
 
         String retryTopupSn = directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setAccountId(account)
@@ -2184,7 +2185,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstPayFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_PAY");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_PAY");
 
         String retryPaySn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 40L,
                 "DIRECT_IDEMPOTENT_PAY");
@@ -2273,7 +2274,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstPayFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_PAY_CONTEXT");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_PAY_CONTEXT");
 
         String retryPaySn = directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
@@ -2388,7 +2389,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstPayFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_PAY_PARTICIPANT");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_PAY_PARTICIPANT");
 
         assertThatThrownBy(() -> pay(anotherPayer, anotherPayee, LedgerSubjectCode.SETTLEMENT, 40L,
                 "DIRECT_IDEMPOTENT_PAY_PARTICIPANT"))
@@ -2468,7 +2469,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTransferFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_TRANSFER");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TRANSFER");
 
         String retryTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payer)
@@ -2566,7 +2567,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstTransferFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT");
 
         String retryTransferSn = directTransactionService.transfer(new FundsTransactionTransferRequest()
                 .setPayerAccountId(payer)
@@ -2668,7 +2669,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_REFUND");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_REFUND");
 
         String retryRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
@@ -2780,7 +2781,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("DIRECT_IDEMPOTENT_REFUND_CONTEXT");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("DIRECT_IDEMPOTENT_REFUND_CONTEXT");
 
         String retryRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
@@ -2891,8 +2892,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 });
     }
 
-    private void assertDirectRouteSnapshotUnchanged(String businessSn, String expectedRouteSnapshot) {
-        assertThat(routeSnapshotJson(businessSn))
+    private void assertDirectRouteSnapshotUnchanged(String businessSn, RouteSnapshotSpec expectedRouteSnapshot) {
+        assertThat(routeSnapshot(businessSn))
                 .as("direct route snapshot must not be rewritten for idempotent businessSn %s", businessSn)
                 .isEqualTo(expectedRouteSnapshot);
         assertDirectRouteSnapshotCarriesMetadata(businessSn);
@@ -2909,8 +2910,10 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         .isEmpty());
     }
 
-    private String routeSnapshotJson(String businessSn) {
-        return fundsTransactionsByBusinessSn(businessSn).getFirst().getRouteSnapshot();
+    private RouteSnapshotSpec routeSnapshot(String businessSn) {
+        String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
+        return fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn)
+                .orElseThrow(() -> new AssertionError("missing route snapshot for businessSn " + businessSn));
     }
 
     private void assertDirectTransactionKeepsContextMinimal(String businessSn) {
