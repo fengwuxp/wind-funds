@@ -96,7 +96,8 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                     assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
                     assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
-                    assertThat(detail.getContextVariables()).contains("\"approved\":false");
+                    assertThat(contextVariablesOf(detail.getContextVariables()))
+                            .containsEntry(FundsInstructionContextKeys.APPROVED, false);
                 });
 
         assertPostedTransactions(1);
@@ -203,9 +204,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                     assertThat(detail.getEventType()).isEqualTo(FundsTransactionEventType.AUTHORIZE);
                     assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.REJECTED);
                     assertThat(detail.getLedgerTransactionSn()).isNull();
-                    assertThat(detail.getContextVariables())
-                            .contains("RISK_DECLINED")
-                            .doesNotContain("LIMIT_DECLINED");
+                    assertThat(contextVariablesOf(detail.getContextVariables()))
+                            .containsEntry(FundsInstructionContextKeys.DECLINE_REASON, "RISK_DECLINED")
+                            .doesNotContainValue("LIMIT_DECLINED");
                 });
         assertPostedTransactions(1);
         assertThat(ledgerTransactions().stream()
@@ -963,11 +964,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .toList())
                 .containsOnlyNulls();
         assertThat(fundsTransactionDetailsByBusinessSn("AUTH_FORCE_SETTLE_CAPTURE"))
-                .allSatisfy(detail -> assertThat(detail.getContextVariables())
-                        .contains("\"settleMode\":\"FORCE\"")
-                        .contains("\"forceSettlePolicyCode\":\"B4_FORCE_SETTLE_OPS\"")
-                        .contains("\"externalOriginalFactRef\":\"processor_settlement_202606020001\"")
-                        .contains("\"forceSettleVoucherRef\":\"ops_voucher_202606020001\""));
+                .allSatisfy(detail -> assertForceSettleContext(detail.getContextVariables()));
         assertLedgerFactsFollowRouteSnapshot("AUTH_FORCE_SETTLE_CAPTURE");
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_TOPUP", 3, 4);
         assertFundsAndLedgerFactsForBusinessSn("AUTH_FORCE_SETTLE_CAPTURE", 1, 2, 1, 2);
@@ -1598,8 +1595,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThat(chargebackTransaction.getEventType()).isEqualTo(FundsTransactionEventType.CHARGEBACK.name());
         assertThat(chargebackTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
         assertThat(chargebackTransaction.getContextVariables())
-                .contains("CARDHOLDER_DISPUTE", "CHARGEBACK_EVIDENCE_202605290001",
-                        "CHARGEBACK_CASE_202605290001");
+                .satisfies(FundsAuthorizationTransactionFlowTests::assertChargebackContext);
         assertThat(entriesOf(chargebackTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
@@ -1618,10 +1614,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                     assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
                     assertThat(detail.getReferenceDetailSn()).isEqualTo(authorizationSn);
                     assertThat(detail.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
-                    assertThat(detail.getContextVariables())
-                            .contains("CARDHOLDER_DISPUTE", "CHARGEBACK_EVIDENCE_202605290001",
-                                    "CHARGEBACK_CASE_202605290001")
-                            .doesNotContain("declineReason");
+                    assertChargebackContext(detail.getContextVariables());
+                    assertThat(contextVariablesOf(detail.getContextVariables()))
+                            .doesNotContainKey(FundsInstructionContextKeys.DECLINE_REASON);
                 });
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_AUTHORIZE", 1, 2);
@@ -2567,6 +2562,25 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         "DISPUTE_EVIDENCE_202605290001")
                 .containsEntry(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
                         "DISPUTE_CASE_202605290001");
+    }
+
+    private static void assertForceSettleContext(String contextVariables) {
+        assertThat(contextVariablesOf(contextVariables))
+                .containsEntry(FundsInstructionContextKeys.SETTLE_MODE, "FORCE")
+                .containsEntry(FundsInstructionContextKeys.FORCE_SETTLE_POLICY_CODE,
+                        "B4_FORCE_SETTLE_OPS")
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_ORIGINAL_FACT_REF,
+                        "processor_settlement_202606020001")
+                .containsEntry(FundsInstructionContextKeys.FORCE_SETTLE_VOUCHER_REF,
+                        "ops_voucher_202606020001");
+    }
+
+    private static void assertChargebackContext(String contextVariables) {
+        assertThat(contextVariablesOf(contextVariables))
+                .containsEntry("chargebackReason", "CARDHOLDER_DISPUTE")
+                .containsEntry("evidenceRef", "CHARGEBACK_EVIDENCE_202605290001")
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
+                        "CHARGEBACK_CASE_202605290001");
     }
 
     private static JSONObject contextVariablesOf(String contextVariables) {
