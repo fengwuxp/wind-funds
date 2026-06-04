@@ -18,6 +18,9 @@ import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.wind.core.ReadonlyContextVariables;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -133,6 +136,22 @@ class FundsTransactionRequestContextVariablesContractTests {
         assertNullContextPreserved(new FundsBalanceAdjustRequest(),
                 FundsBalanceAdjustRequest::setContextVariables,
                 FundsBalanceAdjustRequest::getContextVariables);
+    }
+
+    /**
+     * 场景：授权退款请求契约回归校验。
+     * 预期：refundMode 不再作为调用方入参暴露，只保留为内部资金指令上下文标签。
+     */
+    @Test
+    void testAuthorizationRefundRequestShouldNotExposeRefundMode() {
+        assertThat(Arrays.stream(FundsAuthorizationTransactionRefundRequest.class.getDeclaredFields())
+                .map(Field::getName)
+                .toList())
+                .doesNotContain("refundMode");
+        assertThat(Arrays.stream(FundsAuthorizationTransactionRefundRequest.class.getMethods())
+                .map(Method::getName)
+                .toList())
+                .doesNotContain("getRefundMode", "setRefundMode", "isRefundMode");
     }
 
     private static <T> void assertReadonlyContextStored(T request,
