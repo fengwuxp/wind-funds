@@ -87,6 +87,7 @@ B2-FR 进入 Execution Grant 前必须先选择资金责任目标字段策略，
 | 支付工具能力准入 | `PaymentInstrumentCapabilityApplicationService` | `com.wind.funds.wallet.application.instrument` | `com.wind.funds.wallet.application.instrument.impl` | B2-PI-CAP |
 | 资金责任解析 | `FundingResponsibilityResolutionApplicationService` | `com.wind.funds.wallet.application.funding` | `com.wind.funds.wallet.application.funding.impl` | B2-FR |
 | 授权支付工具入口 | `AuthorizationAdmissionApplicationService` | `com.wind.funds.wallet.application.instrument` | `com.wind.funds.wallet.application.instrument.impl` | B4-AUTH-PI |
+| Spend Rule 控制准入 | `SpendRuleControlApplicationService` | `com.wind.funds.wallet.application.spendrule` | `com.wind.funds.wallet.application.spendrule.impl` | B5-SR-CONTROL |
 | 授权后清算/释放/逆向 | `InstrumentTransactionLifecycleApplicationService` | `com.wind.funds.wallet.application.instrument` | `com.wind.funds.wallet.application.instrument.impl` | P2-VCC-LIFECYCLE |
 | VCC 预付资金处理 | `VccPrepaidFundingApplicationService` | `com.wind.funds.wallet.application.vcc` | `com.wind.funds.wallet.application.vcc.impl` | P2-VCC-PREPAID |
 | VCC 共享卡场景编排 | `VccSharedCardTransactionApplicationService` | `com.wind.funds.wallet.application.vcc` | `com.wind.funds.wallet.application.vcc.impl` | P2-VCC-LIFECYCLE |
@@ -322,6 +323,65 @@ Git 策略：auto_commit
 交接：确认后从 B2-FR-FAO-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置；若要支持信用账户或平台角色责任主体，改走独立 B2-FR-TARGET 迁移 Grant
 ```
 
+### 8.7 B5-SR-CONTROL Round 0 扫描（2026-06-04）
+
+本节把 `B5-SR-CONTROL` 从候选列表推进到可确认输入。它只做只读扫描和候选授权包收敛，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 扫描项 | 结论 |
+| --- | --- |
+| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 兼容代码基线 | 当前可定位的是 `BudgetGroupService` / `BudgetGroupServiceImpl`、`BUDGET_GROUP` ledger profile、余额控制调账和预算组余额查询等兼容路径；`FundsBalanceControlFailureFlowTests` 与 `ControlAccountLedgerInitializationTests` 可作为旧预算组账务兼容回归资产。 |
+| 目标缺口 | 当前未发现 `SpendRuleDecisionLog`、`SpendControlActivity`、Spend Rule application facade、规则版本决策模型或预算控制投影生产模型；既有预算组创建初始化 ledger bucket、`BUDGET_GROUP` 余额桶和预算组额度调账，不能证明目标态 Spend Rule 控制事实已生产可用。 |
+| 语义裁决 | B5 目标只表达规则决策、拒绝原因、控制活动、预算预留释放和只读控制投影；预算组、Spend Rule、规则命中和控制活动不得成为 route leg、posting、LedgerEntry 或账本余额主体。旧 BudgetGroup ledger 路径只能作为兼容差距和回归保护，不得写成目标态 Done。 |
+| schemaDecision | 进入编码前必须在 `contract-only` 与 `ddl-backed` 中二选一。`contract-only` 只允许新增 application facade 契约、Request/DTO 和目标 Red；`ddl-backed` 必须显式授权 DDL/H2 schema、Entity、Mapper、唯一键、幂等摘要和投影表字段。未选择前不写 B5 Java、测试或表结构。 |
+| 首批 Red | `R0-SR-001A`：MCC、商户、时间窗、频次、单笔金额、累计金额或规则版本拒绝时必须产生可审计规则决策和拒绝原因，且无 route、posting、LedgerEntry、余额投影或资金交易副作用。 |
+| 次批 Red | `R0-SR-002A`：授权预留、撤销、过期、部分完成和退款释放只能写 Spend Control Activity 和预算控制投影，并证明幂等、并发和失败无副作用；不得更新预算组 ledger bucket 或资金交易事实。 |
+| Grant 必须列明 | application facade 名称、schemaDecision、Request/DTO、规则版本字段、控制活动字段、拒绝原因、幂等摘要、并发保护、投影边界、目标测试资产、DDL/H2 是否允许和验证命令。 |
+| 禁止混入 | 不改支付工具动作能力、资金责任目标主体字段、授权 application facade、直接交易、授权状态机、BudgetGroup ledger 兼容策略、清结算对账、治理 apply、完整 VCC、P2 轨道、外部协议或敏感原文。 |
+
+### 8.8 spendRuleControlGrantCandidate（2026-06-04）
+
+本节把 8.7 的只读扫描推进为可确认的单一 Execution Grant 候选。它仍不授权写 Java、测试、DDL/H2 schema、公共契约或运行时配置；只有用户确认本节的 `Execution Grant：B5-SR-CONTROL` 并选择 schemaDecision 后，才允许进入首批 Red。
+
+| 授权包字段 | 候选内容 |
+| --- | --- |
+| `taskId` | `B5-SR-CONTROL-CAD-001`。 |
+| `stage` / `wave` | B5 余额控制 / Wave 1 Spend Rule 决策日志与控制活动准入。 |
+| `status` | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| `owner` | 资深架构师负责工程执行；产品架构专家负责规则拒绝原因、控制活动、预算口径和 Not Done 语义复核。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `5a0ee17 docs: 补齐资金责任候选包` 及本节提交点。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
+| `mvpScenario` | 业务入口提交支付工具、使用主体、预算上下文、Spend Rule 规则版本、金额币种和业务流水；系统在 application facade 中完成规则决策。拒绝时只留下规则决策、拒绝原因和审计；批准或授权后继时只记录控制活动和预算控制投影，不生成资金事实。 |
+| `businessAdmission` | 产品锚点为支付工具与 Spend Rule 生产可用性裁决；DSL 锚点为 `SpendRuleDecisionLog`、`SpendControlActivity` 和只读预算控制投影；系分锚点为 `SpendRuleControlApplicationService`；TDD 锚点为 `R0-SR-001`、`R0-SR-002`。 |
+| `schemaDecision` | 待确认，必须二选一：`contract-only` 或 `ddl-backed`。默认不允许 DDL/H2 schema；若选择 `ddl-backed`，Grant 必须列明表、字段、索引、唯一约束、Entity、Mapper 和 H2 fixture。 |
+| `firstRedSet` | `R0-SR-001A`：MCC、商户、时间窗、频次、单笔金额、累计金额或规则版本拒绝仍继续授权或付款必须失败；拒绝必须可审计，且无 route、posting、LedgerEntry、余额投影或资金交易副作用。 |
+| `secondRedSet` | `R0-SR-002A`：授权预留、撤销、过期、部分完成和退款释放缺幂等、缺并发保护、更新预算组 ledger bucket 或生成资金交易事实时必须失败。 |
+| `writeScope` | 先写 `tests/src/test/java/com/wind/funds/wallet/application/spendrule/SpendRuleControlApplicationServiceTests.java` 或等价 application facade 目标 Red；Red 证明缺口后，`contract-only` 只允许在 `wallet/wallet-face` 新增 facade 契约和 Request/DTO，在 `wallet/wallet-impl` 新增最小空实现或拒绝型适配；`ddl-backed` 还必须由 Grant 显式授权模型、Mapper、DDL/H2 和投影实现。 |
+| `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md`、既有 `wallet`、`transaction`、`core`、`ledger`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| `publicContractGate` | 只允许非破坏性新增 wallet application facade、Request/DTO、返回 DTO 和控制事实快照；不得修改交易 canonical 请求、授权状态机、core 交易枚举、ledger 公共契约或现有 BudgetGroup 资源服务语义。 |
+| `schemaGate` | 未确认 `ddl-backed` 前，不修改 `tests/src/test/resources/jdbc-schema.sql`、生产 DDL、Entity 字段、Mapper 表字段、索引或唯一约束；确认 `ddl-backed` 后也只允许 B5 控制事实表和只读投影表，不得借机迁移 BudgetGroup ledger 兼容路径。 |
+| `dependencyGate` | `wallet/wallet-face` 不依赖任何 impl；`wallet/wallet-impl` 可依赖 `wallet/wallet-face`、core 和既有资源服务；`transaction`、`ledger` 不反向依赖 wallet impl。违反依赖方向时立即停止。 |
+| `noWriteScope` | 不把 BudgetGroup、Spend Rule 或控制活动写成 route leg、posting、LedgerEntry 或账本余额主体；不改 `BUDGET_GROUP` 兼容策略；不实现支付工具动作能力、资金责任迁移、授权 application facade、完整规则引擎、清结算对账、治理 apply、完整 VCC、P2 轨道、外部协议或敏感原文。 |
+| `verificationCommand` | 首轮 `just test-one SpendRuleControlApplicationServiceTests tests`；若触碰兼容回归，补 `just test-one FundsBalanceControlFailureFlowTests tests`、`just test-one ControlAccountLedgerInitializationTests tests`、`just test-balance-control`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`。 |
+| `gitStrategy` | 若用户确认本 Grant、选择 schemaDecision 并保持 GSD-CAD 自动模式，目标验证通过且未触发停止条件时按 `auto_commit` 提交；验证失败、环境不可判定或越界时转 `summary_only`。 |
+| `stopCondition` | 未选择 schemaDecision、需要表结构但未获 `ddl-backed` 授权、需要迁移 BudgetGroup ledger 兼容路径、修改交易 canonical 请求、授权 application facade、资金责任字段、ledger 公共契约、清结算对账、治理、外部规则、敏感数据、依赖方向反转、公有方法超过 5 个参数或工作树冲突时停止。 |
+| `handoff` | 本候选包的恢复入口为 `B5-SR-CONTROL-CAD-001`。用户确认 `Execution Grant：B5-SR-CONTROL` 并选择 `contract-only` 或 `ddl-backed` 后进入首批 Red；未确认时只保留为 Round 0 / summary_only。 |
+
+```text
+Execution Grant：B5-SR-CONTROL
+确认基线：确认时 Git HEAD；至少包含 5a0ee17 docs: 补齐资金责任候选包及本节提交点；若确认前有未提交文档变更，必须先提交或列入 authorityBaseline
+任务包：B5-SR-CONTROL-CAD-001
+目标：新增 SpendRuleControlApplicationService 或等价 application facade，完成 Spend Rule 规则版本决策、拒绝原因、控制活动、预算预留释放和只读预算控制投影的首轮准入；拒绝或控制失败无 route、posting、LedgerEntry、资金交易或账本余额副作用
+schemaDecision：必须选择 contract-only 或 ddl-backed；未选择前不写 Java、测试、DDL/H2 schema 或运行时配置
+允许写入：先写 tests 中 Spend Rule 控制 application facade 目标 Red；Red 证明缺口后按 schemaDecision 允许 wallet-face application facade 契约、Request/DTO、wallet-impl 最小实现；只有 ddl-backed 才允许 DDL/H2 schema、Entity、Mapper 和投影实现
+允许公共契约：仅允许非破坏性新增 wallet application facade、Request/DTO、返回 DTO 和控制事实快照；不得修改交易 canonical 请求、授权状态机、ledger 公共契约或现有 BudgetGroup 资源服务语义
+首批 Red：R0-SR-001A；必要时补 R0-SR-002A，覆盖规则拒绝、授权预留、撤销、过期、部分完成、退款释放、幂等、并发和失败无副作用
+验证命令：just test-one SpendRuleControlApplicationServiceTests tests；just test-one FundsBalanceControlFailureFlowTests tests；just test-one ControlAccountLedgerInitializationTests tests；just test-balance-control；just test-boundary；just compile；提交前 just pmd 和 git diff --check
+禁止写入：BudgetGroup 或 Spend Rule 账务主体化、BUDGET_GROUP 兼容路径迁移、交易 canonical 请求、authorizeByInstrument、支付工具动作能力、资金责任迁移、统一 InstrumentTransactionService、清结算对账、治理 apply、完整 VCC、P2 轨道、外部协议或敏感原文
+Git 策略：auto_commit
+停止条件：schemaDecision 未确认、表结构未授权、依赖方向反转、外部规则、敏感数据、B2/B4/B6/B8/P2 越界、验证无法解释失败或工作树冲突即停止
+交接：确认后从 B5-SR-CONTROL-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置
+```
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
@@ -338,6 +398,7 @@ Git 策略：auto_commit
 3. 测试只能证明资源服务通过，不能证明准入、资金责任、拒绝无副作用、route/posting/entry 禁止事实。
 4. 发现目标态要求信用账户或平台角色责任主体，但现有字段只能表达 `fundingAccountId`，且未确认迁移策略。
 5. 工作树存在未分类变更，或本轮未提交文档基线未被纳入 `authorityBaseline`。
+6. B5-SR-CONTROL 需要 DDL/H2 schema、Entity、Mapper、索引或投影表，但 Execution Grant 未明确选择 `ddl-backed`。
 
 ## 11. confirmationTemplate
 
@@ -345,7 +406,7 @@ Git 策略：auto_commit
 Execution Grant：B2/B4 支付工具与 Spend Rule Round 0
 确认基线：确认时 Git HEAD；若本轮文档尚未提交，需显式纳入 authorityBaseline
 选择切片：B2-PI-CAP / B2-FR / B4-AUTH-PI / B5-SR-CONTROL / B6-B8-PI-VIEW 之一
-允许写入：仅限所选切片的测试资产和最小 application facade / DTO / 适配实现；DDL/H2 默认不允许
+允许写入：仅限所选切片的测试资产和最小 application facade / DTO / 适配实现；DDL/H2 默认不允许；若选择 B5-SR-CONTROL，必须同步选择 contract-only 或 ddl-backed
 禁止写入：交易 canonical 请求替换、统一 InstrumentTransactionService、预算组账务主体、资金责任字段策略混用、清结算对账、治理 apply、P2 轨道协议、敏感原文
 首批 Red：按所选切片选择 R0-PI-001、R0-FR-001、R0-AUTH-001、R0-SR-001、R0-SR-002 或 R0-PI-002
 验证命令：just test-one PaymentInstrumentServiceImplTests tests；just test-one SpendSubjectFundingRelationServiceImplTests tests；just test-one PaymentInstrumentRouteDslContractTests tests；必要时 just test-transaction / just test-boundary；提交前 git diff --check 和 just pmd
