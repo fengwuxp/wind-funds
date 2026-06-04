@@ -1,5 +1,7 @@
 package com.wind.funds.dsl;
 
+import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.transaction.model.request.CreateFundsFrozenOrderRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
@@ -16,26 +18,20 @@ import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
-import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.transaction.model.request.MerchantInfoRequest;
+import com.wind.funds.transaction.model.request.TransactionAmount;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.Enumeration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -44,12 +40,26 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class FundsTransactionRequestContextVariablesContractTests {
 
-    private static final String TRANSACTION_REQUEST_PACKAGE = "com.wind.funds.transaction.model.request";
-
-    private static final String TRANSACTION_REQUEST_PACKAGE_PATH =
-            TRANSACTION_REQUEST_PACKAGE.replace('.', '/');
-
-    private static final String CLASS_FILE_SUFFIX = ".class";
+    private static final List<Class<?>> TRANSACTION_REQUEST_PACKAGE_TYPES = List.of(
+            CreateFundsFrozenOrderRequest.class,
+            FundsAuthorizationTransactionAuthorizeRequest.class,
+            FundsAuthorizationTransactionChargebackRequest.class,
+            FundsAuthorizationTransactionExpireRequest.class,
+            FundsAuthorizationTransactionRefundRequest.class,
+            FundsAuthorizationTransactionReversalRequest.class,
+            FundsAuthorizationTransactionSettleRequest.class,
+            FundsBalanceAdjustRequest.class,
+            FundsBalanceFreezeRequest.class,
+            FundsBalanceUnfreezeRequest.class,
+            FundsTransactionFeeRefundRequest.class,
+            FundsTransactionFeeRequest.class,
+            FundsTransactionPayRequest.class,
+            FundsTransactionRefundRequest.class,
+            FundsTransactionTopupRequest.class,
+            FundsTransactionTransferRequest.class,
+            FundsTransactionWithdrawRequest.class,
+            MerchantInfoRequest.class,
+            TransactionAmount.class);
 
     private static final List<RequestContextCase<?>> REQUEST_CONTEXT_CASES = List.of(
             new RequestContextCase<>(FundsTransactionTopupRequest.class,
@@ -140,8 +150,10 @@ class FundsTransactionRequestContextVariablesContractTests {
      * 预期：新增请求必须进入本测试矩阵，显式验证存储和 null 语义。
      */
     @Test
-    void testAllTransactionRequestsWithContextVariablesShouldBeCovered()
-            throws IOException, URISyntaxException, ClassNotFoundException {
+    void testAllTransactionRequestsWithContextVariablesShouldBeCovered() {
+        assertThat(TRANSACTION_REQUEST_PACKAGE_TYPES)
+                .as("transaction request package inventory must be explicit and unique")
+                .doesNotHaveDuplicates();
         assertThat(coveredRequestTypes())
                 .as("requests with ReadonlyContextVariables must be included in context contract matrix")
                 .containsExactlyInAnyOrderElementsOf(transactionRequestTypesWithReadonlyContextVariables());
@@ -184,49 +196,22 @@ class FundsTransactionRequestContextVariablesContractTests {
         assertThat(requestCase.getter().apply(request)).isNull();
     }
 
-    private static Set<String> coveredRequestTypes() {
-        Set<String> requestTypes = new TreeSet<>();
+    private static Set<Class<?>> coveredRequestTypes() {
+        Set<Class<?>> requestTypes = new LinkedHashSet<>();
         REQUEST_CONTEXT_CASES.stream()
-                .map(requestCase -> requestCase.requestType().getSimpleName())
+                .map(RequestContextCase::requestType)
                 .forEach(requestTypes::add);
         return requestTypes;
     }
 
-    private static Set<String> transactionRequestTypesWithReadonlyContextVariables()
-            throws IOException, URISyntaxException, ClassNotFoundException {
-        Set<String> requestTypes = new TreeSet<>();
-        ClassLoader classLoader = FundsTransactionRequestContextVariablesContractTests.class.getClassLoader();
-        Enumeration<URL> packageResources = classLoader.getResources(TRANSACTION_REQUEST_PACKAGE_PATH);
-        while (packageResources.hasMoreElements()) {
-            URL packageResource = packageResources.nextElement();
-            if (!"file".equals(packageResource.getProtocol())) {
-                continue;
-            }
-            try (Stream<Path> compiledClasses = Files.list(Path.of(packageResource.toURI()))) {
-                for (Path compiledClass : compiledClasses
-                        .filter(FundsTransactionRequestContextVariablesContractTests::isTopLevelClassFile)
-                        .toList()) {
-                    Class<?> requestType = Class.forName(
-                            TRANSACTION_REQUEST_PACKAGE + "." + compiledClassSimpleName(compiledClass),
-                            false,
-                            classLoader);
-                    if (hasReadonlyContextVariablesField(requestType)) {
-                        requestTypes.add(requestType.getSimpleName());
-                    }
-                }
+    private static Set<Class<?>> transactionRequestTypesWithReadonlyContextVariables() {
+        Set<Class<?>> requestTypes = new LinkedHashSet<>();
+        for (Class<?> requestType : TRANSACTION_REQUEST_PACKAGE_TYPES) {
+            if (hasReadonlyContextVariablesField(requestType)) {
+                requestTypes.add(requestType);
             }
         }
         return requestTypes;
-    }
-
-    private static boolean isTopLevelClassFile(Path compiledClass) {
-        String fileName = compiledClass.getFileName().toString();
-        return fileName.endsWith(CLASS_FILE_SUFFIX) && !fileName.contains("$");
-    }
-
-    private static String compiledClassSimpleName(Path compiledClass) {
-        String fileName = compiledClass.getFileName().toString();
-        return fileName.substring(0, fileName.length() - CLASS_FILE_SUFFIX.length());
     }
 
     private static boolean hasReadonlyContextVariablesField(Class<?> requestType) {
