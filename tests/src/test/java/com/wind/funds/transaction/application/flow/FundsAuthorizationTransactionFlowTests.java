@@ -25,6 +25,7 @@ import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import java.util.List;
@@ -1190,9 +1191,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 });
         assertThat(fundsTransactionsByBusinessSn("AUTH_NO_AUTH_REFUND_RETURN"))
                 .singleElement()
-                .satisfies(refund -> assertThat(refund.getRouteSnapshot())
-                        .contains("AUTHORIZATION_NO_AUTH_REFUND_STANDARD")
-                        .doesNotContain("AUTHORIZATION_REFUND_REPLAY"));
+                .satisfies(refund -> assertNoAuthRefundRouteCode(refund.getSn()));
         assertLedgerFactsFollowRouteSnapshot("AUTH_NO_AUTH_REFUND_RETURN");
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_EXTERNAL_CAPTURE", 2, 2);
@@ -1229,9 +1228,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .allSatisfy(detail -> assertNoAuthRefundContext(detail.getContextVariables()));
         assertThat(fundsTransactionsByBusinessSn("AUTH_NO_AUTH_REFUND_INFER_RETURN"))
                 .singleElement()
-                .satisfies(refund -> assertThat(refund.getRouteSnapshot())
-                        .contains("AUTHORIZATION_NO_AUTH_REFUND_STANDARD")
-                        .doesNotContain("AUTHORIZATION_REFUND_REPLAY"));
+                .satisfies(refund -> assertNoAuthRefundRouteCode(refund.getSn()));
         assertFundsAndLedgerFactsForBusinessSn("AUTH_NO_AUTH_REFUND_INFER_RETURN", 1, 2, 1, 2);
     }
 
@@ -2581,6 +2578,13 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .containsEntry("evidenceRef", "CHARGEBACK_EVIDENCE_202605290001")
                 .containsEntry(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
                         "CHARGEBACK_CASE_202605290001");
+    }
+
+    private void assertNoAuthRefundRouteCode(String transactionSn) {
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
+                .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getRouteCode())
+                        .isEqualTo(FundsRouteCodes.AUTHORIZATION_NO_AUTH_REFUND_STANDARD)
+                        .isNotEqualTo(FundsRouteCodes.AUTHORIZATION_REFUND_REPLAY));
     }
 
     private static JSONObject contextVariablesOf(String contextVariables) {
