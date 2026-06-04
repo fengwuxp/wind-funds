@@ -265,6 +265,63 @@ Git 策略：auto_commit
 交接：确认后从 B2-PI-CAP-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置
 ```
 
+### 8.5 B2-FR Round 0 扫描（2026-06-04）
+
+本节把 `B2-FR` 资金责任解析切片推进到可确认输入。它只做只读扫描和候选授权包收敛，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 扫描项 | 结论 |
+| --- | --- |
+| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 资源服务基线 | `SpendSubjectFundingRelationService` 和 `SpendSubjectFundingRelationServiceImpl` 仍是关系资源服务；创建关系时只接受 `fundingAccountId`，并校验真实资金账户存在、可借记、币种一致、生效窗口、默认关系唯一、优先级不冲突、敏感上下文阻断和无账务副作用。目标测试资产为 `SpendSubjectFundingRelationServiceImplTests` 和 `PaymentInstrumentRouteDslContractTests`。 |
+| 目标缺口 | 当前未发现 `FundingResponsibilityResolutionApplicationService` 或等价 application facade；`CreateSpendSubjectFundingRelationRequest`、DTO、Query、Entity 和 H2 schema 仍以 `fundingAccountId` / `funding_account_id` 为主要目标字段，不能在不迁移字段的前提下声明信用账户或平台账户角色责任主体生产可用。 |
+| 字段策略裁决 | 本轮只把低风险 `funding-account-only` 收敛为可确认 Grant 候选：解析结果只能是 `FUNDING_ACCOUNT`。如要进入 `targetSubjectType + targetSubjectId`，必须另起高风险迁移 Grant，并显式允许 Request/DTO、DDL/H2 schema、Entity、Mapper、摘要、fixture、route snapshot 和回放断言同步修改。 |
+| 首批 Red | `R0-FR-001A`：资金责任缺失、不唯一、错币种、关系失效、目标资金账户不可借记、预算组或 Spend Rule 被当最终责任主体时必须可解释失败；成功时输出不可变 `FundingAllocationDecision` 或等价决策，且 targetSubjectType 只能是 `FUNDING_ACCOUNT`。 |
+| Grant 必须列明 | application facade 名称、字段策略、Request/DTO、决策快照字段、错误码、关系优先级/默认关系排序、绑定或规则版本引用、敏感字段白名单、目标测试资产和验证命令。 |
+| 禁止混入 | 不做 `targetSubjectType + targetSubjectId` 字段迁移，不把信用账户或平台角色写入 `fundingAccountId`，不进入支付工具动作能力、授权准入组合、Spend Rule 表、预算控制投影、交易投影、清结算对账、治理 apply、完整 VCC 或 P2 轨道协议。 |
+
+### 8.6 fundingResponsibilityGrantCandidate（2026-06-04）
+
+本节把 8.5 的只读扫描推进为可确认的单一 Execution Grant 候选。它仍不授权写 Java、测试、DDL/H2 schema、公共契约或运行时配置；只有用户确认本节的 `Execution Grant：B2-FR-FAO` 后，才允许进入首批 Red。
+
+| 授权包字段 | 候选内容 |
+| --- | --- |
+| `taskId` | `B2-FR-FAO-CAD-001`。 |
+| `stage` / `wave` | B2 钱包基础能力 / Wave 1 资金责任解析 application facade 准入。 |
+| `status` | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| `owner` | 资深架构师负责工程执行；产品架构专家负责资金责任语义、使用者解释和 Not Done 语义复核。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `97359f6 docs: 补齐支付工具能力候选包` 及本节提交点。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
+| `mvpScenario` | 业务入口提交支付工具、使用主体、预算或 Spend Rule 上下文和金额币种；系统在 application facade 中读取已配置的资金责任关系，按默认关系、优先级、生效窗口、状态和币种裁决唯一资金账户责任主体。通过时输出不可变资金责任决策；失败时返回可解释原因，不生成任何资金事实。 |
+| `businessAdmission` | 产品锚点为支付工具与资金责任生产可用性裁决；DSL 锚点为 `FundingAllocationDecision` 只表达最终可入账主体；系分锚点为 `FundingResponsibilityResolutionApplicationService`；TDD 锚点为 `TDD-WALLET-018`、`TDD-ROUTE-012` 和 `R0-FR-001`。 |
+| `fieldStrategy` | `funding-account-only`。本 Grant 只允许声明解析到真实资金账户，不允许声明信用账户、平台账户角色、预算组或 Spend Rule 作为最终资金责任主体。 |
+| `firstRedSet` | `R0-FR-001A`：缺资金责任、多个关系命中、优先级冲突、默认关系不唯一、关系失效、目标资金账户不可借记、错币种、敏感上下文或预算组/Spend Rule 被输出为最终主体时仍被放行必须失败；失败不得生成 route、posting、LedgerEntry 或余额投影。 |
+| `secondRedSet` | `R0-FR-001B`：目标态要求信用账户或平台角色责任主体时必须阻断并提示需要 `targetSubjectType + targetSubjectId` 迁移 Grant；该 Red 只证明策略边界，不进入字段迁移实现。 |
+| `writeScope` | 先写 `tests/src/test/java/com/wind/funds/wallet/application/funding/FundingResponsibilityResolutionApplicationServiceTests.java` 或等价 application facade 目标 Red；Red 证明缺口后，仅允许在 `wallet/wallet-face` 新增 application facade 契约、Request/DTO，在 `wallet/wallet-impl` 新增最小 facade 实现和资源服务适配，并按需补 `SpendSubjectFundingRelationServiceImplTests` 回归。 |
+| `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md`、既有 `wallet`、`core`、`transaction`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| `publicContractGate` | 只允许非破坏性新增 wallet application facade、Request/DTO、返回 DTO 和资金责任决策快照；不得修改交易 canonical 请求、core 交易枚举、ledger 公共契约或现有资源服务语义。 |
+| `schemaGate` | 不修改 `tests/src/test/resources/jdbc-schema.sql`、生产 DDL、Entity 字段、Mapper 表字段、索引或唯一约束；若需要 `target_subject_type` / `target_subject_id`，必须停止并改走 `B2-FR-TARGET` 独立 Grant。 |
+| `dependencyGate` | `wallet/wallet-face` 不依赖任何 impl；`wallet/wallet-impl` 可依赖 `wallet/wallet-face`、core 和既有资源服务；`transaction` 不反向依赖 wallet impl。违反依赖方向时立即停止。 |
+| `noWriteScope` | 不迁移 `targetSubjectType + targetSubjectId`，不新增信用账户或平台角色责任主体生产能力，不把预算组或 Spend Rule 写成 route leg、posting、LedgerEntry 或账本余额主体，不实现 `authorizeByInstrument`，不混入支付工具动作能力、Spend Rule、预算控制投影、清结算对账、治理 apply、完整 VCC、P2 轨道、外部协议或敏感原文处理。 |
+| `verificationCommand` | 首轮 `just test-one FundingResponsibilityResolutionApplicationServiceTests tests`；Green 后按触点补 `just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`。 |
+| `gitStrategy` | 若用户确认本 Grant 并保持 GSD-CAD 自动模式，目标验证通过且未触发停止条件时按 `auto_commit` 提交；验证失败、环境不可判定或越界时转 `summary_only`。 |
+| `stopCondition` | 需要修改目标主体字段、DDL/H2 schema、Entity、Mapper、route snapshot、交易 canonical 请求、授权 application facade、支付工具动作能力、Spend Rule、预算控制投影、清结算对账、治理、外部规则、敏感数据、依赖方向反转、公有方法超过 5 个参数或工作树冲突时停止。 |
+| `handoff` | 本候选包的恢复入口为 `B2-FR-FAO-CAD-001`。用户确认 `Execution Grant：B2-FR-FAO` 后进入首批 Red；未确认时只保留为 Round 0 / summary_only。若用户选择 `targetSubjectType + targetSubjectId`，本候选只作为只读参考，必须另起迁移 Grant。 |
+
+```text
+Execution Grant：B2-FR-FAO
+确认基线：确认时 Git HEAD；至少包含 97359f6 docs: 补齐支付工具能力候选包及本节提交点；若确认前有未提交文档变更，必须先提交或列入 authorityBaseline
+任务包：B2-FR-FAO-CAD-001
+目标：新增 FundingResponsibilityResolutionApplicationService 或等价 application facade，在 funding-account-only 策略下完成资金责任关系读取、唯一资金账户责任主体裁决、币种和有效性校验；通过后输出不可变 FundingAllocationDecision 或等价快照；失败无 route、posting、LedgerEntry、余额投影或完整敏感凭证
+字段策略：funding-account-only；本 Grant 不声明信用账户、平台账户角色、预算组或 Spend Rule 可作为最终资金责任主体
+允许写入：先写 tests 中资金责任解析 application facade 目标 Red；Red 证明缺口后允许 wallet-face application facade 契约、Request/DTO、wallet-impl 最小实现、资源服务适配和必要资源服务回归
+允许公共契约：仅允许非破坏性新增 wallet application facade、Request/DTO、返回 DTO 和资金责任决策快照；不得修改交易 canonical 请求、ledger 公共契约或现有资源服务语义
+首批 Red：R0-FR-001A；必要时补缺关系、多关系、默认关系、优先级、状态、生效窗口、币种、敏感上下文和预算组/Spend Rule 误输出失败矩阵
+验证命令：just test-one FundingResponsibilityResolutionApplicationServiceTests tests；just test-one SpendSubjectFundingRelationServiceImplTests tests；just test-one PaymentInstrumentRouteDslContractTests tests；just test-boundary；just compile；提交前 just pmd 和 git diff --check
+禁止写入：targetSubjectType + targetSubjectId 迁移、DDL/H2 schema、Entity、Mapper、route snapshot 字段迁移、authorizeByInstrument、支付工具动作能力、统一 InstrumentTransactionService、Spend Rule、预算控制投影、清结算对账、治理 apply、完整 VCC、P2 轨道、外部协议或敏感原文
+Git 策略：auto_commit
+停止条件：字段策略越界、表结构、依赖方向反转、外部规则、敏感数据、B4/B5/B6/B8/P2 越界、验证无法解释失败或工作树冲突即停止
+交接：确认后从 B2-FR-FAO-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置；若要支持信用账户或平台角色责任主体，改走独立 B2-FR-TARGET 迁移 Grant
+```
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
