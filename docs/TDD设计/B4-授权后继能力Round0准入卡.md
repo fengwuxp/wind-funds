@@ -2,7 +2,7 @@
 
 ## 1. 文档定位
 
-本文档是 B4 授权后继能力的 Round 0 准入卡和历史执行记录。它最初把 B4-TRX-EXPIRE 和 B4-FORCE-SETTLE 已完成后的剩余授权交易缺口收敛为账户主体型 canonical 内核的候选 Execution Grant 输入页；截至 `006bcaa feat: 补齐无授权退款 canonical 能力`，B4-NO-AUTH-REFUND 已完成首轮编码闭环；截至 `949b24a fix(transaction): 对齐授权争议退款审计语义`，B4-DISPUTE-SEMANTIC-ALIGNMENT 已完成首轮编码闭环；截至 `47c5269 fix(transaction): 串行化授权后继并发竞争`，B4-AUTH-RACE 已完成首轮编码闭环。
+本文档是 B4 授权后继能力的 Round 0 准入卡和历史执行记录。它最初把 B4-TRX-EXPIRE 和 B4-FORCE-SETTLE 已完成后的剩余授权交易缺口收敛为账户主体型 canonical 内核的候选 Execution Grant 输入页；截至 `967586c fix: 按外部引用推断无授权退款路由`，B4-NO-AUTH-REFUND 已完成首轮编码闭环、请求契约收口和路由回退加固；截至 `949b24a fix(transaction): 对齐授权争议退款审计语义`，B4-DISPUTE-SEMANTIC-ALIGNMENT 已完成首轮编码闭环；截至 `47c5269 fix(transaction): 串行化授权后继并发竞争`，B4-AUTH-RACE 已完成首轮编码闭环。
 
 本文档本身不授权新的生产代码、测试代码、DDL/H2 schema 或运行时配置写入。B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT 和 B4-AUTH-RACE 的授权模板已被消费；后续只能作为历史授权样例、回归依据和 CR 依据。下一轮必须重新确认新的单一 MVP Execution Grant。
 
@@ -10,8 +10,8 @@
 
 | 基线项 | 当前口径 |
 | --- | --- |
-| 代码和文档基线 | B4-TRX-EXPIRE 实现基线为 `b0666ba feat: 补齐授权过期释放 canonical 能力`，证据回填基线为 `f99f3a3 docs: 回填授权过期释放完成证据`；B4-FORCE-SETTLE 首轮实现基线为 `616dac1 feat: 补齐授权强制完成能力`，策略红线加固基线为 `3825466 fix: 收紧授权强制完成策略红线`；B4-NO-AUTH-REFUND 执行基线为用户确认时 `b69dbe5 docs: 标记 B4 无授权退款 Grant 前准备饱和`，闭环提交为 `006bcaa feat: 补齐无授权退款 canonical 能力`，后续请求契约收口基线为 `818da34 fix(transaction): 移除授权退款请求模式字段`；B4-DISPUTE-SEMANTIC-ALIGNMENT 候选入口刷新基线为 `8268ce8 docs: 刷新 B4 CAD 候选校验入口`，闭环提交为 `949b24a fix(transaction): 对齐授权争议退款审计语义`；B4-AUTH-RACE Round 0 基线为 `04865ba docs: 补齐 B4 授权并发准入包`，闭环提交为 `47c5269 fix(transaction): 串行化授权后继并发竞争`。 |
-| 已关闭能力 | B4-03 授权过期释放：已新增 `EXPIRE` 事件、`EXPIRED` 状态、`FundsAuthorizationTransactionExpireRequest`、`FundsAuthorizationTransactionService#expire`、route replay、ledger posting 释放路径和生命周期金额校验。B4-FORCE-SETTLE 首轮账户主体型 canonical 能力：已新增 FORCE 完成模式、强制完成策略/上限/原因/外部事实/凭证字段、普通完成与 FORCE 分支隔离、`AVAILABLE -> SETTLEMENT` 路由和受信策略红线。B4-NO-AUTH-REFUND 首轮 canonical 能力经 CR 收缩为资金层最小契约：以空原授权流水进入 no-auth 语义，保留 `externalReferenceSn`、退款原因、操作者/审计、独立退款 route 和失败无副作用测试。B4-DISPUTE-SEMANTIC-ALIGNMENT 首轮 canonical 可区分性已闭合：`settleRefund / AUTH_REFUND` 可通过争议字段承接拒付/争议语义，保留 `DISPUTE` 内部上下文、原因、凭证、外部引用、用户审计上下文、请求摘要和 route/ledger/posting/entry 审计可追溯性。B4-AUTH-RACE 首轮并发竞争红线已闭合：同一授权的 settle / expire / reversal 并发竞争只允许一个赢家，失败方无 route、posting、ledger entry、projection 或余额副作用。 |
+| 代码和文档基线 | B4-TRX-EXPIRE 实现基线为 `b0666ba feat: 补齐授权过期释放 canonical 能力`，证据回填基线为 `f99f3a3 docs: 回填授权过期释放完成证据`；B4-FORCE-SETTLE 首轮实现基线为 `616dac1 feat: 补齐授权强制完成能力`，策略红线加固基线为 `3825466 fix: 收紧授权强制完成策略红线`；B4-NO-AUTH-REFUND 执行基线为用户确认时 `b69dbe5 docs: 标记 B4 无授权退款 Grant 前准备饱和`，闭环提交为 `006bcaa feat: 补齐无授权退款 canonical 能力`，后续请求契约收口基线为 `818da34 fix(transaction): 移除授权退款请求模式字段`，路由外部引用回退基线为 `967586c fix: 按外部引用推断无授权退款路由`；B4-DISPUTE-SEMANTIC-ALIGNMENT 候选入口刷新基线为 `8268ce8 docs: 刷新 B4 CAD 候选校验入口`，闭环提交为 `949b24a fix(transaction): 对齐授权争议退款审计语义`；B4-AUTH-RACE Round 0 基线为 `04865ba docs: 补齐 B4 授权并发准入包`，闭环提交为 `47c5269 fix(transaction): 串行化授权后继并发竞争`。 |
+| 已关闭能力 | B4-03 授权过期释放：已新增 `EXPIRE` 事件、`EXPIRED` 状态、`FundsAuthorizationTransactionExpireRequest`、`FundsAuthorizationTransactionService#expire`、route replay、ledger posting 释放路径和生命周期金额校验。B4-FORCE-SETTLE 首轮账户主体型 canonical 能力：已新增 FORCE 完成模式、强制完成策略/上限/原因/外部事实/凭证字段、普通完成与 FORCE 分支隔离、`AVAILABLE -> SETTLEMENT` 路由和受信策略红线。B4-NO-AUTH-REFUND 首轮 canonical 能力经 CR 收缩为资金层最小契约：以空原授权流水进入 no-auth 语义，请求契约不暴露 `refundMode`，保留 `externalReferenceSn`、退款原因、操作者/审计、独立退款 route、外部引用路由回退和失败无副作用测试。B4-DISPUTE-SEMANTIC-ALIGNMENT 首轮 canonical 可区分性已闭合：`settleRefund / AUTH_REFUND` 可通过争议字段承接拒付/争议语义，保留 `DISPUTE` 内部上下文、原因、凭证、外部引用、用户审计上下文、请求摘要和 route/ledger/posting/entry 审计可追溯性。B4-AUTH-RACE 首轮并发竞争红线已闭合：同一授权的 settle / expire / reversal 并发竞争只允许一个赢家，失败方无 route、posting、ledger entry、projection 或余额副作用。 |
 | 产品入口 | `docs/产品设计/05-产品验收与TDD用例矩阵.md` 的 `AC-AUTH-011` 无授权强制完成、`AC-AUTH-012` 无授权直接退款、授权拒绝与拒付区分、原路径回放和授权并发红线。 |
 | DSL 入口 | `docs/DSL设计/支付资金底座DSL承载层设计.md` 的 `DSL-AUTH-FORCE-CAPTURE-001`、`DSL-AUTH-REFUND-001`、`AUTHORIZATION_TRANSACTION / SETTLE` 强制完成模式、`AUTHORIZATION_TRANSACTION / AUTH_REFUND` 无授权退款模式和拒付语义承接口径。 |
 | 系分入口 | `docs/系分设计/02-交易路由钱包账目与投影系分设计.md` 的授权交易服务契约、状态流转、route replay、投影解释和资金红线。 |
@@ -29,7 +29,7 @@
 | `userVisibleResult` | 用户或商户看到账单、退款、扣回或失败原因；运营和财务能追溯模式、外部引用、原因、操作者、策略、上限、route snapshot、ledger transaction、projection 和审计上下文。 |
 | `productNotDone` | 不声明完整 VCC 发卡、完整 chargeback case 管理、完整清结算追偿、外部卡组织规则、Spend Rule 引擎、支付工具 facade 或治理重放生产能力。 |
 | `firstRedSet` | B4-FORCE-SETTLE、B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT 和 B4-AUTH-RACE 首轮已闭合；下一轮只能在授权支付工具应用入口、授权占券和权益生命周期、完整 dispute/chargeback case 或其他候选中重新选择一个单一 Execution Grant。 |
-| `currentEvidence` | `b0666ba` 已证明授权过期释放基础能力闭合；`616dac1` 和 `3825466` 已证明 B4-FORCE-SETTLE 首轮 canonical 能力与策略红线闭合；`006bcaa` 已证明 B4-NO-AUTH-REFUND 首轮 canonical 能力闭合，`818da34` 已进一步移除 `FundsAuthorizationTransactionRefundRequest#refundMode` 请求字段并保留 `NO_AUTH` 为内部上下文标签；`949b24a` 已证明 `settleRefund / AUTH_REFUND` 争议退款可在不恢复请求 `refundMode` 的前提下保留 `DISPUTE` 内部语义、审计上下文和幂等可区分性；`47c5269` 已证明同一授权后继事件并发竞争时只有一个合法迁移获胜，失败方无资金副作用。剩余授权支付工具应用入口、授权权益生命周期和完整 dispute/chargeback case 仍是设计和任务候选，不因前述提交通过而自动获得编码授权。 |
+| `currentEvidence` | `b0666ba` 已证明授权过期释放基础能力闭合；`616dac1` 和 `3825466` 已证明 B4-FORCE-SETTLE 首轮 canonical 能力与策略红线闭合；`006bcaa` 已证明 B4-NO-AUTH-REFUND 首轮 canonical 能力闭合，`818da34` 已进一步移除 `FundsAuthorizationTransactionRefundRequest#refundMode` 请求字段并保留 `NO_AUTH` 为内部上下文标签，`967586c` 已证明 no-auth `AUTH_REFUND` 可在内部 `REFUND_MODE` 缺失时由 `EXTERNAL_TRANSACTION` reference 进入专用 route resolver，显式 `DISPUTE` 或其他退款归类不被覆盖；`949b24a` 已证明 `settleRefund / AUTH_REFUND` 争议退款可在不恢复请求 `refundMode` 的前提下保留 `DISPUTE` 内部语义、审计上下文和幂等可区分性；`47c5269` 已证明同一授权后继事件并发竞争时只有一个合法迁移获胜，失败方无资金副作用。剩余授权支付工具应用入口、授权权益生命周期和完整 dispute/chargeback case 仍是设计和任务候选，不因前述提交通过而自动获得编码授权。 |
 
 ### 3.1 architectureReviewMap
 
@@ -250,11 +250,11 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 
 ### 8.5 noAuthRefundMinimalGreenMap（2026-06-03）
 
-本节记录 `B4-NAR-RED-001` 获得 Execution Grant 后的最小 Green 判断地图。该地图来自 Grant 前只读扫描；当前实现闭环已由 `006bcaa` 完成，下表作为最小 Green 依据保留。
+本节记录 `B4-NAR-RED-001` 获得 Execution Grant 后的最小 Green 判断地图。该地图来自 Grant 前只读扫描；当前实现闭环已由 `006bcaa` 完成，后续请求契约收口由 `818da34` 完成，路由外部引用回退由 `967586c` 完成。下表作为历史最小 Green 依据和当前回归口径保留。
 
 | 触点 | Grant 前事实 | 最小 Green 约束 |
 | --- | --- | --- |
-| Route resolver 命中 | `DefaultRouteReplayService` 只在 replay event 且 reference type 为 `ORIGINAL_TRANSACTION`、`AUTHORIZATION`、`REFUND`、`FEE` 或 `FREEZE_ORDER` 时命中；`EXTERNAL_TRANSACTION` 明确不是 route snapshot reference。`AuthorizationFundsInstructionRouteResolver#supports` 当前只支持 `AUTHORIZE` 和 FORCE `SETTLE`。 | NO_AUTH 退款不能伪装成内部授权 replay；若基于外部引用生成 route，必须显式切出可解释路径，不能让当前绑定关系静默重选路。 |
+| Route resolver 命中 | Grant 前 `DefaultRouteReplayService` 只在 replay event 且 reference type 为 `ORIGINAL_TRANSACTION`、`AUTHORIZATION`、`REFUND`、`FEE` 或 `FREEZE_ORDER` 时命中；`EXTERNAL_TRANSACTION` 明确不是 route snapshot reference，且 `AuthorizationFundsInstructionRouteResolver#supports` 当时只支持 `AUTHORIZE` 和 FORCE `SETTLE`。`967586c` 后，no-auth `AUTH_REFUND` 可在内部 `REFUND_MODE` 缺失时由 `EXTERNAL_TRANSACTION` reference 进入专用 resolver。 | NO_AUTH 退款不能伪装成内部授权 replay；基于外部引用生成 route 时必须显式切出可解释路径，不能让当前绑定关系静默重选路；普通授权链 `AUTH_REFUND` 仍保持原 route replay 口径，不进入 no-auth resolver。 |
 | Route replay 红线 | `DefaultRouteReplayService` 缺 reference 或缺 route snapshot 时明确失败，并有边界测试证明不得依赖当前支付工具、资金来源关系或 resolver 重算路径。 | Green 不能为通过 Red 而放宽 replay reference 要求；若 NO_AUTH 使用新路径，应保持原 replay 红线不退化。 |
 | 授权退款 route 形态 | 现有 `resolveSettleRefund` 可生成 SETTLEMENT -> AVAILABLE 的退款 leg，但该方法不是当前普通 `AUTH_REFUND` 的主要命中入口，且依赖账户上下文和平台 SETTLEMENT 账户。 | 若复用该 route 形态，必须由 NO_AUTH 明确校验外部引用、原因和账户主体，不得借内部 `AUTHORIZATION_TRANSACTION_SN` 进入。 |
 | 生命周期聚合 | `DefaultFundsInstructionLifecycleSaver#findReferenceTransaction` 会在 reference type 为 `AUTHORIZATION`、`ORIGINAL_TRANSACTION`、`REFUND` 或 `FEE` 时复用引用交易；`EXTERNAL_TRANSACTION` 不复用。 | NO_AUTH 若使用外部引用，应避免复用内部授权交易聚合；交易聚合、明细和请求摘要必须能区分普通授权链退款与 no-auth refund。 |
@@ -273,7 +273,7 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 | 账务事实 | ledger transaction、posting plan、ledger entry 与 route snapshot 对齐，phase 为退款语义，entry 覆盖 `SETTLEMENT` 和 `AVAILABLE`。 | `ledgerTransactionByBusinessSn(...)`、`postingPlansOf(...)`、`entriesOf(...)`、`assertLedgerFactsFollowRouteSnapshot(...)`。 |
 | 审计与摘要 | `externalReferenceSn`、原因和 `NO_AUTH` 内部归类标签进入交易上下文、ledger context 或等价不可变摘要；同 `businessSn` 不同外部引用必须失败且无新增账务事实。 | 现有幂等冲突样例、`assertLedgerTransactionFactsUnchanged(...)`、`assertNoFundsOrLedgerFactsForBusinessSn(...)`。 |
 | 普通退款回归 | 现有授权链 full refund、dispute refund、chargeback 和幂等退款回归不退化。 | `testFundingAuthorizationFullSettleThenFullRefundShouldRestoreAvailableBalance`、`testAuthorizationDisputeRefundShouldUseSettleRefundAndPreserveAuditContext`、现有 refund idempotent 场景。 |
-| 预期 Red 失败点 | 当前基线应失败在 request 契约、converter 内部授权 reference、原授权 ledger transaction 查询或 route resolver 不支持 no-auth 路径之一。 | 若 Red 不失败，立即暂停判断已有实现覆盖或 Red 写错，不进入 Green。 |
+| 预期 Red 失败点 | Grant 前基线应失败在 request 契约、converter 内部授权 reference、原授权 ledger transaction 查询或缺少 no-auth 专用 route 路径之一；当前基线已由 `006bcaa`、`818da34` 和 `967586c` 转为回归。 | 若后续新 Grant 的 Red 不失败，立即暂停判断已有实现覆盖或 Red 写错，不进入 Green。 |
 
 ### 8.7 grantPreflightSaturation（2026-06-03）
 
@@ -296,11 +296,11 @@ B4-NO-AUTH-REFUND 已在用户确认 Execution Grant 后进入 Red -> Green -> R
 | --- | --- |
 | 执行基线 | 用户确认时 Git HEAD 为 `b69dbe5 docs: 标记 B4 无授权退款 Grant 前准备饱和`。 |
 | 闭环提交 | `006bcaa feat: 补齐无授权退款 canonical 能力`。 |
-| 契约收口提交 | `818da34 fix(transaction): 移除授权退款请求模式字段`，确认 `FundsAuthorizationTransactionRefundRequest` 不再暴露 `refundMode`，`NO_AUTH` 只作为资金指令内部上下文标签。 |
+| 契约与路由收口提交 | `818da34 fix(transaction): 移除授权退款请求模式字段` 确认 `FundsAuthorizationTransactionRefundRequest` 不再暴露 `refundMode`，`NO_AUTH` 只作为资金指令内部上下文标签；`967586c fix: 按外部引用推断无授权退款路由` 确认内部 `REFUND_MODE` 缺失时可由 `EXTERNAL_TRANSACTION` reference 推断 no-auth refund 路由，显式 `DISPUTE` 或其他退款归类不被覆盖。 |
 | 写入范围 | `transaction-face` 的退款请求兼容字段和指令上下文 key，`transaction-impl` 的 converter、authorization route resolver、lifecycle saver 和 route code，`tests` 的授权交易 flow 和 no-auth refund helper。 |
 | 未触碰范围 | 未修改 DDL/H2 schema、ledger 公共契约、core 枚举状态、wallet facade、支付工具 facade、VCC、Spend Rule、force settle、chargeback 独立入口、生产配置、外部协议或敏感数据处理。 |
-| 核心语义 | 普通授权链退款继续要求 `authorizationTransactionSn`；无授权退款以 `authorizationTransactionSn` 为空作为分支判定，使用 `externalReferenceSn`、退款原因和操作者/审计形成独立退款事实，`NO_AUTH` 只作为内部归类标签，不构造 `AUTHORIZATION` reference，不查询内部原授权账本交易。 |
-| 目标验证 | `006bcaa` 闭环时 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 24 tests；`818da34` 契约收口后同命令通过 25 tests，并通过 `just compile`、`just pmd`、`git diff --check`、`git diff --cached --check`；`just test-transaction` 通过 92 tests、`just test-boundary` 通过 126 tests。 |
+| 核心语义 | 普通授权链退款继续要求 `authorizationTransactionSn`；无授权退款以 `authorizationTransactionSn` 为空作为分支判定，使用 `externalReferenceSn`、退款原因和操作者/审计形成独立退款事实，请求侧不暴露 `refundMode`，`NO_AUTH` 只作为内部归类标签，不构造 `AUTHORIZATION` reference，不查询内部原授权账本交易；当内部 `REFUND_MODE` 缺失但存在 `EXTERNAL_TRANSACTION` reference 时，route resolver 可推断 no-auth refund 路由。 |
+| 目标验证 | `006bcaa` 闭环时 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 24 tests；`818da34` 契约收口后同命令通过 25 tests，并通过 `just compile`、`just pmd`、`git diff --check`、`git diff --cached --check`；`just test-transaction` 通过 92 tests、`just test-boundary` 通过 126 tests。`967586c` 路由回退加固后，`just verify-slice AuthorizationFundsInstructionRouteResolverTests tests`、`just test-boundary`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just pmd` 和 `git diff --check` 通过。 |
 | 追加回归 | 2026-06-03 追加执行 `just test-business-flow` 通过 106 tests，覆盖业务流程回归。 |
 | 后续 Not Done | no-auth refund 的运营审批、人工差错单、累计退款跨请求聚合控制、查询投影解释和外部规则核验不是 `006bcaa` 的 Done 范围；需要时另起 Execution Grant。 |
 
