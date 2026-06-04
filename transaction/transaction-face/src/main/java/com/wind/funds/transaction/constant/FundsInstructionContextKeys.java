@@ -49,6 +49,9 @@ public final class FundsInstructionContextKeys {
 
     public static final String FORCE_SETTLE_VOUCHER_REF = "forceSettleVoucherRef";
 
+    /**
+     * 退款内部归类标签，仅用于资金指令、路由和资金事实上下文，不作为请求字段暴露。
+     */
     public static final String REFUND_MODE = "refundMode";
 
     public static final String REFUND_MODE_NO_AUTH = "NO_AUTH";

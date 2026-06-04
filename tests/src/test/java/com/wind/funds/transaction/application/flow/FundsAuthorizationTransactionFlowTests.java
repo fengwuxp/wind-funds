@@ -1,5 +1,7 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
@@ -7,6 +9,7 @@ import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
@@ -1186,16 +1189,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .allSatisfy(detail -> {
                     assertThat(detail.getReferenceDetailSn()).isNull();
                     assertThat(detail.getReferenceLedgerTransactionSn()).isNull();
-                    assertThat(detail.getContextVariables())
-                            .contains("\"refundMode\":\"NO_AUTH\"")
-                            .contains("\"externalReferenceSn\":\"processor_capture_202606030001\"")
-                            .contains("\"refundReason\":\"external capture refunded without internal authorization\"")
-                            .doesNotContain("externalOriginalFactRef")
-                            .doesNotContain("externalOriginalFactType")
-                            .doesNotContain("refundVoucherRef")
-                            .doesNotContain("originalFactAmount")
-                            .doesNotContain("originalFactCurrency")
-                            .doesNotContain("authorizationTransactionSn");
+                    assertNoAuthRefundContext(detail.getContextVariables());
                 });
         assertThat(fundsTransactionsByBusinessSn("AUTH_NO_AUTH_REFUND_RETURN"))
                 .singleElement()
@@ -1235,16 +1229,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertThat(fundsTransaction(refundSn).getReferenceTransactionSn()).isNull();
         assertThat(fundsTransactionDetailsByBusinessSn("AUTH_NO_AUTH_REFUND_INFER_RETURN"))
-                .allSatisfy(detail -> assertThat(detail.getContextVariables())
-                        .contains("\"refundMode\":\"NO_AUTH\"")
-                        .contains("\"externalReferenceSn\":\"processor_capture_202606030001\"")
-                        .contains("\"refundReason\":\"external capture refunded without internal authorization\"")
-                        .doesNotContain("externalOriginalFactRef")
-                        .doesNotContain("externalOriginalFactType")
-                        .doesNotContain("refundVoucherRef")
-                        .doesNotContain("originalFactAmount")
-                        .doesNotContain("originalFactCurrency")
-                        .doesNotContain("authorizationTransactionSn"));
+                .allSatisfy(detail -> assertNoAuthRefundContext(detail.getContextVariables()));
         assertThat(fundsTransactionsByBusinessSn("AUTH_NO_AUTH_REFUND_INFER_RETURN"))
                 .singleElement()
                 .satisfies(refund -> assertThat(refund.getRouteSnapshot())
@@ -1411,14 +1396,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThat(disputeRefundTransaction.getBusinessScene()).isEqualTo("AUTHORIZATION_DISPUTE_REFUND");
         assertThat(disputeRefundTransaction.getEventType()).isEqualTo(FundsTransactionEventType.AUTH_REFUND.name());
         assertThat(disputeRefundTransaction.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
-        assertThat(disputeRefundTransaction.getContextVariables())
-                .contains("\"refundMode\":\"DISPUTE\"")
-                .contains("\"disputeMode\":\"CHARGEBACK\"")
-                .contains("\"disputeReason\":\"CARDHOLDER_DISPUTE\"")
-                .contains("\"disputeVoucherRef\":\"DISPUTE_EVIDENCE_202605290001\"")
-                .contains("\"externalDisputeRef\":\"DISPUTE_CASE_202605290001\"")
-                .contains("\"caseOwner\":\"ops-team-a\"")
-                .doesNotContain("declineReason");
+        assertDisputeRefundContext(disputeRefundTransaction.getContextVariables());
+        assertThat(contextVariablesOf(disputeRefundTransaction.getContextVariables()))
+                .containsEntry("caseOwner", "ops-team-a")
+                .doesNotContainKey(FundsInstructionContextKeys.DECLINE_REASON);
         assertThat(entriesOf(disputeRefundTransaction).stream()
                 .map(LedgerEntry::getLedgerSubjectCode)
                 .toList())
@@ -1428,21 +1409,17 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .toList())
                 .containsOnly(LedgerPhaseCode.REFUND.name());
         assertThat(postingPlansOf(disputeRefundTransaction))
-                .allSatisfy(plan -> assertThat(plan.getContextVariables())
-                        .contains("\"refundMode\":\"DISPUTE\"")
-                        .contains("\"disputeMode\":\"CHARGEBACK\"")
-                        .contains("\"disputeReason\":\"CARDHOLDER_DISPUTE\"")
-                        .contains("\"disputeVoucherRef\":\"DISPUTE_EVIDENCE_202605290001\"")
-                        .contains("\"externalDisputeRef\":\"DISPUTE_CASE_202605290001\"")
-                        .contains("\"caseOwner\":\"ops-team-a\""));
+                .allSatisfy(plan -> {
+                    assertDisputeRefundContext(plan.getContextVariables());
+                    assertThat(contextVariablesOf(plan.getContextVariables()))
+                            .containsEntry("caseOwner", "ops-team-a");
+                });
         assertThat(entriesOf(disputeRefundTransaction))
-                .allSatisfy(entry -> assertThat(entry.getContextVariables())
-                        .contains("\"refundMode\":\"DISPUTE\"")
-                        .contains("\"disputeMode\":\"CHARGEBACK\"")
-                        .contains("\"disputeReason\":\"CARDHOLDER_DISPUTE\"")
-                        .contains("\"disputeVoucherRef\":\"DISPUTE_EVIDENCE_202605290001\"")
-                        .contains("\"externalDisputeRef\":\"DISPUTE_CASE_202605290001\"")
-                        .contains("\"caseOwner\":\"ops-team-a\""));
+                .allSatisfy(entry -> {
+                    assertDisputeRefundContext(entry.getContextVariables());
+                    assertThat(contextVariablesOf(entry.getContextVariables()))
+                            .containsEntry("caseOwner", "ops-team-a");
+                });
 
         assertThat(fundsTransactionDetailsByBusinessSn("AUTH_DISPUTE_REFUND_RETURN"))
                 .allSatisfy(detail -> {
@@ -1453,14 +1430,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                     assertThat(detail.getStatus()).isEqualTo(FundsTransactionDetailStatus.SUCCEEDED);
                     assertThat(detail.getReferenceDetailSn()).isEqualTo(authorizationSn);
                     assertThat(detail.getReferenceLedgerTransactionSn()).isEqualTo(authorizationTransaction.getSn());
-                    assertThat(detail.getContextVariables())
-                            .contains("\"refundMode\":\"DISPUTE\"")
-                            .contains("\"disputeMode\":\"CHARGEBACK\"")
-                            .contains("\"disputeReason\":\"CARDHOLDER_DISPUTE\"")
-                            .contains("\"disputeVoucherRef\":\"DISPUTE_EVIDENCE_202605290001\"")
-                            .contains("\"externalDisputeRef\":\"DISPUTE_CASE_202605290001\"")
-                            .contains("\"caseOwner\":\"ops-team-a\"")
-                            .doesNotContain("declineReason");
+                    assertDisputeRefundContext(detail.getContextVariables());
+                    assertThat(contextVariablesOf(detail.getContextVariables()))
+                            .containsEntry("caseOwner", "ops-team-a")
+                            .doesNotContainKey(FundsInstructionContextKeys.DECLINE_REASON);
                     assertThat(detail.getRequestHash()).isNotBlank();
                 });
         BalanceSnapshot beforeIdempotencyConflict = snapshot(balances(user, cashMappingAccount(),
@@ -2562,6 +2535,45 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     private static RaceOutcome awaitOutcome(Future<RaceOutcome> future)
             throws InterruptedException, ExecutionException, TimeoutException {
         return future.get(10, TimeUnit.SECONDS);
+    }
+
+    private static void assertNoAuthRefundContext(String contextVariables) {
+        JSONObject context = contextVariablesOf(contextVariables);
+
+        assertThat(context)
+                .containsEntry(FundsInstructionContextKeys.REFUND_MODE,
+                        FundsInstructionContextKeys.REFUND_MODE_NO_AUTH)
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN,
+                        "processor_capture_202606030001")
+                .containsEntry(FundsInstructionContextKeys.REFUND_REASON,
+                        "external capture refunded without internal authorization");
+        assertThat(context.keySet())
+                .doesNotContain(
+                        "externalOriginalFactRef",
+                        "externalOriginalFactType",
+                        "refundVoucherRef",
+                        "originalFactAmount",
+                        "originalFactCurrency",
+                        FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN);
+    }
+
+    private static void assertDisputeRefundContext(String contextVariables) {
+        assertThat(contextVariablesOf(contextVariables))
+                .containsEntry(FundsInstructionContextKeys.REFUND_MODE,
+                        FundsInstructionContextKeys.REFUND_MODE_DISPUTE)
+                .containsEntry(FundsInstructionContextKeys.DISPUTE_MODE, "CHARGEBACK")
+                .containsEntry(FundsInstructionContextKeys.DISPUTE_REASON, "CARDHOLDER_DISPUTE")
+                .containsEntry(FundsInstructionContextKeys.DISPUTE_VOUCHER_REF,
+                        "DISPUTE_EVIDENCE_202605290001")
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
+                        "DISPUTE_CASE_202605290001");
+    }
+
+    private static JSONObject contextVariablesOf(String contextVariables) {
+        if (contextVariables == null || contextVariables.isBlank()) {
+            return new JSONObject();
+        }
+        return JSON.parseObject(contextVariables);
     }
 
     @FunctionalInterface
