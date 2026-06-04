@@ -49,6 +49,7 @@
 - [x] 2026-06-03 完成 B4-AUTH-PI GSD-CAD Round 0 只读准入：本轮把下一候选收敛为 `B4-AUTH-INSTRUMENT-APPLICATION` / `B4-AUTH-PI` 授权支付工具应用入口；代码扫描确认 `FundsAuthorizationTransactionService#authorize` 和 `FundsAuthorizationTransactionAuthorizeRequest.accountId` 仍是账户主体型 canonical 内核，`wallet-face` 只有 `PaymentInstrumentService`、`SpendSubjectFundingRelationService` 等资源服务，未发现 `AuthorizationAdmissionApplicationService` 或 `authorizeByInstrument` 生产入口。当前状态为 `ROUND0_READY_NOT_CODE_AUTHORIZED`，后续若确认新的单一 Execution Grant，首批 Red 为 `R0-AUTH-001`；未确认前不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
 - [x] 2026-06-03 补齐 B4-AUTH-PI Grant 可执行包：`docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md#82-authinstrumentgrantcandidate2026-06-03` 已把下一轮候选收敛为 `B4-AUTH-PI-CAD-001` 原子任务包；该包明确首轮只写授权 application facade 目标 Red，Red 证明缺口后才允许 wallet-face application facade 契约、Request/DTO、wallet-impl 最小实现、委派适配和必要授权 flow 回归。当前状态为 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`；未确认 `Execution Grant：B4-AUTH-PI` 前仍不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
 - [x] 2026-06-04 回写 B4-AUTH-PI 恢复入口确认基线：`88d80c7 docs: 收敛授权后继索引基线` 已把已闭合 B4 授权后继能力和下一候选索引串入 TDD / OpenSpec 入口；本轮同步把 `B4-AUTH-PI-CAD-001` 的 authority baseline 上调为确认时 Git HEAD 且至少包含 `88d80c7` 及本次基线校准提交。当前状态仍为 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`；未确认 `Execution Grant：B4-AUTH-PI` 前不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
+- [x] 2026-06-04 完成 B4-AUTH-PI CAD 候选结构门禁复核：资深架构师 Harness checker 以 `cad-candidate` 模式检查 `docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md` 和本 Harness tasks，结果均为 `OK harness plan check: kind=cad-candidate`。该复核只证明任务包字段结构完整，不等于用户已确认 Execution Grant、编码授权、测试通过或生产审批。
 
 ## 1. MVP 任务写入范围
 

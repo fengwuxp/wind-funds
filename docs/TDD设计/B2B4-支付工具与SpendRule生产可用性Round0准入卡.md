@@ -177,6 +177,7 @@ Request/DTO 默认落 `com.wind.funds.wallet.model.request` 和 `com.wind.funds.
 | `taskId` | `B4-AUTH-PI-CAD-001`。 |
 | `stage` / `wave` | B4 授权交易 / Wave 2 支付工具授权 application facade 准入。 |
 | `status` | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| `cadCandidateStructureCheck` | 2026-06-04 已用资深架构师 Harness checker 以 `cad-candidate` 模式检查本卡和 Harness tasks，结果均为 `OK harness plan check: kind=cad-candidate`；该检查只证明候选包字段结构完整，不等于编码授权、测试通过或生产审批。 |
 | `owner` | 资深架构师负责工程执行；产品架构专家只负责支付工具、资金主体、Spend Rule 和拒绝原因的业务语义复核。 |
 | `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `88d80c7 docs: 收敛授权后继索引基线` 及本节后续基线校准提交，确保 `967586c` 无授权退款路由回退、`47c5269` 授权并发闭环和 `B4-AUTH-PI-CAD-001` 恢复入口均已纳入确认语境。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
 | `mvpScenario` | 业务方提交支付工具引用、使用主体、金额币种、业务流水、业务场景、预算或 Spend Rule 上下文；系统在 application facade 中完成支付工具能力、绑定快照、资金责任、Spend Rule 和账户能力准入。批准时构造账户主体型授权请求并委派 `FundsAuthorizationTransactionService#authorize`；拒绝时只留下拒绝事实、原因和审计，不生成资金事实。 |
