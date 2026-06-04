@@ -382,6 +382,65 @@ Git 策略：auto_commit
 交接：确认后从 B5-SR-CONTROL-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置
 ```
 
+### 8.9 B6/B8-PI-VIEW Round 0 扫描（2026-06-04）
+
+本节把 `B6/B8-PI-VIEW` 支付工具流水、预算控制视图、规则命中时间线和重放切片推进到可确认输入。它只做只读扫描和候选授权包收敛，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 扫描项 | 结论 |
+| --- | --- |
+| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 局部代码基线 | `FundsTransactionProjectionPublisher`、`FundsTransactionProjectionPublishContext` 和 `FundsTransactionProjectionExplanation` 已表达交易主写链路成功后的正常只读投影发布入口；`DefaultRoutedFundsInstructionOrchestratorProjectionTests` 覆盖付款、授权占用、授权拒绝和投影失败不回滚事实；`DefaultRouteReplayServiceTests` 覆盖原路径快照、支付工具快照、外部账户和资金责任快照回放；`FundsProjectionReplayServiceTests` 覆盖交易投影有界重放、影子/正式模式和差异报告边界。 |
+| 目标缺口 | 当前未形成支付工具维度流水 query DTO、预算控制视图、规则命中时间线、支付工具绑定版本查询投影、Spend Rule 控制投影或面向运营/财务的统一解释查询；治理重放已有局部边界，但不等于完整 B8 Manifest、余额快照、指标水位或大数据消费边界 Done。 |
+| 语义裁决 | B6/B8-PI-VIEW 只读解释必须消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影、重放结果、差异报告或查询 DTO 反写成 route、posting、LedgerEntry、余额投影或资金交易事实。 |
+| schemaDecision | 进入编码前必须在 `query-contract-only` 与 `projection-store-backed` 中二选一。`query-contract-only` 只允许新增查询契约、DTO 和目标 Red；`projection-store-backed` 必须显式授权 DDL/H2 schema、Entity、Mapper、索引、checkpoint、影子表或正式投影表。未选择前不写 B6/B8 Java、测试或表结构。 |
+| 首批 Red | `R0-PI-002A`：工具换绑、解绑、暂停或能力变化后，历史退款、撤销、退费或拒付按当前绑定、当前默认资金责任或当前工具能力重选路必须失败；解释视图必须使用原 route snapshot、原工具快照、原绑定版本和原资金责任决策。 |
+| 次批 Red | `R0-PI-002B`：交易投影或治理重放把支付工具流水、预算控制视图、规则命中时间线写回资金事实、账本事实、余额投影、正式治理 apply 或无界全量重放时必须失败。 |
+| Grant 必须列明 | 查询 facade 名称、schemaDecision、Query/DTO、视图域、投影来源字段、绑定版本字段、规则和控制活动字段、差异报告字段、checkpoint 策略、影子/正式模式、目标测试资产、DDL/H2 是否允许和验证命令。 |
+| 禁止混入 | 不新增资金事实、不重写 route replay 内核、不修改交易 canonical 请求、不迁移 BudgetGroup ledger 兼容路径、不打开 B8 Manifest/余额快照/指标水位完整治理、不混入清结算对账、完整 VCC、P2 轨道、外部协议或敏感原文。 |
+
+### 8.10 paymentInstrumentViewGrantCandidate（2026-06-04）
+
+本节把 8.9 的只读扫描推进为可确认的单一 Execution Grant 候选。它仍不授权写 Java、测试、DDL/H2 schema、公共契约或运行时配置；只有用户确认本节的 `Execution Grant：B6-B8-PI-VIEW` 并选择 schemaDecision 后，才允许进入首批 Red。
+
+| 授权包字段 | 候选内容 |
+| --- | --- |
+| `taskId` | `B6-B8-PI-VIEW-CAD-001`。 |
+| `stage` / `wave` | B6 Route Replay 与交易投影 / B8 治理重放边界 / Wave 1 支付工具解释视图准入。 |
+| `status` | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| `owner` | 资深架构师负责工程执行；产品架构专家负责使用者解释视图、支付工具流水口径、预算控制视图和 Not Done 语义复核。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `053a6a0 docs: 补齐规则控制候选包` 及本节提交点。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
+| `mvpScenario` | 运营、财务或业务方查询某个支付工具、共享卡、VCC、预算上下文或规则命中时间线时，系统只从交易事实、原 route snapshot、原工具快照、资金责任决策、Spend Rule 决策、控制活动和账本摘要构建解释视图。逆向交易或重放必须沿原快照解释，缺失快照时失败或进入人工处理，不按当前绑定关系重新选路。 |
+| `businessAdmission` | 产品锚点为支付工具流水、预算控制视图和可解释输出；DSL 锚点为原 route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity` 和 transaction projection；系分锚点为交易投影正常发布与治理重放边界；TDD 锚点为 `R0-PI-002`。 |
+| `schemaDecision` | 待确认，必须二选一：`query-contract-only` 或 `projection-store-backed`。默认不允许 DDL/H2 schema；若选择 `projection-store-backed`，Grant 必须列明表、字段、索引、唯一约束、Entity、Mapper、H2 fixture、checkpoint 和重放模式。 |
+| `firstRedSet` | `R0-PI-002A`：历史退款、撤销、退费或拒付按当前绑定、当前默认资金责任、当前工具能力或当前规则重新解释必须失败；必须使用原 route snapshot、原工具快照、原绑定版本、原资金责任决策和原控制证据。 |
+| `secondRedSet` | `R0-PI-002B`：投影解释、支付工具流水或治理重放写回 route、posting、LedgerEntry、余额投影、资金交易事实，或无界全量重放、正式 apply 越权时必须失败。 |
+| `writeScope` | 先写 `tests/src/test/java/com/wind/funds/transaction/projection/PaymentInstrumentProjectionViewTests.java` 或等价查询/投影目标 Red；Red 证明缺口后，`query-contract-only` 只允许新增非破坏性 Query/DTO/facade 契约和最小查询适配；`projection-store-backed` 还必须由 Grant 显式授权 DDL/H2、Entity、Mapper、投影表、checkpoint 和重放实现。 |
+| `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md`、既有 `transaction`、`governance`、`wallet`、`ledger`、`core`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| `publicContractGate` | 只允许非破坏性新增查询 facade、Query/DTO、返回 DTO 和只读解释载荷；不得修改交易 canonical 请求、route replay 公共契约、ledger 公共契约、governance checkpoint 枚举或现有投影发布端口语义，除非 Grant 显式列名。 |
+| `schemaGate` | 未确认 `projection-store-backed` 前，不修改 `tests/src/test/resources/jdbc-schema.sql`、生产 DDL、Entity 字段、Mapper 表字段、索引或唯一约束；确认后也只允许 B6/B8 支付工具解释视图和重放相关表，不得借机打开完整 B8 Manifest、余额快照或指标水位。 |
+| `dependencyGate` | 查询 facade 和 DTO 只能依赖 face/core 契约；`transaction` 不反向依赖 governance impl，`wallet` 不反向依赖 transaction impl，`ledger` 不依赖 wallet/transaction impl。违反依赖方向时立即停止。 |
+| `noWriteScope` | 不新增资金交易事实，不反写 route、posting、LedgerEntry 或余额投影，不实现完整治理 apply、B8 Manifest、账本余额快照、指标水位、大数据消费、清结算对账、完整 VCC、P2 轨道、外部协议或敏感原文。 |
+| `verificationCommand` | 首轮 `just test-one PaymentInstrumentProjectionViewTests tests`；若触碰既有回归，补 `just test-one DefaultRouteReplayServiceTests tests`、`just test-one DefaultRoutedFundsInstructionOrchestratorProjectionTests tests`、`just test-one FundsProjectionReplayServiceTests tests`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`。 |
+| `gitStrategy` | 若用户确认本 Grant、选择 schemaDecision 并保持 GSD-CAD 自动模式，目标验证通过且未触发停止条件时按 `auto_commit` 提交；验证失败、环境不可判定或越界时转 `summary_only`。 |
+| `stopCondition` | 未选择 schemaDecision、需要表结构但未获 `projection-store-backed` 授权、需要修改 route replay 公共契约、governance checkpoint 枚举、交易 canonical 请求、ledger 公共契约、完整 B8 治理、清结算对账、外部规则、敏感数据、依赖方向反转、公有方法超过 5 个参数或工作树冲突时停止。 |
+| `handoff` | 本候选包的恢复入口为 `B6-B8-PI-VIEW-CAD-001`。用户确认 `Execution Grant：B6-B8-PI-VIEW` 并选择 `query-contract-only` 或 `projection-store-backed` 后进入首批 Red；未确认时只保留为 Round 0 / summary_only。 |
+
+```text
+Execution Grant：B6-B8-PI-VIEW
+确认基线：确认时 Git HEAD；至少包含 053a6a0 docs: 补齐规则控制候选包及本节提交点；若确认前有未提交文档变更，必须先提交或列入 authorityBaseline
+任务包：B6-B8-PI-VIEW-CAD-001
+目标：新增支付工具流水、预算控制视图、规则命中时间线或等价只读解释视图的首轮查询/投影能力；逆向交易和重放必须沿原 route snapshot、原工具快照、原绑定版本、原资金责任决策和原控制证据解释；缺失快照失败或进入人工处理
+schemaDecision：必须选择 query-contract-only 或 projection-store-backed；未选择前不写 Java、测试、DDL/H2 schema 或运行时配置
+允许写入：先写 tests 中支付工具解释视图目标 Red；Red 证明缺口后按 schemaDecision 允许非破坏性 Query/DTO/facade 契约和最小查询适配；只有 projection-store-backed 才允许 DDL/H2 schema、Entity、Mapper、投影表、checkpoint 和重放实现
+允许公共契约：仅允许非破坏性新增查询 facade、Query/DTO、返回 DTO 和只读解释载荷；不得修改交易 canonical 请求、route replay 公共契约、ledger 公共契约、governance checkpoint 枚举或现有投影发布端口语义，除非 Grant 显式列名
+首批 Red：R0-PI-002A；必要时补 R0-PI-002B，覆盖换绑后逆向、解绑、暂停、能力变化、原快照缺失、无界重放、投影反写事实和正式 apply 越权
+验证命令：just test-one PaymentInstrumentProjectionViewTests tests；just test-one DefaultRouteReplayServiceTests tests；just test-one DefaultRoutedFundsInstructionOrchestratorProjectionTests tests；just test-one FundsProjectionReplayServiceTests tests；just test-boundary；just compile；提交前 just pmd 和 git diff --check
+禁止写入：资金交易事实、route/posting/LedgerEntry/余额投影反写、完整治理 apply、B8 Manifest、账本余额快照、指标水位、大数据消费、清结算对账、完整 VCC、P2 轨道、外部协议或敏感原文
+Git 策略：auto_commit
+停止条件：schemaDecision 未确认、表结构未授权、route replay 公共契约或 governance checkpoint 枚举越界、依赖方向反转、外部规则、敏感数据、B2/B4/B5/B7/P2 越界、验证无法解释失败或工作树冲突即停止
+交接：确认后从 B6-B8-PI-VIEW-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置
+```
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
@@ -399,6 +458,7 @@ Git 策略：auto_commit
 4. 发现目标态要求信用账户或平台角色责任主体，但现有字段只能表达 `fundingAccountId`，且未确认迁移策略。
 5. 工作树存在未分类变更，或本轮未提交文档基线未被纳入 `authorityBaseline`。
 6. B5-SR-CONTROL 需要 DDL/H2 schema、Entity、Mapper、索引或投影表，但 Execution Grant 未明确选择 `ddl-backed`。
+7. B6/B8-PI-VIEW 需要 DDL/H2 schema、Entity、Mapper、索引、checkpoint、影子表或正式投影表，但 Execution Grant 未明确选择 `projection-store-backed`。
 
 ## 11. confirmationTemplate
 
@@ -406,7 +466,7 @@ Git 策略：auto_commit
 Execution Grant：B2/B4 支付工具与 Spend Rule Round 0
 确认基线：确认时 Git HEAD；若本轮文档尚未提交，需显式纳入 authorityBaseline
 选择切片：B2-PI-CAP / B2-FR / B4-AUTH-PI / B5-SR-CONTROL / B6-B8-PI-VIEW 之一
-允许写入：仅限所选切片的测试资产和最小 application facade / DTO / 适配实现；DDL/H2 默认不允许；若选择 B5-SR-CONTROL，必须同步选择 contract-only 或 ddl-backed
+允许写入：仅限所选切片的测试资产和最小 application facade / DTO / 适配实现；DDL/H2 默认不允许；若选择 B5-SR-CONTROL，必须同步选择 contract-only 或 ddl-backed；若选择 B6-B8-PI-VIEW，必须同步选择 query-contract-only 或 projection-store-backed
 禁止写入：交易 canonical 请求替换、统一 InstrumentTransactionService、预算组账务主体、资金责任字段策略混用、清结算对账、治理 apply、P2 轨道协议、敏感原文
 首批 Red：按所选切片选择 R0-PI-001、R0-FR-001、R0-AUTH-001、R0-SR-001、R0-SR-002 或 R0-PI-002
 验证命令：just test-one PaymentInstrumentServiceImplTests tests；just test-one SpendSubjectFundingRelationServiceImplTests tests；just test-one PaymentInstrumentRouteDslContractTests tests；必要时 just test-transaction / just test-boundary；提交前 git diff --check 和 just pmd
