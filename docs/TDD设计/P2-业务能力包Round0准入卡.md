@@ -110,7 +110,7 @@ FX 决策：默认 same-currency-only；跨币种需 fx-quote-backed 且不执�
 
 | 规则来源 | 版本或发布日期 | 适用法域或适用范围 | 核验日期 | 确认方 | 确认状态 |
 | --- | --- | --- | --- | --- | --- |
-| 银行协议、本地清算网络规则、SWIFT/代理行规则、外汇和跨境监管规则、数据跨境规则 | 待确认 | 全球账户入金、目标国家/地区、币种、客户类型、外部账户和银行流水匹配 | 2026-06-04，仅完成本地候选包字段完整性核验 | 待法务、合规、财务、银行、通道、持牌机构和数据安全负责人确认 | 未完成外部规则时效核验，不作为上线依据。 |
+| 银行协议、本地清算网络规则、SWIFT/代理行规则、外汇和跨境监管规则、数据跨境规则 | 待确认 | 全球账户入金、出款、退汇、目标国家/地区、币种、客户类型、外部账户和银行流水/回单匹配 | 2026-06-04，仅完成本地候选包字段完整性核验 | 待法务、合规、财务、银行、通道、持牌机构和数据安全负责人确认 | 未完成外部规则时效核验，不作为上线依据。 |
 
 ## 7. Round 0 验证计划
 
@@ -150,3 +150,88 @@ Git 策略：auto_commit
 ```
 
 也可以选择 `P2-GA-OUTBOUND`、`P2-GA-FX-FEE`、`P2-ACQ-CAPTURE` 或 `P2-ACQ-DISPUTE`，但这些切片需要先补各自 Round 0 扫描和 Grant 候选包。
+
+## 10. P2-GA-OUTBOUND Round 0 扫描（2026-06-04）
+
+状态：ROUND0_READY_NOT_CODE_AUTHORIZED。
+
+产品基线：全球账户出款从 `REQUESTED` 进入前置检查，只有权限、余额、合规资料、收款端点、外部规则、风险和审批门禁完整后，才允许进入 `PRECHECKED`。外部提交后的 `SUBMITTED`、`PROCESSING`、accepted、message sent 或处理中只表达外部已受理或在途，不等于付款成功；只有成功回单、到账证明或对账来源确认后才能进入 `PAID`。退汇必须作为外部 return 事实处理，关联原出金、费用、责任方和幂等，不得静默走普通 refund。
+
+代码基线：当前仓库已有 `PayoutOrderService#checkPayoutPreflight`、`CheckPayoutPreflightRequest`、`PayoutPreflightResultDTO` 和 `PayoutPreflightServiceTests` 候选基线，已能证明出款前置检查结构化阻断、外部规则字段完整性、解释状态和只读无账务事实。该基线只覆盖 preflight，不证明全球账户出款 facade、外部提交、`AVAILABLE -> IN_TRANSIT`、成功回单、退汇、金额不一致、数据库闭环或使用者解释状态已经生产可用。
+
+目标差距：当前未形成 `GlobalAccountOutboundApplicationService`、全球账户出款 Request/DTO、出款幂等摘要、外部提交受理契约、成功回单终态契约、退汇处理契约、出款在途解释视图、退汇费用和责任处理 Red，也未形成出款生命周期表结构或 H2 服务级闭环。
+
+语义决策：出款请求必须先由全球账户产品或出款适配层完成业务归一、收款端点脱敏、用途和合规资料校验。资金服务只接收内部责任主体、出款金额币种、脱敏外部收款引用、preflight 结果、外部规则核验状态、幂等键、操作者、外部提交引用和回单/退汇引用。preflight 缺失、失败或未知时，不得提交外部出款，不得生成 `FUND_OUT`、`IN_TRANSIT`、route、posting 或 LedgerEntry。外部非终态不得展示为到账成功，不得关闭 `SETTLEMENT/IN_TRANSIT`。退汇必须链接原出款事实，不能和普通退款混同。
+
+实现决策需要在授权时二选一：
+
+| 决策 | 说明 |
+| --- | --- |
+| preflight-contract-only | 只允许新增出款 facade Request/DTO 目标 Red、preflight 结果消费、拒绝路径、解释状态和脱敏审计候选；不提交外部出款，不写资金事实，不改 DDL/H2 schema。 |
+| canonical-transit-backed | 允许在明确列出的资金事实入口中表达出款在途、成功回单和退汇回补或差错；必须同步余额桶、route、posting、entry、projection、幂等、审计、解释状态和失败无副作用断言。 |
+
+出款前置检查决策默认 `reuse-reconciliation-preflight-candidate`。若要修改 `PayoutOrderService`、`CheckPayoutPreflightRequest`、`PayoutPreflightResultDTO` 或新增出款单公共契约，必须在 Execution Grant 中显式列入公共契约范围和回归测试。
+
+在途账务决策默认 `no-ledger-in-transit`，即 contract-only 阶段只保留出款单待确认或解释状态。若选择 `ledger-in-transit-backed`，必须证明 `AVAILABLE -> IN_TRANSIT`、成功关闭、失败或退汇只回退一次、重复回单幂等和使用者解释状态不误导。
+
+退汇决策默认 `return-as-difference-only`。若选择 `return-funds-backed`，必须证明退汇关联原出款、费用和责任方可解释、不是普通 refund、重复退汇不重复回补、失败不产生半截事实。
+
+FX 决策默认 `same-currency-only`。跨币种出款只允许在 `fx-quote-backed` 决策下引用外部 quote/approval snapshot；资金服务只存引用和资金影响，不执行 FX。
+
+首批 Red：
+
+| Red ID | 目标 must-fail |
+| --- | --- |
+| R0-GA-OUT-001A | preflight 缺失、失败或未知时，系统仍提交外部出款、生成 `FUND_OUT`、`IN_TRANSIT`、route、posting、LedgerEntry 或成功状态。 |
+| R0-GA-OUT-001B | 外部状态为 submitted、accepted、message sent、processing 或 pending 时，系统仍展示为 `PAID`、关闭 `SETTLEMENT/IN_TRANSIT`、释放为到账成功或允许用户/财务确认完成。 |
+| R0-GA-OUT-001C | 银行退汇被当作普通 refund，缺原出款引用、费用、责任方、幂等摘要或重复退汇防护时仍回补或关闭差错。 |
+
+Execution Grant 必须列明全球账户出款业务章节、`GA-AC-003` 至 `GA-AC-005`、DSL/TDD 不变量、实现决策、preflight 公共契约是否允许变更、在途账务决策、退汇决策、FX 决策、外部规则核验状态、目标测试资产、P0/P1 清结算与交易回归范围和 DDL/H2 schema 是否允许修改。
+
+不得混入全球账户入金匹配、开户、VA 分配、银行核心、SWIFT、本地清算网络、ACH/Nacha、FX 执行、完整清结算、完整对账、运营后台、敏感原文、生产配置或合规结论。
+
+## 11. P2-GA-OUTBOUND Grant 候选（2026-06-04）
+
+| 字段 | 内容 |
+| --- | --- |
+| Task ID | P2-GA-OUTBOUND-CAD-001 |
+| 阶段切片 | P2 全球账户 / Wave 2 出款在途、成功回单和退汇边界 |
+| 状态 | READY_TO_CONFIRM_NOT_CODE_AUTHORIZED |
+| Owner | 产品架构专家负责全球账户出款、退汇、外部状态、跨境、FX、外部规则和 Not Done 语义；资深架构师负责工程边界、TDD、Review、Refactor、验证命令和代码落地。 |
+| authorityBaseline | 用户确认时 Git HEAD，且至少包含 `62aae0b docs: 补齐全球账户入金候选包` 与本次 P2-GA-OUTBOUND 候选包提交。 |
+| MVP 场景 | 客户或业务系统提交全球账户出款，携带内部责任主体、收款端点引用、金额币种、用途、合规资料状态、外部规则状态、preflight 结果、幂等键和操作者。系统证明 preflight 缺失/失败/未知不得提交或写资金事实；外部非终态只进入在途或待确认；成功回单才 `PAID`；退汇必须关联原出金、费用、责任和幂等。 |
+| 业务验收映射 | 产品 `GA-AC-003`、`GA-AC-004`、`GA-AC-005`；DSL 外部提交不等于 success、退汇不等于 refund、外部账户不做 ledger subject、错币种无 quote 阻断；系分 P2 能力包、出款前准入、外部引用、在途、退汇和差错；TDD `TDD-P2-GA-002`、`TDD-RAIL-008`、`TDD-RAIL-009`、`TDD-SETTLE-004`、`TDD-SETTLE-005`、`TDD-FX-001`、`TDD-FX-002`。 |
+| implementationDecision | 必须二选一：`preflight-contract-only` 或 `canonical-transit-backed`。默认建议从 `preflight-contract-only` 开始。 |
+| preflightDecision | 默认 `reuse-reconciliation-preflight-candidate`；改动 `PayoutOrderService`、preflight Request/DTO 或出款单公共契约必须显式授权。 |
+| transitDecision | 默认 `no-ledger-in-transit`；选择 `ledger-in-transit-backed` 必须同步余额桶、账务、投影、幂等和解释状态断言。 |
+| returnDecision | 默认 `return-as-difference-only`；选择 `return-funds-backed` 必须证明退汇不是普通 refund，且关联原出款、费用、责任和幂等。 |
+| fxDecision | 默认 `same-currency-only`；跨币种必须显式选择 `fx-quote-backed`，且只引用外部 quote/approval，不做 FX 执行。 |
+| 首批 Red | `R0-GA-OUT-001A`：preflight 缺失、失败或未知不得提交外部出款或生成资金事实。 |
+| 次批 Red | `R0-GA-OUT-001B`：外部非终态不得展示为 `PAID` 或关闭 `SETTLEMENT/IN_TRANSIT`；`R0-GA-OUT-001C`：退汇不得当普通 refund。 |
+| 写入范围 | 首轮只允许 `tests/src/test/java/com/wind/funds/wallet/application/globalaccount/GlobalAccountOutboundApplicationServiceTests.java` 或等价 P2-GA 出款 Red。Red 成立后，`preflight-contract-only` 只允许 wallet facade Request/DTO、返回 DTO、preflight 结果消费、拒绝路径和解释状态候选；`canonical-transit-backed` 才允许显式授权的出款在途、成功回单、退汇和 P0/P1 回归。 |
+| 写入文件 | 未确认 Execution Grant 前，本候选包只允许写文档和索引；确认后写入文件必须按 Grant 中列出的测试、facade、Request/DTO、实现、preflight 契约或 schema 范围执行。 |
+| 只读范围 | `docs/产品设计/07-全球账户收付款资金底座PRD.md`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec` spec/tasks、`wallet`、`transaction`、`ledger`、`reconciliation`、`core`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| 只读参考 | 全球账户 PRD、DSL、系分、TDD、OpenSpec、现有 `PayoutOrderService` / `PayoutPreflightServiceTests`、wallet/transaction/ledger/reconciliation/core 代码和 H2 schema 只作为参考，不等于编码授权。 |
+| 公共契约门禁 | 只允许非破坏性的 P2-GA 出款 facade、Request/DTO、返回 DTO、preflight 消费和脱敏审计 payload。不得修改 transaction canonical request、ledger 公共契约、reconciliation payout preflight 契约、core FX port 或 route replay 公共契约，除非 Grant 显式列出。 |
+| Schema 门禁 | 未显式授权前不得修改 `jdbc-schema.sql`、DDL、Entity、Mapper 或迁移脚本。若需要出款单、回单、退汇、差错、幂等、在途投影或解释视图表，必须先确认 DDL/H2 范围。 |
+| 禁止事项 | 不写外部协议栈、银行核心、SWIFT/本地清算网络、ACH/Nacha、FX 执行、入金匹配、全球账户开户、完整清结算、完整对账、运营后台、敏感原文、生产配置或合规结论。 |
+| 外部规则门禁 | 只记录外部规则核验完整性状态，必须保留规则来源、版本或发布日期、适用法域或范围、核验日期、确认方和确认状态；未完成法务、合规、财务、银行、通道、持牌机构和数据安全确认前，不得声明生产 Done。 |
+| 验证命令 | 首轮 `just test-one GlobalAccountOutboundApplicationServiceTests tests`；触碰 preflight 候选时追加 `just test-one PayoutPreflightServiceTests tests`；contract-only 触碰 wallet facade 时追加 `just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；canonical-transit-backed 追加清结算、账本、交易模块和业务 flow 回归。 |
+| Git 策略 | auto_commit，前提是验证通过、只包含本候选包授权范围且工具权限允许。 |
+| 停止条件 | 缺 implementationDecision、preflightDecision、transitDecision、returnDecision、FX 决策或外部规则状态；需要 DDL/H2 但未授权；需要修改 transaction/ledger/reconciliation/core 公共契约；需要外部协议、FX 执行、完整清结算、完整对账或出款生产通道；出现敏感原文、依赖反转、公有方法超过 5 个参数或工作树冲突。 |
+| 交接 | 回写 Harness tasks、OpenSpec project/spec、TDD 索引、验证矩阵和残余风险；说明是否仍为 READY_TO_CONFIRM_NOT_CODE_AUTHORIZED。 |
+
+```text
+Execution Grant：P2-GA-OUTBOUND
+
+Task ID：P2-GA-OUTBOUND-CAD-001
+Git 策略：auto_commit
+实现决策：preflight-contract-only 或 canonical-transit-backed（二选一）
+preflight 决策：默认 reuse-reconciliation-preflight-candidate；改公共契约需显式授权
+在途决策：默认 no-ledger-in-transit；账本在途需 ledger-in-transit-backed
+退汇决策：默认 return-as-difference-only；资金回补需 return-funds-backed
+FX 决策：默认 same-currency-only；跨币种需 fx-quote-backed 且不执行 FX
+首批 Red：R0-GA-OUT-001A
+次批 Red：R0-GA-OUT-001B / R0-GA-OUT-001C
+撤销方式：用户说“暂停/停止/撤销 P2-GA-OUTBOUND”即停止自动推进
+```
