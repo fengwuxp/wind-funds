@@ -211,6 +211,60 @@ Git 策略：auto_commit
 交接：确认后从 B4-AUTH-PI-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置
 ```
 
+### 8.3 B2-PI-CAP Round 0 扫描（2026-06-04）
+
+本节把优先级最高的 `B2-PI-CAP` 支付工具能力准入切片推进到可确认输入。它只做只读扫描和候选授权包收敛，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 扫描项 | 结论 |
+| --- | --- |
+| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 资源服务基线 | `PaymentInstrumentService` 和 `PaymentInstrumentServiceImpl` 已覆盖支付工具创建、绑定、绑定历史、状态、方向、币种、生效窗口、敏感字段阻断和无账务副作用；目标测试资产为 `PaymentInstrumentServiceImplTests` 和 `PaymentInstrumentRouteDslContractTests`。 |
+| 目标缺口 | 当前未发现 `PaymentInstrumentCapabilityApplicationService` 或等价 application facade；`PaymentInstrumentDirection` 只有 `RECEIVE`、`PAYMENT`、`BOTH`，尚未固化 RECEIVE、PAY、AUTHORIZE、REFUND、WITHDRAW 五类工具动作能力，也没有统一输出不可变工具准入快照。 |
+| 首批 Red | `R0-PI-001`：工具非 ACTIVE、方向不匹配、缺 RECEIVE/PAY/AUTHORIZE/REFUND/WITHDRAW 动作能力、过期、错币种、敏感原文或绑定版本失效时必须可解释失败，且不生成 route、posting、LedgerEntry 或余额投影。 |
+| Grant 必须列明 | application facade 名称、动作能力承载枚举或等价字段、Request/DTO、准入快照字段、错误码、绑定版本读取、敏感字段白名单、目标测试资产和验证命令。 |
+| 禁止混入 | 不进入授权准入组合、资金责任目标主体迁移、Spend Rule 表、预算控制投影、交易投影、清结算对账、治理 apply、完整 VCC 或 P2 轨道协议。 |
+
+### 8.4 paymentInstrumentCapabilityGrantCandidate（2026-06-04）
+
+本节把 8.3 的只读扫描推进为可确认的单一 Execution Grant 候选。它仍不授权写 Java、测试、DDL/H2 schema、公共契约或运行时配置；只有用户确认本节的 `Execution Grant：B2-PI-CAP` 后，才允许进入首批 Red。
+
+| 授权包字段 | 候选内容 |
+| --- | --- |
+| `taskId` | `B2-PI-CAP-CAD-001`。 |
+| `stage` / `wave` | B2 钱包基础能力 / Wave 1 支付工具能力 application facade 准入。 |
+| `status` | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| `owner` | 资深架构师负责工程执行；产品架构专家负责工具动作、准入快照、敏感字段和 Not Done 语义复核。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `73ea257 docs: 回写授权工具确认基线` 及本节提交点。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
+| `mvpScenario` | 业务入口提交支付工具引用、动作类型、金额币种、使用主体和业务流水；系统在 application facade 中一次性校验工具状态、方向、动作能力、币种、生效窗口、绑定版本和敏感字段。通过时输出不可变工具准入快照；失败时返回可解释原因，不生成任何资金事实。 |
+| `businessAdmission` | 产品锚点为 `AC-PI-003`、`AC-PI-006`；DSL 锚点为 `DSL-PAYMENT-INSTRUMENT-CAPABILITY-001`、`DSL-PAYMENT-INSTRUMENT-FAIL-001`；系分锚点为 `PaymentInstrumentCapabilityApplicationService`；TDD 锚点为 `TDD-WALLET-018`、`TDD-ROUTE-012` 和 `R0-PI-001`。 |
+| `firstRedSet` | `R0-PI-001`：工具非 ACTIVE、方向不匹配、动作能力缺失、过期、错币种、敏感原文或绑定版本失效时仍被放行必须失败；失败不得生成 route、posting、LedgerEntry、余额投影或完整敏感凭证。 |
+| `secondRedSet` | 工具能力通过但账户能力、资金责任或 Spend Rule 失败时不得被工具能力覆盖；该矩阵只作为下一切片输入，除非本 Grant 明确扩展，否则不进入实现。 |
+| `writeScope` | 先写 `tests/src/test/java/com/wind/funds/wallet/application/instrument/PaymentInstrumentCapabilityApplicationServiceTests.java` 或等价 application facade 目标 Red；Red 证明缺口后，仅允许在 `wallet/wallet-face` 新增 application facade 契约、Request/DTO，在 `wallet/wallet-impl` 新增最小 facade 实现和委派适配，并按需补 `PaymentInstrumentServiceImplTests` 回归。 |
+| `readOnlyScope` | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md`、既有 `wallet`、`core`、`transaction`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| `publicContractGate` | 只允许非破坏性新增 wallet application facade、Request/DTO、返回 DTO 和必要动作能力枚举或等价字段；不得修改交易 canonical 请求、授权状态机、core 交易枚举、ledger 公共契约或现有资源服务语义。 |
+| `dependencyGate` | `wallet/wallet-face` 不依赖任何 impl；`wallet/wallet-impl` 可依赖 `wallet/wallet-face`、core 和既有资源服务；`transaction` 不反向依赖 wallet impl。违反依赖方向时立即停止。 |
+| `schemaGate` | 默认不修改 `tests/src/test/resources/jdbc-schema.sql`、生产 DDL、Entity 字段、Mapper 表字段、索引或唯一约束；若动作能力需要持久化字段或表结构，必须重新确认扩权。 |
+| `noWriteScope` | 不实现 `authorizeByInstrument`、不新增统一 `InstrumentTransactionService`、不做资金责任目标主体迁移、不把工具能力通过等同于账户能力、余额、额度或账本周期通过、不混入 Spend Rule、预算控制投影、清结算对账、治理 apply、完整 VCC、P2 轨道、外部协议或敏感原文处理。 |
+| `verificationCommand` | 首轮 `just test-one PaymentInstrumentCapabilityApplicationServiceTests tests`；Green 后按触点补 `just test-one PaymentInstrumentServiceImplTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`。 |
+| `gitStrategy` | 若用户确认本 Grant 并保持 GSD-CAD 自动模式，目标验证通过且未触发停止条件时按 `auto_commit` 提交；验证失败、环境不可判定或越界时转 `summary_only`。 |
+| `stopCondition` | 需要修改交易 canonical 请求、授权 application facade、资金责任目标主体字段、DDL/H2 schema、Spend Rule、预算控制投影、清结算对账、治理、外部规则、敏感数据、依赖方向反转、公有方法超过 5 个参数或工作树冲突时停止。 |
+| `handoff` | 本候选包的恢复入口为 `B2-PI-CAP-CAD-001`。用户确认 `Execution Grant：B2-PI-CAP` 后进入首批 Red；未确认时只保留为 Round 0 / summary_only。 |
+
+```text
+Execution Grant：B2-PI-CAP
+确认基线：确认时 Git HEAD；至少包含 73ea257 docs: 回写授权工具确认基线及本节提交点；若确认前有未提交文档变更，必须先提交或列入 authorityBaseline
+任务包：B2-PI-CAP-CAD-001
+目标：新增 PaymentInstrumentCapabilityApplicationService 或等价 application facade，完成支付工具状态、方向、动作能力、币种、生效窗口、绑定版本和敏感字段准入；通过后输出不可变工具准入快照；失败无 route、posting、LedgerEntry、余额投影或完整敏感凭证
+允许写入：先写 tests 中支付工具能力 application facade 目标 Red；Red 证明缺口后允许 wallet-face application facade 契约、Request/DTO、wallet-impl 最小实现、委派适配和必要资源服务回归
+允许公共契约：仅允许非破坏性新增 wallet application facade、Request/DTO、返回 DTO 和必要动作能力枚举或等价字段；不得修改交易 canonical 请求、授权状态机、ledger 公共契约或现有资源服务语义
+首批 Red：R0-PI-001；必要时补工具状态、方向、RECEIVE/PAY/AUTHORIZE/REFUND/WITHDRAW、币种、生效窗口、绑定版本和敏感上下文失败矩阵
+验证命令：just test-one PaymentInstrumentCapabilityApplicationServiceTests tests；just test-one PaymentInstrumentServiceImplTests tests；just test-one PaymentInstrumentRouteDslContractTests tests；just test-boundary；just compile；提交前 just pmd 和 git diff --check
+禁止写入：authorizeByInstrument、交易 canonical 请求替换、统一 InstrumentTransactionService、资金责任目标主体迁移、DDL/H2 schema、Spend Rule、预算控制投影、清结算对账、治理 apply、完整 VCC、P2 轨道、外部协议或敏感原文
+Git 策略：auto_commit
+停止条件：公共契约越界、表结构、依赖方向反转、外部规则、敏感数据、B4/B5/B6/B8/P2 越界、验证无法解释失败或工作树冲突即停止
+交接：确认后从 B2-PI-CAP-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置
+```
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
