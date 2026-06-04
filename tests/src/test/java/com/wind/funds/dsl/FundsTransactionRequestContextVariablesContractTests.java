@@ -2,6 +2,7 @@ package com.wind.funds.dsl;
 
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
@@ -68,6 +69,9 @@ class FundsTransactionRequestContextVariablesContractTests {
         assertReadonlyContextStored(new FundsAuthorizationTransactionReversalRequest(),
                 FundsAuthorizationTransactionReversalRequest::setContextVariables,
                 FundsAuthorizationTransactionReversalRequest::getContextVariables);
+        assertReadonlyContextStored(new FundsAuthorizationTransactionExpireRequest(),
+                FundsAuthorizationTransactionExpireRequest::setContextVariables,
+                FundsAuthorizationTransactionExpireRequest::getContextVariables);
         assertReadonlyContextStored(new FundsAuthorizationTransactionRefundRequest(),
                 FundsAuthorizationTransactionRefundRequest::setContextVariables,
                 FundsAuthorizationTransactionRefundRequest::getContextVariables);
@@ -121,6 +125,9 @@ class FundsTransactionRequestContextVariablesContractTests {
         assertNullContextPreserved(new FundsAuthorizationTransactionReversalRequest(),
                 FundsAuthorizationTransactionReversalRequest::setContextVariables,
                 FundsAuthorizationTransactionReversalRequest::getContextVariables);
+        assertNullContextPreserved(new FundsAuthorizationTransactionExpireRequest(),
+                FundsAuthorizationTransactionExpireRequest::setContextVariables,
+                FundsAuthorizationTransactionExpireRequest::getContextVariables);
         assertNullContextPreserved(new FundsAuthorizationTransactionRefundRequest(),
                 FundsAuthorizationTransactionRefundRequest::setContextVariables,
                 FundsAuthorizationTransactionRefundRequest::getContextVariables);
