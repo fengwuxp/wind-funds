@@ -1,5 +1,7 @@
 package com.wind.funds.wallet.services.impl;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.dal.entities.PaymentInstrument;
@@ -1018,19 +1020,21 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThat(histories.getFirst())
                 .satisfies(history -> {
                     assertThat(history.getBeforeSnapshot()).isNull();
-                    assertThat(history.getAfterSnapshot()).contains("\"priority\":10");
+                    assertThat(snapshotOf(history.getAfterSnapshot())).containsEntry("priority", 10);
                     assertThat(history.getOperatorId()).isEqualTo(OPERATOR_ID);
                     assertThat(history.getChangeReason()).isEqualTo("bind funding account");
                     assertThat(history.getRequestSn()).isEqualTo(CREATE_BINDING_REQUEST_SN);
                 });
         assertThat(histories.get(1))
                 .satisfies(history -> {
-                    assertThat(history.getBeforeSnapshot()).contains("\"priority\":10");
-                    assertThat(history.getBeforeSnapshot()).contains("\"version\":1");
-                    assertThat(history.getAfterSnapshot()).contains("\"priority\":20");
-                    assertThat(history.getAfterSnapshot()).contains("\"defaultBinding\":false");
-                    assertThat(history.getAfterSnapshot()).contains("\"status\":\"SUSPENDED\"");
-                    assertThat(history.getAfterSnapshot()).contains("\"version\":2");
+                    assertThat(snapshotOf(history.getBeforeSnapshot()))
+                            .containsEntry("priority", 10)
+                            .containsEntry("version", 1);
+                    assertThat(snapshotOf(history.getAfterSnapshot()))
+                            .containsEntry("priority", 20)
+                            .containsEntry("defaultBinding", false)
+                            .containsEntry("status", "SUSPENDED")
+                            .containsEntry("version", 2);
                     assertThat(history.getOperatorId()).isEqualTo(OPERATOR_ID);
                     assertThat(history.getChangeReason()).isEqualTo("risk review");
                     assertThat(history.getRequestSn()).isEqualTo(CHANGE_BINDING_REQUEST_SN);
@@ -1141,6 +1145,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 Long.class,
                 value);
         return result;
+    }
+
+    private static JSONObject snapshotOf(String snapshot) {
+        return JSON.parseObject(snapshot);
     }
 
     @Configuration
