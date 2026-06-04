@@ -45,20 +45,20 @@ test-module module='tests':
 test-core tests='FundsInstructionDslContractTests,RouteDslContractTests,FundsDslJsonContractTests,FundsBenefitSnapshotSpecTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,SettlementPolicySpecTests,FundsAmountBoundaryContractTests':
     @just _run-test-classes "{{tests}}" tests
 
-# Ledger assembly, posting, and projection tests.
-test-ledger tests='DefaultLedgerPostingAssemblerTests,LedgerBalanceProjectionServiceImplTests,LedgerServiceImplTests':
+# Ledger assembly, transaction, posting, and projection tests.
+test-ledger tests='DefaultLedgerPostingAssemblerTests,LedgerBalanceProjectionServiceImplTests,LedgerServiceImplTests,LedgerTransactionServiceImplTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Transaction orchestration and lifecycle tests.
-test-transaction tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,DefaultRoutedFundsInstructionOrchestratorProjectionTests,FundsStableHashSupportTests':
+test-transaction tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,DefaultRoutedFundsInstructionOrchestratorProjectionTests,FundsStableHashSupportTests,RouteSnapshotJsonSupportTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Frozen order and balance-control route tests.
-test-balance-control tests='FundsBalanceControlFailureFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalAfterPartialUnfreezeFlowTests':
+test-balance-control tests='FundsBalanceControlFailureFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalAfterPartialUnfreezeFlowTests,FundsFrozenOrderServiceImplTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Business flow and balance assertion tests.
-test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalRejectionFlowTests,FundsTransferPayWithdrawChainFlowTests,FundsTransactionFeeFlowTests':
+test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsWithdrawalSuccessFlowTests,FundsWithdrawalRejectionFlowTests,FundsTransferPayWithdrawChainFlowTests,FundsTransactionFeeFlowTests,FundsBalanceAssertionSupportTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Contract, route, wallet, and module dependency boundary tests.
@@ -69,11 +69,15 @@ test-boundary tests='FundsContextVariablesContractTests,FundsTransactionParticip
 test-governance tests='FundsProjectionReplayServiceTests':
     @just _run-test-classes "{{tests}}" tests
 
+# Reconciliation and payout preflight tests.
+test-reconciliation tests='PayoutPreflightServiceTests':
+    @just _run-test-classes "{{tests}}" tests
+
 # Fast CAD verification for non-business tooling or test-asset changes.
-verify-fast: mvn-version compile test-boundary test-governance
+verify-fast: mvn-version compile test-boundary test-governance test-reconciliation
 
 # Full CAD verification for the rebuilt payment funds test baseline.
-verify-cad: mvn-version compile test-core test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance pmd
+verify-cad: mvn-version compile test-core test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance test-reconciliation pmd
 
 # Install reactor snapshots locally when Maven plugin resolution needs local artifacts.
 install-snapshots:
