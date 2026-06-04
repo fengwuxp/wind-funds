@@ -20,6 +20,7 @@ import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.RouteLegSpec;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.DefaultFeeType;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -618,7 +619,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstFeeFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("FEE_IDEMPOTENT_CHARGE");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("FEE_IDEMPOTENT_CHARGE");
 
         String retryFeeSn = directTransactionService.fee(new FundsTransactionFeeRequest()
                 .setAccountId(payer)
@@ -731,7 +732,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
         LedgerFactSnapshot afterFirstFeeRefundFacts = ledgerFactSnapshot();
-        String firstRouteSnapshot = routeSnapshotJson("FEE_REFUND_IDEMPOTENT_RETURN");
+        RouteSnapshotSpec firstRouteSnapshot = routeSnapshot("FEE_REFUND_IDEMPOTENT_RETURN");
 
         String retryFeeRefundSn = refundFeeWithContext(payer, 5L, feeSourceTransactionSn,
                 "FEE_REFUND_IDEMPOTENT_RETURN", "RULE-A");
@@ -1181,14 +1182,16 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_SECOND_RETURN");
     }
 
-    private void assertRouteSnapshotUnchanged(String businessSn, String expectedRouteSnapshot) {
-        assertThat(routeSnapshotJson(businessSn))
+    private void assertRouteSnapshotUnchanged(String businessSn, RouteSnapshotSpec expectedRouteSnapshot) {
+        assertThat(routeSnapshot(businessSn))
                 .as("fee route snapshot must not be rewritten for idempotent businessSn %s", businessSn)
                 .isEqualTo(expectedRouteSnapshot);
     }
 
-    private String routeSnapshotJson(String businessSn) {
-        return fundsTransactionsByBusinessSn(businessSn).getFirst().getRouteSnapshot();
+    private RouteSnapshotSpec routeSnapshot(String businessSn) {
+        String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
+        return fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn)
+                .orElseThrow(() -> new AssertionError("missing route snapshot for businessSn " + businessSn));
     }
 
     private String refundFeeWithContext(FundsAccountId accountId,
