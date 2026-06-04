@@ -8,9 +8,6 @@ import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
-import com.wind.funds.route.support.RouteParticipantFactory;
-import com.wind.funds.route.support.RouteSpecSupport;
-import com.wind.funds.route.support.RouteSubjectSupport;
 import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
@@ -20,7 +17,6 @@ import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycle
 import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
 import org.junit.jupiter.api.Test;
 
-import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -30,10 +26,15 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,11 +44,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class RouteResolverFactBoundaryTests {
 
-    private static final String ROUTE_SOURCE_ROOT = "transaction/transaction-impl/src/main/java";
-    private static final String ROUTE_PACKAGE_PATH = "com/wind/funds/route";
     private static final String ROUTE_PACKAGE_NAME = "com.wind.funds.route";
 
-    private static final List<Class<?>> ROUTE_LAYER_TYPES = List.of(
+    private static final String ROUTE_SUPPORT_PACKAGE_NAME = ROUTE_PACKAGE_NAME + ".support";
+
+    private static final String CLASS_FILE_SUFFIX = ".class";
+
+    private static final String TEST_CLASS_SUFFIX = "Tests";
+
+    private static final List<Class<?>> ROUTE_LAYER_SENTINEL_TYPES = List.of(
             RouteResolver.class,
             CompositeRouteResolver.class,
             TransferFundsInstructionRouteResolver.class,
@@ -55,12 +60,7 @@ class RouteResolverFactBoundaryTests {
             BalanceControlFundsInstructionRouteResolver.class,
             DefaultRouteReplayService.class,
             DefaultRouteSnapshotFactory.class,
-            RouteBenefitSnapshotContextSupport.class,
-            RouteReplaySupport.class,
-            PlatformAccountRouteSupport.class,
-            RouteParticipantFactory.class,
-            RouteSpecSupport.class,
-            RouteSubjectSupport.class);
+            PlatformAccountRouteSupport.class);
 
     private static final List<Class<?>> FACT_WRITE_TYPES = List.of(
             LedgerTransactionPostingService.class,
@@ -93,33 +93,20 @@ class RouteResolverFactBoundaryTests {
      * 红线：路由层不得通过注入写事实服务形成隐式副作用。
      */
     @Test
-    void testRouteLayerShouldNotDeclareFactWriteDependencies() {
+    void testRouteLayerShouldNotDeclareFactWriteDependencies()
+            throws IOException, URISyntaxException, ClassNotFoundException {
+        List<Class<?>> routeLayerTypes = routeLayerTypes();
+        assertThat(routeLayerTypes)
+                .as("route boundary scan must discover core resolver contracts and transaction route implementations")
+                .containsAll(ROUTE_LAYER_SENTINEL_TYPES);
         List<String> violations = new ArrayList<>();
-        for (Class<?> routeLayerType : ROUTE_LAYER_TYPES) {
+        for (Class<?> routeLayerType : routeLayerTypes) {
             collectDeclaredTypeDependencies(routeLayerType, violations);
         }
 
         assertThat(violations)
                 .as("RouteResolver layer must not declare transaction, ledger, or projection fact write dependencies")
                 .isEmpty();
-    }
-
-    /**
-     * 场景：新增 route resolver 或 route helper 后，边界测试必须自动暴露未纳入扫描的问题。
-     * 预期：transaction-impl route 源码下的每个 Java 类型都被事实写入依赖扫描覆盖。
-     * 红线：新增路由类型不能绕开 route 不写交易、账本或投影事实的架构守护。
-     */
-    @Test
-    void testRouteBoundaryScanShouldCoverAllRouteImplementationTypes() throws IOException {
-        List<String> scannedRouteTypes = ROUTE_LAYER_TYPES.stream()
-                .map(Class::getName)
-                .filter(typeName -> typeName.startsWith(ROUTE_PACKAGE_NAME))
-                .sorted()
-                .toList();
-
-        assertThat(scannedRouteTypes)
-                .as("route boundary scan must include every route implementation type")
-                .containsAll(routeImplementationTypeNames());
     }
 
     private void collectDeclaredTypeDependencies(Class<?> routeLayerType, List<String> violations) {
@@ -191,33 +178,45 @@ class RouteResolverFactBoundaryTests {
         return FACT_WRITE_PACKAGE_PREFIXES.stream().anyMatch(className::startsWith);
     }
 
-    private List<String> routeImplementationTypeNames() throws IOException {
-        Path sourceRoot = workspaceRoot().resolve(ROUTE_SOURCE_ROOT);
-        Path routePackageRoot = sourceRoot.resolve(ROUTE_PACKAGE_PATH);
-        try (Stream<Path> files = Files.walk(routePackageRoot)) {
-            return files.filter(Files::isRegularFile)
-                    .filter(path -> path.getFileName().toString().endsWith(".java"))
-                    .map(sourceRoot::relativize)
-                    .map(RouteResolverFactBoundaryTests::toClassName)
-                    .sorted()
-                    .toList();
+    private List<Class<?>> routeLayerTypes() throws IOException, URISyntaxException, ClassNotFoundException {
+        Set<String> classNames = new TreeSet<>();
+        collectPackageClassNames(ROUTE_PACKAGE_NAME, classNames);
+        collectPackageClassNames(ROUTE_SUPPORT_PACKAGE_NAME, classNames);
+        ClassLoader classLoader = RouteResolverFactBoundaryTests.class.getClassLoader();
+        List<Class<?>> routeLayerTypes = new ArrayList<>();
+        for (String className : classNames) {
+            routeLayerTypes.add(Class.forName(className, false, classLoader));
+        }
+        return routeLayerTypes;
+    }
+
+    private void collectPackageClassNames(String packageName, Set<String> classNames)
+            throws IOException, URISyntaxException {
+        ClassLoader classLoader = RouteResolverFactBoundaryTests.class.getClassLoader();
+        Enumeration<URL> packageResources = classLoader.getResources(packageName.replace('.', '/'));
+        while (packageResources.hasMoreElements()) {
+            URL packageResource = packageResources.nextElement();
+            if (!"file".equals(packageResource.getProtocol())) {
+                continue;
+            }
+            try (Stream<Path> packageClasses = Files.list(Path.of(packageResource.toURI()))) {
+                packageClasses.filter(RouteResolverFactBoundaryTests::isProductionTopLevelClassFile)
+                        .map(RouteResolverFactBoundaryTests::compiledClassSimpleName)
+                        .map(simpleName -> packageName + "." + simpleName)
+                        .forEach(classNames::add);
+            }
         }
     }
 
-    private static String toClassName(Path sourcePath) {
-        String className = sourcePath.toString().replace(File.separatorChar, '.');
-        return className.substring(0, className.length() - ".java".length());
+    private static boolean isProductionTopLevelClassFile(Path compiledClass) {
+        String fileName = compiledClass.getFileName().toString();
+        return fileName.endsWith(CLASS_FILE_SUFFIX)
+                && !fileName.contains("$")
+                && !compiledClassSimpleName(compiledClass).endsWith(TEST_CLASS_SUFFIX);
     }
 
-    private Path workspaceRoot() {
-        String multiModuleDir = System.getProperty("maven.multiModuleProjectDirectory");
-        if (multiModuleDir != null && !multiModuleDir.isBlank()) {
-            return Path.of(multiModuleDir);
-        }
-        Path current = Path.of("").toAbsolutePath();
-        if ("tests".equals(current.getFileName().toString())) {
-            return current.getParent();
-        }
-        return current;
+    private static String compiledClassSimpleName(Path compiledClass) {
+        String fileName = compiledClass.getFileName().toString();
+        return fileName.substring(0, fileName.length() - CLASS_FILE_SUFFIX.length());
     }
 }
