@@ -17,7 +17,7 @@
 | TDD 入口 | `docs/TDD设计/支付资金底座测试驱动设计.md` 的 TDD-WALLET-018、TDD-WALLET-019、12.2 Round 0 Red 集合。 |
 | OpenSpec 入口 | `openspec/specs/payment-funds-foundation/spec.md` 的支付工具交易入口、支付工具与 Spend Rule 生产可用性、支出主体资金责任解析关系术语；`openspec/changes/tdd-baseline-reset/tasks.md` 的 2026-06-01 生产可用性 CR。 |
 | 现有代码证据 | `PaymentInstrumentServiceImplTests`、`SpendSubjectFundingRelationServiceImplTests`、`PaymentInstrumentRouteDslContractTests` 已作为局部基线；只证明资源服务、现有资金责任关系和 DSL 契约，不证明生产交易入口可用。 |
-| B4 授权内核基线 | 截至 `47c5269`，账户主体型授权后继并发竞争已闭合；`FundsAuthorizationTransactionService#authorize` 和 `FundsAuthorizationTransactionAuthorizeRequest.accountId` 仍是 canonical 授权内核。当前未发现 `AuthorizationAdmissionApplicationService` 或 `authorizeByInstrument` 生产入口，B4-AUTH-PI 只能作为 Round 0 / Grant 候选。 |
+| B4 授权内核基线 | 截至 `967586c` 和 `47c5269`，账户主体型无授权退款路由回退与授权后继并发竞争已闭合；`FundsAuthorizationTransactionService#authorize` 和 `FundsAuthorizationTransactionAuthorizeRequest.accountId` 仍是 canonical 授权内核。当前未发现 `AuthorizationAdmissionApplicationService` 或 `authorizeByInstrument` 生产入口，B4-AUTH-PI 只能作为 Round 0 / Grant 候选。 |
 | 外部参考确认 | Highnote 的 financial account / ledger / payment card / transaction feed 分层只作为设计参考：账户入账、工具归因、activity 或 projection 做卡维度流水。wind-funds 不照搬对象名，不新增卡账本或工具交易内核。 |
 
 ## 3. grantCandidate
@@ -100,8 +100,8 @@ Request/DTO 默认落 `com.wind.funds.wallet.model.request` 和 `com.wind.funds.
 | 交易层能力 | 是否可后续完善 | 典型写入范围 | 禁止混入 |
 | --- | --- | --- | --- |
 | 授权过期释放 | 已完成 B4-TRX-EXPIRE 基础能力，后续只作为回归基线或扩展切片。 | `FundsAuthorizationTransactionService#expire`、`FundsAuthorizationTransactionExpireRequest`、`EXPIRE` 事件、transaction-impl、route replay、授权流测试已由 `b0666ba` 闭合。 | 支付工具主体入参、卡账本、预算组入账；不得借过期释放扩展强制完成、无授权退款或 VCC 生命周期。 |
-| 受控强制完成 | 可以，B4 独立切片。 | settle 请求、策略字段、审计字段、金额边界测试。 | 用强制完成伪造授权占用或绕过原路径。 |
-| 无授权直接退款 | 可以，B3/B4 独立切片。 | `authorizationTransactionSn` 空值语义、`externalReferenceSn`、退款原因、操作者/审计、`NO_AUTH` 内部上下文标签和失败无副作用测试。 | 缺外部引用、缺原因或缺审计仍静默退款，携带内部授权流水，或按当前工具绑定选路。 |
+| 受控强制完成 | 已完成 B4-FORCE-SETTLE 首轮能力，后续只作为回归基线或扩展切片。 | settle 请求、策略字段、审计字段、金额边界测试已由 `616dac1` 和 `3825466` 闭合。 | 用强制完成伪造授权占用或绕过原路径；不得借回归扩展策略引擎、审批流或支付工具入口。 |
+| 无授权直接退款 | 已完成 B4-NO-AUTH-REFUND 首轮能力，后续只作为回归基线或扩展切片。 | `authorizationTransactionSn` 空值语义、`externalReferenceSn`、退款原因、操作者/审计、`NO_AUTH` 内部上下文标签、外部引用路由回退和失败无副作用测试已由 `006bcaa`、`818da34` 和 `967586c` 闭合。 | 缺外部引用、缺原因或缺审计仍静默退款，携带内部授权流水，按当前工具绑定选路；不得借回归扩展运营审批、累计退款控制或完整 dispute case。 |
 | 拒付和争议扣回 | 可以，B4 或 P2-VCC-LIFECYCLE 切片。 | chargeback 或等价逆向请求、原因/凭证/阶段、重复损失防护测试。 | 与授权拒绝或普通 refund 混同。 |
 | 余额控制调账审计 | 可以，B5 独立切片。 | `FundsBalanceControlService`、adjust 请求、审批/差错/凭证字段和测试。 | 用支付工具或预算组作为余额主体。 |
 | 原路径回放和投影解释 | 可以，B6/B8 独立切片。 | route replay、transaction projection、查询 DTO 和重放测试。 | 投影反写事实或替代 route/posting/ledger。 |
