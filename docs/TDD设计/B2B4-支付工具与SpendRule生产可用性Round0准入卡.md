@@ -441,6 +441,69 @@ Git 策略：auto_commit
 交接：确认后从 B6-B8-PI-VIEW-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置
 ```
 
+### 8.11 P2-VCC-PREPAID Round 0 扫描（2026-06-04）
+
+本节把 `P2-VCC-PREPAID` 预付卡入金确认切片推进到可确认输入。它属于 P2 VCC 业务专项能力包，不属于 B2/B4/B5/B6-B8 默认编码队列；本节只做只读扫描和候选授权包收敛，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入。
+
+| 扫描项 | 结论 |
+| --- | --- |
+| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 业务设计基线 | PRD、DSL、系分和 OpenSpec 已统一：VCC、虚拟卡、卡 token 和 prepaid virtual card 都先作为 `PaymentInstrumentRef` 或等价工具快照承接；prepaid 是资金模式，不是新的账本主体类型；共享卡是绑定和使用模式，不是新的工具或账户主体类型。 |
+| 局部代码基线 | 当前只定位到支付工具资源服务、资金责任关系资源服务、账户主体型直接交易、账户主体型授权交易、route replay 和交易投影局部基线；未发现 `VccPrepaidFundingApplicationService`、预付资金 application facade、VCC prepaid funding 请求模型或 VCC 专项资金流实现。 |
+| 目标缺口 | 现有资源服务和直接交易链路不能证明“外部入金或系统内充值已经确认、预付资金责任主体唯一、幂等摘要可追溯、失败无副作用、卡工具不入账”。因此 P2-VCC-PREPAID 只能先作为业务专项 Grant 候选，不得从支付工具资源服务测试直接升级为生产可用。 |
+| 语义裁决 | prepaid virtual card 只表达工具和资金模式；可入账对象必须是经财务、合同、合规或业务专项确认的内部资金责任主体。缺确认引用、缺资金来源、缺责任主体、多个责任主体命中、币种不一致或卡工具自身被当主体时必须失败，且不得生成 route、posting、LedgerEntry、余额投影或资金交易事实。 |
+| implementationDecision | 进入编码前必须在 `contract-only` 与 `funding-flow-backed` 中二选一。`contract-only` 只允许新增 facade 契约、Request/DTO、目标 Red 和失败型/校验型最小适配；`funding-flow-backed` 才允许委派账户主体型直接交易、内部转账或等价资金事实链路，并必须补余额、route、posting、entry、projection、幂等和审计断言。 |
+| responsibilityStrategy | 默认只允许 `funding-account-only`。若 P2 专项要求信用账户、平台角色解析后的平台资金账户或 `targetSubjectType + targetSubjectId`，必须显式授权字段策略、Request/DTO、DDL/H2、Entity、Mapper、摘要、fixture、route snapshot 和回放断言，或先改走 B2-FR-TARGET 迁移 Grant。 |
+| 首批 Red | `R0-VCC-PREPAID-001A`：外部入金或系统内充值缺确认引用、缺资金来源、缺唯一内部责任主体、缺幂等摘要、缺操作者/审计、错币种或敏感原文时仍增加可用余额必须失败；失败无 route、posting、LedgerEntry、余额投影或资金交易副作用。 |
+| 次批 Red | `R0-VCC-PREPAID-001B`：prepaid virtual card、shared card、卡号、token、payment instrument id 或预算组被作为资金账户、ledger subject、route leg、posting subject、LedgerEntry subject 或余额投影主体时必须失败。 |
+| Grant 必须列明 | VCC 业务分册、业务验收 ID、implementationDecision、responsibilityStrategy、外部引用脱敏字段、外部规则核验状态、预付资金责任主体、幂等摘要、审计字段、目标测试资产、P0/P1 回归范围、DDL/H2 是否允许和验证命令。 |
+| 禁止混入 | 不实现完整 VCC 发卡产品、processor/PAN/CVV/PCI、卡余额账本、退卡提现自动化、完整 clearing 文件处理、chargeback 全生命周期、税务/会计自动处理、全球账户、收单、ACH/SWIFT/FX 外部协议、清结算对账或治理 apply。 |
+
+### 8.12 vccPrepaidFundingGrantCandidate（2026-06-04）
+
+本节把 8.11 的只读扫描推进为可确认的单一 Execution Grant 候选。它仍不授权写 Java、测试、DDL/H2 schema、公共契约或运行时配置；只有用户确认本节的 `Execution Grant：P2-VCC-PREPAID`，并选择 implementationDecision 与责任主体策略后，才允许进入首批 Red。
+
+| 授权包字段 | 候选内容 |
+| --- | --- |
+| `taskId` | `P2-VCC-PREPAID-CAD-001`。 |
+| `stage` / `wave` | P2 VCC 业务模式能力包 / Wave 1 预付资金确认准入。 |
+| `status` | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| `owner` | 产品架构专家负责 VCC 业务语义、资金模式、外部规则、合规和 Not Done 口径复核；资深架构师负责工程边界、接口、测试、验证和提交闭环。 |
+| `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `0e08472 docs: 补齐支付工具视图候选包` 及本节提交点。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
+| `mvpScenario` | 业务方提交 VCC prepaid funding 事件、支付工具引用、外部确认引用、资金来源、目标预付责任主体、金额币种、业务流水、幂等键和操作者；系统确认工具只是 VCC/prepaid 工具快照，资金责任唯一且已确认。失败时只返回可解释原因并留下审计；成功时按 implementationDecision 进入 contract-only 结果或账户主体型资金事实委派。 |
+| `businessAdmission` | 产品锚点为 `VCC-AC-007`、`VCC-AC-008`；DSL 锚点为 `DSL-PAYMENT-INSTRUMENT-PREPAID-CARD-001`、prepaid virtual card 不作为 ledger subject、缺确认不入账；系分锚点为 `PostPrepaidFunding` 和 `VccPrepaidFundingApplicationService`；TDD 锚点为 `R0-VCC-PREPAID-001`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011` 中被本 Grant 明确选中的子集。 |
+| `implementationDecision` | 待确认，必须二选一：`contract-only` 或 `funding-flow-backed`。默认不得使用资金流实现；若选择 `funding-flow-backed`，必须同步声明委派的账户主体型直接交易、内部转账或等价资金事实入口，以及 P0/P1 回归测试。 |
+| `responsibilityStrategy` | 默认 `funding-account-only`；若选择 `targetSubjectType + targetSubjectId` 或需要信用账户、平台角色责任主体，必须另行扩权或改走 B2-FR-TARGET 迁移 Grant。 |
+| `firstRedSet` | `R0-VCC-PREPAID-001A`：缺确认引用、缺资金来源、缺唯一内部责任主体、缺幂等摘要、缺操作者/审计、错币种或敏感原文时仍加余额必须失败；失败无 route、posting、LedgerEntry、余额投影或资金交易副作用。 |
+| `secondRedSet` | `R0-VCC-PREPAID-001B`：prepaid virtual card、shared card、卡号、token、payment instrument id、预算组或 Spend Rule 被作为资金账户、账本主体、route leg、posting subject、LedgerEntry subject 或余额投影主体时必须失败。 |
+| `writeScope` | 先写 `tests/src/test/java/com/wind/funds/wallet/application/vcc/VccPrepaidFundingApplicationServiceTests.java` 或等价 VCC prepaid funding 目标 Red；Red 证明缺口后，`contract-only` 只允许在 `wallet/wallet-face` 新增 facade 契约、Request/DTO、返回 DTO，并在 `wallet/wallet-impl` 新增校验型或拒绝型最小实现；`funding-flow-backed` 还必须由 Grant 显式授权账户主体型资金事实委派、余额断言和必要回归。 |
+| `readOnlyScope` | `docs/产品设计/06-VCC发卡业务资金底座PRD.md`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md`、既有 `wallet`、`transaction`、`ledger`、`core`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| `publicContractGate` | 只允许非破坏性新增 wallet VCC application facade、Request/DTO、返回 DTO 和脱敏审计载荷；不得修改交易 canonical 请求、授权状态机、core 交易枚举、ledger 公共契约、支付工具资源服务语义或现有资金责任关系资源服务语义。 |
+| `schemaGate` | 未显式授权前，不修改 `tests/src/test/resources/jdbc-schema.sql`、生产 DDL、Entity 字段、Mapper 表字段、索引或唯一约束；若需要 VCC prepaid funding fact、外部确认表、幂等表或投影表，必须重新确认 DDL/H2 范围。 |
+| `dependencyGate` | `wallet/wallet-face` 不依赖任何 impl；`wallet/wallet-impl` 可依赖 `wallet/wallet-face`、`transaction-face`、`ledger-face` 和 core；`transaction`、`ledger` 不反向依赖 wallet impl。违反依赖方向时立即停止。 |
+| `noWriteScope` | 不把卡工具、卡 token、shared card、预算组或 Spend Rule 写成 route leg、posting、LedgerEntry 或账本余额主体；不新增卡余额账本、卡账户、完整发卡处理商协议、PAN/CVV/PCI、退卡提现自动化、完整 clearing、chargeback 全生命周期、全球账户、收单、ACH/SWIFT/FX、税务/会计自动处理、清结算对账或治理 apply。 |
+| `verificationCommand` | 首轮 `just test-one VccPrepaidFundingApplicationServiceTests tests`；`contract-only` 触碰 wallet facade 时补 `just test-one PaymentInstrumentServiceImplTests tests`、`just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；`funding-flow-backed` 还必须补 `just test-one FundsDirectTransactionFlowTests tests`、`just test-transaction` 和必要业务 flow 回归。 |
+| `gitStrategy` | 若用户确认本 Grant、选择 implementationDecision 和责任主体策略并保持 GSD-CAD 自动模式，目标验证通过且未触发停止条件时按 `auto_commit` 提交；验证失败、环境不可判定或越界时转 `summary_only`。 |
+| `stopCondition` | 未选择 implementationDecision、责任主体策略不清、外部规则核验状态缺失、需要表结构但未获 DDL/H2 授权、需要修改交易 canonical 请求、ledger 公共契约、支付工具资源服务语义、资金责任目标字段、完整 VCC 发卡、清结算对账、治理、外部协议、敏感数据、依赖方向反转、公有方法超过 5 个参数或工作树冲突时停止。 |
+| `handoff` | 本候选包的恢复入口为 `P2-VCC-PREPAID-CAD-001`。用户确认 `Execution Grant：P2-VCC-PREPAID`、选择 `contract-only` 或 `funding-flow-backed`、并确认 `funding-account-only` 或目标主体迁移策略后进入首批 Red；未确认时只保留为 P2 业务专项 Round 0 / summary_only。 |
+
+```text
+Execution Grant：P2-VCC-PREPAID
+确认基线：确认时 Git HEAD；至少包含 0e08472 docs: 补齐支付工具视图候选包及本节提交点；若确认前有未提交文档变更，必须先提交或列入 authorityBaseline
+任务包：P2-VCC-PREPAID-CAD-001
+目标：新增 VccPrepaidFundingApplicationService 或等价 application facade，完成 VCC prepaid funding 事件的工具快照、外部确认引用、资金来源、唯一内部预付责任主体、金额币种、幂等摘要和审计准入；prepaid virtual card 只作为 PaymentInstrumentRef，不作为资金账户、ledger subject 或余额主体
+implementationDecision：必须选择 contract-only 或 funding-flow-backed；未选择前不写 Java、测试、DDL/H2 schema 或运行时配置
+responsibilityStrategy：默认 funding-account-only；如需 targetSubjectType + targetSubjectId、信用账户或平台角色责任主体，必须另行扩权或改走 B2-FR-TARGET 迁移 Grant
+允许写入：先写 tests 中 VCC prepaid funding 目标 Red；Red 证明缺口后按 implementationDecision 允许 wallet-face VCC application facade 契约、Request/DTO、wallet-impl 校验型或拒绝型最小实现；只有 funding-flow-backed 才允许账户主体型资金事实委派、余额断言和必要 P0/P1 回归
+允许公共契约：仅允许非破坏性新增 wallet VCC application facade、Request/DTO、返回 DTO 和脱敏审计载荷；不得修改交易 canonical 请求、授权状态机、ledger 公共契约、支付工具资源服务语义或资金责任关系资源服务语义
+首批 Red：R0-VCC-PREPAID-001A；必要时补 R0-VCC-PREPAID-001B，覆盖缺确认、缺资金来源、缺唯一责任主体、错币种、敏感原文、卡工具入账和失败无副作用
+验证命令：just test-one VccPrepaidFundingApplicationServiceTests tests；just test-one PaymentInstrumentServiceImplTests tests；just test-one SpendSubjectFundingRelationServiceImplTests tests；若 funding-flow-backed 则补 just test-one FundsDirectTransactionFlowTests tests 和 just test-transaction；just test-boundary；just compile；提交前 just pmd 和 git diff --check
+禁止写入：卡工具或共享卡账务主体化、卡余额账本、完整发卡 processor/PAN/CVV/PCI、退卡提现自动化、完整 clearing、chargeback 全生命周期、全球账户、收单、ACH/SWIFT/FX、税务/会计自动处理、清结算对账、治理 apply、外部协议或敏感原文
+Git 策略：auto_commit
+停止条件：implementationDecision 未确认、责任主体策略未确认、外部规则核验缺失、表结构未授权、依赖方向反转、外部协议或敏感数据越界、P0/P1 回归无法解释失败或工作树冲突即停止
+交接：确认后从 P2-VCC-PREPAID-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置，也不得把 P2 业务 pack 当作 P0/P1 默认编码授权
+```
+
 ## 9. verificationPlan
 
 | 阶段 | 命令 | 通过口径 |
@@ -459,16 +522,17 @@ Git 策略：auto_commit
 5. 工作树存在未分类变更，或本轮未提交文档基线未被纳入 `authorityBaseline`。
 6. B5-SR-CONTROL 需要 DDL/H2 schema、Entity、Mapper、索引或投影表，但 Execution Grant 未明确选择 `ddl-backed`。
 7. B6/B8-PI-VIEW 需要 DDL/H2 schema、Entity、Mapper、索引、checkpoint、影子表或正式投影表，但 Execution Grant 未明确选择 `projection-store-backed`。
+8. P2-VCC-PREPAID 未确认 implementationDecision、责任主体策略、外部规则核验状态或 DDL/H2 范围，却开始写 VCC prepaid funding 生产代码、测试代码、公共契约、表结构或运行时配置。
 
 ## 11. confirmationTemplate
 
 ```text
-Execution Grant：B2/B4 支付工具与 Spend Rule Round 0
+Execution Grant：B2/B4/P2 支付工具与 Spend Rule Round 0
 确认基线：确认时 Git HEAD；若本轮文档尚未提交，需显式纳入 authorityBaseline
-选择切片：B2-PI-CAP / B2-FR / B4-AUTH-PI / B5-SR-CONTROL / B6-B8-PI-VIEW 之一
-允许写入：仅限所选切片的测试资产和最小 application facade / DTO / 适配实现；DDL/H2 默认不允许；若选择 B5-SR-CONTROL，必须同步选择 contract-only 或 ddl-backed；若选择 B6-B8-PI-VIEW，必须同步选择 query-contract-only 或 projection-store-backed
+选择切片：B2-PI-CAP / B2-FR / B4-AUTH-PI / P2-VCC-PREPAID / B5-SR-CONTROL / B6-B8-PI-VIEW 之一
+允许写入：仅限所选切片的测试资产和最小 application facade / DTO / 适配实现；DDL/H2 默认不允许；若选择 P2-VCC-PREPAID，必须同步选择 contract-only 或 funding-flow-backed 以及责任主体策略；若选择 B5-SR-CONTROL，必须同步选择 contract-only 或 ddl-backed；若选择 B6-B8-PI-VIEW，必须同步选择 query-contract-only 或 projection-store-backed
 禁止写入：交易 canonical 请求替换、统一 InstrumentTransactionService、预算组账务主体、资金责任字段策略混用、清结算对账、治理 apply、P2 轨道协议、敏感原文
-首批 Red：按所选切片选择 R0-PI-001、R0-FR-001、R0-AUTH-001、R0-SR-001、R0-SR-002 或 R0-PI-002
+首批 Red：按所选切片选择 R0-PI-001、R0-FR-001、R0-AUTH-001、R0-VCC-PREPAID-001、R0-SR-001、R0-SR-002 或 R0-PI-002
 验证命令：just test-one PaymentInstrumentServiceImplTests tests；just test-one SpendSubjectFundingRelationServiceImplTests tests；just test-one PaymentInstrumentRouteDslContractTests tests；必要时 just test-transaction / just test-boundary；提交前 git diff --check 和 just pmd
 停止条件：公共契约、表结构、外部规则、P2 轨道、清结算对账、治理、敏感数据或工作树冲突越界即停止
 ```
