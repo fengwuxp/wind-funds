@@ -51,6 +51,7 @@
 - [x] 2026-06-04 回写 B4-AUTH-PI 恢复入口确认基线：`88d80c7 docs: 收敛授权后继索引基线` 已把已闭合 B4 授权后继能力和下一候选索引串入 TDD / OpenSpec 入口；本轮同步把 `B4-AUTH-PI-CAD-001` 的 authority baseline 上调为确认时 Git HEAD 且至少包含 `88d80c7` 及本次基线校准提交。当前状态仍为 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`；未确认 `Execution Grant：B4-AUTH-PI` 前不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
 - [x] 2026-06-04 完成 B4-AUTH-PI CAD 候选结构门禁复核：资深架构师 Harness checker 以 `cad-candidate` 模式检查 `docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md` 和本 Harness tasks，结果均为 `OK harness plan check: kind=cad-candidate`。该复核只证明任务包字段结构完整，不等于用户已确认 Execution Grant、编码授权、测试通过或生产审批。
 - [x] 2026-06-04 同步 B4-AUTH-PI 索引入口：`be3df9f docs: 同步授权工具候选索引` 和 `c58431e docs: 同步 TDD 授权工具候选索引` 已把 `B4-AUTH-PI-CAD-001` 的只读 Round 0、Grant 候选包和 `cad-candidate` 结构门禁证据同步到根 docs 与 TDD 索引。当前状态仍为 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`；该索引同步不新增编码授权，不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
+- [x] 2026-06-04 收敛 B4-AUTH-PI 确认基线提交集合：`dc88ae2 docs: 收敛授权工具候选确认基线` 已把 `B4-AUTH-PI-CAD-001` 的 authority baseline 从“后续基线校准提交”收敛为 `88d80c7`、`7b49684`、`be3df9f`、`c58431e`、`226dfc2` 和确认时 Git HEAD 的可审计集合。当前状态仍为 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`；该收敛只服务恢复和确认，不新增编码授权，不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
 
 ## 1. MVP 任务写入范围
 
@@ -865,7 +866,7 @@ A0 只读核验通过后，曾建议优先确认 A1 直接交易事实红线。A
 | 当前状态 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
 | Task ID | `B4-AUTH-PI-CAD-001`。 |
 | Owner / 角色 | 资深架构师负责 Red、Green、Review、Refactor、Verify 和提交；产品架构专家负责支付工具、资金主体、Spend Rule、拒绝原因和 Not Done 语义复核。 |
-| authority baseline | 确认时 Git HEAD；至少包含 `88d80c7 docs: 收敛授权后继索引基线` 及本节后续基线校准提交，确保已闭合授权后继回归基线、无授权退款路由回退和 `B4-AUTH-PI-CAD-001` 恢复入口均已纳入确认语境。未提交文档变更必须先提交或列入 Grant 附件。 |
+| authority baseline | 确认时 Git HEAD；至少包含 `88d80c7 docs: 收敛授权后继索引基线`、`7b49684 docs: 记录授权支付工具候选门禁`、`be3df9f docs: 同步授权工具候选索引`、`c58431e docs: 同步 TDD 授权工具候选索引`、`226dfc2 docs: 回写授权工具索引流水` 和 `dc88ae2 docs: 收敛授权工具候选确认基线`，确保已闭合授权后继回归基线、无授权退款路由回退、`B4-AUTH-PI-CAD-001` 结构门禁、索引同步和恢复入口均已纳入确认语境。未提交文档变更必须先提交或列入 Grant 附件。 |
 | 写入范围 | 先写 `AuthorizationAdmissionApplicationServiceTests` 或等价授权 application facade 目标 Red；Red 证明缺口后，仅允许 `wallet-face` 新增 application facade 契约、Request/DTO，`wallet-impl` 新增最小实现和委派适配，并按需补授权 flow 回归。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、既有 wallet/transaction/core、H2 schema 和资源服务测试。 |
 | 首批 Red | `R0-AUTH-001`：支付工具授权入口必须先完成工具、绑定、Spend Rule、资金责任和账户能力准入；批准后委派账户主体型授权内核；拒绝无 route、posting、LedgerEntry、projection 或敏感上下文副作用。 |
