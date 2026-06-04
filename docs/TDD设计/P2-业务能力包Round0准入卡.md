@@ -110,7 +110,7 @@ FX 决策：默认 same-currency-only；跨币种需 fx-quote-backed 且不执�
 
 | 规则来源 | 版本或发布日期 | 适用法域或适用范围 | 核验日期 | 确认方 | 确认状态 |
 | --- | --- | --- | --- | --- | --- |
-| 银行协议、本地清算网络规则、SWIFT/代理行规则、外汇和跨境监管规则、数据跨境规则 | 待确认 | 全球账户入金、出款、退汇、目标国家/地区、币种、客户类型、外部账户和银行流水/回单匹配 | 2026-06-04，仅完成本地候选包字段完整性核验 | 待法务、合规、财务、银行、通道、持牌机构和数据安全负责人确认 | 未完成外部规则时效核验，不作为上线依据。 |
+| 银行协议、本地清算网络规则、SWIFT/代理行规则、外汇和跨境监管规则、数据跨境规则、财务和会计费用归因口径 | 待确认 | 全球账户入金、出款、退汇、FX quote 引用、费用归因、FX P&L 归属、目标国家/地区、币种、客户类型、外部账户和银行流水/回单匹配 | 2026-06-04，仅完成本地候选包字段完整性核验 | 待法务、合规、财务、银行、通道、持牌机构、税务、会计和数据安全负责人确认 | 未完成外部规则时效核验和专业口径确认，不作为上线依据。 |
 
 ## 7. Round 0 验证计划
 
@@ -120,17 +120,17 @@ FX 决策：默认 same-currency-only；跨币种需 fx-quote-backed 且不执�
 | CAD 候选结构检查 | `python3 /Users/wuxp/.codex/skills/senior-software-architect/scripts/check_harness_plan.py --kind cad-candidate --file docs/TDD设计/P2-业务能力包Round0准入卡.md` |
 | 外部规则字段完整性检查 | `python3 /Users/wuxp/.codex/skills/product-architecture-expert/scripts/check_external_rules.py --file docs/TDD设计/P2-业务能力包Round0准入卡.md` |
 | Markdown diff 空白检查 | `git diff --check` 和 `git diff --cached --check` |
-| 索引一致性 | 检索 `P2-GA-INBOUND-CAD-001`、`Execution Grant：P2-GA-INBOUND`、`R0-GA-IN-001A`、`R0-GA-IN-001B`、`contract-only`、`canonical-funds-backed`、`same-currency-only`、`fx-quote-backed`。 |
+| 索引一致性 | 检索本卡已补齐的候选 Task ID、`Execution Grant`、首批 Red、实现决策、FX 决策、费用决策、外部规则门禁和 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
 
 ## 8. 自动停止条件
 
 出现以下任一情况，本候选包不得继续推进到代码：
 
-1. 用户未确认 `Execution Grant：P2-GA-INBOUND`。
-2. 未选择 implementationDecision、accountResolutionDecision、fxDecision 或外部规则核验状态。
+1. 用户未确认对应的单一 `Execution Grant`。
+2. 未选择该切片必需的 implementationDecision、账户解析、preflight、transit、return、FX、费用、外部规则或专业确认决策。
 3. 写入范围需要 Java、测试、公共契约、DDL/H2 schema 或运行时配置，但 Grant 未授权。
 4. 需要改 transaction canonical request、ledger 公共契约、reconciliation payout preflight 契约、core FX port 或 route replay 公共契约。
-5. 需要全球账户开户、VA 分配、银行核心、SWIFT、本地清算网络、ACH/Nacha、FX 执行、出款、退汇、完整清结算、完整对账或运营后台。
+5. 需要全球账户开户、VA 分配、银行核心、SWIFT、本地清算网络、ACH/Nacha、FX 执行、锁汇、外部 FX provider、完整清结算、完整对账或运营后台。
 6. 出现外部账户作为账务主体、敏感原文写入、依赖反转、公有方法超过 5 个参数、生产配置或合规上线结论。
 7. 工作树出现无法区分的用户改动或验证失败且无法在授权范围内修复。
 
@@ -149,7 +149,7 @@ FX 决策：same-currency-only / fx-quote-backed
 Git 策略：auto_commit
 ```
 
-也可以选择 `P2-GA-OUTBOUND`、`P2-GA-FX-FEE`、`P2-ACQ-CAPTURE` 或 `P2-ACQ-DISPUTE`，但这些切片需要先补各自 Round 0 扫描和 Grant 候选包。
+也可以选择 `P2-GA-OUTBOUND` 或 `P2-GA-FX-FEE`，但必须使用各自独立的 Execution Grant 模板。`P2-ACQ-CAPTURE` 和 `P2-ACQ-DISPUTE` 仍需先补各自 Round 0 扫描和 Grant 候选包。
 
 ## 10. P2-GA-OUTBOUND Round 0 扫描（2026-06-04）
 
@@ -234,4 +234,85 @@ FX 决策：默认 same-currency-only；跨币种需 fx-quote-backed 且不执�
 首批 Red：R0-GA-OUT-001A
 次批 Red：R0-GA-OUT-001B / R0-GA-OUT-001C
 撤销方式：用户说“暂停/停止/撤销 P2-GA-OUTBOUND”即停止自动推进
+```
+
+## 12. P2-GA-FX-FEE Round 0 扫描（2026-06-04）
+
+状态：ROUND0_READY_NOT_CODE_AUTHORIZED。
+
+产品基线：全球账户 FX 与费用能力只承接外部已决策的 quote、approval snapshot、费用组件、成本收入归因和使用者解释，不建设 FX 执行系统、汇率平台、跨境合规管理或财务总账。无有效 quote、quote 过期、币种不匹配、费用归因不完整或专业确认缺失时，必须阻断、挂起、差错或人工处理，不得静默换汇、不得把本金、平台费、银行费、中间行费、FX spread 或 FX P&L 净额混成单一金额。
+
+代码基线：当前仓库已有 `FxService`、`FxRequest`、`FxResult`、`FxRate`、`DefaultFxServiceImpl`、`FundsInstruction.originalAmount`、`FundsInstruction.exchangeRate`、直接交易手续费和退费相关 Request/flow 局部能力。这些只能说明资金底座已有 FX 端口、原币金额/汇率字段和直接交易费用能力，不能证明全球账户 FX quote approval snapshot、费用归因矩阵、错币种阻断、使用者费用解释或专业确认门禁已经形成；`FxService` 也不能反推为全球账户 FX 执行能力。
+
+目标差距：当前未形成 `GlobalAccountFxFeeApplicationService`、全球账户 FX quote / fee attribution Request/DTO、quote approval snapshot、费用组件归因模型、FX P&L 专业确认字段、错币种无 quote 红线、费用净额混淆红线、禁止调用 FX 执行红线和对应最小测试资产。
+
+语义决策：资金服务只接收全球账户产品、FX/treasury、银行适配层或财务系统已经归一和脱敏的 quoteRef、fromCurrency、toCurrency、rate、validUntil、provider、executionRef、approvalRef、originalAmount、targetAmount、平台费、银行费、中间行费、费用承担方、成本收入归因、外部规则核验状态、专业确认状态、幂等键、操作者和审计引用。quote 缺失或过期、币种不匹配但无批准 quote、费用承担方不明确、费用与本金净额混同、FX P&L 归属缺专业确认、请求要求资金服务执行 FX 或调用外部汇率/交易系统时，必须失败、挂起或转人工，不得写成功资金事实。
+
+实现决策需要在授权时二选一：
+
+| 决策 | 说明 |
+| --- | --- |
+| contract-only | 只允许新增 FX quote / fee attribution facade Request/DTO 目标 Red、入参校验、拒绝路径、脱敏审计和解释字段候选；不写资金事实，不改 DDL/H2 schema。 |
+| attribution-backed | 允许把 FX quote、费用组件、成本收入归因和专业确认状态作为不可变资金影响快照或显式资金事实引用记录；必须同步余额、posting、entry、projection、幂等、审计、解释状态和失败无副作用断言。 |
+
+FX 执行决策默认 `no-fx-execution`。资金服务不得调用外部 FX 交易、quote provider 或 treasury 执行能力；若后续只做 quote 有效性查询或内部引用校验，必须显式选择 `quote-validation-only`，并证明不产生 FX 成交、锁汇或外部交易副作用。
+
+费用决策默认 `fee-attribution-only`。若要把平台费、银行费或中间行费落成账务资金事实，必须显式选择 `fee-ledger-backed`，并列明直接交易费用/退费能力复用边界、金额闭合、费用承担方、收入成本科目、退款/退汇时费用处理和回归测试。
+
+外部规则和专业确认默认 `external-rules-incomplete-blocking`。缺法务、合规、财务、税务、会计、银行、通道、持牌机构或数据安全确认时，只能阻断、挂起、降级为 contract-only 或标记 Not Done，不得声明生产资金流 Done。
+
+首批 Red：
+
+| Red ID | 目标 must-fail |
+| --- | --- |
+| R0-GA-FX-001A | 实际币种与预期币种不一致且无有效已批准 quote 时，系统仍增加 AVAILABLE、生成成功 route/posting/LedgerEntry/projection 或静默按预期币种入账。 |
+| R0-GA-FX-001B | 本金、平台费、银行费、中间行费、FX spread 或 FX P&L 被净额混成单一金额，导致用户、财务、运营或对账无法解释金额差异。 |
+| R0-GA-FX-001C | 资金服务调用 FX 执行、汇率提供方或外部交易系统，或在外部规则、财务/税务/会计/合规确认缺失时仍自动处理为生产 Done。 |
+
+Execution Grant 必须列明全球账户 FX/费用业务章节、`GA-R003`、`GA-R004`、`GA-RED-001`、`TDD-FX-001`、`TDD-FX-002`、`TDD-DIR-006`、`TDD-DIR-007`、实现决策、FX 执行决策、费用决策、外部规则和专业确认状态、目标测试资产、P0/P1 回归范围和 DDL/H2 schema 是否允许修改。
+
+不得混入 FX 执行、锁汇、报价撮合、汇率平台、treasury 核心、银行核心、SWIFT、本地清算网络、ACH/Nacha、完整清结算、完整对账、运营后台、生产配置、敏感原文或合规上线结论。
+
+## 13. P2-GA-FX-FEE Grant 候选（2026-06-04）
+
+| 字段 | 内容 |
+| --- | --- |
+| Task ID | P2-GA-FX-FEE-CAD-001 |
+| 阶段切片 | P2 全球账户 / Wave 3 FX quote 引用、费用分离和错币种阻断 |
+| 状态 | READY_TO_CONFIRM_NOT_CODE_AUTHORIZED |
+| Owner | 产品架构专家负责全球账户 FX、费用、使用者解释、外部规则、财务/税务/会计/合规待确认和 Not Done 语义；资深架构师负责工程边界、TDD、Review、Refactor、验证命令和代码落地。 |
+| authorityBaseline | 用户确认时 Git HEAD，且至少包含 `e43795b docs: 补齐全球账户出款候选包` 与本次 P2-GA-FX-FEE 候选包提交。 |
+| MVP 场景 | 全球账户入金、出款或退汇出现币种差异或费用差异时，业务系统提交外部已决策 quote snapshot、费用组件、承担方、成本收入归因、外部规则核验状态、专业确认状态、幂等键和操作者。系统证明无有效 quote 不静默换汇，费用不净额混淆，资金服务不执行 FX，专业确认缺失不声明生产 Done。 |
+| 业务验收映射 | 产品 `GA-R003`、`GA-R004`、`GA-RED-001`、`GA-AC-004`；DSL 错币种无 quote 阻断、外部 quote 只做引用、费用组件不混入本金；系分 P2 能力包、外部规则核验、费用归因和使用者解释；TDD `TDD-FX-001`、`TDD-FX-002`、`TDD-P2-GA-RED-001`、`TDD-P2-GA-001`、`TDD-P2-GA-002`、`TDD-DIR-006`、`TDD-DIR-007`、`TDD-RED-030`。 |
+| implementationDecision | 必须二选一：`contract-only` 或 `attribution-backed`。默认建议从 `contract-only` 开始。 |
+| fxExecutionDecision | 默认 `no-fx-execution`；仅在显式授权 `quote-validation-only` 时允许做无成交副作用的 quote 引用校验。 |
+| feeDecision | 默认 `fee-attribution-only`；选择 `fee-ledger-backed` 必须同步费用资金事实、退费、退汇费用、收入成本归因、余额和账务断言。 |
+| externalRuleDecision | 默认 `external-rules-incomplete-blocking`；缺外部规则和专业确认时不得声明生产 Done。 |
+| 首批 Red | `R0-GA-FX-001A`：错币种无有效 quote 不得入账或静默换汇。 |
+| 次批 Red | `R0-GA-FX-001B`：费用、本金和 FX P&L 不得净额混淆；`R0-GA-FX-001C`：资金服务不得执行 FX 或绕过外部规则/专业确认。 |
+| 写入范围 | 首轮只允许 `tests/src/test/java/com/wind/funds/wallet/application/globalaccount/GlobalAccountFxFeeApplicationServiceTests.java` 或等价 P2-GA FX/fee Red。Red 成立后，`contract-only` 只允许 wallet facade Request/DTO、返回 DTO、拒绝路径、脱敏审计和解释字段候选；`attribution-backed` 才允许显式授权的 FX/费用不可变快照、费用事实引用和 P0/P1 回归。 |
+| 写入文件 | 未确认 Execution Grant 前，本候选包只允许写文档和索引；确认后写入文件必须按 Grant 中列出的测试、facade、Request/DTO、实现、费用事实或 schema 范围执行。 |
+| 只读范围 | `docs/产品设计/07-全球账户收付款资金底座PRD.md`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec` spec/tasks、`wallet`、`transaction`、`ledger`、`reconciliation`、`core`、`tests/src/test/resources/jdbc-schema.sql`。 |
+| 只读参考 | 全球账户 PRD、DSL、系分、TDD、OpenSpec、现有 `FxService` / `DefaultFxServiceImpl`、直接交易手续费/退费 flow、wallet/transaction/ledger/reconciliation/core 代码和 H2 schema 只作为参考，不等于编码授权或 FX 执行授权。 |
+| 公共契约门禁 | 只允许非破坏性的 P2-GA FX/fee facade、Request/DTO、返回 DTO、脱敏审计 payload 和解释字段。不得修改 core FX port、transaction canonical request、ledger 公共契约、reconciliation 公共契约或 route replay 公共契约，除非 Grant 显式列出。 |
+| Schema 门禁 | 未显式授权前不得修改 `jdbc-schema.sql`、DDL、Entity、Mapper 或迁移脚本。若需要 FX quote 快照表、费用组件表、费用归因表、FX P&L 确认表或解释视图表，必须先确认 DDL/H2 范围。 |
+| 禁止事项 | 不写 FX 执行、锁汇、报价撮合、汇率平台、treasury 核心、外部 FX provider 集成、银行核心、SWIFT/本地清算网络、ACH/Nacha、完整清结算、完整对账、运营后台、敏感原文、生产配置或合规结论。 |
+| 外部规则门禁 | 只记录外部规则和专业确认完整性状态，必须保留规则来源、版本或发布日期、适用法域或范围、核验日期、确认方和确认状态；未完成法务、合规、财务、税务、会计、银行、通道、持牌机构和数据安全确认前，不得声明生产 Done。 |
+| 验证命令 | 首轮 `just test-one GlobalAccountFxFeeApplicationServiceTests tests`；触碰直接交易费用能力时追加 `just test-one FundsTransactionFeeFlowTests tests`；contract-only 触碰 wallet facade 时追加 `just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；attribution-backed 追加直接交易、账本、交易模块和业务 flow 回归。 |
+| Git 策略 | auto_commit，前提是验证通过、只包含本候选包授权范围且工具权限允许。 |
+| 停止条件 | 缺 implementationDecision、fxExecutionDecision、feeDecision、externalRuleDecision 或专业确认状态；需要 DDL/H2 但未授权；需要修改 core/transaction/ledger/reconciliation 公共契约；需要 FX 执行、外部 FX provider、treasury、完整清结算、完整对账或生产通道；出现敏感原文、依赖反转、公有方法超过 5 个参数或工作树冲突。 |
+| 交接 | 回写 Harness tasks、OpenSpec project/spec、TDD 索引、验证矩阵和残余风险；说明是否仍为 READY_TO_CONFIRM_NOT_CODE_AUTHORIZED。 |
+
+```text
+Execution Grant：P2-GA-FX-FEE
+
+Task ID：P2-GA-FX-FEE-CAD-001
+Git 策略：auto_commit
+实现决策：contract-only 或 attribution-backed（二选一）
+FX 执行决策：默认 no-fx-execution；quote 校验需 quote-validation-only
+费用决策：默认 fee-attribution-only；费用入账需 fee-ledger-backed
+外部规则决策：默认 external-rules-incomplete-blocking
+首批 Red：R0-GA-FX-001A
+次批 Red：R0-GA-FX-001B / R0-GA-FX-001C
+撤销方式：用户说“暂停/停止/撤销 P2-GA-FX-FEE”即停止自动推进
 ```
