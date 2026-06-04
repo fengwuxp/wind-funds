@@ -27,6 +27,10 @@ pmd-update:
 test-one tests module='tests':
     @just _run-test-classes "{{tests}}" {{module}}
 
+# Minimal CAD loop for one implementation slice.
+verify-slice tests module='tests': mvn-version compile
+    @just _run-test-classes "{{tests}}" {{module}}
+
 _assert-test-classes tests:
     @tests="{{tests}}"; missing=0; for test in ${(s:,:)tests}; do test_class="${test%%#*}"; found=$(find . -path "*/src/test/java/*/${test_class}.java" -print -quit); if [[ -z "$found" ]]; then echo "Missing test class: $test_class"; missing=1; fi; done; exit $missing
 

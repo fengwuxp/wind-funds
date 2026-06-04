@@ -118,6 +118,7 @@ OpenSpec 是规格权威源，回答做什么、做到什么程度；Superpowers
 
 - 优先自行补齐可从本仓库发现的信息、运行必要命令、修复本轮范围内的测试或规约问题，并给出阶段性简短更新；除高风险确认点外，不反复询问用户。
 - 每轮必须遵循 `资深架构师` CAD Mode 的执行循环：确认范围、实现或修复、运行对应验证、CR 本轮改动、记录残余风险；具备 `auto_commit` 授权且验证通过时自动提交，权限不足时进入 `summary_only` 但继续推进可执行下一轮。
+- CAD 自动推进默认采用分层验证，平衡编码速度和资金安全：原子代码或测试改动优先运行 `just verify-slice <TestClass>[,<TestClass>] [module]` 或最相关的 `just test-*` 分组；跨模块契约、资金红线、验证矩阵、构建配置、数据库脚本或批次收口时，再运行 `just verify-fast` 或 `just verify-cad`。不得把每个小改都机械升级为全量验证，也不得在触及金额、账务、幂等、清结算、对账或发布前收口时省略必要的完整验证。
 - 只有出现用户明确中断、Execution Grant 越界、工作树冲突无法安全合并、生产/数据/安全/兼容等高风险决策需确认、工具权限被拒且无法降级、验证失败且无法在本轮授权范围内修复，或严重错误会扩大风险时，才暂停自动推进并说明阻断原因和下一步选项。
 - CAD 自动推进不得绕过第 3 节模块边界、第 6 节资金测试红线、平台权限、沙箱限制、Git 授权或不可逆操作确认；不得为了保持自动推进而提交未验证、越界或不可解释的变更。
 
@@ -155,6 +156,7 @@ just compile
 按范围执行相关测试：
 
 ```bash
+just verify-slice <TestClass>[,<TestClass>] [module]
 just test-core
 just test-ledger
 just test-transaction
@@ -171,13 +173,23 @@ just test-one <TestClass> [module]
 just pmd
 ```
 
-CAD 自动模式或完整基线复核优先执行：
+CAD 原子变更默认优先执行：
+
+```bash
+just verify-slice <TestClass>[,<TestClass>] [module]
+```
+
+`verify-slice` 聚合 `mvn-version`、`compile` 和指定测试类，用于单个实现切片、单类回归或小范围测试资产调整。若只改 `Justfile`、文档或治理入口，可选择 `just verify-fast`、`git diff --check` 或对应分组命令作为更合适的验证。
+
+CAD 阶段收口、完整基线复核或提交前风险较高时执行：
 
 ```bash
 just verify-cad
 ```
 
-`verify-cad` 聚合 `mvn-version`、`compile`、`test-core`、`test-ledger`、`test-transaction`、`test-balance-control`、`test-business-flow`、`test-boundary`、`test-governance` 和 `pmd`，用于声明本地完整验证证据。
+`verify-fast` 聚合 `mvn-version`、`compile`、`test-boundary`、`test-governance` 和 `test-reconciliation`，用于非业务逻辑、治理入口和测试基线的中等成本复核。
+
+`verify-cad` 聚合 `mvn-version`、`compile`、`test-core`、`test-ledger`、`test-transaction`、`test-balance-control`、`test-business-flow`、`test-boundary`、`test-governance`、`test-reconciliation` 和 `pmd`，用于声明本地完整验证证据。
 
 如 `pmd:check` 因私有仓库、snapshot、本地 Maven 缓存或依赖解析失败，应在交付说明中按环境依赖问题记录，不得等同于代码规约违规。
 
