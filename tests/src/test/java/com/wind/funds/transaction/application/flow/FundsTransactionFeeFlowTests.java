@@ -1219,7 +1219,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(transaction.getStatus())
                             .isIn(FundsTransactionStatus.OPEN, FundsTransactionStatus.CLOSED);
                     assertThat(transaction.getReferenceTransactionSn()).isEqualTo(sourceTransactionSn);
-                    assertThat(transaction.getRouteSnapshot()).isNotBlank();
+                    assertThat(routeSnapshot(businessSn).getBusinessSn()).isEqualTo(businessSn);
                 });
         String transactionSn = transactions.getFirst().getSn();
         var details = fundsTransactionDetailsByBusinessSn(businessSn);

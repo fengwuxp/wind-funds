@@ -106,6 +106,7 @@ import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.spec.transaction.FeeSpec;
 import com.wind.funds.transaction.enums.DefaultFeeType;
 import com.wind.funds.wallet.FundsAccountId;
@@ -677,7 +678,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .singleElement()
                 .satisfies(transaction -> {
                     assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.FAILED);
-                    assertThat(transaction.getRouteSnapshot()).isNotBlank();
+                    assertReadableRouteSnapshot(transaction.getSn(), businessSn);
                     assertNoLedgerFactsForFundsTransaction(transaction.getSn());
                     assertThat(details)
                             .as("failed funds transaction details must belong to transaction for businessSn %s",
@@ -739,7 +740,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                         assertThat(transaction.getStatus())
                                 .isIn(FundsTransactionStatus.OPEN, FundsTransactionStatus.CLOSED,
                                         FundsTransactionStatus.EXPIRED);
-                        assertThat(transaction.getRouteSnapshot()).isNotBlank();
+                        assertReadableRouteSnapshot(transaction.getSn(), businessSn);
                     });
         }
         assertThat(details)
@@ -841,6 +842,18 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                                         RouteNodeLedgerEntryKey.from(routeLeg.getTargetNode(), EntrySide.CREDIT));
                     });
                 });
+    }
+
+    private void assertReadableRouteSnapshot(String transactionSn, String businessSn) {
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
+                .as("funds transaction route snapshot must be readable for businessSn %s", businessSn)
+                .hasValueSatisfying(routeSnapshot -> assertRouteSnapshotIdentity(routeSnapshot, businessSn));
+    }
+
+    private void assertRouteSnapshotIdentity(RouteSnapshotSpec routeSnapshot, String businessSn) {
+        assertThat(routeSnapshot.getBusinessSn()).isEqualTo(businessSn);
+        assertThat(routeSnapshot.getSnapshotId()).isNotBlank();
+        assertThat(routeSnapshot.getSnapshotSchemaVersion()).isNotBlank();
     }
 
     protected List<LedgerTransaction> ledgerTransactions() {
