@@ -2,6 +2,7 @@ package com.wind.funds.wallet;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.util.StringUtils;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
@@ -38,30 +39,31 @@ class WalletLayerBoundaryTests {
      */
     @Test
     void testWalletFaceShouldOnlyExposeCoreContracts() throws Exception {
-        List<String> artifactIds = artifactIds(workspaceRoot().resolve("wallet/wallet-face/pom.xml"));
+        List<String> dependencyArtifactIds = dependencyArtifactIds(
+                workspaceRoot().resolve("wallet/wallet-face/pom.xml"));
 
-        assertThat(artifactIds).contains("wind-funds-wallet-face", "wind-funds-core", "capte-domain-core");
-        assertThat(artifactIds).doesNotContain(FACE_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
+        assertThat(dependencyArtifactIds).containsExactlyInAnyOrder("wind-funds-core", "capte-domain-core");
+        assertThat(dependencyArtifactIds).doesNotContain(FACE_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
     }
 
     /**
      * 场景：wallet-impl 作为产品门面实现，需要编排钱包契约、交易契约和账务契约。
-     * 预期：impl 只依赖 face/core 契约，不穿透到交易或账务实现包。
+     * 预期：impl 依赖 face 契约和必要基础设施，不穿透到交易或账务实现包。
      * 红线：钱包层不能绕过 transaction/ledger 的服务契约直接耦合实现事实。
      */
     @Test
     void testWalletImplShouldUseFaceContractsWithoutImplDependencies() throws Exception {
-        List<String> artifactIds = artifactIds(workspaceRoot().resolve("wallet/wallet-impl/pom.xml"));
+        List<String> dependencyArtifactIds = dependencyArtifactIds(
+                workspaceRoot().resolve("wallet/wallet-impl/pom.xml"));
 
-        assertThat(artifactIds)
-                .contains("wind-funds-wallet-impl",
-                        "wind-funds-wallet-face",
+        assertThat(dependencyArtifactIds)
+                .contains("wind-funds-wallet-face",
                         "wind-funds-ledger-face",
                         "wind-funds-transaction-face");
-        assertThat(artifactIds).doesNotContain(IMPL_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
+        assertThat(dependencyArtifactIds).doesNotContain(IMPL_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
     }
 
-    private List<String> artifactIds(Path pomPath)
+    private List<String> dependencyArtifactIds(Path pomPath)
             throws ParserConfigurationException, IOException, SAXException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
@@ -70,12 +72,19 @@ class WalletLayerBoundaryTests {
         factory.setExpandEntityReferences(false);
         factory.setXIncludeAware(false);
 
-        NodeList artifactIdNodes = factory.newDocumentBuilder()
+        NodeList dependencyNodes = factory.newDocumentBuilder()
                 .parse(pomPath.toFile())
-                .getElementsByTagName("artifactId");
-        List<String> values = new ArrayList<>(artifactIdNodes.getLength());
-        for (int i = 0; i < artifactIdNodes.getLength(); i++) {
-            values.add(artifactIdNodes.item(i).getTextContent().trim());
+                .getElementsByTagName("dependency");
+        List<String> values = new ArrayList<>(dependencyNodes.getLength());
+        for (int i = 0; i < dependencyNodes.getLength(); i++) {
+            NodeList children = dependencyNodes.item(i).getChildNodes();
+            for (int j = 0; j < children.getLength(); j++) {
+                Node child = children.item(j);
+                if ("artifactId".equals(child.getNodeName())) {
+                    values.add(child.getTextContent().trim());
+                    break;
+                }
+            }
         }
         return values;
     }
