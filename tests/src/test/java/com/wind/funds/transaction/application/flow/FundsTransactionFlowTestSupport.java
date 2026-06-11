@@ -1,5 +1,7 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
@@ -666,6 +668,40 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return FundsBalanceAssertionSupport.ledgerFactSnapshot(jdbcTemplate);
     }
 
+    protected void clearFundsTransactionRouteSnapshot(String transactionSn) {
+        int updated = jdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET route_snapshot = NULL
+                WHERE tenant_id = ? AND sn = ?
+                """, TENANT_ID, transactionSn);
+        assertThat(updated)
+                .as("funds transaction route snapshot cleared for transactionSn %s", transactionSn)
+                .isOne();
+    }
+
+    protected void enrichFundsTransactionRouteSnapshot(String transactionSn,
+                                                       Map<String, Object> values) {
+        String routeSnapshotJson = jdbcTemplate.queryForObject("""
+                SELECT route_snapshot
+                FROM t_funds_transaction
+                WHERE tenant_id = ? AND sn = ?
+                """, String.class, TENANT_ID, transactionSn);
+        assertThat(routeSnapshotJson)
+                .as("funds transaction route snapshot must exist before enrichment for transactionSn %s",
+                        transactionSn)
+                .isNotBlank();
+        JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson);
+        values.forEach(routeSnapshot::put);
+        int updated = jdbcTemplate.update("""
+                UPDATE t_funds_transaction
+                SET route_snapshot = ?
+                WHERE tenant_id = ? AND sn = ?
+                """, JSON.toJSONString(routeSnapshot), TENANT_ID, transactionSn);
+        assertThat(updated)
+                .as("funds transaction route snapshot enriched for transactionSn %s", transactionSn)
+                .isOne();
+    }
+
     protected void assertLedgerTransactionFactsUnchanged(LedgerFactSnapshot expected) {
         FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged(jdbcTemplate, expected);
     }
@@ -704,6 +740,10 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     }
 
     protected void assertNoFundsOrLedgerFactsForBusinessSn(String businessSn) {
+        assertNoPersistedTransactionFactsForBusinessSn(businessSn);
+    }
+
+    protected void assertNoPersistedTransactionFactsForBusinessSn(String businessSn) {
         assertThat(fundsTransactionsByBusinessSn(businessSn))
                 .as("funds transactions for businessSn %s", businessSn)
                 .isEmpty();

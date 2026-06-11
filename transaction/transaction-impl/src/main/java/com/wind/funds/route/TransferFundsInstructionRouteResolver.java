@@ -18,6 +18,7 @@ import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteParticipantRole;
+import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
@@ -171,6 +172,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .targetNode(targetNode(routeSubjectSupport.createSubjectRef(payeeId), payeeLedgerSubjectCode))
                 .balanceEffectType(LedgerBalanceEffectType.CONSUME)
                 .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
                 .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
                 .build());
         List<RouteParticipantSpec> participants = new ArrayList<>();
@@ -379,6 +381,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                         platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.FEE)))
                 .balanceEffectType(LedgerBalanceEffectType.CONSUME)
                 .phaseCode(LedgerPhaseCode.FEE)
+                .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
                 .constraintOverrides(mustNotBeNegative(payerAccountId, LedgerSubjectCode.AVAILABLE))
                 .build());
         participants.add(platformParticipant(RouteParticipantRole.FEE_RECEIVER, feeAccount,

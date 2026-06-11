@@ -392,6 +392,52 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
+     * 场景：预算组已经通过余额控制获得预算额度后，被误作为授权交易账户。
+     * 输入：预算组额度调增 50，再提交预算组授权批准 10。
+     * 输出：授权请求被拒绝；预算组控制账本和平台结算账户余额保持授权前状态。
+     * 预期：预算组只能作为预算控制上下文，不得被授权交易包装成资金价值主体。
+     * 红线：预算组不得生成授权 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testAuthorizeBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId budget = budgetGroup("auth_budget_group");
+        ensureBudgetGroup(budget);
+
+        BalanceSnapshot beforeAdjust = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
+        adjustBalance(budget, 50L, true, "AUTH_BUDGET_GROUP_ADJUST");
+        BalanceSnapshot afterAdjust = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeAdjust, afterAdjust,
+                delta(budget, LedgerSubjectCode.LIMIT, 50L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterAdjustFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> authorize(budget, 10L, true, "AUTH_BUDGET_GROUP_AUTHORIZE"))
+                .hasMessageContaining("授权交易账户不能是预算组");
+
+        BalanceSnapshot afterRejectedAuthorize = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAdjust, afterRejectedAuthorize,
+                delta(budget, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterAdjustFacts);
+
+        assertBucket(balance(budget), LedgerSubjectCode.LIMIT, 50L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_BUDGET_GROUP_ADJUST", 1, 1, 1, 2);
+        assertNoPersistedTransactionFactsForBusinessSn("AUTH_BUDGET_GROUP_AUTHORIZE");
+    }
+
+    /**
      * 场景：用户充值后授权批准，先完成部分金额，再由系统过期释放剩余授权。
      * 输入：充值 100、授权批准 80、完成 30、授权过期释放 50。
      * 输出：AVAILABLE/AUTHORIZATION/SETTLEMENT 余额变化、过期明细和原 route replay 账务事实。
@@ -1513,6 +1559,42 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_MISSING_REASON");
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_MISSING_VOUCHER");
         assertNoFundsOrLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_MISSING_EXTERNAL_REF");
+    }
+
+    /**
+     * 场景：授权后继事件引用不存在的原授权交易。
+     * 输入：已存在账户但不存在原授权流水，分别提交撤销、完成和退款请求。
+     * 输出：请求在生成资金事实前失败，余额、账务事实和业务流水均不变化。
+     * 预期：授权后继事件必须先锁定原授权事实和原 route snapshot，不得根据当前账户重新选路。
+     * 红线：缺原授权事实不得生成 route、posting、ledger transaction、LedgerEntry 或交易投影副作用。
+     */
+    @Test
+    void testAuthorizationSuccessorsMissingOriginalFactShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        String missingAuthorizationSn = "MISSING_AUTHORIZATION_TXN";
+        BalanceSnapshot beforeFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> reverseAuthorization(user, 30L, missingAuthorizationSn,
+                "AUTH_REPLAY_MISSING_ORIGINAL_REVERSAL"))
+                .hasMessageContaining("授权交易不存在");
+        assertThatThrownBy(() -> settleAuthorization(user, 30L, missingAuthorizationSn,
+                "AUTH_REPLAY_MISSING_ORIGINAL_SETTLE"))
+                .hasMessageContaining("授权交易不存在");
+        assertThatThrownBy(() -> refundSettledAuthorization(user, 30L, missingAuthorizationSn,
+                "AUTH_REPLAY_MISSING_ORIGINAL_REFUND"))
+                .hasMessageContaining("授权交易不存在");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_REPLAY_MISSING_ORIGINAL_REVERSAL");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_REPLAY_MISSING_ORIGINAL_SETTLE");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_REPLAY_MISSING_ORIGINAL_REFUND");
     }
 
     /**

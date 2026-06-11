@@ -22,10 +22,12 @@ import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -62,6 +64,7 @@ public class FundsAuthorizationInstructionConverter {
     public @NonNull FundsInstructionSpec convertToAuthorizeInstruction(
             @NonNull FundsAuthorizationTransactionAuthorizeRequest request,
             @NonNull WindOperator operator) {
+        assertNotBudgetGroup(request.getAccountId(), "授权交易账户不能是预算组");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
@@ -355,6 +358,10 @@ public class FundsAuthorizationInstructionConverter {
         }
         result.putAll(extraContext);
         return Map.copyOf(result);
+    }
+
+    private void assertNotBudgetGroup(@NonNull FundsAccountId accountId, @NonNull String message) {
+        AssertUtils.isFalse(FundsSubjectType.BUDGET_GROUP.name().equals(accountId.type()), message);
     }
 
     private @NonNull FundsOperationActorSpec operationActor(@NonNull WindOperator operator) {

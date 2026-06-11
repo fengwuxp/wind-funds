@@ -157,6 +157,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         applySucceededSummary(transaction, details);
         AssertUtils.isTrue(fundsTransactionMapper.update(transaction) == 1,
                 "更新资金交易聚合状态失败，sn = {}", transaction.getSn());
+        applyReferencedTransactionSucceededSummary(instruction, transaction, details);
     }
 
     @Override
@@ -232,7 +233,17 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
 
     private boolean requiresStandaloneTransaction(FundsInstructionSpec instruction) {
         return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION
-                && instruction.getEventType() == FundsTransactionEventType.FEE_REFUND;
+                && switch (instruction.getEventType()) {
+            case REFUND -> isOriginalTransactionReference(instruction.getReference());
+            case FEE_REFUND -> true;
+            default -> false;
+        };
+    }
+
+    private boolean isOriginalTransactionReference(@Nullable FundsInstructionReferenceSpec reference) {
+        return reference != null
+                && reference.getReferenceType() == FundsInstructionReferenceType.ORIGINAL_TRANSACTION
+                && StringUtils.hasText(reference.getReferenceSn());
     }
 
     private boolean isFundsTransactionReference(FundsInstructionReferenceType referenceType) {
@@ -435,6 +446,28 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             case FREEZE, UNFREEZE, BALANCE_ADJUST, LIMIT_ADJUST ->
                     transaction.setStatus(resolveBalanceControlStatus(primaryDetail));
         }
+    }
+
+    private void applyReferencedTransactionSucceededSummary(@NonNull FundsInstructionSpec instruction,
+                                                            @NonNull FundsTransaction transaction,
+                                                            @NonNull List<FundsTransactionDetail> details) {
+        if (!requiresReferencedTransactionSummary(instruction)) {
+            return;
+        }
+        FundsInstructionReferenceSpec reference = instruction.getReference();
+        if (Objects.equals(reference.getReferenceSn(), transaction.getSn())) {
+            return;
+        }
+        FundsTransaction referencedTransaction = findTransactionBySn(reference.getReferenceSn());
+        applySucceededSummary(referencedTransaction, details);
+        AssertUtils.isTrue(fundsTransactionMapper.update(referencedTransaction) == 1,
+                "更新引用资金交易聚合状态失败，sn = {}", referencedTransaction.getSn());
+    }
+
+    private boolean requiresReferencedTransactionSummary(@NonNull FundsInstructionSpec instruction) {
+        return instruction.getInstructionType() == FundsInstructionType.DIRECT_TRANSACTION
+                && instruction.getEventType() == FundsTransactionEventType.REFUND
+                && isOriginalTransactionReference(instruction.getReference());
     }
 
     private void assertPostingSummaryAllowed(FundsInstructionSpec instruction, FundsTransaction transaction) {

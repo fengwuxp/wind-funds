@@ -31,11 +31,13 @@ import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
+import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -65,6 +67,7 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.notNull(request.getAccountId(), "直接充值入账账户不能为空");
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
                 "直接充值入账账户不能是外部账户");
+        assertNotBudgetGroup(request.getAccountId(), "直接充值入账账户不能是预算组");
         AssertUtils.notNull(request.getChannel(), "直接充值资金通道不能为空");
         AssertUtils.notNull(request.getChannelTransactionSn(), "直接充值通道交易流水不能为空");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
@@ -101,6 +104,8 @@ public class FundsDirectTransactionInstructionConverter {
                 "系统内转账付款账户不能是外部账户");
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getPayeeAccountId()),
                 "系统内转账收款账户不能是外部账户");
+        assertNotBudgetGroup(request.getPayerAccountId(), "系统内转账付款账户不能是预算组");
+        assertNotBudgetGroup(request.getPayeeAccountId(), "系统内转账收款账户不能是预算组");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getPayerAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.PAYER_ACCOUNT_ID, request.getPayerAccountId());
@@ -132,6 +137,8 @@ public class FundsDirectTransactionInstructionConverter {
                 "直接付款账户不能是外部账户");
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getPayeeId()),
                 "直接付款收款主体不能是外部账户");
+        assertNotBudgetGroup(request.getAccountId(), "直接付款账户不能是预算组");
+        assertNotBudgetGroup(request.getPayeeId(), "直接付款收款主体不能是预算组");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
@@ -164,6 +171,8 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getPayerId()),
                 "直接退款出资主体不能是外部账户");
         AssertUtils.notNull(request.getPayerLedgerCode(), "直接退款出资账目不能为空");
+        assertNotBudgetGroup(request.getAccountId(), "直接退款到账账户不能是预算组");
+        assertNotBudgetGroup(request.getPayerId(), "直接退款出资主体不能是预算组");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.PAYER_ID, request.getPayerId());
@@ -184,10 +193,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .reference(request.getChannelTransactionSn() == null
-                        ? null
-                        : reference(FundsInstructionReferenceType.EXTERNAL_TRANSACTION, null,
-                        request.getChannelTransactionSn()))
+                .reference(refundReference(request))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -197,12 +203,24 @@ public class FundsDirectTransactionInstructionConverter {
                 .build();
     }
 
+    private @Nullable FundsInstructionReferenceSpec refundReference(@NonNull FundsTransactionRefundRequest request) {
+        if (StringUtils.hasText(request.getReferenceTransactionSn())) {
+            return reference(FundsInstructionReferenceType.ORIGINAL_TRANSACTION, request.getReferenceTransactionSn(),
+                    null);
+        }
+        if (request.getChannelTransactionSn() == null) {
+            return null;
+        }
+        return reference(FundsInstructionReferenceType.EXTERNAL_TRANSACTION, null, request.getChannelTransactionSn());
+    }
+
     public @NonNull FundsInstructionSpec convertToWithdrawInstruction(@NonNull FundsTransactionWithdrawRequest request,
                                                                       @NonNull WindOperator operator) {
         AssertUtils.notNull(request.getAccountId(), "提现账户不能为空");
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
                 "提现账户不能是外部账户");
         AssertUtils.hasText(request.getReferenceFreezeSn(), "提现冻结流水号不能为空");
+        assertNotBudgetGroup(request.getAccountId(), "提现账户不能是预算组");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
@@ -234,6 +252,7 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
                 "手续费支出账户不能是外部账户");
         AssertUtils.notNull(request.getFeeType(), "手续费类型不能为空");
+        assertNotBudgetGroup(request.getAccountId(), "手续费支出账户不能是预算组");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
@@ -260,6 +279,7 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.notNull(request.getAccountId(), "手续费退回到账账户不能为空");
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
                 "手续费退回到账账户不能是外部账户");
+        assertNotBudgetGroup(request.getAccountId(), "手续费退回到账账户不能是预算组");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
@@ -328,6 +348,10 @@ public class FundsDirectTransactionInstructionConverter {
         if (feeSpec != null) {
             context.put(FundsInstructionContextKeys.FEE_SPEC, feeSpec);
         }
+    }
+
+    private void assertNotBudgetGroup(@NonNull FundsAccountId accountId, @NonNull String message) {
+        AssertUtils.isFalse(FundsSubjectType.BUDGET_GROUP.name().equals(accountId.type()), message);
     }
 
     private @NonNull FundsOperationActorSpec operationActor(@NonNull WindOperator operator) {

@@ -42,6 +42,10 @@ public class FundsTransactionRefundRequest {
     @NonNull
     private LedgerSubjectCode payerLedgerCode = LedgerSubjectCode.SETTLEMENT;
 
+    @Schema(description = "原资金交易流水号；填写后直接退款按原交易 RouteSnapshot 回放")
+    @Size(max = 80)
+    private String referenceTransactionSn;
+
     @Schema(description = "业务流水号，退款凭证，例如：在线退款流水号、人工退款单流水号")
     @NotNull
     private String businessSn;

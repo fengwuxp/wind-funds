@@ -150,7 +150,7 @@ mindmap
 | CREATED | 授权成功 | 通道批准或支付成功。 | 记录支付成功事件，生成待清算资金动作。 | AUTHORIZED / CAPTURED | 不得直接进入商户可结算。 |
 | CAPTURED | 账本过账 | 支付结果、主体、币种和金额通过。 | 商户 CLEARING 增加，平台费用入账。 | SPLITTABLE | 未过账不得清分。 |
 | SPLITTABLE | 清分批次确认 | 清分规则、明细和对账通过。 | 固化清分批次。 | SPLIT_CONFIRMED | 清分确认不等于结算。 |
-| SPLIT_CONFIRMED | 清算确认 | 风控、退款、争议、差错阻断均通过。 | CLEARING -> SETTLEMENT 或 AVAILABLE。 | CLEARING_CONFIRMED | 被争议或差错阻断不得清算。 |
+| SPLIT_CONFIRMED | 清算批次确认 | 风控、退款、争议、差错阻断均通过。 | CLEARING -> AVAILABLE；后续结算锁定才 AVAILABLE -> SETTLEMENT。 | CLEARING_CONFIRMED | 被争议或差错阻断不得清算。 |
 | CLEARING_CONFIRMED | 结算锁定 | 结算单复核通过。 | 锁定可结算金额。 | LOCKED | 结算锁定后普通交易不得直接修改净额。 |
 | LOCKED | 出款提交 | 出款前置检查通过。 | SETTLEMENT -> IN_TRANSIT。 | PAYOUT_SUBMITTED | 外部受理不等于 PAID。 |
 | PAYOUT_SUBMITTED | 银行到账 | 回单和对账确认。 | 确认出款完成。 | PAID | 无回单不得终态成功。 |
@@ -249,7 +249,7 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- |
 | ACQ-AC-001 | 支付成功进入待清算 | capture 成功事件、商户、金额、币种。 | 商户 CLEARING 增加，生成 ledger entry。 | 平台手续费、通道成本。 | 重复通知幂等。 |
 | ACQ-AC-002 | 清分批次确认 | 可清分明细、规则版本、周期。 | 生成清分批次，不释放可结算。 | 多商户、多币种。 | 明细缺账本引用阻断。 |
-| ACQ-AC-003 | 清算确认进入可结算 | 清分确认且无阻断。 | CLEARING -> SETTLEMENT 或 AVAILABLE。 | 准备金扣减。 | 争议未闭环阻断。 |
+| ACQ-AC-003 | 清算确认进入可结算 | 清算批次确认且无阻断。 | CLEARING -> AVAILABLE；后续结算锁定才进入 SETTLEMENT。 | 准备金扣减。 | 争议未闭环阻断。 |
 | ACQ-AC-004 | 结算出款成功 | 结算单锁定、出款回单成功。 | IN_TRANSIT -> PAID，商户账单展示到账。 | 部分失败待确认。 | 无回单不得 PAID。 |
 | ACQ-AC-005 | 退款沿原路径 | 已 capture 交易退款。 | 基于原 route snapshot 回放，更新清账和结算影响。 | 结算后退款。 | 超额退款失败。 |
 | ACQ-AC-006 | chargeback 独立追偿 | 已结算交易发生拒付。 | 生成 dispute case、扣准备金、负余额或追偿。 | 争议费。 | 与 refund 碰撞防重复损失。 |

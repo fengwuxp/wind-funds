@@ -14,7 +14,7 @@
 
 目标：把 PRD 的验收条件、DSL 的 caseId、系分的服务入口和代码的真实执行路径映射为可执行或可转化的测试资产，证明每个资金变化都满足状态正确、金额闭合、账目清晰、账本可追溯、投影只读、幂等无副作用和审计可解释。
 
-业务目标：让支付资金底座的资金变化具备可解释、可核对、可回归的测试证据；用户价值是让产品、运营、财务和研发能从同一组 TDD 证据判断当前能力是否可进入单一 Execution Grant。
+业务目标：让支付资金底座的资金变化具备可解释、可核对、可回归的测试证据；用户价值是让产品、运营、财务和研发能从同一组 TDD 证据判断能力是否具备工程落地条件。
 
 非目标：本目录不定义产品功能，不替代 DSL 字段设计，不决定服务接口或表结构，不授权修改生产代码、测试代码、DDL/H2 schema 或运行时配置。进入编码仍以工程任务边界为准。
 
@@ -22,20 +22,30 @@
 
 ## MVP TDD 约规
 
-TDD 默认先证明 MVP 切片，而不是一次性铺大全量目标态。每轮测试设计只覆盖本轮最小闭环所需的正向、逆向、异常、幂等和红线路径；其他业务扩展、外部协议、清结算深水区、资金数据治理、运营后台和报表能力必须写成未覆盖范围或独立能力域。
+TDD 默认先证明 MVP 切片，而不是一次性铺大全量目标态。每个测试设计任务只覆盖最小闭环所需的正向、逆向、异常、幂等和红线路径；其他业务扩展、外部协议、清结算深水区、资金数据治理、运营后台和报表能力必须写成未覆盖范围或独立能力域。
 
 MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可追溯、posting plan 平衡、LedgerEntry 可核对、余额投影正确、重复请求无副作用、失败不产生半截事实。若一个测试只能证明接口不报错、状态变化或数量变化，不能作为 MVP 完成证据。
 
 ## 阅读顺序
 
+本 README 只作为 TDD 设计入口。过程记录、任务排队和编码授权边界保存在对应准入卡、GSD 计划、OpenSpec change tasks 和状态账本中。
+
 | 顺序 | 文档 | 作用 |
 | --- | --- | --- |
 | 1 | [支付资金底座测试驱动设计.md](支付资金底座测试驱动设计.md) | 定义测试驱动设计原则、模块测试矩阵、场景用例、红线用例、目标测试资产和执行门禁。 |
-| 2 | [A0-编码准入基线核验.md](A0-编码准入基线核验.md) | 固化进入编码前的只读核验页，说明 authority baseline、code baseline、target assets、schemaNeed、首批 Red 候选和下一步 Execution Grant 建议。 |
-| 3 | [A1-直接交易事实红线准入卡.md](A1-直接交易事实红线准入卡.md) | 收敛 A1 直接交易事实红线的候选 Execution Grant，说明候选授权、覆盖验收、写入边界、Red 集合、验证命令和停止条件。 |
-| 4 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 收敛 B4-TRX-EXPIRE、B4-FORCE-SETTLE、B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT 和 B4-AUTH-RACE 已闭合后的授权后继能力基线；后续完整 dispute/chargeback case、授权支付工具应用入口、授权占券和权益生命周期必须重新确认独立 Execution Grant 后才允许写 Red 或代码。 |
-| 5 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 收敛支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的 Round 0 候选卡；只作为支付工具及周边支持队列的独立 Execution Grant 输入，不覆盖账本账目、钱包和交易层优先级。 |
-| 6 | [P2-业务能力包Round0准入卡.md](P2-业务能力包Round0准入卡.md) | 收敛全球账户等 P2 业务专项进入资金底座前的 Round 0 候选卡，并保留收单 design-only 边界；全球账户和 VCC 支持放到最后，收单能力仅做设计不做实现。 |
+| 2 | [A0-编码准入基线核验.md](A0-编码准入基线核验.md) | 编码前只读核验页，用于整理 authority baseline、code baseline、target assets、schemaNeed、首批 Red 候选和工程任务建议。 |
+| 3 | [GSD-Goal-生产可用MVP推进计划.md](GSD-Goal-生产可用MVP推进计划.md) | 生产可用 MVP 推进基线，按依赖关系组织账本账目、钱包账户、交易内核、清结算对账、支付工具、VCC 和全球账户。 |
+| 4 | [GSD-1-账本账目Round0准入卡.md](GSD-1-账本账目Round0准入卡.md) | 账本、账目、posting、ledger entry 和余额投影的准入输入。 |
+| 5 | [GSD-1-账本账目Wave1执行计划.md](GSD-1-账本账目Wave1执行计划.md) | 账本账目 Wave 执行计划和目标 Red 分解。 |
+| 6 | [GSD-1-账本账目状态账本.md](GSD-1-账本账目状态账本.md) | 账本账目跨会话状态、决策日志、验证矩阵、handoff 和下一决策记录。 |
+| 7 | [GSD-1-账本账目代码库理解结论包.md](GSD-1-账本账目代码库理解结论包.md) | 账本账目代码入口、调用关系、既有覆盖、验证策略和残余风险。 |
+| 8 | [GSD-1-账本账目ExecutionGrant确认卡.md](GSD-1-账本账目ExecutionGrant确认卡.md) | 账本账目工程授权和消费记录，作为任务历史材料，不替代 TDD 权威设计。 |
+| 9 | [A1-直接交易事实红线准入卡.md](A1-直接交易事实红线准入卡.md) | 直接交易事实红线、覆盖验收、写入边界、Red 集合、验证命令和停止条件。 |
+| 10 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 授权后继能力、无授权退款、拒付语义和并发竞争的任务准入材料。 |
+| 11 | [B4-交易内核生产可用性Round0准入卡.md](B4-交易内核生产可用性Round0准入卡.md) | 账户主体型 canonical 交易内核生产可用补强、原路径回放和缺快照 fail-fast 的任务准入材料。 |
+| 12 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 账户层级、支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的任务准入材料。 |
+| 13 | [B7-清结算与对账Round0准入卡.md](B7-清结算与对账Round0准入卡.md) | 对账差错闭环、重跑幂等、白名单补事实准入和最小 DDL/H2 范围的任务准入材料。 |
+| 14 | [P2-业务能力包Round0准入卡.md](P2-业务能力包Round0准入卡.md) | VCC、全球账户、收单等 P2 业务专项进入资金底座前的准入材料。 |
 
 ## 契约输入
 
@@ -77,7 +87,7 @@ TDD 设计的准入目标是证明设计已经能转成真实测试资产和验�
 | 评估维度 | TDD 侧必须证明 | 阻断信号 |
 | --- | --- | --- |
 | 可用性 | 产品场景能转成可执行或可转化的测试用例，包含输入事实、前置数据、动作和期望结果。 | 场景只能人工理解，无法写测试数据和断言。 |
-| MVP 裁剪 | 本轮只选择最小闭环测试集，能证明目标场景成功、失败、幂等和红线；扩展能力有未覆盖说明。 | 为未来扩展提前铺大量测试，或把清结算、归档、P2 业务混进交易主线 Red。 |
+| MVP 裁剪 | 只选择最小闭环测试集，能证明目标场景成功、失败、幂等和红线；扩展能力有未覆盖说明。 | 为未来扩展提前铺大量测试，或把清结算、归档、P2 业务混进交易主线 Red。 |
 | 资金安全 | 有资金变化的用例同时断言状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、余额桶、route snapshot、posting plan、ledger entry、balance projection、借贷平衡、余额影响和幂等。 | 只断言交易状态、entry 数量或“不报错”。 |
 | 金融红线 | 外部账户入账、敏感信息泄露、授权拒绝写账、冻结表达消费、投影反写事实、无审批调账等必须失败。 | 红线只写在文档里，没有 TDD-RED 用例或明确不适用原因。 |
 | 易用性 | 用户账单、商户账单、运营时间线、错误原因和审计查询有测试或断言来源。 | 只测后台内部对象，不证明使用者能理解结果。 |
@@ -101,13 +111,13 @@ TDD 评审口径：TDD 入口必须承接 PRD 目标、DSL 契约和系分落点
 
 授权支付工具入口只允许测试 application facade 的准入、解析、快照和委派，不允许把账户主体型 `FundsAuthorizationTransactionService.authorize` 请求替换为支付工具引用。P2 场景如 VCC 预付卡充值、共享卡调额、VA 收款、全球账户付款和 ACH/银行转账事件，必须先经业务能力包解释成归一资金事实，再复用 P1/P0 测试资产。
 
-授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核先读 [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md)，该卡把 `B4-FS-RED-*`、`B4-NAR-RED-*`、`B4-CB-RED-*` 和 `B4-RACE-RED-*` 拆成强制完成、无授权退款、拒付承接和并发竞争独立切片；其中强制完成、无授权退款、争议退款可区分性和授权并发竞争已进入回归基线，当前不再默认恢复 `B4-NAR-CAD-001`、`B4-DISPUTE-SEMANTIC-ALIGNMENT` 或 `B4-AUTH-RACE`。支付工具与 Spend Rule 的生产可用性评审再读 [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md)，该卡把 `R0-PI-001`、`R0-FR-001`、`R0-AUTH-001`、`R0-SR-001`、`R0-SR-002` 和 `R0-PI-002` 拆成独立切片；这些切片只属于支付工具及周边支持队列，整体排在账本账目、钱包基础能力和交易层之后。未确认对应 Execution Grant 前，TDD 只能继续做 Round 0、差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置；收单能力仅做设计和边界复核，不写 Red 测试或实现。
+授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核通过授权后继准入卡承接强制完成、无授权退款、拒付承接和并发竞争；支付工具与 Spend Rule 的生产可用性通过支付工具准入卡承接工具准入、资金责任解析、授权 application facade、Spend Rule 控制和只读投影。支付工具及周边支持队列整体排在账本账目、钱包基础能力和交易内核之后；未形成独立工程任务前，TDD 只能继续做差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 
-其中 B2-FR 必须先选择 `funding-account-only` 或 `targetSubjectType + targetSubjectId`。前者只能证明资金账户责任解析，后者才允许声明信用账户或平台角色责任主体，并必须同步 DTO、DDL/H2、摘要、fixture、route snapshot 和回放断言。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产 Done。
+资金责任目标字段必须先选择 `funding-account-only` 或 `targetSubjectType + targetSubjectId`。前者只能证明普通资金账户责任解析，后者才允许声明信用账户、VCC 关联资金/信用子账户或平台角色责任主体，并必须同步 DTO、DDL/H2、摘要、fixture、route snapshot、账户层级快照和回放断言。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产 Done。
 
 ## 生产验证准入口径
 
-TDD 设计区分“目标测试资产”和“当前已执行证据”。目标测试资产只说明生产交付需要哪些测试；只有测试代码存在、数据准备完整、验证命令执行通过，并且交付说明列出覆盖范围后，才能作为生产完成证据。
+TDD 设计区分“目标测试资产”和“执行证据”。目标测试资产只说明生产交付需要哪些测试；只有测试代码存在、数据准备完整、验证命令执行通过，并且交付说明列出覆盖范围后，才能作为生产完成证据。
 
 | 判定对象 | 可接受证据 | 不可接受替代 |
 | --- | --- | --- |
@@ -134,7 +144,7 @@ TDD 设计区分“目标测试资产”和“当前已执行证据”。目标�
 
 | 切片 | Red 目标 | 最低断言 | 暂不覆盖 |
 | --- | --- | --- | --- |
-| 基线核验 | 证明测试环境、H2 schema、现有测试资产和验证命令可用。 | `just mvn-version`、目标测试可定位、fixture 可读取、工作树范围可解释。 | 不新增生产实现、测试代码或 schema。 |
+| 基线核验 | 证明测试环境、H2 schema、现有测试资产和验证命令可用。 | `just mvn-version`、目标测试可定位、fixture 可读取、任务范围可解释。 | 不新增生产实现、测试代码或 schema。 |
 | 直接交易 | 证明直接交易成功和失败的资金事实链。 | 交易状态、route snapshot、posting plan、ledger transaction、ledger entry、余额投影、幂等和审计；余额不足、规则不唯一或重复请求无副作用。 | 清结算、对账、归档、P2 业务能力包。 |
 | 授权交易 | 证明授权完成、部分完成、撤销、过期、退款和拒付的状态与金额边界。 | 授权拒绝不生成 route/entry；累计完成不超授权；撤销/过期释放剩余占用；逆向沿原 route snapshot。 | 商户结算单、出款单、外部卡组织完整规则。 |
 | 余额控制 | 证明冻结、解冻、调整和失败路径不改变资金语义。 | 冻结只做同主体 `AVAILABLE <-> FROZEN`；解冻不产生跨主体转移；调整必须有审批、原因、审计和幂等；失败不写 entry。 | 对账差错调账和运营补事实白名单，除非独立任务确认。 |
@@ -153,7 +163,7 @@ TDD 设计区分“目标测试资产”和“当前已执行证据”。目标�
 | 一个 Red 对应一个业务问题 | 能反查 `businessQuestion`、`mvpScenario`、产品验收 ID 和 DSL caseId。 | 回到产品或 DSL，不写测试。 |
 | 一个 Red 证明一个最小资金不变量 | 至少覆盖适用的主体、账户类型、`normalBalanceSide`、账目、金额、币种、route、posting、entry、projection、幂等和审计。 | 缩小场景或补资金事实表。 |
 | 失败路径必须有 forbidden facts | 明确不允许半截 route、posting、entry、投影、外部出款、敏感导出、治理反写或重复资金副作用。 | 先补失败无副作用断言。 |
-| 不把能力域混在一起 | A1-A4、B7、B8、P2 只能单独授权；清结算深水区、资金数据治理、业务专项不得混入交易主线 Red。 | 拆成独立 Red 候选和独立 Execution Grant。 |
+| 不把能力域混在一起 | A1-A4、B7、B8、P2 只能单独授权；清结算深水区、资金数据治理、业务专项不得混入交易主线 Red。 | 拆成独立 Red 候选和独立工程任务。 |
 | 测试资产要真实可落地 | 指定目标测试类、真实执行路径、fixture/H2 数据、替身边界和验证命令。 | 只能做 TDD 分析或 contract-only。 |
 | 停止条件先写清 | 红灯不符合预期、公共契约/表结构越界、外部规则未确认、生产风险升高时如何停止。 | 不进入 Green 实现。 |
 
@@ -163,7 +173,7 @@ TDD 设计区分“目标测试资产”和“当前已执行证据”。目标�
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
 
-A0 基线核验阶段不写测试代码，但必须输出 `redCandidateSet`、`targetAssets`、`schemaNeed`、`minimumAssertions` 和 `testStopReasons`。只有用户确认单一 Execution Grant 后，才把候选 Red 转成实际测试写入。
+A0 基线核验阶段不写测试代码，但必须输出 `redCandidateSet`、`targetAssets`、`schemaNeed`、`minimumAssertions` 和 `testStopReasons`。只有工程任务明确写入范围后，才把候选 Red 转成实际测试写入。
 
 ### MVP 任务测试卡
 
@@ -171,10 +181,10 @@ A0 基线核验阶段不写测试代码，但必须输出 `redCandidateSet`、`t
 
 | 输出项 | 填写口径 |
 | --- | --- |
-| `mvpScenario` | 本轮目标场景、入口动作、成功终态、失败终态和不覆盖范围。 |
-| `firstRedSet` | 只覆盖本轮最小闭环的 Red；每个 Red 写清失败断言、目标测试类和验证命令。 |
+| `mvpScenario` | 目标场景、入口动作、成功终态、失败终态和不覆盖范围。 |
+| `firstRedSet` | 只覆盖最小闭环的 Red；每个 Red 写清失败断言、目标测试类和验证命令。 |
 | `coreAssertions` | 状态、route snapshot、posting plan、LedgerEntry、余额投影、幂等、审计和失败无副作用中的适用断言。 |
-| `outOfScope` | 清结算深水区、资金数据治理、P2 业务、外部协议、完整运营后台和报表等不进入本轮的范围。 |
+| `outOfScope` | 清结算深水区、资金数据治理、P2 业务、外部协议、完整运营后台和报表等不进入当前任务的范围。 |
 | `nextGate` | 后续扩展需要的产品确认、DSL caseId、系分落点、测试资产和独立授权条件。 |
 
 ### 基线核验测试盘点
@@ -201,17 +211,6 @@ A0 基线核验阶段不写测试代码，但必须输出 `redCandidateSet`、`t
 | `minimumAssertions` | 状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、余额桶、route、posting、entry、projection、借贷平衡、余额影响、幂等、审计和 forbidden facts。 |
 | `schemaNeed` | 是否需要 DDL/H2、Entity、Mapper 或测试资源写入授权。 |
 | `testStopReasons` | 哪些失败必须停止并回到工程任务、系分或外部规则确认。 |
-
-### 代码基线到 Red 的承接口径
-
-当前 TDD 编码准入以确认时 Git HEAD、OpenSpec 和 Harness 最新任务账本为准；`77bc9f4 fix: 阻断钱包上下文权益核心事实`、`81a7ecb docs: 收敛钱包入口与支付工具口径` 和 `270122e docs: 刷新 CAD 准入基线` 只保留为历史准入与局部验证证据。TDD 可以把这些提交之前已验证的上下文不可变、敏感字段阻断、权益核心字段不得旁路、支付工具绑定对象约束和局部服务测试作为回归资产，但不得把它们外推为后续能力已完成；进入编码时仍必须以确认时 Git HEAD 作为 `authorityBaseline`。
-
-| 基线项 | 可复用测试资产 | 后续 Red 触发条件 |
-| --- | --- | --- |
-| 交易 Request 只读上下文 | `FundsTransactionRequestContextVariablesContractTests` 和交易流程敏感上下文测试。 | 新增或修改 `com.wind.funds.transaction.model.request` 字段、请求摘要、转换器或上下文合并逻辑时，必须补请求契约和敏感上下文回归。 |
-| 钱包管理对象上下文红线 | `FundingAccountServiceImplTests`、`PaymentInstrumentServiceImplTests`、`ControlAccountLedgerInitializationTests` 等。 | 账户、支付工具、资金责任解析关系或平台账户新增 `contextVariables` 写入入口时，必须证明敏感字段和权益核心字段失败且不落账户、支付工具或账本事实。 |
-| route/ledger/transaction 上下文红线 | DSL 契约测试、账务服务测试、交易流程测试和投影重放测试。 | route snapshot、posting plan、ledger entry、交易参与方、冻结单、余额投影或重放上下文新增字段时，必须证明核心资金事实不经普通上下文旁路。 |
-| 未覆盖资金流 | 含权益 route/posting/replay、清结算、对账、归档、冷热读取、治理重放和 P2 业务专项仍为目标资产。 | 任一任务要声明生产资金流 Done，必须新增对应服务级或治理级 Red、H2/fixture 证据和验证命令。 |
 
 ### Red 卡模板
 

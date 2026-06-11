@@ -20,7 +20,7 @@
 
 ## MVP DSL 约规
 
-DSL 先承载 MVP 必须闭环的资金事实，不提前抽象完整协议层、通用规则平台或全量业务扩展模型。新增 DSL 对象、枚举或字段前，必须证明它用于本轮可验收场景的请求、route snapshot、posting plan、LedgerEntry、投影解释、幂等或失败红线。
+DSL 先承载 MVP 必须闭环的资金事实，不提前抽象完整协议层、通用规则平台或全量业务扩展模型。新增 DSL 对象、枚举或字段前，必须证明它用于目标可验收场景的请求、route snapshot、posting plan、LedgerEntry、投影解释、幂等或失败红线。
 
 只为未来业务预留的字段、外部协议原文、完整通道状态、完整风控材料、完整运营动作和全量报表口径不得进入 MVP DSL；如后续需要，应以独立场景、独立 caseId 和独立测试证据补充。
 
@@ -102,7 +102,7 @@ DSL 评审口径：DSL 入口必须承接 PRD 的业务目标和资金语义，�
 | 可解释、可核对、可重建 | 每笔资金事实必须有主体、金额、币种、账目、业务引用、规则来源和审计引用。 | 交易、路由、账本、投影、对账和治理分层承接。 | 测试同时断言状态、route snapshot、posting plan、ledger entry、projection、幂等和审计。 | 只有交易状态或错误码，无法证明金额来源和资金路径。 |
 | P0 统一内核 | 钱包、账本、账目、余额投影、对账、清结算和归档使用统一资金事实与账务对象。 | 02、03、04 分册分别落账户账本、对账清算对象和治理对象。 | P0 Red 优先证明账户、账目、余额桶、对账差错、归档水位和只读边界。 | P2 业务在 DSL 中定义平行钱包、账本、清结算、对账或归档对象。 |
 | P1 交易入口 | 直接交易、授权交易、余额控制、交易投影通过 instruction/event/route/posting 组合表达。 | 02 分册落服务入口、状态机、表设计、投影和 route replay。 | TDD 覆盖直接交易、授权完成/撤销/过期、冻结解冻、退款拒付、重复请求和余额不足。 | 授权拒绝生成 route/entry，冻结表达消费，逆向不按原 route snapshot 回放。 |
-| P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账只传入归一业务事实、外部引用、状态映射和待确认规则；VCC 卡、prepaid virtual card、shared card 通过 `PaymentInstrumentRef`、绑定快照、Spend Rule 快照和 `FundingAllocationDecision` 表达，不新增 DSL 主体。 | 业务能力包通过准入卡接入统一资金内核，不改变 P0/P1 边界；资金账户和信用账户按真实资金与授信额度职责入账，预算组和 Spend Rule 只按预算 scope、控制窗口、规则决策和审计职责使用；支付工具、资金责任解析和授权准入应由 wallet application facade 或等价 use-case 入口组合。 | TDD 覆盖业务状态映射、乱序重复、外部引用脱敏、规则待确认、P0/P1 回归、`TDD-RAIL-001A`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011`、`TDD-WALLET-015` 至 `TDD-WALLET-019`。 | 业务轨道协议、外部账户、卡组织/银行原始规则、敏感原文沉入资金内核，绕过 application facade 拼装资源服务，或把卡工具、预付资金模式、共享卡绑定模式、预算组、Spend Rule 当成资金账户或信用账户。 |
+| P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账只传入归一业务事实、外部引用、状态映射和待确认规则；VCC 发卡不新增 `VCC_ACCOUNT`，VCC 卡、prepaid virtual card、shared card 通过 `PaymentInstrumentRef`、绑定快照、`AccountHierarchySnapshot`、Spend Rule 快照和 `FundingAllocationDecision` 表达，并最终解析到资金子账户或信用子账户。 | 业务能力包通过准入卡接入统一资金内核，不改变 P0/P1 边界；VCC 关联子账户、资金账户和信用账户按真实资金、预付余额与授信额度职责入账，父账户默认用于约束和汇总，预算组和 Spend Rule 只按预算 scope、控制窗口、规则决策和审计职责使用；支付工具、资金责任解析和授权准入应由 wallet application facade 或等价 use-case 入口组合。 | TDD 覆盖业务状态映射、乱序重复、外部引用脱敏、规则待确认、P0/P1 回归、`TDD-RAIL-001A`、`TDD-LEDGER-013` 至 `TDD-LEDGER-016`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011`、`TDD-WALLET-015` 至 `TDD-WALLET-019`。 | 业务轨道协议、外部账户、卡组织/银行原始规则、敏感原文沉入资金内核，绕过 application facade 拼装资源服务，或把卡工具、预付资金模式、共享卡绑定模式、父账户汇总、预算组、Spend Rule 当成可入账主体。 |
 | 清结算与对账 | 对账差异、清分、清算、结算、出款和追偿必须保留批次、来源事实、规则和处理证据。 | 03 分册落对象状态机、服务 API、表设计、审批审计和补偿策略。 | `CLS-GATE-*`、`TDD-B7-RED-*`、服务级 H2 流程、并发重跑和失败无副作用测试。 | 对账差异直接改账，出款绕过结算锁定或外部规则核验。 |
 | 归档、重放和指标边界 | Manifest、checkpoint、watermark、差异报告和指标输入都必须表达只读、范围和处理动作。 | 04 分册落 governance 逻辑边界、归档申请、重放任务、差异报告和人工处理。 | `GOV-GATE-*`、`TDD-B8-RED-*`、dry-run/apply、指标水位隔离和治理边界测试。 | 归档改变事实身份，重放重新入账，指标快照替代账本余额确认。 |
 
@@ -117,23 +117,31 @@ ScenarioFundsOperationContext
 
 `authorizeByInstrument` 是 application facade 的入口命名，不改变 `FundsAuthorizationTransactionService.authorize` 的 DSL 内核语义。授权 DSL 内核继续表达已解析账户主体的资金占用、route、posting、ledger 和投影事实。
 
-支付工具与 Spend Rule 若要从 DSL 评审进入工程 Round 0，使用 [../TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](../TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) 作为准入输入。该卡只允许验证支付工具准入、资金责任解析、授权 application facade、Spend Rule 控制事实和只读投影边界；未获授权前，DSL 不新增 `InstrumentTransaction`、支付工具账务主体、预算组账本主体或 Spend Rule 资金交易事实。
+支付工具与 Spend Rule 进入工程任务前，应先完成支付工具准入、资金责任解析、授权 application facade、Spend Rule 控制事实和只读投影边界核验。未形成独立工程任务前，DSL 不新增 `InstrumentTransaction`、支付工具账务主体、预算组账本主体或 Spend Rule 资金交易事实。
 
-B2-FR 进入 DSL fixture、Spec 或公共字段变更前，必须先在 `funding-account-only` 与 `targetSubjectType + targetSubjectId` 中二选一。选择 `funding-account-only` 时，DSL 只能声明支付工具或支出主体解析到资金账户；选择目标主体迁移时，DSL 才能声明信用账户和平台角色解析后的平台资金账户也可作为资金责任结果，并必须同步 TDD、DDL/H2、摘要和回放断言。
+若业务强制要求 VCC 优先，DSL 侧应先证明 `AccountHierarchySnapshot`、绑定快照、父账户快照、账目 profile 和 VCC 卡到资金/信用子账户的映射可以被稳定承载。该路径不得直接新增 `P2-VCC-*` 资金流 DSL、H2/DDL schema、支付工具账务主体或卡号账本主体。
 
-### 支付工具和账户能力重定性后的 DSL CR 基线
+资金责任目标字段进入 DSL fixture、Spec 或公共字段变更前，必须先在 `funding-account-only` 与 `targetSubjectType + targetSubjectId` 中二选一。选择 `funding-account-only` 时，DSL 只能声明支付工具或支出主体解析到资金账户；选择目标主体迁移时，DSL 才能声明信用账户和平台角色解析后的平台资金账户也可作为资金责任结果，并必须同步 TDD、DDL/H2、摘要和回放断言。
 
-本节用于复核支付工具、资金账户和信用账户重新定性后，DSL 约定、路由规则、账目平衡、余额投影和交易投影是否仍然闭合。后续触碰这些对象时，必须先按本表检查；不满足时只能进入设计修正、TDD 分析或单一 Execution Grant，不得顺手改公共契约、测试资源、DDL/H2 schema 或生产代码。
+### 清结算与对账 DSL 边界
+
+B7 目标态可以描述可清分明细、清分批次、内部清算候选、结算锁定、出款结果、对账任务、匹配结果和差错单。最小可交付 DSL 证据应先覆盖对账任务范围、内部事实摘要、外部证据摘要、规则版本、匹配结果、差异指纹、差错阻断、重跑记录、处理动作和补事实白名单引用。
+
+`contract-only` 只能证明契约字段、枚举和目标 Red 可承载，不得声明清结算、对账或出款生产可用；若要声明 B7 切片具备生产交付证据，必须同步最小 DDL/H2、真实 Spring Bean 服务流、差错阻断、重跑幂等、白名单补事实准入和失败无副作用测试。VCC clearing、全球账户入出金、VA 收款和外部 payout 只能消费该差错闭环作为阻断、解释或补事实输入，不得在 P2 业务包内平行定义清结算、对账、出款或追偿事实。
+
+### 支付工具和账户能力 DSL 基线
+
+本节用于约束支付工具、资金账户和信用账户定性后的 DSL 约定、路由规则、账目平衡、余额投影和交易投影。触碰这些对象时，必须先按本表检查；不满足时只能进入设计修正或 TDD 分析，不得顺手改公共契约、测试资源、DDL/H2 schema 或生产代码。
 
 Highnote 公开发卡文档中的 financial account、ledger、ledger entry、payment card 和 financial account activity 分层，可作为本 DSL 的外部参考确认：资金和账本落在账户，卡只是访问工具，账户活动和交易事件承担卡维度归因。wind-funds DSL 因此坚持“账户入账、工具归因、控制留痕、投影查询”：`SubjectRef` 决定可入账主体，`PaymentInstrumentRef` 和 binding snapshot 决定工具归因，Spend Rule / 预算控制只产出控制证据和只读投影输入。
 
-| CR 面 | 对齐裁决 | 必须保持 | 编码准入影响 |
+| 设计面 | 对齐口径 | 必须保持 | 工程影响 |
 | --- | --- | --- | --- |
-| DSL 主体约定 | `SubjectRef` 只承载资金账户、信用账户和平台角色解析后的平台资金账户；`PaymentInstrumentRef`、`ExternalAccountRef` 只承载工具、外部账户和脱敏引用；预算组和 Spend Rule 只承载 scope、规则快照、控制窗口和审计上下文。 | 不新增 `InstrumentTransaction`、`PaymentInstrumentTransaction` 或支付工具账务主体；内部余额钱包、平台钱包、商户钱包、返利钱包和信用额度入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照。 | 触碰 `core` 枚举、Spec、fixture 或公共 DSL 字段时，必须显式声明公共契约授权和 `fixtureLevel`。 |
-| 路由规则 | route resolver 可以消费支付工具快照、绑定快照、`FundingAllocationDecision`、预算组上下文和 Spend Rule 决策，但 route leg participant 必须是最终可入账主体。 | 工具不可用、资金责任不唯一、错币种、预算或规则拒绝时不生成 route；退款、撤销、拒付、退费和重放优先沿原 route snapshot。 | B2、B4、B6 必须独立授权；不得借 A1 直接交易红线附带改支付工具入口或路由回放规则。 |
+| DSL 主体约定 | `SubjectRef` 只承载资金账户、信用账户和平台角色解析后的平台资金账户；`PaymentInstrumentRef`、`ExternalAccountRef` 只承载工具、外部账户和脱敏引用；预算组和 Spend Rule 只承载 scope、规则快照、控制窗口和审计上下文。 | 不新增 `InstrumentTransaction`、`PaymentInstrumentTransaction` 或支付工具账务主体；内部余额钱包、平台钱包、商户钱包、返利钱包和信用额度入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照。 | 触碰 `core` 枚举、Spec、fixture 或公共 DSL 字段时，必须显式声明公共契约边界和 `fixtureLevel`。 |
+| 路由规则 | route resolver 可以消费支付工具快照、绑定快照、`FundingAllocationDecision`、预算组上下文和 Spend Rule 决策，但 route leg participant 必须是最终可入账主体。 | 工具不可用、资金责任不唯一、错币种、预算或规则拒绝时不生成 route；退款、撤销、拒付、退费和重放优先沿原 route snapshot。 | 支付工具入口、资金责任解析和交易投影应分别形成独立任务，不借直接交易红线附带修改。 |
 | 账目平衡 | `PostingPlan` 只从已解析 route 生成；`LedgerEntry.subject` 只能是资金账户、信用账户或平台角色解析后的平台资金账户；每个 posting plan 按同币种独立平衡。 | 预算组、Spend Rule、支付工具、外部账户和交易投影不得生成 ledger bucket；预算控制只生成控制证据、规则证据或只读投影视图。 | 触碰 posting assembler、账本 DSL 或账务表行时，必须补借贷平衡、`normalBalanceSide`、余额桶和 forbidden facts 断言。 |
-| 余额投影 | 账本余额投影只从 ledger entry 派生，面向资金账户、信用账户和平台角色解析后的平台资金账户；余额日志只作为观察证据。 | 不从支付工具、预算组、Spend Rule、交易投影或业务轨道事件直接投影账本余额；预算控制可有独立控制视图，但不等于账本余额。 | BudgetGroup 兼容策略、预算控制视图和余额查询迁移必须放入 B2/B5 独立授权。 |
-| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实。 | B6/B8 必须独立授权；不得用交易投影通过来声明账务事实、余额投影或生产 Done。 |
+| 余额投影 | 账本余额投影只从 ledger entry 派生，面向资金账户、信用账户和平台角色解析后的平台资金账户；余额日志只作为观察证据。 | 不从支付工具、预算组、Spend Rule、交易投影或业务轨道事件直接投影账本余额；预算控制可有独立控制视图，但不等于账本余额。 | BudgetGroup 兼容策略、预算控制视图和余额查询迁移必须拆成独立任务。 |
+| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实。 | 不得用交易投影通过来声明账务事实、余额投影或生产 Done。 |
 
 ### DSL 易用性和误用防护
 
@@ -219,18 +227,3 @@ DSL 基线核验只确认 caseId、字段语义、fixture 等级和可测断言�
 | 失败边界 | 拒绝、余额不足、错币种、缺快照、权限不足、规则待确认和重复请求的无副作用语义明确。 | 补 must-fail case 或写明未覆盖范围。 |
 | 敏感和外部证据 | 外部账户、支付工具、规则来源、凭证和审计证据只保留摘要、脱敏值或引用。 | 清理敏感示例；缺规则状态时不得作为生产完成证据。 |
 | 测试承接 | `targetTestClass`、核心断言和验证命令能定位；未落测试时 `notDone` 明确。 | 只能进入 TDD 分析或契约草案，不能进入生产交付结论。 |
-
-### A0 DSL 准入输出
-
-A0 阶段的 DSL 只负责把产品侧业务问题转成资金事实和机器契约候选，不写测试资源、不改公共契约、不补生产字段。当前 DSL 编码准入以确认时 Git HEAD、OpenSpec 和 Harness 最新任务账本为准；`77bc9f4 fix: 阻断钱包上下文权益核心事实` 只保留为历史局部保护证据，其中 `contextVariables` 已形成只读、敏感字段阻断和权益核心字段不得旁路承载的回归资产；后续若要扩展核心资金语义，必须进入一等字段、route snapshot、交易事实快照或等价不可变存储。
-
-| 输出项 | DSL 填写口径 | 不满足时处理 |
-| --- | --- | --- |
-| `dslCaseId` | 本轮复用或新增的稳定 `DSL-*` caseId；没有 caseId 时只能写 `DOC_ONLY`。 | 回到 DSL 设计补资金事实，不进入测试写入。 |
-| `moneyAction` | 直接交易、授权交易、余额控制、清结算、治理或业务专项的归一资金动作。 | 回到 PRD 拆业务场景或明确非资金能力。 |
-| `accountingAnchor` | 主体、账户类型、`normalBalanceSide`、账目 bucket、借贷平衡表行、余额桶影响和失败红线。 | 不得声明可进入资金流实现。 |
-| `fixtureLevel` | `DOC_ONLY`、`CONTRACT_ONLY`、`FUNDS_FLOW`、`SERVICE_FLOW` 或 `GOVERNANCE_FLOW`。 | 降级交付结论；低等级 fixture 不支撑高等级 Done。 |
-| `contextVariablesBoundary` | 只允许补充上下文或短期追溯引用；敏感字段、外部账户原文、组件金额、资金责任、退款处置完整内容和当前营销规则不得进入。 | 阻断，改为一等字段、不可变快照或补设计。 |
-| `dslNotDone` | 未覆盖 route/posting/replay、服务流、清结算、对账、归档、冷热读取、治理重放、外部规则或敏感数据的范围。 | 写入 TDD 和 Execution Grant 的 Not Done。 |
-
-A0 DSL 输出必须能被 `docs/TDD设计/A0-编码准入基线核验.md` 的 `targetAssets` 和 `firstRedCandidateSet` 反查；否则只能作为设计说明，不得作为机器契约或生产交付证据。

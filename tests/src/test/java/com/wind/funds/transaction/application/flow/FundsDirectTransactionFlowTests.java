@@ -26,7 +26,9 @@ import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
@@ -211,6 +213,314 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_INSUFFICIENT_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_INSUFFICIENT_PAY", 2, 2);
         assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_REFUND_INSUFFICIENT_REFUND");
+    }
+
+    /**
+     * 场景：直接退款指定了不存在的原支付交易流水。
+     * 输入：付款方充值 100、向收款方付款 70，随后按缺失的原交易流水退款 30。
+     * 输出：退款在 RouteSnapshot 回放阶段失败；付款方、收款方和平台账户余额保持付款后的状态。
+     * 预期：缺少原交易 route snapshot 时不生成资金交易事实和账务事实。
+     * 红线：直接退款一旦声明按原交易回放，不得静默退回普通退款路由或按当前账户绑定重选路。
+     */
+    @Test
+    void testRefundWithMissingReferenceTransactionShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_missing_ref_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 100L, "DIRECT_REFUND_MISSING_REFERENCE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_MISSING_REFERENCE_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterPayFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setReferenceTransactionSn("FUNDS_TRANSACTION_NOT_EXISTS")
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_REFUND")
+                .setDescription("refund with missing original transaction"), WindOperator.system()))
+                .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照");
+
+        BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterRejectedRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterPayFacts);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_PAY", 2, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_REFUND");
+    }
+
+    /**
+     * 场景：直接退款指定的原支付交易存在，但原交易缺少 route snapshot。
+     * 输入：付款方充值 100、向收款方付款 70，随后清空原支付交易 route snapshot 并按原交易退款 30。
+     * 输出：退款在 RouteSnapshot 回放阶段失败；付款方、收款方和平台账户余额保持付款后的状态。
+     * 预期：原交易快照缺失时不生成新的资金交易事实和账务事实，原支付交易累计退款金额不变化。
+     * 红线：直接退款一旦声明按原交易回放，不得在快照缺失时静默退回普通退款路由或重选路。
+     */
+    @Test
+    void testRefundWithMissingReferenceRouteSnapshotShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_snap_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 100L, "DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
+                "DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_PAY", 2, 2);
+
+        clearFundsTransactionRouteSnapshot(payTransactionSn);
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(payTransactionSn))
+                .as("original direct pay route snapshot must be absent before replay refund")
+                .isEmpty();
+        LedgerFactSnapshot afterCorruptedReferenceFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_REFUND")
+                .setDescription("refund with missing original route snapshot"), WindOperator.system()))
+                .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照");
+
+        BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterRejectedRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterCorruptedReferenceFacts);
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 30L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(2);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_REFUND");
+        assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
+    }
+
+    /**
+     * 场景：直接退款指定原支付交易流水。
+     * 输入：付款方充值 100、向收款方付款 70，随后按原支付交易流水退款 30。
+     * 输出：退款按原支付 RouteSnapshot 回放并生成独立退款交易事实。
+     * 预期：退款交易引用原支付交易，RouteCode 为 DIRECT_REFUND_REPLAY，原支付交易累计 refundedAmount。
+     * 红线：直接退款不能把退款事件写回原支付 businessSn，也不能因引用原交易而丢失独立退款审计事实。
+     */
+    @Test
+    void testRefundWithReferenceTransactionShouldReplayOriginalRouteAndKeepIndependentRefundFact() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_reference_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 100L, "DIRECT_REFUND_REFERENCE_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
+                "DIRECT_REFUND_REFERENCE_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String refundTransactionSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_REFERENCE_REFUND")
+                .setDescription("refund with original transaction reference"), WindOperator.system());
+        BalanceSnapshot afterRefund = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
+        assertBucket(balance(payer), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_PAY", 2, 2);
+        assertReferenceRefundFacts("DIRECT_REFUND_REFERENCE_REFUND", refundTransactionSn, payTransactionSn);
+
+        LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(50L, CURRENCY))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_REFERENCE_EXCEED_REFUND")
+                .setDescription("refund exceeds original transaction remaining amount"), WindOperator.system()))
+                .hasMessageContaining("回放累计金额不能大于原 RouteLeg 金额");
+
+        BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterRefund, afterRejectedRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_EXCEED_REFUND");
+        assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isEqualTo(30L);
+    }
+
+    /**
+     * 场景：原支付交易的 route snapshot 已固化旧支付工具和旧资金责任快照，后续业务侧发生换绑或责任变化。
+     * 输入：付款方充值 100、向收款方付款 70；测试构造原支付快照含 CARD-OLD、ALLOC-OLD，退款请求携带当前规则上下文。
+     * 输出：退款按原支付 RouteSnapshot 回放并生成独立退款交易事实。
+     * 预期：退款交易保存的新 RouteSnapshot 继续保留 CARD-OLD、旧绑定版本和 ALLOC-OLD，不消费当前请求上下文重选路。
+     * 红线：直接退款引用原交易时不得因当前卡绑定、当前资金责任或当前规则变化改写历史资金路径。
+     */
+    @Test
+    void testRefundWithReferenceTransactionShouldReuseOriginalInstrumentAndFundingSnapshot() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_replay_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        topup(payer, 100L, "DIRECT_REFUND_REPLAY_BINDING_TOPUP");
+        BalanceSnapshot afterTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeTopup, afterTopup,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
+                "DIRECT_REFUND_REPLAY_BINDING_PAY");
+        enrichFundsTransactionRouteSnapshot(payTransactionSn, Map.of(
+                "paymentInstrumentRef", paymentInstrumentSnapshot("CARD-OLD", "BINDING-OLD", "v1"),
+                "routingDecision", routingDecisionSnapshot(payer, 70L, "ALLOC-OLD")));
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(payTransactionSn))
+                .as("original direct pay route snapshot must carry historical attribution")
+                .hasValueSatisfying(routeSnapshot -> {
+                    assertThat(routeSnapshot.getPaymentInstrumentRef().getInstrumentId()).isEqualTo("CARD-OLD");
+                    assertThat(routeSnapshot.getPaymentInstrumentRef().getBindingSnapshot())
+                            .containsEntry("bindingId", "BINDING-OLD")
+                            .containsEntry("bindingVersion", "v1");
+                    assertThat(routeSnapshot.getRoutingDecision().getFundingAllocations())
+                            .singleElement()
+                            .satisfies(allocation -> {
+                                assertThat(allocation.getAllocationId()).isEqualTo("ALLOC-OLD");
+                                assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo(payer.id());
+                                assertThat(allocation.getAmount()).isEqualTo(Money.immutable(70L, CURRENCY));
+                            });
+                });
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterTopup, afterPay,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -70L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 70L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        String refundTransactionSn = directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setAmount(Money.immutable(30L, CURRENCY))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_REPLAY_BINDING_REFUND")
+                .setContextVariables(WritableContextVariables.of(Map.of(
+                        "businessContextVersion", "CURRENT-BINDING-RULE-V2")))
+                .setDescription("refund with changed current binding context"), WindOperator.system());
+        BalanceSnapshot afterRefund = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 60L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_900L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(3);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REPLAY_BINDING_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REPLAY_BINDING_PAY", 2, 2);
+        assertReferenceRefundFacts("DIRECT_REFUND_REPLAY_BINDING_REFUND", refundTransactionSn, payTransactionSn);
+        assertReferencedRefundRouteSnapshotKeepsHistoricalAttribution("DIRECT_REFUND_REPLAY_BINDING_REFUND",
+                payer);
     }
 
     /**
@@ -909,6 +1219,42 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：直接充值把预算组作为入账主体。
+     * 输入：预算组作为 accountId，外部银行账户作为资金来源。
+     * 输出：请求被拒绝；预算组控制账本和平台账户余额不变化。
+     * 预期：预算组只能作为预算控制上下文，不得被充值交易包装成入金价值主体。
+     * 红线：预算组不得生成充值 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testTopupToBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId budget = budgetGroup("topup_bg");
+        ensureBudgetGroup(budget);
+        BalanceSnapshot before = snapshot(balances(budget, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> topup(budget, 10L, "DIRECT_TOPUP_BUDGET_GROUP"))
+                .hasMessageContaining("直接充值入账账户不能是预算组");
+
+        BalanceSnapshot afterRejectedTopup = snapshot(balances(budget, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterRejectedTopup,
+                delta(budget, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+
+        assertBucket(balance(budget), LedgerSubjectCode.LIMIT, 0L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(0);
+        assertNoPersistedTransactionFactsForBusinessSn("DIRECT_TOPUP_BUDGET_GROUP");
+    }
+
+    /**
      * 场景：直接充值把内部资金账户作为资金来源。
      * 输入：普通资金账户作为 fundsSourceAccountId，向另一个普通资金账户充值 10。
      * 输出：请求被拒绝；用户账户、资金来源账户和平台账户余额均不变化。
@@ -1418,6 +1764,58 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：系统内转账把预算组作为付款主体。
+     * 输入：预算组额度调增 50，再向普通资金账户转账 10。
+     * 输出：请求被拒绝；预算组控制账本、收款方和平台账户余额保持转账前状态。
+     * 预期：预算组只能作为预算控制上下文，不得被转账交易包装成资金价值主体。
+     * 红线：预算组不得生成转账 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testTransferFromBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId budget = budgetGroup("transfer_bg");
+        FundsAccountId payee = fundingAccount("budget_transfer_payee");
+        ensureBudgetGroup(budget);
+        ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
+
+        BalanceSnapshot beforeAdjust = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
+        adjustBalance(budget, 50L, true, "DIRECT_TRANSFER_BUDGET_GROUP_ADJUST");
+        BalanceSnapshot afterAdjust = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeAdjust, afterAdjust,
+                delta(budget, LedgerSubjectCode.LIMIT, 50L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterAdjustFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> transfer(budget, payee, 10L, "DIRECT_TRANSFER_BUDGET_GROUP"))
+                .hasMessageContaining("系统内转账付款账户不能是预算组");
+
+        BalanceSnapshot afterRejectedTransfer = snapshot(balances(budget, payee, cashMappingAccount(),
+                prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterAdjust, afterRejectedTransfer,
+                delta(budget, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterAdjustFacts);
+
+        assertBucket(balance(budget), LedgerSubjectCode.LIMIT, 50L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertFundsAndLedgerFactsForBusinessSn("DIRECT_TRANSFER_BUDGET_GROUP_ADJUST", 1, 1, 1, 2);
+        assertNoPersistedTransactionFactsForBusinessSn("DIRECT_TRANSFER_BUDGET_GROUP");
+    }
+
+    /**
      * 场景：系统内转账第一次余额不足生成 FAILED 事实后，付款方补足余额并用相同业务流水重试。
      * 输入：同一 `businessSn` 首次转账 10 失败，随后充值 20 后再次提交同一转账。
      * 输出：重试被拒绝；原 FAILED 资金交易事实不被改写成成功，补账后的余额和账务事实保持不变。
@@ -1849,6 +2247,58 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertPostedTransactions(0);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_EXTERNAL_PAYER");
+    }
+
+    /**
+     * 场景：预算组已经通过余额控制获得预算额度后，被误作为直接付款主体。
+     * 输入：预算组额度调增 50，再提交预算组向普通收款方付款 10。
+     * 输出：付款请求被拒绝；预算组控制账本、收款方和平台账户余额保持付款前状态。
+     * 预期：预算组只能作为预算控制上下文，不得被直接交易包装成资金价值主体。
+     * 红线：预算组不得生成直接付款 route、posting、ledger entry 或余额投影。
+     */
+    @Test
+    void testPayFromBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId budget = budgetGroup("direct_pay_budget_group");
+        FundsAccountId payee = fundingAccount("budget_pay_payee");
+        ensureBudgetGroup(budget);
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        BalanceSnapshot beforeAdjust = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
+        adjustBalance(budget, 50L, true, "DIRECT_PAY_BUDGET_GROUP_ADJUST");
+        BalanceSnapshot afterAdjust = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(beforeAdjust, afterAdjust,
+                delta(budget, LedgerSubjectCode.LIMIT, 50L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot afterAdjustFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> pay(budget, payee, LedgerSubjectCode.SETTLEMENT, 10L,
+                "DIRECT_PAY_BUDGET_GROUP"))
+                .hasMessageContaining("直接付款账户不能是预算组");
+
+        BalanceSnapshot afterRejectedPay = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterAdjust, afterRejectedPay,
+                delta(budget, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(afterAdjustFacts);
+
+        assertBucket(balance(budget), LedgerSubjectCode.LIMIT, 50L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
+        assertBucket(balance(budget), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
+        assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
+        assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
+
+        assertPostedTransactions(1);
+        assertFundsAndLedgerFactsForBusinessSn("DIRECT_PAY_BUDGET_GROUP_ADJUST", 1, 1, 1, 2);
+        assertNoPersistedTransactionFactsForBusinessSn("DIRECT_PAY_BUDGET_GROUP");
     }
 
     /**
@@ -2926,6 +3376,10 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     private String expectedDirectRouteCode(FundsTransaction transaction) {
+        if (transaction.getTransactionType() == DefaultFundsTransactionType.REFUND
+                && transaction.getReferenceTransactionSn() != null) {
+            return FundsRouteCodes.DIRECT_REFUND_REPLAY;
+        }
         return switch (transaction.getTransactionType()) {
             case TOPUP -> FundsRouteCodes.TOPUP_STANDARD;
             case TRANSFER -> FundsRouteCodes.INTERNAL_TRANSFER_STANDARD;
@@ -2934,6 +3388,120 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
             default -> throw new AssertionError("unsupported direct transaction type: "
                     + transaction.getTransactionType());
         };
+    }
+
+    private void assertReferenceRefundFacts(String businessSn,
+                                            String refundTransactionSn,
+                                            String payTransactionSn) {
+        assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, 2, 2);
+        assertThat(refundTransactionSn).isNotEqualTo(payTransactionSn);
+        assertThat(fundsTransaction(refundTransactionSn))
+                .as("referenced direct refund transaction")
+                .satisfies(transaction -> {
+                    assertThat(transaction.getBusinessSn()).isEqualTo(businessSn);
+                    assertThat(transaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);
+                    assertThat(transaction.getStatus()).isEqualTo(FundsTransactionStatus.CLOSED);
+                    assertThat(transaction.getReferenceTransactionSn()).isEqualTo(payTransactionSn);
+                    assertThat(transaction.getRefundedAmount()).isEqualTo(30L);
+                });
+        assertThat(fundsTransaction(payTransactionSn).getRefundedAmount())
+                .as("original direct pay refunded amount")
+                .isEqualTo(30L);
+        assertThat(routeSnapshot(businessSn).getRouteCode()).isEqualTo(FundsRouteCodes.DIRECT_REFUND_REPLAY);
+        assertThat(ledgerTransactionByBusinessSn(businessSn).getFundsTransactionSn()).isEqualTo(refundTransactionSn);
+    }
+
+    private Map<String, Object> paymentInstrumentSnapshot(String instrumentId,
+                                                          String bindingId,
+                                                          String bindingVersion) {
+        Map<String, Object> bindingSnapshot = new LinkedHashMap<>();
+        bindingSnapshot.put("bindingId", bindingId);
+        bindingSnapshot.put("bindingVersion", bindingVersion);
+        bindingSnapshot.put("bindingStatus", "ACTIVE");
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("instrumentId", instrumentId);
+        result.put("instrumentType", "CARD");
+        result.put("instrumentNo", "**** 4242");
+        result.put("ownerId", "funding_user");
+        result.put("ownerType", "USER");
+        result.put("tenantId", TENANT_ID);
+        result.put("currency", CURRENCY.name());
+        result.put("status", "ACTIVE");
+        result.put("bindingSnapshot", bindingSnapshot);
+        result.put("description", "historical payment instrument snapshot");
+        return result;
+    }
+
+    private Map<String, Object> routingDecisionSnapshot(FundsAccountId fundingAccount,
+                                                        long amount,
+                                                        String allocationId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("policyCode", "HISTORICAL_FUNDING_RESPONSIBILITY");
+        result.put("matchedRules", List.of("RULE-OLD-BINDING"));
+        result.put("selectedProcessor", "processor-old");
+        result.put("selectedCashFundingAccount", null);
+        result.put("selectedPlatformAccount", null);
+        result.put("fundingAllocations", List.of(fundingAllocationSnapshot(fundingAccount, amount, allocationId)));
+        result.put("decisionReason", "historical funding responsibility snapshot");
+        result.put("contextVariables", Map.of("decisionVersion", "v1"));
+        return result;
+    }
+
+    private Map<String, Object> fundingAllocationSnapshot(FundsAccountId fundingAccount,
+                                                          long amount,
+                                                          String allocationId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("allocationId", allocationId);
+        result.put("subjectRef", subjectSnapshot(fundingAccount));
+        result.put("ledgerSubjectCode", LedgerSubjectCode.AVAILABLE.name());
+        result.put("amount", moneySnapshot(amount));
+        result.put("priority", 1);
+        result.put("reason", "historical funding allocation snapshot");
+        return result;
+    }
+
+    private Map<String, Object> subjectSnapshot(FundsAccountId accountId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tenantId", TENANT_ID);
+        result.put("subjectId", accountId.id());
+        result.put("subjectType", accountId.type());
+        result.put("subjectName", accountId.id());
+        result.put("currency", CURRENCY.name());
+        result.put("ledgerProfileCode", "TEST");
+        result.put("description", "historical subject snapshot");
+        return result;
+    }
+
+    private Map<String, Object> moneySnapshot(long amount) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("amount", amount);
+        result.put("currency", CURRENCY.name());
+        return result;
+    }
+
+    private void assertReferencedRefundRouteSnapshotKeepsHistoricalAttribution(String businessSn,
+                                                                               FundsAccountId fundingAccount) {
+        assertThat(routeSnapshot(businessSn))
+                .as("referenced refund route snapshot must keep historical instrument and funding attribution")
+                .satisfies(routeSnapshot -> {
+                    assertThat(routeSnapshot.getPaymentInstrumentRef().getInstrumentId()).isEqualTo("CARD-OLD");
+                    assertThat(routeSnapshot.getPaymentInstrumentRef().getBindingSnapshot())
+                            .containsEntry("bindingId", "BINDING-OLD")
+                            .containsEntry("bindingVersion", "v1");
+                    assertThat(routeSnapshot.getRoutingDecision().getFundingAllocations())
+                            .singleElement()
+                            .satisfies(allocation -> {
+                                assertThat(allocation.getAllocationId()).isEqualTo("ALLOC-OLD");
+                                assertThat(allocation.getSubjectRef().getSubjectId())
+                                        .isEqualTo(fundingAccount.id());
+                                assertThat(allocation.getAmount())
+                                        .isEqualTo(Money.immutable(70L, CURRENCY));
+                                assertThat(allocation.getReason())
+                                        .isEqualTo("historical funding allocation snapshot");
+                            });
+                    assertThat(routeSnapshot.getContextVariables())
+                            .doesNotContainEntry("businessContextVersion", "CURRENT-BINDING-RULE-V2");
+                });
     }
 
     private void assertFailedDirectFactsCarryIdentityAndAudit(String businessSn) {

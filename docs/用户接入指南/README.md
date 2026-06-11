@@ -66,7 +66,7 @@
 | 我要记录真实资金、商户待清算、平台现金、预收待付、手续费或差错责任。 | FundingAccount | owner、币种、账户能力、账本 Profile、余额桶、责任来源和审计引用。 | 用 FundingAccount 表达信用额度、预算控制、卡工具、VA、外部银行账户或钱包标识。 |
 | 我要管理授信额度、可用额度和授权占用。 | CreditAccount | 授信 owner、额度周期、LIMIT、AVAILABLE、AUTHORIZATION、调额来源和规则版本。 | 当作现金账户、商户待结算账户或共享卡本体。 |
 | 我要限制部门、项目、员工卡或共享卡一段周期内能花多少。 | BudgetGroup + 预算型 Spend Rule | 预算 owner、scope、币种、规则窗口、控制额度、规则版本、优先级和审计。 | 当作真实资金池、账本主体、外部支付工具或信用额度本身。 |
-| 我要接入卡、VCC、预付卡、共享卡、VA、银行账户、外部钱包或 PSP token。 | PaymentInstrument + binding + FundingAllocationDecision | 工具引用、脱敏展示、绑定版本、使用主体、资金责任解析关系、规则版本和原路径快照。 | 因 prepaid/shared/VCC 名称自动创建资金账户、信用账户、预算组或账本主体。 |
+| 我要接入卡、VCC、预付卡、共享卡、VA、银行账户、外部钱包或 PSP token。 | PaymentInstrument + binding + FundingAllocationDecision + 账户层级快照 | 工具引用、脱敏展示、绑定版本、使用主体、资金责任解析关系、资金子账户或信用子账户、父账户约束、规则版本和原路径快照。 | 因 prepaid/shared/VCC 名称自动创建 `VCC_ACCOUNT`、卡号账户、预算组或账本主体，或未完成账户层级准入就声明 VCC 子账户生产可用。 |
 
 ## 使用顺序
 
@@ -131,7 +131,7 @@
 
 | 验收项 | 测试场景 | 边界路径 | 异常路径 |
 | --- | --- | --- | --- |
-| 对象分类清楚 | FundingAccount、CreditAccount 和平台账户角色能说明资金责任；BudgetGroup、Spend Rule 和 PaymentInstrument 能说明控制或引用作用。 | 共享卡、预付卡、VA、外部账户和钱包标识先作为工具或引用，再解析责任主体。 | 预算组、Spend Rule、支付工具或外部账户被当作 LedgerEntry 主体时阻断。 |
+| 对象分类清楚 | FundingAccount、CreditAccount 和平台账户角色能说明资金责任；BudgetGroup、Spend Rule 和 PaymentInstrument 能说明控制或引用作用。 | 共享卡、预付卡、VA、外部账户和钱包标识先作为工具或引用；VCC 卡交易前必须解析到资金子账户或信用子账户，并固化父账户和绑定快照。 | 预算组、Spend Rule、支付工具、外部账户、`VCC_ACCOUNT` 或卡号账户被当作 LedgerEntry 主体时阻断。 |
 | 资金事实闭环 | route、posting、LedgerEntry、余额投影、交易投影和审计引用能回挂 PRD、DSL、系分和 TDD。 | 授权、冻结、待清算、结算中、出款中和归档重放状态各自可解释。 | 准入失败、幂等冲突、路由失败、账务失败和外部非终态不得留下错误资金事实。 |
 | 评审结论可执行 | 接入评审能输出通过、带条件通过或阻断，并标明 Execution Grant 写入范围、只读范围、验证命令和停止条件。 | 缺外部规则确认、缺目标测试资产或缺生产 Runbook 时只能带条件通过或阻断。 | 未获得 Execution Grant 时不得修改公共契约、DDL/H2、生产代码、测试代码或运行时配置。 |
 

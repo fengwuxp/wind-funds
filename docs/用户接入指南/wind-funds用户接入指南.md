@@ -169,7 +169,7 @@ wind-funds 是支付资金底座，不是 VCC、全球账户、ACH、收单、�
 | 记录真实资金、商户待清算、平台责任、预收待付、手续费或差错责任。 | FundingAccount | owner、币种、账户能力、账本 Profile、余额桶、责任来源和审计引用。 | 把信用额度、预算控制、卡工具、VA、外部银行账户或钱包标识写成 FundingAccount。 |
 | 管理授信额度、可用额度和授权占用。 | CreditAccount | 授信 owner、额度周期、LIMIT、AVAILABLE、AUTHORIZATION、调额来源和规则版本。 | 把 CreditAccount 当现金账户、商户待结算账户或共享卡本体。 |
 | 限制部门、项目、员工卡或共享卡周期内能花多少。 | BudgetGroup + 预算型 Spend Rule | 预算 owner、scope、币种、规则窗口、控制额度、规则版本、优先级和审计。 | 把预算组当真实资金池、账本主体或在缺预算规则时兜底扣款。 |
-| 接入 VCC、prepaid virtual card、shared card、VA、外部银行账户、钱包标识或 PSP token。 | PaymentInstrument + binding + FundingAllocationDecision | 工具引用、脱敏展示、绑定版本、使用主体、资金责任解析关系、规则版本和原路径快照。 | 因 prepaid/shared/VCC 名称自动创建资金账户、信用账户、预算组或账本主体。 |
+| 接入 VCC、prepaid virtual card、shared card、VA、外部银行账户、钱包标识或 PSP token。 | PaymentInstrument + binding + FundingAllocationDecision + 账户层级快照 | 工具引用、脱敏展示、绑定版本、使用主体、资金责任解析关系、资金子账户或信用子账户、父账户约束、规则版本和原路径快照。 | 因 prepaid/shared/VCC 名称自动创建 `VCC_ACCOUNT`、卡号账户、预算组或账本主体，或未完成账户层级准入就声明 VCC 子账户生产可用。 |
 
 ### 3.3 跨文档追踪矩阵
 
@@ -234,7 +234,7 @@ wind-funds 是支付资金底座，不是 VCC、全球账户、ACH、收单、�
 | 授信额度 | `CreditAccount` | 承载额度和授权占用，不等于现金。 |
 | 预算控制 | `BudgetGroup` + 预算型 Spend Rule | BudgetGroup 承载预算 scope、owner、展示和审计；Spend Rule 承载控制额度、规则窗口、占用和释放证据；二者不等于真实资金池。 |
 | 卡、VCC、prepaid virtual card、shared card、VA、银行账户、外部钱包、PSP token | `PaymentInstrumentRef` / `ExternalAccountRef` | 只做支付工具、外部账户或路由引用，不作为 ledger subject。 |
-| VCC 预付卡和共享卡的内部责任 | `PaymentInstrumentRef` + binding snapshot + `FundingAllocationDecision` | 预付资金责任、预算约束、信用额度或资金来源必须另行解析到内部主体；卡本体不创建 FundingAccount、CreditAccount 或 BudgetGroup。 |
+| VCC 预付卡和共享卡的内部责任 | `PaymentInstrumentRef` + binding snapshot + `FundingAllocationDecision` + 账户层级快照 | 预付卡交易前解析到资金子账户，共享卡交易前解析到信用子账户；父账户默认只做约束和汇总，不自动生成父账户分录；卡本体不创建 `VCC_ACCOUNT`、卡号账户、BudgetGroup 或独立账本主体。 |
 | 已成立资金动作 | `FundsInstructionSpec` | 统一资金事实入口，承载 instructionType、eventType、transactionType、金额、币种和引用。 |
 | 路由结果 | `RouteSnapshotSpec` | 固化本次资金路径，供退款、撤销、拒付、退费、解冻等后续事件回放。 |
 | 账务计划 | `PostingPlan` / `LedgerTransactionSpec` | 由系统从 route 推导，业务方不能直接拼分录。 |
@@ -399,7 +399,21 @@ Round 0 的输出不是代码任务，而是接入结论：通过、带条件通
 | 授权交易 | authorize、reversal、settle、settleRefund、chargeback。 | 授权批准占用，拒绝无副作用；后续事件引用原授权或原 route snapshot。 |
 | 余额控制 | freeze、unfreeze、adjust。 | 冻结不改变归属；解冻不超过冻结剩余；adjust 不承接跨主体价值转移。 |
 
-### 6.5.1 开发者最小伪请求样例
+#### 6.5.1 充值、提现和转账快速判定
+
+接入方填写交易类型或资金动作时，不能只按页面按钮、外部通道或业务习惯命名。资金底座优先按资金账户流动性等级和资金方向判定：从高流动性账户进入低流动性账户叫充值，从低流动性账户回到高流动性账户叫提现，同一流动性等级账户之间叫转账。
+
+这里的流动性等级是资金账户的可使用范围和外部结算确定性，不是 `CreditAccount`。例如可按“央行账户或央行货币层级 > 商业银行账户 > 支付机构账户 > 金融科技公司内部账户”的方向理解。具体账户性质、资金归属和外部规则仍需财务、合规、通道或持牌机构确认。
+
+| 接入判断 | 默认交易动作 | 接入材料 | 验收重点 |
+| --- | --- | --- | --- |
+| 银行账户、支付机构账户或平台主资金账户进入内部钱包、商户余额、VCC 资金子账户。 | 充值 / topup | 来源账户、目标账户、账户流动性等级、同名或同一实控主体证明、外部入金终态或内部划拨凭证。 | 外部非终态不展示到账；同名或实控关系缺失时阻断或转人工。 |
+| 内部钱包、商户余额、VCC 资金子账户回到银行账户、支付机构账户或平台主资金账户。 | 提现 / withdraw | 来源账户、目标账户、账户流动性等级、同名或同一实控主体证明、提现申请、外部收款端点和出款结果。 | 提现申请不是提现成功；外部失败或退回必须释放、回补或进入差错。 |
+| 同层钱包、同层平台账户、同层商户账户或同等级内部账户之间移动。 | 转账 / transfer | 转出方、转入方、同名或不同名关系、业务授权、幂等键、费用承担方和审计引用。 | 不同名转账必须有业务关系、权限、风控、合规和审计证据。 |
+
+充值、提现通常要求同名、同主体或同一实控主体；转账可以同名也可以不同名。若业务上需要非同名充值或提现，必须在接入申请和 Execution Grant 中说明例外原因、规则确认方、风控措施、对账方式和人工兜底；未确认前不得作为自动资金处理进入生产 Done。
+
+### 6.5.2 开发者最小伪请求样例
 
 本节只说明接入方应准备哪些字段和证据，不代表已经冻结的 Java Request、DTO 或 JSON API。真实接口字段以 `*-face`、`core` 契约和具体 Execution Grant 为准。
 
@@ -794,7 +808,7 @@ P2 业务能力包的目标是让 VCC、全球账户、ACH 和收单复用资金
 
 | 验收标准 | 测试场景 | 边界路径 | 异常路径 |
 | --- | --- | --- | --- |
-| 内部能力选择可解释。 | FundingAccount、CreditAccount、平台账户角色、BudgetGroup、Spend Rule 和 PaymentInstrument 均能说明使用理由，并区分资金账务主体、支出控制对象和工具引用。 | VCC 预付卡和共享卡先作为 PaymentInstrument，再解析 FundingAllocationDecision；BudgetGroup 和 Spend Rule 只进入控制快照。 | prepaid/shared 名称触发自动建账、缺资金责任主体、缺预算规则、多资金责任不唯一，或预算组/Spend Rule 被当作账本主体时失败无账务副作用。 |
+| 内部能力选择可解释。 | FundingAccount、CreditAccount、平台账户角色、BudgetGroup、Spend Rule 和 PaymentInstrument 均能说明使用理由，并区分资金账务主体、支出控制对象和工具引用。 | VCC 预付卡和共享卡先作为 PaymentInstrument；交易前解析资金子账户或信用子账户、父账户约束、FundingAllocationDecision、BudgetGroup 上下文和 Spend Rule 控制快照。 | prepaid/shared 名称触发自动建 `VCC_ACCOUNT` 或卡号账户、缺子账户、缺父账户约束、缺资金责任主体、缺预算规则、多资金责任不唯一，或预算组/Spend Rule 被当作账本主体时失败无账务副作用。 |
 | 资金事实和账务闭环可验证。 | 直接交易、授权、冻结、退款、清结算和对账差错都能回挂 PRD AC/RED、DSL caseId、系分章节和 TDD 用例。 | 金额组件、账户类型、`normalBalanceSide`、余额桶、route snapshot 和 posting plan 均可追踪。 | 准入失败、幂等冲突、路由失败、账务失败和投影失败不得留下错误 route、entry 或余额变化。 |
 | 使用者解释和运营处理可闭环。 | 用户、商户、运营、财务、风控和安全能理解状态、失败原因和下一步动作。 | 授权、冻结、待清算、结算中、出款中、差错和归档重放状态不混用。 | 外部 pending、accepted、processing 或规则待确认不得展示为成功或驱动自动资金处理。 |
 
