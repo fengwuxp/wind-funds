@@ -30,6 +30,7 @@ public record ImmutableFundingAllocationDecisionSpec(String allocationId,
         if (amount.getAmount() <= 0) {
             throw new IllegalArgumentException("funding allocation amount must be positive");
         }
+        FundingAllocationDecisionValidator.requireSubjectAmountCurrency(subjectRef, amount);
         if (!StringUtils.hasText(reason)) {
             throw new IllegalArgumentException("funding allocation reason is required");
         }

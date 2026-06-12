@@ -37,6 +37,7 @@ public record ImmutableAccountHierarchyFundingAllocationDecisionSpec(String allo
         if (amount.getAmount() <= 0) {
             throw new IllegalArgumentException("funding allocation amount must be positive");
         }
+        FundingAllocationDecisionValidator.requireSubjectAmountCurrency(subjectRef, amount);
         if (!StringUtils.hasText(reason)) {
             throw new IllegalArgumentException("funding allocation reason is required");
         }
@@ -89,6 +90,10 @@ public record ImmutableAccountHierarchyFundingAllocationDecisionSpec(String allo
         if (!Objects.equals(accountRef.getTenantId(), subjectRef.getTenantId())) {
             throw new IllegalArgumentException(
                     "accountHierarchySnapshot accountRef tenant must match funding allocation subjectRef tenant");
+        }
+        if (!Objects.equals(accountRef.getCurrency(), subjectRef.getCurrency())) {
+            throw new IllegalArgumentException(
+                    "accountHierarchySnapshot accountRef currency must match funding allocation subjectRef currency");
         }
     }
 }

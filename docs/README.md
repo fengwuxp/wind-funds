@@ -69,7 +69,7 @@ MVP 评审时优先回答四个问题：
 | 设计宣讲 | 本 README、产品设计 README、系分设计 README、用户接入指南。 | 共同语言、能力边界、P0/P1/P2 优先级和评审安排。 |
 | 产品或接入评审 | 产品设计、用户接入指南、资金事实说明卡、接入评审清单。 | 业务目标、能力成熟度、接入结论、补齐清单和待确认项。 |
 | 系分和 TDD 准入 | DSL 设计、系分设计、TDD 设计、产品验收矩阵。 | 服务入口、系统边界、首批 Red、资金不变量断言和验证命令。 |
-| GSD + Goal 推进 | [TDD设计/GSD-Goal-生产可用MVP推进计划.md](TDD设计/GSD-Goal-生产可用MVP推进计划.md)、OpenSpec/Harness。 | Goal 卡、依赖顺序、生产可用 MVP 交付雷达、Goal 完成度审计、Wave 计划、Execution Grant 队列、授权前基线状态、不能算 Done 清单和 handoff；`GSD1-LEDGER-BOUND-LEDGER` 已被 002A 消费，`GSD1-LEDGER-PROJECTION-REGRESSION` 已被 003 消费，`GSD1-LEDGER-BUDGET-GROUP-COMPAT-GUARD` 已被 004A 消费，当前无可沿用编码 Grant，需重新确认新的单一 Grant。 |
+| GSD + Goal 推进 | [TDD设计/GSD-2-新基线工作流规划.md](TDD设计/GSD-2-新基线工作流规划.md)、[TDD设计/GSD-2-AgentLoop-PlanGrant默认授权策略.md](TDD设计/GSD-2-AgentLoop-PlanGrant默认授权策略.md)、[TDD设计/AI代码交付闭环与Spec模板基线.md](TDD设计/AI代码交付闭环与Spec模板基线.md)、[TDD设计/GSD-2-Spec-AC-Harness-CAD任务模板.md](TDD设计/GSD-2-Spec-AC-Harness-CAD任务模板.md)、[TDD设计/GSD-Goal-生产可用MVP推进计划.md](TDD设计/GSD-Goal-生产可用MVP推进计划.md)、OpenSpec/Harness。 | GSD-2 是 2026-06-12 之后的活跃工作流入口，负责清零旧活跃未完成计划、重建设计/代码/任务基线、规划 Wave 和下一单一 Grant；Agent Loop / Plan Grant 默认授权策略负责说明低风险文档、状态、只读 Gap Audit、Spec/AC/Harness/CAD 任务卡和本地门禁可默认推进，以及代码、测试、DDL、公共契约、OpenSpec 状态、Git、联网和生产动作必须显式确认；AI 代码交付闭环负责约束 Spec 强度、AC 映射、Harness 三层、独立验证、CR 交接、知识回流和停止条件；GSD-2 单一 Grant 模板用于把 Spec、AC、Red、Harness、CAD Loop、CR 交接、交付证据和建议提交切片压到同一张任务卡；旧 GSD Goal 计划只保留历史证据、消费记录、Not Done 边界和 handoff。`GSD1-LEDGER-BOUND-LEDGER`、`GSD1-LEDGER-PROJECTION-REGRESSION`、`GSD1-LEDGER-BUDGET-GROUP-COMPAT-GUARD` 和 `B3-DIRECT-REFUND-REFERENCE-REPLAY` 均已消费，当前无可沿用编码 Grant，源码级写入需在 GSD-2 下重新确认新的单一 Grant。 |
 | 编码或生产 Done 判定 | Execution Grant、OpenSpec/Harness、实现证据、测试、DDL/H2、审计和外部确认。 | 写入范围闭合、验证通过、残余风险和 Not Done 清单。 |
 
 | 使用场景 | 先用材料 | 会议产出 | 能得出的结论 | 不能得出的结论 |

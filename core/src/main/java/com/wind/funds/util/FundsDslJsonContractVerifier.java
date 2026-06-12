@@ -357,6 +357,7 @@ public final class FundsDslJsonContractVerifier {
         if (routingDecision == null) {
             return;
         }
+        Set<Long> seenPriorities = new HashSet<>();
         for (Map<String, ?> allocation : childObjects(routingDecision,
                 "fundingAllocations",
                 "expectedRoute.routingDecision.fundingAllocations")) {
@@ -365,9 +366,19 @@ public final class FundsDslJsonContractVerifier {
             JsonSubjectRef subjectRef = parseSubjectRef(asNullableMap(allocation.get("subjectRef"),
                     path + ".subjectRef"), path + ".subjectRef");
             verifyEnum(LedgerSubjectCode.class, allocation, "ledgerSubjectCode", path + ".ledgerSubjectCode");
-            verifyMoney(allocation, "amount", path + ".amount");
+            Money amount = verifyMoney(allocation, "amount", path + ".amount");
+            if (StringUtils.hasText(subjectRef.currency())
+                    && !subjectRef.currency().equals(amount.getCurrency().name())) {
+                throw new IllegalArgumentException(path
+                        + ".amount: funding allocation amount currency must match subjectRef currency");
+            }
             verifyAccountHierarchySnapshot(asNullableMap(allocation.get("accountHierarchySnapshot"),
                     path + ".accountHierarchySnapshot"), subjectRef, path + ".accountHierarchySnapshot");
+            long priority = requireInteger(allocation, "priority", path + ".priority");
+            if (!seenPriorities.add(priority)) {
+                throw new IllegalArgumentException(path + ".priority must be unique");
+            }
+            requireText(allocation, "reason", path + ".reason");
         }
     }
 
@@ -379,29 +390,60 @@ public final class FundsDslJsonContractVerifier {
         }
         JsonSubjectRef accountRef = parseAccountHierarchySubjectRef(
                 asNullableMap(snapshot.get("accountRef"), path + ".accountRef"), path + ".accountRef");
-        parseOptionalAccountHierarchySubjectRef(snapshot, "parentAccountRef", accountRef, path);
-        parseOptionalAccountHierarchySubjectRef(snapshot, "rootAccountRef", accountRef, path);
+        JsonSubjectRef parentAccountRef = parseOptionalAccountHierarchySubjectRef(snapshot,
+                "parentAccountRef",
+                accountRef,
+                path);
+        JsonSubjectRef rootAccountRef = parseOptionalAccountHierarchySubjectRef(snapshot,
+                "rootAccountRef",
+                accountRef,
+                path);
+        verifyParentAndRootAccountRef(parentAccountRef, rootAccountRef, path);
         requireText(snapshot, "hierarchyVersion", path + ".hierarchyVersion");
         asNullableMap(snapshot.get("contextVariables"), path + ".contextVariables");
         if (!sameSubject(accountRef, allocationSubjectRef)) {
             throw new IllegalArgumentException(path + ".accountRef must match funding allocation subjectRef");
         }
+        if (!compatible(accountRef.currency(), allocationSubjectRef.currency())) {
+            throw new IllegalArgumentException(path
+                    + ".accountRef currency must match funding allocation subjectRef currency");
+        }
     }
 
-    private static void parseOptionalAccountHierarchySubjectRef(Map<String, ?> snapshot,
-                                                                String fieldName,
-                                                                JsonSubjectRef accountRef,
-                                                                String path) {
+    private static @Nullable JsonSubjectRef parseOptionalAccountHierarchySubjectRef(Map<String, ?> snapshot,
+                                                                                   String fieldName,
+                                                                                   JsonSubjectRef accountRef,
+                                                                                   String path) {
         Map<String, ?> relation = asNullableMap(snapshot.get(fieldName), path + "." + fieldName);
         if (relation == null) {
-            return;
+            return null;
         }
         JsonSubjectRef relationRef = parseAccountHierarchySubjectRef(relation, path + "." + fieldName);
+        if (sameSubject(accountRef, relationRef)) {
+            throw new IllegalArgumentException(path + "." + fieldName + " must not reference accountRef itself");
+        }
         if (!compatible(accountRef.tenantId(), relationRef.tenantId())) {
             throw new IllegalArgumentException(path + "." + fieldName + ".tenantId must match account tenantId");
         }
         if (!compatible(accountRef.currency(), relationRef.currency())) {
             throw new IllegalArgumentException(path + "." + fieldName + ".currency must match account currency");
+        }
+        return relationRef;
+    }
+
+    private static void verifyParentAndRootAccountRef(@Nullable JsonSubjectRef parentAccountRef,
+                                                      @Nullable JsonSubjectRef rootAccountRef,
+                                                      String path) {
+        if (parentAccountRef == null || rootAccountRef == null) {
+            return;
+        }
+        if (!compatible(parentAccountRef.tenantId(), rootAccountRef.tenantId())) {
+            throw new IllegalArgumentException(path
+                    + ".rootAccountRef.tenantId must match parentAccountRef.tenantId");
+        }
+        if (!compatible(parentAccountRef.currency(), rootAccountRef.currency())) {
+            throw new IllegalArgumentException(path
+                    + ".rootAccountRef.currency must match parentAccountRef.currency");
         }
     }
 
@@ -580,10 +622,22 @@ public final class FundsDslJsonContractVerifier {
         throw new IllegalArgumentException(path + " must be text");
     }
 
+    private static long requireInteger(Map<String, ?> owner, String fieldName, String path) {
+        Object value = owner.get(fieldName);
+        if (value == null) {
+            throw new IllegalArgumentException(path + " is required");
+        }
+        return parseInteger(value, path);
+    }
+
     private static @Nullable Long optionalLong(@Nullable Object value, String path) {
         if (value == null) {
             return null;
         }
+        return parseInteger(value, path);
+    }
+
+    private static long parseInteger(Object value, String path) {
         if (value instanceof Number number) {
             return number.longValue();
         }

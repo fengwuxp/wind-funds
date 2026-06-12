@@ -34,18 +34,22 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 | --- | --- | --- |
 | 1 | [支付资金底座测试驱动设计.md](支付资金底座测试驱动设计.md) | 定义测试驱动设计原则、模块测试矩阵、场景用例、红线用例、目标测试资产和执行门禁。 |
 | 2 | [A0-编码准入基线核验.md](A0-编码准入基线核验.md) | 编码前只读核验页，用于整理 authority baseline、code baseline、target assets、schemaNeed、首批 Red 候选和工程任务建议。 |
-| 3 | [GSD-Goal-生产可用MVP推进计划.md](GSD-Goal-生产可用MVP推进计划.md) | 生产可用 MVP 推进基线，按依赖关系组织账本账目、钱包账户、交易内核、清结算对账、支付工具、VCC 和全球账户。 |
-| 4 | [GSD-1-账本账目Round0准入卡.md](GSD-1-账本账目Round0准入卡.md) | 账本、账目、posting、ledger entry 和余额投影的准入输入。 |
-| 5 | [GSD-1-账本账目Wave1执行计划.md](GSD-1-账本账目Wave1执行计划.md) | 账本账目 Wave 执行计划和目标 Red 分解。 |
-| 6 | [GSD-1-账本账目状态账本.md](GSD-1-账本账目状态账本.md) | 账本账目跨会话状态、决策日志、验证矩阵、handoff 和下一决策记录。 |
-| 7 | [GSD-1-账本账目代码库理解结论包.md](GSD-1-账本账目代码库理解结论包.md) | 账本账目代码入口、调用关系、既有覆盖、验证策略和残余风险。 |
-| 8 | [GSD-1-账本账目ExecutionGrant确认卡.md](GSD-1-账本账目ExecutionGrant确认卡.md) | 账本账目工程授权和消费记录，作为任务历史材料，不替代 TDD 权威设计。 |
-| 9 | [A1-直接交易事实红线准入卡.md](A1-直接交易事实红线准入卡.md) | 直接交易事实红线、覆盖验收、写入边界、Red 集合、验证命令和停止条件。 |
-| 10 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 授权后继能力、无授权退款、拒付语义和并发竞争的任务准入材料。 |
-| 11 | [B4-交易内核生产可用性Round0准入卡.md](B4-交易内核生产可用性Round0准入卡.md) | 账户主体型 canonical 交易内核生产可用补强、原路径回放和缺快照 fail-fast 的任务准入材料。 |
-| 12 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 账户层级、支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的任务准入材料。 |
-| 13 | [B7-清结算与对账Round0准入卡.md](B7-清结算与对账Round0准入卡.md) | 对账差错闭环、重跑幂等、白名单补事实准入和最小 DDL/H2 范围的任务准入材料。 |
-| 14 | [P2-业务能力包Round0准入卡.md](P2-业务能力包Round0准入卡.md) | VCC、全球账户、收单等 P2 业务专项进入资金底座前的准入材料。 |
+| 3 | [GSD-2-新基线工作流规划.md](GSD-2-新基线工作流规划.md) | 2026-06-12 之后的活跃 Loop + GSD + Goal 新基线入口，用于清零旧活跃未完成计划、重建设计/代码/任务基线和规划新 Workflow。 |
+| 4 | [GSD-2-AgentLoop-PlanGrant默认授权策略.md](GSD-2-AgentLoop-PlanGrant默认授权策略.md) | Agent Loop Engineering 和 GSD/CAD 默认低风险 Plan Grant 授权策略入口，说明可默认推进的文档/状态/任务卡范围，以及必须显式确认的代码、测试、DDL、Git、OpenSpec 状态和生产边界。 |
+| 5 | [AI代码交付闭环与Spec模板基线.md](AI代码交付闭环与Spec模板基线.md) | AI 代码交付闭环和 Spec 模板准入入口，用于约束后续 Grant 的 Spec 强度、AC 映射、Harness、独立验证、CR 交接、知识回流和停止条件。 |
+| 6 | [GSD-2-Spec-AC-Harness-CAD任务模板.md](GSD-2-Spec-AC-Harness-CAD任务模板.md) | GSD-2 单一 Grant 可填写模板，用于把 Spec、AC、Red、Harness、CAD Loop、CR 交接、交付证据和建议提交切片压到同一张任务卡。 |
+| 7 | [GSD-Goal-生产可用MVP推进计划.md](GSD-Goal-生产可用MVP推进计划.md) | 上一轮 GSD + Goal 生产可用 MVP 推进历史基线，保留证据、消费记录、Not Done 边界和 handoff；不再作为当前活跃计划。 |
+| 8 | [GSD-1-账本账目Round0准入卡.md](GSD-1-账本账目Round0准入卡.md) | 账本、账目、posting、ledger entry 和余额投影的历史准入输入；后续若重新选择需在 GSD-2 下重新确认 Grant。 |
+| 9 | [GSD-1-账本账目Wave1执行计划.md](GSD-1-账本账目Wave1执行计划.md) | 账本账目 Wave 执行历史计划和目标 Red 分解。 |
+| 10 | [GSD-1-账本账目状态账本.md](GSD-1-账本账目状态账本.md) | 账本账目跨会话状态、决策日志、验证矩阵、handoff 和下一决策历史记录。 |
+| 11 | [GSD-1-账本账目代码库理解结论包.md](GSD-1-账本账目代码库理解结论包.md) | 账本账目代码入口、调用关系、既有覆盖、验证策略和残余风险。 |
+| 12 | [GSD-1-账本账目ExecutionGrant确认卡.md](GSD-1-账本账目ExecutionGrant确认卡.md) | 账本账目工程授权和消费记录，作为任务历史材料，不替代 TDD 权威设计。 |
+| 13 | [A1-直接交易事实红线准入卡.md](A1-直接交易事实红线准入卡.md) | 直接交易事实红线、覆盖验收、写入边界、Red 集合、验证命令和停止条件。 |
+| 14 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 授权后继能力、无授权退款、拒付语义和并发竞争的任务准入历史材料。 |
+| 15 | [B4-交易内核生产可用性Round0准入卡.md](B4-交易内核生产可用性Round0准入卡.md) | 账户主体型 canonical 交易内核生产可用补强、原路径回放和缺快照 fail-fast 的历史准入材料。 |
+| 16 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 账户层级、支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的历史准入材料。 |
+| 17 | [B7-清结算与对账Round0准入卡.md](B7-清结算与对账Round0准入卡.md) | 对账差错闭环、重跑幂等、白名单补事实准入和最小 DDL/H2 范围的历史准入材料。 |
+| 18 | [P2-业务能力包Round0准入卡.md](P2-业务能力包Round0准入卡.md) | VCC、全球账户、收单等 P2 业务专项进入资金底座前的历史准入材料。 |
 
 ## 契约输入
 

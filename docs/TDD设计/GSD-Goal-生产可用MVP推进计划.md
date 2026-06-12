@@ -15,16 +15,18 @@
 | 写入范围 | 默认只允许写 `docs/TDD设计/GSD-Goal-生产可用MVP推进计划.md`、B2/B4/B7 Round 0 准入卡、TDD README、docs README、OpenSpec project 和 Harness tasks 索引；进入 `Plan Grant` 后，可额外写入所选低风险切片的目标测试文件，并必须回写验证证据和 Not Done 边界。 |
 | 只读范围 | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec`、wind-funds 源码与测试、fincone、fincone-issuing、nobe 参考代码、公开可访问支付语义资料。 |
 | Git 策略 | 默认 `summary_only`；未获显式 Git 授权前不自动 git add、git commit。 |
-| 当前状态 | `RUNTIME_GOAL_ACTIVE_PLAN_GRANT_B4_CURRENT_BINDING_REPLAY_FLOW_VERIFIED_SUMMARY_ONLY` |
+| 当前状态 | `SUPERSEDED_BY_GSD2_BASELINE_RESET_HISTORY_ONLY`；新的活跃工作流入口见 [GSD-2-新基线工作流规划.md](GSD-2-新基线工作流规划.md)。 |
 
 Harness 恢复字段：
 
 | 字段 | 内容 |
 | --- | --- |
-| 原子任务 | 建立生产可用 MVP 的 Goal Ledger、依赖顺序、Wave 计划和 Execution Grant 队列。 |
-| 所属阶段 | GSD Round 0 / Goal Baseline / Pre-Grant Decision Gate。 |
+| 原子任务 | 历史 Goal Ledger、依赖顺序、Wave 计划和 Execution Grant 队列归档。 |
+| 所属阶段 | History / Baseline Evidence / Superseded by GSD-2。 |
 | 写入文件 | `docs/TDD设计/GSD-Goal-生产可用MVP推进计划.md`、`docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md`、`docs/TDD设计/B4-交易内核生产可用性Round0准入卡.md`、`docs/TDD设计/B7-清结算与对账Round0准入卡.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/project.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 只读参考 | wind-funds 设计与代码、fincone 产品架构、fincone-issuing v3 设计、nobe 真实业务代码和公开可访问支付语义资料。 |
+
+GSD-2 迁移裁决：本文保留上一轮 GSD + Goal 的证据、消费记录、Not Done 边界和 handoff，不再承载当前活跃计划。旧的 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`、`QUEUED_AFTER_P0_P1` 和 `PARTIAL_*_NOT_DONE` 候选均已移出活跃执行队列；后续必须通过 [GSD-2-新基线工作流规划.md](GSD-2-新基线工作流规划.md) 重新选择 Task ID、Goal 映射、写入范围、验证命令和单一 Execution Grant。
 
 ## 2. 证据来源和边界
 
@@ -67,7 +69,7 @@ Harness 恢复字段：
 | Success Criteria | 账本账目、钱包账户、交易内核、清结算对账和 VCC/全球账户接入均按单一 MVP 切片形成真实代码、服务级测试、H2/fixture、幂等、失败无副作用、审计和验证命令证据。 |
 | Production Evidence | 使用真实 Spring Bean、真实 H2 schema、真实服务入口和可追溯账务断言；不能用 mock 流程、内存版业务 Service、空 facade、只断言状态或数量的测试冒充生产完成。 |
 | Non-goals | 不做完整发卡处理商、卡组织协议、PAN/CVV/HSM、完整 Spend Rule 引擎、完整 FX 执行、收单生产实现、监管或会计最终结论。 |
-| 状态 | `ACTIVE_RUNTIME_GOAL`；本会话已按用户要求开启运行时 Goal，但仍不等于 Execution Grant。 |
+| 状态 | 历史当时曾开启运行时 Goal；2026-06-12 已迁移到 GSD-2，本文不再承载当前运行时 Goal 或 Execution Grant。 |
 | 停止条件 | 缺少单一 Execution Grant、跨能力域写入、需要改公共契约或 DDL 但未授权、外部规则未确认却要自动放行、测试无法证明资金不变量、工作树冲突无法安全合并。 |
 
 ### 3.1 Goal Ledger 当前更新
@@ -142,18 +144,18 @@ Harness 恢复字段：
 | Loop ID | `GSD-GOAL-MVP-VCC-GLOBAL-FUNDS-LOOP-2026-06-11` |
 | 关联 Goal | `GSD-GOAL-MVP-VCC-GLOBAL-FUNDS-2026-06-07` |
 | Loop 类型 | `Plan Grant Loop / summary_only`；允许低风险本地文档、状态、索引、验证矩阵、交接记录和目标测试覆盖补齐。 |
-| 当前状态 | `B4_CURRENT_BINDING_REPLAY_FLOW_VERIFIED_SUMMARY_ONLY`。 |
+| 当前状态 | `CLOSED_AS_HISTORY_BY_GSD2_BASELINE_RESET`。 |
 | 状态载体 | 本文、`GSD-1-账本账目状态账本.md`、`GSD-1-账本账目Wave1执行计划.md`、`openspec/project.md` 和 `openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 决策输入 | 当前 Git 工作树、已消费 Grant、GSD Wave 队列、Execution Grant 队列、PRD/DSL/系分/TDD/OpenSpec 权威入口、验证结果和用户新增约束。 |
-| 允许动作 | 读取和同步权威状态；修正事实错误、索引漂移、恢复入口、验证矩阵、handoff、下一 Grant 候选说明；在无公共契约、无 DDL、无生产代码改动、无跨域写入的前提下补目标测试覆盖；运行文档结构、空白、目标测试、编译和 diff 校验。 |
+| 允许动作 | 仅允许读取历史证据、消费记录、Not Done 边界和审计线索；新的低风险文档同步、只读 Gap Audit、目标测试覆盖或 Grant 草案必须进入 GSD-2。 |
 | 禁止动作 | 未确认新的单一 Execution Grant 前，不改公共契约、DDL/H2 schema、运行时配置、生产配置、外部规则结论、Git add/commit/push、联网、依赖安装或任何不可逆操作；Plan Grant 下若目标测试暴露必须改生产代码的真实缺口，应先收口为 Red 证据并等待新的单一 Execution Grant。 |
 | 反馈源 | Harness checker、产品/架构 deliverable checker、外部规则字段 checker、`rg` 一致性扫描、`git status --short`、`git diff --check`、用户确认和后续目标测试结果。 |
 | 验证者 | 文档和 Harness 结构由脚本验证；代码、测试、TDD/CAD 和 CR 由 `资深架构师` 接手；产品语义和验收种子由 `产品架构专家` 接手；最终优先级和 Grant 由用户确认。 |
 | 预算 / 最大轮次 | 每轮最多 1 个低风险本地任务；连续 2 轮没有新增证据、状态变化或缺口收敛时暂停。 |
 | 无进展检测 | 若复扫仍只是重复“无可沿用 Execution Grant”且没有新增事实、候选、目标测试或验证证据，则停止扩写，回到用户确认新的单一 Grant。 |
 | 停止条件 | 命中公共契约、DDL/H2、生产代码修改、跨能力域、外部规则专业确认、工作树冲突、验证失败无法解释、工具权限升级、Git 操作或用户中断时停止。 |
-| 恢复入口 | 第 9 节 handoff；下一轮若继续交易内核，回到 `B4-CANONICAL-REPLAY-FAILFAST` 剩余缺口，优先选择交易投影解释、余额调账审计，或授权/争议/VCC lifecycle 更大组合 replay flow；否则在 B2 账户层级 contract-only/no-ddl 或 B7 对账差错中选择一个低风险切片。 |
-| 失败回写位置 | Goal Ledger、本节 Loop 契约、状态账本第 8/9 节、OpenSpec tasks 9.2 和具体候选准入卡。 |
+| 恢复入口 | [GSD-2-新基线工作流规划.md](GSD-2-新基线工作流规划.md)。后续若选择交易、账户或对账候选，必须在 GSD-2 下重新编号并确认新的单一 Grant。 |
+| 失败回写位置 | GSD-2、新 OpenSpec project 指针、Harness tasks 和对应候选准入卡；本文只保留历史证据。 |
 | Git 策略 | `summary_only`；本 Loop 不执行 `git add` 或 `git commit`。 |
 
 ## 4. 生产可用定义
@@ -344,6 +346,8 @@ Harness 恢复字段：
 
 ## 7. Execution Grant 队列
 
+GSD-2 迁移说明：下表从 2026-06-12 起不再是当前活跃队列，只是 backlog reference 和历史准入材料。新的活跃候选队列以 [GSD-2-新基线工作流规划.md#7-下一候选优先级](GSD-2-新基线工作流规划.md#7-下一候选优先级) 为准。
+
 | 优先级 | Grant 候选 | 当前状态 | 依赖 | 备注 |
 | --- | --- | --- | --- | --- |
 | 已消费 | `GSD1-LEDGER-BUDGET-GROUP-COMPAT-GUARD`（`GSD1-LD-RED-004A`） | `CONSUMED_BY_GSD1_LD_RED_004A` | 001A/001B/002A 已有当前工作树证据，003 已有既有投影回归证据 | 004A 已完成 BudgetGroup 兼容 guard；后续不得沿用该 Grant。 |
@@ -397,12 +401,12 @@ Harness 恢复字段：
 
 ### 7.2 授权前收口判断
 
-当前 GSD + Goal 基线已经具备下一轮编码准入所需的最小恢复入口，不需要继续为同一批候选重复扩写 Round 0 文档。后续推进的价值应来自确认单一 `Execution Grant`、执行目标 Red/Green、运行真实验证和回写交付证据。
+当前 GSD + Goal 基线已经迁移为历史证据。2026-06-12 起，旧未完成计划已从活跃队列移除；后续推进的价值应来自 GSD-2 下的 Gap Audit、重新选择单一 `Execution Grant`、执行目标 Red/Green、运行真实验证和回写交付证据。
 
 | 判断项 | 当前结论 | 下一动作 |
 | --- | --- | --- |
-| 默认依赖顺序 | `GSD1-LD-RED-002A`、`GSD1-LD-RED-003` 和 `GSD1-LD-RED-004A` 均已闭合；当前无可沿用编码 Grant。 | 重新选择新的单一 Grant；若业务强制 VCC 优先，切到 `B2-ACCOUNT-HIERARCHY`。 |
-| 授权前文档饱和度 | Goal 卡、交付雷达、Wave 队列、Grant 队列、默认入口、切换规则和验证矩阵已齐备。 | 只在发现事实错误、索引漂移或用户新增约束时继续改文档。 |
+| 默认依赖顺序 | `GSD1-LD-RED-002A`、`GSD1-LD-RED-003` 和 `GSD1-LD-RED-004A` 均已闭合；当前无可沿用编码 Grant。 | 在 GSD-2 中重新选择新的单一 Grant；若业务强制 VCC 优先，优先评估 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`。 |
+| 授权前文档饱和度 | Goal 卡、交付雷达、Wave 队列、Grant 队列、默认入口、切换规则和验证矩阵已齐备，现已作为历史证据冻结。 | 只在发现事实错误、索引漂移或用户新增约束时修正；新的计划在 GSD-2 维护。 |
 | VCC 快速路径 | 不直接打开 P2 VCC facade；先进入账户层级。该快速路径只允许 `contract-only/no-ddl` 准入 Red 先行准备，不豁免账本账目、资金责任、交易内核、对账差错和工具准入依赖。 | 明确要求 VCC 优先时，切换到 `B2-ACCOUNT-HIERARCHY`；若要生产 Done 或 H2-backed 资金流，先补对应前置 Wave。 |
 | 编码门禁 | Plan Grant 可补低风险目标测试覆盖；公共契约、DDL/H2、生产代码、运行时配置和 Git 操作仍不是自动授权。 | 目标测试直接 Green 时登记覆盖补齐；若 Red 暴露必须改生产代码的真实缺口，先停在 Red 证据并重新确认单一 Execution Grant。 |
 | 停止扩写条件 | 001A/001B/002A 已具备消费记录、验证证据和交接记录。 | 不再为 001B 或 002A 重复新增候选卡、扫描表或测试设计表；后续只维护新的单一 Grant。 |
@@ -412,8 +416,8 @@ Harness 恢复字段：
 | 用户输入 | 默认动作 |
 | --- | --- |
 | 再次提及或确认 `Execution Grant：GSD1-LEDGER-BOUND-LEDGER` | 提醒该 Grant 已消费，不能复用；必须重新选择 `GSD1-LD-RED-003`、`GSD1-LD-RED-004` 或切到其他单一 Grant。 |
-| 只说继续推进、继续完善、自动模式推进 | 若未明确 `Agent Loop Engineering` / `GSD + Goal 按任务计划推进`，只做设计、状态、索引、验证矩阵和下一候选准备。 |
-| 明确要求 `Agent Loop Engineering` / `GSD + Goal 按任务计划推进` | 形成受控 Plan Grant，自动选择一个低风险本地切片；可补目标测试并运行验证，但不得改公共契约、DDL/H2、生产代码、运行时配置或 Git。 |
+| 只说继续推进、继续完善、自动模式推进 | 进入 GSD-2，只做新基线 Gap Audit、状态、索引、验证矩阵和下一候选准备。 |
+| 明确要求 `Agent Loop Engineering` / `GSD + Goal 按任务计划推进` | 进入 GSD-2 的受控 Plan Grant Loop；先选择低风险文档同步或只读 Gap Audit。目标测试、生产代码、公共契约、DDL/H2、运行时配置或 Git 仍需新的 Grant 或显式授权。 |
 | 要求先做 VCC | 不直接进入 P2 VCC facade；优先切到 `B2-ACCOUNT-HIERARCHY` 的账户层级 Grant，且默认仅限 `contract-only/no-ddl` 准入 Red。 |
 | 要求先做全球账户 | 不直接进入外部付款 facade；先补钱包账户、交易内核和对账差错 Round 0 或对应 Grant。 |
 | 要求先做交易内核 | 切到 `B4-CANONICAL-REPLAY-FAILFAST`，只处理原路径回放 fail-fast，不改 canonical 入参。 |
@@ -477,7 +481,7 @@ Harness 恢复字段：
 
 | 检查项 | 当前证据 | 裁决 |
 | --- | --- | --- |
-| Goal 状态 | 运行时 Goal 为 `ACTIVE_RUNTIME_GOAL`，目标仍是生产可用 MVP，不是文档完成。 | 可继续推进，但不能把 Goal 当授权。 |
+| Goal 状态 | 历史当时曾开启运行时 Goal；2026-06-12 已迁移到 GSD-2，旧 Goal 只作为历史证据。 | 只能作为历史准入证据，不能继续推进或当授权。 |
 | 上游权威入口 | 第 8.2 节确认 PRD、系分、DSL、TDD 结构门禁通过。 | 上游入口足以支撑下一 Grant 确认。 |
 | 跨候选准入 | 第 8.1 节确认 Goal 总计划、账本 002A、钱包账户/支付工具/Spend Rule、B4 和 B7 候选结构门禁通过。 | 候选材料足以选择一个单一 Grant。 |
 | 默认下一编码入口 | 无可沿用 Grant；需重新选择一个新的单一 Grant，或按业务优先级切 `B2-ACCOUNT-HIERARCHY`。 | `NEEDS_NEW_SINGLE_GRANT`。 |
@@ -583,10 +587,11 @@ Harness 恢复字段：
 
 恢复入口：
 
-1. 若继续按依赖优先级推进，Agent Loop 可自动选择低风险 Plan Grant 切片；涉及公共契约、DDL/H2、生产代码、运行时配置或 Git 时，必须重新确认新的单一 Execution Grant。`B3-DIRECT-REFUND-REFERENCE-REPLAY` 已消费，纯 route replay 原快照复用边界、缺原 route snapshot 直接退款全链路失败无副作用和直接退款当前绑定/资金责任变化后沿原快照回放均已验证；下一轮若继续交易内核，应回到 `B4-CANONICAL-REPLAY-FAILFAST` 剩余缺口，优先选择交易投影解释、余额调账审计，或授权/争议/VCC lifecycle 更大组合 replay flow 中的单一低风险切片。
-2. 若业务强制先做 VCC，优先确认 `Execution Grant：B2-ACCOUNT-HIERARCHY`，不要直接确认 P2 VCC facade。
-3. 若业务强制先做全球账户，先补钱包账户、交易内核和对账差错 Round 0，不直接写 outbound/inbound facade。
-4. 若任何 Wave 发现 PRD、DSL、系分、TDD 或代码冲突，先回补权威文档和 OpenSpec，再继续编码。
+1. 当前恢复入口已迁移到 [GSD-2-新基线工作流规划.md](GSD-2-新基线工作流规划.md)。本文不再承载活跃未完成计划。
+2. 若继续按依赖优先级推进，先进入 `GSD2-W1-BASELINE-GAP-AUDIT`；涉及公共契约、DDL/H2、生产代码、运行时配置或 Git 时，必须进入 `GSD2-W2-SINGLE-GRANT-SELECTION` 并重新确认单一 Execution Grant。
+3. 若业务强制先做 VCC，GSD-2 默认候选为 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`，不要直接确认 P2 VCC facade。
+4. 若业务强制先做全球账户，先在 GSD-2 复核钱包账户、交易内核和对账差错，不直接写 outbound/inbound facade。
+5. 若任何 Wave 发现 PRD、DSL、系分、TDD 或代码冲突，先回补权威文档和 OpenSpec，再继续编码。
 
 交接要求：
 

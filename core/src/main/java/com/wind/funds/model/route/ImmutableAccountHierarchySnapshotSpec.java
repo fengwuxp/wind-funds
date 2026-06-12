@@ -31,6 +31,7 @@ public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
         requireOptionalAccountSubject(rootAccountRef, "root account");
         requireCompatibleRelation(accountRef, parentAccountRef, "parent account");
         requireCompatibleRelation(accountRef, rootAccountRef, "root account");
+        requireCompatibleRelation(parentAccountRef, rootAccountRef);
         if (!StringUtils.hasText(hierarchyVersion)) {
             throw new IllegalArgumentException("account hierarchy version is required");
         }
@@ -89,12 +90,34 @@ public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
         if (relationRef == null) {
             return;
         }
+        if (sameAccount(accountRef, relationRef)) {
+            throw new IllegalArgumentException(label + " must not reference account itself");
+        }
         if (!compatible(accountRef.getTenantId(), relationRef.getTenantId())) {
             throw new IllegalArgumentException(label + " tenant must match account tenant");
         }
         if (!compatible(accountRef.getCurrency(), relationRef.getCurrency())) {
             throw new IllegalArgumentException(label + " currency must match account currency");
         }
+    }
+
+    private static void requireCompatibleRelation(@Nullable SubjectRef parentAccountRef,
+                                                  @Nullable SubjectRef rootAccountRef) {
+        if (parentAccountRef == null || rootAccountRef == null) {
+            return;
+        }
+        if (!compatible(parentAccountRef.getTenantId(), rootAccountRef.getTenantId())) {
+            throw new IllegalArgumentException("root account tenant must match parent account tenant");
+        }
+        if (!compatible(parentAccountRef.getCurrency(), rootAccountRef.getCurrency())) {
+            throw new IllegalArgumentException("root account currency must match parent account currency");
+        }
+    }
+
+    private static boolean sameAccount(SubjectRef accountRef, SubjectRef relationRef) {
+        return accountRef.getSubjectType() == relationRef.getSubjectType()
+                && Objects.equals(accountRef.getSubjectId(), relationRef.getSubjectId())
+                && compatible(accountRef.getTenantId(), relationRef.getTenantId());
     }
 
     private static boolean compatible(@Nullable Object left, @Nullable Object right) {

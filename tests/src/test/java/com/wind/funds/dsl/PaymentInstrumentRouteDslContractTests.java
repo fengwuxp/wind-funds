@@ -264,6 +264,71 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     /**
+     * 场景：业务侧把实际落账账户也填成 parent 或 root。
+     * 预期：账户层级快照构造期拒绝自引用。
+     * 红线：父账户 / 根账户必须表达上级约束或聚合节点，不能指回子账户本身，否则父子汇总和防双算失真。
+     */
+    @Test
+    void testAccountHierarchySnapshotShouldRejectSelfParentOrRootAccountRef() {
+        SubjectRef cardCreditAccount = creditAccount("CA-VCC-CARD-SELF-001");
+
+        assertThatThrownBy(() -> accountHierarchySnapshot(cardCreditAccount,
+                cardCreditAccount,
+                fundingAccount("FA-VCC-PARENT-SELF-001"),
+                "card-binding-self-parent",
+                Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("parent account must not reference account itself");
+        assertThatThrownBy(() -> accountHierarchySnapshot(cardCreditAccount,
+                fundingAccount("FA-VCC-PARENT-SELF-002"),
+                cardCreditAccount,
+                "card-binding-self-root",
+                Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("root account must not reference account itself");
+    }
+
+    /**
+     * 场景：账户层级快照中的父账户和根账户来自不同租户或币种。
+     * 预期：账户层级快照构造期拒绝父根关系冲突。
+     * 红线：同一张 VCC 卡绑定的父账户 / 根账户必须属于同一责任边界，不能形成跨租户或跨币种聚合。
+     */
+    @Test
+    void testAccountHierarchySnapshotShouldRejectInconsistentParentAndRootRelation() {
+        SubjectRef cardCreditAccount = accountSubject("CA-VCC-CARD-REL-001",
+                FundsSubjectType.CREDIT_ACCOUNT,
+                null,
+                null);
+        SubjectRef parentAccount = accountSubject("FA-VCC-PARENT-REL-001",
+                FundsSubjectType.FUNDING_ACCOUNT,
+                1L,
+                CurrencyIsoCode.USD.name());
+        SubjectRef otherTenantRootAccount = accountSubject("FA-VCC-ROOT-REL-001",
+                FundsSubjectType.FUNDING_ACCOUNT,
+                2L,
+                CurrencyIsoCode.USD.name());
+        SubjectRef otherCurrencyRootAccount = accountSubject("FA-VCC-ROOT-REL-002",
+                FundsSubjectType.FUNDING_ACCOUNT,
+                1L,
+                CurrencyIsoCode.EUR.name());
+
+        assertThatThrownBy(() -> accountHierarchySnapshot(cardCreditAccount,
+                parentAccount,
+                otherTenantRootAccount,
+                "card-binding-parent-root-tenant-mismatch",
+                Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("root account tenant must match parent account tenant");
+        assertThatThrownBy(() -> accountHierarchySnapshot(cardCreditAccount,
+                parentAccount,
+                otherCurrencyRootAccount,
+                "card-binding-parent-root-currency-mismatch",
+                Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("root account currency must match parent account currency");
+    }
+
+    /**
      * 场景：资金来源决策挂载了不匹配的账户层级快照。
      * 预期：FundingAllocation 构造期拒绝。
      * 红线：路由回放不能出现 funding allocation 指向一个账户、层级快照指向另一个账户。
@@ -284,6 +349,99 @@ class PaymentInstrumentRouteDslContractTests {
                 hierarchySnapshot))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("accountHierarchySnapshot accountRef must match funding allocation subjectRef");
+    }
+
+    /**
+     * 场景：资金来源决策主体和账户层级快照主体 ID 一致，但币种不同。
+     * 预期：FundingAllocation 构造期拒绝。
+     * 红线：同一个资金责任主体不能在 route snapshot 中被记录成不同币种，否则回放和余额投影会跨币种归因。
+     */
+    @Test
+    void testFundingAllocationShouldRejectAccountHierarchySnapshotCurrencyMismatch() {
+        SubjectRef allocationSubject = accountSubject("CA-VCC-CARD-CURRENCY-001",
+                FundsSubjectType.CREDIT_ACCOUNT,
+                1L,
+                CurrencyIsoCode.USD.name());
+        SubjectRef snapshotAccount = accountSubject("CA-VCC-CARD-CURRENCY-001",
+                FundsSubjectType.CREDIT_ACCOUNT,
+                1L,
+                CurrencyIsoCode.EUR.name());
+        AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(snapshotAccount,
+                accountSubject("FA-VCC-PARENT-CURRENCY-001",
+                        FundsSubjectType.FUNDING_ACCOUNT,
+                        1L,
+                        CurrencyIsoCode.EUR.name()),
+                accountSubject("FA-VCC-PARENT-CURRENCY-001",
+                        FundsSubjectType.FUNDING_ACCOUNT,
+                        1L,
+                        CurrencyIsoCode.EUR.name()),
+                "card-binding-currency-mismatch",
+                Map.of());
+
+        assertThatThrownBy(() -> fundingAllocation("ALLOC-VCC-CURRENCY-MISMATCH",
+                allocationSubject,
+                LedgerSubjectCode.AUTHORIZATION,
+                10,
+                "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT",
+                hierarchySnapshot))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("accountHierarchySnapshot accountRef currency must match funding allocation subjectRef currency");
+    }
+
+    /**
+     * 场景：资金来源决策主体币种和 allocation 金额币种不一致。
+     * 预期：FundingAllocation 构造期拒绝。
+     * 红线：资金来源决策是“某个资金主体承担某笔金额”，主体币种和金额币种不能分叉。
+     */
+    @Test
+    void testFundingAllocationShouldRejectSubjectAmountCurrencyMismatch() {
+        SubjectRef eurFundingAccount = accountSubject("FA-VCC-FUNDING-CURRENCY-001",
+                FundsSubjectType.FUNDING_ACCOUNT,
+                1L,
+                CurrencyIsoCode.EUR.name());
+
+        assertThatThrownBy(() -> fundingAllocation("ALLOC-VCC-AMOUNT-CURRENCY-MISMATCH",
+                eurFundingAccount,
+                LedgerSubjectCode.AVAILABLE,
+                Money.immutable(100L, CurrencyIsoCode.USD),
+                10,
+                "SUBJECT_AMOUNT_CURRENCY_MISMATCH"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding allocation amount currency must match subjectRef currency");
+    }
+
+    /**
+     * 场景：VCC 子账户 allocation 的主体和账户层级快照均为 EUR，但 allocation 金额为 USD。
+     * 预期：FundingAllocation 构造期拒绝。
+     * 红线：带层级快照的资金责任不能只校验主体快照一致，还必须校验金额币种和主体币种一致。
+     */
+    @Test
+    void testAccountHierarchyFundingAllocationShouldRejectSubjectAmountCurrencyMismatch() {
+        SubjectRef eurCardAccount = accountSubject("CA-VCC-CARD-AMOUNT-CURRENCY-001",
+                FundsSubjectType.CREDIT_ACCOUNT,
+                1L,
+                CurrencyIsoCode.EUR.name());
+        SubjectRef eurParentAccount = accountSubject("FA-VCC-PARENT-AMOUNT-CURRENCY-001",
+                FundsSubjectType.FUNDING_ACCOUNT,
+                1L,
+                CurrencyIsoCode.EUR.name());
+        AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(eurCardAccount,
+                eurParentAccount,
+                eurParentAccount,
+                "card-binding-amount-currency-mismatch",
+                Map.of());
+
+        assertThatThrownBy(() -> ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
+                .allocationId("ALLOC-VCC-HIERARCHY-AMOUNT-CURRENCY-MISMATCH")
+                .subjectRef(eurCardAccount)
+                .ledgerSubjectCode(LedgerSubjectCode.AUTHORIZATION)
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .accountHierarchySnapshot(hierarchySnapshot)
+                .priority(10)
+                .reason("HIERARCHY_SUBJECT_AMOUNT_CURRENCY_MISMATCH")
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("funding allocation amount currency must match subjectRef currency");
     }
 
     /**
@@ -651,7 +809,22 @@ class PaymentInstrumentRouteDslContractTests {
                                                             LedgerSubjectCode ledgerSubjectCode,
                                                             Integer priority,
                                                             String reason) {
-        return fundingAllocation(allocationId, subjectRef, ledgerSubjectCode, priority, reason, null);
+        return fundingAllocation(allocationId,
+                subjectRef,
+                ledgerSubjectCode,
+                Money.immutable(100L, CurrencyIsoCode.USD),
+                priority,
+                reason,
+                null);
+    }
+
+    private FundingAllocationDecisionSpec fundingAllocation(String allocationId,
+                                                            SubjectRef subjectRef,
+                                                            LedgerSubjectCode ledgerSubjectCode,
+                                                            Money amount,
+                                                            Integer priority,
+                                                            String reason) {
+        return fundingAllocation(allocationId, subjectRef, ledgerSubjectCode, amount, priority, reason, null);
     }
 
     private FundingAllocationDecisionSpec fundingAllocation(String allocationId,
@@ -660,12 +833,28 @@ class PaymentInstrumentRouteDslContractTests {
                                                             Integer priority,
                                                             String reason,
                                                             AccountHierarchySnapshotSpec accountHierarchySnapshot) {
+        return fundingAllocation(allocationId,
+                subjectRef,
+                ledgerSubjectCode,
+                Money.immutable(100L, CurrencyIsoCode.USD),
+                priority,
+                reason,
+                accountHierarchySnapshot);
+    }
+
+    private FundingAllocationDecisionSpec fundingAllocation(String allocationId,
+                                                            SubjectRef subjectRef,
+                                                            LedgerSubjectCode ledgerSubjectCode,
+                                                            Money amount,
+                                                            Integer priority,
+                                                            String reason,
+                                                            AccountHierarchySnapshotSpec accountHierarchySnapshot) {
         if (accountHierarchySnapshot != null) {
             return ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
                     .allocationId(allocationId)
                     .subjectRef(subjectRef)
                     .ledgerSubjectCode(ledgerSubjectCode)
-                    .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                    .amount(amount)
                     .accountHierarchySnapshot(accountHierarchySnapshot)
                     .priority(priority)
                     .reason(reason)
@@ -675,7 +864,7 @@ class PaymentInstrumentRouteDslContractTests {
                 .allocationId(allocationId)
                 .subjectRef(subjectRef)
                 .ledgerSubjectCode(ledgerSubjectCode)
-                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .amount(amount)
                 .priority(priority)
                 .reason(reason)
                 .build();
@@ -703,11 +892,18 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     private SubjectRef subjectRef(String subjectId, FundsSubjectType subjectType) {
+        return accountSubject(subjectId, subjectType, 1L, CurrencyIsoCode.USD.name());
+    }
+
+    private SubjectRef accountSubject(String subjectId,
+                                      FundsSubjectType subjectType,
+                                      Long tenantId,
+                                      String currency) {
         return ImmutableSubjectRef.builder()
-                .tenantId(1L)
+                .tenantId(tenantId)
                 .subjectId(subjectId)
                 .subjectType(subjectType)
-                .currency(CurrencyIsoCode.USD.name())
+                .currency(currency)
                 .ledgerProfileCode("DEFAULT")
                 .build();
     }
