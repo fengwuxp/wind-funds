@@ -557,6 +557,68 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：VCC route JSON 样例中信用子账户 leg 消耗 100，但资金责任只分配 80。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：核心资金 / 信用账户的资金责任分配金额必须和 route leg 消耗金额闭合，避免 route snapshot 进入后续账务时资金责任短缺。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectUnclosedCoreAccountFundingAllocationAmount() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-VCC-ROUTE-ALLOCATION-CLOSURE-001",
+                  "instruction": {
+                    "instructionType": "AUTHORIZATION_TRANSACTION",
+                    "eventType": "AUTHORIZE",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedRoute": {
+                    "routingDecision": {
+                      "fundingAllocations": [{
+                        "allocationId": "alloc_vcc_closure_001",
+                        "subjectRef": {
+                          "subjectType": "CREDIT_ACCOUNT",
+                          "subjectId": "ca_vcc_closure_001",
+                          "currency": "USD"
+                        },
+                        "ledgerSubjectCode": "AUTHORIZATION",
+                        "amount": { "currency": "USD", "amount": 80 },
+                        "priority": 10,
+                        "reason": "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT"
+                      }]
+                    },
+                    "legs": [{
+                      "legType": "HOLD",
+                      "sourceNode": {
+                        "nodeType": "SUBJECT",
+                        "nodeRole": "SOURCE",
+                        "subjectType": "CREDIT_ACCOUNT",
+                        "subjectId": "ca_vcc_closure_001",
+                        "ledgerSubjectCode": "AVAILABLE"
+                      },
+                      "targetNode": {
+                        "nodeType": "SUBJECT",
+                        "nodeRole": "TARGET",
+                        "subjectType": "CREDIT_ACCOUNT",
+                        "subjectId": "ca_vcc_closure_001",
+                        "ledgerSubjectCode": "AUTHORIZATION"
+                      },
+                      "amount": { "currency": "USD", "amount": 100 },
+                      "balanceEffectType": "HOLD",
+                      "phaseCode": "AUTHORIZATION",
+                      "replayPolicy": "PARTIAL_ALLOWED"
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("core account allocation amount must equal consume route amount");
+    }
+
+    /**
      * 场景：JSON 样例把预算组写成账户层级中的实际账户。
      * 预期：JSON 契约校验显式失败。
      * 红线：预算组是控制范围，不是资金或信用账户，不能进入账户层级作为落账主体。

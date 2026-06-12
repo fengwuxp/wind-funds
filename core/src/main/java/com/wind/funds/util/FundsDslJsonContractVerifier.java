@@ -38,6 +38,7 @@ import org.springframework.util.StringUtils;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -336,28 +337,39 @@ public final class FundsDslJsonContractVerifier {
             return;
         }
         verifyEnum(RouteReplayType.class, route, "replayType", "expectedRoute.replayType", false);
-        verifyRoutingDecision(asNullableMap(route.get("routingDecision"), "expectedRoute.routingDecision"));
+        Map<String, ?> routingDecision = asNullableMap(route.get("routingDecision"), "expectedRoute.routingDecision");
+        Map<CurrencyIsoCode, Long> allocationAmounts = verifyRoutingDecision(routingDecision);
         for (Map<String, ?> participant : childObjects(route, "participants", "expectedRoute.participants")) {
             verifyEnum(RouteParticipantRole.class, participant, "participantRole", "expectedRoute.participants.participantRole");
             verifySubjectRef(asNullableMap(participant.get("subjectRef"), "expectedRoute.participants.subjectRef"),
                     "expectedRoute.participants.subjectRef");
         }
+        Map<CurrencyIsoCode, Long> routeAmounts = new EnumMap<>(CurrencyIsoCode.class);
         for (Map<String, ?> leg : childObjects(route, "legs", "expectedRoute.legs")) {
             verifyEnum(RouteLegType.class, leg, "legType", "expectedRoute.legs.legType");
-            verifyNode(asNullableMap(leg.get("sourceNode"), "expectedRoute.legs.sourceNode"), "expectedRoute.legs.sourceNode");
+            FundsSubjectType sourceSubjectType = verifyNode(asNullableMap(leg.get("sourceNode"),
+                    "expectedRoute.legs.sourceNode"), "expectedRoute.legs.sourceNode");
             verifyNode(asNullableMap(leg.get("targetNode"), "expectedRoute.legs.targetNode"), "expectedRoute.legs.targetNode");
-            verifyMoney(leg, "amount", "expectedRoute.legs.amount");
-            verifyEnum(LedgerBalanceEffectType.class, leg, "balanceEffectType", "expectedRoute.legs.balanceEffectType");
+            Money amount = verifyMoney(leg, "amount", "expectedRoute.legs.amount");
+            LedgerBalanceEffectType balanceEffectType = verifyEnum(LedgerBalanceEffectType.class, leg,
+                    "balanceEffectType", "expectedRoute.legs.balanceEffectType");
             verifyEnum(LedgerPhaseCode.class, leg, "phaseCode", "expectedRoute.legs.phaseCode");
             verifyEnum(RouteReplayPolicy.class, leg, "replayPolicy", "expectedRoute.legs.replayPolicy");
+            if (isCoreAccountConsumeLeg(balanceEffectType, sourceSubjectType)) {
+                addAmount(routeAmounts, amount, "core account route amount sum overflow");
+            }
+        }
+        if (routingDecision != null && !routeAmounts.isEmpty() && !routeAmounts.equals(allocationAmounts)) {
+            throw new IllegalArgumentException("core account allocation amount must equal consume route amount");
         }
     }
 
-    private static void verifyRoutingDecision(@Nullable Map<String, ?> routingDecision) {
+    private static Map<CurrencyIsoCode, Long> verifyRoutingDecision(@Nullable Map<String, ?> routingDecision) {
         if (routingDecision == null) {
-            return;
+            return Map.of();
         }
         Set<Long> seenPriorities = new HashSet<>();
+        Map<CurrencyIsoCode, Long> allocationAmounts = new EnumMap<>(CurrencyIsoCode.class);
         for (Map<String, ?> allocation : childObjects(routingDecision,
                 "fundingAllocations",
                 "expectedRoute.routingDecision.fundingAllocations")) {
@@ -372,6 +384,9 @@ public final class FundsDslJsonContractVerifier {
                 throw new IllegalArgumentException(path
                         + ".amount: funding allocation amount currency must match subjectRef currency");
             }
+            if (isCoreAccount(subjectRef.subjectType())) {
+                addAmount(allocationAmounts, amount, "core account allocation amount sum overflow");
+            }
             verifyAccountHierarchySnapshot(asNullableMap(allocation.get("accountHierarchySnapshot"),
                     path + ".accountHierarchySnapshot"), subjectRef, path + ".accountHierarchySnapshot");
             long priority = requireInteger(allocation, "priority", path + ".priority");
@@ -380,6 +395,7 @@ public final class FundsDslJsonContractVerifier {
             }
             requireText(allocation, "reason", path + ".reason");
         }
+        return allocationAmounts;
     }
 
     private static void verifyAccountHierarchySnapshot(@Nullable Map<String, ?> snapshot,
@@ -456,12 +472,24 @@ public final class FundsDslJsonContractVerifier {
         return parsed;
     }
 
-    private static void verifyNode(@Nullable Map<String, ?> node, String path) {
+    private static FundsSubjectType verifyNode(@Nullable Map<String, ?> node, String path) {
         if (node == null) {
             throw new IllegalArgumentException(path + " is required");
         }
-        verifyEnum(FundsSubjectType.class, node, "subjectType", path + ".subjectType");
+        FundsSubjectType subjectType = verifyEnum(FundsSubjectType.class, node, "subjectType", path + ".subjectType");
         verifyEnum(LedgerSubjectCode.class, node, "ledgerSubjectCode", path + ".ledgerSubjectCode");
+        return subjectType;
+    }
+
+    private static boolean isCoreAccountConsumeLeg(LedgerBalanceEffectType balanceEffectType,
+                                                   FundsSubjectType sourceSubjectType) {
+        return (balanceEffectType == LedgerBalanceEffectType.CONSUME
+                || balanceEffectType == LedgerBalanceEffectType.HOLD)
+                && isCoreAccount(sourceSubjectType);
+    }
+
+    private static boolean isCoreAccount(FundsSubjectType subjectType) {
+        return subjectType == FundsSubjectType.FUNDING_ACCOUNT || subjectType == FundsSubjectType.CREDIT_ACCOUNT;
     }
 
     private static void verifySubjectRef(@Nullable Map<String, ?> subjectRef, String path) {
@@ -664,6 +692,11 @@ public final class FundsDslJsonContractVerifier {
         } catch (ArithmeticException ex) {
             throw new IllegalArgumentException(message, ex);
         }
+    }
+
+    private static void addAmount(Map<CurrencyIsoCode, Long> target, Money amount, String overflowMessage) {
+        target.merge(amount.getCurrency(), amount.getAmount(),
+                (left, right) -> addExact(left, right, overflowMessage));
     }
 
     private static List<Map<String, ?>> childObjects(Map<String, ?> owner, String fieldName, String path) {
