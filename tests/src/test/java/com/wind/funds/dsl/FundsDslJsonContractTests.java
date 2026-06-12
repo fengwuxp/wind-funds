@@ -619,6 +619,68 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：VCC route JSON 样例把支付工具节点写成账本 route leg 来源节点。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：支付工具只能作为路由输入和快照引用，不能穿透为账本可记账节点。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectPaymentInstrumentRouteLegNode() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-VCC-ROUTE-PAYMENT-INSTRUMENT-NODE-001",
+                  "instruction": {
+                    "instructionType": "AUTHORIZATION_TRANSACTION",
+                    "eventType": "AUTHORIZE",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedRoute": {
+                    "routingDecision": {
+                      "fundingAllocations": [{
+                        "allocationId": "alloc_vcc_card_node_001",
+                        "subjectRef": {
+                          "subjectType": "CREDIT_ACCOUNT",
+                          "subjectId": "ca_vcc_card_node_001",
+                          "currency": "USD"
+                        },
+                        "ledgerSubjectCode": "AUTHORIZATION",
+                        "amount": { "currency": "USD", "amount": 100 },
+                        "priority": 10,
+                        "reason": "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT"
+                      }]
+                    },
+                    "legs": [{
+                      "legType": "HOLD",
+                      "sourceNode": {
+                        "nodeType": "PAYMENT_INSTRUMENT",
+                        "nodeRole": "SOURCE",
+                        "subjectType": "CREDIT_ACCOUNT",
+                        "subjectId": "ca_vcc_card_node_001",
+                        "ledgerSubjectCode": "AVAILABLE"
+                      },
+                      "targetNode": {
+                        "nodeType": "SUBJECT",
+                        "nodeRole": "TARGET",
+                        "subjectType": "CREDIT_ACCOUNT",
+                        "subjectId": "ca_vcc_card_node_001",
+                        "ledgerSubjectCode": "AUTHORIZATION"
+                      },
+                      "amount": { "currency": "USD", "amount": 100 },
+                      "balanceEffectType": "HOLD",
+                      "phaseCode": "AUTHORIZATION",
+                      "replayPolicy": "PARTIAL_ALLOWED"
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("RouteLeg sourceNode must be ledger-postable");
+    }
+
+    /**
      * 场景：JSON 样例把预算组写成账户层级中的实际账户。
      * 预期：JSON 契约校验显式失败。
      * 红线：预算组是控制范围，不是资金或信用账户，不能进入账户层级作为落账主体。

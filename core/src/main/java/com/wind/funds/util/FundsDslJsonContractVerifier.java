@@ -15,6 +15,8 @@ import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteLegType;
+import com.wind.funds.route.enums.RouteNodeRole;
+import com.wind.funds.route.enums.RouteNodeType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.enums.RouteReplayType;
@@ -476,9 +478,31 @@ public final class FundsDslJsonContractVerifier {
         if (node == null) {
             throw new IllegalArgumentException(path + " is required");
         }
+        RouteNodeType nodeType = verifyEnum(RouteNodeType.class, node, "nodeType", path + ".nodeType", false);
+        if (nodeType == RouteNodeType.PAYMENT_INSTRUMENT || nodeType == RouteNodeType.EXTERNAL_ACCOUNT) {
+            throw new IllegalArgumentException(routeLegNodeLabel(path) + " must be ledger-postable");
+        }
+        RouteNodeRole nodeRole = verifyEnum(RouteNodeRole.class, node, "nodeRole", path + ".nodeRole", false);
+        if (path.endsWith("sourceNode") && nodeRole == RouteNodeRole.TARGET) {
+            throw new IllegalArgumentException(path + ".nodeRole must be SOURCE");
+        }
+        if (path.endsWith("targetNode") && nodeRole == RouteNodeRole.SOURCE) {
+            throw new IllegalArgumentException(path + ".nodeRole must be TARGET");
+        }
         FundsSubjectType subjectType = verifyEnum(FundsSubjectType.class, node, "subjectType", path + ".subjectType");
+        requireText(node, "subjectId", path + ".subjectId");
         verifyEnum(LedgerSubjectCode.class, node, "ledgerSubjectCode", path + ".ledgerSubjectCode");
         return subjectType;
+    }
+
+    private static String routeLegNodeLabel(String path) {
+        if (path.endsWith("sourceNode")) {
+            return "RouteLeg sourceNode";
+        }
+        if (path.endsWith("targetNode")) {
+            return "RouteLeg targetNode";
+        }
+        return path;
     }
 
     private static boolean isCoreAccountConsumeLeg(LedgerBalanceEffectType balanceEffectType,
