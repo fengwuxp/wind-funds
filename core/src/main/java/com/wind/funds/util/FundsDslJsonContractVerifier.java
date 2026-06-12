@@ -548,12 +548,16 @@ public final class FundsDslJsonContractVerifier {
         if (posting == null) {
             return;
         }
-        for (Map<String, ?> plan : childObjects(posting, "postingPlans", "expectedPosting.postingPlans")) {
+        for (Map<String, ?> plan : requiredChildObjects(posting, "postingPlans",
+                "expectedPosting.postingPlans")) {
             verifyEnum(LedgerPostingIntentType.class, plan, "intent", "expectedPosting.postingPlans.intent");
             verifyEnum(LedgerPostingScope.class, plan, "postingScope", "expectedPosting.postingPlans.postingScope");
             verifyEnum(LedgerBalanceEffectType.class, plan, "balanceEffectType", "expectedPosting.postingPlans.balanceEffectType");
             verifyEnum(LedgerPhaseCode.class, plan, "phaseCode", "expectedPosting.postingPlans.phaseCode");
-            for (Map<String, ?> entry : childObjects(plan, "entries", "expectedPosting.postingPlans.entries")) {
+            Map<CurrencyIsoCode, Long> debitAmounts = new EnumMap<>(CurrencyIsoCode.class);
+            Map<CurrencyIsoCode, Long> creditAmounts = new EnumMap<>(CurrencyIsoCode.class);
+            for (Map<String, ?> entry : requiredChildObjects(plan, "entries",
+                    "expectedPosting.postingPlans.entries")) {
                 verifyEnum(FundsSubjectType.class, entry, "subjectType", "expectedPosting.postingPlans.entries.subjectType");
                 requireText(entry, "subjectId", "expectedPosting.postingPlans.entries.subjectId");
                 verifyEnum(LedgerSubjectCode.class, entry, "ledgerSubjectCode",
@@ -563,13 +567,50 @@ public final class FundsDslJsonContractVerifier {
                 AccountBalancePeriodType periodType = verifyEnum(AccountBalancePeriodType.class, entry, "periodType",
                         "expectedPosting.postingPlans.entries.periodType");
                 String periodId = requireText(entry, "periodId", "expectedPosting.postingPlans.entries.periodId");
-                verifyEnum(EntrySide.class, entry, "entrySide", "expectedPosting.postingPlans.entries.entrySide");
+                EntrySide entrySide = verifyEnum(EntrySide.class, entry, "entrySide",
+                        "expectedPosting.postingPlans.entries.entrySide");
                 Money amount = verifyMoney(entry, "amount", "expectedPosting.postingPlans.entries.amount");
                 if (currency != amount.getCurrency()) {
                     throw new IllegalArgumentException("expectedPosting.postingPlans.entries entry currency must match "
                             + "amount currency");
                 }
                 verifyLedgerEntryPeriod(periodType, periodId);
+                addPostingPlanAmount(entrySide, amount, debitAmounts, creditAmounts);
+            }
+            verifyPostingPlanBalanced(debitAmounts, creditAmounts);
+        }
+    }
+
+    private static void addPostingPlanAmount(EntrySide entrySide,
+                                             Money amount,
+                                             Map<CurrencyIsoCode, Long> debitAmounts,
+                                             Map<CurrencyIsoCode, Long> creditAmounts) {
+        if (entrySide == EntrySide.DEBIT) {
+            addAmount(debitAmounts, amount, "posting plan debit amount sum overflow");
+            return;
+        }
+        if (entrySide == EntrySide.CREDIT) {
+            addAmount(creditAmounts, amount, "posting plan credit amount sum overflow");
+            return;
+        }
+        throw new IllegalArgumentException("expectedPosting.postingPlans.entries.entrySide must be DEBIT or CREDIT");
+    }
+
+    private static void verifyPostingPlanBalanced(Map<CurrencyIsoCode, Long> debitAmounts,
+                                                  Map<CurrencyIsoCode, Long> creditAmounts) {
+        if (debitAmounts.isEmpty() || creditAmounts.isEmpty()) {
+            throw new IllegalArgumentException("expectedPosting.postingPlans posting plan must include debit and "
+                    + "credit entries");
+        }
+        if (!debitAmounts.keySet().equals(creditAmounts.keySet())) {
+            throw new IllegalArgumentException("expectedPosting.postingPlans posting plan currency mismatch");
+        }
+        if (debitAmounts.size() != 1) {
+            throw new IllegalArgumentException("expectedPosting.postingPlans posting plan must use one currency");
+        }
+        for (Map.Entry<CurrencyIsoCode, Long> debitEntry : debitAmounts.entrySet()) {
+            if (!Objects.equals(debitEntry.getValue(), creditAmounts.get(debitEntry.getKey()))) {
+                throw new IllegalArgumentException("expectedPosting.postingPlans posting plan must be balanced");
             }
         }
     }

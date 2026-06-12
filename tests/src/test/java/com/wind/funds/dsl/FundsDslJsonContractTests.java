@@ -255,6 +255,242 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：账务期望样例没有任何账务计划。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：expectedPosting 只要出现，就必须明确可验证的 PostingPlan。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectExpectedPostingWithoutPostingPlans() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-POSTING-EMPTY-PLANS-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedPosting": {
+                    "postingPlans": []
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedPosting.postingPlans must not be empty");
+    }
+
+    /**
+     * 场景：账务计划样例没有任何分录。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：PostingPlan 不能用空 entries 绕过借贷平衡和余额影响断言。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectPostingPlanWithoutEntries() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-POSTING-EMPTY-ENTRIES-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedPosting": {
+                    "postingPlans": [{
+                      "intent": "TRANSFER",
+                      "postingScope": "BETWEEN_SUBJECTS",
+                      "balanceEffectType": "CONSUME",
+                      "phaseCode": "SETTLEMENT",
+                      "entries": []
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedPosting.postingPlans.entries must not be empty");
+    }
+
+    /**
+     * 场景：账务计划样例中同币种借贷金额不相等。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：DSL 样例不能让不平衡 PostingPlan 进入交易、账本和投影测试入口。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectUnbalancedPostingPlan() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-POSTING-UNBALANCED-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedPosting": {
+                    "postingPlans": [{
+                      "intent": "TRANSFER",
+                      "postingScope": "BETWEEN_SUBJECTS",
+                      "balanceEffectType": "CONSUME",
+                      "phaseCode": "SETTLEMENT",
+                      "entries": [{
+                        "subjectId": "fa_user_10001_usd",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "AVAILABLE",
+                        "currency": "USD",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "DEBIT",
+                        "amount": { "currency": "USD", "amount": 100 }
+                      }, {
+                        "subjectId": "fa_merchant_20001_usd",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "CLEARING",
+                        "currency": "USD",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "CREDIT",
+                        "amount": { "currency": "USD", "amount": 80 }
+                      }]
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("posting plan must be balanced");
+    }
+
+    /**
+     * 场景：账务计划样例中借贷金额数值相等但币种不同。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：PostingPlan 必须按同币种独立平衡，不能用数值相等掩盖跨币种错账。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectCrossCurrencyPostingPlan() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-POSTING-CROSS-CURRENCY-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedPosting": {
+                    "postingPlans": [{
+                      "intent": "TRANSFER",
+                      "postingScope": "BETWEEN_SUBJECTS",
+                      "balanceEffectType": "CONSUME",
+                      "phaseCode": "SETTLEMENT",
+                      "entries": [{
+                        "subjectId": "fa_user_10001_usd",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "AVAILABLE",
+                        "currency": "USD",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "DEBIT",
+                        "amount": { "currency": "USD", "amount": 100 }
+                      }, {
+                        "subjectId": "fa_merchant_20001_eur",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "CLEARING",
+                        "currency": "EUR",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "CREDIT",
+                        "amount": { "currency": "EUR", "amount": 100 }
+                      }]
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("posting plan currency mismatch");
+    }
+
+    /**
+     * 场景：账务计划样例中 USD 和 EUR 各自借贷数值都平衡，但混在同一个 PostingPlan。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：每个 PostingPlan 只能表达一个币种的独立平衡，不允许用多币种集合掩盖账务阶段边界。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectMultiCurrencyPostingPlan() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-POSTING-MULTI-CURRENCY-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedPosting": {
+                    "postingPlans": [{
+                      "intent": "TRANSFER",
+                      "postingScope": "BETWEEN_SUBJECTS",
+                      "balanceEffectType": "CONSUME",
+                      "phaseCode": "SETTLEMENT",
+                      "entries": [{
+                        "subjectId": "fa_user_10001_usd",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "AVAILABLE",
+                        "currency": "USD",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "DEBIT",
+                        "amount": { "currency": "USD", "amount": 100 }
+                      }, {
+                        "subjectId": "fa_merchant_20001_usd",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "CLEARING",
+                        "currency": "USD",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "CREDIT",
+                        "amount": { "currency": "USD", "amount": 100 }
+                      }, {
+                        "subjectId": "fa_user_10001_eur",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "AVAILABLE",
+                        "currency": "EUR",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "DEBIT",
+                        "amount": { "currency": "EUR", "amount": 80 }
+                      }, {
+                        "subjectId": "fa_merchant_20001_eur",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "CLEARING",
+                        "currency": "EUR",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "CREDIT",
+                        "amount": { "currency": "EUR", "amount": 80 }
+                      }]
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("posting plan must use one currency");
+    }
+
+    /**
      * 场景：样例作者把权益快照核心金额藏入 contextVariables。
      * 预期：JSON 契约校验显式失败。
      * 红线：权益金额闭合、规则版本和退款处置必须是一等字段。
