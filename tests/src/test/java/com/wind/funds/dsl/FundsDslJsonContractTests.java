@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -93,6 +94,25 @@ class FundsDslJsonContractTests {
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("targetTestClass");
+    }
+
+    /**
+     * 场景：CONTRACT_ONLY 夹具携带 route、posting 或 replay 资金流断言字段。
+     * 预期：JSON 契约校验显式失败，错误指向 fixtureLevel 越权。
+     * 红线：contract-only 只能证明字段结构、枚举和 validation，不能夹带资金流完成证据。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectContractOnlyFixtureWithFundsFlowAssertions() {
+        for (String assertionField : List.of("expectedRoute", "expectedPosting", "replayRequest")) {
+            Map<String, Object> document = new LinkedHashMap<>(contractOnlyFixtureInventory());
+            document.put(assertionField, Map.of("placeholder", true));
+
+            assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                    .as(assertionField)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("CONTRACT_ONLY")
+                    .hasMessageContaining(assertionField);
+        }
     }
 
     /**
@@ -1630,6 +1650,29 @@ class FundsDslJsonContractTests {
                     .sorted()
                     .toList());
         }
+    }
+
+    private Map<String, Object> contractOnlyFixtureInventory() {
+        Map<String, Object> document = new LinkedHashMap<>();
+        document.put("caseId", "DSL-INVALID-CONTRACT-FUNDS-FLOW-001");
+        document.put("fixtureLevel", "CONTRACT_ONLY");
+        document.put("scenarioCode", "DIRECT_PAY_WITH_CONTRACT_ONLY_FUNDS_FLOW");
+        document.put("acceptanceIds", List.of("AC-CONTRACT-002"));
+        document.put("tddIds", List.of("TDD-CONTRACT-002"));
+        document.put("systemDesignRefs", List.of("02-交易路由钱包账目与投影系分设计#契约承载"));
+        document.put("targetTestClass", "FundsDslJsonContractTests");
+        document.put("coreAssertions", List.of("字段结构可解析"));
+        document.put("notDone", List.of("不证明 route、posting、ledger entry、余额投影或 replay 已完成"));
+        document.put("instruction", Map.of(
+                "instructionType", "DIRECT_TRANSACTION",
+                "eventType", "PAY",
+                "transactionType", "PAY",
+                "amount", Map.of("currency", "USD", "amount", 100),
+                "originalAmount", Map.of("currency", "USD", "amount", 100)));
+        document.put("validation", Map.of(
+                "mustPass", List.of("字段结构可解析"),
+                "mustFail", List.of("声明资金流已完成")));
+        return document;
     }
 
     private Path workspaceRoot() {

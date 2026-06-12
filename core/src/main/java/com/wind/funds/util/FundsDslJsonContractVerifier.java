@@ -132,9 +132,20 @@ public final class FundsDslJsonContractVerifier {
         requireText(document, "targetTestClass");
         requiredChildTexts(document, "coreAssertions", "coreAssertions");
         requiredChildTexts(document, "notDone", "notDone");
+        rejectContractOnlyFundsFlowAssertions(document);
         Map<String, ?> validation = asMap(document.get("validation"), "validation");
         requiredChildTexts(validation, "mustPass", "validation.mustPass");
         requiredChildTexts(validation, "mustFail", "validation.mustFail");
+    }
+
+    private static void rejectContractOnlyFundsFlowAssertions(Map<String, ?> document) {
+        for (String field : List.of("expectedRoute", "expectedPosting", "replayRequest")) {
+            if (document.containsKey(field) && document.get(field) != null) {
+                throw new IllegalArgumentException(
+                        "CONTRACT_ONLY fixture must not contain " + field
+                                + "; use FUNDS_FLOW, SERVICE_FLOW or GOVERNANCE_FLOW for flow assertions");
+            }
+        }
     }
 
     private static void verifyInstruction(@Nullable Map<String, ?> instruction) {
