@@ -681,6 +681,72 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：VCC route participant 只声明预算组类型，缺少稳定主体标识。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：预算组可作为迁移期控制参与方快照，但不能缺失可追溯主体 ID。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectBudgetGroupRouteParticipantWithoutSubjectId() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-VCC-ROUTE-BUDGET-PARTICIPANT-001",
+                  "instruction": {
+                    "instructionType": "AUTHORIZATION_TRANSACTION",
+                    "eventType": "AUTHORIZE",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedRoute": {
+                    "participants": [{
+                      "participantRole": "BUDGET_CONTROLLER",
+                      "subjectRef": {
+                        "subjectType": "BUDGET_GROUP"
+                      }
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedRoute.participants.subjectRef.subjectId");
+    }
+
+    /**
+     * 场景：route participant 只声明主体类型，缺少稳定主体标识。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：route participant 会进入 route snapshot 和回放解释链路，不能缺失可追溯主体 ID。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectRouteParticipantWithoutSubjectId() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-VCC-ROUTE-PARTICIPANT-SUBJECT-ID-001",
+                  "instruction": {
+                    "instructionType": "AUTHORIZATION_TRANSACTION",
+                    "eventType": "AUTHORIZE",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedRoute": {
+                    "participants": [{
+                      "participantRole": "AUTH_HOLDER",
+                      "subjectRef": {
+                        "subjectType": "CREDIT_ACCOUNT"
+                      }
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedRoute.participants.subjectRef.subjectId");
+    }
+
+    /**
      * 场景：JSON 样例把预算组写成账户层级中的实际账户。
      * 预期：JSON 契约校验显式失败。
      * 红线：预算组是控制范围，不是资金或信用账户，不能进入账户层级作为落账主体。

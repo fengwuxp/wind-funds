@@ -343,7 +343,7 @@ public final class FundsDslJsonContractVerifier {
         Map<CurrencyIsoCode, Long> allocationAmounts = verifyRoutingDecision(routingDecision);
         for (Map<String, ?> participant : childObjects(route, "participants", "expectedRoute.participants")) {
             verifyEnum(RouteParticipantRole.class, participant, "participantRole", "expectedRoute.participants.participantRole");
-            verifySubjectRef(asNullableMap(participant.get("subjectRef"), "expectedRoute.participants.subjectRef"),
+            parseSubjectRef(asNullableMap(participant.get("subjectRef"), "expectedRoute.participants.subjectRef"),
                     "expectedRoute.participants.subjectRef");
         }
         Map<CurrencyIsoCode, Long> routeAmounts = new EnumMap<>(CurrencyIsoCode.class);
@@ -514,13 +514,6 @@ public final class FundsDslJsonContractVerifier {
 
     private static boolean isCoreAccount(FundsSubjectType subjectType) {
         return subjectType == FundsSubjectType.FUNDING_ACCOUNT || subjectType == FundsSubjectType.CREDIT_ACCOUNT;
-    }
-
-    private static void verifySubjectRef(@Nullable Map<String, ?> subjectRef, String path) {
-        if (subjectRef == null) {
-            throw new IllegalArgumentException(path + " is required");
-        }
-        verifyEnum(FundsSubjectType.class, subjectRef, "subjectType", path + ".subjectType");
     }
 
     private static JsonSubjectRef parseSubjectRef(@Nullable Map<String, ?> subjectRef, String path) {
