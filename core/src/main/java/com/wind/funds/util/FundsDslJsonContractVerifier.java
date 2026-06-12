@@ -13,6 +13,7 @@ import com.wind.funds.model.transaction.ImmutableFundsBenefitRefundPolicySpec;
 import com.wind.funds.model.transaction.ImmutableFundsBenefitSnapshotSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteNodeRole;
@@ -20,6 +21,7 @@ import com.wind.funds.route.enums.RouteNodeType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.enums.RouteReplayType;
+import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsBenefitAmountClosureRole;
 import com.wind.funds.transaction.enums.FundsBenefitComponentType;
@@ -31,6 +33,7 @@ import com.wind.funds.transaction.enums.FundsBenefitType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
@@ -42,6 +45,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -339,12 +343,17 @@ public final class FundsDslJsonContractVerifier {
             return;
         }
         verifyEnum(RouteReplayType.class, route, "replayType", "expectedRoute.replayType", false);
+        verifyRouteContext(asNullableMap(route.get("contextVariables"), "expectedRoute.contextVariables"),
+                "expectedRoute.contextVariables");
         Map<String, ?> routingDecision = asNullableMap(route.get("routingDecision"), "expectedRoute.routingDecision");
         Map<CurrencyIsoCode, Long> allocationAmounts = verifyRoutingDecision(routingDecision);
         for (Map<String, ?> participant : childObjects(route, "participants", "expectedRoute.participants")) {
             verifyEnum(RouteParticipantRole.class, participant, "participantRole", "expectedRoute.participants.participantRole");
             parseSubjectRef(asNullableMap(participant.get("subjectRef"), "expectedRoute.participants.subjectRef"),
                     "expectedRoute.participants.subjectRef");
+            verifyRouteContext(asNullableMap(participant.get("contextVariables"),
+                            "expectedRoute.participants.contextVariables"),
+                    "expectedRoute.participants.contextVariables");
         }
         Map<CurrencyIsoCode, Long> routeAmounts = new EnumMap<>(CurrencyIsoCode.class);
         for (Map<String, ?> leg : childObjects(route, "legs", "expectedRoute.legs")) {
@@ -357,6 +366,8 @@ public final class FundsDslJsonContractVerifier {
                     "balanceEffectType", "expectedRoute.legs.balanceEffectType");
             verifyEnum(LedgerPhaseCode.class, leg, "phaseCode", "expectedRoute.legs.phaseCode");
             verifyEnum(RouteReplayPolicy.class, leg, "replayPolicy", "expectedRoute.legs.replayPolicy");
+            verifyRouteContext(asNullableMap(leg.get("contextVariables"), "expectedRoute.legs.contextVariables"),
+                    "expectedRoute.legs.contextVariables");
             if (isCoreAccountConsumeLeg(balanceEffectType, sourceSubjectType)) {
                 addAmount(routeAmounts, amount, "core account route amount sum overflow");
             }
@@ -370,6 +381,9 @@ public final class FundsDslJsonContractVerifier {
         if (routingDecision == null) {
             return Map.of();
         }
+        verifyRouteContext(asNullableMap(routingDecision.get("contextVariables"),
+                        "expectedRoute.routingDecision.contextVariables"),
+                "expectedRoute.routingDecision.contextVariables");
         Set<Long> seenPriorities = new HashSet<>();
         Map<CurrencyIsoCode, Long> allocationAmounts = new EnumMap<>(CurrencyIsoCode.class);
         for (Map<String, ?> allocation : childObjects(routingDecision,
@@ -418,7 +432,8 @@ public final class FundsDslJsonContractVerifier {
                 path);
         verifyParentAndRootAccountRef(parentAccountRef, rootAccountRef, path);
         requireText(snapshot, "hierarchyVersion", path + ".hierarchyVersion");
-        asNullableMap(snapshot.get("contextVariables"), path + ".contextVariables");
+        verifyRouteContext(asNullableMap(snapshot.get("contextVariables"), path + ".contextVariables"),
+                path + ".contextVariables");
         if (!sameSubject(accountRef, allocationSubjectRef)) {
             throw new IllegalArgumentException(path + ".accountRef must match funding allocation subjectRef");
         }
@@ -552,6 +567,20 @@ public final class FundsDslJsonContractVerifier {
             return;
         }
         verifyEnum(FundsSubjectType.class, replayRequest, "subjectType", "replayRequest.subjectType", false);
+        verifyRouteContext(asNullableMap(replayRequest.get("contextVariables"), "replayRequest.contextVariables"),
+                "replayRequest.contextVariables");
+    }
+
+    private static void verifyRouteContext(@Nullable Map<String, ?> contextVariables, String path) {
+        if (contextVariables == null) {
+            return;
+        }
+        Map<String, Object> context = asObjectValueMap(contextVariables);
+        if (PaymentInstrumentSensitiveValueValidator.containsSensitiveField(context)
+                || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(context)) {
+            throw new IllegalArgumentException(path + " must not contain sensitive fields");
+        }
+        FundsBenefitSpecValidators.immutableInstructionContext(context, pathOwner(path));
     }
 
     private static Money verifyMoney(Map<String, ?> owner, String fieldName, String path) {
@@ -771,6 +800,21 @@ public final class FundsDslJsonContractVerifier {
             return (Map<String, ?>) map;
         }
         throw new IllegalArgumentException(path + " must be object");
+    }
+
+    private static Map<String, Object> asObjectValueMap(Map<String, ?> values) {
+        Map<String, Object> result = new LinkedHashMap<>(values.size());
+        for (Map.Entry<String, ?> entry : values.entrySet()) {
+            result.put(entry.getKey(), entry.getValue());
+        }
+        return Map.copyOf(result);
+    }
+
+    private static String pathOwner(String path) {
+        if (path.endsWith(".contextVariables")) {
+            return path.substring(0, path.length() - ".contextVariables".length());
+        }
+        return path;
     }
 
     private record JsonSubjectRef(FundsSubjectType subjectType,

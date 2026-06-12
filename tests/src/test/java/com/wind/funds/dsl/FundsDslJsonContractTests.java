@@ -747,6 +747,82 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：route participant JSON 样例把外部账户原文字段放进上下文。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：route participant 会进入 route snapshot 和归档重放链路，不能绕过对象 DSL 的敏感字段保护。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectRouteParticipantSensitiveContextVariables() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-ROUTE-PARTICIPANT-SENSITIVE-CONTEXT-001",
+                  "instruction": {
+                    "instructionType": "AUTHORIZATION_TRANSACTION",
+                    "eventType": "AUTHORIZE",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedRoute": {
+                    "participants": [{
+                      "participantRole": "AUTH_HOLDER",
+                      "subjectRef": {
+                        "subjectType": "CREDIT_ACCOUNT",
+                        "subjectId": "ca_vcc_sensitive_context_001"
+                      },
+                      "contextVariables": {
+                        "externalAccount": { "bankAccountNo": "123456789012" }
+                      }
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedRoute.participants.contextVariables")
+                .hasMessageContaining("sensitive fields");
+    }
+
+    /**
+     * 场景：route participant JSON 样例把权益退款处置藏进上下文。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：route participant context 只能承载稳定摘要，不能替代权益快照或资金责任一等字段。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectRouteParticipantCoreBenefitContextVariables() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-ROUTE-PARTICIPANT-BENEFIT-CONTEXT-001",
+                  "instruction": {
+                    "instructionType": "AUTHORIZATION_TRANSACTION",
+                    "eventType": "AUTHORIZE",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedRoute": {
+                    "participants": [{
+                      "participantRole": "AUTH_HOLDER",
+                      "subjectRef": {
+                        "subjectType": "CREDIT_ACCOUNT",
+                        "subjectId": "ca_vcc_benefit_context_001"
+                      },
+                      "contextVariables": {
+                        "benefitPayload": { "refundDisposition": "REFUND_TO_PLATFORM" }
+                      }
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedRoute.participants.contextVariables")
+                .hasMessageContaining("core benefit field: refundDisposition");
+    }
+
+    /**
      * 场景：JSON 样例把预算组写成账户层级中的实际账户。
      * 预期：JSON 契约校验显式失败。
      * 红线：预算组是控制范围，不是资金或信用账户，不能进入账户层级作为落账主体。
