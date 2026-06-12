@@ -1,13 +1,18 @@
 package com.wind.funds.dsl;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.model.route.ImmutableAccountHierarchyFundingAllocationDecisionSpec;
+import com.wind.funds.model.route.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.model.route.ImmutableExternalAccountRefSpec;
 import com.wind.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.funds.model.route.ImmutableRouteNodeSpec;
+import com.wind.funds.model.route.ImmutableRouteSnapshotSpec;
 import com.wind.funds.model.route.ImmutableRoutingDecisionSpec;
 import com.wind.funds.model.route.ImmutableSubjectRef;
 import com.wind.funds.route.enums.FundsSubjectType;
@@ -18,14 +23,20 @@ import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.SubjectRef;
+import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.route.spec.RoutingDecisionSpec;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsInstructionType;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -136,6 +147,143 @@ class PaymentInstrumentRouteDslContractTests {
         assertThat(sharedCardBudgetGroupFundingAccount.getFundingAllocations())
                 .extracting(item -> item.getSubjectRef().getSubjectType())
                 .containsExactly(FundsSubjectType.BUDGET_GROUP, FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
+    /**
+     * 场景：VCC 共享卡授权时，支付工具先解析到信用子账户。
+     * 预期：资金来源决策保留卡绑定快照，并固化账户层级快照，实际落账主体仍是信用账户。
+     * 红线：VCC 卡不得成为账本主体；回放、账单和责任归因必须依赖当次账户层级快照。
+     */
+    @Test
+    void testVccSharedCardShouldResolveToCreditSubAccountWithHierarchySnapshot() {
+        PaymentInstrumentRefSpec sharedCard = paymentInstrumentRef("PI-VCC-SHARED-001",
+                "**** 1888",
+                Map.of("bindingRole", "VCC_SHARED_CARD", "bindingVersion", 7));
+        SubjectRef parentAccount = fundingAccount("FA-VCC-PARENT-001");
+        SubjectRef cardCreditAccount = creditAccount("CA-VCC-CARD-001");
+        AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(cardCreditAccount,
+                parentAccount,
+                parentAccount,
+                "card-binding-v7",
+                Map.of("cardBindingVersion", 7, "accountPurpose", "VCC_SHARED_CARD"));
+        FundingAllocationDecisionSpec allocation = fundingAllocation("ALLOC-VCC-SHARED",
+                cardCreditAccount,
+                LedgerSubjectCode.AUTHORIZATION,
+                10,
+                "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT",
+                hierarchySnapshot);
+
+        assertThat(sharedCard.getBindingSnapshot()).containsEntry("bindingRole", "VCC_SHARED_CARD");
+        assertThat(allocation.getSubjectRef().getSubjectType()).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT);
+        assertThat(allocation.getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AUTHORIZATION);
+        assertThat(allocation.getAccountHierarchySnapshot()).isSameAs(hierarchySnapshot);
+        assertThat(hierarchySnapshot.getAccountRef()).isSameAs(cardCreditAccount);
+        assertThat(hierarchySnapshot.getParentAccountRef()).isSameAs(parentAccount);
+        assertThat(hierarchySnapshot.getRootAccountRef()).isSameAs(parentAccount);
+        assertThat(hierarchySnapshot.getContextVariables()).containsEntry("cardBindingVersion", 7);
+    }
+
+    /**
+     * 场景：VCC 共享卡授权生成 route snapshot 后进入归档、重放或交易投影链路。
+     * 预期：快照 JSON 保留支付工具引用、资金来源决策和账户层级快照。
+     * 红线：route snapshot 不得把 VCC 卡当账本主体，也不得泄露完整卡号等敏感值。
+     */
+    @Test
+    void testVccSharedCardRouteSnapshotJsonShouldCarryAccountHierarchySnapshot() {
+        PaymentInstrumentRefSpec sharedCard = paymentInstrumentRef("PI-VCC-SHARED-002",
+                "**** 2999",
+                Map.of("bindingRole", "VCC_SHARED_CARD", "bindingVersion", 9));
+        SubjectRef parentAccount = fundingAccount("FA-VCC-PARENT-004");
+        SubjectRef cardCreditAccount = creditAccount("CA-VCC-CARD-004");
+        AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(cardCreditAccount,
+                parentAccount,
+                parentAccount,
+                "card-binding-v9",
+                Map.of("cardBindingVersion", 9, "accountPurpose", "VCC_SHARED_CARD"));
+        FundingAllocationDecisionSpec allocation = fundingAllocation("ALLOC-VCC-SHARED-JSON",
+                cardCreditAccount,
+                LedgerSubjectCode.AUTHORIZATION,
+                10,
+                "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT",
+                hierarchySnapshot);
+        RouteSnapshotSpec snapshot = ImmutableRouteSnapshotSpec.builder()
+                .tenantId(1L)
+                .snapshotId("RS-VCC-SHARED-JSON-001")
+                .snapshotSchemaVersion("route-snapshot-v1")
+                .routeCode("VCC_SHARED_CARD_AUTH")
+                .routeVersion("v1")
+                .businessScene("VCC_AUTHORIZATION")
+                .businessSn("AUTH-VCC-SHARED-JSON-001")
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
+                .eventType(FundsTransactionEventType.AUTHORIZE)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of())
+                .legs(List.of(routeLeg(cardCreditAccount, fundingAccount("FA-MERCHANT-JSON-001"))))
+                .routingDecision(routingDecision("VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT", List.of(allocation)))
+                .paymentInstrumentRef(sharedCard)
+                .resolvedAt(LocalDateTime.of(2026, 6, 12, 10, 0))
+                .contextVariables(Map.of("fixtureLevel", "CONTRACT_ONLY"))
+                .build();
+
+        JSONObject document = JSON.parseObject(JSON.toJSONString(snapshot));
+        JSONObject serializedAllocation = document.getJSONObject("routingDecision")
+                .getJSONArray("fundingAllocations")
+                .getJSONObject(0);
+        JSONObject serializedHierarchy = serializedAllocation.getJSONObject("accountHierarchySnapshot");
+
+        assertThat(document.getJSONObject("paymentInstrumentRef").getString("instrumentId"))
+                .isEqualTo("PI-VCC-SHARED-002");
+        assertThat(serializedAllocation.getJSONObject("subjectRef").getString("subjectType"))
+                .isEqualTo(FundsSubjectType.CREDIT_ACCOUNT.name());
+        assertThat(serializedHierarchy.getJSONObject("accountRef").getString("subjectId"))
+                .isEqualTo("CA-VCC-CARD-004");
+        assertThat(serializedHierarchy.getJSONObject("parentAccountRef").getString("subjectId"))
+                .isEqualTo("FA-VCC-PARENT-004");
+        assertThat(serializedHierarchy.getJSONObject("rootAccountRef").getString("subjectId"))
+                .isEqualTo("FA-VCC-PARENT-004");
+        assertThat(serializedHierarchy.getString("hierarchyVersion")).isEqualTo("card-binding-v9");
+        assertThat(serializedHierarchy.getJSONObject("contextVariables").getString("accountPurpose"))
+                .isEqualTo("VCC_SHARED_CARD");
+        assertThat(document.toJSONString()).doesNotContain("4242424242424242");
+    }
+
+    /**
+     * 场景：业务侧误把预算组当作账户层级中的实际落账账户。
+     * 预期：账户层级快照构造期拒绝。
+     * 红线：预算组是控制范围，不是资金或信用账户，不能进入账户层级作为落账主体。
+     */
+    @Test
+    void testAccountHierarchySnapshotShouldRejectBudgetGroupAsAccountRef() {
+        assertThatThrownBy(() -> accountHierarchySnapshot(budgetGroup("BG-VCC-001"),
+                fundingAccount("FA-VCC-PARENT-002"),
+                fundingAccount("FA-VCC-PARENT-002"),
+                "budget-binding-v1",
+                Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("account hierarchy subject must be funding or credit account");
+    }
+
+    /**
+     * 场景：资金来源决策挂载了不匹配的账户层级快照。
+     * 预期：FundingAllocation 构造期拒绝。
+     * 红线：路由回放不能出现 funding allocation 指向一个账户、层级快照指向另一个账户。
+     */
+    @Test
+    void testFundingAllocationShouldRejectMismatchedAccountHierarchySnapshot() {
+        AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(creditAccount("CA-VCC-CARD-002"),
+                fundingAccount("FA-VCC-PARENT-003"),
+                fundingAccount("FA-VCC-PARENT-003"),
+                "card-binding-v8",
+                Map.of());
+
+        assertThatThrownBy(() -> fundingAllocation("ALLOC-VCC-MISMATCH",
+                creditAccount("CA-VCC-CARD-003"),
+                LedgerSubjectCode.AUTHORIZATION,
+                10,
+                "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT",
+                hierarchySnapshot))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("accountHierarchySnapshot accountRef must match funding allocation subjectRef");
     }
 
     /**
@@ -503,6 +651,26 @@ class PaymentInstrumentRouteDslContractTests {
                                                             LedgerSubjectCode ledgerSubjectCode,
                                                             Integer priority,
                                                             String reason) {
+        return fundingAllocation(allocationId, subjectRef, ledgerSubjectCode, priority, reason, null);
+    }
+
+    private FundingAllocationDecisionSpec fundingAllocation(String allocationId,
+                                                            SubjectRef subjectRef,
+                                                            LedgerSubjectCode ledgerSubjectCode,
+                                                            Integer priority,
+                                                            String reason,
+                                                            AccountHierarchySnapshotSpec accountHierarchySnapshot) {
+        if (accountHierarchySnapshot != null) {
+            return ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
+                    .allocationId(allocationId)
+                    .subjectRef(subjectRef)
+                    .ledgerSubjectCode(ledgerSubjectCode)
+                    .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                    .accountHierarchySnapshot(accountHierarchySnapshot)
+                    .priority(priority)
+                    .reason(reason)
+                    .build();
+        }
         return ImmutableFundingAllocationDecisionSpec.builder()
                 .allocationId(allocationId)
                 .subjectRef(subjectRef)
@@ -526,6 +694,10 @@ class PaymentInstrumentRouteDslContractTests {
         return subjectRef(subjectId, FundsSubjectType.FUNDING_ACCOUNT);
     }
 
+    private SubjectRef creditAccount(String subjectId) {
+        return subjectRef(subjectId, FundsSubjectType.CREDIT_ACCOUNT);
+    }
+
     private SubjectRef budgetGroup(String subjectId) {
         return subjectRef(subjectId, FundsSubjectType.BUDGET_GROUP);
     }
@@ -537,6 +709,20 @@ class PaymentInstrumentRouteDslContractTests {
                 .subjectType(subjectType)
                 .currency(CurrencyIsoCode.USD.name())
                 .ledgerProfileCode("DEFAULT")
+                .build();
+    }
+
+    private AccountHierarchySnapshotSpec accountHierarchySnapshot(SubjectRef accountRef,
+                                                                  SubjectRef parentAccountRef,
+                                                                  SubjectRef rootAccountRef,
+                                                                  String hierarchyVersion,
+                                                                  Map<String, Object> contextVariables) {
+        return ImmutableAccountHierarchySnapshotSpec.builder()
+                .accountRef(accountRef)
+                .parentAccountRef(parentAccountRef)
+                .rootAccountRef(rootAccountRef)
+                .hierarchyVersion(hierarchyVersion)
+                .contextVariables(contextVariables)
                 .build();
     }
 

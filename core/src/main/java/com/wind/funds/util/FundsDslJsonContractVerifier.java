@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -335,6 +336,7 @@ public final class FundsDslJsonContractVerifier {
             return;
         }
         verifyEnum(RouteReplayType.class, route, "replayType", "expectedRoute.replayType", false);
+        verifyRoutingDecision(asNullableMap(route.get("routingDecision"), "expectedRoute.routingDecision"));
         for (Map<String, ?> participant : childObjects(route, "participants", "expectedRoute.participants")) {
             verifyEnum(RouteParticipantRole.class, participant, "participantRole", "expectedRoute.participants.participantRole");
             verifySubjectRef(asNullableMap(participant.get("subjectRef"), "expectedRoute.participants.subjectRef"),
@@ -351,6 +353,67 @@ public final class FundsDslJsonContractVerifier {
         }
     }
 
+    private static void verifyRoutingDecision(@Nullable Map<String, ?> routingDecision) {
+        if (routingDecision == null) {
+            return;
+        }
+        for (Map<String, ?> allocation : childObjects(routingDecision,
+                "fundingAllocations",
+                "expectedRoute.routingDecision.fundingAllocations")) {
+            String path = "expectedRoute.routingDecision.fundingAllocations";
+            requireText(allocation, "allocationId", path + ".allocationId");
+            JsonSubjectRef subjectRef = parseSubjectRef(asNullableMap(allocation.get("subjectRef"),
+                    path + ".subjectRef"), path + ".subjectRef");
+            verifyEnum(LedgerSubjectCode.class, allocation, "ledgerSubjectCode", path + ".ledgerSubjectCode");
+            verifyMoney(allocation, "amount", path + ".amount");
+            verifyAccountHierarchySnapshot(asNullableMap(allocation.get("accountHierarchySnapshot"),
+                    path + ".accountHierarchySnapshot"), subjectRef, path + ".accountHierarchySnapshot");
+        }
+    }
+
+    private static void verifyAccountHierarchySnapshot(@Nullable Map<String, ?> snapshot,
+                                                       JsonSubjectRef allocationSubjectRef,
+                                                       String path) {
+        if (snapshot == null) {
+            return;
+        }
+        JsonSubjectRef accountRef = parseAccountHierarchySubjectRef(
+                asNullableMap(snapshot.get("accountRef"), path + ".accountRef"), path + ".accountRef");
+        parseOptionalAccountHierarchySubjectRef(snapshot, "parentAccountRef", accountRef, path);
+        parseOptionalAccountHierarchySubjectRef(snapshot, "rootAccountRef", accountRef, path);
+        requireText(snapshot, "hierarchyVersion", path + ".hierarchyVersion");
+        asNullableMap(snapshot.get("contextVariables"), path + ".contextVariables");
+        if (!sameSubject(accountRef, allocationSubjectRef)) {
+            throw new IllegalArgumentException(path + ".accountRef must match funding allocation subjectRef");
+        }
+    }
+
+    private static void parseOptionalAccountHierarchySubjectRef(Map<String, ?> snapshot,
+                                                                String fieldName,
+                                                                JsonSubjectRef accountRef,
+                                                                String path) {
+        Map<String, ?> relation = asNullableMap(snapshot.get(fieldName), path + "." + fieldName);
+        if (relation == null) {
+            return;
+        }
+        JsonSubjectRef relationRef = parseAccountHierarchySubjectRef(relation, path + "." + fieldName);
+        if (!compatible(accountRef.tenantId(), relationRef.tenantId())) {
+            throw new IllegalArgumentException(path + "." + fieldName + ".tenantId must match account tenantId");
+        }
+        if (!compatible(accountRef.currency(), relationRef.currency())) {
+            throw new IllegalArgumentException(path + "." + fieldName + ".currency must match account currency");
+        }
+    }
+
+    private static JsonSubjectRef parseAccountHierarchySubjectRef(@Nullable Map<String, ?> subjectRef, String path) {
+        JsonSubjectRef parsed = parseSubjectRef(subjectRef, path);
+        if (parsed.subjectType() != FundsSubjectType.FUNDING_ACCOUNT
+                && parsed.subjectType() != FundsSubjectType.CREDIT_ACCOUNT) {
+            throw new IllegalArgumentException(path + ".subjectType must be FUNDING_ACCOUNT or CREDIT_ACCOUNT");
+        }
+        return parsed;
+    }
+
     private static void verifyNode(@Nullable Map<String, ?> node, String path) {
         if (node == null) {
             throw new IllegalArgumentException(path + " is required");
@@ -364,6 +427,18 @@ public final class FundsDslJsonContractVerifier {
             throw new IllegalArgumentException(path + " is required");
         }
         verifyEnum(FundsSubjectType.class, subjectRef, "subjectType", path + ".subjectType");
+    }
+
+    private static JsonSubjectRef parseSubjectRef(@Nullable Map<String, ?> subjectRef, String path) {
+        if (subjectRef == null) {
+            throw new IllegalArgumentException(path + " is required");
+        }
+        FundsSubjectType subjectType = verifyEnum(FundsSubjectType.class, subjectRef, "subjectType",
+                path + ".subjectType");
+        String subjectId = requireText(subjectRef, "subjectId", path + ".subjectId");
+        Long tenantId = optionalLong(subjectRef.get("tenantId"), path + ".tenantId");
+        String currency = optionalText(subjectRef.get("currency"), path + ".currency");
+        return new JsonSubjectRef(subjectType, subjectId, tenantId, currency);
     }
 
     private static void verifyPosting(@Nullable Map<String, ?> posting) {
@@ -495,8 +570,38 @@ public final class FundsDslJsonContractVerifier {
         return text;
     }
 
+    private static @Nullable String optionalText(@Nullable Object value, String path) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof String text) {
+            return text;
+        }
+        throw new IllegalArgumentException(path + " must be text");
+    }
+
+    private static @Nullable Long optionalLong(@Nullable Object value, String path) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        throw new IllegalArgumentException(path + " must be integer");
+    }
+
     private static boolean isTextValue(Object value) {
         return value instanceof String text && StringUtils.hasText(text);
+    }
+
+    private static boolean sameSubject(JsonSubjectRef left, JsonSubjectRef right) {
+        return left.subjectType() == right.subjectType()
+                && Objects.equals(left.subjectId(), right.subjectId())
+                && compatible(left.tenantId(), right.tenantId());
+    }
+
+    private static boolean compatible(@Nullable Object left, @Nullable Object right) {
+        return left == null || right == null || Objects.equals(left, right);
     }
 
     private static long addExact(long left, long right, String message) {
@@ -562,5 +667,11 @@ public final class FundsDslJsonContractVerifier {
             return (Map<String, ?>) map;
         }
         throw new IllegalArgumentException(path + " must be object");
+    }
+
+    private record JsonSubjectRef(FundsSubjectType subjectType,
+                                  String subjectId,
+                                  @Nullable Long tenantId,
+                                  @Nullable String currency) {
     }
 }

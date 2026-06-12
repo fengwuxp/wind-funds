@@ -24,6 +24,11 @@ public interface FundingAllocationDecisionSpec {
     Money getAmount();
 
     @Nullable
+    default AccountHierarchySnapshotSpec getAccountHierarchySnapshot() {
+        return null;
+    }
+
+    @Nullable
     default Integer getPriority() {
         return null;
     }

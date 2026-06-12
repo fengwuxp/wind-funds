@@ -123,10 +123,32 @@ class FundsAmountBoundaryContractTests {
 
         assertThatThrownBy(() -> resolvedRoute(mismatch.leg(), mismatch.routingDecision()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+                .hasMessageContaining("core account allocation amount must equal consume route amount");
         assertThatThrownBy(() -> routeSnapshot(mismatch.leg(), mismatch.routingDecision()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+                .hasMessageContaining("core account allocation amount must equal consume route amount");
+    }
+
+    /**
+     * 场景：VCC 共享卡或授信支付解析出信用账户资金责任，同时 route leg 表达信用账户额度消耗。
+     * 预期：信用账户 funding allocation 合计必须等于正向额度消耗 leg 合计。
+     * 红线：信用账户作为核心账务主体，不能绕过 route amount 与资金责任分配闭合校验。
+     */
+    @Test
+    void testRouteShouldRejectUnclosedCreditAccountAllocationAmount() {
+        ImmutableRouteLegSpec creditLeg = routeLeg("LEG-CREDIT-001", 100L, FundsSubjectType.CREDIT_ACCOUNT);
+        RoutingDecisionSpec routingDecision = routingDecision(List.of(fundingAllocation("ALLOC-CA-001",
+                subjectRef("CA-CREDIT-001", FundsSubjectType.CREDIT_ACCOUNT),
+                80L,
+                10,
+                "CREDIT_ACCOUNT")));
+
+        assertThatThrownBy(() -> resolvedRoute(creditLeg, routingDecision))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("core account allocation amount must equal consume route amount");
+        assertThatThrownBy(() -> routeSnapshot(creditLeg, routingDecision))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("core account allocation amount must equal consume route amount");
     }
 
     /**
@@ -146,10 +168,10 @@ class FundsAmountBoundaryContractTests {
 
         assertThatThrownBy(() -> resolvedRoute(cnyLeg, routingDecision))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+                .hasMessageContaining("core account allocation amount must equal consume route amount");
         assertThatThrownBy(() -> routeSnapshot(cnyLeg, routingDecision))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+                .hasMessageContaining("core account allocation amount must equal consume route amount");
     }
 
     /**
@@ -171,7 +193,7 @@ class FundsAmountBoundaryContractTests {
                                 20,
                                 "REAL_FUNDING_ACCOUNT")))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding account allocation amount must equal consume route amount");
+                .hasMessageContaining("core account allocation amount must equal consume route amount");
 
         ImmutableResolvedRouteSpec validRoute = resolvedRoute(routeLeg(100L),
                 routingDecision(List.of(fundingAllocation("ALLOC-BUDGET-002",
@@ -213,10 +235,10 @@ class FundsAmountBoundaryContractTests {
 
         assertThatThrownBy(() -> resolvedRoute(legs, routingDecision))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding account route amount sum overflow");
+                .hasMessageContaining("core account route amount sum overflow");
         assertThatThrownBy(() -> routeSnapshot(legs, routingDecision))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding account route amount sum overflow");
+                .hasMessageContaining("core account route amount sum overflow");
     }
 
     /**
@@ -239,10 +261,10 @@ class FundsAmountBoundaryContractTests {
 
         assertThatThrownBy(() -> resolvedRoute(routeLeg(100L), routingDecision))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding account allocation amount sum overflow");
+                .hasMessageContaining("core account allocation amount sum overflow");
         assertThatThrownBy(() -> routeSnapshot(routeLeg(100L), routingDecision))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding account allocation amount sum overflow");
+                .hasMessageContaining("core account allocation amount sum overflow");
     }
 
     /**
@@ -307,6 +329,10 @@ class FundsAmountBoundaryContractTests {
         return routeLeg(legId, amount, null, null);
     }
 
+    private ImmutableRouteLegSpec routeLeg(String legId, long amount, FundsSubjectType sourceSubjectType) {
+        return routeLeg(legId, amount, CURRENCY, sourceSubjectType, null, null);
+    }
+
     private ImmutableRouteLegSpec routeLeg(String legId, long amount, CurrencyIsoCode currency) {
         return routeLeg(legId, amount, currency, null, null);
     }
@@ -329,11 +355,20 @@ class FundsAmountBoundaryContractTests {
                                            CurrencyIsoCode currency,
                                            AccountBalancePeriodType periodType,
                                            String periodId) {
+        return routeLeg(legId, amount, currency, FundsSubjectType.FUNDING_ACCOUNT, periodType, periodId);
+    }
+
+    private ImmutableRouteLegSpec routeLeg(String legId,
+                                           long amount,
+                                           CurrencyIsoCode currency,
+                                           FundsSubjectType sourceSubjectType,
+                                           AccountBalancePeriodType periodType,
+                                           String periodId) {
         return ImmutableRouteLegSpec.builder()
                 .legId(legId)
                 .sequence(1)
                 .legType(RouteLegType.CONSUME)
-                .sourceNode(routeNode("FA-SOURCE-001", RouteNodeRole.SOURCE))
+                .sourceNode(routeNode("FA-SOURCE-001", sourceSubjectType, RouteNodeRole.SOURCE))
                 .targetNode(routeNode("FA-TARGET-001", RouteNodeRole.TARGET))
                 .amount(Money.immutable(amount, currency))
                 .balanceEffectType(LedgerBalanceEffectType.CONSUME)
@@ -443,9 +478,13 @@ class FundsAmountBoundaryContractTests {
     }
 
     private RouteNodeSpec routeNode(String subjectId, RouteNodeRole nodeRole) {
+        return routeNode(subjectId, FundsSubjectType.FUNDING_ACCOUNT, nodeRole);
+    }
+
+    private RouteNodeSpec routeNode(String subjectId, FundsSubjectType subjectType, RouteNodeRole nodeRole) {
         return ImmutableRouteNodeSpec.builder()
                 .nodeType(RouteNodeType.SUBJECT)
-                .subjectRef(subjectRef(subjectId))
+                .subjectRef(subjectRef(subjectId, subjectType))
                 .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
                 .nodeRole(nodeRole)
                 .build();

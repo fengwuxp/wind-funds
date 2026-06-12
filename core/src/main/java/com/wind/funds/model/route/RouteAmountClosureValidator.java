@@ -18,57 +18,61 @@ import java.util.Map;
  */
 final class RouteAmountClosureValidator {
 
-    private static final String FUNDING_ACCOUNT_CLOSURE_MESSAGE =
-            "funding account allocation amount must equal consume route amount";
-    private static final String FUNDING_ACCOUNT_ROUTE_AMOUNT_OVERFLOW_MESSAGE =
-            "funding account route amount sum overflow";
-    private static final String FUNDING_ACCOUNT_ALLOCATION_AMOUNT_OVERFLOW_MESSAGE =
-            "funding account allocation amount sum overflow";
+    private static final String CORE_ACCOUNT_CLOSURE_MESSAGE =
+            "core account allocation amount must equal consume route amount";
+    private static final String CORE_ACCOUNT_ROUTE_AMOUNT_OVERFLOW_MESSAGE =
+            "core account route amount sum overflow";
+    private static final String CORE_ACCOUNT_ALLOCATION_AMOUNT_OVERFLOW_MESSAGE =
+            "core account allocation amount sum overflow";
 
     private RouteAmountClosureValidator() {
     }
 
-    static void validateFundingAccountClosure(List<RouteLegSpec> legs,
-                                              @Nullable RoutingDecisionSpec routingDecision) {
+    static void validateCoreAccountClosure(List<RouteLegSpec> legs,
+                                           @Nullable RoutingDecisionSpec routingDecision) {
         if (routingDecision == null) {
             return;
         }
-        Map<CurrencyIsoCode, Long> routeAmounts = sumFundingAccountConsumeLegs(legs);
+        Map<CurrencyIsoCode, Long> routeAmounts = sumCoreAccountConsumeLegs(legs);
         if (routeAmounts.isEmpty()) {
             return;
         }
-        Map<CurrencyIsoCode, Long> allocationAmounts = sumFundingAccountAllocations(routingDecision);
+        Map<CurrencyIsoCode, Long> allocationAmounts = sumCoreAccountAllocations(routingDecision);
         if (!routeAmounts.equals(allocationAmounts)) {
-            throw new IllegalArgumentException(FUNDING_ACCOUNT_CLOSURE_MESSAGE);
+            throw new IllegalArgumentException(CORE_ACCOUNT_CLOSURE_MESSAGE);
         }
     }
 
-    private static Map<CurrencyIsoCode, Long> sumFundingAccountConsumeLegs(List<RouteLegSpec> legs) {
+    private static Map<CurrencyIsoCode, Long> sumCoreAccountConsumeLegs(List<RouteLegSpec> legs) {
         Map<CurrencyIsoCode, Long> result = new EnumMap<>(CurrencyIsoCode.class);
         for (RouteLegSpec leg : legs) {
-            if (!isFundingAccountConsumeLeg(leg)) {
+            if (!isCoreAccountConsumeLeg(leg)) {
                 continue;
             }
-            add(result, leg.getAmount(), FUNDING_ACCOUNT_ROUTE_AMOUNT_OVERFLOW_MESSAGE);
+            add(result, leg.getAmount(), CORE_ACCOUNT_ROUTE_AMOUNT_OVERFLOW_MESSAGE);
         }
         return result;
     }
 
-    private static boolean isFundingAccountConsumeLeg(RouteLegSpec leg) {
+    private static boolean isCoreAccountConsumeLeg(RouteLegSpec leg) {
         return (leg.getBalanceEffectType() == LedgerBalanceEffectType.CONSUME
                 || leg.getBalanceEffectType() == LedgerBalanceEffectType.HOLD)
-                && leg.getSourceNode().getSubjectRef().getSubjectType() == FundsSubjectType.FUNDING_ACCOUNT;
+                && isCoreAccount(leg.getSourceNode().getSubjectRef().getSubjectType());
     }
 
-    private static Map<CurrencyIsoCode, Long> sumFundingAccountAllocations(RoutingDecisionSpec routingDecision) {
+    private static Map<CurrencyIsoCode, Long> sumCoreAccountAllocations(RoutingDecisionSpec routingDecision) {
         Map<CurrencyIsoCode, Long> result = new EnumMap<>(CurrencyIsoCode.class);
         for (FundingAllocationDecisionSpec allocation : routingDecision.getFundingAllocations()) {
-            if (allocation.getSubjectRef().getSubjectType() != FundsSubjectType.FUNDING_ACCOUNT) {
+            if (!isCoreAccount(allocation.getSubjectRef().getSubjectType())) {
                 continue;
             }
-            add(result, allocation.getAmount(), FUNDING_ACCOUNT_ALLOCATION_AMOUNT_OVERFLOW_MESSAGE);
+            add(result, allocation.getAmount(), CORE_ACCOUNT_ALLOCATION_AMOUNT_OVERFLOW_MESSAGE);
         }
         return result;
+    }
+
+    private static boolean isCoreAccount(FundsSubjectType subjectType) {
+        return subjectType == FundsSubjectType.FUNDING_ACCOUNT || subjectType == FundsSubjectType.CREDIT_ACCOUNT;
     }
 
     private static void add(Map<CurrencyIsoCode, Long> target, Money amount, String overflowMessage) {

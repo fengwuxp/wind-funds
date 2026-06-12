@@ -8,6 +8,8 @@ import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.model.route.ImmutableAccountHierarchyFundingAllocationDecisionSpec;
+import com.wind.funds.model.route.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.model.route.ImmutableExternalAccountRefSpec;
 import com.wind.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
@@ -27,6 +29,7 @@ import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.SubjectRef;
+import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
@@ -239,8 +242,29 @@ final class RouteSnapshotJsonSupport {
                 enumName(fundingAllocation.getLedgerSubjectCode()));
         values.put(ImmutableFundingAllocationDecisionSpec.Fields.amount,
                 moneySummary(fundingAllocation.getAmount()));
+        values.put(ImmutableAccountHierarchyFundingAllocationDecisionSpec.Fields.accountHierarchySnapshot,
+                accountHierarchySnapshotSummary(fundingAllocation.getAccountHierarchySnapshot()));
         values.put(ImmutableFundingAllocationDecisionSpec.Fields.priority, fundingAllocation.getPriority());
         values.put(ImmutableFundingAllocationDecisionSpec.Fields.reason, fundingAllocation.getReason());
+        return values;
+    }
+
+    private static Map<String, Object> accountHierarchySnapshotSummary(AccountHierarchySnapshotSpec snapshot) {
+        Map<String, Object> values = new TreeMap<>();
+        if (snapshot == null) {
+            return values;
+        }
+        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.accountRef,
+                subjectSummary(snapshot.getAccountRef()));
+        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.parentAccountRef,
+                subjectSummary(snapshot.getParentAccountRef()));
+        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.rootAccountRef,
+                subjectSummary(snapshot.getRootAccountRef()));
+        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.hierarchyVersion,
+                snapshot.getHierarchyVersion());
+        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.contextVariables,
+                sortedMap(snapshot.getContextVariables()));
+        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.description, snapshot.getDescription());
         return values;
     }
 
@@ -483,18 +507,55 @@ final class RouteSnapshotJsonSupport {
         List<FundingAllocationDecisionSpec> result = new ArrayList<>(values.size());
         for (Object item : values) {
             JSONObject value = (JSONObject) item;
-            result.add(ImmutableFundingAllocationDecisionSpec.builder()
-                    .allocationId(value.getString(ImmutableFundingAllocationDecisionSpec.Fields.allocationId))
-                    .subjectRef(parseSubjectRef(value.getJSONObject(
-                            ImmutableFundingAllocationDecisionSpec.Fields.subjectRef)))
-                    .ledgerSubjectCode(parseLedgerSubjectCode(value.getString(
-                            ImmutableFundingAllocationDecisionSpec.Fields.ledgerSubjectCode)))
-                    .amount(parseMoney(value.getJSONObject(ImmutableFundingAllocationDecisionSpec.Fields.amount)))
-                    .priority(value.getInteger(ImmutableFundingAllocationDecisionSpec.Fields.priority))
-                    .reason(value.getString(ImmutableFundingAllocationDecisionSpec.Fields.reason))
-                    .build());
+            AccountHierarchySnapshotSpec accountHierarchySnapshot = parseAccountHierarchySnapshot(value.getJSONObject(
+                    ImmutableAccountHierarchyFundingAllocationDecisionSpec.Fields.accountHierarchySnapshot));
+            SubjectRef subjectRef = parseSubjectRef(value.getJSONObject(
+                    ImmutableFundingAllocationDecisionSpec.Fields.subjectRef));
+            LedgerSubjectCode ledgerSubjectCode = parseLedgerSubjectCode(value.getString(
+                    ImmutableFundingAllocationDecisionSpec.Fields.ledgerSubjectCode));
+            Money amount = parseMoney(value.getJSONObject(ImmutableFundingAllocationDecisionSpec.Fields.amount));
+            Integer priority = value.getInteger(ImmutableFundingAllocationDecisionSpec.Fields.priority);
+            String reason = value.getString(ImmutableFundingAllocationDecisionSpec.Fields.reason);
+            if (accountHierarchySnapshot == null) {
+                result.add(ImmutableFundingAllocationDecisionSpec.builder()
+                        .allocationId(value.getString(ImmutableFundingAllocationDecisionSpec.Fields.allocationId))
+                        .subjectRef(subjectRef)
+                        .ledgerSubjectCode(ledgerSubjectCode)
+                        .amount(amount)
+                        .priority(priority)
+                        .reason(reason)
+                        .build());
+            } else {
+                result.add(ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
+                        .allocationId(value.getString(ImmutableFundingAllocationDecisionSpec.Fields.allocationId))
+                        .subjectRef(subjectRef)
+                        .ledgerSubjectCode(ledgerSubjectCode)
+                        .amount(amount)
+                        .accountHierarchySnapshot(accountHierarchySnapshot)
+                        .priority(priority)
+                        .reason(reason)
+                        .build());
+            }
         }
         return List.copyOf(result);
+    }
+
+    private static @Nullable AccountHierarchySnapshotSpec parseAccountHierarchySnapshot(JSONObject value) {
+        if (CollectionUtils.isEmpty(value)) {
+            return null;
+        }
+        return ImmutableAccountHierarchySnapshotSpec.builder()
+                .accountRef(parseSubjectRef(value.getJSONObject(
+                        ImmutableAccountHierarchySnapshotSpec.Fields.accountRef)))
+                .parentAccountRef(parseSubjectRef(value.getJSONObject(
+                        ImmutableAccountHierarchySnapshotSpec.Fields.parentAccountRef)))
+                .rootAccountRef(parseSubjectRef(value.getJSONObject(
+                        ImmutableAccountHierarchySnapshotSpec.Fields.rootAccountRef)))
+                .hierarchyVersion(value.getString(ImmutableAccountHierarchySnapshotSpec.Fields.hierarchyVersion))
+                .contextVariables(parseObjectMap(value.getJSONObject(
+                        ImmutableAccountHierarchySnapshotSpec.Fields.contextVariables)))
+                .description(value.getString(ImmutableAccountHierarchySnapshotSpec.Fields.description))
+                .build();
     }
 
     private static List<String> parseStringList(JSONArray values) {
