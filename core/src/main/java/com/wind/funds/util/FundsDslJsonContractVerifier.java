@@ -59,6 +59,13 @@ public final class FundsDslJsonContractVerifier {
 
     private static final BigInteger LONG_MAX_VALUE = BigInteger.valueOf(Long.MAX_VALUE);
 
+    private static final Set<String> FIXTURE_LEVELS = Set.of(
+            "DOC_ONLY",
+            "CONTRACT_ONLY",
+            "FUNDS_FLOW",
+            "SERVICE_FLOW",
+            "GOVERNANCE_FLOW");
+
     private static final Set<String> RESERVED_BENEFIT_CONTEXT_KEYS = Set.of(
             ImmutableFundsBenefitSnapshotSpec.Fields.benefitSnapshotId,
             ImmutableFundsBenefitSnapshotSpec.Fields.benefitSchemaVersion,
@@ -110,6 +117,10 @@ public final class FundsDslJsonContractVerifier {
         }
         if (!(fixtureLevel instanceof String value) || !StringUtils.hasText(value)) {
             throw new IllegalArgumentException("fixtureLevel is required");
+        }
+        if (!FIXTURE_LEVELS.contains(value)) {
+            throw new IllegalArgumentException("fixtureLevel must be one of DOC_ONLY, CONTRACT_ONLY, FUNDS_FLOW, "
+                    + "SERVICE_FLOW, GOVERNANCE_FLOW");
         }
         if (!"CONTRACT_ONLY".equals(value)) {
             return;

@@ -43,6 +43,30 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：样例作者声明未被 DSL 基线允许的 fixtureLevel。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：fixtureLevel 决定交付结论等级，不能用未知值绕过盘点和验证门禁。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectUnknownFixtureLevel() {
+        Map<String, Object> document = Map.of(
+                "caseId", "DSL-INVALID-FIXTURE-LEVEL-001",
+                "fixtureLevel", "DEMO_ONLY",
+                "instruction", Map.of(
+                        "instructionType", "DIRECT_TRANSACTION",
+                        "eventType", "PAY",
+                        "transactionType", "PAY",
+                        "amount", Map.of("currency", "USD", "amount", 100),
+                        "originalAmount", Map.of("currency", "USD", "amount", 100)));
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fixtureLevel")
+                .hasMessageContaining("DOC_ONLY")
+                .hasMessageContaining("GOVERNANCE_FLOW");
+    }
+
+    /**
      * 场景：样例作者误把金额写成主单位 value。
      * 预期：JSON 契约校验显式失败。
      * 红线：测试样例不能把小数主单位绕过金额最小单位边界。
