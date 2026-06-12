@@ -129,6 +129,9 @@ public final class FundsDslJsonContractVerifier {
         requiredChildTexts(document, "acceptanceIds", "acceptanceIds");
         requiredChildTexts(document, "tddIds", "tddIds");
         requiredChildTexts(document, "systemDesignRefs", "systemDesignRefs");
+        requireText(document, "targetTestClass");
+        requiredChildTexts(document, "coreAssertions", "coreAssertions");
+        requiredChildTexts(document, "notDone", "notDone");
         Map<String, ?> validation = asMap(document.get("validation"), "validation");
         requiredChildTexts(validation, "mustPass", "validation.mustPass");
         requiredChildTexts(validation, "mustFail", "validation.mustFail");

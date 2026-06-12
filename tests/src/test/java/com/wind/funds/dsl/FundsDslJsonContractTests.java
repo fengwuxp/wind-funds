@@ -67,6 +67,35 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：CONTRACT_ONLY 夹具缺少执行化盘点字段。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：contract-only 只能证明结构契约，必须标明目标测试、核心断言和未完成范围。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectContractOnlyFixtureWithoutExecutionInventory() {
+        Map<String, Object> document = Map.of(
+                "caseId", "DSL-INVALID-CONTRACT-INVENTORY-001",
+                "fixtureLevel", "CONTRACT_ONLY",
+                "scenarioCode", "DIRECT_PAY_WITH_CONTRACT_ONLY_FIXTURE",
+                "acceptanceIds", List.of("AC-CONTRACT-001"),
+                "tddIds", List.of("TDD-CONTRACT-001"),
+                "systemDesignRefs", List.of("02-交易路由钱包账目与投影系分设计#契约承载"),
+                "instruction", Map.of(
+                        "instructionType", "DIRECT_TRANSACTION",
+                        "eventType", "PAY",
+                        "transactionType", "PAY",
+                        "amount", Map.of("currency", "USD", "amount", 100),
+                        "originalAmount", Map.of("currency", "USD", "amount", 100)),
+                "validation", Map.of(
+                        "mustPass", List.of("字段结构可解析"),
+                        "mustFail", List.of("声明资金流已完成")));
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("targetTestClass");
+    }
+
+    /**
      * 场景：样例作者误把金额写成主单位 value。
      * 预期：JSON 契约校验显式失败。
      * 红线：测试样例不能把小数主单位绕过金额最小单位边界。

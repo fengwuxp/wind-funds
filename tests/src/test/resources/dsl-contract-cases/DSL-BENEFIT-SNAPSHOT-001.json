@@ -5,6 +5,18 @@
   "acceptanceIds": ["AC-BEN-001", "AC-BEN-012", "AC-BEN-013", "RED-050", "RED-058", "RED-059"],
   "tddIds": ["TDD-BEN-001", "TDD-BEN-002", "TDD-BEN-003", "TDD-BEN-004", "TDD-BEN-005", "TDD-BEN-006", "TDD-BEN-007"],
   "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#权益快照分期落点", "02-交易路由钱包账目与投影系分设计#阶段门禁"],
+  "targetTestClass": "FundsDslJsonContractTests",
+  "coreAssertions": [
+    "benefitSnapshot 请求态字段结构可解析",
+    "ORDER_DISCOUNT_CLOSURE 组件参与订单正向金额闭合",
+    "稳定摘要覆盖权益快照 ID、组件金额、闭合角色、规则版本和退款处置",
+    "权益核心字段不得藏入 contextVariables"
+  ],
+  "notDone": [
+    "不证明 route、posting、ledger entry 或余额投影已完成",
+    "不证明含权益生产资金流、退款分摊、清结算、对账、归档或治理重放已完成",
+    "不证明外部规则、容量、并发、审计和生产 NFR 已确认"
+  ],
   "instruction": {
     "tenantId": 1,
     "instructionType": "DIRECT_TRANSACTION",
