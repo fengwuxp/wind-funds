@@ -1,5 +1,6 @@
 package com.wind.funds.util;
 
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -554,11 +555,34 @@ public final class FundsDslJsonContractVerifier {
             verifyEnum(LedgerPhaseCode.class, plan, "phaseCode", "expectedPosting.postingPlans.phaseCode");
             for (Map<String, ?> entry : childObjects(plan, "entries", "expectedPosting.postingPlans.entries")) {
                 verifyEnum(FundsSubjectType.class, entry, "subjectType", "expectedPosting.postingPlans.entries.subjectType");
+                requireText(entry, "subjectId", "expectedPosting.postingPlans.entries.subjectId");
                 verifyEnum(LedgerSubjectCode.class, entry, "ledgerSubjectCode",
                         "expectedPosting.postingPlans.entries.ledgerSubjectCode");
+                CurrencyIsoCode currency = verifyEnum(CurrencyIsoCode.class, entry, "currency",
+                        "expectedPosting.postingPlans.entries.currency");
+                AccountBalancePeriodType periodType = verifyEnum(AccountBalancePeriodType.class, entry, "periodType",
+                        "expectedPosting.postingPlans.entries.periodType");
+                String periodId = requireText(entry, "periodId", "expectedPosting.postingPlans.entries.periodId");
                 verifyEnum(EntrySide.class, entry, "entrySide", "expectedPosting.postingPlans.entries.entrySide");
-                verifyMoney(entry, "amount", "expectedPosting.postingPlans.entries.amount");
+                Money amount = verifyMoney(entry, "amount", "expectedPosting.postingPlans.entries.amount");
+                if (currency != amount.getCurrency()) {
+                    throw new IllegalArgumentException("expectedPosting.postingPlans.entries entry currency must match "
+                            + "amount currency");
+                }
+                verifyLedgerEntryPeriod(periodType, periodId);
             }
+        }
+    }
+
+    private static void verifyLedgerEntryPeriod(AccountBalancePeriodType periodType, String periodId) {
+        if (periodType == AccountBalancePeriodType.LIFETIME) {
+            if (!AccountBalancePeriodType.LIFETIME.name().equals(periodId)) {
+                throw new IllegalArgumentException("expectedPosting.postingPlans.entries.periodId must be LIFETIME");
+            }
+            return;
+        }
+        if (AccountBalancePeriodType.LIFETIME.name().equals(periodId)) {
+            throw new IllegalArgumentException("expectedPosting.postingPlans.entries.periodId must not be LIFETIME");
         }
     }
 

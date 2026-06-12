@@ -93,6 +93,9 @@
             "subjectId": "fa_user_10001_usd",
             "subjectType": "FUNDING_ACCOUNT",
             "ledgerSubjectCode": "AVAILABLE",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
@@ -103,6 +106,9 @@
             "subjectId": "fa_user_10001_usd",
             "subjectType": "FUNDING_ACCOUNT",
             "ledgerSubjectCode": "FROZEN",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",

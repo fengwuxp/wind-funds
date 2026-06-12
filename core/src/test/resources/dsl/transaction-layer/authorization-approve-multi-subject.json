@@ -153,6 +153,9 @@
             "subjectId": "fa_user_10001_usd",
             "subjectType": "FUNDING_ACCOUNT",
             "ledgerSubjectCode": "AVAILABLE",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
@@ -163,6 +166,9 @@
             "subjectId": "fa_user_10001_usd",
             "subjectType": "FUNDING_ACCOUNT",
             "ledgerSubjectCode": "AUTHORIZATION",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
@@ -183,6 +189,9 @@
             "subjectId": "ca_user_10001_usd",
             "subjectType": "CREDIT_ACCOUNT",
             "ledgerSubjectCode": "AVAILABLE",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
@@ -193,6 +202,9 @@
             "subjectId": "ca_user_10001_usd",
             "subjectType": "CREDIT_ACCOUNT",
             "ledgerSubjectCode": "AUTHORIZATION",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
@@ -213,6 +225,9 @@
             "subjectId": "bg_team_90001_usd",
             "subjectType": "BUDGET_GROUP",
             "ledgerSubjectCode": "AVAILABLE",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
@@ -223,6 +238,9 @@
             "subjectId": "bg_team_90001_usd",
             "subjectType": "BUDGET_GROUP",
             "ledgerSubjectCode": "AUTHORIZATION",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",

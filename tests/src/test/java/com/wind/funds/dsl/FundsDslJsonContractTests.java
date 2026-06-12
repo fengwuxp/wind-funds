@@ -85,6 +85,176 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：账务分录样例缺少稳定可追踪的主体 ID。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：LedgerEntry 不能只靠主体类型和账目代码落账，否则余额投影和回放无法定位真实主体。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectPostingEntryWithoutSubjectId() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-POSTING-SUBJECT-ID-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedPosting": {
+                    "postingPlans": [{
+                      "intent": "TRANSFER",
+                      "postingScope": "BETWEEN_SUBJECTS",
+                      "balanceEffectType": "CONSUME",
+                      "phaseCode": "SETTLEMENT",
+                      "entries": [{
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "AVAILABLE",
+                        "currency": "USD",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "DEBIT",
+                        "amount": { "currency": "USD", "amount": 100 }
+                      }]
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedPosting.postingPlans.entries.subjectId");
+    }
+
+    /**
+     * 场景：账务分录样例缺少顶层币种。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：LedgerEntry 的余额 bucket 口径必须显式包含 currency，不能只从金额对象间接推断。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectPostingEntryWithoutCurrency() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-POSTING-CURRENCY-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedPosting": {
+                    "postingPlans": [{
+                      "intent": "TRANSFER",
+                      "postingScope": "BETWEEN_SUBJECTS",
+                      "balanceEffectType": "CONSUME",
+                      "phaseCode": "SETTLEMENT",
+                      "entries": [{
+                        "subjectId": "fa_user_10001_usd",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "AVAILABLE",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "DEBIT",
+                        "amount": { "currency": "USD", "amount": 100 }
+                      }]
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expectedPosting.postingPlans.entries.currency");
+    }
+
+    /**
+     * 场景：账务分录样例的余额 bucket 币种和金额币种不一致。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：同一 LedgerEntry 不能表达为 USD 金额却落入 EUR 余额 bucket。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectPostingEntryCurrencyMismatch() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-POSTING-CURRENCY-MISMATCH-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedPosting": {
+                    "postingPlans": [{
+                      "intent": "TRANSFER",
+                      "postingScope": "BETWEEN_SUBJECTS",
+                      "balanceEffectType": "CONSUME",
+                      "phaseCode": "SETTLEMENT",
+                      "entries": [{
+                        "subjectId": "fa_user_10001_usd",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "AVAILABLE",
+                        "currency": "EUR",
+                        "periodType": "LIFETIME",
+                        "periodId": "LIFETIME",
+                        "entrySide": "DEBIT",
+                        "amount": { "currency": "USD", "amount": 100 }
+                      }]
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("entry currency must match amount currency");
+    }
+
+    /**
+     * 场景：账务分录样例声明非生命周期账本周期，却把 periodId 写成 LIFETIME。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：非 LIFETIME 周期必须由账户策略、业务请求或路由规则显式确定，不能复用生命周期占位值。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectPostingEntryInvalidPeriodId() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-POSTING-PERIOD-001",
+                  "instruction": {
+                    "instructionType": "DIRECT_TRANSACTION",
+                    "eventType": "PAY",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedPosting": {
+                    "postingPlans": [{
+                      "intent": "TRANSFER",
+                      "postingScope": "BETWEEN_SUBJECTS",
+                      "balanceEffectType": "CONSUME",
+                      "phaseCode": "SETTLEMENT",
+                      "entries": [{
+                        "subjectId": "fa_user_10001_usd",
+                        "subjectType": "FUNDING_ACCOUNT",
+                        "ledgerSubjectCode": "AVAILABLE",
+                        "currency": "USD",
+                        "periodType": "MONTHLY",
+                        "periodId": "LIFETIME",
+                        "entrySide": "DEBIT",
+                        "amount": { "currency": "USD", "amount": 100 }
+                      }]
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("periodId must not be LIFETIME");
+    }
+
+    /**
      * 场景：样例作者把权益快照核心金额藏入 contextVariables。
      * 预期：JSON 契约校验显式失败。
      * 红线：权益金额闭合、规则版本和退款处置必须是一等字段。

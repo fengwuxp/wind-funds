@@ -137,6 +137,9 @@
             "subjectId": "fa_user_10001_usd",
             "subjectType": "FUNDING_ACCOUNT",
             "ledgerSubjectCode": "AVAILABLE",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
@@ -147,6 +150,9 @@
             "subjectId": "fa_merchant_20001_usd",
             "subjectType": "FUNDING_ACCOUNT",
             "ledgerSubjectCode": "CLEARING",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
@@ -167,6 +173,9 @@
             "subjectId": "fa_user_10001_usd",
             "subjectType": "FUNDING_ACCOUNT",
             "ledgerSubjectCode": "AVAILABLE",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
@@ -177,6 +186,9 @@
             "subjectId": "fa_platform_fee_usd",
             "subjectType": "FUNDING_ACCOUNT",
             "ledgerSubjectCode": "FEE",
+            "currency": "USD",
+            "periodType": "LIFETIME",
+            "periodId": "LIFETIME",
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
