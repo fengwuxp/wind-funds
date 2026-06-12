@@ -9,6 +9,8 @@ import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
+import com.wind.funds.model.route.ImmutableAccountHierarchyFundingAllocationDecisionSpec;
+import com.wind.funds.model.route.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.model.route.ImmutableExternalAccountRefSpec;
 import com.wind.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
@@ -33,6 +35,7 @@ import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.SubjectRef;
+import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.route.spec.RoutingDecisionSpec;
@@ -188,6 +191,56 @@ class DefaultRouteReplayServiceTests {
                     assertThat(allocation.getAllocationId()).isEqualTo("ALLOC-OLD");
                     assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo("PAYER-001");
                     assertThat(allocation.getReason()).isEqualTo("original funding allocation snapshot");
+                });
+    }
+
+    /**
+     * 场景：VCC shared card 原交易完成后，卡换绑到新的子账户或父账户版本，本次退款请求携带当前工具上下文。
+     * 输入：原 RouteSnapshot 固化旧卡工具、信用子账户、父账户和层级版本。
+     * 输出：回放成功，ResolvedRoute 继续使用原 RouteSnapshot 中的账户层级快照。
+     * 预期：funding allocation 的 accountHierarchySnapshot 不被当前工具或当前绑定关系覆盖。
+     * 红线：VCC 后续事件必须沿原路径事实回放，不得按当前卡绑定重选子账户或父账户约束。
+     */
+    @Test
+    void testResolveReplayInstructionShouldReuseSnapshotAccountHierarchyForVccSharedCard() {
+        SubjectRef cardCreditAccount = creditAccount("VCC-CREDIT-SUB-001");
+        SubjectRef parentCreditAccount = creditAccount("VCC-CREDIT-PARENT-001");
+        AccountHierarchySnapshotSpec originalHierarchy = accountHierarchySnapshot(cardCreditAccount,
+                parentCreditAccount,
+                "vcc-shared-card-binding-v1");
+        RoutingDecisionSpec originalDecision = vccSharedCardRoutingDecision("ALLOC-VCC-OLD",
+                cardCreditAccount,
+                originalHierarchy);
+        PaymentInstrumentRefSpec originalInstrument = paymentInstrumentRef("CARD-OLD", "old-binding");
+        PaymentInstrumentRefSpec currentInstrument = paymentInstrumentRef("CARD-NEW", "new-binding");
+        FundsInstructionReferenceSpec reference = ImmutableFundsInstructionReferenceSpec.builder()
+                .referenceType(FundsInstructionReferenceType.ORIGINAL_TRANSACTION)
+                .referenceSn("FT-VCC-SHARED-001")
+                .build();
+        DefaultRouteReplayService replayService = new DefaultRouteReplayService(
+                new SnapshotFundsTransactionQueryService(
+                        vccSharedCardRouteSnapshot(originalInstrument, originalDecision, cardCreditAccount)));
+
+        ResolvedRouteSpec resolvedRoute = replayService.resolve(replayInstruction(reference, currentInstrument));
+
+        assertThat(resolvedRoute.getPaymentInstrumentRef()).isSameAs(originalInstrument);
+        assertThat(resolvedRoute.getPaymentInstrumentRef().getBindingSnapshot())
+                .containsEntry("bindingId", "old-binding");
+        assertThat(resolvedRoute.getRoutingDecision().getFundingAllocations()).singleElement()
+                .satisfies(allocation -> {
+                    assertThat(allocation.getAllocationId()).isEqualTo("ALLOC-VCC-OLD");
+                    assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo("VCC-CREDIT-SUB-001");
+                    assertThat(allocation.getAccountHierarchySnapshot()).isNotNull();
+                    assertThat(allocation.getAccountHierarchySnapshot().getAccountRef().getSubjectId())
+                            .isEqualTo("VCC-CREDIT-SUB-001");
+                    assertThat(allocation.getAccountHierarchySnapshot().getParentAccountRef()).isNotNull();
+                    assertThat(allocation.getAccountHierarchySnapshot().getParentAccountRef().getSubjectId())
+                            .isEqualTo("VCC-CREDIT-PARENT-001");
+                    assertThat(allocation.getAccountHierarchySnapshot().getHierarchyVersion())
+                            .isEqualTo("vcc-shared-card-binding-v1");
+                    assertThat(allocation.getAccountHierarchySnapshot().getContextVariables())
+                            .containsEntry("cardBindingVersion", 1)
+                            .containsEntry("cardFundingMode", "SHARED");
                 });
     }
 
@@ -450,6 +503,31 @@ class DefaultRouteReplayServiceTests {
                 .build();
     }
 
+    private RouteSnapshotSpec vccSharedCardRouteSnapshot(PaymentInstrumentRefSpec paymentInstrumentRef,
+                                                         RoutingDecisionSpec routingDecision,
+                                                         SubjectRef cardCreditAccount) {
+        SubjectRef merchant = fundingAccount("MERCHANT-001");
+        return ImmutableRouteSnapshotSpec.builder()
+                .tenantId(1L)
+                .snapshotId("SNAPSHOT-VCC-SHARED-202605190001")
+                .snapshotSchemaVersion(FundsRouteCodes.CURRENT_ROUTE_VERSION)
+                .routeCode(FundsRouteCodes.DIRECT_PAY_STANDARD)
+                .routeVersion(FundsRouteCodes.CURRENT_ROUTE_VERSION)
+                .businessScene("VCC_SHARED_CARD_PAY")
+                .businessSn("VCC-SHARED-PAY-202605190001")
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of(participant(RouteParticipantRole.PAYER, cardCreditAccount),
+                        participant(RouteParticipantRole.PAYEE, merchant)))
+                .legs(List.of(routeLeg(cardCreditAccount, merchant)))
+                .routingDecision(routingDecision)
+                .paymentInstrumentRef(paymentInstrumentRef)
+                .resolvedAt(LocalDateTime.of(2026, 5, 18, 12, 0))
+                .contextVariables(Map.of())
+                .build();
+    }
+
     private ImmutableRouteLegSpec routeLeg(SubjectRef payer, SubjectRef payee) {
         return ImmutableRouteLegSpec.builder()
                 .legId("PAY")
@@ -501,6 +579,29 @@ class DefaultRouteReplayServiceTests {
                 .build();
     }
 
+    private SubjectRef creditAccount(String accountId) {
+        return ImmutableSubjectRef.builder()
+                .tenantId(1L)
+                .subjectId(accountId)
+                .subjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                .currency(CurrencyIsoCode.USD.name())
+                .ledgerProfileCode("CREDIT")
+                .build();
+    }
+
+    private AccountHierarchySnapshotSpec accountHierarchySnapshot(SubjectRef accountRef,
+                                                                  SubjectRef parentAccountRef,
+                                                                  String hierarchyVersion) {
+        return ImmutableAccountHierarchySnapshotSpec.builder()
+                .accountRef(accountRef)
+                .parentAccountRef(parentAccountRef)
+                .rootAccountRef(parentAccountRef)
+                .hierarchyVersion(hierarchyVersion)
+                .contextVariables(Map.of("cardBindingVersion", 1, "cardFundingMode", "SHARED"))
+                .description("VCC shared card credit sub-account hierarchy snapshot")
+                .build();
+    }
+
     private PaymentInstrumentRefSpec paymentInstrumentRef(String instrumentId, String bindingId) {
         return ImmutablePaymentInstrumentRefSpec.builder()
                 .instrumentId(instrumentId)
@@ -547,6 +648,28 @@ class DefaultRouteReplayServiceTests {
                         .reason("original funding allocation snapshot")
                         .build()))
                 .decisionReason("original route snapshot")
+                .contextVariables(Map.of("snapshot", allocationId))
+                .build();
+    }
+
+    private RoutingDecisionSpec vccSharedCardRoutingDecision(String allocationId,
+                                                             SubjectRef cardCreditAccount,
+                                                             AccountHierarchySnapshotSpec hierarchySnapshot) {
+        return ImmutableRoutingDecisionSpec.builder()
+                .policyCode("VCC_SHARED_CARD_ACCOUNT_HIERARCHY_POLICY")
+                .matchedRules(List.of("original-vcc-shared-card-account-hierarchy"))
+                .selectedProcessor("VCC_ORIGINAL_PROCESSOR")
+                .selectedCashFundingAccount(cardCreditAccount.getSubjectId())
+                .fundingAllocations(List.of(ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
+                        .allocationId(allocationId)
+                        .subjectRef(cardCreditAccount)
+                        .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                        .amount(Money.immutable(10L, CurrencyIsoCode.USD))
+                        .accountHierarchySnapshot(hierarchySnapshot)
+                        .priority(1)
+                        .reason("original VCC shared card account hierarchy snapshot")
+                        .build()))
+                .decisionReason("original VCC shared card route snapshot")
                 .contextVariables(Map.of("snapshot", allocationId))
                 .build();
     }
