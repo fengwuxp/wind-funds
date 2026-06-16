@@ -25,12 +25,12 @@
 | --- | --- |
 | `Task ID` | `B7-RECON-DIFFERENCE-MVP-CAD-001` |
 | `Execution Grant` | `B7-RECON-DIFFERENCE-MVP`，待用户确认。 |
-| `mvpScenario` | 一笔已成功、已过账且有账本分录的交易进入对账；系统按任务范围、规则版本和来源证据执行匹配，发现金额、状态、漏单、重复或来源不一致；生成差错单，阻断清算候选或出款提交；差错处理后可以重新对账，或在白名单、审批、凭证和幂等键齐备时追加调账、冲正或补事实。 |
-| `abilityBatch` | B7 Wave 1 只做对账任务、匹配结果、差错单、阻断、重跑和补事实白名单准入；不一次性实现清分批次、清算批次、结算单、出款单和追偿全生命周期。 |
-| `businessQuestion` | 财务、运营、商户和研发能否解释“为什么这笔已过账交易不能清算或出款”，并能看到差错原因、责任方、审批、凭证、重跑结果、可补事实动作和下一步处理入口。 |
+| `mvpScenario` | 一笔已成功、已过账且有账本分录的交易进入对账；系统先把外部文件、流水或回单标准化为来源记录、标准化明细和来源质量结论，再按任务范围、规则版本和匹配强度执行匹配；发现金额、状态、漏单、重复、来源未验证或候选匹配不可靠时生成差错单，阻断清算候选或出款提交；差错处理后可以重新对账，首轮补事实白名单默认关闭。 |
+| `abilityBatch` | B7 Wave 1 只做对账来源标准化、对账任务、匹配强度、差错单、阻断、账龄升级、重跑和补事实白名单准入；不一次性实现清分批次、清算批次、结算单、出款单和追偿全生命周期。 |
+| `businessQuestion` | 财务、运营、商户和研发能否解释“为什么这笔已过账交易不能清算或出款”，并能看到来源质量、匹配强度、差错原因、责任方、账龄、到期动作、审批、凭证、重跑结果、可补事实动作和下一步处理入口。 |
 | `moneyInvariant` | 对账差错和处理动作不得直接修改历史交易、历史分录、余额投影或交易投影；资金影响只能通过明确白名单的交易层或账本层追加事实完成；重大差错未闭环时不得生成清算候选、确认清算批次、锁定结算单或提交出款。 |
 | `productNotDone` | 不声明完整清分、完整内部清算、完整商户结算、完整外部出款、完整追偿、完整运营后台、完整报表、持牌清算、外部通道规则或生产上线完成。 |
-| `firstRedSet` | `R0-B7-RECON-001`、`R0-B7-RECON-002`、`R0-B7-RECON-003` 优先；若选择清算准入再补 `R0-B7-CLS-001`；若选择出款解释再补 `R0-B7-PAYOUT-001`；若选择运营权限再补 `R0-B7-OPS-001`。 |
+| `firstRedSet` | `R0-B7-RECON-001` 至 `R0-B7-RECON-006` 优先；若选择清算准入再补 `R0-B7-CLS-001`；若选择出款解释再补 `R0-B7-PAYOUT-001`；若选择运营权限再补 `R0-B7-OPS-001`。 |
 | `currentEvidence` | 既有 `LedgerEntry` 对账字段、平台 CLEARING/SETTLEMENT 账目、清算策略契约和出款前准入候选实现只能证明局部承载能力，不能直接升级为 B7 生产可用。 |
 
 ## 4. productReviewMap
@@ -38,12 +38,12 @@
 | 产品审查项 | 本卡落点 |
 | --- | --- |
 | 业务目标、用户价值、成功指标和非目标 | 业务目标是让清结算和出款前的差异可发现、可阻断、可处理、可重跑和可审计；用户价值是财务、运营和商户不再把交易成功、结算审批或外部受理误读成钱已对上；成功指标是对账差错闭环能阻断清算或出款，并能通过重跑或白名单补事实恢复；非目标是不做整条清分清算结算出款追偿生产链路。 |
-| 能力地图、能力域、前台能力、后台能力和数据能力 | 能力域拆为对账任务、对账匹配、对账差错、清算/出款阻断、重跑、补事实白名单、审计和解释视图；前台能力只展示事实状态和不可操作原因；后台能力只做排查、审批、核销、重跑和补证据；数据能力提供差错、审批、凭证、责任方和重跑报告。 |
-| 业务对象、对象模型、字段口径、生命周期和状态 | 业务对象包括对账任务、匹配结果、差异指纹、差错单、阻断记录、处理动作、审批、凭证、重跑记录和补事实引用；生命周期至少包含创建、收数、匹配、差异、阻断、处理中、已核销、重跑中、关闭；状态不得和清分批次、清算批次、结算单或出款单混成一个对象。 |
-| 业务流程、主流程、异常流程和人工兜底 | 主流程是创建任务、收集内部事实和外部证据、匹配、生成差异、阻断、处理、重跑和关闭；异常流程包括来源缺失、金额不符、状态不符、漏单、重复、外部非终态、规则待确认和凭证缺失；人工兜底只能补证据、审批、核销、重跑或发起白名单补事实，不能直接改账。 |
-| 规则矩阵、触发条件、判断逻辑、优先级和版本 | 规则矩阵包含账实、账账、单账、余额一致性、差异等级、阻断等级、低风险有条件放行、白名单动作、审批级别、重跑范围和规则版本；重大差错优先级高于清算候选、结算锁定和出款提交。 |
+| 能力地图、能力域、前台能力、后台能力和数据能力 | 能力域拆为对账来源标准化、对账任务、对账匹配、对账差错、清算/出款阻断、账龄升级、重跑、补事实白名单、审计和解释视图；前台能力只展示事实状态和不可操作原因；后台能力只做排查、审批、核销、重跑和补证据；数据能力提供来源质量、匹配强度、差错、审批、凭证、责任方和重跑报告。 |
+| 业务对象、对象模型、字段口径、生命周期和状态 | 业务对象包括来源记录、标准化来源明细、来源质量结论、对账任务、匹配结果、匹配强度、差异指纹、差错单、账龄策略、阻断记录、处理动作、审批、凭证、重跑记录和补事实引用；生命周期至少包含创建、收数、等待数据、匹配、差异、阻断、有条件放行、处理中、已核销、重跑中、关闭；状态不得和清分批次、清算批次、结算单或出款单混成一个对象。 |
+| 业务流程、主流程、异常流程和人工兜底 | 主流程是创建任务、标准化外部来源、收集内部事实和外部证据、按匹配强度匹配、生成差异、阻断、处理、重跑和关闭；异常流程包括来源缺失、验签失败、解析失败、重复来源、候选匹配、金额不符、状态不符、漏单、重复、外部非终态、规则待确认和凭证缺失；人工兜底只能补证据、审批、核销、重跑或发起白名单补事实，不能直接改账。 |
+| 规则矩阵、触发条件、判断逻辑、优先级和版本 | 规则矩阵包含账实、账账、单账、余额一致性、来源质量、匹配强度、差异等级、阻断等级、低风险有条件放行、白名单动作、审批级别、账龄升级、重跑范围和规则版本；重大差错优先级高于清算候选、结算锁定和出款提交。 |
 | 运营后台、指标、报表、审计和数据口径 | 运营后台显示任务范围、差异类型、金额币种、责任方、阻断对象、不可操作原因、下一步动作、审批和凭证；指标和报表只消费只读差错结果；审计必须包含操作者、复核人、原因、凭证、traceId、前后状态和脱敏证据引用。 |
-| 风险、待确认、验收、确认方和发布 | 风险是把对账字段当作完整对账系统、把低风险差异静默放行、把外部受理展示为成功、或用后台直接改账；待确认项包括模块物理落点、表结构、补事实白名单、外部规则、权限审计和生产 Runbook；验收由产品、架构、财务、运营、测试、安全和合规/通道确认方共同复核；发布只在单独 Grant 中补齐。 |
+| 风险、待确认、验收、确认方和发布 | 风险是把对账字段当作完整对账系统、把未验证外部来源或候选匹配自动对平、把低风险差异静默放行、把外部受理展示为成功、账龄长期悬挂、或用后台直接改账；待确认项包括模块物理落点、表结构、补事实白名单、外部规则、权限审计和生产 Runbook；验收由产品、架构、财务、运营、测试、安全和合规/通道确认方共同复核；发布只在单独 Grant 中补齐。 |
 
 ## 5. architectureReviewMap
 
@@ -52,19 +52,20 @@
 | 背景、目标、非目标、成功标准 | 背景是清结算与对账已具备产品/系分/TDD 目标态，但服务级 H2 闭环缺失；目标是把 B7 第一切片收敛为对账差错闭环；非目标是不混入完整清分、清算、结算、出款、追偿、治理或 P2 业务；成功标准是候选 Red 能追溯到 PRD、DSL、系分、TDD、写入范围和停止条件。 |
 | 现状、约束、问题和影响范围 | 现状是 `reconciliation-*` 模块骨架、出款前准入候选、LedgerEntry 对账字段和清算策略契约存在；约束是 B7 未获独立 Grant 前不可写 Java、测试、DDL/H2 或公共契约；问题是没有对账任务、匹配、差错、重跑和白名单补事实的最小服务级证明；影响范围覆盖 reconciliation、transaction、ledger、wallet 查询、测试 H2 schema 和运营解释视图。 |
 | 核心决策、职责边界和取舍 | 核心决策是先交付对账差错闭环，再交付清分、清算、结算和出款；`reconciliation` 只维护运营对象、匹配结果、差错和审计，资金变化必须通过交易层或账本层追加标准事实；取舍是第一轮只确认 `B7-RECON-DIFFERENCE-MVP`，不一次性打开 B7 全量对象。 |
-| 接口契约、入参、错误码、幂等和兼容 | Execution Grant 必须显式列出 application service、Request/DTO、Query/DTO、错误码、幂等键、差异指纹、规则版本、审批字段和兼容策略；未确认前不修改 transaction canonical request、ledger 公共契约、route replay 契约或出款前准入公共契约。 |
-| 数据方案、事务边界、一致性、补偿和对账 | 数据方案至少需要对账任务、运行记录、匹配结果、差错单、处理动作、审批、凭证、重跑记录和补事实引用；事务边界必须保证差错生成、阻断和审计原子可追溯；补偿只通过重跑、重新对账、白名单调账/冲正/补事实；不得覆盖旧运行记录或历史分录。 |
+| 接口契约、入参、错误码、幂等和兼容 | Execution Grant 必须显式列出 application service、Request/DTO、Query/DTO、错误码、幂等键、来源质量、匹配强度、差异指纹、账龄字段、规则版本、审批字段和兼容策略；未确认前不修改 transaction canonical request、ledger 公共契约、route replay 契约或出款前准入公共契约。 |
+| 数据方案、事务边界、一致性、补偿和对账 | 数据方案至少需要来源记录、标准化来源明细、来源质量结论、对账任务、运行记录、匹配结果、差错单、账龄策略、处理动作、审批、凭证、重跑记录和补事实引用；事务边界必须保证差错生成、阻断和审计原子可追溯；补偿只通过重跑、重新对账、白名单调账/冲正/补事实；不得覆盖旧运行记录或历史分录。 |
 | 可靠性、安全、权限、审计和告警 | 可靠性关注任务重跑幂等、差异指纹稳定、重复处理不重复补事实、并发核销不覆盖审批；安全关注高危动作职责分离、权限、脱敏、导出审批、敏感字段阻断；审计关注操作者、复核人、原因、凭证和 traceId；告警关注重大差错、重跑失败、阻断超时和规则待确认。 |
-| 验证方案、测试、静态检查和回归 | 每个候选切片必须先写目标 Red，再按 Grant 跑对应 `just test-one ...`、`just test-reconciliation` 或相关分组、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；既有通过测试只能作为回归资产。 |
+| 验证方案、测试、静态检查和回归 | 每个候选切片必须先写目标 Red，再按 Grant 跑对应 `just test-one ...`、`just test-reconciliation` 或相关分组、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`；首轮 Red 必须覆盖外部来源未验证、候选匹配误对平、账龄超期和白名单默认关闭；既有通过测试只能作为回归资产。 |
 | 发布、灰度、回滚、风险和待确认 | 本卡不进入生产发布；后续编码若触碰公共契约、DDL/H2、外部规则、敏感数据、补事实白名单、出款提交或运营导出，必须补发布、灰度、回滚、Runbook、风险和待确认项。 |
 
 ## 6. 场景裁剪
 
 | 场景 | 本卡允许进入 Round 0 的内容 | 本卡不允许声明 |
 | --- | --- | --- |
-| 对账任务和匹配 | 任务范围、内部事实摘要、外部证据摘要、规则版本、匹配结果和差异指纹。 | 完整外部文件采集、银行/卡组织/通道协议解析或生产调度平台。 |
-| 对账差错闭环 | 差错单、差异等级、阻断清算/出款、责任方、处理动作、审批、凭证、重跑和核销。 | 后台直接改账、直接改历史分录、直接改余额投影或绕过交易/账本追加资金事实。 |
-| 补事实白名单 | 只定义允许的动作类型、来源单据、审批号、证据引用、幂等键、原事实引用、操作者和失败无副作用断言。 | 泛化 actionType、无审批补账、无原事实引用调账、任意运营动作生成资金事实。 |
+| 对账来源标准化 | 来源类型、提供方、文件或批次引用、digest、验签状态、解析版本、重复识别键、标准化金额币种方向状态、来源质量和脱敏证据引用。 | 完整外部文件采集、银行/卡组织/通道协议解析、生产调度平台或敏感原文查询。 |
+| 对账任务和匹配 | 任务范围、内部事实摘要、外部证据摘要、规则版本、匹配强度、匹配结果和差异指纹。 | 候选匹配自动对平、人工确认直接释放资金、完整银行/卡组织/通道协议解析或生产调度平台。 |
+| 对账差错闭环 | 差错单、差异等级、账龄桶、SLA、阻断清算/出款、责任方、处理动作、审批、凭证、重跑和核销。 | 后台直接改账、直接改历史分录、直接改余额投影或绕过交易/账本追加资金事实。 |
+| 补事实白名单 | 首轮默认关闭；只定义允许的动作类型、来源单据、审批号、证据引用、幂等键、原事实引用、操作者和失败无副作用断言。 | 泛化 actionType、无审批补账、无原事实引用调账、任意运营动作生成资金事实。 |
 | 清算准入阻断 | 重大对账差错阻断清算候选或清算确认。 | 完整清分批次、完整清算批次确认和 `CLEARING -> AVAILABLE` 实现。 |
 | 出款准入阻断 | 出款前准入引用差错状态、规则确认状态和不可操作原因。 | 完整出款单生命周期、银行出款提交、回单成功/失败/退回处理。 |
 | 收益分润与激励结算验收 | 只允许把收益应得项、收益参与方、两级归因快照、GMV 阶梯或利润口径、规则版本、审批和账户解析作为 B7 生产验收输入。 | 不实现代理系统、无限级分销、GMV 统计、利润计算、KPI 引擎、薪税系统、税务会计最终确认或营销规则引擎。 |
@@ -76,6 +77,7 @@
 
 | 能力 | 候选接口 | face 包 | impl 包 | 准入切片 |
 | --- | --- | --- | --- | --- |
+| 对账来源标准化 | `ReconciliationSourceApplicationService` | `com.wind.funds.reconciliation.application.source` | `com.wind.funds.reconciliation.application.source.impl` | B7-RECON-DIFFERENCE-MVP |
 | 对账任务 | `ReconciliationTaskApplicationService` | `com.wind.funds.reconciliation.application.task` | `com.wind.funds.reconciliation.application.task.impl` | B7-RECON-DIFFERENCE-MVP |
 | 对账匹配 | `ReconciliationMatchingApplicationService` | `com.wind.funds.reconciliation.application.matching` | `com.wind.funds.reconciliation.application.matching.impl` | B7-RECON-DIFFERENCE-MVP |
 | 差错生命周期 | `ReconciliationDifferenceApplicationService` | `com.wind.funds.reconciliation.application.difference` | `com.wind.funds.reconciliation.application.difference.impl` | B7-RECON-DIFFERENCE-MVP |
@@ -89,10 +91,10 @@ Request/DTO 默认落 `com.wind.funds.reconciliation.model.request`、`com.wind.
 
 | 范围 | 候选授权 |
 | --- | --- |
-| 首批测试资产 | `ReconciliationDifferenceLifecycleTests`、`ReconciliationMatchingRuleTests`、`ClearingSettlementBoundaryTests`、`PayoutPreflightTests` 或等价目标 Red。 |
+| 首批测试资产 | `ReconciliationSourceStandardizationTests`、`ReconciliationDifferenceLifecycleTests`、`ReconciliationMatchingRuleTests`、`ReconciliationDifferenceAgingTests`、`ClearingSettlementBoundaryTests`、`PayoutPreflightTests` 或等价目标 Red。 |
 | 生产实现 | 只有 Red 证明真实缺口后，才允许在 `reconciliation-face`、`reconciliation-impl` 增加 application facade、DTO、最小实现和必要查询；交易层或账本层只在独立列名的白名单补事实场景下被委派。 |
 | 公共契约 | 默认不允许破坏既有 face/core 请求字段；如必须新增 reconciliation face 契约、错误码、状态枚举或 DTO，必须在 Execution Grant 明确命名、兼容策略和回归范围。 |
-| DDL/H2 schema | 默认不允许修改；若对账任务、匹配结果、差错单、处理动作、重跑记录、审批或凭证需要表结构，必须单独扩权到 DDL/H2、Entity、Mapper、MapStruct 和表结构测试。 |
+| DDL/H2 schema | 默认不允许修改；若来源记录、标准化来源明细、来源质量结论、对账任务、匹配结果、匹配强度、差错单、账龄字段、处理动作、重跑记录、审批或凭证需要表结构，必须单独扩权到 DDL/H2、Entity、Mapper、MapStruct 和表结构测试。 |
 | 运行时配置 | 默认不允许修改；批处理窗口、告警阈值、白名单动作、规则版本、导出策略和开关都必须在生产变更或后续 Grant 中声明。 |
 
 ### 8.1 harnessScopeCandidate
@@ -124,6 +126,9 @@ Request/DTO 默认落 `com.wind.funds.reconciliation.model.request`、`com.wind.
 | `R0-B7-RECON-001` | 已过账交易与外部证据金额或状态不一致时，系统是否能生成差错并阻断清算/出款。 | 重大差错未闭环不得生成清算候选、确认清算批次、锁定结算单或提交出款。 | 对账任务、匹配结果、差错单、阻断记录、责任方、规则版本、审计摘要和不可操作原因。 | 不得直接改历史分录、余额投影、交易投影或把外部受理写成成功。 | 差异类型、金额币种、规则版本、阻断对象、无资金副作用、审计字段、解释状态。 | `ReconciliationDifferenceLifecycleTests`、`ClearingSettlementBoundaryTests`。 | `just test-one ReconciliationDifferenceLifecycleTests tests` 或 Grant 指定命令。 | 需要 DDL/H2、公共契约或状态枚举但未授权。 |
 | `R0-B7-RECON-002` | 对账重跑是否生成新运行记录和差异报告，而不是覆盖旧审批和凭证。 | 重跑不得覆盖旧运行记录、旧差异报告、审批、凭证或核销结果。 | 新 runSn、原任务引用、规则版本、差异报告、重跑原因、操作者和审计。 | 不得删除旧运行记录，不得无新证据重开已关闭差错。 | runSn 递增或稳定唯一、旧记录保留、审批凭证保留、重跑幂等、失败无副作用。 | `ReconciliationTaskServiceTests`、`ReconciliationMatchingRuleTests`。 | `just test-one ReconciliationTaskServiceTests tests` 或 Grant 指定命令。 | 需要任务表、运行记录表或差异报告表但未授权。 |
 | `R0-B7-RECON-003` | 差错核销或补事实是否必须经过白名单、审批、凭证和重新对账。 | 差错处理不能直接改账；补事实只通过白名单动作追加标准事实。 | 处理动作、审批号、凭证引用、原事实引用、幂等键、补事实命令摘要、重新对账引用。 | 不得无审批核销、不得无原事实引用调账、不得绕过交易层或账本层补账。 | 白名单动作、审批、凭证、幂等、原事实、重跑结果、失败无 route/posting/entry。 | `ReconciliationDifferenceLifecycleTests`、`FundsOperationPermissionBoundaryTests`。 | `just test-reconciliation` 或 Grant 指定命令。 | 补事实需要 transaction/ledger 公共契约但未列名授权。 |
+| `R0-B7-RECON-004` | 外部来源未验签、解析失败、重复或缺主体映射时，是否会被误用于自动匹配或自动对平。 | 未验证来源不得生成资金事实、不得标记对平、不得释放清算/出款。 | 来源记录、标准化来源明细、来源质量结论、digest、解析版本、重复识别键、等待或失败原因。 | 不得写入敏感原文，不得绕过来源质量直接生成匹配结果，不得把缺文件当作对账通过。 | sourceQuality、verificationStatus、parserVersion、dedupeKey、DATA_READY 阻断、无 route/posting/entry。 | `ReconciliationSourceStandardizationTests`、`ReconciliationMatchingRuleTests`。 | `just test-one ReconciliationSourceStandardizationTests tests` 或 Grant 指定命令。 | 需要来源表、解析状态枚举、证据脱敏字段或外部协议解析但未授权。 |
+| `R0-B7-RECON-005` | 候选匹配、人工确认或未匹配是否会被误当作自动对平。 | 只有 `EXACT_MATCH` 或带规则版本的 `RULE_MATCH` 才允许自动对平；其他匹配强度不得释放资金。 | matchStrength、autoBalance、规则版本、候选原因、人工审批或差错引用。 | 不得让 `CANDIDATE_MATCH`、`MANUAL_CONFIRMED` 或 `UNMATCHED` 进入 BALANCED；不得用人工备注替代规则版本。 | 匹配强度、自动对平标记、规则版本、差错或复核状态、无资金副作用。 | `ReconciliationMatchingRuleTests`、`ReconciliationDifferenceLifecycleTests`。 | `just test-one ReconciliationMatchingRuleTests tests` 或 Grant 指定命令。 | 需要匹配强度枚举、匹配结果表或放行规则引擎但未授权。 |
+| `R0-B7-RECON-006` | 等待数据、有条件放行、候选匹配、挂账或恢复处理中是否会长期悬挂。 | 超 SLA 的差异必须升级阻断或人工复核，不得长期停留在可放行状态。 | ageBucket、dueAt、SLA、escalationReason、blockedObject、responsibleParty 和审计。 | 不得无到期动作、不得无限续放、不得到期后继续提交清算/出款。 | 账龄桶、到期动作、升级结果、阻断对象、审计、无资金副作用。 | `ReconciliationDifferenceAgingTests`、`ClearingSettlementBoundaryTests`。 | `just test-one ReconciliationDifferenceAgingTests tests` 或 Grant 指定命令。 | 需要调度器、时间推进框架、状态枚举或清算/出款阻断契约但未授权。 |
 | `R0-B7-CLS-001` | 清算缺前置对账时，是否仍生成候选或确认清算。 | 清算候选和清算确认依赖前置对账放行；候选本身不改变余额。 | 清算前置对账引用、阻断原因、候选状态、无余额变化。 | 不得让可清分明细、清分批次或清算候选直接入账。 | `CLEARING` 余额不变、候选状态、阻断原因、审计。 | `ClearingSettlementBoundaryTests`。 | `just test-reconciliation` 或 Grant 指定命令。 | 需要清分/清算表结构但未授权。 |
 | `R0-B7-PAYOUT-001` | 外部出款受理、处理中、在途或金额不一致时，是否会被展示为成功。 | 外部非终态不得关闭 `SETTLEMENT/IN_TRANSIT`，金额不一致必须进入差错。 | factStatus、displayStatus、operationStatus、不可操作原因、差错引用和审计。 | 不得展示到账成功、不得自动放行、不得重复回退。 | 三态解释、金额币种、外部引用脱敏、无成功资金事实。 | `PayoutReceiptMismatchTests`、`PayoutExplainabilityTests`。 | `just test-reconciliation` 或 Grant 指定命令。 | 需要出款单生命周期或外部回单契约但未授权。 |
 | `R0-B7-OPS-001` | 高危差错处理和敏感导出是否有权限、职责分离、脱敏和审计。 | 无权限、无审批或职责未分离不得处理差错、补事实或导出敏感明细。 | 操作者、复核人、权限、审批、脱敏字段、水印、导出范围和审计结果。 | 不得导出敏感原文，不得单人绕过复核，不得审计失败仍成功。 | 权限失败、审批失败、脱敏、审计、前后值、失败无副作用。 | `FundsOperationPermissionBoundaryTests`。 | `just test-boundary` 或 Grant 指定命令。 | 需要安全/权限框架接入但未授权。 |
@@ -135,7 +140,7 @@ Request/DTO 默认落 `com.wind.funds.reconciliation.model.request`、`com.wind.
 
 | 切片 | 局部顺位 | 目标 | 首批 Red | 允许写入建议 | 不适合混入 |
 | --- | --- | --- | --- | --- | --- |
-| B7-RECON-DIFFERENCE-MVP | 1 | 对账任务、匹配结果、差错单、阻断、重跑和白名单补事实准入。 | `R0-B7-RECON-001`、`R0-B7-RECON-002`、`R0-B7-RECON-003`。 | reconciliation face/impl 的最小 application facade、DTO、状态、表结构和服务测试；具体范围由 Grant 决定。 | 完整清分、清算、结算、出款、追偿、P2 轨道协议。 |
+| B7-RECON-DIFFERENCE-MVP | 1 | 对账来源标准化、对账任务、匹配强度、差错单、阻断、账龄升级、重跑和白名单补事实准入。 | `R0-B7-RECON-001` 至 `R0-B7-RECON-006`。 | reconciliation face/impl 的最小 application facade、DTO、状态、表结构和服务测试；具体范围由 Grant 决定。 | 完整清分、清算、结算、出款、追偿、P2 轨道协议。 |
 | B7-CLEARING-GATE | 2 | 清分和清算前置对账阻断。 | `R0-B7-CLS-001`。 | 清分/清算候选边界测试和必要契约。 | 清算确认入账、结算锁定和出款提交。 |
 | B7-PAYOUT-EXPLAIN | 3 | 出款状态解释和金额不一致差错。 | `R0-B7-PAYOUT-001`。 | 出款解释 DTO、查询和出款回单差异测试。 | 外部银行协议、真实出款执行、完整退汇。 |
 | B7-OPS-AUDIT | 4 | 高危处理权限、审批、脱敏和审计。 | `R0-B7-OPS-001`。 | 权限边界测试、审计摘要和导出脱敏测试。 | 运营后台页面和完整报表。 |
@@ -156,7 +161,7 @@ Request/DTO 默认落 `com.wind.funds.reconciliation.model.request`、`com.wind.
 | 架构交付结构检查 | `python3 /Users/wuxp/.codex/skills/senior-software-architect/scripts/check_architecture_deliverable.py --kind architecture-plan --file docs/TDD设计/B7-清结算与对账Round0准入卡.md` |
 | 外部规则字段完整性检查 | `python3 /Users/wuxp/.codex/skills/product-architecture-expert/scripts/check_external_rules.py --file docs/TDD设计/B7-清结算与对账Round0准入卡.md` |
 | Markdown diff 空白检查 | `git diff --check` |
-| 索引一致性 | 检索 `B7-RECON-DIFFERENCE-MVP`、`B7-RECON-DIFFERENCE-MVP-CAD-001`、`B7-REVSHARE-ACCEPTANCE`、`R0-B7-RECON-001`、`R0-B7-REVSHARE-001`、`READY_TO_CONFIRM_NOT_CODE_AUTHORIZED` 和 `Execution Grant`；不得再出现把 B7 首切片命名为清分、清算、结算全量大包的旧恢复入口。 |
+| 索引一致性 | 检索 `B7-RECON-DIFFERENCE-MVP`、`B7-RECON-DIFFERENCE-MVP-CAD-001`、`B7-REVSHARE-ACCEPTANCE`、`R0-B7-RECON-001`、`R0-B7-RECON-004`、`R0-B7-RECON-006`、`R0-B7-REVSHARE-001`、`READY_TO_CONFIRM_NOT_CODE_AUTHORIZED` 和 `Execution Grant`；不得再出现把 B7 首切片命名为清分、清算、结算全量大包的旧恢复入口。 |
 
 后续若获得 Execution Grant，验证命令按授权范围选择：`just test-one <TargetTest> tests`、`just test-reconciliation`、`just test-boundary`、`just compile`、`just pmd` 和必要的业务流程回归。仅修改文档时不运行编译。
 
@@ -180,9 +185,9 @@ Request/DTO 默认落 `com.wind.funds.reconciliation.model.request`、`com.wind.
 Execution Grant：B7-RECON-DIFFERENCE-MVP
 Task ID：B7-RECON-DIFFERENCE-MVP-CAD-001
 实现决策：contract-only / ddl-backed / service-flow-backed（三选一）
-首批 Red：R0-B7-RECON-001
-次批 Red：R0-B7-RECON-002、R0-B7-RECON-003
-补事实白名单：不开放 / 调账 / 冲正 / 补事实（需列动作、审批、凭证、幂等和原事实引用）
+首批 Red：R0-B7-RECON-001、R0-B7-RECON-004、R0-B7-RECON-005
+次批 Red：R0-B7-RECON-002、R0-B7-RECON-003、R0-B7-RECON-006
+补事实白名单：默认关闭 / 调账 / 冲正 / 补事实（若开放需列动作、审批、凭证、幂等和原事实引用）
 外部规则状态：仅本地字段完整性 / 已完成法务合规财务通道确认
 Git 策略：auto_commit / summary_only
 撤销方式：用户说“暂停/停止/撤销 B7”即停止自动推进
@@ -196,14 +201,13 @@ Git 策略：auto_commit / summary_only
 | --- | --- |
 | `Execution Grant` | `B7-RECON-DIFFERENCE-MVP`。 |
 | `Task ID` | `B7-RECON-DIFFERENCE-MVP-CAD-001`。 |
-| `业务问题` | 一笔已成功、已过账、有账本分录的交易进入对账后，若金额、状态、漏单、重复或来源不一致，系统必须生成差错、阻断清算或出款、保留审批凭证，并能重跑或通过白名单补事实闭环；不得把交易成功、结算审批或外部受理误展示为钱已对上。 |
-| `当前判断` | PRD、DSL、系分和 TDD 已具备清结算与对账目标态；代码侧只有 reconciliation 模块骨架、LedgerEntry 对账字段、清算策略契约和出款前准入候选，尚未形成对账任务、匹配结果、差错单、阻断、重跑和补事实白名单的服务级 H2 闭环。 |
+| `业务问题` | 一笔已成功、已过账、有账本分录的交易进入对账后，若金额、状态、漏单、重复、来源未验证、候选匹配不可靠或账龄超期，系统必须生成差错、阻断清算或出款、保留审批凭证，并能重跑或在白名单明确授权后补事实闭环；不得把交易成功、结算审批或外部受理误展示为钱已对上。 |
+| `当前判断` | PRD、DSL、系分和 TDD 已具备清结算与对账目标态；代码侧只有 reconciliation 模块骨架、LedgerEntry 对账字段、清算策略契约和出款前准入候选，尚未形成对账来源标准化、匹配强度、差错单、阻断、账龄升级、重跑和补事实白名单的服务级 H2 闭环。 |
 | `默认决策` | `implementationDecision=service-flow-backed`，`schemaDecision=minimal-reconciliation-ddl-h2-required`，`adjustmentWhitelist=closed-first`，`externalRuleDecision=local-field-check-only`。若用户只确认 `contract-only`，只能交付契约/DTO/目标 Red，不得声明 B7 生产可用。 |
-| `允许写入` | 先写 `ReconciliationDifferenceLifecycleTests`、`ReconciliationTaskServiceTests` 或 `ReconciliationMatchingRuleTests` 目标 Red；Red 证明缺口后，按确认范围允许新增 `reconciliation-face` application facade、Request/Query/DTO、状态、`reconciliation-impl` 最小服务实现、必要 DDL/H2 schema、Entity、Mapper、MapStruct 和表结构测试。 |
+| `允许写入` | 先写 `ReconciliationSourceStandardizationTests`、`ReconciliationDifferenceLifecycleTests`、`ReconciliationTaskServiceTests`、`ReconciliationMatchingRuleTests` 或 `ReconciliationDifferenceAgingTests` 目标 Red；Red 证明缺口后，按确认范围允许新增 `reconciliation-face` application facade、Request/Query/DTO、状态、`reconciliation-impl` 最小服务实现、必要 DDL/H2 schema、Entity、Mapper、MapStruct 和表结构测试。 |
 | `禁止写入` | 不一次性实现完整清分、清算、结算、出款、追偿和运营后台；不直接修改历史交易、LedgerEntry、余额投影、交易投影或外部流水；不开放泛化补事实；不实现银行、卡组织、ACH、SWIFT、PSP、收单、跨境或 FX 外部协议；不实现 VCC clearing 文件、全球账户 VA/银行流水匹配或收单生产能力。 |
-| `首批 Red` | `R0-B7-RECON-001`：已过账交易与外部证据金额或状态不一致时，必须生成差错并阻断清算/出款，且无资金副作用。 |
-| `第二 Red` | `R0-B7-RECON-002`：对账重跑必须生成新运行记录和差异报告，不覆盖旧审批、凭证、核销结果或旧运行记录。 |
-| `第三 Red` | `R0-B7-RECON-003`：差错核销或补事实必须经过白名单、审批、凭证、幂等键和重新对账；未授权前补事实白名单默认关闭。 |
+| `首批 Red` | `R0-B7-RECON-001`：已过账交易与外部证据金额或状态不一致时，必须生成差错并阻断清算/出款，且无资金副作用；`R0-B7-RECON-004`：未验证、解析失败、重复或缺主体映射的来源不得自动匹配或对平；`R0-B7-RECON-005`：候选匹配、人工确认或未匹配不得自动对平。 |
+| `第二批 Red` | `R0-B7-RECON-002`：对账重跑必须生成新运行记录和差异报告，不覆盖旧审批、凭证、核销结果或旧运行记录；`R0-B7-RECON-003`：差错核销或补事实必须经过白名单、审批、凭证、幂等键和重新对账，首轮默认关闭；`R0-B7-RECON-006`：等待数据、有条件放行、候选匹配、挂账或恢复处理中超 SLA 必须升级阻断或人工复核。 |
 | `验证命令` | 首轮 `just test-one ReconciliationDifferenceLifecycleTests tests` 或 `just test-one ReconciliationTaskServiceTests tests`；按触点补 `just test-reconciliation`、`just test-boundary`、`just compile`、提交前 `just pmd` 和 `git diff --check`。 |
 | `Git 策略` | 未确认前 `summary_only`；确认时若用户同时保留 GSD-CAD 自动提交授权，目标验证通过且无停止条件时可 `auto_commit`；未明确 auto_commit 时保持 `summary_only`。 |
 | `停止条件` | 未确认 implementationDecision、schemaDecision、补事实白名单或 DDL/H2 范围；需要修改 transaction、ledger、wallet、route replay、出款前准入或 core 公共契约但 Grant 未列名；出现直接改账、泛化补事实、敏感原文写入、依赖反转、外部协议实现、测试无法解释失败或工作树冲突。 |

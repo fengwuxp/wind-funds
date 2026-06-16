@@ -192,10 +192,10 @@ Request/DTO 默认落 `com.wind.funds.wallet.model.request` 和 `com.wind.funds.
 | 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
 | 产品基线 | VCC 不再新增独立 `VCC_ACCOUNT`；每张卡绑定一个资金子账户或信用子账户。预付卡绑定资金子账户，共享卡绑定信用子账户；多卡共享资金池或额度池时，卡仍各自绑定子账户，子账户归属同一父账户或根账户控制域。 |
 | DSL / TDD 基线 | `LedgerEntry.subject` 只能落 `FUNDING_ACCOUNT` 或 `CREDIT_ACCOUNT`；`PaymentInstrumentRef`、卡号、PAN、token、预算组、Spend Rule 和父账户汇总视图不得作为账本主体。父账户只在显式 `PARENT_CONTROL` 或真实父子划拨场景写分录，默认 `AGGREGATE_VIEW` 只能由子账户事实聚合。 |
-| 代码扫描 | 当前代码已存在 `FundingAccountType.PREPAID_CARD`、`CreditFundsAccountType.SHARED_CARD` 和 `CreditFundsAccountType.CREDIT_CARD` 等账户类型枚举；但未发现 `AccountHierarchySnapshot`、`PostingRole`、`parentAccountRef`、`rootAccountRef`、`accountPath` 或 `hierarchyVersion` 的公共承载。`SpendSubjectFundingRelation` 测试 schema 仍以 `funding_account_id` 表达资金责任关系。 |
-| 目标缺口 | 缺少账户层级 application facade、账户层级快照、子账户账目 profile、父账户约束摘要、层级版本、父子账户账本初始化准入、父账户只读聚合防重复入账 Red，以及 VCC 子账户和支付工具绑定的最小交接模型。 |
+| 代码扫描 | 当前代码已存在 `FundingAccountType.PREPAID_CARD`、`CreditFundsAccountType.SHARED_CARD` 和 `CreditFundsAccountType.CREDIT_CARD` 等账户类型枚举；但未发现 `AccountHierarchySnapshot`、`PostingRole`、`parentAccountRef`、`rootAccountRef` 或 `accountPath` 的公共承载。`SpendSubjectFundingRelation` 测试 schema 仍以 `funding_account_id` 表达资金责任关系。 |
+| 目标缺口 | 缺少账户层级 application facade、账户层级快照、子账户账目 profile、父账户约束摘要、父子账户账本初始化准入、父账户只读聚合防重复入账 Red，以及 VCC 子账户和支付工具绑定的最小交接模型。 |
 | 产品判断 | 多级账户是 VCC 支持的前置钱包基础能力，不是 P2 VCC 专项自身的完整发卡实现。先补账户层级和账本主体边界，再进入 VCC prepaid funding 或 lifecycle，更利于避免把卡、工具、预算组或父账户汇总误写成资金事实。 |
-| 首批 Red | `R0-ACCOUNT-HIERARCHY-001A`：创建或引用 VCC 关联子账户时，缺父账户、根账户、层级版本、账目 profile、币种、状态、工具绑定摘要或资金来源时必须失败，且无 route、posting、LedgerEntry 或余额投影副作用。 |
+| 首批 Red | `R0-ACCOUNT-HIERARCHY-001A`：创建或引用 VCC 关联子账户时，缺父账户、根账户、账目 profile、币种、状态、工具绑定摘要或资金来源时必须失败，且无 route、posting、LedgerEntry 或余额投影副作用。 |
 | 次批 Red | `R0-ACCOUNT-HIERARCHY-001B`：父账户聚合视图、支付工具、卡号、PAN、token、预算组或 Spend Rule 被写成 route leg、posting subject、LedgerEntry subject 或余额投影主体时必须失败；`AGGREGATE_VIEW` 不得生成账本分录。 |
 | Grant 必须列明 | 是否只做 `contract-only`，是否允许 `ledger-snapshot-backed`；是否新增公共 Request/DTO；是否新增 core DSL value object；是否允许 DDL/H2 schema；首批目标测试资产、依赖方向、验证命令和停止条件。 |
 | 禁止混入 | 不新增 `VCC_ACCOUNT`；不实现完整 VCC 卡生命周期、issuer 协议、PAN/CVV/PCI、清结算对账、预算控制投影、Spend Rule 引擎、全球账户、收单或外部发卡处理商协议。 |
@@ -273,10 +273,10 @@ Git 策略：未确认前 summary_only；确认后若用户保持 GSD-CAD 自动
 
 | 锚点 | 当前代码事实 | 对 `B2-ACCOUNT-HIERARCHY` 的影响 |
 | --- | --- | --- |
-| `DefaultFundsAccountType` / `FundingAccountType` / `CreditFundsAccountType` | 已存在 `PREPAID_CARD`、`SHARED_CARD`、`CREDIT_CARD` 等账户类型枚举。 | 枚举只能证明账户类型名已存在，不能证明 VCC 子账户、父账户、根账户、层级版本、账目 profile、绑定摘要或资金来源准入已经生产可用。 |
-| `CreateFundingAccountRequest` / `CreateCreditAccountRequest` | 只有账户号、tenant、owner、accountType、currency、ledger profile、状态和上下文字段；未承载 `parentAccountRef`、`rootAccountRef`、`accountPath`、`hierarchyVersion`、`postingRole` 或绑定摘要。 | `contract-only` 首批 Red 应优先证明缺层级快照时失败；若要把这些字段落入 Request/DTO、DSL value object 或持久层，必须由 Grant 显式授权。 |
-| `tests/src/test/resources/jdbc-schema.sql` 的 `t_funding_account` / `t_credit_account` | 表结构未包含父账户、根账户、层级路径、层级版本或 posting role 字段。 | 默认 `schemaDecision=no-ddl` 是合理的；若选择 `ledger-snapshot-backed` 或持久化层级快照，必须另行列明 DDL/H2、Entity、Mapper、索引、迁移和回滚范围。 |
-| `CreatePaymentInstrumentBindingRequest` / `PaymentInstrumentServiceImpl` | 支付工具绑定支持 `subjectType` / `subjectId`，且 `FUNDING_SUBJECT` 必须绑定 `FUNDING_ACCOUNT`，`CREDIT_SUBJECT` 必须绑定 `CREDIT_ACCOUNT`。 | 现有绑定服务可作为工具绑定到资金/信用子账户的局部基线，但它不固化父账户/根账户快照、层级版本、账目 profile 或资金来源，不能替代账户层级 application facade。 |
+| `DefaultFundsAccountType` / `FundingAccountType` / `CreditFundsAccountType` | 已存在 `PREPAID_CARD`、`SHARED_CARD`、`CREDIT_CARD` 等账户类型枚举。 | 枚举只能证明账户类型名已存在，不能证明 VCC 子账户、父账户、根账户、账目 profile、绑定摘要或资金来源准入已经生产可用。 |
+| `CreateFundingAccountRequest` / `CreateCreditAccountRequest` | 只有账户号、tenant、owner、accountType、currency、ledger profile、状态和上下文字段；未承载 `parentAccountRef`、`rootAccountRef`、`accountPath`、`postingRole` 或绑定摘要。 | `contract-only` 首批 Red 应优先证明缺层级快照时失败；若要把这些字段落入 Request/DTO、DSL value object 或持久层，必须由 Grant 显式授权。 |
+| `tests/src/test/resources/jdbc-schema.sql` 的 `t_funding_account` / `t_credit_account` | 表结构未包含父账户、根账户、层级路径或 posting role 字段。 | 默认 `schemaDecision=no-ddl` 是合理的；若选择 `ledger-snapshot-backed` 或持久化层级快照，必须另行列明 DDL/H2、Entity、Mapper、索引、迁移和回滚范围。 |
+| `CreatePaymentInstrumentBindingRequest` / `PaymentInstrumentServiceImpl` | 支付工具绑定支持 `subjectType` / `subjectId`，且 `FUNDING_SUBJECT` 必须绑定 `FUNDING_ACCOUNT`，`CREDIT_SUBJECT` 必须绑定 `CREDIT_ACCOUNT`。 | 现有绑定服务可作为工具绑定到资金/信用子账户的局部基线，但它不固化父账户/根账户快照、账目 profile 或资金来源，不能替代账户层级 application facade。 |
 | `CreateSpendSubjectFundingRelationRequest` / `t_spend_subject_funding_rel` | 资金责任关系仍以 `fundingAccountId` / `funding_account_id` 表达真实资金账户。 | 账户层级 Grant 不能顺手完成 `targetSubjectType + targetSubjectId` 迁移；涉及 VCC 信用子账户、平台责任或信用账户责任时，仍必须后续确认 `B2-FR-TARGET`。 |
 | wallet application facade 搜索 | 未发现 `AccountHierarchyApplicationService`、`WalletAccountApplicationService` 或等价账户层级应用服务。 | `B2-ACCOUNT-HIERARCHY` 的生产缺口不是“枚举缺失”，而是 application facade、层级快照、Red 断言和必要契约承载缺失。 |
 

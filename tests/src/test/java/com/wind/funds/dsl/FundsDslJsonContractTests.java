@@ -891,7 +891,6 @@ class FundsDslJsonContractTests {
                             "currency": "USD",
                             "ledgerProfileCode": "FUNDING_BASIC"
                           },
-                          "hierarchyVersion": "card-binding-v1",
                           "contextVariables": { "accountPurpose": "VCC_SHARED_CARD" }
                         }
                       }]
@@ -1334,8 +1333,7 @@ class FundsDslJsonContractTests {
                           "accountRef": {
                             "subjectType": "BUDGET_GROUP",
                             "subjectId": "bg_vcc_001"
-                          },
-                          "hierarchyVersion": "budget-binding-v1"
+                          }
                         }
                       }]
                     }
@@ -1382,8 +1380,7 @@ class FundsDslJsonContractTests {
                           "accountRef": {
                             "subjectType": "CREDIT_ACCOUNT",
                             "subjectId": "ca_vcc_card_002"
-                          },
-                          "hierarchyVersion": "card-binding-v1"
+                          }
                         }
                       }]
                     }
@@ -1441,8 +1438,7 @@ class FundsDslJsonContractTests {
                             "subjectType": "FUNDING_ACCOUNT",
                             "subjectId": "fa_vcc_parent_currency_001",
                             "currency": "EUR"
-                          },
-                          "hierarchyVersion": "card-binding-currency-mismatch"
+                          }
                         }
                       }]
                     }
@@ -1500,8 +1496,7 @@ class FundsDslJsonContractTests {
                             "subjectType": "FUNDING_ACCOUNT",
                             "subjectId": "fa_vcc_parent_amount_currency_001",
                             "currency": "EUR"
-                          },
-                          "hierarchyVersion": "card-binding-amount-currency-mismatch"
+                          }
                         }
                       }]
                     }
@@ -1559,8 +1554,7 @@ class FundsDslJsonContractTests {
                             "subjectType": "CREDIT_ACCOUNT",
                             "subjectId": "ca_vcc_card_self_001",
                             "currency": "USD"
-                          },
-                          "hierarchyVersion": "card-binding-self"
+                          }
                         }
                       }]
                     }
@@ -1618,8 +1612,7 @@ class FundsDslJsonContractTests {
                             "subjectId": "fa_vcc_root_root_001",
                             "tenantId": 2,
                             "currency": "USD"
-                          },
-                          "hierarchyVersion": "card-binding-root-mismatch"
+                          }
                         }
                       }]
                     }

@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.funds</groupId>
-        <artifactId>wind-funds</artifactId>
+        <artifactId>capte-funds</artifactId>
         <version>${revision}</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>wind-funds-wallet-impl</artifactId>
+    <artifactId>capte-funds-wallet-impl</artifactId>
 
     <dependencies>
         <dependency>
@@ -19,15 +19,15 @@
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-ledger-face</artifactId>
+            <artifactId>capte-funds-ledger-face</artifactId>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-wallet-face</artifactId>
+            <artifactId>capte-funds-wallet-face</artifactId>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-transaction-face</artifactId>
+            <artifactId>capte-funds-transaction-face</artifactId>
         </dependency>
     </dependencies>
 

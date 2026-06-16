@@ -12,7 +12,7 @@
     </parent>
 
     <groupId>com.wind.funds</groupId>
-    <artifactId>wind-funds</artifactId>
+    <artifactId>capte-funds</artifactId>
     <packaging>pom</packaging>
     <version>${revision}</version>
 
@@ -57,62 +57,62 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-core</artifactId>
+                <artifactId>capte-funds-core</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-ledger-face</artifactId>
+                <artifactId>capte-funds-ledger-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-ledger-impl</artifactId>
+                <artifactId>capte-funds-ledger-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-transaction-face</artifactId>
+                <artifactId>capte-funds-transaction-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-transaction-impl</artifactId>
+                <artifactId>capte-funds-transaction-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-reconciliation-face</artifactId>
+                <artifactId>capte-funds-reconciliation-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-reconciliation-impl</artifactId>
+                <artifactId>capte-funds-reconciliation-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-governance-face</artifactId>
+                <artifactId>capte-funds-governance-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-governance-impl</artifactId>
+                <artifactId>capte-funds-governance-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-wallet-face</artifactId>
+                <artifactId>capte-funds-wallet-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-wallet-impl</artifactId>
+                <artifactId>capte-funds-wallet-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>wind-funds-tests</artifactId>
+                <artifactId>capte-funds-tests</artifactId>
                 <version>${revision}</version>
             </dependency>
         </dependencies>

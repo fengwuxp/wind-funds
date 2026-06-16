@@ -5,25 +5,25 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.funds</groupId>
-        <artifactId>wind-funds</artifactId>
+        <artifactId>capte-funds</artifactId>
         <version>${revision}</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>wind-funds-reconciliation-impl</artifactId>
+    <artifactId>capte-funds-reconciliation-impl</artifactId>
 
     <dependencies>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-reconciliation-face</artifactId>
+            <artifactId>capte-funds-reconciliation-face</artifactId>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-transaction-face</artifactId>
+            <artifactId>capte-funds-transaction-face</artifactId>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-ledger-face</artifactId>
+            <artifactId>capte-funds-ledger-face</artifactId>
         </dependency>
     </dependencies>
 

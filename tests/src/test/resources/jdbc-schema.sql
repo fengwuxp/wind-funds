@@ -60,6 +60,37 @@ CREATE TABLE `t_credit_account`
   DEFAULT CHARSET = utf8mb4 COMMENT = '信用账户表';
 
 -- ----------------------------
+-- 账户层级绑定表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_account_hierarchy_binding`;
+CREATE TABLE `t_account_hierarchy_binding`
+(
+    `id`                     BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`             DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`           DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                     VARCHAR(64) NOT NULL COMMENT '绑定号，全局唯一',
+    `tenant_id`              BIGINT(20)  NOT NULL COMMENT '租户 ID',
+    `account_id`             VARCHAR(64) NOT NULL COMMENT '子账户 ID',
+    `account_type`           VARCHAR(50) NOT NULL COMMENT '子账户主体类型',
+    `parent_account_id`      VARCHAR(64) NOT NULL COMMENT '父账户 ID',
+    `parent_account_type`    VARCHAR(50) NOT NULL COMMENT '父账户主体类型',
+    `root_account_id`        VARCHAR(64) NOT NULL COMMENT '根账户 ID',
+    `root_account_type`      VARCHAR(50) NOT NULL COMMENT '根账户主体类型',
+    `currency`               VARCHAR(10) NOT NULL COMMENT '币种',
+    `status`                 VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
+    `version`                INT(11)     NOT NULL DEFAULT 1 COMMENT '乐观锁版本',
+    `operator_id`            VARCHAR(64)          DEFAULT NULL COMMENT '操作者',
+    `context_variables`      TEXT                 DEFAULT NULL COMMENT '扩展上下文',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_account_hierarchy_binding_sn` (`sn`),
+    KEY `idx_account_hierarchy_binding_account` (`tenant_id`, `account_type`, `account_id`),
+    KEY `idx_account_hierarchy_binding_parent` (`tenant_id`, `parent_account_type`, `parent_account_id`),
+    KEY `idx_account_hierarchy_binding_root` (`tenant_id`, `root_account_type`, `root_account_id`),
+    KEY `idx_account_hierarchy_binding_status` (`status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '账户层级绑定表';
+
+-- ----------------------------
 -- 预算组表
 -- ----------------------------
 DROP TABLE IF EXISTS `t_budget_group`;

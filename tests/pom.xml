@@ -5,41 +5,41 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.funds</groupId>
-        <artifactId>wind-funds</artifactId>
+        <artifactId>capte-funds</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>wind-funds-tests</artifactId>
+    <artifactId>capte-funds-tests</artifactId>
 
     <dependencies>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-core</artifactId>
+            <artifactId>capte-funds-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-ledger-impl</artifactId>
+            <artifactId>capte-funds-ledger-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-transaction-impl</artifactId>
+            <artifactId>capte-funds-transaction-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-reconciliation-impl</artifactId>
+            <artifactId>capte-funds-reconciliation-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-governance-impl</artifactId>
+            <artifactId>capte-funds-governance-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-wallet-impl</artifactId>
+            <artifactId>capte-funds-wallet-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

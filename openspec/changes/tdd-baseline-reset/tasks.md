@@ -44,7 +44,11 @@
 - [x] 2026-06-11 完成授权争议 / chargeback 语义再裁决：dispute / chargeback 定性为案件过程，不是授权交易层默认资金结果。资金底座只消费裁决后的退款结果：用户胜诉或需退款时通过 `settleRefund / AUTH_REFUND` 沿原完成路径承接；用户败诉或无需资金处理时不得生成 route、posting、LedgerEntry、余额变化或新的交易事实。既有 `FundsAuthorizationTransactionService#chargeback` 只能视为历史兼容或内部适配资产；移除公共 API、迁移测试、调整 `CHARGEBACK` event 入口或建立完整 dispute case 必须另起 `B4-DISPUTE-OUTCOME-API-CLEANUP` 或等价新的单一 Execution Grant，不能混入账本 004A、VCC、清结算或其他切片。本轮仅同步 PRD/DSL/系分/TDD/OpenSpec 交付口径，不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。
 - [x] 2026-06-03 刷新 B4 GSD-CAD 候选结构校验入口：`818da34 fix(transaction): 移除授权退款请求模式字段` 已把 no-auth refund 请求契约进一步收口为“请求无 `refundMode`、`NO_AUTH` 仅为内部上下文标签”，同轮 `just test-one FundsAuthorizationTransactionFlowTests tests` 通过 25 tests；B4 准入卡第 8.10 已补充标准 Harness `harnessScopeIndex`，用于让 CAD 候选结构校验识别写入范围、写入文件、只读范围和只读参考。本记录只刷新 docs/OpenSpec 任务入口，不授权 Java、测试、DDL/H2 schema、公共契约或运行时配置写入。
 - [x] 2026-06-04 回写 B4-NO-AUTH-REFUND 路由回退基线：`967586c fix: 按外部引用推断无授权退款路由` 已补齐请求侧无 `refundMode` 后的 route resolver 行为，内部 `REFUND_MODE` 标签缺失时可从 `EXTERNAL_TRANSACTION` reference 推断 no-auth refund 路由，显式 `DISPUTE` 或其他退款归类不被覆盖；已验证 `just verify-slice AuthorizationFundsInstructionRouteResolverTests tests`、`just test-boundary`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just pmd` 和 `git diff --check` 通过。本记录只回写 OpenSpec/任务账本基线，不新增 Java、测试、DDL/H2 schema、公共契约或运行时配置授权。
-- [x] 2026-06-12 建立 GSD-2 新基线工作流：以 `b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 作为当前提交基线，新增 `docs/TDD设计/GSD-2-新基线工作流规划.md`，并把旧 GSD + Goal 未完成计划从当前活跃执行队列移除。旧 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`、`QUEUED_AFTER_P0_P1`、`PARTIAL_*_NOT_DONE` 候选只作为 backlog reference 和历史准入材料；后续必须通过 GSD-2 重新选择 Task ID、Goal 映射、写入范围、验证命令和单一 Execution Grant。本记录只更新文档、索引和状态载体，不授权 Java、测试、公共契约、DDL/H2 schema、运行时配置或 Git 操作。
+- [x] 2026-06-12 建立 GSD-2 新基线工作流：以 `b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 作为 GSD-2 初始重置点，新增 `docs/TDD设计/GSD-2-新基线工作流规划.md`，并把旧 GSD + Goal 未完成计划从当前活跃执行队列移除。旧 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`、`QUEUED_AFTER_P0_P1`、`PARTIAL_*_NOT_DONE` 候选只作为 backlog reference 和历史准入材料；后续必须通过 GSD-2 重新选择 Task ID、Goal 映射、写入范围、验证命令和单一 Execution Grant。本记录只更新文档、索引和状态载体，不授权 Java、测试、公共契约、DDL/H2 schema、运行时配置或 Git 操作。
+- [x] 2026-06-12 完成 `GSD2-W1-BASELINE-GAP-AUDIT` 低风险基线差距审计：当前实际 Git/code baseline 已校准为 `da7d2ea test: 阻断契约夹具承载资金流断言`，`b3b9712` 只保留为 GSD-2 初始重置点和历史证据；`a56bfbc`、`3c71e29`、`a3c2e21` 和 `4b63996..da7d2ea` 的账户层级、信用账户路由闭合、GSD2 路由快照和 DSL 契约门禁强化被登记为局部前置证据。新增 `docs/TDD设计/GSD-2-W1-基线差距审计.md`，状态为 `W1_GAP_AUDIT_DONE_READY_FOR_W2_SINGLE_GRANT_SELECTION`，下一步推荐进入 `GSD2-W2-SINGLE-GRANT-SELECTION`，优先评估 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`。本记录只更新文档、索引和 OpenSpec tasks，不授权 Java、测试、公共契约、DDL/H2 schema、运行时配置或 Git 操作。
+- [x] 2026-06-12 完成 `GSD2-W2-SINGLE-GRANT-SELECTION` 草案并推进 W3A 只读定位：新增 `docs/TDD设计/GSD-2-W2-单一Grant选择卡.md`，把下一推荐候选收敛为 `Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`；新增 `docs/TDD设计/GSD-2-W3-B2账户层级CAD准入草案.md`，确认账户层级 DSL / value object / route snapshot JSON / route replay 已有局部证据，并把首批 Red 从“新增账户层级契约”调整为真实服务流生成、生命周期保存、原快照回放和失败无副作用。当前状态为 `W3_READONLY_SOURCE_POSITIONING_DONE_WAITING_EXECUTION_GRANT`；未获用户确认前不进入 Red/Green/CAD Loop，不写 Java、测试、公共契约、DDL/H2 schema、运行时配置或 Git 操作。
+- [x] 2026-06-12 完成 `GSD2-W4-B2-AH-EXECUTION-GRANT-PACK` 确认包：新增 `docs/TDD设计/GSD-2-W4-B2账户层级ExecutionGrant确认包.md`，提供可复制确认文本、授权范围、首个 Red `B2-AH-RED-001-SERVICE-FLOW-SNAPSHOT`、验证命令和停止条件。该 Grant 已在 2026-06-15 被用户确认并消费到首个 Red，观察到授权服务流缺少合法账户层级来源；下一步改为确认 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 或等价来源契约 Grant。
+- [x] 2026-06-15 完成 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 本地 Green：新增账户层级来源 port、wallet-face 账户层级服务契约、wallet-impl 账户关系持久化与快照解析、H2 schema、授权 route snapshot 接入和服务流目标测试，并按评审结论移除 `AccountHierarchyBinding` 与 `AccountHierarchySnapshot` 中无实质闭环的 `hierarchyVersion`、`changeReason`、`requestSn` 和 `description` 字段。`B2-AH-RED-001-SERVICE-FLOW-SNAPSHOT` 已转 Green，授权 route snapshot 能携带 `routingDecision.fundingAllocations[].accountHierarchySnapshot`，LedgerEntry 主体仍落在授权账户而非父账户。已验证 `just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-one AuthorizationFundsInstructionRouteResolverTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests` 和 `just test-one RouteSnapshotJsonSupportTests tests` 通过；收口追加 `test-boundary`、`pmd` 和 `git diff --check`。下一候选转为 `GSD2-B2-FR-TARGET-001`，不得重复消费账户层级来源契约 Grant。
 - [x] 2026-06-03 完成 B4-DISPUTE-SEMANTIC-ALIGNMENT 首轮 CAD 闭环：`949b24a fix(transaction): 对齐授权争议退款审计语义` 已让 `settleRefund / AUTH_REFUND` 通过 `disputeMode`、`disputeReason`、`disputeVoucherRef`、`externalDisputeRef` 一等字段承接争议/拒付语义，请求侧仍不恢复 `refundMode`，`DISPUTE` 只作为资金指令内部上下文标签；route replay 只在 `AUTH_REFUND + DISPUTE` 场景传播争议审计上下文，避免普通退款、NO_AUTH 退款和 fee refund 被请求上下文污染。已验证 `just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary`、`just pmd` 和 `git diff --check` 通过。本闭环只关闭 `B4-CB-RED-001A / TDD-RED-017B` 首个 canonical 可区分性切片，不声明完整 dispute case、独立 chargeback 一等 API、清结算追偿、VCC processor、DDL/H2 schema、core 枚举状态或 ledger 公共契约完成。
 - [x] 2026-06-03 完成 B4-AUTH-RACE GSD-CAD Round 0：`docs/TDD设计/B4-授权后继能力Round0准入卡.md#813-authraceround0scan2026-06-03` 已记录授权后续事件并发竞争的只读扫描，现有顺序金额闭合、幂等摘要和失败无副作用覆盖充分，但当时未发现同一授权 settle / reversal / expire / settleRefund 并发竞争专用 Red；`#814-authracegrantcandidate2026-06-03` 已把候选收敛为 `B4-AUTH-RACE` 原子任务包，历史状态为 `ROUND0_READY_NOT_CODE_AUTHORIZED`。该准备态后续已由 `47c5269 fix(transaction): 串行化授权后继并发竞争` 消费并闭合，不再作为新的自动编码授权。
 - [x] 2026-06-03 完成 B4-AUTH-RACE 首轮 CAD 闭环：`47c5269 fix(transaction): 串行化授权后继并发竞争` 已把 `B4-RACE-RED-001` 转为回归基线，新增同一授权 settle / expire / reversal 并发竞争测试，证明只有一个合法金额迁移获胜，失败方不生成 route、posting、ledger entry、projection 或余额副作用；实现层对授权后继命令增加事务完成前持有的 JVM 锁，并在读取授权原交易时使用 `FOR UPDATE` 行锁，同时保留完成、撤销和过期金额上限校验。已验证 `git diff --check`、`just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-transaction`、`just test-business-flow`、`just test-boundary` 和 `just pmd` 通过。本闭环不声明 DDL/H2 schema、公共契约、core 枚举状态、ledger 公共契约、支付工具 facade、钱包 application facade、VCC、Spend Rule、完整 dispute/chargeback case、清结算对账或治理完成。
@@ -476,12 +480,13 @@ B7 在本 change 中只保留边界、计划和设计评审输入，不表示整
 | B7-02 | 固化可清分准入、清分批次和清算候选排除。 | 待确认 | 可清分规则、清分批次、清算候选。 | 未完成交易入可清分明细、清分批次确认即入账、冻结或重大差错交易入清算候选。 | 可清分只来自成功交易、已过账 `CLEARING` 分录和完整来源快照；清分批次只固化归类和规则版本；候选只来自已确认清分结果且满足可清算规则。 | 待确认 |
 | B7-03 | 固化清算批次确认、结算锁定、出款成功/失败和追偿。 | 待确认 | 清算批次、结算单、出款单、追偿单边界。 | 候选入池即清算、清算前置对账缺失、出款失败直接改历史分录，或重复出款。 | 清算批次确认才触发 `CLEARING -> AVAILABLE`；结算锁定、出款单、失败原因和追偿链路各自独立。 | 待确认 |
 | B7-04 | 固化对账批次、差错单和核销。 | 待确认 | 对账差错闭环。 | 对账差异直接改分录或余额，或绕过差错闭环直接调用 adjust。 | 强制差错单、审批、凭证、调账/冲正、核销、重新对账；差错类资金账户余额调整由闭环触发余额控制 adjust 或批次授权直接交易调账事实。 | 待确认 |
+| B7-04A | 固化外部来源标准化、匹配强度和账龄升级。 | 待确认 | PRD 8.3.1、8.4、8.4.1；B7 Round0 准入卡。 | 未验签、解析失败、重复或缺主体映射的来源进入自动对平；候选匹配或人工确认被当作自动对平；等待数据、有条件放行或挂账长期悬挂。 | 来源记录、标准化明细、来源质量结论、`EXACT_MATCH/RULE_MATCH/CANDIDATE_MATCH/MANUAL_CONFIRMED/UNMATCHED` 匹配强度、账龄桶、SLA、到期升级和阻断对象必须可测；首轮补事实白名单默认关闭。 | 待确认 |
 | B7-05 | 固化清结算与对账并发竞争红线。 | 待确认 | TDD 13.5、清结算退款时序、对账重跑。 | 清算候选锁定与退款并发、结算锁定与出款回单/退款并发、对账重跑与差错核销并发导致重复扣减、重复出款或证据覆盖。 | 建立对象级锁定、批次唯一键、候选状态版本、重跑运行记录和差错核销互斥；失败方必须可审计且无副作用。 | 待确认 |
 | B7-06 | 固化含权益交易的清结算和对账拆分。 | 待确认 | `DSL-BENEFIT-CLEARING-RECONCILIATION-001`、`AC-BEN-011`、`AC-BEN-013`、`AC-BEN-015`、`TDD-BEN-CLS-*`、`TDD-BEN-RECON-*`、`RED-057`、`RED-059` 至 `RED-062`。 | 营销核销、订单金额、用户实付、商户应收、平台补贴、手续费和退款冲回不一致时被静默补平；商户券被误当平台成本；补贴冲回、不可退权益、负债恢复或展示项混入订单正向闭合；`CONTRACT_ONLY` 夹具或专业确认缺失被当作清结算 Done。 | 清分、清算、结算和对账明细拆出权益金额项；闭合角色决定金额项进入订单、退款、补贴冲回、负债恢复或展示解释；差异进入差错单和审计，不直接改历史资金事实；进入 B7 前必须确认夹具级别、权益事实源和专业确认状态。 | 待确认 |
 | B7-07 | 固化清结算、对账和出款工作台可解释性。 | 待确认 | 产品使用者可解释性矩阵、系分 03 运营后台、系分 05 告警到 Runbook 动作矩阵、`GAP-OPS-001`。 | 重大差错或前置对账未完成仍展示为可清算、可结算或可出款；出款受理展示为成功；差错缺责任方、阈值、账龄、审批或到期重查；证据原文进入导出或告警；外部规则未核验仍展示可操作；缺事实状态、展示状态或操作状态仍进入商户账单、运营台或审计导出。 | 清分、清算、结算、出款、对账差错和追偿视图必须能解释金额来源、事实状态、展示状态、操作状态、阻断原因、放行依据、审批链、下一步动作、脱敏证据引用、外部规则核验状态和恢复验收。 | 待确认 |
 | B7-08 | 固化两级代理收益分润生产可用验收用例。 | 待确认 | PRD `AC-CLR-007` 至 `AC-CLR-009`、`AC-SET-010`、`CLS-GATE-009`，DSL 收益分润清算确认，系分收益分润与激励结算验收对象，TDD-B7-REVSHARE-*。 | 收益应得项清分确认直接入账；平台员工分润用户代理佣金但缺两级归因、规则版本、GMV 阶梯或利润口径、审批、账户解析或专业确认仍清算；退款、争议或规则重跑覆盖旧批次和旧审批。 | 将用户代理佣金、平台员工二级分润和 KPI 激励拆成收益金额项；清分和候选阶段不改变余额；清算确认才委派交易层生成标准资金事实；缺证据时进入差错、排除或阻断，不实现代理/KPI/税务/营销规则引擎。 | 待确认 |
 
-B7 首批 Red 集必须在 B7-01 至 B7-08 任一 Green 实现前完成：`TDD-B7-RED-001` 清分候选直接入账、`TDD-B7-RED-002` 出款前准入未知或失败仍提交、`TDD-B7-RED-003` 非白名单运营动作生成资金事实、`TDD-B7-RED-004` 外部非终态被当成功、`TDD-B7-RED-005` 差错未重新对账即关闭、`TDD-B7-RED-006` 缺使用者解释仍可放行、`TDD-B7-RED-007` 单人绕过职责分离或查看敏感原文。若进入收益分润验收包，还必须补 `TDD-B7-REVSHARE-001` 至 `TDD-B7-REVSHARE-003`，证明收益应得项清分不入账、收益清算确认才入账、退款争议和规则缺失会阻断。首批 Red 未落地时，B7 只能继续做设计或契约草案，不能声明清结算、对账、出款或收益分润生命周期生产可用。
+B7 首批 Red 集必须在 B7-01 至 B7-08 任一 Green 实现前完成：`TDD-B7-RED-001` 清分候选直接入账、`TDD-B7-RED-002` 出款前准入未知或失败仍提交、`TDD-B7-RED-003` 非白名单运营动作生成资金事实、`TDD-B7-RED-004` 外部非终态被当成功、`TDD-B7-RED-005` 差错未重新对账即关闭、`TDD-B7-RED-006` 缺使用者解释仍可放行、`TDD-B7-RED-007` 单人绕过职责分离或查看敏感原文。当前 `B7-RECON-DIFFERENCE-MVP` 首切片还必须以 Round0 准入卡中的 `R0-B7-RECON-004` 至 `R0-B7-RECON-006` 覆盖外部来源未验证、候选匹配误对平和账龄超期升级。若进入收益分润验收包，还必须补 `TDD-B7-REVSHARE-001` 至 `TDD-B7-REVSHARE-003`，证明收益应得项清分不入账、收益清算确认才入账、退款争议和规则缺失会阻断。首批 Red 未落地时，B7 只能继续做设计或契约草案，不能声明清结算、对账、出款或收益分润生命周期生产可用。
 
 人工确认点：是否新建模块、模块命名、表命名、状态机、是否扩展出款前准入候选能力、权益清分字段、收益应得项对象、收益参与方账户解析、两级归因快照、权益/收益对账差错类型、运营补事实命令白名单、使用者解释字段、职责分离策略、证据最小化策略、NFR 假设、外部规则确认状态、是否进入本轮开发范围。
 
@@ -567,9 +572,9 @@ B8 首批 Red 集必须在 B8-01 至 B8-09 任一 Green 实现前完成：`TDD-B
 
 ### 9.0 B7 当前首切片恢复口径（2026-06-07）
 
-上表中的 B7 行是清结算与对账目标态覆盖索引，不等同于当前编码授权。当前可恢复的首个候选只限定为 `B7-RECON-DIFFERENCE-MVP` / `B7-RECON-DIFFERENCE-MVP-CAD-001`，目标是先证明对账任务、匹配结果、差错单、阻断、重跑和补事实白名单准入。
+上表中的 B7 行是清结算与对账目标态覆盖索引，不等同于当前编码授权。当前可恢复的首个候选只限定为 `B7-RECON-DIFFERENCE-MVP` / `B7-RECON-DIFFERENCE-MVP-CAD-001`，目标是先证明对账来源标准化、对账任务、匹配强度、差错单、阻断、账龄升级、重跑和补事实白名单准入。
 
-`contract-only` 只能交付契约字段、DTO 或目标 Red，不得声明 B7 生产可用；`ddl-backed` 只能说明最小对账表结构、Entity、Mapper 和 H2 schema 可落地；只有 `service-flow-backed` 加 `schemaDecision=minimal-reconciliation-ddl-h2-required`，并覆盖真实 Spring Bean、差错阻断、重跑幂等、白名单补事实准入和失败无副作用测试，才可作为 B7 首切片生产交付证据。
+`contract-only` 只能交付契约字段、DTO 或目标 Red，不得声明 B7 生产可用；`ddl-backed` 只能说明最小对账表结构、Entity、Mapper 和 H2 schema 可落地；只有 `service-flow-backed` 加 `schemaDecision=minimal-reconciliation-ddl-h2-required`，并覆盖真实 Spring Bean、来源质量阻断、匹配强度约束、差错阻断、账龄升级、重跑幂等、白名单补事实准入和失败无副作用测试，才可作为 B7 首切片生产交付证据。
 
 当前恢复口径不授权完整清分、内部清算、结算锁定、出款提交、追偿、VCC clearing、全球账户外部流水匹配、银行/卡组织/通道协议解析或生产调度平台。VCC 和全球账户后续只能消费 B7 差错闭环作为阻断、解释、补事实或出款前准入输入，不得在 P2 业务包中平行实现清结算与对账对象。
 
@@ -639,16 +644,16 @@ B8 首批 Red 集必须在 B8-01 至 B8-09 任一 Green 实现前完成：`TDD-B
 | --- | --- |
 | Goal ID | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
 | Loop ID | `GSD2-LOOP-BASELINE-PLANNING-2026-06-12` |
-| 权威文档 | `docs/TDD设计/GSD-2-新基线工作流规划.md` |
-| 当前状态 | `ACTIVE_PLANNING_BASELINE_RESET_NO_CODING_GRANT` |
-| Git / code baseline | `b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` |
+| 权威文档 | `docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/GSD-2-W1-基线差距审计.md`、`docs/TDD设计/GSD-2-W2-单一Grant选择卡.md`、`docs/TDD设计/GSD-2-W3-B2账户层级CAD准入草案.md`、`docs/TDD设计/GSD-2-W4-B2账户层级ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` |
+| 当前状态 | `W5_P0P1_LWT_B2_AH_SOURCE_CONTRACT_GREEN_VERIFIED_NEXT_FR_TARGET` |
+| Git / code baseline | 当前实际基线为 `da7d2ea test: 阻断契约夹具承载资金流断言`；`b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 只保留为 GSD-2 初始重置点。 |
 | 活跃未完成计划 | `EMPTY`。旧候选不再是当前计划，只能作为 backlog reference。 |
 | 写入范围 | `docs/TDD设计/GSD-2-新基线工作流规划.md`、旧 GSD 迁移指针、TDD README、docs README、OpenSpec project 和本 Harness tasks。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、源码、测试、Justfile、最近 Git 提交和旧 GSD/Grant 历史材料。 |
-| 下一 Workflow | `GSD2-W1-BASELINE-GAP-AUDIT` 或 `GSD2-W2-SINGLE-GRANT-SELECTION`。 |
-| 下一候选 | 默认建议先评估 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`；其他 backlog reference 包括 `GSD2-B2-FR-TARGET-001`、`GSD2-B7-RECON-DIFFERENCE-MVP-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` 和 `GSD2-B5-BALANCE-ADJUST-AUDIT-001`。 |
-| 禁止范围 | 未确认新的单一 Execution Grant 前，不写 Java、测试、公共契约、DDL/H2 schema、运行时配置、Git add/commit/push、联网、依赖安装、生产配置或不可逆操作。 |
-| 验证命令 | Harness checker、产品/架构结构检查、`rg` 一致性扫描和 `git diff --check`。 |
+| 下一 Workflow | `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 已被首个 Red 消费；`GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已补齐账户层级来源契约并完成本地 Green。下一步需确认 `GSD2-B2-FR-TARGET-001` 或等价资金责任目标主体 Grant。 |
+| 下一候选 | 下一编码入口转为 `GSD2-B2-FR-TARGET-001`；后续依赖队列依次为 `GSD2-B2-WALLET-APPLICATION-FACADE-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-001` 和必要时升级的 `GSD2-LD-LEDGER-GUARD-REGRESSION-001`。B7、支付工具/Spend Rule 和 P2 业务仍后置。 |
+| 禁止范围 | 未确认新的单一 Execution Grant 前，不继续扩展资金责任目标主体、wallet application facade、交易投影、余额调账、Java、测试、公共契约、DDL/H2 schema、运行时配置、Git add/commit/push、联网、依赖安装、生产配置或不可逆操作。 |
+| 验证命令 | `just compile`、目标授权 flow 测试、route resolver 测试、route DSL/JSON 回归；收口追加 `test-boundary`、`pmd` 和 `git diff --check`。 |
 
 ### 9.3 账本账目到钱包账户交接门禁（2026-06-07）
 

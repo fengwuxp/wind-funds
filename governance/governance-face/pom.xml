@@ -5,17 +5,17 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.funds</groupId>
-        <artifactId>wind-funds</artifactId>
+        <artifactId>capte-funds</artifactId>
         <version>${revision}</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>wind-funds-governance-face</artifactId>
+    <artifactId>capte-funds-governance-face</artifactId>
 
     <dependencies>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-core</artifactId>
+            <artifactId>capte-funds-core</artifactId>
         </dependency>
         <dependency>
             <groupId>com.capte.domain</groupId>

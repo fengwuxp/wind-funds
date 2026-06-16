@@ -260,11 +260,8 @@ final class RouteSnapshotJsonSupport {
                 subjectSummary(snapshot.getParentAccountRef()));
         values.put(ImmutableAccountHierarchySnapshotSpec.Fields.rootAccountRef,
                 subjectSummary(snapshot.getRootAccountRef()));
-        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.hierarchyVersion,
-                snapshot.getHierarchyVersion());
         values.put(ImmutableAccountHierarchySnapshotSpec.Fields.contextVariables,
                 sortedMap(snapshot.getContextVariables()));
-        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.description, snapshot.getDescription());
         return values;
     }
 
@@ -311,7 +308,6 @@ final class RouteSnapshotJsonSupport {
         values.put(ImmutableSubjectRef.Fields.subjectName, subjectRef.getSubjectName());
         values.put(ImmutableSubjectRef.Fields.currency, subjectRef.getCurrency());
         values.put(ImmutableSubjectRef.Fields.ledgerProfileCode, subjectRef.getLedgerProfileCode());
-        values.put(ImmutableSubjectRef.Fields.description, subjectRef.getDescription());
         return values;
     }
 
@@ -420,7 +416,6 @@ final class RouteSnapshotJsonSupport {
                 .subjectName(value.getString(ImmutableSubjectRef.Fields.subjectName))
                 .currency(value.getString(ImmutableSubjectRef.Fields.currency))
                 .ledgerProfileCode(value.getString(ImmutableSubjectRef.Fields.ledgerProfileCode))
-                .description(value.getString(ImmutableSubjectRef.Fields.description))
                 .build();
     }
 
@@ -551,10 +546,8 @@ final class RouteSnapshotJsonSupport {
                         ImmutableAccountHierarchySnapshotSpec.Fields.parentAccountRef)))
                 .rootAccountRef(parseSubjectRef(value.getJSONObject(
                         ImmutableAccountHierarchySnapshotSpec.Fields.rootAccountRef)))
-                .hierarchyVersion(value.getString(ImmutableAccountHierarchySnapshotSpec.Fields.hierarchyVersion))
                 .contextVariables(parseObjectMap(value.getJSONObject(
                         ImmutableAccountHierarchySnapshotSpec.Fields.contextVariables)))
-                .description(value.getString(ImmutableAccountHierarchySnapshotSpec.Fields.description))
                 .build();
     }
 

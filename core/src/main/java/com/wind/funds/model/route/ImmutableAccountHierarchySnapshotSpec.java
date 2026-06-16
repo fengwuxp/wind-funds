@@ -20,9 +20,7 @@ import java.util.Objects;
 public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
                                                     @Nullable SubjectRef parentAccountRef,
                                                     @Nullable SubjectRef rootAccountRef,
-                                                    String hierarchyVersion,
-                                                    Map<String, Object> contextVariables,
-                                                    @Nullable String description)
+                                                    Map<String, Object> contextVariables)
         implements AccountHierarchySnapshotSpec {
 
     public ImmutableAccountHierarchySnapshotSpec {
@@ -32,9 +30,6 @@ public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
         requireCompatibleRelation(accountRef, parentAccountRef, "parent account");
         requireCompatibleRelation(accountRef, rootAccountRef, "root account");
         requireCompatibleRelation(parentAccountRef, rootAccountRef);
-        if (!StringUtils.hasText(hierarchyVersion)) {
-            throw new IllegalArgumentException("account hierarchy version is required");
-        }
         contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "accountHierarchySnapshot");
     }
 
@@ -54,18 +49,8 @@ public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
     }
 
     @Override
-    public @NonNull String getHierarchyVersion() {
-        return hierarchyVersion;
-    }
-
-    @Override
     public @NonNull Map<String, Object> getContextVariables() {
         return contextVariables;
-    }
-
-    @Override
-    public @Nullable String getDescription() {
-        return description;
     }
 
     private static void requireOptionalAccountSubject(@Nullable SubjectRef subjectRef, String label) {

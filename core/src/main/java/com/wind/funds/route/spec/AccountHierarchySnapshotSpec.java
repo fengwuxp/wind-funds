@@ -42,14 +42,6 @@ public interface AccountHierarchySnapshotSpec {
     }
 
     /**
-     * 层级关系版本，来源于账户绑定、额度关系或资金责任解析版本。
-     *
-     * @return 层级关系版本
-     */
-    @NonNull
-    String getHierarchyVersion();
-
-    /**
      * 层级快照扩展上下文，不承载卡号、外部账户原文或通道密钥等敏感信息。
      *
      * @return 扩展上下文
@@ -57,15 +49,5 @@ public interface AccountHierarchySnapshotSpec {
     @NonNull
     default Map<String, Object> getContextVariables() {
         return Map.of();
-    }
-
-    /**
-     * 快照说明。
-     *
-     * @return 快照说明
-     */
-    @Nullable
-    default String getDescription() {
-        return null;
     }
 }

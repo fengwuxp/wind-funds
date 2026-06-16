@@ -32,9 +32,4 @@ public interface SubjectRef {
     default String getLedgerProfileCode() {
         return null;
     }
-
-    @Nullable
-    default String getDescription() {
-        return null;
-    }
 }

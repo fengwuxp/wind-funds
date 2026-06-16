@@ -17,8 +17,7 @@ public record ImmutableSubjectRef(@Nullable Long tenantId,
                                   FundsSubjectType subjectType,
                                   @Nullable String subjectName,
                                   @Nullable String currency,
-                                  @Nullable String ledgerProfileCode,
-                                  @Nullable String description) implements SubjectRef {
+                                  @Nullable String ledgerProfileCode) implements SubjectRef {
 
     @Override
     public @NonNull String getSubjectId() {
@@ -49,11 +48,6 @@ public record ImmutableSubjectRef(@Nullable Long tenantId,
     @Override
     public @Nullable String getLedgerProfileCode() {
         return ledgerProfileCode;
-    }
-
-    @Override
-    public @Nullable String getDescription() {
-        return description;
     }
 
 }

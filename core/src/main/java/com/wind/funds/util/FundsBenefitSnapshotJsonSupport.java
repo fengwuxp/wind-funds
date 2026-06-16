@@ -114,7 +114,6 @@ public final class FundsBenefitSnapshotJsonSupport {
                 .subjectName(optionalText(value, ImmutableSubjectRef.Fields.subjectName))
                 .currency(optionalText(value, ImmutableSubjectRef.Fields.currency))
                 .ledgerProfileCode(optionalText(value, ImmutableSubjectRef.Fields.ledgerProfileCode))
-                .description(optionalText(value, ImmutableSubjectRef.Fields.description))
                 .build();
     }
 

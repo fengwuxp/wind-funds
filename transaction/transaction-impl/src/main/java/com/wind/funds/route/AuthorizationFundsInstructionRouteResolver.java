@@ -10,7 +10,9 @@ import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSet
 import com.wind.funds.transaction.support.FundsInstructionContextReader;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.transaction.support.FundsRouteLegIds;
+import com.wind.funds.model.route.ImmutableAccountHierarchyFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutableResolvedRouteSpec;
+import com.wind.funds.model.route.ImmutableRoutingDecisionSpec;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -19,24 +21,28 @@ import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.ref.SubjectRef;
+import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
+import com.wind.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
+import com.wind.funds.route.spec.RoutingDecisionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.wind.funds.route.support.RouteSpecSupport.mustNotBeNegative;
 import static com.wind.funds.route.support.RouteSpecSupport.routeLeg;
@@ -47,7 +53,6 @@ import static com.wind.funds.route.support.RouteSpecSupport.targetNode;
  * 授权交易 RouteResolver。
  */
 @Component
-@AllArgsConstructor
 public class AuthorizationFundsInstructionRouteResolver implements RouteResolver, Ordered {
 
     private static final String UNSUPPORTED_EVENT_TYPE_MESSAGE = "unsupported authorization eventType: ";
@@ -57,6 +62,28 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
     private final RouteSubjectSupport routeSubjectSupport;
 
     private final PlatformAccountRouteSupport platformAccountRouteSupport;
+
+    private final AccountHierarchySnapshotResolver accountHierarchySnapshotResolver;
+
+    @Autowired
+    public AuthorizationFundsInstructionRouteResolver(RouteParticipantFactory routeParticipantFactory,
+                                                      RouteSubjectSupport routeSubjectSupport,
+                                                      PlatformAccountRouteSupport platformAccountRouteSupport,
+                                                      AccountHierarchySnapshotResolver accountHierarchySnapshotResolver) {
+        this.routeParticipantFactory = routeParticipantFactory;
+        this.routeSubjectSupport = routeSubjectSupport;
+        this.platformAccountRouteSupport = platformAccountRouteSupport;
+        this.accountHierarchySnapshotResolver = accountHierarchySnapshotResolver;
+    }
+
+    public AuthorizationFundsInstructionRouteResolver(RouteParticipantFactory routeParticipantFactory,
+                                                      RouteSubjectSupport routeSubjectSupport,
+                                                      PlatformAccountRouteSupport platformAccountRouteSupport) {
+        this(routeParticipantFactory,
+                routeSubjectSupport,
+                platformAccountRouteSupport,
+                (accountRef, effectiveAt) -> Optional.empty());
+    }
 
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
@@ -91,7 +118,13 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 .toList();
         List<RouteLegSpec> legs = approved ? authorizationLegs(authorizationSubjects, instruction) : List.of();
         PlatformAccountsSnapshotSpec platformAccounts = approved ? settlementAccountSnapshot(instruction) : null;
-        return route(instruction, FundsRouteCodes.AUTHORIZATION_STANDARD, participants, legs, platformAccounts);
+        RoutingDecisionSpec routingDecision = approved ? accountHierarchyRoutingDecision(instruction, legs) : null;
+        return route(instruction,
+                FundsRouteCodes.AUTHORIZATION_STANDARD,
+                participants,
+                legs,
+                platformAccounts,
+                routingDecision);
     }
 
     private ResolvedRouteSpec resolveReversal(FundsInstructionSpec instruction) {
@@ -303,6 +336,15 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                                     List<RouteParticipantSpec> participants,
                                     List<RouteLegSpec> legs,
                                     @Nullable PlatformAccountsSnapshotSpec platformAccounts) {
+        return route(instruction, routeCode, participants, legs, platformAccounts, null);
+    }
+
+    private ResolvedRouteSpec route(FundsInstructionSpec instruction,
+                                    String routeCode,
+                                    List<RouteParticipantSpec> participants,
+                                    List<RouteLegSpec> legs,
+                                    @Nullable PlatformAccountsSnapshotSpec platformAccounts,
+                                    @Nullable RoutingDecisionSpec routingDecision) {
         List<RouteParticipantSpec> distinctParticipants = routeParticipantFactory.distinct(participants);
         RouteSpecSupport.requireParticipants(distinctParticipants);
         ResolvedRouteSpec result = ImmutableResolvedRouteSpec.builder()
@@ -316,6 +358,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 .transactionType(instruction.getTransactionType())
                 .participants(distinctParticipants)
                 .legs(legs)
+                .routingDecision(routingDecision)
                 .paymentInstrumentRef(instruction.getInstrumentRef())
                 .platformAccounts(platformAccounts)
                 .resolvedAt(instruction.getEventTime())
@@ -324,6 +367,41 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 .build();
         RouteSpecSupport.validateResolvedRoute(result);
         return result;
+    }
+
+    @Nullable
+    private RoutingDecisionSpec accountHierarchyRoutingDecision(FundsInstructionSpec instruction,
+                                                               List<RouteLegSpec> legs) {
+        List<FundingAllocationDecisionSpec> allocations = new ArrayList<>();
+        int priority = 1;
+        for (RouteLegSpec leg : legs) {
+            Optional<AccountHierarchySnapshotSpec> snapshot = accountHierarchySnapshotResolver.resolve(
+                    leg.getSourceNode().getSubjectRef(),
+                    instruction.getEventTime());
+            if (snapshot.isEmpty()) {
+                continue;
+            }
+            allocations.add(ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
+                    .allocationId("ALLOC_" + leg.getLegId())
+                    .subjectRef(leg.getSourceNode().getSubjectRef())
+                    .ledgerSubjectCode(leg.getTargetNode().getLedgerSubjectCode())
+                    .amount(leg.getAmount())
+                    .accountHierarchySnapshot(snapshot.get())
+                    .priority(priority)
+                    .reason("ACCOUNT_HIERARCHY_SNAPSHOT")
+                    .build());
+            priority++;
+        }
+        if (allocations.isEmpty()) {
+            return null;
+        }
+        return ImmutableRoutingDecisionSpec.builder()
+                .policyCode("ACCOUNT_HIERARCHY_SOURCE")
+                .matchedRules(List.of("ACCOUNT_HIERARCHY_ACTIVE"))
+                .fundingAllocations(allocations)
+                .decisionReason("ACCOUNT_HIERARCHY_SNAPSHOT_RESOLVED")
+                .contextVariables(Map.of("source", "ACCOUNT_HIERARCHY_BINDING"))
+                .build();
     }
 
     private PlatformAccountsSnapshotSpec settlementAccountSnapshot(FundsInstructionSpec instruction) {

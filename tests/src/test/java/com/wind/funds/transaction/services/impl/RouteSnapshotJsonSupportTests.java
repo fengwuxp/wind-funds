@@ -1,5 +1,7 @@
 package com.wind.funds.transaction.services.impl;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
@@ -55,9 +57,14 @@ class RouteSnapshotJsonSupportTests {
                 FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST, "sha256:original-benefit-digest"));
 
         String json = RouteSnapshotJsonSupport.toRouteSnapshotJson(snapshot);
+        JSONObject document = JSON.parseObject(json);
         RouteSnapshotSpec parsed = RouteSnapshotJsonSupport.parseRouteSnapshot(json,
                 LocalDateTime.of(2026, 5, 24, 10, 0));
 
+        assertThat(document.getJSONArray("participants")
+                .getJSONObject(0)
+                .getJSONObject("subjectRef"))
+                .doesNotContainKey("description");
         assertThat(parsed.getContextVariables())
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, "BS-ORIGINAL-JSON-001")
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST,
@@ -71,7 +78,7 @@ class RouteSnapshotJsonSupportTests {
      * 场景：VCC 共享卡经支付工具路由后，实际资金责任落到子信用账户。
      * 输入：RouteSnapshot routingDecision 的 funding allocation 携带账户层级快照。
      * 输出：JSON 往返后的 RouteSnapshot。
-     * 预期：子账户、父账户、根账户和层级版本不丢失。
+     * 预期：子账户、父账户和根账户不丢失。
      * 红线：交易事实快照必须能支撑共享卡按卡、按子账户、按主账户追溯，且不得保存完整卡号。
      */
     @Test
@@ -85,6 +92,17 @@ class RouteSnapshotJsonSupportTests {
         assertThat(json)
                 .contains("accountHierarchySnapshot")
                 .doesNotContain("4111111111111111");
+        JSONObject document = JSON.parseObject(json);
+        JSONObject serializedHierarchy = document.getJSONObject("routingDecision")
+                .getJSONArray("fundingAllocations")
+                .getJSONObject(0)
+                .getJSONObject("accountHierarchySnapshot");
+        assertThat(serializedHierarchy.getJSONObject("accountRef"))
+                .doesNotContainKey("description");
+        assertThat(serializedHierarchy.getJSONObject("parentAccountRef"))
+                .doesNotContainKey("description");
+        assertThat(serializedHierarchy.getJSONObject("rootAccountRef"))
+                .doesNotContainKey("description");
         assertThat(parsed.getRoutingDecision().getFundingAllocations()).singleElement()
                 .satisfies(allocation -> {
                     assertThat(allocation.getSubjectRef().getSubjectType())
@@ -99,7 +117,6 @@ class RouteSnapshotJsonSupportTests {
                     assertThat(hierarchySnapshot.getRootAccountRef()).isNotNull();
                     assertThat(hierarchySnapshot.getRootAccountRef().getSubjectId())
                             .isEqualTo("VCC-CREDIT-MAIN-001");
-                    assertThat(hierarchySnapshot.getHierarchyVersion()).isEqualTo("vcc-shared-card-binding-v1");
                     assertThat(hierarchySnapshot.getContextVariables())
                             .containsEntry("instrumentId", "VCC-CARD-001")
                             .containsEntry("instrumentType", "VCC_SHARED_CARD");
@@ -145,11 +162,9 @@ class RouteSnapshotJsonSupportTests {
                 .accountRef(childCreditAccount)
                 .parentAccountRef(subject("VCC-CREDIT-MAIN-001", FundsSubjectType.CREDIT_ACCOUNT))
                 .rootAccountRef(subject("VCC-CREDIT-MAIN-001", FundsSubjectType.CREDIT_ACCOUNT))
-                .hierarchyVersion("vcc-shared-card-binding-v1")
                 .contextVariables(Map.of(
                         "instrumentId", "VCC-CARD-001",
                         "instrumentType", "VCC_SHARED_CARD"))
-                .description("VCC shared card resolves to credit sub-account")
                 .build();
         return ImmutableRoutingDecisionSpec.builder()
                 .policyCode("VCC_SHARED_CARD_ROUTE")

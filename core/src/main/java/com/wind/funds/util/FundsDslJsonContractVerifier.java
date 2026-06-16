@@ -457,7 +457,6 @@ public final class FundsDslJsonContractVerifier {
                 accountRef,
                 path);
         verifyParentAndRootAccountRef(parentAccountRef, rootAccountRef, path);
-        requireText(snapshot, "hierarchyVersion", path + ".hierarchyVersion");
         verifyRouteContext(asNullableMap(snapshot.get("contextVariables"), path + ".contextVariables"),
                 path + ".contextVariables");
         if (!sameSubject(accountRef, allocationSubjectRef)) {

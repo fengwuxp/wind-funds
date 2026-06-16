@@ -403,7 +403,7 @@ VCC、prepaid virtual card 和 shared card 的 DSL 处理顺序是：先用 `Pay
 | DSL 抽象 | 必填或建议字段 | 语义 |
 | --- | --- | --- |
 | `SubjectRef` | `subjectType`、`subjectId`。 | LedgerEntry 的真实主体，只能是具体资金账户或信用账户节点。 |
-| `AccountHierarchySnapshot` | `accountRef`、`parentAccountRef`、`rootAccountRef`、`accountPath`、`accountLevel`、`hierarchyVersion`、`accountPurpose`。 | 记录交易发生时的账户层级，用于父账户汇总、共享池约束和逆向回放。 |
+| `AccountHierarchySnapshot` | `accountRef`、`parentAccountRef`、`rootAccountRef`、`accountPath`、`accountLevel`、`accountPurpose`。 | 记录交易发生时的账户层级，用于父账户汇总、共享池约束和逆向回放。 |
 | `PostingRole` | `DETAIL`、`PARENT_CONTROL`、`TRANSFER_OUT`、`TRANSFER_IN`、`AGGREGATE_VIEW`。 | 区分子账户明细、父级控制、父子真实划拨和只读聚合；`AGGREGATE_VIEW` 不生成 LedgerEntry。 |
 | `LedgerEntry` | `subjectRef`、`ledgerSubjectCode`、`currency`、`periodType`、`periodId`、`amount`、`postingRole`、`hierarchySnapshotRef`。 | 不可变分录；父账户是否入账必须由 postingRole 显式表达，不能由投影聚合自动补写。 |
 | `LedgerTransaction` | `ledgerTransactionSn`、`postingPlanDigest`、`routeSnapshotId`、`accountHierarchyDigest`、`entryRefs`。 | 一次资金事实或控制事实的完整过账单元，可包含子账户明细分录、父级控制分录或父子划拨分录。 |
@@ -1073,6 +1073,16 @@ Route、Posting 和 Replay 消费顺序：
 | `LedgerTransaction` | 一组账务计划的业务级账本交易。 | 必须能追溯到资金指令和来源事实。 |
 | `PostingPlan` | 一个 route leg 或控制意图对应的一组借贷计划。 | 必须独立平衡。 |
 | `LedgerEntry` | 最小不可变账务事实。 | 金额为正，方向由借贷和账目 normal balance 推导。 |
+
+Ledger DSL 的职责契约：
+
+| 契约 | DSL 口径 | 反例 |
+| --- | --- | --- |
+| 事实先决 | `LedgerTransaction` 只能来自已成立的资金事实、控制事实或清结算/对账确认后的追加事实。 | 用账本接口替代业务交易、授权、清算、出款或差错审批流程。 |
+| 路径先决 | `PostingPlan` 必须来自已解析 `RouteSnapshot`、控制意图或经授权的补事实，不在 ledger 层重新选路。 | 缺原快照时按当前支付工具绑定或当前资金责任关系重新生成分录。 |
+| 主体受限 | `LedgerEntry.subjectRef` 只能是具体资金账户、信用账户或平台角色解析后的具体平台资金账户节点。 | 支付工具、VA、卡、外部账户、预算组、Spend Rule、业务单据或 `VCC_ACCOUNT` 成为 entry 主体。 |
+| 分录不可变 | 历史分录不通过 update/delete 修正；错账必须追加冲正、补记、调账、追偿或核销事实。 | 用管理型 CRUD、投影重放、报表汇总或手工备注直接改余额。 |
+| 投影只读 | `BalanceProjection`、余额日志、交易投影、指标和报表都从 `LedgerEntry` 派生。 | 余额投影反写 `LedgerEntry`，或交易投影生成新的账本事实。 |
 
 `PostingPlan` 的核心字段：
 

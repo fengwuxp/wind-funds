@@ -81,10 +81,13 @@ import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.wind.funds.wallet.model.request.CreateAccountHierarchyBindingRequest;
 import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
+import com.wind.funds.wallet.service.AccountHierarchyService;
 import com.wind.funds.wallet.service.BudgetGroupService;
 import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
@@ -162,6 +165,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             "t_funds_frozen_order",
             "t_funds_transaction_detail",
             "t_funds_transaction",
+            "t_account_hierarchy_binding",
             "t_funding_account",
             "t_credit_account",
             "t_budget_group",
@@ -184,6 +188,9 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     @Autowired
     protected CreditAccountService creditAccountService;
+
+    @Autowired
+    protected AccountHierarchyService accountHierarchyService;
 
     @Autowired
     protected BudgetGroupService budgetGroupService;
@@ -353,6 +360,20 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setBudgetType(DefaultFundsAccountType.BUDGET_GROUP.name())
                 .setCurrency(CURRENCY));
+    }
+
+    protected void bindAccountHierarchy(FundsAccountId accountId,
+                                        FundsAccountId parentAccountId,
+                                        FundsAccountId rootAccountId,
+                                        String businessSn) {
+        accountHierarchyService.createAccountHierarchyBinding(new CreateAccountHierarchyBindingRequest()
+                .setSn("AH_" + businessSn)
+                .setTenantId(TENANT_ID)
+                .setAccountId(accountId)
+                .setParentAccountId(parentAccountId)
+                .setRootAccountId(rootAccountId)
+                .setCurrency(CURRENCY)
+                .setOperatorId("flow-test"));
     }
 
     protected void adjustBalance(FundsAccountId accountId, long amount, boolean increase, String businessSn) {
@@ -1255,6 +1276,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultFundsTransactionQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            AccountHierarchyServiceImpl.class,
             CreditAccountServiceImpl.class,
             BudgetGroupServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,

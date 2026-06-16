@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.funds</groupId>
-        <artifactId>wind-funds</artifactId>
+        <artifactId>capte-funds</artifactId>
         <version>${revision}</version>
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>wind-funds-ledger-impl</artifactId>
+    <artifactId>capte-funds-ledger-impl</artifactId>
 
     <dependencies>
         <dependency>
@@ -19,7 +19,7 @@
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>wind-funds-ledger-face</artifactId>
+            <artifactId>capte-funds-ledger-face</artifactId>
         </dependency>
     </dependencies>
 

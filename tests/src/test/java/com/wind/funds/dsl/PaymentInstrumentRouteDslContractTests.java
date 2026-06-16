@@ -164,7 +164,6 @@ class PaymentInstrumentRouteDslContractTests {
         AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(cardCreditAccount,
                 parentAccount,
                 parentAccount,
-                "card-binding-v7",
                 Map.of("cardBindingVersion", 7, "accountPurpose", "VCC_SHARED_CARD"));
         FundingAllocationDecisionSpec allocation = fundingAllocation("ALLOC-VCC-SHARED",
                 cardCreditAccount,
@@ -198,7 +197,6 @@ class PaymentInstrumentRouteDslContractTests {
         AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(cardCreditAccount,
                 parentAccount,
                 parentAccount,
-                "card-binding-v9",
                 Map.of("cardBindingVersion", 9, "accountPurpose", "VCC_SHARED_CARD"));
         FundingAllocationDecisionSpec allocation = fundingAllocation("ALLOC-VCC-SHARED-JSON",
                 cardCreditAccount,
@@ -241,7 +239,7 @@ class PaymentInstrumentRouteDslContractTests {
                 .isEqualTo("FA-VCC-PARENT-004");
         assertThat(serializedHierarchy.getJSONObject("rootAccountRef").getString("subjectId"))
                 .isEqualTo("FA-VCC-PARENT-004");
-        assertThat(serializedHierarchy.getString("hierarchyVersion")).isEqualTo("card-binding-v9");
+        assertThat(serializedHierarchy).doesNotContainKey("hierarchyVersion");
         assertThat(serializedHierarchy.getJSONObject("contextVariables").getString("accountPurpose"))
                 .isEqualTo("VCC_SHARED_CARD");
         assertThat(document.toJSONString()).doesNotContain("4242424242424242");
@@ -257,7 +255,6 @@ class PaymentInstrumentRouteDslContractTests {
         assertThatThrownBy(() -> accountHierarchySnapshot(budgetGroup("BG-VCC-001"),
                 fundingAccount("FA-VCC-PARENT-002"),
                 fundingAccount("FA-VCC-PARENT-002"),
-                "budget-binding-v1",
                 Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("account hierarchy subject must be funding or credit account");
@@ -275,14 +272,12 @@ class PaymentInstrumentRouteDslContractTests {
         assertThatThrownBy(() -> accountHierarchySnapshot(cardCreditAccount,
                 cardCreditAccount,
                 fundingAccount("FA-VCC-PARENT-SELF-001"),
-                "card-binding-self-parent",
                 Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("parent account must not reference account itself");
         assertThatThrownBy(() -> accountHierarchySnapshot(cardCreditAccount,
                 fundingAccount("FA-VCC-PARENT-SELF-002"),
                 cardCreditAccount,
-                "card-binding-self-root",
                 Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("root account must not reference account itself");
@@ -315,14 +310,12 @@ class PaymentInstrumentRouteDslContractTests {
         assertThatThrownBy(() -> accountHierarchySnapshot(cardCreditAccount,
                 parentAccount,
                 otherTenantRootAccount,
-                "card-binding-parent-root-tenant-mismatch",
                 Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("root account tenant must match parent account tenant");
         assertThatThrownBy(() -> accountHierarchySnapshot(cardCreditAccount,
                 parentAccount,
                 otherCurrencyRootAccount,
-                "card-binding-parent-root-currency-mismatch",
                 Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("root account currency must match parent account currency");
@@ -338,7 +331,6 @@ class PaymentInstrumentRouteDslContractTests {
         AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(creditAccount("CA-VCC-CARD-002"),
                 fundingAccount("FA-VCC-PARENT-003"),
                 fundingAccount("FA-VCC-PARENT-003"),
-                "card-binding-v8",
                 Map.of());
 
         assertThatThrownBy(() -> fundingAllocation("ALLOC-VCC-MISMATCH",
@@ -375,7 +367,6 @@ class PaymentInstrumentRouteDslContractTests {
                         FundsSubjectType.FUNDING_ACCOUNT,
                         1L,
                         CurrencyIsoCode.EUR.name()),
-                "card-binding-currency-mismatch",
                 Map.of());
 
         assertThatThrownBy(() -> fundingAllocation("ALLOC-VCC-CURRENCY-MISMATCH",
@@ -428,7 +419,6 @@ class PaymentInstrumentRouteDslContractTests {
         AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(eurCardAccount,
                 eurParentAccount,
                 eurParentAccount,
-                "card-binding-amount-currency-mismatch",
                 Map.of());
 
         assertThatThrownBy(() -> ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
@@ -911,13 +901,11 @@ class PaymentInstrumentRouteDslContractTests {
     private AccountHierarchySnapshotSpec accountHierarchySnapshot(SubjectRef accountRef,
                                                                   SubjectRef parentAccountRef,
                                                                   SubjectRef rootAccountRef,
-                                                                  String hierarchyVersion,
                                                                   Map<String, Object> contextVariables) {
         return ImmutableAccountHierarchySnapshotSpec.builder()
                 .accountRef(accountRef)
                 .parentAccountRef(parentAccountRef)
                 .rootAccountRef(rootAccountRef)
-                .hierarchyVersion(hierarchyVersion)
                 .contextVariables(contextVariables)
                 .build();
     }

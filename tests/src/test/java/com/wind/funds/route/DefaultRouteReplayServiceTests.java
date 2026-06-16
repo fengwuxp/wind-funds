@@ -206,8 +206,7 @@ class DefaultRouteReplayServiceTests {
         SubjectRef cardCreditAccount = creditAccount("VCC-CREDIT-SUB-001");
         SubjectRef parentCreditAccount = creditAccount("VCC-CREDIT-PARENT-001");
         AccountHierarchySnapshotSpec originalHierarchy = accountHierarchySnapshot(cardCreditAccount,
-                parentCreditAccount,
-                "vcc-shared-card-binding-v1");
+                parentCreditAccount);
         RoutingDecisionSpec originalDecision = vccSharedCardRoutingDecision("ALLOC-VCC-OLD",
                 cardCreditAccount,
                 originalHierarchy);
@@ -236,8 +235,6 @@ class DefaultRouteReplayServiceTests {
                     assertThat(allocation.getAccountHierarchySnapshot().getParentAccountRef()).isNotNull();
                     assertThat(allocation.getAccountHierarchySnapshot().getParentAccountRef().getSubjectId())
                             .isEqualTo("VCC-CREDIT-PARENT-001");
-                    assertThat(allocation.getAccountHierarchySnapshot().getHierarchyVersion())
-                            .isEqualTo("vcc-shared-card-binding-v1");
                     assertThat(allocation.getAccountHierarchySnapshot().getContextVariables())
                             .containsEntry("cardBindingVersion", 1)
                             .containsEntry("cardFundingMode", "SHARED");
@@ -590,15 +587,12 @@ class DefaultRouteReplayServiceTests {
     }
 
     private AccountHierarchySnapshotSpec accountHierarchySnapshot(SubjectRef accountRef,
-                                                                  SubjectRef parentAccountRef,
-                                                                  String hierarchyVersion) {
+                                                                  SubjectRef parentAccountRef) {
         return ImmutableAccountHierarchySnapshotSpec.builder()
                 .accountRef(accountRef)
                 .parentAccountRef(parentAccountRef)
                 .rootAccountRef(parentAccountRef)
-                .hierarchyVersion(hierarchyVersion)
                 .contextVariables(Map.of("cardBindingVersion", 1, "cardFundingMode", "SHARED"))
-                .description("VCC shared card credit sub-account hierarchy snapshot")
                 .build();
     }
 

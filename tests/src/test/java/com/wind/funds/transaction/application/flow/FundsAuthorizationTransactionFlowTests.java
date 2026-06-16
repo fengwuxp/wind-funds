@@ -829,6 +829,59 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
+     * 场景：VCC 共享卡授权已经解析到信用子账户及其父账户层级。
+     * 输入：信用子账户额度 100，授权批准 60。
+     * 输出：授权 route snapshot 的 funding allocation 携带账户层级快照。
+     * 预期：accountHierarchySnapshot 固化子账户、父账户和根账户。
+     * 红线：父账户只作为归因快照，不得作为本次授权的 LedgerEntry 主体。
+     */
+    @Test
+    void testSharedCardAuthorizationShouldPersistAccountHierarchySnapshotInRoute() {
+        FundsAccountId parentAccount = fundingAccount("vcc_parent_pool");
+        FundsAccountId cardAccount = creditAccount("vcc_shared_card_credit");
+        ensureFundingAccount(parentAccount);
+        ensureCreditAccount(cardAccount);
+        bindAccountHierarchy(cardAccount,
+                parentAccount,
+                parentAccount,
+                "AUTH_SHARED_CARD_HIERARCHY");
+
+        adjustBalance(cardAccount, 100L, true, "AUTH_SHARED_CARD_LIMIT");
+
+        String authorizationSn = authorize(cardAccount, 60L, true, "AUTH_SHARED_CARD_AUTHORIZE");
+
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
+                .as("authorization route snapshot should carry account hierarchy")
+                .hasValueSatisfying(routeSnapshot -> {
+                    assertThat(routeSnapshot.getRoutingDecision()).isNotNull();
+                    assertThat(routeSnapshot.getRoutingDecision().getFundingAllocations())
+                            .singleElement()
+                            .satisfies(allocation -> {
+                                assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo(cardAccount.id());
+                                assertThat(allocation.getSubjectRef().getSubjectType().name())
+                                        .isEqualTo(cardAccount.type());
+                                assertThat(allocation.getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AUTHORIZATION);
+                                assertThat(allocation.getAmount()).isEqualTo(Money.immutable(60L, CURRENCY));
+                                assertThat(allocation.getAccountHierarchySnapshot()).isNotNull();
+                                assertThat(allocation.getAccountHierarchySnapshot().getAccountRef().getSubjectId())
+                                        .isEqualTo(cardAccount.id());
+                                assertThat(allocation.getAccountHierarchySnapshot().getParentAccountRef())
+                                        .isNotNull()
+                                        .satisfies(parent -> assertThat(parent.getSubjectId())
+                                                .isEqualTo(parentAccount.id()));
+                                assertThat(allocation.getAccountHierarchySnapshot().getRootAccountRef())
+                                        .isNotNull()
+                                        .satisfies(root -> assertThat(root.getSubjectId())
+                                                .isEqualTo(parentAccount.id()));
+                            });
+                });
+        assertThat(entriesByBusinessSn("AUTH_SHARED_CARD_AUTHORIZE"))
+                .extracting(LedgerEntry::getSubjectId)
+                .contains(cardAccount.id())
+                .doesNotContain(parentAccount.id());
+    }
+
+    /**
      * 场景：同一笔授权在并发窗口内同时收到完成和撤销。
      * 输入：充值 100、授权批准 60，两个线程同时发起完成 60 和撤销 60。
      * 输出：只有一个后继事件成功落账，输家业务流水不留下任何交易或账务事实。
