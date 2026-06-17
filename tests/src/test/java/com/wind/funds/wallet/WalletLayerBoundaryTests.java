@@ -22,15 +22,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WalletLayerBoundaryTests {
 
     private static final List<String> FACE_FORBIDDEN_ARTIFACTS = List.of(
-            "wind-funds-ledger-face",
-            "wind-funds-ledger-impl",
-            "wind-funds-transaction-face",
-            "wind-funds-transaction-impl",
-            "wind-funds-wallet-impl");
+            "capte-funds-ledger-face",
+            "capte-funds-ledger-impl",
+            "capte-funds-transaction-face",
+            "capte-funds-transaction-impl",
+            "capte-funds-wallet-impl");
 
     private static final List<String> IMPL_FORBIDDEN_ARTIFACTS = List.of(
-            "wind-funds-ledger-impl",
-            "wind-funds-transaction-impl");
+            "capte-funds-ledger-impl",
+            "capte-funds-transaction-impl");
 
     /**
      * 场景：wallet-face 对外表达产品契约。
@@ -42,7 +42,7 @@ class WalletLayerBoundaryTests {
         List<String> dependencyArtifactIds = dependencyArtifactIds(
                 workspaceRoot().resolve("wallet/wallet-face/pom.xml"));
 
-        assertThat(dependencyArtifactIds).containsExactlyInAnyOrder("wind-funds-core", "capte-domain-core");
+        assertThat(dependencyArtifactIds).containsExactlyInAnyOrder("capte-funds-core", "capte-domain-core");
         assertThat(dependencyArtifactIds).doesNotContain(FACE_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
     }
 
@@ -57,9 +57,9 @@ class WalletLayerBoundaryTests {
                 workspaceRoot().resolve("wallet/wallet-impl/pom.xml"));
 
         assertThat(dependencyArtifactIds)
-                .contains("wind-funds-wallet-face",
-                        "wind-funds-ledger-face",
-                        "wind-funds-transaction-face");
+                .contains("capte-funds-wallet-face",
+                        "capte-funds-ledger-face",
+                        "capte-funds-transaction-face");
         assertThat(dependencyArtifactIds).doesNotContain(IMPL_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
     }
 

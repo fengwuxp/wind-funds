@@ -31,49 +31,111 @@ public class SpendSubjectFundingRel implements Serializable, TenantIsolationObje
 
     public static final String TABLE_NAME = "t_spend_subject_funding_rel";
 
+    /**
+     * 自增主键。
+     */
     @Id(keyType = KeyType.Auto)
     private Long id;
 
+    /**
+     * 创建时间。
+     */
     private LocalDateTime gmtCreate;
 
+    /**
+     * 最后修改时间。
+     */
     private LocalDateTime gmtModified;
 
+    /**
+     * 资金关系流水号。
+     */
     @NotNull
     private String sn;
 
+    /**
+     * 租户 ID。
+     */
     @Column(tenantId = true)
     private Long tenantId;
 
+    /**
+     * 支出控制主体 ID。
+     */
     @NotNull
     private String spendSubjectId;
 
+    /**
+     * 支出控制主体类型。
+     */
     @NotNull
     private FundsSubjectType spendSubjectType;
 
-    @NotNull
+    /**
+     * 兼容字段：历史资金账户 ID。
+     */
     private String fundingAccountId;
 
+    /**
+     * 目标资金主体类型。
+     */
+    @NotNull
+    private FundsSubjectType targetSubjectType;
+
+    /**
+     * 目标资金主体 ID。
+     */
+    @NotNull
+    private String targetSubjectId;
+
+    /**
+     * 关系适用币种。
+     */
     @NotNull
     private CurrencyIsoCode currency;
 
+    /**
+     * 资金关系类型。
+     */
     @NotNull
     private SpendSubjectFundingRelationType relationType;
 
+    /**
+     * 匹配优先级。
+     */
     @NotNull
     private Integer priority;
 
+    /**
+     * 是否默认资金关系。
+     */
     @NotNull
     @Column("is_default")
     private Boolean defaultRelation;
 
+    /**
+     * 资金关系状态。
+     */
     @NotNull
     private FundsAccountStatus status;
 
+    /**
+     * 关系生效时间。
+     */
     private LocalDateTime validFrom;
 
+    /**
+     * 关系失效时间。
+     */
     private LocalDateTime validTo;
 
+    /**
+     * 关系说明。
+     */
     private String description;
 
+    /**
+     * 扩展上下文变量。
+     */
     private String contextVariables;
 }

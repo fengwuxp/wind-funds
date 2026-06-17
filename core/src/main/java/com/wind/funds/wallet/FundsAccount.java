@@ -104,9 +104,7 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      * @return 账户能力
      */
     @NonNull
-    default Set<FundsAccountCapability> getCapabilities() {
-        return FundsAccountCapability.allValues();
-    }
+    Set<FundsAccountCapability> getCapabilities();
 
     default boolean canWithdraw() {
         return getStatus().canDebit() && getCapabilities().contains(FundsAccountCapability.WITHDRAW);

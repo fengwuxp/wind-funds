@@ -153,8 +153,6 @@ class FundsInstructionDslContractTests {
                 .contextVariables(Map.of(
                         "benefitSnapshotId", "BS-REFERENCE-SUMMARY-001",
                         "stableDigest", "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
-                        "benefitGroupSn", "BG-REFERENCE-SUMMARY-001",
-                        "componentSn", "COMP-REFERENCE-SUMMARY-001",
                         "ruleVersion", "rule-v1",
                         "refundDecisionId", "refund-decision-001",
                         "externalDecisionId", "pricing-decision-001"))
@@ -164,8 +162,6 @@ class FundsInstructionDslContractTests {
                 .containsEntry("benefitSnapshotId", "BS-REFERENCE-SUMMARY-001")
                 .containsEntry("stableDigest",
                         "sha256:fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210")
-                .containsEntry("benefitGroupSn", "BG-REFERENCE-SUMMARY-001")
-                .containsEntry("componentSn", "COMP-REFERENCE-SUMMARY-001")
                 .containsEntry("ruleVersion", "rule-v1")
                 .containsEntry("refundDecisionId", "refund-decision-001")
                 .containsEntry("externalDecisionId", "pricing-decision-001");
@@ -236,8 +232,6 @@ class FundsInstructionDslContractTests {
                 .contextVariables(Map.of(
                         "benefitSnapshotId", "BS-ACTOR-SUMMARY-001",
                         "stableDigest", "sha256:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-                        "benefitGroupSn", "BG-ACTOR-SUMMARY-001",
-                        "componentSn", "COMP-ACTOR-SUMMARY-001",
                         "ruleVersion", "rule-v1",
                         "refundDecisionId", "refund-decision-001",
                         "externalDecisionId", "pricing-decision-001"))
@@ -247,8 +241,6 @@ class FundsInstructionDslContractTests {
                 .containsEntry("benefitSnapshotId", "BS-ACTOR-SUMMARY-001")
                 .containsEntry("stableDigest",
                         "sha256:00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
-                .containsEntry("benefitGroupSn", "BG-ACTOR-SUMMARY-001")
-                .containsEntry("componentSn", "COMP-ACTOR-SUMMARY-001")
                 .containsEntry("ruleVersion", "rule-v1")
                 .containsEntry("refundDecisionId", "refund-decision-001")
                 .containsEntry("externalDecisionId", "pricing-decision-001");

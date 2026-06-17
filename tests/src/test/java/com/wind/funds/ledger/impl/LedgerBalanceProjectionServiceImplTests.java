@@ -15,6 +15,7 @@ import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -386,6 +387,8 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         private final EntrySide entryType;
 
         private final LedgerPhaseCode phaseCode;
+
+        private final LedgerPostingRole postingRole = LedgerPostingRole.DETAIL;
 
         private final LedgerBalanceConstraintType balanceConstraintType;
 

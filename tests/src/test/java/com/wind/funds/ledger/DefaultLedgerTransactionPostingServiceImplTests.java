@@ -6,6 +6,7 @@ import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -663,6 +664,11 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         @Override
         public LedgerPhaseCode getPhaseCode() {
             return LedgerPhaseCode.TRANSFER;
+        }
+
+        @Override
+        public LedgerPostingRole getPostingRole() {
+            return LedgerPostingRole.DETAIL;
         }
 
         @Override

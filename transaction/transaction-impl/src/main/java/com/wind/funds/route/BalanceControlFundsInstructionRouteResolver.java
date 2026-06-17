@@ -279,7 +279,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 .platformAccounts(platformAccounts)
                 .resolvedAt(instruction.getEventTime())
                 .description(instruction.getDescription())
-                .contextVariables(RouteBenefitSnapshotContextSupport.mergeBenefitSnapshotSummary(instruction))
+                .contextVariables(Map.of())
                 .build();
         RouteSpecSupport.validateResolvedRoute(result);
         return result;

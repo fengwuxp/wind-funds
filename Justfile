@@ -46,7 +46,7 @@ test-module module='tests':
     @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl {{module}} -am test {{test_flags}}
 
 # Core DSL and contract tests.
-test-core tests='FundsInstructionDslContractTests,RouteDslContractTests,FundsDslJsonContractTests,FundsBenefitSnapshotSpecTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,SettlementPolicySpecTests,FundsAmountBoundaryContractTests':
+test-core tests='FundsInstructionDslContractTests,RouteDslContractTests,FundsDslJsonContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,SettlementPolicySpecTests,FundsAmountBoundaryContractTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Ledger assembly, transaction, posting, and projection tests.
@@ -66,7 +66,7 @@ test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTran
     @just _run-test-classes "{{tests}}" tests
 
 # Contract, route, wallet, and module dependency boundary tests.
-test-boundary tests='FundsContextVariablesContractTests,FundsTransactionParticipantContractTests,FundsTransactionRequestContextVariablesContractTests,LedgerBalanceChangedEventContractTests,LedgerDtoContextVariablesContractTests,LedgerRequestContextVariablesContractTests,SensitiveContextVariablesValidatorTests,RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,RouteResolverFactBoundaryTests,FundingAccountServiceImplTests,ControlAccountLedgerInitializationTests,PaymentInstrumentServiceImplTests,SpendSubjectFundingRelationServiceImplTests,PlatformFundingAccountServiceImplTests,FundsSubjectBalanceQueryServiceImplTests,WalletLayerBoundaryTests,FundsModuleDependencyBoundaryTests':
+test-boundary tests='FundsContextVariablesContractTests,FundsTransactionParticipantContractTests,FundsTransactionRequestContextVariablesContractTests,LedgerBalanceChangedEventContractTests,LedgerDtoContextVariablesContractTests,LedgerRequestContextVariablesContractTests,SensitiveContextVariablesValidatorTests,RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,RouteResolverFactBoundaryTests,FundingAccountServiceImplTests,LedgerProfileContractTests,ControlAccountLedgerInitializationTests,PaymentInstrumentServiceImplTests,SpendSubjectFundingRelationServiceImplTests,PlatformFundingAccountServiceImplTests,FundsSubjectBalanceQueryServiceImplTests,WalletLayerBoundaryTests,FundsModuleDependencyBoundaryTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Governance projection replay boundary tests.

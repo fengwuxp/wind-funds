@@ -13,7 +13,7 @@
 | 所属阶段 | GSD-2 Wave 0 / Baseline Reset / Planning-only。 |
 | Goal ID | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
 | Loop ID | `GSD2-LOOP-DEFAULT-PLAN-GRANT-2026-06-12` |
-| 当前状态 | `W5_P0P1_LWT_B2_AH_SOURCE_CONTRACT_GREEN_VERIFIED_NEXT_FR_TARGET` |
+| 当前状态 | `W5_P0P1_LWT_WALLET_FR_AND_PI_CAPABILITY_FACADE_GREEN_PENDING_FULL_GATE` |
 | Git / code baseline | 当前实际 Git/code baseline 为 `da7d2ea test: 阻断契约夹具承载资金流断言`；`b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 只保留为 GSD-2 初始重置点和历史证据。当前仅允许低风险文档、状态和任务卡推进。 |
 | 设计 baseline | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec` 的当前可读状态；`openspec` 异常 Git 状态只作为停止条件和只读事实记录。 |
 | 活跃未完成计划 | 已清零。旧候选不再作为当前计划，只能在新 Workflow 中被重新选择、重新编号、重新确认。 |
@@ -211,7 +211,7 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | 写入范围 | 仅 W5 推进计划和入口状态回写，不写生产代码、测试、DDL/H2 或公共契约。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、tests、Justfile 和最近 Git 提交。 |
 | 上下文账本 | [GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md) 已把 ledger guard、账户层级、资金责任、wallet application facade、交易投影解释和余额调账审计排成依赖队列。 |
-| 当前结果 | 当前状态为 `W5_P0P1_LWT_B2_AH_SOURCE_CONTRACT_GREEN_VERIFIED_NEXT_FR_TARGET`；账户层级来源契约已在工作树完成本地 Green，下一可执行确认应转为 `GSD2-B2-FR-TARGET-001` 或等价资金责任目标主体 Grant。 |
+| 当前结果 | 当前状态为 `W5_P0P1_LWT_FR_TARGET_SERVICE_FLOW_GREEN_PENDING_FULL_GATE`；账户层级来源契约已在工作树完成本地 Green，`GSD2-B2-FR-TARGET-001` 已完成首轮服务流 Green，待本轮完整验证和 CR 收口。 |
 | 验证命令 | Harness checker、产品/架构结构检查、`rg` 一致性扫描和 `git diff --check`。 |
 | 停止条件 | 用户未确认 Execution Grant，或需要 Java/测试/公共契约/DDL/H2/Git/联网/生产动作。 |
 
@@ -251,31 +251,30 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 
 | 优先级 | 候选 | 建议级别 | 理由 | 不做范围 |
 | --- | --- | --- | --- | --- |
-| 1 | `GSD2-B2-FR-TARGET-001` | `contract-only` 或 `service-flow-backed` | 账户层级来源契约已补齐，VCC、信用账户和平台责任下一步需要 `targetSubjectType + targetSubjectId` 或等价主体引用。 | 不把 `fundingAccountId` 继续写成所有责任来源的唯一事实；不混入支付工具能力准入。 |
-| 2 | `GSD2-B2-WALLET-APPLICATION-FACADE-001` | `service-flow-backed` | 账户层级来源和资金责任目标主体之后，需要用 application facade 封装开户、绑工具、资金能力解析和预交易快照。 | 不让调用方拼多个资源服务，不直接写交易事实或账本事实。 |
+| 1 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` | `service-flow-backed` 或 `projection-store-backed` | 账户层级、资金责任目标主体和 wallet funding responsibility facade 已有首轮服务流证据，下一步可补交易投影解释或查询证据。 | 不改 canonical 入参，不新增统一支付工具交易服务。 |
+| 2 | `GSD2-B2-WALLET-APPLICATION-FACADE-002` | `service-flow-backed` | `FundingResponsibilityResolutionApplicationService` 首轮已补齐；后续可继续补支付工具动作能力、钱包账户聚合或预交易快照。 | 不把支付工具能力通过等同账户能力通过，不直接写交易事实或账本事实。 |
 | 3 | `GSD2-B7-RECON-DIFFERENCE-MVP-001` | `service-flow-backed` | 清结算与对账需要最小差错闭环，才能支持 VCC clearing、全球账户出入金和运营补事实。 | 不一次性打开完整清分、清算、结算、出款、追偿和运营后台。 |
-| 4 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` | `service-flow-backed` 或 `projection-store-backed` | B3/B4 已有回放局部证据，下一步可补交易投影解释或查询证据。 | 不改 canonical 入参，不新增统一支付工具交易服务。 |
-| 5 | `GSD2-B5-BALANCE-ADJUST-AUDIT-001` | `service-flow-backed` | 余额调账、外部余额异常和运营补事实需要审批、原因、审计、幂等和对账回链。 | 不把普通调账绕过对账差错和审批白名单。 |
-| 6 | `GSD2-LD-LEDGER-GUARD-REGRESSION-001` | `guard-regression` | 任一资金变化切片触碰 posting、LedgerEntry、账目、余额投影或 H2 schema 时，必须伴随或前置 ledger guard。 | 不重启 GSD1 大包，不把清结算或治理重放混入 ledger guard。 |
-| 7 | 支付工具 / Spend Rule 支持 | `contract-only` 起步 | 工具动作能力、授权 application facade、Spend Rule 控制活动和只读解释依赖账户、资金责任、交易内核和对账。 | 不把支付工具、预算组或 Spend Rule 写成 ledger subject。 |
-| 8 | P2 VCC / 全球账户 | `contract-only` 起步 | 业务目标重要，但必须消费账户、资金责任、交易内核和对账差错证据。 | 不直接写 P2 facade、资金流、外部轨道或通道规则生产结论。 |
-| 9 | 收单 | `design-only` | 当前不是 MVP 实现优先级。 | 不写 capture/dispute 生产代码、测试或 DDL。 |
+| 4 | `GSD2-B5-BALANCE-ADJUST-AUDIT-001` | `service-flow-backed` | 余额调账、外部余额异常和运营补事实需要审批、原因、审计、幂等和对账回链。 | 不把普通调账绕过对账差错和审批白名单。 |
+| 5 | `GSD2-LD-LEDGER-GUARD-REGRESSION-001` | `guard-regression` | 任一资金变化切片触碰 posting、LedgerEntry、账目、余额投影或 H2 schema 时，必须伴随或前置 ledger guard。 | 不重启 GSD1 大包，不把清结算或治理重放混入 ledger guard。 |
+| 6 | 支付工具 / Spend Rule 支持 | `contract-only` 起步 | 工具动作能力、授权 application facade、Spend Rule 控制活动和只读解释依赖账户、资金责任、交易内核和对账。 | 不把支付工具、预算组或 Spend Rule 写成 ledger subject。 |
+| 7 | P2 VCC / 全球账户 | `contract-only` 起步 | 业务目标重要，但必须消费账户、资金责任、交易内核和对账差错证据。 | 不直接写 P2 facade、资金流、外部轨道或通道规则生产结论。 |
+| 8 | 收单 | `design-only` | 当前不是 MVP 实现优先级。 | 不写 capture/dispute 生产代码、测试或 DDL。 |
 
 ## 8. Execution Handoff Card
 
 | 字段 | 内容 |
 | --- | --- |
 | Goal ID | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
-| Wave / Task ID | 当前为 `GSD2-W5-P0P1-LWT-PRIORITY-PLAN`；`GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已完成本地 Green 和目标回归，下一候选转为 `GSD2-B2-FR-TARGET-001`。 |
+| Wave / Task ID | 当前为 `GSD2-W5-P0P1-LWT-PRIORITY-PLAN`；`GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已完成本地 Green 和目标回归，`GSD2-B2-FR-TARGET-001` 已完成首轮服务流 Green，`GSD2-B2-WALLET-APPLICATION-FACADE-001` 已完成资金责任解析 facade 首轮服务流 Green，下一候选转为 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001`。 |
 | 状态载体 | 本文、W1 基线差距审计、W2 单一 Grant 选择卡、W3 B2 账户层级 CAD 准入草案、W4 B2 账户层级 Execution Grant 确认包、W5 P0/P1 ledger-wallet-transaction 推进计划、Agent Loop / Plan Grant 默认授权策略、AI 代码交付闭环基线、GSD-2 单一 Grant 任务模板、TDD README、docs README。 |
-| 写入范围 | 本轮已按来源契约 Grant 写入 core port、wallet-face/impl、H2 schema、授权路由接入、目标测试和任务状态；后续按新的单一 Grant 限定。 |
+| 写入范围 | 本轮已按来源契约 Grant 写入 core port、wallet-face/impl、H2 schema、授权路由接入、目标测试和任务状态；资金责任目标 Grant 已写入 wallet 资源关系契约、H2 schema 和服务测试；wallet application facade 已写入资金责任解析契约、Request/DTO、实现和目标测试；后续按新的单一 Grant 限定。 |
 | 只读范围 | 全部设计文档、OpenSpec、源码、测试、旧状态账本和 Git 提交。 |
 | 反馈源 | checker、`rg`、`git status --short`、`git diff --check`、用户确认和专项测试。 |
-| 验证命令 | 已执行 `just compile`、目标授权 flow 测试、route resolver 测试、route DSL/JSON 回归；收口追加 `test-boundary`、`pmd` 和 `git diff --check`。 |
+| 验证命令 | 已执行账户层级来源目标测试、`just test-one SpendSubjectFundingRelationServiceImplTests tests` 和 `just test-one FundingResponsibilityResolutionApplicationServiceTests tests`；收口追加 `test-boundary`、`compile`、`pmd` 和 `git diff --check`。 |
 | AI 交付准出 | 后续 Grant 必须列出 Spec/AC 映射、Red/Green 证据、独立验证命令、CR 交接、Not Done、知识回流和建议 commit message。 |
-| 停止条件 | 越过本次来源契约范围、需要继续修改资金责任目标主体或 application facade、需要 Git 授权、需要处置 `openspec` 异常状态、验证失败或用户调整优先级。 |
+| 停止条件 | 越过本轮资金责任目标主体范围、需要继续修改 wallet application facade、需要 Git 授权、需要处置 `openspec` 异常状态、验证失败或用户调整优先级。 |
 | Git 策略 | `summary_only`。 |
-| 下一 owner | 用户确认 `GSD2-B2-FR-TARGET-001`；产品架构专家确认资金责任目标主体业务口径和 Not Done；资深架构师明确 Request/DTO、兼容字段、DDL/H2 和服务测试写入范围。 |
+| 下一 owner | 用户确认 `GSD2-B2-WALLET-APPLICATION-FACADE-001`；产品架构专家确认钱包 application facade 的用例、业务口径和 Not Done；资深架构师明确 facade 命名、Request/DTO、委派边界和服务测试写入范围。 |
 
 ## 9. 验证矩阵
 

@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 权益 DSL 契约校验工具。
+ * 权益资金上下文校验工具。
  */
 public final class FundsBenefitSpecValidators {
 
@@ -23,51 +23,28 @@ public final class FundsBenefitSpecValidators {
     private static final Pattern RAW_FIELD_NAME_PATTERN = Pattern.compile(
             "(?:\"([^\"]+)\"|(?<![A-Za-z0-9_-])([A-Za-z][A-Za-z0-9_ -]*))\\s*:");
 
-    private static final Set<String> RESERVED_CONTEXT_KEYS = Set.of(
-            ImmutableFundsBenefitSnapshotSpec.Fields.benefitSnapshotId,
-            ImmutableFundsBenefitSnapshotSpec.Fields.benefitSchemaVersion,
-            ImmutableFundsBenefitSnapshotSpec.Fields.benefitGroupSn,
-            ImmutableFundsBenefitSnapshotSpec.Fields.orderAmount,
-            ImmutableFundsBenefitSnapshotSpec.Fields.userPayAmount,
-            ImmutableFundsBenefitSnapshotSpec.Fields.merchantReceivableAmount,
-            ImmutableFundsBenefitComponentSpec.Fields.componentSn,
-            ImmutableFundsBenefitComponentSpec.Fields.benefitType,
-            ImmutableFundsBenefitComponentSpec.Fields.componentType,
-            ImmutableFundsBenefitComponentSpec.Fields.closureRole,
-            ImmutableFundsBenefitComponentSpec.Fields.amount,
-            ImmutableFundsBenefitComponentSpec.Fields.ledgerEffect,
-            ImmutableFundsBenefitComponentSpec.Fields.fundingNature,
-            ImmutableFundsBenefitComponentSpec.Fields.benefitReference,
-            ImmutableFundsBenefitComponentSpec.Fields.refundPolicy,
-            ImmutableFundsBenefitRefundPolicySpec.Fields.partialRefundStrategy,
-            ImmutableFundsBenefitRefundPolicySpec.Fields.dispositions,
-            "refundDisposition",
-            ImmutableFundsBenefitRefundPolicySpec.Fields.refundableAmount,
-            ImmutableFundsBenefitRefundPolicySpec.Fields.nonRefundableAmount,
-            ImmutableFundsBenefitRefundPolicySpec.Fields.refundRuleVersion,
-            ImmutableFundsBenefitRefundPolicySpec.Fields.refundDecisionId,
-            ImmutableFundsBenefitReferenceSpec.Fields.ruleVersion,
-            "currentMarketingRule",
-            "couponEligibility",
-            "couponAvailable",
-            "recalculatedDiscount",
-            "bestCoupon",
-            "activityRules",
-            "userCouponBag");
-
     private static final Set<String> RESERVED_INSTRUCTION_CONTEXT_KEYS = Set.of(
-            ImmutableFundsBenefitSnapshotSpec.Fields.orderAmount,
-            ImmutableFundsBenefitSnapshotSpec.Fields.userPayAmount,
-            ImmutableFundsBenefitSnapshotSpec.Fields.merchantReceivableAmount,
-            ImmutableFundsBenefitComponentSpec.Fields.amount,
-            ImmutableFundsBenefitComponentSpec.Fields.ledgerEffect,
-            ImmutableFundsBenefitComponentSpec.Fields.fundingNature,
-            ImmutableFundsBenefitComponentSpec.Fields.refundPolicy,
-            ImmutableFundsBenefitRefundPolicySpec.Fields.partialRefundStrategy,
-            ImmutableFundsBenefitRefundPolicySpec.Fields.dispositions,
+            "benefitSnapshot",
+            "benefitGroupSn",
+            "orderAmount",
+            "userPayAmount",
+            "merchantReceivableAmount",
+            "authorizationExpireTime",
+            "amount",
+            "ledgerEffect",
+            "fundingNature",
+            "refundPolicy",
+            "partialRefundStrategy",
+            "dispositions",
             "refundDisposition",
-            ImmutableFundsBenefitRefundPolicySpec.Fields.refundableAmount,
-            ImmutableFundsBenefitRefundPolicySpec.Fields.nonRefundableAmount,
+            "refundableAmount",
+            "nonRefundableAmount",
+            "userCouponId",
+            "lockNo",
+            "redemptionNo",
+            "releaseNo",
+            "returnNo",
+            "ruleVersionId",
             "currentMarketingRule",
             "couponEligibility",
             "couponAvailable",
@@ -77,18 +54,6 @@ public final class FundsBenefitSpecValidators {
             "userCouponBag");
 
     private FundsBenefitSpecValidators() {
-    }
-
-    static void requireText(@Nullable String value, String message) {
-        if (!StringUtils.hasText(value)) {
-            throw new IllegalArgumentException(message);
-        }
-    }
-
-    static Map<String, Object> immutableContext(Map<String, Object> contextVariables, String owner) {
-        Map<String, Object> copied = FundsContextVariables.immutableCopy(contextVariables);
-        rejectReservedContextKeys(copied, owner);
-        return copied;
     }
 
     public static Map<String, Object> immutableInstructionContext(Map<String, Object> contextVariables, String owner) {
@@ -106,10 +71,6 @@ public final class FundsBenefitSpecValidators {
         } catch (JSONException ignored) {
             rejectReservedRawInstructionContextKeys(contextVariables, owner);
         }
-    }
-
-    private static void rejectReservedContextKeys(@Nullable Object value, String owner) {
-        rejectReservedContextKeys(value, owner, RESERVED_CONTEXT_KEYS);
     }
 
     private static void rejectReservedInstructionContextKeys(@Nullable Object value, String owner) {

@@ -8,13 +8,17 @@ import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
 import com.wind.funds.wallet.model.query.SpendSubjectFundingRelationQuery;
+import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
+import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -63,6 +67,16 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
     private static final String THIRD_FUNDING_ACCOUNT_SN = "funding_relation_third_target";
 
+    private static final String CREDIT_TARGET_SN = "credit_relation_target_subject";
+
+    private static final String SUSPENDED_CREDIT_TARGET_SN = "credit_rel_suspended_target";
+
+    private static final String CREDIT_TARGET_RELATION_SN = "spend_credit_target_rel";
+
+    private static final String SUSPENDED_CREDIT_TARGET_RELATION_SN = "spend_credit_target_suspended_rel";
+
+    private static final String BUDGET_TARGET_RELATION_SN = "spend_budget_target_rel";
+
     private static final String SPEND_SUBJECT_ID = "credit_relation_subject";
 
     private static final String OWNER_ID = "owner_relation_service";
@@ -75,6 +89,9 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
     @Autowired
     private FundingAccountService fundingAccountService;
+
+    @Autowired
+    private CreditAccountService creditAccountService;
 
     @Autowired
     private SpendSubjectFundingRelationService fundingRelationService;
@@ -114,6 +131,8 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                     assertThat(relation.getSpendSubjectId()).isEqualTo(SPEND_SUBJECT_ID);
                     assertThat(relation.getSpendSubjectType()).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT);
                     assertThat(relation.getFundingAccountId()).isEqualTo(FUNDING_ACCOUNT_SN);
+                    assertThat(relation.getTargetSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT);
+                    assertThat(relation.getTargetSubjectId()).isEqualTo(FUNDING_ACCOUNT_SN);
                     assertThat(relation.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
                     assertThat(relation.getRelationType())
                             .isEqualTo(SpendSubjectFundingRelationType.FUNDING_SOURCE);
@@ -433,6 +452,88 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：VCC 共享卡或平台授信场景把最终资金责任配置到信用账户子账户。
+     * 输入：支出主体资金责任关系声明 targetSubjectType = CREDIT_ACCOUNT，targetSubjectId = 信用账户号。
+     * 输出：关系可创建、可按目标主体查询，兼容 fundingAccountId 不再是唯一写入事实。
+     * 红线：配置资金责任目标主体不写账、不改余额，不把信用账户误退化为 fundingAccountId。
+     */
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldSupportCreditAccountTargetSubject() {
+        creditAccountService.createCreditAccount(createCreditAccountRequest(CREDIT_TARGET_SN, FundsAccountStatus.ACTIVE));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        Long relationId = fundingRelationService.createSpendSubjectFundingRelation(createCreditTargetRelationRequest());
+
+        List<SpendSubjectFundingRelationDTO> records = fundingRelationService.querySpendSubjectFundingRelations(
+                new SpendSubjectFundingRelationQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSpendSubjectId(SPEND_SUBJECT_ID)
+                        .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                        .setTargetSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                        .setTargetSubjectId(CREDIT_TARGET_SN)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                        .setDefaultRelation(Boolean.TRUE)
+                        .setStatus(FundsAccountStatus.ACTIVE),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+
+        assertThat(relationId).isPositive();
+        assertThat(records).hasSize(1);
+        assertThat(records.getFirst())
+                .satisfies(relation -> {
+                    assertThat(relation.getSn()).isEqualTo(CREDIT_TARGET_RELATION_SN);
+                    assertThat(relation.getTargetSubjectType()).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT);
+                    assertThat(relation.getTargetSubjectId()).isEqualTo(CREDIT_TARGET_SN);
+                    assertThat(relation.getFundingAccountId()).isNull();
+                    assertThat(relation.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+                    assertThat(relation.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+                });
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：信用账户目标主体已被风控暂停。
+     * 输入：ACTIVE 资金责任关系指向 SUSPENDED 信用账户。
+     * 输出：创建被拒绝，不留下候选关系。
+     * 红线：不可用信用账户不得进入资金责任候选池，也不得写账。
+     */
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldRejectUnavailableCreditAccountTargetWithoutRelation() {
+        creditAccountService.createCreditAccount(createCreditAccountRequest(SUSPENDED_CREDIT_TARGET_SN,
+                FundsAccountStatus.SUSPENDED));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(
+                createCreditTargetRelationRequest()
+                        .setSn(SUSPENDED_CREDIT_TARGET_RELATION_SN)
+                        .setTargetSubjectId(SUSPENDED_CREDIT_TARGET_SN)))
+                .hasMessageContaining("资金责任目标主体不可用");
+
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", SUSPENDED_CREDIT_TARGET_RELATION_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：运营误把预算组配置为最终资金责任主体。
+     * 输入：targetSubjectType = BUDGET_GROUP。
+     * 输出：创建被拒绝。
+     * 红线：预算组和 Spend Rule 只能做控制和解释，不能成为最终资金责任主体。
+     */
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldRejectBudgetGroupTargetSubjectWithoutRelation() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createCreditTargetRelationRequest()
+                .setSn(BUDGET_TARGET_RELATION_SN)
+                .setTargetSubjectType(FundsSubjectType.BUDGET_GROUP)
+                .setTargetSubjectId("budget_relation_target")))
+                .hasMessageContaining("资金责任目标主体类型不支持");
+
+        assertThat(countRows("t_spend_subject_funding_rel", "sn", BUDGET_TARGET_RELATION_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpSpendSubjectFundingRelationTestData() {
         cleanupSpendSubjectFundingRelationTestData();
@@ -449,14 +550,24 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 DUPLICATE_DEFAULT_RELATION_SN,
                 PRIORITY_CONFLICT_RELATION_SN,
                 PRIORITY_ORDER_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?, ?)",
+                CREDIT_TARGET_RELATION_SN,
+                SUSPENDED_CREDIT_TARGET_RELATION_SN,
+                BUDGET_TARGET_RELATION_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
                 FUNDING_ACCOUNT_SN,
                 SECOND_FUNDING_ACCOUNT_SN,
                 THIRD_FUNDING_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
+                CREDIT_TARGET_SN,
+                SUSPENDED_CREDIT_TARGET_SN);
         jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?)",
                 FUNDING_ACCOUNT_SN,
                 SECOND_FUNDING_ACCOUNT_SN,
                 THIRD_FUNDING_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn IN (?, ?)",
+                CREDIT_TARGET_SN,
+                SUSPENDED_CREDIT_TARGET_SN);
     }
 
     private CreateFundingAccountRequest createFundingAccountRequest() {
@@ -484,6 +595,14 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 .setDefaultRelation(Boolean.TRUE);
     }
 
+    private CreateSpendSubjectFundingRelationRequest createCreditTargetRelationRequest() {
+        return createRelationRequest()
+                .setSn(CREDIT_TARGET_RELATION_SN)
+                .setFundingAccountId(null)
+                .setTargetSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                .setTargetSubjectId(CREDIT_TARGET_SN);
+    }
+
     private CreateSpendSubjectFundingRelationRequest createPriorityOrderRelationRequest() {
         return createRelationRequest()
                 .setSn(PRIORITY_ORDER_RELATION_SN)
@@ -501,6 +620,19 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 DefaultPageQueryOptions.defaults(10)).getRecords();
     }
 
+    private CreateCreditAccountRequest createCreditAccountRequest(String sn, FundsAccountStatus status) {
+        return new CreateCreditAccountRequest()
+                .setSn(sn)
+                .setTenantId(TENANT_ID)
+                .setOwnerId(OWNER_ID)
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setAccountType(CreditFundsAccountType.SHARED_CARD.name())
+                .setCurrency(CurrencyIsoCode.USD)
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
+                .setStatus(status);
+    }
+
     private long countRows(String tableName, String columnName, Object value) {
         Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
                 Long.class, value);
@@ -513,6 +645,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
             FundingAccountServiceImpl.class,
+            CreditAccountServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class
     })
     static class Config {

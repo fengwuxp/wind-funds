@@ -32,50 +32,101 @@ public class CreditAccount implements Serializable, TenantIsolationObject<Long> 
 
     public static final String TABLE_NAME = "t_credit_account";
 
+    /**
+     * 自增主键。
+     */
     @Id(keyType = KeyType.Auto)
     private Long id;
 
+    /**
+     * 创建时间。
+     */
     private LocalDateTime gmtCreate;
 
+    /**
+     * 最后修改时间。
+     */
     private LocalDateTime gmtModified;
 
+    /**
+     * 信用账户流水号。
+     */
     @NotNull
     private String sn;
 
+    /**
+     * 租户 ID。
+     */
     @Column(tenantId = true)
     private Long tenantId;
 
+    /**
+     * 账户归属主体 ID。
+     */
     @NotNull
     private String ownerId;
 
+    /**
+     * 账户归属主体类型。
+     */
     @NotNull
     private FundsAccountOwnerType ownerType;
 
+    /**
+     * 信用账户业务类型。
+     */
     @NotNull
     private String accountType;
 
+    /**
+     * 账户币种。
+     */
     @NotNull
     private CurrencyIsoCode currency;
 
+    /**
+     * 账期类型。
+     */
     @NotNull
     private AccountBalancePeriodType periodType;
 
+    /**
+     * 账期标识。
+     */
     @NotNull
     private String periodId;
 
+    /**
+     * 账目 profile 编码快照。
+     */
     @NotNull
     private LedgerProfileCode ledgerProfileCode;
 
+    /**
+     * 账目 profile 版本快照。
+     */
     @NotNull
     private Integer ledgerProfileVersion;
 
+    /**
+     * 信用账户状态。
+     */
     @NotNull
     private FundsAccountStatus status;
 
+    /**
+     * 账户说明。
+     */
     private String description;
 
+    /**
+     * 扩展上下文变量。
+     */
     private String contextVariables;
 
+    /**
+     * 乐观锁版本号。
+     */
     @Column(version = true)
     private Integer version;
 }

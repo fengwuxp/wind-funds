@@ -2,6 +2,7 @@ package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.spec.ledger.LedgerProfileSpec;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -24,7 +25,7 @@ import java.util.List;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class LedgerProfileDTO implements Serializable {
+public class LedgerProfileDTO implements LedgerProfileSpec, Serializable {
 
     @Serial
     private static final long serialVersionUID = -9020154778373879922L;
@@ -41,4 +42,33 @@ public class LedgerProfileDTO implements Serializable {
     @Schema(description = "科目明细")
     private List<LedgerProfileItemDTO> items;
 
+    @Override
+    public LedgerProfileCode getProfileCode() {
+        return code;
+    }
+
+    @Override
+    public String getProfileName() {
+        return code.getDesc();
+    }
+
+    @Override
+    public Integer getProfileVersion() {
+        return version;
+    }
+
+    @Override
+    public String getStatus() {
+        return "ACTIVE";
+    }
+
+    @Override
+    public String getDescription() {
+        return code.getDesc();
+    }
+
+    @Override
+    public List<LedgerProfileItemDTO> getItems() {
+        return items;
+    }
 }

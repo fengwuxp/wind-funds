@@ -29,47 +29,95 @@ public class AccountHierarchyBinding implements Serializable, TenantIsolationObj
 
     public static final String TABLE_NAME = "t_account_hierarchy_binding";
 
+    /**
+     * 自增主键。
+     */
     @Id(keyType = KeyType.Auto)
     private Long id;
 
+    /**
+     * 创建时间。
+     */
     private LocalDateTime gmtCreate;
 
+    /**
+     * 最后修改时间。
+     */
     private LocalDateTime gmtModified;
 
+    /**
+     * 层级绑定流水号。
+     */
     @NotNull
     private String sn;
 
+    /**
+     * 租户 ID。
+     */
     @Column(tenantId = true)
     private Long tenantId;
 
+    /**
+     * 子账户 ID。
+     */
     @NotNull
     private String accountId;
 
+    /**
+     * 子账户类型。
+     */
     @NotNull
     private FundsSubjectType accountType;
 
+    /**
+     * 父账户 ID。
+     */
     @NotNull
     private String parentAccountId;
 
+    /**
+     * 父账户类型。
+     */
     @NotNull
     private FundsSubjectType parentAccountType;
 
+    /**
+     * 根账户 ID。
+     */
     @NotNull
     private String rootAccountId;
 
+    /**
+     * 根账户类型。
+     */
     @NotNull
     private FundsSubjectType rootAccountType;
 
+    /**
+     * 层级关系币种。
+     */
     @NotNull
     private CurrencyIsoCode currency;
 
+    /**
+     * 层级绑定状态。
+     */
     @NotNull
     private FundsAccountStatus status;
 
+    /**
+     * 乐观锁版本号。
+     */
     @NotNull
     private Integer version;
 
+    /**
+     * 操作人 ID。
+     */
     private String operatorId;
 
+    /**
+     * 扩展上下文变量。
+     */
     private String contextVariables;
 }

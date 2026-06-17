@@ -63,18 +63,6 @@ public interface FundsInstructionSpec {
     @Nullable
     FundsInstructionReferenceSpec getReference();
 
-    /**
-     * 已由业务侧、订单侧或营销权益系统决策完成的权益结果快照。
-     *
-     * <p>为空表示无权益交易，既有资金指令语义保持不变。</p>
-     *
-     * @return 权益结果快照
-     */
-    @Nullable
-    default FundsBenefitSnapshotSpec getBenefitSnapshot() {
-        return null;
-    }
-
     @NonNull
     String getBusinessScene();
 

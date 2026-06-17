@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.model.dto;
 
+import com.wind.funds.spec.ledger.NegativeAvailablePolicySpec;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -21,7 +22,7 @@ import java.io.Serializable;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class NegativeAvailablePolicyDTO implements Serializable {
+public class NegativeAvailablePolicyDTO implements NegativeAvailablePolicySpec, Serializable {
 
     @Serial
     private static final long serialVersionUID = 6587679411739150799L;

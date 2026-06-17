@@ -48,6 +48,16 @@ public record ImmutableRouteSnapshotSpec(@Nullable Long tenantId,
     public ImmutableRouteSnapshotSpec {
         participants = List.copyOf(participants == null ? List.of() : participants);
         legs = List.copyOf(legs == null ? List.of() : legs);
+        RouteFactContractValidator.validateRouteSnapshot(snapshotId,
+                snapshotSchemaVersion,
+                routeCode,
+                routeVersion,
+                businessScene,
+                businessSn,
+                instructionType,
+                eventType,
+                transactionType,
+                resolvedAt);
         RouteAmountClosureValidator.validateCoreAccountClosure(legs, routingDecision);
         contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "routeSnapshot");
     }

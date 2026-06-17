@@ -39,7 +39,7 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 | 5 | [GSD-2-W2-单一Grant选择卡.md](GSD-2-W2-单一Grant选择卡.md) | GSD-2 Wave 2 单一 Grant 选择草案，推荐下一步确认 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`，但当前仍不授权代码。 |
 | 6 | [GSD-2-W3-B2账户层级CAD准入草案.md](GSD-2-W3-B2账户层级CAD准入草案.md) | GSD-2 Wave 3 B2 账户层级只读源码定位和 CAD 准入草案，确认 DSL/value object/JSON/replay 已有局部证据，并把下一 Red 收窄到真实服务流生成、保存、回放和失败无副作用。 |
 | 7 | [GSD-2-W4-B2账户层级ExecutionGrant确认包.md](GSD-2-W4-B2账户层级ExecutionGrant确认包.md) | GSD-2 Wave 4 B2 账户层级 Execution Grant 确认包；`GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 已被首个 Red 消费，随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 在当前工作树完成本地 Green。 |
-| 8 | [GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md) | GSD-2 Wave 5 P0/P1 ledger、wallet、transaction 优先推进计划，当前账户层级来源契约已完成本地 Green，下一 Grant 转为 `GSD2-B2-FR-TARGET-001`，并把 wallet application facade、交易投影解释和余额调账审计排成依赖队列。 |
+| 8 | [GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md) | GSD-2 Wave 5 P0/P1 ledger、wallet、transaction 优先推进计划，当前账户层级来源契约已完成本地 Green，`GSD2-B2-FR-TARGET-001` 已完成资金责任目标主体首轮服务流 Green，并把 wallet application facade、交易投影解释和余额调账审计排成后续依赖队列。 |
 | 9 | [GSD-2-AgentLoop-PlanGrant默认授权策略.md](GSD-2-AgentLoop-PlanGrant默认授权策略.md) | Agent Loop Engineering 和 GSD/CAD 默认低风险 Plan Grant 授权策略入口，说明可默认推进的文档/状态/任务卡范围，以及必须显式确认的代码、测试、DDL、Git、OpenSpec 状态和生产边界。 |
 | 10 | [AI代码交付闭环与Spec模板基线.md](AI代码交付闭环与Spec模板基线.md) | AI 代码交付闭环和 Spec 模板准入入口，用于约束后续 Grant 的 Spec 强度、AC 映射、Harness、独立验证、CR 交接、知识回流和停止条件。 |
 | 11 | [GSD-2-Spec-AC-Harness-CAD任务模板.md](GSD-2-Spec-AC-Harness-CAD任务模板.md) | GSD-2 单一 Grant 可填写模板，用于把 Spec、AC、Red、Harness、CAD Loop、CR 交接、交付证据和建议提交切片压到同一张任务卡。 |
@@ -122,7 +122,7 @@ TDD 评审口径：TDD 入口必须承接 PRD 目标、DSL 契约和系分落点
 
 授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核通过授权后继准入卡承接强制完成、无授权退款、拒付承接和并发竞争；支付工具与 Spend Rule 的生产可用性通过支付工具准入卡承接工具准入、资金责任解析、授权 application facade、Spend Rule 控制和只读投影。支付工具及周边支持队列整体排在账本账目、钱包基础能力和交易内核之后；未形成独立工程任务前，TDD 只能继续做差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 
-资金责任目标字段必须先选择 `funding-account-only` 或 `targetSubjectType + targetSubjectId`。前者只能证明普通资金账户责任解析，后者才允许声明信用账户、VCC 关联资金/信用子账户或平台角色责任主体，并必须同步 DTO、DDL/H2、摘要、fixture、route snapshot、账户层级快照和回放断言。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产 Done。
+资金责任目标字段已在 `GSD2-B2-FR-TARGET-001` 首轮选择并落地 `targetSubjectType + targetSubjectId`，允许资源关系表达资金账户和信用账户目标主体；平台角色责任主体、完整 `FundingAllocationDecision` 摘要、route snapshot、账户层级快照和回放断言仍需后续 Grant。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产 Done。
 
 ## 生产验证准入口径
 

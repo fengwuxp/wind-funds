@@ -37,7 +37,7 @@ text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsof
 </g><g>
 <rect x="875" y="140" width="165" height="88" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
 
-<text x="891" y="168" class="node-title">权益快照</text>
+<text x="891" y="168" class="node-title">权益资金事实</text>
 <text x="891" y="192" class="node-text" text-anchor="start"><tspan x="891" dy="0">优惠券 / 代金券</tspan><tspan x="891" dy="17">补贴 / 让利 / 储值权益</tspan></text>
 </g><g>
 <rect x="250" y="320" width="220" height="98" rx="8" ry="8" fill="#faf5ff" stroke="#e9d5ff" stroke-width="1.5"/>

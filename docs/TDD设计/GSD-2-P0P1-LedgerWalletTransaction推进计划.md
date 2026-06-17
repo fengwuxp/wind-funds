@@ -12,7 +12,7 @@
 | 原子任务 | 重新对齐 ledger、wallet、transaction 的依赖顺序、Grant 队列、写入范围、验证命令和停止条件。 |
 | 所属阶段 | GSD-2 Wave 5 / P0-P1 dependency planning / source-contract Green verified。 |
 | 关联 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
-| 当前状态 | `B2_AH_SOURCE_CONTRACT_GREEN_VERIFIED_NEXT_FR_TARGET` |
+| 当前状态 | `FR_TARGET_SERVICE_FLOW_GREEN_PENDING_FULL_GATE` |
 | 上游输入 | GSD-2 W1 基线差距审计、W2 单一 Grant 选择卡、W3 B2 账户层级 CAD 准入草案、W4 B2 Execution Grant 确认包、当前 PRD/DSL/系分/TDD/OpenSpec 和 Git/code baseline `da7d2ea`。 |
 | Owner | AI Native 流程编排负责顺序和门禁；产品架构专家确认业务价值、验收和 Not Done；资深架构师确认源码锚点、写入范围、Red、验证命令和 CAD 停止条件；用户确认单一 Grant。 |
 | 写入范围 | 本文、GSD-2 入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
@@ -20,14 +20,14 @@
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、tests、Justfile、AGENTS.md、最近 Git 提交和旧 GSD/Grant 历史材料。 |
 | Git 策略 | `summary_only`。本文不授权 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。 |
 
-Wave 边界：本文最初只做任务规划和设计落地；用户后续已确认 `Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 并进入首个 Red。Red 已证明当前授权服务流缺少合法账户层级来源；随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已在当前工作树补齐来源契约并完成本地 Green。下一步不得重复消费账户层级来源 Grant，应转向 `GSD2-B2-FR-TARGET-001` 或等价资金责任目标主体 Grant。
+Wave 边界：本文最初只做任务规划和设计落地；用户后续已确认 `Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 并进入首个 Red。Red 已证明当前授权服务流缺少合法账户层级来源；随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已在当前工作树补齐来源契约并完成本地 Green。`GSD2-B2-FR-TARGET-001` 已进入首轮服务流 Green，采用 `ddl-backed targetSubjectType + targetSubjectId`，下一步应完成边界、编译、PMD 和状态收口后再转向 wallet application facade。
 
 ## 2. 编排结论
 
 当前仍不应跳过 W4 已收敛的 B2 账户层级服务流确认包。ledger、wallet、transaction 的优先推进顺序应按“被依赖方证据优先、真实服务流优先、清结算和 P2 后置”的原则收敛：
 
 1. ledger 不重新开启大包改造，而作为每个资金变化切片的强制验证门禁：posting 绑定账本、账目、币种、余额投影、幂等和失败无副作用必须在目标测试或回归中证明。
-2. wallet 的下一关键缺口不是支付工具 facade，而是账户层级和资金责任能否被真实服务流稳定消费；`GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已补齐账户层级来源契约，下一单一 Grant 应聚焦资金责任目标主体。
+2. wallet 的下一关键缺口不是支付工具 facade，而是账户层级和资金责任能否被真实服务流稳定消费；`GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已补齐账户层级来源契约，`GSD2-B2-FR-TARGET-001` 首轮已补齐资金责任目标主体字段和资源服务校验。
 3. transaction 的下一关键缺口不是新增支付工具交易入口，而是 route snapshot、原路径回放、交易投影解释和余额调账审计能否在账户主体型 canonical 内核下闭合。
 4. B7 清结算与对账、P2 VCC / 全球账户 / 收单继续后置；它们只能消费已确认的 ledger、wallet、transaction 证据，不得平行实现资金内核。
 
@@ -50,10 +50,10 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 ### 3.1 业务对象、流程和状态
 
 - 业务对象：FundingAccount、CreditAccount、AccountHierarchy、WalletApplicationFacade、FundingResponsibilityResolution、FundsTransaction、RouteSnapshot、LedgerTransaction、LedgerEntry、BalanceProjection、TransactionProjection。
-- 字段口径：本计划不新增生产字段；后续 Grant 若触及入参、出参、错误码、幂等摘要、枚举、表结构或投影字段，必须单独升级 Execution Grant。
+- 字段口径：本文最初作为计划卡不直接新增生产字段；后续已由 `GSD2-B2-FR-TARGET-001` 单一 Grant 消费并写入资金责任目标主体字段。后续再触及错误码、幂等摘要、枚举、投影字段或生产迁移脚本，仍必须单独升级 Execution Grant。
 - 生命周期 / 状态：当前只固化任务准入状态，不新增交易状态机。交易事实仍遵循直接交易、授权交易、退款/撤销/重放、余额控制现有生命周期；账本事实仍以 ledger transaction 和 entry 为不可变事实。
-- 业务流程：`B2-AH-RED-001` 已从“钱包入口 -> 账户层级/责任解析 -> 交易内核 -> 账本分录 -> 余额/交易投影”服务流验证到授权 route snapshot 可携带账户层级来源快照；下一步应验证资金责任能表达信用账户、平台账户或其他目标主体，而不是继续只依赖 `fundingAccountId`。
-- 主流程：账户层级服务流快照通过后，依次推进资金责任目标、钱包 application facade、交易投影解释、余额调整审计，ledger 作为每轮验证护栏。
+- 业务流程：`B2-AH-RED-001` 已从“钱包入口 -> 账户层级/责任解析 -> 交易内核 -> 账本分录 -> 余额/交易投影”服务流验证到授权 route snapshot 可携带账户层级来源快照；`GSD2-B2-FR-TARGET-001` 首轮进一步证明资金责任关系可表达 `FUNDING_ACCOUNT` 和 `CREDIT_ACCOUNT` 目标主体，不再只依赖 `fundingAccountId`。
+- 主流程：账户层级服务流快照和资金责任目标主体首轮通过后，依次推进钱包 application facade、交易投影解释、余额调整审计，ledger 作为每轮验证护栏。
 - 异常流程：若发现预算组、支付工具、营销账户或外部工具被误当成核心账务主体，立即停止编码并回到设计/任务基线修正。
 - 人工兜底：涉及兼容表结构、公开接口、清结算批次、真实资金调整、数据迁移或跨项目接入时，由用户重新确认单一 Execution Grant。
 - 运营后台 / 数据口径：本计划不新增运营后台、指标、报表或导出能力；后续运营、审计、报表只消费交易事实、route snapshot、ledger entry、余额投影和交易投影解释形成的数据口径。
@@ -71,10 +71,10 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 
 ### 3.3 接口契约和数据边界
 
-- 接口契约：本计划本身不修改 `ledger-face`、`transaction-face`、`wallet-face` 的公开接口契约；不新增或调整入参、出参、错误码、幂等摘要、Request/Query/DTO、枚举和状态机。
+- 接口契约：本文最初不直接授权修改 `ledger-face`、`transaction-face`、`wallet-face` 的公开接口契约；`GSD2-B2-FR-TARGET-001` 已在授权范围内扩展 wallet 资金责任 Request/Query/DTO。后续不再基于本文直接新增或调整出参、错误码、幂等摘要、枚举和状态机。
 - 兼容策略：若 B2-AH-RED-001 证明现有契约无法表达多级账户服务流，只允许在下一张 Grant 中提出兼容扩展方案，不在本计划卡中直接授权修改。
 - 幂等要求：所有后续交易、余额控制、钱包 facade 和 ledger guard 的实现必须保留业务请求号、外部请求号、route snapshot、ledger transaction 与 entry 的可重放幂等链路。
-- 数据方案：默认 no-ddl；若需要新增字段、索引、投影表、迁移脚本或测试 schema 变更，停止并单独申请数据 Grant。
+- 数据方案：本文原始计划默认 no-ddl；`GSD2-B2-FR-TARGET-001` 已明确采用 `ddl-backed` 并修改 H2 schema。后续如需新增投影表、迁移脚本或生产 DDL，仍必须停止并单独申请数据 Grant。
 - 事务边界：wallet 只做用例编排，transaction 生成交易事实和路由快照，ledger 生成账本事实和投影；不得跨层直接写事实表。
 - 补偿 / 对账：异常资金调整、外部钱包/VCC 余额不一致、清结算差错和对账修复不在本计划直接实现，必须由后续 B5/B7 Grant 给出审计、补偿和对账闭环。
 
@@ -82,8 +82,8 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 
 | 顺位 | Grant 候选 | 模块焦点 | 依赖关系 | 首批 Red / AC | 候选写入范围 | 验证门禁 | 不做范围 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `GSD2-B2-FR-TARGET-001` | wallet 资金责任解析 | 依赖账户层级快照服务流证据；该依赖已由来源契约 Green 提供局部证明。 | 支出主体资金责任从 `fundingAccountId` 升级到 `targetSubjectType + targetSubjectId` 或确认 funding-account-only。 | Request/DTO、摘要、fixture、route snapshot 和服务测试；DDL/H2 是否开放必须单独确认。 | 资金责任解析测试、route snapshot 回归、敏感上下文回归、`compile`、`diff --check`。 | 不混入支付工具能力准入、Spend Rule 策略引擎或 P2 业务 facade。 |
-| 2 | `GSD2-B2-WALLET-APPLICATION-FACADE-001` | wallet application facade | 依赖账户层级和资金责任目标主体口径。 | `PaymentInstrumentCapabilityApplicationService`、`FundingResponsibilityResolutionApplicationService`、`WalletAccountApplicationService` 或等价入口能封装资源服务组合。 | wallet-face / wallet-impl application 包、Request/DTO、最小服务测试；不直接写交易事实。 | wallet 服务测试、transaction 委派边界测试、boundary、compile、diff。 | 不让 transaction-impl 依赖 wallet 资源服务，不把 facade 做成内存版业务 Service。 |
+| 1 | `GSD2-B2-FR-TARGET-001` | wallet 资金责任解析 | 依赖账户层级快照服务流证据；该依赖已由来源契约 Green 提供局部证明。 | 支出主体资金责任从 `fundingAccountId` 升级到 `targetSubjectType + targetSubjectId`。 | 已首轮写入 Request/DTO/Query、Entity、H2 schema、资源服务校验和服务测试；route snapshot 决策、application facade 和平台角色解析仍后续承接。 | 资金责任解析测试、route snapshot 回归、敏感上下文回归、`compile`、`diff --check`。 | 不混入支付工具能力准入、Spend Rule 策略引擎或 P2 业务 facade。 |
+| 2 | `GSD2-B2-WALLET-APPLICATION-FACADE-001` | wallet application facade | 依赖账户层级和资金责任目标主体口径。 | 首轮已补 `FundingResponsibilityResolutionApplicationService`，能把支出主体、主体类型、币种和关系类型解析为当前默认资金责任目标主体。 | 已写入 wallet-face application 契约、Request/DTO、wallet-impl application 实现和服务测试；支付工具能力、钱包账户聚合和预交易快照仍后续承接。 | 目标 wallet application 服务测试、`test-boundary`、`compile`、`pmd`、`diff`。 | 不让 transaction-impl 依赖 wallet 资源服务，不直接写交易、route、LedgerEntry 或余额投影，不把 facade 做成内存版业务 Service。 |
 | 3 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` | transaction 投影解释 | 依赖 route snapshot、账户层级和支付工具快照稳定。 | 交易投影解释能展示事实状态、展示状态、操作状态、原 route snapshot 和不可操作原因。 | transaction 查询/投影服务、DTO、服务测试和必要持久化读取；schema 变更需单独授权。 | `test-transaction`、目标投影测试、route replay 回归、compile、pmd、diff。 | 不反写资金事实，不替代 ledger balance projection，不做 B7 对账差错闭环。 |
 | 4 | `GSD2-B5-BALANCE-ADJUST-AUDIT-001` | transaction / balance control | 依赖 ledger guard 和交易事实审计。 | 外部余额异常、负可用余额纠偏、运营调账必须有审批、原因、幂等、原事实引用和对账回链。 | balance control 服务测试、审计 DTO、最小实现；资金事实委派范围需列名。 | `test-balance-control`、ledger 回归、boundary、compile、pmd、diff。 | 不绕过对账差错和白名单，不开放泛化运营补账。 |
 | 5 | `GSD2-LD-LEDGER-GUARD-REGRESSION-001` | ledger 回归门禁 | 可作为顺位 1-4 中任一资金变化切片的伴随 guard；若发现 ledger 缺口，则升级为独立 Grant。 | entry 与 bound ledger 的 subject、账目、币种、normal side、allow negative、余额投影和幂等必须一致。 | ledger 目标测试或回归测试；默认不改生产代码。 | `test-ledger`、目标 ledger 测试、compile、diff。 | 不重启 GSD1 大包，不做清结算或治理重放。 |
@@ -91,7 +91,7 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 执行裁决：
 
 1. `Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已完成本地 Green，不要重复消费旧 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 或来源契约 Grant。
-2. 若用户要求继续编码，下一步建议确认 `Execution Grant：GSD2-B2-FR-TARGET-001`，并明确资金责任目标主体、公共契约/DDL 写入范围和停止条件。
+2. `Execution Grant：GSD2-B2-FR-TARGET-001` 已进入首轮 Green，当前完成的是资源关系字段、H2 schema 和服务校验，不等于 wallet application facade、平台角色责任解析或完整 route snapshot 回放已完成。
 3. 任一后续切片触碰 ledger posting、LedgerEntry、余额投影或 H2 schema 时，`GSD2-LD-LEDGER-GUARD-REGRESSION-001` 立即升级为前置或伴随 Red。
 
 ## 5. Coding Loop Contract 候选
@@ -100,11 +100,11 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | --- | --- |
 | Loop ID | `GSD2-P0P1-LWT-LOOP-2026-06-15` |
 | 关联 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
-| 当前状态 | `Loop Candidate / source-contract Green verified` |
+| 当前状态 | `Wallet funding responsibility facade service-flow Green / pending full gate` |
 | 状态载体 | 本文、GSD-2 新基线工作流规划、W2/W3/W4 B2 账户层级文档、TDD README、docs README、OpenSpec tasks。 |
 | 反馈源 | checker、`rg`、`git status --short`、`git diff --check`、目标测试、compile、pmd、用户确认。 |
 | 验证者 | 产品语义由产品架构专家确认；工程边界由资深架构师确认；优先级和 Grant 由用户确认。 |
-| 默认推进 | 当前来源契约切片已完成本地 Green；下一轮默认只允许低风险状态回写、验证收口和新 Grant 准备，继续编码需确认 `GSD2-B2-FR-TARGET-001`。 |
+| 默认推进 | 当前来源契约切片已完成本地 Green；资金责任目标主体首轮服务流已完成目标测试 Green；wallet application facade 首轮已完成资金责任解析服务流 Green。下一轮默认先完成验证收口和状态回写，再准备交易投影解释或后续 wallet facade 子能力。 |
 | 显式确认 | Java、测试、公共契约、DDL/H2、运行时配置、Git、联网、依赖安装、生产配置、真实资金、外部规则和专业合规确认。 |
 | 无进展检测 | 连续两轮只是重复 W4 确认包而无新增源码证据、验证证据、任务收敛或用户确认时暂停。 |
 | 交接 | 用户确认 B2-AH 后交给资深架构师进入 CAD；未确认时继续 docs-only 计划维护。 |
@@ -125,12 +125,12 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | 字段 | 内容 |
 | --- | --- |
 | 当前 Wave / Task | `GSD2-W5-P0P1-LWT-PRIORITY-PLAN` |
-| 当前状态 | `B2_AH_SOURCE_CONTRACT_GREEN_VERIFIED_NEXT_FR_TARGET` |
-| 下一建议 Grant | `Execution Grant：GSD2-B2-FR-TARGET-001` |
-| 下一 Red | 资金责任目标主体 Red：证明支出主体资金责任不能长期只依赖 `fundingAccountId`，需要 `targetSubjectType + targetSubjectId` 或等价主体引用。 |
-| 写入范围 | 来源契约已写入 core port、wallet-face/impl、H2 schema、授权路由接入和目标测试；下一 Grant 必须另行明确资金责任 Request/DTO、兼容字段、H2 schema、Entity、Mapper 或关系表写入。 |
+| 当前状态 | `WALLET_FR_AND_PI_CAPABILITY_FACADE_GREEN_PENDING_FULL_GATE` |
+| 下一建议 Grant | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001`；若继续 wallet，则另行确认 `WalletAccountApplicationService`、账户能力准入、授权 admission 或完整预交易快照子切片。 |
+| 下一 Red | 交易投影解释 Red：证明交易投影能解释事实状态、展示状态、操作状态、原 route snapshot 和不可操作原因。 |
+| 写入范围 | 来源契约已写入 core port、wallet-face/impl、H2 schema、授权路由接入和目标测试；资金责任目标主体已写入 wallet Request/DTO/Query、Entity、H2 schema、资源服务校验和目标测试；wallet application facade 首轮已写入资金责任解析契约、支付工具能力准入契约、Request/DTO、实现和目标测试。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、tests、Justfile、AGENTS.md、最近 Git 提交和历史准入卡。 |
-| 验证命令 | 已执行 `just compile`、授权 flow 目标测试、route resolver 测试、route DSL/JSON 回归；收口追加 `test-boundary`、`pmd` 和 `git diff --check`。下一 Grant 后运行资金责任目标测试、route snapshot 回归、敏感上下文阻断、`just compile`、`git diff --check`，必要时补分组测试和 `pmd`。 |
+| 验证命令 | 已执行 `just compile`、授权 flow 目标测试、route resolver 测试、route DSL/JSON 回归、资金责任解析 facade 目标测试和支付工具能力准入目标测试；收口追加 `test-boundary`、`pmd` 和 `git diff --check`。下一 Grant 后运行对应目标测试、route snapshot 回归、敏感上下文阻断、`just compile`、`git diff --check`，必要时补分组测试和 `pmd`。 |
 | Git 策略 | `summary_only`。 |
 | 交接要求 | 若用户确认资金责任目标主体 Grant，先写最小 Red，再最小 Green；完成后回写本文第 4 节 Grant 队列、OpenSpec tasks、验证证据、Not Done 和残余风险。 |
 
@@ -141,6 +141,24 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | Harness 结构 | `check_harness_plan.py --kind gsd-wave --file docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | Task、Owner、范围、Wave、上下文账本、禁止事项、验证和 handoff 字段齐全。 |
 | 产品结构 | `check_product_deliverable.py --kind product-architecture --file docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | 业务目标、能力地图、对象、流程、规则、运营数据、风险和验收齐全。 |
 | 架构结构 | `check_architecture_deliverable.py --kind architecture-plan --file docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | 背景目标、现状约束、核心决策、契约、数据一致性、可靠性安全、验证、发布风险齐全。 |
-| 状态一致性 | `rg "GSD2-W5|P0P1-LWT|GSD2-B2-ACCOUNT-HIERARCHY|B2-AH-RED-001|SOURCE-CONTRACT" docs openspec` | GSD2 入口、README 和 OpenSpec tasks 能追踪到本文、Red 结果和下一 Grant。 |
+| 状态一致性 | `rg "GSD2-W5|P0P1-LWT|GSD2-B2-FR-TARGET|FR_TARGET|targetSubject" docs openspec` | GSD2 入口、README 和 OpenSpec tasks 能追踪到本文、FR target Green 结果和下一 Grant。 |
 | 空白和 Markdown | `git diff --check` | 无行尾空白或 patch 格式问题。 |
 | 编译、测试、PMD | `just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-one AuthorizationFundsInstructionRouteResolverTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests`、`just test-one RouteSnapshotJsonSupportTests tests`；收口追加 `test-boundary`、`pmd` 和 `git diff --check`。 | 账户层级来源契约、授权服务流 route snapshot、route resolver 兼容、route DSL/JSON 回归通过；完整 `verify-cad` 未在本切片默认执行。 |
+
+## 9. Ledger-Wallet Loop 恢复裁决（2026-06-16）
+
+本节只记录本轮进入 ledger / wallet 模块能力完善 loop 后的最终准入裁决，不替代新的单一 Execution Grant。
+
+| 字段 | 内容 |
+| --- | --- |
+| Loop ID | `GSD2-LD-WALLET-CAPABILITY-LOOP-2026-06-16` |
+| 当前状态 | `FR_TARGET_SERVICE_FLOW_GREEN_PENDING_FULL_GATE` |
+| 本轮输入 | 当前 GSD2 计划、OpenSpec tasks、wallet 资金责任关系服务、route funding allocation 快照契约、账户层级来源契约和当前工作树变更。 |
+| 代码锚点 | `CreateSpendSubjectFundingRelationRequest`、`SpendSubjectFundingRelationDTO`、`SpendSubjectFundingRelationQuery`、`SpendSubjectFundingRel` 和 `t_spend_subject_funding_rel` 已新增 `targetSubjectType / targetSubjectId` 与 `target_subject_type / target_subject_id`；`fundingAccountId / funding_account_id` 保留为资金账户目标兼容字段。 |
+| 裁决 | ledger profile 契约切片已具备本地 Green 证据；wallet 资金责任目标主体已选择 `targetSubjectType + targetSubjectId` 并完成首轮资源服务 Green。 |
+| 已消费 Grant | `Execution Grant：GSD2-B2-FR-TARGET-001`。 |
+| 已采用 schema gate | `ddl-backed`。新增 `target_subject_type`、`target_subject_id`、目标主体唯一键和查询索引，保留 `funding_account_id` 作为兼容字段。 |
+| 首批 Green 证据 | 旧 `fundingAccountId` 兼容路径归一为 `FUNDING_ACCOUNT` 目标；`CREDIT_ACCOUNT` 目标可创建并查询；不可用信用账户和 `BUDGET_GROUP` 目标被拒绝；失败路径不写 relation，也不改 ledger facts。 |
+| 候选写入上限 | 已消费 `wallet-face` Request/DTO/Query、`wallet-impl` Entity/service、`tests/src/test/resources/jdbc-schema.sql` 和资金责任服务测试；不触碰支付工具 facade、Spend Rule 策略引擎、VCC processor、清结算、对账、运行时配置或 Git。 |
+| 验证门禁 | `just test-one SpendSubjectFundingRelationServiceImplTests tests`、目标 route snapshot 回归、敏感上下文阻断回归、`just compile`、`git diff --check`；若改公共契约或 schema，收口追加 `just test-boundary` 和 `just pmd`。 |
+| 停止条件 | 用户未确认 `GSD2-B2-FR-TARGET-001`；schema gate 未确认；需要跨模块 public API 或生产数据迁移但 Grant 未列名；发现 BudgetGroup、Spend Rule、PaymentInstrument 或父账户被写成 ledger subject。 |

@@ -40,7 +40,7 @@ flowchart TD
 | 授权 `EXPIRE` 事件和服务入口已闭合 | 授权过期需要与外部撤销区分。 | 已由 `b0666ba feat: 补齐授权过期释放 canonical 能力` 按 B4-TRX-EXPIRE 单一授权闭合；后续只作为授权生命周期回归基线，不再作为待实现差距。 |
 | `settle` 强制完成首轮 canonical 能力已闭合 | `616dac1` 和 `3825466` 已证明 FORCE 模式、内部受信策略、上限、原因、外部原事实引用、凭证、审计、普通完成与 FORCE 分支隔离，以及失败无资金副作用。现有普通完成仍依赖内部原授权流水，首轮 FORCE 不携带 `authorizationTransactionSn`、不构造 `AUTHORIZATION` reference、不查询原授权账本交易。 | 后续只作为 B4 授权交易回归基线；若要扩展生产策略引擎、审批流、额度窗口、带原授权 overcapture、外部清算文件或运营审批系统，必须另起单一 MVP Execution Grant。 |
 | `settleRefund` 无授权退款模式引用和审计字段需复核 | 无前置授权但有可追溯外部引用时，需要可证明不补造授权占用且可追溯；当前扫描确认普通授权链退款仍依赖 `authorizationTransactionSn`、`AUTHORIZATION` reference 和原授权/原完成 route replay。 | 归入 B4 授权交易覆盖索引；进入编码时按单一 MVP 任务授权，并显式确认 `authorizationTransactionSn` 空值语义、`externalReferenceSn`、退款原因、操作者/审计字段和 `NO_AUTH` 内部上下文标签；普通授权链退款继续要求内部授权流水，NO_AUTH 模式不得携带或查询内部授权流水。 |
-| 权益快照 DSL 已统一到主 DSL 文档，生产链路仍需分段闭合 | `FundsBenefitSnapshotSpec`、组件、闭合角色、引用、退款策略、权益枚举和 JSON 夹具已在 `6be9c99` 纳入 B1-10 契约承载基线，并在 `75b46ef`、`9db3eba` 收敛请求摘要和稳定摘要支撑；是否可声明完成仍以 Execution Grant 覆盖范围和验证命令结果为准。即使 Phase 1 契约已通过，直接交易、授权、退款回放、清结算和对账也不能自动声明已实现；Phase 2/3 必须补 Phase 能力边界、任务切片、`fixtureLevel`、权益事实源、零实付表达和专业确认准入。 | B1-10 只证明契约承载；后续 route、posting、replay、清结算和对账必须拆成独立 MVP 任务消费。 |
+| 权益资金事实 DSL 已从旧快照契约重基线，生产链路仍需分段闭合 | 旧 `FundsBenefitSnapshotSpec`、组件、引用、退款策略、稳定摘要对象和 JSON 夹具曾作为 B1-10 历史契约承载基线；当前目标态已由 `GSD2-BENEFIT-FUNDING-TRANSACTION-REBASE-001`、`GSD2-BENEFIT-FUNDING-TRANSACTION-IMPL-001` 和 `GSD2-BENEFIT-LEGACY-SNAPSHOT-REMOVE-001` 重基线为 `FundsBenefitFundingApplicationService`、权益资金请求模型、来源引用、旧字段拒绝和历史摘要兼容。即使契约与首个 `POSTING_REQUIRED` 切片通过，直接交易、授权、退款回放、清结算和对账也不能自动声明已实现；Phase 2/3 必须补 Phase 能力边界、任务切片、`fixtureLevel`、权益事实源、零实付表达和专业确认准入。 | 后续 route、posting、replay、清结算和对账必须拆成独立 MVP 任务消费；不得恢复旧快照 DSL 作为公共契约。 |
 | 目标态测试已局部重建但覆盖未闭环 | 不能依赖旧测试或少量局部测试证明目标态；`DefaultLedgerPostingAssemblerTests` 长 ID 用例规范化只证明账务计划装配器的局部追溯边界。 | 02 设计域仍从 B1 起按覆盖索引逐步闭合；已重建测试作为对应覆盖索引局部基线。 |
 | 清结算、对账和资金数据治理已有骨架或候选实现但不得混入主链路 | 容易误以为 03 或 B8 已获准抢跑，或把治理能力写回交易主链路。 | 03 和 B8 分别独立处理。冻结基线中 `reconciliation-*` 仅具备模块骨架和 B7-00 出款前准入候选实现，只视为候选输入；`governance-*` 只视为候选落点和局部基线。 |
 
@@ -63,7 +63,7 @@ flowchart TD
 4. Route Replay、交易投影正常入口、交易投影治理重放、余额重建和归档续跑是否会产生边界混用。
 5. 03 清结算与对账、B8 资金数据治理是否进入本轮实现；默认顺序为先 02，再 03，再由 B8 按独立 Execution Grant 承接。
 6. 是否开启 CAD Mode、Git 策略和 Execution Grant。
-7. 权益快照是否允许修改 `FundsInstructionSpec` 公共契约、是否新增 `FundsBenefit*` 枚举和 `FundsBenefitAmountClosureRole`，route snapshot 是否固化权益摘要、平台补贴/储值券资金性质由谁最终确认。
+7. 含权益资金流是否允许新增一等字段、事实表或不可变存储，route snapshot 是否固化权益资金事实摘要，平台补贴/储值券资金性质由谁最终确认；不得恢复旧 `FundsInstructionSpec.benefitSnapshot`、旧 `FundsBenefit*` 快照枚举或旧重型权益 DSL。
 
 ## 七、架构准入映射
 

@@ -291,7 +291,7 @@ Git 策略：未确认前 summary_only；确认后若用户保持 GSD-CAD 自动
 | 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
 | canonical 内核 | `FundsAuthorizationTransactionService#authorize` 仍接收 `FundsAuthorizationTransactionAuthorizeRequest`，请求以 `FundsAccountId accountId` 作为已解析账户主体入参；B4-AUTH-PI 不应替换该请求字段。 |
 | 钱包资源服务 | `PaymentInstrumentService` 负责工具和绑定管理；`SpendSubjectFundingRelationService` 负责资金责任关系维护；两者不是授权准入 application facade。 |
-| 缺口 | 未发现 `AuthorizationAdmissionApplicationService`、`PaymentInstrumentCapabilityApplicationService` 生产实现或 `authorizeByInstrument` 入口；既有测试未证明工具准入、绑定快照、Spend Rule、资金责任和账户能力组合后委派授权内核。 |
+| 缺口 | 已补首轮 `PaymentInstrumentCapabilityApplicationService` 工具能力准入；仍未发现 `AuthorizationAdmissionApplicationService` 或 `authorizeByInstrument` 入口，既有测试也未证明工具准入、绑定快照、Spend Rule、资金责任和账户能力组合后委派授权内核。 |
 | 首批 Red | `R0-AUTH-001`：支付工具授权入口必须先做工具、绑定、Spend Rule、资金责任和账户能力准入；拒绝无 route、posting、LedgerEntry、projection 或敏感上下文副作用；批准后只委派账户主体型授权内核。 |
 | Grant 必须列明 | application facade 名称、Request/DTO、错误码、幂等摘要、拒绝事实、route snapshot / audit 快照位置、敏感上下文白名单、目标测试资产和验证命令。 |
 | 禁止混入 | 不新增统一 `InstrumentTransactionService`；不把支付工具、预算组或 Spend Rule 作为账务主体；不混入完整 VCC、Spend Rule 引擎、清结算对账、治理 apply、P2 轨道或敏感原文。 |
@@ -345,9 +345,9 @@ Git 策略：auto_commit
 
 | 扫描项 | 结论 |
 | --- | --- |
-| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 当前状态 | `CONSUMED_FIRST_GREEN_2026-06-16`。 |
 | 资源服务基线 | `PaymentInstrumentService` 和 `PaymentInstrumentServiceImpl` 已覆盖支付工具创建、绑定、绑定历史、状态、方向、币种、生效窗口、敏感字段阻断和无账务副作用；目标测试资产为 `PaymentInstrumentServiceImplTests` 和 `PaymentInstrumentRouteDslContractTests`。 |
-| 目标缺口 | 当前未发现 `PaymentInstrumentCapabilityApplicationService` 或等价 application facade；`PaymentInstrumentDirection` 只有 `RECEIVE`、`PAYMENT`、`BOTH`，尚未固化 RECEIVE、PAY、AUTHORIZE、REFUND、WITHDRAW 五类工具动作能力，也没有统一输出不可变工具准入快照。 |
+| 目标缺口 | 首轮已补 `PaymentInstrumentCapabilityApplicationService` 或等价 application facade，并基于 `PaymentInstrumentDirection` 固化 RECEIVE、PAY、AUTHORIZE、REFUND、WITHDRAW 五类工具动作能力，输出不可变工具准入快照；配置化工具能力矩阵、账户能力组合、授权 admission 和完整预交易快照仍未完成。 |
 | 首批 Red | `R0-PI-001`：工具非 ACTIVE、方向不匹配、缺 RECEIVE/PAY/AUTHORIZE/REFUND/WITHDRAW 动作能力、过期、错币种、敏感原文或绑定版本失效时必须可解释失败，且不生成 route、posting、LedgerEntry 或余额投影。 |
 | Grant 必须列明 | application facade 名称、动作能力承载枚举或等价字段、Request/DTO、准入快照字段、错误码、绑定版本读取、敏感字段白名单、目标测试资产和验证命令。 |
 | 禁止混入 | 不进入授权准入组合、资金责任目标主体迁移、Spend Rule 表、预算控制投影、交易投影、清结算对账、治理 apply、完整 VCC 或 P2 轨道协议。 |

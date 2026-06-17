@@ -28,45 +28,93 @@ public class PaymentInstrumentBindingHistory implements Serializable, TenantIsol
 
     public static final String TABLE_NAME = "t_payment_instrument_binding_history";
 
+    /**
+     * 自增主键。
+     */
     @Id(keyType = KeyType.Auto)
     private Long id;
 
+    /**
+     * 创建时间。
+     */
     private LocalDateTime gmtCreate;
 
+    /**
+     * 最后修改时间。
+     */
     private LocalDateTime gmtModified;
 
+    /**
+     * 绑定历史流水号。
+     */
     @NotNull
     private String sn;
 
+    /**
+     * 租户 ID。
+     */
     @Column(tenantId = true)
     private Long tenantId;
 
+    /**
+     * 绑定关系流水号。
+     */
     @NotNull
     private String bindingSn;
 
+    /**
+     * 支付工具流水号。
+     */
     @NotNull
     private String instrumentSn;
 
+    /**
+     * 绑定变更类型。
+     */
     @NotNull
     private PaymentInstrumentBindingChangeType changeType;
 
+    /**
+     * 变更后的绑定版本号。
+     */
     @NotNull
     private Integer version;
 
+    /**
+     * 变更前快照。
+     */
     private String beforeSnapshot;
 
+    /**
+     * 变更后快照。
+     */
     @NotNull
     private String afterSnapshot;
 
+    /**
+     * 操作人 ID。
+     */
     @NotNull
     private String operatorId;
 
+    /**
+     * 变更原因。
+     */
     @NotNull
     private String changeReason;
 
+    /**
+     * 变更生效时间。
+     */
     private LocalDateTime effectiveAt;
 
+    /**
+     * 幂等请求流水号。
+     */
     private String requestSn;
 
+    /**
+     * 扩展上下文变量。
+     */
     private String contextVariables;
 }

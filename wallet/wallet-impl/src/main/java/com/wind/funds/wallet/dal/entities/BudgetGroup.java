@@ -32,52 +32,106 @@ public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
 
     public static final String TABLE_NAME = "t_budget_group";
 
+    /**
+     * 自增主键。
+     */
     @Id(keyType = KeyType.Auto)
     private Long id;
 
+    /**
+     * 创建时间。
+     */
     private LocalDateTime gmtCreate;
 
+    /**
+     * 最后修改时间。
+     */
     private LocalDateTime gmtModified;
 
+    /**
+     * 预算组流水号。
+     */
     @NotNull
     private String sn;
 
+    /**
+     * 租户 ID。
+     */
     @Column(tenantId = true)
     private Long tenantId;
 
+    /**
+     * 预算归属主体 ID。
+     */
     @NotNull
     private String ownerId;
 
+    /**
+     * 预算归属主体类型。
+     */
     @NotNull
     private FundsAccountOwnerType ownerType;
 
+    /**
+     * 预算组业务类型。
+     */
     @NotNull
     private String budgetType;
 
+    /**
+     * 预算币种。
+     */
     @NotNull
     private CurrencyIsoCode currency;
 
+    /**
+     * 预算周期类型。
+     */
     @NotNull
     private AccountBalancePeriodType periodType;
 
+    /**
+     * 预算周期标识。
+     */
     @NotNull
     private String periodId;
 
+    /**
+     * 预算周期策略。
+     */
     private String periodPolicy;
 
+    /**
+     * 账目 profile 编码快照。
+     */
     @NotNull
     private LedgerProfileCode ledgerProfileCode;
 
+    /**
+     * 账目 profile 版本快照。
+     */
     @NotNull
     private Integer ledgerProfileVersion;
 
+    /**
+     * 预算组状态。
+     */
     @NotNull
     private FundsAccountStatus status;
 
+    /**
+     * 预算组说明。
+     */
     private String description;
 
+    /**
+     * 扩展上下文变量。
+     */
     private String contextVariables;
 
+    /**
+     * 乐观锁版本号。
+     */
     @Column(version = true)
     private Integer version;
 }

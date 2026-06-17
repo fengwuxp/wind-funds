@@ -121,7 +121,7 @@ ScenarioFundsOperationContext
 
 若业务强制要求 VCC 优先，DSL 侧应先证明 `AccountHierarchySnapshot`、绑定快照、父账户快照、账目 profile 和 VCC 卡到资金/信用子账户的映射可以被稳定承载。该路径不得直接新增 `P2-VCC-*` 资金流 DSL、H2/DDL schema、支付工具账务主体或卡号账本主体。
 
-资金责任目标字段进入 DSL fixture、Spec 或公共字段变更前，必须先在 `funding-account-only` 与 `targetSubjectType + targetSubjectId` 中二选一。选择 `funding-account-only` 时，DSL 只能声明支付工具或支出主体解析到资金账户；选择目标主体迁移时，DSL 才能声明信用账户和平台角色解析后的平台资金账户也可作为资金责任结果，并必须同步 TDD、DDL/H2、摘要和回放断言。
+资金责任目标字段已在 `GSD2-B2-FR-TARGET-001` 首轮选择 `targetSubjectType + targetSubjectId`，资源关系可表达资金账户和信用账户目标主体；平台角色解析后的平台资金账户、完整 DSL fixture、资金责任摘要和回放断言仍需后续 Grant 同步。
 
 ### 清结算与对账 DSL 边界
 

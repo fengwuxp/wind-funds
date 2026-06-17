@@ -20,10 +20,6 @@ import com.wind.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
 import com.wind.funds.model.route.ImmutableRouteSnapshotSpec;
 import com.wind.funds.model.route.ImmutableSubjectRef;
-import com.wind.funds.model.transaction.ImmutableFundsBenefitComponentSpec;
-import com.wind.funds.model.transaction.ImmutableFundsBenefitReferenceSpec;
-import com.wind.funds.model.transaction.ImmutableFundsBenefitRefundPolicySpec;
-import com.wind.funds.model.transaction.ImmutableFundsBenefitSnapshotSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
@@ -39,18 +35,9 @@ import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.route.spec.RoutingDecisionSpec;
-import com.wind.funds.spec.transaction.FundsBenefitComponentSpec;
-import com.wind.funds.spec.transaction.FundsBenefitSnapshotSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
-import com.wind.funds.transaction.enums.FundsBenefitAmountClosureRole;
-import com.wind.funds.transaction.enums.FundsBenefitComponentType;
-import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
-import com.wind.funds.transaction.enums.FundsBenefitLedgerEffect;
-import com.wind.funds.transaction.enums.FundsBenefitPartialRefundStrategy;
-import com.wind.funds.transaction.enums.FundsBenefitRefundDisposition;
-import com.wind.funds.transaction.enums.FundsBenefitType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -276,26 +263,25 @@ class DefaultRouteReplayServiceTests {
     }
 
     /**
-     * 场景：含权益原交易发起退款回放，但原 RouteSnapshot 没有原权益快照摘要。
-     * 输入：退款指令携带业务层本次退款决策引用的 benefitSnapshot，原路径快照 context 为空。
+     * 场景：历史含权益原交易发起退款回放，但原 RouteSnapshot 没有原权益快照摘要。
+     * 输入：退款指令仅引用原交易，原路径快照 context 为空。
      * 输出：解析器拒绝回放。
-     * 预期：错误明确指向缺少原权益快照摘要，并带上原交易流水号。
-     * 红线：含权益退款不得用当前请求权益结果替代原交易权益快照，也不得静默按当前营销规则重算。
+     * 预期：无旧权益摘要时按普通历史交易回放，不再要求当前请求携带旧权益快照 DSL。
+     * 红线：清理旧 DSL 后，Route Replay 不得依赖当前请求 benefitSnapshot 判断是否含权益。
      */
     @Test
-    void testResolveBenefitReplayWithoutOriginalBenefitSnapshotShouldFail() {
-        FundsBenefitSnapshotSpec currentBenefitSnapshot = benefitSnapshot("BS-CURRENT-001", 9000L, 1000L);
+    void testResolveReplayWithoutOriginalBenefitSnapshotSummaryShouldNotRequireLegacySnapshotDsl() {
         FundsInstructionReferenceSpec reference = originalTransactionReference("FT202605190004");
         DefaultRouteReplayService replayService = new DefaultRouteReplayService(
                 new SnapshotFundsTransactionQueryService(
                         routeSnapshot(paymentInstrumentRef("CARD-OLD", "old-binding"))));
 
-        assertThatThrownBy(() -> replayService.resolve(replayInstruction(reference,
-                paymentInstrumentRef("CARD-NEW", "new-binding"),
-                null,
-                currentBenefitSnapshot)))
-                .hasMessageContaining(MISSING_ORIGINAL_BENEFIT_SNAPSHOT_MESSAGE)
-                .hasMessageContaining("FT202605190004");
+        ResolvedRouteSpec resolvedRoute = replayService.resolve(replayInstruction(reference,
+                paymentInstrumentRef("CARD-NEW", "new-binding")));
+
+        assertThat(resolvedRoute.getContextVariables())
+                .doesNotContainKeys(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID,
+                        FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST);
     }
 
     /**
@@ -321,38 +307,32 @@ class DefaultRouteReplayServiceTests {
     }
 
     /**
-     * 场景：含权益退款回放引用原 RouteSnapshot，当前请求也携带了新的权益快照和请求上下文。
-     * 输入：原 RouteSnapshot context 只保存原权益快照 ID 和稳定摘要，当前请求携带另一份权益快照和 accountId。
+     * 场景：含权益退款回放引用带历史权益摘要的原 RouteSnapshot。
+     * 输入：原 RouteSnapshot context 保存原权益快照 ID 和稳定摘要，当前请求携带 accountId 等临时上下文。
      * 输出：回放成功，ResolvedRoute context 继承原权益快照摘要。
-     * 预期：回放结果不使用当前请求的权益摘要覆盖原路径事实，也不扩散当前请求上下文。
-     * 红线：Route Replay 只读原权益快照摘要，不能按当前营销或退款请求重新生成历史权益事实或携带临时请求字段。
+     * 预期：回放结果继续使用原路径摘要，也不扩散当前请求上下文。
+     * 红线：Route Replay 只读原权益快照摘要，不能按当前营销或退款请求重新生成历史权益事实。
      */
     @Test
     void testResolveBenefitReplayShouldReuseOriginalBenefitSnapshotSummary() {
-        FundsBenefitSnapshotSpec originalBenefitSnapshot = benefitSnapshot("BS-ORIGINAL-001", 9000L, 1000L);
-        FundsBenefitSnapshotSpec currentBenefitSnapshot = benefitSnapshot("BS-CURRENT-001", 8000L, 2000L);
         FundsInstructionReferenceSpec reference = originalTransactionReference("FT202605190005");
         RouteSnapshotSpec routeSnapshot = routeSnapshot(paymentInstrumentRef("CARD-OLD", "old-binding"),
                 null,
                 routingDecision("ALLOC-OLD", fundingAccount("PAYER-001")),
-                benefitSnapshotSummary(originalBenefitSnapshot));
+                benefitSnapshotSummary("BS-ORIGINAL-001", "sha256:original-benefit-digest"));
         DefaultRouteReplayService replayService = new DefaultRouteReplayService(
                 new SnapshotFundsTransactionQueryService(routeSnapshot));
 
         ResolvedRouteSpec resolvedRoute = replayService.resolve(replayInstruction(reference,
                 paymentInstrumentRef("CARD-NEW", "new-binding"),
                 null,
-                currentBenefitSnapshot,
                 Map.of(FundsInstructionContextKeys.ACCOUNT_ID, "PAYER-CURRENT", "requestChannel", "mobile")));
 
         assertThat(resolvedRoute.getContextVariables())
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, "BS-ORIGINAL-001")
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST,
-                        originalBenefitSnapshot.getStableDigest());
+                        "sha256:original-benefit-digest");
         assertThat(resolvedRoute.getContextVariables())
-                .doesNotContainEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, "BS-CURRENT-001")
-                .doesNotContainEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST,
-                        currentBenefitSnapshot.getStableDigest())
                 .doesNotContainKeys(FundsInstructionContextKeys.ACCOUNT_ID, "requestChannel");
     }
 
@@ -368,20 +348,12 @@ class DefaultRouteReplayServiceTests {
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference,
                                                    PaymentInstrumentRefSpec instrumentRef,
                                                    ExternalAccountRefSpec externalAccountRef) {
-        return replayInstruction(reference, instrumentRef, externalAccountRef, null);
+        return replayInstruction(reference, instrumentRef, externalAccountRef, Map.of());
     }
 
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference,
                                                    PaymentInstrumentRefSpec instrumentRef,
                                                    ExternalAccountRefSpec externalAccountRef,
-                                                   FundsBenefitSnapshotSpec benefitSnapshot) {
-        return replayInstruction(reference, instrumentRef, externalAccountRef, benefitSnapshot, Map.of());
-    }
-
-    private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference,
-                                                   PaymentInstrumentRefSpec instrumentRef,
-                                                   ExternalAccountRefSpec externalAccountRef,
-                                                   FundsBenefitSnapshotSpec benefitSnapshot,
                                                    Map<String, Object> contextVariables) {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(1L)
@@ -392,7 +364,6 @@ class DefaultRouteReplayServiceTests {
                 .instrumentRef(instrumentRef)
                 .externalAccountRef(externalAccountRef)
                 .reference(reference)
-                .benefitSnapshot(benefitSnapshot)
                 .businessScene("REFUND")
                 .businessSn("REPLAY_MISSING_REFERENCE")
                 .eventTime(LocalDateTime.of(2026, 5, 19, 0, 0))
@@ -675,58 +646,18 @@ class DefaultRouteReplayServiceTests {
                 .build();
     }
 
-    private FundsBenefitSnapshotSpec benefitSnapshot(String benefitSnapshotId,
-                                                     long userPayAmount,
-                                                     long discountAmount) {
-        return ImmutableFundsBenefitSnapshotSpec.builder()
-                .benefitSnapshotId(benefitSnapshotId)
-                .benefitGroupSn("BG-ORDER-001")
-                .orderSn("ORDER-001")
-                .pricingSnapshotSn("PRICE-001")
-                .orderAmount(Money.immutable(10_000L, CurrencyIsoCode.USD))
-                .userPayAmount(Money.immutable(userPayAmount, CurrencyIsoCode.USD))
-                .merchantReceivableAmount(Money.immutable(userPayAmount, CurrencyIsoCode.USD))
-                .components(List.of(merchantDiscountComponent(benefitSnapshotId, discountAmount)))
-                .decisionSource("ORDER_PRICING")
-                .decisionTraceId("TRACE-" + benefitSnapshotId)
-                .contextVariables(Map.of())
+    private SubjectRef subjectRef(String subjectId) {
+        return ImmutableSubjectRef.builder()
+                .subjectId(subjectId)
+                .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .currency(CurrencyIsoCode.USD.name())
                 .build();
     }
 
-    private FundsBenefitComponentSpec merchantDiscountComponent(String benefitSnapshotId, long amount) {
-        return ImmutableFundsBenefitComponentSpec.builder()
-                .componentSn("BC-" + benefitSnapshotId)
-                .sequence(1)
-                .benefitType(FundsBenefitType.MERCHANT_COUPON)
-                .componentType(FundsBenefitComponentType.MERCHANT_DISCOUNT)
-                .closureRole(FundsBenefitAmountClosureRole.ORDER_DISCOUNT_CLOSURE)
-                .amount(Money.immutable(amount, CurrencyIsoCode.USD))
-                .ledgerEffect(FundsBenefitLedgerEffect.NO_LEDGER)
-                .fundingNature(FundsBenefitFundingNature.MERCHANT_BORNE)
-                .bearerSubjectRef(fundingAccount("MERCHANT-001"))
-                .beneficiarySubjectRef(fundingAccount("PAYER-001"))
-                .benefitReference(ImmutableFundsBenefitReferenceSpec.builder()
-                        .couponId("COUPON-001")
-                        .ruleVersion("merchant-rule-v3")
-                        .externalDecisionId("pricing-decision-001")
-                        .contextVariables(Map.of())
-                        .build())
-                .refundPolicy(ImmutableFundsBenefitRefundPolicySpec.builder()
-                        .partialRefundStrategy(FundsBenefitPartialRefundStrategy.ITEM_LINE_BASED)
-                        .dispositions(List.of(FundsBenefitRefundDisposition.NO_REFUND,
-                                FundsBenefitRefundDisposition.REDUCE_MERCHANT_RECEIVABLE))
-                        .refundRuleVersion("merchant-refund-v3")
-                        .refundPolicyCode("MERCHANT_COUPON_NO_RETURN")
-                        .contextVariables(Map.of())
-                        .build())
-                .contextVariables(Map.of())
-                .build();
-    }
-
-    private Map<String, Object> benefitSnapshotSummary(FundsBenefitSnapshotSpec snapshot) {
+    private Map<String, Object> benefitSnapshotSummary(String benefitSnapshotId, String stableDigest) {
         return Map.of(
-                FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, snapshot.getBenefitSnapshotId(),
-                FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST, snapshot.getStableDigest());
+                FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, benefitSnapshotId,
+                FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST, stableDigest);
     }
 
     private static class EmptyFundsTransactionQueryService implements FundsTransactionQueryService {

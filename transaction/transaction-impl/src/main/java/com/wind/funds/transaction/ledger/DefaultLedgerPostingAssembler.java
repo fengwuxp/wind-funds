@@ -13,6 +13,7 @@ import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSettlementStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
@@ -198,6 +199,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                 .balanceConstraintType(resolveBalanceConstraintType(leg, node))
                 .intent(intent)
                 .postingScope(postingScope)
+                .postingRole(LedgerPostingRole.DETAIL)
                 .balanceEffectType(leg.getBalanceEffectType())
                 .phaseCode(leg.getPhaseCode())
                 .contextVariables(mergedContext(resolvedRoute, leg))
@@ -420,6 +422,8 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
 
         private final LedgerPostingScope postingScope;
 
+        private final LedgerPostingRole postingRole;
+
         private final LedgerBalanceEffectType balanceEffectType;
 
         private final LedgerBalanceConstraintType balanceConstraintType;
@@ -453,6 +457,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                                        LedgerPhaseCode phaseCode,
                                        LedgerPostingIntentType intent,
                                        LedgerPostingScope postingScope,
+                                       LedgerPostingRole postingRole,
                                        LedgerBalanceEffectType balanceEffectType,
                                        LedgerBalanceConstraintType balanceConstraintType,
                                        String businessScene,
@@ -474,6 +479,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             this.phaseCode = phaseCode;
             this.intent = intent;
             this.postingScope = postingScope;
+            this.postingRole = postingRole;
             this.balanceEffectType = balanceEffectType;
             this.balanceConstraintType = balanceConstraintType;
             this.businessScene = businessScene;

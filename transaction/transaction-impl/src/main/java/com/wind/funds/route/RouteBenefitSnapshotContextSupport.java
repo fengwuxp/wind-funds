@@ -3,7 +3,6 @@ package com.wind.funds.route;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.spec.transaction.FundsBenefitSnapshotSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import org.springframework.util.StringUtils;
 
@@ -21,19 +20,6 @@ final class RouteBenefitSnapshotContextSupport {
     private RouteBenefitSnapshotContextSupport() {
     }
 
-    static Map<String, Object> mergeBenefitSnapshotSummary(FundsInstructionSpec instruction) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        FundsBenefitSnapshotSpec benefitSnapshot = instruction.getBenefitSnapshot();
-        if (benefitSnapshot == null) {
-            return Map.copyOf(result);
-        }
-        result.put(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID,
-                benefitSnapshot.getBenefitSnapshotId());
-        result.put(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST,
-                benefitSnapshot.getStableDigest());
-        return Map.copyOf(result);
-    }
-
     static void assertOriginalBenefitSnapshotPresent(FundsInstructionSpec instruction,
                                                      RouteSnapshotSpec routeSnapshot) {
         Map<String, Object> originalContext = routeSnapshot.getContextVariables();
@@ -41,14 +27,12 @@ final class RouteBenefitSnapshotContextSupport {
         Object originalSnapshotDigest = originalContext.get(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST);
         boolean hasOriginalSnapshotId = originalSnapshotId instanceof String text && StringUtils.hasText(text);
         boolean hasOriginalSnapshotDigest = originalSnapshotDigest instanceof String text && StringUtils.hasText(text);
-        FundsBenefitSnapshotSpec benefitSnapshot = instruction.getBenefitSnapshot();
-        if (benefitSnapshot == null && !hasOriginalSnapshotId && !hasOriginalSnapshotDigest) {
+        if (!hasOriginalSnapshotId && !hasOriginalSnapshotDigest) {
             return;
         }
         AssertUtils.isTrue(hasOriginalSnapshotId && hasOriginalSnapshotDigest,
-                MISSING_BENEFIT_SNAPSHOT_MESSAGE + "，referenceSn = {}，benefitSnapshotId = {}",
-                instruction.getReference().getReferenceSn(),
-                benefitSnapshot == null ? null : benefitSnapshot.getBenefitSnapshotId());
+                MISSING_BENEFIT_SNAPSHOT_MESSAGE + "，referenceSn = {}",
+                instruction.getReference().getReferenceSn());
     }
 
     static Map<String, Object> originalBenefitSnapshotSummary(RouteSnapshotSpec routeSnapshot) {

@@ -8,6 +8,7 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.enums.LedgerTransactionStatus;
@@ -443,6 +444,11 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
         @Override
         public EntrySide getEntryType() {
             return entryType;
+        }
+
+        @Override
+        public LedgerPostingRole getPostingRole() {
+            return LedgerPostingRole.DETAIL;
         }
 
         @Override

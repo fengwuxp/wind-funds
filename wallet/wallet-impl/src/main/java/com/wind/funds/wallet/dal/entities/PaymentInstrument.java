@@ -33,49 +33,103 @@ public class PaymentInstrument implements Serializable, TenantIsolationObject<Lo
 
     public static final String TABLE_NAME = "t_payment_instrument";
 
+    /**
+     * 自增主键。
+     */
     @Id(keyType = KeyType.Auto)
     private Long id;
 
+    /**
+     * 创建时间。
+     */
     private LocalDateTime gmtCreate;
 
+    /**
+     * 最后修改时间。
+     */
     private LocalDateTime gmtModified;
 
+    /**
+     * 支付工具流水号。
+     */
     @NotNull
     private String sn;
 
+    /**
+     * 租户 ID。
+     */
     @Column(tenantId = true)
     private Long tenantId;
 
+    /**
+     * 工具归属主体 ID。
+     */
     @NotNull
     private String ownerId;
 
+    /**
+     * 工具归属主体类型。
+     */
     @NotNull
     private FundsAccountOwnerType ownerType;
 
+    /**
+     * 支付工具类型。
+     */
     @NotNull
     private String instrumentType;
 
+    /**
+     * 工具资金方向。
+     */
     @NotNull
     private PaymentInstrumentDirection instrumentDirection;
 
+    /**
+     * 工具号码或账号标识。
+     */
     @NotNull
     private String instrumentNo;
 
+    /**
+     * 工具所属渠道编码。
+     */
     private String channelCode;
 
+    /**
+     * 外部渠道工具 ID。
+     */
     private String externalInstrumentId;
 
+    /**
+     * 工具币种。
+     */
     @NotNull
     private CurrencyIsoCode currency;
 
+    /**
+     * 支付工具状态。
+     */
     @NotNull
     private FundsAccountStatus status;
 
+    /**
+     * 工具生效时间。
+     */
     private LocalDateTime validFrom;
 
+    /**
+     * 工具失效时间。
+     */
     private LocalDateTime validTo;
 
+    /**
+     * 工具说明。
+     */
     private String description;
 
+    /**
+     * 扩展上下文变量。
+     */
     private String contextVariables;
 }

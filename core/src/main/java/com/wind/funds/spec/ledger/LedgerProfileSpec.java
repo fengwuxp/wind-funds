@@ -1,5 +1,7 @@
 package com.wind.funds.spec.ledger;
 
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.route.enums.FundsSubjectType;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -17,7 +19,7 @@ public interface LedgerProfileSpec {
      * @return profile 编码
      */
     @NonNull
-    String getProfileCode();
+    LedgerProfileCode getProfileCode();
 
     /**
      * @return profile 名称
@@ -29,7 +31,7 @@ public interface LedgerProfileSpec {
      * @return 适用主体类型
      */
     @NonNull
-    String getSubjectType();
+    FundsSubjectType getSubjectType();
 
     /**
      * @return profile 版本
@@ -53,5 +55,5 @@ public interface LedgerProfileSpec {
      * @return 科目配置
      */
     @NonNull
-    List<LedgerProfileItemSpec> getItems();
+    List<? extends LedgerProfileItemSpec> getItems();
 }

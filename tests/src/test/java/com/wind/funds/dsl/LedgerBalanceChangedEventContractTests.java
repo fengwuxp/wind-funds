@@ -64,8 +64,6 @@ class LedgerBalanceChangedEventContractTests {
         LedgerBalanceChangedEvent event = balanceChangedEvent(Map.of(
                 "benefitSnapshotId", "BS-BALANCE-EVENT-SUMMARY-001",
                 "stableDigest", "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                "benefitGroupSn", "BG-BALANCE-EVENT-SUMMARY-001",
-                "componentSn", "COMP-BALANCE-EVENT-SUMMARY-001",
                 "ruleVersion", "rule-v1",
                 "refundDecisionId", "refund-decision-001",
                 "externalDecisionId", "pricing-decision-001"));
@@ -74,8 +72,6 @@ class LedgerBalanceChangedEventContractTests {
                 .containsEntry("benefitSnapshotId", "BS-BALANCE-EVENT-SUMMARY-001")
                 .containsEntry("stableDigest",
                         "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
-                .containsEntry("benefitGroupSn", "BG-BALANCE-EVENT-SUMMARY-001")
-                .containsEntry("componentSn", "COMP-BALANCE-EVENT-SUMMARY-001")
                 .containsEntry("ruleVersion", "rule-v1")
                 .containsEntry("refundDecisionId", "refund-decision-001")
                 .containsEntry("externalDecisionId", "pricing-decision-001");

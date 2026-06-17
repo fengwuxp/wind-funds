@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
@@ -42,7 +43,7 @@ public class ImmutableFundsAccount implements FundsAccount {
 
     @Override
     public Set<FundsAccountCapability> getCapabilities() {
-        return capabilities == null ? FundsAccount.super.getCapabilities() : capabilities;
+        return capabilities == null ? Set.of() : Collections.unmodifiableSet(capabilities);
     }
 
     @Override

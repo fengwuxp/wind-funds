@@ -1,11 +1,28 @@
 package com.wind.funds.wallet.services.impl;
 
+import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.AbstractFundsServiceTest;
-import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.ledger.LedgerBalanceBucket;
 import com.wind.funds.ledger.dto.LedgerDTO;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerSubjectCategory;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.service.LedgerService;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.wallet.FundsAccount;
+import com.wind.funds.wallet.FundsAccountBalanceView;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountQueryService;
+import com.wind.funds.wallet.enums.CreditFundsAccountType;
+import com.wind.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.funds.wallet.enums.FundsAccountCapability;
+import com.wind.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.model.dto.BudgetGroupDTO;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
@@ -17,21 +34,6 @@ import com.wind.funds.wallet.service.BudgetGroupService;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.wind.funds.wallet.service.SubjectLedgerInitializer;
-import com.wind.common.query.supports.DefaultPageQueryOptions;
-import com.wind.funds.ledger.LedgerBalanceBucket;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.EntrySide;
-import com.wind.funds.ledger.enums.LedgerProfileCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCategory;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.wallet.FundsAccountBalanceView;
-import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.FundsAccountQueryService;
-import com.wind.funds.wallet.enums.CreditFundsAccountType;
-import com.wind.funds.wallet.enums.DefaultFundsAccountType;
-import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -126,6 +128,8 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         Long accountId = creditAccountService.createCreditAccount(createCreditAccountRequest());
 
         CreditAccountDTO account = creditAccountService.getCreditAccountById(accountId);
+        FundsAccount accountView = fundsAccountQueryService.getAccount(
+                FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
         List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SN);
 
         assertThat(account.getSn()).isEqualTo(CREDIT_ACCOUNT_SN);
@@ -134,6 +138,10 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(account.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         assertThat(account.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.CREDIT_BASIC);
         assertThat(account.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
+        assertThat(accountView.getCapabilities()).containsExactly(FundsAccountCapability.PAY);
+        assertThat(accountView.canPay()).isTrue();
+        assertThat(accountView.canReceive()).isFalse();
+        assertThat(accountView.canWithdraw()).isFalse();
         assertThat(ledgers).hasSize(3);
         assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
                 ledger,

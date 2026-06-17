@@ -4,6 +4,7 @@ import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.spec.ledger.LedgerProfileItemSpec;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -26,7 +27,7 @@ import java.time.LocalTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class LedgerProfileItemDTO implements Serializable {
+public class LedgerProfileItemDTO implements LedgerProfileItemSpec, Serializable {
 
     @Serial
     private static final long serialVersionUID = -3691606869013497836L;

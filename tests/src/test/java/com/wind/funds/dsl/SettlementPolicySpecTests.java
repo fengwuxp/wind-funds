@@ -2,7 +2,10 @@ package com.wind.funds.dsl;
 
 import com.wind.funds.spec.ledger.SettlementPolicySpec;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -15,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class SettlementPolicySpecTests {
 
     private static final LocalDateTime BASE_TIME = LocalDateTime.of(2026, 5, 20, 22, 30);
+    private static final String DEFAULT_HOLIDAY_CALENDAR = "SettlementPolicySpec.defaultHolidayCalendar";
 
     /**
      * 场景：清结算规则解析产品 DSL 中声明的标准结算策略。
@@ -25,6 +29,7 @@ class SettlementPolicySpecTests {
     void testSettlementPolicyShouldParseDocumentedDslSamples() {
         SettlementPolicySpec realtime = SettlementPolicySpec.parse("RT");
         SettlementPolicySpec delay = SettlementPolicySpec.parse("T+1");
+        SettlementPolicySpec naturalDayDelay = SettlementPolicySpec.parse("D+1");
         SettlementPolicySpec dailyAt = SettlementPolicySpec.parse("D@23:00");
         SettlementPolicySpec weekly = SettlementPolicySpec.parse("W@MON");
         SettlementPolicySpec monthly = SettlementPolicySpec.parse("M@15");
@@ -35,6 +40,9 @@ class SettlementPolicySpecTests {
         assertThat(realtime.getSettlementMode()).isEqualTo(SettlementPolicySpec.SettlementMode.REALTIME);
         assertThat(delay.getSettlementMode()).isEqualTo(SettlementPolicySpec.SettlementMode.DELAY_DAYS);
         assertThat(delay.getInterval()).isEqualTo(1);
+        assertThat(naturalDayDelay.getSettlementMode())
+                .isEqualTo(SettlementPolicySpec.SettlementMode.DELAY_NATURAL_DAYS);
+        assertThat(naturalDayDelay.getInterval()).isEqualTo(1);
         assertThat(dailyAt.getSettlementMode()).isEqualTo(SettlementPolicySpec.SettlementMode.DAILY_AT);
         assertThat(dailyAt.nextSettlementTime(BASE_TIME)).isEqualTo(LocalDateTime.of(2026, 5, 20, 23, 0));
         assertThat(weekly.getSettlementMode()).isEqualTo(SettlementPolicySpec.SettlementMode.WEEKLY);
@@ -51,13 +59,62 @@ class SettlementPolicySpecTests {
     }
 
     /**
+     * 场景：交易日延迟和自然日延迟从周五开始计算。
+     * 预期：T+N 跳过节假日，D+N 只按自然日顺延。
+     * 红线：工作日结算不能被实现成普通 plusDays，自然日结算不能被误判为工作日。
+     */
+    @Test
+    @ResourceLock(DEFAULT_HOLIDAY_CALENDAR)
+    void testSettlementPolicyShouldSeparateBusinessAndNaturalDayDelay() {
+        LocalDateTime friday = LocalDateTime.of(2026, 5, 22, 10, 15);
+        SettlementPolicySpec.SettlementHolidayCalendar holidayCalendar =
+                date -> isWeekend(date) || date.equals(LocalDate.of(2026, 5, 25));
+
+        assertThat(SettlementPolicySpec.parse("T+1").nextSettlementTime(friday))
+                .isEqualTo(LocalDateTime.of(2026, 5, 25, 10, 15));
+        assertThat(SettlementPolicySpec.parse("T+2").nextSettlementTime(friday))
+                .isEqualTo(LocalDateTime.of(2026, 5, 26, 10, 15));
+        assertThat(SettlementPolicySpec.parse("T+1").nextSettlementTime(friday, holidayCalendar))
+                .isEqualTo(LocalDateTime.of(2026, 5, 26, 10, 15));
+        assertThat(SettlementPolicySpec.parse("D+1").nextSettlementTime(friday))
+                .isEqualTo(LocalDateTime.of(2026, 5, 23, 10, 15));
+    }
+
+    /**
+     * 场景：系统配置默认节假日日历后，调用方不显式传入日历。
+     * 预期：T+N 使用配置后的默认日历，测试结束恢复为内置周末日历。
+     * 红线：默认日历不能作为公开可变字段暴露，也不能让单次配置污染后续用例。
+     */
+    @Test
+    @ResourceLock(DEFAULT_HOLIDAY_CALENDAR)
+    void testSettlementPolicyShouldUseConfiguredDefaultHolidayCalendar() {
+        LocalDateTime friday = LocalDateTime.of(2026, 5, 22, 10, 15);
+        SettlementPolicySpec.SettlementHolidayCalendar holidayCalendar =
+                date -> isWeekend(date) || date.equals(LocalDate.of(2026, 5, 25));
+
+        try {
+            SettlementPolicySpec.configureDefaultHolidayCalendar(holidayCalendar);
+
+            assertThat(SettlementPolicySpec.parse("T+1").nextSettlementTime(friday))
+                    .isEqualTo(LocalDateTime.of(2026, 5, 26, 10, 15));
+        } finally {
+            SettlementPolicySpec.resetDefaultHolidayCalendar();
+        }
+
+        assertThat(SettlementPolicySpec.parse("T+1").nextSettlementTime(friday))
+                .isEqualTo(LocalDateTime.of(2026, 5, 25, 10, 15));
+        assertThatThrownBy(() -> SettlementPolicySpec.configureDefaultHolidayCalendar(null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    /**
      * 场景：结算策略表达式非法或无法识别。
      * 预期：解析必须显式失败。
      * 红线：空表达式、未知策略或非法时间不能静默降级成实时结算。
      */
     @Test
     void testSettlementPolicyShouldRejectInvalidExpressions() {
-        List.of("", " ", "UNKNOWN", "T+X", "D@25:00", "C@").forEach(expression ->
+        List.of("", " ", "UNKNOWN", "T+X", "D+0", "D+X", "D@25:00", "C@").forEach(expression ->
                 assertThatThrownBy(() -> SettlementPolicySpec.parse(expression))
                         .as(expression)
                         .isInstanceOf(IllegalArgumentException.class));
@@ -75,5 +132,10 @@ class SettlementPolicySpecTests {
         assertThatThrownBy(() -> customRange.nextSettlementTime(BASE_TIME))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("external range");
+    }
+
+    private static boolean isWeekend(LocalDate date) {
+        DayOfWeek dayOfWeek = date.getDayOfWeek();
+        return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
     }
 }

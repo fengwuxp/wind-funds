@@ -156,11 +156,11 @@ DSL 主文档只记录目标契约、字段边界和验收红线。若后续扩�
 | `referenceTransactionSn` | 内部原资金交易引用，转换为 `FundsInstructionReferenceSpec(ORIGINAL_TRANSACTION)`。 | 用于读取原交易 route snapshot 并按原 leg 回放；缺原事实、缺快照、错币种或累计超额必须失败且无 route、posting、LedgerEntry、余额投影副作用。 |
 | `channelTransactionSn` | 外部通道、退款流水或外部账务引用，转换为 `EXTERNAL_TRANSACTION` 或保留为外部引用。 | 只能用于外部事实追溯和对账，不得替代内部原交易引用驱动原路径回放。 |
 
-后续如新增 `authorizeByInstrument` 或其他支付工具型 application facade，DSL 契约必须证明“应用入口先解析、内核按主体”的转换关系：内部入口解析为 `SubjectRef` 或 `BenefitSnapshot`，外部工具解析为 `PaymentInstrumentRef` 或 `ExternalAccountRef`；工具校验、入口解析或规则决策失败时不生成 route；批准或放行时 `PaymentInstrumentRef`、`FundingAllocationDecision` 或权益快照按需进入 route snapshot；后续撤销、完成、退款和拒付只回放原 route snapshot，不读取当前绑定重新选路。
+后续如新增 `authorizeByInstrument` 或其他支付工具型 application facade，DSL 契约必须证明“应用入口先解析、内核按主体”的转换关系：内部入口解析为 `SubjectRef` 或权益让利资金交易事实，外部工具解析为 `PaymentInstrumentRef` 或 `ExternalAccountRef`；工具校验、入口解析或规则决策失败时不生成 route；批准或放行时 `PaymentInstrumentRef`、`FundingAllocationDecision` 或权益资金交易摘要按需进入 route snapshot；后续撤销、完成、退款和拒付只回放原 route snapshot，不读取当前绑定重新选路。
 
 VCC、多级账户或父子账户相关 DSL 字段进入 fixture、Spec 或公共字段变更前，必须由账户层级工程任务确认 `AccountHierarchySnapshot`、`PostingRole`、父账户 / 根账户快照、层级版本、账目 profile、父账户是否允许 `PARENT_CONTROL` 分录、H2/DDL 范围和回放断言。未确认前，DSL 只能把这些对象作为目标态设计和 contract-only 约束，不能声明发卡账务、父账户汇总或父子账户账单已经生产可用。
 
-资金责任目标字段进入 DSL fixture、Spec 或公共字段变更前，必须先在 `funding-account-only` 与 `targetSubjectType + targetSubjectId` 中二选一。选择 `funding-account-only` 时，`FundingAllocationDecision` 只能声明解析到资金账户；选择目标主体迁移时，才允许声明信用账户、平台角色解析后的平台资金账户以及 VCC 关联资金/信用子账户也可作为责任主体，并必须同步 TDD、DDL/H2、摘要、route snapshot、账户层级快照和回放断言。
+资金责任目标字段已在 `GSD2-B2-FR-TARGET-001` 首轮选择 `targetSubjectType + targetSubjectId`，资源关系可表达资金账户和信用账户目标主体。后续若要让 `FundingAllocationDecision` 正式声明平台角色解析后的平台资金账户以及 VCC 关联资金/信用子账户责任主体，必须继续同步 TDD、DSL fixture、摘要、route snapshot、账户层级快照和回放断言。
 
 ### 3.1 能力域到 DSL 承载和契约证据矩阵
 
@@ -174,7 +174,7 @@ VCC、多级账户或父子账户相关 DSL 字段进入 fixture、Spec 或公�
 | P0 | 清结算与对账 | `SettlementPolicySpec`、清结算 DSL 对象、差错和调账引用。 | 清分明细、清算候选、清算批次、结算锁定、出款结果、对账差异、审批和核销。 | `DSL-SETTLEMENT-*`、`DSL-BENEFIT-CLEARING-RECONCILIATION-001`；`TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`。 | 清分候选直接入账、对账差异直接改历史分录、结算锁定当出款成功。 |
 | P0 | 资金数据治理 | `governanceTask`、`archiveRequest`、`archiveManifest`、`BalanceSnapshotVerifyRef`、`differenceReport`、`manualResolutionRef`、治理读取或导出快照引用。 | 范围、审批、checkpoint、watermark、Manifest、coverage mode、dry-run/apply、差异报告、阻断原因、影响范围、责任归属、证据引用、人工处理动作、可重跑条件、导出快照、脱敏、digest 和审计边界。 | `DSL-GOVERNANCE-*`；`TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`。 | 无范围重放、缺 Manifest 仍推进水位、普通指标快照替代账本余额快照、异常人工处理直接修改交易/账目/余额/投影事实，或报表数仓绕过治理边界直接读取冷归档、反写资金事实。 |
 | P1 | 交易接入 | `FundsInstruction`、`FundsInstructionReferenceSpec`、`businessScene`、`eventType`、`transactionType`，授权应用入口可携带 `PaymentInstrumentRef` 并在准入后转成 `FundingAllocationDecision`。 | 业务流水、幂等键、金额、币种、操作者、来源事实、后续引用、授权工具快照和解析后的资金责任主体。 | `DSL-DIRECT-*`、`DSL-AUTH-*`、`DSL-BALANCE-CONTROL-*`、`DSL-PAYMENT-INSTRUMENT-*`；`TDD-DIR-*`、`TDD-AUTH-*`、`TDD-CTRL-*`、`TDD-ROUTE-*`。 | 把业务订单状态、通道状态机或运营工单直接当作资金交易；或把支付工具入口误解为 ledger subject。 |
-| P1 | 权益语义 | `FundsBenefitSnapshotSpec`、`FundsBenefitComponentSpec`、`FundsBenefitReferenceSpec`、`FundsBenefitRefundPolicySpec`、营销账户引用、伴随权益指令组、补充权益事实、审计证据包引用、使用者解释视图引用。 | 原权益结果、金额闭合、组件角色、承担方、受益方、规则版本、退款处置、本次决策引用、营销账户 profile、伴随指令原子性、补充事实来源、最终确认状态、视图防误导、证据最小化和外部规则核验状态。 | `DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`、`TDD-RACE-012`。 | 把核心权益金额、规则版本或退款处置藏进 `contextVariables`，按当前营销规则重算历史权益，把营销账户当支付工具或营销规则系统，或把伴随指令、补充事实、审计证据包、解释视图和外部规则核验当作备注字段处理。 |
+| P1 | 权益语义 | `FundsBenefitFundingApplicationService`、权益让利资金交易请求、权益来源引用、营销账户引用、伴随权益指令组、补充权益事实、审计证据包引用、使用者解释视图引用。 | 原权益让利资金交易、金额闭合、承担方、受益方、规则版本、退款处置、本次决策引用、营销账户 profile、伴随指令原子性、补充事实来源、最终确认状态、视图防误导、证据最小化和外部规则核验状态。 | `DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`、`TDD-RACE-012`。 | 把核心权益金额、规则版本或退款处置藏进 `contextVariables`，按当前营销规则重算历史权益，把营销账户当支付工具或营销规则系统，或把伴随指令、补充事实、审计证据包、解释视图和外部规则核验当作备注字段处理。 |
 | P1 | 资金路由 | `ResolvedRoute`、`RouteSnapshot`、`RouteParticipant`、`RouteNode`、`RouteLeg`、`RoutingDecision`、`FundingAllocationDecision`。 | 参与方、账目、账本周期、平台账户、资金责任、命中规则、失败原因和原路径回放。 | `DSL-PAYMENT-INSTRUMENT-ROUTE-001`、`DSL-PAYMENT-INSTRUMENT-REPLAY-001`、`DSL-REVERSE-REFUND-FEE-001`；`TDD-ROUTE-*`。 | 缺原 route snapshot 时重新选路，或让 route 直接写交易事实和账本事实。 |
 | P1 | 交易投影 | `TransactionView`、`projectionReplayTask`、交易投影 checkpoint。 | 交易视图来源、重放范围、差异报告、人工处理引用和只读口径。 | `DSL-GOVERNANCE-PROJECTION-REPLAY-001`；`TDD-VIEW-*`、`TDD-REPLAY-*`。 | 交易投影反写交易事实、账本事实或余额投影。 |
 | P2 | VCC、全球账户和收单业务支持 | 业务能力包引用、轨道/外部账户引用、归一资金事实、外部规则核验字段。 | 业务模式边界、外部轨道结果、风险合规确认、资金底座可复用的账户、账本、清结算、对账和归档接口；ACH 或银行转账事件必须已经由上层业务或适配层解释为资金事实。 | 业务专项 PRD、系分补充和 `TDD-RAIL-*`、`TDD-FX-*`、`TDD-OPS-*`。 | 把业务模式、卡组织/银行/PSP/ACH 协议、return code/NOC/reversal 规则解释、风控模型或合规结论沉入统一资金 DSL 内核。 |
@@ -307,9 +307,9 @@ flowchart TD
 | 对账误报关闭 | 对账差错处理动作。 |
 | 对账补事实、冲正、调账或核销 | `DIRECT_TRANSACTION / ADJUSTMENT` 或白名单运营命令。 |
 | 平台补贴 | `DIRECT_TRANSACTION / PAY` 的权益伴随 leg 或独立伴随指令。 |
-| 商户让利或展示优惠 | 权益快照 `NO_LEDGER` 组件。 |
-| 储值券或预付权益核销 | 权益快照 `POSTING_REQUIRED` 组件。 |
-| 零实付交易 | `DIRECT_TRANSACTION / PAY` 携带权益快照。 |
+| 商户让利或展示优惠 | 权益让利资金事实 `NO_LEDGER`，不生成资金分录，只进入解释、清分和对账归因。 |
+| 储值券或预付权益核销 | 权益让利资金事实 `POSTING_REQUIRED`，按预付负债、预收待付或用户权益余额口径生成独立资金影响。 |
+| 零实付交易 | 主支付金额为 0 或由业务拆成伴随权益资金交易；不得通过 `FundsInstruction.benefitSnapshot` 承载完整权益结果。 |
 | 归档、重放、余额快照或交易投影重建 | governance DSL 对象。 |
 
 表解释规则：
@@ -416,7 +416,7 @@ VCC、prepaid virtual card 和 shared card 的 DSL 处理顺序是：先用 `Pay
 | --- | --- |
 | VCC 关联子账户 | 发卡场景中的内部资金子账户或信用子账户，归入 `FUNDING_ACCOUNT` 或 `CREDIT_ACCOUNT`；必须有父账户引用、层级版本、账目 profile、币种、状态、资金责任来源和审计引用。 |
 | prepaid virtual card | 卡本体归入 `PaymentInstrumentRef`；预付余额归入资金子账户；只有经财务、合同或合规确认的预付资金来源才可解析为 `FUNDING_ACCOUNT`、平台责任账户或 product funding / source account。 |
-| 储值券、礼品卡、预付代金券 | 归入权益快照、预收待付或用户权益余额语义；不因名称包含“卡”自动归入 VCC。 |
+| 储值券、礼品卡、预付代金券 | 归入权益让利资金事实、预收待付或用户权益余额语义；不因名称包含“卡”自动归入 VCC。 |
 | shared card | 卡本体归入 `PaymentInstrumentRef`；授权占用归入卡绑定信用子账户；多卡共享通过同一父账户额度池或资金约束表达。 |
 | 信用卡账户 / charge card 额度 | 如果承载授信额度，归入 `CREDIT_ACCOUNT`；卡本身只是工具引用。 |
 | 预算组 | 归入预算控制上下文，只表达预算范围、规则归属、展示和审计，不表达真实资金沉淀，也不作为 `LedgerEntry` 主体。 |
@@ -442,7 +442,7 @@ VCC、prepaid virtual card 和 shared card 的 DSL 处理顺序是：先用 `Pay
 3. 再判断对象是否是内部可记账主体；真实资金责任、授信额度、VCC 关联资金/信用子账户或平台账户角色解析后的平台资金账户可以进入 `SubjectRef`。
 4. 如果对象是 prepaid virtual card，卡本体仍为 `PaymentInstrumentRef`，预付余额必须落到资金子账户，父账户约束必须进入 `AccountHierarchySnapshot`，预付资金来源必须经外部确认后解析为内部责任来源；确认缺失时不得生成 route、posting 或 entry。
 5. 如果对象是 shared card，卡本体仍为 `PaymentInstrumentRef`，共享账务主体应是卡绑定信用子账户；共享关系必须通过 binding snapshot、使用人上下文、父账户快照、预算组、Spend Rule 快照和 `FundingAllocationDecision` 表达；后续事件必须沿原 route snapshot 回放。
-6. 如果对象是储值券、礼品卡、预付代金券或平台补贴权益，先进入权益快照、预收待付或补贴责任语义，不因名称包含“卡”自动进入 VCC。
+6. 如果对象是储值券、礼品卡、预付代金券或平台补贴权益，先进入权益让利资金事实、预收待付或补贴责任语义，不因名称包含“卡”自动进入 VCC。
 7. 任何无法在上述路径中确定唯一内部可记账主体的对象，都只能形成拒绝、待确认或 contract-only 结果。
 
 ### 6.2 账目与余额桶
@@ -513,7 +513,7 @@ FX 边界：
 | `eventTime` | 是 | 事实发生时间。 |
 | `operator` | 是 | 操作者快照。 |
 | `reference` | 条件必填 | 后续事件必须引用原事实或原快照。 |
-| `benefitSnapshot` | 条件必填 | 交易使用优惠券、代金券、平台补贴、商户让利、储值券或其他权益抵扣时必填，承接业务侧已决策的权益结果快照；无权益交易为空。 |
+| `benefitFundingRef` | 条件必填 | 交易使用优惠券、代金券、平台补贴、商户让利、储值券或其他权益抵扣且需要资金底座记账、退款、撤销或对账时必填，引用权益让利资金交易或等价不可变事实；无权益交易为空。 |
 | `contextVariables` | 是 | 补充上下文，不能隐藏必填主语义。 |
 | `riskAndComplianceRef` | 条件必填 | 涉及资质、法域、客户资金、备付金、跨境、外汇、敏感数据、外部规则或高危人工动作时必填，记录规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方、确认状态、审批或证据引用；不得保存敏感原文。 |
 
@@ -544,454 +544,243 @@ FX 边界：
 
 DSL 契约统一使用 `instrumentSn` 和 `instrumentDisplayNo`：前者作为稳定工具引用，后者作为脱敏展示号；不得把稳定工具号和展示号混用。
 
-### 7.2.1 权益结果快照
+### 7.2.1 权益让利资金事实
 
-`FundsBenefitSnapshotSpec` 是资金指令上的权益结果快照。它只表达业务侧、订单侧或营销权益系统已经决策完成的权益结果，不计算券规则、不判断券是否可用、不维护券生命周期。无权益交易不携带该对象。
+权益让利资金事实用于把业务侧、订单侧或营销权益系统已经决策完成的优惠券、代金券、平台补贴、商户让利和储值权益结果，转换成资金底座可理解、可记账、可退款、可撤销、可清结算和可对账的稳定事实。资金底座不计算券规则、不判断券是否可用、不维护券包生命周期。
 
 对象关系：
 
 | 对象 | 用途 | 边界 |
 | --- | --- | --- |
-| `FundsBenefitSnapshotSpec` | 表达一组权益结果快照，包含订单金额、用户实付、商户应收、权益组件和默认退款规则。 | 不替代 `FundsInstruction.amount`，不保存完整营销规则。 |
-| `FundsBenefitComponentSpec` | 表达一个权益金额组件，例如商户让利、平台补贴、代金券核销、储值券抵扣。 | 只表达权益金额、承担方、受益方、账务效果和退款处置，不表达手续费和税费。 |
-| `FundsBenefitReferenceSpec` | 保存券、活动、核销、占用、规则版本和外部决策引用。 | 外部引用不是资金底座主键，不作为可入账主体。 |
-| `FundsBenefitRefundPolicySpec` | 保存组件级或快照级退款处置。 | 用户侧不返券和资金侧不冲补贴必须分开表达。 |
+| `FundsBenefitFundingApplicationService` | 权益让利资金交易应用服务，提供 `apply`、`refund`、`reverse`，返回资金交易流水号。 | 和直接交易服务处于同一抽象层级；不直接写 route、posting、LedgerEntry 或余额投影。 |
+| `FundsBenefitFundingApplyRequest` | 表达正向权益让利资金事实。 | 只承载已决策结果，不承载完整营销规则、券包库存或最优券计算。 |
+| `FundsBenefitFundingRefundRequest` | 表达原权益让利资金交易的退款。 | 必须引用原权益让利资金交易流水号；不得携带当前重新计算的权益结果作为资金事实来源。 |
+| `FundsBenefitFundingReverseRequest` | 表达原权益让利资金交易的撤销或反向冲销。 | 必须引用原权益让利资金交易流水号；适用于取消、纠错或准实时冲销，不替代退款语义。 |
+| `FundsBenefitFundingSourceDTO` | 保存权益让利来源、规则和对应金额引用；外部决策通过 `sourceType=EXTERNAL_DECISION` 或 `sourceId` 表达。 | 不是资金账户、支付工具或账务主体；只做审计、对账和归因。 |
 
-职责边界：券能不能退是业务层、订单层、营销权益系统或运营审批链路的决策。资金底座不判断券是否可退，不读取当前券包状态，不调用当前营销规则重新计算。DSL 只承接两类事实：原交易权益快照中的默认退款策略，以及本次退款或后续事件由业务层给出的退款决策结果。后续退款、撤销、过期或拒付必须引用原权益快照和本次决策结果，不得在资金底座内补算。
+职责边界：券能不能退、是否返券、是否作废、是否补贴冲回，仍由业务层、订单层、营销权益系统或运营审批链路决策。资金底座只校验已决策权益让利资金事实是否具备交易、记账、路由、清结算、对账和回放所需证据。
 
 #### 7.2.1.1 设计目标、字段对齐和包结构
 
-权益快照的 DSL 设计目标是把优惠券、代金券、平台补贴、商户让利、储值权益等已经决策完成的权益结果变成资金底座可读、可审计、可回放的稳定事实。它解决四个问题：
+权益让利资金事实的 DSL 设计目标是回答四个问题：
 
-1. 让权益金额成为一等 DSL，而不是塞进 `contextVariables` 的临时扩展。
-2. 区分“只影响订单价格或展示”的权益和“需要形成资金影响”的权益。
-3. 为退款、撤销、授权过期、清结算、对账和交易投影重放保留原始权益事实。
-4. 避免后续事件按当前营销规则重算历史权益，导致资金路径、商户应收和补贴成本漂移。
+1. 谁给谁让了多少钱。
+2. 基于哪些权益让利来源、规则或外部决策。
+3. 关联哪笔原始订单、原资金交易或原权益让利资金交易。
+4. 是否需要进入 route、posting、LedgerEntry、清结算、对账、投影或只做解释归因。
 
 设计原则：
 
 1. 不改变 `FundsInstructionSpec` 既有主字段语义。
-2. 只在资金指令上增加一个可选一级字段：`benefitSnapshot`。
-3. 权益快照必须可被 route、posting、refund replay、clearing、reconciliation 和 projection 消费。
+2. 交易层入口使用 `FundsBenefitFundingApplicationService`，而不是新增 `FundsMarketingTransactionService` 或 `authorizeBenefit/settleBenefit/refundBenefit` 平行生命周期。
+3. 权益让利资金事实必须能被 route、posting、refund/reverse replay、clearing、reconciliation 和 projection 消费。
 4. 商户让利、展示优惠等无资金转移权益不能误生成 `LedgerEntry`。
 5. 平台补贴、储值代金券、合作方补贴等有资金影响权益必须能被拆成独立 route leg、独立伴随指令或独立 posting 依据。
-6. 营销账户只作为有资金影响权益组件的账户化承接。MVP 通过 `fundingSubjectRef`、`fundingAccountRole`、资金账户 profile、平台责任账户 profile 或等价不可变快照表达，不因为出现营销账户概念就直接新增不受控的 `FundsSubjectType`。
+6. 营销账户只作为有资金影响权益组件的账户化承接。MVP 通过 `costBearerSubjectRef`、`benefitReceiverSubjectRef`、资金账户 profile、平台责任账户 profile 或等价不可变事实表达，不因为出现营销账户概念就直接新增不受控的 `FundsSubjectType`。
 
 现有字段对齐：
 
-| 现有字段 | 当前语义 | 权益快照是否改变 |
+| 现有字段 | 当前语义 | 权益资金事实是否改变 |
 | --- | --- | --- |
 | `amount` | 当前资金指令主链路金额。 | 不改变；付款场景通常等于用户实付金额。 |
 | `originalAmount` | 当前资金指令原始金额和 FX 快照。 | 不改变；不拿来表达订单原价。 |
 | `exchangeRate` | `originalAmount -> amount` 的汇率快照。 | 不改变；权益跨币种必须由业务侧给出已决策 FX 快照。 |
 | `instrumentRef` | 支付工具引用快照。 | 不改变；只影响支付工具和资金责任解析。 |
 | `externalAccountRef` | 外部账户引用快照。 | 不改变；外部账户仍不得入账。 |
-| `reference` | 后续事件引用原资金事实、原 route snapshot 或原冻结/授权事实。 | 不改变；权益逆向事件还必须引用原权益快照或等价摘要。 |
-| `contextVariables` | 补充上下文。 | 不改变；但不得承载核心权益金额、金额闭合、规则版本或退款处置。 |
+| `reference` | 后续事件引用原资金事实、原 route snapshot 或原冻结/授权事实。 | 不改变；权益逆向事件必须引用原权益让利资金交易或等价不可变事实。 |
+| `contextVariables` | 补充上下文。 | 不改变；但不得承载核心权益金额、完整资金责任、退款处置或当前营销规则输入；`benefitSnapshotId`、`stableDigest`、`ruleVersion` 只允许作为历史追溯摘要。 |
 
-建议新增到 `FundsInstructionSpec` 的可选字段：
-
-```java
-@Nullable
-default FundsBenefitSnapshotSpec getBenefitSnapshot() {
-    return null;
-}
-```
-
-该字段与 `instrumentRef`、`externalAccountRef`、`reference` 同级，是资金指令可选事实快照，不是临时上下文。
-
-包结构建议保持现有 `spec` / `model` / `enums` 分层风格：
+目标包结构：
 
 ```text
-core/src/main/java/com/wind/funds/spec/transaction/
-  FundsBenefitSnapshotSpec.java
-  FundsBenefitComponentSpec.java
-  FundsBenefitReferenceSpec.java
-  FundsBenefitRefundPolicySpec.java
+transaction/transaction-face/src/main/java/com/wind/funds/transaction/application/
+  FundsBenefitFundingApplicationService.java
 
-core/src/main/java/com/wind/funds/model/transaction/
-  ImmutableFundsBenefitSnapshotSpec.java
-  ImmutableFundsBenefitComponentSpec.java
-  ImmutableFundsBenefitReferenceSpec.java
-  ImmutableFundsBenefitRefundPolicySpec.java
+transaction/transaction-face/src/main/java/com/wind/funds/transaction/model/request/
+  FundsBenefitFundingApplyRequest.java
+  FundsBenefitFundingRefundRequest.java
+  FundsBenefitFundingReverseRequest.java
+
+transaction/transaction-face/src/main/java/com/wind/funds/transaction/model/dto/
+  FundsBenefitFundingSourceDTO.java
 
 core/src/main/java/com/wind/funds/transaction/enums/
-  FundsBenefitType.java
-  FundsBenefitComponentType.java
-  FundsBenefitAmountClosureRole.java
   FundsBenefitLedgerEffect.java
   FundsBenefitFundingNature.java
-  FundsBenefitRefundDisposition.java
-  FundsBenefitPartialRefundStrategy.java
-  FundsBenefitLifecycleAction.java
 ```
 
-不建议把权益模型放到 `route` 包。权益快照先属于资金指令事实，route、posting、清结算、对账和投影只消费它，不拥有它。
+旧重型权益快照 DSL 已从 core 目标契约中移除：不再提供 `FundsInstruction.benefitSnapshot`、`FundsBenefitSnapshotSpec`、组件、引用、退款策略和稳定摘要对象。目标态只保留权益让利资金交易事实、来源引用和通用请求摘要；历史 route、投影或对账中已固化的 `benefitSnapshotId`、`stableDigest` 只能作为只读摘要追溯字段，不能恢复为完整旧 DSL。
 
 营销账户字段承接建议：
 
 | 字段或对象 | 营销账户语义 | 边界 |
 | --- | --- | --- |
-| `fundingSubjectRef` | 指向已解析的资金账户、平台责任资金账户或等价营销账户 profile。 | 不能指向支付工具、活动、券实例、用户经营主体或商户经营主体。 |
-| `fundingAccountRole` | 表达平台营销成本、权益负债、合作方补贴、营销留置等平台账户角色。 | 角色必须先解析成可入账账户；角色本身不直接入账。 |
-| `bearerSubjectRef` | 说明权益成本、让利或负债责任归属方。 | 可用于解释和对账，不等于必然生成账本分录。 |
-| `beneficiarySubjectRef` | 说明权益资金影响的受益方，例如商户待清算主体。 | 受益方仍需通过 route 解析为可入账账户。 |
-| `benefitReference` | 保存券、活动、核销、占用、规则和外部决策引用。 | 不是账户引用，也不是资金来源。 |
+| `costBearerSubjectRef` | 指向承担本组件让利、补贴、权益负债或合作方责任的资金账户、平台责任资金账户或等价营销账户 profile，是资金底座的 canonical 账务责任主体。 | 不能指向支付工具、活动、券实例、用户经营主体或商户经营主体；业务归因通过账户 profile、账目维度、业务单据和权益引用追溯。 |
+| `benefitReceiverSubjectRef` | 指向权益资金影响的受益账务主体，例如商户待清算主体、用户权益账户或平台目标责任账户。 | 为空时由 route、清结算或上层业务关系解析；不作为营销规则或券包状态。 |
+| `fundingAccountRoleCode` | 表达平台营销成本、权益负债、合作方补贴、营销留置等平台账户角色。 | 角色必须先解析成可入账账户；角色本身不直接入账。 |
+| `benefitFundingSources` | 保存券、活动、核销、占用、规则等权益让利来源引用；外部决策按来源类型或来源标识归一表达。 | 不是账户引用、支付工具引用，也不是资金来源账户。 |
 
-营销账户不替代权益快照。权益快照保存“本次用了什么权益、金额和处置”；营销账户只回答“其中需要入账或留置的资金责任落到哪个账户 profile”。没有权益快照或等价摘要时，后续退款、撤销、清结算、对账和投影不得只凭营销账户重新构造历史权益。
+营销账户不替代权益让利资金事实。权益让利资金事实保存“本次用了什么权益、谁给谁让利、金额和处置”；营销账户只回答“其中需要入账或留置的资金责任落到哪个账户 profile”。没有原权益资金交易或等价不可变事实时，后续退款、撤销、清结算、对账和投影不得只凭营销账户重新构造历史权益。
 
 营销账户服务入口边界：
 
 | 边界 | DSL 裁决 |
 | --- | --- |
 | 禁止新增权益交易 DSL 服务入口 | 不新增 `FundsMarketingTransactionService`、`authorizeBenefit`、`settleBenefit`、`refundBenefit` 等平行交易入口；权益授权、结算和退款必须落回现有直接交易、授权交易、退款、撤销和清结算生命周期。 |
-| 应用门面只生成或校验快照 | `FundsBenefitFundingApplicationService` 是已确认保留的应用门面命名；后续若落地 Java 公共契约，只能解析权益资金责任、校验营销账户 profile、固化权益资金快照并委派既有交易服务，不直接生成账本事实。 |
-| 解析服务不拥有营销规则 | `BenefitFundingResolutionService` 只消费已决策权益组件、承担方、资金性质、受益方和专业确认状态，不读取当前券包、活动规则或最优券计算。 |
-| guard 在 route/posting 前失败 | `MarketingAccountGuard` 必须在 route leg、posting plan 或 LedgerEntry 生成前阻断缺账户引用、缺账户 profile、缺专业确认、缺核销/占用引用和 `NO_LEDGER` 误入账。 |
-| 快照进入既有 DSL | 权益资金影响仍通过 `FundsInstructionSpec.benefitSnapshot`、route snapshot、posting context 和交易事实快照表达；不得新增独立 marketing transaction 指令类型替代原交易生命周期。 |
+| 权益交易应用服务 | `FundsBenefitFundingApplicationService` 是已确认保留的交易级 application 服务命名；公共契约提供 `apply`、`refund`、`reverse`，返回资金交易流水号。 |
+| 解析服务不拥有营销规则 | `BenefitFundingResolutionService` 只消费已决策权益资金事实、承担方、资金性质和受益方，不读取当前券包、活动规则或最优券计算。 |
+| guard 在 route/posting 前失败 | `MarketingAccountGuard` 必须在 route leg、posting plan 或 LedgerEntry 生成前阻断缺账户引用、缺账户 profile、缺核销/占用引用和 `NO_LEDGER` 误入账；专业确认属于生产准入或审计证据，不作为公共交易请求字段。 |
+| 事实进入既有资金链路 | 权益资金影响通过权益让利资金交易事实、route snapshot、posting context 和交易事实表达；不得新增独立 marketing transaction 指令类型替代原交易生命周期。 |
 
 #### 7.2.1.2 对象关系和接口草图
 
 ```mermaid
 classDiagram
-    class FundsInstructionSpec {
-      +Money getAmount()
-      +Money getOriginalAmount()
-      +FundsInstructionReferenceSpec getReference()
-      +FundsBenefitSnapshotSpec getBenefitSnapshot()
+    class FundsBenefitFundingApplicationService {
+      +String apply(FundsBenefitFundingApplyRequest request)
+      +String refund(FundsBenefitFundingRefundRequest request)
+      +String reverse(FundsBenefitFundingReverseRequest request)
     }
 
-    class FundsBenefitSnapshotSpec {
-      +String getBenefitSnapshotId()
-      +String getBenefitSchemaVersion()
-      +String getBenefitGroupSn()
-      +Money getOrderAmount()
-      +Money getUserPayAmount()
-      +Money getMerchantReceivableAmount()
-      +List~FundsBenefitComponentSpec~ getComponents()
-      +FundsBenefitRefundPolicySpec getRefundPolicy()
+    class FundsBenefitFundingApplyRequest {
+      +String businessScene
+      +String businessSn
+      +String originalOrderSn
+      +String referenceTransactionSn
+      +SubjectRef costBearerSubjectRef
+      +SubjectRef benefitReceiverSubjectRef
+      +Money amount
+      +FundsBenefitFundingNature fundingNature
+      +FundsBenefitLedgerEffect ledgerEffect
+      +List~FundsBenefitFundingSourceDTO~ benefitFundingSources
     }
 
-    class FundsBenefitComponentSpec {
-      +String getComponentSn()
-      +FundsBenefitType getBenefitType()
-      +FundsBenefitComponentType getComponentType()
-      +FundsBenefitAmountClosureRole getClosureRole()
-      +Money getAmount()
-      +FundsBenefitLedgerEffect getLedgerEffect()
-      +FundsBenefitFundingNature getFundingNature()
-      +FundsBenefitReferenceSpec getBenefitReference()
-      +FundsBenefitRefundPolicySpec getRefundPolicy()
+    class FundsBenefitFundingRefundRequest {
+      +String referenceBenefitTransactionSn
+      +Money amount
+      +String businessScene
+      +String businessSn
+      +String originalOrderSn
     }
 
-    class FundsBenefitReferenceSpec {
-      +String getCampaignId()
-      +String getCouponId()
-      +String getVoucherId()
-      +String getHoldId()
-      +String getWriteOffId()
-      +String getRuleVersion()
+    class FundsBenefitFundingReverseRequest {
+      +String referenceBenefitTransactionSn
+      +Money amount
+      +String businessScene
+      +String businessSn
+      +String originalOrderSn
     }
 
-    class FundsBenefitRefundPolicySpec {
-      +FundsBenefitPartialRefundStrategy getPartialRefundStrategy()
-      +List~FundsBenefitRefundDisposition~ getDispositions()
-      +Money getRefundableAmount()
-      +Money getNonRefundableAmount()
+    class FundsBenefitFundingSourceDTO {
+      +FundsBenefitFundingSourceType sourceType
+      +String sourceId
+      +String ruleId
+      +String ruleVersion
+      +Money amount
     }
 
-    FundsInstructionSpec --> FundsBenefitSnapshotSpec
-    FundsBenefitSnapshotSpec --> FundsBenefitComponentSpec
-    FundsBenefitSnapshotSpec --> FundsBenefitRefundPolicySpec
-    FundsBenefitComponentSpec --> FundsBenefitReferenceSpec
-    FundsBenefitComponentSpec --> FundsBenefitRefundPolicySpec
+    FundsBenefitFundingApplicationService --> FundsBenefitFundingApplyRequest
+    FundsBenefitFundingApplicationService --> FundsBenefitFundingRefundRequest
+    FundsBenefitFundingApplicationService --> FundsBenefitFundingReverseRequest
+    FundsBenefitFundingApplyRequest --> FundsBenefitFundingSourceDTO
 ```
 
-接口草图用于约束公共契约骨架；字段完整语义、必填条件和默认值以本节字段表和校验规则为准。
+接口草图用于约束公共契约骨架；字段完整语义、必填条件和默认值以 transaction-face Java 契约为准。
 
 ```java
-public interface FundsBenefitSnapshotSpec {
+public interface FundsBenefitFundingApplicationService {
 
-    @NonNull String getBenefitSnapshotId();
+    @NonNull String apply(@NonNull FundsBenefitFundingApplyRequest request,
+                          @NonNull WindOperator operator);
 
-    @NonNull String getBenefitSchemaVersion();
+    @NonNull String refund(@NonNull FundsBenefitFundingRefundRequest request,
+                           @NonNull WindOperator operator);
 
-    @NonNull String getBenefitGroupSn();
-
-    @Nullable String getOrderSn();
-
-    @Nullable String getPricingSnapshotSn();
-
-    @NonNull Money getOrderAmount();
-
-    @NonNull Money getUserPayAmount();
-
-    @Nullable Money getMerchantReceivableAmount();
-
-    @NonNull List<FundsBenefitComponentSpec> getComponents();
-
-    @Nullable FundsBenefitRefundPolicySpec getRefundPolicy();
-
-    @Nullable String getDecisionSource();
-
-    @Nullable String getDecisionTraceId();
-
-    @NonNull Map<String, Object> getContextVariables();
-}
-
-public interface FundsBenefitComponentSpec {
-
-    @NonNull String getComponentSn();
-
-    int getSequence();
-
-    @NonNull FundsBenefitType getBenefitType();
-
-    @NonNull FundsBenefitComponentType getComponentType();
-
-    @NonNull FundsBenefitAmountClosureRole getClosureRole();
-
-    @NonNull Money getAmount();
-
-    @NonNull FundsBenefitLedgerEffect getLedgerEffect();
-
-    @NonNull FundsBenefitFundingNature getFundingNature();
-
-    @Nullable SubjectRef getBearerSubjectRef();
-
-    @Nullable SubjectRef getBeneficiarySubjectRef();
-
-    @Nullable SubjectRef getFundingSubjectRef();
-
-    @Nullable String getFundingAccountRole();
-
-    @NonNull FundsBenefitReferenceSpec getBenefitReference();
-
-    @Nullable FundsBenefitRefundPolicySpec getRefundPolicy();
-
-    @Nullable String getDescription();
-
-    @NonNull Map<String, Object> getContextVariables();
-}
-
-public interface FundsBenefitReferenceSpec {
-
-    @Nullable String getCampaignId();
-
-    @Nullable String getCouponId();
-
-    @Nullable String getVoucherId();
-
-    @Nullable String getBenefitInstanceId();
-
-    @Nullable String getHoldId();
-
-    @Nullable String getWriteOffId();
-
-    @Nullable String getReleaseId();
-
-    @Nullable String getRuleVersion();
-
-    @Nullable String getExternalDecisionId();
-
-    @NonNull Map<String, Object> getContextVariables();
-}
-
-public interface FundsBenefitRefundPolicySpec {
-
-    @NonNull FundsBenefitPartialRefundStrategy getPartialRefundStrategy();
-
-    @NonNull List<FundsBenefitRefundDisposition> getDispositions();
-
-    @Nullable Money getRefundableAmount();
-
-    @Nullable Money getNonRefundableAmount();
-
-    @Nullable String getRefundRuleVersion();
-
-    @Nullable String getRefundPolicyCode();
-
-    @Nullable String getRefundDecisionId();
-
-    @Nullable String getDecisionSource();
-
-    @Nullable Instant getDecisionTime();
-
-    @NonNull Map<String, Object> getContextVariables();
+    @NonNull String reverse(@NonNull FundsBenefitFundingReverseRequest request,
+                            @NonNull WindOperator operator);
 }
 ```
 
-核心字段：
+正向请求核心字段：
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `benefitSnapshotId` | 是 | 权益快照 ID，用于审计、回放、清结算和对账。 |
-| `benefitSchemaVersion` | 是 | 权益快照结构版本，默认可为 `1.0`。 |
-| `benefitGroupSn` | 是 | 同一订单、支付、补贴、退款、清结算之间的权益关联组号。 |
-| `orderSn` | 否 | 订单号或业务订单引用。 |
-| `pricingSnapshotSn` | 否 | 订单价格或商品行分摊快照引用。 |
-| `orderAmount` | 是 | 订单原始金额，不替代资金指令 `amount`。 |
-| `userPayAmount` | 是 | 用户实付或本次应由用户资金承担的金额。 |
-| `merchantReceivableAmount` | 否 | 商户应收毛额，未知时由清结算规则计算。 |
-| `components` | 是 | 权益金额组件列表。 |
-| `refundPolicy` | 否 | 快照级默认退款规则，组件级可覆盖。 |
-| `decisionSource` | 否 | 外部决策来源，例如订单计价或营销权益系统。 |
-| `decisionTraceId` | 否 | 外部权益决策链路追踪 ID。 |
+| `tenantId` | 是 | 租户 ID。 |
+| `businessScene` | 是 | 业务场景，例如平台补贴、商户让利、储值权益核销、合作方补贴。 |
+| `businessSn` | 是 | 本次业务流水号，也是权益让利资金交易幂等入口，例如支付、退款、人工补贴或清分调整流水号。 |
+| `originalOrderSn` | 是 | 原始业务订单号。 |
+| `referenceTransactionSn` | 否 | 关联原主资金交易流水号，可用于伴随支付、退款、撤销、争议或对账回放。 |
+| `costBearerSubjectRef` | 是 | 让利、补贴、权益负债或合作方责任承担账务主体。 |
+| `benefitReceiverSubjectRef` | 是 | 权益资金影响受益账务主体。 |
+| `amount` | 是 | 让利资金金额。 |
+| `fundingNature` | 是 | 权益资金性质，例如平台自有资金、商户承担、预付负债、合作方出资。 |
+| `ledgerEffect` | 是 | 账务效果，例如不入账、必须入账、占用、释放、反向冲销。 |
+| `benefitFundingSources` | 是 | 权益让利来源和规则引用列表；外部决策通过来源类型或来源标识表达。 |
+| `contextVariables` | 否 | 非关键只读上下文，不得承载核心金额、规则版本、券包或敏感原文。 |
 
-组件字段：
+退款和撤销请求核心字段：
 
-| 字段 | 必填 | 说明 |
-| --- | --- | --- |
-| `componentSn` | 是 | 组件唯一标识，退款、对账和问题定位使用。 |
-| `sequence` | 否 | 组件稳定排序号，便于审计展示、序列化摘要和差错定位；缺省为 0。 |
-| `benefitType` | 是 | 权益类型，例如商户券、平台券、代金券、储值券、合作方补贴。 |
-| `componentType` | 是 | 金额组件类型，例如商户让利、平台补贴、代金券核销、补贴冲回。 |
-| `closureRole` | 是 | 金额闭合角色，用于区分正向订单抵扣、商户应收影响、逆向退款处置和只读展示对账。 |
-| `amount` | 是 | 组件金额，币种必须与快照金额一致，跨币种必须由业务侧给出已决策 FX 快照。 |
-| `ledgerEffect` | 是 | 账务效果，例如 `NO_LEDGER`、`POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED`。 |
-| `fundingNature` | 是 | 资金性质，例如商户承担、平台自有资金、预付负债、合作方出资。 |
-| `bearerSubjectRef` | 条件必填 | 承担方，商户让利等 `NO_LEDGER` 组件至少要能解释承担方。 |
-| `beneficiarySubjectRef` | 否 | 受益方，例如用户、商户或平台。 |
-| `fundingSubjectRef` 或 `fundingAccountRole` | 条件必填 | 有资金影响的权益组件必须能解析资金来源。 |
-| `benefitReference` | 是 | 券、活动、核销、占用、规则版本和外部引用。 |
-| `refundPolicy` | 否 | 组件级退款规则；为空时使用快照级规则。 |
-| `description` | 否 | 面向运营、客服、财务和审计的问题定位说明。 |
-| `contextVariables` | 是 | 非关键扩展上下文，缺省为空 Map；不得承载金额闭合、规则版本、退款处置等核心语义。 |
+| 字段 | 退款 | 撤销 | 说明 |
+| --- | --- | --- | --- |
+| `businessSn` | 是 | 是 | 本次退款或撤销业务流水号，也是逆向幂等入口。 |
+| `referenceBenefitTransactionSn` | 是 | 是 | 被退款或被撤销的原权益让利资金交易流水号。 |
+| `referenceTransactionSn` | 否 | 否 | 关联原主资金交易流水号。 |
+| `amount` | 是 | 是 | 本次退款或撤销金额。 |
+| `businessScene`、`originalOrderSn` | 是 | 是 | 本次逆向业务场景和原始业务订单。 |
+| `refundReason` / `reverseReason` | 否 | 否 | 本次退款或撤销原因。 |
 
-引用字段：
+权益来源引用字段：
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `campaignId` | 否 | 活动、补贴或券批次引用。 |
-| `couponId` | 否 | 用户券或优惠券引用，不是资金底座主键。 |
-| `voucherId` | 否 | 代金券、储值券、礼品卡或权益余额引用。 |
-| `benefitInstanceId` | 否 | 外部权益实例引用。 |
-| `holdId` | 条件必填 | 授权占券、释放占用或授权过期时的外部占用引用。 |
-| `writeOffId` | 条件必填 | 已核销权益、支付完成或补贴入账场景的外部核销引用。 |
-| `releaseId` | 否 | 权益占用释放、撤销或过期释放引用。 |
-| `ruleVersion` | 条件必填 | 原交易权益规则版本；退款、释放、冲回和对账不得按当前规则重算。 |
-| `externalDecisionId` | 否 | 订单、营销、权益或运营系统的外部决策流水。 |
-| `contextVariables` | 是 | 非关键扩展上下文，缺省为空 Map；不得保存完整营销规则、用户券包敏感信息或内部配置。 |
+| `sourceType` | 是 | 权益让利来源类型，例如 `COUPON`、`VOUCHER`、`PAYMENT_DISCOUNT`、`MERCHANT_DISCOUNT`。 |
+| `sourceId` | 否 | 券实例 ID、代金券 ID、活动补贴单 ID 或外部决策 ID。 |
+| `ruleId` | 否 | 权益规则 ID。 |
+| `ruleVersion` | 条件必填 | 原始权益规则版本；退款、释放、冲回和对账不得按当前规则重算。 |
+| `amount` | 是 | 该权益来源或规则贡献的让利金额。 |
 
-退款策略字段：
-
-| 字段 | 必填 | 说明 |
-| --- | --- | --- |
-| `partialRefundStrategy` | 是 | 部分退款分摊策略；缺省为 `ORIGINAL_SNAPSHOT`。 |
-| `dispositions` | 是 | 退款处置列表，允许同时表达用户侧和资金侧处置，例如 `NO_REFUND + REVERSE_SUBSIDY`。 |
-| `refundableAmount` | 否 | 当前组件可返还、可释放或可冲回金额。 |
-| `nonRefundableAmount` | 否 | 当前组件不可退、不可返还或不可冲回金额。 |
-| `refundRuleVersion` | 条件必填 | 退款规则版本；不退券、保留补贴或释放收入等场景必须保留。 |
-| `refundPolicyCode` | 否 | 外部退款策略码，用于客服、运营和财务审计。 |
-| `refundDecisionId` | 否 | 本次退款、撤销、过期或争议处理的外部决策流水；用于证明退券决策来自业务层、营销权益系统或运营审批。 |
-| `decisionSource` | 否 | 本次退款决策来源，例如订单退款引擎、营销权益系统、客服工单或人工审批。 |
-| `decisionTime` | 否 | 本次退款决策时间；用于审计、对账和并发处理。 |
-| `contextVariables` | 是 | 非关键扩展上下文，缺省为空 Map。 |
-
-退款分摊确定性规则：
+确定性和幂等规则：
 
 | 规则项 | DSL 约束 |
 | --- | --- |
-| 规则版本 | `refundRuleVersion` 或等价 `allocationRuleVersion` 必须进入稳定摘要；同一原权益快照、同一退款请求和同一规则版本必须得到相同分摊结果。 |
-| 分摊依据 | `partialRefundStrategy` 必须明确商品行、比例、现金优先、权益优先或不可退权益优先；商品行策略缺 `pricingSnapshotSn` 或行级快照时不得降级为比例。 |
-| 组件顺序 | 多组件分摊必须按 `componentSn`、`sequence` 或业务侧给定的稳定 `componentSortKey` 排序；不得依赖数据库返回顺序、当前执行顺序、线程调度、随机数或系统时间。 |
-| 舍入和精度 | 每个币种按最小货币单位计算；舍入模式和精度必须由规则版本解释，不能在运行时隐式切换。 |
-| 尾差归属 | 尾差只能由规则明确的 `remainderOwner`、最后一笔合法退款或最后一个可处理组件吸收；吸收后累计金额仍不得超过原组件剩余额度。 |
-| 累计上限 | 现金退款、补贴冲回、代金券恢复、不可退权益和商户应收冲回分别按组件剩余额度控制，不能只校验总退款金额。 |
-| 幂等摘要 | 原资金交易、原 route snapshot、原权益快照、`refundDecisionId`、`partialRefundStrategy`、规则版本、组件剩余额度版本和尾差归属必须进入幂等或冲突判定口径。 |
-| 并发保护 | 多笔部分退款并发时必须以原交易权益剩余额度版本或等价乐观锁保护；失败请求无 route、posting、entry、清结算或对账副作用。 |
-
-缺少分摊规则版本、分摊依据、尾差归属或组件剩余额度时，部分退款只能失败、进入人工处理或停留在 contract-only 夹具，不得以当前营销规则或临时执行顺序补齐。
-
-枚举取值：
-
-| 枚举 | 取值 |
-| --- | --- |
-| `FundsBenefitType` | `MERCHANT_COUPON`、`PLATFORM_COUPON`、`VOUCHER`、`PREPAID_VOUCHER`、`GIFT_CARD`、`PARTNER_SUBSIDY`、`MANUAL_BENEFIT` |
-| `FundsBenefitComponentType` | `MERCHANT_DISCOUNT`、`PLATFORM_SUBSIDY`、`PLATFORM_DISPLAY_DISCOUNT`、`VOUCHER_REDEEM`、`PREPAID_REDEEM`、`PARTNER_SUBSIDY`、`BENEFIT_REFUND`、`SUBSIDY_REVERSAL`、`VOUCHER_RESTORE`、`NON_REFUNDABLE_BENEFIT` |
-| `FundsBenefitLedgerEffect` | `NO_LEDGER`、`POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED`、`PROJECTION_ONLY` |
-| `FundsBenefitFundingNature` | `NO_FUNDS_TRANSFER`、`MERCHANT_BORNE`、`PLATFORM_OWN_FUNDS`、`PREPAID_LIABILITY`、`PARTNER_FUNDED`、`USER_BENEFIT_BALANCE`、`UNKNOWN_PENDING_CONFIRMATION` |
-| `FundsBenefitRefundDisposition` | `REISSUE`、`RELEASE_HOLD`、`VOID`、`NO_REFUND`、`REVERSE_SUBSIDY`、`RETAIN_SUBSIDY`、`REDUCE_MERCHANT_RECEIVABLE`、`RESTORE_PREPAID_LIABILITY`、`RELEASE_TO_INCOME_OR_BREAKAGE` |
-| `FundsBenefitPartialRefundStrategy` | `ORIGINAL_SNAPSHOT`、`ITEM_LINE_BASED`、`PROPORTIONAL`、`CASH_FIRST`、`BENEFIT_FIRST`、`NON_REFUNDABLE_BENEFIT_FIRST`、`MANUAL_REVIEW` |
-| `FundsBenefitLifecycleAction` | `DECIDED`、`HOLD`、`WRITE_OFF`、`RELEASE`、`REISSUE`、`VOID`、`REVERSAL` |
-| `FundsBenefitAmountClosureRole` | `ORDER_DISCOUNT_CLOSURE`、`MERCHANT_RECEIVABLE_EFFECT`、`REFUND_DISPOSITION_EFFECT`、`VIEW_RECONCILIATION_ONLY` |
-
-`FundsBenefitLifecycleAction` 第一阶段不作为组件必填字段，避免资金底座接管权益生命周期；可作为 `benefitReference.contextVariables` 或后续扩展字段使用。
-
-金额闭合规则：
-
-```text
-orderAmount = userPayAmount + sum(ORDER_DISCOUNT_CLOSURE components)
-```
-
-组件金额不再默认全部进入正向订单闭合。平台补足商户、储值权益结算、补贴冲回、代金券恢复、不可退权益和展示项必须通过 `closureRole` 或等价字段进入各自闭合公式，不能参与 `orderAmount` 的正向抵扣闭合。
-
-| 闭合角色 | 说明 | 校验重点 |
-| --- | --- | --- |
-| `ORDER_DISCOUNT_CLOSURE` | 解释订单原价、用户实付和权益抵扣之间的关系。 | `userPayAmount + sum(role=ORDER_DISCOUNT_CLOSURE) = orderAmount`。 |
-| `MERCHANT_RECEIVABLE_EFFECT` | 解释商户应收、补足商户、清结算金额项。 | 必须说明是否补足商户、资金来源、承担方和受益方。 |
-| `REFUND_DISPOSITION_EFFECT` | 解释退款、撤销、授权过期、拒付或差错中的冲回、恢复和不可退。 | 必须引用原权益组件、本次退款决策和剩余可处理金额。 |
-| `VIEW_RECONCILIATION_ONLY` | 只影响用户、商户、运营、财务展示和对账解释。 | 不得生成 route leg、posting plan 或 ledger entry。 |
-
-第一阶段组件只放抵扣、让利、补贴、代金券核销和补贴冲回等权益金额；手续费、税费、通道成本仍走现有 `FeeSpec` 或清结算金额项，不放入权益组件。
-
-快照级校验：
-
-1. `benefitSnapshotId`、`benefitGroupSn` 不能为空。
-2. `orderAmount`、`userPayAmount` 必须为正数或明确支持零实付场景；若当前主资金指令不支持零金额，零实付必须拆为补贴或代金券资金事实，不提交用户支付主指令。
-3. `components` 非空时，每个 `componentSn` 在同一快照内唯一。
-4. 所有组件币种必须与 `orderAmount` 币种一致；跨币种场景必须由业务侧给出已决策 FX 快照，本模型不计算换汇。
-5. 权益金额合计不得超过 `orderAmount`，除非业务侧已裁剪为本次交易可用金额。
-6. `userPayAmount + role=ORDER_DISCOUNT_CLOSURE 的 components.amount` 应能解释 `orderAmount`；不参与正向抵扣闭合的费用、税费、通道成本、逆向处置和展示项不得进入该公式。
-
-组件级校验：
-
-| 场景 | 校验 |
-| --- | --- |
-| `NO_LEDGER` | 不要求 `fundingSubjectRef`，但必须有 `bearerSubjectRef` 或可从订单、商户上下文解释承担方。 |
-| `POSTING_REQUIRED` | 必须有 `fundingSubjectRef` 或 `fundingAccountRole`，否则 route 无法生成资金路径。 |
-| `HOLD_ONLY` | 必须有 `holdId` 或外部占用引用。 |
-| `RELEASE_ONLY` | 必须引用原 `holdId` 或原权益快照。 |
-| `PREPAID_LIABILITY` | 必须有 `voucherId`、`benefitInstanceId` 或 `fundingSubjectRef`，并需财务确认负债口径。 |
-| `REVERSE_SUBSIDY` | 必须能引用原补贴组件、原交易或原 route snapshot。 |
-| `NO_REFUND` | 必须有 `refundRuleVersion` 或原权益规则版本。 |
-| 本次退款决策 | 若本次处置不同于原快照默认退款策略，必须有 `refundDecisionId`、`decisionSource` 或等价审计引用；资金底座只校验引用和金额，不判断券是否可退。 |
+| 请求流水 | `businessSn` 是正向、退款和撤销的统一幂等入口；同键不同事实摘要必须失败。 |
+| 事实摘要 | 摘要由实现侧根据核心字段计算，至少覆盖租户、业务场景、业务流水、原订单、原主交易或原权益交易、金额、承担主体、受益主体、资金性质、账务效果和权益来源引用。 |
+| 来源顺序 | 多权益来源引用必须按业务侧给定顺序、来源类型和来源标识形成稳定摘要；不得依赖数据库返回顺序、线程调度、随机数或系统时间。 |
+| 金额上限 | 退款和撤销累计不得超过原权益让利资金交易剩余额度；失败请求无 route、posting、entry、清结算或对账副作用。 |
+| 决策来源 | 本次退款或撤销若不同于原业务默认处置，必须能通过上游业务单据、审计证据或原权益资金事实追溯；资金底座不判断券是否可退，也不在公共请求中承载审批状态。 |
 
 账务规则：
 
-| 组件 | DSL 行为 |
+| 资金事实 | DSL 行为 |
 | --- | --- |
-| `MERCHANT_DISCOUNT + NO_LEDGER` | 不生成 route leg 或 posting，只进入权益快照、清结算展示和对账依据。 |
-| `PLATFORM_SUBSIDY + POSTING_REQUIRED` | 需要生成平台补贴资金来源到商户或目标主体的独立资金影响，或由业务编排为独立伴随指令。 |
-| `VOUCHER_REDEEM + PREPAID_LIABILITY` | 需要按预付负债、预收待付或用户权益余额冲减处理，不得按普通平台券处理。 |
-| `HOLD_ONLY` | 授权阶段只记录权益占用引用，不进入商户清算；完成、撤销、过期时沿原快照处理。 |
-| `NO_REFUND + REVERSE_SUBSIDY` | 用户侧不返券，但资金侧冲回补贴或减少商户应收。 |
-| `NO_REFUND + RETAIN_SUBSIDY` | 用户侧不返券，资金侧不冲补贴；必须有规则版本和财务、会计或合同确认口径。 |
+| 商户让利且 `NO_LEDGER` | 不生成 route leg 或 posting，只进入清分展示、商户账单、对账解释和成本归因。 |
+| 平台补贴且 `POSTING_REQUIRED` | 生成平台补贴资金来源到商户或目标主体的独立资金影响，或由业务编排为独立伴随指令。 |
+| 预付、储值或礼品卡权益 | 按预付负债、预收待付或用户权益余额冲减处理；未确认财务、会计或合同口径前不得按普通平台券处理。 |
+| 占用、释放和反向冲销 | 使用 `HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 表达资金影响；必须引用原权益资金交易或外部占用/核销引用。 |
 
 目标态落地边界：
 
-1. `FundsInstruction` 可以携带 `benefitSnapshot`，无权益交易遵循空值语义。
-2. `RouteSnapshot` 应固化权益快照或等价摘要，否则权益退款、撤销、授权过期、清结算和对账需要回查原指令，不利于长期回放。
-3. 历史无权益快照但被判断为含权益的交易，逆向处理必须失败或进入人工处理，不按当前营销规则重算。
-4. 本次退款决策可以覆盖原快照默认退款策略，但必须来自业务层或审批链路，并保留决策来源、决策流水、规则版本和审计引用；资金底座不得自行推导“券能不能退”。
-5. 涉及公共契约、枚举、route snapshot、posting、表结构或夹具等级变更时，必须在工程任务中明确写入范围、禁止范围、测试矩阵和回归范围。
+1. `FundsBenefitFundingApplicationService` 只表达已决策权益让利资金事实，不承接营销实时规则、券包库存或活动生命周期。
+2. 交易实现必须委派标准交易路由、交易事实和账本分录链路，不得在 application 层直接写 route、posting、LedgerEntry 或余额投影。
+3. 退款、撤销、授权过期、拒付、清结算重跑和对账差错必须引用原权益让利资金交易或等价不可变事实，不按当前营销规则重算。
+4. 历史只有旧权益摘要但没有权益资金交易的存量事实，可以通过补充事实或迁移任务纳入回放；不得在逆向处理时临时补造。
+5. 当前 core DSL 不再接收完整旧权益快照；JSON 契约必须拒绝 `instruction.benefitSnapshot`，同时允许历史 route 摘要通过 `benefitSnapshotId` 和 `stableDigest` 被只读追溯。
 
-权益快照消费能力边界：
+能力完成边界：
 
 | 能力范围 | 可声明完成 | 不可声明完成 |
 | --- | --- | --- |
-| 契约承载 | `FundsInstructionSpec` 可选携带 `benefitSnapshot`；无权益交易遵循空值语义；JSON、金额闭合、枚举和反序列化契约可测。 | route、posting、replay、清结算或对账已经完整消费权益快照。 |
-| route/posting 消费 | `POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 可生成独立资金路径或明确独立伴随指令；`NO_LEDGER` 不入账。 | 补贴、本金、手续费或代金券净额混记；缺资金责任主体仍放行；未选持久化落点、夹具级别、专业确认状态或伴随指令原子性策略时声明生产资金流可用。 |
-| replay/清结算/对账/投影/归档消费 | 原 route snapshot 或等价不可变事实能取回 `benefitSnapshotId`、`componentSn`、规则版本、退款策略、决策流水、专业确认状态、审计证据引用、解释视图引用和外部规则核验引用；清分金额项、对账差错、交易投影、归档和治理重放按原权益快照追溯。 | 退款、撤销、授权过期、清结算重跑、对账差错、投影重放、归档读取或治理重放按当前营销规则重算；从报表汇总、投影或归档结果反推历史权益事实；缺核验规则仍自动放行。 |
-| 生产链路可用 | 交易事实、route snapshot、posting context、清分金额项、对账差错、交易投影、归档 Manifest 或治理重放差异报告都能追溯权益组件摘要、伴随指令组、补充事实链、脱敏审计证据引用、使用者解释视图和外部规则核验状态。 | 只有请求态对象或文档样例，没有不可变事实存储、幂等校验、逆向回放证据、伴随指令原子性证据、补充事实审计链、审计证据包、视图防误导、证据最小化或规则核验证据。 |
+| 公共契约 | `FundsBenefitFundingApplicationService` 暴露 `apply/refund/reverse`，请求模型能表达让利方、受益方、金额、来源引用、原订单或交易引用和确认信息。 | route、posting、replay、清结算或对账已经完整消费权益让利资金事实。 |
+| route/posting 消费 | MVP 已支持 `POSTING_REQUIRED` 正向、退款和撤销通过标准直接交易、route、posting、ledger 链路形成独立资金影响；`NO_LEDGER` 暂 fail-fast 且无资金或账务副作用。 | 补贴、本金、手续费或代金券净额混记；缺资金责任主体仍放行；把 `HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 或非入账权益解释事实声明为已具备生产资金流可用。 |
+| replay/清结算/对账/投影/归档消费 | 原交易事实、route snapshot 或等价不可变事实能取回原权益资金交易流水号、来源引用、规则版本、专业确认状态、审计证据引用和外部规则核验引用。 | 退款、撤销、授权过期、清结算重跑、对账差错、投影重放、归档读取或治理重放按当前营销规则重算。 |
 
 Route、Posting 和 Replay 消费顺序：
 
-1. `RouteResolver` 先消费 `benefitSnapshot.components`，按 `ledgerEffect` 和 `fundingNature` 判断是否生成额外 leg、独立伴随指令或仅保存摘要。
-2. `RouteSnapshot` 必须固化权益快照或等价摘要；兼容期可通过 `contextVariables` 承载引用或摘要，但生产链路不得只依赖原请求回查。
-3. `LedgerPostingAssembler` 只消费 route leg 和组件账务效果，不理解营销规则；`NO_LEDGER` 不生成 posting，`POSTING_REQUIRED` 必须独立平衡。
-4. 后续退款、撤销、授权过期、拒付、清结算重跑和对账差错先读取原资金事实或原 route snapshot，再取得原权益快照和本次决策，不调用当前营销规则。
-5. `componentSn`、`benefitSnapshotId`、`ruleVersion`、`refundDecisionId` 和 `externalDecisionId` 应进入 route snapshot、posting context、清分金额项、对账差错和交易投影摘要中的至少一个可追溯位置。
+1. Application service 接收权益让利资金事实并完成幂等、专业确认、账户主体和金额基础校验。
+2. `RouteResolver` 按 `ledgerEffect` 和 `fundingNature` 判断是否生成额外 leg、独立伴随指令或仅保存摘要。
+3. `RouteSnapshot` 必须固化权益资金交易引用或等价摘要；兼容期可通过 `contextVariables` 承载引用或摘要，但生产链路不得只依赖原请求回查。
+4. `LedgerPostingAssembler` 只消费 route leg 和账务效果，不理解营销规则；`NO_LEDGER` 不生成 posting，`POSTING_REQUIRED` 必须独立平衡。
+5. 后续退款、撤销、授权过期、拒付、清结算重跑和对账差错先读取原资金事实或原 route snapshot，再取得原权益资金交易和本次决策，不调用当前营销规则。
 
 伴随权益指令不是权益专用服务入口，而是含权益资金事实被拆分后的编排关系。选择伴随模式时，DSL 或等价运行态事实必须能表达以下对象口径：
 
@@ -1002,7 +791,7 @@ Route、Posting 和 Replay 消费顺序：
 | 补偿策略 | 主成功伴随失败、伴随成功主失败、重复提交、超时未知和人工接管的处理方式。 | 交易状态机、差错单、清结算阻断、Runbook。 | 部分成功被展示为普通成功或清结算 Done。 |
 | 投影合并键 | `projectionMergeKey` 或等价业务组键。 | 用户账单、商户账单、运营时间线、财务核对视图、指标项输入和归档重放。 | 伴随指令在投影、清分或对账中丢失。 |
 
-历史补充权益事实只用于缺原权益快照的受控解释，不是补造原始快照。它可以是独立表、治理差异报告中的追加事实，或等价不可变存储，但必须满足：只追加、不覆盖；包含原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系；被撤销、证据缺失、范围不匹配或 digest 冲突时不得参与退款、对账、归档 apply 或治理重放 apply。
+历史补充权益事实只用于缺原权益让利资金交易的受控解释，不是补造原始事实。它可以是独立表、治理差异报告中的追加事实，或等价不可变存储，但必须满足：只追加、不覆盖；包含原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系；被撤销、证据缺失、范围不匹配或 digest 冲突时不得参与退款、对账、归档 apply 或治理重放 apply。
 
 审计证据包必须在最终写入前参与校验。预检时有效的确认状态，在 posting、refund、settlement confirmation、archive apply 或 governance replay apply 前仍需重新读取确认状态、有效期、适用范围、撤销/变更记录和脱敏证据引用；dry-run 成功不能作为 apply 证据。
 
@@ -1012,18 +801,18 @@ Route、Posting 和 Replay 消费顺序：
 
 | 字段类别 | 可否放入 `contextVariables` 过渡 | 说明 |
 | --- | --- | --- |
-| `benefitSnapshotId`、`stableDigest`、`benefitGroupSn` | 可以 | 用于临时追溯和幂等比对，生产链路应迁移到 route snapshot、交易事实快照或等价不可变存储。 |
-| `componentSn` 列表、组件数量、组件摘要哈希 | 可以 | 只能作为摘要，不得替代组件金额、资金责任和退款策略的正式事实源。 |
-| `ruleVersion`、`refundDecisionId`、`externalDecisionId` | 可以 | 用于串联业务决策、审批流水和审计引用。 |
-| 组件金额、价格闭合、`ledgerEffect`、`fundingNature`、退款处置完整内容 | 不可以 | 属于核心权益资金语义，必须进入 `benefitSnapshot`、route snapshot、交易事实快照或等价不可变存储。 |
+| 权益资金交易流水号、事实摘要、`benefitGroupSn` | 可以 | 用于临时追溯和幂等比对，生产链路应迁移到 route snapshot、交易事实快照或等价不可变存储。 |
+| 来源引用列表、组件数量、组件摘要哈希 | 可以 | 只能作为摘要，不得替代组件金额、资金责任和退款策略的正式事实源。 |
+| `ruleVersion`、`refundDecisionId`、历史 `externalDecisionId` | 可以 | 仅作为 `contextVariables` 过渡摘要，用于串联业务决策、审批流水和审计引用；不作为 `FundsBenefitFundingSourceDTO` 的一等字段。 |
+| 组件金额、价格闭合、`ledgerEffect`、`fundingNature`、退款处置完整内容 | 不可以 | 属于核心权益资金语义，必须进入权益让利资金交易、route snapshot、交易事实快照或等价不可变存储。 |
 | 当前营销规则、券包状态、券可用性判断 | 不可以 | 资金底座不重新计算或推进营销生命周期。 |
 
 模块落点建议：
 
 | 模块 | 基础承载 | 资金流消费 | 治理和运营消费 |
 | --- | --- | --- | --- |
-| `FundsInstructionSpec` | 新增可选 `benefitSnapshot`。 | 保持契约稳定。 | 保持契约稳定，必要时扩展 schema version。 |
-| `RouteSnapshotSpec` | 可先通过摘要或 context 过渡。 | 增加可选 `benefitSnapshot` 或等价不可变摘要。 | 作为退款、撤销、过期、拒付和差错回放来源。 |
+| `FundsBenefitFundingApplicationService` | 承接权益让利资金交易命令。 | 生成权益资金交易并委派 route/posting。 | 作为退款、撤销、清结算、对账和投影的事实入口。 |
+| `RouteSnapshotSpec` | 可先通过摘要或 context 过渡。 | 增加权益资金交易引用或等价不可变摘要。 | 作为退款、撤销、过期、拒付和差错回放来源。 |
 | `RouteResolver` | 不强制消费完整权益对象。 | 识别 `POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED`。 | 支持原权益组件反向回放和累计上限。 |
 | `PostingAssembler` | 只验证不误入账。 | 组件资金影响独立 posting，`componentSn` 进入 context。 | 支持清结算、对账和投影按组件追溯。 |
 | 清结算与对账 | 文档和 DSL caseId 定义金额项。 | 可读取权益摘要拆分金额项。 | 差异、重跑、核销和审计闭环。 |
@@ -1034,11 +823,11 @@ Route、Posting 和 Replay 消费顺序：
 | --- | --- | --- |
 | C01 | `Money` 是否允许 `userPayAmount=0`。 | 决定零实付订单是单指令表达，还是拆成补贴或代金券资金事实；未确认前不得声明零实付生产资金流完成。 |
 | C02 | 平台补贴作为同一资金指令额外 leg，还是独立伴随指令。 | 决定 route resolver、幂等键、交易投影粒度和逆向生命周期；未确认前只能保留 DSL 目标场景。 |
-| C03 | `RouteSnapshotSpec` 是否新增 `getBenefitSnapshot()`。 | 决定 replay 是否需要回查原指令，以及归档后如何回放；生产链路必须选择 route snapshot、交易事实快照、独立权益快照表或等价不可变存储之一。 |
-| C04 | 平台补贴账户是否进入 `PlatformAccountsSnapshotSpec`。 | 可使用 `fundingSubjectRef` 或 `fundingAccountRole` 表达引用，但生产账务口径必须明确平台成本账户角色；未确认前不得把平台补贴与用户本金净额混记。 |
+| C03 | `RouteSnapshotSpec` 是否新增权益资金交易引用或等价摘要。 | 决定 replay 是否需要回查交易事实，以及归档后如何回放；生产链路必须选择 route snapshot、交易事实快照、独立权益事实表或等价不可变存储之一。 |
+| C04 | 平台补贴账户是否进入 `PlatformAccountsSnapshotSpec`。 | 可使用 `costBearerSubjectRef` 或 `fundingAccountRoleCode` 表达引用，但生产账务口径必须明确平台成本账户角色；未确认前不得把平台补贴与用户本金净额混记。 |
 | C05 | 储值、礼品卡、预付代金券是否纳入当前一期。 | 决定是否需要负债账户、预收待付口径和财务确认；未确认前不得按普通平台券处理。 |
-| C06 | 退款分摊是否必须支持商品行。 | 决定是否需要 `pricingSnapshotSn` 和商品行权益明细；未确认前部分退款只能采用已明确的非商品行策略。 |
-| C07 | 历史无权益快照交易如何逆向处理。 | 决定迁移、人工处理和对账差错策略；未确认前默认失败或进入人工处理，不按当前营销规则重算。 |
+| C06 | 退款分摊是否必须支持商品行。 | 决定是否需要 `quoteSn` 和商品行权益明细；未确认前部分退款只能采用已明确的非商品行策略。 |
+| C07 | 历史无权益资金交易或等价不可变事实时如何逆向处理。 | 决定迁移、人工处理和对账差错策略；未确认前默认失败或进入人工处理，不按当前营销规则重算。 |
 | C08 | 若选择独立伴随指令，主交易和伴随指令是否同事务、同业务组幂等或采用补偿模式。 | 决定部分成功状态、失败补偿、冲正、投影合并和审计解释；未确认前不得声明平台补贴独立伴随指令生产可用。 |
 | C09 | 专业确认在预检通过后、实际入账/退款/清结算/重放前被撤销、过期或范围变更时如何处理。 | 决定 TOCTOU 风险和阻断时机；未确认前必须在最终写入前重新校验确认状态。 |
 | C10 | 历史补充权益事实是否允许进入当前工程范围。 | 决定是否新增 supplemental benefit fact 或等价不可变存储、撤销关系、审计和重放校验；未确认前缺原快照只能失败、跳过或人工处理。 |
@@ -1140,10 +929,28 @@ Replay 语义边界：
 
 结算策略用于表达候选结算日期和结算节奏，不表达结算审批、出款执行或回单核验。
 
+字符和符号含义：
+
+| 字符 / 符号 | 含义 |
+| --- | --- |
+| `RT` | Realtime，实时结算。 |
+| `T` | Trade day，交易日 / 工作日延迟，`T+N` 跳过节假日，包括周末和交易日历登记的法定节假日。 |
+| `D` | Day，自然日或每日固定时间，`D+N` 表示 N 个自然日后，`D@HH:mm` 表示每日固定时间。 |
+| `H` | Hour，小时级周期。 |
+| `W` | Week，周周期。 |
+| `M` | Month，月周期。 |
+| `Q` | Quarter，季度周期。 |
+| `Y` | Year，年周期。 |
+| `C` | Custom cycle / range，自定义账期或外部账期引用。 |
+| `+` | 周期间隔或延迟数量，例如 `T+2`、`D+1`、`W+2@1`、`M+2@1`。 |
+| `@` | 结算锚点、cutoff 或账期参数，例如 `D@23:00`、`W@MON`、`C@05-04`。 |
+| `L` | Last day，所在月、季度或周期的最后一天。 |
+
 | 表达 | 含义 |
 | --- | --- |
 | `RT` | 实时结算。 |
-| `T+N` | 交易日后第 N 天结算。 |
+| `T+N` | 交易后第 N 个交易日 / 工作日结算，跳过节假日。 |
+| `D+N` | 交易后第 N 个自然日结算。 |
 | `D@HH:mm` | 每日指定时间结算。 |
 | `W@DOW` | 每周指定星期结算。 |
 | `M@DD` | 每月指定日期结算。 |
@@ -1151,7 +958,7 @@ Replay 语义边界：
 | `Y@MM-DD` | 每年指定月日结算。 |
 | `C@RANGE` | 自定义账期。 |
 
-规则不能把 `RT` 固化为唯一策略；无法识别的策略必须显式失败。
+规则不能把 `RT` 固化为唯一策略；无法识别的策略必须显式失败。法定节假日不写死在 DSL 表达式中，应由清结算或交易日历配置默认日历，或在单次计算时显式传入。
 
 ### 7.8 投影 DSL
 
@@ -1200,8 +1007,8 @@ Replay 语义边界：
 | 余额控制不做 FX | `BALANCE_CONTROL` 不承接换汇决策。 |
 | `LIMIT` 只能受控调整 | 普通授权完成不触碰 `LIMIT`。 |
 | 授权拒绝无账务 | 授权拒绝不得生成 route、posting 或 entry。 |
-| 权益快照不改主金额 | `FundsBenefitSnapshotSpec` 不改变 `FundsInstruction.amount`、`originalAmount` 或 `exchangeRate` 的既有语义。 |
-| 资金底座不重算券 | 权益快照只保存已决策结果，不调用当前营销规则重新计算优惠金额。 |
+| 权益资金事实不改主金额 | 权益让利资金交易不改变 `FundsInstruction.amount`、`originalAmount` 或 `exchangeRate` 的既有语义。 |
+| 资金底座不重算券 | 权益让利资金事实只保存已决策结果，不调用当前营销规则重新计算优惠金额。 |
 | `NO_LEDGER` 权益不入账 | 商户让利、展示优惠等无资金转移组件不得生成 `PostingPlan` 或 `LedgerEntry`。 |
 | 有资金影响权益必须独立解释 | 平台补贴、储值券、合作方补贴等不得和本金、手续费净额混记。 |
 | 伴随权益指令必须有组原子性 | 独立伴随指令必须声明业务组、主从角色、原子性模式、补偿策略和投影合并键。 |
@@ -1251,20 +1058,20 @@ Replay 语义边界：
 
 ### 9.1.1 权益金额组件用例族
 
-权益金额组件用例族不替代直接交易、授权交易、清结算或对账主链路，而是给这些链路提供权益快照输入。工程任务拆分时，应先验证契约承载，再验证 route/posting/replay 消费，最后验证清结算和对账消费。
+权益金额组件用例族不替代直接交易、授权交易、清结算或对账主链路，而是通过权益让利资金交易或等价不可变事实给这些链路提供资金影响和解释输入。工程任务拆分时，应先验证 application 契约，再验证 route/posting/replay 消费，最后验证清结算和对账消费。
 
 | 用例 | 资金交易结构 | 权益 DSL 重点 | 开发承接 | 测试承接 |
 | --- | --- | --- | --- | --- |
-| 无权益交易目标态 | 任意 `FundsInstruction`。 | `benefitSnapshot` 为空。 | 交易、授权、余额控制和退款保持主语义。 | `DSL-BENEFIT-SNAPSHOT-001`、`TDD-BEN-001`。 |
+| 无权益交易目标态 | 任意 `FundsInstruction`。 | `benefitFundingRef` 或等价权益资金事实引用为空。 | 交易、授权、余额控制和退款保持主语义。 | `TDD-BEN-001`。 |
 | 商户优惠券支付 | `DIRECT_TRANSACTION / PAY`，`amount=userPayAmount`。 | `MERCHANT_COUPON / MERCHANT_DISCOUNT / NO_LEDGER / MERCHANT_BORNE`。 | 不生成权益 route leg 或 posting；清结算可展示商户让利。 | `DSL-BENEFIT-MERCHANT-DISCOUNT-001`、`TDD-BEN-DIR-001`。 |
 | 平台补贴券补足商户 | `DIRECT_TRANSACTION / PAY` + 平台补贴组件。 | `PLATFORM_COUPON / PLATFORM_SUBSIDY / POSTING_REQUIRED / PLATFORM_OWN_FUNDS`。 | 生成独立补贴 leg 或明确独立伴随指令；不得和本金净额混记。 | `DSL-BENEFIT-PLATFORM-SUBSIDY-001`、`TDD-BEN-DIR-002`。 |
-| 平台券不补足商户 | `DIRECT_TRANSACTION / PAY`。 | `PLATFORM_COUPON / PLATFORM_DISPLAY_DISCOUNT / NO_LEDGER / NO_FUNDS_TRANSFER`。 | 平台券只影响用户实付和商户应收，不形成补贴资金路径；通过权益快照和商户应收口径解释，不误记平台成本。 | `DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`TDD-BEN-DIR-003`。 |
+| 平台券不补足商户 | `DIRECT_TRANSACTION / PAY`。 | `PLATFORM_COUPON / PLATFORM_DISPLAY_DISCOUNT / NO_LEDGER / NO_FUNDS_TRANSFER`。 | 平台券只影响用户实付和商户应收，不形成补贴资金路径；通过权益资金事实和商户应收口径解释，不误记平台成本。 | `DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`TDD-BEN-DIR-003`。 |
 | 储值或预付代金券 | `DIRECT_TRANSACTION / PAY` + 代金券核销组件。 | `VOUCHER_REDEEM / PREPAID_LIABILITY`。 | 需要负债、预收待付或用户权益余额口径；未确认前不得入主链路。 | `DSL-BENEFIT-PREPAID-VOUCHER-001`、`TDD-BEN-DIR-004`。 |
 | 授权时占券 | `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | `ledgerEffect=HOLD_ONLY`，`benefitReference.holdId` 必填。 | 授权阶段只固化占用引用；完成时核销，撤销或过期时释放。 | `DSL-BENEFIT-AUTH-HOLD-001`、`TDD-BEN-AUTH-001`。 |
-| 不退券但冲补贴 | `REFUND` 或 `AUTH_REFUND` 引用原权益快照。 | `NO_REFUND + REVERSE_SUBSIDY`。 | 用户侧不返券，资金侧按原补贴组件冲回。 | `DSL-BENEFIT-REFUND-NO-COUPON-001`、`TDD-BEN-REFUND-001`。 |
+| 不退券但冲补贴 | `REFUND` 或 `AUTH_REFUND` 引用原权益资金交易。 | `NO_REFUND + REVERSE_SUBSIDY`。 | 用户侧不返券，资金侧按原补贴资金事实冲回。 | `DSL-BENEFIT-REFUND-NO-COUPON-001`、`TDD-BEN-REFUND-001`。 |
 | 不退券且不冲补贴 | `REFUND` 或清结算差错处理。 | `NO_REFUND + RETAIN_SUBSIDY`。 | 需要财务、会计或合同确认，保留规则版本和审计。 | `DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001`、`TDD-BEN-REFUND-002`。 |
 | 部分退款分摊权益 | `REFUND` 或 `AUTH_REFUND`。 | `partialRefundStrategy`、`refundRuleVersion`、稳定组件顺序、舍入模式和尾差归属固化原策略。 | 按原快照的商品行、比例、现金优先、权益优先或不可退优先分摊；同一输入重试结果一致，累计不超过组件剩余额度。 | `DSL-BENEFIT-PARTIAL-REFUND-001`、`TDD-BEN-REFUND-003`、`TDD-BEN-REFUND-005`、`TDD-BEN-RACE-001`。 |
-| 缺原权益快照的逆向事件 | `REFUND`、`REVERSAL`、`EXPIRE`、清结算或对账差错处理。 | 原交易被判断为含权益，但缺 `benefitSnapshot` 或等价快照。 | 失败或进入人工处理，不调用当前营销规则。 | `DSL-BENEFIT-MISSING-SNAPSHOT-REPLAY-001`、`TDD-BEN-REPLAY-001`。 |
+| 缺原权益资金事实的逆向事件 | `REFUND`、`REVERSAL`、`EXPIRE`、清结算或对账差错处理。 | 原交易被判断为含权益，但缺原权益让利资金交易或等价不可变事实。 | 失败或进入人工处理，不调用当前营销规则。 | `TDD-BEN-REPLAY-001`。 |
 
 ### 9.2 授权交易用例族
 
@@ -1272,7 +1079,7 @@ Replay 语义边界：
 
 VCC 交易是授权交易的典型接入场景，但 VCC 卡、卡号、PAN、token、持卡人、预算组、Spend Rule 和通道授权号都不是账本主体。DSL 必须把 VCC 工具信息放在 `instrumentRef`、`merchantInfo`、BudgetGroup 上下文、Spend Rule 快照或 `contextVariables` 中作为工具、控制和审计上下文；真正发生账务影响的对象只能是 VCC 关联资金子账户、VCC 关联信用子账户、普通资金账户、普通信用账户或平台角色解析后的平台资金账户。Spend controls、card controls、velocity controls 或协同授权只产生授权前决策结果：拒绝时不生成 route、posting、entry，通过时也只是允许进入资金底座授权校验，不等于已经占用成功。
 
-预付卡和共享卡不引入“卡号主体”“共享卡主体”或独立 `VCC_ACCOUNT` 主体。prepaid virtual card 仍通过 `instrumentRef` 表达卡工具，通过 `SubjectRef(FUNDING_ACCOUNT)` 表达预付余额所在资金子账户，通过 `AccountHierarchySnapshot` 表达父账户约束，通过资金责任解析关系、route participant 或外部确认引用表达背后资金来源；shared card 仍通过 `instrumentRef`、binding snapshot、cardholder/department/project 上下文、BudgetGroup 上下文、Spend Rule 快照、`SubjectRef(CREDIT_ACCOUNT)`、`AccountHierarchySnapshot` 和 `FundingAllocationDecision` 表达使用模式。储值券、礼品卡或预付代金券属于权益或预收待付语义，继续使用权益快照，不自动归入 VCC DSL。
+预付卡和共享卡不引入“卡号主体”“共享卡主体”或独立 `VCC_ACCOUNT` 主体。prepaid virtual card 仍通过 `instrumentRef` 表达卡工具，通过 `SubjectRef(FUNDING_ACCOUNT)` 表达预付余额所在资金子账户，通过 `AccountHierarchySnapshot` 表达父账户约束，通过资金责任解析关系、route participant 或外部确认引用表达背后资金来源；shared card 仍通过 `instrumentRef`、binding snapshot、cardholder/department/project 上下文、BudgetGroup 上下文、Spend Rule 快照、`SubjectRef(CREDIT_ACCOUNT)`、`AccountHierarchySnapshot` 和 `FundingAllocationDecision` 表达使用模式。储值券、礼品卡或预付代金券属于权益、负债或预收待付语义，使用权益资金事实或等价不可变事实承接，不自动归入 VCC DSL。
 
 拒付/争议 DSL 口径：dispute / chargeback 是案件过程，不是资金底座默认交易结果。`settleRefund / AUTH_REFUND` 的争议字段、外部引用、凭证、audit、projection 和 idempotency digest 用于承接裁决后的退款结果，并区分普通授权链退款、`NO_AUTH` 退款和授权拒绝；请求侧不恢复 `refundMode`，`DISPUTE` 只作为资金指令内部上下文标签。用户败诉或无需资金处理时，DSL 只允许保留案件引用、审计和投影解释，不生成 route、posting、LedgerEntry 或余额变化。平台、商户或外部机构之间的追偿、准备金抵扣、争议费用或后续结算扣减由清结算、对账或争议专项 DSL 承接，不反向要求授权交易层新增 `chargeback` 主入口。独立 `chargeback` 只能作为历史兼容或内部适配资产，不能反向要求成为目标态主入口；完整 dispute case、representment、裁决状态机、外部规则或 `chargeback` API 移除需要独立工程任务承接。
 
@@ -1283,7 +1090,7 @@ VCC 授权接入口径：
 | VCC 卡、卡 token、掩码卡号、卡产品、持卡人 | `instrumentRef` 或 `contextVariables` | 支付工具快照和审计上下文。 | 不得作为 ledger subject 入账，不得保存完整 PAN、CVV 或敏感凭证。 |
 | VCC 关联子账户 | `SubjectRef(FUNDING_ACCOUNT/CREDIT_ACCOUNT)`、`AccountHierarchySnapshot`、route participant、ledger subject、account profile | VCC 卡背后的内部账务主体：预付卡落资金子账户，共享卡落信用子账户；父账户用于约束、汇总或显式控制。 | 不得从卡号临时推导主体；缺子账户、父账户快照、账目 profile、币种、状态或资金来源时不得入账。 |
 | 企业资金账户、信用账户、预算组 / Spend Rule | 资金责任引用使用 route participant、`targetSubjectType + targetSubjectId` 或兼容字段；预算控制引用使用 `linkedBudgetGroupId`、Spend Rule 快照、规则快照和控制证据 | 资金账户、信用账户或平台账户角色解释 VCC 关联子账户背后的资金责任来源；预算组和 Spend Rule 只表达预算范围、规则命中和控制证据。 | 资金影响必须解析为 VCC 关联资金/信用子账户、普通资金账户、普通信用账户或平台资金账户；不得用卡、外部账户、预算组或 Spend Rule 替代。 |
-| prepaid virtual card | `instrumentRef` + `SubjectRef(FUNDING_ACCOUNT)` + `AccountHierarchySnapshot` + `FundingAllocationDecision` + 预付资金确认引用 | 卡是支付工具；预付余额落到资金子账户；背后资金来源必须落到经确认的内部责任来源。 | 不得把预付卡当作储值券权益快照，也不得把卡号或 token 当作余额主体。 |
+| prepaid virtual card | `instrumentRef` + `SubjectRef(FUNDING_ACCOUNT)` + `AccountHierarchySnapshot` + `FundingAllocationDecision` + 预付资金确认引用 | 卡是支付工具；预付余额落到资金子账户；背后资金来源必须落到经确认的内部责任来源。 | 不得把预付卡当作储值券权益事实，也不得把卡号或 token 当作余额主体。 |
 | shared card | `instrumentRef`、binding snapshot、cardholder/department/project 上下文、BudgetGroup 上下文、Spend Rule 快照、`SubjectRef(CREDIT_ACCOUNT)`、`AccountHierarchySnapshot`、`FundingAllocationDecision` | 共享卡是使用和绑定模式；每张卡绑定一个信用子账户，多卡共享通过同一父账户额度池或资金约束表达。每次授权必须解释谁使用、受哪个预算、规则或资金责任约束。 | 不得新增共享卡主体类型；不得把预算组或 Spend Rule 当成入账主体；不得在逆向事件中按当前绑定重选路。 |
 | MCC、商户、国家、POS、PAN entry mode、CVV/AVS、风控结果 | `merchantInfo`、`transactionCountry`、`contextVariables` | 授权判断、拒绝原因和审计上下文。 | 只作为规则输入或审计事实，不直接生成账务分录。 |
 | Spend controls / card controls / velocity controls | `contextVariables.authorizationControlDecision`、拒绝原因、规则版本 | 授权前门禁；通过后才能继续资金授权校验，拒绝则只记录失败事实。 | 规则窗口不得替代账本周期；规则通过不得跳过余额、额度、预算和 route 校验。 |
@@ -1484,7 +1291,7 @@ String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator o
 
 ## 十一、JSON 契约用例
 
-JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、数据库结构或运营页面。本文默认保留最小骨架和场景矩阵；对资金语义复杂、容易误实现的权益快照场景，补充契约夹具和资金流夹具示例作为后续可执行资产的来源。
+JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、数据库结构或运营页面。本文默认保留最小骨架和场景矩阵；对资金语义复杂、容易误实现的权益让利场景，补充权益资金交易事实、历史摘要兼容和旧快照拒绝夹具作为后续可执行资产的来源。
 
 ### 11.1 最小契约骨架
 
@@ -1559,17 +1366,17 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-PAYMENT-INSTRUMENT-SHARED-CARD-001` | shared card 授权、撤销、过期、完成和退款。 | `PaymentInstrumentRef`、`SubjectRef(CREDIT_ACCOUNT)`、`AccountHierarchySnapshot`、binding snapshot、cardholder/department/project 上下文、BudgetGroup 上下文、Spend Rule 快照和资金责任决策。 | 共享卡是使用模式；每张卡绑定一个信用子账户，多卡共享通过同一父账户约束，后续事件沿原快照回放，不读取当前绑定重选路。 | 共享卡、卡号或持卡人入账、缺信用子账户、缺父账户快照、缺绑定版本、当前换绑影响历史退款。 |
 | `DSL-PAYMENT-INSTRUMENT-FAIL-001` | 支付工具不可用或资金责任不唯一。 | command validation 和 route failure boundary。 | 失败无副作用，不生成 route/posting/entry。 | 自动换路、自动改绑定、失败仍写账。 |
 | `DSL-PAYMENT-INSTRUMENT-REPLAY-001` | 工具换绑后退款、撤销、退费或拒付。 | 原 route snapshot、原工具快照和原费用 leg。 | 后续事件沿原路径回放，不读取当前绑定关系重选路。 | 退款入到新绑定账户、缺快照兜底重选路、累计超额。 |
-| `DSL-BENEFIT-SNAPSHOT-001` | 权益快照最小合法契约和无权益空值语义。 | `FundsInstruction.benefitSnapshot` 可为空；有权益时包含快照 ID、关联组号、订单金额、用户实付和组件。 | JSON 可解析；无权益交易保持 DSL 主语义；有权益交易金额闭合。 | 缺必填 ID、组件重复、金额不闭合、核心语义塞入 context。 |
-| `DSL-BENEFIT-MERCHANT-DISCOUNT-001` | 商户优惠券不入账。 | `MERCHANT_DISCOUNT / NO_LEDGER / MERCHANT_BORNE`。 | 商户让利进入权益快照和清结算展示，不生成权益 posting。 | 商户让利生成 LedgerEntry、商户应收无法解释。 |
-| `DSL-BENEFIT-PLATFORM-SUBSIDY-001` | 平台补贴券补足商户。 | `PLATFORM_SUBSIDY / POSTING_REQUIRED / PLATFORM_OWN_FUNDS`。 | 补贴形成独立资金影响或独立伴随指令；本金和补贴拆分。 | 补贴与本金净额混记、缺平台资金来源、缺规则版本。 |
-| `DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001` | 平台券不补足商户。 | `PLATFORM_DISPLAY_DISCOUNT / NO_LEDGER / NO_FUNDS_TRANSFER`，平台券降低用户实付和商户应收。 | 不生成平台补贴 leg，不误生成平台补贴成本。 | 展示优惠被误当平台资金支出。 |
-| `DSL-BENEFIT-PREPAID-VOUCHER-001` | 储值、预付或礼品卡代金券。 | `VOUCHER_REDEEM / PREPAID_LIABILITY`。 | 按负债、预收待付或用户权益余额处理；专业口径未确认前不进入权益资金流生产完成口径。 | 储值券按普通优惠券处理、缺负债口径仍入账。 |
-| `DSL-BENEFIT-MARKETING-ACCOUNT-001` | 营销账户承接有资金影响的权益组件。 | `fundingSubjectRef`、`fundingAccountRole`、账户 profile、专业确认引用和权益组件摘要。 | 平台补贴、储值负债释放、合作方补贴、补贴冲回和待确认留置必须能解析到资金账户、平台责任资金账户或等价营销账户 profile；`NO_LEDGER` 组件不得解析成分录。 | 把营销账户当支付工具、营销规则系统或券库存；把展示优惠和商户让利默认入账；缺营销账户仍放行。 |
+| `DSL-BENEFIT-FUNDING-APPLY-001` | 权益让利资金事实最小契约。 | `FundsBenefitFundingApplicationService#apply` 请求，包含成本承担主体、受益主体、金额、资金性质、账务效果和来源引用。 | JSON 可表达谁给谁让利、让了多少钱、来自哪些规则或工具；需要入账时形成独立权益资金事实。 | 恢复 `FundsInstruction.benefitSnapshot`、把核心金额和责任塞入 `contextVariables`、补贴与本金净额混记。 |
+| `DSL-BENEFIT-MERCHANT-DISCOUNT-001` | 商户优惠券不入账。 | 权益资金来源声明 `sourceType=MERCHANT_DISCOUNT`，账务效果为 `NO_LEDGER`，成本归因到商户。 | 商户让利进入清结算展示、商户账单或投影归因，不生成权益 posting。 | 商户让利生成 LedgerEntry、商户应收无法解释。 |
+| `DSL-BENEFIT-PLATFORM-SUBSIDY-001` | 平台补贴券补足商户。 | `FundsBenefitFundingApplicationService#apply`，成本承担主体为平台营销资金账户或等价责任账户。 | 补贴形成独立权益资金交易或伴随资金事实；本金和补贴拆分。 | 补贴与本金净额混记、缺平台资金来源、缺规则版本。 |
+| `DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001` | 平台券不补足商户。 | 权益来源仅用于降低用户实付和商户应收，不生成补贴资金事实。 | 不生成平台补贴 leg，不误生成平台补贴成本。 | 展示优惠被误当平台资金支出。 |
+| `DSL-BENEFIT-PREPAID-VOUCHER-001` | 储值、预付或礼品卡代金券。 | 权益资金来源声明负债、预收待付或用户权益余额口径，并解析到资金账户或平台责任账户。 | 按负债、预收待付或用户权益余额处理；专业口径未确认前不进入权益资金流生产完成口径。 | 储值券按普通优惠券处理、缺负债口径仍入账。 |
+| `DSL-BENEFIT-MARKETING-ACCOUNT-001` | 营销账户承接有资金影响的权益组件。 | `costBearerSubjectRef`、`benefitReceiverSubjectRef`、`fundingAccountRoleCode`、账户 profile、专业确认引用和权益组件摘要。 | 平台补贴、储值负债释放、合作方补贴、补贴冲回和待确认留置必须能解析到资金账户、平台责任资金账户或等价营销账户 profile；`NO_LEDGER` 组件不得解析成分录。 | 把营销账户当支付工具、营销规则系统或券库存；把展示优惠和商户让利默认入账；缺营销账户仍放行。 |
 | `DSL-BENEFIT-AUTH-HOLD-001` | 授权时占券、完成时核销。 | `ledgerEffect=HOLD_ONLY`，携带 `holdId`。 | 授权阶段只固化权益占用，完成核销，撤销或过期释放。 | 授权拒绝核销权益、授权阶段进入商户清算。 |
 | `DSL-BENEFIT-REFUND-NO-COUPON-001` | 不退券但冲补贴。 | `NO_REFUND + REVERSE_SUBSIDY`。 | 用户侧不返券，资金侧冲回补贴或减少商户应收。 | 用一个布尔值混淆用户侧和资金侧处置。 |
 | `DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001` | 不退券且不冲补贴。 | `NO_REFUND + RETAIN_SUBSIDY`。 | 保留补贴成本或合同口径，必须有规则版本和专业确认。 | 未确认财务口径仍自动放行。 |
 | `DSL-BENEFIT-PARTIAL-REFUND-001` | 部分退款权益分摊。 | `partialRefundStrategy`、组件级 `refundPolicy`、规则版本、稳定组件顺序、舍入模式和尾差归属。 | 多次退款按原策略累计闭合；同一输入重试结果一致；尾差由确定性规则吸收且不超组件剩余额度。 | 按当前活动规则重算、累计超额、尾差静默补平或由当前执行顺序随机分摊。 |
-| `DSL-BENEFIT-MISSING-SNAPSHOT-REPLAY-001` | 缺原权益快照的逆向处理。 | 原交易缺 `benefitSnapshot` 或等价快照。 | 失败或人工处理，不调用当前营销规则。 | 当前规则重算、补造历史权益结果。 |
+| `DSL-BENEFIT-MISSING-FUNDING-FACT-REPLAY-001` | 缺原权益资金事实的逆向处理。 | 原交易缺权益资金交易、原 route 摘要或经审批补充事实。 | 失败或人工处理，不调用当前营销规则。 | 当前规则重算、补造历史权益结果。 |
 | `DSL-BENEFIT-COMPANION-INSTRUCTION-001` | 独立伴随权益指令原子性。 | 伴随指令组、主从角色、原子性模式、补偿策略、投影合并键。 | 主交易和伴随指令可按同一业务组幂等、补偿、投影和对账；部分成功进入差错或补偿。 | 缺组键、缺补偿策略、部分成功静默成功、伴随指令丢失在投影或清分中。 |
 | `DSL-BENEFIT-SUPPLEMENTAL-FACT-001` | 历史补充权益事实。 | 原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系。 | 只追加补充事实，用于退款、差错、对账、归档读取或治理重放解释。 | 覆盖原交易、原 route snapshot、原账本事实；缺证据仍参与 apply。 |
 | `DSL-BENEFIT-AUDIT-EVIDENCE-001` | 专业确认和审计证据包最终校验。 | 确认方、确认时间、结论版本、适用范围、有效期、脱敏证据引用、撤销或变更处理、审计责任人。 | 最终写入前重校验，失效时阻断、降级或转人工。 | dry-run 替代 apply 证据；过期、撤销、范围不匹配或敏感原文仍放行。 |
@@ -1582,974 +1389,87 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001` | 普通指标快照边界。 | `metricSnapshot` 和指标水位。 | 只属于报表指标发布上下文，不推进余额水位、Manifest 或重放 checkpoint。 | 指标水位替代资金水位、指标质量报告替代资金差异报告。 |
 | `DSL-GOVERNANCE-BIG-DATA-ARCHIVE-BOUNDARY-001` | 大数据消费边界；caseId 保留历史 archive 命名。 | 治理读取请求、导出快照引用、Manifest 摘要、脱敏策略、digest、审计引用和报表数仓消费方。 | 报表数仓、离线指标或经营分析只能只读消费治理导出或授权读取结果；资金冷归档仍是事实留存和重放证据，不是在线报表库。 | 报表数仓直接扫资金冷归档、反写交易/账目/余额/清结算/对账/投影事实，或用指标快照推进资金水位、替代余额快照或交易重放 checkpoint。 |
 
-### 11.3 权益快照夹具场景示例
+### 11.3 权益让利资金事实夹具场景示例
 
-本节是权益快照 DSL 场景示例的权威入口。以下示例可以按 `{caseId}.json` 迁移到 `tests/src/test/resources/dsl-contract-cases/`；只做契约承载时可先落契约夹具，涉及资金路径、账务、投影、清结算、对账或归档事实时必须升级为资金流夹具。正文示例只表达 DSL 契约、资金预期和验收预期，不表达 Controller 报文、数据库结构或运营页面字段。
+本节是权益让利资金事实 DSL 场景示例的权威入口。样例只表达目标态交付口径：权益资金事实通过 `FundsBenefitFundingApplicationService` 的 `apply`、`refund`、`reverse` 请求进入交易层；`FundsInstruction.benefitSnapshot`、旧 `FundsBenefitSnapshotSpec` 及其组件、引用、退款策略对象不再作为 core DSL。
 
-#### 11.3.1 商户优惠券：不生成权益账务
+#### 11.3.1 平台补贴：独立权益资金交易
 
 ```json
 {
-  "caseId": "DSL-BENEFIT-MERCHANT-DISCOUNT-001",
-  "scenarioCode": "DIRECT_PAY_WITH_MERCHANT_COUPON_NO_LEDGER",
-  "acceptanceIds": ["AC-BEN-002", "RED-050", "RED-052"],
-  "tddIds": ["TDD-BEN-DIR-001", "TDD-BEN-RED-003"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#权益快照分期落点"],
-  "instruction": {
+  "caseId": "DSL-BENEFIT-FUNDING-APPLY-001",
+  "fixtureLevel": "CONTRACT_ONLY",
+  "scenarioCode": "BENEFIT_FUNDING_PLATFORM_SUBSIDY_APPLY",
+  "targetTestClass": "FundsBenefitFundingApplicationServiceContractTests",
+  "acceptanceIds": ["AC-BEN-FUNDING-001"],
+  "tddIds": ["TDD-BEN-FUNDING-001"],
+  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#权益让利资金交易"],
+  "benefitFundingApplyRequest": {
     "tenantId": 1,
+    "businessScene": "PLATFORM_SUBSIDY",
+    "businessSn": "BEN_APPLY_202606160001",
+    "originalOrderSn": "ORDER_202606160001",
+    "referenceTransactionSn": "PAY_202606160001",
+    "costBearerSubjectRef": { "subjectType": "FUNDING_ACCOUNT", "subjectId": "fa_platform_marketing_usd" },
+    "benefitReceiverSubjectRef": { "subjectType": "FUNDING_ACCOUNT", "subjectId": "fa_merchant_clearing_usd" },
+    "amount": { "currency": "USD", "amount": 2000 },
+    "fundingNature": "PLATFORM_OWN_FUNDS",
+    "ledgerEffect": "POSTING_REQUIRED",
+    "benefitFundingSources": [{
+      "sourceType": "PAYMENT_DISCOUNT",
+      "sourceId": "subsidy_decision_202606160001",
+      "ruleId": "platform_subsidy_rule",
+      "ruleVersion": "v3",
+      "amount": { "currency": "USD", "amount": 2000 }
+    }]
+  },
+  "validation": {
+    "mustPass": ["request can express who bears cost, who receives benefit, amount and source references"],
+    "mustFail": ["current promotion rules are recalculated", "subsidy and principal are netted into one amount"]
+  }
+}
+```
+
+#### 11.3.2 历史摘要兼容：只读追溯
+
+```json
+{
+  "caseId": "DSL-BENEFIT-SUMMARY-CONTEXT-001",
+  "instruction": {
     "instructionType": "DIRECT_TRANSACTION",
     "eventType": "PAY",
     "transactionType": "PAY",
-    "businessScene": "MERCHANT_ORDER_PAY",
-    "businessSn": "PAY_BEN_MERCHANT_202605210001",
     "amount": { "currency": "USD", "amount": 8000 },
     "originalAmount": { "currency": "USD", "amount": 8000 },
-    "exchangeRate": "1",
-    "benefitSnapshot": {
-      "benefitSnapshotId": "bs_merchant_202605210001",
-      "benefitSchemaVersion": "1.0",
-      "benefitGroupSn": "bg_order_202605210001",
-      "orderSn": "order_10001",
-      "pricingSnapshotSn": "price_10001_v3",
-      "orderAmount": { "currency": "USD", "amount": 10000 },
-      "userPayAmount": { "currency": "USD", "amount": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "amount": 8000 },
-      "components": [
-        {
-          "componentSn": "bc_merchant_discount_001",
-          "sequence": 1,
-          "benefitType": "MERCHANT_COUPON",
-          "componentType": "MERCHANT_DISCOUNT",
-          "amount": { "currency": "USD", "amount": 2000 },
-          "ledgerEffect": "NO_LEDGER",
-          "fundingNature": "MERCHANT_BORNE",
-          "bearerSubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_20001" },
-          "beneficiarySubjectRef": { "subjectType": "USER", "subjectId": "user_10001" },
-          "benefitReference": {
-            "campaignId": "merchant_campaign_01",
-            "couponId": "merchant_coupon_10001",
-            "writeOffId": "writeoff_90001",
-            "ruleVersion": "merchant_rule_v3",
-            "externalDecisionId": "pricing_decision_10001"
-          },
-          "refundPolicy": {
-            "partialRefundStrategy": "ITEM_LINE_BASED",
-            "dispositions": ["NO_REFUND", "REDUCE_MERCHANT_RECEIVABLE"],
-            "refundRuleVersion": "merchant_refund_v3",
-            "refundPolicyCode": "MERCHANT_COUPON_NO_RETURN"
-          },
-          "contextVariables": {}
-        }
-      ],
-      "decisionSource": "ORDER_PRICING",
-      "decisionTraceId": "trace_price_10001",
-      "contextVariables": {}
-    },
     "contextVariables": {
-      "payerAccountId": "fa_user_10001_usd",
-      "payeeAccountId": "fa_merchant_20001_usd",
-      "payeeLedgerSubjectCode": "CLEARING"
+      "benefitSnapshotId": "BS-HISTORICAL-SUMMARY-001",
+      "stableDigest": "sha256:historical-benefit-digest"
     }
   },
-  "expectedRoute": {
-    "routeCode": "DIRECT_PAY_MERCHANT_ORDER",
-    "shouldCreateRoute": true,
-    "legs": [
-      {
-        "legType": "PAY",
-        "fromAccountId": "fa_user_10001_usd",
-        "fromBucket": "AVAILABLE",
-        "toAccountId": "fa_merchant_20001_usd",
-        "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "amount": 8000 }
-      }
-    ],
-    "benefitRouteAssertions": [
-      "bc_merchant_discount_001 does not create route leg",
-      "benefitSnapshotId is retained for clearing display and reconciliation"
-    ]
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": true,
-    "postingPlanRule": "pay_leg_only",
-    "balanceAssertions": [
-      "payer AVAILABLE decreases by 8000",
-      "merchant CLEARING increases by 8000"
-    ],
-    "benefitAssertions": [
-      "merchant discount does not create LedgerEntry",
-      "merchant discount is visible as benefit amount in clearing projection"
-    ]
-  },
   "validation": {
-    "mustPass": ["amount closure: 8000 + 2000 = 10000", "repeat request idempotent"],
-    "mustFail": ["merchant discount creates posting", "funds service recalculates coupon amount", "benefit core fields stored only in contextVariables"]
+    "mustPass": ["historical summary can be retained for replay, projection and audit"],
+    "mustFail": ["summary is expanded into a full legacy benefit snapshot DSL"]
   }
 }
 ```
 
-#### 11.3.2 平台补贴券：补足商户并独立入账
+#### 11.3.3 旧权益快照字段拒绝
 
 ```json
 {
-  "caseId": "DSL-BENEFIT-PLATFORM-SUBSIDY-001",
-  "scenarioCode": "DIRECT_PAY_WITH_PLATFORM_SUBSIDY_POSTING",
-  "acceptanceIds": ["AC-BEN-003", "RED-050", "RED-051"],
-  "tddIds": ["TDD-BEN-DIR-002", "TDD-BEN-RED-004", "TDD-BEN-RED-008"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#权益路由账务消费"],
+  "caseId": "DSL-INVALID-LEGACY-BENEFIT-SNAPSHOT-001",
   "instruction": {
-    "tenantId": 1,
     "instructionType": "DIRECT_TRANSACTION",
     "eventType": "PAY",
     "transactionType": "PAY",
-    "businessScene": "MERCHANT_ORDER_PAY",
-    "businessSn": "PAY_BEN_PLATFORM_202605210001",
     "amount": { "currency": "USD", "amount": 8000 },
     "originalAmount": { "currency": "USD", "amount": 8000 },
-    "exchangeRate": "1",
     "benefitSnapshot": {
-      "benefitSnapshotId": "bs_platform_202605210001",
-      "benefitSchemaVersion": "1.0",
-      "benefitGroupSn": "bg_order_202605210002",
-      "orderSn": "order_10002",
-      "orderAmount": { "currency": "USD", "amount": 10000 },
-      "userPayAmount": { "currency": "USD", "amount": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
-      "components": [
-        {
-          "componentSn": "bc_platform_subsidy_001",
-          "sequence": 1,
-          "benefitType": "PLATFORM_COUPON",
-          "componentType": "PLATFORM_DISPLAY_DISCOUNT",
-          "amount": { "currency": "USD", "amount": 2000 },
-          "ledgerEffect": "POSTING_REQUIRED",
-          "fundingNature": "PLATFORM_OWN_FUNDS",
-          "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
-          "bearerSubjectRef": { "subjectType": "PLATFORM", "subjectId": "platform_default" },
-          "beneficiarySubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_20001" },
-          "benefitReference": {
-            "campaignId": "platform_campaign_01",
-            "couponId": "platform_coupon_20001",
-            "writeOffId": "writeoff_90002",
-            "ruleVersion": "platform_rule_v5",
-            "externalDecisionId": "promotion_decision_20001"
-          },
-          "refundPolicy": {
-            "partialRefundStrategy": "PROPORTIONAL",
-            "dispositions": ["NO_REFUND", "REVERSE_SUBSIDY"],
-            "refundRuleVersion": "platform_refund_v5",
-            "refundPolicyCode": "PLATFORM_SUBSIDY_REVERSE_ON_REFUND"
-          },
-          "contextVariables": {}
-        }
-      ],
-      "decisionSource": "PROMOTION_SYSTEM",
-      "decisionTraceId": "trace_promo_20001",
-      "contextVariables": {}
-    },
-    "contextVariables": {
-      "payerAccountId": "fa_user_10001_usd",
-      "payeeAccountId": "fa_merchant_20001_usd",
-      "payeeLedgerSubjectCode": "CLEARING"
+      "benefitSnapshotId": "bs_legacy_001"
     }
   },
-  "expectedRoute": {
-    "routeCode": "DIRECT_PAY_WITH_PLATFORM_SUBSIDY",
-    "shouldCreateRoute": true,
-    "legs": [
-      {
-        "legType": "PAY",
-        "fromAccountId": "fa_user_10001_usd",
-        "fromBucket": "AVAILABLE",
-        "toAccountId": "fa_merchant_20001_usd",
-        "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "amount": 8000 }
-      },
-      {
-        "legType": "PLATFORM_SUBSIDY",
-        "fromAccountRole": "PLATFORM_SUBSIDY_COST",
-        "toAccountId": "fa_merchant_20001_usd",
-        "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "amount": 2000 },
-        "benefitComponentSn": "bc_platform_subsidy_001"
-      }
-    ]
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": true,
-    "postingPlanRule": "principal_and_subsidy_separately_balanced",
-    "balanceAssertions": [
-      "payer AVAILABLE decreases by 8000",
-      "platform subsidy cost account decreases by 2000 or records subsidy cost by configured account policy",
-      "merchant CLEARING increases by 10000"
-    ],
-    "benefitAssertions": [
-      "componentSn and benefitSnapshotId are retained in posting context",
-      "subsidy is not netted into principal or fee"
-    ]
-  },
   "validation": {
-    "mustPass": ["amount closure: 8000 + 2000 = 10000", "merchant receivable is explainable as 10000"],
-    "mustFail": ["amount rewritten to 10000", "platform subsidy mixed into fee", "missing fundingAccountRole"]
-  }
-}
-```
-
-#### 11.3.3 储值代金券：按负债或权益余额处理
-
-```json
-{
-  "caseId": "DSL-BENEFIT-PREPAID-VOUCHER-001",
-  "scenarioCode": "DIRECT_PAY_WITH_PREPAID_VOUCHER",
-  "acceptanceIds": ["AC-BEN-005", "RED-055"],
-  "tddIds": ["TDD-BEN-DIR-004", "TDD-BEN-RED-006"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#储值券资金性质"],
-  "instruction": {
-    "tenantId": 1,
-    "instructionType": "DIRECT_TRANSACTION",
-    "eventType": "PAY",
-    "transactionType": "PAY",
-    "businessScene": "MERCHANT_ORDER_PAY",
-    "businessSn": "PAY_BEN_PREPAID_202605210001",
-    "amount": { "currency": "USD", "amount": 7000 },
-    "originalAmount": { "currency": "USD", "amount": 7000 },
-    "exchangeRate": "1",
-    "benefitSnapshot": {
-      "benefitSnapshotId": "bs_prepaid_202605210001",
-      "benefitSchemaVersion": "1.0",
-      "benefitGroupSn": "bg_order_202605210003",
-      "orderSn": "order_10003",
-      "orderAmount": { "currency": "USD", "amount": 10000 },
-      "userPayAmount": { "currency": "USD", "amount": 7000 },
-      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
-      "components": [
-        {
-          "componentSn": "bc_prepaid_redeem_001",
-          "sequence": 1,
-          "benefitType": "PREPAID_VOUCHER",
-          "componentType": "PREPAID_REDEEM",
-          "amount": { "currency": "USD", "amount": 3000 },
-          "ledgerEffect": "POSTING_REQUIRED",
-          "fundingNature": "PREPAID_LIABILITY",
-          "fundingSubjectRef": { "subjectType": "PREPAID_LIABILITY_ACCOUNT", "subjectId": "liability_gift_card_usd" },
-          "beneficiarySubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_20001" },
-          "benefitReference": {
-            "voucherId": "gift_card_30001",
-            "benefitInstanceId": "benefit_instance_30001",
-            "writeOffId": "writeoff_90003",
-            "ruleVersion": "prepaid_rule_v1",
-            "externalDecisionId": "prepaid_decision_30001"
-          },
-          "refundPolicy": {
-            "partialRefundStrategy": "PROPORTIONAL",
-            "dispositions": ["RESTORE_PREPAID_LIABILITY"],
-            "refundRuleVersion": "prepaid_refund_v1",
-            "refundPolicyCode": "RESTORE_GIFT_CARD_BALANCE"
-          },
-          "contextVariables": {
-            "financeConfirmationRef": "finance_confirm_prepaid_001"
-          }
-        }
-      ],
-      "decisionSource": "PREPAID_VOUCHER_SYSTEM",
-      "decisionTraceId": "trace_prepaid_30001",
-      "contextVariables": {}
-    },
-    "contextVariables": {
-      "payerAccountId": "fa_user_10001_usd",
-      "payeeAccountId": "fa_merchant_20001_usd",
-      "payeeLedgerSubjectCode": "CLEARING"
-    }
-  },
-  "expectedRoute": {
-    "routeCode": "DIRECT_PAY_WITH_PREPAID_VOUCHER",
-    "shouldCreateRoute": true,
-    "legs": [
-      {
-        "legType": "PAY",
-        "fromAccountId": "fa_user_10001_usd",
-        "fromBucket": "AVAILABLE",
-        "toAccountId": "fa_merchant_20001_usd",
-        "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "amount": 7000 }
-      },
-      {
-        "legType": "PREPAID_REDEEM",
-        "fromSubjectRef": { "subjectType": "PREPAID_LIABILITY_ACCOUNT", "subjectId": "liability_gift_card_usd" },
-        "toAccountId": "fa_merchant_20001_usd",
-        "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "amount": 3000 },
-        "benefitComponentSn": "bc_prepaid_redeem_001"
-      }
-    ]
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": true,
-    "postingPlanRule": "prepaid_liability_and_cash_separately_balanced",
-    "balanceAssertions": [
-      "payer AVAILABLE decreases by 7000",
-      "prepaid liability or user benefit balance decreases by 3000",
-      "merchant CLEARING increases by 10000"
-    ],
-    "benefitAssertions": [
-      "fundingNature is PREPAID_LIABILITY",
-      "finance confirmation reference is retained"
-    ]
-  },
-  "validation": {
-    "mustPass": ["amount closure: 7000 + 3000 = 10000", "prepaid liability path is explicit"],
-    "mustFail": ["prepaid voucher treated as platform coupon", "missing voucherId and funding subject", "missing finance confirmation when policy requires it"]
-  }
-}
-```
-
-#### 11.3.4 授权占券：授权阶段只占用不核销
-
-```json
-{
-  "caseId": "DSL-BENEFIT-AUTH-HOLD-001",
-  "scenarioCode": "AUTHORIZATION_WITH_BENEFIT_HOLD",
-  "acceptanceIds": ["AC-BEN-006", "RED-053"],
-  "tddIds": ["TDD-BEN-AUTH-001", "TDD-BEN-AUTH-004", "TDD-BEN-RED-005"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#授权占券"],
-  "instruction": {
-    "tenantId": 1,
-    "instructionType": "AUTHORIZATION_TRANSACTION",
-    "eventType": "AUTHORIZE",
-    "transactionType": "PAY",
-    "businessScene": "CARD_ORDER_AUTH",
-    "businessSn": "AUTH_BEN_HOLD_202605210001",
-    "amount": { "currency": "USD", "amount": 8000 },
-    "originalAmount": { "currency": "USD", "amount": 8000 },
-    "exchangeRate": "1",
-    "benefitSnapshot": {
-      "benefitSnapshotId": "bs_auth_hold_202605210001",
-      "benefitSchemaVersion": "1.0",
-      "benefitGroupSn": "bg_auth_202605210001",
-      "orderSn": "order_auth_10001",
-      "orderAmount": { "currency": "USD", "amount": 10000 },
-      "userPayAmount": { "currency": "USD", "amount": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
-      "components": [
-        {
-          "componentSn": "bc_auth_hold_001",
-          "sequence": 1,
-          "benefitType": "PLATFORM_COUPON",
-          "componentType": "PLATFORM_SUBSIDY",
-          "amount": { "currency": "USD", "amount": 2000 },
-          "ledgerEffect": "HOLD_ONLY",
-          "fundingNature": "PLATFORM_OWN_FUNDS",
-          "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
-          "beneficiarySubjectRef": { "subjectType": "MERCHANT", "subjectId": "merchant_20001" },
-          "benefitReference": {
-            "campaignId": "platform_campaign_auth_01",
-            "couponId": "platform_coupon_auth_10001",
-            "holdId": "benefit_hold_70001",
-            "ruleVersion": "auth_coupon_rule_v2",
-            "externalDecisionId": "promotion_auth_decision_10001"
-          },
-          "refundPolicy": {
-            "partialRefundStrategy": "ORIGINAL_SNAPSHOT",
-            "dispositions": ["RELEASE_HOLD"],
-            "refundRuleVersion": "auth_coupon_refund_v2",
-            "refundPolicyCode": "RELEASE_HOLD_ON_AUTH_REVERSAL_OR_EXPIRE"
-          },
-          "contextVariables": {
-            "benefitLifecycleAction": "HOLD"
-          }
-        }
-      ],
-      "decisionSource": "PROMOTION_SYSTEM",
-      "decisionTraceId": "trace_auth_promo_10001",
-      "contextVariables": {}
-    },
-    "contextVariables": {
-      "authorizationAccountId": "fa_user_10001_usd",
-      "merchantAccountId": "fa_merchant_20001_usd",
-      "paymentInstrumentSn": "pi_card_10001"
-    }
-  },
-  "expectedRoute": {
-    "routeCode": "AUTHORIZATION_WITH_BENEFIT_HOLD",
-    "shouldCreateRoute": true,
-    "legs": [
-      {
-        "legType": "AUTHORIZE",
-        "fromAccountId": "fa_user_10001_usd",
-        "fromBucket": "AVAILABLE",
-        "toAccountId": "fa_user_10001_usd",
-        "toBucket": "AUTHORIZATION",
-        "amount": { "currency": "USD", "amount": 8000 }
-      }
-    ],
-    "benefitRouteAssertions": [
-      "benefit hold is retained by holdId",
-      "benefit hold does not enter merchant CLEARING during AUTHORIZE"
-    ]
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": true,
-    "postingPlanRule": "authorization_cash_hold_only",
-    "balanceAssertions": [
-      "user AVAILABLE decreases by 8000",
-      "user AUTHORIZATION increases by 8000",
-      "merchant CLEARING unchanged"
-    ],
-    "benefitAssertions": [
-      "coupon is held but not written off",
-      "no platform subsidy posting is created during AUTHORIZE"
-    ]
-  },
-  "validation": {
-    "mustPass": ["holdId retained", "authorization replay can release hold on reversal or expire"],
-    "mustFail": ["authorization decline writes off coupon", "AUTHORIZE creates merchant clearing subsidy", "missing holdId for HOLD_ONLY component"]
-  }
-}
-```
-
-#### 11.3.5 不退券退款：用户侧不返券，资金侧冲回补贴
-
-```json
-{
-  "caseId": "DSL-BENEFIT-REFUND-NO-COUPON-001",
-  "scenarioCode": "REFUND_NO_COUPON_REVERSE_SUBSIDY",
-  "acceptanceIds": ["AC-BEN-007", "RED-054", "RED-056"],
-  "tddIds": ["TDD-BEN-REFUND-001", "TDD-BEN-RED-007", "TDD-BEN-RED-008"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#退款回放"],
-  "instruction": {
-    "tenantId": 1,
-    "instructionType": "DIRECT_TRANSACTION",
-    "eventType": "REFUND",
-    "transactionType": "REFUND",
-    "businessScene": "MERCHANT_ORDER_REFUND",
-    "businessSn": "REFUND_BEN_202605210001",
-    "amount": { "currency": "USD", "amount": 8000 },
-    "originalAmount": { "currency": "USD", "amount": 8000 },
-    "exchangeRate": "1",
-    "reference": {
-      "originalBusinessSn": "PAY_BEN_PLATFORM_202605210001",
-      "originalRouteSnapshotSn": "route_snapshot_platform_202605210001",
-      "originalBenefitSnapshotId": "bs_platform_202605210001"
-    },
-    "benefitSnapshot": {
-      "benefitSnapshotId": "bs_refund_reverse_202605210001",
-      "benefitSchemaVersion": "1.0",
-      "benefitGroupSn": "bg_order_202605210002",
-      "orderSn": "order_10002",
-      "orderAmount": { "currency": "USD", "amount": 10000 },
-      "userPayAmount": { "currency": "USD", "amount": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
-      "components": [
-        {
-          "componentSn": "bc_platform_subsidy_001_reversal",
-          "sequence": 1,
-          "benefitType": "PLATFORM_COUPON",
-          "componentType": "SUBSIDY_REVERSAL",
-          "amount": { "currency": "USD", "amount": 2000 },
-          "ledgerEffect": "REVERSAL_REQUIRED",
-          "fundingNature": "PLATFORM_OWN_FUNDS",
-          "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
-          "benefitReference": {
-            "campaignId": "platform_campaign_01",
-            "couponId": "platform_coupon_20001",
-            "writeOffId": "writeoff_90002",
-            "ruleVersion": "platform_rule_v5",
-            "externalDecisionId": "promotion_decision_20001"
-          },
-          "refundPolicy": {
-            "partialRefundStrategy": "ORIGINAL_SNAPSHOT",
-            "dispositions": ["NO_REFUND", "REVERSE_SUBSIDY"],
-            "refundableAmount": { "currency": "USD", "amount": 2000 },
-            "nonRefundableAmount": { "currency": "USD", "amount": 0 },
-            "refundRuleVersion": "platform_refund_v5",
-            "refundPolicyCode": "NO_COUPON_RETURN_REVERSE_SUBSIDY"
-          },
-          "contextVariables": {
-            "originalComponentSn": "bc_platform_subsidy_001"
-          }
-        }
-      ],
-      "decisionSource": "ORIGINAL_BENEFIT_SNAPSHOT",
-      "decisionTraceId": "trace_refund_10001",
-      "contextVariables": {}
-    },
-    "contextVariables": {
-      "refundReason": "ORDER_CANCELLED",
-      "payerAccountId": "fa_user_10001_usd",
-      "merchantAccountId": "fa_merchant_20001_usd"
-    }
-  },
-  "expectedRoute": {
-    "routeCode": "REFUND_REPLAY_ORIGINAL_ROUTE_WITH_SUBSIDY_REVERSAL",
-    "shouldCreateRoute": true,
-    "legs": [
-      {
-        "legType": "REFUND",
-        "fromAccountId": "fa_merchant_20001_usd",
-        "fromBucket": "CLEARING",
-        "toAccountId": "fa_user_10001_usd",
-        "toBucket": "AVAILABLE",
-        "amount": { "currency": "USD", "amount": 8000 }
-      },
-      {
-        "legType": "SUBSIDY_REVERSAL",
-        "fromAccountId": "fa_merchant_20001_usd",
-        "fromBucket": "CLEARING",
-        "toAccountRole": "PLATFORM_SUBSIDY_COST",
-        "amount": { "currency": "USD", "amount": 2000 },
-        "benefitComponentSn": "bc_platform_subsidy_001_reversal"
-      }
-    ]
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": true,
-    "postingPlanRule": "cash_refund_and_subsidy_reversal_separately_balanced",
-    "balanceAssertions": [
-      "merchant CLEARING decreases by 10000",
-      "user AVAILABLE increases by 8000",
-      "platform subsidy cost is reversed by 2000 according to configured account policy"
-    ],
-    "benefitAssertions": [
-      "coupon is not reissued to user",
-      "subsidy reversal references original component"
-    ]
-  },
-  "validation": {
-    "mustPass": ["NO_REFUND and REVERSE_SUBSIDY are both present", "original route snapshot is used"],
-    "mustFail": ["current promotion rule recalculated", "coupon silently reissued", "subsidy retained without policy"]
-  }
-}
-```
-
-#### 11.3.6 缺原权益快照：失败或进入人工处理
-
-```json
-{
-  "caseId": "DSL-BENEFIT-MISSING-SNAPSHOT-REPLAY-001",
-  "scenarioCode": "REFUND_REQUIRES_ORIGINAL_BENEFIT_SNAPSHOT",
-  "acceptanceIds": ["AC-BEN-010", "RED-054", "RED-057"],
-  "tddIds": ["TDD-BEN-REPLAY-001", "TDD-BEN-RED-002", "TDD-BEN-RED-009"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#权益快照目标态风险"],
-  "instruction": {
-    "tenantId": 1,
-    "instructionType": "DIRECT_TRANSACTION",
-    "eventType": "REFUND",
-    "transactionType": "REFUND",
-    "businessScene": "MERCHANT_ORDER_REFUND",
-    "businessSn": "REFUND_BEN_MISSING_202605210001",
-    "amount": { "currency": "USD", "amount": 8000 },
-    "originalAmount": { "currency": "USD", "amount": 8000 },
-    "exchangeRate": "1",
-    "reference": {
-      "originalBusinessSn": "PAY_WITH_BENEFIT_BUT_MISSING_SNAPSHOT",
-      "originalRouteSnapshotSn": "route_snapshot_missing_benefit_001",
-      "originalBenefitSnapshotRequired": true
-    },
-    "contextVariables": {
-      "refundReason": "CUSTOMER_RETURN",
-      "originalTransactionMarkedWithBenefit": true
-    }
-  },
-  "expectedRoute": {
-    "shouldCreateRoute": false,
-    "failureCode": "ORIGINAL_BENEFIT_SNAPSHOT_REQUIRED",
-    "manualReviewRequired": true
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": false,
-    "balanceAssertions": [
-      "payer balance unchanged",
-      "merchant balance unchanged",
-      "platform subsidy account unchanged"
-    ]
-  },
-  "validation": {
-    "mustPass": ["manual exception is created with original transaction reference", "no route/posting/entry side effect"],
-    "mustFail": ["current promotion rule recalculated", "synthetic historical benefitSnapshot created", "refund proceeds with silent amount adjustment"]
-  }
-}
-```
-
-#### 11.3.7 平台券不补足商户：不生成平台补贴资金路径
-
-```json
-{
-  "caseId": "DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001",
-  "scenarioCode": "DIRECT_PAY_WITH_PLATFORM_COUPON_NO_MERCHANT_SETTLEMENT",
-  "acceptanceIds": ["AC-BEN-004", "RED-050", "RED-052"],
-  "tddIds": ["TDD-BEN-DIR-003", "TDD-BEN-RED-004"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#权益路由账务消费"],
-  "instruction": {
-    "tenantId": 1,
-    "instructionType": "DIRECT_TRANSACTION",
-    "eventType": "PAY",
-    "transactionType": "PAY",
-    "businessScene": "MERCHANT_ORDER_PAY",
-    "businessSn": "PAY_BEN_PLATFORM_NO_SETTLEMENT_202605210001",
-    "amount": { "currency": "USD", "amount": 8000 },
-    "originalAmount": { "currency": "USD", "amount": 8000 },
-    "exchangeRate": "1",
-    "benefitSnapshot": {
-      "benefitSnapshotId": "bs_platform_no_settlement_202605210001",
-      "benefitSchemaVersion": "1.0",
-      "benefitGroupSn": "bg_order_202605210004",
-      "orderSn": "order_10004",
-      "orderAmount": { "currency": "USD", "amount": 10000 },
-      "userPayAmount": { "currency": "USD", "amount": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "amount": 8000 },
-      "components": [
-        {
-          "componentSn": "bc_platform_display_discount_001",
-          "sequence": 1,
-          "benefitType": "PLATFORM_COUPON",
-          "componentType": "PLATFORM_SUBSIDY",
-          "amount": { "currency": "USD", "amount": 2000 },
-          "ledgerEffect": "NO_LEDGER",
-          "fundingNature": "NO_FUNDS_TRANSFER",
-          "bearerSubjectRef": { "subjectType": "PLATFORM", "subjectId": "platform_default" },
-          "beneficiarySubjectRef": { "subjectType": "USER", "subjectId": "user_10001" },
-          "benefitReference": {
-            "campaignId": "platform_campaign_no_settlement_01",
-            "couponId": "platform_coupon_no_settlement_10001",
-            "writeOffId": "writeoff_90004",
-            "ruleVersion": "platform_no_settlement_rule_v1",
-            "externalDecisionId": "promotion_decision_40001"
-          },
-          "refundPolicy": {
-            "partialRefundStrategy": "ORIGINAL_SNAPSHOT",
-            "dispositions": ["NO_REFUND"],
-            "refundRuleVersion": "platform_no_settlement_refund_v1",
-            "refundPolicyCode": "DISPLAY_DISCOUNT_NO_MERCHANT_SETTLEMENT"
-          },
-          "contextVariables": {
-            "contractSettlementMode": "DISCOUNTED_MERCHANT_RECEIVABLE"
-          }
-        }
-      ],
-      "decisionSource": "PROMOTION_SYSTEM",
-      "decisionTraceId": "trace_promo_no_settlement_40001",
-      "contextVariables": {}
-    },
-    "contextVariables": {
-      "payerAccountId": "fa_user_10001_usd",
-      "payeeAccountId": "fa_merchant_20001_usd",
-      "payeeLedgerSubjectCode": "CLEARING"
-    }
-  },
-  "expectedRoute": {
-    "routeCode": "DIRECT_PAY_PLATFORM_COUPON_NO_SETTLEMENT",
-    "shouldCreateRoute": true,
-    "legs": [
-      {
-        "legType": "PAY",
-        "fromAccountId": "fa_user_10001_usd",
-        "fromBucket": "AVAILABLE",
-        "toAccountId": "fa_merchant_20001_usd",
-        "toBucket": "CLEARING",
-        "amount": { "currency": "USD", "amount": 8000 }
-      }
-    ],
-    "benefitRouteAssertions": [
-      "platform coupon creates no subsidy route leg",
-      "merchant receivable is discounted to 8000 by original snapshot"
-    ]
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": true,
-    "postingPlanRule": "pay_leg_only",
-    "balanceAssertions": [
-      "payer AVAILABLE decreases by 8000",
-      "merchant CLEARING increases by 8000",
-      "platform subsidy cost account unchanged"
-    ],
-    "benefitAssertions": [
-      "platform display discount remains projection-only",
-      "no platform subsidy LedgerEntry is created"
-    ]
-  },
-  "validation": {
-    "mustPass": ["amount closure: 8000 + 2000 = 10000", "merchant receivable follows original discounted snapshot"],
-    "mustFail": ["platform subsidy cost leg created", "coupon recalculated from current campaign", "discount silently treated as merchant-borne coupon"]
-  }
-}
-```
-
-#### 11.3.8 不退券且不冲补贴：保留补贴成本
-
-```json
-{
-  "caseId": "DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001",
-  "scenarioCode": "REFUND_NO_COUPON_RETAIN_SUBSIDY",
-  "acceptanceIds": ["AC-BEN-008", "RED-054", "RED-056"],
-  "tddIds": ["TDD-BEN-REFUND-002", "TDD-BEN-RED-007"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#退款回放"],
-  "instruction": {
-    "tenantId": 1,
-    "instructionType": "DIRECT_TRANSACTION",
-    "eventType": "REFUND",
-    "transactionType": "REFUND",
-    "businessScene": "MERCHANT_ORDER_REFUND",
-    "businessSn": "REFUND_BEN_RETAIN_202605210001",
-    "amount": { "currency": "USD", "amount": 8000 },
-    "originalAmount": { "currency": "USD", "amount": 8000 },
-    "exchangeRate": "1",
-    "reference": {
-      "originalBusinessSn": "PAY_BEN_PLATFORM_202605210001",
-      "originalRouteSnapshotSn": "route_snapshot_platform_202605210001",
-      "originalBenefitSnapshotId": "bs_platform_202605210001"
-    },
-    "benefitSnapshot": {
-      "benefitSnapshotId": "bs_refund_retain_202605210001",
-      "benefitSchemaVersion": "1.0",
-      "benefitGroupSn": "bg_order_202605210002",
-      "orderSn": "order_10002",
-      "orderAmount": { "currency": "USD", "amount": 10000 },
-      "userPayAmount": { "currency": "USD", "amount": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
-      "components": [
-        {
-          "componentSn": "bc_platform_subsidy_001_retain",
-          "sequence": 1,
-          "benefitType": "PLATFORM_COUPON",
-          "componentType": "NON_REFUNDABLE_BENEFIT",
-          "amount": { "currency": "USD", "amount": 2000 },
-          "ledgerEffect": "PROJECTION_ONLY",
-          "fundingNature": "PLATFORM_OWN_FUNDS",
-          "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
-          "benefitReference": {
-            "campaignId": "platform_campaign_01",
-            "couponId": "platform_coupon_20001",
-            "writeOffId": "writeoff_90002",
-            "ruleVersion": "platform_rule_v5",
-            "externalDecisionId": "promotion_decision_20001"
-          },
-          "refundPolicy": {
-            "partialRefundStrategy": "ORIGINAL_SNAPSHOT",
-            "dispositions": ["NO_REFUND", "RETAIN_SUBSIDY"],
-            "nonRefundableAmount": { "currency": "USD", "amount": 2000 },
-            "refundRuleVersion": "platform_refund_v5",
-            "refundPolicyCode": "NO_COUPON_RETURN_RETAIN_SUBSIDY"
-          },
-          "contextVariables": {
-            "financeConfirmationRef": "finance_confirm_retain_subsidy_001",
-            "originalComponentSn": "bc_platform_subsidy_001"
-          }
-        }
-      ],
-      "decisionSource": "ORIGINAL_BENEFIT_SNAPSHOT",
-      "decisionTraceId": "trace_refund_retain_10001",
-      "contextVariables": {}
-    },
-    "contextVariables": {
-      "refundReason": "CUSTOMER_RETURN",
-      "payerAccountId": "fa_user_10001_usd",
-      "merchantAccountId": "fa_merchant_20001_usd"
-    }
-  },
-  "expectedRoute": {
-    "routeCode": "REFUND_REPLAY_ORIGINAL_ROUTE_RETAIN_SUBSIDY",
-    "shouldCreateRoute": true,
-    "legs": [
-      {
-        "legType": "REFUND",
-        "fromAccountId": "fa_merchant_20001_usd",
-        "fromBucket": "CLEARING",
-        "toAccountId": "fa_user_10001_usd",
-        "toBucket": "AVAILABLE",
-        "amount": { "currency": "USD", "amount": 8000 }
-      }
-    ],
-    "benefitRouteAssertions": [
-      "no subsidy reversal leg is created",
-      "retain subsidy policy is auditable"
-    ]
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": true,
-    "postingPlanRule": "cash_refund_only_retain_subsidy",
-    "balanceAssertions": [
-      "merchant CLEARING decreases by 8000",
-      "user AVAILABLE increases by 8000",
-      "platform subsidy cost is not reversed"
-    ],
-    "benefitAssertions": [
-      "coupon is not reissued to user",
-      "finance confirmation reference is retained for retained subsidy"
-    ]
-  },
-  "validation": {
-    "mustPass": ["NO_REFUND and RETAIN_SUBSIDY are both present", "original benefit snapshot is used"],
-    "mustFail": ["subsidy reversal generated without policy", "retain subsidy allowed without confirmation reference", "current promotion rule recalculated"]
-  }
-}
-```
-
-#### 11.3.9 部分退款：按原权益快照分摊
-
-```json
-{
-  "caseId": "DSL-BENEFIT-PARTIAL-REFUND-001",
-  "scenarioCode": "PARTIAL_REFUND_WITH_PROPORTIONAL_BENEFIT_ALLOCATION",
-  "acceptanceIds": ["AC-BEN-009", "RED-054", "RED-056"],
-  "tddIds": ["TDD-BEN-REFUND-003", "TDD-BEN-RACE-001", "TDD-BEN-RED-008", "TDD-BEN-RED-009"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#退款回放"],
-  "instruction": {
-    "tenantId": 1,
-    "instructionType": "DIRECT_TRANSACTION",
-    "eventType": "REFUND",
-    "transactionType": "REFUND",
-    "businessScene": "MERCHANT_ORDER_PARTIAL_REFUND",
-    "businessSn": "REFUND_BEN_PARTIAL_202605210001",
-    "amount": { "currency": "USD", "amount": 4000 },
-    "originalAmount": { "currency": "USD", "amount": 4000 },
-    "exchangeRate": "1",
-    "reference": {
-      "originalBusinessSn": "PAY_BEN_PLATFORM_202605210001",
-      "originalRouteSnapshotSn": "route_snapshot_platform_202605210001",
-      "originalBenefitSnapshotId": "bs_platform_202605210001"
-    },
-    "benefitSnapshot": {
-      "benefitSnapshotId": "bs_partial_refund_202605210001",
-      "benefitSchemaVersion": "1.0",
-      "benefitGroupSn": "bg_order_202605210002",
-      "orderSn": "order_10002",
-      "orderAmount": { "currency": "USD", "amount": 10000 },
-      "userPayAmount": { "currency": "USD", "amount": 8000 },
-      "merchantReceivableAmount": { "currency": "USD", "amount": 10000 },
-      "components": [
-        {
-          "componentSn": "bc_platform_subsidy_001_partial_reversal",
-          "sequence": 1,
-          "benefitType": "PLATFORM_COUPON",
-          "componentType": "SUBSIDY_REVERSAL",
-          "amount": { "currency": "USD", "amount": 1000 },
-          "ledgerEffect": "REVERSAL_REQUIRED",
-          "fundingNature": "PLATFORM_OWN_FUNDS",
-          "fundingAccountRole": "PLATFORM_SUBSIDY_COST",
-          "benefitReference": {
-            "campaignId": "platform_campaign_01",
-            "couponId": "platform_coupon_20001",
-            "writeOffId": "writeoff_90002",
-            "ruleVersion": "platform_rule_v5",
-            "externalDecisionId": "promotion_decision_20001"
-          },
-          "refundPolicy": {
-            "partialRefundStrategy": "PROPORTIONAL",
-            "dispositions": ["NO_REFUND", "REVERSE_SUBSIDY"],
-            "refundableAmount": { "currency": "USD", "amount": 1000 },
-            "refundRuleVersion": "platform_refund_v5",
-            "refundPolicyCode": "PROPORTIONAL_SUBSIDY_REVERSAL"
-          },
-          "contextVariables": {
-            "originalComponentSn": "bc_platform_subsidy_001",
-            "originalComponentAmountMinor": "2000",
-            "refundOrderAmountMinor": "5000",
-            "cumulativeReversedAmountAfterMinor": "1000"
-          }
-        }
-      ],
-      "decisionSource": "ORIGINAL_BENEFIT_SNAPSHOT",
-      "decisionTraceId": "trace_partial_refund_10001",
-      "contextVariables": {}
-    },
-    "contextVariables": {
-      "refundReason": "ITEM_RETURN",
-      "refundLineIds": ["line_01"],
-      "payerAccountId": "fa_user_10001_usd",
-      "merchantAccountId": "fa_merchant_20001_usd"
-    }
-  },
-  "expectedRoute": {
-    "routeCode": "PARTIAL_REFUND_REPLAY_ORIGINAL_ROUTE",
-    "shouldCreateRoute": true,
-    "legs": [
-      {
-        "legType": "REFUND",
-        "fromAccountId": "fa_merchant_20001_usd",
-        "fromBucket": "CLEARING",
-        "toAccountId": "fa_user_10001_usd",
-        "toBucket": "AVAILABLE",
-        "amount": { "currency": "USD", "amount": 4000 }
-      },
-      {
-        "legType": "SUBSIDY_REVERSAL",
-        "fromAccountId": "fa_merchant_20001_usd",
-        "fromBucket": "CLEARING",
-        "toAccountRole": "PLATFORM_SUBSIDY_COST",
-        "amount": { "currency": "USD", "amount": 1000 },
-        "benefitComponentSn": "bc_platform_subsidy_001_partial_reversal"
-      }
-    ]
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": true,
-    "postingPlanRule": "partial_cash_refund_and_proportional_subsidy_reversal",
-    "balanceAssertions": [
-      "merchant CLEARING decreases by 5000",
-      "user AVAILABLE increases by 4000",
-      "platform subsidy cost is reversed by 1000"
-    ],
-    "benefitAssertions": [
-      "cumulative subsidy reversal does not exceed original 2000",
-      "allocation uses original snapshot and refund line context"
-    ]
-  },
-  "validation": {
-    "mustPass": ["partial allocation is proportional to original snapshot", "repeat partial refund request is idempotent"],
-    "mustFail": ["cumulative subsidy reversal exceeds original component", "tail difference silently adjusted", "current promotion rule recalculated"]
-  }
-}
-```
-
-#### 11.3.10 清结算与对账：权益金额项可拆分核对
-
-```json
-{
-  "caseId": "DSL-BENEFIT-CLEARING-RECONCILIATION-001",
-  "scenarioCode": "CLEARING_AND_RECONCILIATION_WITH_BENEFIT_BREAKDOWN",
-  "acceptanceIds": ["AC-BEN-011", "RED-057"],
-  "tddIds": ["TDD-BEN-CLS-001", "TDD-BEN-CLS-002", "TDD-BEN-RECON-001", "TDD-BEN-RED-010"],
-  "systemDesignRefs": ["03-清结算与对账系分设计#权益金额项"],
-  "clearingCandidate": {
-    "tenantId": 1,
-    "candidateSn": "clr_candidate_benefit_202605210001",
-    "sourceBusinessSn": "PAY_BEN_PLATFORM_202605210001",
-    "sourceRouteSnapshotSn": "route_snapshot_platform_202605210001",
-    "benefitSnapshotId": "bs_platform_202605210001",
-    "merchantAccountId": "fa_merchant_20001_usd",
-    "amountItems": [
-      { "itemType": "ORDER_AMOUNT", "currency": "USD", "amount": 10000 },
-      { "itemType": "USER_PAY_AMOUNT", "currency": "USD", "amount": 8000 },
-      { "itemType": "PLATFORM_SUBSIDY", "currency": "USD", "amount": 2000, "componentSn": "bc_platform_subsidy_001" },
-      { "itemType": "MERCHANT_RECEIVABLE", "currency": "USD", "amount": 10000 },
-      { "itemType": "FEE", "currency": "USD", "amount": 300 }
-    ],
-    "reconciliationRefs": {
-      "marketingWriteOffId": "writeoff_90002",
-      "orderSn": "order_10002",
-      "paymentSn": "PAY_BEN_PLATFORM_202605210001",
-      "clearingRuleVersion": "clearing_rule_benefit_v1"
-    }
-  },
-  "expectedRoute": {
-    "shouldCreateRoute": false,
-    "reason": "clearing candidate is a projection input, not a funds instruction"
-  },
-  "expectedPosting": {
-    "shouldCreatePosting": false,
-    "balanceAssertions": [
-      "clearing candidate creation does not change ledger balance",
-      "settlement confirmation must reference candidate and create a separate settlement instruction if funds move"
-    ]
-  },
-  "expectedClearing": {
-    "mustExposeAmountItems": ["ORDER_AMOUNT", "USER_PAY_AMOUNT", "PLATFORM_SUBSIDY", "MERCHANT_RECEIVABLE", "FEE"],
-    "mustRetainReferences": ["benefitSnapshotId", "componentSn", "marketingWriteOffId", "clearingRuleVersion"],
-    "reconciliationBehavior": "marketing, order, funds, clearing and settlement differences create reconciliation discrepancy records"
-  },
-  "validation": {
-    "mustPass": ["platform subsidy can be reconciled to original component", "merchant receivable and fee are separately visible"],
-    "mustFail": ["subsidy and principal are netted into one amount", "marketing mismatch silently adjusts clearing amount", "clearing candidate writes ledger entry"]
+    "mustFail": ["instruction.benefitSnapshot legacy benefit snapshot DSL has been removed"]
   }
 }
 ```
@@ -2615,13 +1535,13 @@ JSON 契约用例按 `fixtureLevel` 分为契约夹具和资金流夹具。两�
 | 主体合法 | 所有入账主体只能是资金账户或信用账户；VCC 场景必须先解析到对应资金/信用子账户；平台账户角色必须先解析为平台资金账户；预算组和 Spend Rule 只能作为控制上下文、规则快照和审计证据。 |
 | route 合法 | 工具、外部账户、平台角色不能直接入账。 |
 | 支付工具契约 | `PaymentInstrumentRef` 只保存脱敏展示和绑定快照；`RoutingDecision` 保存命中规则、资金责任和原因。 |
-| 权益快照契约 | 无权益交易遵循空值语义；有权益交易必须保存快照 ID、关联组号、金额闭合、组件唯一性、规则版本和退款处置。 |
-| 权益金额闭合 | `ORDER_DISCOUNT_CLOSURE` 才参与正向订单抵扣闭合；商户应收、逆向处置和只读展示组件不得混入同一公式。 |
-| 权益生产门禁 | 请求态 `benefitSnapshot` 只能证明契约承载；生产链路必须证明 route snapshot、posting context、清分金额项、对账差错或交易投影中有可追溯摘要。 |
+| 权益资金事实契约 | 无权益交易遵循空值语义；有资金影响的权益让利必须通过 `FundsBenefitFundingApplicationService` 或等价不可变事实保存成本承担主体、受益主体、金额、资金性质、账务效果、来源引用和规则版本。 |
+| 权益金额闭合 | 权益资金事实只能承接业务侧已决策结果；商户应收、逆向处置、只读展示项和平台补贴不得混入同一净额公式。 |
+| 权益生产门禁 | `FundsInstruction.benefitSnapshot` 已移除；生产链路必须证明权益资金交易、route snapshot、posting context、清分金额项、对账差错或交易投影中有可追溯摘要。 |
 | 营销账户契约 | 有资金影响权益组件必须能解析到资金账户、平台责任资金账户或等价营销账户 profile，并在 route snapshot、posting context 或等价不可变事实中保留账户引用、账户 profile、专业确认状态和权益组件摘要。 |
 | posting 平衡 | 每个 `PostingPlan` 独立平衡，整笔交易平衡。 |
-| replay 边界 | 缺原快照失败，不读取当前绑定关系重新选路。 |
-| 权益 replay 边界 | 缺原权益快照或等价摘要的退款、撤销、授权过期、拒付、清结算重跑和对账差错必须失败或人工处理，不按当前营销规则重算。 |
+| replay 边界 | 缺原 route 快照失败，不读取当前绑定关系重新选路。 |
+| 权益 replay 边界 | 缺原权益资金事实、原 route 摘要或经审批补充事实的退款、撤销、授权过期、拒付、清结算重跑和对账差错必须失败或人工处理，不按当前营销规则重算。 |
 | 工具换绑边界 | 退款、撤销、退费或拒付必须按原 route snapshot 和原工具快照回放。 |
 | 结算策略 | `SettlementPolicy` 解析失败、空表达式或未知策略必须显式失败，不能降级为实时结算。 |
 | 治理任务边界 | 统一治理任务、资金归档 Manifest、余额水位、账本余额快照、普通指标快照和交易投影重放 checkpoint 状态独立，治理任务不生成资金路径或账务分录。 |
@@ -2649,7 +1569,7 @@ JSON 契约用例按 `fixtureLevel` 分为契约夹具和资金流夹具。两�
 | 缺 route snapshot 时重新选路 replay | 会导致绑定关系和平台账户变化后资金路径漂移。 |
 | 交易层或余额控制层隐式调用 `FxService` | 是否换汇是业务层或外汇域决策。 |
 | 把核心权益语义放进 `contextVariables` | 金额闭合、规则版本、资金性质、退款处置和决策流水必须是一等契约或可追溯摘要。 |
-| 只有请求态 `benefitSnapshot` 就声明生产完成 | 请求态对象不能证明逆向回放、清结算重跑、对账差错和归档后重放可用。 |
+| 恢复请求态 `benefitSnapshot` 或只靠上下文摘要声明生产完成 | 请求态对象和只读摘要都不能证明逆向回放、清结算重跑、对账差错和归档后重放可用。 |
 | 按当前营销规则重算历史权益 | 会导致退款、撤销、授权过期、清结算和对账结果与原交易事实不一致。 |
 | 把所有权益组件默认纳入订单抵扣闭合 | 平台补足商户、储值负债、补贴冲回、不可退权益和展示项有不同闭合公式。 |
 | 平台补贴、本金、手续费或代金券净额混记 | 会破坏 posting 独立平衡、清结算拆分、对账核销和成本归集。 |
@@ -2662,9 +1582,9 @@ JSON 契约用例按 `fixtureLevel` 分为契约夹具和资金流夹具。两�
 | --- | --- |
 | 产品评审 | 场景是否覆盖充值、付款、转账、退款、费用、授权、冻结、调额、清结算和对账差错。 |
 | 资金语义评审 | 主体、账目、金额、FX、route、posting 和投影边界是否清晰。 |
-| 权益语义评审 | `benefitSnapshot` 是否只承接已决策结果；`closureRole`、`ledgerEffect`、`fundingNature`、承担方、受益方、资金来源和退款处置是否能解释每个组件。 |
+| 权益语义评审 | 权益让利资金事实是否只承接已决策结果；`ledgerEffect`、`fundingNature`、成本承担主体、受益主体、资金来源和退款处置引用是否能解释每个资金影响。 |
 | 营销账户评审 | 有资金影响的权益组件是否解析到资金账户、平台责任资金账户或等价营销账户 profile；平台补贴、商户让利、权益负债、合作方补贴和营销留置是否分开；`NO_LEDGER` 组件是否没有误入账。 |
-| 权益生产评审 | 是否区分契约承载、route/posting 消费和生产链路 Done；是否证明原权益快照能被退款、撤销、过期、拒付、清结算、对账和交易投影重放取回。 |
+| 权益生产评审 | 是否区分契约承载、route/posting 消费和生产链路 Done；是否证明原权益资金事实或历史摘要能被退款、撤销、过期、拒付、清结算、对账和交易投影重放取回。 |
 | 系分评审 | `instruction`、`route`、`snapshot`、`posting`、`entry`、`projection` 的职责是否单一。 |
-| 测试评审 | 是否有可解析 JSON 契约样例；是否覆盖成功、失败、幂等、余额变化、replay、digest、权益金额闭合、无权益空值语义和缺原权益快照失败。 |
+| 测试评审 | 是否有可解析 JSON 契约样例；是否覆盖成功、失败、幂等、余额变化、replay、digest、权益资金事实、无权益空值语义和缺原权益事实失败。 |
 | 运营与审计评审 | 差错、调账、退费、拒付、清结算结果是否具备来源、操作者、凭证和核销路径。 |

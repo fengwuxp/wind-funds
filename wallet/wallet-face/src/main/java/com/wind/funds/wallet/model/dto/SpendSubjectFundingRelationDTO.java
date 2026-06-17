@@ -52,8 +52,14 @@ public class SpendSubjectFundingRelationDTO implements Serializable {
     @Schema(description = "支出控制主体类型")
     private FundsSubjectType spendSubjectType;
 
-    @Schema(description = "真实资金账户 ID")
+    @Schema(description = "兼容真实资金账户 ID，仅资金账户目标主体使用")
     private String fundingAccountId;
+
+    @Schema(description = "资金责任目标主体类型")
+    private FundsSubjectType targetSubjectType;
+
+    @Schema(description = "资金责任目标主体 ID")
+    private String targetSubjectId;
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;

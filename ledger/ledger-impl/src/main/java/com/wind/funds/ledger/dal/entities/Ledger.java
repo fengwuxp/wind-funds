@@ -34,13 +34,22 @@ public class Ledger implements Serializable, TenantIsolationObject<Long> {
 
     public static final String TABLE_NAME = "t_ledger";
 
+    /**
+     * 自增主键。
+     */
     @Id(keyType = KeyType.Auto)
     @NotNull
     private Long id;
 
+    /**
+     * 创建时间。
+     */
     @NotNull
     private LocalDateTime gmtCreate;
 
+    /**
+     * 最后修改时间。
+     */
     @NotNull
     private LocalDateTime gmtModified;
 

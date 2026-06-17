@@ -44,6 +44,14 @@ public record ImmutableResolvedRouteSpec(@Nullable Long tenantId,
     public ImmutableResolvedRouteSpec {
         participants = List.copyOf(participants == null ? List.of() : participants);
         legs = List.copyOf(legs == null ? List.of() : legs);
+        RouteFactContractValidator.validateResolvedRoute(routeCode,
+                routeVersion,
+                businessScene,
+                businessSn,
+                instructionType,
+                eventType,
+                transactionType,
+                resolvedAt);
         RouteAmountClosureValidator.validateCoreAccountClosure(legs, routingDecision);
         contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "resolvedRoute");
     }

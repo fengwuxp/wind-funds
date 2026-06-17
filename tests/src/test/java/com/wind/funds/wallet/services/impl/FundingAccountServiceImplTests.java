@@ -1,12 +1,31 @@
 package com.wind.funds.wallet.services.impl;
 
+import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.AbstractFundsServiceTest;
-import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.ledger.LedgerBalanceBucket;
 import com.wind.funds.ledger.dto.LedgerDTO;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerSubjectCategory;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
-import com.wind.funds.ledger.impl.LedgerServiceImpl;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.wallet.FundsAccount;
+import com.wind.funds.wallet.FundsAccountBalanceView;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountOwner;
+import com.wind.funds.wallet.FundsAccountQueryService;
+import com.wind.funds.wallet.ImmutableFundsAccount;
+import com.wind.funds.wallet.enums.FundingAccountType;
+import com.wind.funds.wallet.enums.FundsAccountCapability;
+import com.wind.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
@@ -15,22 +34,6 @@ import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.wind.funds.wallet.service.SubjectLedgerInitializer;
-import com.wind.common.query.supports.DefaultPageQueryOptions;
-import com.wind.funds.ledger.LedgerBalanceBucket;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.EntrySide;
-import com.wind.funds.ledger.enums.LedgerProfileCode;
-import com.wind.funds.ledger.enums.LedgerSubjectCategory;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.wallet.FundsAccount;
-import com.wind.funds.wallet.FundsAccountBalanceView;
-import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.FundsAccountQueryService;
-import com.wind.funds.wallet.enums.FundingAccountType;
-import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
-import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -287,6 +290,13 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
         assertThat(account.getLedgerIds()).containsExactlyInAnyOrderEntriesOf(lifetimeAccount.getLedgerIds());
         assertThat(accountView.getAccountLedgerIds()).containsExactlyInAnyOrderEntriesOf(lifetimeAccount.getLedgerIds());
+        assertThat(accountView.getCapabilities())
+                .containsExactlyInAnyOrder(FundsAccountCapability.RECEIVE,
+                        FundsAccountCapability.PAY,
+                        FundsAccountCapability.WITHDRAW);
+        assertThat(accountView.canReceive()).isTrue();
+        assertThat(accountView.canPay()).isTrue();
+        assertThat(accountView.canWithdraw()).isTrue();
         assertThat(balanceView.getBalanceBuckets()).containsOnlyKeys(LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCode.FROZEN, LedgerSubjectCode.AUTHORIZATION);
         assertThat(balanceView.getBalanceBuckets().values())
@@ -299,6 +309,31 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         assertThat(accountView.getAccountLedgerIds()).doesNotContainValue(monthlyAvailableLedgerId);
         assertThat(loadLedgers()).hasSize(4);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：资金账户快照没有显式声明账户能力。
+     * 输入：ACTIVE 账户但 capabilities 为空。
+     * 输出：不具备付款、收款或提现能力。
+     * 红线：资金能力必须显式配置，不能把缺失能力字段默认解释成全部能力。
+     */
+    @Test
+    void testFundsAccountWithoutExplicitCapabilitiesShouldDenyMoneyActions() {
+        FundsAccount account = ImmutableFundsAccount.builder()
+                .id(1L)
+                .tenantId(TENANT_ID)
+                .accountId(FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT))
+                .owner(FundsAccountOwner.of(OWNER_ID, FundsAccountOwnerType.USER))
+                .status(FundsAccountStatus.ACTIVE)
+                .currency(CurrencyIsoCode.USD)
+                .accountLedgerIds(Map.of())
+                .version(1)
+                .build();
+
+        assertThat(account.getCapabilities()).isEmpty();
+        assertThat(account.canPay()).isFalse();
+        assertThat(account.canReceive()).isFalse();
+        assertThat(account.canWithdraw()).isFalse();
     }
 
     @BeforeEach

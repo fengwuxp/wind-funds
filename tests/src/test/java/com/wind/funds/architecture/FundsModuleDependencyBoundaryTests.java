@@ -44,20 +44,20 @@ class FundsModuleDependencyBoundaryTests {
             "reconciliation/reconciliation-face/pom.xml",
             "governance/governance-face/pom.xml");
 
-    private static final List<String> FACE_ALLOWED_FUNDS_ARTIFACTS = List.of("wind-funds-core");
+    private static final List<String> FACE_ALLOWED_FUNDS_ARTIFACTS = List.of("capte-funds-core");
 
     private static final List<String> CORE_FORBIDDEN_ARTIFACTS = List.of(
-            "wind-funds-ledger-face",
-            "wind-funds-ledger-impl",
-            "wind-funds-transaction-face",
-            "wind-funds-transaction-impl",
-            "wind-funds-wallet-face",
-            "wind-funds-wallet-impl",
-            "wind-funds-reconciliation-face",
-            "wind-funds-reconciliation-impl",
-            "wind-funds-governance-face",
-            "wind-funds-governance-impl",
-            "wind-funds-tests",
+            "capte-funds-ledger-face",
+            "capte-funds-ledger-impl",
+            "capte-funds-transaction-face",
+            "capte-funds-transaction-impl",
+            "capte-funds-wallet-face",
+            "capte-funds-wallet-impl",
+            "capte-funds-reconciliation-face",
+            "capte-funds-reconciliation-impl",
+            "capte-funds-governance-face",
+            "capte-funds-governance-impl",
+            "capte-funds-tests",
             "catep-infrastructure-dal");
 
     private static final List<String> PACKAGE_GUARD_SCAN_PATHS = List.of(
@@ -112,7 +112,7 @@ class FundsModuleDependencyBoundaryTests {
 
     /**
      * 场景：各业务 face 模块作为跨模块契约入口。
-     * 预期：face 只依赖 wind-funds-core，不依赖任一 impl、同级 face 或测试模块。
+     * 预期：face 只依赖资金 core，不依赖任一 impl、同级 face 或测试模块。
      * 红线：对外契约不能泄漏实现模块、其他能力域契约或测试资产。
      */
     @Test
@@ -120,7 +120,7 @@ class FundsModuleDependencyBoundaryTests {
         List<String> violations = new ArrayList<>();
         for (String pomPath : FACE_MODULE_POMS) {
             for (String artifactId : dependencyArtifactIds(workspaceRoot().resolve(pomPath))) {
-                if (artifactId.startsWith("wind-funds-") && !FACE_ALLOWED_FUNDS_ARTIFACTS.contains(artifactId)) {
+                if (artifactId.startsWith("capte-funds-") && !FACE_ALLOWED_FUNDS_ARTIFACTS.contains(artifactId)) {
                     violations.add(pomPath + " depends on " + artifactId);
                 }
             }
@@ -140,8 +140,8 @@ class FundsModuleDependencyBoundaryTests {
     void testProductionModulesShouldNotDependOnTestsModule() throws Exception {
         List<String> violations = new ArrayList<>();
         for (String pomPath : PRODUCTION_MODULE_POMS) {
-            if (dependencyArtifactIds(workspaceRoot().resolve(pomPath)).contains("wind-funds-tests")) {
-                violations.add(pomPath + " depends on wind-funds-tests");
+            if (dependencyArtifactIds(workspaceRoot().resolve(pomPath)).contains("capte-funds-tests")) {
+                violations.add(pomPath + " depends on capte-funds-tests");
             }
         }
 

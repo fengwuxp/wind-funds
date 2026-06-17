@@ -42,6 +42,14 @@ public interface LedgerProfileItemSpec {
     Boolean getAllowNegative();
 
     /**
+     * @return 受控负可用余额策略
+     */
+    @Nullable
+    default NegativeAvailablePolicySpec getNegativeAvailablePolicy() {
+        return null;
+    }
+
+    /**
      * @return 主体初始化时是否必建
      */
     @NonNull

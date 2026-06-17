@@ -118,6 +118,60 @@ class RouteDslContractTests {
     }
 
     /**
+     * 场景：运行态 route 或持久化 route snapshot 缺少身份、类型或时间字段。
+     * 预期：构造期给出明确错误，不能让坏快照进入交易事实、账务装配或回放链路。
+     * 红线：核心 route 事实不能只依赖注解表达必填，必须有运行期契约校验。
+     */
+    @Test
+    void testRouteFactsShouldRequireIdentityTypeAndResolvedTime() {
+        assertThatThrownBy(() -> ImmutableResolvedRouteSpec.builder()
+                .routeVersion("1.0")
+                .businessScene("ROUTE_DSL")
+                .businessSn("BIZ-ROUTE-REQUIRED-001")
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of(routeParticipant(Map.of())))
+                .legs(List.of(routeLeg(Map.of())))
+                .resolvedAt(LocalDateTime.of(2026, 5, 20, 10, 0))
+                .contextVariables(Map.of())
+                .build())
+                .hasMessageContaining("resolvedRoute.routeCode must not be blank");
+
+        assertThatThrownBy(() -> ImmutableRouteSnapshotSpec.builder()
+                .snapshotId("RS-REQUIRED-001")
+                .snapshotSchemaVersion("1.0")
+                .routeCode("DIRECT_PAY_STANDARD")
+                .routeVersion("1.0")
+                .businessScene("ROUTE_DSL")
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of(routeParticipant(Map.of())))
+                .legs(List.of(routeLeg(Map.of())))
+                .resolvedAt(LocalDateTime.of(2026, 5, 20, 10, 0))
+                .contextVariables(Map.of())
+                .build())
+                .hasMessageContaining("routeSnapshot.businessSn must not be blank");
+
+        assertThatThrownBy(() -> ImmutableRouteSnapshotSpec.builder()
+                .snapshotId("RS-REQUIRED-002")
+                .snapshotSchemaVersion("1.0")
+                .routeCode("DIRECT_PAY_STANDARD")
+                .routeVersion("1.0")
+                .businessScene("ROUTE_DSL")
+                .businessSn("BIZ-ROUTE-REQUIRED-002")
+                .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
+                .eventType(FundsTransactionEventType.PAY)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .participants(List.of(routeParticipant(Map.of())))
+                .legs(List.of(routeLeg(Map.of())))
+                .contextVariables(Map.of())
+                .build())
+                .hasMessageContaining("routeSnapshot.resolvedAt must not be null");
+    }
+
+    /**
      * 场景：路由快照、路由分录或参与方扩展上下文被调用方塞入通道密钥或外部账户原文。
      * 预期：Route DSL 构造期立即拒绝。
      * 红线：route snapshot 会进入交易事实、账务装配和归档重放链路，不能保存 PAN、CVV、密钥或银行账户原文。
@@ -198,8 +252,6 @@ class RouteDslContractTests {
         Map<String, Object> summaryRefs = Map.of(
                 "benefitSnapshotId", "BS-ROUTE-SUMMARY-001",
                 "stableDigest", "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
-                "benefitGroupSn", "BG-ROUTE-SUMMARY-001",
-                "componentSn", "COMP-ROUTE-SUMMARY-001",
                 "ruleVersion", "rule-v1",
                 "refundDecisionId", "refund-decision-001",
                 "externalDecisionId", "pricing-decision-001");
@@ -208,8 +260,6 @@ class RouteDslContractTests {
                 .containsEntry("benefitSnapshotId", "BS-ROUTE-SUMMARY-001")
                 .containsEntry("stableDigest",
                         "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd")
-                .containsEntry("benefitGroupSn", "BG-ROUTE-SUMMARY-001")
-                .containsEntry("componentSn", "COMP-ROUTE-SUMMARY-001")
                 .containsEntry("ruleVersion", "rule-v1")
                 .containsEntry("refundDecisionId", "refund-decision-001")
                 .containsEntry("externalDecisionId", "pricing-decision-001");

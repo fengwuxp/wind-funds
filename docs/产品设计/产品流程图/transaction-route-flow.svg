@@ -18,7 +18,7 @@ text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsof
 <rect x="60" y="150" width="220" height="100" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
 
 <text x="76" y="178" class="node-title">资金事实输入</text>
-<text x="76" y="202" class="node-text" text-anchor="start"><tspan x="76" dy="0">业务流水 / 金额组件</tspan><tspan x="76" dy="17">权益快照 / 支付工具</tspan><tspan x="76" dy="17">外部引用摘要</tspan></text>
+<text x="76" y="202" class="node-text" text-anchor="start"><tspan x="76" dy="0">业务流水 / 金额组件</tspan><tspan x="76" dy="17">权益资金事实 / 支付工具</tspan><tspan x="76" dy="17">外部引用摘要</tspan></text>
 </g><g>
 <rect x="60" y="310" width="220" height="100" rx="8" ry="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5"/>
 

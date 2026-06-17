@@ -3,6 +3,7 @@ package com.wind.funds.spec.ledger;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.transaction.core.Money;
 import jakarta.validation.constraints.NotNull;
@@ -117,6 +118,7 @@ public interface LedgerPostingPlanSpec {
         return StringUtils.hasText(entry.getSubjectId())
                 && StringUtils.hasText(entry.getSubjectType())
                 && StringUtils.hasText(entry.getLedgerTransactionSn())
+                && entry.getPostingRole() != LedgerPostingRole.AGGREGATE_VIEW
                 && isPositiveEntryAmount(entry);
     }
 

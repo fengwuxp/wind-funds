@@ -17,6 +17,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 结算策略规范
@@ -35,11 +36,30 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <h2>表达式规范（DSL）</h2>
  *
+ * <p>字符和符号含义：</p>
+ * <ul>
+ *     <li>RT：Realtime，实时结算。</li>
+ *     <li>T：Trade day，交易日 / 工作日延迟，T+N 会跳过节假日，
+ *     包括周末和交易日历登记的法定节假日。</li>
+ *     <li>D：Day，自然日或每日固定时间，D+N 表示 N 个自然日后，
+ *     D@HH:mm 表示每日固定时间。</li>
+ *     <li>H：Hour，小时级周期。</li>
+ *     <li>W：Week，周周期。</li>
+ *     <li>M：Month，月周期。</li>
+ *     <li>Q：Quarter，季度周期。</li>
+ *     <li>Y：Year，年周期。</li>
+ *     <li>C：Custom cycle / range，自定义账期或外部账期引用。</li>
+ *     <li>+：周期间隔或延迟数量，例如 T+2、W+2@1、M+2@1。</li>
+ *     <li>@：结算锚点、cutoff 或账期参数，例如 D@23:00、W@MON、C@05-04。</li>
+ *     <li>L：Last day，所在月、季度或周期的最后一天。</li>
+ * </ul>
+ *
  * <pre>
  * ===================== 延迟结算 =====================
  * RT              实时结算
- * T+1             交易后1天结算
- * T+2             交易后2天结算
+ * T+1             交易后1个工作日结算
+ * T+2             交易后2个工作日结算
+ * D+1             交易后1个自然日结算
  * D@23:00         每日23:00结算
  *
  * ===================== 小时级 =====================
@@ -83,62 +103,166 @@ public final class SettlementPolicySpec {
 
     // ========================= 常用标准结算策略 =========================
 
+    private static final String EXPRESSION_REALTIME = "RT";
+    private static final String EXPRESSION_T1 = "T+1";
+    private static final String EXPRESSION_T2 = "T+2";
+    private static final String EXPRESSION_T3 = "T+3";
+    private static final String EXPRESSION_T7 = "T+7";
+    private static final String EXPRESSION_D1 = "D+1";
+    private static final String EXPRESSION_WEEKLY_MONDAY = "W+1@1";
+    private static final String EXPRESSION_WEEKLY_FRIDAY = "W+1@5";
+    private static final String EXPRESSION_MONTHLY_FIRST_DAY = "M+1@1";
+    private static final String EXPRESSION_MONTHLY_MID = "M+1@15";
+    private static final String EXPRESSION_MONTHLY_END = "M+1@L";
+    private static final String EXPRESSION_QUARTERLY = "Q+1";
+    private static final String EXPRESSION_QUARTERLY_END = "Q+1@L";
+    private static final String EXPRESSION_YEARLY = "Y+1";
+    private static final String EXPRESSION_YEARLY_JAN1 = "Y+1@01-01";
+    private static final String EXPRESSION_BILLING_CYCLE_5_4 = "C@05-04";
+
+    private static final String TYPE_REALTIME = "RT";
+    private static final String TYPE_TRADE_DAY = "T";
+    private static final String TYPE_DAY = "D";
+    private static final String TYPE_HOUR = "H";
+    private static final String TYPE_WEEK = "W";
+    private static final String TYPE_MONTH = "M";
+    private static final String TYPE_QUARTER = "Q";
+    private static final String TYPE_YEAR = "Y";
+    private static final String TYPE_CUSTOM_CYCLE = "C";
+
+    private static final String PREFIX_CUSTOM_CYCLE = "C@";
+    private static final String PREFIX_DAILY_AT = "D@";
+    private static final String PREFIX_NATURAL_DAY_DELAY = "D+";
+    private static final String PREFIX_WEEKLY_AT = "W@";
+    private static final String PREFIX_MONTHLY_AT = "M@";
+    private static final String PREFIX_QUARTERLY_AT = "Q@";
+    private static final String PREFIX_YEARLY_AT = "Y@";
+    private static final String PREFIX_TRADE_DAY_DELAY = "T+";
+    private static final String INTERVAL_SEPARATOR = "+";
+    private static final String LAST_DAY_TOKEN = "L";
+    private static final String DATE_SEPARATOR = "-";
+    private static final String REGEX_MONTH_DAY = "\\d{2}-\\d{2}";
+    private static final String REGEX_CUSTOM_CYCLE = "\\d{1,2}-\\d{1,2}";
+    private static final String REGEX_HOUR_MINUTE = "\\d{2}:\\d{2}";
+    private static final String WEEKDAY_MONDAY = "MON";
+    private static final String WEEKDAY_TUESDAY = "TUE";
+    private static final String WEEKDAY_WEDNESDAY = "WED";
+    private static final String WEEKDAY_THURSDAY = "THU";
+    private static final String WEEKDAY_FRIDAY = "FRI";
+    private static final String WEEKDAY_SATURDAY = "SAT";
+    private static final String WEEKDAY_SUNDAY = "SUN";
+    private static final String REQUIRED_EXPRESSION_MESSAGE = "expression must not be null";
+    private static final String REQUIRED_HOLIDAY_CALENDAR_MESSAGE = "holidayCalendar must not be null";
+    private static final String YEAR_MONTH_RANGE_MESSAGE = "Month must be 1-12";
+    private static final String MONTH_DAY_RANGE_MESSAGE = "Day must be 1-31";
+
+    private static final char HOURLY_EXPRESSION_PREFIX = 'H';
+    private static final char WEEKLY_EXPRESSION_PREFIX = 'W';
+    private static final char MONTHLY_EXPRESSION_PREFIX = 'M';
+    private static final char QUARTERLY_EXPRESSION_PREFIX = 'Q';
+    private static final char YEARLY_EXPRESSION_PREFIX = 'Y';
+    private static final char CUSTOM_CYCLE_EXPRESSION_PREFIX = 'C';
+
+    private static final int ZERO_INTERVAL = 0;
+    private static final int DEFAULT_INTERVAL = 1;
+    private static final int EXPRESSION_PREFIX_LENGTH = 2;
+    private static final int PREFIX_CHAR_INDEX = 0;
+    private static final int FIRST_PART_INDEX = 0;
+    private static final int SECOND_PART_INDEX = 1;
+    private static final int SINGLE_PART_LENGTH = 1;
+    private static final int PAIR_PART_LENGTH = 2;
+    private static final int MAX_AT_PARTS = 2;
+    private static final int LAST_DAY = -1;
+    private static final int FIRST_DAY = 1;
+    private static final int LAST_DAY_OF_MONTH = 31;
+    private static final int FIRST_MONTH = 1;
+    private static final int LAST_MONTH = 12;
+    private static final int FIRST_WEEKDAY = 1;
+    private static final int TUESDAY_WEEKDAY = 2;
+    private static final int WEDNESDAY_WEEKDAY = 3;
+    private static final int THURSDAY_WEEKDAY = 4;
+    private static final int FRIDAY_WEEKDAY = 5;
+    private static final int SATURDAY_WEEKDAY = 6;
+    private static final int LAST_WEEKDAY = 7;
+    private static final int TWO_DAY_DELAY = 2;
+    private static final int THREE_DAY_DELAY = 3;
+    private static final int SEVEN_DAY_DELAY = 7;
+    private static final int FIRST_QUARTER_MONTH_OFFSET = 1;
+    private static final int LAST_QUARTER_MONTH_OFFSET = 3;
+    private static final int HOURS_PER_DAY = 24;
+    private static final int MONTHS_PER_QUARTER = 3;
+    private static final int MIDNIGHT_HOUR = 0;
+    private static final int MID_MONTH_DAY = 15;
+    private static final int BILLING_CYCLE_START_DAY = 5;
+    private static final int BILLING_CYCLE_END_DAY = 4;
+
+    private static final SettlementHolidayCalendar WEEKEND_ONLY_HOLIDAY_CALENDAR = SettlementPolicySpec::isWeekend;
+    private static final AtomicReference<SettlementHolidayCalendar> DEFAULT_HOLIDAY_CALENDAR =
+            new AtomicReference<>(WEEKEND_ONLY_HOLIDAY_CALENDAR);
+
     public static final SettlementPolicySpec RT = new SettlementPolicySpec(
-            SettlementMode.REALTIME, 0, null, null, "RT");
+            SettlementMode.REALTIME, ZERO_INTERVAL, null, null, EXPRESSION_REALTIME);
     public static final SettlementPolicySpec T1 = new SettlementPolicySpec(
-            SettlementMode.DELAY_DAYS, 1, null, null, "T+1");
+            SettlementMode.DELAY_DAYS, DEFAULT_INTERVAL, null, null, EXPRESSION_T1);
     public static final SettlementPolicySpec T2 = new SettlementPolicySpec(
-            SettlementMode.DELAY_DAYS, 2, null, null, "T+2");
+            SettlementMode.DELAY_DAYS, TWO_DAY_DELAY, null, null, EXPRESSION_T2);
     public static final SettlementPolicySpec T3 = new SettlementPolicySpec(
-            SettlementMode.DELAY_DAYS, 3, null, null, "T+3");
+            SettlementMode.DELAY_DAYS, THREE_DAY_DELAY, null, null, EXPRESSION_T3);
     public static final SettlementPolicySpec T7 = new SettlementPolicySpec(
-            SettlementMode.DELAY_DAYS, 7, null, null, "T+7");
+            SettlementMode.DELAY_DAYS, SEVEN_DAY_DELAY, null, null, EXPRESSION_T7);
+    public static final SettlementPolicySpec D1 = new SettlementPolicySpec(
+            SettlementMode.DELAY_NATURAL_DAYS, DEFAULT_INTERVAL, null, null, EXPRESSION_D1);
 
     public static final SettlementPolicySpec WEEKLY_MONDAY = new SettlementPolicySpec(
-            SettlementMode.WEEKLY, 1, 1, null, "W+1@1");
+            SettlementMode.WEEKLY, DEFAULT_INTERVAL, FIRST_WEEKDAY, null, EXPRESSION_WEEKLY_MONDAY);
     public static final SettlementPolicySpec WEEKLY_FRIDAY = new SettlementPolicySpec(
-            SettlementMode.WEEKLY, 1, 5, null, "W+1@5");
+            SettlementMode.WEEKLY, DEFAULT_INTERVAL, FRIDAY_WEEKDAY, null, EXPRESSION_WEEKLY_FRIDAY);
 
     public static final SettlementPolicySpec MONTHLY_FIRST_DAY = new SettlementPolicySpec(
-            SettlementMode.MONTHLY, 1, 1, null, "M+1@1");
+            SettlementMode.MONTHLY, DEFAULT_INTERVAL, FIRST_DAY, null, EXPRESSION_MONTHLY_FIRST_DAY);
     public static final SettlementPolicySpec MONTHLY_MID = new SettlementPolicySpec(
-            SettlementMode.MONTHLY, 1, 15, null, "M+1@15");
+            SettlementMode.MONTHLY, DEFAULT_INTERVAL, MID_MONTH_DAY, null, EXPRESSION_MONTHLY_MID);
     public static final SettlementPolicySpec MONTHLY_END = new SettlementPolicySpec(
-            SettlementMode.MONTHLY, 1, -1, null, "M+1@L");
+            SettlementMode.MONTHLY, DEFAULT_INTERVAL, LAST_DAY, null, EXPRESSION_MONTHLY_END);
 
     public static final SettlementPolicySpec QUARTERLY = new SettlementPolicySpec(
-            SettlementMode.QUARTERLY, 1, null, null, "Q+1");
+            SettlementMode.QUARTERLY, DEFAULT_INTERVAL, null, null, EXPRESSION_QUARTERLY);
     public static final SettlementPolicySpec QUARTERLY_END = new SettlementPolicySpec(
-            SettlementMode.QUARTERLY, 1, -1, null, "Q+1@L");
+            SettlementMode.QUARTERLY, DEFAULT_INTERVAL, LAST_DAY, null, EXPRESSION_QUARTERLY_END);
 
     public static final SettlementPolicySpec YEARLY = new SettlementPolicySpec(
-            SettlementMode.YEARLY, 1, null, null, "Y+1");
+            SettlementMode.YEARLY, DEFAULT_INTERVAL, null, null, EXPRESSION_YEARLY);
     public static final SettlementPolicySpec YEARLY_JAN1 = new SettlementPolicySpec(
-            SettlementMode.YEARLY, 1, 1, 1, "Y+1@01-01");
+            SettlementMode.YEARLY, DEFAULT_INTERVAL, FIRST_MONTH, FIRST_DAY, EXPRESSION_YEARLY_JAN1);
 
     public static final SettlementPolicySpec BILLING_CYCLE_5_4 = new SettlementPolicySpec(
-            SettlementMode.CUSTOM_CYCLE, 0, 5, 4, "C@05-04");
+            SettlementMode.CUSTOM_CYCLE,
+            ZERO_INTERVAL,
+            BILLING_CYCLE_START_DAY,
+            BILLING_CYCLE_END_DAY,
+            EXPRESSION_BILLING_CYCLE_5_4);
 
     // ========================= 预定义常量缓存 =========================
 
     private static final Map<String, SettlementPolicySpec> CONSTANTS = new ConcurrentHashMap<>();
 
     static {
-        CONSTANTS.put("RT", RT);
-        CONSTANTS.put("T+1", T1);
-        CONSTANTS.put("T+2", T2);
-        CONSTANTS.put("T+3", T3);
-        CONSTANTS.put("T+7", T7);
-        CONSTANTS.put("W+1@1", WEEKLY_MONDAY);
-        CONSTANTS.put("W+1@5", WEEKLY_FRIDAY);
-        CONSTANTS.put("M+1@1", MONTHLY_FIRST_DAY);
-        CONSTANTS.put("M+1@15", MONTHLY_MID);
-        CONSTANTS.put("M+1@L", MONTHLY_END);
-        CONSTANTS.put("Q+1", QUARTERLY);
-        CONSTANTS.put("Q+1@L", QUARTERLY_END);
-        CONSTANTS.put("Y+1", YEARLY);
-        CONSTANTS.put("Y+1@01-01", YEARLY_JAN1);
-        CONSTANTS.put("C@05-04", BILLING_CYCLE_5_4);
+        CONSTANTS.put(EXPRESSION_REALTIME, RT);
+        CONSTANTS.put(EXPRESSION_T1, T1);
+        CONSTANTS.put(EXPRESSION_T2, T2);
+        CONSTANTS.put(EXPRESSION_T3, T3);
+        CONSTANTS.put(EXPRESSION_T7, T7);
+        CONSTANTS.put(EXPRESSION_D1, D1);
+        CONSTANTS.put(EXPRESSION_WEEKLY_MONDAY, WEEKLY_MONDAY);
+        CONSTANTS.put(EXPRESSION_WEEKLY_FRIDAY, WEEKLY_FRIDAY);
+        CONSTANTS.put(EXPRESSION_MONTHLY_FIRST_DAY, MONTHLY_FIRST_DAY);
+        CONSTANTS.put(EXPRESSION_MONTHLY_MID, MONTHLY_MID);
+        CONSTANTS.put(EXPRESSION_MONTHLY_END, MONTHLY_END);
+        CONSTANTS.put(EXPRESSION_QUARTERLY, QUARTERLY);
+        CONSTANTS.put(EXPRESSION_QUARTERLY_END, QUARTERLY_END);
+        CONSTANTS.put(EXPRESSION_YEARLY, YEARLY);
+        CONSTANTS.put(EXPRESSION_YEARLY_JAN1, YEARLY_JAN1);
+        CONSTANTS.put(EXPRESSION_BILLING_CYCLE_5_4, BILLING_CYCLE_5_4);
     }
 
     // ========================= 核心字段 =========================
@@ -172,7 +296,7 @@ public final class SettlementPolicySpec {
      * 解析结算策略
      */
     public static SettlementPolicySpec parse(String expression) {
-        Assert.hasText(expression, "expression must not be null");
+        Assert.hasText(expression, REQUIRED_EXPRESSION_MESSAGE);
         String rawExpression = expression.trim();
         String normalized = rawExpression.toUpperCase(Locale.ROOT);
 
@@ -183,33 +307,36 @@ public final class SettlementPolicySpec {
         }
 
         // 自定义账期 C@DD-DD 不使用 + 语法，需在通用周期表达式前解析。
-        if (normalized.startsWith("C@")) {
+        if (normalized.startsWith(PREFIX_CUSTOM_CYCLE)) {
             return parseCustomCycle(rawExpression);
         }
 
         // 产品 DSL：每日固定时间 D@HH:mm。
-        if (normalized.startsWith("D@")) {
+        if (normalized.startsWith(PREFIX_DAILY_AT)) {
             return parseDailyAt(normalized);
+        }
+        if (normalized.startsWith(PREFIX_NATURAL_DAY_DELAY)) {
+            return parseNaturalDayDelay(rawExpression, normalized);
         }
 
         // 产品 DSL：W@MON、M@15、Q@03-31、Y@01-01。
-        if (normalized.startsWith("W@")) {
+        if (normalized.startsWith(PREFIX_WEEKLY_AT)) {
             return parseWeeklyAt(normalized);
         }
-        if (normalized.startsWith("M@")) {
+        if (normalized.startsWith(PREFIX_MONTHLY_AT)) {
             return parseMonthlyAt(normalized);
         }
-        if (normalized.startsWith("Q@")) {
+        if (normalized.startsWith(PREFIX_QUARTERLY_AT)) {
             return parseQuarterlyAt(normalized);
         }
-        if (normalized.startsWith("Y@")) {
+        if (normalized.startsWith(PREFIX_YEARLY_AT)) {
             return parseYearlyAt(normalized);
         }
 
         // 延迟结算 T+N
-        if (normalized.startsWith("T+")) {
-            int days = parseInt(normalized.substring(2));
-            if (days <= 0) {
+        if (normalized.startsWith(PREFIX_TRADE_DAY_DELAY)) {
+            int days = parseInt(normalized.substring(EXPRESSION_PREFIX_LENGTH));
+            if (days <= ZERO_INTERVAL) {
                 throw new IllegalArgumentException("T delay must be positive: " + rawExpression);
             }
             return new SettlementPolicySpec(SettlementMode.DELAY_DAYS, days, null, null, normalized);
@@ -217,74 +344,75 @@ public final class SettlementPolicySpec {
 
         // 处理带 @ 的表达式
         String[] atParts = normalized.split(WindConstants.AT);
-        AssertUtils.isTrue(atParts.length <= 2,
+        AssertUtils.isTrue(atParts.length <= MAX_AT_PARTS,
                 "Invalid format, expected at most one '@' character: " + rawExpression);
-        String left = atParts[0];
-        String right = atParts.length > 1 ? atParts[1] : null;
+        String left = atParts[FIRST_PART_INDEX];
+        String right = atParts.length > SINGLE_PART_LENGTH ? atParts[SECOND_PART_INDEX] : null;
 
         // 校验 @ 后面的部分不能包含负号（除非是合法的 L 或 Y 模式的 MM-dd）
-        if (right != null && !"L".equals(right) && right.contains("-")
-                && !(left.charAt(0) == 'Y' && right.matches("\\d{2}-\\d{2}"))) {
+        if (right != null && !LAST_DAY_TOKEN.equals(right) && right.contains(DATE_SEPARATOR)
+                && !(left.charAt(PREFIX_CHAR_INDEX) == YEARLY_EXPRESSION_PREFIX && right.matches(REGEX_MONTH_DAY))) {
             throw new IllegalArgumentException("Invalid parameter, negative numbers not allowed: " + rawExpression);
         }
 
-        char prefix = left.charAt(0);
-        String numPart = left.substring(1);
-        if (!numPart.startsWith("+")) {
+        char prefix = left.charAt(PREFIX_CHAR_INDEX);
+        String numPart = left.substring(SINGLE_PART_LENGTH);
+        if (!numPart.startsWith(INTERVAL_SEPARATOR)) {
             throw new IllegalArgumentException("Invalid format, expected '+' after prefix: " + rawExpression);
         }
-        int interval = parseInt(numPart.substring(1));
-        if (interval <= 0) {
+        int interval = parseInt(numPart.substring(SINGLE_PART_LENGTH));
+        if (interval <= ZERO_INTERVAL) {
             throw new IllegalArgumentException("Interval must be positive: " + rawExpression);
         }
 
         return switch (prefix) {
-            case 'H' -> new SettlementPolicySpec(SettlementMode.HOURLY, interval, null, null, normalized);
-            case 'W' -> {
+            case HOURLY_EXPRESSION_PREFIX -> new SettlementPolicySpec(
+                    SettlementMode.HOURLY, interval, null, null, normalized);
+            case WEEKLY_EXPRESSION_PREFIX -> {
                 if (right == null) {
                     throw new IllegalArgumentException("Weekday must be specified after @: " + rawExpression);
                 }
                 int weekday = parseInt(right);
-                if (weekday < 1 || weekday > 7) {
+                if (weekday < FIRST_WEEKDAY || weekday > LAST_WEEKDAY) {
                     throw new IllegalArgumentException("Weekday must be 1-7, got: " + weekday);
                 }
                 yield new SettlementPolicySpec(SettlementMode.WEEKLY, interval, weekday, null, normalized);
             }
-            case 'M' -> {
+            case MONTHLY_EXPRESSION_PREFIX -> {
                 if (right == null) {
                     throw new IllegalArgumentException(
                             "Day must be specified after @ (1-31 or L): " + rawExpression);
                 }
                 int day;
-                if ("L".equals(right)) {
-                    day = -1;
+                if (LAST_DAY_TOKEN.equals(right)) {
+                    day = LAST_DAY;
                 } else {
                     day = parseInt(right);
-                    if (day < 1 || day > 31) {
+                    if (day < FIRST_DAY || day > LAST_DAY_OF_MONTH) {
                         throw new IllegalArgumentException("Day must be 1-31 or L, got: " + day);
                     }
                 }
                 yield new SettlementPolicySpec(SettlementMode.MONTHLY, interval, day, null, normalized);
             }
-            case 'Q' -> {
+            case QUARTERLY_EXPRESSION_PREFIX -> {
                 if (right == null) {
                     yield new SettlementPolicySpec(SettlementMode.QUARTERLY, interval, null, null, normalized);
-                } else if ("L".equals(right)) {
-                    yield new SettlementPolicySpec(SettlementMode.QUARTERLY, interval, -1, null, normalized);
+                } else if (LAST_DAY_TOKEN.equals(right)) {
+                    yield new SettlementPolicySpec(SettlementMode.QUARTERLY, interval, LAST_DAY, null, normalized);
                 } else {
                     throw new IllegalArgumentException("Quarterly only supports @L or no suffix: " + rawExpression);
                 }
             }
-            case 'Y' -> {
-                if (right != null && right.matches("\\d{2}-\\d{2}")) {
-                    String[] md = right.split("-");
-                    int month = parseInt(md[0]);
-                    int day = parseInt(md[1]);
-                    if (month < 1 || month > 12) {
-                        throw new IllegalArgumentException("Month must be 1-12");
+            case YEARLY_EXPRESSION_PREFIX -> {
+                if (right != null && right.matches(REGEX_MONTH_DAY)) {
+                    String[] md = right.split(DATE_SEPARATOR);
+                    int month = parseInt(md[FIRST_PART_INDEX]);
+                    int day = parseInt(md[SECOND_PART_INDEX]);
+                    if (month < FIRST_MONTH || month > LAST_MONTH) {
+                        throw new IllegalArgumentException(YEAR_MONTH_RANGE_MESSAGE);
                     }
-                    if (day < 1 || day > 31) {
-                        throw new IllegalArgumentException("Day must be 1-31");
+                    if (day < FIRST_DAY || day > LAST_DAY_OF_MONTH) {
+                        throw new IllegalArgumentException(MONTH_DAY_RANGE_MESSAGE);
                     }
                     MonthDay.of(month, day);
                     yield new SettlementPolicySpec(SettlementMode.YEARLY, interval, month, day, normalized);
@@ -295,96 +423,140 @@ public final class SettlementPolicySpec {
                             "Invalid year format, expected MM-dd or nothing: " + rawExpression);
                 }
             }
-            case 'C' -> parseCustomCycle(rawExpression);
+            case CUSTOM_CYCLE_EXPRESSION_PREFIX -> parseCustomCycle(rawExpression);
             default -> throw new IllegalArgumentException("Unknown settlement type: " + rawExpression);
         };
     }
 
+    private static SettlementPolicySpec parseNaturalDayDelay(String rawExpression, String normalized) {
+        int days = parseInt(normalized.substring(EXPRESSION_PREFIX_LENGTH));
+        if (days <= ZERO_INTERVAL) {
+            throw new IllegalArgumentException("D delay must be positive: " + rawExpression);
+        }
+        return new SettlementPolicySpec(SettlementMode.DELAY_NATURAL_DAYS, days, null, null, normalized);
+    }
+
     private static SettlementPolicySpec parseCustomCycle(String expr) {
-        if (!expr.toUpperCase(Locale.ROOT).startsWith("C@")) {
+        if (!expr.toUpperCase(Locale.ROOT).startsWith(PREFIX_CUSTOM_CYCLE)) {
             throw new IllegalArgumentException("Custom cycle must start with C@: " + expr);
         }
-        String body = expr.substring(2);
+        String body = expr.substring(EXPRESSION_PREFIX_LENGTH);
         Assert.hasText(body, "Custom cycle or range id must not be empty: " + expr);
-        if (!body.matches("\\d{1,2}-\\d{1,2}")) {
-            return new SettlementPolicySpec(SettlementMode.CUSTOM_RANGE, 0, null, null, expr, body);
+        if (!body.matches(REGEX_CUSTOM_CYCLE)) {
+            return new SettlementPolicySpec(SettlementMode.CUSTOM_RANGE, ZERO_INTERVAL, null, null, expr, body);
         }
-        String[] parts = body.split("-");
-        if (parts.length != 2) {
+        String[] parts = body.split(DATE_SEPARATOR);
+        if (parts.length != PAIR_PART_LENGTH) {
             throw new IllegalArgumentException("Invalid custom cycle, expected C@dd-dd : " + expr);
         }
-        int start = parseInt(parts[0]);
-        int end = parseInt(parts[1]);
-        if (start < 1 || start > 31) {
+        int start = parseInt(parts[FIRST_PART_INDEX]);
+        int end = parseInt(parts[SECOND_PART_INDEX]);
+        if (start < FIRST_DAY || start > LAST_DAY_OF_MONTH) {
             throw new IllegalArgumentException("Custom cycle start day must be 1-31: " + start);
         }
-        if (end < 1 || end > 31) {
+        if (end < FIRST_DAY || end > LAST_DAY_OF_MONTH) {
             throw new IllegalArgumentException("Custom cycle end day must be 1-31: " + end);
         }
-        return new SettlementPolicySpec(SettlementMode.CUSTOM_CYCLE, 0, start, end, expr);
+        return new SettlementPolicySpec(SettlementMode.CUSTOM_CYCLE, ZERO_INTERVAL, start, end, expr);
     }
 
     private static SettlementPolicySpec parseDailyAt(String expression) {
-        String timeText = expression.substring(2);
-        if (!timeText.matches("\\d{2}:\\d{2}")) {
+        String timeText = expression.substring(EXPRESSION_PREFIX_LENGTH);
+        if (!timeText.matches(REGEX_HOUR_MINUTE)) {
             throw new IllegalArgumentException("Daily settlement time must be HH:mm: " + expression);
         }
         try {
             LocalTime time = LocalTime.parse(timeText);
             return new SettlementPolicySpec(
-                    SettlementMode.DAILY_AT, 1, time.getHour(), time.getMinute(), expression);
+                    SettlementMode.DAILY_AT, DEFAULT_INTERVAL, time.getHour(), time.getMinute(), expression);
         } catch (DateTimeParseException ex) {
             throw new IllegalArgumentException("Invalid daily settlement time: " + expression, ex);
         }
     }
 
     private static SettlementPolicySpec parseWeeklyAt(String expression) {
-        String weekdayText = expression.substring(2);
+        String weekdayText = expression.substring(EXPRESSION_PREFIX_LENGTH);
         int weekday = parseWeekday(weekdayText);
-        return new SettlementPolicySpec(SettlementMode.WEEKLY, 1, weekday, null, expression);
+        return new SettlementPolicySpec(SettlementMode.WEEKLY, DEFAULT_INTERVAL, weekday, null, expression);
     }
 
     private static SettlementPolicySpec parseMonthlyAt(String expression) {
-        String dayText = expression.substring(2);
+        String dayText = expression.substring(EXPRESSION_PREFIX_LENGTH);
         int day = parseMonthDay(dayText);
-        return new SettlementPolicySpec(SettlementMode.MONTHLY, 1, day, null, expression);
+        return new SettlementPolicySpec(SettlementMode.MONTHLY, DEFAULT_INTERVAL, day, null, expression);
     }
 
     private static SettlementPolicySpec parseQuarterlyAt(String expression) {
-        String dateText = expression.substring(2);
-        String[] parts = dateText.split("-");
-        if (parts.length != 2) {
+        String dateText = expression.substring(EXPRESSION_PREFIX_LENGTH);
+        String[] parts = dateText.split(DATE_SEPARATOR);
+        if (parts.length != PAIR_PART_LENGTH) {
             throw new IllegalArgumentException("Quarterly settlement date must be MM-dd: " + expression);
         }
-        int quarterMonth = parseInt(parts[0]);
-        int day = parseInt(parts[1]);
-        if (quarterMonth < 1 || quarterMonth > 3) {
+        int quarterMonth = parseInt(parts[FIRST_PART_INDEX]);
+        int day = parseInt(parts[SECOND_PART_INDEX]);
+        if (quarterMonth < FIRST_QUARTER_MONTH_OFFSET || quarterMonth > LAST_QUARTER_MONTH_OFFSET) {
             throw new IllegalArgumentException("Quarterly month offset must be 1-3: " + expression);
         }
-        if (day < 1 || day > 31) {
+        if (day < FIRST_DAY || day > LAST_DAY_OF_MONTH) {
             throw new IllegalArgumentException("Quarterly day must be 1-31: " + expression);
         }
-        return new SettlementPolicySpec(SettlementMode.QUARTERLY, 1, quarterMonth, day, expression);
+        return new SettlementPolicySpec(SettlementMode.QUARTERLY, DEFAULT_INTERVAL, quarterMonth, day, expression);
     }
 
     private static SettlementPolicySpec parseYearlyAt(String expression) {
-        String dateText = expression.substring(2);
-        String[] parts = dateText.split("-");
-        if (parts.length != 2) {
+        String dateText = expression.substring(EXPRESSION_PREFIX_LENGTH);
+        String[] parts = dateText.split(DATE_SEPARATOR);
+        if (parts.length != PAIR_PART_LENGTH) {
             throw new IllegalArgumentException("Yearly settlement date must be MM-dd: " + expression);
         }
-        int month = parseInt(parts[0]);
-        int day = parseInt(parts[1]);
+        int month = parseInt(parts[FIRST_PART_INDEX]);
+        int day = parseInt(parts[SECOND_PART_INDEX]);
         MonthDay.of(month, day);
-        return new SettlementPolicySpec(SettlementMode.YEARLY, 1, month, day, expression);
+        return new SettlementPolicySpec(SettlementMode.YEARLY, DEFAULT_INTERVAL, month, day, expression);
     }
 
     // ========================= 核心计算 =========================
 
+    /**
+     * 配置默认节假日日历，影响未显式传入日历的 T+N 结算时间计算。
+     *
+     * @param holidayCalendar 默认节假日日历，返回 true 表示该日期不参与交易日计数
+     */
+    public static void configureDefaultHolidayCalendar(SettlementHolidayCalendar holidayCalendar) {
+        Assert.notNull(holidayCalendar, REQUIRED_HOLIDAY_CALENDAR_MESSAGE);
+        DEFAULT_HOLIDAY_CALENDAR.set(holidayCalendar);
+    }
+
+    /**
+     * 恢复默认节假日日历为仅识别周末。
+     */
+    public static void resetDefaultHolidayCalendar() {
+        DEFAULT_HOLIDAY_CALENDAR.set(WEEKEND_ONLY_HOLIDAY_CALENDAR);
+    }
+
+    /**
+     * 使用默认节假日日历计算下一次候选结算时间。
+     *
+     * @param now 当前时间
+     * @return 下一次候选结算时间
+     */
     public LocalDateTime nextSettlementTime(LocalDateTime now) {
+        return nextSettlementTime(now, DEFAULT_HOLIDAY_CALENDAR.get());
+    }
+
+    /**
+     * 使用指定节假日日历计算下一次候选结算时间。
+     *
+     * @param now 当前时间
+     * @param holidayCalendar 节假日日历，返回 true 表示该日期不参与 T+N 交易日计数
+     * @return 下一次候选结算时间
+     */
+    public LocalDateTime nextSettlementTime(LocalDateTime now, SettlementHolidayCalendar holidayCalendar) {
+        Assert.notNull(holidayCalendar, REQUIRED_HOLIDAY_CALENDAR_MESSAGE);
         return switch (settlementMode) {
             case REALTIME -> now;
-            case DELAY_DAYS -> now.plusDays(interval);
+            case DELAY_DAYS -> nextBusinessDayDelay(now, interval, holidayCalendar);
+            case DELAY_NATURAL_DAYS -> now.plusDays(interval);
             case DAILY_AT -> nextDailyAt(now, param, endParam);
             case HOURLY -> nextHourly(now, interval);
             case WEEKLY -> nextWeekly(now, interval, param);
@@ -397,19 +569,38 @@ public final class SettlementPolicySpec {
         };
     }
 
+    private static LocalDateTime nextBusinessDayDelay(LocalDateTime now,
+                                                      int days,
+                                                      SettlementHolidayCalendar holidayCalendar) {
+        LocalDateTime candidate = now;
+        int remaining = days;
+        while (remaining > ZERO_INTERVAL) {
+            candidate = candidate.plusDays(DEFAULT_INTERVAL);
+            if (!holidayCalendar.isHoliday(candidate.toLocalDate())) {
+                remaining--;
+            }
+        }
+        return candidate;
+    }
+
+    private static boolean isWeekend(LocalDate date) {
+        DayOfWeek dayOfWeek = date.getDayOfWeek();
+        return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
+    }
+
     private static LocalDateTime nextDailyAt(LocalDateTime now, int hour, int minute) {
         LocalDateTime candidate = now.toLocalDate().atTime(hour, minute);
         if (!candidate.isAfter(now)) {
-            return candidate.plusDays(1);
+            return candidate.plusDays(DEFAULT_INTERVAL);
         }
         return candidate;
     }
 
     private static LocalDateTime nextHourly(LocalDateTime now, int intervalHours) {
         int hour = now.getHour();
-        int alignedHour = ((hour / intervalHours) + 1) * intervalHours;
-        if (alignedHour >= 24) {
-            return now.plusDays(1).truncatedTo(ChronoUnit.DAYS).withHour(0);
+        int alignedHour = ((hour / intervalHours) + DEFAULT_INTERVAL) * intervalHours;
+        if (alignedHour >= HOURS_PER_DAY) {
+            return now.plusDays(DEFAULT_INTERVAL).truncatedTo(ChronoUnit.DAYS).withHour(MIDNIGHT_HOUR);
         }
         return now.truncatedTo(ChronoUnit.HOURS).withHour(alignedHour);
     }
@@ -426,7 +617,7 @@ public final class SettlementPolicySpec {
         }
         // 计算从基准周（周一）到目标日期的周数差，确保是 intervalWeeks 的倍数
         long weeksDiff = ChronoUnit.WEEKS.between(getWeekBase(current), getWeekBase(nextDate));
-        if (weeksDiff == 0 || weeksDiff % intervalWeeks != 0) {
+        if (weeksDiff == ZERO_INTERVAL || weeksDiff % intervalWeeks != ZERO_INTERVAL) {
             long remainder = intervalWeeks - (weeksDiff % intervalWeeks);
             nextDate = nextDate.plusWeeks(remainder);
         }
@@ -443,7 +634,7 @@ public final class SettlementPolicySpec {
 
     private static LocalDateTime nextMonthly(LocalDateTime now, int intervalMonths, int targetDay) {
         LocalDate current = now.toLocalDate();
-        boolean isEndOfMonth = targetDay == -1;
+        boolean isEndOfMonth = targetDay == LAST_DAY;
         LocalDate nextDate;
         if (isEndOfMonth) {
             nextDate = current.withDayOfMonth(current.lengthOfMonth());
@@ -469,7 +660,7 @@ public final class SettlementPolicySpec {
             }
         }
         long monthsDiff = ChronoUnit.MONTHS.between(getMonthBase(current), getMonthBase(nextDate));
-        if (monthsDiff % intervalMonths != 0) {
+        if (monthsDiff % intervalMonths != ZERO_INTERVAL) {
             long remainder = intervalMonths - (monthsDiff % intervalMonths);
             nextDate = nextDate.plusMonths(remainder);
             if (isEndOfMonth) {
@@ -483,7 +674,7 @@ public final class SettlementPolicySpec {
     }
 
     private static LocalDate getMonthBase(LocalDate date) {
-        return date.withDayOfMonth(1);
+        return date.withDayOfMonth(FIRST_DAY);
     }
 
     private static LocalDateTime nextQuarterly(LocalDateTime now,
@@ -493,27 +684,31 @@ public final class SettlementPolicySpec {
         if (targetDay != null) {
             return nextQuarterlyAt(now, intervalQuarters, targetMonthOrDay, targetDay);
         }
-        int currentQuarterStartMonth = (now.getMonthValue() - 1) / 3 * 3 + 1;
-        LocalDate currentQuarterStart = LocalDate.of(now.getYear(), currentQuarterStartMonth, 1);
+        int currentQuarterStartMonth =
+                (now.getMonthValue() - DEFAULT_INTERVAL) / MONTHS_PER_QUARTER * MONTHS_PER_QUARTER
+                        + FIRST_MONTH;
+        LocalDate currentQuarterStart = LocalDate.of(now.getYear(), currentQuarterStartMonth, FIRST_DAY);
         if (targetMonthOrDay == null) {
             long quartersToAdd = intervalQuarters;
-            LocalDate targetDate = currentQuarterStart.plusMonths(3L * quartersToAdd);
+            LocalDate targetDate = currentQuarterStart.plusMonths(MONTHS_PER_QUARTER * quartersToAdd);
             if (targetDate.isBefore(now.toLocalDate()) ||
                     (targetDate.isEqual(now.toLocalDate()) && now.toLocalTime().isAfter(LocalTime.MIDNIGHT))) {
-                targetDate = targetDate.plusMonths(3L * intervalQuarters);
+                targetDate = targetDate.plusMonths(MONTHS_PER_QUARTER * intervalQuarters);
             }
             return targetDate.atStartOfDay();
-        } else if (targetMonthOrDay == -1) {
-            LocalDate currentQuarterEnd = currentQuarterStart.plusMonths(3).minusDays(1);
+        } else if (targetMonthOrDay == LAST_DAY) {
+            LocalDate currentQuarterEnd = currentQuarterStart.plusMonths(MONTHS_PER_QUARTER)
+                    .minusDays(DEFAULT_INTERVAL);
             if (currentQuarterEnd.isAfter(now.toLocalDate()) ||
                     (currentQuarterEnd.isEqual(now.toLocalDate()) && now.toLocalTime().equals(LocalTime.MIDNIGHT))) {
                 return currentQuarterEnd.atStartOfDay();
             }
-            LocalDate nextQuarterStart = currentQuarterStart.plusMonths(3L * intervalQuarters);
-            LocalDate nextQuarterEnd = nextQuarterStart.plusMonths(3).minusDays(1);
+            LocalDate nextQuarterStart = currentQuarterStart.plusMonths(MONTHS_PER_QUARTER * intervalQuarters);
+            LocalDate nextQuarterEnd = nextQuarterStart.plusMonths(MONTHS_PER_QUARTER).minusDays(DEFAULT_INTERVAL);
             if (nextQuarterEnd.isBefore(now.toLocalDate()) ||
                     (nextQuarterEnd.isEqual(now.toLocalDate()) && now.toLocalTime().isAfter(LocalTime.MIDNIGHT))) {
-                nextQuarterEnd = nextQuarterStart.plusMonths(3L * (intervalQuarters + 1)).minusDays(1);
+                nextQuarterEnd = nextQuarterStart.plusMonths(MONTHS_PER_QUARTER
+                        * (intervalQuarters + DEFAULT_INTERVAL)).minusDays(DEFAULT_INTERVAL);
             }
             return nextQuarterEnd.atStartOfDay();
         } else {
@@ -525,17 +720,22 @@ public final class SettlementPolicySpec {
                                                  int intervalQuarters,
                                                  int quarterMonth,
                                                  int targetDay) {
-        int currentQuarterStartMonth = (now.getMonthValue() - 1) / 3 * 3 + 1;
-        LocalDate currentQuarterStart = LocalDate.of(now.getYear(), currentQuarterStartMonth, 1);
+        int currentQuarterStartMonth =
+                (now.getMonthValue() - DEFAULT_INTERVAL) / MONTHS_PER_QUARTER * MONTHS_PER_QUARTER
+                        + FIRST_MONTH;
+        LocalDate currentQuarterStart = LocalDate.of(now.getYear(), currentQuarterStartMonth, FIRST_DAY);
         LocalDate targetDate = quarterlyDate(currentQuarterStart, quarterMonth, targetDay);
         if (!targetDate.atStartOfDay().isAfter(now)) {
-            targetDate = quarterlyDate(currentQuarterStart.plusMonths(3L * intervalQuarters), quarterMonth, targetDay);
+            targetDate = quarterlyDate(
+                    currentQuarterStart.plusMonths(MONTHS_PER_QUARTER * intervalQuarters),
+                    quarterMonth,
+                    targetDay);
         }
         return targetDate.atStartOfDay();
     }
 
     private static LocalDate quarterlyDate(LocalDate quarterStart, int quarterMonth, int targetDay) {
-        LocalDate month = quarterStart.plusMonths(quarterMonth - 1L);
+        LocalDate month = quarterStart.plusMonths(quarterMonth - DEFAULT_INTERVAL);
         return month.withDayOfMonth(Math.min(targetDay, month.lengthOfMonth()));
     }
 
@@ -555,7 +755,7 @@ public final class SettlementPolicySpec {
             }
         }
         long yearsDiff = ChronoUnit.YEARS.between(getYearBase(current), getYearBase(targetDate));
-        if (yearsDiff % intervalYears != 0) {
+        if (yearsDiff % intervalYears != ZERO_INTERVAL) {
             long remainder = intervalYears - (yearsDiff % intervalYears);
             targetDate = targetDate.plusYears(remainder);
         }
@@ -563,14 +763,14 @@ public final class SettlementPolicySpec {
     }
 
     private static LocalDate getYearBase(LocalDate date) {
-        return date.withDayOfYear(1);
+        return date.withDayOfYear(FIRST_DAY);
     }
 
     private static LocalDateTime nextCustomCycle(LocalDateTime now, int startDay, int endDay) {
         int today = now.getDayOfMonth();
         LocalDate targetDate;
         if (today >= startDay) {
-            targetDate = now.toLocalDate().plusMonths(1);
+            targetDate = now.toLocalDate().plusMonths(DEFAULT_INTERVAL);
         } else {
             targetDate = now.toLocalDate();
         }
@@ -578,10 +778,10 @@ public final class SettlementPolicySpec {
         int realEnd = Math.min(endDay, lastDay);
         targetDate = targetDate.withDayOfMonth(realEnd);
         if (targetDate.equals(now.toLocalDate()) && now.toLocalTime().isAfter(LocalTime.MIDNIGHT)) {
-            LocalDate nextMonth = targetDate.plusMonths(1);
+            LocalDate nextMonth = targetDate.plusMonths(DEFAULT_INTERVAL);
             targetDate = nextMonth.withDayOfMonth(Math.min(endDay, nextMonth.lengthOfMonth()));
         } else if (targetDate.isBefore(now.toLocalDate())) {
-            LocalDate nextMonth = targetDate.plusMonths(1);
+            LocalDate nextMonth = targetDate.plusMonths(DEFAULT_INTERVAL);
             targetDate = nextMonth.withDayOfMonth(Math.min(endDay, nextMonth.lengthOfMonth()));
         }
         return targetDate.atStartOfDay();
@@ -597,16 +797,16 @@ public final class SettlementPolicySpec {
 
     private static int parseWeekday(String value) {
         return switch (value) {
-            case "MON" -> 1;
-            case "TUE" -> 2;
-            case "WED" -> 3;
-            case "THU" -> 4;
-            case "FRI" -> 5;
-            case "SAT" -> 6;
-            case "SUN" -> 7;
+            case WEEKDAY_MONDAY -> FIRST_WEEKDAY;
+            case WEEKDAY_TUESDAY -> TUESDAY_WEEKDAY;
+            case WEEKDAY_WEDNESDAY -> WEDNESDAY_WEEKDAY;
+            case WEEKDAY_THURSDAY -> THURSDAY_WEEKDAY;
+            case WEEKDAY_FRIDAY -> FRIDAY_WEEKDAY;
+            case WEEKDAY_SATURDAY -> SATURDAY_WEEKDAY;
+            case WEEKDAY_SUNDAY -> LAST_WEEKDAY;
             default -> {
                 int weekday = parseInt(value);
-                if (weekday < 1 || weekday > 7) {
+                if (weekday < FIRST_WEEKDAY || weekday > LAST_WEEKDAY) {
                     throw new IllegalArgumentException("Weekday must be MON-SUN or 1-7, got: " + value);
                 }
                 yield weekday;
@@ -615,11 +815,11 @@ public final class SettlementPolicySpec {
     }
 
     private static int parseMonthDay(String value) {
-        if ("L".equals(value)) {
-            return -1;
+        if (LAST_DAY_TOKEN.equals(value)) {
+            return LAST_DAY;
         }
         int day = parseInt(value);
-        if (day < 1 || day > 31) {
+        if (day < FIRST_DAY || day > LAST_DAY_OF_MONTH) {
             throw new IllegalArgumentException("Day must be 1-31 or L, got: " + day);
         }
         return day;
@@ -633,9 +833,34 @@ public final class SettlementPolicySpec {
     @Getter
     @AllArgsConstructor
     public enum SettlementMode {
-        REALTIME("RT"), DELAY_DAYS("T"), DAILY_AT("D"), HOURLY("H"),
-        WEEKLY("W"), MONTHLY("M"), QUARTERLY("Q"),
-        YEARLY("Y"), CUSTOM_CYCLE("C"), CUSTOM_RANGE("C");
+        REALTIME(TYPE_REALTIME),
+        DELAY_DAYS(TYPE_TRADE_DAY),
+        DELAY_NATURAL_DAYS(TYPE_DAY),
+        DAILY_AT(TYPE_DAY),
+        HOURLY(TYPE_HOUR),
+        WEEKLY(TYPE_WEEK),
+        MONTHLY(TYPE_MONTH),
+        QUARTERLY(TYPE_QUARTER),
+        YEARLY(TYPE_YEAR),
+        CUSTOM_CYCLE(TYPE_CUSTOM_CYCLE),
+        CUSTOM_RANGE(TYPE_CUSTOM_CYCLE);
+
         private final String prefix;
+    }
+
+    /**
+     * 节假日日历。返回 true 表示该日期不参与 T+N 交易日计数，
+     * 通常包括周末和法定节假日。
+     */
+    @FunctionalInterface
+    public interface SettlementHolidayCalendar {
+
+        /**
+         * 判断目标日期是否不参与 T+N 交易日计数。
+         *
+         * @param date 目标日期
+         * @return true 表示节假日，false 表示交易日
+         */
+        boolean isHoliday(LocalDate date);
     }
 }

@@ -33,69 +33,144 @@ public class FundsTransactionDetail implements Serializable, TenantIsolationObje
 
     public static final String TABLE_NAME = "t_funds_transaction_detail";
 
+    /**
+     * 自增主键。
+     */
     @Id(keyType = KeyType.Auto)
     private Long id;
 
+    /**
+     * 创建时间。
+     */
     private LocalDateTime gmtCreate;
 
+    /**
+     * 最后修改时间。
+     */
     private LocalDateTime gmtModified;
 
+    /**
+     * 交易明细流水号。
+     */
     @NotNull
     private String sn;
 
+    /**
+     * 租户 ID。
+     */
     @Column(tenantId = true)
     private Long tenantId;
 
+    /**
+     * 资金交易流水号。
+     */
     @NotNull
     private String transactionSn;
 
+    /**
+     * 业务场景。
+     */
     @NotNull
     private String businessScene;
 
+    /**
+     * 业务流水号。
+     */
     @NotNull
     private String businessSn;
 
+    /**
+     * 交易类型。
+     */
     @NotNull
     private DefaultFundsTransactionType transactionType;
 
+    /**
+     * 交易事件类型。
+     */
     @NotNull
     private FundsTransactionEventType eventType;
 
+    /**
+     * 交易参与主体 ID。
+     */
     @NotNull
     private String subjectId;
 
+    /**
+     * 交易参与主体类型。
+     */
     @NotNull
     private String subjectType;
 
+    /**
+     * 路由参与方角色。
+     */
     @NotNull
     private RouteParticipantRole participantRole;
 
+    /**
+     * 请求幂等摘要。
+     */
     @NotNull
     private String requestHash;
 
+    /**
+     * 资金影响类型。
+     */
     @NotNull
     private FundsEffectType fundsEffectType;
 
+    /**
+     * 关联账本交易流水号。
+     */
     private String ledgerTransactionSn;
 
+    /**
+     * 关联原交易明细流水号。
+     */
     private String referenceDetailSn;
 
+    /**
+     * 关联原账本交易流水号。
+     */
     private String referenceLedgerTransactionSn;
 
+    /**
+     * 明细金额，单位：分。
+     */
     @NotNull
     private Long amount;
 
+    /**
+     * 明细币种。
+     */
     @NotNull
     private CurrencyIsoCode currency;
 
+    /**
+     * 交易明细状态。
+     */
     @NotNull
     private FundsTransactionDetailStatus status;
 
+    /**
+     * 失败错误码。
+     */
     private String errorCode;
 
+    /**
+     * 失败错误信息。
+     */
     private String errorMessage;
 
+    /**
+     * 明细说明。
+     */
     private String description;
 
+    /**
+     * 扩展上下文变量。
+     */
     private String contextVariables;
 }

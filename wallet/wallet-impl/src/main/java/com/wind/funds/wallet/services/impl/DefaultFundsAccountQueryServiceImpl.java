@@ -1,8 +1,21 @@
 package com.wind.funds.wallet.services.impl;
 
+import com.mybatisflex.core.query.QueryWrapper;
+import com.wind.common.exception.AssertUtils;
+import com.wind.common.query.supports.DefaultPageQueryOptions;
+import com.wind.funds.ledger.LedgerBalanceBucket;
 import com.wind.funds.ledger.dto.LedgerDTO;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.service.LedgerService;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.FundsAccount;
+import com.wind.funds.wallet.FundsAccountBalanceView;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountOwner;
+import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.ImmutableFundsAccount;
 import com.wind.funds.wallet.ImmutableFundsBalanceView;
 import com.wind.funds.wallet.dal.entities.BudgetGroup;
@@ -14,23 +27,12 @@ import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.wind.funds.wallet.dal.mapper.BudgetGroupMapper;
 import com.wind.funds.wallet.dal.mapper.CreditAccountMapper;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
-import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.enums.FundsAccountCapability;
+import com.wind.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
-import com.mybatisflex.core.query.QueryWrapper;
-import com.wind.common.exception.AssertUtils;
-import com.wind.common.query.supports.DefaultPageQueryOptions;
-import com.wind.funds.wallet.FundsAccount;
-import com.wind.funds.wallet.FundsAccountBalanceView;
-import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.FundsAccountOwner;
-import com.wind.funds.wallet.FundsAccountQueryService;
-import com.wind.funds.wallet.enums.FundsAccountOwnerType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
-import com.wind.funds.ledger.LedgerBalanceBucket;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
@@ -79,6 +81,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                 .owner(FundsAccountOwner.of(subject.ownerId(), subject.ownerType()))
                 .status(subject.status())
                 .currency(subject.currency())
+                .capabilities(resolveCapabilitiesFromProfile(subject))
                 .accountLedgerIds(loadLedgerIds(subject))
                 .version(subject.version())
                 .build();
@@ -370,6 +373,16 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
         return result == null ? 0L : result;
     }
 
+    private Set<FundsAccountCapability> resolveCapabilitiesFromProfile(ResolvedFundsSubject subject) {
+        return switch (subject.ledgerProfileCode()) {
+            case FUNDING_BASIC, FUNDING_MERCHANT, FUNDING_PLATFORM -> Set.of(FundsAccountCapability.RECEIVE,
+                    FundsAccountCapability.PAY,
+                    FundsAccountCapability.WITHDRAW);
+            case CREDIT_BASIC -> Set.of(FundsAccountCapability.PAY);
+            case BUDGET_BASIC -> Set.of();
+        };
+    }
+
     private LocalDateTime activeTime(LedgerDTO ledger) {
         return ledger.getGmtCreate() == null ? LocalDateTime.now() : ledger.getGmtCreate();
     }
@@ -383,6 +396,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
             FundsAccountOwnerType ownerType,
             FundsAccountStatus status,
             CurrencyIsoCode currency,
+            LedgerProfileCode ledgerProfileCode,
             AccountBalancePeriodType periodType,
             String periodId,
             Integer version
@@ -398,6 +412,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     account.getOwnerType(),
                     account.getStatus(),
                     account.getCurrency(),
+                    account.getLedgerProfileCode(),
                     AccountBalancePeriodType.LIFETIME,
                     AccountBalancePeriodType.LIFETIME.name(),
                     account.getVersion()
@@ -414,6 +429,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     account.getOwnerType(),
                     account.getStatus(),
                     account.getCurrency(),
+                    account.getLedgerProfileCode(),
                     account.getPeriodType(),
                     account.getPeriodId(),
                     account.getVersion()
@@ -430,6 +446,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     account.getOwnerType(),
                     account.getStatus(),
                     account.getCurrency(),
+                    account.getLedgerProfileCode(),
                     account.getPeriodType(),
                     account.getPeriodId(),
                     account.getVersion()

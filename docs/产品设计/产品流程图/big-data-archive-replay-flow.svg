@@ -18,7 +18,7 @@ text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsof
 <rect x="50" y="150" width="175" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
 
 <text x="66" y="178" class="node-title">归档候选</text>
-<text x="66" y="202" class="node-text" text-anchor="start"><tspan x="66" dy="0">资金交易 / 明细</tspan><tspan x="66" dy="17">权益快照 / 账目明细</tspan><tspan x="66" dy="17">清结算 / 对账事实</tspan></text>
+<text x="66" y="202" class="node-text" text-anchor="start"><tspan x="66" dy="0">资金交易 / 明细</tspan><tspan x="66" dy="17">权益资金事实 / 账目明细</tspan><tspan x="66" dy="17">清结算 / 对账事实</tspan></text>
 </g><g>
 <rect x="265" y="150" width="175" height="104" rx="8" ry="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5"/>
 

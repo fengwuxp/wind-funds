@@ -5,7 +5,6 @@ import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
-import com.wind.funds.spec.transaction.FundsBenefitSnapshotSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
@@ -37,7 +36,6 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
                                             @Nullable PaymentInstrumentRefSpec instrumentRef,
                                             @Nullable ExternalAccountRefSpec externalAccountRef,
                                             @Nullable FundsInstructionReferenceSpec reference,
-                                            @Nullable FundsBenefitSnapshotSpec benefitSnapshot,
                                             String businessScene,
                                             String businessSn,
                                             LocalDateTime eventTime,
@@ -146,11 +144,6 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
     @Override
     public @Nullable FundsInstructionReferenceSpec getReference() {
         return reference;
-    }
-
-    @Override
-    public @Nullable FundsBenefitSnapshotSpec getBenefitSnapshot() {
-        return benefitSnapshot;
     }
 
     @Override

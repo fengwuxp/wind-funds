@@ -231,7 +231,9 @@ CREATE TABLE `t_spend_subject_funding_rel`
     `tenant_id`           BIGINT(20)  NOT NULL COMMENT '租户 ID',
     `spend_subject_id`    VARCHAR(30) NOT NULL COMMENT '支出控制主体 ID',
     `spend_subject_type`  VARCHAR(50) NOT NULL COMMENT '支出控制主体类型',
-    `funding_account_id`  VARCHAR(30) NOT NULL COMMENT '真实资金账户 ID',
+    `funding_account_id`  VARCHAR(30)          DEFAULT NULL COMMENT '兼容真实资金账户 ID，仅资金账户目标主体使用',
+    `target_subject_type` VARCHAR(50) NOT NULL COMMENT '资金责任目标主体类型',
+    `target_subject_id`   VARCHAR(30) NOT NULL COMMENT '资金责任目标主体 ID',
     `currency`            VARCHAR(10) NOT NULL COMMENT '币种',
     `relation_type`       VARCHAR(50) NOT NULL COMMENT '关系类型',
     `priority`            INT(11)     NOT NULL DEFAULT 0 COMMENT '路由优先级',
@@ -243,9 +245,10 @@ CREATE TABLE `t_spend_subject_funding_rel`
     `context_variables`   TEXT                 DEFAULT NULL COMMENT '扩展上下文',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_spend_subject_funding_rel_sn` (`sn`),
-    UNIQUE KEY `uk_spend_subject_funding_rel_subject` (`spend_subject_type`, `spend_subject_id`, `funding_account_id`, `currency`, `relation_type`),
+    UNIQUE KEY `uk_spend_subject_funding_rel_subject` (`spend_subject_type`, `spend_subject_id`, `target_subject_type`, `target_subject_id`, `currency`, `relation_type`),
     KEY `idx_spend_subject_funding_rel_spend_subject` (`spend_subject_type`, `spend_subject_id`),
     KEY `idx_spend_subject_funding_rel_funding` (`funding_account_id`),
+    KEY `idx_spend_subject_funding_rel_target` (`target_subject_type`, `target_subject_id`),
     KEY `idx_spend_subject_funding_rel_status` (`status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '支出主体资金关系表';
