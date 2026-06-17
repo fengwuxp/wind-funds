@@ -188,6 +188,7 @@ public abstract class AbstractFundsServiceTest {
     @MapperScan({
             "com.wind.funds.ledger.dal.mapper",
             "com.wind.funds.transaction.dal.mapper",
+            "com.wind.funds.reconciliation.dal.mapper",
             "com.wind.funds.wallet.dal.mapper"
     })
     @EnableTransactionManagement

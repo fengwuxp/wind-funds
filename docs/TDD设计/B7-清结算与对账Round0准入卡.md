@@ -202,7 +202,7 @@ Git 策略：auto_commit / summary_only
 | `Execution Grant` | `B7-RECON-DIFFERENCE-MVP`。 |
 | `Task ID` | `B7-RECON-DIFFERENCE-MVP-CAD-001`。 |
 | `业务问题` | 一笔已成功、已过账、有账本分录的交易进入对账后，若金额、状态、漏单、重复、来源未验证、候选匹配不可靠或账龄超期，系统必须生成差错、阻断清算或出款、保留审批凭证，并能重跑或在白名单明确授权后补事实闭环；不得把交易成功、结算审批或外部受理误展示为钱已对上。 |
-| `当前判断` | PRD、DSL、系分和 TDD 已具备清结算与对账目标态；代码侧只有 reconciliation 模块骨架、LedgerEntry 对账字段、清算策略契约和出款前准入候选，尚未形成对账来源标准化、匹配强度、差错单、阻断、账龄升级、重跑和补事实白名单的服务级 H2 闭环。 |
+| `当前判断` | 首轮已完成 service-flow-backed 差错生命周期 MVP：代码侧具备差错来源质量、匹配强度、差错单、阻断状态、处理动作回链和重新对账幂等的服务级 H2 闭环；完整对账来源标准化、匹配规则引擎、账龄升级、清算/出款阻断消费和补事实白名单仍未完成。 |
 | `默认决策` | `implementationDecision=service-flow-backed`，`schemaDecision=minimal-reconciliation-ddl-h2-required`，`adjustmentWhitelist=closed-first`，`externalRuleDecision=local-field-check-only`。若用户只确认 `contract-only`，只能交付契约/DTO/目标 Red，不得声明 B7 生产可用。 |
 | `允许写入` | 先写 `ReconciliationSourceStandardizationTests`、`ReconciliationDifferenceLifecycleTests`、`ReconciliationTaskServiceTests`、`ReconciliationMatchingRuleTests` 或 `ReconciliationDifferenceAgingTests` 目标 Red；Red 证明缺口后，按确认范围允许新增 `reconciliation-face` application facade、Request/Query/DTO、状态、`reconciliation-impl` 最小服务实现、必要 DDL/H2 schema、Entity、Mapper、MapStruct 和表结构测试。 |
 | `禁止写入` | 不一次性实现完整清分、清算、结算、出款、追偿和运营后台；不直接修改历史交易、LedgerEntry、余额投影、交易投影或外部流水；不开放泛化补事实；不实现银行、卡组织、ACH、SWIFT、PSP、收单、跨境或 FX 外部协议；不实现 VCC clearing 文件、全球账户 VA/银行流水匹配或收单生产能力。 |
@@ -211,13 +211,26 @@ Git 策略：auto_commit / summary_only
 | `验证命令` | 首轮 `just test-one ReconciliationDifferenceLifecycleTests tests` 或 `just test-one ReconciliationTaskServiceTests tests`；按触点补 `just test-reconciliation`、`just test-boundary`、`just compile`、提交前 `just pmd` 和 `git diff --check`。 |
 | `Git 策略` | 未确认前 `summary_only`；确认时若用户同时保留 GSD-CAD 自动提交授权，目标验证通过且无停止条件时可 `auto_commit`；未明确 auto_commit 时保持 `summary_only`。 |
 | `停止条件` | 未确认 implementationDecision、schemaDecision、补事实白名单或 DDL/H2 范围；需要修改 transaction、ledger、wallet、route replay、出款前准入或 core 公共契约但 Grant 未列名；出现直接改账、泛化补事实、敏感原文写入、依赖反转、外部协议实现、测试无法解释失败或工作树冲突。 |
-| `交接` | 用户确认 `Execution Grant：B7-RECON-DIFFERENCE-MVP` 后，从 `R0-B7-RECON-001` 开始；若只是“继续推进/完善/自动模式”，继续 docs-only 对齐，不写 Java、测试、DDL/H2 schema 或运行时配置。 |
+| `交接` | `Execution Grant：GSD2-B7-RECON-DIFFERENCE-MVP-001` 已完成首轮 Green；下一步若继续 B7，应确认清算/出款门禁如何消费差错状态、阻断范围和重跑结果，不得直接跳到完整清分、清算、结算、出款或追偿。 |
+
+### 15.2 reconciliationDifferenceFirstGreen2026-06-17
+
+本节记录 `GSD2-B7-RECON-DIFFERENCE-MVP-001` 的首轮交付结果，只保留最终可交付口径。
+
+| 项 | 结果 |
+| --- | --- |
+| 已交付能力 | 新增 `ReconciliationDifferenceApplicationService`，支持创建差错、回链处理动作或调账结果、登记重新对账结果。差错默认进入 `BLOCKED`，重跑对平前必须已有处理动作回链。 |
+| 数据与契约 | 新增差错类型、严重等级、状态、来源质量和匹配强度枚举；新增 create / link / rerun 请求模型和差错 DTO；新增 `t_reconciliation_difference` H2 测试表、Entity 和 Mapper。 |
+| 资金红线 | reconciliation 只登记运营差错对象和处理结果引用，不直接生成交易事实、route、posting、LedgerEntry、余额投影或交易投影；服务测试断言登记、回链和重跑均不改变账本事实。 |
+| 幂等红线 | `tenantId + differenceSn` 创建幂等；同差错流水号的来源、金额、币种、来源质量、匹配强度、责任方、阻断范围、规则版本和证据引用不一致必须拒绝；同一处理动作和同一重跑流水号的事实漂移也必须拒绝。 |
+| 验证证据 | `just test-one ReconciliationDifferenceApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just verify-fast`、`just pmd` 和 `git diff --check` 已通过；目标测试在沙箱内因 embedded Redis 本地端口绑定限制失败，已按权限规则在非沙箱环境重跑通过。 |
+| Not Done | 完整清分、清算、结算、出款、追偿、运营后台、账龄升级、清算/出款阻断消费、外部规则确认、生产迁移脚本、对账任务运行记录、差异报告和补事实白名单仍未完成。 |
 
 ## 16. handoff
 
 | 项 | 要求 |
 | --- | --- |
-| 恢复入口 | 优先从 `B7-RECON-DIFFERENCE-MVP` 恢复；若要直接做清算、结算、出款或追偿，必须说明为什么跳过差错闭环第一切片。 |
+| 恢复入口 | 优先从 `GSD2-B7-RECON-DIFFERENCE-MVP-002` 或等价新 Grant 恢复，让清算、结算或出款准入消费差错状态和阻断范围；若要直接做清算、结算、出款或追偿，必须说明为什么跳过差错状态消费。 |
 | 回写位置 | `docs/TDD设计/README.md`、`docs/TDD设计/GSD-Goal-生产可用MVP推进计划.md`、`openspec/project.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | TDD / Review / Refactor | 确认后必须先 Red 后 Green；Review 优先检查资金不变量、模块边界、失败无副作用、补事实白名单和敏感数据；Refactor 只在 Red 变绿后做必要收敛。 |
 | AI 产物复核 | 不接受空 facade、内存版业务 Service、只 mock 内部核心组件、只断言状态或数量的测试作为生产可用证据。 |

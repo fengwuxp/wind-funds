@@ -26,6 +26,8 @@ public enum SourceObjectType implements DescriptiveEnum {
 
     BALANCE_ADJUSTMENT("余额调整"),
 
+    EXTERNAL_BALANCE_ANOMALY("外部余额异常"),
+
     BUDGET_ADJUSTMENT("预算调整");
 
     private final String desc;

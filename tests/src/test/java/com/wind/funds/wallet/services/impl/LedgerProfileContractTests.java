@@ -5,9 +5,12 @@ import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.spec.ledger.LedgerProfileItemSpec;
 import com.wind.funds.spec.ledger.LedgerProfileSpec;
-import com.wind.funds.spec.ledger.NegativeAvailablePolicySpec;
+import com.wind.funds.wallet.model.dto.LedgerProfileItemDTO;
 import com.wind.funds.wallet.service.LedgerProfileService;
 import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Method;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -41,32 +44,23 @@ class LedgerProfileContractTests {
     }
 
     /**
-     * 场景：profile 允许 AVAILABLE 负余额，用于处理受控异常余额、风控和后续治理。
+     * 场景：profile 只声明账目是否具备受控负余额能力，运行时治理由余额控制请求、路由和账本 posting 共同完成。
      * 输入：FUNDING_BASIC profile 的 AVAILABLE / FROZEN item。
-     * 输出：允许负余额的 AVAILABLE 必须携带治理策略；不允许负余额的 FROZEN 不携带该策略。
-     * 红线：allowNegative=true 不能只是布尔开关，必须能追溯来源事实、审批/风控、限额、账龄和治理路径。
+     * 输出：允许负余额的 AVAILABLE 只暴露静态能力闸门；profile 契约和 DTO 不暴露运行时治理策略对象。
+     * 红线：来源事实、审批/风控、限额、账龄和治理路径不能沉淀在静态账目画像中，避免和交易路由准入形成双重事实源。
      */
     @Test
-    void testAllowNegativeProfileItemShouldExposeGovernancePolicy() {
+    void testAllowNegativeProfileItemShouldOnlyExposeStaticCapabilityGuard() {
         LedgerProfileSpec profile = ledgerProfileService.getProfile(LedgerProfileCode.FUNDING_BASIC);
         LedgerProfileItemSpec available = requiredItem(profile, LedgerSubjectCode.AVAILABLE);
         LedgerProfileItemSpec frozen = requiredItem(profile, LedgerSubjectCode.FROZEN);
 
-        NegativeAvailablePolicySpec policy = available.getNegativeAvailablePolicy();
-
         assertThat(available.getAllowNegative()).isTrue();
-        assertThat(policy).isNotNull();
-        assertThat(policy.getPolicyCode()).isEqualTo("FUNDING_AVAILABLE_CONTROLLED_NEGATIVE");
-        assertThat(policy.getPolicyVersion()).isEqualTo(1);
-        assertThat(policy.getRequireSourceFact()).isTrue();
-        assertThat(policy.getRequireApprovalOrRiskRule()).isTrue();
-        assertThat(policy.getRequireSingleLimit()).isTrue();
-        assertThat(policy.getRequireCumulativeLimit()).isTrue();
-        assertThat(policy.getRequireAgingTracking()).isTrue();
-        assertThat(policy.getRecheckFutureTransaction()).isTrue();
-        assertThat(policy.getGovernancePath()).contains("风控", "对账");
         assertThat(frozen.getAllowNegative()).isFalse();
-        assertThat(frozen.getNegativeAvailablePolicy()).isNull();
+        assertThat(publicMethodNames(LedgerProfileItemSpec.class))
+                .doesNotContain("getNegativeAvailablePolicy");
+        assertThat(publicMethodNames(LedgerProfileItemDTO.class))
+                .doesNotContain("getNegativeAvailablePolicy", "setNegativeAvailablePolicy");
     }
 
     private LedgerProfileItemSpec requiredItem(LedgerProfileSpec profile, LedgerSubjectCode subjectCode) {
@@ -74,5 +68,11 @@ class LedgerProfileContractTests {
                 .filter(item -> item.getLedgerSubjectCode() == subjectCode)
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private static Iterable<String> publicMethodNames(Class<?> type) {
+        return Arrays.stream(type.getMethods())
+                .map(Method::getName)
+                .toList();
     }
 }

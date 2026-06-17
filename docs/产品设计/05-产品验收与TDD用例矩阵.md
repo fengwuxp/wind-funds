@@ -244,7 +244,7 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | AC-CTRL-001 | 冻结成功 | 主体可用余额充足，原因、期限和权限合法。 | 创建冻结单，AVAILABLE -> FROZEN。 | 冻结不创建资金交易，不改变资金归属。 |
 | AC-CTRL-002 | 解冻成功 | 原冻结单存在，剩余冻结金额充足。 | FROZEN -> AVAILABLE。 | 超额解冻失败，释放记录可审计。 |
 | AC-CTRL-003 | 冻结后扣划 | 原冻结单存在，需要追偿或调账。 | 创建独立资金事实并引用冻结单。 | 不得通过修改冻结状态表达消费。 |
-| AC-CTRL-004 | 资金账户余额调整 | 对账差错、运营修正或财务调整来源明确，审批、凭证、原因和操作者齐备。 | 生成余额调整动作，目标资金账户同主体、同币种、同周期目标账目受控变化。 | 不承接跨主体价值转移；无来源、无审批、无凭证、错币种或破坏负余额策略失败。 |
+| AC-CTRL-004 | 资金账户余额调整 | 对账差错、运营修正或财务调整来源明确，审批、凭证、原因和操作者齐备。 | 生成余额调整动作，目标资金账户同主体、同币种、同周期目标账目受控变化。 | 不承接跨主体价值转移；无来源、无审批、无凭证、错币种、账本未开放负余额能力或缺少本次运行时策略事实时失败。 |
 | AC-ADJ-001 | 资金调账 | 财务或运营提交原因、凭证、审批和差错引用。 | 作为受控余额调整或批次授权直接交易调账事实，生成调整记录、审计引用和平衡账务影响。 | 不修改历史分录；不得通过余额控制表达跨主体价值转移；无来源、无审批或无凭证失败。 |
 | AC-CTRL-005 | 信用账户额度调整 | 管理员调增或调减信用额度。 | LIMIT 和 AVAILABLE 按规则变化。 | LIMIT 不作为普通交易 source/target。 |
 | AC-CTRL-006 | 预算规则调整 | 管理员调增或调减预算型 Spend Rule 的额度、窗口或作用域。 | 预算控制视图、规则版本和审计记录变化。 | 预算不是资金，不入现金流，也不生成 LedgerEntry 主体。 |
@@ -260,10 +260,10 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 
 | 判定场景 | 产品验收 | DSL / 系分承接 | TDD 承接 | 必须失败的边界 |
 | --- | --- | --- | --- | --- |
-| 同主体资金账户目标账目修正，来源为对账差错、运营修正或财务调整，审批、凭证、原因和操作者齐备。 | AC-CTRL-004 | BALANCE_CONTROL / BALANCE_ADJUST；系分 02 的 t_funds_balance_adjust_action。 | TDD-CTRL-009、TDD-CTRL-ERR-005。 | 跨主体、错币种、错周期、无来源、无审批、无凭证或破坏负余额策略。 |
+| 同主体资金账户目标账目修正，来源为对账差错、运营修正或财务调整，审批、凭证、原因和操作者齐备。 | AC-CTRL-004 | BALANCE_CONTROL / BALANCE_ADJUST；系分 02 的 t_funds_balance_adjust_action。 | TDD-CTRL-009、TDD-CTRL-ERR-005。 | 跨主体、错币种、错周期、无来源、无审批、无凭证、账本未开放负余额能力或缺少本次运行时策略事实。 |
 | 信用账户额度调整或预算规则调整，不表达现金流和跨主体资金转移。 | AC-CTRL-005、AC-CTRL-006 | BALANCE_CONTROL / LIMIT_ADJUST；预算型 Spend Rule 版本和控制视图。 | TDD-CTRL-005 至 TDD-CTRL-008。 | 把 LIMIT 当作普通交易 source/target，或把预算组 / Spend Rule 当作资金池或账本主体。 |
 | 对账差错闭环内需要修正同主体资金账户余额。 | AC-ADJ-001、AC-CTRL-004 | 差错单引用 BALANCE_CONTROL / BALANCE_ADJUST；ApplyExceptionActionRequest.adjustActionSn；重新对账闭环。 | TDD-RECON-001、TDD-RECON-002、TDD-CTRL-009、TDD-CTRL-ERR-005。 | 绕过差错单、审批、凭证、账本交易或重新对账依据直接改余额。 |
-| 外部钱包、VCC 发卡行或发卡处理商余额终局事实与我侧不一致，需要修正同主体目标账目余额。 | AC-CTRL-013、AC-ADJ-001 | BALANCE_CONTROL / BALANCE_ADJUST；DSL-BALANCE-CONTROL-EXTERNAL-DEFICIT-ADJUST-001；系分 02 外部余额异常纠偏。 | TDD-CTRL-012、TDD-CTRL-ERR-007、TDD-RECON-016。 | 上游未终局、无外部余额快照、无差错单或审批、无凭证、跨主体转移损失、或纠偏后绕过负余额策略继续交易。 |
+| 外部钱包、VCC 发卡行或发卡处理商余额终局事实与我侧不一致，需要修正同主体目标账目余额。 | AC-CTRL-013、AC-ADJ-001 | BALANCE_CONTROL / BALANCE_ADJUST；DSL-BALANCE-CONTROL-EXTERNAL-DEFICIT-ADJUST-001；系分 02 外部余额异常纠偏。 | TDD-CTRL-012、TDD-CTRL-ERR-007、TDD-RECON-016。 | 上游未终局、无外部余额快照、无差错单或审批、无凭证、跨主体转移损失，或纠偏后绕过运行时负余额策略继续交易。 |
 | 对账差错闭环内需要跨主体补偿、价值转移或明确的资金调账交易。 | AC-ADJ-001 | 批次授权 DIRECT_TRANSACTION / ADJUSTMENT；DSL-SETTLEMENT-RECONCILIATION-ADJUST-001；差错调账账务规则。 | TDD-RECON-001、TDD-RECON-002、TDD-OPS-001。 | 通过余额控制 adjust 表达跨主体价值转移，或直接修改历史分录和投影。 |
 
 ### 5.5 清分、清算、结算与出款

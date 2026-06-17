@@ -544,3 +544,56 @@ CREATE TABLE `t_ledger_entry`
     KEY `idx_ledger_entry_transaction_time` (`transaction_time`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '账户账本条目表';
+
+-- ----------------------------
+-- 对账差错表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_reconciliation_difference`;
+CREATE TABLE `t_reconciliation_difference`
+(
+    `id`                        BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`              DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `difference_sn`             VARCHAR(64) NOT NULL COMMENT '对账差错流水号',
+    `tenant_id`                 BIGINT(20)  NOT NULL COMMENT '租户 ID',
+    `reconciliation_batch_sn`   VARCHAR(64) NOT NULL COMMENT '对账批次流水号',
+    `source_record_sn`          VARCHAR(64) NOT NULL COMMENT '对账来源记录流水号',
+    `source_quality`            VARCHAR(50) NOT NULL COMMENT '对账来源质量',
+    `match_strength`            VARCHAR(50) NOT NULL COMMENT '对账匹配强度',
+    `difference_type`           VARCHAR(50) NOT NULL COMMENT '对账差错类型',
+    `severity`                  VARCHAR(50) NOT NULL COMMENT '对账差错严重等级',
+    `status`                    VARCHAR(50) NOT NULL COMMENT '对账差错状态',
+    `currency`                  VARCHAR(10) NOT NULL COMMENT '差异币种',
+    `difference_amount`         BIGINT(20)  NOT NULL COMMENT '差异金额，最小货币单位',
+    `responsible_party_ref`     VARCHAR(128) NOT NULL COMMENT '责任方引用',
+    `blocking_scope`            VARCHAR(128) NOT NULL COMMENT '阻断范围',
+    `rule_version`              VARCHAR(64) NOT NULL COMMENT '匹配或对账规则版本',
+    `evidence_ref`              VARCHAR(128) NOT NULL COMMENT '来源证据引用',
+    `adjustment_sn`             VARCHAR(64)          DEFAULT NULL COMMENT '关联处理动作或调账单号',
+    `adjustment_transaction_sn` VARCHAR(64)          DEFAULT NULL COMMENT '关联资金交易流水号',
+    `adjustment_approval_ref`   VARCHAR(128)         DEFAULT NULL COMMENT '调账审批引用',
+    `adjustment_evidence_ref`   VARCHAR(128)         DEFAULT NULL COMMENT '调账证据引用',
+    `adjustment_reason`         VARCHAR(512)         DEFAULT NULL COMMENT '处理原因',
+    `last_rerun_sn`             VARCHAR(64)          DEFAULT NULL COMMENT '最后一次重跑流水号',
+    `last_rerun_batch_sn`       VARCHAR(64)          DEFAULT NULL COMMENT '最后一次重跑批次流水号',
+    `last_rerun_rule_version`   VARCHAR(64)          DEFAULT NULL COMMENT '最后一次重跑规则版本',
+    `last_rerun_balanced`       TINYINT(1)           DEFAULT NULL COMMENT '最后一次重跑是否对平',
+    `last_rerun_evidence_ref`   VARCHAR(128)         DEFAULT NULL COMMENT '最后一次重跑证据引用',
+    `last_rerun_result_digest`  VARCHAR(128)         DEFAULT NULL COMMENT '最后一次重跑结果摘要',
+    `rerun_count`               INT(11)     NOT NULL DEFAULT 0 COMMENT '重跑次数',
+    `created_by`                VARCHAR(64)          DEFAULT NULL COMMENT '创建人',
+    `adjusted_by`               VARCHAR(64)          DEFAULT NULL COMMENT '处理人',
+    `resolved_by`               VARCHAR(64)          DEFAULT NULL COMMENT '关闭人',
+    `adjusted_time`             DATETIME             DEFAULT NULL COMMENT '处理时间',
+    `resolved_time`             DATETIME             DEFAULT NULL COMMENT '关闭时间',
+    `description`               VARCHAR(512)         DEFAULT NULL COMMENT '描述',
+    `version`                   INT(11)     NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_difference_sn` (`tenant_id`, `difference_sn`),
+    KEY `idx_reconciliation_difference_batch` (`tenant_id`, `reconciliation_batch_sn`),
+    KEY `idx_reconciliation_difference_source` (`tenant_id`, `source_record_sn`),
+    KEY `idx_reconciliation_difference_status` (`tenant_id`, `status`),
+    KEY `idx_reconciliation_difference_adjustment` (`tenant_id`, `adjustment_sn`),
+    KEY `idx_reconciliation_difference_rerun` (`tenant_id`, `last_rerun_sn`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '对账差错表';

@@ -14,6 +14,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.capte.domain</groupId>
+            <artifactId>catep-infrastructure-dal</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.wind.funds</groupId>
             <artifactId>capte-funds-reconciliation-face</artifactId>
         </dependency>

@@ -13,8 +13,8 @@
 | 所属阶段 | GSD-2 Wave 0 / Baseline Reset / Planning-only。 |
 | Goal ID | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
 | Loop ID | `GSD2-LOOP-DEFAULT-PLAN-GRANT-2026-06-12` |
-| 当前状态 | `W5_P0P1_LWT_WALLET_FR_AND_PI_CAPABILITY_FACADE_GREEN_PENDING_FULL_GATE` |
-| Git / code baseline | 当前实际 Git/code baseline 为 `da7d2ea test: 阻断契约夹具承载资金流断言`；`b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 只保留为 GSD-2 初始重置点和历史证据。当前仅允许低风险文档、状态和任务卡推进。 |
+| 当前状态 | `B7_RECON_DIFFERENCE_MVP_FIRST_GREEN_NEXT_CONSUMPTION_OR_B5_AUDIT_EXPANSION` |
+| Git / code baseline | 当前实际 Git/code baseline 为 `e81a8a25 feat: 完善账务钱包交易基线` 加本轮未提交的 B4 投影解释首轮 Green、B5 余额调账审计首轮 Green 和 B7 对账差错闭环首轮 Green 变更；`da7d2ea test: 阻断契约夹具承载资金流断言` 和 `b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 只保留为 GSD-2 历史证据。下一轮仅允许重新确认单一 Grant 后进入对应 Red/Green，不自动授权 Git、DDL/H2 schema、运行时配置或外部业务范围。 |
 | 设计 baseline | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec` 的当前可读状态；`openspec` 异常 Git 状态只作为停止条件和只读事实记录。 |
 | 活跃未完成计划 | 已清零。旧候选不再作为当前计划，只能在新 Workflow 中被重新选择、重新编号、重新确认。 |
 | Owner | AI Native 流程编排负责状态、Loop、GSD 和门禁；产品架构专家负责业务目标、对象、能力、验收和金融待确认；资深架构师负责系统边界、接口、TDD、验证和编码准入。 |
@@ -66,7 +66,7 @@
 
 ## 4. 架构和代码基线
 
-背景：GSD-2 初始重置点为 `b3b9712`，后续已继续提交账户层级快照、信用账户路由闭合、GSD2 路由快照契约和 DSL 契约门禁强化，当前实际 Git/code baseline 已推进到 `da7d2ea`。当前需要避免继续沿用旧计划或旧基线状态，先以 W1 审计把最新设计、代码、任务和 OpenSpec 重新对齐。
+背景：GSD-2 初始重置点为 `b3b9712`，后续已继续提交账户层级快照、信用账户路由闭合、GSD2 路由快照契约、DSL 契约门禁、资金责任目标主体、wallet application facade 和支付工具能力准入 facade，当前实际 Git/code baseline 已推进到 `e81a8a25`。当前需要避免继续沿用旧计划或旧基线状态，先以状态载体把最新设计、代码、任务和 OpenSpec 重新对齐。
 
 目标：用 GSD-2 固定当前设计、代码和任务基线，清理活跃队列，重新定义下一轮只读侦察、Gap Audit、单一 Grant 选择和 CAD 执行的顺序。
 
@@ -76,7 +76,7 @@
 
 | 架构项 | 当前基线 |
 | --- | --- |
-| 现状和影响范围 | 当前代码基线为 `da7d2ea`；`b3b9712` 只保留为 GSD-2 初始重置点。影响范围仍覆盖 core、wallet、transaction、ledger、reconciliation、governance、tests、docs 和 openspec。 |
+| 现状和影响范围 | 当前代码基线为 `e81a8a25`；`da7d2ea` 和 `b3b9712` 只保留为 GSD-2 历史证据。影响范围仍覆盖 core、wallet、transaction、ledger、reconciliation、governance、tests、docs 和 openspec。 |
 | 核心决策 | 交易内核继续使用已解析账户主体作为 canonical 入参；支付工具入口留在 wallet/application facade；ledger 只维护账本事实；route 只解析路径和快照；投影只读派生，不反写事实。 |
 | 职责边界和取舍 | 先完整被依赖方能力，再做 VCC 和全球账户；先 contract-only 或 service-flow-backed 小切片，再考虑 P2 业务 facade；不为了统一入口引入 `InstrumentTransactionService`。 |
 | 接口契约 | 任一入参、出参、错误码、幂等摘要、公共 DTO、Request、Query、枚举、状态机或兼容变更，必须由新的单一 Execution Grant 明确授权。 |
@@ -140,7 +140,7 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | Task ID | `GSD2-W1-BASELINE-GAP-AUDIT` |
 | Owner | 产品架构专家负责产品和验收口径；资深架构师负责源码、测试、OpenSpec 和架构边界。 |
 | 写入范围 | 默认只写 Gap Audit 报告和任务状态，不写生产代码、测试、DDL/H2 或公共契约。 |
-| 只读范围 | PRD、DSL、系分、TDD、OpenSpec、源码、测试和 `b3b9712..da7d2ea` 的已提交差异。 |
+| 只读范围 | PRD、DSL、系分、TDD、OpenSpec、源码、测试和 `b3b9712..e81a8a25` 的已提交差异。 |
 | 验收场景 | 重新列出设计与代码差异、生产可用缺口、下一可选 Grant 和 Not Done 边界。 |
 | AI 交付闭环 | 每个缺口需标注建议 Spec 强度、AC 覆盖方式、独立验证证据和是否需要人工主导。 |
 | 验证命令 | `rg` 追踪、`git status --short`、必要时只读源码锚点扫描；若不改代码，不要求编译。 |
@@ -157,8 +157,8 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | 只读范围 | 所有候选准入卡和源码证据。 |
 | Spec 准入 | 必须消费 `AI代码交付闭环与Spec模板基线.md` 并复制 `GSD-2-Spec-AC-Harness-CAD任务模板.md` 或等价任务卡，补齐 Spec ID、Spec 强度、AC 表、Goal / AC 映射、验证命令、CR 交接和知识回流位置。 |
 | 并行边界 | 同一时间只允许一个 Grant 进入 active；共享公共契约、状态机、fixture 或 H2 schema 的候选必须串行。 |
-| 候选队列 | `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`、`GSD2-B2-FR-TARGET-001`、`GSD2-B7-RECON-DIFFERENCE-MVP-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-001`。 |
-| 默认建议 | 若业务仍以 VCC 和全球账户为目标，优先 `B2-ACCOUNT-HIERARCHY` 的 `contract-only/no-ddl`，因为卡绑定子账户、父账户快照和账目 profile 是 VCC/全球账户后续资金流前置。 |
+| 候选队列 | 已完成 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`、`GSD2-B2-FR-TARGET-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-001` 和 `GSD2-B7-RECON-DIFFERENCE-MVP-001` 首轮 Green；下一候选收敛为 `GSD2-B7-RECON-DIFFERENCE-MVP-002` 或 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
+| 默认建议 | 若继续优先服务清结算与对账生产可用性，下一步优先 `GSD2-B7-RECON-DIFFERENCE-MVP-002`，让清算、结算或出款准入消费差错状态、阻断范围和重新对账结果；若产品更关注余额异常治理，则切到 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
 | 当前结果 | 已形成 [GSD-2-W2-单一Grant选择卡.md](GSD-2-W2-单一Grant选择卡.md)，并已由 W3A 完成只读源码定位、由 W4 完成确认包；`Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 已在 2026-06-15 消费到首个 Red，随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已在当前工作树完成最小 Green 和目标回归。 |
 | 停止条件 | 用户未确认优先级、Grant 字段缺写入范围、验证命令或停止条件；或候选需要外部规则、专业确认、生产配置、联网、依赖安装、Git push、部署或不可逆操作。 |
 
@@ -211,7 +211,7 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | 写入范围 | 仅 W5 推进计划和入口状态回写，不写生产代码、测试、DDL/H2 或公共契约。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、tests、Justfile 和最近 Git 提交。 |
 | 上下文账本 | [GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md) 已把 ledger guard、账户层级、资金责任、wallet application facade、交易投影解释和余额调账审计排成依赖队列。 |
-| 当前结果 | 当前状态为 `W5_P0P1_LWT_FR_TARGET_SERVICE_FLOW_GREEN_PENDING_FULL_GATE`；账户层级来源契约已在工作树完成本地 Green，`GSD2-B2-FR-TARGET-001` 已完成首轮服务流 Green，待本轮完整验证和 CR 收口。 |
+| 当前结果 | 当前状态为 `B7_RECON_DIFFERENCE_MVP_FIRST_GREEN_NEXT_CONSUMPTION_OR_B5_AUDIT_EXPANSION`；账户层级来源契约、资金责任目标主体、资金责任解析 facade 和支付工具能力准入 facade 已纳入 `e81a8a25`，B4 投影解释首轮已补只读查询契约、持久化事实解释实现和服务流测试，B5 余额调账审计首轮已补外部余额异常来源、审计字段校验/透传、受控负可用字段和失败无副作用服务流测试，B7 对账差错闭环首轮已补差错登记、处理动作回链、重新对账幂等和无资金副作用测试，并通过目标测试、对账分组、compile、verify-fast、PMD 和 diff。下一候选转为 `GSD2-B7-RECON-DIFFERENCE-MVP-002` 或 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
 | 验证命令 | Harness checker、产品/架构结构检查、`rg` 一致性扫描和 `git diff --check`。 |
 | 停止条件 | 用户未确认 Execution Grant，或需要 Java/测试/公共契约/DDL/H2/Git/联网/生产动作。 |
 
@@ -251,10 +251,10 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 
 | 优先级 | 候选 | 建议级别 | 理由 | 不做范围 |
 | --- | --- | --- | --- | --- |
-| 1 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` | `service-flow-backed` 或 `projection-store-backed` | 账户层级、资金责任目标主体和 wallet funding responsibility facade 已有首轮服务流证据，下一步可补交易投影解释或查询证据。 | 不改 canonical 入参，不新增统一支付工具交易服务。 |
-| 2 | `GSD2-B2-WALLET-APPLICATION-FACADE-002` | `service-flow-backed` | `FundingResponsibilityResolutionApplicationService` 首轮已补齐；后续可继续补支付工具动作能力、钱包账户聚合或预交易快照。 | 不把支付工具能力通过等同账户能力通过，不直接写交易事实或账本事实。 |
-| 3 | `GSD2-B7-RECON-DIFFERENCE-MVP-001` | `service-flow-backed` | 清结算与对账需要最小差错闭环，才能支持 VCC clearing、全球账户出入金和运营补事实。 | 不一次性打开完整清分、清算、结算、出款、追偿和运营后台。 |
-| 4 | `GSD2-B5-BALANCE-ADJUST-AUDIT-001` | `service-flow-backed` | 余额调账、外部余额异常和运营补事实需要审批、原因、审计、幂等和对账回链。 | 不把普通调账绕过对账差错和审批白名单。 |
+| 1 | `GSD2-B7-RECON-DIFFERENCE-MVP-002` | `service-flow-backed` | B7-001 已证明差错来源、处理结果、重新对账和调账回链可追溯；下一步应让清算、结算或出款准入消费差错状态、阻断范围和重跑结果。 | 不一次性打开完整清分、清算、结算、出款、追偿和运营后台。 |
+| 2 | `GSD2-B5-BALANCE-ADJUST-AUDIT-002` | `service-flow-backed` | `GSD2-B5-BALANCE-ADJUST-AUDIT-001` 已完成请求侧审计字段和交易明细上下文；后续可扩展独立审计查询、route snapshot 回链或运营审批闭环。 | 不把普通调账绕过对账差错和审批白名单，不新增泛化运营补账。 |
+| 3 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002` | `service-flow-backed` | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` 已证明 posted pay、declined authorization 和缺失 RouteSnapshot fail-fast；后续可扩展退款、no-auth refund、释放、拒付和失败态解释矩阵。 | 不新增 projection store/DDL/治理重放，不反写资金事实。 |
+| 4 | `GSD2-B2-WALLET-APPLICATION-FACADE-002` | `service-flow-backed` | `FundingResponsibilityResolutionApplicationService` 首轮已补齐；后续可继续补支付工具动作能力、钱包账户聚合或预交易快照。 | 不把支付工具能力通过等同账户能力通过，不直接写交易事实或账本事实。 |
 | 5 | `GSD2-LD-LEDGER-GUARD-REGRESSION-001` | `guard-regression` | 任一资金变化切片触碰 posting、LedgerEntry、账目、余额投影或 H2 schema 时，必须伴随或前置 ledger guard。 | 不重启 GSD1 大包，不把清结算或治理重放混入 ledger guard。 |
 | 6 | 支付工具 / Spend Rule 支持 | `contract-only` 起步 | 工具动作能力、授权 application facade、Spend Rule 控制活动和只读解释依赖账户、资金责任、交易内核和对账。 | 不把支付工具、预算组或 Spend Rule 写成 ledger subject。 |
 | 7 | P2 VCC / 全球账户 | `contract-only` 起步 | 业务目标重要，但必须消费账户、资金责任、交易内核和对账差错证据。 | 不直接写 P2 facade、资金流、外部轨道或通道规则生产结论。 |
@@ -265,16 +265,16 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | 字段 | 内容 |
 | --- | --- |
 | Goal ID | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
-| Wave / Task ID | 当前为 `GSD2-W5-P0P1-LWT-PRIORITY-PLAN`；`GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已完成本地 Green 和目标回归，`GSD2-B2-FR-TARGET-001` 已完成首轮服务流 Green，`GSD2-B2-WALLET-APPLICATION-FACADE-001` 已完成资金责任解析 facade 首轮服务流 Green，下一候选转为 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001`。 |
+| Wave / Task ID | 当前为 `GSD2-B7-RECON-DIFFERENCE-MVP-001`；`GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002`、`GSD2-B2-FR-TARGET-001`、`GSD2-B2-WALLET-APPLICATION-FACADE-001`、`GSD2-B2-WALLET-APPLICATION-FACADE-002 / B2-PI-CAP-CAD-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-001` 和 `GSD2-B7-RECON-DIFFERENCE-MVP-001` 已完成本地 Green、目标回归和门禁收口，下一候选转为 `GSD2-B7-RECON-DIFFERENCE-MVP-002` 或 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
 | 状态载体 | 本文、W1 基线差距审计、W2 单一 Grant 选择卡、W3 B2 账户层级 CAD 准入草案、W4 B2 账户层级 Execution Grant 确认包、W5 P0/P1 ledger-wallet-transaction 推进计划、Agent Loop / Plan Grant 默认授权策略、AI 代码交付闭环基线、GSD-2 单一 Grant 任务模板、TDD README、docs README。 |
-| 写入范围 | 本轮已按来源契约 Grant 写入 core port、wallet-face/impl、H2 schema、授权路由接入、目标测试和任务状态；资金责任目标 Grant 已写入 wallet 资源关系契约、H2 schema 和服务测试；wallet application facade 已写入资金责任解析契约、Request/DTO、实现和目标测试；后续按新的单一 Grant 限定。 |
+| 写入范围 | 本轮已按来源契约 Grant 写入 core port、wallet-face/impl、H2 schema、授权路由接入、目标测试和任务状态；资金责任目标 Grant 已写入 wallet 资源关系契约、H2 schema 和服务测试；wallet application facade 已写入资金责任解析契约、Request/DTO、实现和目标测试；B4 投影解释已写入 transaction-face projection 查询契约、解释来源、transaction-impl 查询实现和服务流测试；B5 余额调账审计已写入 balance adjust 请求审计字段、外部异常来源类型、instruction context keys、转换器校验/透传和服务流测试；B7 差错闭环已写入 reconciliation application 契约、Request/DTO、差错枚举、Entity/Mapper、H2 schema 和服务流测试；后续按新的单一 Grant 限定。 |
 | 只读范围 | 全部设计文档、OpenSpec、源码、测试、旧状态账本和 Git 提交。 |
 | 反馈源 | checker、`rg`、`git status --short`、`git diff --check`、用户确认和专项测试。 |
-| 验证命令 | 已执行账户层级来源目标测试、`just test-one SpendSubjectFundingRelationServiceImplTests tests` 和 `just test-one FundingResponsibilityResolutionApplicationServiceTests tests`；收口追加 `test-boundary`、`compile`、`pmd` 和 `git diff --check`。 |
+| 验证命令 | `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 已通过；B5 首轮追加 `just test-one FundsBalanceAdjustAuditFlowTests tests`、`just test-one FundsBalanceControlFailureFlowTests tests`、`just test-balance-control`、`just test-reconciliation`、`just compile`、`just pmd` 和 `git diff --check`；B7 首轮追加 `just test-one ReconciliationDifferenceApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just verify-fast`、`just pmd` 和 `git diff --check`。 |
 | AI 交付准出 | 后续 Grant 必须列出 Spec/AC 映射、Red/Green 证据、独立验证命令、CR 交接、Not Done、知识回流和建议 commit message。 |
-| 停止条件 | 越过本轮资金责任目标主体范围、需要继续修改 wallet application facade、需要 Git 授权、需要处置 `openspec` 异常状态、验证失败或用户调整优先级。 |
+| 停止条件 | 未确认新的单一 Execution Grant 前，不继续修改 Java、测试、DDL/H2 schema、公共契约、wallet application facade、交易投影、余额调账、支付工具准入、Spend Rule、VCC、清结算或 P2 业务；需要 Git 授权、处置 `openspec` 异常状态、验证失败或用户调整优先级时停止。 |
 | Git 策略 | `summary_only`。 |
-| 下一 owner | 用户确认 `GSD2-B2-WALLET-APPLICATION-FACADE-001`；产品架构专家确认钱包 application facade 的用例、业务口径和 Not Done；资深架构师明确 facade 命名、Request/DTO、委派边界和服务测试写入范围。 |
+| 下一 owner | 用户确认 `GSD2-B7-RECON-DIFFERENCE-MVP-002` 或 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`；产品架构专家确认用例、展示口径和 Not Done；资深架构师明确查询/交易边界、DTO、服务测试、route snapshot 回链和验证命令。 |
 
 ## 9. 验证矩阵
 
@@ -289,15 +289,15 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | 架构方案结构 | `python3 /Users/wuxp/.codex/skills/senior-software-architect/scripts/check_architecture_deliverable.py --kind architecture-plan --file docs/TDD设计/GSD-2-新基线工作流规划.md` | 背景目标、边界取舍、契约、数据一致性、可靠性安全、验证、发布风险齐全。 |
 | 状态一致性 | `rg` 扫描旧 Loop、旧 active status 和新 GSD2 指针 | 旧计划不再作为活跃入口，新 Workflow 可追踪。 |
 | 空白和 Markdown | `git diff --check` | 无行尾空白或 patch 格式问题。 |
-| 编译和测试 | `just compile`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just test-one AuthorizationFundsInstructionRouteResolverTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests`、`just test-one RouteSnapshotJsonSupportTests tests`；收口追加 `test-boundary`、`pmd` 和 `git diff --check`。 | 账户层级来源契约、授权服务流 route snapshot、route resolver 兼容、route DSL/JSON 回归通过；完整 `verify-cad` 未在本切片默认执行。 |
+| 编译和测试 | `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad`、B4/B5/B7 目标测试、`just test-reconciliation`、`just compile`、`just verify-fast`、`just pmd`、`git diff --check`。 | 账户层级来源契约、资金责任目标主体、资金责任解析 facade、支付工具能力准入 facade、边界测试、治理测试、账本、交易、余额控制、业务流和 PMD 完整门禁已在 `e81a8a25` 收口通过；本轮 B7 对账差错闭环已完成目标测试、对账分组、compile、verify-fast、PMD 和 diff 收口。 |
 
 ## 10. 残余风险和停止条件
 
 残余风险：
 
 1. GSD-2 只移除活跃未完成计划，不删除旧准入卡中的候选材料；后续 Review 时仍需避免把历史候选误读为活跃计划。
-2. `da7d2ea` 之后若出现新代码或文档变更，下一轮必须先复核 `git status --short` 和 diff。
-3. B2、B4、B7、P2 等候选仍有生产可用缺口，不能因为进入 GSD-2 而自动获得编码授权。
+2. `e81a8a25` 之后若出现新代码或文档变更，下一轮必须先复核 `git status --short` 和 diff。
+3. B7-002、B5-002、B4-002、钱包后续 facade 和 P2 等候选仍有生产可用缺口，不能因为 B7-001 首轮 Green 而自动获得编码授权。
 4. 涉及真实资金、客户资金、跨境、卡组织、银行、ACH、SWIFT、FX、税务、会计、法务或合规的结论，仍需专业确认。
 
 停止条件：

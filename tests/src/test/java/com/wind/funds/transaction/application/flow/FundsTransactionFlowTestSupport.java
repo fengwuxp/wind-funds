@@ -39,6 +39,7 @@ import com.wind.funds.transaction.application.FundsBalanceControlService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.application.impl.FundsBenefitFundingApplicationServiceImpl;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
+import com.wind.funds.transaction.projection.impl.DefaultFundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
 import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
 import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
@@ -333,6 +334,30 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected void ensureLedger(FundsAccountId accountId, LedgerSubjectCode ledgerSubjectCode) {
         ensureLedger(accountId, ledgerSubjectCode, 0L);
+    }
+
+    protected void allowNegativeLedger(FundsAccountId accountId, LedgerSubjectCode ledgerSubjectCode) {
+        int updated = jdbcTemplate.update("""
+                        UPDATE t_ledger
+                        SET is_allow_negative = 1
+                        WHERE tenant_id = ?
+                          AND subject_id = ?
+                          AND subject_type = ?
+                          AND ledger_subject_code = ?
+                          AND currency = ?
+                          AND period_type = ?
+                          AND period_id = ?
+                        """,
+                TENANT_ID,
+                accountId.id(),
+                accountId.type(),
+                ledgerSubjectCode.name(),
+                CURRENCY.name(),
+                AccountBalancePeriodType.LIFETIME.name(),
+                AccountBalancePeriodType.LIFETIME.name());
+        assertThat(updated)
+                .as("ledger allowNegative enabled for accountId %s and subject %s", accountId, ledgerSubjectCode)
+                .isOne();
     }
 
     protected void ensureCreditAccount(FundsAccountId accountId) {
@@ -1267,6 +1292,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultLedgerPostingAssembler.class,
             DefaultRoutedFundsInstructionOrchestrator.class,
             FundsBenefitFundingApplicationServiceImpl.class,
+            DefaultFundsTransactionProjectionExplainApplicationService.class,
             FundsTransactionCommandServiceImpl.class,
             LedgerServiceImpl.class,
             LedgerTransactionServiceImpl.class,

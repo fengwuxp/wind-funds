@@ -13,6 +13,7 @@ import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.funds.operation.FundsOperationActorSpec;
+import com.wind.funds.spec.SourceObjectType;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
@@ -41,6 +42,24 @@ public class FundsBalanceControlInstructionConverter {
     private static final String ADJUST_EVIDENCE_REF_REQUIRED_MESSAGE = "余额调账缺少调账凭证";
 
     private static final String ADJUST_APPROVAL_REF_REQUIRED_MESSAGE = "余额调账缺少审批引用";
+
+    private static final String EXTERNAL_BALANCE_ANOMALY_SOURCE_SN_REQUIRED_MESSAGE =
+            "外部余额异常纠偏缺少来源单号";
+
+    private static final String EXTERNAL_BALANCE_ANOMALY_REASON_CODE_REQUIRED_MESSAGE =
+            "外部余额异常纠偏缺少原因码";
+
+    private static final String EXTERNAL_BALANCE_ANOMALY_FINAL_EVENT_REQUIRED_MESSAGE =
+            "外部余额异常纠偏缺少外部终局事件引用";
+
+    private static final String EXTERNAL_BALANCE_ANOMALY_SNAPSHOT_REQUIRED_MESSAGE =
+            "外部余额异常纠偏缺少外部余额快照引用";
+
+    private static final String EXTERNAL_BALANCE_ANOMALY_RECONCILIATION_REQUIRED_MESSAGE =
+            "外部余额异常纠偏缺少对账差错引用";
+
+    private static final String EXTERNAL_BALANCE_ANOMALY_RESPONSIBILITY_REQUIRED_MESSAGE =
+            "外部余额异常纠偏缺少责任归属引用";
 
     private static final String UNFREEZE_REFERENCE_REQUIRED_MESSAGE = "余额解冻缺少原冻结单引用";
 
@@ -128,6 +147,23 @@ public class FundsBalanceControlInstructionConverter {
         AssertUtils.hasText(request.getAdjustReason(), ADJUST_REASON_REQUIRED_MESSAGE);
         AssertUtils.hasText(request.getAdjustEvidenceRef(), ADJUST_EVIDENCE_REF_REQUIRED_MESSAGE);
         AssertUtils.hasText(request.getApprovalRef(), ADJUST_APPROVAL_REF_REQUIRED_MESSAGE);
+        requireExternalBalanceAnomalyContext(request);
+    }
+
+    private void requireExternalBalanceAnomalyContext(@NonNull FundsBalanceAdjustRequest request) {
+        if (request.getSourceType() != SourceObjectType.EXTERNAL_BALANCE_ANOMALY) {
+            return;
+        }
+        AssertUtils.hasText(request.getSourceSn(), EXTERNAL_BALANCE_ANOMALY_SOURCE_SN_REQUIRED_MESSAGE);
+        AssertUtils.hasText(request.getReasonCode(), EXTERNAL_BALANCE_ANOMALY_REASON_CODE_REQUIRED_MESSAGE);
+        AssertUtils.hasText(request.getExternalFinalEventRef(),
+                EXTERNAL_BALANCE_ANOMALY_FINAL_EVENT_REQUIRED_MESSAGE);
+        AssertUtils.hasText(request.getExternalBalanceSnapshotRef(),
+                EXTERNAL_BALANCE_ANOMALY_SNAPSHOT_REQUIRED_MESSAGE);
+        AssertUtils.hasText(request.getReconciliationExceptionRef(),
+                EXTERNAL_BALANCE_ANOMALY_RECONCILIATION_REQUIRED_MESSAGE);
+        AssertUtils.hasText(request.getResponsibilityRef(),
+                EXTERNAL_BALANCE_ANOMALY_RESPONSIBILITY_REQUIRED_MESSAGE);
     }
 
     private @NonNull Map<String, Object> adjustContext(@NonNull FundsBalanceAdjustRequest request) {
@@ -137,11 +173,45 @@ public class FundsBalanceControlInstructionConverter {
         result.put(FundsInstructionContextKeys.ADJUST_REASON, request.getAdjustReason());
         result.put(FundsInstructionContextKeys.ADJUST_EVIDENCE_REF, request.getAdjustEvidenceRef());
         result.put(FundsInstructionContextKeys.APPROVAL_REF, request.getApprovalRef());
+        putIfPresent(result, FundsInstructionContextKeys.SOURCE_TYPE, request.getSourceType() == null
+                ? null : request.getSourceType().name());
+        putIfPresent(result, FundsInstructionContextKeys.SOURCE_SN, request.getSourceSn());
+        putIfPresent(result, FundsInstructionContextKeys.REASON_CODE, request.getReasonCode());
+        putIfPresent(result, FundsInstructionContextKeys.EXTERNAL_INSTITUTION_REF,
+                request.getExternalInstitutionRef());
+        putIfPresent(result, FundsInstructionContextKeys.EXTERNAL_ACCOUNT_REF, request.getExternalAccountRef());
+        putIfPresent(result, FundsInstructionContextKeys.EXTERNAL_FINAL_EVENT_REF,
+                request.getExternalFinalEventRef());
+        putIfPresent(result, FundsInstructionContextKeys.EXTERNAL_BALANCE_SNAPSHOT_REF,
+                request.getExternalBalanceSnapshotRef());
+        putIfPresent(result, FundsInstructionContextKeys.RESPONSIBILITY_REF, request.getResponsibilityRef());
         if (request.getReconciliationExceptionRef() != null) {
             result.put(FundsInstructionContextKeys.RECONCILIATION_EXCEPTION_REF,
                     request.getReconciliationExceptionRef());
         }
+        putIfPresent(result, FundsInstructionContextKeys.RECONCILIATION_RERUN_REF,
+                request.getReconciliationRerunRef());
+        putIfPresent(result, FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE,
+                request.getAllowNegativeBalance());
+        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_POLICY_CODE,
+                request.getNegativeAvailablePolicyCode());
+        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_RISK_STATUS,
+                request.getNegativeAvailableRiskStatus());
+        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT,
+                request.getNegativeAvailableSingleLimit());
+        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT,
+                request.getNegativeAvailableCumulativeLimit());
+        putIfPresent(result, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_AGING_STARTED_AT,
+                request.getNegativeAvailableAgingStartedAt());
         return result;
+    }
+
+    private void putIfPresent(@NonNull Map<String, Object> target,
+                              @NonNull String key,
+                              @Nullable Object value) {
+        if (value != null) {
+            target.put(key, value);
+        }
     }
 
     private boolean isLimitAdjust(@NonNull FundsBalanceAdjustRequest request) {

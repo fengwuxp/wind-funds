@@ -73,8 +73,8 @@ test-boundary tests='FundsContextVariablesContractTests,FundsTransactionParticip
 test-governance tests='FundsProjectionReplayServiceTests':
     @just _run-test-classes "{{tests}}" tests
 
-# Reconciliation and payout preflight tests.
-test-reconciliation tests='PayoutPreflightServiceTests':
+# Reconciliation, difference lifecycle, and payout preflight tests.
+test-reconciliation tests='PayoutPreflightServiceTests,ReconciliationDifferenceApplicationServiceTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Fast CAD verification for non-business tooling or test-asset changes.

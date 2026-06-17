@@ -102,6 +102,22 @@ public final class FundsInstructionContextKeys {
 
     public static final String ADJUST_EVIDENCE_REF = "adjustEvidenceRef";
 
+    public static final String SOURCE_TYPE = "sourceType";
+
+    public static final String SOURCE_SN = "sourceSn";
+
+    public static final String REASON_CODE = "reasonCode";
+
+    public static final String EXTERNAL_INSTITUTION_REF = "externalInstitutionRef";
+
+    public static final String EXTERNAL_ACCOUNT_REF = "externalAccountRef";
+
+    public static final String EXTERNAL_FINAL_EVENT_REF = "externalFinalEventRef";
+
+    public static final String EXTERNAL_BALANCE_SNAPSHOT_REF = "externalBalanceSnapshotRef";
+
+    public static final String RESPONSIBILITY_REF = "responsibilityRef";
+
     public static final String ALLOW_NEGATIVE_BALANCE = "allowNegativeBalance";
 
     public static final String NEGATIVE_AVAILABLE_POLICY_CODE = "negativeAvailablePolicyCode";
@@ -109,6 +125,8 @@ public final class FundsInstructionContextKeys {
     public static final String APPROVAL_REF = "approvalRef";
 
     public static final String RECONCILIATION_EXCEPTION_REF = "reconciliationExceptionRef";
+
+    public static final String RECONCILIATION_RERUN_REF = "reconciliationRerunRef";
 
     public static final String NEGATIVE_AVAILABLE_RISK_STATUS = "negativeAvailableRiskStatus";
 

@@ -44,9 +44,6 @@ public class LedgerProfileItemDTO implements LedgerProfileItemSpec, Serializable
     @Schema(description = "是否允许负余额")
     private Boolean allowNegative;
 
-    @Schema(description = "受控负可用余额策略元数据")
-    private NegativeAvailablePolicyDTO negativeAvailablePolicy;
-
     @Schema(description = "是否必建账本")
     private Boolean required;
 
