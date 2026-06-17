@@ -3,6 +3,7 @@ package com.wind.funds.reconciliation.application.difference.impl;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
@@ -113,7 +114,10 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 minimumRerunRequest(), WindOperator.system());
 
         assertThat(linked.getStatus()).isEqualTo(ReconciliationDifferenceStatus.ADJUSTING);
+        assertThat(linked.getActionType()).isEqualTo(ReconciliationDifferenceActionType.ADJUST);
         assertThat(linked.getAdjustmentSn()).isEqualTo(ADJUSTMENT_SN);
+        assertThat(linked.getAdjustmentIdempotencyKey()).isEqualTo("idem-recon-adjust-001");
+        assertThat(linked.getOriginalFactRef()).isEqualTo("external-balance-anomaly:issuer-ledger-001");
         assertThat(linked.getAdjustmentTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
         assertThat(linkedReplay.getId()).isEqualTo(linked.getId());
         assertThat(closed.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RESOLVED);
@@ -121,6 +125,21 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertThat(closed.getRerunCount()).isOne();
         assertThat(closedReplay.getRerunCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：运营只回链调账单号、审批和证据，但没有声明白名单处理动作和原始事实引用。
+     * 输入：差错流水号、调账单号、资金交易流水、审批、凭证和原因。
+     * 输出：拒绝回链处理结果。
+     * 红线：差错处理不能退化为任意单号备注；必须能说明白名单动作和被处理的原始事实。
+     */
+    @Test
+    void testAdjustmentLinkShouldRejectMissingWhitelistActionContext() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                adjustmentRequestWithoutWhitelistActionContext(), WindOperator.system()))
+                .hasMessageContaining("对账差错处理动作类型不能为空");
     }
 
     /**
@@ -179,6 +198,31 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     }
 
     /**
+     * 场景：同一差错已回链调账动作后，又用相同处理动作号提交不同幂等键或原事实引用。
+     * 输入：已回链处理动作的差错、同一 adjustmentSn 和漂移后的处理上下文。
+     * 输出：拒绝覆盖既有处理上下文。
+     * 红线：动作类型、幂等键和原事实引用属于审计事实，不允许二次回链静默改写。
+     */
+    @Test
+    void testAdjustmentLinkShouldRejectWhitelistContextConflict() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperator.system());
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setIdempotencyKey("idem-recon-adjust-changed"),
+                WindOperator.system()))
+                .hasMessageContaining("对账差错处理幂等请求幂等键不一致");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setOriginalFactRef("external-balance-anomaly:changed"),
+                WindOperator.system()))
+                .hasMessageContaining("对账差错处理幂等请求原始事实引用不一致");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest().setActionType(ReconciliationDifferenceActionType.REVERSE),
+                WindOperator.system()))
+                .hasMessageContaining("对账差错处理幂等请求动作类型不一致");
+    }
+
+    /**
      * 场景：差错已经重新对账通过并关闭后，又收到新的未对平重跑结果。
      * 输入：已关闭差错、新 rerunSn 和 balanced=false。
      * 输出：拒绝追加新重跑结果，状态不得从已关闭退回处理中。
@@ -219,6 +263,20 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     }
 
     private LinkReconciliationDifferenceAdjustmentRequest minimumAdjustmentRequest() {
+        return new LinkReconciliationDifferenceAdjustmentRequest()
+                .setTenantId(TENANT_ID)
+                .setDifferenceSn(DIFFERENCE_SN)
+                .setActionType(ReconciliationDifferenceActionType.ADJUST)
+                .setAdjustmentSn(ADJUSTMENT_SN)
+                .setIdempotencyKey("idem-recon-adjust-001")
+                .setOriginalFactRef("external-balance-anomaly:issuer-ledger-001")
+                .setAdjustmentTransactionSn(FUNDS_TRANSACTION_SN)
+                .setApprovalRef("approval-recon-adjust-001")
+                .setEvidenceRef("adjustment-evidence-001")
+                .setReason("已由余额控制调账纠偏，等待重新对账");
+    }
+
+    private LinkReconciliationDifferenceAdjustmentRequest adjustmentRequestWithoutWhitelistActionContext() {
         return new LinkReconciliationDifferenceAdjustmentRequest()
                 .setTenantId(TENANT_ID)
                 .setDifferenceSn(DIFFERENCE_SN)

@@ -55,7 +55,10 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
             assertSameAdjustmentRequest(entity, request);
             return toDTO(entity);
         }
+        entity.setActionType(request.getActionType());
         entity.setAdjustmentSn(request.getAdjustmentSn());
+        entity.setAdjustmentIdempotencyKey(request.getIdempotencyKey());
+        entity.setOriginalFactRef(request.getOriginalFactRef());
         entity.setAdjustmentTransactionSn(request.getAdjustmentTransactionSn());
         entity.setAdjustmentApprovalRef(request.getApprovalRef());
         entity.setAdjustmentEvidenceRef(request.getEvidenceRef());
@@ -152,7 +155,10 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                 .setBlockingScope(entity.getBlockingScope())
                 .setRuleVersion(entity.getRuleVersion())
                 .setEvidenceRef(entity.getEvidenceRef())
+                .setActionType(entity.getActionType())
                 .setAdjustmentSn(entity.getAdjustmentSn())
+                .setAdjustmentIdempotencyKey(entity.getAdjustmentIdempotencyKey())
+                .setOriginalFactRef(entity.getOriginalFactRef())
                 .setAdjustmentTransactionSn(entity.getAdjustmentTransactionSn())
                 .setLastRerunSn(entity.getLastRerunSn())
                 .setLastRerunBatchSn(entity.getLastRerunBatchSn())
@@ -187,7 +193,10 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
     private void validateAdjustmentRequest(LinkReconciliationDifferenceAdjustmentRequest request) {
         AssertUtils.notNull(request.getTenantId(), "对账差错处理回链租户 ID 不能为空");
         AssertUtils.hasText(request.getDifferenceSn(), "对账差错处理回链差错流水号不能为空");
+        AssertUtils.notNull(request.getActionType(), "对账差错处理动作类型不能为空");
         AssertUtils.hasText(request.getAdjustmentSn(), "对账差错处理动作号不能为空");
+        AssertUtils.hasText(request.getIdempotencyKey(), "对账差错处理幂等键不能为空");
+        AssertUtils.hasText(request.getOriginalFactRef(), "对账差错处理原始事实引用不能为空");
         AssertUtils.hasText(request.getApprovalRef(), "对账差错处理审批引用不能为空");
         AssertUtils.hasText(request.getEvidenceRef(), "对账差错处理证据引用不能为空");
         AssertUtils.hasText(request.getReason(), "对账差错处理原因不能为空");
@@ -234,8 +243,14 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
 
     private void assertSameAdjustmentRequest(ReconciliationDifference existing,
                                              LinkReconciliationDifferenceAdjustmentRequest request) {
+        AssertUtils.isTrue(existing.getActionType() == request.getActionType(),
+                "对账差错处理幂等请求动作类型不一致，differenceSn = {}", request.getDifferenceSn());
         AssertUtils.isTrue(existing.getAdjustmentSn().equals(request.getAdjustmentSn()),
                 "对账差错已关联其他处理动作，differenceSn = {}", request.getDifferenceSn());
+        AssertUtils.isTrue(existing.getAdjustmentIdempotencyKey().equals(request.getIdempotencyKey()),
+                "对账差错处理幂等请求幂等键不一致，differenceSn = {}", request.getDifferenceSn());
+        AssertUtils.isTrue(existing.getOriginalFactRef().equals(request.getOriginalFactRef()),
+                "对账差错处理幂等请求原始事实引用不一致，differenceSn = {}", request.getDifferenceSn());
         AssertUtils.isTrue(sameNullable(existing.getAdjustmentTransactionSn(), request.getAdjustmentTransactionSn()),
                 "对账差错已关联其他资金交易，differenceSn = {}", request.getDifferenceSn());
         AssertUtils.isTrue(existing.getAdjustmentApprovalRef().equals(request.getApprovalRef()),

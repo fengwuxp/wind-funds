@@ -1,5 +1,6 @@
 package com.wind.funds.reconciliation.model.dto;
 
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
@@ -80,8 +81,17 @@ public class ReconciliationDifferenceDTO implements Serializable {
     @Schema(description = "来源证据引用")
     private String evidenceRef;
 
+    @Schema(description = "差错处理动作类型")
+    private ReconciliationDifferenceActionType actionType;
+
     @Schema(description = "关联处理动作或调账单号")
     private String adjustmentSn;
+
+    @Schema(description = "处理动作幂等键")
+    private String adjustmentIdempotencyKey;
+
+    @Schema(description = "被处理的原始事实引用")
+    private String originalFactRef;
 
     @Schema(description = "关联资金交易流水号")
     private String adjustmentTransactionSn;

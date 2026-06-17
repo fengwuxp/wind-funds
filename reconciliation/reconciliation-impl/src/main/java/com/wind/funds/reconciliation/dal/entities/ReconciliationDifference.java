@@ -4,6 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
@@ -139,9 +140,24 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
     private String evidenceRef;
 
     /**
+     * 差错处理动作类型。
+     */
+    private ReconciliationDifferenceActionType actionType;
+
+    /**
      * 关联处理动作或调账单号。
      */
     private String adjustmentSn;
+
+    /**
+     * 处理动作幂等键。
+     */
+    private String adjustmentIdempotencyKey;
+
+    /**
+     * 被处理的原始事实引用。
+     */
+    private String originalFactRef;
 
     /**
      * 关联资金交易流水号。

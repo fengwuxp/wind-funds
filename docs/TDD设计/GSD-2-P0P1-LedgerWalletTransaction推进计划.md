@@ -12,7 +12,7 @@
 | 原子任务 | 重新对齐 ledger、wallet、transaction 的依赖顺序、Grant 队列、写入范围、验证命令和停止条件。 |
 | 所属阶段 | GSD-2 Wave 5 / P0-P1 dependency planning / full gate verified。 |
 | 关联 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
-| 当前状态 | `FIRST_GREEN_VERIFIED_RECON_DIFFERENCE_MVP` |
+| 当前状态 | `B7_RECON_DIFFERENCE_ACTION_GUARD_GREEN_VERIFIED` |
 | 上游输入 | GSD-2 W1 基线差距审计、W2 单一 Grant 选择卡、W3 B2 账户层级 CAD 准入草案、W4 B2 Execution Grant 确认包、当前 PRD/DSL/系分/TDD/OpenSpec 和 Git/code baseline `e81a8a25`。 |
 | Owner | AI Native 流程编排负责顺序和门禁；产品架构专家确认业务价值、验收和 Not Done；资深架构师确认源码锚点、写入范围、Red、验证命令和 CAD 停止条件；用户确认单一 Grant。 |
 | 写入范围 | 本文、GSD-2 入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
@@ -20,7 +20,7 @@
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、tests、Justfile、AGENTS.md、最近 Git 提交和旧 GSD/Grant 历史材料。 |
 | Git 策略 | `summary_only`。本文不授权 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。 |
 
-Wave 边界：本文最初只做任务规划和设计落地；用户后续已确认 `Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 并进入首个 Red。Red 已证明当前授权服务流缺少合法账户层级来源；随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 补齐来源契约，`GSD2-B2-FR-TARGET-001` 采用 `ddl-backed targetSubjectType + targetSubjectId` 补齐资金责任目标主体，`GSD2-B2-WALLET-APPLICATION-FACADE-001` 补齐资金责任解析 facade，`GSD2-B2-WALLET-APPLICATION-FACADE-002 / B2-PI-CAP-CAD-001` 补齐支付工具能力准入 facade，`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` 补齐交易投影解释首轮只读查询能力，`GSD2-B5-BALANCE-ADJUST-AUDIT-001` 补齐外部余额异常纠偏和受控负可用调账的首轮审计准入，`GSD2-B7-RECON-DIFFERENCE-MVP-001` 补齐对账差错登记、处理回链、重新对账幂等和无资金副作用首轮闭环。上述已完成切片均保留 Not Done 边界；下一步应重新确认 `GSD2-B7-RECON-DIFFERENCE-MVP-002` 或 `GSD2-B5-BALANCE-ADJUST-AUDIT-002` 单一 Grant。
+Wave 边界：本文最初只做任务规划和设计落地；用户后续已确认 `Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 并进入首个 Red。Red 已证明当前授权服务流缺少合法账户层级来源；随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 补齐来源契约，`GSD2-B2-FR-TARGET-001` 采用 `ddl-backed targetSubjectType + targetSubjectId` 补齐资金责任目标主体，`GSD2-B2-WALLET-APPLICATION-FACADE-001` 补齐资金责任解析 facade，`GSD2-B2-WALLET-APPLICATION-FACADE-002 / B2-PI-CAP-CAD-001` 补齐支付工具能力准入 facade，`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` 补齐交易投影解释首轮只读查询能力，`GSD2-B5-BALANCE-ADJUST-AUDIT-001` 补齐外部余额异常纠偏和受控负可用调账的首轮审计准入，`GSD2-B7-RECON-DIFFERENCE-MVP-001` 补齐对账差错登记、处理回链、重新对账幂等和无资金副作用首轮闭环，`GSD2-B7-RECON-DIFFERENCE-MVP-002` 补齐差错处理动作白名单上下文守卫。上述已完成切片均保留 Not Done 边界；下一步应重新确认清算/结算/出款准入如何消费差错状态和阻断范围，或确认 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。
 
 ## 2. 编排结论
 
@@ -87,7 +87,8 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | 3 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` | transaction 投影解释 | 依赖 route snapshot、账户层级和支付工具快照稳定。 | 首轮已补只读投影解释 application service，能基于已持久化交易事实、RouteSnapshot 和交易明细解释 posted pay、declined authorization 和缺失 RouteSnapshot fail-fast。 | 已写入 transaction-face projection 查询契约、解释来源、transaction-impl 持久化事实解释实现和服务流测试；schema 变更需单独授权。 | 目标投影解释测试、原有投影发布回归、compile、pmd、diff。 | 不反写资金事实，不替代 ledger balance projection，不新增 projection store/DDL/治理重放，不覆盖退款、no-auth refund、释放、拒付全量解释场景。 |
 | 4 | `GSD2-B5-BALANCE-ADJUST-AUDIT-001` | transaction / balance control | 依赖 ledger guard 和交易事实审计。 | 首轮已证明外部余额异常、负可用余额纠偏必须携带来源类型、来源流水、原因、外部终局事件、外部余额快照、差错单和责任引用。 | 已写入 balance adjust 请求一等审计字段、外部异常来源类型、instruction context keys、转换器校验/透传和服务流测试。 | 目标余额调账审计测试、`test-balance-control`、`test-reconciliation`、compile、pmd、diff 已通过。 | 不绕过对账差错和白名单，不开放泛化运营补账；未新增独立审计表、运营审批流、B7 差错单闭环或 route snapshot 审计持久化。 |
 | 5 | `GSD2-B7-RECON-DIFFERENCE-MVP-001` | reconciliation 差错闭环 | 依赖 B5 外部余额异常审计和 reconciliation 出款前准入候选。 | 首轮已证明对账差错必须登记来源质量、匹配强度、差异金额、责任方、阻断范围、规则版本和证据引用；处理后通过回链处理动作和重新对账关闭，且幂等冲突必须拒绝。 | 已写入 reconciliation-face application 契约、Request/DTO、差错枚举、reconciliation-impl Entity/Mapper/服务实现、H2 schema 和服务流测试；生产迁移和完整清结算消费需后续 Grant。 | 目标差错生命周期测试、`test-reconciliation`、`verify-fast`、compile、pmd、diff 已通过。 | 不直接生成资金事实，不修改历史交易、LedgerEntry、余额投影或交易投影；不开放完整清分、清算、结算、出款、追偿、账龄升级、运营后台或补事实白名单。 |
-| 6 | `GSD2-LD-LEDGER-GUARD-REGRESSION-001` | ledger 回归门禁 | 可作为资金变化切片的伴随 guard；若发现 ledger 缺口，则升级为独立 Grant。 | entry 与 bound ledger 的 subject、账目、币种、normal side、allow negative、余额投影和幂等必须一致。 | ledger 目标测试或回归测试；默认不改生产代码。 | `test-ledger`、目标 ledger 测试、compile、diff。 | 不重启 GSD1 大包，不做清结算或治理重放。 |
+| 6 | `GSD2-B7-RECON-DIFFERENCE-MVP-002` | reconciliation 差错处理动作守卫 | 依赖 B7-001 差错对象、处理回链和重新对账闭环。 | 首轮已证明差错处理动作必须声明白名单动作类型、处理幂等键和原始事实引用；重复回链时动作、幂等键或原始事实引用漂移必须拒绝。 | 已写入 `ReconciliationDifferenceActionType`、link 请求、DTO、Entity、H2 schema、服务校验和服务流测试。 | 目标差错处理动作守卫测试、`test-reconciliation`、compile、pmd、diff。 | 不直接生成资金事实，不新增补事实执行服务，不修改交易、账本、余额投影、交易投影、清算、结算或出款对象。 |
+| 7 | `GSD2-LD-LEDGER-GUARD-REGRESSION-001` | ledger 回归门禁 | 可作为资金变化切片的伴随 guard；若发现 ledger 缺口，则升级为独立 Grant。 | entry 与 bound ledger 的 subject、账目、币种、normal side、allow negative、余额投影和幂等必须一致。 | ledger 目标测试或回归测试；默认不改生产代码。 | `test-ledger`、目标 ledger 测试、compile、diff。 | 不重启 GSD1 大包，不做清结算或治理重放。 |
 
 执行裁决：
 
@@ -96,7 +97,8 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 3. `Execution Grant：GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` 已完成首轮 Green，当前完成的是只读解释查询和持久化事实回放，不等于投影存储、治理重放、差异报告或全交易类型解释矩阵完成。
 4. `Execution Grant：GSD2-B5-BALANCE-ADJUST-AUDIT-001` 已完成首轮 Green，当前完成的是外部余额异常纠偏的交易入参审计、instruction context 透传、受控负可用策略字段和失败无副作用服务流测试，不等于独立运营审批、审计表或完整补偿闭环完成。
 5. `Execution Grant：GSD2-B7-RECON-DIFFERENCE-MVP-001` 已完成首轮 Green，当前完成的是差错单登记、处理动作回链、重新对账幂等和无资金副作用，不等于完整清分、清算、结算、出款、追偿、账龄升级、运营后台、生产迁移或补事实白名单完成。
-6. 任一后续切片触碰 ledger posting、LedgerEntry、余额投影或 H2 schema 时，`GSD2-LD-LEDGER-GUARD-REGRESSION-001` 立即升级为前置或伴随 Red。
+6. `Execution Grant：GSD2-B7-RECON-DIFFERENCE-MVP-002` 已完成首轮 Green，当前完成的是差错处理动作上下文守卫，不等于补事实命令执行服务、运营审批流、清算/结算/出款消费或真实资金修正闭环完成。
+7. 任一后续切片触碰 ledger posting、LedgerEntry、余额投影或 H2 schema 时，`GSD2-LD-LEDGER-GUARD-REGRESSION-001` 立即升级为前置或伴随 Red。
 
 ## 5. Coding Loop Contract 候选
 
@@ -104,11 +106,11 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | --- | --- |
 | Loop ID | `GSD2-P0P1-LWT-LOOP-2026-06-15` |
 | 关联 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
-| 当前状态 | `B7 reconciliation difference first green / next clearing-payout consumption or audit persistence expansion` |
+| 当前状态 | `B7 reconciliation difference action guard green / next clearing-payout consumption or audit persistence expansion` |
 | 状态载体 | 本文、GSD-2 新基线工作流规划、W2/W3/W4 B2 账户层级文档、TDD README、docs README、OpenSpec tasks。 |
 | 反馈源 | checker、`rg`、`git status --short`、`git diff --check`、目标测试、compile、pmd、用户确认。 |
 | 验证者 | 产品语义由产品架构专家确认；工程边界由资深架构师确认；优先级和 Grant 由用户确认。 |
-| 默认推进 | 当前来源契约、资金责任目标主体、资金责任解析 facade、支付工具能力准入 facade、交易投影解释、余额调账审计和对账差错闭环首轮 Green 已完成目标测试、分组回归、规约扫描和状态回写。下一轮默认进入 B7 差错状态消费，让清算、结算或出款准入读取差错阻断范围和重跑结果；或继续扩展 B5 审计持久化/route snapshot 回链。若继续 wallet，需要另行确认钱包账户聚合、账户能力来源、授权 admission 或完整预交易快照子切片。 |
+| 默认推进 | 当前来源契约、资金责任目标主体、资金责任解析 facade、支付工具能力准入 facade、交易投影解释、余额调账审计、对账差错闭环和差错处理动作上下文守卫首轮 Green 已完成目标测试、分组回归、规约扫描和状态回写。下一轮默认进入 B7 差错状态消费，让清算、结算或出款准入读取差错阻断范围、处理动作和重跑结果；或继续扩展 B5 审计持久化/route snapshot 回链。若继续 wallet，需要另行确认钱包账户聚合、账户能力来源、授权 admission 或完整预交易快照子切片。 |
 | 显式确认 | Java、测试、公共契约、DDL/H2、运行时配置、Git、联网、依赖安装、生产配置、真实资金、外部规则和专业合规确认。 |
 | 无进展检测 | 连续两轮只是重复 W4 确认包而无新增源码证据、验证证据、任务收敛或用户确认时暂停。 |
 | 交接 | 用户确认 B2-AH 后交给资深架构师进入 CAD；未确认时继续 docs-only 计划维护。 |
@@ -174,10 +176,10 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | 字段 | 内容 |
 | --- | --- |
 | Loop ID | `GSD2-P0P1-LWT-FULL-GATE-2026-06-17` |
-| Git / code baseline | `e81a8a25 feat: 完善账务钱包交易基线`。 |
-| 收口范围 | 账户层级来源契约、资金责任目标主体、资金责任解析 application facade、支付工具能力准入 application facade、相关 H2 schema、目标服务测试、边界测试、治理测试和 PMD。 |
-| 验证证据 | `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 通过；`git diff --check` 通过。 |
-| 当前状态 | `FIRST_GREEN_VERIFIED_RECON_DIFFERENCE_MVP`。 |
-| 下一候选 | `GSD2-B7-RECON-DIFFERENCE-MVP-002`；若继续 B5，则为 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
-| Not Done | 清算/结算/出款对差错状态的消费、完整清分清算结算出款、追偿、账龄升级、运营后台、生产迁移脚本、差异报告、补事实白名单、余额调账独立审计表/审批流/route snapshot 审计回链、退款/no-auth refund/释放/拒付全量投影解释矩阵、projection store、治理重放、钱包账户聚合、账户能力来源组合、授权 admission、完整预交易快照、Spend Rule 控制闭环、VCC / 全球账户 / 清结算 P2 场景。 |
+| Git / code baseline | `ae8cb8a6 feat: 完善资金基线对账与投影能力` 加本轮未提交 B7 动作守卫切片。 |
+| 收口范围 | 账户层级来源契约、资金责任目标主体、资金责任解析 application facade、支付工具能力准入 application facade、交易投影解释、余额调账审计、对账差错闭环、差错处理动作守卫、相关 H2 schema、目标服务测试、边界测试、治理测试和 PMD。 |
+| 验证证据 | `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 已在 `e81a8a25` 通过；本轮 B7 动作守卫验证 `just test-one ReconciliationDifferenceApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just verify-fast`、`just pmd` 和 `git diff --check` 通过。 |
+| 当前状态 | `B7_RECON_DIFFERENCE_ACTION_GUARD_GREEN_VERIFIED`。 |
+| 下一候选 | 清算/结算/出款准入消费差错状态、阻断范围、处理动作和重跑结果；若继续 B5，则为 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
+| Not Done | 清算/结算/出款对差错状态的消费、完整清分清算结算出款、追偿、账龄升级、运营后台、生产迁移脚本、差异报告、补事实命令执行服务、运营审批流、余额调账独立审计表/审批流/route snapshot 审计回链、退款/no-auth refund/释放/拒付全量投影解释矩阵、projection store、治理重放、钱包账户聚合、账户能力来源组合、授权 admission、完整预交易快照、Spend Rule 控制闭环、VCC / 全球账户 / 清结算 P2 场景。 |
 | 禁止误读 | 本轮 full gate 只证明已落地切片的工程门禁通过，不等于 wallet 全量生产 Done，不等于支付工具授权入口、VCC facade、清结算对账或 P2 业务已可交付。 |
