@@ -39,8 +39,8 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 | 5 | [GSD-2-W2-单一Grant选择卡.md](GSD-2-W2-单一Grant选择卡.md) | GSD-2 Wave 2 单一 Grant 选择草案，推荐下一步确认 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`，但当前仍不授权代码。 |
 | 6 | [GSD-2-W3-B2账户层级CAD准入草案.md](GSD-2-W3-B2账户层级CAD准入草案.md) | GSD-2 Wave 3 B2 账户层级只读源码定位和 CAD 准入草案，确认 DSL/value object/JSON/replay 已有局部证据，并把下一 Red 收窄到真实服务流生成、保存、回放和失败无副作用。 |
 | 7 | [GSD-2-W4-B2账户层级ExecutionGrant确认包.md](GSD-2-W4-B2账户层级ExecutionGrant确认包.md) | GSD-2 Wave 4 B2 账户层级 Execution Grant 确认包；`GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 已被首个 Red 消费，随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 在当前工作树完成本地 Green。 |
-| 8 | [GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md) | GSD-2 Wave 5 P0/P1 ledger、wallet、transaction 优先推进计划，当前账户层级来源契约已完成本地 Green，`GSD2-B2-FR-TARGET-001` 已完成资金责任目标主体首轮服务流 Green，并把 wallet application facade、交易投影解释和余额调账审计排成后续依赖队列。 |
-| 9 | [GSD-2-B7-PRD系分合议预审与三卡交接.md](GSD-2-B7-PRD系分合议预审与三卡交接.md) | B7 对账差错动作守卫 Green 后的 PRD / 系分合议预审和三卡交接，建议下一候选为 `GSD2-B7-RECON-GATE-CONSUME-001`，但不授权编码。 |
+| 8 | [GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md) | GSD-2 Wave 5 P0/P1 ledger、wallet、transaction 优先推进计划，当前账户层级来源契约、资金责任目标主体、wallet application facade、交易投影解释、余额调账审计、B7 差错闭环、动作守卫和准入消费已完成首轮 Green，下一候选转为具体消费方接入或 B5 审计扩展。 |
+| 9 | [GSD-2-B7-PRD系分合议预审与三卡交接.md](GSD-2-B7-PRD系分合议预审与三卡交接.md) | B7 对账差错动作守卫 Green 后的 PRD / 系分合议预审和三卡交接；`GSD2-B7-RECON-GATE-CONSUME-001` 已由后续代码切片消费并完成本地 Green，本文件保留为该切片授权前交接证据。 |
 | 10 | [GSD-2-AgentLoop-PlanGrant默认授权策略.md](GSD-2-AgentLoop-PlanGrant默认授权策略.md) | Agent Loop Engineering 和 GSD/CAD 默认低风险 Plan Grant 授权策略入口，说明可默认推进的文档/状态/任务卡范围，以及必须显式确认的代码、测试、DDL、Git、OpenSpec 状态和生产边界。 |
 | 11 | [AI代码交付闭环与Spec模板基线.md](AI代码交付闭环与Spec模板基线.md) | AI 代码交付闭环和 Spec 模板准入入口，用于约束后续 Grant 的 Spec 强度、AC 映射、Harness、独立验证、CR 交接、知识回流和停止条件。 |
 | 12 | [GSD-2-Spec-AC-Harness-CAD任务模板.md](GSD-2-Spec-AC-Harness-CAD任务模板.md) | GSD-2 单一 Grant 可填写模板，用于把 Spec、AC、Red、Harness、CAD Loop、CR 交接、交付证据和建议提交切片压到同一张任务卡。 |
@@ -54,7 +54,7 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 | 20 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 授权后继能力、无授权退款、拒付语义和并发竞争的任务准入历史材料。 |
 | 21 | [B4-交易内核生产可用性Round0准入卡.md](B4-交易内核生产可用性Round0准入卡.md) | 账户主体型 canonical 交易内核生产可用补强、原路径回放和缺快照 fail-fast 的历史准入材料。 |
 | 22 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 账户层级、支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的历史准入材料。 |
-| 23 | [B7-清结算与对账Round0准入卡.md](B7-清结算与对账Round0准入卡.md) | 对账来源标准化、匹配强度、差错闭环、账龄升级、重跑幂等、白名单补事实准入和最小 DDL/H2 范围的历史准入材料。 |
+| 23 | [B7-清结算与对账Round0准入卡.md](B7-清结算与对账Round0准入卡.md) | 对账来源标准化、匹配强度、差错闭环、动作守卫、准入消费、账龄升级、重跑幂等、白名单补事实准入和最小 DDL/H2 范围的历史准入材料。 |
 | 24 | [P2-业务能力包Round0准入卡.md](P2-业务能力包Round0准入卡.md) | VCC、全球账户、收单等 P2 业务专项进入资金底座前的历史准入材料。 |
 
 ## 契约输入

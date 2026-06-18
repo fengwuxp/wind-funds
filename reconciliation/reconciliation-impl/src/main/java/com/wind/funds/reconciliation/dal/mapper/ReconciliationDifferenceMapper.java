@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 /**
  * 对账差错 Mapper。
  */
@@ -28,4 +30,26 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
             """)
     ReconciliationDifference selectByDifferenceSnForUpdate(@Param("tenantId") Long tenantId,
                                                            @Param("differenceSn") String differenceSn);
+
+    /**
+     * 查询命中阻断范围的对账差错。
+     *
+     * @param tenantId      租户 ID
+     * @param blockingScope 阻断范围，例如 CLEARING、SETTLEMENT、PAYOUT
+     * @return 对账差错列表
+     */
+    @Select("""
+            SELECT *
+            FROM t_reconciliation_difference
+            WHERE tenant_id = #{tenantId}
+              AND (
+                  blocking_scope = #{blockingScope}
+                  OR blocking_scope LIKE CONCAT(#{blockingScope}, ',%')
+                  OR blocking_scope LIKE CONCAT('%,', #{blockingScope})
+                  OR blocking_scope LIKE CONCAT('%,', #{blockingScope}, ',%')
+              )
+            ORDER BY id ASC
+            """)
+    List<ReconciliationDifference> selectByBlockingScope(@Param("tenantId") Long tenantId,
+                                                         @Param("blockingScope") String blockingScope);
 }

@@ -239,11 +239,24 @@ Git 策略：auto_commit / summary_only
 | 验证证据 | `just test-one ReconciliationDifferenceApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just verify-fast`、`just pmd` 和 `git diff --check` 已通过；目标 Spring 测试在沙箱内受 embedded Redis 本地端口限制，按权限规则在非沙箱环境重跑。 |
 | Not Done | 补事实命令执行服务、交易层/账本层委派、运营审批流、审批职责分离、清算/结算/出款消费、生产迁移脚本、账龄升级和完整差异报告仍未完成。 |
 
+### 15.4 reconciliationGateConsume2026-06-18
+
+本节记录 `GSD2-B7-RECON-GATE-CONSUME-001` 的首轮交付结果，只保留最终可交付口径。
+
+| 项 | 结果 |
+| --- | --- |
+| 已交付能力 | 新增 `ReconciliationGateApplicationService`，为清算、结算和出款等消费方提供对账差错准入判断，返回 `PASSED`、`CONDITIONALLY_PASSED` 或 `BLOCKED` 决策、阻断差错摘要、证据引用和解释。 |
+| 数据与契约 | 新增 `CheckReconciliationGateRequest`、`ReconciliationGateDecisionDTO`、`ReconciliationGateBlockingDifferenceDTO`、`ReconciliationGateDecisionStatus` 和 `ReconciliationGateObjectType`；`ReconciliationDifferenceMapper` 增加按 `blockingScope` 查询命中差错的只读能力。 |
+| 资金红线 | gate consumption 只读取对账差错事实，不创建清算候选、确认清算批次、锁定结算单、提交出款，也不写交易事实、route、posting、LedgerEntry、余额投影或交易投影；服务测试断言准入检查不改变账本事实。 |
+| 准入红线 | 未闭环差错、已处理但重新对账未对平、动作上下文漂移被拒绝的差错均不得释放清算、结算或出款；已处理且重跑对平的差错只能条件放行，并保留来源、处理和重跑证据。 |
+| 验证证据 | `just test-one ReconciliationGateApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just pmd` 和 `git diff --check` 已通过；目标 Spring 测试在沙箱内受 embedded Redis 本地端口限制，按权限规则在非沙箱环境重跑。 |
+| Not Done | 完整清分、清算、结算、出款、追偿、运营后台、生产迁移脚本、差异报告、补事实命令执行服务、运营审批流和外部规则确认仍未完成。 |
+
 ## 16. handoff
 
 | 项 | 要求 |
 | --- | --- |
-| 恢复入口 | 优先从清算/结算/出款准入消费差错状态和阻断范围的等价新 Grant 恢复；若要直接做补事实执行、清算、结算、出款或追偿，必须说明为什么跳过差错状态消费和动作守卫消费。 |
+| 恢复入口 | 优先从 `GSD2-B7-RECON-GATE-CONSUME-001` 的后继切片恢复，继续补消费方接入、运营审批或差异报告；若要直接做补事实执行、完整清算、结算、出款或追偿，必须说明为什么跳过准入消费和白名单命令闭环。 |
 | 回写位置 | `docs/TDD设计/README.md`、`docs/TDD设计/GSD-Goal-生产可用MVP推进计划.md`、`openspec/project.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | TDD / Review / Refactor | 确认后必须先 Red 后 Green；Review 优先检查资金不变量、模块边界、失败无副作用、补事实白名单和敏感数据；Refactor 只在 Red 变绿后做必要收敛。 |
 | AI 产物复核 | 不接受空 facade、内存版业务 Service、只 mock 内部核心组件、只断言状态或数量的测试作为生产可用证据。 |
