@@ -12,19 +12,21 @@
 | 原子任务 | 重新对齐 ledger、wallet、transaction 的依赖顺序、Grant 队列、写入范围、验证命令和停止条件。 |
 | 所属阶段 | GSD-2 Wave 5 / P0-P1 dependency planning / full gate verified。 |
 | 关联 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
-| 当前状态 | `B7_RECON_GATE_PAYOUT_PREFLIGHT_CONSUME_GREEN_VERIFIED` |
-| 上游输入 | GSD-2 W1 基线差距审计、W2 单一 Grant 选择卡、W3 B2 账户层级 CAD 准入草案、W4 B2 Execution Grant 确认包、当前 PRD/DSL/系分/TDD/OpenSpec、Git/code baseline `bc7ffc0f` 和 `GSD2-B7-RECON-GATE-CONSUME-002` 本地 Green 证据。 |
+| 当前状态 | `AUTH_CHARGEBACK_COMPAT_ADAPTER_GREEN_VERIFIED_SUMMARY_ONLY` |
+| 上游输入 | GSD-2 W1 基线差距审计、W2 单一 Grant 选择卡、W3 B2 账户层级 CAD 准入草案、W4 B2 Execution Grant 确认包、当前 PRD/DSL/系分/TDD/OpenSpec、Git/code baseline `a38776c5`、`GSD2-B7-RECON-GATE-CONSUME-002` 本地 Green 证据、[GSD-2-LWT-生产可用能力Goal.md](GSD-2-LWT-生产可用能力Goal.md)、[GSD-2-AUTH-Chargeback目标语义对齐任务卡.md](GSD-2-AUTH-Chargeback目标语义对齐任务卡.md) 和 [GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md](GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md)。 |
 | Owner | AI Native 流程编排负责顺序和门禁；产品架构专家确认业务价值、验收和 Not Done；资深架构师确认源码锚点、写入范围、Red、验证命令和 CAD 停止条件；用户确认单一 Grant。 |
-| 写入范围 | 本文、GSD-2 入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
-| 写入文件 | `docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
+| 写入范围 | 本文、LWT 生产可用能力 Goal、AUTH Chargeback 目标语义任务卡、AUTH Chargeback 兼容入口确认包、GSD-2 入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
+| 写入文件 | `docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-AUTH-Chargeback目标语义对齐任务卡.md`、`docs/TDD设计/GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、tests、Justfile、AGENTS.md、最近 Git 提交和旧 GSD/Grant 历史材料。 |
 | Git 策略 | `summary_only`。本文不授权 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。 |
 
-Wave 边界：本文最初只做任务规划和设计落地；用户后续已确认 `Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 并进入首个 Red。Red 已证明当前授权服务流缺少合法账户层级来源；随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 补齐来源契约，`GSD2-B2-FR-TARGET-001` 采用 `ddl-backed targetSubjectType + targetSubjectId` 补齐资金责任目标主体，`GSD2-B2-WALLET-APPLICATION-FACADE-001` 补齐资金责任解析 facade，`GSD2-B2-WALLET-APPLICATION-FACADE-002 / B2-PI-CAP-CAD-001` 补齐支付工具能力准入 facade，`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` 补齐交易投影解释首轮只读查询能力，`GSD2-B5-BALANCE-ADJUST-AUDIT-001` 补齐外部余额异常纠偏和受控负可用调账的首轮审计准入，`GSD2-B7-RECON-DIFFERENCE-MVP-001` 补齐对账差错登记、处理回链、重新对账幂等和无资金副作用首轮闭环，`GSD2-B7-RECON-DIFFERENCE-MVP-002` 补齐差错处理动作白名单上下文守卫，`GSD2-B7-RECON-GATE-CONSUME-001` 补齐清算、结算和出款准入的只读差错消费决策，`GSD2-B7-RECON-GATE-CONSUME-002` 已把 gate 决策接入出款前准入消费方。上述已完成切片均保留 Not Done 边界；下一步应补清算/结算消费方接入、B7 差异报告，或确认 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。
+状态层级：`GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` 是 GSD-2 父 Goal，`GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` 是当前 LWT 子 Goal，当前可执行状态以 `AUTH_CHARGEBACK_COMPAT_ADAPTER_GREEN_VERIFIED_SUMMARY_ONLY` 为准。完整映射见 [GSD-2-LWT-生产可用能力Goal.md](GSD-2-LWT-生产可用能力Goal.md) 第 1.1 节；历史 B7、B2 或 AUTH 兼容 adapter 状态只作为已消费证据，不作为下一步授权。
+
+Wave 边界：本文最初只做任务规划和设计落地；用户后续已确认 `Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 并进入首个 Red。Red 已证明当前授权服务流缺少合法账户层级来源；随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 补齐来源契约，`GSD2-B2-FR-TARGET-001` 采用 `ddl-backed targetSubjectType + targetSubjectId` 补齐资金责任目标主体，`GSD2-B2-WALLET-APPLICATION-FACADE-001` 补齐资金责任解析 facade，`GSD2-B2-WALLET-APPLICATION-FACADE-002 / B2-PI-CAP-CAD-001` 补齐支付工具能力准入 facade，`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` 补齐交易投影解释首轮只读查询能力，`GSD2-B5-BALANCE-ADJUST-AUDIT-001` 补齐外部余额异常纠偏和受控负可用调账的首轮审计准入，`GSD2-B7-RECON-DIFFERENCE-MVP-001` 补齐对账差错登记、处理回链、重新对账幂等和无资金副作用首轮闭环，`GSD2-B7-RECON-DIFFERENCE-MVP-002` 补齐差错处理动作白名单上下文守卫，`GSD2-B7-RECON-GATE-CONSUME-001` 补齐清算、结算和出款准入的只读差错消费决策，`GSD2-B7-RECON-GATE-CONSUME-002` 已把 gate 决策接入出款前准入消费方。上述已完成切片均保留 Not Done 边界；`GSD2-AUTH-CHARGEBACK-TARGET-ALIGN-001` 已补 contract/design-only 任务卡，确认 dispute / chargeback 是案件过程，资金结果默认由 `settleRefund` 争议字段承接，现有 `chargeback` 仅作为兼容资产；`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 已完成兼容说明、最小审计 guard、兼容测试和状态回写。下一步应优先确认 B4 投影解释扩展，或在 wallet facade、ledger guard、清算/结算消费方接入、B7 差异报告或 `GSD2-B5-BALANCE-ADJUST-AUDIT-002` 中确认单一 Grant。
 
 ## 2. 编排结论
 
-当前仍不应跳过 W4 已收敛的 B2 账户层级服务流确认包。ledger、wallet、transaction 的优先推进顺序应按“被依赖方证据优先、真实服务流优先、清结算和 P2 后置”的原则收敛：
+当前不再以 W4/B2 账户层级确认包作为下一候选；W4/B2 只保留为历史已消费证据。ledger、wallet、transaction 的优先推进顺序应按“被依赖方证据优先、真实服务流优先、当前单一 Grant 优先、清结算和 P2 后置”的原则收敛：
 
 1. ledger 不重新开启大包改造，而作为每个资金变化切片的强制验证门禁：posting 绑定账本、账目、币种、余额投影、幂等和失败无副作用必须在目标测试或回归中证明。
 2. wallet 的下一关键缺口不是支付工具 facade，而是账户层级和资金责任能否被真实服务流稳定消费；`GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已补齐账户层级来源契约，`GSD2-B2-FR-TARGET-001` 首轮已补齐资金责任目标主体字段和资源服务校验。
@@ -109,15 +111,15 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | 字段 | 内容 |
 | --- | --- |
 | Loop ID | `GSD2-P0P1-LWT-LOOP-2026-06-15` |
-| 关联 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
-| 当前状态 | `B7 reconciliation gate consume green / next concrete consumer integration or audit persistence expansion` |
-| 状态载体 | 本文、GSD-2 新基线工作流规划、W2/W3/W4 B2 账户层级文档、TDD README、docs README、OpenSpec tasks。 |
+| 关联 Goal | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
+| 当前状态 | `AUTH_CHARGEBACK_COMPAT_ADAPTER_GREEN_VERIFIED_SUMMARY_ONLY` |
+| 状态载体 | 本文、GSD-2 新基线工作流规划、LWT 生产可用能力 Goal、AUTH Chargeback 目标语义任务卡、AUTH Chargeback 兼容入口确认包、W2/W3/W4 B2 账户层级文档、TDD README、docs README、OpenSpec tasks。 |
 | 反馈源 | checker、`rg`、`git status --short`、`git diff --check`、目标测试、compile、pmd、用户确认。 |
 | 验证者 | 产品语义由产品架构专家确认；工程边界由资深架构师确认；优先级和 Grant 由用户确认。 |
-| 默认推进 | 当前来源契约、资金责任目标主体、资金责任解析 facade、支付工具能力准入 facade、交易投影解释、余额调账审计、对账差错闭环、差错处理动作上下文守卫、B7 准入消费和出款 preflight 首个消费方接入已完成目标测试、分组回归、规约扫描和状态回写。下一轮默认补清算/结算消费方接入或 B7 差异报告；也可继续扩展 B5 审计持久化/route snapshot 回链。若继续 wallet，需要另行确认钱包账户聚合、账户能力来源、授权 admission 或完整预交易快照子切片。 |
+| 默认推进 | 当前来源契约、资金责任目标主体、资金责任解析 facade、支付工具能力准入 facade、交易投影解释、余额调账审计、对账差错闭环、差错处理动作上下文守卫、B7 准入消费和出款 preflight 首个消费方接入已完成目标测试、分组回归、规约扫描和状态回写；`GSD2-AUTH-CHARGEBACK-TARGET-ALIGN-001` 已完成 contract/design-only 任务卡，`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 已完成确认包。下一轮默认在 chargeback 兼容 adapter、B4 投影解释扩展、清算/结算消费方接入或 B7 差异报告中选择一个；也可继续扩展 B5 审计持久化/route snapshot 回链。若继续 wallet，需要另行确认钱包账户聚合、账户能力来源、授权 admission 或完整预交易快照子切片。 |
 | 显式确认 | Java、测试、公共契约、DDL/H2、运行时配置、Git、联网、依赖安装、生产配置、真实资金、外部规则和专业合规确认。 |
-| 无进展检测 | 连续两轮只是重复 W4 确认包而无新增源码证据、验证证据、任务收敛或用户确认时暂停。 |
-| 交接 | 用户确认 B2-AH 后交给资深架构师进入 CAD；未确认时继续 docs-only 计划维护。 |
+| 无进展检测 | 连续两轮只是重复当前 AUTH 兼容确认包而无新增状态证据、缺口收敛或用户确认时暂停；不得用历史 W4/B2 口径继续推进。 |
+| 交接 | 用户确认 `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 后交给资深架构师消费确认包、第 11 节预检清单和第 12 节运行卡进入首个 Red；未确认时继续 docs-only 状态和任务卡维护。 |
 
 ## 6. 停止条件
 
@@ -134,24 +136,24 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 
 | 字段 | 内容 |
 | --- | --- |
-| 当前 Wave / Task | `GSD2-B7-RECON-GATE-CONSUME-002` |
-| 当前状态 | `FIRST_GREEN_VERIFIED_RECON_GATE_PAYOUT_PREFLIGHT_CONSUME` |
-| 下一建议 Grant | 补清算/结算消费方接入或 B7 差异报告；若继续 B5，则另行确认 `GSD2-B5-BALANCE-ADJUST-AUDIT-002` 扩展审计持久化、route snapshot 回链或运营审批闭环。 |
-| 下一 Red | B7 清算/结算消费方 Red：证明存在 `BLOCKED` 或未对平差错时不得生成清算候选、确认清算批次或锁定结算单；或 B7 差异报告 Red：证明可解释差错来源、处理动作、重跑和准入消费关系；或 B5 扩展 Red：证明审计字段进入 route snapshot/独立审计查询且不污染普通调账。 |
+| 当前 Wave / Task | `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 已消费；下一默认候选为 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002`。 |
+| 当前状态 | `AUTH_CHARGEBACK_COMPAT_ADAPTER_GREEN_VERIFIED_SUMMARY_ONLY` |
+| 下一建议 Grant | 若继续 B4，确认 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002`，补普通退款、无授权退款、争议退款、授权拒绝和兼容 chargeback 的解释矩阵；也可补清算/结算消费方接入、B7 差异报告或 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
+| 下一 Red | B4 投影解释 Red：证明查询和交易投影能区分普通退款、无授权退款、争议退款、授权拒绝和兼容 chargeback。 |
 | 写入范围 | 来源契约已写入 core port、wallet-face/impl、H2 schema、授权路由接入和目标测试；资金责任目标主体已写入 wallet Request/DTO/Query、Entity、H2 schema、资源服务校验和目标测试；wallet application facade 首轮已写入资金责任解析契约、支付工具能力准入契约、Request/DTO、实现和目标测试；B4 投影解释已写入 transaction-face projection 查询契约、解释来源、transaction-impl 查询实现和服务流测试；B5 余额调账审计已写入 balance adjust 请求审计字段、外部异常来源类型、instruction context keys、转换器校验/透传和服务流测试；B7 差错闭环已写入 reconciliation application 契约、Request/DTO、差错枚举、Entity/Mapper、H2 schema 和服务流测试；B7 准入消费已写入 reconciliation gate application 契约、Request/DTO、决策枚举、Mapper 只读查询、实现和服务测试；B7 出款准入消费已写入 `PayoutOrderServiceImpl` gate 调用、阻断原因映射、证据合并和服务流测试。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、tests、Justfile、AGENTS.md、最近 Git 提交和历史准入卡。 |
 | 验证命令 | B4 首轮已执行 `just test-one FundsTransactionProjectionExplainApplicationServiceTests tests`、`just test-one DefaultRoutedFundsInstructionOrchestratorProjectionTests tests`、`just compile`、`just pmd` 和 `git diff --check`；B5 首轮已执行 `just test-one FundsBalanceAdjustAuditFlowTests tests`、`just test-one FundsBalanceControlFailureFlowTests tests`、`just test-balance-control`、`just test-reconciliation`、`just compile`、`just pmd` 和 `git diff --check`；B7 差错闭环和动作守卫已执行 `just test-one ReconciliationDifferenceApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just verify-fast`、`just pmd` 和 `git diff --check`；B7 准入消费已执行 `just test-one ReconciliationGateApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just pmd` 和 `git diff --check`；B7 出款准入消费已执行 `just test-one PayoutPreflightServiceTests tests` 和 `just test-reconciliation`；此前 `e81a8a25` 已完成 `verify-cad` 全门禁。下一 Grant 后运行对应目标测试、route snapshot 回归、`just compile`、`git diff --check`，必要时补分组测试和 `pmd`。 |
 | Git 策略 | `summary_only`。 |
-| 交接要求 | 若用户确认下一 Grant，先写最小 Red，再最小 Green；完成后回写本文第 4 节 Grant 队列、OpenSpec tasks、验证证据、Not Done 和残余风险。 |
+| 交接要求 | 若用户确认下一 Grant，先读取对应确认包、消费第 11 节预检清单和第 12 节运行卡，再写最小 Red、最小 Green；完成后回写本文第 4 节 Grant 队列、OpenSpec tasks、验证证据、Not Done 和残余风险。 |
 
 ## 8. 验证矩阵
 
 | 验证层 | 命令或方式 | 通过口径 |
 | --- | --- | --- |
-| Harness 结构 | `check_harness_plan.py --kind gsd-wave --file docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | Task、Owner、范围、Wave、上下文账本、禁止事项、验证和 handoff 字段齐全。 |
-| 产品结构 | `check_product_deliverable.py --kind product-architecture --file docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | 业务目标、能力地图、对象、流程、规则、运营数据、风险和验收齐全。 |
-| 架构结构 | `check_architecture_deliverable.py --kind architecture-plan --file docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | 背景目标、现状约束、核心决策、契约、数据一致性、可靠性安全、验证、发布风险齐全。 |
-| 状态一致性 | `rg "GSD2-W5|P0P1-LWT|GSD2-B2-FR-TARGET|FR_TARGET|targetSubject" docs openspec` | GSD2 入口、README 和 OpenSpec tasks 能追踪到本文、FR target Green 结果和下一 Grant。 |
+| Harness 结构 | `python3 /Users/wuxp/.codex/skills/senior-software-architect/scripts/check_harness_plan.py --kind gsd-wave --file docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | Task、Owner、范围、Wave、上下文账本、禁止事项、验证和 handoff 字段齐全。 |
+| 产品结构 | `python3 /Users/wuxp/.codex/skills/product-architecture-expert/scripts/check_product_deliverable.py --kind product-architecture --file docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | 业务目标、能力地图、对象、流程、规则、运营数据、风险和验收齐全。 |
+| 架构结构 | `python3 /Users/wuxp/.codex/skills/senior-software-architect/scripts/check_architecture_deliverable.py --kind architecture-plan --file docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | 背景目标、现状约束、核心决策、契约、数据一致性、可靠性安全、验证、发布风险齐全。 |
+| 状态一致性 | `rg "GSD2-W5|P0P1-LWT|GSD2-AUTH-CHARGEBACK-TARGET-ALIGN|GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER|FR_TARGET|targetSubject" docs openspec` | GSD2 入口、AUTH Chargeback 目标语义任务卡、兼容入口确认包、README 和 OpenSpec tasks 能追踪到本文、FR target Green 结果和下一 Grant。 |
 | 空白和 Markdown | `git diff --check` | 无行尾空白或 patch 格式问题。 |
 | 编译、测试、PMD | `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just test-one FundsTransactionProjectionExplainApplicationServiceTests tests`、`just test-one DefaultRoutedFundsInstructionOrchestratorProjectionTests tests`、`just compile`、`just pmd`、`git diff --check`。 | B4 首轮只读投影解释服务流和原投影发布回归通过；账户层级来源契约、资金责任目标主体、资金责任解析 facade、支付工具能力准入 facade 的完整门禁已在 `e81a8a25` 收口通过。 |
 
@@ -187,3 +189,27 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | 下一候选 | 清算/结算/出款准入消费差错状态、阻断范围、处理动作和重跑结果；若继续 B5，则为 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
 | Not Done | 清算/结算/出款对差错状态的消费、完整清分清算结算出款、追偿、账龄升级、运营后台、生产迁移脚本、差异报告、补事实命令执行服务、运营审批流、余额调账独立审计表/审批流/route snapshot 审计回链、退款/no-auth refund/释放/拒付全量投影解释矩阵、projection store、治理重放、钱包账户聚合、账户能力来源组合、授权 admission、完整预交易快照、Spend Rule 控制闭环、VCC / 全球账户 / 清结算 P2 场景。 |
 | 禁止误读 | 本轮 full gate 只证明已落地切片的工程门禁通过，不等于 wallet 全量生产 Done，不等于支付工具授权入口、VCC facade、清结算对账或 P2 业务已可交付。 |
+
+## 11. LWT 生产可用能力 Goal 聚合裁决（2026-06-18）
+
+本节记录用户要求“把建议聚合成 Goal，使用 loop + goal 推进”后的状态收口。该裁决不替代后续单一 Execution Grant，也不授权继续写 Java、测试、DDL/H2 schema、公共契约或 Git。
+
+| 字段 | 内容 |
+| --- | --- |
+| Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
+| Loop ID | `GSD2-LWT-PRODUCTION-CAPABILITY-LOOP-2026-06-18` |
+| Git / code baseline | `a38776c5 feat: 接入出款准入对账门禁`。 |
+| 新增状态载体 | [GSD-2-LWT-生产可用能力Goal.md](GSD-2-LWT-生产可用能力Goal.md)。 |
+| 裁决 | 当前不再把 `GSD2-B7-RECON-GATE-CONSUME-002` 作为下一候选；该切片已在 `a38776c5` 提交并成为已消费证据。`GSD2-AUTH-CHARGEBACK-TARGET-ALIGN-001` 已补任务卡：dispute / chargeback 是案件过程，资金结果默认由 `settleRefund` 争议字段承接，现有 `chargeback` 方法只作为兼容、显式事件或内部适配资产；`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 已按 `COMPAT_GUARD_NO_BEHAVIOR_BREAK` 完成最小审计 guard 和验证收口。 |
+| 基线判定 | `GSD-2-LWT-生产可用能力Goal.md` 第 5.5 节已把当前能力定为 `CONDITIONAL_DELIVERABLE_BASELINE`：可作为上层 MVP 后续单一 Grant 的被依赖能力继续消费，但不等于 ledger、wallet、transaction 或 B7 清结算全量生产 Done。 |
+| 可消费证据 | 账户主体、账户层级来源、资金责任目标主体、资金责任解析 facade、支付工具能力准入 facade、账户主体型交易内核、route snapshot、ledger guard、余额投影、B4 首轮交易投影解释、B5 首轮余额调账审计、B7 差错 gate 和出款 preflight 消费。 |
+| 不可外推范围 | 完整预交易快照、授权 admission、完整投影解释矩阵、chargeback 兼容 guard、独立 ledger guard 回归包、清算/结算消费方、差异报告、补事实命令执行、运营审批、生产迁移、灰度、告警、VCC / 全球账户 / 收单 P2 业务。 |
+| Completion Audit | `GSD-2-LWT-生产可用能力Goal.md` 第 11 节已补完成度审计和三卡交接：状态载体、完备性矩阵和条件基线为 `DONE_DOCS_ONLY`；AUTH 兼容 adapter 为 `GREEN_VERIFIED_SUMMARY_ONLY`；三模块全量生产 Done、完整投影解释矩阵、完整清结算和 P2 业务仍为 `NOT_DONE`。 |
+| Evidence Anchors | `GSD-2-LWT-生产可用能力Goal.md` 第 11.3 节已把条件基线映射到 wallet / transaction / ledger / reconciliation 的 face、impl、测试类和已记录验证命令；后续任何编码切片必须复跑目标测试，不得只凭锚点矩阵声明 Done。 |
+| Structure Gates | `GSD-2-LWT-生产可用能力Goal.md` 第 11.4 节已记录 GSD-2 总入口、LWT Goal、P0/P1 LWT 推进计划、AUTH Chargeback 目标语义任务卡和 AUTH Chargeback 兼容入口确认包的 Harness、产品和架构结构 checker 通过结果；该结果只证明文档入口可消费，不替代 Java 编译、目标测试、PMD、Git 授权或生产准出。 |
+| Grant Decision Ledger | `GSD-2-LWT-生产可用能力Goal.md` 第 8.1 节已补单一 Grant 决策账本：默认推荐 `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001`，并列明切换到 B4-002、wallet facade、ledger guard、B7 清算/结算 gate 或 B5-002 的进入条件、停止条件和状态回写位置。 |
+| Grant Consume Precheck / Run Card | `GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` 第 11 节已补消费预检清单：用户授权、工作树状态、baseline、首个 Red 收窄、写入范围、验证顺序、状态回写和 Git 策略必须先检查；第 12 节已补 Red 选择、Red 范围、Green 实现、Review、Verify、Handoff 和最小断言清单。 |
+| 下一候选顺序 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002`、`GSD2-B2-WALLET-APPLICATION-FACADE-002`、`GSD2-LD-LEDGER-GUARD-REGRESSION-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
+| 当前可默认推进 | 低风险文档同步、状态回写、只读 Gap Audit、Spec/AC/Harness/CAD 任务卡和验证矩阵。 |
+| 显式确认后才可推进 | Java、测试、DDL/H2 schema、公共契约、Entity、Mapper、状态机、运行时配置、Git、联网、真实资金、外部规则和专业合规确认。 |
+| 验证命令 | `rg "GSD2-LWT|LWT-PRODUCTION|单一 Grant 决策账本|结构门禁验证证据账本|a38776c5" docs openspec`、`git diff --check`。 |

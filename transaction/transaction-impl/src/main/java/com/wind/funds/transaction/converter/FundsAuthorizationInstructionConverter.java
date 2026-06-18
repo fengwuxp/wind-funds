@@ -50,6 +50,10 @@ public class FundsAuthorizationInstructionConverter {
 
     private static final long TRUSTED_FORCE_SETTLE_LIMIT_AMOUNT = 60L;
 
+    private static final String CHARGEBACK_REASON_CONTEXT_KEY = "chargebackReason";
+
+    private static final String CHARGEBACK_EVIDENCE_REF_CONTEXT_KEY = "evidenceRef";
+
     private final FundsInstructionAmountSupport amountSupport;
 
     private final LedgerTransactionService ledgerTransactionService;
@@ -242,6 +246,11 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull FundsAuthorizationTransactionChargebackRequest request,
             @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        Map<String, Object> context = mergeContext(request.getContextVariables(), Map.of(
+                FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
+                FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
+                request.getAuthorizationTransactionSn()));
+        validateChargebackContext(context);
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
@@ -256,10 +265,7 @@ public class FundsAuthorizationInstructionConverter {
                 .eventTime(eventTime(request.getChargebackTime()))
                 .description(request.getDescription())
                 .operator(operationActor(operator))
-                .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
-                        FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
-                        request.getAuthorizationTransactionSn())))
+                .contextVariables(context)
                 .build();
     }
 
@@ -310,6 +316,20 @@ public class FundsAuthorizationInstructionConverter {
         context.put(FundsInstructionContextKeys.DISPUTE_REASON, request.getDisputeReason());
         context.put(FundsInstructionContextKeys.DISPUTE_VOUCHER_REF, request.getDisputeVoucherRef());
         context.put(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF, request.getExternalDisputeRef());
+    }
+
+    private void validateChargebackContext(@NonNull Map<String, Object> context) {
+        AssertUtils.hasText(contextValue(context, CHARGEBACK_REASON_CONTEXT_KEY),
+                "chargebackReason must not be blank");
+        AssertUtils.hasText(contextValue(context, CHARGEBACK_EVIDENCE_REF_CONTEXT_KEY),
+                "evidenceRef must not be blank");
+        AssertUtils.hasText(contextValue(context, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF),
+                "externalDisputeRef must not be blank");
+    }
+
+    private String contextValue(@NonNull Map<String, Object> context, @NonNull String key) {
+        Object value = context.get(key);
+        return value instanceof String text ? text : null;
     }
 
     private @NonNull FundsInstructionReferenceSpec authorizationReference(@NonNull String authorizationTransactionSn) {

@@ -88,6 +88,8 @@ public interface FundsAuthorizationTransactionService {
      * <p>
      * 用于已结算授权交易发生持卡人或发卡机构争议时，按原结算路径回放资金退回；
      * 不用于授权阶段批准失败，授权失败使用 authorize 的 approved=false 表达。
+     * 该方法是历史兼容入口，新增场景应优先按争议裁决资金结果使用 {@link #settleRefund(FundsAuthorizationTransactionRefundRequest, WindOperator)}，
+     * 并携带争议字段；继续使用本入口时必须携带拒付原因、证据引用和外部争议引用等最小审计上下文。
      *
      * @param request  授权结算后拒付/争议请求
      * @param operator 操作者

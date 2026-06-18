@@ -1757,6 +1757,55 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
+     * 场景：已完成授权使用兼容 chargeback 入口，但缺少外部争议引用。
+     * 输入：充值 100、授权 60、完成 60、拒付 40，仅携带拒付原因和凭证引用。
+     * 输出：请求在资金事实写入前失败，余额、交易累计和账务事实保持失败前状态。
+     * 预期：兼容 chargeback 入口必须携带可审计的外部争议引用，不能被当作普通退款快捷入口。
+     * 红线：缺审计上下文不得生成 CHARGEBACK 交易、route、posting、LedgerEntry 或余额投影副作用。
+     */
+    @Test
+    void testAuthorizationChargebackMissingExternalDisputeRefShouldRejectAndLeaveNoSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "AUTH_CHARGEBACK_MISSING_REF_TOPUP");
+        String authorizationSn = authorize(user, 60L, true, "AUTH_CHARGEBACK_MISSING_REF_AUTHORIZE");
+        settleAuthorization(user, 60L, authorizationSn, "AUTH_CHARGEBACK_MISSING_REF_CAPTURE");
+
+        BalanceSnapshot beforeFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> authorizationTransactionService.chargeback(
+                new FundsAuthorizationTransactionChargebackRequest()
+                        .setAccountId(user)
+                        .setAmount(Money.immutable(40L, CURRENCY))
+                        .setAuthorizationTransactionSn(authorizationSn)
+                        .setBusinessScene("AUTHORIZATION_CHARGEBACK")
+                        .setBusinessSn("AUTH_CHARGEBACK_MISSING_REF_RETURN")
+                        .setDescription("authorization chargeback without external dispute ref")
+                        .setContextVariables(WritableContextVariables.of(Map.of(
+                                "chargebackReason", "CARDHOLDER_DISPUTE",
+                                "evidenceRef", "CHARGEBACK_EVIDENCE_MISSING_REF_202606180001"))),
+                WindOperator.system()))
+                .hasMessageContaining(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF);
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+
+        FundsTransactionDTO transaction = fundsTransaction(authorizationSn);
+        assertThat(transaction.getSettledAmount()).isEqualTo(60L);
+        assertThat(transaction.getDeclinedAmount()).isZero();
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_MISSING_REF_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_MISSING_REF_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_MISSING_REF_CAPTURE", 0, 2, 1, 2);
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_CHARGEBACK_MISSING_REF_RETURN");
+    }
+
+    /**
      * 场景：用户授权 80 后只完成 50，平台结算户另有充足余额时尝试拒付 60。
      * 输入：A 充值并授权 80、完成 50；B 另完成 100 使平台 SETTLEMENT 余额充足；A 拒付 60。
      * 输出：A 拒付请求失败，A/B/平台余额、交易累计和账务事实保持失败前状态。
@@ -1854,7 +1903,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         .setDescription("authorization chargeback exceed")
                         .setContextVariables(WritableContextVariables.of(Map.of(
                                 "chargebackReason", "CARDHOLDER_DISPUTE",
-                                "evidenceRef", "CHARGEBACK_EVIDENCE_EXCEED_202605290001"))),
+                                "evidenceRef", "CHARGEBACK_EVIDENCE_EXCEED_202605290001",
+                                FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
+                                "CHARGEBACK_CASE_EXCEED_202605290001"))),
                 WindOperator.system()))
                 .hasMessageContaining("资金交易已结算可回退金额不足");
 
@@ -2770,7 +2821,9 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setDescription("authorization chargeback")
                 .setContextVariables(WritableContextVariables.of(Map.of(
                         "chargebackReason", "CARDHOLDER_DISPUTE",
-                        "evidenceRef", "CHARGEBACK_EVIDENCE_IDEMPOTENT_202605290001"))),
+                        "evidenceRef", "CHARGEBACK_EVIDENCE_IDEMPOTENT_202605290001",
+                        FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
+                        "CHARGEBACK_CASE_IDEMPOTENT_202605290001"))),
                 WindOperator.system());
     }
 
