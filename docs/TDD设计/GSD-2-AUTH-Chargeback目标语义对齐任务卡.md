@@ -59,7 +59,7 @@
 | 争议退款资金结果 | 裁决或业务决策需要退款时，通过 `settleRefund` 携带争议字段承接。 | 用户、财务和账务能看到明确退款资金影响。 | TDD 已有目标口径，代码已有 `FundsAuthorizationTransactionRefundRequest` 争议字段。 |
 | 无资金影响结果 | 用户败诉、无需资金处理或只更新案件状态时，不生成 route、posting、LedgerEntry、余额变化或新资金交易事实。 | 避免无依据调账、重复扣回和账务污染。 | 需要后续 Red 或应用层输入证明。 |
 | 兼容 chargeback 入口 | 现有 `chargeback` 方法只作为历史兼容、显式事件适配或内部过渡入口。 | 保持已有调用不被文档误删，同时不扩张目标 API。 | 代码存在，目标语义仍需后续单一 Grant 裁决是否加 guard、adapter 或 deprecated。 |
-| 查询和投影解释 | 查询、交易投影和审计必须区分普通退款、无授权退款、争议裁决退款、授权拒绝和兼容 chargeback 事件。 | 运营、财务、用户账单和研发排障可解释。 | B4-001 只完成首轮投影解释，争议矩阵仍 Not Done。 |
+| 查询和投影解释 | 查询、交易投影和审计必须区分普通退款、无授权退款、争议裁决退款、授权拒绝和兼容 chargeback 事件。 | 运营、财务、用户账单和研发排障可解释。 | B4 已覆盖 posted pay、授权拒绝、缺失 route snapshot、争议退款、普通退款、无授权退款、授权释放/过期和兼容 chargeback 的只读解释；失败态全量解释、projection store、治理重放和运营差异报告仍 Not Done。 |
 
 业务对象和字段口径：
 

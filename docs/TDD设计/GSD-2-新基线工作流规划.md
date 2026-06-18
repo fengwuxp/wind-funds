@@ -255,7 +255,7 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | --- | --- | --- | --- | --- |
 | 1 | [GSD2-AUTH-CHARGEBACK-TARGET-ALIGN-001](GSD-2-AUTH-Chargeback目标语义对齐任务卡.md) | `contract/design-only` | 已补任务卡：目标态主入口为 `settleRefund` 争议字段；现有 `chargeback` 仅作为历史兼容、显式事件或内部适配资产。 | 已完成 docs-only 对齐，不进入代码。 |
 | 2 | [GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001](GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md) | `consumed-green` | 已按 `COMPAT_GUARD_NO_BEHAVIOR_BREAK` 完成现有 `chargeback` 入口的兼容说明、最小审计 guard、兼容测试和状态回写。 | 不继续沿用本 Grant 扩完整 dispute case、DDL/H2 schema、事件语义迁移或公共 API 删除。 |
-| 3 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002` | `service-flow-backed` | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001` 已证明 posted pay、declined authorization 和缺失 RouteSnapshot fail-fast；后续可扩展退款、no-auth refund、争议退款、释放、兼容 chargeback 和失败态解释矩阵。 | 不新增 projection store/DDL/治理重放，不反写资金事实。 |
+| 3 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` | `consumed-green` | 已覆盖普通退款、无授权退款、争议退款、释放/过期和兼容 chargeback 的只读解释矩阵。 | 不继续沿用本 Grant 扩 projection store、治理重放、历史节点选择查询、失败态全量解释或运营差异报告。 |
 | 4 | `GSD2-B2-WALLET-APPLICATION-FACADE-002` | `service-flow-backed` | `FundingResponsibilityResolutionApplicationService` 和 `PaymentInstrumentCapabilityApplicationService` 首轮已补齐；后续可继续补钱包账户聚合、账户能力来源组合、授权 admission 或完整预交易快照。 | 不把支付工具能力通过等同账户能力通过，不直接写交易事实或账本事实。 |
 | 5 | `GSD2-LD-LEDGER-GUARD-REGRESSION-001` | `guard-regression` | 任一资金变化切片触碰 posting、LedgerEntry、账目、余额投影或 H2 schema 时，必须伴随或前置 ledger guard。 | 不重启 GSD1 大包，不把清结算或治理重放混入 ledger guard。 |
 | 6 | `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` | `service-flow-backed` | B7 gate consume 和出款 preflight 消费已完成；清算/结算消费方仍未接入。 | 不一次性打开完整清分、清算、结算、出款、追偿和运营后台；不直接生成补事实资金事实。 |
@@ -278,7 +278,7 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | AI 交付准出 | 后续 Grant 必须列出 Spec/AC 映射、Red/Green 证据、独立验证命令、CR 交接、Not Done、知识回流和建议 commit message。 |
 | 停止条件 | 未确认新的单一 Execution Grant 前，不继续修改 Java、测试、DDL/H2 schema、公共契约、wallet application facade、交易投影、余额调账、支付工具准入、Spend Rule、VCC、清结算或 P2 业务；需要 Git 授权、处置 `openspec` 异常状态、验证失败或用户调整优先级时停止。 |
 | Git 策略 | `summary_only`。 |
-| 下一 owner | 用户确认是否进入 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002`；若不继续 B4，再从 `GSD2-B2-WALLET-APPLICATION-FACADE-002`、`GSD2-LD-LEDGER-GUARD-REGRESSION-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` 或 `GSD2-B5-BALANCE-ADJUST-AUDIT-002` 中选择单一 Grant；产品架构专家确认业务用例、展示口径和 Not Done；资深架构师明确接入边界、查询/交易边界、DTO、服务测试、route snapshot 回链和验证命令。 |
+| 下一 owner | 用户确认是否进入 `GSD2-B2-WALLET-APPLICATION-FACADE-002`；若不继续 wallet，再从 `GSD2-LD-LEDGER-GUARD-REGRESSION-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、B7 差异报告或 `GSD2-B5-BALANCE-ADJUST-AUDIT-002` 中选择单一 Grant；产品架构专家确认业务用例、展示口径和 Not Done；资深架构师明确接入边界、查询/交易边界、DTO、服务测试、route snapshot 回链和验证命令。 |
 
 ## 9. 验证矩阵
 

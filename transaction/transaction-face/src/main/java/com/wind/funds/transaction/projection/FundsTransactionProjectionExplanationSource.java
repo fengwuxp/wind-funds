@@ -60,7 +60,13 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String DISPLAY_STATUS_RELEASED = "RELEASED";
 
+    private static final String DISPLAY_STATUS_REFUNDED = "REFUNDED";
+
+    private static final String DISPLAY_STATUS_NO_AUTH_REFUNDED = "NO_AUTH_REFUNDED";
+
     private static final String DISPLAY_STATUS_DISPUTE_REFUNDED = "DISPUTE_REFUNDED";
+
+    private static final String DISPLAY_STATUS_COMPAT_CHARGEBACK_REFUNDED = "COMPAT_CHARGEBACK_REFUNDED";
 
     private static final String DISPLAY_STATUS_DECLINED = "DECLINED";
 
@@ -89,7 +95,13 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String STATUS_MEANING_FUNDS_RELEASED = "FUNDS_RELEASED";
 
+    private static final String STATUS_MEANING_FUNDS_REFUNDED = "FUNDS_REFUNDED";
+
+    private static final String STATUS_MEANING_NO_AUTH_REFUND_POSTED = "NO_AUTH_REFUND_POSTED";
+
     private static final String STATUS_MEANING_DISPUTE_REFUND_POSTED = "DISPUTE_REFUND_POSTED";
+
+    private static final String STATUS_MEANING_COMPAT_CHARGEBACK_POSTED = "COMPAT_CHARGEBACK_POSTED";
 
     private static final String STATUS_MEANING_FACT_PROCESSING = "FACT_PROCESSING";
 
@@ -113,6 +125,10 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
     private static final String UNAVAILABLE_BALANCE_FREEZE_NOT_CONSUMPTION = "BALANCE_FREEZE_IS_NOT_CONSUMPTION";
 
     private static final String UNAVAILABLE_TRANSACTION_FAILED = "TRANSACTION_FAILED";
+
+    private static final String CHARGEBACK_REASON_CONTEXT_KEY = "chargebackReason";
+
+    private static final String CHARGEBACK_EVIDENCE_REF_CONTEXT_KEY = "evidenceRef";
 
     public FundsTransactionProjectionExplanationSource {
         AssertUtils.hasText(businessScene, "交易投影解释业务场景不能为空");
@@ -178,6 +194,15 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         if (isDisputeRefund()) {
             return DISPLAY_STATUS_DISPUTE_REFUNDED;
         }
+        if (isNoAuthRefund()) {
+            return DISPLAY_STATUS_NO_AUTH_REFUNDED;
+        }
+        if (isCompatChargeback()) {
+            return DISPLAY_STATUS_COMPAT_CHARGEBACK_REFUNDED;
+        }
+        if (isRefundEvent()) {
+            return DISPLAY_STATUS_REFUNDED;
+        }
         return switch (eventType) {
             case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn)
                     ? DISPLAY_STATUS_AUTHORIZED_HOLD
@@ -213,6 +238,15 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         }
         if (isDisputeRefund()) {
             return STATUS_MEANING_DISPUTE_REFUND_POSTED;
+        }
+        if (isNoAuthRefund()) {
+            return STATUS_MEANING_NO_AUTH_REFUND_POSTED;
+        }
+        if (isCompatChargeback()) {
+            return STATUS_MEANING_COMPAT_CHARGEBACK_POSTED;
+        }
+        if (isRefundEvent()) {
+            return STATUS_MEANING_FUNDS_REFUNDED;
         }
         return switch (eventType) {
             case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn)
@@ -297,6 +331,8 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         }
         addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF, "externalDisputeRef");
         addContextEvidence(refs, FundsInstructionContextKeys.DISPUTE_VOUCHER_REF, "disputeVoucherRef");
+        addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN, "externalReferenceSn");
+        addContextEvidence(refs, CHARGEBACK_EVIDENCE_REF_CONTEXT_KEY, "chargebackEvidenceRef");
         return List.copyOf(refs);
     }
 
@@ -310,15 +346,22 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
     }
 
     private @NonNull Map<String, Object> resolveExplanationContext() {
-        if (!isDisputeRefund()) {
-            return Map.of();
-        }
         Map<String, Object> result = new LinkedHashMap<>();
-        putContextValue(result, FundsInstructionContextKeys.REFUND_MODE);
-        putContextValue(result, FundsInstructionContextKeys.DISPUTE_MODE);
-        putContextValue(result, FundsInstructionContextKeys.DISPUTE_REASON);
-        putContextValue(result, FundsInstructionContextKeys.DISPUTE_VOUCHER_REF);
-        putContextValue(result, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF);
+        if (isDisputeRefund()) {
+            putContextValue(result, FundsInstructionContextKeys.REFUND_MODE);
+            putContextValue(result, FundsInstructionContextKeys.DISPUTE_MODE);
+            putContextValue(result, FundsInstructionContextKeys.DISPUTE_REASON);
+            putContextValue(result, FundsInstructionContextKeys.DISPUTE_VOUCHER_REF);
+            putContextValue(result, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF);
+        } else if (isNoAuthRefund()) {
+            putContextValue(result, FundsInstructionContextKeys.REFUND_MODE);
+            putContextValue(result, FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN);
+            putContextValue(result, FundsInstructionContextKeys.REFUND_REASON);
+        } else if (isCompatChargeback()) {
+            putContextValue(result, CHARGEBACK_REASON_CONTEXT_KEY);
+            putContextValue(result, CHARGEBACK_EVIDENCE_REF_CONTEXT_KEY);
+            putContextValue(result, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF);
+        }
         return Map.copyOf(result);
     }
 
@@ -333,6 +376,21 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         return eventType == FundsTransactionEventType.AUTH_REFUND
                 && FundsInstructionContextKeys.REFUND_MODE_DISPUTE.equals(
                 contextString(FundsInstructionContextKeys.REFUND_MODE));
+    }
+
+    private boolean isNoAuthRefund() {
+        return eventType == FundsTransactionEventType.AUTH_REFUND
+                && FundsInstructionContextKeys.REFUND_MODE_NO_AUTH.equals(
+                contextString(FundsInstructionContextKeys.REFUND_MODE));
+    }
+
+    private boolean isCompatChargeback() {
+        return eventType == FundsTransactionEventType.CHARGEBACK;
+    }
+
+    private boolean isRefundEvent() {
+        return eventType == FundsTransactionEventType.REFUND
+                || eventType == FundsTransactionEventType.AUTH_REFUND;
     }
 
     private @Nullable String contextString(@NonNull String contextKey) {

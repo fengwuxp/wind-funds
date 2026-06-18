@@ -6,6 +6,7 @@ import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainQuery;
@@ -196,6 +197,193 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
                 .containsEntry(FundsInstructionContextKeys.DISPUTE_MODE, "CHARGEBACK")
                 .containsEntry(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
                         "DISPUTE_CASE_PROJECTION_202606180001");
+        assertLedgerTransactionFactsUnchanged(beforeExplainFacts);
+    }
+
+    /**
+     * 场景：普通直接交易退款已经成功入账，运营侧按退款资金交易流水查询投影解释。
+     * 输入：付款 70 后退款 30。
+     * 输出：解释摘要展示 REFUNDED/FUNDS_REFUNDED，而不是普通付款成功口径。
+     * 预期：普通退款可与付款、争议退款、无授权退款和兼容 chargeback 区分。
+     * 红线：投影解释不得把 REFUND 事件退化为 SUCCEEDED/FUNDS_POSTED。
+     */
+    @Test
+    void testDirectRefundShouldExplainRefundedStatusFromPersistedFacts() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("projection_refund_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "PROJECTION_EXPLAIN_REFUND_TOPUP");
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "PROJECTION_EXPLAIN_REFUND_PAY");
+
+        refund(payer, payee, LedgerSubjectCode.SETTLEMENT, 30L, "PROJECTION_EXPLAIN_REFUND_RETURN");
+        String refundSn = fundsTransactionsByBusinessSn("PROJECTION_EXPLAIN_REFUND_RETURN").getFirst().getSn();
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_EXPLAIN_REFUND_RETURN");
+        LedgerFactSnapshot beforeExplainFacts = ledgerFactSnapshot();
+        BalanceSnapshot afterRefund = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+
+        FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
+                FundsTransactionProjectionExplainQuery.builder()
+                        .fundsTransactionSn(refundSn)
+                        .build());
+
+        assertThat(explanation.businessScene()).isEqualTo("REFUND");
+        assertThat(explanation.businessSn()).isEqualTo("PROJECTION_EXPLAIN_REFUND_RETURN");
+        assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+        assertThat(explanation.factStatus()).isEqualTo("POSTED");
+        assertThat(explanation.displayStatus()).isEqualTo("REFUNDED");
+        assertThat(explanation.statusMeaning()).isEqualTo("FUNDS_REFUNDED");
+        assertThat(explanation.evidenceRefs())
+                .contains("fundsTransaction:" + refundSn,
+                        "ledgerTransaction:" + ledgerTransaction.getSn());
+        assertThat(explanation.payload())
+                .containsEntry("displayStatus", "REFUNDED")
+                .containsEntry("statusMeaning", "FUNDS_REFUNDED");
+        assertLedgerTransactionFactsUnchanged(beforeExplainFacts);
+        assertThat(snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount())))
+                .isEqualTo(afterRefund);
+    }
+
+    /**
+     * 场景：外部 capture 没有内部授权记录，但后续需要按外部引用入账退款。
+     * 输入：外部已扣款事实通过无授权退款返回 40，并携带外部引用和退款原因。
+     * 输出：解释摘要展示 NO_AUTH_REFUNDED，并透出外部原始事实引用。
+     * 预期：无授权退款不被误读为普通授权链退款或争议退款。
+     * 红线：投影解释不得丢失 no-auth refund 的外部追溯字段。
+     */
+    @Test
+    void testNoAuthRefundShouldExplainExternalReferenceFromPersistedFacts() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "PROJECTION_EXPLAIN_NO_AUTH_REFUND_TOPUP");
+        pay(user, settlementAccount(), LedgerSubjectCode.SETTLEMENT, 70L,
+                "PROJECTION_EXPLAIN_NO_AUTH_REFUND_CAPTURE");
+
+        String refundSn = refundWithoutAuthorization(user, 40L,
+                "PROJECTION_EXPLAIN_NO_AUTH_REFUND_RETURN");
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(
+                "PROJECTION_EXPLAIN_NO_AUTH_REFUND_RETURN");
+        LedgerFactSnapshot beforeExplainFacts = ledgerFactSnapshot();
+
+        FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
+                FundsTransactionProjectionExplainQuery.builder()
+                        .fundsTransactionSn(refundSn)
+                        .build());
+
+        assertThat(explanation.businessScene()).isEqualTo("AUTHORIZATION_NO_AUTH_REFUND");
+        assertThat(explanation.businessSn()).isEqualTo("PROJECTION_EXPLAIN_NO_AUTH_REFUND_RETURN");
+        assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+        assertThat(explanation.factStatus()).isEqualTo("POSTED");
+        assertThat(explanation.displayStatus()).isEqualTo("NO_AUTH_REFUNDED");
+        assertThat(explanation.statusMeaning()).isEqualTo("NO_AUTH_REFUND_POSTED");
+        assertThat(explanation.evidenceRefs())
+                .contains("fundsTransaction:" + refundSn,
+                        "ledgerTransaction:" + ledgerTransaction.getSn(),
+                        "externalReferenceSn:processor_capture_202606030001");
+        assertThat(explanation.payload())
+                .containsEntry("displayStatus", "NO_AUTH_REFUNDED")
+                .containsEntry("statusMeaning", "NO_AUTH_REFUND_POSTED")
+                .containsEntry(FundsInstructionContextKeys.REFUND_MODE,
+                        FundsInstructionContextKeys.REFUND_MODE_NO_AUTH)
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN,
+                        "processor_capture_202606030001")
+                .containsEntry(FundsInstructionContextKeys.REFUND_REASON,
+                        "external capture refunded without internal authorization");
+        assertLedgerTransactionFactsUnchanged(beforeExplainFacts);
+    }
+
+    /**
+     * 场景：授权占用到期释放后，运营侧按原授权资金交易流水查询最新投影解释。
+     * 输入：授权 80 后过期释放 80。
+     * 输出：解释摘要选择最新非手续费交易明细，展示 RELEASED/FUNDS_RELEASED。
+     * 预期：释放/过期只表达授权占用释放，不被展示为成功消费或退款。
+     * 红线：投影解释不得把 EXPIRE 事件退化为 SUCCEEDED/FUNDS_POSTED。
+     */
+    @Test
+    void testAuthorizationExpireShouldExplainReleasedStatusFromLatestDetail() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "PROJECTION_EXPLAIN_EXPIRE_TOPUP");
+        String authorizationSn = authorize(user, 80L, true, "PROJECTION_EXPLAIN_EXPIRE_AUTHORIZE");
+
+        String expireSn = expireAuthorization(user, 80L, authorizationSn,
+                "PROJECTION_EXPLAIN_EXPIRE_RELEASE");
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_EXPLAIN_EXPIRE_RELEASE");
+        LedgerFactSnapshot beforeExplainFacts = ledgerFactSnapshot();
+
+        FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
+                FundsTransactionProjectionExplainQuery.builder()
+                        .fundsTransactionSn(expireSn)
+                        .build());
+
+        assertThat(explanation.businessScene()).isEqualTo("AUTHORIZATION_EXPIRE");
+        assertThat(explanation.businessSn()).isEqualTo("PROJECTION_EXPLAIN_EXPIRE_RELEASE");
+        assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+        assertThat(explanation.factStatus()).isEqualTo("RELEASED");
+        assertThat(explanation.displayStatus()).isEqualTo("RELEASED");
+        assertThat(explanation.statusMeaning()).isEqualTo("FUNDS_RELEASED");
+        assertThat(explanation.evidenceRefs())
+                .contains("fundsTransaction:" + authorizationSn,
+                        "ledgerTransaction:" + ledgerTransaction.getSn());
+        assertThat(explanation.payload())
+                .containsEntry("displayStatus", "RELEASED")
+                .containsEntry("statusMeaning", "FUNDS_RELEASED");
+        assertLedgerTransactionFactsUnchanged(beforeExplainFacts);
+    }
+
+    /**
+     * 场景：历史兼容 chargeback 入口完成结算后拒付资金退回。
+     * 输入：授权 60、完成 60、兼容 chargeback 40，并携带最小拒付审计上下文。
+     * 输出：解释摘要展示 COMPAT_CHARGEBACK_REFUNDED，并透出外部争议和凭证引用。
+     * 预期：兼容 chargeback 与授权拒绝、普通退款和争议 settleRefund 均可区分。
+     * 红线：投影解释不得把 CHARGEBACK 事件退化为普通成功状态或授权 declined。
+     */
+    @Test
+    void testCompatChargebackShouldExplainAuditContextFromPersistedFacts() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "PROJECTION_EXPLAIN_COMPAT_CHARGEBACK_TOPUP");
+        String authorizationSn = authorize(user, 60L, true,
+                "PROJECTION_EXPLAIN_COMPAT_CHARGEBACK_AUTHORIZE");
+        settleAuthorization(user, 60L, authorizationSn,
+                "PROJECTION_EXPLAIN_COMPAT_CHARGEBACK_CAPTURE");
+        String chargebackSn = authorizationTransactionService.chargeback(
+                new FundsAuthorizationTransactionChargebackRequest()
+                        .setAccountId(user)
+                        .setAmount(Money.immutable(40L, CURRENCY))
+                        .setAuthorizationTransactionSn(authorizationSn)
+                        .setBusinessScene("AUTHORIZATION_CHARGEBACK")
+                        .setBusinessSn("PROJECTION_EXPLAIN_COMPAT_CHARGEBACK_RETURN")
+                        .setDescription("authorization chargeback")
+                        .setContextVariables(WritableContextVariables.of(Map.of(
+                                "chargebackReason", "CARDHOLDER_DISPUTE",
+                                "evidenceRef", "CHARGEBACK_EVIDENCE_PROJECTION_202606180001",
+                                FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
+                                "CHARGEBACK_CASE_PROJECTION_202606180001"))),
+                WindOperator.system());
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(
+                "PROJECTION_EXPLAIN_COMPAT_CHARGEBACK_RETURN");
+        LedgerFactSnapshot beforeExplainFacts = ledgerFactSnapshot();
+
+        FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
+                FundsTransactionProjectionExplainQuery.builder()
+                        .fundsTransactionSn(chargebackSn)
+                        .build());
+
+        assertThat(explanation.businessScene()).isEqualTo("AUTHORIZATION_CHARGEBACK");
+        assertThat(explanation.businessSn()).isEqualTo("PROJECTION_EXPLAIN_COMPAT_CHARGEBACK_RETURN");
+        assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+        assertThat(explanation.factStatus()).isEqualTo("POSTED");
+        assertThat(explanation.displayStatus()).isEqualTo("COMPAT_CHARGEBACK_REFUNDED");
+        assertThat(explanation.statusMeaning()).isEqualTo("COMPAT_CHARGEBACK_POSTED");
+        assertThat(explanation.evidenceRefs())
+                .contains("fundsTransaction:" + authorizationSn,
+                        "ledgerTransaction:" + ledgerTransaction.getSn(),
+                        "externalDisputeRef:CHARGEBACK_CASE_PROJECTION_202606180001",
+                        "chargebackEvidenceRef:CHARGEBACK_EVIDENCE_PROJECTION_202606180001");
+        assertThat(explanation.payload())
+                .containsEntry("displayStatus", "COMPAT_CHARGEBACK_REFUNDED")
+                .containsEntry("statusMeaning", "COMPAT_CHARGEBACK_POSTED")
+                .containsEntry("chargebackReason", "CARDHOLDER_DISPUTE")
+                .containsEntry("evidenceRef", "CHARGEBACK_EVIDENCE_PROJECTION_202606180001")
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
+                        "CHARGEBACK_CASE_PROJECTION_202606180001");
         assertLedgerTransactionFactsUnchanged(beforeExplainFacts);
     }
 

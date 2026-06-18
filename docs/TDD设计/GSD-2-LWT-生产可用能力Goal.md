@@ -13,7 +13,7 @@
 | 所属阶段 | GSD-2 / LWT capability goal / docs-only Plan Grant。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
 | Loop ID | `GSD2-LWT-PRODUCTION-CAPABILITY-LOOP-2026-06-18` |
-| 当前状态 | `B4_TRANSACTION_PROJECTION_EXPLAIN_002_DISPUTE_REFUND_GREEN_VERIFIED` |
+| 当前状态 | `B4_TRANSACTION_PROJECTION_EXPLAIN_002_REMAINING_GREEN_VERIFIED` |
 | Git / code baseline | `a38776c5 feat: 接入出款准入对账门禁`；`bc7ffc0f`、`10853e2d`、`ae8cb8a6` 和 `e81a8a25` 保留为已消费能力证据。 |
 | 关联入口 | [GSD-2-新基线工作流规划.md](GSD-2-新基线工作流规划.md)、[GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md)、[GSD-2-AUTH-Chargeback目标语义对齐任务卡.md](GSD-2-AUTH-Chargeback目标语义对齐任务卡.md)、[GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md](GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md)、OpenSpec `tdd-baseline-reset` tasks。 |
 | Owner | AI Native 流程编排负责 Goal、Loop、状态和停止条件；产品架构专家负责业务价值、验收和 Not Done；资深架构师负责模块边界、契约、测试、验证和编码准入；用户确认单一 Grant。 |
@@ -31,8 +31,8 @@
 | 层级 | ID / 状态 | 含义 | 当前动作 |
 | --- | --- | --- | --- |
 | 父 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` | GSD-2 总基线，负责清理旧活跃计划、维护 Wave、OpenSpec tasks、Plan Grant 和恢复入口。 | 继续作为总入口和历史证据账本，不直接授权编码。 |
-| LWT 子 Goal | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` / `B4_TRANSACTION_PROJECTION_EXPLAIN_002_DISPUTE_REFUND_GREEN_VERIFIED` | 聚合 ledger、wallet、transaction 和 reconciliation 的条件生产基线、完备性矩阵、三卡交接和下一 Grant 队列。 | 继续作为当前 LWT 状态载体，记录 AUTH 兼容 guard 和 B4 争议退款投影解释已消费。 |
-| 当前可执行状态 | `B4_TRANSACTION_PROJECTION_EXPLAIN_002_DISPUTE_REFUND_GREEN_VERIFIED` | B4 投影解释扩展首轮已完成争议退款解释：查询服务能从授权聚合下最新非手续费明细恢复 `DISPUTE_REFUNDED / DISPUTE_REFUND_POSTED`、争议上下文和外部证据引用。 | 下一轮默认从 B4 投影解释剩余矩阵、wallet facade、ledger guard、B7 清算/结算 gate 或 B5 审计扩展中重新确认单一 Grant。 |
+| LWT 子 Goal | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` / `B4_TRANSACTION_PROJECTION_EXPLAIN_002_REMAINING_GREEN_VERIFIED` | 聚合 ledger、wallet、transaction 和 reconciliation 的条件生产基线、完备性矩阵、三卡交接和下一 Grant 队列。 | 继续作为当前 LWT 状态载体，记录 AUTH 兼容 guard 和 B4 投影解释矩阵已消费。 |
+| 当前可执行状态 | `B4_TRANSACTION_PROJECTION_EXPLAIN_002_REMAINING_GREEN_VERIFIED` | B4 投影解释已覆盖 posted pay、declined authorization、缺 RouteSnapshot fail-fast、争议退款、普通退款、无授权退款、授权释放/过期和兼容 chargeback 的只读解释。 | 下一轮默认从 wallet facade、ledger guard、B7 清算/结算 gate、B7 差异报告或 B5 审计扩展中重新确认单一 Grant。 |
 | 历史证据状态 | `B7_RECON_DIFFERENCE_ACTION_GUARD_GREEN_VERIFIED`、`GSD2-B7-RECON-GATE-CONSUME-001/002`、`10853e2d` 等 | 只表示过去切片已完成或已消费，不能作为当前下一步或默认授权。 | 仅作为 Evidence Anchor 和 Not Done 边界来源。 |
 
 恢复规则：下一轮必须先读取本文、GSD-2 工作流、W5 推进计划、AUTH Chargeback 兼容入口确认包和 OpenSpec tasks；若用户没有确认新的单一 Grant，只能继续 docs-only 状态维护。若用户改选 B4、wallet、ledger guard、B7 清算/结算 gate 或 B5 审计扩展，必须先同步本映射和第 8.1 节 Grant 决策账本。
@@ -49,6 +49,7 @@
 | `LWT-NO-GRANT-004` | 2026-06-18 | 复核当前工作树和运行时 Goal，确认未出现新的单一 Execution Grant，且本轮没有新的事实差异、验证证据或状态缺口收敛。 | 无新增能力证据；本轮只把“无新 Grant 时不继续扩写确认包”的判断回写为停止条件证据。 | 1 | 下一轮若仍未确认 Grant 且没有新事实，应停止 docs-only 扩写并交还用户选择，而不是继续维护同一确认包。 |
 | `AUTH-COMPAT-005` | 2026-06-18 | 消费 `Execution Grant：GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001`，完成兼容 chargeback 最小审计 guard、契约说明、Red/Green、交易分组、compile 和 PMD。 | 新增失败无副作用 Red，证明缺 `externalDisputeRef` 的兼容 chargeback 不得入账；Green 后目标测试 32 tests、transaction 分组 107 tests、compile 和 PMD 均通过。 | 0 | 本 Grant 已消费；下一轮不得沿用本 Grant 扩完整 dispute case，需重新确认 B4-002 或其他单一 Grant。 |
 | `B4-PROJECTION-006` | 2026-06-18 | 消费 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002` 首轮争议退款解释切片。 | 新增争议退款投影解释 Red/Green：授权聚合下的 `settleRefund` 争议退款按最新非手续费明细解释，payload 透出 dispute 上下文，evidenceRefs 包含外部争议号和凭证号；目标测试 4 tests、主写投影回归 5 tests 通过。 | 0 | B4-002 仍有普通退款、无授权退款、释放/过期和兼容 chargeback 解释矩阵剩余；下一轮不得把本首轮外推为完整投影解释 Done。 |
+| `B4-PROJECTION-007` | 2026-06-18 | 消费 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`。 | 新增普通退款、无授权退款、授权释放/过期和兼容 chargeback 投影解释 Red/Green：解释层能区分 `REFUNDED`、`NO_AUTH_REFUNDED`、`RELEASED` 和 `COMPAT_CHARGEBACK_REFUNDED`，并透出外部引用、退款原因、chargeback evidence 和外部争议引用；目标投影解释测试 8 tests 通过。 | 0 | B4 remaining 已消费；下一轮不再重复 B4 remaining，除非新 Grant 明确扩失败态解释、projection store、治理重放、历史节点选择查询或运营差异报告。 |
 
 ## 2. 现状和影响范围
 
@@ -141,8 +142,8 @@
 | 状态 | 能力 | 当前结论 | 下一动作 |
 | --- | --- | --- | --- |
 | Ready | 账户主体型直接交易、授权交易、余额控制、route snapshot、原路径回放和基础投影解释 | 已有 B4、B5、B7 多个服务流切片证明交易事实、失败无副作用和只读解释边界。 | 保持 canonical 内核以账户主体为稳定入参。 |
-| Conditional Ready | 交易投影解释、余额调账审计和兼容 chargeback 最小 guard | B4-001、B4-002 首轮争议退款、B5-001 和 AUTH 兼容 adapter 已完成最小闭环；普通退款、no-auth refund、释放/过期、兼容 chargeback、独立审计表和 route snapshot 审计回链仍未进入全量解释矩阵。 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`、`GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
-| Not Done | 完整授权 admission、projection store、治理重放、差异报告和完整 dispute case | `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 只保护历史兼容入口的最小审计上下文，不声明完整 dispute / chargeback 生产链路 Done。 | 进入 B4-002 或 P2 / B7 专项前重新确认单一 Grant。 |
+| Conditional Ready | 交易投影解释、余额调账审计和兼容 chargeback 最小 guard | B4-001、B4-002 首轮争议退款、B4-002 remaining、B5-001 和 AUTH 兼容 adapter 已完成最小闭环；查询解释矩阵已覆盖付款、授权拒绝、缺快照、普通退款、无授权退款、争议退款、释放/过期和兼容 chargeback。 | 后续按 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`、失败态解释或运营差异报告专项补强。 |
+| Not Done | 完整授权 admission、projection store、治理重放、失败态全量解释、差异报告和完整 dispute case | `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 只保护历史兼容入口的最小审计上下文，不声明完整 dispute / chargeback 生产链路 Done。 | 进入 wallet admission、B5、B7 或 P2 专项前重新确认单一 Grant。 |
 | Blocker | 把交易内核整体改成支付工具入参，或让交易投影反写事实 | 会破坏账户主体 canonical 入账和重放稳定性。 | 停止并回到架构裁决。 |
 
 ### 5.4 Reconciliation / Clearing / Settlement
@@ -165,7 +166,7 @@
 | 交易内核基线 | 直接交易、授权交易、余额控制和原路径回放继续以账户主体作为 canonical 入参，支付工具只在外层解析。 | B4、B5、B7 多个切片已证明 route snapshot、失败无副作用和只读解释边界。 | `CONDITIONAL_DELIVERABLE_BASELINE`。 | 先处理 `chargeback` 兼容入口 guard 或 B4-002 投影解释扩展，避免历史方法误导新入口。 |
 | 账本护栏基线 | 每笔资金变化必须能断言 posting plan 平衡、LedgerEntry、余额桶、幂等和失败无副作用。 | 已完成切片均以 ledger 事实和余额投影作为验证护栏。 | `CONDITIONAL_DELIVERABLE_BASELINE`。 | 后续触碰 posting、entry、余额投影或 schema 时，`GSD2-LD-LEDGER-GUARD-REGRESSION-001` 升级为前置或伴随 Red。 |
 | 对账准入基线 | 差错登记、动作守卫、只读 gate 和出款 preflight 消费能阻断未闭环差错。 | B7 差错闭环、动作守卫、gate 决策和出款 preflight 消费已完成首轮 Green。 | `CONDITIONAL_DELIVERABLE_BASELINE`。 | 清算和结算消费方仍需独立 Grant；不得把出款 preflight 证据外推为完整清结算 Done。 |
-| 查询解释基线 | 交易投影和余额投影只能解释事实，不反写事实；退款、争议、兼容 chargeback 和授权拒绝需要可区分。 | B4-001 已覆盖 posted pay、declined authorization 和缺 RouteSnapshot fail-fast；B4-002 首轮已覆盖授权争议退款解释和最新明细事实选择。 | `PARTIAL_BASELINE`。 | 继续补齐普通退款、无授权退款、释放/过期和兼容 chargeback 的解释矩阵。 |
+| 查询解释基线 | 交易投影和余额投影只能解释事实，不反写事实；退款、争议、兼容 chargeback 和授权拒绝需要可区分。 | B4-001 已覆盖 posted pay、declined authorization 和缺 RouteSnapshot fail-fast；B4-002 已覆盖争议退款、普通退款、无授权退款、授权释放/过期和兼容 chargeback，并保持查询只读。 | `CONDITIONAL_DELIVERABLE_BASELINE`。 | 失败态全量解释、projection store、治理重放、历史节点选择查询或运营差异报告仍需独立 Grant。 |
 | 生产发布基线 | 生产迁移、灰度、回滚、监控、告警、运营审批和外部规则确认必须可追溯。 | 当前只完成本地服务流、H2、编译、PMD、分组测试和文档状态回写证据。 | `NOT_DELIVERABLE_AS_FULL_PRODUCTION_DONE`。 | 上线或真实资金前另起发布/迁移/运营准入，不在 LWT Goal 文档-only 范围内声明完成。 |
 
 当前裁决：ledger、wallet、transaction 和 reconciliation 已具备“条件可交付基线”，可继续作为上层 MVP 的被依赖能力进入下一单一 Grant；但不具备“全量生产 Done”裁决。后续任何代码切片都必须说明消费了哪一项基线、补强了哪一项 `PARTIAL_BASELINE` 或 `Not Done`，以及没有扩大到禁止范围。
@@ -224,12 +225,12 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | --- | --- | --- | --- | --- |
 | 1 | [GSD2-AUTH-CHARGEBACK-TARGET-ALIGN-001](GSD-2-AUTH-Chargeback目标语义对齐任务卡.md) | `contract/design-only` | 已补任务卡：目标态主入口为 `settleRefund` 争议字段；现有 `chargeback` 仅作为历史兼容、显式事件或内部适配资产。 | 已完成 docs-only 对齐，不进入代码。 |
 | 2 | [GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001](GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md) | `consumed-green` | 已按 `COMPAT_GUARD_NO_BEHAVIOR_BREAK` 完成兼容说明、最小审计 guard、兼容测试和状态回写。 | 不继续沿用本 Grant 扩完整 dispute case、DDL/H2 schema、事件语义迁移或公共 API 删除。 |
-| 3 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` | `service-flow-backed` | B4-002 首轮已覆盖授权争议退款解释；普通退款、无授权退款、释放/过期和兼容 chargeback 仍未覆盖，适合作为下一解释矩阵补强切片。 | 不新增 projection store，不反写资金事实，不把本轮最新明细选择外推为历史节点查询能力。 |
+| 3 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` | `consumed-green` | 已覆盖普通退款、无授权退款、释放/过期和兼容 chargeback 的解释矩阵。 | 不继续沿用本 Grant 扩 projection store、治理重放、历史节点选择查询或运营差异报告。 |
 | 4 | `GSD2-B2-WALLET-APPLICATION-FACADE-002` | `service-flow-backed` | wallet 已有资金责任和支付工具能力准入，但仍缺完整预交易快照、账户能力来源组合和授权 admission。 | 不做 VCC facade、不替换交易 canonical 入参。 |
 | 5 | `GSD2-LD-LEDGER-GUARD-REGRESSION-001` | `guard-regression` | 后续任一资金变化切片都需要 ledger guard 伴随证明。 | 不重启 GSD1 大包。 |
 | 6 | `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` | `service-flow-backed` | 出款 preflight 已消费 gate，清算/结算消费方仍未接入。 | 不一次性做完整清分、清算、结算、出款和补事实。 |
 | 7 | `GSD2-B5-BALANCE-ADJUST-AUDIT-002` | `service-flow-backed` | B5-001 已有入参审计和交易上下文，后续可补独立审计查询、route snapshot 回链或审批闭环。 | 不开放泛化运营补账。 |
-| 8 | Spend Rule / P2 VCC / 全球账户 | `contract-only` 起步 | 业务价值高，但必须消费账户、钱包 facade、交易投影、ledger guard 和对账差错证据。 | 不直接写 P2 生产代码、外部轨道或通道规则。 |
+| 8 | B7 差异报告 / Spend Rule / P2 VCC / 全球账户 | `contract-only` 起步 | 业务价值高，但必须消费账户、钱包 facade、交易投影、ledger guard 和对账差错证据。 | 不直接写 P2 生产代码、外部轨道或通道规则。 |
 
 ### 8.1 单一 Grant 决策账本
 
@@ -237,9 +238,9 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 
 | 决策项 | 当前裁决 | 进入条件 | 切换条件 | 状态回写 |
 | --- | --- | --- | --- | --- |
-| 默认推荐 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`。 | 用户重新确认该 Execution Grant；资深架构师按普通退款、无授权退款、释放/过期和兼容 chargeback 解释矩阵写首个 Red。 | 若用户明确不继续 B4，改选 wallet facade、ledger guard、B7 清算/结算 gate 或 B5-002。 | 本文第 8 节、第 10 节、第 11 节、W5 推进计划和 OpenSpec tasks。 |
+| 默认推荐 | `GSD2-B2-WALLET-APPLICATION-FACADE-002`。 | 用户重新确认该 Execution Grant；资深架构师按完整预交易快照、账户能力来源组合或授权 admission 写首个 Red。 | 若用户明确不继续 wallet，改选 ledger guard、B7 清算/结算 gate、B7 差异报告或 B5-002。 | 本文第 8 节、第 10 节、第 11 节、W5 推进计划和 OpenSpec tasks。 |
 | AUTH 兼容 adapter | 目标是防止历史 `chargeback` 被误当新目标主入口。 | 已按 `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 完成兼容说明、最小 guard、兼容测试和状态回写。 | 后续需要删除公共 API、改 DDL/H2 schema、完整 dispute case 或迁移到 `settleRefund` 委派时，必须重新开 Grant。 | `GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` 第 14 节已记录 Red/Green、验证证据和 Not Done。 |
-| B4 投影解释扩展 | 目标是补齐普通退款、无授权退款、释放/过期和兼容 chargeback 的解释矩阵。 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002` 首轮争议退款已消费；若继续 B4，需确认 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`，写入范围限 projection explain 只读查询和目标测试。 | 需要 projection store、治理重放、历史节点选择查询、反写事实或 DDL 时停止。 | 回写第 5.5 查询解释基线，从 `PARTIAL_BASELINE` 向条件基线推进。 |
+| B4 投影解释扩展 | 目标是补齐普通退款、无授权退款、释放/过期和兼容 chargeback 的解释矩阵。 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` 已消费，写入范围限 projection explain 只读查询和目标测试。 | 需要 projection store、治理重放、历史节点选择查询、反写事实、失败态全量解释、运营差异报告或 DDL 时停止并重新开 Grant。 | 已回写第 5.5 查询解释基线为 `CONDITIONAL_DELIVERABLE_BASELINE`。 |
 | Wallet facade 补强 | 目标是补完整预交易快照、账户能力来源组合或授权 admission 前置。 | 用户确认 `GSD2-B2-WALLET-APPLICATION-FACADE-002` 或等价 wallet 子切片。 | 需要 VCC facade、外部规则最终结论或替换交易 canonical 入参时停止。 | 回写第 5.2 Wallet 矩阵和 Evidence Anchor Matrix。 |
 | Ledger guard 回归 | 目标是证明后续资金变化仍满足 posting、entry、余额投影和幂等红线。 | 触碰 posting、LedgerEntry、余额投影、账目 schema 或资金变化高风险切片时前置或伴随。 | 发现非账务主体入账、余额桶不平或失败有副作用时停止。 | 回写第 5.1 Ledger 矩阵和第 11 Completion Audit。 |
 | B7 清算/结算 gate 消费 | 目标是把对账 gate 从出款 preflight 扩展到清算/结算消费方。 | 用户确认 `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`。 | 需要完整清分、清算、结算、补事实执行、运营审批或生产迁移时停止。 | 回写第 5.4 Reconciliation 矩阵和 W5 Grant 队列。 |
@@ -263,17 +264,17 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | Grant 消费可用性 | `rg -n 'Grant 消费预检清单|Grant 消费运行卡|Red 选择|最小断言清单|AUTH-CB-COMPAT-RED-001' docs/TDD设计/GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md openspec/changes/tdd-baseline-reset/tasks.md` | AUTH 兼容确认包不仅有可复制 Grant，还能指导确认后的预检、首个 Red 选择、最小 Green、Review、Verify 和 Handoff。 |
 | README 恢复导航 | `rg -n 'W1 基线差距审计把当前 Git/code baseline 校准到|推荐下一步确认 .*GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001|当前仍不授权代码|当前下一候选.*B2|下一候选.*GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001' docs/README.md docs/TDD设计/README.md docs/TDD设计/GSD-2-新基线工作流规划.md openspec/changes/tdd-baseline-reset/tasks.md` | 不再把 W1/W2/W3/W4 的历史基线、历史推荐或 B2 候选误写成当前下一候选；README 入口应指向 `a38776c5`、LWT Goal 和 AUTH 兼容确认包。 |
 | 空白和 Markdown | `git diff --check` | 无行尾空白或 patch 格式问题。 |
-| 编译和测试 | 本切片只改文档和任务状态，不运行 `just compile`。 | 无 Java、测试、DDL/H2 schema、公共契约或运行时配置变更。 |
+| 编译和测试 | B4 remaining 涉及 transaction-face 解释来源、目标测试和文档状态回写，已运行目标测试、投影回归、`just compile`、`just pmd` 和 `git diff --check`。 | Java、测试和公共契约变更均有本地验证证据。 |
 
 ## 10. 当前执行交接和 handoff
 
 | 字段 | 内容 |
 | --- | --- |
-| 当前可执行任务 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002` 首轮争议退款解释已完成 Red / Green / Review / Verify 和状态回写；下一轮默认等待重新确认 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` 或其他单一 Grant。 |
-| 写入范围 | 本文、GSD-2 入口、P0/P1 LWT 推进计划、TDD README、docs README 和 OpenSpec tasks 状态同步。 |
-| 验证命令 | B4 争议退款投影解释已执行 `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just test-one FundsTransactionProjectionExplainApplicationServiceTests tests`、`just test-one DefaultRoutedFundsInstructionOrchestratorProjectionTests tests`；本轮收口继续执行 `just compile`、`just pmd` 和 `git diff --check`。 |
-| 编译说明 | 本轮包含 Java、测试和公共契约注释变更，已运行 `just compile`。 |
-| 下一 owner | 用户确认是否进入 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002`；若不继续 B4，再从 wallet facade、ledger guard、B7 清算/结算 gate 消费或 B5 审计扩展中选择单一 Grant。 |
+| 当前可执行任务 | `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` 已完成 Red / Green / Verify 和状态回写；下一轮默认等待重新确认 wallet facade、ledger guard、B7 清算/结算 gate、B7 差异报告、B5 审计扩展或其他单一 Grant。 |
+| 写入范围 | `transaction-face` 投影解释来源、目标投影解释测试、本文、GSD-2 入口、P0/P1 LWT 推进计划、TDD README、docs README 和 OpenSpec tasks 状态同步。 |
+| 验证命令 | B4 remaining 已执行 `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just test-one FundsTransactionProjectionExplainApplicationServiceTests tests`，目标 8 tests 通过；本轮收口已执行 `just test-one DefaultRoutedFundsInstructionOrchestratorProjectionTests tests` 5 tests 通过、`just compile` 通过、`just pmd` 通过和 `git diff --check` 通过。 |
+| 编译说明 | 本轮包含 Java、测试和公共契约逻辑变更，已运行 `just compile`。 |
+| 下一 owner | 用户确认是否进入 wallet facade、ledger guard、B7 清算/结算 gate 消费、B7 差异报告或 B5 审计扩展；若继续 B4，必须是新的失败态解释、projection store、治理重放、历史节点选择查询或运营差异报告专项 Grant。 |
 | 交接要求 | 后续每轮必须先读取本文、GSD-2 工作流、W5 推进计划、AUTH 兼容确认包第 11 节预检清单、第 12 节运行卡和 OpenSpec tasks，再确认单一 Execution Grant、写入范围、禁止范围、验证命令和回滚提示。 |
 | 回滚提示 | 本轮为独立 B4 投影解释首切片，回滚时还原 projection explanation 契约、解释来源、查询实现、投影解释服务流测试和相关文档状态 diff；不得连带回滚无关历史提交或用户未归属变更。 |
 
@@ -291,13 +292,13 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | 给出下一单一 Grant 决策账本 | 第 8.1 已拆分默认推荐、候选切换条件、停止条件和状态回写位置。 | `DONE_DOCS_ONLY`。 | 用户确认单一 Grant 后，按对应候选首个 Red 进入代码闭环。 |
 | 结构门禁命令可复跑且通过 | 第 11.4 已记录 LWT Goal、P0/P1 LWT 推进计划、AUTH Chargeback 目标语义任务卡和 AUTH Chargeback 兼容入口确认包的 Harness、产品和架构结构 checker 结果。 | `DONE_DOCS_ONLY`。 | 后续改动任一活跃入口时必须复跑对应结构门禁。 |
 | 对齐当前 Git/code baseline | 本文、W5、GSD-2 工作流和 OpenSpec tasks 均校准到 `a38776c5`，并保留 `bc7ffc0f`、`10853e2d`、`ae8cb8a6`、`e81a8a25` 作为已消费证据。 | `DONE_DOCS_ONLY`。 | 若发生新提交，先回写 baseline 再继续。 |
-| 校准 README 恢复导航 | docs README 和 TDD README 已把 W1/W2/W3/W4 标为历史记录或已消费证据，当前入口指向 LWT Goal、`a38776c5`、AUTH 兼容 adapter Green 结果和下一默认候选 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002`；README 旧口径扫描无残留。 | `DONE_DOCS_ONLY`。 | 后续改 README 或入口导航时必须复跑 README 恢复导航扫描。 |
+| 校准 README 恢复导航 | docs README 和 TDD README 已把 W1/W2/W3/W4 标为历史记录或已消费证据，当前入口指向 LWT Goal、`a38776c5`、AUTH 兼容 adapter Green 结果、B4 投影解释 remaining 已消费结果和下一默认候选 `GSD2-B2-WALLET-APPLICATION-FACADE-002`；README 旧口径扫描无残留。 | `DONE_DOCS_ONLY`。 | 后续改 README 或入口导航时必须复跑 README 恢复导航扫描。 |
 | 按依赖顺序推进低风险文档/计划 | 下一候选已按 chargeback 兼容、B4 投影解释、wallet facade、ledger guard、B7 清算/结算 gate、B5 审计扩展排序。 | `DONE_DOCS_ONLY`。 | 未确认 Grant 前只允许状态和任务卡维护。 |
 | 建立无进展计数和停止账本 | 第 1.2 节已记录 docs-only 推进轮次、证据变化和无进展计数；当前计数为 1。 | `DONE_DOCS_ONLY`。 | 下一轮若没有 Grant、事实差异、验证证据或状态缺口收敛，应停止 docs-only 扩写并交还用户选择。 |
 | 单一 Execution Grant 后进入代码、测试、验证、提交闭环 | `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 已消费：补兼容入口最小审计 guard、契约说明和失败无副作用 Red；目标测试、交易分组、compile 和 PMD 通过。 | `GREEN_VERIFIED_SUMMARY_ONLY`。 | 本 Grant 已消费，下一轮必须重新确认新的单一 Grant。 |
 | 补齐 AUTH 兼容 Grant 消费预检 | `GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` 第 11 节已补用户授权、工作树状态、当前基线、首个 Red 收窄、写入范围、验证顺序、状态回写和 Git 策略预检，并已被本轮消费。 | `CONSUMED_GREEN`。 | 预检结果只作为本 Grant 审计证据，后续不得复用为新授权。 |
 | 补齐 AUTH 兼容 Grant 消费运行卡 | `GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` 第 12 节已补 Red 选择、Red 范围、Green 实现、Review、Verify、Handoff 和最小断言清单，并已被本轮消费。 | `CONSUMED_GREEN`。 | 运行卡结果只作为本 Grant 审计证据，后续不得复用为新授权。 |
-| 证明三模块全量生产可用 | 当前只具备条件可交付基线，仍缺完整预交易快照、授权 admission、完整投影解释矩阵、ledger guard 回归、清算/结算消费、差异报告、补事实、运营审批、生产迁移、灰度和告警。 | `NOT_DONE`。 | 不得标记 Goal complete；继续按单一 Grant 收敛缺口。 |
+| 证明三模块全量生产可用 | 当前只具备条件可交付基线，仍缺完整预交易快照、授权 admission、失败态全量解释、projection store、治理重放、ledger guard 回归、清算/结算消费、差异报告、补事实、运营审批、生产迁移、灰度和告警。 | `NOT_DONE`。 | 不得标记 Goal complete；继续按单一 Grant 收敛缺口。 |
 
 审计裁决：当前 Goal 的状态载体、完备性矩阵、条件基线判定、AUTH 兼容 Grant 确认包、消费预检和运行卡已完成收口；`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 已进入代码、测试和验证闭环，但三模块仍未被证明为全量生产 Done，且下一轮缺口必须重新确认单一 Grant。因此本线程 Goal 继续保持 active。
 
@@ -306,10 +307,10 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | 交接卡 | 已具备内容 | 缺口 | 下一 owner |
 | --- | --- | --- | --- |
 | Product Context Card | 业务目标、用户价值、核心对象、入账主体规则、支付工具边界、投影边界、对账 gate、条件基线和 Not Done 已在第 3 至 5 节表达。 | VCC、全球账户、收单、完整清结算和运营后台验收仍需独立场景卡。 | 产品架构专家。 |
-| Engineering Handoff Card | `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 已消费并通过目标测试、交易分组、compile 和 PMD；写入范围、禁止事项、验证命令、Not Done 和下一候选已回写。 | 下一轮仍缺新的单一 Execution Grant；本 Grant 不得复用。 | 资深架构师 + 用户。 |
+| Engineering Handoff Card | `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 和 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` 已消费并通过目标测试；写入范围、禁止事项、验证命令、Not Done 和下一候选已回写。 | 下一轮仍缺新的单一 Execution Grant；本 Grant 不得复用。 | 资深架构师 + 用户。 |
 | Production Loop Card | 已声明生产发布基线未完成，并列出迁移、灰度、回滚、监控、告警、运营审批、外部规则和真实资金前置条件。 | 生产发布、SLO、告警、Runbook、合规/法务/财务/通道确认均未授权。 | 发布 owner / 业务 owner / 合规和财务确认方。 |
 
-三卡裁决：当前三卡可用于下一轮编码准入交接，但不能替代新的 Execution Grant、测试通过、Git 授权或上线审批。`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 已消费，后续不得复用该 Grant 继续扩完整 dispute case；若继续推进，需重新确认 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002` 或其他单一 Grant。
+三卡裁决：当前三卡可用于下一轮编码准入交接，但不能替代新的 Execution Grant、测试通过、Git 授权或上线审批。`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 和 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` 已消费，后续不得复用这些 Grant 继续扩完整 dispute case、projection store 或治理重放；若继续推进，需重新确认 wallet facade、ledger guard、B7 清算/结算 gate、B7 差异报告、B5 审计扩展或其他单一 Grant。
 
 ### 11.3 Evidence Anchor Matrix
 
