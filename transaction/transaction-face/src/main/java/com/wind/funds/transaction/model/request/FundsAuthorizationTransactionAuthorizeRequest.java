@@ -1,6 +1,7 @@
 package com.wind.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.InternationalRegionCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -63,6 +64,9 @@ public class FundsAuthorizationTransactionAuthorizeRequest {
 
     @Schema(description = "授权拒绝原因，仅授权失败时需要，不表示结算后的拒付/争议")
     private String declineReason;
+
+    @Schema(description = "支付工具引用快照，仅用于 route snapshot 和审计回链，不作为账务主体")
+    private PaymentInstrumentRefSpec paymentInstrumentRef;
 
     @Schema(description = "上下文变量")
     private ReadonlyContextVariables contextVariables;

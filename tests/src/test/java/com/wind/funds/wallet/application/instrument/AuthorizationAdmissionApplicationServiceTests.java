@@ -1,6 +1,7 @@
 package com.wind.funds.wallet.application.instrument;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
@@ -189,6 +190,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(ledgerEntryCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(2);
         assertThat(routeSnapshotJson(AUTHORIZE_BUSINESS_SN)).isNotBlank();
         assertThat(routeLegCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
+        assertAuthorizationInstrumentSnapshot(AUTHORIZE_BUSINESS_SN);
     }
 
     /**
@@ -490,6 +492,27 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         return JSON.parseObject(routeSnapshotJson(businessSn))
                 .getJSONArray("legs")
                 .size();
+    }
+
+    private void assertAuthorizationInstrumentSnapshot(String businessSn) {
+        JSONObject paymentInstrumentRef = JSON.parseObject(routeSnapshotJson(businessSn))
+                .getJSONObject("paymentInstrumentRef");
+        assertThat(paymentInstrumentRef).isNotNull().isNotEmpty();
+        assertThat(paymentInstrumentRef.getString("instrumentId")).isEqualTo(PAYMENT_INSTRUMENT_SN);
+        assertThat(paymentInstrumentRef.getString("instrumentType")).isEqualTo("CARD");
+        assertThat(paymentInstrumentRef.getString("currency")).isEqualTo(CurrencyIsoCode.USD.name());
+        assertThat(paymentInstrumentRef.getString("status")).isEqualTo(FundsAccountStatus.ACTIVE.name());
+
+        JSONObject bindingSnapshot = paymentInstrumentRef.getJSONObject("bindingSnapshot");
+        assertThat(bindingSnapshot).isNotNull().isNotEmpty();
+        assertThat(bindingSnapshot.getString("bindingSn")).isEqualTo(PAYMENT_BINDING_SN);
+        assertThat(bindingSnapshot.getInteger("bindingVersion")).isEqualTo(1);
+        assertThat(bindingSnapshot.getString("bindingRole"))
+                .isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name());
+        assertThat(bindingSnapshot.getString("subjectType")).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT.name());
+        assertThat(bindingSnapshot.getString("subjectId")).isEqualTo(CREDIT_ACCOUNT_SN);
+        assertThat(bindingSnapshot.getString("admissionAction")).isEqualTo("AUTHORIZE");
+        assertThat(bindingSnapshot.getString("admissionDecision")).isEqualTo("APPROVED");
     }
 
     private void assertNoFundsOrLedgerFacts(String businessSn) {

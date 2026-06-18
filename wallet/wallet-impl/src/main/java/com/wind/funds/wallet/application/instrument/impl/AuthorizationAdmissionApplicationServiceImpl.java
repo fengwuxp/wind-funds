@@ -2,7 +2,9 @@ package com.wind.funds.wallet.application.instrument.impl;
 
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
+import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -26,6 +28,8 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -56,7 +60,9 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
         assertBindingMatchesFundingSubject(instrumentDecision, fundingDecision);
         FundsAccountId accountId = resolveTargetAccountId(fundingDecision);
         assertAccountCanAuthorize(request, accountId);
-        return authorizationTransactionService.authorize(convertToAuthorizeRequest(request, accountId), operator);
+        return authorizationTransactionService.authorize(convertToAuthorizeRequest(request,
+                accountId,
+                instrumentDecision), operator);
     }
 
     private void validateRequest(AuthorizeByPaymentInstrumentRequest request) {
@@ -130,7 +136,8 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
 
     private FundsAuthorizationTransactionAuthorizeRequest convertToAuthorizeRequest(
             AuthorizeByPaymentInstrumentRequest request,
-            FundsAccountId accountId) {
+            FundsAccountId accountId,
+            PaymentInstrumentCapabilityDecisionDTO instrumentDecision) {
         return new FundsAuthorizationTransactionAuthorizeRequest()
                 .setAccountId(accountId)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
@@ -141,6 +148,52 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
                 .setAuthorizedTime(request.getAuthorizedTime())
                 .setTransactionCountry(request.getTransactionCountry())
                 .setDeclineReason(request.getDeclineReason())
+                .setPaymentInstrumentRef(paymentInstrumentRef(request, instrumentDecision))
                 .setDescription(request.getDescription());
+    }
+
+    private PaymentInstrumentRefSpec paymentInstrumentRef(AuthorizeByPaymentInstrumentRequest request,
+                                                          PaymentInstrumentCapabilityDecisionDTO instrumentDecision) {
+        assertPaymentInstrumentSnapshotReady(instrumentDecision);
+        return ImmutablePaymentInstrumentRefSpec.builder()
+                .tenantId(instrumentDecision.getTenantId())
+                .instrumentId(instrumentDecision.getInstrumentSn())
+                .instrumentType(instrumentDecision.getInstrumentType())
+                .instrumentNo(instrumentDecision.getInstrumentNo())
+                .ownerId(instrumentDecision.getOwnerId())
+                .ownerType(instrumentDecision.getOwnerType().name())
+                .currency(instrumentDecision.getCurrency().name())
+                .status(instrumentDecision.getStatus().name())
+                .bindingSnapshot(bindingSnapshot(request, instrumentDecision))
+                .description(instrumentDecision.getDescription())
+                .build();
+    }
+
+    private void assertPaymentInstrumentSnapshotReady(PaymentInstrumentCapabilityDecisionDTO instrumentDecision) {
+        AssertUtils.hasText(instrumentDecision.getInstrumentSn(), "支付工具快照工具号不能为空");
+        AssertUtils.hasText(instrumentDecision.getInstrumentNo(), "支付工具快照展示号不能为空");
+        AssertUtils.hasText(instrumentDecision.getOwnerId(), "支付工具快照归属主体 ID 不能为空");
+        AssertUtils.notNull(instrumentDecision.getOwnerType(), "支付工具快照归属主体类型不能为空");
+        AssertUtils.hasText(instrumentDecision.getInstrumentType(), "支付工具快照类型不能为空");
+        AssertUtils.notNull(instrumentDecision.getCurrency(), "支付工具快照币种不能为空");
+        AssertUtils.notNull(instrumentDecision.getStatus(), "支付工具快照状态不能为空");
+        AssertUtils.hasText(instrumentDecision.getBindingSn(), "支付工具绑定快照绑定号不能为空");
+        AssertUtils.notNull(instrumentDecision.getBindingVersion(), "支付工具绑定快照版本不能为空");
+        AssertUtils.notNull(instrumentDecision.getBindingRole(), "支付工具绑定快照角色不能为空");
+        AssertUtils.notNull(instrumentDecision.getSubjectType(), "支付工具绑定快照主体类型不能为空");
+        AssertUtils.hasText(instrumentDecision.getSubjectId(), "支付工具绑定快照主体 ID 不能为空");
+    }
+
+    private Map<String, Object> bindingSnapshot(AuthorizeByPaymentInstrumentRequest request,
+                                                PaymentInstrumentCapabilityDecisionDTO instrumentDecision) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("bindingSn", instrumentDecision.getBindingSn());
+        values.put("bindingVersion", instrumentDecision.getBindingVersion());
+        values.put("bindingRole", instrumentDecision.getBindingRole().name());
+        values.put("subjectType", instrumentDecision.getSubjectType().name());
+        values.put("subjectId", instrumentDecision.getSubjectId());
+        values.put("admissionAction", PaymentInstrumentAction.AUTHORIZE.name());
+        values.put("admissionDecision", Boolean.TRUE.equals(request.getApproved()) ? "APPROVED" : "DECLINED");
+        return values;
     }
 }

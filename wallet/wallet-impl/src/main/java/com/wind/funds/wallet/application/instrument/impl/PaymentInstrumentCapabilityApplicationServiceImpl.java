@@ -136,17 +136,22 @@ public class PaymentInstrumentCapabilityApplicationServiceImpl
                 .setTenantId(request.getTenantId())
                 .setInstrumentId(instrument.getId())
                 .setInstrumentSn(instrument.getSn())
+                .setInstrumentNo(instrument.getInstrumentNo())
+                .setOwnerId(instrument.getOwnerId())
+                .setOwnerType(instrument.getOwnerType())
                 .setInstrumentType(instrument.getInstrumentType())
                 .setInstrumentDirection(instrument.getInstrumentDirection())
                 .setChannelCode(instrument.getChannelCode())
                 .setAction(request.getAction())
                 .setCurrency(request.getCurrency())
+                .setStatus(instrument.getStatus())
                 .setBindingId(binding.getId())
                 .setBindingSn(binding.getSn())
                 .setBindingRole(binding.getBindingRole())
                 .setSubjectId(binding.getSubjectId())
                 .setSubjectType(binding.getSubjectType())
                 .setBindingVersion(binding.getVersion())
-                .setDefaultBinding(binding.getDefaultBinding());
+                .setDefaultBinding(binding.getDefaultBinding())
+                .setDescription(instrument.getDescription());
     }
 }

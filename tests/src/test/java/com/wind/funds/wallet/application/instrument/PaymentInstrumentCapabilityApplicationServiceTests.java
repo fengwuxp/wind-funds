@@ -87,11 +87,15 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
                     assertThat(result.getTenantId()).isEqualTo(TENANT_ID);
                     assertThat(result.getInstrumentId()).isNotNull();
                     assertThat(result.getInstrumentSn()).isEqualTo(PAYMENT_INSTRUMENT_SN);
+                    assertThat(result.getInstrumentNo()).isEqualTo(MASKED_INSTRUMENT_NO);
+                    assertThat(result.getOwnerId()).isEqualTo(OWNER_ID);
+                    assertThat(result.getOwnerType()).isEqualTo(FundsAccountOwnerType.USER);
                     assertThat(result.getInstrumentType()).isEqualTo(INSTRUMENT_TYPE_CARD);
                     assertThat(result.getInstrumentDirection()).isEqualTo(PaymentInstrumentDirection.PAYMENT);
                     assertThat(result.getChannelCode()).isEqualTo(CHANNEL_CODE);
                     assertThat(result.getAction()).isEqualTo(PaymentInstrumentAction.AUTHORIZE);
                     assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+                    assertThat(result.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
                     assertThat(result.getBindingId()).isEqualTo(bindingId);
                     assertThat(result.getBindingSn()).isEqualTo(PAYMENT_BINDING_SN);
                     assertThat(result.getBindingRole()).isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT);

@@ -1,6 +1,8 @@
 package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
@@ -24,7 +26,7 @@ import java.io.Serializable;
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode
-@ToString
+@ToString(exclude = "instrumentNo")
 @Accessors(chain = true)
 public class PaymentInstrumentCapabilityDecisionDTO implements Serializable {
 
@@ -40,6 +42,15 @@ public class PaymentInstrumentCapabilityDecisionDTO implements Serializable {
     @Schema(description = "支付工具号")
     private String instrumentSn;
 
+    @Schema(description = "支付工具展示号或稳定识别号")
+    private String instrumentNo;
+
+    @Schema(description = "支付工具归属主体 ID")
+    private String ownerId;
+
+    @Schema(description = "支付工具归属主体类型")
+    private FundsAccountOwnerType ownerType;
+
     @Schema(description = "支付工具类型")
     private String instrumentType;
 
@@ -54,6 +65,9 @@ public class PaymentInstrumentCapabilityDecisionDTO implements Serializable {
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;
+
+    @Schema(description = "支付工具状态")
+    private FundsAccountStatus status;
 
     @Schema(description = "绑定主键")
     private Long bindingId;
@@ -75,4 +89,7 @@ public class PaymentInstrumentCapabilityDecisionDTO implements Serializable {
 
     @Schema(description = "是否默认绑定")
     private Boolean defaultBinding;
+
+    @Schema(description = "支付工具描述")
+    private String description;
 }

@@ -90,6 +90,7 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .instrumentRef(request.getPaymentInstrumentRef())
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(eventTime(request.getAuthorizedTime()))

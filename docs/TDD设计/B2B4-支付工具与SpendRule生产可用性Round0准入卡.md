@@ -288,12 +288,12 @@ Git 策略：未确认前 summary_only；确认后若用户保持 GSD-CAD 自动
 
 | 扫描项 | 结论 |
 | --- | --- |
-| 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
+| 当前状态 | `CONSUMED_PARTIAL_GREEN_WITH_ROUTE_SNAPSHOT_BACKLINK`。支付工具能力准入、授权准入和授权 route snapshot 回链已完成首轮 Green；Spend Rule 控制闭环、预算控制投影和完整 VCC facade 仍未完成。 |
 | canonical 内核 | `FundsAuthorizationTransactionService#authorize` 仍接收 `FundsAuthorizationTransactionAuthorizeRequest`，请求以 `FundsAccountId accountId` 作为已解析账户主体入参；B4-AUTH-PI 不应替换该请求字段。 |
 | 钱包资源服务 | `PaymentInstrumentService` 负责工具和绑定管理；`SpendSubjectFundingRelationService` 负责资金责任关系维护；两者不是授权准入 application facade。 |
-| 缺口 | 已补首轮 `PaymentInstrumentCapabilityApplicationService` 工具能力准入，并由 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 补齐 `AuthorizationAdmissionApplicationService` 最小授权准入服务流；仍未证明授权准入 route snapshot 回链、Spend Rule 控制闭环、预算控制投影或完整 VCC facade。 |
+| 缺口 | 已补首轮 `PaymentInstrumentCapabilityApplicationService` 工具能力准入，并由 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 补齐 `AuthorizationAdmissionApplicationService` 最小授权准入服务流；授权 route snapshot 回链已由 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 补齐。Spend Rule 控制闭环、预算控制投影和完整 VCC facade 仍未完成。 |
 | 首批 Red | `R0-AUTH-001`：支付工具授权入口必须先做工具、绑定、Spend Rule、资金责任和账户能力准入；准入失败无资金交易、route、posting、LedgerEntry、projection 或敏感上下文副作用；`approved=false` 授权拒绝只生成标准拒绝交易事实，route legs 为空且无 posting、LedgerEntry 或余额影响；批准后只委派账户主体型授权内核。 |
-| Grant 必须列明 | 下一轮若继续 wallet，应重新确认 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 或等价 Grant，并列明 route snapshot / audit 快照位置、支付工具引用、绑定版本、准入动作、准入决策、敏感上下文白名单、目标测试资产和验证命令。 |
+| Grant 必须列明 | 后续若继续 wallet，不再重复消费 route snapshot Grant；应重新确认完整预交易快照、账户能力来源组合、Spend Rule 控制闭环、预算控制投影或 VCC facade 中的单一切片，并列明快照位置、规则版本、敏感上下文白名单、目标测试资产和验证命令。 |
 | 禁止混入 | 不新增统一 `InstrumentTransactionService`；不把支付工具、预算组或 Spend Rule 作为账务主体；不混入完整 VCC、Spend Rule 引擎、清结算对账、治理 apply、P2 轨道或敏感原文。 |
 
 ### 8.2 authInstrumentGrantCandidate（2026-06-03）
@@ -322,7 +322,7 @@ Git 策略：未确认前 summary_only；确认后若用户保持 GSD-CAD 自动
 | `verificationCommand` | 首轮 `just test-one AuthorizationAdmissionApplicationServiceTests tests`；Green 后按触点补 `just test-one PaymentInstrumentServiceImplTests tests`、`just test-one SpendSubjectFundingRelationServiceImplTests tests`、`just test-one PaymentInstrumentRouteDslContractTests tests`、`just test-transaction`、`just test-boundary`、`just compile`、`just pmd` 和 `git diff --check`。 |
 | `gitStrategy` | 若用户确认本 Grant 并保持 GSD-CAD 自动模式，目标验证通过且未触发停止条件时按 `auto_commit` 提交；验证失败、环境不可判定或越界时转 `summary_only`。 |
 | `stopCondition` | 需要修改 transaction canonical 请求、core 枚举或状态、ledger 公共契约、DDL/H2 schema、目标主体字段迁移、Spend Rule 表、预算控制投影、完整 VCC、清结算对账、治理、外部规则、敏感数据、跨模块依赖反转、公有方法超过 5 个参数或工作树冲突时停止。 |
-| `handoff` | 本候选包已消费为 `AuthorizationAdmissionApplicationService` 最小服务流；后续只作为只读参考和残余风险记录。若继续 wallet，下一恢复入口为 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001`，不得复用本授权包扩展 VCC、Spend Rule 或统一支付工具交易内核。 |
+| `handoff` | 本候选包已消费为 `AuthorizationAdmissionApplicationService` 最小服务流；route snapshot 回链也已由 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 消费。后续只作为只读参考和残余风险记录；若继续 wallet，需在完整预交易快照、账户能力来源组合、Spend Rule 控制闭环或 VCC facade 中重新确认单一 Grant，不得复用本授权包扩展 VCC、Spend Rule 或统一支付工具交易内核。 |
 
 ```text
 Execution Grant：B4-AUTH-PI（历史已消费，禁止复用）
@@ -341,19 +341,19 @@ Git 策略：auto_commit
 
 ### 8.2.1 GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001 准入包（2026-06-18）
 
-本节是 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 提交后的下一候选准入包，只固化只读源码审计和最小执行边界。它不授权 Java、测试、DDL/H2 schema、运行时配置或 Git 写入。
+本节最初是 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 提交后的下一候选准入包，现已被 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 消费为本地 Green 证据。它保留为只读源码审计、最小执行边界和回归依据，不再作为新的编码授权。
 
 | 项 | 当前口径 |
 | --- | --- |
-| 当前状态 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| 当前状态 | `CONSUMED_GREEN_2026-06-18`。 |
 | 目标 | 支付工具授权准入批准后，route snapshot 顶层 `paymentInstrumentRef` 必须可审计支付工具引用、绑定快照、绑定版本、准入动作和准入决策；交易内核仍以已解析 `FundsAccountId` 作为 canonical 入参。 |
 | 只读源码事实 | `ImmutableFundsInstructionSpec`、`ResolvedRouteSpec`、`ImmutableRouteSnapshotSpec` 和 `RouteSnapshotJsonSupport` 已有 `paymentInstrumentRef` 承载、序列化和回放能力；`AuthorizationFundsInstructionRouteResolver` 已从 `instruction.getInstrumentRef()` 透传到 resolved route；`DefaultRouteSnapshotFactory` 会把 resolved route 写入 route snapshot。 |
-| 当前缺口 | `AuthorizationAdmissionApplicationServiceImpl` 已完成支付工具准入和账户主体型授权委派，但 `FundsAuthorizationTransactionAuthorizeRequest` 与 `FundsAuthorizationInstructionConverter#convertToAuthorizeInstruction` 尚未把支付工具快照写入 `ImmutableFundsInstructionSpec.instrumentRef`；因此授权准入服务流只能证明 route snapshot 存在，不能证明 route snapshot 已回链支付工具引用。 |
+| 当前缺口 | 已由 `FundsAuthorizationTransactionAuthorizeRequest.paymentInstrumentRef`、`FundsAuthorizationInstructionConverter#convertToAuthorizeInstruction` 透传和 `AuthorizationAdmissionApplicationServiceImpl` 支付工具快照构造补齐；授权准入服务流已能证明 route snapshot 顶层 `paymentInstrumentRef` 回链支付工具引用、绑定版本和准入决策。 |
 | 产品口径 | 支付工具引用使用稳定业务工具号或 token 化引用作为 `instrumentId`，不把数据库主键当跨系统身份；内部主键如需追踪，只能进入受控 `bindingSnapshot` 或交易审计上下文，且不得包含 PAN、CVV、完整卡号、外部密钥或敏感原文。 |
 | 首批 Red | 在 `AuthorizationAdmissionApplicationServiceTests` 或等价服务流测试中，批准路径断言 persisted route snapshot 的 `paymentInstrumentRef.instrumentId`、`instrumentType`、`currency`、`status` 和 `bindingSnapshot.bindingSn / bindingVersion / bindingRole / subjectType / subjectId / admissionAction / admissionDecision` 非空且与准入决策一致；拒绝路径继续断言无 posting、LedgerEntry 和余额影响。 |
 | 允许写入 | Red 证明缺口后，允许非破坏性新增授权请求的可选支付工具快照字段或等价只读审计承载、在授权 converter 中写入 `ImmutableFundsInstructionSpec.instrumentRef`、在 wallet 授权准入实现中构造敏感字段安全的 `PaymentInstrumentRefSpec`，并补目标测试和必要 route snapshot / 授权交易回归。 |
 | 禁止写入 | 不替换 `FundsAuthorizationTransactionAuthorizeRequest.accountId`，不把支付工具作为账务主体，不让支付工具成为 route leg、posting、LedgerEntry 或余额投影主体，不新增统一 `InstrumentTransactionService`，不混入 VCC 生命周期、Spend Rule 策略引擎、清结算对账、DDL/H2 schema、projection store、治理重放或敏感原文处理。 |
-| 验证命令 | 首轮 `just test-one AuthorizationAdmissionApplicationServiceTests tests`；Green 后按触点补 `just test-one RouteSnapshotJsonSupportTests tests`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just compile`、`just pmd` 和 `git diff --check`。 |
+| 验证命令 | 本轮已执行 `just test-one AuthorizationAdmissionApplicationServiceTests tests`、`just test-one AuthorizationAdmissionApplicationServiceTests,PaymentInstrumentCapabilityApplicationServiceTests,RouteSnapshotJsonSupportTests,FundsAuthorizationTransactionFlowTests tests`、`just compile`、`just pmd`、`git diff --check` 和 `cad-candidate` 结构检查后提交。 |
 | 停止条件 | 需要破坏性修改 transaction canonical 入参、公共 API 删除、DDL/H2 schema、跨模块依赖反转、敏感字段落库、VCC/Spend Rule/清结算越界或无法解释的资金测试失败时停止。 |
 
 ### 8.3 B2-PI-CAP Round 0 扫描（2026-06-04）
