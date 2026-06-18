@@ -11,6 +11,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
@@ -59,6 +60,8 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String DISPLAY_STATUS_RELEASED = "RELEASED";
 
+    private static final String DISPLAY_STATUS_DISPUTE_REFUNDED = "DISPUTE_REFUNDED";
+
     private static final String DISPLAY_STATUS_DECLINED = "DECLINED";
 
     private static final String DISPLAY_STATUS_FAILED = "FAILED";
@@ -85,6 +88,8 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             "BALANCE_FROZEN_NOT_CONSUMED";
 
     private static final String STATUS_MEANING_FUNDS_RELEASED = "FUNDS_RELEASED";
+
+    private static final String STATUS_MEANING_DISPUTE_REFUND_POSTED = "DISPUTE_REFUND_POSTED";
 
     private static final String STATUS_MEANING_FACT_PROCESSING = "FACT_PROCESSING";
 
@@ -140,7 +145,8 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
                 .failureReason(resolveFailureReason())
                 .unavailableReason(resolveUnavailableReason())
                 .nextAction(resolveNextAction())
-                .evidenceRefs(evidenceRefs(fundsTransactionSn, routeSnapshot.getSnapshotId(), ledgerTransactionSn))
+                .evidenceRefs(evidenceRefs())
+                .explanationContext(resolveExplanationContext())
                 .externalRuleVerificationStatus(NOT_APPLICABLE)
                 .build();
     }
@@ -168,6 +174,9 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         }
         if (!completed) {
             return DISPLAY_STATUS_PROCESSING;
+        }
+        if (isDisputeRefund()) {
+            return DISPLAY_STATUS_DISPUTE_REFUNDED;
         }
         return switch (eventType) {
             case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn)
@@ -201,6 +210,9 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         }
         if (!completed) {
             return STATUS_MEANING_FACT_PROCESSING;
+        }
+        if (isDisputeRefund()) {
+            return STATUS_MEANING_DISPUTE_REFUND_POSTED;
         }
         return switch (eventType) {
             case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn)
@@ -274,17 +286,57 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         return NOT_APPLICABLE;
     }
 
-    private static @NonNull List<String> evidenceRefs(@Nullable String fundsTransactionSn,
-                                                      @NonNull String routeSnapshotId,
-                                                      @Nullable String ledgerTransactionSn) {
+    private @NonNull List<String> evidenceRefs() {
         List<String> refs = new ArrayList<>();
         if (StringUtils.hasText(fundsTransactionSn)) {
             refs.add("fundsTransaction:" + fundsTransactionSn);
         }
-        refs.add("routeSnapshot:" + routeSnapshotId);
+        refs.add("routeSnapshot:" + routeSnapshot.getSnapshotId());
         if (StringUtils.hasText(ledgerTransactionSn)) {
             refs.add("ledgerTransaction:" + ledgerTransactionSn);
         }
+        addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF, "externalDisputeRef");
+        addContextEvidence(refs, FundsInstructionContextKeys.DISPUTE_VOUCHER_REF, "disputeVoucherRef");
         return List.copyOf(refs);
+    }
+
+    private void addContextEvidence(@NonNull List<String> refs,
+                                    @NonNull String contextKey,
+                                    @NonNull String evidencePrefix) {
+        String value = contextString(contextKey);
+        if (StringUtils.hasText(value)) {
+            refs.add(evidencePrefix + ":" + value);
+        }
+    }
+
+    private @NonNull Map<String, Object> resolveExplanationContext() {
+        if (!isDisputeRefund()) {
+            return Map.of();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        putContextValue(result, FundsInstructionContextKeys.REFUND_MODE);
+        putContextValue(result, FundsInstructionContextKeys.DISPUTE_MODE);
+        putContextValue(result, FundsInstructionContextKeys.DISPUTE_REASON);
+        putContextValue(result, FundsInstructionContextKeys.DISPUTE_VOUCHER_REF);
+        putContextValue(result, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF);
+        return Map.copyOf(result);
+    }
+
+    private void putContextValue(@NonNull Map<String, Object> values, @NonNull String contextKey) {
+        Object value = contextVariables.get(contextKey);
+        if (value != null) {
+            values.put(contextKey, value);
+        }
+    }
+
+    private boolean isDisputeRefund() {
+        return eventType == FundsTransactionEventType.AUTH_REFUND
+                && FundsInstructionContextKeys.REFUND_MODE_DISPUTE.equals(
+                contextString(FundsInstructionContextKeys.REFUND_MODE));
+    }
+
+    private @Nullable String contextString(@NonNull String contextKey) {
+        Object value = contextVariables.get(contextKey);
+        return value == null ? null : value.toString();
     }
 }

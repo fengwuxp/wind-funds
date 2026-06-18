@@ -32,10 +32,12 @@ public record FundsTransactionProjectionExplanation(@NonNull String businessScen
                                                     @NonNull String unavailableReason,
                                                     @NonNull String nextAction,
                                                     @NonNull List<String> evidenceRefs,
+                                                    @NonNull Map<String, Object> explanationContext,
                                                     @NonNull String externalRuleVerificationStatus) {
 
     public FundsTransactionProjectionExplanation {
         evidenceRefs = List.copyOf(evidenceRefs);
+        explanationContext = explanationContext == null ? Map.of() : Map.copyOf(explanationContext);
     }
 
     /**
@@ -62,6 +64,7 @@ public record FundsTransactionProjectionExplanation(@NonNull String businessScen
         payload.put("unavailableReason", unavailableReason);
         payload.put("nextAction", nextAction);
         payload.put("evidenceRefs", evidenceRefs);
+        payload.putAll(explanationContext);
         payload.put("externalRuleVerificationStatus", externalRuleVerificationStatus);
         return Map.copyOf(payload);
     }

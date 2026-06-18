@@ -5,7 +5,6 @@ import com.alibaba.fastjson2.JSONObject;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
-import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
@@ -55,15 +54,15 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
                 query.fundsTransactionSn());
         FundsTransactionDetailDTO primaryDetail = resolvePrimaryDetail(details);
         return FundsTransactionProjectionExplanationSource.builder()
-                .businessScene(transaction.getBusinessScene())
-                .businessSn(transaction.getBusinessSn())
+                .businessScene(primaryDetail.getBusinessScene())
+                .businessSn(primaryDetail.getBusinessSn())
                 .fundsTransactionSn(transaction.getSn())
                 .routeSnapshot(routeSnapshot)
-                .ledgerTransactionSn(resolveLedgerTransactionSn(details))
-                .completed(isCompleted(transaction.getStatus()))
-                .failed(transaction.getStatus() == FundsTransactionStatus.FAILED)
+                .ledgerTransactionSn(primaryDetail.getLedgerTransactionSn())
+                .completed(isCompleted(primaryDetail.getStatus()))
+                .failed(primaryDetail.getStatus() == FundsTransactionDetailStatus.FAILED)
                 .eventType(primaryDetail.getEventType())
-                .amount(Money.immutable(transaction.getAmount(), transaction.getCurrency()))
+                .amount(Money.immutable(primaryDetail.getAmount(), primaryDetail.getCurrency()))
                 .contextVariables(parseContextVariables(primaryDetail.getContextVariables()))
                 .failureReasonOverride(resolveFailureReason(primaryDetail))
                 .build()
@@ -83,23 +82,19 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
     private FundsTransactionDetailDTO resolvePrimaryDetail(List<FundsTransactionDetailDTO> details) {
         return details.stream()
                 .filter(detail -> detail.getParticipantRole() != RouteParticipantRole.FEE_RECEIVER)
-                .findFirst()
+                .max((left, right) -> Long.compare(nullableId(left), nullableId(right)))
                 .orElse(details.getFirst());
     }
 
-    private @Nullable String resolveLedgerTransactionSn(List<FundsTransactionDetailDTO> details) {
-        return details.stream()
-                .map(FundsTransactionDetailDTO::getLedgerTransactionSn)
-                .filter(StringUtils::hasText)
-                .findFirst()
-                .orElse(null);
+    private long nullableId(FundsTransactionDetailDTO detail) {
+        Long id = detail.getId();
+        return id == null ? 0L : id;
     }
 
-    private boolean isCompleted(FundsTransactionStatus status) {
-        return status == FundsTransactionStatus.OPEN
-                || status == FundsTransactionStatus.CLOSED
-                || status == FundsTransactionStatus.EXPIRED
-                || status == FundsTransactionStatus.REJECTED;
+    private boolean isCompleted(FundsTransactionDetailStatus status) {
+        return status == FundsTransactionDetailStatus.SUCCEEDED
+                || status == FundsTransactionDetailStatus.REJECTED
+                || status == FundsTransactionDetailStatus.FAILED;
     }
 
     private @NonNull Map<String, Object> parseContextVariables(@Nullable String contextVariables) {

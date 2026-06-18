@@ -1,15 +1,22 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainQuery;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplanation;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.core.WritableContextVariables;
+import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Map;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.delta;
@@ -130,6 +137,66 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
                 .noneMatch(ref -> ref.startsWith("ledgerTransaction:"));
         assertLedgerTransactionFactsUnchanged(beforeDeclineFacts);
         assertNoLedgerFactsForFundsTransaction(authorizationSn);
+    }
+
+    /**
+     * 场景：已完成授权发生外部争议，资金结果通过 settleRefund 承接。
+     * 输入：授权 60、完成 60、争议退款 40，并携带 dispute 审计字段。
+     * 输出：解释摘要必须展示 DISPUTE_REFUND 语义，并暴露外部争议引用。
+     * 预期：争议退款可与普通退款、无授权退款和兼容 chargeback 区分。
+     * 红线：投影解释不得把带 dispute 上下文的 AUTH_REFUND 退化为普通 FUNDS_POSTED。
+     */
+    @Test
+    void testDisputeAuthorizationRefundShouldExplainDisputeContextFromPersistedFacts() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 100L, "PROJECTION_EXPLAIN_DISPUTE_TOPUP");
+        String authorizationSn = authorize(user, 60L, true, "PROJECTION_EXPLAIN_DISPUTE_AUTHORIZE");
+        settleAuthorization(user, 60L, authorizationSn, "PROJECTION_EXPLAIN_DISPUTE_CAPTURE");
+        String refundSn = authorizationTransactionService.settleRefund(new FundsAuthorizationTransactionRefundRequest()
+                .setAccountId(user)
+                .setAmount(Money.immutable(40L, CURRENCY))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setDisputeMode("CHARGEBACK")
+                .setDisputeReason("CARDHOLDER_DISPUTE")
+                .setDisputeVoucherRef("DISPUTE_EVIDENCE_PROJECTION_202606180001")
+                .setExternalDisputeRef("DISPUTE_CASE_PROJECTION_202606180001")
+                .setBusinessScene("AUTHORIZATION_DISPUTE_REFUND")
+                .setBusinessSn("PROJECTION_EXPLAIN_DISPUTE_RETURN")
+                .setDescription("authorization dispute refund")
+                .setContextVariables(WritableContextVariables.of(Map.of(
+                        "caseOwner", "ops-team-a"))), WindOperator.system());
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_EXPLAIN_DISPUTE_RETURN");
+        LedgerFactSnapshot beforeExplainFacts = ledgerFactSnapshot();
+
+        FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
+                FundsTransactionProjectionExplainQuery.builder()
+                        .fundsTransactionSn(refundSn)
+                        .build());
+
+        assertThat(explanation.businessScene()).isEqualTo("AUTHORIZATION_DISPUTE_REFUND");
+        assertThat(explanation.businessSn()).isEqualTo("PROJECTION_EXPLAIN_DISPUTE_RETURN");
+        assertThat(explanation.ledgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
+        assertThat(explanation.factStatus()).isEqualTo("POSTED");
+        assertThat(explanation.displayStatus()).isEqualTo("DISPUTE_REFUNDED");
+        assertThat(explanation.operationStatus()).isEqualTo("NO_ACTION_REQUIRED");
+        assertThat(explanation.statusMeaning()).isEqualTo("DISPUTE_REFUND_POSTED");
+        assertThat(explanation.failureReason()).isEqualTo("N/A");
+        assertThat(explanation.unavailableReason()).isEqualTo("N/A");
+        assertThat(explanation.nextAction()).isEqualTo("N/A");
+        assertThat(explanation.evidenceRefs())
+                .contains("fundsTransaction:" + refundSn,
+                        "ledgerTransaction:" + ledgerTransaction.getSn(),
+                        "externalDisputeRef:DISPUTE_CASE_PROJECTION_202606180001",
+                        "disputeVoucherRef:DISPUTE_EVIDENCE_PROJECTION_202606180001");
+        assertThat(explanation.payload())
+                .containsEntry("displayStatus", "DISPUTE_REFUNDED")
+                .containsEntry("statusMeaning", "DISPUTE_REFUND_POSTED")
+                .containsEntry(FundsInstructionContextKeys.REFUND_MODE,
+                        FundsInstructionContextKeys.REFUND_MODE_DISPUTE)
+                .containsEntry(FundsInstructionContextKeys.DISPUTE_MODE, "CHARGEBACK")
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
+                        "DISPUTE_CASE_PROJECTION_202606180001");
+        assertLedgerTransactionFactsUnchanged(beforeExplainFacts);
     }
 
     /**
