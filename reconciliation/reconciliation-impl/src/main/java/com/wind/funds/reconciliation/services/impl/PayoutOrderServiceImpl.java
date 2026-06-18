@@ -1,18 +1,24 @@
 package com.wind.funds.reconciliation.services.impl;
 
 import com.capte.domain.core.operator.WindOperator;
+import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingReasonCode;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightFactStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightOperationStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightBlockingReasonDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightResultDTO;
+import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckPayoutPreflightRequest;
+import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
 import com.wind.funds.reconciliation.service.PayoutOrderService;
 import com.wind.common.exception.AssertUtils;
+import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -21,7 +27,9 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 出款单服务实现。
@@ -32,6 +40,7 @@ import java.util.List;
  */
 @NullMarked
 @Service
+@AllArgsConstructor
 public class PayoutOrderServiceImpl implements PayoutOrderService {
 
     private static final long PREFLIGHT_RESULT_EXPIRE_MINUTES = 5L;
@@ -40,10 +49,13 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
 
     private static final String OPERATIONS_CONFIRMATION_OWNER = "OPERATIONS";
 
+    private final ReconciliationGateApplicationService reconciliationGateApplicationService;
+
     @Override
     @Transactional(readOnly = true)
     public PayoutPreflightResultDTO checkPayoutPreflight(CheckPayoutPreflightRequest request, WindOperator operator) {
         validateRequest(request);
+        AssertUtils.notNull(operator, "出款前准入检查操作人不能为空");
         List<PayoutPreflightBlockingReasonDTO> blockingReasons = new ArrayList<>();
         addBlockingReasonIfMissing(blockingReasons, request.getPayoutAccountRef(),
                 PayoutPreflightBlockingReasonCode.PAYOUT_ACCOUNT_INVALID,
@@ -58,6 +70,8 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
         addBlockingReasonIfMissing(blockingReasons, request.getApprovalRef(),
                 PayoutPreflightBlockingReasonCode.APPROVAL_REQUIRED,
                 "approvalRef", "审批证据缺失", OPERATIONS_CONFIRMATION_OWNER);
+        ReconciliationGateDecisionDTO reconciliationGateDecision = checkReconciliationGate(request, operator);
+        addReconciliationGateBlockingReasonIfBlocked(blockingReasons, reconciliationGateDecision);
 
         LocalDateTime checkedAt = LocalDateTime.now();
         boolean passed = blockingReasons.isEmpty();
@@ -73,7 +87,7 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
                 .setCheckedAt(checkedAt)
                 .setCheckedBy(String.valueOf(operator.getOperatorId()))
                 .setExpiresAt(checkedAt.plusMinutes(PREFLIGHT_RESULT_EXPIRE_MINUTES))
-                .setEvidenceRefs(evidenceRefs(request));
+                .setEvidenceRefs(evidenceRefs(request, reconciliationGateDecision));
     }
 
     private void validateRequest(CheckPayoutPreflightRequest request) {
@@ -126,16 +140,64 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
         return ExternalRuleVerificationStatus.UNVERIFIED;
     }
 
-    private List<String> evidenceRefs(CheckPayoutPreflightRequest request) {
-        List<String> result = new ArrayList<>();
+    private ReconciliationGateDecisionDTO checkReconciliationGate(CheckPayoutPreflightRequest request,
+                                                                 WindOperator operator) {
+        return reconciliationGateApplicationService.checkGate(new CheckReconciliationGateRequest()
+                .setTenantId(request.getTenantId())
+                .setGateObjectType(ReconciliationGateObjectType.PAYOUT)
+                .setGateObjectSn(payoutGateObjectSn(request)), operator);
+    }
+
+    private String payoutGateObjectSn(CheckPayoutPreflightRequest request) {
+        if (StringUtils.hasText(request.getPayoutSn())) {
+            return request.getPayoutSn();
+        }
+        return request.getSettlementSn();
+    }
+
+    private void addReconciliationGateBlockingReasonIfBlocked(
+            List<PayoutPreflightBlockingReasonDTO> blockingReasons,
+            ReconciliationGateDecisionDTO reconciliationGateDecision) {
+        if (reconciliationGateDecision.getDecisionStatus() != ReconciliationGateDecisionStatus.BLOCKED) {
+            return;
+        }
+        blockingReasons.add(new PayoutPreflightBlockingReasonDTO()
+                .setCode(PayoutPreflightBlockingReasonCode.RECONCILIATION_BLOCKED)
+                .setMessage("对账差错未闭环，出款准入阻断：" + reconciliationGateDecision.getExplanation())
+                .setGuardName("reconciliationGate")
+                .setSeverity(PayoutPreflightBlockingLevel.BLOCKED)
+                .setRecoverable(true)
+                .setEvidenceRef(firstEvidenceRef(reconciliationGateDecision))
+                .setConfirmationOwner(OPERATIONS_CONFIRMATION_OWNER));
+    }
+
+    private @Nullable String firstEvidenceRef(ReconciliationGateDecisionDTO reconciliationGateDecision) {
+        List<String> evidenceRefs = reconciliationGateDecision.getEvidenceRefs();
+        if (evidenceRefs == null || evidenceRefs.isEmpty()) {
+            return null;
+        }
+        return evidenceRefs.getFirst();
+    }
+
+    private List<String> evidenceRefs(CheckPayoutPreflightRequest request,
+                                      ReconciliationGateDecisionDTO reconciliationGateDecision) {
+        Set<String> result = new LinkedHashSet<>();
         ExternalRuleVerificationEvidenceDTO externalRuleEvidence = request.getExternalRuleVerificationEvidence();
         if (externalRuleEvidence != null && StringUtils.hasText(externalRuleEvidence.getEvidenceRef())) {
             result.add(externalRuleEvidence.getEvidenceRef());
         }
-        if (StringUtils.hasText(request.getApprovalRef())) {
-            result.add(request.getApprovalRef());
+        addText(result, request.getApprovalRef());
+        List<String> gateEvidenceRefs = reconciliationGateDecision.getEvidenceRefs();
+        if (gateEvidenceRefs != null) {
+            gateEvidenceRefs.forEach(evidenceRef -> addText(result, evidenceRef));
         }
         return List.copyOf(result);
+    }
+
+    private void addText(Set<String> result, @Nullable String value) {
+        if (StringUtils.hasText(value)) {
+            result.add(value);
+        }
     }
 
     private PayoutPreflightFactStatus resolveFactStatus(boolean passed) {

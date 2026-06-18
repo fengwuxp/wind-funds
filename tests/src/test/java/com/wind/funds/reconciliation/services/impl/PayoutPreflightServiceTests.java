@@ -2,19 +2,31 @@ package com.wind.funds.reconciliation.services.impl;
 
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.AbstractFundsServiceTest;
+import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
+import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
+import com.wind.funds.reconciliation.application.gate.impl.ReconciliationGateApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingReasonCode;
 import com.wind.funds.reconciliation.enums.PayoutPreflightDisplayStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightFactStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightOperationStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
+import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
+import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
+import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightBlockingReasonDTO;
 import com.wind.funds.reconciliation.model.dto.PayoutPreflightResultDTO;
 import com.wind.funds.reconciliation.model.request.CheckPayoutPreflightRequest;
+import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
+import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceAdjustmentRequest;
+import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
 import com.wind.funds.reconciliation.service.PayoutOrderService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
@@ -46,11 +58,29 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
     private static final String IDEMPOTENCY_KEY = "idem_payout_preflight_001";
 
+    private static final String DIFFERENCE_SN = "recon_payout_gate_diff_001";
+
+    private static final String RECONCILIATION_BATCH_SN = "recon_payout_gate_batch_001";
+
+    private static final String SOURCE_RECORD_SN = "processor_payout_gate_line_001";
+
+    private static final String ADJUSTMENT_SN = "balance_adjust_payout_gate_001";
+
+    private static final String RERUN_SN = "recon_payout_gate_rerun_001";
+
     @Autowired
     private PayoutOrderService payoutOrderService;
 
     @Autowired
+    private ReconciliationDifferenceApplicationService reconciliationDifferenceApplicationService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @BeforeEach
+    void cleanReconciliationDifference() {
+        jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
+    }
 
     /**
      * 场景：提交出款前缺少账户、收款端点、通道、外部规则核验证据和审批证据。
@@ -159,6 +189,64 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：出款前存在命中 PAYOUT 阻断范围的未闭环对账差错。
+     * 输入：出款账户、收款端点、通道、外部规则和审批证据均齐备，但 PAYOUT 差错仍为 BLOCKED。
+     * 输出：出款准入结果阻断，并把对账差错证据纳入解释和证据引用。
+     * 红线：消费对账差错准入不得创建出款、交易、route、posting 或 ledger entry。
+     */
+    @Test
+    void testCheckPayoutPreflightShouldBlockWhenPayoutReconciliationGateBlocked() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        reconciliationDifferenceApplicationService.createDifference(payoutDifferenceRequest(), WindOperator.system());
+
+        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+                readyPayoutPreflightRequest(), WindOperator.system());
+
+        assertThat(result.isPassed()).isFalse();
+        assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.BLOCKED);
+        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_BLOCKED);
+        assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.WAITING_EVIDENCE);
+        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.BLOCKED);
+        assertThat(result.getBlockingReasons())
+                .extracting(PayoutPreflightBlockingReasonDTO::getCode)
+                .containsExactly(PayoutPreflightBlockingReasonCode.RECONCILIATION_BLOCKED);
+        PayoutPreflightBlockingReasonDTO blockingReason = result.getBlockingReasons().getFirst();
+        assertThat(blockingReason.getGuardName()).isEqualTo("reconciliationGate");
+        assertThat(blockingReason.getMessage()).contains("对账差错");
+        assertThat(blockingReason.getEvidenceRef()).isEqualTo("processor-payout-file-digest-001");
+        assertThat(result.getEvidenceRefs())
+                .containsExactly("rule-evidence-001", "approval-001", "processor-payout-file-digest-001");
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：命中 PAYOUT 范围的差错已完成白名单处理并重新对账通过。
+     * 输入：出款准入基础证据齐备，差错已回链处理动作和重跑对平证据。
+     * 输出：出款准入可以继续提交，但保留差错、处理动作和重跑证据引用。
+     * 红线：条件放行仍不代表已创建出款单或已经出款成功。
+     */
+    @Test
+    void testCheckPayoutPreflightShouldPassWhenPayoutReconciliationGateConditionallyPassed() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        reconciliationDifferenceApplicationService.createDifference(payoutDifferenceRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(payoutAdjustmentRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.recordRerunResult(payoutRerunRequest(), WindOperator.system());
+
+        PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
+                readyPayoutPreflightRequest(), WindOperator.system());
+
+        assertThat(result.isPassed()).isTrue();
+        assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.PASSED);
+        assertThat(result.getBlockingReasons()).isEmpty();
+        assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
+        assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.SUBMITTABLE);
+        assertThat(result.getEvidenceRefs())
+                .containsExactly("rule-evidence-001", "approval-001", "processor-payout-file-digest-001",
+                        "adjustment-evidence-payout-001", "rerun-report-payout-001");
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     private CheckPayoutPreflightRequest minimumPayoutPreflightRequest() {
         return new CheckPayoutPreflightRequest()
                 .setTenantId(TENANT_ID)
@@ -191,8 +279,58 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 .setStatus(ExternalRuleVerificationStatus.VERIFIED);
     }
 
+    private CreateReconciliationDifferenceRequest payoutDifferenceRequest() {
+        return new CreateReconciliationDifferenceRequest()
+                .setTenantId(TENANT_ID)
+                .setDifferenceSn(DIFFERENCE_SN)
+                .setReconciliationBatchSn(RECONCILIATION_BATCH_SN)
+                .setSourceRecordSn(SOURCE_RECORD_SN)
+                .setSourceQuality(ReconciliationSourceQuality.UNVERIFIED)
+                .setMatchStrength(ReconciliationMatchStrength.CANDIDATE_MATCH)
+                .setDifferenceType(ReconciliationDifferenceType.AMOUNT_MISMATCH)
+                .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setDifferenceAmount(50L)
+                .setResponsiblePartyRef("processor:issuer-ledger")
+                .setBlockingScope("PAYOUT")
+                .setRuleVersion("recon-rule-v1")
+                .setEvidenceRef("processor-payout-file-digest-001")
+                .setDescription("外部 processor 出款文件金额与内部待出款金额不一致");
+    }
+
+    private LinkReconciliationDifferenceAdjustmentRequest payoutAdjustmentRequest() {
+        return new LinkReconciliationDifferenceAdjustmentRequest()
+                .setTenantId(TENANT_ID)
+                .setDifferenceSn(DIFFERENCE_SN)
+                .setActionType(ReconciliationDifferenceActionType.ADJUST)
+                .setAdjustmentSn(ADJUSTMENT_SN)
+                .setIdempotencyKey("idem-recon-payout-adjust-001")
+                .setOriginalFactRef("external-payout-anomaly:issuer-ledger-001")
+                .setAdjustmentTransactionSn("funds_tx_adjust_payout_gate_001")
+                .setApprovalRef("approval-recon-payout-adjust-001")
+                .setEvidenceRef("adjustment-evidence-payout-001")
+                .setReason("已由余额控制调账纠偏，等待重新对账");
+    }
+
+    private RecordReconciliationDifferenceRerunRequest payoutRerunRequest() {
+        return new RecordReconciliationDifferenceRerunRequest()
+                .setTenantId(TENANT_ID)
+                .setDifferenceSn(DIFFERENCE_SN)
+                .setRerunSn(RERUN_SN)
+                .setRerunBatchSn("recon_payout_gate_batch_001_rerun_001")
+                .setRuleVersion("recon-rule-v1")
+                .setBalanced(true)
+                .setEvidenceRef("rerun-report-payout-001")
+                .setResultDigest("sha256:payout-rerun-balanced-001")
+                .setDescription("调账后重新对账通过");
+    }
+
     @Configuration
-    @Import(PayoutOrderServiceImpl.class)
+    @Import({
+            PayoutOrderServiceImpl.class,
+            ReconciliationDifferenceApplicationServiceImpl.class,
+            ReconciliationGateApplicationServiceImpl.class
+    })
     static class Config {
     }
 }

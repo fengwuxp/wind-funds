@@ -252,12 +252,25 @@ Git 策略：auto_commit / summary_only
 | 验证证据 | `just test-one ReconciliationGateApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just pmd` 和 `git diff --check` 已通过；目标 Spring 测试在沙箱内受 embedded Redis 本地端口限制，按权限规则在非沙箱环境重跑。 |
 | Not Done | 完整清分、清算、结算、出款、追偿、运营后台、生产迁移脚本、差异报告、补事实命令执行服务、运营审批流和外部规则确认仍未完成。 |
 
+### 15.5 reconciliationGatePayoutPreflightConsume2026-06-18
+
+本节记录 `GSD2-B7-RECON-GATE-CONSUME-002` 的首轮交付结果，只保留最终可交付口径。
+
+| 项 | 结果 |
+| --- | --- |
+| 已交付能力 | `PayoutOrderService#checkPayoutPreflight` 已接入 `ReconciliationGateApplicationService`，在出款提交前只读消费 `PAYOUT` 阻断范围内的对账差错准入决策。 |
+| 消费方边界 | 出款准入继续只返回 preflight 结果、阻断原因、服务端解释状态和证据引用；未创建出款单、未调用通道、未写交易事实、route、posting、LedgerEntry、余额投影或交易投影。 |
+| 阻断口径 | 命中 `PAYOUT` 范围的未闭环差错、已处理但重跑未对平差错，都会映射为 `RECONCILIATION_BLOCKED`；已处理且重跑对平的差错允许条件放行，但必须把原差错、处理动作和重跑证据纳入 `evidenceRefs`。 |
+| 创建前检查 | 若尚未生成 `payoutSn`，gate 消费对象流水使用 `settlementSn`，不破坏现有“创建出款单前先做准入检查”的契约。 |
+| 验证证据 | `just test-one PayoutPreflightServiceTests tests` 和 `just test-reconciliation` 已通过；目标 Spring 测试在沙箱内受 embedded Redis 本地端口限制，按权限规则在非沙箱环境重跑。 |
+| Not Done | 完整出款单生命周期、外部受理/处理中/成功/失败回单、金额不一致处理、出款表结构、生产迁移、运营审批流、完整清分清算结算消费方接入和差异报告仍未完成。 |
+
 ## 16. handoff
 
 | 项 | 要求 |
 | --- | --- |
-| 恢复入口 | 优先从 `GSD2-B7-RECON-GATE-CONSUME-001` 的后继切片恢复，继续补消费方接入、运营审批或差异报告；若要直接做补事实执行、完整清算、结算、出款或追偿，必须说明为什么跳过准入消费和白名单命令闭环。 |
+| 恢复入口 | 优先从 `GSD2-B7-RECON-GATE-CONSUME-002` 的后继切片恢复，继续补清算/结算消费方接入、运营审批或差异报告；若要直接做补事实执行、完整清算、结算、出款或追偿，必须说明为什么跳过准入消费和白名单命令闭环。 |
 | 回写位置 | `docs/TDD设计/README.md`、`docs/TDD设计/GSD-Goal-生产可用MVP推进计划.md`、`openspec/project.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | TDD / Review / Refactor | 确认后必须先 Red 后 Green；Review 优先检查资金不变量、模块边界、失败无副作用、补事实白名单和敏感数据；Refactor 只在 Red 变绿后做必要收敛。 |
 | AI 产物复核 | 不接受空 facade、内存版业务 Service、只 mock 内部核心组件、只断言状态或数量的测试作为生产可用证据。 |
-| 残余风险 | 完整清分、清算、结算、出款、追偿、运营后台、报表、外部规则和生产 Runbook 仍是 Not Done。 |
+| 残余风险 | 完整清分、清算、结算、出款生命周期、追偿、运营后台、报表、外部规则和生产 Runbook 仍是 Not Done。 |
