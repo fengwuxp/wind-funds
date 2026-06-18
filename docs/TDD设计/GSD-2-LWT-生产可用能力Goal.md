@@ -52,6 +52,7 @@
 | `B4-PROJECTION-007` | 2026-06-18 | 消费 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`。 | 新增普通退款、无授权退款、授权释放/过期和兼容 chargeback 投影解释 Red/Green：解释层能区分 `REFUNDED`、`NO_AUTH_REFUNDED`、`RELEASED` 和 `COMPAT_CHARGEBACK_REFUNDED`，并透出外部引用、退款原因、chargeback evidence 和外部争议引用；目标投影解释测试 8 tests 通过。 | 0 | B4 remaining 已消费；下一轮不再重复 B4 remaining，除非新 Grant 明确扩失败态解释、projection store、治理重放、历史节点选择查询或运营差异报告。 |
 | `LWT-ROLE-LOOP-008` | 2026-06-18 | 重新加载 AI Native、产品架构专家和资深架构师角色协作规约，复核当前 Git、docs、OpenSpec 和 wallet / transaction 代码锚点。 | 当时 HEAD 已推进到 `ca603eab`，活跃基线需从旧 `a38776c5` 回写到 B4 remaining 已提交状态；代码扫描确认已有资金责任解析 facade 和支付工具能力准入 facade，但当时缺少 `AuthorizationAdmissionApplicationService` 或 `authorizeByInstrument` 生产入口。该缺口已由 `WALLET-AUTH-ADMISSION-009` 消费。 | 0 | 已转入下一轮 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 并完成 Green；当前下一候选以 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 为准。 |
 | `WALLET-AUTH-ADMISSION-009` | 2026-06-18 | 消费 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001`，补齐 wallet 支付工具授权准入最小服务流。 | 新增 `AuthorizationAdmissionApplicationService`、`AuthorizeByPaymentInstrumentRequest`、wallet-impl 最小实现和服务流测试；目标测试 3 tests、wallet application 组合回归 9 tests、授权交易回归 32 tests、`just compile`、`just pmd` 和 `git diff --check` 均通过。准入失败无资金事实；`approved=false` 授权拒绝只生成拒绝交易事实，route legs 为空且无 posting、LedgerEntry 或余额影响。 | 0 | 本 Grant 已消费；下一轮不得沿用它扩 VCC facade、Spend Rule 策略引擎或统一支付工具交易内核。默认下一候选为 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001`。 |
+| `WALLET-AUTH-ROUTE-SNAPSHOT-PRECHECK-010` | 2026-06-18 | 对 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 做只读源码准入审计。 | 源码确认 core/route 已有 `paymentInstrumentRef` 承载、序列化和回放能力，授权 route resolver 已透传 `instruction.instrumentRef`；当前缺口是 wallet 授权准入构造账户主体型授权请求时尚未把支付工具快照写入资金指令，route snapshot 只能证明存在，不能证明已回链支付工具引用和绑定版本。 | 0 | 已补下一候选准入包；未确认单一 Execution Grant 前不写 Java、测试、DDL/H2 schema 或运行时配置。 |
 
 ## 2. 现状和影响范围
 
@@ -343,10 +344,11 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | `docs/TDD设计/GSD-2-新基线工作流规划.md` | `check_harness_plan.py --kind gsd-wave` 通过。 | `check_product_deliverable.py --kind product-architecture` 通过。 | `check_architecture_deliverable.py --kind architecture-plan` 通过。 | GSD-2 总恢复入口可消费。 |
 | `docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md` | `check_harness_plan.py --kind gsd-wave` 通过。 | `check_product_deliverable.py --kind product-architecture` 通过。 | `check_architecture_deliverable.py --kind architecture-plan` 通过。 | Goal 状态载体可消费。 |
 | `docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` | `check_harness_plan.py --kind gsd-wave` 通过。 | `check_product_deliverable.py --kind product-architecture` 通过。 | `check_architecture_deliverable.py --kind architecture-plan` 通过。 | W5 推进计划可消费。 |
+| `docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md` | `check_harness_plan.py --kind cad-candidate` 通过。 | 未运行，原因是本轮只补工程准入包结构。 | 未运行，原因是本轮只补工程准入包结构。 | `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 准入包可作为下一 Execution Grant 输入。 |
 | `docs/TDD设计/GSD-2-AUTH-Chargeback目标语义对齐任务卡.md` | `check_harness_plan.py --kind gsd-wave` 通过。 | `check_product_deliverable.py --kind product-architecture` 通过。 | `check_architecture_deliverable.py --kind architecture-plan` 通过。 | contract/design-only 任务卡可消费。 |
 | `docs/TDD设计/GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` | `check_harness_plan.py --kind cad-candidate` 和 `--kind gsd-wave` 通过。 | `check_product_deliverable.py --kind product-architecture` 通过。 | `check_architecture_deliverable.py --kind architecture-plan` 通过。 | 确认包已被用户授权并完成 Green 验证，保留为本 Grant 审计和回放依据。 |
 
-验证边界：本轮 AUTH 兼容切片已运行目标测试、交易分组、`just compile`、`just pmd`、`rg` 一致性检索和 `git diff --check`；未运行 `verify-cad`，原因是本 Grant 范围只触碰授权兼容入口的最小 guard、契约说明、目标测试和状态回写。
+验证边界：本轮 route snapshot 准入包为 docs-only，对应已运行 `check_harness_plan.py --kind cad-candidate`、LWT Goal 的 `gsd-wave` / 产品 / 架构结构检查、`rg` 一致性检索和 `git diff --check`；未运行 `compile`、`pmd` 或业务测试，原因是没有 Java、测试、DDL/H2 schema、公共契约或运行时配置变更。
 
 ## 12. 停止条件
 

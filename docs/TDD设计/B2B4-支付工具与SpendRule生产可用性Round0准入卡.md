@@ -339,6 +339,23 @@ Git 策略：auto_commit
 交接：确认后从 B4-AUTH-PI-CAD-001 首批 Red 开始；未确认时不写 Java、测试、DDL/H2 schema 或运行时配置
 ```
 
+### 8.2.1 GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001 准入包（2026-06-18）
+
+本节是 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 提交后的下一候选准入包，只固化只读源码审计和最小执行边界。它不授权 Java、测试、DDL/H2 schema、运行时配置或 Git 写入。
+
+| 项 | 当前口径 |
+| --- | --- |
+| 当前状态 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
+| 目标 | 支付工具授权准入批准后，route snapshot 顶层 `paymentInstrumentRef` 必须可审计支付工具引用、绑定快照、绑定版本、准入动作和准入决策；交易内核仍以已解析 `FundsAccountId` 作为 canonical 入参。 |
+| 只读源码事实 | `ImmutableFundsInstructionSpec`、`ResolvedRouteSpec`、`ImmutableRouteSnapshotSpec` 和 `RouteSnapshotJsonSupport` 已有 `paymentInstrumentRef` 承载、序列化和回放能力；`AuthorizationFundsInstructionRouteResolver` 已从 `instruction.getInstrumentRef()` 透传到 resolved route；`DefaultRouteSnapshotFactory` 会把 resolved route 写入 route snapshot。 |
+| 当前缺口 | `AuthorizationAdmissionApplicationServiceImpl` 已完成支付工具准入和账户主体型授权委派，但 `FundsAuthorizationTransactionAuthorizeRequest` 与 `FundsAuthorizationInstructionConverter#convertToAuthorizeInstruction` 尚未把支付工具快照写入 `ImmutableFundsInstructionSpec.instrumentRef`；因此授权准入服务流只能证明 route snapshot 存在，不能证明 route snapshot 已回链支付工具引用。 |
+| 产品口径 | 支付工具引用使用稳定业务工具号或 token 化引用作为 `instrumentId`，不把数据库主键当跨系统身份；内部主键如需追踪，只能进入受控 `bindingSnapshot` 或交易审计上下文，且不得包含 PAN、CVV、完整卡号、外部密钥或敏感原文。 |
+| 首批 Red | 在 `AuthorizationAdmissionApplicationServiceTests` 或等价服务流测试中，批准路径断言 persisted route snapshot 的 `paymentInstrumentRef.instrumentId`、`instrumentType`、`currency`、`status` 和 `bindingSnapshot.bindingSn / bindingVersion / bindingRole / subjectType / subjectId / admissionAction / admissionDecision` 非空且与准入决策一致；拒绝路径继续断言无 posting、LedgerEntry 和余额影响。 |
+| 允许写入 | Red 证明缺口后，允许非破坏性新增授权请求的可选支付工具快照字段或等价只读审计承载、在授权 converter 中写入 `ImmutableFundsInstructionSpec.instrumentRef`、在 wallet 授权准入实现中构造敏感字段安全的 `PaymentInstrumentRefSpec`，并补目标测试和必要 route snapshot / 授权交易回归。 |
+| 禁止写入 | 不替换 `FundsAuthorizationTransactionAuthorizeRequest.accountId`，不把支付工具作为账务主体，不让支付工具成为 route leg、posting、LedgerEntry 或余额投影主体，不新增统一 `InstrumentTransactionService`，不混入 VCC 生命周期、Spend Rule 策略引擎、清结算对账、DDL/H2 schema、projection store、治理重放或敏感原文处理。 |
+| 验证命令 | 首轮 `just test-one AuthorizationAdmissionApplicationServiceTests tests`；Green 后按触点补 `just test-one RouteSnapshotJsonSupportTests tests`、`just test-one FundsAuthorizationTransactionFlowTests tests`、`just compile`、`just pmd` 和 `git diff --check`。 |
+| 停止条件 | 需要破坏性修改 transaction canonical 入参、公共 API 删除、DDL/H2 schema、跨模块依赖反转、敏感字段落库、VCC/Spend Rule/清结算越界或无法解释的资金测试失败时停止。 |
+
 ### 8.3 B2-PI-CAP Round 0 扫描（2026-06-04）
 
 本节把支付工具支持队列中的 `B2-PI-CAP` 支付工具能力准入切片推进到可确认输入。它只做只读扫描和候选授权包收敛，不授权生产代码、测试代码、DDL/H2 schema、公共契约或运行时配置写入；全局恢复顺位仍服从账本账目 > 钱包 > 交易层 > 清结算对账 > 支付工具支持。
