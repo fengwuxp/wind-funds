@@ -139,6 +139,25 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：调用方显式传入固定科目类别不匹配的正常余额方向。
+     * 输入：ASSET 账本使用 CREDIT 正常余额方向。
+     * 输出：建账入口拒绝请求，账本事实保持不变。
+     * 红线：固定方向科目不得创建出会反向投影余额的账本 profile。
+     */
+    @Test
+    void testCreateLedgerShouldRejectFixedCategoryNormalBalanceSideMismatchBeforePersistence() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> ledgerService.createLedger(createLedgerRequest(
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name())
+                .setNormalBalanceSide(EntrySide.CREDIT)))
+                .hasMessageContaining("账本科目类别与正常余额方向不一致");
+
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpLedgerServiceTestData() {
         cleanupLedgerServiceTestData();

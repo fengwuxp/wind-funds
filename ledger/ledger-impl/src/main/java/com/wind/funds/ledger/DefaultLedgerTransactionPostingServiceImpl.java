@@ -271,6 +271,11 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         AssertUtils.isTrue(ledger.getLedgerSubjectCode() == entry.getLedgerSubjectCode()
                         && ledger.getLedgerSubjectCategory() == entry.getLedgerSubjectCategory(),
                 "账本分录科目与账本科目不一致，ledgerId = {}", ledger.getId());
+        LedgerNormalBalanceGuard.assertCategoryNormalBalance(
+                "入账",
+                ledger.getId(),
+                ledger.getLedgerSubjectCategory(),
+                ledger.getNormalBalanceSide());
         AssertUtils.isTrue(ledger.getCurrency() == entry.getCurrency(),
                 "账本分录币种与账本币种不一致，ledgerId = {}", ledger.getId());
         AssertUtils.isTrue(entry.getBalanceConstraintType() != LedgerBalanceConstraintType.ALLOW_NEGATIVE

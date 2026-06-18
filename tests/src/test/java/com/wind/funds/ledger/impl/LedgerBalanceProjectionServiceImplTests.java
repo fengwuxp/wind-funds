@@ -49,6 +49,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerTransactionFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
@@ -224,6 +225,29 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：历史账本数据的科目类别与正常余额方向不一致，调用方直接触发余额投影。
+     * 输入：AVAILABLE/ASSET 账本被异常改成 CREDIT 正常余额方向，一笔借方入账 25。
+     * 输出：投影入口在余额更新和观察事件发布前拒绝请求。
+     * 红线：余额投影不能用错误 normal side 反向计算余额。
+     */
+    @Test
+    void testProjectShouldRejectLedgerNormalBalanceSideMismatchBeforeBalanceMutation() {
+        List<LedgerBalanceChangedEvent> publishedEvents = new ArrayList<>();
+        setTestApplicationEventPublisher(event -> publishedEvents.add((LedgerBalanceChangedEvent) event));
+        markLedgerNormalBalanceSide(availableLedgerId, EntrySide.CREDIT);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> projectionService.project(List.of(ledgerEntry(25L))))
+                .hasMessageContaining("账本科目类别与正常余额方向不一致");
+
+        LedgerDTO ledger = ledgerService.getLedgerById(availableLedgerId);
+        assertThat(ledger.getDebitAmount()).isEqualTo(100L);
+        assertThat(ledger.getCreditAmount()).isZero();
+        assertThat(publishedEvents).isEmpty();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpProjectionServiceTestData() {
         cleanupProjectionServiceTestData();
@@ -306,6 +330,12 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
                     .setCreditAmountDelta(initialBalance > 0L ? initialBalance : null));
         }
         return ledgerId;
+    }
+
+    private void markLedgerNormalBalanceSide(Long ledgerId, EntrySide normalBalanceSide) {
+        jdbcTemplate.update("UPDATE t_ledger SET normal_balance_side = ? WHERE id = ?",
+                normalBalanceSide.name(),
+                ledgerId);
     }
 
     private LedgerEntrySpec ledgerEntry(long amount) {

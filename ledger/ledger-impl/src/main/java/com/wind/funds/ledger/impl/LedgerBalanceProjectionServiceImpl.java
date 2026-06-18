@@ -8,6 +8,7 @@ import com.wind.common.spring.SpringEventPublishUtils;
 import com.wind.funds.ledger.LedgerBalanceBucket;
 import com.wind.funds.ledger.LedgerBalanceChangedEvent;
 import com.wind.funds.ledger.LedgerBalanceProjectionService;
+import com.wind.funds.ledger.LedgerNormalBalanceGuard;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -208,6 +209,11 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
             AssertUtils.isTrue(ledger.getLedgerSubjectCode() == entry.getLedgerSubjectCode()
                             && ledger.getLedgerSubjectCategory() == entry.getLedgerSubjectCategory(),
                     "账本分录科目与账本科目不一致，ledgerId = {}", ledger.getId());
+            LedgerNormalBalanceGuard.assertCategoryNormalBalance(
+                    "余额投影",
+                    ledger.getId(),
+                    ledger.getLedgerSubjectCategory(),
+                    ledger.getNormalBalanceSide());
             AssertUtils.isTrue(ledger.getCurrency() == entry.getCurrency(),
                     "账本分录币种与账本币种不一致，ledgerId = {}", ledger.getId());
             AssertUtils.isTrue(entry.getBalanceConstraintType() != LedgerBalanceConstraintType.ALLOW_NEGATIVE

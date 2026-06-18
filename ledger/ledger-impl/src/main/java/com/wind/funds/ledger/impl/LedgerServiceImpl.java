@@ -17,6 +17,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
+import com.wind.funds.ledger.LedgerNormalBalanceGuard;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
@@ -158,6 +159,11 @@ public class LedgerServiceImpl implements LedgerService {
             );
             entity.setNormalBalanceSide(normalBalanceSide);
         }
+        LedgerNormalBalanceGuard.assertCategoryNormalBalance(
+                "创建",
+                entity.getId(),
+                entity.getLedgerSubjectCategory(),
+                entity.getNormalBalanceSide());
         if (entity.getAllowNegative() == null) {
             entity.setAllowNegative(Boolean.FALSE);
         }

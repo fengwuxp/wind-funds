@@ -311,6 +311,27 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     /**
+     * 场景：历史账本数据的科目类别与正常余额方向不一致，但分录主体、科目和币种本身都匹配。
+     * 输入：AVAILABLE/ASSET 账本被异常改成 CREDIT 正常余额方向后参与入账。
+     * 输出：posting 入口在账本事实和余额投影前拒绝请求。
+     * 红线：入账编排不能盲信会反向计算余额的绑定账本快照。
+     */
+    @Test
+    void testPostShouldRejectLedgerNormalBalanceSideMismatchBeforeFacts() {
+        Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID);
+        Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID);
+        markLedgerNormalBalanceSide(sourceLedgerId, EntrySide.CREDIT);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> postingService.post(transaction(
+                LedgerTransactionStatus.POSTED,
+                List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)))))
+                .hasMessageContaining("账本科目类别与正常余额方向不一致");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一账本交易已经入账成功后，外部编排因重试再次提交完全相同的 LedgerTransactionSpec。
      * 输入：第一次 post 生成 ledger transaction、posting plan、entry 并更新 source / target AVAILABLE 余额；
      * 第二次使用相同 sn、相同 posting plan 和相同 entry 再次 post。
@@ -443,6 +464,12 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .setCutOffTime(LocalTime.MIDNIGHT)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+    }
+
+    private void markLedgerNormalBalanceSide(Long ledgerId, EntrySide normalBalanceSide) {
+        jdbcTemplate.update("UPDATE t_ledger SET normal_balance_side = ? WHERE id = ?",
+                normalBalanceSide.name(),
+                ledgerId);
     }
 
     private Long createAvailableLedger(String subjectId, long initialBalance) {
