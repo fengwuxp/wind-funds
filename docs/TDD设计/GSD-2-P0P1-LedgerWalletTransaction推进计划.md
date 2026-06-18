@@ -13,7 +13,7 @@
 | 所属阶段 | GSD-2 Wave 5 / P0-P1 dependency planning / full gate verified。 |
 | 关联 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
 | 当前状态 | `B7_RECON_DIFFERENCE_ACTION_GUARD_GREEN_VERIFIED` |
-| 上游输入 | GSD-2 W1 基线差距审计、W2 单一 Grant 选择卡、W3 B2 账户层级 CAD 准入草案、W4 B2 Execution Grant 确认包、当前 PRD/DSL/系分/TDD/OpenSpec 和 Git/code baseline `e81a8a25`。 |
+| 上游输入 | GSD-2 W1 基线差距审计、W2 单一 Grant 选择卡、W3 B2 账户层级 CAD 准入草案、W4 B2 Execution Grant 确认包、当前 PRD/DSL/系分/TDD/OpenSpec 和 Git/code baseline `10853e2d`。 |
 | Owner | AI Native 流程编排负责顺序和门禁；产品架构专家确认业务价值、验收和 Not Done；资深架构师确认源码锚点、写入范围、Red、验证命令和 CAD 停止条件；用户确认单一 Grant。 |
 | 写入范围 | 本文、GSD-2 入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
 | 写入文件 | `docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
@@ -176,9 +176,9 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | 字段 | 内容 |
 | --- | --- |
 | Loop ID | `GSD2-P0P1-LWT-FULL-GATE-2026-06-17` |
-| Git / code baseline | `ae8cb8a6 feat: 完善资金基线对账与投影能力` 加本轮未提交 B7 动作守卫切片。 |
+| Git / code baseline | `10853e2d feat: 收紧对账差错处理动作守卫`。 |
 | 收口范围 | 账户层级来源契约、资金责任目标主体、资金责任解析 application facade、支付工具能力准入 application facade、交易投影解释、余额调账审计、对账差错闭环、差错处理动作守卫、相关 H2 schema、目标服务测试、边界测试、治理测试和 PMD。 |
-| 验证证据 | `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 已在 `e81a8a25` 通过；本轮 B7 动作守卫验证 `just test-one ReconciliationDifferenceApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just verify-fast`、`just pmd` 和 `git diff --check` 通过。 |
+| 验证证据 | `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just verify-cad` 已在 `e81a8a25` 通过；B7 动作守卫已在 `10853e2d` 完成 `just test-one ReconciliationDifferenceApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just verify-fast`、`just pmd` 和 `git diff --check` 验证。 |
 | 当前状态 | `B7_RECON_DIFFERENCE_ACTION_GUARD_GREEN_VERIFIED`。 |
 | 下一候选 | 清算/结算/出款准入消费差错状态、阻断范围、处理动作和重跑结果；若继续 B5，则为 `GSD2-B5-BALANCE-ADJUST-AUDIT-002`。 |
 | Not Done | 清算/结算/出款对差错状态的消费、完整清分清算结算出款、追偿、账龄升级、运营后台、生产迁移脚本、差异报告、补事实命令执行服务、运营审批流、余额调账独立审计表/审批流/route snapshot 审计回链、退款/no-auth refund/释放/拒付全量投影解释矩阵、projection store、治理重放、钱包账户聚合、账户能力来源组合、授权 admission、完整预交易快照、Spend Rule 控制闭环、VCC / 全球账户 / 清结算 P2 场景。 |

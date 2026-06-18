@@ -657,7 +657,7 @@ B8 首批 Red 集必须在 B8-01 至 B8-09 任一 Green 实现前完成：`TDD-B
 | Loop ID | `GSD2-LOOP-BASELINE-PLANNING-2026-06-12` |
 | 权威文档 | `docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/GSD-2-W1-基线差距审计.md`、`docs/TDD设计/GSD-2-W2-单一Grant选择卡.md`、`docs/TDD设计/GSD-2-W3-B2账户层级CAD准入草案.md`、`docs/TDD设计/GSD-2-W4-B2账户层级ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md` |
 | 当前状态 | `B7_RECON_DIFFERENCE_ACTION_GUARD_GREEN_NEXT_CONSUMPTION_OR_B5_AUDIT_EXPANSION` |
-| Git / code baseline | 当前实际基线为 `e81a8a25 feat: 完善账务钱包交易基线` 加已提交的 B4 投影解释首轮 Green、B5 余额调账审计首轮 Green、B7 对账差错闭环首轮 Green，以及当前未提交的 B7 差错处理动作守卫 Green 变更；`da7d2ea test: 阻断契约夹具承载资金流断言` 和 `b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 只保留为 GSD-2 历史证据。 |
+| Git / code baseline | 当前实际基线为 `10853e2d feat: 收紧对账差错处理动作守卫`；`e81a8a25 feat: 完善账务钱包交易基线` 和 `ae8cb8a6 feat: 完善资金基线对账与投影能力` 保留为已消费能力证据，`da7d2ea test: 阻断契约夹具承载资金流断言` 和 `b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 只保留为 GSD-2 历史证据。 |
 | 活跃未完成计划 | `EMPTY`。旧候选不再是当前计划，只能作为 backlog reference。 |
 | 写入范围 | `docs/TDD设计/GSD-2-新基线工作流规划.md`、旧 GSD 迁移指针、TDD README、docs README、OpenSpec project 和本 Harness tasks。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、源码、测试、Justfile、最近 Git 提交和旧 GSD/Grant 历史材料。 |
