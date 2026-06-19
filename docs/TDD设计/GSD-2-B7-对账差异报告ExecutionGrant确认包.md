@@ -11,14 +11,14 @@
 | Task ID | `GSD2-B7-RECON-DIFFERENCE-REPORT-001` |
 | 原子任务 | 新增对账差异报告最小只读查询能力，解释差错状态、阻断对象、处理动作、重跑结果、准入 gate 和证据引用。 |
 | 所属阶段 | GSD-2 / B7 reconciliation difference report / Green verified。 |
-| 当前状态 | `CONSUMED_GREEN_VERIFIED_SUMMARY_ONLY` |
-| 前置证据 | `GSD2-B7-RECON-DIFFERENCE-MVP-001`、`GSD2-B7-RECON-DIFFERENCE-MVP-002`、`GSD2-B7-RECON-GATE-CONSUME-001/002`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` 和 `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 已完成；当前已提交 Git/code baseline 为 `0d3f68dc feat: 补齐清算结算对账准入消费`。 |
+| 当前状态 | `CONSUMED_GREEN_VERIFIED_COMMITTED` |
+| 前置证据 | `GSD2-B7-RECON-DIFFERENCE-MVP-001`、`GSD2-B7-RECON-DIFFERENCE-MVP-002`、`GSD2-B7-RECON-GATE-CONSUME-001/002`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` 和 `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 已完成；当前已提交 Git/code baseline 为 `a1397ddf feat: 补齐对账差异报告只读查询`。 |
 | Owner | AI Native 负责 Loop、Goal、状态回写和停止条件；产品架构专家负责业务目标、对象、能力地图、规则矩阵、验收和风险；资深架构师负责接口契约、边界、TDD、实现建议、Review 和验证；用户确认单一 Grant。 |
 | 写入范围 | 本文、LWT Goal、W5 推进计划、GSD-2 工作流入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
 | 写入文件 | `docs/TDD设计/GSD-2-B7-对账差异报告ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、`reconciliation-*`、`ledger-*`、`transaction-*`、`wallet-*`、tests、Justfile、AGENTS.md 和最近 Git 提交。 |
 | 只读参考 | `ReconciliationDifferenceApplicationService`、`ReconciliationGateApplicationService`、`ClearingSettlementGateConsumerService`、`PayoutOrderService#checkPayoutPreflight`、B7 对象级 Gate 确认包、B7 清算 / 结算 consumer 确认包和当前 LWT Goal。 |
-| Git 策略 | 本 Grant 当前为 `summary_only`，已完成代码、测试和状态回写，但未授权 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。若后续需要提交，必须重新确认提交范围。 |
+| Git 策略 | 本 Grant 已在验证通过后提交到 `a1397ddf`；后续扩展不得复用本 Grant，需重新确认新的单一 Execution Grant 和 Git 策略。 |
 
 ## 2. 产品裁决
 
@@ -210,17 +210,17 @@ Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001
 
 ## 10. Grant 消费预检清单
 
-用户确认 `Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001` 后，资深架构师进入编码前先消费本清单。任一项不满足时停止在预检阶段，不写 Java、测试、DDL/H2 schema 或公共契约。
+用户已确认并消费 `Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001`。本清单保留为本 Grant 的历史消费证据；后续扩展不得复用本清单继续写 Java、测试、DDL/H2 schema 或公共契约。
 
 | 检查项 | 通过口径 | 不通过处理 |
 | --- | --- | --- |
 | 授权文本 | 用户明确确认第 9 节可复制文本，且未扩大为批次报告、运营后台、导出、补事实或完整清结算。 | 回到用户确认单一 Grant。 |
 | 工作树 | `git status --short` 中没有影响 `reconciliation-*`、`tests`、TDD/OpenSpec 状态文件的未归属变更；若有，只能先分类或停止。 | 停止并说明冲突文件。 |
-| 当前基线 | 最近提交至少包含 `0d3f68dc feat: 补齐清算结算对账准入消费` 和本确认包。 | 重新读取当前 Git / docs / OpenSpec 后再决策。 |
+| 当前基线 | 本 Grant 已提交到 `a1397ddf feat: 补齐对账差异报告只读查询`。 | 后续扩展重新读取当前 Git / docs / OpenSpec 后再决策。 |
 | 首个 Red | 默认选择 `B7-REPORT-RED-001`，只证明对象级未闭环差错可以生成只读报告且无资金副作用。 | 若当前代码已满足，改选 `B7-REPORT-RED-002` 或 `B7-REPORT-RED-004`。 |
 | 写入范围 | 仅允许 reconciliation-face 报告契约、Request、DTO、枚举，reconciliation-impl 只读实现和 mapper 只读查询，目标测试和状态文档回写。 | 任一需求超出范围时另起 Grant。 |
 | 验证顺序 | 目标测试先行，再 `test-reconciliation`、`compile`、`pmd`、`git diff --check`。 | 验证失败且无法在授权范围内修复时停止。 |
-| Git 策略 | 默认 `summary_only`；如需提交，必须在用户另行确认提交范围后执行。 | 未确认前不得 `git add` / `git commit`。 |
+| Git 策略 | 本 Grant 已提交到 `a1397ddf`。 | 后续新 Grant 默认 `summary_only`，除非用户再次明确授权提交。 |
 
 ## 11. Grant 消费运行卡
 

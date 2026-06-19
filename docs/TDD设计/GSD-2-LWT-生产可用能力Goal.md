@@ -4,7 +4,7 @@
 
 本文是 ledger、wallet、transaction 三条资金底座被依赖能力的 `Loop + Goal` 状态载体，用于把已完成的 GSD2 切片、仍未 Done 的生产能力缺口和下一轮单一 Execution Grant 候选聚合到一张可持续推进的 Goal 卡中。
 
-本文不是新的 PRD，不替代产品设计、DSL 设计、系分设计或 TDD 设计；也不单独替代 DDL/H2 schema 授权、公共契约变更授权、生产发布授权或外部规则专业确认。`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已在 `da3b4f19` 提交固化为能力证据；`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在 `4ef64275` 提交固化余额调账独立审计查询 Red / Green / Verify 结果；`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` 与 `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 已在 `0d3f68dc` 提交固化对象级 Gate 和清算 / 结算只读 consumer 服务。`GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已完成本地 Red / Green / Verify，当前为 `summary_only` 未提交状态。当前不再复用 B5-003、B7 对象级阻断、B7 consumer 或 B7 差异报告授权扩范围，下一轮需重新确认单一 Grant。
+本文不是新的 PRD，不替代产品设计、DSL 设计、系分设计或 TDD 设计；也不单独替代 DDL/H2 schema 授权、公共契约变更授权、生产发布授权或外部规则专业确认。`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已在 `da3b4f19` 提交固化为能力证据；`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在 `4ef64275` 提交固化余额调账独立审计查询 Red / Green / Verify 结果；`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` 与 `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 已在 `0d3f68dc` 提交固化对象级 Gate 和清算 / 结算只读 consumer 服务。`GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已在 `a1397ddf` 提交固化对账差异报告最小只读查询能力。当前不再复用 B5-003、B7 对象级阻断、B7 consumer 或 B7 差异报告授权扩范围，下一轮需重新确认单一 Grant。
 
 | 字段 | 内容 |
 | --- | --- |
@@ -13,8 +13,8 @@
 | 所属阶段 | GSD-2 / LWT capability goal / B7 difference report verified。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
 | Loop ID | `GSD2-LWT-PRODUCTION-CAPABILITY-LOOP-2026-06-18` |
-| 当前状态 | `B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_SUMMARY_ONLY` |
-| Git / code baseline | `0d3f68dc feat: 补齐清算结算对账准入消费` 是当前已提交基线；B7 对象级 Gate 和清算 / 结算 consumer 已作为能力证据固化。`GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已在当前工作树完成本地 Green / Verify，但尚未提交。`4ef64275 feat: 补齐余额调账独立审计查询`、`da3b4f19 feat: 补齐余额调账路由审计回链`、`0b251593 feat: 补齐账本正常余额方向护栏`、`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6` 和 `e81a8a25` 保留为已消费能力证据。 |
+| 当前状态 | `B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_COMMITTED` |
+| Git / code baseline | `a1397ddf feat: 补齐对账差异报告只读查询` 是当前已提交基线；B7 对象级 Gate、清算 / 结算 consumer 和 B7 对账差异报告均已作为能力证据固化。`4ef64275 feat: 补齐余额调账独立审计查询`、`da3b4f19 feat: 补齐余额调账路由审计回链`、`0b251593 feat: 补齐账本正常余额方向护栏`、`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6` 和 `e81a8a25` 保留为已消费能力证据。 |
 | 关联入口 | [GSD-2-新基线工作流规划.md](GSD-2-新基线工作流规划.md)、[GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md)、[GSD-2-B7-对账差异报告ExecutionGrant确认包.md](GSD-2-B7-对账差异报告ExecutionGrant确认包.md)、[GSD-2-B7-清算结算Gate消费ExecutionGrant确认包.md](GSD-2-B7-清算结算Gate消费ExecutionGrant确认包.md)、[GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md](GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md)、[GSD-2-AUTH-Chargeback目标语义对齐任务卡.md](GSD-2-AUTH-Chargeback目标语义对齐任务卡.md)、[GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md](GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md)、OpenSpec `tdd-baseline-reset` tasks。 |
 | Owner | AI Native 流程编排负责 Goal、Loop、状态和停止条件；产品架构专家负责业务价值、验收和 Not Done；资深架构师负责模块边界、契约、测试、验证和编码准入；用户确认单一 Grant。 |
 | 写入范围 | 本文、B7 对账差异报告确认包、GSD-2 入口、P0/P1 LWT 推进计划、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
@@ -22,7 +22,7 @@
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、reconciliation、tests、Justfile、AGENTS.md、最近 Git 提交和历史准入卡。 |
 | 只读参考 | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec`、源码、测试和 Git 提交记录。 |
 | 上下文账本 | 本文是 LWT 当前状态账本；GSD-2 工作流、W5 推进计划、TDD README、docs README 和 OpenSpec tasks 是恢复入口。 |
-| Git 策略 | B5-003 已提交到 `4ef64275`；B7 对象级阻断和清算 / 结算 consumer 已提交到 `0d3f68dc`。B7 差异报告当前为 `summary_only` 本地 Green 状态，未授权提交；后续若提交或继续新 Grant，需重新确认写入范围和 Git 策略。 |
+| Git 策略 | B5-003 已提交到 `4ef64275`；B7 对象级阻断和清算 / 结算 consumer 已提交到 `0d3f68dc`。B7 差异报告已提交到 `a1397ddf`；后续若继续新 Grant，需重新确认写入范围和 Git 策略。 |
 
 ### 1.1 Goal 层级和当前恢复入口
 
@@ -31,8 +31,8 @@
 | 层级 | ID / 状态 | 含义 | 当前动作 |
 | --- | --- | --- | --- |
 | 父 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` | GSD-2 总基线，负责清理旧活跃计划、维护 Wave、OpenSpec tasks、Plan Grant 和恢复入口。 | 继续作为总入口和历史证据账本，不直接授权编码。 |
-| LWT 子 Goal | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` / `B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_SUMMARY_ONLY` | 聚合 ledger、wallet、transaction 和 reconciliation 的条件生产基线、完备性矩阵、三卡交接和下一 Grant 队列。 | 继续作为当前 LWT 状态载体，记录 wallet 授权准入、授权 route snapshot 回链、ledger normal balance guard、AUTH 兼容 guard、B4 投影解释矩阵、B5 route snapshot 审计回链、B5 独立审计查询、B7 对象级 gate 基座、B7 清算 / 结算 consumer 已提交，以及 B7 差异报告本地 Green / Verify。 |
-| 当前可执行状态 | `B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_SUMMARY_ONLY` | 对账差错已能登记对象级阻断字段，gate 查询可按对象精确命中并兼容历史类型级差错；清算 / 结算 consumer 已能只读消费对象级 gate；B7 差异报告已补单笔只读报告查询能力。 | 当前 Grant 已消费，未授权提交；下一步需要用户确认提交范围，或重新选择 B7 报告扩展、wallet 完整预交易快照、账户能力来源组合、Spend Rule 控制闭环等新的单一 Grant。 |
+| LWT 子 Goal | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` / `B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_COMMITTED` | 聚合 ledger、wallet、transaction 和 reconciliation 的条件生产基线、完备性矩阵、三卡交接和下一 Grant 队列。 | 继续作为当前 LWT 状态载体，记录 wallet 授权准入、授权 route snapshot 回链、ledger normal balance guard、AUTH 兼容 guard、B4 投影解释矩阵、B5 route snapshot 审计回链、B5 独立审计查询、B7 对象级 gate 基座、B7 清算 / 结算 consumer 已提交，以及 B7 差异报告 Green / Verify 已提交。 |
+| 当前可执行状态 | `B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_COMMITTED` | 对账差错已能登记对象级阻断字段，gate 查询可按对象精确命中并兼容历史类型级差错；清算 / 结算 consumer 已能只读消费对象级 gate；B7 差异报告已补单笔只读报告查询能力。 | 当前 Grant 已消费并提交；下一步需要重新选择 B7 报告扩展、wallet 完整预交易快照、账户能力来源组合、Spend Rule 控制闭环等新的单一 Grant。 |
 | 历史证据状态 | `B7_RECON_DIFFERENCE_ACTION_GUARD_GREEN_VERIFIED`、`GSD2-B7-RECON-GATE-CONSUME-001/002`、`10853e2d` 等 | 只表示过去切片已完成或已消费，不能作为当前下一步或默认授权。 | 仅作为 Evidence Anchor 和 Not Done 边界来源。 |
 
 恢复规则：下一轮必须先读取本文、GSD-2 工作流、W5 推进计划、B5-003 余额调账审计扩展确认包和 OpenSpec tasks；若运行时 Goal objective、旧对话摘要或历史任务卡仍指向 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 或 `GSD2-B5-BALANCE-ADJUST-AUDIT-003`，以当前工作树、本文和 OpenSpec tasks 为准，将这些切片视为已消费证据，不得回退重做或沿用为新授权。若用户没有确认新的单一 Grant，只能继续低风险状态维护或只读 Gap Audit。若用户改选 B7 清算/结算 gate、B7 差异报告、wallet 预交易快照或 P2 业务能力，必须先同步本映射和第 8.1 节 Grant 决策账本。
@@ -75,7 +75,7 @@
 | `B7-REPORT-SOURCE-AUDIT-029` | 2026-06-19 | 对 B7 对账差异报告确认包做只读源码落点审计。 | 当前源码确认：差错写服务位于 `application/difference`，gate 服务位于 `application/gate`，清算 / 结算 consumer 位于 `service` / `services/impl`；Request、DTO、枚举分别落在 `model/request`、`model/dto`、`reconciliation/enums`；`ReconciliationDifferenceMapper` 缺少报告所需的不加锁单笔查询。确认包已把候选接口校准为 `application/difference/report`，Query 改为 Request 风格，并补只读 mapper 方法和目标测试包路径。 | 0 | 本轮只做 docs-only 准入可消费性修正；不授权 Java、测试、DDL/H2 schema、公共契约、Mapper 实现、运行时配置或 Git。用户确认 `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 后，才可从报告服务首个 Red 进入编码闭环。 |
 | `B7-REPORT-GRANT-RUNBOOK-030` | 2026-06-19 | 为 B7 对账差异报告确认包补齐 Grant 消费预检清单和运行卡。 | 确认包第 10 / 11 节已明确授权文本、工作树、当前基线、首个 Red、写入范围、验证顺序、Git 策略、Pick / Red / Green / Review / Verify / Handoff 和最小断言清单。确认后默认从 `B7-REPORT-RED-001` 开始，只证明单笔报告解释对象级未闭环差错且无资金副作用。 | 0 | 本轮只增强确认包可执行性；未确认 Grant 前仍不授权 Java、测试、DDL/H2 schema、公共契约、Mapper 实现、运行时配置、Git 或生产发布。 |
 | `B7-REPORT-ENTRY-SYNC-031` | 2026-06-19 | 同步 GSD-2 总入口和 LWT Goal 的当前确认包口径。 | `GSD-2-新基线工作流规划.md` 已从“无待消费确认包”修正为“B7 对账差异报告确认包已准备但未授权编码”；本文现状和影响范围已改为 B7 报告 docs-only 准入材料，不再误写为 B5 route snapshot 审计摘要或清算 / 结算 gate 消费缺口。 | 0 | 该准备态已被下一轮 `B7-REPORT-GREEN-032` 消费。 |
-| `B7-REPORT-GREEN-032` | 2026-06-19 | 消费 `Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001`，完成对账差异报告最小只读查询 Red / Green / Verify。 | 新增 `ReconciliationDifferenceReportApplicationService`、查询 Request、报告 DTO、完整性枚举、只读 mapper 查询和 report impl；新增目标服务流测试证明对象级未闭环差错报告可解释差错、阻断对象、gate 阻断、证据引用、报告视图开关、处理动作证据不完整、缺重跑结果和历史类型级差错缺 gate 决策，并保持无账本事实副作用；`test-reconciliation` 已纳入报告测试。目标测试 5 tests、对账分组 31 tests、compile 和 PMD 通过；沙箱内 embedded Redis 端口限制已在非沙箱复跑目标测试和对账分组确认。 | 0 | 当前 Grant 已消费但未提交；不得沿用它扩批次报告、导出、运营后台、Controller、HTTP/RPC、补事实、完整清结算生命周期或生产发布。 |
+| `B7-REPORT-GREEN-032` | 2026-06-19 | 消费 `Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001`，完成对账差异报告最小只读查询 Red / Green / Verify。 | 新增 `ReconciliationDifferenceReportApplicationService`、查询 Request、报告 DTO、完整性枚举、只读 mapper 查询和 report impl；新增目标服务流测试证明对象级未闭环差错报告可解释差错、阻断对象、gate 阻断、证据引用、报告视图开关、处理动作证据不完整、缺重跑结果和历史类型级差错缺 gate 决策，并保持无账本事实副作用；`test-reconciliation` 已纳入报告测试。目标测试 5 tests、对账分组 31 tests、compile 和 PMD 通过；沙箱内 embedded Redis 端口限制已在非沙箱复跑目标测试和对账分组确认。 | 0 | 当前 Grant 已消费并提交；不得沿用它扩批次报告、导出、运营后台、Controller、HTTP/RPC、补事实、完整清结算生命周期或生产发布。 |
 
 ## 2. 现状和影响范围
 
@@ -259,7 +259,7 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | 8 | `GSD2-B5-BALANCE-ADJUST-AUDIT-003` | `consumed-green` | 已补余额调账独立审计查询最小服务流，能只读聚合交易事实、交易明细上下文、route snapshot、ledger transaction 和 LedgerEntry，并验证敏感字段不泄露、查询无资金副作用。 | 不继续沿用本 Grant 扩独立审计表、运营审批流、泛化运营补账、补事实执行、B7 差错创建或生产权限模型。 |
 | 9 | `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` | `consumed-green-committed` | 已按 `scopeDecision=object-scope-schema-backed` 完成对象级阻断基座，并随 `0d3f68dc` 提交：差错事实、DTO、H2 schema、Mapper 和 gate 查询支持对象精确命中，兼容历史类型级差错。 | 本 Grant 不再复用；不一次性做完整清分、清算、结算、出款和补事实，不做生产迁移或运营后台。 |
 | 10 | `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` | `consumed-green-verified-committed` | 已新增清算 / 结算只读 gate consumer 并随 `0d3f68dc` 提交，证明 CLEARING / SETTLEMENT 对象可真实消费对象级 gate，且目标测试、reconciliation 分组、compile 和 PMD 通过。 | 不继续沿用本 Grant 扩完整清分分佣、出款生命周期、补事实执行、运营审批、生产迁移或报表大包。 |
-| 11 | `GSD2-B7-RECON-DIFFERENCE-REPORT-001` | `consumed-green-verified-summary-only` | 已完成单笔只读差异报告查询：解释差错状态、阻断对象、处理动作、重跑结果、gate 决策和证据引用，并证明查询无账务副作用；当前未提交。 | 不继续沿用本 Grant 扩批次报告、运营后台、导出、完整清结算、补事实、生产迁移或 Git。 |
+| 11 | `GSD2-B7-RECON-DIFFERENCE-REPORT-001` | `consumed-green-verified-committed` | 已完成单笔只读差异报告查询：解释差错状态、阻断对象、处理动作、重跑结果、gate 决策和证据引用，并证明查询无账务副作用；已提交到 `a1397ddf`。 | 不继续沿用本 Grant 扩批次报告、运营后台、导出、完整清结算、补事实或生产迁移。 |
 | 12 | Spend Rule / P2 VCC / 全球账户 | `contract-only` 起步 | 业务价值高，但必须消费账户、钱包 facade、交易投影、ledger guard、余额调账审计回链、对象级 gate、清算 / 结算 consumer 和必要报告解释证据。 | 不直接写 P2 生产代码、外部轨道或通道规则。 |
 
 ### 8.1 单一 Grant 决策账本
@@ -268,7 +268,7 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 
 | 决策项 | 当前裁决 | 进入条件 | 切换条件 | 状态回写 |
 | --- | --- | --- | --- | --- |
-| 默认推荐 | 先确认是否提交 `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 本地 Green / Verify 变更；若继续编码，再从 wallet 完整预交易快照、账户能力来源组合、Spend Rule 控制闭环或 B7 报告扩展中重新选择单一 Grant。 | 提交需用户确认 Git 范围；新的编码切片需重新确认单一 Execution Grant、首个 Red、写入范围、验证命令和停止条件。 | 若优先完整清结算生命周期、运营审批或 P2 业务，则另起专项 Grant，不复用已消费 consumer 或 report Grant。 | 本文第 8 节、第 10 节、第 11 节、W5 推进计划、B7 对账差异报告确认包和 OpenSpec tasks。 |
+| 默认推荐 | B7 对账差异报告已提交，下一轮从 wallet 完整预交易快照、账户能力来源组合、Spend Rule 控制闭环或 B7 报告扩展中重新选择单一 Grant。 | 新的编码切片需重新确认单一 Execution Grant、首个 Red、写入范围、验证命令和停止条件。 | 若优先完整清结算生命周期、运营审批或 P2 业务，则另起专项 Grant，不复用已消费 consumer 或 report Grant。 | 本文第 8 节、第 10 节、第 11 节、W5 推进计划、B7 对账差异报告确认包和 OpenSpec tasks。 |
 | Wallet 授权准入 | 目标是补齐支付工具授权入口的最小服务流。 | 已按 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 完成 application 契约、Request、实现和服务流测试。 | 后续需要 route snapshot 回链、Spend Rule、VCC facade、完整预交易快照或交易 canonical 入参调整时，必须重新开 Grant。 | 本文第 1.2 节、第 5.2 节、第 8 节和 Evidence Anchor Matrix。 |
 | Wallet 授权准入恢复核验 | 防止旧运行时 Goal 或摘要把已消费 B2 授权准入误恢复为当前默认任务。 | 2026-06-19 已重跑授权准入目标测试 3 tests 和授权准入组合回归 40 tests，均在沙箱外通过；本轮无代码变更。 | 若后续用户仍指定该 ID，先按“已消费基线核验”处理；只有明确提出新的 wallet 子能力，才进入新的单一 Grant。 | 本文第 1.2 节、W5 推进计划和 OpenSpec tasks。 |
 | AUTH 兼容 adapter | 目标是防止历史 `chargeback` 被误当新目标主入口。 | 已按 `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 完成兼容说明、最小 guard、兼容测试和状态回写。 | 后续需要删除公共 API、改 DDL/H2 schema、完整 dispute case 或迁移到 `settleRefund` 委派时，必须重新开 Grant。 | `GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` 第 14 节已记录 Red/Green、验证证据和 Not Done。 |
@@ -293,7 +293,7 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | Harness 结构 | `python3 /Users/wuxp/.codex/skills/senior-software-architect/scripts/check_harness_plan.py --kind gsd-wave --file docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md` | Task、Owner、范围、Wave、上下文账本、禁止事项、验证和 handoff 字段齐全。 |
 | 产品结构 | `python3 /Users/wuxp/.codex/skills/product-architecture-expert/scripts/check_product_deliverable.py --kind product-architecture --file docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md` | 业务目标、能力地图、对象、流程、规则、运营数据、风险和验收齐全。 |
 | 架构结构 | `python3 /Users/wuxp/.codex/skills/senior-software-architect/scripts/check_architecture_deliverable.py --kind architecture-plan --file docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md` | 背景目标、现状、核心决策、契约、数据一致性、可靠性安全、验证、发布风险齐全。 |
-| 状态一致性 | `rg "GSD2-LWT|LWT-PRODUCTION|CONDITIONAL_DELIVERABLE_BASELINE|PARTIAL_BASELINE|Completion Audit|Evidence Anchor Matrix|单一 Grant 决策账本|Loop Progress Ledger|AuthorizationAdmissionApplicationServiceTests|LedgerNormalBalanceGuard|B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_SUMMARY_ONLY|GSD2-B7-RECON-DIFFERENCE-REPORT-001|GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001|GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001|blockingObjectType|blockingObjectSn" docs openspec` | GSD2 入口、W5、生产可用基线裁决、完成度审计、证据锚点、单一 Grant 决策账本、Loop Progress Ledger、README、OpenSpec tasks、wallet 授权准入、ledger guard、B5 route snapshot 审计回链、B5-003 独立审计查询、B7 对象级 Gate 基座、B7 清算/结算 consumer 和 B7 差异报告 Green 结果能追踪到本文和当前基线。 |
+| 状态一致性 | `rg "GSD2-LWT|LWT-PRODUCTION|CONDITIONAL_DELIVERABLE_BASELINE|PARTIAL_BASELINE|Completion Audit|Evidence Anchor Matrix|单一 Grant 决策账本|Loop Progress Ledger|AuthorizationAdmissionApplicationServiceTests|LedgerNormalBalanceGuard|B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_COMMITTED|GSD2-B7-RECON-DIFFERENCE-REPORT-001|GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001|GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001|blockingObjectType|blockingObjectSn" docs openspec` | GSD2 入口、W5、生产可用基线裁决、完成度审计、证据锚点、单一 Grant 决策账本、Loop Progress Ledger、README、OpenSpec tasks、wallet 授权准入、ledger guard、B5 route snapshot 审计回链、B5-003 独立审计查询、B7 对象级 Gate 基座、B7 清算/结算 consumer 和 B7 差异报告 Green 结果能追踪到本文和当前基线。 |
 | Grant 消费可用性 | `rg -n 'Grant 消费预检清单|Grant 消费运行卡|Red 选择|最小断言清单|AUTH-CB-COMPAT-RED-001' docs/TDD设计/GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md openspec/changes/tdd-baseline-reset/tasks.md` | AUTH 兼容确认包不仅有可复制 Grant，还能指导确认后的预检、首个 Red 选择、最小 Green、Review、Verify 和 Handoff。 |
 | README 恢复导航 | `rg -n 'W1 基线差距审计把当前 Git/code baseline 校准到|推荐下一步确认 .*GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001|当前仍不授权代码|当前下一候选.*B2|下一候选.*GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001' docs/README.md docs/TDD设计/README.md docs/TDD设计/GSD-2-新基线工作流规划.md openspec/changes/tdd-baseline-reset/tasks.md` | 不再把 W1/W2/W3/W4 的历史基线、历史推荐或 B2 账户层级候选误写成当前下一候选；README 入口应指向本轮支付工具授权准入提交、LWT Goal、B4 remaining 已消费和 wallet 授权准入下一切片。 |
 | 空白和 Markdown | `git diff --check` | 无行尾空白或 patch 格式问题。 |
@@ -303,12 +303,12 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 
 | 字段 | 内容 |
 | --- | --- |
-| 当前可执行任务 | `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已消费为本地 Green / Verify，当前状态 `B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_SUMMARY_ONLY`。B7 对象级 Gate 基座和清算 / 结算只读 consumer 已在 `0d3f68dc` 提交。 |
+| 当前可执行任务 | `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已消费为本地 Green / Verify，当前状态 `B7_RECON_DIFFERENCE_REPORT_GREEN_VERIFIED_COMMITTED`。B7 对象级 Gate 基座和清算 / 结算只读 consumer 已在 `0d3f68dc` 提交。 |
 | 写入范围 | 本轮已写入 B7 对账差异报告 face 契约、request、DTO、完整性枚举、impl 只读聚合、mapper 只读查询、目标服务流测试、`Justfile` 对账分组和状态文档。未授权 DDL/H2 schema、资金写入链路、运营后台、导出、完整清结算消费方、补事实执行、运行时配置或 Git。 |
 | 服务层边界 | 本轮只交付 reconciliation application service 能力；不新增 Controller、HTTP/RPC、页面、导出端点或外部适配入口。 |
 | 验证命令 | `just test-one ReconciliationDifferenceReportApplicationServiceTests tests`、`just test-reconciliation`、`just compile`、`just pmd` 和 `git diff --check` 已通过。 |
 | 编译说明 | 本轮已改 Java、测试和文档，并完成目标测试、reconciliation 分组、编译和 PMD；Spring/Redis 端口类 sandbox 失败已按环境问题在非 sandbox 复跑通过。 |
-| 下一 owner | 用户确认是否提交本地 B7 差异报告变更；若继续编码，需重新确认 B7 报告扩展、wallet 完整预交易快照、账户能力来源组合、Spend Rule 控制闭环等单一 Grant。若要扩完整清结算生命周期、补事实、运营审批或生产迁移，必须另起专项 Grant。 |
+| 下一 owner | 继续编码前需重新确认 B7 报告扩展、wallet 完整预交易快照、账户能力来源组合、Spend Rule 控制闭环等单一 Grant。若要扩完整清结算生命周期、补事实、运营审批或生产迁移，必须另起专项 Grant。 |
 | 交接要求 | 后续每轮必须先读取本文、B7 对账差异报告确认包、GSD-2 工作流、W5 推进计划和 OpenSpec tasks，再确认新的单一 Execution Grant、写入范围、禁止范围、验证命令和回滚提示。 |
 | 回滚提示 | B7 对象级 Gate 与清算 / 结算 consumer 已提交到 `0d3f68dc`，后续如需回退应按 Git revert 或补偿提交处理；不得连带回滚 `4ef64275`、`da3b4f19` 或更早已提交能力证据。 |
 
@@ -325,7 +325,7 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | 给出可交付生产基线判定 | 第 5.5 已明确 `CONDITIONAL_DELIVERABLE_BASELINE`、`PARTIAL_BASELINE` 和 `NOT_DELIVERABLE_AS_FULL_PRODUCTION_DONE`。 | `DONE_DOCS_ONLY`。 | 后续切片必须声明消费或补强哪一项基线。 |
 | 给出下一单一 Grant 决策账本 | 第 8.1 已拆分默认推荐、候选切换条件、停止条件和状态回写位置。 | `DONE_DOCS_ONLY`。 | 用户确认单一 Grant 后，按对应候选首个 Red 进入代码闭环。 |
 | 结构门禁命令可复跑且通过 | 第 11.4 已记录 LWT Goal、P0/P1 LWT 推进计划、AUTH Chargeback 目标语义任务卡和 AUTH Chargeback 兼容入口确认包的 Harness、产品和架构结构 checker 结果。 | `DONE_DOCS_ONLY`。 | 后续改动任一活跃入口时必须复跑对应结构门禁。 |
-| 对齐当前 Git/code baseline | 本文、W5、GSD-2 工作流和 OpenSpec tasks 均校准到 `0d3f68dc` 加当前工作树 B7 差异报告本地 Green 变更；`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已在 `da3b4f19` 提交固化，`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在 `4ef64275` 提交固化，`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001 / scopeDecision=object-scope-schema-backed` 和 `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 已在 `0d3f68dc` 提交固化，并保留 `0b251593`、`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6`、`e81a8a25` 作为已消费证据。 | `DONE_CURRENT_BASELINE_PLUS_LOCAL_GREEN`。 | 后续先确认是否提交 B7 差异报告本地变更，再选择新的单一 Grant。 |
+| 对齐当前 Git/code baseline | 本文、W5、GSD-2 工作流和 OpenSpec tasks 均校准到 `a1397ddf`；`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已在 `da3b4f19` 提交固化，`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在 `4ef64275` 提交固化，`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001 / scopeDecision=object-scope-schema-backed` 和 `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 已在 `0d3f68dc` 提交固化，`GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已在 `a1397ddf` 提交固化，并保留 `0b251593`、`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6`、`e81a8a25` 作为已消费证据。 | `DONE_CURRENT_BASELINE_COMMITTED`。 | 后续选择新的单一 Grant。 |
 | 校准 README 恢复导航 | docs README 和 TDD README 已把 W1/W2/W3/W4 标为历史记录或已消费证据，当前入口指向 LWT Goal、B5 route snapshot 审计回链提交、B5-003 余额调账审计扩展确认包、ledger guard 结果、AUTH 兼容 adapter Green 结果、B4 投影解释 remaining 已消费结果、wallet 授权准入与 route snapshot 回链结果。 | `DONE_DOCS_ONLY`。 | 后续改 README 或入口导航时必须复跑 README 恢复导航扫描。 |
 | 按依赖顺序推进低风险文档/计划 | AUTH 兼容、B4 投影解释 remaining、wallet 授权准入、route snapshot 回链、ledger guard、B5 route snapshot 审计回链和 B5 独立审计查询均已消费；B5-003 已补 service、Query、DTO、impl、目标测试、验证证据和 Not Done。 | `CONSUMED_GREEN`。 | 下一轮不得复用 B5-003；需重新确认 B7 清算/结算 gate、B7 差异报告或 wallet 后续单一 Grant。 |
 | 建立无进展计数和停止账本 | 第 1.2 节已记录 docs-only 推进轮次、证据变化和无进展计数；最近一轮已把运行时 Goal 旧 B2 objective 与当前 B5-003/B7 决策账本的冲突收敛为恢复规则。 | `DONE_DOCS_ONLY`。 | 下一轮若没有 Grant、事实差异、验证证据或状态缺口收敛，应停止 docs-only 扩写并交还用户选择。 |
@@ -333,7 +333,7 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | 补齐 AUTH 兼容 Grant 消费预检 | `GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` 第 11 节已补用户授权、工作树状态、当前基线、首个 Red 收窄、写入范围、验证顺序、状态回写和 Git 策略预检，并已被本轮消费。 | `CONSUMED_GREEN`。 | 预检结果只作为本 Grant 审计证据，后续不得复用为新授权。 |
 | 补齐 AUTH 兼容 Grant 消费运行卡 | `GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` 第 12 节已补 Red 选择、Red 范围、Green 实现、Review、Verify、Handoff 和最小断言清单，并已被本轮消费。 | `CONSUMED_GREEN`。 | 运行卡结果只作为本 Grant 审计证据，后续不得复用为新授权。 |
 | 消费 B7 清算 / 结算真实消费方服务 | `GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md` 已从确认包演进为消费记录；新增 `ClearingSettlementGateConsumerService`、请求、结果 DTO、只读实现和目标服务流测试。Red 首次证明服务缺失；Green 后清算和结算对象能真实消费对象级 gate，且无账本副作用。 | `CONSUMED_GREEN_VERIFIED_COMMITTED`。 | 本 Grant 已在 `0d3f68dc` 提交；下一轮不得沿用它扩完整清分、清算、结算、出款、补事实、运营审批或生产迁移。 |
-| 消费 B7 对账差异报告 Grant | `GSD-2-B7-对账差异报告ExecutionGrant确认包.md` 第 13 节已记录 Red / Green / Verify；新增单笔只读差异报告查询能力和目标服务流测试。 | `CONSUMED_GREEN_VERIFIED_SUMMARY_ONLY`。 | 用户确认后可提交本轮变更；继续能力扩展必须另起新的单一 Grant。 |
+| 消费 B7 对账差异报告 Grant | `GSD-2-B7-对账差异报告ExecutionGrant确认包.md` 第 13 节已记录 Red / Green / Verify；新增单笔只读差异报告查询能力和目标服务流测试。 | `CONSUMED_GREEN_VERIFIED_COMMITTED`。 | 本 Grant 已提交到 `a1397ddf`；继续能力扩展必须另起新的单一 Grant。 |
 | 刷新 B7 对象级 Gate 验证证据 | 非沙箱环境复跑 `just test-one ReconciliationGateApplicationServiceTests,ReconciliationDifferenceApplicationServiceTests tests` 20 tests 通过，`just test-reconciliation` 26 tests 通过；沙箱内 embedded Redis 端口探测失败已归类为环境限制。 | `GREEN_EVIDENCE_REFRESHED`。 | 后续 consumer 编码仍需新的单一 Grant，且不得把对象级 Gate 基座验证外推为完整清算 / 结算 Done。 |
 | 证明三模块全量生产可用 | 当前只具备条件可交付基线，仍缺完整预交易快照、失败态全量解释、projection store、治理重放、差异报告、完整清分/清算/结算/出款生命周期、补事实、运营审批、生产迁移、灰度和告警。 | `NOT_DONE`。 | 不得标记 Goal complete；继续按单一 Grant 收敛缺口。 |
 
@@ -344,10 +344,10 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | 交接卡 | 已具备内容 | 缺口 | 下一 owner |
 | --- | --- | --- | --- |
 | Product Context Card | 业务目标、用户价值、核心对象、入账主体规则、支付工具边界、投影边界、对账 gate、条件基线和 Not Done 已在第 3 至 5 节表达。 | VCC、全球账户、收单、完整清结算和运营后台验收仍需独立场景卡。 | 产品架构专家。 |
-| Engineering Handoff Card | `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`、`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001`、`GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001`、`GSD2-LD-LEDGER-GUARD-REGRESSION-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-002`、`GSD2-B5-BALANCE-ADJUST-AUDIT-003`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 和 `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已消费并通过目标测试；B7 报告当前未提交。 | 下一轮仍缺用户确认提交或新的单一 Execution Grant；若改选后续能力，默认从 wallet 完整预交易快照、账户能力来源组合、Spend Rule 控制闭环或 B7 报告扩展中选择；对象级 Gate、consumer 和 report Grant 均不得复用。 | 资深架构师 + 用户。 |
+| Engineering Handoff Card | `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`、`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001`、`GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001`、`GSD2-LD-LEDGER-GUARD-REGRESSION-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-002`、`GSD2-B5-BALANCE-ADJUST-AUDIT-003`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 和 `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已消费并通过目标测试；B7 报告已提交到 `a1397ddf`。 | 下一轮仍缺新的单一 Execution Grant；若改选后续能力，默认从 wallet 完整预交易快照、账户能力来源组合、Spend Rule 控制闭环或 B7 报告扩展中选择；对象级 Gate、consumer 和 report Grant 均不得复用。 | 资深架构师 + 用户。 |
 | Production Loop Card | 已声明生产发布基线未完成，并列出迁移、灰度、回滚、监控、告警、运营审批、外部规则和真实资金前置条件。 | 生产发布、SLO、告警、Runbook、合规/法务/财务/通道确认均未授权。 | 发布 owner / 业务 owner / 合规和财务确认方。 |
 
-三卡裁决：当前三卡可用于下一轮编码准入交接，但不能替代新的 Execution Grant、测试通过、Git 授权或上线审批。`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`、`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001`、`GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001`、`GSD2-LD-LEDGER-GUARD-REGRESSION-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-002`、`GSD2-B5-BALANCE-ADJUST-AUDIT-003`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 和 `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已消费；B7 差异报告当前为本地 Green / Verify、未提交。后续不得复用已消费 Grant 继续扩完整 dispute case、projection store、治理重放、VCC facade、Spend Rule 策略引擎、完整预交易快照、统一支付工具交易内核、独立审计表、运营审批流、补事实执行、完整清结算生命周期或清结算补事实；若继续推进，默认先确认提交本轮变更，或重新选择 wallet 后续能力、B7 报告扩展或其他单一 Grant。
+三卡裁决：当前三卡可用于下一轮编码准入交接，但不能替代新的 Execution Grant、测试通过、Git 授权或上线审批。`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`、`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001`、`GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001`、`GSD2-LD-LEDGER-GUARD-REGRESSION-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-002`、`GSD2-B5-BALANCE-ADJUST-AUDIT-003`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 和 `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已消费；B7 差异报告已提交到 `a1397ddf`。后续不得复用已消费 Grant 继续扩完整 dispute case、projection store、治理重放、VCC facade、Spend Rule 策略引擎、完整预交易快照、统一支付工具交易内核、独立审计表、运营审批流、补事实执行、完整清结算生命周期或清结算补事实；若继续推进，默认重新选择 wallet 后续能力、B7 报告扩展或其他单一 Grant。
 
 ### 11.3 Evidence Anchor Matrix
 
