@@ -187,7 +187,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `B7-CLSSET-GATE-RED-001` | 清算消费方遇到未闭环 `CLEARING` 差错是否被阻断。 | 未闭环差错不得释放清算。 | 返回 `BLOCKED`、差错流水、责任方、证据和解释。 | 不生成清算候选、交易、route、posting、LedgerEntry、余额或投影副作用。 | 清算 gate 目标测试或 `ReconciliationGateApplicationServiceTests`。 | `just test-one ReconciliationGateApplicationServiceTests tests`。 | 需要完整清算对象时停止。 |
 | `B7-CLSSET-GATE-RED-002` | 结算消费方遇到未闭环 `SETTLEMENT` 差错是否被阻断。 | 未闭环差错不得释放结算。 | 返回 `BLOCKED`、差错流水、责任方、证据和解释。 | 不生成结算单、出款单、交易、route、posting 或 LedgerEntry。 | 结算 gate 目标测试。 | 目标测试 + `just test-reconciliation`。 | 需要完整结算锁定时停止。 |
-| `B7-CLSSET-GATE-RED-003` | 对象级方案下，某清算候选或结算单差错是否不会误阻断另一个对象。 | 对象级阻断必须准确命中。 | 对象 A 被阻断，对象 B 不被误阻断或仅受类型级历史差错影响。 | 不用类型级全阻断冒充对象级能力。 | schema-backed gate 测试。 | 目标测试 + `just test-reconciliation`。 | 未授权 DDL/H2 或公共契约时停止。 |
+| `B7-CLSSET-GATE-RED-003` | 对象级方案下，某清算候选或结算单差错是否不会误阻断另一个对象。 | 对象级阻断必须准确命中。 | 对象 A 被阻断并返回 `blockingObjectType / blockingObjectSn`，对象 B 不被误阻断或仅受类型级历史差错影响。 | 不用类型级全阻断冒充对象级能力。 | schema-backed gate 测试。 | 目标测试 + `just test-reconciliation`。 | 未授权 DDL/H2 或公共契约时停止。 |
 | `B7-CLSSET-GATE-RED-004` | 差错已处理但重跑未对平时是否继续阻断。 | 处理动作不等于放行。 | 返回 `BLOCKED`，解释重跑未对平。 | 不因 actionType 存在就条件放行。 | gate 回归测试。 | `just test-one ReconciliationGateApplicationServiceTests tests`。 | 需要改变差错状态机时停止。 |
 | `B7-CLSSET-GATE-RED-005` | 差错已处理且重跑对平后是否条件放行。 | 放行必须基于重新对账证据。 | 返回 `CONDITIONALLY_PASSED` 和证据摘要。 | 不创建后续清算 / 结算事实。 | gate 回归测试。 | `just test-one ReconciliationGateApplicationServiceTests tests`。 | 需要真实清算确认时停止。 |
 
@@ -231,6 +231,29 @@
 3. 不执行补事实、核销、调账或治理重放。
 4. 不把差错处理动作当成资金事实。
 5. 不绕过用户确认扩大到 B7 差异报告、运营后台、外部规则或生产迁移。
+
+### 7.3 对象级字段最小口径
+
+对象级方案不引入完整清算批次、结算单或出款对象模型，只在对账差错事实上补“这个差错阻断哪个消费对象”的最小字段。
+
+| 字段 | 建议落点 | 口径 | 兼容规则 |
+| --- | --- | --- | --- |
+| `blockingObjectType` | `CreateReconciliationDifferenceRequest`、`ReconciliationDifferenceDTO`、`ReconciliationGateBlockingDifferenceDTO`、`ReconciliationDifference`、H2 schema。 | 阻断对象类型，取值对齐 `ReconciliationGateObjectType`，例如 `CLEARING`、`SETTLEMENT`、`PAYOUT`；不是 ledger subject，也不是清算 / 结算实体类型枚举。 | 历史差错为空时视为类型级阻断。新对象级差错若用于清算 / 结算 gate，应显式填写。 |
+| `blockingObjectSn` | 同上。 | 阻断对象流水，例如清算候选流水、结算单流水或出款单流水；与 gate request 的 `gateObjectSn` 进行匹配。 | 历史差错为空时视为类型级阻断。新对象级差错若已知消费对象，应显式填写。 |
+| 查询索引 | H2 schema 和生产迁移方案候选。 | 建议按 `tenant_id + blocking_scope + blocking_object_type + blocking_object_sn + status` 建立查询能力；本确认包只授权 H2 和代码最小闭环，生产迁移仍是 Not Done。 | 未做生产迁移前，交付说明必须标明生产 DDL / 回滚 / 灰度待补。 |
+
+命名裁决：不把 `gateObjectSn` 直接写入差错表，避免把“消费方请求对象”与“差错阻断对象”混成同一个语义；差错侧使用 `blockingObjectType / blockingObjectSn`，gate 侧继续使用 `gateObjectType / gateObjectSn`。
+
+### 7.4 对象级兼容命中规则
+
+| 场景 | 命中规则 | gate 决策 |
+| --- | --- | --- |
+| 对象级精确命中 | 同租户、`blockingScope` 包含当前 `gateObjectType`，且 `blockingObjectType == gateObjectType`、`blockingObjectSn == gateObjectSn`。 | 未闭环或重跑未对平时 `BLOCKED`；已处理且重跑对平时 `CONDITIONALLY_PASSED`。 |
+| 同类型不同对象 | 同租户、`blockingScope` 包含当前 `gateObjectType`，但 `blockingObjectSn != gateObjectSn`。 | 不阻断当前对象；Red 必须证明不会误阻断。 |
+| 历史类型级差错 | `blockingObjectType` 或 `blockingObjectSn` 为空，但 `blockingScope` 命中当前 gate 类型。 | 保守阻断，避免历史差错因升级对象级查询被静默放行；解释中需体现类型级历史阻断。 |
+| 空对象请求 | `CheckReconciliationGateRequest.gateObjectSn` 为空。 | 继续拒绝请求，不把缺对象的消费方请求降级成类型级全局检查。 |
+
+Mapper 目标：对象级 Grant 下，原 `selectByBlockingScope` 应演进为能表达“精确对象命中 + 历史类型级保守命中”的只读查询；不得在 gate 查询中写差错、交易、账本或投影事实。
 
 ## 8. 验证矩阵
 
