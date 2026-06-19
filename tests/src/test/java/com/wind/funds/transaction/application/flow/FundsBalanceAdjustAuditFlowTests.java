@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.spec.SourceObjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
@@ -69,6 +70,7 @@ class FundsBalanceAdjustAuditFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, 2, 1, 2);
         assertLedgerFactsFollowRouteSnapshot(businessSn);
         fundsTransactionDetailsByBusinessSn(businessSn).forEach(this::assertExternalAnomalyAuditContext);
+        assertExternalAnomalyAuditContextInRouteSnapshot(businessSn);
     }
 
     /**
@@ -137,6 +139,43 @@ class FundsBalanceAdjustAuditFlowTests extends FundsTransactionFlowTestSupport {
         assertThat(detail.getContextVariables())
                 .contains(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_SINGLE_LIMIT)
                 .contains(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_CUMULATIVE_LIMIT);
+    }
+
+    private void assertExternalAnomalyAuditContextInRouteSnapshot(String businessSn) {
+        String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
+                .as("balance adjust route snapshot must carry audit backlinks for businessSn %s", businessSn)
+                .hasValueSatisfying(this::assertExternalAnomalyAuditRouteContext);
+    }
+
+    private void assertExternalAnomalyAuditRouteContext(RouteSnapshotSpec routeSnapshot) {
+        assertThat(routeSnapshot.getContextVariables())
+                .containsEntry(FundsInstructionContextKeys.SOURCE_TYPE,
+                        SourceObjectType.EXTERNAL_BALANCE_ANOMALY.name())
+                .containsEntry(FundsInstructionContextKeys.SOURCE_SN,
+                        "EXT_BALANCE_ANOMALY_202606170001")
+                .containsEntry(FundsInstructionContextKeys.ADJUST_EVIDENCE_REF,
+                        "EVIDENCE_EXTERNAL_BALANCE_ANOMALY_202606170001")
+                .containsEntry(FundsInstructionContextKeys.APPROVAL_REF,
+                        "APPROVAL_EXTERNAL_BALANCE_ANOMALY_202606170001")
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_FINAL_EVENT_REF,
+                        "ISSUER_FINAL_EVENT_202606170001")
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_BALANCE_SNAPSHOT_REF,
+                        "ISSUER_BALANCE_SNAPSHOT_202606170001")
+                .containsEntry(FundsInstructionContextKeys.RECONCILIATION_EXCEPTION_REF,
+                        "RECON_DIFF_202606170001")
+                .containsEntry(FundsInstructionContextKeys.RECONCILIATION_RERUN_REF,
+                        "RECON_RERUN_202606170001")
+                .containsEntry(FundsInstructionContextKeys.RESPONSIBILITY_REF,
+                        "RECOVERY_CASE_202606170001")
+                .containsEntry(FundsInstructionContextKeys.REASON_CODE,
+                        "EXTERNAL_TERMINAL_BALANCE_DEFICIT")
+                .containsEntry(FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE, Boolean.TRUE)
+                .containsEntry(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_POLICY_CODE,
+                        "EXT_DEFICIT_RECOVERY")
+                .containsEntry(FundsInstructionContextKeys.NEGATIVE_AVAILABLE_RISK_STATUS,
+                        "RECOVERY_PENDING")
+                .doesNotContainKey(FundsInstructionContextKeys.EXTERNAL_ACCOUNT_REF);
     }
 
     private static FundsBalanceAdjustRequest externalBalanceAnomalyAdjustRequest(FundsAccountId accountId,

@@ -34,6 +34,8 @@ import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -279,10 +281,51 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
                 .platformAccounts(platformAccounts)
                 .resolvedAt(instruction.getEventTime())
                 .description(instruction.getDescription())
-                .contextVariables(Map.of())
+                .contextVariables(routeContextVariables(instruction))
                 .build();
         RouteSpecSupport.validateResolvedRoute(result);
         return result;
+    }
+
+    private Map<String, Object> routeContextVariables(FundsInstructionSpec instruction) {
+        return switch (instruction.getEventType()) {
+            case BALANCE_ADJUST, LIMIT_ADJUST -> adjustmentRouteContextVariables(instruction);
+            default -> Map.of();
+        };
+    }
+
+    private Map<String, Object> adjustmentRouteContextVariables(FundsInstructionSpec instruction) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.SOURCE_TYPE, String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.SOURCE_SN, String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.REASON_CODE, String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.ADJUST_REASON, String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.ADJUST_EVIDENCE_REF, String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.APPROVAL_REF, String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.EXTERNAL_FINAL_EVENT_REF, String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.EXTERNAL_BALANCE_SNAPSHOT_REF,
+                String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.RECONCILIATION_EXCEPTION_REF,
+                String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.RECONCILIATION_RERUN_REF,
+                String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.RESPONSIBILITY_REF, String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE, Boolean.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_POLICY_CODE,
+                String.class);
+        putContextIfPresent(result, instruction, FundsInstructionContextKeys.NEGATIVE_AVAILABLE_RISK_STATUS,
+                String.class);
+        return Collections.unmodifiableMap(result);
+    }
+
+    private <T> void putContextIfPresent(Map<String, Object> result,
+                                         FundsInstructionSpec instruction,
+                                         String key,
+                                         Class<T> valueType) {
+        T value = FundsInstructionContextReader.getValue(instruction, key, valueType);
+        if (value != null) {
+            result.put(key, value);
+        }
     }
 
     private RouteParticipantSpec subjectParticipant(FundsAccountId accountId, FundsInstructionSpec instruction) {
