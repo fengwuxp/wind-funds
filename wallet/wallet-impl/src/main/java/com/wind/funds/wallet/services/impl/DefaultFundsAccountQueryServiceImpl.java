@@ -27,7 +27,6 @@ import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.wind.funds.wallet.dal.mapper.BudgetGroupMapper;
 import com.wind.funds.wallet.dal.mapper.CreditAccountMapper;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
-import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
@@ -74,6 +73,10 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     @Override
     public @NonNull FundsAccount getAccount(@NonNull FundsAccountId accountId) {
         ResolvedFundsSubject subject = findRequired(accountId);
+        FundsAccountCapabilitySourceResolver.AccountCapabilityResolution capabilityResolution =
+                FundsAccountCapabilitySourceResolver.resolve(
+                        subject.ledgerProfileCode(),
+                        subject.contextVariables());
         return ImmutableFundsAccount.builder()
                 .id(subject.id())
                 .tenantId(subject.tenantId())
@@ -81,7 +84,8 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                 .owner(FundsAccountOwner.of(subject.ownerId(), subject.ownerType()))
                 .status(subject.status())
                 .currency(subject.currency())
-                .capabilities(resolveCapabilitiesFromProfile(subject))
+                .capabilities(capabilityResolution.capabilities())
+                .capabilitySource(capabilityResolution.source())
                 .accountLedgerIds(loadLedgerIds(subject))
                 .version(subject.version())
                 .build();
@@ -373,16 +377,6 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
         return result == null ? 0L : result;
     }
 
-    private Set<FundsAccountCapability> resolveCapabilitiesFromProfile(ResolvedFundsSubject subject) {
-        return switch (subject.ledgerProfileCode()) {
-            case FUNDING_BASIC, FUNDING_MERCHANT, FUNDING_PLATFORM -> Set.of(FundsAccountCapability.RECEIVE,
-                    FundsAccountCapability.PAY,
-                    FundsAccountCapability.WITHDRAW);
-            case CREDIT_BASIC -> Set.of(FundsAccountCapability.PAY);
-            case BUDGET_BASIC -> Set.of();
-        };
-    }
-
     private LocalDateTime activeTime(LedgerDTO ledger) {
         return ledger.getGmtCreate() == null ? LocalDateTime.now() : ledger.getGmtCreate();
     }
@@ -399,6 +393,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
             LedgerProfileCode ledgerProfileCode,
             AccountBalancePeriodType periodType,
             String periodId,
+            String contextVariables,
             Integer version
     ) {
 
@@ -415,6 +410,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     account.getLedgerProfileCode(),
                     AccountBalancePeriodType.LIFETIME,
                     AccountBalancePeriodType.LIFETIME.name(),
+                    account.getContextVariables(),
                     account.getVersion()
             );
         }
@@ -432,6 +428,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     account.getLedgerProfileCode(),
                     account.getPeriodType(),
                     account.getPeriodId(),
+                    account.getContextVariables(),
                     account.getVersion()
             );
         }
@@ -449,6 +446,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                     account.getLedgerProfileCode(),
                     account.getPeriodType(),
                     account.getPeriodId(),
+                    account.getContextVariables(),
                     account.getVersion()
             );
         }

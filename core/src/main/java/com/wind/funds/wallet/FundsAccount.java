@@ -106,6 +106,14 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
     @NonNull
     Set<FundsAccountCapability> getCapabilities();
 
+    /**
+     * 账户能力来源。
+     *
+     * @return 账户能力来源，例如 LEDGER_PROFILE、CONTEXT_VARIABLES
+     */
+    @NonNull
+    String getCapabilitySource();
+
     default boolean canWithdraw() {
         return getStatus().canDebit() && getCapabilities().contains(FundsAccountCapability.WITHDRAW);
     }

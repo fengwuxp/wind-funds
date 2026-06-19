@@ -37,6 +37,8 @@ public class ImmutableFundsAccount implements FundsAccount {
 
     private final Set<FundsAccountCapability> capabilities;
 
+    private final String capabilitySource;
+
     private final Map<LedgerSubjectCode, Long> accountLedgerIds;
 
     private final Integer version;
