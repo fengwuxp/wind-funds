@@ -30,6 +30,8 @@
 
 现有 B7 gate 已能按 `blockingScope` 对 `CLEARING`、`SETTLEMENT`、`PAYOUT` 范围内的未闭环差错做阻断，并已被出款 preflight 消费。下一步的业务问题不是“能否调用 gate”，而是“清算候选或结算单应该被全类型阻断，还是只被命中自身对象的差错阻断”。
 
+2026-06-19 源码 Gap Audit 结论：当前 `CheckReconciliationGateRequest.gateObjectSn` 已是准入消费对象必填字段，但 `ReconciliationDifference`、`CreateReconciliationDifferenceRequest`、`ReconciliationDifferenceDTO`、H2 schema 和 `ReconciliationDifferenceMapper.selectByBlockingScope` 都只表达 `blockingScope`，没有阻断对象类型或对象流水；`ReconciliationGateApplicationServiceImpl` 也只按 `tenantId + blockingScope` 查询。因此，类型级方案只能作为保守 MVP，生产可用条件基线应优先选择 `scopeDecision=object-scope-schema-backed`。
+
 默认建议：
 
 1. 若目标是快速复用现有能力，可选择类型级阻断：任一命中 `CLEARING` 或 `SETTLEMENT` 的未闭环差错都会阻断该租户同类型准入。优点是低风险、无需 schema；缺点是误阻断范围大，只适合保守 MVP 或早期内控。
@@ -94,7 +96,7 @@
 | `type-scope-no-schema` | 沿用当前 `blockingScope` 类型级阻断。 | 可只补清算 / 结算消费方测试和最小服务，不改表。 | 保守 MVP、早期内控、差错量低且宁可误阻断。 | 任一 CLEARING / SETTLEMENT 差错会阻断同类型所有对象，可用性差。 |
 | `object-scope-schema-backed` | 新增阻断对象类型和对象流水，gate 按对象命中。 | 需要公共契约、DDL/H2 schema、Entity、Mapper、DTO、测试和兼容读取。 | 生产运营、局部放行、多批次并行、需要解释“为什么这张单被阻断”。 | 改动范围更大，需要迁移和兼容策略。 |
 
-推荐结论：若本轮目标是“生产可用条件基线”，优先选择 `object-scope-schema-backed`；若只想先补清算 / 结算调用侧，选择 `type-scope-no-schema`，但交付结论必须标为 `CONSERVATIVE_MVP_NOT_FULLY_USABLE`。
+推荐结论：若本轮目标是“生产可用条件基线”，优先选择 `object-scope-schema-backed`；若只想先补清算 / 结算调用侧，选择 `type-scope-no-schema`，但交付结论必须标为 `CONSERVATIVE_MVP_NOT_FULLY_USABLE`。当前源码证据已支持该推荐，不再把两个方案视为同等生产可用。
 
 ### 3.3 规则矩阵
 
@@ -121,6 +123,7 @@
 2. `PayoutOrderServiceImpl` 已把 `payoutSn` 或 `settlementSn` 作为 PAYOUT gate 消费对象流水。
 3. `ReconciliationDifference` 当前只保存 `blockingScope`，没有阻断对象流水字段。
 4. `ReconciliationDifferenceMapper.selectByBlockingScope` 当前只按 `tenantId + blockingScope` 查询，不使用 `gateObjectSn`。
+5. `CreateReconciliationDifferenceRequest`、`ReconciliationDifferenceDTO`、`ReconciliationGateBlockingDifferenceDTO` 和 `t_reconciliation_difference` 测试 schema 均未承载阻断对象字段；对象级阻断不能靠现有 DTO 或 Mapper 隐式实现。
 
 候选契约口径：
 
@@ -157,6 +160,7 @@
 | 下一 owner | 用户确认 Grant 后交给资深架构师进入 TDD / 测试设计和编码实现；AI Native 继续维护 Goal、Loop、状态账本和停止条件。 |
 | 入口契约 | 首选复用 `ReconciliationGateApplicationService`；是否新增清算 / 结算专用 application consumer 取决于首个 Red。 |
 | 推荐决策 | 生产可用方向推荐 `scopeDecision=object-scope-schema-backed`；低风险 MVP 可选 `scopeDecision=type-scope-no-schema`。 |
+| 源码收敛证据 | `gateObjectSn` 已在 gate request / decision 中存在，但差错登记、差错 DTO、Entity、H2 schema 和 Mapper 仍只有 `blockingScope`；若要避免同类型不同对象误阻断，必须显式补阻断对象字段和查询规则。 |
 | 只读源码锚点 | `ReconciliationGateApplicationServiceImpl`、`ReconciliationDifferenceMapper.selectByBlockingScope`、`ReconciliationDifference`、`CheckReconciliationGateRequest`、`ReconciliationGateApplicationServiceTests`、`PayoutOrderServiceImpl`、`PayoutPreflightServiceTests`。 |
 | 写入上限 | 未确认前只写本文和状态索引；确认后按 `scopeDecision` 限定清算 / 结算 gate consumer、目标测试、必要契约、schema 和 Mapper。 |
 | TDD 切入 | 先写清算 / 结算 gate Red，证明阻断、条件放行和无资金副作用；对象级方案必须先写“不误阻断另一个对象”的 Red。 |
