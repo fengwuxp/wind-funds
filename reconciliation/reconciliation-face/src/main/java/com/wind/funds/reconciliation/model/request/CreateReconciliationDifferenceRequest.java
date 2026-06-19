@@ -2,6 +2,7 @@ package com.wind.funds.reconciliation.model.request;
 
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
+import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -83,6 +84,12 @@ public class CreateReconciliationDifferenceRequest implements Serializable {
     @Schema(description = "阻断范围，例如 CLEARING、SETTLEMENT、PAYOUT")
     @NotBlank
     private String blockingScope;
+
+    @Schema(description = "阻断对象类型，例如 CLEARING、SETTLEMENT、PAYOUT；为空表示历史类型级阻断")
+    private ReconciliationGateObjectType blockingObjectType;
+
+    @Schema(description = "阻断对象流水号，例如清算候选、结算单或出款单号；为空表示历史类型级阻断")
+    private String blockingObjectSn;
 
     @Schema(description = "匹配或对账规则版本")
     @NotBlank

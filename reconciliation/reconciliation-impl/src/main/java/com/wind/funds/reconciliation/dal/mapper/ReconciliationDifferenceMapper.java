@@ -32,10 +32,14 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
                                                            @Param("differenceSn") String differenceSn);
 
     /**
-     * 查询命中阻断范围的对账差错。
+     * 查询命中准入对象的对账差错。
      *
-     * @param tenantId      租户 ID
-     * @param blockingScope 阻断范围，例如 CLEARING、SETTLEMENT、PAYOUT
+     * <p>对象级差错按对象类型和流水号精确命中；历史差错缺少阻断对象字段时保守按类型级范围命中。</p>
+     *
+     * @param tenantId           租户 ID
+     * @param blockingScope      阻断范围，例如 CLEARING、SETTLEMENT、PAYOUT
+     * @param blockingObjectType 阻断对象类型，例如 CLEARING、SETTLEMENT、PAYOUT
+     * @param blockingObjectSn   阻断对象流水号
      * @return 对账差错列表
      */
     @Select("""
@@ -48,8 +52,20 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
                   OR blocking_scope LIKE CONCAT('%,', #{blockingScope})
                   OR blocking_scope LIKE CONCAT('%,', #{blockingScope}, ',%')
               )
+              AND (
+                  (
+                      blocking_object_type = #{blockingObjectType}
+                      AND blocking_object_sn = #{blockingObjectSn}
+                  )
+                  OR (
+                      blocking_object_type IS NULL
+                      AND blocking_object_sn IS NULL
+                  )
+              )
             ORDER BY id ASC
             """)
-    List<ReconciliationDifference> selectByBlockingScope(@Param("tenantId") Long tenantId,
-                                                         @Param("blockingScope") String blockingScope);
+    List<ReconciliationDifference> selectByGateObject(@Param("tenantId") Long tenantId,
+                                                      @Param("blockingScope") String blockingScope,
+                                                      @Param("blockingObjectType") String blockingObjectType,
+                                                      @Param("blockingObjectSn") String blockingObjectSn);
 }

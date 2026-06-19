@@ -8,6 +8,7 @@ import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
+import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.integration.core.model.TenantIsolationObject;
@@ -126,6 +127,16 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
      */
     @NotNull
     private String blockingScope;
+
+    /**
+     * 阻断对象类型，例如清算候选、结算单或出款单；为空表示历史类型级阻断。
+     */
+    private ReconciliationGateObjectType blockingObjectType;
+
+    /**
+     * 阻断对象流水号；为空表示历史类型级阻断。
+     */
+    private String blockingObjectSn;
 
     /**
      * 匹配或对账规则版本。

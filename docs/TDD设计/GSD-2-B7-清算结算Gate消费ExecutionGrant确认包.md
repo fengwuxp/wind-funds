@@ -2,37 +2,37 @@
 
 ## 1. 文档定位
 
-本文是 `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` 的 Execution Grant 确认包，用于承接 B7 对账差错闭环、准入 gate 和出款 preflight 已完成后的下一轮清算 / 结算消费方接入。
+本文是 `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` 的 Execution Grant 确认和消费记录，用于承接 B7 对账差错闭环、准入 gate 和出款 preflight 已完成后的对象级 Gate 基座补强。
 
-本文不是编码授权、不是 DDL/H2 schema 授权、不是 Git 授权，也不是完整清分、清算、结算、出款或补事实执行服务授权。用户明确确认本 Grant 前，只允许作为 Plan Grant 做低风险文档、状态和任务边界维护。
+本文不是 Git 授权，也不是完整清分、清算、结算、出款或补事实执行服务授权。本轮已按用户推荐选择 `scopeDecision=object-scope-schema-backed` 完成本地 Green；后续清算 / 结算真实消费方、B7 差异报告、补事实、生产迁移或提交仍需新的单一 Grant。
 
 | 字段 | 内容 |
 | --- | --- |
 | Task ID | `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` |
-| 原子任务 | 补齐清算 / 结算消费方对对账 gate 的准入消费能力，进入编码前先确认阻断粒度。 |
-| 所属阶段 | GSD-2 / B7 reconciliation gate consume / ready to confirm。 |
+| 原子任务 | 补齐对账 gate 的对象级阻断基座，作为清算 / 结算真实消费方后续接入前置能力。 |
+| 所属阶段 | GSD-2 / B7 reconciliation gate consume / object scope green。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
 | Loop ID | `GSD2-LWT-PRODUCTION-CAPABILITY-LOOP-2026-06-18` |
-| 当前状态 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED` |
-| Git / code baseline | 当前已提交代码基线为 `4ef64275 feat: 补齐余额调账独立审计查询`；B5-003 已完成本地 Green 并提交固化。 |
+| 当前状态 | `OBJECT_SCOPE_SCHEMA_BACKED_GREEN_SUMMARY_ONLY` |
+| Git / code baseline | 当前已提交代码基线为 `8ae0f90f docs: 收敛B7对象级阻断交接包`；本轮对象级阻断字段、H2 schema、Mapper 查询和 gate 目标测试已完成本地 Green，但尚未获得 Git 提交授权。 |
 | Owner | AI Native 负责 Goal、Loop、状态和停止条件；产品架构专家负责清算 / 结算业务语义、阻断对象和验收边界；资深架构师负责接口、schema 决策、TDD、实现路径和验证命令。 |
-| Wave 边界 | 本确认包只准备 B7 清算 / 结算 gate 消费一个原子任务；不得并行推进完整清分、清算确认、结算锁定、出款提交、追偿、补事实执行、B7 差异报告、wallet 预交易快照、VCC、全球账户或 Spend Rule。 |
-| 执行顺序 / 依赖关系 | 依赖 `GSD2-B7-RECON-GATE-CONSUME-001`、`GSD2-B7-RECON-GATE-CONSUME-002` 和 B5-003 已完成；进入编码前先确认 `scopeDecision`。 |
-| 授权范围 | 未确认前仅允许本文、LWT Goal、W5、README 和 OpenSpec tasks 的状态同步。 |
+| Wave 边界 | 本确认包只消费 B7 对象级 Gate 基座一个原子任务；不得并行推进完整清分、清算确认、结算锁定、出款提交、追偿、补事实执行、B7 差异报告、wallet 预交易快照、VCC、全球账户或 Spend Rule。 |
+| 执行顺序 / 依赖关系 | 依赖 `GSD2-B7-RECON-GATE-CONSUME-001`、`GSD2-B7-RECON-GATE-CONSUME-002` 和 B5-003 已完成；本轮已消费 `scopeDecision=object-scope-schema-backed`。 |
+| 授权范围 | 已完成差错对象级阻断字段、H2 schema、Mapper、gate 查询和目标测试；未授权完整清结算消费方、补事实或 Git。 |
 | 写入范围 | 本文、LWT Goal、GSD-2 工作流、P0/P1 LWT 推进计划、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
 | 写入文件 | `docs/TDD设计/GSD-2-B7-清算结算Gate消费ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、reconciliation-face、reconciliation-impl、transaction、ledger、wallet、tests、AGENTS.md、B7 历史准入卡和最近 Git 提交。 |
-| Git 策略 | `summary_only`。本文不授权 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。 |
+| Git 策略 | `summary_only`。本轮未授权 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。 |
 
 ## 2. 产品裁决
 
-产品裁决：清算 / 结算消费方应接入对账 gate，但必须先明确阻断粒度。
+产品裁决：清算 / 结算消费方应接入对账 gate，阻断粒度已按对象级 schema-backed 方案落地为前置基座。
 
 现有 B7 gate 已能按 `blockingScope` 对 `CLEARING`、`SETTLEMENT`、`PAYOUT` 范围内的未闭环差错做阻断，并已被出款 preflight 消费。下一步的业务问题不是“能否调用 gate”，而是“清算候选或结算单应该被全类型阻断，还是只被命中自身对象的差错阻断”。
 
-2026-06-19 源码 Gap Audit 结论：当前 `CheckReconciliationGateRequest.gateObjectSn` 已是准入消费对象必填字段，但 `ReconciliationDifference`、`CreateReconciliationDifferenceRequest`、`ReconciliationDifferenceDTO`、H2 schema 和 `ReconciliationDifferenceMapper.selectByBlockingScope` 都只表达 `blockingScope`，没有阻断对象类型或对象流水；`ReconciliationGateApplicationServiceImpl` 也只按 `tenantId + blockingScope` 查询。因此，类型级方案只能作为保守 MVP，生产可用条件基线应优先选择 `scopeDecision=object-scope-schema-backed`。
+2026-06-19 源码 Gap Audit 曾确认：`CheckReconciliationGateRequest.gateObjectSn` 已是准入消费对象必填字段，但差错事实侧缺少阻断对象类型和对象流水。用户随后确认推荐方案，本轮已按 `scopeDecision=object-scope-schema-backed` 补齐 `blockingObjectType / blockingObjectSn`、H2 schema、Mapper 对象级查询和 gate 目标测试。
 
-默认建议：
+历史方案说明：
 
 1. 若目标是快速复用现有能力，可选择类型级阻断：任一命中 `CLEARING` 或 `SETTLEMENT` 的未闭环差错都会阻断该租户同类型准入。优点是低风险、无需 schema；缺点是误阻断范围大，只适合保守 MVP 或早期内控。
 2. 若目标是生产可用，应选择对象级阻断：差错需要能声明它阻断的清算候选、清算批次、结算单或出款单；gate 按消费对象流水命中差错。优点是可解释、可运营、可局部放行；缺点是需要公共契约、DDL/H2 schema、Entity、Mapper、迁移和兼容设计。
@@ -96,7 +96,7 @@
 | `type-scope-no-schema` | 沿用当前 `blockingScope` 类型级阻断。 | 可只补清算 / 结算消费方测试和最小服务，不改表。 | 保守 MVP、早期内控、差错量低且宁可误阻断。 | 任一 CLEARING / SETTLEMENT 差错会阻断同类型所有对象，可用性差。 |
 | `object-scope-schema-backed` | 新增阻断对象类型和对象流水，gate 按对象命中。 | 需要公共契约、DDL/H2 schema、Entity、Mapper、DTO、测试和兼容读取。 | 生产运营、局部放行、多批次并行、需要解释“为什么这张单被阻断”。 | 改动范围更大，需要迁移和兼容策略。 |
 
-推荐结论：若本轮目标是“生产可用条件基线”，优先选择 `object-scope-schema-backed`；若只想先补清算 / 结算调用侧，选择 `type-scope-no-schema`，但交付结论必须标为 `CONSERVATIVE_MVP_NOT_FULLY_USABLE`。当前源码证据已支持该推荐，不再把两个方案视为同等生产可用。
+消费结论：本轮已选择并完成 `object-scope-schema-backed`；`type-scope-no-schema` 只保留为历史备选，不再作为当前推荐或待确认项。
 
 ### 3.3 规则矩阵
 
@@ -117,24 +117,24 @@
 - `ReconciliationGateObjectType.CLEARING / SETTLEMENT / PAYOUT`。
 - `ReconciliationGateDecisionDTO` 和 `ReconciliationGateBlockingDifferenceDTO`。
 
-只读审计结论：
+消费后契约口径：
 
-1. `CheckReconciliationGateRequest.gateObjectSn` 已作为消费对象请求和返回解释字段存在。
-2. `PayoutOrderServiceImpl` 已把 `payoutSn` 或 `settlementSn` 作为 PAYOUT gate 消费对象流水。
-3. `ReconciliationDifference` 当前只保存 `blockingScope`，没有阻断对象流水字段。
-4. `ReconciliationDifferenceMapper.selectByBlockingScope` 当前只按 `tenantId + blockingScope` 查询，不使用 `gateObjectSn`。
-5. `CreateReconciliationDifferenceRequest`、`ReconciliationDifferenceDTO`、`ReconciliationGateBlockingDifferenceDTO` 和 `t_reconciliation_difference` 测试 schema 均未承载阻断对象字段；对象级阻断不能靠现有 DTO 或 Mapper 隐式实现。
+1. `CheckReconciliationGateRequest.gateObjectType / gateObjectSn` 继续表达准入消费对象。
+2. `CreateReconciliationDifferenceRequest.blockingObjectType / blockingObjectSn` 表达差错阻断对象；两者必须同时填写或同时为空。
+3. `ReconciliationDifferenceDTO` 和 `ReconciliationGateBlockingDifferenceDTO` 返回阻断对象字段，便于运营解释和审计定位。
+4. `ReconciliationDifferenceMapper.selectByGateObject` 支持 `blockingScope + blockingObjectType + blockingObjectSn` 精确命中，并兼容历史 `blockingObjectType / blockingObjectSn` 为空的类型级差错。
+5. H2 `t_reconciliation_difference` 已补阻断对象字段和对象级索引；生产 DDL、迁移、灰度和回滚仍是后续 Not Done。
 
-候选契约口径：
+当前实现边界：
 
-| 契约项 | `type-scope-no-schema` | `object-scope-schema-backed` |
+| 契约项 | 当前实现 | 后续 Not Done |
 | --- | --- | --- |
-| Check request | 复用现有 `gateObjectSn` 作为解释和审计字段。 | 复用 `gateObjectSn` 作为消费对象命中键。 |
-| Difference request | 不新增字段。 | 新增或等价表达 `blockingObjectType`、`blockingObjectSn`，可为空兼容历史类型级差错。 |
-| Entity / schema | 不新增。 | 新增 H2 / 生产迁移候选字段和索引。 |
-| Mapper | 继续按 `blockingScope` 查。 | 按 `blockingScope + blockingObjectSn` 或兼容规则查。 |
-| DTO | 仅返回现有 blocking difference。 | 返回阻断对象字段，便于解释和运营定位。 |
-| 消费方 | 最小清算 / 结算 gate consumer 或目标测试。 | 同上，并覆盖不同对象不误阻断。 |
+| Check request | 复用现有 `gateObjectType / gateObjectSn` 作为消费对象命中键。 | 清算 / 结算真实消费方服务仍需新 Grant。 |
+| Difference request | 已新增 `blockingObjectType / blockingObjectSn`。 | 生产 API 兼容说明和对外接入文档可在真实消费方 Grant 中补齐。 |
+| Entity / schema | H2 schema、Entity 和对象级索引已补。 | 生产 DDL、迁移、回滚和数据回填未授权。 |
+| Mapper | 已演进为对象级精确命中 + 历史类型级保守命中。 | 大批量查询性能、生产索引和 explain 仍需发布前评审。 |
+| DTO | 已返回阻断对象字段。 | 运营后台展示、导出和权限仍需独立设计。 |
+| 消费方 | gate service 可按对象精确判断。 | 完整清算候选、结算单、出款生命周期和差异报告仍未实现。 |
 
 ## 5. 角色协作 Loop 三卡交接
 
@@ -150,20 +150,20 @@
 | 异常路径 | 缺消费对象、差错未闭环、重跑未对平、动作上下文漂移、对象粒度缺失时默认阻断或拒绝。 |
 | 验收种子 | `B7-CLSSET-GATE-RED-001` 清算阻断、`B7-CLSSET-GATE-RED-002` 结算阻断、`B7-CLSSET-GATE-RED-003` 对象级不误阻断、`B7-CLSSET-GATE-RED-004` 无资金副作用。 |
 | 非目标 | 不做完整清分、清算确认、结算锁定、出款、追偿、补事实执行、差异报告、运营后台或生产迁移。 |
-| 风险和待确认 | 需确认 `scopeDecision`；对象级方案涉及 schema、迁移、兼容读取和生产数据回填策略。 |
+| 风险和待确认 | `scopeDecision` 已确认并消费；生产迁移、数据回填、清算 / 结算真实消费方和运营后台仍需后续独立确认。 |
 
 ### 5.2 Engineering Handoff Card
 
 | 字段 | 内容 |
 | --- | --- |
-| 当前阶段 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED / summary_only`。 |
-| 下一 owner | 用户确认 Grant 后交给资深架构师进入 TDD / 测试设计和编码实现；AI Native 继续维护 Goal、Loop、状态账本和停止条件。 |
+| 当前阶段 | `OBJECT_SCOPE_SCHEMA_BACKED_GREEN_SUMMARY_ONLY`。 |
+| 下一 owner | 用户确认新的单一 Grant 后交给资深架构师进入清算 / 结算真实消费方或 B7 差异报告的 TDD / 编码实现；AI Native 继续维护 Goal、Loop、状态账本和停止条件。 |
 | 入口契约 | 首选复用 `ReconciliationGateApplicationService`；是否新增清算 / 结算专用 application consumer 取决于首个 Red。 |
-| 推荐决策 | 生产可用方向推荐 `scopeDecision=object-scope-schema-backed`；低风险 MVP 可选 `scopeDecision=type-scope-no-schema`。 |
-| 源码收敛证据 | `gateObjectSn` 已在 gate request / decision 中存在，但差错登记、差错 DTO、Entity、H2 schema 和 Mapper 仍只有 `blockingScope`；若要避免同类型不同对象误阻断，必须显式补阻断对象字段和查询规则。 |
-| 只读源码锚点 | `ReconciliationGateApplicationServiceImpl`、`ReconciliationDifferenceMapper.selectByBlockingScope`、`ReconciliationDifference`、`CheckReconciliationGateRequest`、`ReconciliationGateApplicationServiceTests`、`PayoutOrderServiceImpl`、`PayoutPreflightServiceTests`。 |
-| 写入上限 | 未确认前只写本文和状态索引；确认后按 `scopeDecision` 限定清算 / 结算 gate consumer、目标测试、必要契约、schema 和 Mapper。 |
-| TDD 切入 | 先写清算 / 结算 gate Red，证明阻断、条件放行和无资金副作用；对象级方案必须先写“不误阻断另一个对象”的 Red。 |
+| 推荐决策 | 本 Grant 已按 `scopeDecision=object-scope-schema-backed` 消费；下一轮不再确认阻断粒度，直接从消费方或报告能力中重新开 Grant。 |
+| 源码收敛证据 | 差错登记、差错 DTO、阻断 DTO、Entity、H2 schema 和 Mapper 已显式承载阻断对象字段；gate 查询支持对象精确命中和历史类型级保守命中。 |
+| 源码锚点 | `ReconciliationGateApplicationServiceImpl`、`ReconciliationDifferenceMapper.selectByGateObject`、`ReconciliationDifference`、`CreateReconciliationDifferenceRequest`、`CheckReconciliationGateRequest`、`ReconciliationGateApplicationServiceTests`、`ReconciliationDifferenceApplicationServiceTests`。 |
+| 写入上限 | 本轮只写对象级 Gate 基座；后续清算 / 结算 consumer、差异报告、补事实、生产迁移和 Git 需新 Grant。 |
+| TDD 切入 | 已覆盖同类型不同对象不误阻断、结算对象精确阻断、复合阻断范围下对象类型精确匹配、对象级差错幂等和字段成对校验。 |
 | 验证命令 | `just test-one ReconciliationGateApplicationServiceTests tests`、必要时新增清算 / 结算目标测试；分组用 `just test-reconciliation`，收口用 `just compile`、`just pmd`、`git diff --check`。 |
 | Git 策略 | 当前仍是 `summary_only`；只有用户另行授权提交，且验证通过、工作树未混入无关改动时，才可提交。 |
 | 停止条件 | 需要完整清分、清算、结算、出款、补事实执行、生产迁移、外部规则最终确认或对象级 schema 但 Grant 未列明时停止。 |
@@ -317,7 +317,30 @@ scopeDecision=object-scope-schema-backed
 | Verify | 运行目标测试、分组、compile、pmd 和 diff。 | 命令通过，或环境问题被区分并复跑。 | 验证失败且无法在授权范围内修复时停止。 |
 | Handoff | 回写 LWT Goal、W5、README、OpenSpec 和确认包结果。 | Done / Not Done / 验证命令 / 下一 owner 清楚。 | 需要 Git、发布、生产或专业确认时停止。 |
 
-## 12. Not Done 和残余风险
+## 12. Execution Grant 消费结果
+
+本轮已按用户推荐选择消费 `scopeDecision=object-scope-schema-backed`。落地范围只覆盖对账差错对象级阻断命中键和 gate 查询能力，不实现完整清算候选、清算批次、结算单、出款单、追偿对象或补事实执行服务。
+
+完成内容：
+
+1. `CreateReconciliationDifferenceRequest`、`ReconciliationDifferenceDTO`、`ReconciliationGateBlockingDifferenceDTO` 和 `ReconciliationDifference` 增加 `blockingObjectType / blockingObjectSn`。
+2. H2 `t_reconciliation_difference` 增加阻断对象字段和对象级查询索引；生产 DDL、迁移、灰度和回滚仍为 Not Done。
+3. `ReconciliationDifferenceMapper` 的 gate 查询从类型级范围查询演进为“对象级精确命中 + 历史类型级保守命中”。
+4. `ReconciliationGateApplicationService` 返回阻断对象字段，清算 / 结算 gate 测试覆盖同类型不同对象不误阻断、结算对象精确阻断、复合阻断范围下对象类型精确匹配和无账本副作用。
+5. `ReconciliationDifferenceApplicationServiceTests` 覆盖对象级差错创建幂等和阻断对象字段成对校验，避免半截对象命中键落库。
+
+已验证：
+
+1. `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just test-one ReconciliationGateApplicationServiceTests,ReconciliationDifferenceApplicationServiceTests tests`
+2. `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just test-reconciliation`
+3. `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just compile`
+4. `WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just pmd`
+
+验证说明：目标 Spring 测试在 sandbox 内曾因 embedded Redis 本地端口绑定权限失败；已按项目规则在非 sandbox 环境重跑通过。`git diff --check` 在文档回写后收口执行。
+
+交付边界：本轮不能声明完整清分、清算、结算、出款或 B7 生产闭环 Done；只能声明“对账差错的对象级阻断键和 gate 精确命中能力已本地 Green”。清算 / 结算真实消费方服务、生产迁移脚本、运营审批、差异报告、补事实执行和告警 Runbook 仍需后续单一 Grant。
+
+## 13. Not Done 和残余风险
 
 本确认包完成后仍不能声明以下能力 Done：
 
@@ -326,3 +349,5 @@ scopeDecision=object-scope-schema-backed
 3. 生产 DDL 迁移、回滚、灰度、SLO、告警和 Runbook。
 4. 外部卡组织、银行、通道、ACH、SWIFT、FX、税务、会计、法务或合规最终确认。
 5. wallet 全量生产 Done、VCC facade、全球账户业务能力和 Spend Rule 控制闭环。
+
+下一推荐确认包：[GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md](GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md) 已把 `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 收敛为待确认切片。若继续 B7，应优先确认该服务，用真实清算 / 结算准入消费方证明“对象级 gate 基座可以被生产链路消费”；未确认前不得复用本 Grant 继续写 Java、测试、DDL/H2 schema、完整清结算或 Git。

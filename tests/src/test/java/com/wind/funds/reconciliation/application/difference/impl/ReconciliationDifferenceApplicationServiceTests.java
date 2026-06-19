@@ -7,6 +7,7 @@ import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
+import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ReconciliationDifferenceDTO;
@@ -94,6 +95,58 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     }
 
     /**
+     * 场景：清算或结算消费方登记一个对象级阻断差错。
+     * 输入：blockingScope、blockingObjectType 和 blockingObjectSn。
+     * 输出：差错结果回传阻断对象字段，重复提交保持幂等。
+     * 红线：对象级字段只是差错命中键，不生成清算、结算、route、posting 或账本事实。
+     */
+    @Test
+    void testCreateDifferenceShouldKeepObjectScopeInResultAndIdempotentReplay() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        CreateReconciliationDifferenceRequest request = minimumCreateRequest()
+                .setBlockingScope("SETTLEMENT")
+                .setBlockingObjectType(ReconciliationGateObjectType.SETTLEMENT)
+                .setBlockingObjectSn("settlement-order-001");
+        ReconciliationDifferenceDTO result = reconciliationDifferenceApplicationService.createDifference(
+                request, WindOperator.system());
+        ReconciliationDifferenceDTO replay = reconciliationDifferenceApplicationService.createDifference(
+                request, WindOperator.system());
+
+        assertThat(result.getBlockingScope()).isEqualTo("SETTLEMENT");
+        assertThat(result.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.SETTLEMENT);
+        assertThat(result.getBlockingObjectSn()).isEqualTo("settlement-order-001");
+        assertThat(replay.getId()).isEqualTo(result.getId());
+        assertThat(countDifferenceRows(DIFFERENCE_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：对账差错只传阻断对象类型或只传阻断对象流水。
+     * 输入：不完整的对象级阻断字段。
+     * 输出：拒绝创建差错。
+     * 红线：对象级阻断不能形成半截命中键，也不能生成 route、posting 或账本事实。
+     */
+    @Test
+    void testCreateDifferenceShouldRejectIncompleteObjectScope() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest()
+                        .setBlockingObjectType(ReconciliationGateObjectType.CLEARING),
+                WindOperator.system()))
+                .hasMessageContaining("创建对账差错阻断对象类型和流水号必须同时填写或同时为空");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest()
+                        .setBlockingObjectSn("clearing-candidate-001"),
+                WindOperator.system()))
+                .hasMessageContaining("创建对账差错阻断对象类型和流水号必须同时填写或同时为空");
+
+        assertThat(countDifferenceRows(DIFFERENCE_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：差错已由交易层余额调账处理后，运营回链调账结果并重新对账。
      * 输入：差错流水号、调账单号、资金交易流水、审批和重跑结果。
      * 输出：先进入调账处理中，再在重新对账通过后关闭；重复回链和重复重跑不增加次数。
@@ -156,6 +209,12 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
                 minimumCreateRequest().setDifferenceAmount(51L), WindOperator.system()))
                 .hasMessageContaining("对账差错幂等请求差异金额不一致");
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest()
+                        .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
+                        .setBlockingObjectSn("clearing-candidate-001"),
+                WindOperator.system()))
+                .hasMessageContaining("对账差错幂等请求阻断对象类型不一致");
 
         assertThat(countDifferenceRows(DIFFERENCE_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);

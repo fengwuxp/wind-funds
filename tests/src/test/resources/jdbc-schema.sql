@@ -567,6 +567,8 @@ CREATE TABLE `t_reconciliation_difference`
     `difference_amount`         BIGINT(20)  NOT NULL COMMENT '差异金额，最小货币单位',
     `responsible_party_ref`     VARCHAR(128) NOT NULL COMMENT '责任方引用',
     `blocking_scope`            VARCHAR(128) NOT NULL COMMENT '阻断范围',
+    `blocking_object_type`      VARCHAR(50)          DEFAULT NULL COMMENT '阻断对象类型',
+    `blocking_object_sn`        VARCHAR(64)          DEFAULT NULL COMMENT '阻断对象流水号',
     `rule_version`              VARCHAR(64) NOT NULL COMMENT '匹配或对账规则版本',
     `evidence_ref`              VARCHAR(128) NOT NULL COMMENT '来源证据引用',
     `action_type`               VARCHAR(50)          DEFAULT NULL COMMENT '差错处理动作类型',
@@ -596,6 +598,7 @@ CREATE TABLE `t_reconciliation_difference`
     KEY `idx_reconciliation_difference_batch` (`tenant_id`, `reconciliation_batch_sn`),
     KEY `idx_reconciliation_difference_source` (`tenant_id`, `source_record_sn`),
     KEY `idx_reconciliation_difference_status` (`tenant_id`, `status`),
+    KEY `idx_reconciliation_difference_blocking_object` (`tenant_id`, `blocking_scope`, `blocking_object_type`, `blocking_object_sn`, `status`),
     KEY `idx_reconciliation_difference_adjustment` (`tenant_id`, `adjustment_sn`),
     KEY `idx_reconciliation_difference_rerun` (`tenant_id`, `last_rerun_sn`)
 ) ENGINE = InnoDB

@@ -3,6 +3,7 @@ package com.wind.funds.reconciliation.model.dto;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -42,6 +43,12 @@ public class ReconciliationGateBlockingDifferenceDTO implements Serializable {
 
     @Schema(description = "阻断范围")
     private String blockingScope;
+
+    @Schema(description = "阻断对象类型；为空表示历史类型级阻断")
+    private ReconciliationGateObjectType blockingObjectType;
+
+    @Schema(description = "阻断对象流水号；为空表示历史类型级阻断")
+    private String blockingObjectSn;
 
     @Schema(description = "来源证据引用")
     private String evidenceRef;

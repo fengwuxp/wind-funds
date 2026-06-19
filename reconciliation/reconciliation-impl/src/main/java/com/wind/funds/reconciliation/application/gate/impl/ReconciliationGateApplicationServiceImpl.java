@@ -37,8 +37,9 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
     public ReconciliationGateDecisionDTO checkGate(CheckReconciliationGateRequest request, WindOperator operator) {
         validateRequest(request);
         AssertUtils.notNull(operator, "对账差错准入检查操作人不能为空");
-        List<ReconciliationDifference> scopedDifferences = reconciliationDifferenceMapper.selectByBlockingScope(
-                request.getTenantId(), request.getGateObjectType().name());
+        List<ReconciliationDifference> scopedDifferences = reconciliationDifferenceMapper.selectByGateObject(
+                request.getTenantId(), request.getGateObjectType().name(), request.getGateObjectType().name(),
+                request.getGateObjectSn());
         List<ReconciliationDifference> blockingDifferences = scopedDifferences.stream()
                 .filter(this::shouldBlock)
                 .toList();
@@ -92,6 +93,8 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
                 .setSeverity(difference.getSeverity())
                 .setResponsiblePartyRef(difference.getResponsiblePartyRef())
                 .setBlockingScope(difference.getBlockingScope())
+                .setBlockingObjectType(difference.getBlockingObjectType())
+                .setBlockingObjectSn(difference.getBlockingObjectSn())
                 .setEvidenceRef(difference.getEvidenceRef())
                 .setActionType(difference.getActionType())
                 .setAdjustmentSn(difference.getAdjustmentSn())

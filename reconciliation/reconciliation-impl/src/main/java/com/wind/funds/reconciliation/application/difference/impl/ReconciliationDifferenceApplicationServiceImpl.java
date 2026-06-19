@@ -128,6 +128,8 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
         result.setDifferenceAmount(request.getDifferenceAmount());
         result.setResponsiblePartyRef(request.getResponsiblePartyRef());
         result.setBlockingScope(request.getBlockingScope());
+        result.setBlockingObjectType(request.getBlockingObjectType());
+        result.setBlockingObjectSn(request.getBlockingObjectSn());
         result.setRuleVersion(request.getRuleVersion());
         result.setEvidenceRef(request.getEvidenceRef());
         result.setRerunCount(0);
@@ -153,6 +155,8 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                 .setDifferenceAmount(entity.getDifferenceAmount())
                 .setResponsiblePartyRef(entity.getResponsiblePartyRef())
                 .setBlockingScope(entity.getBlockingScope())
+                .setBlockingObjectType(entity.getBlockingObjectType())
+                .setBlockingObjectSn(entity.getBlockingObjectSn())
                 .setRuleVersion(entity.getRuleVersion())
                 .setEvidenceRef(entity.getEvidenceRef())
                 .setActionType(entity.getActionType())
@@ -186,6 +190,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
         AssertUtils.isTrue(request.getDifferenceAmount() > 0, "创建对账差错金额必须大于 0");
         AssertUtils.hasText(request.getResponsiblePartyRef(), "创建对账差错责任方不能为空");
         AssertUtils.hasText(request.getBlockingScope(), "创建对账差错阻断范围不能为空");
+        AssertUtils.isTrue(objectScopeComplete(request), "创建对账差错阻断对象类型和流水号必须同时填写或同时为空");
         AssertUtils.hasText(request.getRuleVersion(), "创建对账差错规则版本不能为空");
         AssertUtils.hasText(request.getEvidenceRef(), "创建对账差错证据引用不能为空");
     }
@@ -235,6 +240,10 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                 "对账差错幂等请求责任方不一致，differenceSn = {}", request.getDifferenceSn());
         AssertUtils.isTrue(existing.getBlockingScope().equals(request.getBlockingScope()),
                 "对账差错幂等请求阻断范围不一致，differenceSn = {}", request.getDifferenceSn());
+        AssertUtils.isTrue(existing.getBlockingObjectType() == request.getBlockingObjectType(),
+                "对账差错幂等请求阻断对象类型不一致，differenceSn = {}", request.getDifferenceSn());
+        AssertUtils.isTrue(sameNullable(existing.getBlockingObjectSn(), request.getBlockingObjectSn()),
+                "对账差错幂等请求阻断对象流水号不一致，differenceSn = {}", request.getDifferenceSn());
         AssertUtils.isTrue(existing.getRuleVersion().equals(request.getRuleVersion()),
                 "对账差错幂等请求规则版本不一致，differenceSn = {}", request.getDifferenceSn());
         AssertUtils.isTrue(existing.getEvidenceRef().equals(request.getEvidenceRef()),
@@ -280,6 +289,11 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
             return true;
         }
         return left != null && left.equals(right);
+    }
+
+    private boolean objectScopeComplete(CreateReconciliationDifferenceRequest request) {
+        return (request.getBlockingObjectType() == null && !StringUtils.hasText(request.getBlockingObjectSn()))
+                || (request.getBlockingObjectType() != null && StringUtils.hasText(request.getBlockingObjectSn()));
     }
 
     private String operatorId(WindOperator operator) {

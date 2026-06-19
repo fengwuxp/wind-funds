@@ -145,6 +145,106 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     }
 
     /**
+     * 场景：同一清算类型下存在两个不同清算候选的差错。
+     * 输入：一个精确命中当前候选的对象级差错，以及一个同类型但不同候选的对象级差错。
+     * 输出：当前清算准入只被精确命中的差错阻断，不被其他清算候选误阻断。
+     * 红线：对象级 gate 不能退化成类型级全量阻断，也不能写入任何资金或账本事实。
+     */
+    @Test
+    void testCheckGateShouldOnlyBlockExactClearingObjectWhenObjectScopedDifferenceExists() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest()
+                        .setBlockingScope("CLEARING")
+                        .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
+                        .setBlockingObjectSn("clearing-candidate-001"),
+                WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest()
+                        .setDifferenceSn("recon_gate_diff_002")
+                        .setSourceRecordSn("processor_gate_line_002")
+                        .setBlockingScope("CLEARING")
+                        .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
+                        .setBlockingObjectSn("clearing-candidate-other")
+                        .setEvidenceRef("processor-gate-file-digest-002"),
+                WindOperator.system());
+
+        ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
+                clearingGateRequest(), WindOperator.system());
+
+        assertThat(result.isPassed()).isFalse();
+        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getBlockingDifferences())
+                .extracting(ReconciliationGateBlockingDifferenceDTO::getDifferenceSn)
+                .containsExactly(DIFFERENCE_SN);
+        ReconciliationGateBlockingDifferenceDTO blockingDifference = result.getBlockingDifferences().getFirst();
+        assertThat(blockingDifference.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
+        assertThat(blockingDifference.getBlockingObjectSn()).isEqualTo("clearing-candidate-001");
+        assertThat(result.getEvidenceRefs()).containsExactly("processor-gate-file-digest-001");
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：结算单锁定前存在精确命中该结算单的对象级差错。
+     * 输入：blockingObjectType=SETTLEMENT、blockingObjectSn=settlement-order-001 的未闭环差错。
+     * 输出：结算准入被阻断，并回传阻断对象字段。
+     * 红线：只做 gate 决策，不生成结算单、出款单、交易、route、posting 或账本事实。
+     */
+    @Test
+    void testCheckGateShouldBlockExactSettlementObjectWhenObjectScopedDifferenceExists() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest()
+                        .setBlockingScope("SETTLEMENT")
+                        .setBlockingObjectType(ReconciliationGateObjectType.SETTLEMENT)
+                        .setBlockingObjectSn("settlement-order-001"),
+                WindOperator.system());
+
+        ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
+                settlementGateRequest(), WindOperator.system());
+
+        assertThat(result.isPassed()).isFalse();
+        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getGateObjectType()).isEqualTo(ReconciliationGateObjectType.SETTLEMENT);
+        assertThat(result.getGateObjectSn()).isEqualTo("settlement-order-001");
+        ReconciliationGateBlockingDifferenceDTO blockingDifference = result.getBlockingDifferences().getFirst();
+        assertThat(blockingDifference.getDifferenceSn()).isEqualTo(DIFFERENCE_SN);
+        assertThat(blockingDifference.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.SETTLEMENT);
+        assertThat(blockingDifference.getBlockingObjectSn()).isEqualTo("settlement-order-001");
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：差错阻断范围覆盖多个消费方，但只绑定其中一个结算对象。
+     * 输入：blockingScope=CLEARING,SETTLEMENT，blockingObjectType=SETTLEMENT，blockingObjectSn=settlement-order-001。
+     * 输出：结算准入被精确阻断，清算准入不会因为同流水号被误阻断。
+     * 红线：阻断范围和阻断对象类型不能在 Mapper 中混用。
+     */
+    @Test
+    void testCheckGateShouldMatchObjectTypeEvenWhenBlockingScopeContainsMultipleScopes() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest()
+                        .setBlockingScope("CLEARING,SETTLEMENT")
+                        .setBlockingObjectType(ReconciliationGateObjectType.SETTLEMENT)
+                        .setBlockingObjectSn("settlement-order-001"),
+                WindOperator.system());
+
+        ReconciliationGateDecisionDTO settlementResult = reconciliationGateApplicationService.checkGate(
+                settlementGateRequest(), WindOperator.system());
+        ReconciliationGateDecisionDTO clearingResult = reconciliationGateApplicationService.checkGate(
+                clearingGateRequest().setGateObjectSn("settlement-order-001"), WindOperator.system());
+
+        assertThat(settlementResult.isPassed()).isFalse();
+        assertThat(settlementResult.getBlockingDifferences())
+                .extracting(ReconciliationGateBlockingDifferenceDTO::getDifferenceSn)
+                .containsExactly(DIFFERENCE_SN);
+        assertThat(clearingResult.isPassed()).isTrue();
+        assertThat(clearingResult.getBlockingDifferences()).isEmpty();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：调用方未传入操作人。
      * 输入：合法清算准入请求和空操作人。
      * 输出：拒绝准入检查请求并给出明确错误。
