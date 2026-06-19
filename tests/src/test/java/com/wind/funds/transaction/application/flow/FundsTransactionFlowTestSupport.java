@@ -38,6 +38,7 @@ import com.wind.funds.transaction.application.FundsAuthorizationTransactionServi
 import com.wind.funds.transaction.application.FundsBalanceControlService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.application.impl.FundsBenefitFundingApplicationServiceImpl;
+import com.wind.funds.transaction.application.impl.DefaultFundsBalanceAdjustmentAuditApplicationService;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
 import com.wind.funds.transaction.projection.impl.DefaultFundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
@@ -726,6 +727,30 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .isOne();
     }
 
+    protected void clearLedgerFactsForFundsTransaction(String transactionSn) {
+        int deletedEntries = jdbcTemplate.update("""
+                DELETE FROM t_ledger_entry
+                WHERE tenant_id = ? AND funds_transaction_sn = ?
+                """, TENANT_ID, transactionSn);
+        int deletedPlans = jdbcTemplate.update("""
+                DELETE FROM t_ledger_posting_plan
+                WHERE tenant_id = ? AND funds_transaction_sn = ?
+                """, TENANT_ID, transactionSn);
+        int deletedTransactions = jdbcTemplate.update("""
+                DELETE FROM t_ledger_transaction
+                WHERE tenant_id = ? AND funds_transaction_sn = ?
+                """, TENANT_ID, transactionSn);
+        assertThat(deletedEntries)
+                .as("ledger entries cleared for funds transaction %s", transactionSn)
+                .isPositive();
+        assertThat(deletedPlans)
+                .as("posting plans cleared for funds transaction %s", transactionSn)
+                .isPositive();
+        assertThat(deletedTransactions)
+                .as("ledger transactions cleared for funds transaction %s", transactionSn)
+                .isPositive();
+    }
+
     protected void enrichFundsTransactionRouteSnapshot(String transactionSn,
                                                        Map<String, Object> values) {
         String routeSnapshotJson = jdbcTemplate.queryForObject("""
@@ -1292,6 +1317,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultLedgerPostingAssembler.class,
             DefaultRoutedFundsInstructionOrchestrator.class,
             FundsBenefitFundingApplicationServiceImpl.class,
+            DefaultFundsBalanceAdjustmentAuditApplicationService.class,
             DefaultFundsTransactionProjectionExplainApplicationService.class,
             FundsTransactionCommandServiceImpl.class,
             LedgerServiceImpl.class,

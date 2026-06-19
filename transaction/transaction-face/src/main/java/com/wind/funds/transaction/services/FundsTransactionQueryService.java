@@ -29,6 +29,22 @@ public interface FundsTransactionQueryService {
     Optional<FundsTransactionDTO> queryFundsTransaction(@NonNull String transactionSn);
 
     /**
+     * 按业务场景和业务流水查询主交易事实。
+     *
+     * <p>能力范围：用于运营审计、交易解释和幂等追踪等只读场景，查询已经落库的主交易事实。
+     * 如果不存在对应交易，返回 empty；不负责生成、修复或重放交易事实。</p>
+     *
+     * @param tenantId 租户 ID
+     * @param businessScene 业务场景
+     * @param businessSn 业务流水号
+     * @return 已保存主交易；不存在时返回 empty
+     */
+    @NonNull
+    Optional<FundsTransactionDTO> findFundsTransactionByBusiness(@NonNull Long tenantId,
+                                                                 @NonNull String businessScene,
+                                                                 @NonNull String businessSn);
+
+    /**
      * 查询交易明细事实。
      *
      * <p>按主键升序返回该交易下已有主体明细；不存在明细时返回空列表。</p>

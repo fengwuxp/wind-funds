@@ -96,4 +96,30 @@ class LedgerDtoContextVariablesContractTests {
                 .hasMessageContaining("ledgerEntryDto.contextVariables must not contain core benefit field: "
                         + "currentMarketingRule");
     }
+
+    /**
+     * 场景：账务审计上下文携带金额型值对象，例如受控负可用单笔限额。
+     * 预期：标准 Money JSON 形态可作为普通审计值读取，但权益核心金额字段仍被拒绝。
+     * 红线：不能因为允许 Money 值对象而让 orderAmount 或自定义权益金额对象绕过校验。
+     */
+    @Test
+    void testLedgerDtoContextShouldAllowMoneyValueObjectButRejectBenefitAmountFacts() {
+        LedgerTransactionDTO transaction = new LedgerTransactionDTO()
+                .setContextVariables(Map.of("negativeAvailableSingleLimit",
+                        Map.of("amount", 100L, "currency", "USD")));
+
+        assertThat(transaction.getContextVariables())
+                .containsKey("negativeAvailableSingleLimit");
+        assertThatThrownBy(() -> new LedgerTransactionDTO()
+                .setContextVariables(Map.of("orderAmount",
+                        Map.of("amount", 100L, "currency", "USD"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ledgerTransactionDto.contextVariables must not contain core benefit field: "
+                        + "orderAmount");
+        assertThatThrownBy(() -> new LedgerEntryDTO()
+                .setContextVariables(Map.of("benefitAmount",
+                        Map.of("amount", 100L, "currency", "USD", "source", "coupon"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ledgerEntryDto.contextVariables must not contain core benefit field: amount");
+    }
 }

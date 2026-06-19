@@ -63,6 +63,23 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
     }
 
     @Override
+    public @NonNull Optional<FundsTransactionDTO> findFundsTransactionByBusiness(@NonNull Long tenantId,
+                                                                                 @NonNull String businessScene,
+                                                                                 @NonNull String businessSn) {
+        AssertUtils.notNull(tenantId, "资金交易租户 ID 不能为空");
+        AssertUtils.hasText(businessScene, "资金交易业务场景不能为空");
+        AssertUtils.hasText(businessSn, "资金交易业务流水不能为空");
+        FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.businessScene.eq(businessScene))
+                .and(ref.businessSn.eq(businessSn));
+        return Optional.ofNullable(fundsTransactionMapper.selectOneByQuery(wrapper))
+                .map(FundsTransactionConverter.INSTANCE::convertToFundsTransactionDTO);
+    }
+
+    @Override
     public @NonNull List<FundsTransactionDetailDTO> queryFundsTransactionDetails(@NonNull String transactionSn) {
         AssertUtils.hasText(transactionSn, "资金交易流水号不能为空");
         FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;

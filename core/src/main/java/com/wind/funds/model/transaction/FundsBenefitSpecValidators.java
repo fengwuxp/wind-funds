@@ -53,6 +53,8 @@ public final class FundsBenefitSpecValidators {
             "activityRules",
             "userCouponBag");
 
+    private static final Set<String> MONEY_VALUE_OBJECT_KEYS = Set.of("amount", "currency");
+
     private FundsBenefitSpecValidators() {
     }
 
@@ -79,6 +81,9 @@ public final class FundsBenefitSpecValidators {
 
     private static void rejectReservedContextKeys(@Nullable Object value, String owner, Set<String> reservedKeys) {
         if (value instanceof Map<?, ?> values) {
+            if (isMoneyValueObject(values)) {
+                return;
+            }
             for (Map.Entry<?, ?> entry : values.entrySet()) {
                 if (entry.getKey() instanceof String key && reservedKeys.contains(key)) {
                     throw new IllegalArgumentException(
@@ -100,6 +105,13 @@ public final class FundsBenefitSpecValidators {
                 rejectReservedContextKeys(Array.get(value, index), owner, reservedKeys);
             }
         }
+    }
+
+    private static boolean isMoneyValueObject(Map<?, ?> values) {
+        return values.size() == MONEY_VALUE_OBJECT_KEYS.size()
+                && values.keySet().stream()
+                .allMatch(key -> key instanceof String stringKey
+                        && MONEY_VALUE_OBJECT_KEYS.contains(stringKey));
     }
 
     private static void rejectReservedRawInstructionContextKeys(String contextVariables, String owner) {

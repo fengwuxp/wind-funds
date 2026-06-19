@@ -668,6 +668,13 @@ class DefaultRouteReplayServiceTests {
         }
 
         @Override
+        public Optional<FundsTransactionDTO> findFundsTransactionByBusiness(Long tenantId,
+                                                                            String businessScene,
+                                                                            String businessSn) {
+            return Optional.empty();
+        }
+
+        @Override
         public List<FundsTransactionDetailDTO> queryFundsTransactionDetails(String transactionSn) {
             return List.of();
         }

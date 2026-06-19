@@ -8,12 +8,18 @@ import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.spec.SourceObjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.application.FundsBalanceAdjustmentAuditApplicationService;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
+import com.wind.funds.transaction.enums.FundsBalanceAdjustmentAuditCompleteness;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.model.dto.FundsBalanceAdjustmentAuditDTO;
+import com.wind.funds.transaction.model.query.FundsBalanceAdjustmentAuditQuery;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 
@@ -28,6 +34,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 余额调账审计业务流测试。
  */
 class FundsBalanceAdjustAuditFlowTests extends FundsTransactionFlowTestSupport {
+
+    @Autowired
+    private FundsBalanceAdjustmentAuditApplicationService balanceAdjustmentAuditApplicationService;
 
     /**
      * 场景：外部钱包或发卡处理商已经形成终局余额事实，我侧需要将同一资金账户可用余额纠偏为负。
@@ -115,6 +124,158 @@ class FundsBalanceAdjustAuditFlowTests extends FundsTransactionFlowTestSupport {
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_EXTERNAL_MISSING_SNAPSHOT");
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_EXTERNAL_MISSING_RECON");
         assertNoFundsOrLedgerFactsForBusinessSn("BALANCE_ADJUST_EXTERNAL_MISSING_RESPONSIBILITY");
+    }
+
+    /**
+     * 场景：运营或对账人员需要按业务号或资金交易号追溯外部余额异常纠偏的审计链路。
+     * 输入：已完成的外部余额异常余额调账交易。
+     * 输出：查询结果返回交易事实、RouteSnapshot 回链、账本交易与分录摘要、过滤后的审计上下文。
+     * 预期：查询为只读聚合能力，多次查询不新增或修改账本事实、交易事实和余额投影。
+     * 红线：不得把敏感外部账户引用暴露到审计查询结果，不得为了查询审计补写 route、ledger 或 projection。
+     */
+    @Test
+    void testExternalBalanceAnomalyAdjustAuditCanBeQueriedWithoutSideEffects() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId adjustmentAccount = fundingAccount("platform_adjustment");
+        allowNegativeLedger(user, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT);
+        topup(user, 50L, "BALANCE_ADJUST_AUDIT_QUERY_TOPUP");
+
+        String businessScene = "EXTERNAL_BALANCE_ANOMALY";
+        String businessSn = "BALANCE_ADJUST_EXTERNAL_AUDIT_QUERY";
+        balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user, businessSn), WindOperator.system());
+        String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
+        BalanceSnapshot beforeAuditBalance = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(),
+                adjustmentAccount));
+        LedgerFactSnapshot beforeAuditFacts = ledgerFactSnapshot();
+
+        FundsBalanceAdjustmentAuditDTO byBusinessSn = balanceAdjustmentAuditApplicationService.findByBusinessSn(
+                        new FundsBalanceAdjustmentAuditQuery()
+                                .setTenantId(TENANT_ID)
+                                .setBusinessScene(businessScene)
+                                .setBusinessSn(businessSn))
+                .orElseThrow();
+        FundsBalanceAdjustmentAuditDTO byTransactionSn = balanceAdjustmentAuditApplicationService.findByTransactionSn(
+                        new FundsBalanceAdjustmentAuditQuery()
+                                .setTenantId(TENANT_ID)
+                                .setFundsTransactionSn(transactionSn))
+                .orElseThrow();
+
+        assertThat(byBusinessSn).usingRecursiveComparison().isEqualTo(byTransactionSn);
+        assertThat(byBusinessSn.getAuditCompleteness())
+                .isEqualTo(FundsBalanceAdjustmentAuditCompleteness.COMPLETE);
+        assertThat(byBusinessSn.getFundsTransactionSn()).isEqualTo(transactionSn);
+        assertThat(byBusinessSn.getTransactionType()).isEqualTo(DefaultFundsTransactionType.ADJUSTMENT);
+        assertThat(byBusinessSn.getBusinessScene()).isEqualTo(businessScene);
+        assertThat(byBusinessSn.getBusinessSn()).isEqualTo(businessSn);
+        assertThat(byBusinessSn.getAmount()).isEqualTo(80L);
+        assertThat(byBusinessSn.getCurrency()).isEqualTo(CURRENCY);
+        assertThat(byBusinessSn.isRouteSnapshotPresent()).isTrue();
+        assertThat(byBusinessSn.isLedgerFactsPresent()).isTrue();
+        assertThat(byBusinessSn.getLedgerTransactionCount()).isOne();
+        assertThat(byBusinessSn.getLedgerEntryCount()).isEqualTo(2);
+        assertThat(byBusinessSn.getPrimaryLedgerTransactionSn()).isNotBlank();
+        assertThat(byBusinessSn.getLedgerEntries())
+                .hasSize(2)
+                .allSatisfy(entry -> {
+                    assertThat(entry.getFundsTransactionSn()).isEqualTo(transactionSn);
+                    assertThat(entry.getBusinessScene()).isEqualTo(businessScene);
+                    assertThat(entry.getBusinessSn()).isEqualTo(businessSn);
+                    assertThat(entry.getAmount()).isEqualTo(80L);
+                    assertThat(entry.getCurrency()).isEqualTo(CURRENCY.name());
+                });
+        assertThat(byBusinessSn.getAuditContextVariables())
+                .containsEntry(FundsInstructionContextKeys.SOURCE_TYPE,
+                        SourceObjectType.EXTERNAL_BALANCE_ANOMALY.name())
+                .containsEntry(FundsInstructionContextKeys.SOURCE_SN,
+                        "EXT_BALANCE_ANOMALY_202606170001")
+                .containsEntry(FundsInstructionContextKeys.ADJUST_EVIDENCE_REF,
+                        "EVIDENCE_EXTERNAL_BALANCE_ANOMALY_202606170001")
+                .containsEntry(FundsInstructionContextKeys.APPROVAL_REF,
+                        "APPROVAL_EXTERNAL_BALANCE_ANOMALY_202606170001")
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_FINAL_EVENT_REF,
+                        "ISSUER_FINAL_EVENT_202606170001")
+                .containsEntry(FundsInstructionContextKeys.EXTERNAL_BALANCE_SNAPSHOT_REF,
+                        "ISSUER_BALANCE_SNAPSHOT_202606170001")
+                .containsEntry(FundsInstructionContextKeys.RECONCILIATION_EXCEPTION_REF,
+                        "RECON_DIFF_202606170001")
+                .containsEntry(FundsInstructionContextKeys.RECONCILIATION_RERUN_REF,
+                        "RECON_RERUN_202606170001")
+                .containsEntry(FundsInstructionContextKeys.RESPONSIBILITY_REF,
+                        "RECOVERY_CASE_202606170001")
+                .containsEntry(FundsInstructionContextKeys.REASON_CODE,
+                        "EXTERNAL_TERMINAL_BALANCE_DEFICIT")
+                .containsEntry(FundsInstructionContextKeys.ALLOW_NEGATIVE_BALANCE, Boolean.TRUE)
+                .doesNotContainKey(FundsInstructionContextKeys.EXTERNAL_ACCOUNT_REF);
+        assertThat(balanceAdjustmentAuditApplicationService.findByBusinessSn(new FundsBalanceAdjustmentAuditQuery()
+                .setTenantId(TENANT_ID)
+                .setBusinessScene(businessScene)
+                .setBusinessSn("BALANCE_ADJUST_EXTERNAL_AUDIT_QUERY_NOT_FOUND"))).isEmpty();
+
+        BalanceSnapshot afterAuditBalance = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(),
+                adjustmentAccount));
+        assertOnlyBalanceDeltas(beforeAuditBalance, afterAuditBalance,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
+                delta(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeAuditFacts);
+        assertPostedTransactions(2);
+    }
+
+    /**
+     * 场景：历史或异常数据中交易事实和 RouteSnapshot 仍存在，但账本交易与分录事实缺失。
+     * 输入：已完成的外部余额异常调账交易，随后清理该交易关联的账本事实模拟不完整审计链路。
+     * 输出：按业务流水查询仍能定位交易事实，并返回账本不完整状态。
+     * 预期：审计查询以资金交易事实为主轴，不能因为账本事实缺失就误判为未找到。
+     * 红线：查询不能为了补齐审计结果而重建 ledger transaction、posting plan 或 LedgerEntry。
+     */
+    @Test
+    void testBalanceAdjustmentAuditByBusinessSnShouldExposeIncompleteLedgerFacts() {
+        FundsAccountId user = fundingAccount("funding_user");
+        FundsAccountId adjustmentAccount = fundingAccount("platform_adjustment");
+        allowNegativeLedger(user, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT);
+        topup(user, 50L, "BALANCE_ADJUST_INCOMPLETE_LEDGER_TOPUP");
+
+        String businessScene = "EXTERNAL_BALANCE_ANOMALY";
+        String businessSn = "BALANCE_ADJUST_INCOMPLETE_LEDGER";
+        balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user, businessSn), WindOperator.system());
+        String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
+        clearLedgerFactsForFundsTransaction(transactionSn);
+        BalanceSnapshot beforeAuditBalance = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(),
+                adjustmentAccount));
+        LedgerFactSnapshot beforeAuditFacts = ledgerFactSnapshot();
+
+        FundsBalanceAdjustmentAuditDTO audit = balanceAdjustmentAuditApplicationService.findByBusinessSn(
+                        new FundsBalanceAdjustmentAuditQuery()
+                                .setTenantId(TENANT_ID)
+                                .setBusinessScene(businessScene)
+                                .setBusinessSn(businessSn))
+                .orElseThrow();
+
+        assertThat(audit.getFundsTransactionSn()).isEqualTo(transactionSn);
+        assertThat(audit.getAuditCompleteness())
+                .isEqualTo(FundsBalanceAdjustmentAuditCompleteness.INCOMPLETE_LEDGER);
+        assertThat(audit.isRouteSnapshotPresent()).isTrue();
+        assertThat(audit.isLedgerFactsPresent()).isFalse();
+        assertThat(audit.getLedgerTransactionCount()).isZero();
+        assertThat(audit.getLedgerEntryCount()).isZero();
+        assertThat(audit.getAuditContextVariables())
+                .containsEntry(FundsInstructionContextKeys.RECONCILIATION_EXCEPTION_REF,
+                        "RECON_DIFF_202606170001")
+                .doesNotContainKey(FundsInstructionContextKeys.EXTERNAL_ACCOUNT_REF);
+        assertNoLedgerFactsForFundsTransaction(transactionSn);
+        BalanceSnapshot afterAuditBalance = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(),
+                adjustmentAccount));
+        assertOnlyBalanceDeltas(beforeAuditBalance, afterAuditBalance,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY),
+                delta(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeAuditFacts);
     }
 
     private void assertExternalAnomalyAuditContext(FundsTransactionDetail detail) {
