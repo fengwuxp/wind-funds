@@ -15,6 +15,22 @@ import java.util.List;
 public interface ReconciliationDifferenceMapper extends BaseMapper<ReconciliationDifference> {
 
     /**
+     * 按差错流水号只读查询。
+     *
+     * @param tenantId     租户 ID
+     * @param differenceSn 差错流水号
+     * @return 对账差错；不存在时返回 null
+     */
+    @Select("""
+            SELECT *
+            FROM t_reconciliation_difference
+            WHERE tenant_id = #{tenantId}
+              AND difference_sn = #{differenceSn}
+            """)
+    ReconciliationDifference selectByDifferenceSn(@Param("tenantId") Long tenantId,
+                                                  @Param("differenceSn") String differenceSn);
+
+    /**
      * 按差错流水号加锁查询。
      *
      * @param tenantId     租户 ID

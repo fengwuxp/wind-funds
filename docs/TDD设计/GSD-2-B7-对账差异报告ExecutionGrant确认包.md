@@ -4,21 +4,21 @@
 
 本文是 `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 的 Execution Grant 确认包，用于承接已提交的对账差错、对象级 Gate、出款 preflight 和清算 / 结算只读 consumer 证据，补齐面向运营、财务、风控、研发和测试的只读差异报告查询能力。
 
-本文不是新的 PRD，不替代清结算与对账产品设计、DSL、系分或 TDD 正文；也不是编码授权、生产 DDL 授权、公共契约变更授权、Git 授权或上线发布授权。用户确认本 Grant 前，只允许把本文作为产品、架构、TDD 和编码准入交接材料。
+本文不是新的 PRD，不替代清结算与对账产品设计、DSL、系分或 TDD 正文；也不是生产 DDL 授权、Git 授权或上线发布授权。本文最初作为产品、架构、TDD 和编码准入交接材料；用户已确认 `Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001` 后，本文件继续记录本 Grant 的消费结果、验证证据和 Not Done。
 
 | 字段 | 内容 |
 | --- | --- |
 | Task ID | `GSD2-B7-RECON-DIFFERENCE-REPORT-001` |
 | 原子任务 | 新增对账差异报告最小只读查询能力，解释差错状态、阻断对象、处理动作、重跑结果、准入 gate 和证据引用。 |
-| 所属阶段 | GSD-2 / B7 reconciliation difference report / ready-to-confirm。 |
-| 当前状态 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED` |
+| 所属阶段 | GSD-2 / B7 reconciliation difference report / Green verified。 |
+| 当前状态 | `CONSUMED_GREEN_VERIFIED_SUMMARY_ONLY` |
 | 前置证据 | `GSD2-B7-RECON-DIFFERENCE-MVP-001`、`GSD2-B7-RECON-DIFFERENCE-MVP-002`、`GSD2-B7-RECON-GATE-CONSUME-001/002`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` 和 `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 已完成；当前已提交 Git/code baseline 为 `0d3f68dc feat: 补齐清算结算对账准入消费`。 |
 | Owner | AI Native 负责 Loop、Goal、状态回写和停止条件；产品架构专家负责业务目标、对象、能力地图、规则矩阵、验收和风险；资深架构师负责接口契约、边界、TDD、实现建议、Review 和验证；用户确认单一 Grant。 |
 | 写入范围 | 本文、LWT Goal、W5 推进计划、GSD-2 工作流入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
 | 写入文件 | `docs/TDD设计/GSD-2-B7-对账差异报告ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、`reconciliation-*`、`ledger-*`、`transaction-*`、`wallet-*`、tests、Justfile、AGENTS.md 和最近 Git 提交。 |
 | 只读参考 | `ReconciliationDifferenceApplicationService`、`ReconciliationGateApplicationService`、`ClearingSettlementGateConsumerService`、`PayoutOrderService#checkPayoutPreflight`、B7 对象级 Gate 确认包、B7 清算 / 结算 consumer 确认包和当前 LWT Goal。 |
-| Git 策略 | 本确认包默认 `summary_only`；它不授权 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。若用户后续确认本 Grant 并保持自动提交策略，需在验证通过且工作树无混入变更后重新确认提交范围。 |
+| Git 策略 | 本 Grant 当前为 `summary_only`，已完成代码、测试和状态回写，但未授权 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。若后续需要提交，必须重新确认提交范围。 |
 
 ## 2. 产品裁决
 
@@ -100,7 +100,7 @@
 
 职责边界：
 
-1. `reconciliation-face` 暴露查询契约、Query、DTO 和完整性枚举。
+1. `reconciliation-face` 暴露查询契约、Request、DTO 和完整性枚举。
 2. `reconciliation-impl` 只读聚合现有差错事实、gate 决策和必要证据引用。
 3. `ledger`、`transaction`、`wallet` 只作为后续只读引用来源，不被本 Grant 写入。
 4. 运营后台、导出、批量报告和治理归档后置。
@@ -115,16 +115,16 @@
 
 | 契约 | 建议落点 | 入参 / 出参 | 兼容和幂等 |
 | --- | --- | --- | --- |
-| `ReconciliationDifferenceReportApplicationService` | `reconciliation-face/src/main/java/com/wind/funds/reconciliation/service` | `getReport(ReconciliationDifferenceReportQuery query)` 返回 `ReconciliationDifferenceReportDTO`。 | 查询只读，无写入幂等事实；按 `tenantId + differenceSn` 稳定定位。 |
-| `ReconciliationDifferenceReportQuery` | `reconciliation-face/model/query` | 入参包含 `tenantId`、`differenceSn`、可选 `includeGateDecision`、可选 `includeEvidenceRefs`。 | 缺租户或差错流水直接拒绝。 |
-| `ReconciliationDifferenceReportDTO` | `reconciliation-face/model/dto` | 出参包含差错摘要、阻断摘要、处理摘要、重跑摘要、gate 摘要、完整性和安全过滤提示。 | DTO 兼容已有差错状态，不改旧服务契约。 |
-| `ReconciliationDifferenceReportCompleteness` | `reconciliation-face/model/enums` | 出参完整性，例如 `COMPLETE`、`INCOMPLETE_ACTION_EVIDENCE`、`MISSING_RERUN_RESULT`、`MISSING_GATE_DECISION`。 | 完整性只用于解释，不驱动资金动作。 |
+| `ReconciliationDifferenceReportApplicationService` | `reconciliation-face/src/main/java/com/wind/funds/reconciliation/application/difference/report` | `getReport(GetReconciliationDifferenceReportRequest request, WindOperator operator)` 返回 `ReconciliationDifferenceReportDTO`。 | 查询只读，无写入幂等事实；按 `tenantId + differenceSn` 稳定定位。 |
+| `GetReconciliationDifferenceReportRequest` | `reconciliation-face/src/main/java/com/wind/funds/reconciliation/model/request` | 入参包含 `tenantId`、`differenceSn`、可选 `includeGateDecision`、可选 `includeEvidenceRefs`。 | 延续当前 reconciliation 查询/动作入参统一放在 `model/request` 的风格；缺租户或差错流水直接拒绝。 |
+| `ReconciliationDifferenceReportDTO` | `reconciliation-face/src/main/java/com/wind/funds/reconciliation/model/dto` | 出参包含差错摘要、阻断摘要、处理摘要、重跑摘要、gate 摘要、完整性和安全过滤提示。 | DTO 兼容已有差错状态，不改旧服务契约。 |
+| `ReconciliationDifferenceReportCompleteness` | `reconciliation-face/src/main/java/com/wind/funds/reconciliation/enums` | 出参完整性，例如 `COMPLETE`、`INCOMPLETE_ACTION_EVIDENCE`、`MISSING_RERUN_RESULT`、`MISSING_GATE_DECISION`。 | 枚举延续当前 `com.wind.funds.reconciliation.enums` 包；完整性只用于解释，不驱动资金动作。 |
 
 错误码或断言语义：优先使用现有断言工具和资金域异常口径；本 Grant 不新增完整公共错误码体系。
 
 ### 5.3 数据方案和一致性
 
-数据方案：首轮只读聚合已有 `t_reconciliation_difference` 和现有 gate 查询结果；不新增生产表、不修改生产 DDL、不创建 report fact。
+数据方案：首轮只读聚合已有 `t_reconciliation_difference` 和现有 gate 查询结果；不新增生产表、不修改生产 DDL、不创建 report fact。当前 `ReconciliationDifferenceMapper` 只有 `selectByDifferenceSnForUpdate` 和 `selectByGateObject`，确认后需要新增不加锁的只读查询方法，例如 `selectByDifferenceSn(tenantId, differenceSn)`；不得复用 `FOR UPDATE` 查询来构造报告。
 
 事务边界：查询服务使用只读事务或等价只读语义；不得调用 create、link、rerun、posting、balance projection、clearing、settlement、payout 或补事实入口。
 
@@ -134,11 +134,24 @@
 
 对账：差异报告是对账运营视图，不替代原始对账任务、重新对账运行记录或 gate 决策事实。
 
+### 5.4 源码锚点审计
+
+本节是确认前只读源码审计结果，用于减少确认后 Red / Green 的二次翻译成本，不构成编码授权。
+
+| 审计项 | 当前源码事实 | 对本 Grant 的影响 |
+| --- | --- | --- |
+| 差错应用服务 | 已存在 `ReconciliationDifferenceApplicationService` 和 `ReconciliationDifferenceApplicationServiceImpl`，落点为 `application/difference`。 | 报告能力应放在 `application/difference/report` 子包，避免混入 create / link / rerun 写服务职责。 |
+| 准入 Gate 应用服务 | 已存在 `ReconciliationGateApplicationService#checkGate`，返回 `ReconciliationGateDecisionDTO`，实现为只读事务。 | 报告实现可以只读调用 gate service 或复用同等查询逻辑，但不得写 gate 决策事实或重新执行清结算。 |
+| 清算 / 结算消费方 | 已存在 `ClearingSettlementGateConsumerService` 和 `ClearingSettlementGateConsumerServiceImpl`，落点为 `reconciliation-face/.../service` 和 `reconciliation-impl/.../services/impl`。 | consumer 是被报告解释的证据来源之一；报告服务不应放到 `service` 包混淆为业务消费方。 |
+| 差错 DTO / Request 风格 | 现有请求统一在 `model/request`，DTO 在 `model/dto`，枚举在 `reconciliation/enums`。 | 新增 Query 建议命名为 Request，并进入 `model/request`；完整性枚举进入 `reconciliation/enums`。 |
+| 差错 Mapper | 当前有加锁查询和对象级 gate 查询，缺少单笔报告不加锁查询。 | 首个 Green 可只新增只读 mapper 方法；不得修改 Entity 字段、DDL/H2 schema 或现有写入查询。 |
+| 目标测试 | 现有差错 lifecycle 测试在 `tests/.../application/difference/impl/ReconciliationDifferenceApplicationServiceTests`，gate 测试在 `application/gate/impl`，consumer 测试在 `services/impl`。 | 新测试建议落在 `tests/src/test/java/com/wind/funds/reconciliation/application/difference/report/impl/ReconciliationDifferenceReportApplicationServiceTests.java`。 |
+
 ## 6. Red 候选和验收矩阵
 
 | redId | 验收场景 | moneyInvariant | expectedFacts | forbiddenFacts | targetAssets | verificationCommand | stopCondition |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `B7-REPORT-RED-001` | 未闭环对象级差错生成报告。 | 查询不得改变资金、账本、清算或结算事实。 | 报告展示差错、阻断对象、阻断范围、金额、币种和 gate 阻断状态。 | 不创建交易、route、posting、LedgerEntry、余额投影、清算或结算事实。 | `ReconciliationDifferenceReportApplicationServiceTests`。 | `just test-one ReconciliationDifferenceReportApplicationServiceTests tests`。 | 需要新 report table 或批次快照时停止。 |
+| `B7-REPORT-RED-001` | 未闭环对象级差错生成报告。 | 查询不得改变资金、账本、清算或结算事实。 | 报告展示差错、阻断对象、阻断范围、金额、币种和 gate 阻断状态。 | 不创建交易、route、posting、LedgerEntry、余额投影、清算或结算事实。 | `tests/.../application/difference/report/impl/ReconciliationDifferenceReportApplicationServiceTests`。 | `just test-one ReconciliationDifferenceReportApplicationServiceTests tests`。 | 需要新 report table 或批次快照时停止。 |
 | `B7-REPORT-RED-002` | 已处理但重跑未对平的差错报告。 | 处理动作不等于自动放行。 | 报告展示 action type、幂等键、原始事实、处理引用和重跑未对平。 | 不改差错状态，不重新执行 rerun。 | 同上。 | 目标测试 + `just test-reconciliation`。 | 需要改变差错状态机时停止。 |
 | `B7-REPORT-RED-003` | 处理后重跑对平的差错报告。 | 条件放行必须可追踪到重跑证据。 | 报告展示 `CONDITIONALLY_PASSED` 或等价 gate 摘要和证据引用。 | 不创建清算、结算、出款或补事实。 | 同上。 | 目标测试。 | 需要接清算 / 结算生命周期时停止。 |
 | `B7-REPORT-RED-004` | 敏感上下文过滤。 | 报告不得泄露敏感外部账户或通道字段。 | DTO 返回安全过滤提示和脱敏引用。 | 不返回外部账户原文、完整卡号、任意 contextVariables 原文。 | 同上。 | 目标测试 + boundary 视情况。 | 需要权限体系或脱敏框架改造时停止。 |
@@ -149,9 +162,9 @@
 
 确认后允许写入：
 
-1. `reconciliation-face` 新增报告查询契约、Query、DTO 和必要枚举。
-2. `reconciliation-impl` 新增只读 application service 实现。
-3. `tests` 新增目标服务流测试，使用真实 Spring Bean、H2 schema 和既有差错服务。
+1. `reconciliation-face` 新增报告查询契约、Request、DTO 和必要枚举。
+2. `reconciliation-impl` 新增只读 application service 实现和必要的 mapper 只读查询方法。
+3. `tests` 新增目标服务流测试，使用真实 Spring Bean、H2 schema 和既有差错、gate、consumer 服务。
 4. 文档、LWT Goal、W5、README 和 OpenSpec tasks 状态回写。
 
 禁止事项：
@@ -166,7 +179,7 @@
 
 ## 8. 验证方案和 Review
 
-TDD：确认后先写 `ReconciliationDifferenceReportApplicationServiceTests` 首个 Red，证明当前缺少报告查询服务或服务不能解释对象级阻断差错；再做最小 Green。
+TDD：确认后先写 `ReconciliationDifferenceReportApplicationServiceTests` 首个 Red，证明当前缺少报告查询服务或服务不能解释对象级阻断差错；再做最小 Green。首个 Red 推荐复用 `ReconciliationDifferenceApplicationService` 创建对象级差错、复用 `ClearingSettlementGateConsumerService` 或 `ReconciliationGateApplicationService` 获取 gate 证据，再调用报告服务断言报告解释完整且无账务事实副作用。
 
 Review：完成 Green 后按问题优先 CR 检查业务语义、模块边界、公共契约、敏感字段、只读事务、失败无副作用、测试断言和 Not Done。
 
@@ -195,7 +208,41 @@ Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001
 确认新增对账差异报告最小只读查询能力，承接已提交的对象级 Gate 和清算 / 结算 consumer 证据，写入范围限 reconciliation-face 查询契约、reconciliation-impl 只读聚合实现、目标服务流测试和状态文档回写；不授权生产 DDL、完整清结算、出款、补事实、运营审批、治理归档、报表导出、生产发布或 Git 提交。
 ```
 
-## 10. 停止条件和交接
+## 10. Grant 消费预检清单
+
+用户确认 `Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001` 后，资深架构师进入编码前先消费本清单。任一项不满足时停止在预检阶段，不写 Java、测试、DDL/H2 schema 或公共契约。
+
+| 检查项 | 通过口径 | 不通过处理 |
+| --- | --- | --- |
+| 授权文本 | 用户明确确认第 9 节可复制文本，且未扩大为批次报告、运营后台、导出、补事实或完整清结算。 | 回到用户确认单一 Grant。 |
+| 工作树 | `git status --short` 中没有影响 `reconciliation-*`、`tests`、TDD/OpenSpec 状态文件的未归属变更；若有，只能先分类或停止。 | 停止并说明冲突文件。 |
+| 当前基线 | 最近提交至少包含 `0d3f68dc feat: 补齐清算结算对账准入消费` 和本确认包。 | 重新读取当前 Git / docs / OpenSpec 后再决策。 |
+| 首个 Red | 默认选择 `B7-REPORT-RED-001`，只证明对象级未闭环差错可以生成只读报告且无资金副作用。 | 若当前代码已满足，改选 `B7-REPORT-RED-002` 或 `B7-REPORT-RED-004`。 |
+| 写入范围 | 仅允许 reconciliation-face 报告契约、Request、DTO、枚举，reconciliation-impl 只读实现和 mapper 只读查询，目标测试和状态文档回写。 | 任一需求超出范围时另起 Grant。 |
+| 验证顺序 | 目标测试先行，再 `test-reconciliation`、`compile`、`pmd`、`git diff --check`。 | 验证失败且无法在授权范围内修复时停止。 |
+| Git 策略 | 默认 `summary_only`；如需提交，必须在用户另行确认提交范围后执行。 | 未确认前不得 `git add` / `git commit`。 |
+
+## 11. Grant 消费运行卡
+
+| 阶段 | 动作 | 通过口径 | 停止条件 |
+| --- | --- | --- | --- |
+| Pick | 选择 `B7-REPORT-RED-001` 作为首个 Red。 | Red 聚焦单笔差异报告，不触碰批次报告、导出或运营后台。 | 需要 report table、生产 DDL 或不可篡改快照时停止。 |
+| Red | 新增 `ReconciliationDifferenceReportApplicationServiceTests`。 | 当前缺少报告服务或无法解释对象级阻断差错时失败。 | Red 必须修改差错状态机、gate 语义或清结算事实时停止。 |
+| Green | 新增最小报告查询契约、Request、DTO、完整性枚举、只读 mapper 查询和只读实现。 | 能按 `tenantId + differenceSn` 返回报告，并解释差错、阻断对象、处理动作、重跑和 gate 摘要。 | 需要写交易、route、posting、LedgerEntry、余额投影、清算或结算事实时停止。 |
+| Review | 做问题优先 CR。 | 检查模块边界、公共契约、DTO 字段、敏感字段过滤、只读事务和失败无副作用。 | 发现报告实现反写事实或泄露敏感上下文时停止。 |
+| Verify | 运行目标测试、reconciliation 分组、compile、pmd 和 diff。 | 命令通过，或环境问题被区分并复跑。 | 验证失败且无法在授权范围内修复时停止。 |
+| Handoff | 回写本文、LWT Goal、W5、README 和 OpenSpec tasks。 | Done / Not Done / 验证命令 / 下一 owner 清楚。 | 需要 Git、发布、生产迁移或专业确认时停止。 |
+
+最小断言清单：
+
+1. 报告查询前后 ledger transaction、posting、LedgerEntry、余额投影、清算和结算事实数量不变。
+2. 对象级差错展示 `blockingObjectType / blockingObjectSn`；历史类型级差错展示保守阻断或完整性提示。
+3. 已回链处理动作时展示 action type、幂等键、原始事实引用、处理事实引用和证据引用。
+4. 已重跑时展示重跑流水、是否对平、结果摘要和 gate 条件放行或阻断解释。
+5. 缺处理证据、缺重跑结果或缺 gate 决策时返回完整性状态，不自动补写事实。
+6. 不返回外部账户原文、完整卡号、通道敏感字段或任意 `contextVariables` 原文。
+
+## 12. 停止条件和交接
 
 人工确认点：
 
@@ -210,6 +257,36 @@ Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001
 | 交接项 | 内容 |
 | --- | --- |
 | Product Context Card | 业务目标、用户价值、对象、流程、规则矩阵、运营数据、风险和验收已在第 2 至 4 节表达。 |
-| Engineering Handoff Card | 推荐接口、Query、DTO、完整性枚举、Red 候选、验证命令、禁止范围和停止条件已在第 5 至 8 节表达。 |
+| Engineering Handoff Card | 推荐接口、Request、DTO、完整性枚举、Red 候选、预检清单、运行卡、验证命令、禁止范围和停止条件已在第 5 至 11 节表达。 |
 | Production Loop Card | 本 Grant 不发布生产；发布、灰度、回滚、权限、告警和 Runbook 仍为 Not Done。 |
 | 残余风险 | 批次报告、报告留存、导出、运营后台、治理归档、生产权限、完整清结算生命周期、补事实执行和专业规则确认仍未完成。 |
+
+## 13. Grant 消费结果（2026-06-19）
+
+用户已确认并消费 `Execution Grant：GSD2-B7-RECON-DIFFERENCE-REPORT-001`。本轮按 `B7-REPORT-RED-001` 进入 Red / Green：首个 Red 证明当前缺少对账差异报告查询契约、DTO、完整性枚举和只读实现；Green 新增最小只读报告查询能力，并纳入对账分组验证。
+
+写入结果：
+
+1. `reconciliation-face` 新增 `ReconciliationDifferenceReportApplicationService`、`GetReconciliationDifferenceReportRequest`、`ReconciliationDifferenceReportDTO` 和 `ReconciliationDifferenceReportCompleteness`。
+2. `reconciliation-impl` 新增 `ReconciliationDifferenceReportApplicationServiceImpl`，按 `tenantId + differenceSn` 只读聚合差错事实、gate 决策、证据引用、完整性和安全过滤提示。
+3. `ReconciliationDifferenceMapper` 新增不加锁的 `selectByDifferenceSn`，报告查询不复用 `FOR UPDATE`。
+4. `tests` 新增 `ReconciliationDifferenceReportApplicationServiceTests`，覆盖对象级未闭环差错报告、gate 阻断解释、证据引用、报告视图开关、处理动作证据不完整、缺重跑结果、历史类型级差错缺 gate 决策和无账本事实副作用。
+5. `Justfile` 的 `test-reconciliation` 已纳入 `ReconciliationDifferenceReportApplicationServiceTests`。
+
+验证结果：
+
+| 命令 | 结果 | 说明 |
+| --- | --- | --- |
+| `just test-one ReconciliationDifferenceReportApplicationServiceTests tests` | PASS | 沙箱内因 embedded Redis 端口绑定限制失败，已在非沙箱环境复跑通过；5 tests passed。 |
+| `just test-reconciliation` | PASS | 沙箱内因 embedded Redis 端口绑定限制失败，已在非沙箱环境复跑通过；31 tests passed。 |
+| `just compile` | PASS | Maven reactor compile 通过。 |
+| `just pmd` | PASS | PMD 通过。 |
+| `git diff --check` | PASS | 未发现空白或补丁格式问题。 |
+
+Review 结论：
+
+1. 报告服务定位为 reconciliation application 层只读解释视图，不写交易、route、posting、LedgerEntry、余额投影、清算或结算事实。
+2. DTO 只返回事实引用、状态摘要和解释文本；敏感字段以安全提示呈现，不返回外部账户、卡号、通道敏感字段或上下文原文。
+3. 完整性状态只服务人工判断和运营解释，不触发补事实、重跑、调账或清结算动作。
+4. 本 Grant 不声明批次报告、导出、运营后台、生产权限、完整清结算生命周期、补事实执行、治理归档或生产发布 Done。
+5. 本 Grant 只交付服务层 application 能力；不新增 Controller、HTTP/RPC 入口、页面、导出端点或外部适配入口。
