@@ -4,17 +4,17 @@
 
 本文是 ledger、wallet、transaction 三条资金底座被依赖能力的 `Loop + Goal` 状态载体，用于把已完成的 GSD2 切片、仍未 Done 的生产能力缺口和下一轮单一 Execution Grant 候选聚合到一张可持续推进的 Goal 卡中。
 
-本文不是新的 PRD，不替代产品设计、DSL 设计、系分设计或 TDD 设计；也不单独替代 DDL/H2 schema 授权、公共契约变更授权、生产发布授权或外部规则专业确认。`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已提交固化为能力证据；`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在本地未提交工作树完成余额调账独立审计查询 Red / Green / Verify。当前不再复用 B5-003 授权扩范围，下一轮需在 B7 清算/结算 gate、B7 差异报告、wallet 完整预交易快照或其他单一 Grant 中重新确认。
+本文不是新的 PRD，不替代产品设计、DSL 设计、系分设计或 TDD 设计；也不单独替代 DDL/H2 schema 授权、公共契约变更授权、生产发布授权或外部规则专业确认。`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已在 `da3b4f19` 提交固化为能力证据；`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在 `4ef64275` 提交固化余额调账独立审计查询 Red / Green / Verify 结果。当前不再复用 B5-003 授权扩范围，下一轮需在 B7 清算/结算 gate、B7 差异报告、wallet 完整预交易快照或其他单一 Grant 中重新确认。
 
 | 字段 | 内容 |
 | --- | --- |
 | Task ID | `GSD2-LWT-PRODUCTION-CAPABILITY-GOAL-001` |
 | 原子任务 | 建立 LWT 生产可用能力 Goal，聚合当前能力完备性、下一候选优先级、验证矩阵和 handoff。 |
-| 所属阶段 | GSD-2 / LWT capability goal / B5 audit query consumed local Green。 |
+| 所属阶段 | GSD-2 / LWT capability goal / B5 audit query committed。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
 | Loop ID | `GSD2-LWT-PRODUCTION-CAPABILITY-LOOP-2026-06-18` |
-| 当前状态 | `B5_BALANCE_ADJUST_AUDIT_QUERY_GREEN_VERIFIED` |
-| Git / code baseline | `da3b4f19 feat: 补齐余额调账路由审计回链` 是当前已提交基线；本轮 B5-003 余额调账独立审计查询仍在未提交工作树，待用户另行授权 Git 后提交固化；`0b251593 feat: 补齐账本正常余额方向护栏` 是进入 `GSD2-B5-BALANCE-ADJUST-AUDIT-002` route snapshot 审计回链子切片前的已提交基线；`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6` 和 `e81a8a25` 保留为已消费能力证据。 |
+| 当前状态 | `B5_BALANCE_ADJUST_AUDIT_QUERY_COMMITTED` |
+| Git / code baseline | `4ef64275 feat: 补齐余额调账独立审计查询` 是当前已提交基线；`da3b4f19 feat: 补齐余额调账路由审计回链` 是进入 B5-003 前的已提交基线；`0b251593 feat: 补齐账本正常余额方向护栏` 是进入 `GSD2-B5-BALANCE-ADJUST-AUDIT-002` route snapshot 审计回链子切片前的已提交基线；`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6` 和 `e81a8a25` 保留为已消费能力证据。 |
 | 关联入口 | [GSD-2-新基线工作流规划.md](GSD-2-新基线工作流规划.md)、[GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md)、[GSD-2-B7-清算结算Gate消费ExecutionGrant确认包.md](GSD-2-B7-清算结算Gate消费ExecutionGrant确认包.md)、[GSD-2-AUTH-Chargeback目标语义对齐任务卡.md](GSD-2-AUTH-Chargeback目标语义对齐任务卡.md)、[GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md](GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md)、OpenSpec `tdd-baseline-reset` tasks。 |
 | Owner | AI Native 流程编排负责 Goal、Loop、状态和停止条件；产品架构专家负责业务价值、验收和 Not Done；资深架构师负责模块边界、契约、测试、验证和编码准入；用户确认单一 Grant。 |
 | 写入范围 | 本文、B5-003 确认包、B7 清算/结算 Gate 确认包、GSD-2 入口、P0/P1 LWT 推进计划、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
@@ -22,7 +22,7 @@
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、reconciliation、tests、Justfile、AGENTS.md、最近 Git 提交和历史准入卡。 |
 | 只读参考 | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec`、源码、测试和 Git 提交记录。 |
 | 上下文账本 | 本文是 LWT 当前状态账本；GSD-2 工作流、W5 推进计划、TDD README、docs README 和 OpenSpec tasks 是恢复入口。 |
-| Git 策略 | `summary_only`。B5-003 已获得用户 Execution Grant 并完成本地 Green，但本轮未授权 Git 提交；不执行 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。 |
+| Git 策略 | B5-003 已按用户提交授权在验证通过后提交到 `4ef64275`；后续新 Grant 默认重新确认写入范围和 Git 策略，不继承本轮提交授权。 |
 
 ### 1.1 Goal 层级和当前恢复入口
 
@@ -31,8 +31,8 @@
 | 层级 | ID / 状态 | 含义 | 当前动作 |
 | --- | --- | --- | --- |
 | 父 Goal | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` | GSD-2 总基线，负责清理旧活跃计划、维护 Wave、OpenSpec tasks、Plan Grant 和恢复入口。 | 继续作为总入口和历史证据账本，不直接授权编码。 |
-| LWT 子 Goal | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` / `B5_BALANCE_ADJUST_AUDIT_QUERY_GREEN_VERIFIED` | 聚合 ledger、wallet、transaction 和 reconciliation 的条件生产基线、完备性矩阵、三卡交接和下一 Grant 队列。 | 继续作为当前 LWT 状态载体，记录 wallet 授权准入、授权 route snapshot 回链、ledger normal balance guard、AUTH 兼容 guard、B4 投影解释矩阵、B5 route snapshot 审计回链和 B5 独立审计查询已消费。 |
-| 当前可执行状态 | `B5_BALANCE_ADJUST_AUDIT_QUERY_GREEN_VERIFIED` | balance adjust 独立审计查询已能只读聚合外部余额异常纠偏调账的交易事实、交易明细上下文、route snapshot、ledger transaction 和 LedgerEntry，并过滤敏感外部账户上下文。 | 下一轮不得沿用 B5-003 扩审批、补事实或泛化运营补账；若继续 LWT，需从 B7 清算/结算 gate 消费、B7 差异报告、wallet 完整预交易快照、账户能力来源组合或其他单一 Grant 重新确认。 |
+| LWT 子 Goal | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` / `B5_BALANCE_ADJUST_AUDIT_QUERY_COMMITTED` | 聚合 ledger、wallet、transaction 和 reconciliation 的条件生产基线、完备性矩阵、三卡交接和下一 Grant 队列。 | 继续作为当前 LWT 状态载体，记录 wallet 授权准入、授权 route snapshot 回链、ledger normal balance guard、AUTH 兼容 guard、B4 投影解释矩阵、B5 route snapshot 审计回链和 B5 独立审计查询已消费并提交。 |
+| 当前可执行状态 | `B5_BALANCE_ADJUST_AUDIT_QUERY_COMMITTED` | balance adjust 独立审计查询已能只读聚合外部余额异常纠偏调账的交易事实、交易明细上下文、route snapshot、ledger transaction 和 LedgerEntry，并过滤敏感外部账户上下文，且已提交固化。 | 下一轮不得沿用 B5-003 扩审批、补事实或泛化运营补账；若继续 LWT，需从 B7 清算/结算 gate 消费、B7 差异报告、wallet 完整预交易快照、账户能力来源组合或其他单一 Grant 重新确认。 |
 | 历史证据状态 | `B7_RECON_DIFFERENCE_ACTION_GUARD_GREEN_VERIFIED`、`GSD2-B7-RECON-GATE-CONSUME-001/002`、`10853e2d` 等 | 只表示过去切片已完成或已消费，不能作为当前下一步或默认授权。 | 仅作为 Evidence Anchor 和 Not Done 边界来源。 |
 
 恢复规则：下一轮必须先读取本文、GSD-2 工作流、W5 推进计划、B5-003 余额调账审计扩展确认包和 OpenSpec tasks；若运行时 Goal objective、旧对话摘要或历史任务卡仍指向 `GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 或 `GSD2-B5-BALANCE-ADJUST-AUDIT-003`，以当前工作树、本文和 OpenSpec tasks 为准，将这些切片视为已消费证据，不得回退重做或沿用为新授权。若用户没有确认新的单一 Grant，只能继续低风险状态维护或只读 Gap Audit。若用户改选 B7 清算/结算 gate、B7 差异报告、wallet 预交易快照或 P2 业务能力，必须先同步本映射和第 8.1 节 Grant 决策账本。
@@ -65,7 +65,7 @@
 
 ## 2. 现状和影响范围
 
-现状：`GSD2-B7-RECON-GATE-CONSUME-002` 已在 `a38776c5` 提交，`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 和 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` 已推进到 `ca603eab`；`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 与 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 已在 `dd442888` 前完成本地 Green，wallet 授权准入能从支付工具解析到账户主体、委派授权内核，并把支付工具引用、绑定版本和准入决策固化到 route snapshot。`GSD2-LD-LEDGER-GUARD-REGRESSION-001` 已在 `0b251593` 固化固定账目类别正常余额方向 guard 首轮。`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已完成 route snapshot 审计回链子切片，`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在未提交工作树完成余额调账独立审计查询最小服务流。ledger、wallet、transaction 和 reconciliation 已完成多个 service-flow-backed 首轮 Green，但仍存在完整预交易快照、账户能力来源组合、清算/结算 gate 消费、B7 差异报告、运营审批闭环和生产权限模型等生产可用缺口。
+现状：`GSD2-B7-RECON-GATE-CONSUME-002` 已在 `a38776c5` 提交，`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 和 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING` 已推进到 `ca603eab`；`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 与 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 已在 `dd442888` 前完成本地 Green，wallet 授权准入能从支付工具解析到账户主体、委派授权内核，并把支付工具引用、绑定版本和准入决策固化到 route snapshot。`GSD2-LD-LEDGER-GUARD-REGRESSION-001` 已在 `0b251593` 固化固定账目类别正常余额方向 guard 首轮。`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已在 `da3b4f19` 完成 route snapshot 审计回链子切片，`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在 `4ef64275` 提交余额调账独立审计查询最小服务流。ledger、wallet、transaction 和 reconciliation 已完成多个 service-flow-backed 首轮 Green，但仍存在完整预交易快照、账户能力来源组合、清算/结算 gate 消费、B7 差异报告、运营审批闭环和生产权限模型等生产可用缺口。
 
 影响范围：本轮只影响 transaction route snapshot 审计摘要、B5 目标服务流测试、文档状态和任务入口；不影响 DDL/H2 schema、公共契约、运行时配置、外部通道、生产迁移和 Git 历史重写。后续任一候选进入编码前，必须重新确认单一 Execution Grant。
 
@@ -276,7 +276,7 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | Harness 结构 | `python3 /Users/wuxp/.codex/skills/senior-software-architect/scripts/check_harness_plan.py --kind gsd-wave --file docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md` | Task、Owner、范围、Wave、上下文账本、禁止事项、验证和 handoff 字段齐全。 |
 | 产品结构 | `python3 /Users/wuxp/.codex/skills/product-architecture-expert/scripts/check_product_deliverable.py --kind product-architecture --file docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md` | 业务目标、能力地图、对象、流程、规则、运营数据、风险和验收齐全。 |
 | 架构结构 | `python3 /Users/wuxp/.codex/skills/senior-software-architect/scripts/check_architecture_deliverable.py --kind architecture-plan --file docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md` | 背景目标、现状、核心决策、契约、数据一致性、可靠性安全、验证、发布风险齐全。 |
-| 状态一致性 | `rg "GSD2-LWT|LWT-PRODUCTION|CONDITIONAL_DELIVERABLE_BASELINE|PARTIAL_BASELINE|Completion Audit|Evidence Anchor Matrix|单一 Grant 决策账本|Loop Progress Ledger|AuthorizationAdmissionApplicationServiceTests|LedgerNormalBalanceGuard|B5_BALANCE_ADJUST_AUDIT_QUERY_GREEN_VERIFIED|GSD2-B5-BALANCE-ADJUST-AUDIT-003|GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001|scopeDecision|da3b4f19|余额调账审计扩展|清算结算Gate消费" docs openspec` | GSD2 入口、W5、生产可用基线裁决、完成度审计、证据锚点、单一 Grant 决策账本、Loop Progress Ledger、README、OpenSpec tasks、wallet 授权准入、ledger guard、B5 route snapshot 审计回链、B5-003 独立审计查询和 B7 清算/结算 Gate scopeDecision 能追踪到本文和当前基线。 |
+| 状态一致性 | `rg "GSD2-LWT|LWT-PRODUCTION|CONDITIONAL_DELIVERABLE_BASELINE|PARTIAL_BASELINE|Completion Audit|Evidence Anchor Matrix|单一 Grant 决策账本|Loop Progress Ledger|AuthorizationAdmissionApplicationServiceTests|LedgerNormalBalanceGuard|B5_BALANCE_ADJUST_AUDIT_QUERY_COMMITTED|GSD2-B5-BALANCE-ADJUST-AUDIT-003|GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001|scopeDecision|4ef64275|余额调账审计扩展|清算结算Gate消费" docs openspec` | GSD2 入口、W5、生产可用基线裁决、完成度审计、证据锚点、单一 Grant 决策账本、Loop Progress Ledger、README、OpenSpec tasks、wallet 授权准入、ledger guard、B5 route snapshot 审计回链、B5-003 独立审计查询和 B7 清算/结算 Gate scopeDecision 能追踪到本文和当前基线。 |
 | Grant 消费可用性 | `rg -n 'Grant 消费预检清单|Grant 消费运行卡|Red 选择|最小断言清单|AUTH-CB-COMPAT-RED-001' docs/TDD设计/GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md openspec/changes/tdd-baseline-reset/tasks.md` | AUTH 兼容确认包不仅有可复制 Grant，还能指导确认后的预检、首个 Red 选择、最小 Green、Review、Verify 和 Handoff。 |
 | README 恢复导航 | `rg -n 'W1 基线差距审计把当前 Git/code baseline 校准到|推荐下一步确认 .*GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001|当前仍不授权代码|当前下一候选.*B2|下一候选.*GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001' docs/README.md docs/TDD设计/README.md docs/TDD设计/GSD-2-新基线工作流规划.md openspec/changes/tdd-baseline-reset/tasks.md` | 不再把 W1/W2/W3/W4 的历史基线、历史推荐或 B2 账户层级候选误写成当前下一候选；README 入口应指向本轮支付工具授权准入提交、LWT Goal、B4 remaining 已消费和 wallet 授权准入下一切片。 |
 | 空白和 Markdown | `git diff --check` | 无行尾空白或 patch 格式问题。 |
@@ -287,12 +287,12 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | 字段 | 内容 |
 | --- | --- |
 | 当前可执行任务 | `GSD2-B5-BALANCE-ADJUST-AUDIT-003` 独立审计查询已完成本地 Green；当前仅做状态回写、交接收口和 B7 清算/结算 Gate 下一轮确认包准备。下一轮默认从 B7 清算/结算 gate、B7 差异报告或 wallet 完整预交易快照中重新确认单一 Grant。 |
-| 写入范围 | 本轮已写入 B5-003 查询契约、DTO/Query、只读聚合实现、目标测试、Money value object 上下文校验、B7 清算/结算 Gate scopeDecision 确认包、本文、GSD-2 入口、P0/P1 LWT 推进计划、TDD README、docs README 和 OpenSpec tasks 状态同步；未授权 DDL/H2 schema、Entity、Mapper、运行时配置或 Git。 |
+| 写入范围 | 本轮已写入并提交 B5-003 查询契约、DTO/Query、只读聚合实现、目标测试、Money value object 上下文校验、本文、GSD-2 入口、P0/P1 LWT 推进计划、TDD README、docs README 和 OpenSpec tasks 状态同步；同时新增 B7 清算/结算 Gate scopeDecision 确认包但未授权进入 B7 编码。未授权 DDL/H2 schema、Entity、Mapper、运行时配置或生产配置。 |
 | 验证命令 | `just test-one LedgerDtoContextVariablesContractTests tests`、`just test-one FundsBalanceAdjustAuditFlowTests tests`、`just test-balance-control`、`just test-boundary`、`just test-transaction`、`just compile`、`just pmd` 已通过；收口执行 `git diff --check`。 |
 | 编译说明 | 本轮已改 Java、测试和文档，并完成目标测试、分组测试、编译和 PMD；Spring/Redis 端口类 sandbox 失败已按环境问题在非 sandbox 复跑通过。 |
 | 下一 owner | 用户确认下一单一 Grant；建议优先在 B7 清算/结算 gate 消费或 B7 差异报告中二选一，若继续 wallet 则选择完整预交易快照、账户能力来源组合或 Spend Rule 控制闭环。 |
 | 交接要求 | 后续每轮必须先读取本文、B5-003 确认包、B7 清算结算 Gate 确认包、GSD-2 工作流、W5 推进计划和 OpenSpec tasks，再确认新的单一 Execution Grant、写入范围、禁止范围、验证命令和回滚提示。 |
-| 回滚提示 | 当前未提交工作树可通过 Git diff 回滚；不得连带回滚 `da3b4f19` 之前已提交的 B5-002 代码、测试或其他历史能力证据。 |
+| 回滚提示 | B5-003 已提交到 `4ef64275`，后续如需回退应按 Git revert 或补偿提交处理；不得连带回滚 `da3b4f19` 之前已提交的 B5-002 代码、测试或其他历史能力证据。 |
 
 ## 11. Completion Audit 和三卡交接
 
@@ -307,11 +307,11 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | 给出可交付生产基线判定 | 第 5.5 已明确 `CONDITIONAL_DELIVERABLE_BASELINE`、`PARTIAL_BASELINE` 和 `NOT_DELIVERABLE_AS_FULL_PRODUCTION_DONE`。 | `DONE_DOCS_ONLY`。 | 后续切片必须声明消费或补强哪一项基线。 |
 | 给出下一单一 Grant 决策账本 | 第 8.1 已拆分默认推荐、候选切换条件、停止条件和状态回写位置。 | `DONE_DOCS_ONLY`。 | 用户确认单一 Grant 后，按对应候选首个 Red 进入代码闭环。 |
 | 结构门禁命令可复跑且通过 | 第 11.4 已记录 LWT Goal、P0/P1 LWT 推进计划、AUTH Chargeback 目标语义任务卡和 AUTH Chargeback 兼容入口确认包的 Harness、产品和架构结构 checker 结果。 | `DONE_DOCS_ONLY`。 | 后续改动任一活跃入口时必须复跑对应结构门禁。 |
-| 对齐当前 Git/code baseline | 本文、W5、GSD-2 工作流和 OpenSpec tasks 均校准到 `da3b4f19`；`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已提交固化为能力证据，并保留 `0b251593`、`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6`、`e81a8a25` 作为已消费证据。 | `DONE_COMMITTED`。 | 后续基线从 `da3b4f19` 后继续演进。 |
+| 对齐当前 Git/code baseline | 本文、W5、GSD-2 工作流和 OpenSpec tasks 均校准到 `4ef64275`；`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已在 `da3b4f19` 提交固化，`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在 `4ef64275` 提交固化，并保留 `0b251593`、`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6`、`e81a8a25` 作为已消费证据。 | `DONE_COMMITTED`。 | 后续基线从 `4ef64275` 后继续演进。 |
 | 校准 README 恢复导航 | docs README 和 TDD README 已把 W1/W2/W3/W4 标为历史记录或已消费证据，当前入口指向 LWT Goal、B5 route snapshot 审计回链提交、B5-003 余额调账审计扩展确认包、ledger guard 结果、AUTH 兼容 adapter Green 结果、B4 投影解释 remaining 已消费结果、wallet 授权准入与 route snapshot 回链结果。 | `DONE_DOCS_ONLY`。 | 后续改 README 或入口导航时必须复跑 README 恢复导航扫描。 |
 | 按依赖顺序推进低风险文档/计划 | AUTH 兼容、B4 投影解释 remaining、wallet 授权准入、route snapshot 回链、ledger guard、B5 route snapshot 审计回链和 B5 独立审计查询均已消费；B5-003 已补 service、Query、DTO、impl、目标测试、验证证据和 Not Done。 | `CONSUMED_GREEN`。 | 下一轮不得复用 B5-003；需重新确认 B7 清算/结算 gate、B7 差异报告或 wallet 后续单一 Grant。 |
 | 建立无进展计数和停止账本 | 第 1.2 节已记录 docs-only 推进轮次、证据变化和无进展计数；最近一轮已把运行时 Goal 旧 B2 objective 与当前 B5-003/B7 决策账本的冲突收敛为恢复规则。 | `DONE_DOCS_ONLY`。 | 下一轮若没有 Grant、事实差异、验证证据或状态缺口收敛，应停止 docs-only 扩写并交还用户选择。 |
-| 单一 Execution Grant 后进入代码、测试、验证、提交闭环 | `GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已消费并提交到 `da3b4f19`；`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在未提交工作树完成 Red / Green / Verify，补余额调账独立审计查询，目标测试证明查询完整性、敏感字段过滤和无资金副作用；收口追加余额控制、边界、交易分组、compile、PMD 和 diff。 | `CONSUMED_GREEN_SUMMARY_ONLY`。 | 下一轮必须重新确认新的单一 Grant；如需固化本轮，需用户另行授权 Git。 |
+| 单一 Execution Grant 后进入代码、测试、验证、提交闭环 | `GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已消费并提交到 `da3b4f19`；`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已消费并提交到 `4ef64275`，补余额调账独立审计查询，目标测试证明查询完整性、敏感字段过滤和无资金副作用；收口追加余额控制、边界、交易分组、compile、PMD 和 diff。 | `CONSUMED_GREEN_COMMITTED`。 | 下一轮必须重新确认新的单一 Grant。 |
 | 补齐 AUTH 兼容 Grant 消费预检 | `GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` 第 11 节已补用户授权、工作树状态、当前基线、首个 Red 收窄、写入范围、验证顺序、状态回写和 Git 策略预检，并已被本轮消费。 | `CONSUMED_GREEN`。 | 预检结果只作为本 Grant 审计证据，后续不得复用为新授权。 |
 | 补齐 AUTH 兼容 Grant 消费运行卡 | `GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md` 第 12 节已补 Red 选择、Red 范围、Green 实现、Review、Verify、Handoff 和最小断言清单，并已被本轮消费。 | `CONSUMED_GREEN`。 | 运行卡结果只作为本 Grant 审计证据，后续不得复用为新授权。 |
 | 证明三模块全量生产可用 | 当前只具备条件可交付基线，仍缺完整预交易快照、失败态全量解释、projection store、治理重放、清算/结算消费、差异报告、补事实、运营审批、生产迁移、灰度和告警。 | `NOT_DONE`。 | 不得标记 Goal complete；继续按单一 Grant 收敛缺口。 |

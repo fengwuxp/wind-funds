@@ -14,7 +14,7 @@
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
 | Loop ID | `GSD2-LWT-PRODUCTION-CAPABILITY-LOOP-2026-06-18` |
 | 当前状态 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED` |
-| Git / code baseline | 当前已提交代码基线为 `da3b4f19 feat: 补齐余额调账路由审计回链`；B5-003 仍在未提交工作树，已完成本地 Green 但未获 Git 提交授权。 |
+| Git / code baseline | 当前已提交代码基线为 `4ef64275 feat: 补齐余额调账独立审计查询`；B5-003 已完成本地 Green 并提交固化。 |
 | Owner | AI Native 负责 Goal、Loop、状态和停止条件；产品架构专家负责清算 / 结算业务语义、阻断对象和验收边界；资深架构师负责接口、schema 决策、TDD、实现路径和验证命令。 |
 | Wave 边界 | 本确认包只准备 B7 清算 / 结算 gate 消费一个原子任务；不得并行推进完整清分、清算确认、结算锁定、出款提交、追偿、补事实执行、B7 差异报告、wallet 预交易快照、VCC、全球账户或 Spend Rule。 |
 | 执行顺序 / 依赖关系 | 依赖 `GSD2-B7-RECON-GATE-CONSUME-001`、`GSD2-B7-RECON-GATE-CONSUME-002` 和 B5-003 已完成；进入编码前先确认 `scopeDecision`。 |
@@ -272,7 +272,7 @@ scopeDecision=object-scope-schema-backed
 | 检查项 | 通过条件 |
 | --- | --- |
 | 用户授权 | 用户复制确认第 9 节其中一个 Grant 文本，且 `scopeDecision` 明确。 |
-| 工作树 | `git status --short` 已复核，B5-003 未提交变更和本 Grant 写入范围不冲突。 |
+| 工作树 | `git status --short` 已复核，当前工作树只允许包含本 Grant 可解释的状态维护；B5-003 已提交固化，不再作为工作树冲突来源。 |
 | 设计入口 | 已读取 PRD 03、系分 03、B7 Round0、LWT Goal、W5 和 OpenSpec tasks。 |
 | 源码锚点 | 已复核 `ReconciliationGateApplicationServiceImpl`、Mapper、Entity、Request、DTO 和目标测试。 |
 | 首个 Red | 已按 `scopeDecision` 选择 `B7-CLSSET-GATE-RED-001` 或对象级 `B7-CLSSET-GATE-RED-003`。 |
@@ -299,4 +299,3 @@ scopeDecision=object-scope-schema-backed
 3. 生产 DDL 迁移、回滚、灰度、SLO、告警和 Runbook。
 4. 外部卡组织、银行、通道、ACH、SWIFT、FX、税务、会计、法务或合规最终确认。
 5. wallet 全量生产 Done、VCC facade、全球账户业务能力和 Spend Rule 控制闭环。
-

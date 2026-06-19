@@ -13,8 +13,8 @@
 | 所属阶段 | GSD-2 / B5 balance adjustment audit extension / consumed local Green。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
 | Loop ID | `GSD2-LWT-PRODUCTION-CAPABILITY-LOOP-2026-06-18` |
-| 当前状态 | `B5_BALANCE_ADJUST_AUDIT_QUERY_GREEN_VERIFIED` |
-| Git / code baseline | `da3b4f19 feat: 补齐余额调账路由审计回链` 是本 Grant 开工前已提交基线；本轮 B5-003 变更仍在未提交工作树，待用户另行授权 Git 后提交固化。 |
+| 当前状态 | `B5_BALANCE_ADJUST_AUDIT_QUERY_COMMITTED` |
+| Git / code baseline | `da3b4f19 feat: 补齐余额调账路由审计回链` 是本 Grant 开工前已提交基线；本轮 B5-003 变更已在 `4ef64275 feat: 补齐余额调账独立审计查询` 提交固化。 |
 | Owner | AI Native 流程编排负责 Goal、Loop、状态和停止条件；产品架构专家负责审计展示口径、运营验收和 Not Done；资深架构师负责查询契约、源码锚点、TDD、Review、验证命令和后续实现。 |
 | Wave 边界 | 本确认包只准备一个 B5 审计扩展原子任务；不得并行推进 B7 清算/结算 gate、B7 差异报告、wallet 预交易快照、VCC facade、Spend Rule、运营审批流或泛化运营补账。 |
 | 执行顺序 / 依赖关系 | 依赖 B5-001、B5-002 已完成；本轮已先写独立审计查询 Red，再做最小只读查询实现，最后回写 LWT Goal、W5 和 OpenSpec tasks。 |
@@ -22,7 +22,7 @@
 | 写入范围 | 本文、LWT Goal、GSD-2 工作流、P0/P1 LWT 推进计划、TDD README、docs README 和 OpenSpec tasks 的状态同步；确认 Grant 后的候选代码写入范围见第 7 节。 |
 | 写入文件 | `docs/TDD设计/GSD-2-B5-余额调账审计扩展ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、transaction-face、transaction-impl、ledger-face、ledger-impl、tests、AGENTS.md、B5-001/B5-002 目标测试和最近 Git 提交。 |
-| Git 策略 | `summary_only`。本 Grant 未授权 `git add`、`git commit`、push、PR、merge、rebase、reset 或分支切换。 |
+| Git 策略 | 本确认包生成时为 `summary_only`；用户后续明确要求提交本轮变更后，B5-003 已在验证通过后提交到 `4ef64275`。 |
 
 ## 2. 产品裁决
 
@@ -155,7 +155,7 @@ public interface FundsBalanceAdjustmentAuditApplicationService {
 
 | 字段 | 内容 |
 | --- | --- |
-| 当前阶段 | `Consumed / B5_BALANCE_ADJUST_AUDIT_QUERY_GREEN_VERIFIED / summary_only`。 |
+| 当前阶段 | `Consumed / B5_BALANCE_ADJUST_AUDIT_QUERY_COMMITTED / committed`。 |
 | 下一 owner | 用户确认 Grant 后交给资深架构师进入 TDD / 测试设计和编码实现；AI Native 继续维护 Goal、Loop、状态账本和停止条件。 |
 | 入口契约 | 候选 `FundsBalanceAdjustmentAuditApplicationService`，提供 `findByBusinessSn` 与 `findByTransactionSn` 两个只读查询方法。 |
 | 建议包边界 | `transaction-face` 放 application service、`model/query` Query、`model/dto` DTO；`transaction-impl/application/impl` 做只读聚合实现；`tests` 新增目标服务流测试；优先复用现有交易和账本查询服务，不新增 Mapper、Entity 或 schema。 |
@@ -163,7 +163,7 @@ public interface FundsBalanceAdjustmentAuditApplicationService {
 | 写入上限 | 确认 Grant 后仅允许审计查询契约、DTO/Query、只读查询实现、目标测试和文档状态回写；不得新增 DDL、Entity、Mapper 或运行时配置。 |
 | TDD 切入 | 先写 `B5-AUDIT-QUERY-RED-001`，证明完整审计查询必须能从已有事实聚合证据且无写侧副作用。 |
 | 验证命令 | 目标测试、`just test-balance-control`、`just compile`、`just pmd` 和 `git diff --check`；若触碰公共契约或边界测试，再追加对应分组。 |
-| Git 策略 | 当前仍是 `summary_only`；只有用户另行授权提交，且验证通过、工作树未混入用户无关改动时，才可提交。 |
+| Git 策略 | B5-003 已按用户提交授权固化到 `4ef64275`；后续新 Grant 默认重新确认写入范围和 Git 策略。 |
 | 停止条件 | 需要 DDL/H2 schema、审批状态、运营工单、权限模型、补事实执行、真实资金操作、外部 processor payload 或敏感字段返回时停止。 |
 
 ### 5.3 Production Loop Card
@@ -275,7 +275,7 @@ Execution Grant：GSD2-B5-BALANCE-ADJUST-AUDIT-003
 - `Execution Grant` 只授权 B5-003 一个原子任务，不继承 B5-002、B7、AUTH、wallet 或 ledger guard 的旧授权。
 - “只读查询”表示服务可以读取交易事实、交易明细、route snapshot、ledger transaction 和 LedgerEntry，不能创建、重放、补写或修复任何资金事实。
 - “最小服务流”表示首个 Red 优先证明完整审计查询、敏感字段不泄露和查询无写侧副作用；不把运营审批闭环放入本 Grant。
-- Git 策略仍是 `summary_only`；如需提交，必须用户另行明确授权，且验证通过、工作树未混入无关改动。
+- B5-003 已按用户提交授权固化到 `4ef64275`；后续若继续推进新 Grant，必须重新确认写入范围、验证命令和 Git 策略。
 
 ## 10. Grant 消费预检清单
 
@@ -285,13 +285,13 @@ Execution Grant：GSD2-B5-BALANCE-ADJUST-AUDIT-003
 | --- | --- | --- |
 | 用户授权 | 用户明确回复 `Execution Grant：GSD2-B5-BALANCE-ADJUST-AUDIT-003` 或等价确认。 | 未确认前只允许 docs-only 状态维护或只读 Gap Audit。 |
 | 工作树状态 | `git status --short` 只包含本 Grant 可解释的变更，且没有影响目标文件的用户未归属改动。 | 先收口或请用户确认保留/隔离策略。 |
-| 当前基线 | 以 `da3b4f19 feat: 补齐余额调账路由审计回链` 之后的当前工作树为准。 | 若 HEAD 或工作树已变化，先重新读取 B5-003 确认包、LWT Goal、W5 和 OpenSpec tasks。 |
+| 当前基线 | 以 `4ef64275 feat: 补齐余额调账独立审计查询` 之后的当前工作树为准。 | 若 HEAD 或工作树已变化，先重新读取 B5-003 确认包、LWT Goal、W5 和 OpenSpec tasks。 |
 | 首个 Red 收窄 | 默认选择 `B5-AUDIT-QUERY-RED-001`；若现有代码已满足，则改用 `B5-AUDIT-QUERY-RED-002` 或 `B5-AUDIT-QUERY-RED-003`。 | 不得直接写 Green；先证明缺口或记录现有证据。 |
 | 写入范围 | 仅 `transaction-face` 查询契约/DTO/Query、`transaction-impl` 只读聚合、目标测试和状态文档。 | 需要 DDL、Entity、Mapper、审批、运营后台、权限或补事实时停止。 |
 | 只读来源 | 复用 `FundsTransactionQueryService`、`LedgerTransactionService`、route snapshot 和 B5-001/B5-002 已有事实来源。 | 不跨过 face 直接读 ledger DAL，不调用生命周期 saver 反向补事实。 |
 | 验证顺序 | 目标测试 -> `just test-balance-control` -> `just compile` -> `just pmd` -> `git diff --check`；必要时追加 boundary / governance 分组。 | 验证失败先按本 Grant 修复；越界才暂停确认。 |
 | 状态回写 | Green 后必须回写本文、LWT Goal、W5、TDD README、docs README 和 OpenSpec tasks。 | 没有状态回写不得进入下一 Grant。 |
-| Git 策略 | 默认 `summary_only`；未获 Git 授权时只给建议提交单元和 commit message。 | 不执行 `git add` / `git commit`。 |
+| Git 策略 | B5-003 已提交固化；后续新 Grant 默认 `summary_only`，除非用户明确授权提交。 | 未获 Git 授权时只给建议提交单元和 commit message。 |
 
 ## 11. Grant 消费运行卡
 
@@ -328,7 +328,7 @@ Execution Grant：GSD2-B5-BALANCE-ADJUST-AUDIT-003
 
 | 字段 | 内容 |
 | --- | --- |
-| 消费状态 | `B5_BALANCE_ADJUST_AUDIT_QUERY_GREEN_VERIFIED`。 |
+| 消费状态 | `B5_BALANCE_ADJUST_AUDIT_QUERY_COMMITTED`。 |
 | Red 证据 | `FundsBalanceAdjustAuditFlowTests` 新增外部余额异常纠偏调账审计查询用例；Red 阶段证明缺少余额调账独立审计查询 application service、Query、DTO 和完整性状态。 |
 | Green 实现 | 新增 `FundsBalanceAdjustmentAuditApplicationService`、`FundsBalanceAdjustmentAuditQuery`、`FundsBalanceAdjustmentAuditDTO`、`FundsBalanceAdjustmentAuditCompleteness` 和 `DefaultFundsBalanceAdjustmentAuditApplicationService`；实现以 `FundsTransactionQueryService.findFundsTransactionByBusiness` 或交易流水定位资金交易主事实，再只读聚合交易明细上下文、route snapshot、ledger transaction 和 LedgerEntry。 |
 | 安全边界 | 审计查询过滤 `externalAccountRef`、PAN、CVV、secret、password、token 和 raw payload 等敏感上下文；只返回安全审计摘要，不返回完整外部账户或 processor 原始载荷。 |
@@ -336,6 +336,6 @@ Execution Grant：GSD2-B5-BALANCE-ADJUST-AUDIT-003
 | 资金副作用边界 | 查询服务不调用 posting、更新、删除、replay、生命周期 saver 或补事实入口；目标测试断言查询前后余额、账本交易和分录数量不变，不为不完整链路补写账本事实。 |
 | 关联修复 | `FundsBenefitSpecValidators` 允许 contextVariables 中的精确 Money value object `{amount,currency}`，用于承载 `negativeAvailableSingleLimit` 等风控阈值，同时继续阻断顶层或非 Money 结构的核心权益金额字段。 |
 | 验证命令 | `just test-one FundsBalanceAdjustAuditFlowTests tests` 非 sandbox 通过；sandbox 内该 Spring 测试因 embedded Redis 端口被拒绝失败，已按环境问题复跑确认。`just test-one DefaultRouteReplayServiceTests tests`、`just test-one LedgerDtoContextVariablesContractTests tests` 已通过；其余分组和静态门禁见本轮交付说明。 |
-| Git 策略 | 本轮仍为 `summary_only`，未执行 Git 提交；后续如需提交需用户另行授权。 |
+| Git 策略 | 本轮已按用户提交授权执行 Git 提交，提交点为 `4ef64275 feat: 补齐余额调账独立审计查询`。 |
 | Not Done | 不新增独立审计表、运营审批流、运营工单、权限模型、泛化运营补账、补事实执行、对账差错创建、清算/结算处理、真实资金操作、生产迁移或后台页面。 |
 | 下一候选 | 本 Grant 不得复用继续扩审批或补事实；下一轮建议在 B7 清算/结算 gate 消费、B7 差异报告、wallet 完整预交易快照或其他单一 Grant 中重新确认。 |
