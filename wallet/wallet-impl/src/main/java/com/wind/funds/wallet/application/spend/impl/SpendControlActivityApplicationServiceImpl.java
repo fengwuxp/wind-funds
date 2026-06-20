@@ -144,6 +144,9 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(query.getBudgetGroupSn(), "预算组标识不能为空");
         AssertUtils.notNull(query.getCurrency(), "币种不能为空");
+        if (query.getTargetAccountId() != null) {
+            assertSupportedTargetSubjectType(targetSubjectType(query.getTargetAccountId()));
+        }
     }
 
     private SpendControlActivity findByActivitySn(Long tenantId, String activitySn) {
@@ -276,6 +279,10 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.spendRuleId.eq(query.getSpendRuleId()))
                 .and(ref.spendRuleVersion.eq(query.getSpendRuleVersion()));
+        if (query.getTargetAccountId() != null) {
+            wrapper.and(ref.targetSubjectId.eq(query.getTargetAccountId().id()))
+                    .and(ref.targetSubjectType.eq(targetSubjectType(query.getTargetAccountId())));
+        }
         wrapper.orderBy(ref.id.asc());
         return wrapper;
     }
@@ -328,6 +335,7 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .setCurrency(query.getCurrency())
                 .setSpendRuleId(query.getSpendRuleId())
                 .setSpendRuleVersion(query.getSpendRuleVersion())
+                .setTargetAccountId(query.getTargetAccountId())
                 .setReservedAmount(reservedAmount)
                 .setConsumedAmount(consumedAmount)
                 .setReleasedAmount(releasedAmount)

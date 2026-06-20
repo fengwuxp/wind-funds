@@ -91,6 +91,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String CREDIT_ACCOUNT_SN = "sctc_credit_account";
 
+    private static final String SECOND_CREDIT_ACCOUNT_SN = "sctc_second_credit_account";
+
     private static final String PAYMENT_INSTRUMENT_SN = "sctc_card";
 
     private static final String PAYMENT_BINDING_SN = "sctc_binding";
@@ -153,6 +155,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private static final String OVER_CONSUME_ACTIVITY_SN = "activity_over_consumed_001";
 
     private static final String RESERVED_ACTIVITY_SN = "activity_reserved_for_consume_001";
+
+    private static final String SECOND_RESERVED_ACTIVITY_SN = "activity_reserved_for_second_account_001";
 
     private static final String SPEND_RULE_ID = "sr_vcc_transaction_daily_limit";
 
@@ -266,6 +270,56 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                         "sha256:sctc-consumed"));
         assertThat(replayed.getId()).isEqualTo(activity.getId());
         assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一预算组和 Spend Rule 下存在多个目标账户，交易成功只消费其中一个账户的控制占用。
+     * 输入：两个信用账户分别存在 RESERVED 控制活动，其中一个账户发生成功资金交易并记录 CONSUMED。
+     * 输出：按目标账户查询预算控制投影时，只解释该账户的占用和消费。
+     * 红线：交易消费服务不得让同预算组下其他账户或其他卡的控制活动污染当前账户投影。
+     */
+    @Test
+    void testConsumeProjectionShouldFilterTargetAccountWithoutMixingOtherAccountActivities() {
+        prepareSpendControlTransactionConsumptionData();
+        creditAccountService.createCreditAccount(createCreditAccountRequest().setSn(SECOND_CREDIT_ACCOUNT_SN));
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, SECOND_RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-second-account-reserved")
+                .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
+                        FundsSubjectType.CREDIT_ACCOUNT))
+                .setAmount(40L));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-consumed"));
+
+        BudgetControlProjectionDTO primaryProjection = spendControlActivityApplicationService
+                .getBudgetControlProjection(projectionQuery()
+                        .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
+                                FundsSubjectType.CREDIT_ACCOUNT)));
+        assertThat(primaryProjection.getTargetAccountId())
+                .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
+        assertThat(primaryProjection.getReservedAmount()).isEqualTo(60L);
+        assertThat(primaryProjection.getConsumedAmount()).isEqualTo(60L);
+        assertThat(primaryProjection.getReleasedAmount()).isZero();
+        assertThat(primaryProjection.getRemainingControlAmount()).isZero();
+        assertThat(primaryProjection.getLastActivitySn()).isEqualTo(CONSUME_ACTIVITY_SN);
+
+        BudgetControlProjectionDTO secondProjection = spendControlActivityApplicationService
+                .getBudgetControlProjection(projectionQuery()
+                        .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
+                                FundsSubjectType.CREDIT_ACCOUNT)));
+        assertThat(secondProjection.getReservedAmount()).isEqualTo(40L);
+        assertThat(secondProjection.getConsumedAmount()).isZero();
+        assertThat(secondProjection.getReleasedAmount()).isZero();
+        assertThat(secondProjection.getRemainingControlAmount()).isEqualTo(40L);
+        assertThat(secondProjection.getLastActivitySn()).isEqualTo(SECOND_RESERVED_ACTIVITY_SN);
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -1199,7 +1253,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn = ?", PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn = ?", PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", CREDIT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", SECOND_CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", CREDIT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", SECOND_CREDIT_ACCOUNT_SN);
     }
 
     @Configuration

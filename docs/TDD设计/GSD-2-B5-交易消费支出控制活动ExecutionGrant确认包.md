@@ -12,7 +12,7 @@
 | 原子任务 | 在服务层补齐交易结果对 Spend Rule 控制活动的消费、释放、冲正和投影解释边界。 |
 | 所属阶段 | GSD-2 / B5 Spend Rule / Transaction consumption admission / refund reference fact business guard green verified。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
-| 当前状态 | `SR_TRANSACTION_REFUND_REFERENCE_FACT_BUSINESS_GUARD_GREEN_VERIFIED` |
+| 当前状态 | `SR_TRANSACTION_BUDGET_PROJECTION_TARGET_ACCOUNT_GUARD_GREEN_VERIFIED` |
 | 当前基线 | 本 Grant 已消费并随本提交固化；历史基线包含 `3b31d6e0 docs: 同步资金服务层提交状态`、`a5b12a3f feat: 收敛资金服务层交付基线`、`78f7f008 feat: 补齐支出控制活动与预算投影`、`021ee2ce feat: 补齐支出控制准入快照`。 |
 | Owner | AI Native 流程编排负责确认包、状态和停止条件；产品架构专家负责业务目标、验收和 Not Done；资深架构师负责接口契约、事务边界、测试和验证命令；用户确认单一 Grant。 |
 | 写入范围 | `SpendControlTransactionConsumptionApplicationServiceImpl` 退款引用原交易业务一致性守卫、`SpendControlTransactionConsumptionApplicationServiceTests` 目标回归，以及本文、LWT Goal、W5 推进计划、TDD / docs README 和 OpenSpec tasks 的状态同步。 |
@@ -596,3 +596,17 @@ Not Done：
 | 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 21 tests 通过，组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 28 tests 通过；收口执行 `just compile`、`just pmd` 和 `git diff --check`。 |
 | 当前状态 | `SR_TRANSACTION_REFUND_REFERENCE_FACT_BUSINESS_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |
+
+### 14.14 预算控制投影目标账户隔离守卫补充记录（2026-06-20）
+
+本节记录 `GSD2-B5-SR-TRANSACTION-BUDGET-PROJECTION-TARGET-ACCOUNT-GUARD-014` 的实际执行结果。该补片只补预算控制投影按目标资金账户或信用账户过滤的服务层能力，并在交易消费服务流中证明同一预算组和同一 Spend Rule 下不同账户控制活动不会串入当前账户投影；不重新打开 Controller、HTTP/RPC、支付工具 `REFUND` 能力方向、交易 canonical 入参或 ledger posting。
+
+| 字段 | 内容 |
+| --- | --- |
+| 补充任务 | `GSD2-B5-SR-TRANSACTION-BUDGET-PROJECTION-TARGET-ACCOUNT-GUARD-014`。 |
+| 写入范围 | `BudgetControlProjectionQuery`、`BudgetControlProjectionDTO`、`SpendControlActivityApplicationServiceImpl`、`SpendControlActivityApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、推进计划、TDD 清单、docs 索引和 OpenSpec tasks 状态同步。 |
+| 已完成能力 | 预算控制投影可传入 `targetAccountId`，按目标资金账户或信用账户过滤控制活动；不传时仍保留预算控制范围级聚合投影。交易消费服务测试证明同预算组、同 Spend Rule 下其他账户或其他卡的 `RESERVED` 控制活动不会污染当前账户的 `CONSUMED` 投影解释。 |
+| 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
+| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 22 tests 通过，组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 31 tests 通过；收口执行 `just compile`、`just pmd`、边界关键词扫描和 `git diff --check` 通过。 |
+| 当前状态 | `SR_TRANSACTION_BUDGET_PROJECTION_TARGET_ACCOUNT_GUARD_GREEN_VERIFIED`。 |
+| Not Done | 释放上限是否进一步按目标账户隔离、完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |

@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.model.dto;
 
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -42,6 +43,9 @@ public class BudgetControlProjectionDTO implements Serializable {
 
     @Schema(description = "Spend Rule 版本")
     private String spendRuleVersion;
+
+    @Schema(description = "控制活动目标资金账户或信用账户标识，空表示预算控制范围级聚合投影")
+    private FundsAccountId targetAccountId;
 
     @Schema(description = "控制占用金额，最小货币单位")
     private Long reservedAmount;

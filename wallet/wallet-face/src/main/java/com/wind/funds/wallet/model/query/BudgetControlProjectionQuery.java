@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.model.query;
 
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -46,4 +47,7 @@ public class BudgetControlProjectionQuery implements Serializable {
 
     @Schema(description = "Spend Rule 版本")
     private String spendRuleVersion;
+
+    @Schema(description = "控制活动目标资金账户或信用账户标识，不传时按预算控制范围聚合")
+    private FundsAccountId targetAccountId;
 }

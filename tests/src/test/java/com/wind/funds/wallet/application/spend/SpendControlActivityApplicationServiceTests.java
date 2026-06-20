@@ -73,6 +73,8 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
 
     private static final String CREDIT_ACCOUNT_SN = "sca_credit_account";
 
+    private static final String SECOND_CREDIT_ACCOUNT_SN = "sca_second_credit_account";
+
     private static final String PAYMENT_INSTRUMENT_SN = "spend_control_activity_card";
 
     private static final String PAYMENT_BINDING_SN = "spend_control_activity_binding";
@@ -106,6 +108,8 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
     private static final String RESERVED_ACTIVITY_SN = "activity_reserved_001";
 
     private static final String RELEASED_ACTIVITY_SN = "activity_released_001";
+
+    private static final String SECOND_RESERVED_ACTIVITY_SN = "activity_reserved_second_account_001";
 
     @Autowired
     private CreditAccountService creditAccountService;
@@ -300,6 +304,47 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
     }
 
     /**
+     * 场景：同一预算组和 Spend Rule 下存在多个目标账户控制活动。
+     * 输入：两个信用账户分别记录控制占用。
+     * 输出：传入目标账户查询投影时，只返回该账户的控制占用。
+     * 红线：预算组级投影可以汇总，但账户级投影不得把其他账户或其他卡的控制占用混入。
+     */
+    @Test
+    void testBudgetControlProjectionShouldFilterByTargetAccountWithoutMixingAccounts() {
+        prepareSpendControlActivityData();
+        creditAccountService.createCreditAccount(createCreditAccountRequest().setSn(SECOND_CREDIT_ACCOUNT_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:activity-reserved"));
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, SECOND_RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:activity-second-account-reserved")
+                .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
+                        FundsSubjectType.CREDIT_ACCOUNT))
+                .setAmount(40L));
+
+        BudgetControlProjectionDTO projection = spendControlActivityApplicationService.getBudgetControlProjection(
+                new BudgetControlProjectionQuery()
+                        .setTenantId(TENANT_ID)
+                        .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setSpendRuleId(SPEND_RULE_ID)
+                        .setSpendRuleVersion(SPEND_RULE_VERSION)
+                        .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
+                                FundsSubjectType.CREDIT_ACCOUNT)));
+
+        assertThat(projection.getTargetAccountId())
+                .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
+        assertThat(projection.getReservedAmount()).isEqualTo(60L);
+        assertThat(projection.getConsumedAmount()).isZero();
+        assertThat(projection.getReleasedAmount()).isZero();
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(60L);
+        assertThat(projection.getLastActivitySn()).isEqualTo(RESERVED_ACTIVITY_SN);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：查询控制活动时传入非资金账户或信用账户主体。
      * 输入：预算组类型的目标主体。
      * 输出：直接拒绝查询条件。
@@ -313,6 +358,29 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         assertThatThrownBy(() -> spendControlActivityApplicationService.queryActivities(
                 new SpendControlActivityQuery()
                         .setTenantId(TENANT_ID)
+                        .setTargetAccountId(FundsAccountId.immutable(BUDGET_GROUP_SN,
+                                FundsSubjectType.BUDGET_GROUP))))
+                .hasMessageContaining("控制活动目标只能是资金账户或信用账户");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：查询预算控制投影时传入非资金账户或信用账户主体。
+     * 输入：预算组类型的目标主体。
+     * 输出：直接拒绝查询条件。
+     * 红线：账户级预算控制投影只能按资金账户或信用账户过滤，不能把预算组重新打开成目标主体。
+     */
+    @Test
+    void testBudgetControlProjectionShouldRejectUnsupportedTargetSubjectType() {
+        prepareSpendControlActivityData();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlActivityApplicationService.getBudgetControlProjection(
+                new BudgetControlProjectionQuery()
+                        .setTenantId(TENANT_ID)
+                        .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setCurrency(CurrencyIsoCode.USD)
                         .setTargetAccountId(FundsAccountId.immutable(BUDGET_GROUP_SN,
                                 FundsSubjectType.BUDGET_GROUP))))
                 .hasMessageContaining("控制活动目标只能是资金账户或信用账户");
@@ -458,7 +526,9 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn = ?", PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn = ?", PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", CREDIT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", SECOND_CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", CREDIT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", SECOND_CREDIT_ACCOUNT_SN);
     }
 
     private int activityCount(String activitySn) {
