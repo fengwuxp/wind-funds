@@ -20,6 +20,10 @@ public enum SpendControlActivityType implements DescriptiveEnum {
 
     RESERVED("控制占用"),
 
+    CONSUMED("控制消耗"),
+
+    REFUND_COMPENSATED("退款控制补偿"),
+
     RELEASED("控制释放"),
 
     EXPIRED("控制过期"),

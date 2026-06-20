@@ -161,6 +161,8 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .and(ref.activityType.eq(query.getActivityType()))
                 .and(ref.businessScene.eq(query.getBusinessScene()))
                 .and(ref.businessSn.eq(query.getBusinessSn()))
+                .and(ref.originalActivitySn.eq(query.getOriginalActivitySn()))
+                .and(ref.transactionSn.eq(query.getTransactionSn()))
                 .and(ref.instrumentSn.eq(query.getInstrumentSn()))
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.spendRuleId.eq(query.getSpendRuleId()))
@@ -209,13 +211,21 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
     private BudgetControlProjectionDTO toProjection(BudgetControlProjectionQuery query,
                                                     List<SpendControlActivity> activities) {
         List<SpendControlActivity> budgetActivities = activities.stream()
-                .filter(activity -> activity.getActivityType() == SpendControlActivityType.RESERVED
-                        || isReleaseActivity(activity.getActivityType()))
+                .filter(activity -> isBudgetActivity(activity.getActivityType()))
                 .toList();
         long reservedAmount = budgetActivities.stream()
                 .filter(activity -> activity.getActivityType() == SpendControlActivityType.RESERVED)
                 .mapToLong(SpendControlActivity::getAmount)
                 .sum();
+        long grossConsumedAmount = budgetActivities.stream()
+                .filter(activity -> activity.getActivityType() == SpendControlActivityType.CONSUMED)
+                .mapToLong(SpendControlActivity::getAmount)
+                .sum();
+        long refundCompensatedAmount = budgetActivities.stream()
+                .filter(activity -> activity.getActivityType() == SpendControlActivityType.REFUND_COMPENSATED)
+                .mapToLong(SpendControlActivity::getAmount)
+                .sum();
+        long consumedAmount = grossConsumedAmount - refundCompensatedAmount;
         long releasedAmount = budgetActivities.stream()
                 .filter(activity -> isReleaseActivity(activity.getActivityType()))
                 .mapToLong(SpendControlActivity::getAmount)
@@ -228,8 +238,9 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .setSpendRuleId(query.getSpendRuleId())
                 .setSpendRuleVersion(query.getSpendRuleVersion())
                 .setReservedAmount(reservedAmount)
+                .setConsumedAmount(consumedAmount)
                 .setReleasedAmount(releasedAmount)
-                .setRemainingControlAmount(reservedAmount - releasedAmount)
+                .setRemainingControlAmount(reservedAmount - consumedAmount - releasedAmount)
                 .setLastActivitySn(lastActivity == null ? null : lastActivity.getActivitySn())
                 .setLastActivityAt(lastActivity == null ? null : lastActivity.getGmtCreate());
     }
@@ -242,6 +253,8 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         result.setActivityType(request.getActivityType());
         result.setBusinessScene(request.getBusinessScene());
         result.setBusinessSn(request.getBusinessSn());
+        result.setOriginalActivitySn(request.getOriginalActivitySn());
+        result.setTransactionSn(request.getTransactionSn());
         result.setInstrumentSn(request.getInstrumentSn());
         result.setAction(request.getAction());
         result.setTargetSubjectId(request.getTargetAccountId().id());
@@ -271,6 +284,8 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .setActivityType(entity.getActivityType())
                 .setBusinessScene(entity.getBusinessScene())
                 .setBusinessSn(entity.getBusinessSn())
+                .setOriginalActivitySn(entity.getOriginalActivitySn())
+                .setTransactionSn(entity.getTransactionSn())
                 .setInstrumentSn(entity.getInstrumentSn())
                 .setAction(entity.getAction())
                 .setTargetAccountId(FundsAccountId.immutable(entity.getTargetSubjectId(),
@@ -313,6 +328,8 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
 
     private boolean isBudgetActivity(SpendControlActivityType type) {
         return type == SpendControlActivityType.RESERVED
+                || type == SpendControlActivityType.CONSUMED
+                || type == SpendControlActivityType.REFUND_COMPENSATED
                 || type == SpendControlActivityType.RELEASED
                 || type == SpendControlActivityType.EXPIRED
                 || type == SpendControlActivityType.REVERSED;

@@ -964,14 +964,15 @@ Replay 语义边界：
 | 预算组 | BudgetGroup 上下文、预算控制视图、预留和释放证据。 | 预算使用视图、预算维度账单、预算差异报告。 | 预算组作为 route leg、posting plan 或 `LedgerEntry` 主体。 |
 | Spend Rule | rule snapshot、规则决策日志、Spend Control Activity。 | 规则命中时间线、拒绝原因、预留/释放解释视图。 | 规则通过等同资金可用，或规则记录直接生成资金交易。 |
 
-Spend Control Activity 是控制事实 DSL，不是资金事实 DSL。它只描述某个业务流水在某个规则版本、预算 scope 和目标账户主体下发生了准入记录、拒绝记录、预算预留、预算释放、过期、撤销或退款释放等控制事件。它可以作为 `TransactionView` 的输入，也可以派生预算控制投影；但不能生成 `RouteLeg`、`PostingPlan`、`LedgerEntry`、`LedgerTransaction` 或 `BalanceProjection`。
+Spend Control Activity 是控制事实 DSL，不是资金事实 DSL。它只描述某个业务流水在某个规则版本、预算 scope 和目标账户主体下发生了准入记录、拒绝记录、预算预留、交易成功消耗、预算释放、过期、撤销或退款释放等控制事件。它可以作为 `TransactionView` 的输入，也可以派生预算控制投影；但不能生成 `RouteLeg`、`PostingPlan`、`LedgerEntry`、`LedgerTransaction` 或 `BalanceProjection`。
 
 | 控制事实 DSL 字段 | 含义 | 禁止 |
 | --- | --- | --- |
 | `activitySn` | 控制活动幂等流水。 | 复用资金交易流水替代控制活动流水。 |
-| `activityType` | `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`RELEASED`、`EXPIRED`、`REVERSED` 等控制动作。 | 用控制动作表达真实资金消费、入账、冻结或调账。 |
+| `activityType` | `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`CONSUMED`、`RELEASED`、`EXPIRED`、`REVERSED` 等控制动作；`CONSUMED` 是下一 Grant 推荐的交易成功消耗语义，是否进入代码以授权为准。 | 用控制动作表达真实资金消费、入账、冻结或调账；把交易成功消耗和失败释放混用同一活动类型。 |
 | `targetSubjectRef` | 已解析资金账户、信用账户或平台角色解析后的平台资金账户。 | 预算组、Spend Rule、支付工具、卡号、PAN、token 或外部账户成为目标主体。 |
 | `budgetGroupRef` / `ruleRef` | 预算 scope、规则 ID、规则版本和规则决策证据。 | 规则通过直接生成 route、posting、entry 或余额投影。 |
+| `transactionRef` / `originalActivityRef` | 交易后控制消费、释放或退款释放时回链原资金交易和原控制活动。 | 缺原控制活动或原交易时补写控制消费事实，或由控制活动反向修改交易事实。 |
 | `activityDigest` | 控制活动摘要，用于幂等、回放和对账追踪。 | 用摘要替代核心字段校验，或允许同流水不同摘要覆盖旧事实。 |
 
 ### 7.9 扩展与治理 DSL 边界

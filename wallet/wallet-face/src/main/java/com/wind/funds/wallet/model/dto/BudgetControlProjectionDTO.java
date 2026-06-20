@@ -46,6 +46,9 @@ public class BudgetControlProjectionDTO implements Serializable {
     @Schema(description = "控制占用金额，最小货币单位")
     private Long reservedAmount;
 
+    @Schema(description = "控制消耗金额，最小货币单位")
+    private Long consumedAmount;
+
     @Schema(description = "控制释放金额，最小货币单位")
     private Long releasedAmount;
 

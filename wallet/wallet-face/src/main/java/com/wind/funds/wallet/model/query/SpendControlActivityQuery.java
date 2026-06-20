@@ -46,6 +46,12 @@ public class SpendControlActivityQuery implements Serializable {
     @Schema(description = "业务流水号或请求幂等号")
     private String businessSn;
 
+    @Schema(description = "原支出控制活动流水号")
+    private String originalActivitySn;
+
+    @Schema(description = "资金交易流水号")
+    private String transactionSn;
+
     @Schema(description = "支付工具号")
     private String instrumentSn;
 

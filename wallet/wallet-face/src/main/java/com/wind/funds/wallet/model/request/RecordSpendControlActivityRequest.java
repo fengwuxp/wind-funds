@@ -53,6 +53,12 @@ public class RecordSpendControlActivityRequest implements Serializable {
     @NotBlank
     private String businessSn;
 
+    @Schema(description = "原支出控制活动流水号，用于交易消费、释放或退款补偿回链")
+    private String originalActivitySn;
+
+    @Schema(description = "已存在的资金交易流水号，用于交易结果消费控制活动回链")
+    private String transactionSn;
+
     @Schema(description = "支付工具号")
     @NotBlank
     private String instrumentSn;
