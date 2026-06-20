@@ -58,6 +58,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         SpendControlActivityDTO originalActivity = getOriginalReservedActivity(request);
         FundsTransactionDTO transaction = getExistingFundsTransaction(request);
         assertReleasableTransaction(request, transaction);
+        AssertUtils.isTrue(transaction.getTransactionType() != DefaultFundsTransactionType.REFUND,
+                "控制释放不能使用退款交易事实，transactionSn = {}", request.getTransactionSn());
         assertControlActivityMatchesOriginalActivity(request, originalActivity, "控制释放");
         assertControlActivityMatchesTransaction(request, transaction, "控制释放");
         assertEnoughRemainingControlAmount(request, originalActivity, "控制释放金额超过原占用剩余额度");

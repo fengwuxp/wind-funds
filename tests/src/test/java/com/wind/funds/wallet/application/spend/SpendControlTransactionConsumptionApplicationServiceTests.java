@@ -131,6 +131,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_001";
 
+    private static final String FAILED_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_failed_001";
+
     @Autowired
     private CreditAccountService creditAccountService;
 
@@ -275,6 +277,33 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(projection.getLastActivitySn()).isEqualTo(RELEASE_ACTIVITY_SN);
 
         assertThat(fundsTransactionCount(FAILED_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：上游返回失败的退款交易事实，调用方误用 release 释放原控制占用。
+     * 输入：已有 RESERVED 控制活动和失败 REFUND 资金交易事实。
+     * 输出：请求被拒绝，不写新的控制活动。
+     * 红线：退款交易只能走退款补偿语义，不得被降级为普通失败释放，也不得写 route、posting 或账本事实。
+     */
+    @Test
+    void testReleaseWithFailedRefundTransactionShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertFundsTransaction(FAILED_REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_FAILED_001",
+                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD,
+                FUNDS_TRANSACTION_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.release(
+                consumptionRequest(RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FAILED_REFUND_TRANSACTION_SN,
+                        "sha256:sctc-release-refund-conflict")))
+                .hasMessageContaining("控制释放不能使用退款交易事实");
+
+        assertThat(activityCount(RELEASE_ACTIVITY_SN)).isZero();
+        assertThat(fundsTransactionCount(FAILED_REFUND_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
