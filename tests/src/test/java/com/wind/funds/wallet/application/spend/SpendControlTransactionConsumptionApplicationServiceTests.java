@@ -113,6 +113,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String REFUND_ACTIVITY_SN = "activity_refund_compensated_001";
 
+    private static final String NON_REFUND_ACTIVITY_SN = "activity_non_refund_compensated_001";
+
     private static final String OVER_CONSUME_ACTIVITY_SN = "activity_over_consumed_001";
 
     private static final String RESERVED_ACTIVITY_SN = "activity_reserved_for_consume_001";
@@ -378,6 +380,40 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
         assertThat(fundsTransactionCount(REFUND_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方把普通成功交易事实误用到退款控制补偿。
+     * 输入：已有 RESERVED、CONSUMED 控制活动和 CLOSED PAY 资金交易事实。
+     * 输出：请求被拒绝，不写新的退款控制补偿活动。
+     * 红线：退款控制补偿只能解释已有退款交易事实，不得把普通成功交易降级为退款补偿语义。
+     */
+    @Test
+    void testRefundWithNonRefundTransactionShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
+        spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-consumed"));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
+                consumptionRequest(NON_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-non-refund-compensated")))
+                .hasMessageContaining("退款控制补偿必须使用退款交易事实");
+
+        assertThat(activityCount(NON_REFUND_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+        BudgetControlProjectionDTO projection = spendControlActivityApplicationService.getBudgetControlProjection(
+                projectionQuery());
+        assertThat(projection.getConsumedAmount()).isEqualTo(60L);
+        assertThat(projection.getRemainingControlAmount()).isZero();
+        assertThat(projection.getLastActivitySn()).isEqualTo(CONSUME_ACTIVITY_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
