@@ -107,6 +107,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String CONSUME_ACTIVITY_SN = "activity_consumed_001";
 
+    private static final String REFUND_CONSUME_ACTIVITY_SN = "activity_refund_consumed_001";
+
     private static final String RELEASE_ACTIVITY_SN = "activity_released_001";
 
     private static final String REFUND_ACTIVITY_SN = "activity_refund_compensated_001";
@@ -204,6 +206,33 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(replayed.getId()).isEqualTo(activity.getId());
         assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方把已关闭的退款资金交易事实误用到 Spend Rule 控制消费。
+     * 输入：已有 RESERVED 控制活动和 CLOSED REFUND 资金交易事实。
+     * 输出：请求被拒绝，不写新的控制活动。
+     * 红线：退款交易只能走退款补偿语义，不得被降级为普通成功消费，也不得写 route、posting 或账本事实。
+     */
+    @Test
+    void testConsumeWithRefundTransactionShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_FOR_CONSUME_001",
+                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 60L, CurrencyIsoCode.USD,
+                FUNDS_TRANSACTION_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(REFUND_CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
+                        "sha256:sctc-consume-refund-conflict")))
+                .hasMessageContaining("控制消费不能使用退款交易事实");
+
+        assertThat(activityCount(REFUND_CONSUME_ACTIVITY_SN)).isZero();
+        assertThat(fundsTransactionCount(REFUND_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
