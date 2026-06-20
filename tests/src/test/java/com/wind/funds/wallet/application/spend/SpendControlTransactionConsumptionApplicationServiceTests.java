@@ -117,6 +117,10 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String REFUND_CONSUME_ACTIVITY_SN = "activity_refund_consumed_001";
 
+    private static final String SMALL_CONSUME_ACTIVITY_SN = "activity_small_consumed_001";
+
+    private static final String LARGE_CONSUME_ACTIVITY_SN = "activity_large_consumed_001";
+
     private static final String RELEASE_ACTIVITY_SN = "activity_released_001";
 
     private static final String CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN = "activity_cross_business_sn_released_001";
@@ -124,6 +128,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private static final String REFUND_ACTIVITY_SN = "activity_refund_compensated_001";
 
     private static final String UNLINKED_REFUND_ACTIVITY_SN = "activity_refund_unlinked_001";
+
+    private static final String OVER_REFERENCE_REFUND_ACTIVITY_SN = "activity_refund_over_reference_001";
 
     private static final String NON_REFUND_ACTIVITY_SN = "activity_non_refund_compensated_001";
 
@@ -147,6 +153,10 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String CROSS_BUSINESS_SN_TRANSACTION_SN = "funds_transaction_sctc_cross_business_sn_001";
 
+    private static final String SMALL_CONSUME_TRANSACTION_SN = "funds_transaction_sctc_small_consume_001";
+
+    private static final String LARGE_CONSUME_TRANSACTION_SN = "funds_transaction_sctc_large_consume_001";
+
     private static final String FAILED_TRANSACTION_SN = "funds_transaction_sctc_failed_001";
 
     private static final String CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN =
@@ -155,6 +165,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private static final String REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_001";
 
     private static final String UNLINKED_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_unlinked_001";
+
+    private static final String OVER_REFERENCE_REFUND_TRANSACTION_SN =
+            "funds_transaction_sctc_refund_over_reference_001";
 
     private static final String FAILED_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_failed_001";
 
@@ -518,6 +531,58 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(projection.getReleasedAmount()).isZero();
         assertThat(projection.getRemainingControlAmount()).isEqualTo(60L);
         assertThat(projection.getLastActivitySn()).isEqualTo(RESERVED_ACTIVITY_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一原占用下存在多笔已消费控制活动，退款交易只引用其中一笔较小消费。
+     * 输入：已消费 20 和 40 的控制活动，退款交易引用 20 的原交易但请求补偿 40。
+     * 输出：请求被拒绝，不写新的退款控制补偿活动。
+     * 红线：退款补偿金额只能基于退款交易引用的已消费控制活动净额，
+     * 不得借用同一原占用下其他消费活动的净额。
+     */
+    @Test
+    void testRefundOverReferencedConsumedAmountShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertSucceededFundsTransaction(SMALL_CONSUME_TRANSACTION_SN, BUSINESS_SN + "_SMALL", 20L,
+                CurrencyIsoCode.USD);
+        insertSucceededFundsTransaction(LARGE_CONSUME_TRANSACTION_SN, BUSINESS_SN + "_LARGE", 40L,
+                CurrencyIsoCode.USD);
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, SMALL_CONSUME_ACTIVITY_SN,
+                SpendControlActivityType.CONSUMED, "sha256:sctc-small-consumed")
+                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(SMALL_CONSUME_TRANSACTION_SN)
+                .setAmount(20L));
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, LARGE_CONSUME_ACTIVITY_SN,
+                SpendControlActivityType.CONSUMED, "sha256:sctc-large-consumed")
+                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(LARGE_CONSUME_TRANSACTION_SN)
+                .setAmount(40L));
+        insertFundsTransaction(OVER_REFERENCE_REFUND_TRANSACTION_SN,
+                "SPEND_CONTROL_TRANSACTION_REFUND_OVER_REFERENCE_001",
+                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                SMALL_CONSUME_TRANSACTION_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
+                consumptionRequest(OVER_REFERENCE_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                        OVER_REFERENCE_REFUND_TRANSACTION_SN, "sha256:sctc-refund-over-reference")
+                        .setAmount(40L)
+                        .setDescription("退款补偿金额超过被引用消费控制活动净额时拒绝")))
+                .hasMessageContaining("退款控制补偿金额超过被引用已消费控制金额");
+
+        assertThat(activityCount(OVER_REFERENCE_REFUND_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(SMALL_CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(activityCount(LARGE_CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(OVER_REFERENCE_REFUND_TRANSACTION_SN)).isOne();
+        BudgetControlProjectionDTO projection = spendControlActivityApplicationService.getBudgetControlProjection(
+                projectionQuery());
+        assertThat(projection.getConsumedAmount()).isEqualTo(60L);
+        assertThat(projection.getRemainingControlAmount()).isZero();
+        assertThat(projection.getLastActivitySn()).isEqualTo(LARGE_CONSUME_ACTIVITY_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 

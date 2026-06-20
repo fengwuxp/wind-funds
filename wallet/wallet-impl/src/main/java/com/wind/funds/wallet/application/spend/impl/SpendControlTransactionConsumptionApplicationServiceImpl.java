@@ -80,7 +80,9 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "退款控制补偿必须使用退款交易事实，transactionSn = {}", request.getTransactionSn());
         assertControlActivityMatchesOriginalActivity(request, originalActivity, "退款控制补偿");
         assertControlActivityMatchesTransaction(request, transaction, "退款控制补偿");
-        assertRefundReferencesConsumedTransaction(request, transaction);
+        List<SpendControlActivityDTO> referencedConsumedActivities = assertRefundReferencesConsumedTransaction(request,
+                transaction);
+        assertRefundDoesNotExceedReferencedConsumedAmount(request, transaction, referencedConsumedActivities);
         assertRefundDoesNotExceedNetConsumedAmount(request, originalActivity);
         return spendControlActivityApplicationService.recordActivity(
                 toRecordRequest(request, originalActivity, SpendControlActivityType.REFUND_COMPENSATED));
@@ -190,8 +192,9 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 request.getAmount());
     }
 
-    private void assertRefundReferencesConsumedTransaction(SpendControlTransactionConsumptionRequest request,
-                                                          FundsTransactionDTO transaction) {
+    private List<SpendControlActivityDTO> assertRefundReferencesConsumedTransaction(
+            SpendControlTransactionConsumptionRequest request,
+            FundsTransactionDTO transaction) {
         AssertUtils.hasText(transaction.getReferenceTransactionSn(),
                 "退款交易必须引用原消费交易，transactionSn = {}", request.getTransactionSn());
         List<SpendControlActivityDTO> consumedActivities = spendControlActivityApplicationService.queryActivities(
@@ -204,6 +207,69 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "退款交易未关联已消费控制活动，transactionSn = {}, referenceTransactionSn = {}",
                 request.getTransactionSn(),
                 transaction.getReferenceTransactionSn());
+        return consumedActivities;
+    }
+
+    private void assertRefundDoesNotExceedReferencedConsumedAmount(
+            SpendControlTransactionConsumptionRequest request,
+            FundsTransactionDTO transaction,
+            List<SpendControlActivityDTO> referencedConsumedActivities) {
+        long referencedConsumedAmount = referencedConsumedActivities.stream()
+                .filter(activity -> !Objects.equals(activity.getActivitySn(), request.getActivitySn()))
+                .mapToLong(SpendControlActivityDTO::getAmount)
+                .sum();
+        long referencedRefundCompensatedAmount = sumRefundCompensatedAmountForReference(request,
+                transaction.getReferenceTransactionSn());
+        long referencedNetConsumedAmount = referencedConsumedAmount - referencedRefundCompensatedAmount;
+        AssertUtils.isTrue(referencedNetConsumedAmount >= request.getAmount(),
+                "退款控制补偿金额超过被引用已消费控制金额，activitySn = {}, referenceTransactionSn = {}, "
+                        + "referencedNetConsumedAmount = {}, amount = {}",
+                request.getActivitySn(),
+                transaction.getReferenceTransactionSn(),
+                referencedNetConsumedAmount,
+                request.getAmount());
+    }
+
+    private long sumRefundCompensatedAmountForReference(SpendControlTransactionConsumptionRequest request,
+                                                       String referenceTransactionSn) {
+        List<SpendControlActivityDTO> refundCompensatedActivities =
+                spendControlActivityApplicationService.queryActivities(new SpendControlActivityQuery()
+                        .setTenantId(request.getTenantId())
+                        .setOriginalActivitySn(request.getOriginalActivitySn())
+                        .setActivityType(SpendControlActivityType.REFUND_COMPENSATED));
+        long refundCompensatedAmount = 0L;
+        for (SpendControlActivityDTO activity : refundCompensatedActivities) {
+            if (Objects.equals(activity.getActivitySn(), request.getActivitySn())) {
+                continue;
+            }
+            if (refundActivityReferencesConsumedTransaction(request, activity, referenceTransactionSn)) {
+                refundCompensatedAmount += activity.getAmount();
+            }
+        }
+        return refundCompensatedAmount;
+    }
+
+    private boolean refundActivityReferencesConsumedTransaction(SpendControlTransactionConsumptionRequest request,
+                                                               SpendControlActivityDTO activity,
+                                                               String referenceTransactionSn) {
+        AssertUtils.hasText(activity.getTransactionSn(),
+                "退款控制补偿活动缺少资金交易流水，activitySn = {}", activity.getActivitySn());
+        FundsTransactionDTO refundTransaction = fundsTransactionQueryService.queryFundsTransaction(
+                        activity.getTransactionSn())
+                .orElse(null);
+        AssertUtils.notNull(refundTransaction,
+                "退款控制补偿活动缺少资金交易事实，activitySn = {}, transactionSn = {}",
+                activity.getActivitySn(),
+                activity.getTransactionSn());
+        AssertUtils.isTrue(Objects.equals(refundTransaction.getTenantId(), request.getTenantId()),
+                "退款控制补偿活动资金交易租户不一致，activitySn = {}, transactionSn = {}",
+                activity.getActivitySn(),
+                activity.getTransactionSn());
+        AssertUtils.isTrue(refundTransaction.getTransactionType() == DefaultFundsTransactionType.REFUND,
+                "退款控制补偿活动必须关联退款交易事实，activitySn = {}, transactionSn = {}",
+                activity.getActivitySn(),
+                activity.getTransactionSn());
+        return Objects.equals(refundTransaction.getReferenceTransactionSn(), referenceTransactionSn);
     }
 
     private ControlActivityUsage controlActivityUsage(SpendControlTransactionConsumptionRequest request,
