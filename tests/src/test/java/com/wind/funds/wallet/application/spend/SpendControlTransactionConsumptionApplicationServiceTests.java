@@ -143,6 +143,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String MISSING_REFERENCE_REFUND_ACTIVITY_SN = "activity_refund_missing_reference_tx_001";
 
+    private static final String INCONSISTENT_REFERENCE_REFUND_ACTIVITY_SN =
+            "activity_refund_inconsistent_reference_tx_001";
+
     private static final String OVER_REFERENCE_REFUND_ACTIVITY_SN = "activity_refund_over_reference_001";
 
     private static final String NON_REFUND_ACTIVITY_SN = "activity_non_refund_compensated_001";
@@ -184,6 +187,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String MISSING_REFERENCE_REFUND_TRANSACTION_SN =
             "funds_transaction_sctc_refund_missing_reference_tx_001";
+
+    private static final String INCONSISTENT_REFERENCE_REFUND_TRANSACTION_SN =
+            "funds_transaction_sctc_refund_inconsistent_reference_tx_001";
 
     private static final String OVER_REFERENCE_REFUND_TRANSACTION_SN =
             "funds_transaction_sctc_refund_over_reference_001";
@@ -722,6 +728,45 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     /**
+     * 场景：退款交易引用的原消费资金交易与原占用业务流水不一致。
+     * 输入：已有 RESERVED、CONSUMED 控制活动，退款交易引用同流水控制活动但原消费资金交易 businessSn 不一致。
+     * 输出：请求被拒绝，不写新的退款控制补偿活动。
+     * 红线：退款补偿必须同时校验已消费控制活动和原消费资金交易事实，不得只凭控制活动回链放过交易脏事实。
+     */
+    @Test
+    void testRefundWithInconsistentReferencedFundsTransactionShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, OTHER_BUSINESS_SN, 40L, CurrencyIsoCode.USD);
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, CONSUME_ACTIVITY_SN,
+                SpendControlActivityType.CONSUMED, "sha256:sctc-consumed")
+                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(FUNDS_TRANSACTION_SN)
+                .setAmount(40L));
+        insertFundsTransaction(INCONSISTENT_REFERENCE_REFUND_TRANSACTION_SN,
+                "SPEND_CONTROL_TRANSACTION_REFUND_INCONSISTENT_REFERENCE_TX_001",
+                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                FUNDS_TRANSACTION_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
+                consumptionRequest(INCONSISTENT_REFERENCE_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                        INCONSISTENT_REFERENCE_REFUND_TRANSACTION_SN,
+                        "sha256:sctc-refund-inconsistent-reference-tx")
+                        .setAmount(40L)
+                        .setDescription("退款引用的原消费资金交易与原占用不一致时拒绝补偿")))
+                .hasMessageContaining("退款交易引用的原消费交易业务流水不一致");
+
+        assertThat(activityCount(INCONSISTENT_REFERENCE_REFUND_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+        assertThat(fundsTransactionCount(INCONSISTENT_REFERENCE_REFUND_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一原占用下存在多笔已消费控制活动，退款交易只引用其中一笔较小消费。
      * 输入：已消费 20 和 40 的控制活动，退款交易引用 20 的原交易但请求补偿 40。
      * 输出：请求被拒绝，不写新的退款控制补偿活动。
@@ -734,10 +779,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
         spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
-        insertSucceededFundsTransaction(SMALL_CONSUME_TRANSACTION_SN, BUSINESS_SN + "_SMALL", 20L,
-                CurrencyIsoCode.USD);
-        insertSucceededFundsTransaction(LARGE_CONSUME_TRANSACTION_SN, BUSINESS_SN + "_LARGE", 40L,
-                CurrencyIsoCode.USD);
+        insertSucceededFundsTransaction(SMALL_CONSUME_TRANSACTION_SN, BUSINESS_SN, 20L, CurrencyIsoCode.USD);
+        insertSucceededFundsTransaction(LARGE_CONSUME_TRANSACTION_SN, BUSINESS_SN + "_LARGE", 40L, CurrencyIsoCode.USD);
         spendControlActivityApplicationService.recordActivity(recordRequest(decision, SMALL_CONSUME_ACTIVITY_SN,
                 SpendControlActivityType.CONSUMED, "sha256:sctc-small-consumed")
                 .setOriginalActivitySn(RESERVED_ACTIVITY_SN)

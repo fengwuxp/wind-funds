@@ -262,6 +262,14 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "退款交易引用的原消费交易必须已关闭，transactionSn = {}, referenceTransactionSn = {}",
                 request.getTransactionSn(),
                 refundTransaction.getReferenceTransactionSn());
+        AssertUtils.isTrue(Objects.equals(referencedTransaction.getBusinessScene(), request.getBusinessScene()),
+                "退款交易引用的原消费交易业务场景不一致，transactionSn = {}, referenceTransactionSn = {}",
+                request.getTransactionSn(),
+                refundTransaction.getReferenceTransactionSn());
+        AssertUtils.isTrue(Objects.equals(referencedTransaction.getBusinessSn(), request.getBusinessSn()),
+                "退款交易引用的原消费交易业务流水不一致，transactionSn = {}, referenceTransactionSn = {}",
+                request.getTransactionSn(),
+                refundTransaction.getReferenceTransactionSn());
         AssertUtils.isTrue(referencedTransaction.getCurrency() == request.getCurrency(),
                 "退款交易引用的原消费交易币种不一致，transactionSn = {}, referenceTransactionSn = {}",
                 request.getTransactionSn(),
