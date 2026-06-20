@@ -12,7 +12,7 @@
 | 原子任务 | 在服务层补齐交易结果对 Spend Rule 控制活动的消费、释放、冲正和投影解释边界。 |
 | 所属阶段 | GSD-2 / B5 Spend Rule / Transaction consumption admission / green verified committed。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
-| 当前状态 | `SR_TRANSACTION_CONSUME_GREEN_VERIFIED_COMMITTED` |
+| 当前状态 | `SR_TRANSACTION_CONSUME_CONCURRENCY_GREEN_VERIFIED_COMMITTED` |
 | 当前基线 | 本 Grant 已消费并随本提交固化；历史基线包含 `3b31d6e0 docs: 同步资金服务层提交状态`、`a5b12a3f feat: 收敛资金服务层交付基线`、`78f7f008 feat: 补齐支出控制活动与预算投影`、`021ee2ce feat: 补齐支出控制准入快照`。 |
 | Owner | AI Native 流程编排负责确认包、状态和停止条件；产品架构专家负责业务目标、验收和 Not Done；资深架构师负责接口契约、事务边界、测试和验证命令；用户确认单一 Grant。 |
 | 写入范围 | 本文、LWT Goal、W5 推进计划、GSD-2 新基线入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
@@ -397,10 +397,10 @@ schemaDecision：contract-only
 | 投影解释 | `BudgetControlProjectionDTO` 补 `consumedAmount`；预算控制投影按 `reserved - netConsumed - released` 解释剩余控制额度。 |
 | 无副作用边界 | 目标服务只记录控制活动，不创建或修改资金交易、route snapshot、posting、LedgerEntry、账本交易、余额投影或交易 canonical 请求。 |
 | Red 证据 | 首次运行 `SpendControlTransactionConsumptionApplicationServiceTests` 因缺服务、请求和实现类型失败，符合 Red 预期。 |
-| Green 证据 | `SpendControlTransactionConsumptionApplicationServiceTests` 覆盖消费、失败释放、退款补偿、超额拒绝和摘要冲突幂等边界，5 tests 通过。 |
+| Green 证据 | `SpendControlTransactionConsumptionApplicationServiceTests` 覆盖消费、失败释放、退款补偿、超额拒绝、摘要冲突幂等边界和并发唯一键冲突回读，6 tests 通过。 |
 | 相邻回归 | `SpendControlActivityApplicationServiceTests` 6 tests 通过；`SpendControlAdmissionApplicationServiceTests` 3 tests 通过。 |
 | 编译与规约 | `just compile`、`just pmd` 和 `git diff --check` 均通过；沙箱内 embedded Redis 端口限制已按项目经验在非沙箱权限下复跑确认。 |
-| 当前状态 | `SR_TRANSACTION_CONSUME_GREEN_VERIFIED_COMMITTED`。 |
+| 当前状态 | `SR_TRANSACTION_CONSUME_CONCURRENCY_GREEN_VERIFIED_COMMITTED`。 |
 
 验证命令：
 
@@ -419,4 +419,18 @@ Not Done：
 2. 不包含完整 Spend Rule 规则引擎、规则定义、规则计算、决策日志持久化或外部规则专业确认。
 3. 不包含统一支付工具交易内核、VCC facade、清结算、补事实、生产发布或支付工具 `REFUND` 方向重裁决。
 4. 不包含交易内核 canonical 入参改造、route resolver、route replay、posting assembler 或 ledger posting 改造。
-5. 并发唯一键冲突后的数据库异常捕获回读、自动告警和补偿重试仍需后续专项 Grant 评估。
+5. 自动告警、补偿重试和外部事件消费仍需后续专项 Grant 评估。
+
+### 14.1 并发幂等硬化记录（2026-06-20）
+
+本节记录 `GSD2-B5-SR-TRANSACTION-CONSUME-CONCURRENCY-001` 的实际执行结果，不重新打开交易 canonical 入参、支付工具 `REFUND` 方向或 ledger posting。
+
+| 字段 | 内容 |
+| --- | --- |
+| Execution Grant | `GSD2-B5-SR-TRANSACTION-CONSUME-CONCURRENCY-001`。 |
+| 写入范围 | `wallet-impl` 控制活动记录服务、交易消费目标服务流并发测试和状态文档。 |
+| Red 证据 | 非沙箱环境首次运行新增并发用例时，第二个并发请求因 `tenantId + activitySn` 唯一键冲突抛出 `DuplicateKeyException`。 |
+| Green 证据 | `SpendControlActivityApplicationServiceImpl` 捕获并发唯一键冲突后回读既有活动并比较摘要；同摘要返回既有活动，不同摘要沿用摘要冲突拒绝。 |
+| 无副作用证据 | 并发测试断言只保留一条 `CONSUMED` 控制活动、一条资金交易事实，且 route、posting、LedgerEntry、账本交易和余额投影不变化。 |
+| 验证证据 | `SpendControlTransactionConsumptionApplicationServiceTests`、`SpendControlActivityApplicationServiceTests`、`SpendControlAdmissionApplicationServiceTests` 服务层组合回归 15 tests 通过；`just compile`、`just pmd`、`git diff --check` 和边界关键词扫描通过。 |
+| 当前状态 | `SR_TRANSACTION_CONSUME_CONCURRENCY_GREEN_VERIFIED_COMMITTED`。 |

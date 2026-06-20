@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.application.spend;
 
+import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -9,8 +10,10 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.application.account.FundsAccountCapabilityApplicationService;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResolutionApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
@@ -18,6 +21,7 @@ import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTra
 import com.wind.funds.wallet.application.spend.impl.SpendControlActivityApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
+import com.wind.funds.wallet.dal.mapper.SpendControlActivityMapper;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -60,7 +64,15 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -138,6 +150,15 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private SpendControlTransactionConsumptionApplicationService spendControlTransactionConsumptionApplicationService;
 
     @Autowired
+    private FundsAccountCapabilityApplicationService fundsAccountCapabilityApplicationService;
+
+    @Autowired
+    private FundsTransactionQueryService fundsTransactionQueryService;
+
+    @Autowired
+    private SpendControlActivityMapper spendControlActivityMapper;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     /**
@@ -182,6 +203,42 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：两个线程并发消费同一控制活动流水且摘要相同。
+     * 输入：已有 RESERVED 控制活动和已存在的成功资金交易事实。
+     * 输出：只有一条 CONSUMED 控制活动，两个调用都回到同一活动事实。
+     * 红线：并发唯一键冲突必须按幂等回读处理，不得抛出数据库异常或生成重复资金、route、posting、账本事实。
+     */
+    @Test
+    void testConcurrentConsumeSameActivitySnWithSameDigestShouldReadBackExistingActivity() throws Exception {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        SpendControlTransactionConsumptionApplicationService concurrentService = concurrentConsumptionService(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Callable<SpendControlActivityDTO> command = () -> withTenant(() -> concurrentService.consume(
+                    consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                            "sha256:sctc-consumed")));
+
+            Future<SpendControlActivityDTO> first = executor.submit(command);
+            Future<SpendControlActivityDTO> second = executor.submit(command);
+
+            SpendControlActivityDTO firstActivity = first.get(10, TimeUnit.SECONDS);
+            SpendControlActivityDTO secondActivity = second.get(10, TimeUnit.SECONDS);
+            assertThat(firstActivity.getId()).isEqualTo(secondActivity.getId());
+            assertThat(firstActivity.getActivityType()).isEqualTo(SpendControlActivityType.CONSUMED);
+            assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
+            assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+            assertLedgerFactsUnchanged(jdbcTemplate, before);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     /**
@@ -523,6 +580,40 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_funds_transaction WHERE tenant_id = ? AND sn = ?",
                 Integer.class, TENANT_ID, transactionSn);
+    }
+
+    private SpendControlTransactionConsumptionApplicationService concurrentConsumptionService(int concurrentInserts) {
+        SpendControlActivityApplicationService activityService = new SpendControlActivityApplicationServiceImpl(
+                gatedSpendControlActivityMapper(concurrentInserts),
+                fundsAccountCapabilityApplicationService);
+        return new SpendControlTransactionConsumptionApplicationServiceImpl(activityService, fundsTransactionQueryService);
+    }
+
+    private SpendControlActivityMapper gatedSpendControlActivityMapper(int concurrentInserts) {
+        CountDownLatch insertReady = new CountDownLatch(concurrentInserts);
+        return (SpendControlActivityMapper) Proxy.newProxyInstance(
+                SpendControlActivityMapper.class.getClassLoader(),
+                new Class<?>[]{SpendControlActivityMapper.class},
+                (proxy, method, args) -> {
+                    if ("insertSelective".equals(method.getName())) {
+                        insertReady.countDown();
+                        assertThat(insertReady.await(5, TimeUnit.SECONDS)).isTrue();
+                    }
+                    try {
+                        return method.invoke(spendControlActivityMapper, args);
+                    } catch (InvocationTargetException exception) {
+                        throw exception.getCause();
+                    }
+                });
+    }
+
+    private <T> T withTenant(Callable<T> command) throws Exception {
+        ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
+        try {
+            return command.call();
+        } finally {
+            ThreadContextTenantIdHolder.remove();
+        }
     }
 
     private void cleanupSpendControlTransactionConsumptionTestData() {

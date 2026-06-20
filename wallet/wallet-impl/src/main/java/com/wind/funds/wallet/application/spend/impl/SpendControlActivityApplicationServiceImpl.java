@@ -22,6 +22,7 @@ import com.wind.funds.wallet.model.request.ResolveFundsAccountCapabilityRequest;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -52,15 +53,17 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         validateIdempotencyBoundary(request);
         SpendControlActivity existing = findByActivitySn(request.getTenantId(), request.getActivitySn());
         if (existing != null) {
-            AssertUtils.isTrue(Objects.equals(existing.getActivityDigest(), request.getActivityDigest()),
-                    "控制活动流水已存在但摘要不一致，activitySn = {}",
-                    request.getActivitySn());
+            assertSameActivityDigest(request, existing);
             return toDTO(existing);
         }
         validateRecordRequest(request);
         assertReleaseAmountNotOverReserved(request);
         SpendControlActivity entity = toEntity(request);
-        spendControlActivityMapper.insertSelective(entity);
+        try {
+            spendControlActivityMapper.insertSelective(entity);
+        } catch (DataIntegrityViolationException exception) {
+            return readIdempotentActivityAfterInsertConflict(request, exception);
+        }
         AssertUtils.notNull(entity.getId(), "记录支出控制活动失败，activitySn = {}", request.getActivitySn());
         return toDTO(spendControlActivityMapper.selectOneById(entity.getId()));
     }
@@ -150,6 +153,23 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .where(ref.tenantId.eq(tenantId))
                 .and(ref.activitySn.eq(activitySn));
         return spendControlActivityMapper.selectOneByQuery(wrapper);
+    }
+
+    private SpendControlActivityDTO readIdempotentActivityAfterInsertConflict(
+            RecordSpendControlActivityRequest request,
+            DataIntegrityViolationException exception) {
+        SpendControlActivity existing = findByActivitySn(request.getTenantId(), request.getActivitySn());
+        if (existing == null) {
+            throw exception;
+        }
+        assertSameActivityDigest(request, existing);
+        return toDTO(existing);
+    }
+
+    private void assertSameActivityDigest(RecordSpendControlActivityRequest request, SpendControlActivity existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getActivityDigest(), request.getActivityDigest()),
+                "控制活动流水已存在但摘要不一致，activitySn = {}",
+                request.getActivitySn());
     }
 
     private QueryWrapper toQueryWrapper(SpendControlActivityQuery query) {
