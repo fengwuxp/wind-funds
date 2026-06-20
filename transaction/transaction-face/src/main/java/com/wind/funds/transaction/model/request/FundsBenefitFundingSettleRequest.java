@@ -17,18 +17,19 @@ import lombok.experimental.Accessors;
 import java.util.List;
 
 /**
- * 权益让利资金交易请求。
+ * 权益让利资金结算请求。
  *
- * <p>该请求表达业务侧已经决策完成的权益让利资金事实，不承载营销实时规则、券包库存或活动生命周期。</p>
+ * <p>该请求表达业务侧已经决策完成、需要确认入账的权益让利资金事实，
+ * 不承载营销实时规则、券包库存或活动生命周期。</p>
  *
  * @author Codex
  * @date 2026-06-16
  */
-@Schema(description = "权益让利资金交易请求")
+@Schema(description = "权益让利资金结算请求")
 @Data
 @NoArgsConstructor
 @Accessors(chain = true)
-public class FundsBenefitFundingApplyRequest {
+public class FundsBenefitFundingSettleRequest {
 
     @Schema(description = "租户 ID")
     @NotNull
@@ -38,7 +39,7 @@ public class FundsBenefitFundingApplyRequest {
     @NotBlank
     private String businessScene;
 
-    @Schema(description = "本次业务流水号，例如支付、退款、人工补贴或清分调整流水号")
+    @Schema(description = "本次权益结算业务流水号，例如支付补贴、人工补贴或清分调整流水号")
     @NotBlank
     private String businessSn;
 
@@ -46,7 +47,7 @@ public class FundsBenefitFundingApplyRequest {
     @NotBlank
     private String originalOrderSn;
 
-    @Schema(description = "关联原资金交易流水号，可用于伴随支付、退款、撤销、争议或对账回放")
+    @Schema(description = "关联原资金交易流水号，可用于伴随支付、争议或对账回放")
     private String referenceTransactionSn;
 
     @Schema(description = "让利、补贴、权益负债或合作方责任承担账务主体")

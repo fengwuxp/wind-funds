@@ -728,7 +728,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     void testBudgetLimitAdjustShouldAffectOnlyBudgetControlLedgers() {
         FundsAccountId budget = budgetGroup("budget_limit_flow");
         FundsAccountId funding = fundingAccount("funding_user");
-        ensureBudgetGroup(budget);
+        ensureBudgetGroupControlLedgers(budget);
         BalanceSnapshot before = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
 
         adjustBalance(budget, 300L, true, "BUDGET_LIMIT_ADJUST_INCREASE");
@@ -831,7 +831,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     void testBudgetLimitDecreaseExceedingAvailableShouldLeaveNoSideEffects() {
         FundsAccountId budget = budgetGroup("budget_limit_dec_fail");
         FundsAccountId funding = fundingAccount("funding_user");
-        ensureBudgetGroup(budget);
+        ensureBudgetGroupControlLedgers(budget);
         BalanceSnapshot before = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
 
         adjustBalance(budget, 200L, true, "BUDGET_LIMIT_DECREASE_FAIL_INCREASE");

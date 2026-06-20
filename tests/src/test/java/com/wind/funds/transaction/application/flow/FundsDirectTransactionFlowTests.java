@@ -1228,7 +1228,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     @Test
     void testTopupToBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId budget = budgetGroup("topup_bg");
-        ensureBudgetGroup(budget);
+        ensureBudgetGroupControlLedgers(budget);
         BalanceSnapshot before = snapshot(balances(budget, cashMappingAccount(), prepaymentAccount()));
         LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
 
@@ -1774,7 +1774,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testTransferFromBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId budget = budgetGroup("transfer_bg");
         FundsAccountId payee = fundingAccount("budget_transfer_payee");
-        ensureBudgetGroup(budget);
+        ensureBudgetGroupControlLedgers(budget);
         ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
 
         BalanceSnapshot beforeAdjust = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
@@ -2260,7 +2260,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     void testPayFromBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId budget = budgetGroup("direct_pay_budget_group");
         FundsAccountId payee = fundingAccount("budget_pay_payee");
-        ensureBudgetGroup(budget);
+        ensureBudgetGroupControlLedgers(budget);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforeAdjust = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));

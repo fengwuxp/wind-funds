@@ -12,7 +12,8 @@ import lombok.experimental.Accessors;
 /**
  * 权益让利退款请求。
  *
- * <p>退款用于对已经入账的权益让利资金交易进行反向资金影响，必须引用原权益让利资金交易流水号。</p>
+ * <p>退款、业务取消、人工纠错或反向冲销都用于对已经入账的权益让利资金交易进行反向资金影响，
+ * 必须引用原权益让利资金交易流水号。</p>
  *
  * @author Codex
  * @date 2026-06-16
@@ -50,7 +51,7 @@ public class FundsBenefitFundingRefundRequest {
     @NotBlank
     private String originalOrderSn;
 
-    @Schema(description = "退款原因")
+    @Schema(description = "退款、业务取消、人工纠错或反向冲销原因")
     private String refundReason;
 
     @Schema(description = "非关键扩展上下文，不得承载核心金额、规则版本、券包或敏感原文")

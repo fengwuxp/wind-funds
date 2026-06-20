@@ -3,9 +3,8 @@ package com.wind.funds.transaction.application;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.transaction.enums.FundsBenefitFundingSourceType;
 import com.wind.funds.transaction.model.dto.FundsBenefitFundingSourceDTO;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingApplyRequest;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingReverseRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -27,22 +26,20 @@ class FundsBenefitFundingApplicationServiceContractTests {
     @Test
     void testBenefitFundingApplicationServiceShouldExposeTransactionCommandContract()
             throws NoSuchMethodException {
-        Method applyMethod = FundsBenefitFundingApplicationService.class.getMethod("apply",
-                FundsBenefitFundingApplyRequest.class,
+        Method settleMethod = FundsBenefitFundingApplicationService.class.getMethod("settle",
+                FundsBenefitFundingSettleRequest.class,
                 WindOperator.class);
         Method refundMethod = FundsBenefitFundingApplicationService.class.getMethod("refund",
                 FundsBenefitFundingRefundRequest.class,
                 WindOperator.class);
-        Method reverseMethod = FundsBenefitFundingApplicationService.class.getMethod("reverse",
-                FundsBenefitFundingReverseRequest.class,
-                WindOperator.class);
 
-        assertThat(applyMethod.getReturnType()).isEqualTo(String.class);
+        assertThat(settleMethod.getReturnType()).isEqualTo(String.class);
         assertThat(refundMethod.getReturnType()).isEqualTo(String.class);
-        assertThat(reverseMethod.getReturnType()).isEqualTo(String.class);
         assertThat(serviceMethodNames())
-                .containsExactlyInAnyOrder("apply", "refund", "reverse")
+                .containsExactlyInAnyOrder("settle", "refund")
                 .doesNotContain("prepareBenefitFunding",
+                        "apply",
+                        "reverse",
                         "authorizeBenefit",
                         "settleBenefit",
                         "refundBenefit",
@@ -55,9 +52,9 @@ class FundsBenefitFundingApplicationServiceContractTests {
      * 红线：入口不要求调用方构造完整复杂权益快照、确认审批状态或外部摘要，也不把营销规则、券实例或支付工具当账务主体。
      */
     @Test
-    void testApplyRequestShouldModelBenefitFundingFactsWithoutHeavySnapshotDependency()
+    void testSettleRequestShouldModelBenefitFundingFactsWithoutHeavySnapshotDependency()
             throws NoSuchMethodException {
-        List<String> getterNames = Arrays.stream(FundsBenefitFundingApplyRequest.class.getMethods())
+        List<String> getterNames = Arrays.stream(FundsBenefitFundingSettleRequest.class.getMethods())
                 .map(Method::getName)
                 .toList();
 
@@ -80,16 +77,13 @@ class FundsBenefitFundingApplicationServiceContractTests {
     }
 
     /**
-     * 场景：权益让利退款或撤销需要引用原权益资金交易。
+     * 场景：权益让利退款、业务取消或人工纠错需要引用原权益资金交易。
      * 预期：逆向请求以原交易流水号、本次业务流水号和金额作为回放、幂等和审计入口。
      * 红线：逆向请求不重新携带当前权益工具或确认状态，避免调用方按当前规则重算历史权益。
      */
     @Test
-    void testReverseRequestsShouldReferenceOriginalBenefitFundingTransaction() {
+    void testRefundRequestShouldReferenceOriginalBenefitFundingTransaction() {
         List<String> refundGetterNames = Arrays.stream(FundsBenefitFundingRefundRequest.class.getMethods())
-                .map(Method::getName)
-                .toList();
-        List<String> reverseGetterNames = Arrays.stream(FundsBenefitFundingReverseRequest.class.getMethods())
                 .map(Method::getName)
                 .toList();
 
@@ -101,19 +95,6 @@ class FundsBenefitFundingApplicationServiceContractTests {
                         "getOriginalOrderSn");
         assertThat(refundGetterNames)
                 .doesNotContain("getBenefitRefundSn",
-                        "getBenefitFundingSources",
-                        "getConfirmationStatus",
-                        "getConfirmationReferenceSn",
-                        "getBenefitFundingDigest",
-                        "getDescription");
-        assertThat(reverseGetterNames)
-                .contains("getReferenceBenefitTransactionSn",
-                        "getAmount",
-                        "getBusinessScene",
-                        "getBusinessSn",
-                        "getOriginalOrderSn");
-        assertThat(reverseGetterNames)
-                .doesNotContain("getBenefitReverseSn",
                         "getBenefitFundingSources",
                         "getConfirmationStatus",
                         "getConfirmationReferenceSn",

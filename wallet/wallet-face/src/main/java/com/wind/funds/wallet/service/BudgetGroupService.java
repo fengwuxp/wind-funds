@@ -12,9 +12,9 @@ import org.jspecify.annotations.NonNull;
 /**
  * 预算组服务。
  *
- * <p>职责：管理预算控制主体，并在创建时初始化预算额度相关 ledger。</p>
+ * <p>职责：管理预算控制主体。</p>
  *
- * <p>边界：预算组不是支付工具，也不直接保存真实资金；实际扣款资金来源由支出主体资金关系确定。</p>
+ * <p>边界：预算组不是支付工具，也不是资金或信用账务主体；实际扣款资金来源由支出主体资金关系确定。</p>
  *
  * @author Codex
  * @date 2026-05-07
@@ -22,9 +22,9 @@ import org.jspecify.annotations.NonNull;
 public interface BudgetGroupService {
 
     /**
-     * 创建预算组并显式初始化 ledger。
+     * 创建预算组。
      *
-     * <p>能力范围：创建 BudgetGroup 主体，并按 BUDGET_BASIC profile 初始化预算额度账本。</p>
+     * <p>能力范围：创建预算控制对象，不初始化 ledger bucket，不表达可入账余额。</p>
      *
      * @param request 创建请求
      * @return 预算组主键

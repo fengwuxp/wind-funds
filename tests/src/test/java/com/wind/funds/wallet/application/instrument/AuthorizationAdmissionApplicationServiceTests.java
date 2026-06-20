@@ -31,6 +31,10 @@ import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
+import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
+import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainQuery;
+import com.wind.funds.transaction.projection.FundsTransactionProjectionExplanation;
+import com.wind.funds.transaction.projection.impl.DefaultFundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
@@ -83,6 +87,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
@@ -148,6 +153,9 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private AuthorizationAdmissionApplicationService authorizationAdmissionApplicationService;
 
     @Autowired
+    private FundsTransactionProjectionExplainApplicationService projectionExplainApplicationService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     /**
@@ -191,6 +199,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(routeSnapshotJson(AUTHORIZE_BUSINESS_SN)).isNotBlank();
         assertThat(routeLegCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
         assertAuthorizationInstrumentSnapshot(AUTHORIZE_BUSINESS_SN);
+        assertAuthorizationProjectionInstrumentExplanation(authorizationSn);
     }
 
     /**
@@ -515,6 +524,40 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(bindingSnapshot.getString("admissionDecision")).isEqualTo("APPROVED");
     }
 
+    private void assertAuthorizationProjectionInstrumentExplanation(String authorizationSn) {
+        FundsTransactionProjectionExplanation explanation = projectionExplainApplicationService.explain(
+                FundsTransactionProjectionExplainQuery.builder()
+                        .fundsTransactionSn(authorizationSn)
+                        .build());
+
+        assertThat(explanation.evidenceRefs())
+                .contains("paymentInstrument:" + PAYMENT_INSTRUMENT_SN,
+                        "paymentInstrumentBinding:" + PAYMENT_BINDING_SN + ":v1");
+        assertThat(explanation.payload()).containsKey("paymentInstrumentRef");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paymentInstrumentRef = (Map<String, Object>) explanation.payload()
+                .get("paymentInstrumentRef");
+        assertThat(paymentInstrumentRef)
+                .containsEntry("instrumentId", PAYMENT_INSTRUMENT_SN)
+                .containsEntry("instrumentType", "CARD")
+                .containsEntry("instrumentNo", "****2468")
+                .containsEntry("currency", CurrencyIsoCode.USD.name())
+                .containsEntry("status", FundsAccountStatus.ACTIVE.name());
+        assertThat(paymentInstrumentRef)
+                .doesNotContainKey("externalInstrumentId");
+        assertThat(paymentInstrumentRef.toString()).doesNotContain("tok_auth_admission_2468");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> bindingSnapshot = (Map<String, Object>) paymentInstrumentRef.get("bindingSnapshot");
+        assertThat(bindingSnapshot)
+                .containsEntry("bindingSn", PAYMENT_BINDING_SN)
+                .containsEntry("bindingVersion", 1)
+                .containsEntry("bindingRole", PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name())
+                .containsEntry("subjectType", FundsSubjectType.CREDIT_ACCOUNT.name())
+                .containsEntry("subjectId", CREDIT_ACCOUNT_SN)
+                .containsEntry("admissionAction", "AUTHORIZE")
+                .containsEntry("admissionDecision", "APPROVED");
+    }
+
     private void assertNoFundsOrLedgerFacts(String businessSn) {
         assertThat(countRows("t_funds_transaction", businessSn)).isZero();
         assertThat(countRows("t_funds_transaction_detail", businessSn)).isZero();
@@ -554,6 +597,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
+            DefaultFundsTransactionProjectionExplainApplicationService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
             AccountHierarchyServiceImpl.class,

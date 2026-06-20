@@ -13,9 +13,8 @@ import com.wind.funds.transaction.enums.FundsBenefitFundingSourceType;
 import com.wind.funds.transaction.enums.FundsBenefitLedgerEffect;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.model.dto.FundsBenefitFundingSourceDTO;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingApplyRequest;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingReverseRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
@@ -42,13 +41,13 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
     private FundsBenefitFundingApplicationService benefitFundingApplicationService;
 
     /**
-     * 场景：平台或商户责任账户向用户权益余额账户入账让利，随后发生部分退款和业务撤销。
-     * 输入：让利方充值 100；权益正向入账 30；退款 10；撤销 5。
+     * 场景：平台或商户责任账户向用户权益余额账户入账让利，随后发生部分退款和业务取消退款。
+     * 输入：让利方充值 100；权益资金结算 30；退款 10；取消退款 5。
      * 输出：三笔权益资金交易均返回资金交易流水，并通过标准 route、交易事实和账本分录入账。
      * 红线：权益服务不得绕过直接交易链路写 LedgerEntry；逆向事件必须引用原权益资金交易回放。
      */
     @Test
-    void testApplyRefundAndReverseShouldPostThroughStandardTransactionLedgerChain() {
+    void testSettleAndRefundShouldPostThroughStandardTransactionLedgerChain() {
         FundsAccountId costBearer = fundingAccount("ben_cost");
         FundsAccountId receiver = fundingAccount("ben_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
@@ -57,22 +56,22 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
         topup(costBearer, 100L, "BENEFIT_CHAIN_TOPUP");
         var afterTopup = snapshot(balances(costBearer, receiver));
 
-        String applyTransactionSn = benefitFundingApplicationService.apply(applyRequest(costBearer, receiver, 30L,
-                "BENEFIT_APPLY_001"), WindOperator.system());
+        String settleTransactionSn = benefitFundingApplicationService.settle(settleRequest(costBearer, receiver, 30L,
+                "BENEFIT_SETTLE_001"), WindOperator.system());
 
-        assertThat(applyTransactionSn).isNotBlank();
-        var afterApply = snapshot(balances(costBearer, receiver));
-        assertOnlyBalanceDeltas(afterTopup, afterApply,
+        assertThat(settleTransactionSn).isNotBlank();
+        var afterSettle = snapshot(balances(costBearer, receiver));
+        assertOnlyBalanceDeltas(afterTopup, afterSettle,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY));
-        assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_APPLY_001", 2, 2);
-        assertLedgerFactsFollowRouteSnapshot("BENEFIT_APPLY_001");
-        assertLedgerEventAndBuckets("BENEFIT_APPLY_001", FundsTransactionEventType.PAY,
+        assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_SETTLE_001", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("BENEFIT_SETTLE_001");
+        assertLedgerEventAndBuckets("BENEFIT_SETTLE_001", FundsTransactionEventType.PAY,
                 LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.SETTLEMENT);
 
         String refundTransactionSn = benefitFundingApplicationService.refund(new FundsBenefitFundingRefundRequest()
                 .setTenantId(TENANT_ID)
-                .setReferenceBenefitTransactionSn(applyTransactionSn)
+                .setReferenceBenefitTransactionSn(settleTransactionSn)
                 .setReferenceTransactionSn("PAY_ORDER_001")
                 .setAmount(Money.immutable(10L, CURRENCY))
                 .setBusinessScene("BENEFIT_REFUND")
@@ -82,7 +81,7 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
 
         assertThat(refundTransactionSn).isNotBlank();
         var afterRefund = snapshot(balances(costBearer, receiver));
-        assertOnlyBalanceDeltas(afterApply, afterRefund,
+        assertOnlyBalanceDeltas(afterSettle, afterRefund,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 10L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, -10L, CURRENCY));
         assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_REFUND_001", 2, 2);
@@ -90,29 +89,29 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
         assertLedgerEventAndBuckets("BENEFIT_REFUND_001", FundsTransactionEventType.REFUND,
                 LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
 
-        String reverseTransactionSn = benefitFundingApplicationService.reverse(new FundsBenefitFundingReverseRequest()
+        String cancelRefundTransactionSn = benefitFundingApplicationService.refund(new FundsBenefitFundingRefundRequest()
                 .setTenantId(TENANT_ID)
-                .setReferenceBenefitTransactionSn(applyTransactionSn)
+                .setReferenceBenefitTransactionSn(settleTransactionSn)
                 .setReferenceTransactionSn("PAY_ORDER_001")
                 .setAmount(Money.immutable(5L, CURRENCY))
-                .setBusinessScene("BENEFIT_REVERSE")
-                .setBusinessSn("BENEFIT_REVERSE_001")
+                .setBusinessScene("BENEFIT_CANCEL")
+                .setBusinessSn("BENEFIT_CANCEL_REFUND_001")
                 .setOriginalOrderSn("ORDER_001")
-                .setReverseReason("benefit correction"), WindOperator.system());
+                .setRefundReason("benefit cancellation correction"), WindOperator.system());
 
-        assertThat(reverseTransactionSn).isNotBlank();
-        var afterReverse = snapshot(balances(costBearer, receiver));
-        assertOnlyBalanceDeltas(afterRefund, afterReverse,
+        assertThat(cancelRefundTransactionSn).isNotBlank();
+        var afterCancelRefund = snapshot(balances(costBearer, receiver));
+        assertOnlyBalanceDeltas(afterRefund, afterCancelRefund,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 5L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, -5L, CURRENCY));
-        assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_REVERSE_001", 2, 2);
-        assertLedgerFactsFollowRouteSnapshot("BENEFIT_REVERSE_001");
-        assertLedgerEventAndBuckets("BENEFIT_REVERSE_001", FundsTransactionEventType.REFUND,
+        assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_CANCEL_REFUND_001", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("BENEFIT_CANCEL_REFUND_001");
+        assertLedgerEventAndBuckets("BENEFIT_CANCEL_REFUND_001", FundsTransactionEventType.REFUND,
                 LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
 
         assertBucket(balance(costBearer), LedgerSubjectCode.AVAILABLE, 85L, CURRENCY);
         assertBucket(balance(receiver), LedgerSubjectCode.SETTLEMENT, 15L, CURRENCY);
-        assertThat(fundsTransaction(applyTransactionSn).getRefundedAmount()).isEqualTo(15L);
+        assertThat(fundsTransaction(settleTransactionSn).getRefundedAmount()).isEqualTo(15L);
     }
 
     /**
@@ -122,14 +121,14 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
      * 红线：不能为了返回交易流水而伪造无账务资金交易事实。
      */
     @Test
-    void testApplyWithNonPostingEffectShouldFailWithoutFundsOrLedgerFacts() {
+    void testSettleWithNonPostingEffectShouldFailWithoutFundsOrLedgerFacts() {
         FundsAccountId costBearer = fundingAccount("ben_no_cost");
         FundsAccountId receiver = fundingAccount("ben_no_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         var before = snapshot(balances(costBearer, receiver));
 
-        assertThatThrownBy(() -> benefitFundingApplicationService.apply(applyRequest(costBearer, receiver, 20L,
+        assertThatThrownBy(() -> benefitFundingApplicationService.settle(settleRequest(costBearer, receiver, 20L,
                 "BENEFIT_NO_LEDGER_001").setLedgerEffect(FundsBenefitLedgerEffect.NO_LEDGER), WindOperator.system()))
                 .hasMessageContaining("权益让利账务效果");
 
@@ -140,13 +139,13 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
         assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_NO_LEDGER_001");
     }
 
-    private FundsBenefitFundingApplyRequest applyRequest(FundsAccountId costBearer,
-                                                         FundsAccountId receiver,
-                                                         long amount,
-                                                         String businessSn) {
-        return new FundsBenefitFundingApplyRequest()
+    private FundsBenefitFundingSettleRequest settleRequest(FundsAccountId costBearer,
+                                                           FundsAccountId receiver,
+                                                           long amount,
+                                                           String businessSn) {
+        return new FundsBenefitFundingSettleRequest()
                 .setTenantId(TENANT_ID)
-                .setBusinessScene("BENEFIT_APPLY")
+                .setBusinessScene("BENEFIT_SETTLE")
                 .setBusinessSn(businessSn)
                 .setOriginalOrderSn("ORDER_001")
                 .setReferenceTransactionSn("PAY_ORDER_001")

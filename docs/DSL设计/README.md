@@ -141,7 +141,7 @@ Highnote 公开发卡文档中的 financial account、ledger、ledger entry、pa
 | 路由规则 | route resolver 可以消费支付工具快照、绑定快照、`FundingAllocationDecision`、预算组上下文和 Spend Rule 决策，但 route leg participant 必须是最终可入账主体。 | 工具不可用、资金责任不唯一、错币种、预算或规则拒绝时不生成 route；退款、撤销、拒付、退费和重放优先沿原 route snapshot。 | 支付工具入口、资金责任解析和交易投影应分别形成独立任务，不借直接交易红线附带修改。 |
 | 账目平衡 | `PostingPlan` 只从已解析 route 生成；`LedgerEntry.subject` 只能是资金账户、信用账户或平台角色解析后的平台资金账户；每个 posting plan 按同币种独立平衡。 | 预算组、Spend Rule、支付工具、外部账户和交易投影不得生成 ledger bucket；预算控制只生成控制证据、规则证据或只读投影视图。 | 触碰 posting assembler、账本 DSL 或账务表行时，必须补借贷平衡、`normalBalanceSide`、余额桶和 forbidden facts 断言。 |
 | 余额投影 | 账本余额投影只从 ledger entry 派生，面向资金账户、信用账户和平台角色解析后的平台资金账户；余额日志只作为观察证据。 | 不从支付工具、预算组、Spend Rule、交易投影或业务轨道事件直接投影账本余额；预算控制可有独立控制视图，但不等于账本余额。 | BudgetGroup 兼容策略、预算控制视图和余额查询迁移必须拆成独立任务。 |
-| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实。 | 不得用交易投影通过来声明账务事实、余额投影或生产 Done。 |
+| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。支付工具型交易解释只能读取已固化的 `paymentInstrumentRef` 和 binding snapshot。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实；不得按当前工具绑定重新解释历史交易。 | 不得用交易投影通过来声明账务事实、余额投影或生产 Done；补支付工具解释时必须验证脱敏展示号、绑定版本、准入决策和敏感原文不外泄。 |
 
 ### DSL 易用性和误用防护
 

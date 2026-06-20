@@ -87,9 +87,11 @@ import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyBindingRequest;
 import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
+import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.AccountHierarchyService;
 import com.wind.funds.wallet.service.BudgetGroupService;
 import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
@@ -199,6 +201,9 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected BudgetGroupService budgetGroupService;
 
     @Autowired
+    protected SubjectLedgerInitializer subjectLedgerInitializer;
+
+    @Autowired
     private LedgerTransactionMapper ledgerTransactionMapper;
 
     @Autowired
@@ -302,6 +307,19 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return fundingAccountMapper.selectCountByQuery(wrapper) > 0;
     }
 
+    private boolean budgetGroupExists(String budgetGroupSn) {
+        Long count = jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*)
+                        FROM t_budget_group
+                        WHERE tenant_id = ?
+                          AND sn = ?
+                        """,
+                Long.class,
+                TENANT_ID,
+                budgetGroupSn);
+        return count != null && count > 0;
+    }
+
     private void ensureLedger(FundsAccountId accountId,
                               LedgerSubjectCode ledgerSubjectCode,
                               long initialBalance) {
@@ -377,7 +395,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected void ensureBudgetGroup(FundsAccountId accountId) {
         assertThat(accountId.type()).isEqualTo(FundsSubjectType.BUDGET_GROUP.name());
-        if (!findLedgers(accountId).isEmpty()) {
+        if (budgetGroupExists(accountId.id())) {
             return;
         }
         budgetGroupService.createBudgetGroup(new CreateBudgetGroupRequest()
@@ -387,6 +405,21 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setBudgetType(DefaultFundsAccountType.BUDGET_GROUP.name())
                 .setCurrency(CURRENCY));
+    }
+
+    protected void ensureBudgetGroupControlLedgers(FundsAccountId accountId) {
+        ensureBudgetGroup(accountId);
+        if (!findLedgers(accountId).isEmpty()) {
+            return;
+        }
+        subjectLedgerInitializer.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(accountId.id())
+                .setSubjectType(FundsSubjectType.BUDGET_GROUP)
+                .setCurrency(CURRENCY)
+                .setLedgerProfileCode(LedgerProfileCode.BUDGET_BASIC)
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
     }
 
     protected void bindAccountHierarchy(FundsAccountId accountId,

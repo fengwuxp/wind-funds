@@ -2,6 +2,7 @@ package com.wind.funds.transaction.projection;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
+import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
@@ -129,6 +130,32 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
     private static final String CHARGEBACK_REASON_CONTEXT_KEY = "chargebackReason";
 
     private static final String CHARGEBACK_EVIDENCE_REF_CONTEXT_KEY = "evidenceRef";
+
+    private static final String PAYMENT_INSTRUMENT_REF_CONTEXT_KEY = "paymentInstrumentRef";
+
+    private static final String INSTRUMENT_ID_FIELD = "instrumentId";
+
+    private static final String INSTRUMENT_TYPE_FIELD = "instrumentType";
+
+    private static final String INSTRUMENT_NO_FIELD = "instrumentNo";
+
+    private static final String OWNER_ID_FIELD = "ownerId";
+
+    private static final String OWNER_TYPE_FIELD = "ownerType";
+
+    private static final String TENANT_ID_FIELD = "tenantId";
+
+    private static final String CURRENCY_FIELD = "currency";
+
+    private static final String STATUS_FIELD = "status";
+
+    private static final String BINDING_SNAPSHOT_FIELD = "bindingSnapshot";
+
+    private static final String BINDING_SN_FIELD = "bindingSn";
+
+    private static final String BINDING_VERSION_FIELD = "bindingVersion";
+
+    private static final String DESCRIPTION_FIELD = "description";
 
     public FundsTransactionProjectionExplanationSource {
         AssertUtils.hasText(businessScene, "交易投影解释业务场景不能为空");
@@ -329,6 +356,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         if (StringUtils.hasText(ledgerTransactionSn)) {
             refs.add("ledgerTransaction:" + ledgerTransactionSn);
         }
+        addPaymentInstrumentEvidence(refs);
         addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF, "externalDisputeRef");
         addContextEvidence(refs, FundsInstructionContextKeys.DISPUTE_VOUCHER_REF, "disputeVoucherRef");
         addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN, "externalReferenceSn");
@@ -345,8 +373,27 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         }
     }
 
+    private void addPaymentInstrumentEvidence(@NonNull List<String> refs) {
+        PaymentInstrumentRefSpec paymentInstrumentRef = routeSnapshot.getPaymentInstrumentRef();
+        if (paymentInstrumentRef == null) {
+            return;
+        }
+        if (StringUtils.hasText(paymentInstrumentRef.getInstrumentId())) {
+            refs.add("paymentInstrument:" + paymentInstrumentRef.getInstrumentId());
+        }
+        Map<String, Object> bindingSnapshot = paymentInstrumentRef.getBindingSnapshot();
+        Object bindingSn = bindingSnapshot.get(BINDING_SN_FIELD);
+        if (bindingSn == null || !StringUtils.hasText(bindingSn.toString())) {
+            return;
+        }
+        Object bindingVersion = bindingSnapshot.get(BINDING_VERSION_FIELD);
+        String versionSuffix = bindingVersion == null ? "" : ":v" + bindingVersion;
+        refs.add("paymentInstrumentBinding:" + bindingSn + versionSuffix);
+    }
+
     private @NonNull Map<String, Object> resolveExplanationContext() {
         Map<String, Object> result = new LinkedHashMap<>();
+        putPaymentInstrumentRef(result);
         if (isDisputeRefund()) {
             putContextValue(result, FundsInstructionContextKeys.REFUND_MODE);
             putContextValue(result, FundsInstructionContextKeys.DISPUTE_MODE);
@@ -363,6 +410,37 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             putContextValue(result, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF);
         }
         return Map.copyOf(result);
+    }
+
+    private void putPaymentInstrumentRef(@NonNull Map<String, Object> values) {
+        PaymentInstrumentRefSpec paymentInstrumentRef = routeSnapshot.getPaymentInstrumentRef();
+        if (paymentInstrumentRef == null) {
+            return;
+        }
+        Map<String, Object> refValues = new LinkedHashMap<>();
+        putIfText(refValues, INSTRUMENT_ID_FIELD, paymentInstrumentRef.getInstrumentId());
+        putIfText(refValues, INSTRUMENT_TYPE_FIELD, paymentInstrumentRef.getInstrumentType());
+        putIfText(refValues, INSTRUMENT_NO_FIELD, paymentInstrumentRef.getInstrumentNo());
+        putIfText(refValues, OWNER_ID_FIELD, paymentInstrumentRef.getOwnerId());
+        putIfText(refValues, OWNER_TYPE_FIELD, paymentInstrumentRef.getOwnerType());
+        putIfNotNull(refValues, TENANT_ID_FIELD, paymentInstrumentRef.getTenantId());
+        putIfText(refValues, CURRENCY_FIELD, paymentInstrumentRef.getCurrency());
+        putIfText(refValues, STATUS_FIELD, paymentInstrumentRef.getStatus());
+        refValues.put(BINDING_SNAPSHOT_FIELD, paymentInstrumentRef.getBindingSnapshot());
+        putIfText(refValues, DESCRIPTION_FIELD, paymentInstrumentRef.getDescription());
+        values.put(PAYMENT_INSTRUMENT_REF_CONTEXT_KEY, Map.copyOf(refValues));
+    }
+
+    private void putIfText(@NonNull Map<String, Object> values, @NonNull String key, @Nullable String value) {
+        if (StringUtils.hasText(value)) {
+            values.put(key, value);
+        }
+    }
+
+    private void putIfNotNull(@NonNull Map<String, Object> values, @NonNull String key, @Nullable Object value) {
+        if (value != null) {
+            values.put(key, value);
+        }
     }
 
     private void putContextValue(@NonNull Map<String, Object> values, @NonNull String contextKey) {

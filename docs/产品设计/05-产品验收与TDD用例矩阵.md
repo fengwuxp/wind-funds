@@ -189,7 +189,7 @@ flowchart TD
 | AC-BEN-015 | 权益契约夹具准入 | JSON 样例声明 `fixtureLevel=CONTRACT_ONLY` 或资金流夹具。 | `CONTRACT_ONLY` 只证明字段、枚举、金额闭合和 validation；资金流夹具额外证明 route/posting/balance。 | 不得用 contract-only 样例声明 route、posting、replay、清结算或对账生产完成。 |
 | AC-BEN-016 | 独立伴随权益指令原子性 | 平台补贴、储值或预付权益被设计为主交易之外的伴随资金事实。 | 主交易和伴随指令必须绑定业务组、幂等组、原子性模式、失败补偿、冲正策略和投影合并键。 | 未声明同事务、同业务组幂等加补偿或 Saga 补偿模式前不得声明生产可用；部分成功不得展示为交易成功或清结算完成。 |
 | AC-BEN-017 | 历史补充权益事实 | 历史交易缺权益资金事实或历史摘要，但经审批允许补充用于退款、差错、对账或归档重放解释。 | 只追加补充权益事实或等价补充事实，不覆盖原交易、原 route snapshot 或原账本事实。 | 必须记录补录来源、审批、复核、digest、版本、关联原交易、撤销关系和重放校验；缺任一项只能失败、跳过或转人工。 |
-| AC-BEN-018 | 专业确认与审计证据包最终校验 | 预检时专业确认有效，但实际入账、退款、清结算确认、归档 apply 或治理重放 apply 前确认状态可能变化。 | 最终写入前重新校验确认状态和审计证据包。 | 证据缺失、过期、撤销、范围不匹配或引用含敏感原文时必须阻断或降级，dry-run 不能替代 apply 证据。 |
+| AC-BEN-018 | 专业确认与审计证据包最终校验 | 预检时专业确认有效，但实际入账、退款、清结算确认、归档正式执行或治理重放正式执行前确认状态可能变化。 | 最终写入前重新校验确认状态和审计证据包。 | 证据缺失、过期、撤销、范围不匹配或引用含敏感原文时必须阻断或降级，dry-run 不能替代正式执行证据。 |
 | AC-BEN-019 | 权益视图可理解且不误导 | 含权益交易进入用户账单、商户账单、运营时间线、财务对账视图或审计导出。 | 视图必须说明金额来源、状态含义、不可操作原因、下一步动作和脱敏证据引用。 | 不得把授权占用展示为最终消费、冻结展示为扣款、待清算展示为可提现、出款受理展示为到账成功；敏感证据只能展示脱敏摘要或外部 reference。 |
 
 权益退款分摊补充验收口径：
@@ -541,7 +541,7 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | RED-025 | AUTHORIZATION_CONTROL_DECLINE | 支出规则拒绝后不得生成 route、posting plan 或 LedgerEntry。 |
 | RED-026 | AUTHORIZATION_CONTROL_DECLINE | 拒绝必须保留规则版本、原因和请求摘要。 |
 | RED-027 | AUTHORIZATION_CONTROL_VELOCITY_DECLINE | 支出窗口和账本周期双向隔离。 |
-| AC-BEN-001 至 AC-BEN-019 | `FundsBenefitFundingApplicationService`、`DSL-BENEFIT-FUNDING-APPLY-001`、`DSL-BENEFIT-MERCHANT-DISCOUNT-001`、`DSL-BENEFIT-PLATFORM-SUBSIDY-001`、`DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`DSL-BENEFIT-AUTH-HOLD-001`、`DSL-BENEFIT-REFUND-NO-COUPON-001`、`DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001`、`DSL-BENEFIT-PREPAID-VOUCHER-001`、`DSL-BENEFIT-PARTIAL-REFUND-001`、`DSL-BENEFIT-MISSING-FUNDING-FACT-REPLAY-001`、`DSL-BENEFIT-CLEARING-RECONCILIATION-001`、伴随权益指令组、补充权益事实、审计证据包、使用者解释视图 | 权益让利资金事实只承接已决策结果；商户券、平台补贴、平台展示优惠、储值券、不退券、授权占券、部分退款、零实付权益、伴随指令、补充事实和清结算拆分都必须能解释资金影响；生产链路必须具备原权益资金事实、历史摘要或补充事实长期回放来源，使用者视图不能误导，且 `CONTRACT_ONLY` 夹具不得声明生产资金流完成。 |
+| AC-BEN-001 至 AC-BEN-019 | `FundsBenefitFundingApplicationService`、`DSL-BENEFIT-FUNDING-SETTLE-001`、`DSL-BENEFIT-MERCHANT-DISCOUNT-001`、`DSL-BENEFIT-PLATFORM-SUBSIDY-001`、`DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`DSL-BENEFIT-AUTH-HOLD-001`、`DSL-BENEFIT-REFUND-NO-COUPON-001`、`DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001`、`DSL-BENEFIT-PREPAID-VOUCHER-001`、`DSL-BENEFIT-PARTIAL-REFUND-001`、`DSL-BENEFIT-MISSING-FUNDING-FACT-REPLAY-001`、`DSL-BENEFIT-CLEARING-RECONCILIATION-001`、伴随权益指令组、补充权益事实、审计证据包、使用者解释视图 | 权益让利资金事实只承接已决策结果；商户券、平台补贴、平台展示优惠、储值券、不退券、授权占券、部分退款、零实付权益、伴随指令、补充事实和清结算拆分都必须能解释资金影响；生产链路必须具备原权益资金事实、历史摘要或补充事实长期回放来源，使用者视图不能误导，且 `CONTRACT_ONLY` 夹具不得声明生产资金流完成。 |
 | RED-050 至 RED-066 | expectedBenefitFundingFact、expectedRoute、expectedPosting、expectedReplay、fixtureLevel、权益准入证明、companionInstructionGroup、supplementalBenefitFact、auditEvidencePackage、explainableProjection | 资金底座不得重算券；不得改写主金额语义；无资金影响权益不得入账；授权拒绝不得核销权益；逆向事件不得按当前规则重算；储值券不得误作普通券；权益差异不得静默补平；不得把契约承载误判为生产完成；不得缺准入决策进入资金流；不得把 `CONTRACT_ONLY`、请求态权益结果或 `contextVariables` 当作生产事实证据；专业确认缺失、审计证据包失效、伴随指令部分成功未处理、补充事实覆盖原事实、视图误导、证据越界或外部规则未核验时不得自动入账。 |
 
 ### 8.1 用例族级追踪索引

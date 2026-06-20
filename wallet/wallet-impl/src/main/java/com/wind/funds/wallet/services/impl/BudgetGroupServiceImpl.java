@@ -11,9 +11,7 @@ import com.wind.funds.wallet.mapstruct.BudgetGroupConverter;
 import com.wind.funds.wallet.model.dto.BudgetGroupDTO;
 import com.wind.funds.wallet.model.query.BudgetGroupQuery;
 import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
-import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.BudgetGroupService;
-import com.wind.funds.wallet.service.SubjectLedgerInitializer;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
@@ -44,8 +42,6 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
 
     private final BudgetGroupMapper budgetGroupMapper;
 
-    private final SubjectLedgerInitializer subjectLedgerInitializer;
-
     private final LedgerService ledgerService;
 
     @Override
@@ -56,14 +52,6 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
         BudgetGroup entity = BudgetGroupConverter.INSTANCE.convertToBudgetGroup(request);
         budgetGroupMapper.insertSelective(entity);
         AssertUtils.notNull(entity.getId(), "创建预算组失败");
-        subjectLedgerInitializer.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
-                .setTenantId(entity.getTenantId())
-                .setSubjectId(entity.getSn())
-                .setSubjectType(FundsSubjectType.BUDGET_GROUP)
-                .setCurrency(entity.getCurrency())
-                .setLedgerProfileCode(entity.getLedgerProfileCode())
-                .setPeriodType(entity.getPeriodType())
-                .setPeriodId(request.getPeriodId()));
         return entity.getId();
     }
 

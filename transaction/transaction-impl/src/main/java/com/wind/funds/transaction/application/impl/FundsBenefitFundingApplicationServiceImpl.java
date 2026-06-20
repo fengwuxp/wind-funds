@@ -14,9 +14,8 @@ import com.wind.funds.transaction.application.FundsBenefitFundingApplicationServ
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.enums.FundsBenefitLedgerEffect;
 import com.wind.funds.transaction.model.dto.FundsBenefitFundingSourceDTO;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingApplyRequest;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingReverseRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -58,17 +57,15 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
 
     private static final String BENEFIT_REFUND_REASON = "benefitRefundReason";
 
-    private static final String BENEFIT_REVERSE_REASON = "benefitReverseReason";
-
     private final FundsDirectTransactionService directTransactionService;
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull String apply(@NonNull FundsBenefitFundingApplyRequest request,
-                                 @NonNull WindOperator operator) {
-        assertApplyRequest(request);
+    public @NonNull String settle(@NonNull FundsBenefitFundingSettleRequest request,
+                                  @NonNull WindOperator operator) {
+        assertSettleRequest(request);
         FundsAccountId costBearer = toAccountId(request.getCostBearerSubjectRef(), "权益让利承担方");
         FundsAccountId receiver = toAccountId(request.getBenefitReceiverSubjectRef(), "权益让利受益方");
         return directTransactionService.pay(new FundsTransactionPayRequest()
@@ -78,8 +75,8 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
                 .setTransactionAmount(TransactionAmount.sameCurrency(request.getAmount()))
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
-                .setContextVariables(ReadonlyContextVariables.of(applyContext(request)))
-                .setDescription("benefit funding apply"), operator);
+                .setContextVariables(ReadonlyContextVariables.of(settleContext(request)))
+                .setDescription("benefit funding settle"), operator);
     }
 
     @Override
@@ -100,25 +97,7 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
                 .setDescription("benefit funding refund"), operator);
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public @NonNull String reverse(@NonNull FundsBenefitFundingReverseRequest request,
-                                   @NonNull WindOperator operator) {
-        assertReverseRequest(request);
-        OriginalBenefitRoute route = originalBenefitRoute(request.getReferenceBenefitTransactionSn());
-        return directTransactionService.refund(new FundsTransactionRefundRequest()
-                .setAccountId(route.costBearerAccountId())
-                .setPayerId(route.benefitReceiverAccountId())
-                .setPayerLedgerCode(route.benefitReceiverLedgerCode())
-                .setAmount(request.getAmount())
-                .setReferenceTransactionSn(request.getReferenceBenefitTransactionSn())
-                .setBusinessScene(request.getBusinessScene())
-                .setBusinessSn(request.getBusinessSn())
-                .setContextVariables(ReadonlyContextVariables.of(reverseContext(request)))
-                .setDescription("benefit funding reverse"), operator);
-    }
-
-    private void assertApplyRequest(@NonNull FundsBenefitFundingApplyRequest request) {
+    private void assertSettleRequest(@NonNull FundsBenefitFundingSettleRequest request) {
         AssertUtils.notNull(request.getTenantId(), "权益让利 tenantId 不能为空");
         AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
                 "权益让利 tenantId 与当前租户不一致");
@@ -148,18 +127,6 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
         AssertUtils.hasText(request.getOriginalOrderSn(), "权益让利退款原始订单号不能为空");
     }
 
-    private void assertReverseRequest(@NonNull FundsBenefitFundingReverseRequest request) {
-        AssertUtils.notNull(request.getTenantId(), "权益让利撤销 tenantId 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
-                "权益让利撤销 tenantId 与当前租户不一致");
-        AssertUtils.hasText(request.getReferenceBenefitTransactionSn(), "原权益让利资金交易流水不能为空");
-        AssertUtils.notNull(request.getAmount(), "权益让利撤销金额不能为空");
-        AssertUtils.isTrue(request.getAmount().getAmount() > 0, "权益让利撤销金额必须大于 0");
-        AssertUtils.hasText(request.getBusinessScene(), "权益让利撤销业务场景不能为空");
-        AssertUtils.hasText(request.getBusinessSn(), "权益让利撤销业务流水不能为空");
-        AssertUtils.hasText(request.getOriginalOrderSn(), "权益让利撤销原始订单号不能为空");
-    }
-
     private OriginalBenefitRoute originalBenefitRoute(@NonNull String referenceBenefitTransactionSn) {
         RouteSnapshotSpec snapshot = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(referenceBenefitTransactionSn)
                 .orElseThrow(() -> new IllegalArgumentException("原权益让利资金交易 RouteSnapshot 不存在，transactionSn = "
@@ -186,7 +153,7 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
         return FundsAccountId.immutable(subjectRef.getSubjectId(), subjectRef.getSubjectType().name());
     }
 
-    private Map<String, Object> applyContext(@NonNull FundsBenefitFundingApplyRequest request) {
+    private Map<String, Object> settleContext(@NonNull FundsBenefitFundingSettleRequest request) {
         Map<String, Object> result = mergeContext(request.getContextVariables());
         result.put(BENEFIT_FUNDING, Boolean.TRUE);
         result.put(BENEFIT_FUNDING_NATURE_CODE, request.getFundingNature().name());
@@ -211,19 +178,6 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
         }
         if (request.getRefundReason() != null) {
             result.put(BENEFIT_REFUND_REASON, request.getRefundReason());
-        }
-        return Map.copyOf(result);
-    }
-
-    private Map<String, Object> reverseContext(@NonNull FundsBenefitFundingReverseRequest request) {
-        Map<String, Object> result = mergeContext(request.getContextVariables());
-        result.put(BENEFIT_FUNDING, Boolean.TRUE);
-        result.put(BENEFIT_ORIGINAL_ORDER_SN, request.getOriginalOrderSn());
-        if (request.getReferenceTransactionSn() != null) {
-            result.put(BENEFIT_REFERENCE_TRANSACTION_SN, request.getReferenceTransactionSn());
-        }
-        if (request.getReverseReason() != null) {
-            result.put(BENEFIT_REVERSE_REASON, request.getReverseReason());
         }
         return Map.copyOf(result);
     }

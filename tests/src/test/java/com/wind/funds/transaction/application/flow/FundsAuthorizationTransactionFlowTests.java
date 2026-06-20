@@ -401,7 +401,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     @Test
     void testAuthorizeBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId budget = budgetGroup("auth_budget_group");
-        ensureBudgetGroup(budget);
+        ensureBudgetGroupControlLedgers(budget);
 
         BalanceSnapshot beforeAdjust = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
         adjustBalance(budget, 50L, true, "AUTH_BUDGET_GROUP_ADJUST");
