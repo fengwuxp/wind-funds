@@ -84,6 +84,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         assertControlActivityMatchesTransaction(request, transaction, "退款控制补偿");
         List<SpendControlActivityDTO> referencedConsumedActivities = assertRefundReferencesConsumedTransaction(request,
                 transaction);
+        assertRefundReferenceTransactionValid(request, transaction);
         assertReferencedConsumedActivitiesMatchOriginalActivity(originalActivity, referencedConsumedActivities);
         assertRefundDoesNotExceedReferencedConsumedAmount(request, transaction, referencedConsumedActivities);
         assertRefundDoesNotExceedNetConsumedAmount(request, originalActivity);
@@ -238,6 +239,33 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 request.getTransactionSn(),
                 transaction.getReferenceTransactionSn());
         return consumedActivities;
+    }
+
+    private void assertRefundReferenceTransactionValid(SpendControlTransactionConsumptionRequest request,
+                                                       FundsTransactionDTO refundTransaction) {
+        FundsTransactionDTO referencedTransaction = fundsTransactionQueryService.queryFundsTransaction(
+                        refundTransaction.getReferenceTransactionSn())
+                .orElse(null);
+        AssertUtils.notNull(referencedTransaction,
+                "退款交易引用的原消费交易不存在，transactionSn = {}, referenceTransactionSn = {}",
+                request.getTransactionSn(),
+                refundTransaction.getReferenceTransactionSn());
+        AssertUtils.isTrue(Objects.equals(referencedTransaction.getTenantId(), request.getTenantId()),
+                "退款交易引用的原消费交易租户不一致，transactionSn = {}, referenceTransactionSn = {}",
+                request.getTransactionSn(),
+                refundTransaction.getReferenceTransactionSn());
+        AssertUtils.isTrue(referencedTransaction.getTransactionType() != DefaultFundsTransactionType.REFUND,
+                "退款交易不能引用另一笔退款交易，transactionSn = {}, referenceTransactionSn = {}",
+                request.getTransactionSn(),
+                refundTransaction.getReferenceTransactionSn());
+        AssertUtils.isTrue(referencedTransaction.getStatus() == FundsTransactionStatus.CLOSED,
+                "退款交易引用的原消费交易必须已关闭，transactionSn = {}, referenceTransactionSn = {}",
+                request.getTransactionSn(),
+                refundTransaction.getReferenceTransactionSn());
+        AssertUtils.isTrue(referencedTransaction.getCurrency() == request.getCurrency(),
+                "退款交易引用的原消费交易币种不一致，transactionSn = {}, referenceTransactionSn = {}",
+                request.getTransactionSn(),
+                refundTransaction.getReferenceTransactionSn());
     }
 
     private void assertReferencedConsumedActivitiesMatchOriginalActivity(

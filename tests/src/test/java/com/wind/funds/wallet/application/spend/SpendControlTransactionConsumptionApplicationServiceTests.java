@@ -141,6 +141,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String UNLINKED_REFUND_ACTIVITY_SN = "activity_refund_unlinked_001";
 
+    private static final String MISSING_REFERENCE_REFUND_ACTIVITY_SN = "activity_refund_missing_reference_tx_001";
+
     private static final String OVER_REFERENCE_REFUND_ACTIVITY_SN = "activity_refund_over_reference_001";
 
     private static final String NON_REFUND_ACTIVITY_SN = "activity_non_refund_compensated_001";
@@ -179,6 +181,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private static final String INCONSISTENT_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_inconsistent_001";
 
     private static final String UNLINKED_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_unlinked_001";
+
+    private static final String MISSING_REFERENCE_REFUND_TRANSACTION_SN =
+            "funds_transaction_sctc_refund_missing_reference_tx_001";
 
     private static final String OVER_REFERENCE_REFUND_TRANSACTION_SN =
             "funds_transaction_sctc_refund_over_reference_001";
@@ -637,6 +642,43 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(projection.getReleasedAmount()).isZero();
         assertThat(projection.getRemainingControlAmount()).isEqualTo(60L);
         assertThat(projection.getLastActivitySn()).isEqualTo(RESERVED_ACTIVITY_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：历史脏控制活动引用了不存在的原消费资金交易。
+     * 输入：已有 RESERVED 和 CONSUMED 控制活动，退款交易引用的原消费交易事实不存在。
+     * 输出：请求被拒绝，不写新的退款控制补偿活动。
+     * 红线：退款补偿必须同时基于已消费控制活动和真实原消费交易事实，不能只凭控制活动回链生成补偿。
+     */
+    @Test
+    void testRefundWithMissingReferencedFundsTransactionShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, CONSUME_ACTIVITY_SN,
+                SpendControlActivityType.CONSUMED, "sha256:sctc-consumed")
+                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(FUNDS_TRANSACTION_SN)
+                .setAmount(40L));
+        insertFundsTransaction(MISSING_REFERENCE_REFUND_TRANSACTION_SN,
+                "SPEND_CONTROL_TRANSACTION_REFUND_MISSING_REFERENCE_TX_001",
+                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                FUNDS_TRANSACTION_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
+                consumptionRequest(MISSING_REFERENCE_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                        MISSING_REFERENCE_REFUND_TRANSACTION_SN, "sha256:sctc-refund-missing-reference-tx")
+                        .setAmount(40L)
+                        .setDescription("退款引用的原消费交易不存在时拒绝补偿")))
+                .hasMessageContaining("退款交易引用的原消费交易不存在");
+
+        assertThat(activityCount(MISSING_REFERENCE_REFUND_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isZero();
+        assertThat(fundsTransactionCount(MISSING_REFERENCE_REFUND_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
