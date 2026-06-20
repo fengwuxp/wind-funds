@@ -82,6 +82,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         assertControlActivityMatchesTransaction(request, transaction, "退款控制补偿");
         List<SpendControlActivityDTO> referencedConsumedActivities = assertRefundReferencesConsumedTransaction(request,
                 transaction);
+        assertReferencedConsumedActivitiesMatchOriginalActivity(originalActivity, referencedConsumedActivities);
         assertRefundDoesNotExceedReferencedConsumedAmount(request, transaction, referencedConsumedActivities);
         assertRefundDoesNotExceedNetConsumedAmount(request, originalActivity);
         return spendControlActivityApplicationService.recordActivity(
@@ -208,6 +209,30 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 request.getTransactionSn(),
                 transaction.getReferenceTransactionSn());
         return consumedActivities;
+    }
+
+    private void assertReferencedConsumedActivitiesMatchOriginalActivity(
+            SpendControlActivityDTO originalActivity,
+            List<SpendControlActivityDTO> referencedConsumedActivities) {
+        for (SpendControlActivityDTO consumedActivity : referencedConsumedActivities) {
+            AssertUtils.isTrue(Objects.equals(consumedActivity.getBusinessScene(), originalActivity.getBusinessScene()),
+                    "被引用已消费控制活动业务场景不一致，activitySn = {}, originalActivitySn = {}",
+                    consumedActivity.getActivitySn(),
+                    originalActivity.getActivitySn());
+            AssertUtils.isTrue(Objects.equals(consumedActivity.getBusinessSn(), originalActivity.getBusinessSn()),
+                    "被引用已消费控制活动业务流水不一致，activitySn = {}, originalActivitySn = {}",
+                    consumedActivity.getActivitySn(),
+                    originalActivity.getActivitySn());
+            AssertUtils.isTrue(Objects.equals(consumedActivity.getTargetAccountId(),
+                            originalActivity.getTargetAccountId()),
+                    "被引用已消费控制活动目标账户不一致，activitySn = {}, originalActivitySn = {}",
+                    consumedActivity.getActivitySn(),
+                    originalActivity.getActivitySn());
+            AssertUtils.isTrue(consumedActivity.getCurrency() == originalActivity.getCurrency(),
+                    "被引用已消费控制活动币种不一致，activitySn = {}, originalActivitySn = {}",
+                    consumedActivity.getActivitySn(),
+                    originalActivity.getActivitySn());
+        }
     }
 
     private void assertRefundDoesNotExceedReferencedConsumedAmount(

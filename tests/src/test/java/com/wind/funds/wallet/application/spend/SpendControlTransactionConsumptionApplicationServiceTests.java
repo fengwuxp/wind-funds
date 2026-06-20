@@ -117,6 +117,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String REFUND_CONSUME_ACTIVITY_SN = "activity_refund_consumed_001";
 
+    private static final String INCONSISTENT_CONSUME_ACTIVITY_SN = "activity_inconsistent_consumed_001";
+
     private static final String SMALL_CONSUME_ACTIVITY_SN = "activity_small_consumed_001";
 
     private static final String LARGE_CONSUME_ACTIVITY_SN = "activity_large_consumed_001";
@@ -126,6 +128,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private static final String CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN = "activity_cross_business_sn_released_001";
 
     private static final String REFUND_ACTIVITY_SN = "activity_refund_compensated_001";
+
+    private static final String INCONSISTENT_REFUND_ACTIVITY_SN = "activity_refund_inconsistent_001";
 
     private static final String UNLINKED_REFUND_ACTIVITY_SN = "activity_refund_unlinked_001";
 
@@ -163,6 +167,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
             "funds_transaction_sctc_cross_business_sn_failed_001";
 
     private static final String REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_001";
+
+    private static final String INCONSISTENT_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_inconsistent_001";
 
     private static final String UNLINKED_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_unlinked_001";
 
@@ -531,6 +537,45 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(projection.getReleasedAmount()).isZero();
         assertThat(projection.getRemainingControlAmount()).isEqualTo(60L);
         assertThat(projection.getLastActivitySn()).isEqualTo(RESERVED_ACTIVITY_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：历史脏事实或绕过入口留下了与原占用业务流水不一致的已消费控制活动。
+     * 输入：已有 RESERVED 控制活动、业务流水不一致的 CONSUMED 控制活动和引用原交易的成功退款事实。
+     * 输出：请求被拒绝，不写新的退款控制补偿活动。
+     * 红线：退款补偿必须基于与原占用一致的已消费控制事实，不得借历史脏事实重新解释控制占用。
+     */
+    @Test
+    void testRefundWithInconsistentReferencedConsumedActivityShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 40L, CurrencyIsoCode.USD);
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, INCONSISTENT_CONSUME_ACTIVITY_SN,
+                SpendControlActivityType.CONSUMED, "sha256:sctc-inconsistent-consumed")
+                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(FUNDS_TRANSACTION_SN)
+                .setBusinessSn(OTHER_BUSINESS_SN)
+                .setAmount(40L));
+        insertFundsTransaction(INCONSISTENT_REFUND_TRANSACTION_SN,
+                "SPEND_CONTROL_TRANSACTION_REFUND_INCONSISTENT_001",
+                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                FUNDS_TRANSACTION_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
+                consumptionRequest(INCONSISTENT_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                        INCONSISTENT_REFUND_TRANSACTION_SN, "sha256:sctc-refund-inconsistent")
+                        .setAmount(40L)
+                        .setDescription("退款引用的已消费控制活动与原占用不一致时拒绝补偿")))
+                .hasMessageContaining("被引用已消费控制活动业务流水不一致");
+
+        assertThat(activityCount(INCONSISTENT_REFUND_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(INCONSISTENT_CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+        assertThat(fundsTransactionCount(INCONSISTENT_REFUND_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
