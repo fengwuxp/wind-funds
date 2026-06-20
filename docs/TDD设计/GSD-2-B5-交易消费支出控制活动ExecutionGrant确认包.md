@@ -12,13 +12,13 @@
 | 原子任务 | 在服务层补齐交易结果对 Spend Rule 控制活动的消费、释放、冲正和投影解释边界。 |
 | 所属阶段 | GSD-2 / B5 Spend Rule / Transaction consumption admission / green verified committed。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
-| 当前状态 | `SR_TRANSACTION_CONSUME_BUSINESS_SN_GUARD_GREEN_VERIFIED` |
+| 当前状态 | `SR_TRANSACTION_RELEASE_BUSINESS_SN_GUARD_GREEN_VERIFIED` |
 | 当前基线 | 本 Grant 已消费并随本提交固化；历史基线包含 `3b31d6e0 docs: 同步资金服务层提交状态`、`a5b12a3f feat: 收敛资金服务层交付基线`、`78f7f008 feat: 补齐支出控制活动与预算投影`、`021ee2ce feat: 补齐支出控制准入快照`。 |
 | Owner | AI Native 流程编排负责确认包、状态和停止条件；产品架构专家负责业务目标、验收和 Not Done；资深架构师负责接口契约、事务边界、测试和验证命令；用户确认单一 Grant。 |
 | 写入范围 | `SpendControlTransactionConsumptionApplicationServiceImpl` 服务层校验、`SpendControlTransactionConsumptionApplicationServiceTests` 目标测试，以及本文、LWT Goal、W5 推进计划、GSD-2 新基线入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
 | 写入文件 | `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application/spend/impl/SpendControlTransactionConsumptionApplicationServiceImpl.java`、`tests/src/test/java/com/wind/funds/wallet/application/spend/SpendControlTransactionConsumptionApplicationServiceTests.java`、`docs/TDD设计/GSD-2-B5-交易消费支出控制活动ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、core、wallet、transaction、ledger、tests、Justfile、AGENTS.md 和最近 Git 提交。 |
-| Git 策略 | 本确认包已被多轮服务层补片消费；本轮业务流水一致性守卫随提交固化。后续若继续新 Grant，需重新确认写入范围和 Git 策略。 |
+| Git 策略 | 本确认包已被多轮服务层补片消费；本轮释放业务流水一致性守卫随提交固化。后续若继续新 Grant，需重新确认写入范围和 Git 策略。 |
 | 服务层边界 | 只处理 wallet / transaction 的服务层能力，不新增 Controller、HTTP/RPC、页面、导出、外部通道适配或控制层能力。 |
 
 ## 2. 业务目标
@@ -495,7 +495,20 @@ Not Done：
 | --- | --- |
 | 补充任务 | `GSD2-B5-SR-TRANSACTION-CONSUME-BUSINESS-SN-GUARD-006`。 |
 | 写入范围 | `SpendControlTransactionConsumptionApplicationServiceImpl` 服务层校验、`SpendControlTransactionConsumptionApplicationServiceTests` 目标服务流测试和状态文档；不改 Controller、HTTP/RPC、交易 canonical 入参、支付工具 `REFUND` 方向、route、posting、ledger posting、DDL/H2 schema、Entity、Mapper 或生产迁移。 |
-| Guard 语义 | `consume` 要求已关闭成功资金交易的 `businessSn` 与请求和原控制活动业务流水一致；`release` 与 `refund` 保留失败交易、退款交易自身业务流水语义，不新增该强约束。 |
+| Guard 语义 | `consume` 要求已关闭成功资金交易的 `businessSn` 与请求和原控制活动业务流水一致；本补片当时只约束成功消费，后续第 14.7 节已补 `release` 业务流水一致性守卫，`refund` 仍按退款交易引用的已消费控制活动闭环。 |
 | 无副作用证据 | 目标测试断言同场景不同业务流水交易消费失败后不新增控制活动，不修改资金交易事实，且 route、posting、LedgerEntry、账本交易和余额投影不变化。 |
 | 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 12 tests 通过；收口执行 `just compile`、`just pmd` 和 `git diff --check`。 |
 | 当前状态 | `SR_TRANSACTION_CONSUME_BUSINESS_SN_GUARD_GREEN_VERIFIED`。 |
+
+### 14.7 释放业务流水一致性守卫补充记录（2026-06-20）
+
+本节记录 `SpendControlTransactionConsumptionApplicationServiceTests` 针对失败释放业务流水一致性的补充回归。该补片只确认 `release` 不能使用同一业务场景下其他业务流水的失败、拒绝或过期交易事实；不重新打开 Controller、HTTP/RPC、交易 canonical 入参、支付工具 `REFUND` 方向或 ledger posting。
+
+| 字段 | 内容 |
+| --- | --- |
+| 补充任务 | `GSD2-B5-SR-TRANSACTION-RELEASE-BUSINESS-SN-GUARD-007`。 |
+| 写入范围 | `SpendControlTransactionConsumptionApplicationServiceImpl` 服务层校验、`SpendControlTransactionConsumptionApplicationServiceTests` 目标服务流测试和状态文档；不改 Controller、HTTP/RPC、交易 canonical 入参、支付工具 `REFUND` 方向、route、posting、ledger posting、DDL/H2 schema、Entity、Mapper 或生产迁移。 |
+| Guard 语义 | `release` 要求失败、拒绝或过期资金交易的 `businessSn` 与请求和原控制活动业务流水一致；同业务场景但不同业务流水的失败交易不得释放当前 Spend Rule 控制占用。 |
+| 无副作用证据 | 目标测试断言同场景不同业务流水交易释放失败后不新增控制活动，不修改资金交易事实，且 route、posting、LedgerEntry、账本交易和余额投影不变化。 |
+| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 13 tests 通过；收口执行 `just compile`、`just pmd` 和 `git diff --check`。 |
+| 当前状态 | `SR_TRANSACTION_RELEASE_BUSINESS_SN_GUARD_GREEN_VERIFIED`。 |

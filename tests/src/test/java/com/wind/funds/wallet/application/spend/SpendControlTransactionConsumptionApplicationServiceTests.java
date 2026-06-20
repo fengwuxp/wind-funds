@@ -119,6 +119,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String RELEASE_ACTIVITY_SN = "activity_released_001";
 
+    private static final String CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN = "activity_cross_business_sn_released_001";
+
     private static final String REFUND_ACTIVITY_SN = "activity_refund_compensated_001";
 
     private static final String UNLINKED_REFUND_ACTIVITY_SN = "activity_refund_unlinked_001";
@@ -146,6 +148,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private static final String CROSS_BUSINESS_SN_TRANSACTION_SN = "funds_transaction_sctc_cross_business_sn_001";
 
     private static final String FAILED_TRANSACTION_SN = "funds_transaction_sctc_failed_001";
+
+    private static final String CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN =
+            "funds_transaction_sctc_cross_business_sn_failed_001";
 
     private static final String REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_001";
 
@@ -354,7 +359,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
         spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
-        insertFundsTransaction(FAILED_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_FAILED_001",
+        insertFundsTransaction(FAILED_TRANSACTION_SN, BUSINESS_SN,
                 DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -376,6 +381,32 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(projection.getLastActivitySn()).isEqualTo(RELEASE_ACTIVITY_SN);
 
         assertThat(fundsTransactionCount(FAILED_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方把同业务场景但不同业务流水的失败交易事实误用于当前 Spend Rule 控制释放。
+     * 输入：已有 RESERVED 控制活动和同业务场景、不同业务流水的 FAILED PAY 资金交易事实。
+     * 输出：请求被拒绝，不写新的释放控制活动。
+     * 红线：失败释放只能解释同一业务流水的交易终局，不得跨订单释放控制占用，也不得写 route、posting 或账本事实。
+     */
+    @Test
+    void testReleaseWithDifferentBusinessSnTransactionShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertFundsTransaction(CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN, OTHER_BUSINESS_SN,
+                DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.release(
+                consumptionRequest(CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                        CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN, "sha256:sctc-cross-business-sn-released")))
+                .hasMessageContaining("资金交易业务流水不一致");
+
+        assertThat(activityCount(CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN)).isZero();
+        assertThat(fundsTransactionCount(CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
