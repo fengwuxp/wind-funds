@@ -111,6 +111,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String CONSUME_ACTIVITY_SN = "activity_consumed_001";
 
+    private static final String SECOND_CONSUME_ACTIVITY_SN = "activity_consumed_002";
+
     private static final String CROSS_SCENE_CONSUME_ACTIVITY_SN = "activity_cross_scene_consumed_001";
 
     private static final String CROSS_BUSINESS_SN_CONSUME_ACTIVITY_SN = "activity_cross_business_sn_consumed_001";
@@ -125,9 +127,13 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String RELEASE_ACTIVITY_SN = "activity_released_001";
 
+    private static final String SECOND_RELEASE_ACTIVITY_SN = "activity_released_002";
+
     private static final String CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN = "activity_cross_business_sn_released_001";
 
     private static final String REFUND_ACTIVITY_SN = "activity_refund_compensated_001";
+
+    private static final String SECOND_REFUND_ACTIVITY_SN = "activity_refund_compensated_002";
 
     private static final String INCONSISTENT_REFUND_ACTIVITY_SN = "activity_refund_inconsistent_001";
 
@@ -367,6 +373,35 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     /**
+     * 场景：同一原占用活动下，同一资金交易流水被多个控制消费活动累计解释超过交易金额。
+     * 输入：原占用金额大于交易金额，先消费 40，再用同一交易尝试消费 30。
+     * 输出：第二次消费被拒绝，不写新的控制活动。
+     * 红线：同一原控制活动不能把同一交易流水累计解释成超过资金交易金额的控制消费。
+     */
+    @Test
+    void testConsumeSameTransactionOverTransactionAmountShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved").setAmount(100L));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
+        spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-consumed").setAmount(40L));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(SECOND_CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-second-consumed").setAmount(30L)))
+                .hasMessageContaining("控制消费累计金额超过资金交易金额");
+
+        assertThat(activityCount(SECOND_CONSUME_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：资金交易失败后释放已预留的 Spend Rule 控制活动。
      * 输入：已有 RESERVED 控制活动和失败资金交易事实。
      * 输出：记录 RELEASED 控制活动，预算控制投影释放金额增加。
@@ -453,6 +488,36 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
         assertThat(activityCount(RELEASE_ACTIVITY_SN)).isZero();
         assertThat(fundsTransactionCount(FAILED_REFUND_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一原占用活动下，同一失败交易流水被多个释放活动累计解释超过交易金额。
+     * 输入：原占用金额大于失败交易金额，先释放 40，再用同一交易尝试释放 30。
+     * 输出：第二次释放被拒绝，不写新的控制活动。
+     * 红线：同一原控制活动不能把同一交易流水累计解释成超过资金交易金额的控制释放。
+     */
+    @Test
+    void testReleaseSameTransactionOverTransactionAmountShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved").setAmount(100L));
+        insertFundsTransaction(FAILED_TRANSACTION_SN, BUSINESS_SN,
+                DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
+        spendControlTransactionConsumptionApplicationService.release(
+                consumptionRequest(RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FAILED_TRANSACTION_SN,
+                        "sha256:sctc-released").setAmount(40L));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.release(
+                consumptionRequest(SECOND_RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FAILED_TRANSACTION_SN,
+                        "sha256:sctc-second-released").setAmount(30L)))
+                .hasMessageContaining("控制释放累计金额超过资金交易金额");
+
+        assertThat(activityCount(SECOND_RELEASE_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(RELEASE_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FAILED_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -662,6 +727,41 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(projection.getConsumedAmount()).isEqualTo(60L);
         assertThat(projection.getRemainingControlAmount()).isZero();
         assertThat(projection.getLastActivitySn()).isEqualTo(CONSUME_ACTIVITY_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一原占用活动下，同一退款交易流水被多个补偿活动累计解释超过退款交易金额。
+     * 输入：已消费 100，退款交易金额 40，先补偿 25，再用同一退款交易尝试补偿 20。
+     * 输出：第二次补偿被拒绝，不写新的退款控制补偿活动。
+     * 红线：同一原控制活动不能把同一退款交易累计解释成超过退款交易金额的控制补偿。
+     */
+    @Test
+    void testRefundSameTransactionOverTransactionAmountShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved").setAmount(100L));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 100L, CurrencyIsoCode.USD);
+        spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-consumed").setAmount(100L));
+        insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_001",
+                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 40L, CurrencyIsoCode.USD,
+                FUNDS_TRANSACTION_SN);
+        spendControlTransactionConsumptionApplicationService.refund(
+                consumptionRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
+                        "sha256:sctc-refund-compensated").setAmount(25L));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.refund(
+                consumptionRequest(SECOND_REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
+                        "sha256:sctc-second-refund-compensated").setAmount(20L)))
+                .hasMessageContaining("退款控制补偿累计金额超过资金交易金额");
+
+        assertThat(activityCount(SECOND_REFUND_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(REFUND_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(REFUND_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 

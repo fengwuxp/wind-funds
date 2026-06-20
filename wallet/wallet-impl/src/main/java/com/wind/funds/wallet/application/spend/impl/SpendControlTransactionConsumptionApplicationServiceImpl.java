@@ -48,6 +48,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         assertControlActivityMatchesTransaction(request, transaction, "控制消费");
         assertTransactionBusinessSnMatches(request, transaction);
         assertEnoughRemainingControlAmount(request, originalActivity, "控制消费金额超过原占用剩余额度");
+        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlActivityType.CONSUMED, "控制消费");
         return spendControlActivityApplicationService.recordActivity(
                 toRecordRequest(request, originalActivity, SpendControlActivityType.CONSUMED));
     }
@@ -65,6 +66,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         assertControlActivityMatchesTransaction(request, transaction, "控制释放");
         assertTransactionBusinessSnMatches(request, transaction);
         assertEnoughRemainingControlAmount(request, originalActivity, "控制释放金额超过原占用剩余额度");
+        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlActivityType.RELEASED, "控制释放");
         return spendControlActivityApplicationService.recordActivity(
                 toRecordRequest(request, originalActivity, SpendControlActivityType.RELEASED));
     }
@@ -85,6 +87,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         assertReferencedConsumedActivitiesMatchOriginalActivity(originalActivity, referencedConsumedActivities);
         assertRefundDoesNotExceedReferencedConsumedAmount(request, transaction, referencedConsumedActivities);
         assertRefundDoesNotExceedNetConsumedAmount(request, originalActivity);
+        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlActivityType.REFUND_COMPENSATED,
+                "退款控制补偿");
         return spendControlActivityApplicationService.recordActivity(
                 toRecordRequest(request, originalActivity, SpendControlActivityType.REFUND_COMPENSATED));
     }
@@ -169,6 +173,31 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                                                     FundsTransactionDTO transaction) {
         AssertUtils.isTrue(Objects.equals(transaction.getBusinessSn(), request.getBusinessSn()),
                 "资金交易业务流水不一致，transactionSn = {}", request.getTransactionSn());
+    }
+
+    private void assertTransactionControlAmountNotExceeded(SpendControlTransactionConsumptionRequest request,
+                                                           FundsTransactionDTO transaction,
+                                                           SpendControlActivityType activityType,
+                                                           String actionName) {
+        List<SpendControlActivityDTO> transactionActivities = spendControlActivityApplicationService.queryActivities(
+                new SpendControlActivityQuery()
+                        .setTenantId(request.getTenantId())
+                        .setOriginalActivitySn(request.getOriginalActivitySn())
+                        .setActivityType(activityType)
+                        .setTransactionSn(request.getTransactionSn()));
+        long usedTransactionAmount = transactionActivities.stream()
+                .filter(activity -> !Objects.equals(activity.getActivitySn(), request.getActivitySn()))
+                .mapToLong(SpendControlActivityDTO::getAmount)
+                .sum();
+        long remainingTransactionAmount = transaction.getAmount() - usedTransactionAmount;
+        AssertUtils.isTrue(remainingTransactionAmount >= request.getAmount(),
+                "{}累计金额超过资金交易金额，activitySn = {}, transactionSn = {}, "
+                        + "remainingTransactionAmount = {}, amount = {}",
+                actionName,
+                request.getActivitySn(),
+                request.getTransactionSn(),
+                remainingTransactionAmount,
+                request.getAmount());
     }
 
     private void assertEnoughRemainingControlAmount(SpendControlTransactionConsumptionRequest request,
