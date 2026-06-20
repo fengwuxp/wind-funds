@@ -131,6 +131,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN = "activity_cross_business_sn_released_001";
 
+    private static final String REPLAYED_RELEASE_ACTIVITY_SN = "activity_replayed_released_001";
+
     private static final String REFUND_ACTIVITY_SN = "activity_refund_compensated_001";
 
     private static final String SECOND_REFUND_ACTIVITY_SN = "activity_refund_compensated_002";
@@ -518,6 +520,39 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activityCount(SECOND_RELEASE_ACTIVITY_SN)).isZero();
         assertThat(activityCount(RELEASE_ACTIVITY_SN)).isOne();
         assertThat(fundsTransactionCount(FAILED_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一控制活动流水和摘要被错误地从 release 语义复用到 consume。
+     * 输入：已存在 RELEASED 控制活动，再用同一 activitySn 和 activityDigest 调用 consume。
+     * 输出：请求被拒绝，不返回类型不匹配的旧活动。
+     * 红线：幂等回放必须保持控制活动语义一致，不能只凭摘要复用不同类型、不同交易状态的控制活动。
+     */
+    @Test
+    void testConsumeSameActivitySnAndDigestWithDifferentActivityTypeShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, REPLAYED_RELEASE_ACTIVITY_SN,
+                SpendControlActivityType.RELEASED, "sha256:sctc-replayed-activity")
+                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(FUNDS_TRANSACTION_SN)
+                .setDescription("交易失败后释放 Spend Rule 控制占用"));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(REPLAYED_RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-replayed-activity")))
+                .hasMessageContaining("控制活动流水已存在但类型不一致");
+
+        SpendControlActivityDTO replayedActivity = queryActivity(REPLAYED_RELEASE_ACTIVITY_SN);
+        assertThat(replayedActivity.getActivityType()).isEqualTo(SpendControlActivityType.RELEASED);
+        assertThat(replayedActivity.getTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
+        assertThat(activityCount(REPLAYED_RELEASE_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 

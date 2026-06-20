@@ -53,7 +53,7 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         validateIdempotencyBoundary(request);
         SpendControlActivity existing = findByActivitySn(request.getTenantId(), request.getActivitySn());
         if (existing != null) {
-            assertSameActivityDigest(request, existing);
+            assertSameActivity(request, existing);
             return toDTO(existing);
         }
         validateRecordRequest(request);
@@ -162,8 +162,79 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         if (existing == null) {
             throw exception;
         }
-        assertSameActivityDigest(request, existing);
+        assertSameActivity(request, existing);
         return toDTO(existing);
+    }
+
+    private void assertSameActivity(RecordSpendControlActivityRequest request, SpendControlActivity existing) {
+        assertSameActivityDigest(request, existing);
+        AssertUtils.notNull(request.getTargetAccountId(), "控制活动目标账户不能为空");
+        assertSameActivityIdentity(request, existing);
+        assertSameActivityTarget(request, existing);
+        assertSameActivityAmountAndRule(request, existing);
+        assertSameActivityDecision(request, existing);
+    }
+
+    private void assertSameActivityIdentity(RecordSpendControlActivityRequest request, SpendControlActivity existing) {
+        AssertUtils.isTrue(existing.getActivityType() == request.getActivityType(),
+                "控制活动流水已存在但类型不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getBusinessScene(), request.getBusinessScene()),
+                "控制活动流水已存在但业务场景不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getBusinessSn(), request.getBusinessSn()),
+                "控制活动流水已存在但业务流水不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getOriginalActivitySn(), request.getOriginalActivitySn()),
+                "控制活动流水已存在但原控制活动流水不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getTransactionSn(), request.getTransactionSn()),
+                "控制活动流水已存在但资金交易流水不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getInstrumentSn(), request.getInstrumentSn()),
+                "控制活动流水已存在但支付工具号不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(existing.getAction() == request.getAction(),
+                "控制活动流水已存在但支付工具动作不一致，activitySn = {}",
+                request.getActivitySn());
+    }
+
+    private void assertSameActivityTarget(RecordSpendControlActivityRequest request, SpendControlActivity existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getTargetSubjectId(), request.getTargetAccountId().id())
+                        && existing.getTargetSubjectType() == targetSubjectType(request.getTargetAccountId()),
+                "控制活动流水已存在但目标账户不一致，activitySn = {}",
+                request.getActivitySn());
+    }
+
+    private void assertSameActivityAmountAndRule(RecordSpendControlActivityRequest request,
+            SpendControlActivity existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getAmount(), request.getAmount()),
+                "控制活动流水已存在但控制金额不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(existing.getCurrency() == request.getCurrency(),
+                "控制活动流水已存在但币种不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getSpendRuleId(), request.getSpendRuleId()),
+                "控制活动流水已存在但 Spend Rule 标识不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getSpendRuleVersion(), request.getSpendRuleVersion()),
+                "控制活动流水已存在但 Spend Rule 版本不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getBudgetGroupSn(), request.getBudgetGroupSn()),
+                "控制活动流水已存在但预算组标识不一致，activitySn = {}",
+                request.getActivitySn());
+    }
+
+    private void assertSameActivityDecision(RecordSpendControlActivityRequest request, SpendControlActivity existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getSpendDecisionSn(), request.getSpendDecisionSn()),
+                "控制活动流水已存在但决策流水不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(existing.getSpendDecisionResult() == request.getSpendDecisionResult(),
+                "控制活动流水已存在但决策结果不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getSpendDecisionDigest(), request.getSpendDecisionDigest()),
+                "控制活动流水已存在但决策摘要不一致，activitySn = {}",
+                request.getActivitySn());
     }
 
     private void assertSameActivityDigest(RecordSpendControlActivityRequest request, SpendControlActivity existing) {

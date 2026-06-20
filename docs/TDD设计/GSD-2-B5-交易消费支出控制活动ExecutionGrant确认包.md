@@ -10,15 +10,15 @@
 | --- | --- |
 | Task ID | `GSD2-B5-SR-TRANSACTION-CONSUME-001` |
 | 原子任务 | 在服务层补齐交易结果对 Spend Rule 控制活动的消费、释放、冲正和投影解释边界。 |
-| 所属阶段 | GSD-2 / B5 Spend Rule / Transaction consumption admission / transaction amount guard green verified。 |
+| 所属阶段 | GSD-2 / B5 Spend Rule / Transaction consumption admission / idempotency semantic guard green verified。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
-| 当前状态 | `SR_TRANSACTION_CONTROL_TRANSACTION_AMOUNT_GUARD_GREEN_VERIFIED` |
+| 当前状态 | `SR_TRANSACTION_CONSUME_IDEMPOTENCY_SEMANTIC_GUARD_GREEN_VERIFIED` |
 | 当前基线 | 本 Grant 已消费并随本提交固化；历史基线包含 `3b31d6e0 docs: 同步资金服务层提交状态`、`a5b12a3f feat: 收敛资金服务层交付基线`、`78f7f008 feat: 补齐支出控制活动与预算投影`、`021ee2ce feat: 补齐支出控制准入快照`。 |
 | Owner | AI Native 流程编排负责确认包、状态和停止条件；产品架构专家负责业务目标、验收和 Not Done；资深架构师负责接口契约、事务边界、测试和验证命令；用户确认单一 Grant。 |
-| 写入范围 | `SpendControlTransactionConsumptionApplicationServiceImpl` 服务层校验、`SpendControlTransactionConsumptionApplicationServiceTests` 目标测试，以及本文、LWT Goal、W5 推进计划和 OpenSpec tasks 的状态同步。 |
-| 写入文件 | `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application/spend/impl/SpendControlTransactionConsumptionApplicationServiceImpl.java`、`tests/src/test/java/com/wind/funds/wallet/application/spend/SpendControlTransactionConsumptionApplicationServiceTests.java`、`docs/TDD设计/GSD-2-B5-交易消费支出控制活动ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
+| 写入范围 | `SpendControlActivityApplicationServiceImpl` 控制活动幂等语义一致性校验、`SpendControlTransactionConsumptionApplicationServiceTests` 与 `SpendControlActivityApplicationServiceTests` 目标回归，以及本文、LWT Goal、W5 推进计划和 OpenSpec tasks 的状态同步。 |
+| 写入文件 | `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application/spend/impl/SpendControlActivityApplicationServiceImpl.java`、`tests/src/test/java/com/wind/funds/wallet/application/spend/SpendControlTransactionConsumptionApplicationServiceTests.java`、`tests/src/test/java/com/wind/funds/wallet/application/spend/SpendControlActivityApplicationServiceTests.java`、`docs/TDD设计/GSD-2-B5-交易消费支出控制活动ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、core、wallet、transaction、ledger、tests、Justfile、AGENTS.md 和最近 Git 提交。 |
-| Git 策略 | 本确认包已被多轮服务层补片消费；退款引用已消费一致性守卫已形成服务层验证证据，本轮交易事实累计解释金额守卫形成服务层验证证据。后续若继续新 Grant，需重新确认写入范围和 Git 策略。 |
+| Git 策略 | 本确认包已被多轮服务层补片消费；退款引用已消费一致性守卫和交易事实累计解释金额守卫已形成服务层验证证据，本轮控制活动幂等语义一致性守卫随本次提交固化。后续若继续新 Grant，需重新确认写入范围和 Git 策略。 |
 | 服务层边界 | 只处理 wallet / transaction 的服务层能力，不新增 Controller、HTTP/RPC、页面、导出、外部通道适配或控制层能力。 |
 
 ## 2. 业务目标
@@ -554,3 +554,17 @@ Not Done：
 | 验证证据 | 非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 18 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 24 tests 通过；收口执行 `just compile`、`just pmd`、`git diff --check` 和边界关键词扫描。 |
 | 当前状态 | `SR_TRANSACTION_CONTROL_TRANSACTION_AMOUNT_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实和支付工具 `REFUND` 方向裁决。 |
+
+### 14.11 控制活动幂等语义一致性守卫补充记录（2026-06-20）
+
+本节记录 `GSD2-B5-SR-TRANSACTION-CONSUME-IDEMPOTENCY-SEMANTIC-GUARD-011` 的实际执行结果。该补片只补控制活动记录服务的幂等语义一致性守卫，不重新打开 Controller、HTTP/RPC、支付工具 `REFUND` 能力方向、交易 canonical 入参或 ledger posting。
+
+| 字段 | 内容 |
+| --- | --- |
+| 补充任务 | `GSD2-B5-SR-TRANSACTION-CONSUME-IDEMPOTENCY-SEMANTIC-GUARD-011`。 |
+| 写入范围 | `SpendControlActivityApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceTests`、`SpendControlActivityApplicationServiceTests`、本文、LWT Goal、TDD 清单和 OpenSpec tasks 状态同步。 |
+| 已完成能力 | 控制活动幂等回放不再只比较 `activityDigest`；同一 `tenantId + activitySn + activityDigest` 还必须保持活动类型、业务场景、业务流水、原活动、交易流水、支付工具、目标账户、金额、币种、Spend Rule 和决策证据一致。 |
+| 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
+| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 19 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 26 tests 通过；收口执行 `just compile`、`just pmd`、`git diff --check` 和边界关键词扫描。 |
+| 当前状态 | `SR_TRANSACTION_CONSUME_IDEMPOTENCY_SEMANTIC_GUARD_GREEN_VERIFIED`。 |
+| Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |

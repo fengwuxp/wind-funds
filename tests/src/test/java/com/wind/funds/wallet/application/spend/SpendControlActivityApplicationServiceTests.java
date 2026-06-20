@@ -239,6 +239,34 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
     }
 
     /**
+     * 场景：同一控制活动流水和摘要被不同业务语义复用。
+     * 输入：已存在 RESERVED 控制活动，再用同一 activitySn 和 activityDigest 记录 RELEASED。
+     * 输出：拒绝回放，已有活动保持原语义。
+     * 红线：控制活动幂等不能只比摘要，关键业务字段变化必须被识别为冲突，且不得创建任何资金事实。
+     */
+    @Test
+    void testRecordActivityShouldRejectSameDigestWithDifferentSemanticFieldsWithoutFundsSideEffect() {
+        prepareSpendControlActivityData();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:activity-reserved"));
+
+        assertThatThrownBy(() -> spendControlActivityApplicationService.recordActivity(
+                recordRequest(decision, RESERVED_ACTIVITY_SN, SpendControlActivityType.RELEASED,
+                        "sha256:activity-reserved")))
+                .hasMessageContaining("控制活动流水已存在但类型不一致");
+
+        List<SpendControlActivityDTO> activities = spendControlActivityApplicationService.queryActivities(
+                new SpendControlActivityQuery().setTenantId(TENANT_ID).setActivitySn(RESERVED_ACTIVITY_SN));
+        assertThat(activities).hasSize(1);
+        assertThat(activities.getFirst().getActivityType()).isEqualTo(SpendControlActivityType.RESERVED);
+        assertThat(activityCount(RESERVED_ACTIVITY_SN)).isOne();
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：预算控制投影从控制活动派生。
      * 输入：同一预算组下先记录占用，再记录释放。
      * 输出：投影展示控制占用、释放和剩余控制金额。
