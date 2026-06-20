@@ -103,9 +103,13 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String BUSINESS_SCENE = "SPEND_CONTROL_TRANSACTION";
 
+    private static final String OTHER_BUSINESS_SCENE = "OTHER_SPEND_CONTROL_TRANSACTION";
+
     private static final String BUSINESS_SN = "SPEND_CONTROL_TRANSACTION_001";
 
     private static final String CONSUME_ACTIVITY_SN = "activity_consumed_001";
+
+    private static final String CROSS_SCENE_CONSUME_ACTIVITY_SN = "activity_cross_scene_consumed_001";
 
     private static final String REFUND_CONSUME_ACTIVITY_SN = "activity_refund_consumed_001";
 
@@ -132,6 +136,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private static final String BUDGET_GROUP_SN = "budget_sctc";
 
     private static final String FUNDS_TRANSACTION_SN = "funds_transaction_sctc_001";
+
+    private static final String CROSS_SCENE_TRANSACTION_SN = "funds_transaction_sctc_cross_scene_001";
 
     private static final String FAILED_TRANSACTION_SN = "funds_transaction_sctc_failed_001";
 
@@ -239,6 +245,32 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
         assertThat(activityCount(REFUND_CONSUME_ACTIVITY_SN)).isZero();
         assertThat(fundsTransactionCount(REFUND_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方把其他业务场景下的成功资金交易事实误用于当前 Spend Rule 控制消费。
+     * 输入：已有 RESERVED 控制活动和不同业务场景的 CLOSED PAY 资金交易事实。
+     * 输出：请求被拒绝，不写新的控制活动。
+     * 红线：控制活动只能消费同一业务场景下的资金交易事实，不得跨业务域串用交易流水，也不得写 route、posting 或账本事实。
+     */
+    @Test
+    void testConsumeWithDifferentBusinessSceneTransactionShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertFundsTransaction(CROSS_SCENE_TRANSACTION_SN, OTHER_BUSINESS_SCENE, BUSINESS_SN,
+                DefaultFundsTransactionType.PAY, FundsTransactionStatus.CLOSED, 60L, CurrencyIsoCode.USD, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(CROSS_SCENE_CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                        CROSS_SCENE_TRANSACTION_SN, "sha256:sctc-cross-scene-consumed")))
+                .hasMessageContaining("资金交易业务场景不一致");
+
+        assertThat(activityCount(CROSS_SCENE_CONSUME_ACTIVITY_SN)).isZero();
+        assertThat(fundsTransactionCount(CROSS_SCENE_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -687,6 +719,18 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                                         Long amount,
                                         CurrencyIsoCode currency,
                                         String referenceTransactionSn) {
+        insertFundsTransaction(transactionSn, BUSINESS_SCENE, businessSn, transactionType, status, amount, currency,
+                referenceTransactionSn);
+    }
+
+    private void insertFundsTransaction(String transactionSn,
+                                        String businessScene,
+                                        String businessSn,
+                                        DefaultFundsTransactionType transactionType,
+                                        FundsTransactionStatus status,
+                                        Long amount,
+                                        CurrencyIsoCode currency,
+                                        String referenceTransactionSn) {
         jdbcTemplate.update("""
                         INSERT INTO t_funds_transaction (
                             sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
@@ -698,7 +742,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 TENANT_ID,
                 FundsTransactionMode.DIRECT.name(),
                 transactionType.name(),
-                BUSINESS_SCENE,
+                businessScene,
                 businessSn,
                 referenceTransactionSn,
                 status.name(),

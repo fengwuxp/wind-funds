@@ -137,6 +137,10 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
     private void assertControlActivityMatchesOriginalActivity(SpendControlTransactionConsumptionRequest request,
                                                               SpendControlActivityDTO originalActivity,
                                                               String actionName) {
+        AssertUtils.isTrue(Objects.equals(originalActivity.getBusinessScene(), request.getBusinessScene()),
+                "{}业务场景不一致，activitySn = {}", actionName, request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(originalActivity.getBusinessSn(), request.getBusinessSn()),
+                "{}业务流水不一致，activitySn = {}", actionName, request.getActivitySn());
         AssertUtils.isTrue(Objects.equals(originalActivity.getTargetAccountId(), request.getTargetAccountId()),
                 "{}目标账户不一致，activitySn = {}", actionName, request.getActivitySn());
         AssertUtils.isTrue(originalActivity.getCurrency() == request.getCurrency(),
@@ -148,6 +152,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
     private void assertControlActivityMatchesTransaction(SpendControlTransactionConsumptionRequest request,
                                                          FundsTransactionDTO transaction,
                                                          String actionName) {
+        AssertUtils.isTrue(Objects.equals(transaction.getBusinessScene(), request.getBusinessScene()),
+                "资金交易业务场景不一致，transactionSn = {}", request.getTransactionSn());
         AssertUtils.isTrue(transaction.getCurrency() == request.getCurrency(),
                 "资金交易币种不一致，transactionSn = {}", request.getTransactionSn());
         AssertUtils.isTrue(transaction.getAmount() >= request.getAmount(),
