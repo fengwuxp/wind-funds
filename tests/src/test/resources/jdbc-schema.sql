@@ -254,6 +254,47 @@ CREATE TABLE `t_spend_subject_funding_rel`
   DEFAULT CHARSET = utf8mb4 COMMENT = '支出主体资金关系表';
 
 -- ----------------------------
+-- 支出控制活动表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_spend_control_activity`;
+CREATE TABLE `t_spend_control_activity`
+(
+    `id`                    BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`            DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `activity_sn`           VARCHAR(64) NOT NULL COMMENT '控制活动流水号',
+    `tenant_id`             BIGINT(20)  NOT NULL COMMENT '租户 ID',
+    `activity_type`         VARCHAR(50) NOT NULL COMMENT '控制活动类型',
+    `business_scene`        VARCHAR(50) NOT NULL COMMENT '业务场景',
+    `business_sn`           VARCHAR(64) NOT NULL COMMENT '业务号',
+    `instrument_sn`         VARCHAR(64) NOT NULL COMMENT '支付工具号',
+    `action`                VARCHAR(50) NOT NULL COMMENT '支付工具动作',
+    `target_subject_id`     VARCHAR(64) NOT NULL COMMENT '目标资金主体 ID',
+    `target_subject_type`   VARCHAR(50) NOT NULL COMMENT '目标资金主体类型',
+    `amount`                BIGINT(20)  NOT NULL DEFAULT 0 COMMENT '控制金额',
+    `currency`              VARCHAR(10) NOT NULL COMMENT '币种',
+    `spend_rule_id`         VARCHAR(64) NOT NULL COMMENT 'Spend Rule 标识',
+    `spend_rule_version`    VARCHAR(64) NOT NULL COMMENT 'Spend Rule 版本',
+    `spend_decision_sn`     VARCHAR(64) NOT NULL COMMENT 'Spend Rule 决策流水号',
+    `spend_decision_result` VARCHAR(50) NOT NULL COMMENT 'Spend Rule 决策结果',
+    `spend_decision_digest` VARCHAR(128) NOT NULL COMMENT 'Spend Rule 决策摘要',
+    `budget_group_sn`       VARCHAR(64)          DEFAULT NULL COMMENT '预算组或控制范围标识',
+    `reject_reason`         VARCHAR(512)         DEFAULT NULL COMMENT '拒绝原因',
+    `activity_digest`       VARCHAR(128) NOT NULL COMMENT '控制活动摘要',
+    `description`           VARCHAR(512)         DEFAULT NULL COMMENT '描述',
+    `context_variables`     TEXT                 DEFAULT NULL COMMENT '扩展上下文',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_spend_control_activity_sn` (`tenant_id`, `activity_sn`),
+    KEY `idx_spend_control_activity_business` (`tenant_id`, `business_scene`, `business_sn`),
+    KEY `idx_spend_control_activity_instrument` (`tenant_id`, `instrument_sn`, `action`),
+    KEY `idx_spend_control_activity_target` (`tenant_id`, `target_subject_type`, `target_subject_id`),
+    KEY `idx_spend_control_activity_budget` (`tenant_id`, `budget_group_sn`, `currency`),
+    KEY `idx_spend_control_activity_rule` (`tenant_id`, `spend_rule_id`, `spend_rule_version`),
+    KEY `idx_spend_control_activity_created` (`gmt_create`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '支出控制活动表';
+
+-- ----------------------------
 -- 资金交易表
 -- ----------------------------
 DROP TABLE IF EXISTS `t_funds_transaction`;
