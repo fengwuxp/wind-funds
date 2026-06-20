@@ -12,7 +12,7 @@
 | 原子任务 | 在服务层补齐交易结果对 Spend Rule 控制活动的消费、释放、冲正和投影解释边界。 |
 | 所属阶段 | GSD-2 / B5 Spend Rule / Transaction consumption admission / green verified committed。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
-| 当前状态 | `SR_TRANSACTION_CONSUME_REFUND_COMPENSATION_GUARD_GREEN_VERIFIED` |
+| 当前状态 | `SR_TRANSACTION_CONSUME_REFUND_REFERENCE_GUARD_GREEN_VERIFIED` |
 | 当前基线 | 本 Grant 已消费并随本提交固化；历史基线包含 `3b31d6e0 docs: 同步资金服务层提交状态`、`a5b12a3f feat: 收敛资金服务层交付基线`、`78f7f008 feat: 补齐支出控制活动与预算投影`、`021ee2ce feat: 补齐支出控制准入快照`。 |
 | Owner | AI Native 流程编排负责确认包、状态和停止条件；产品架构专家负责业务目标、验收和 Not Done；资深架构师负责接口契约、事务边界、测试和验证命令；用户确认单一 Grant。 |
 | 写入范围 | 本文、LWT Goal、W5 推进计划、GSD-2 新基线入口、TDD README、docs README 和 OpenSpec tasks 的状态同步。 |
@@ -460,3 +460,16 @@ Not Done：
 | 无副作用证据 | 目标测试断言失败路径不新增退款补偿控制活动，不修改既有消费控制活动或资金交易事实，且 route、posting、LedgerEntry、账本交易和余额投影不变化。 |
 | 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 9 tests 通过；`just compile`、`just pmd` 和 `git diff --check` 通过。 |
 | 当前状态 | `SR_TRANSACTION_CONSUME_REFUND_COMPENSATION_GUARD_GREEN_VERIFIED`。 |
+
+### 14.4 退款已消费引用守卫补充记录（2026-06-20）
+
+本节记录 `SpendControlTransactionConsumptionApplicationServiceTests` 针对 `refund` 侧的补充回归。该补片只确认退款交易事实必须关联已消费控制活动；不重新打开交易 canonical 入参、支付工具 `REFUND` 方向或 ledger posting。
+
+| 字段 | 内容 |
+| --- | --- |
+| 补充任务 | `GSD2-B5-SR-TRANSACTION-CONSUME-REFUND-REFERENCE-GUARD-004`。 |
+| 写入范围 | 仅新增 `SpendControlTransactionConsumptionApplicationServiceTests` 目标服务流测试和状态文档；生产实现沿用既有服务层守卫。 |
+| Guard 语义 | `refund` 不仅要求已关闭 `REFUND` 交易事实，还要求退款交易引用的原资金交易已经存在对应 `CONSUMED` 控制活动；只有退款交易事实但没有已消费控制事实时，不得记录 `REFUND_COMPENSATED`。 |
+| 无副作用证据 | 目标测试断言失败路径不新增退款补偿控制活动，不新增消费控制活动，不修改既有资金交易事实，且 route、posting、LedgerEntry、账本交易和余额投影不变化。 |
+| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 10 tests 通过；`just compile`、`just pmd` 和 `git diff --check` 均通过。 |
+| 当前状态 | `SR_TRANSACTION_CONSUME_REFUND_REFERENCE_GUARD_GREEN_VERIFIED`。 |
