@@ -13,17 +13,17 @@
 | 所属阶段 | GSD-2 Wave 0 / Baseline Reset / Planning-only。 |
 | Goal ID | `GSD2-GOAL-PRODUCTION-FUNDS-BASELINE-2026-06-12` |
 | Loop ID | `GSD2-LOOP-DEFAULT-PLAN-GRANT-2026-06-12` |
-| 当前状态 | `SR_CONTROL_ACTIVITY_GREEN_VERIFIED` |
-| Git / code baseline | 当前已提交 Git/code baseline 包含 `021ee2ce feat: 补齐支出控制准入快照`、`a1397ddf feat: 补齐对账差异报告只读查询` 和 `96938fa8 docs: 回写对账差异报告提交基线`；`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001 / scopeDecision=object-scope-schema-backed`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001`、`GSD2-B7-RECON-DIFFERENCE-REPORT-001` 和 `GSD2-B2-SPEND-CONTROL-ADMISSION-001` 已完成 Red / Green / Verify 并提交固化。本轮准备 `GSD2-B5-SR-CONTROL-ACTIVITY-001` 确认包，作为 wallet Spend Rule 控制活动与预算投影的下一默认候选。`GSD2-B2-ACCOUNT-CAPABILITY-SOURCE-001` 已成为已消费被依赖证据；`4ef64275 feat: 补齐余额调账独立审计查询`、`da3b4f19 feat: 补齐余额调账路由审计回链`、`0b251593 feat: 补齐账本正常余额方向护栏`、`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6` 和 `e81a8a25` 保留为已消费能力证据，`da7d2ea test: 阻断契约夹具承载资金流断言` 和 `b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 只保留为 GSD-2 历史证据。 |
+| 当前状态 | `SR_CONTROL_ACTIVITY_GREEN_VERIFIED_COMMITTED` |
+| Git / code baseline | 当前已提交 Git/code baseline 包含 `78f7f008 feat: 补齐支出控制活动与预算投影`、`021ee2ce feat: 补齐支出控制准入快照`、`a1397ddf feat: 补齐对账差异报告只读查询` 和 `96938fa8 docs: 回写对账差异报告提交基线`；`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001 / scopeDecision=object-scope-schema-backed`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001`、`GSD2-B7-RECON-DIFFERENCE-REPORT-001`、`GSD2-B2-SPEND-CONTROL-ADMISSION-001` 和 `GSD2-B5-SR-CONTROL-ACTIVITY-001` 已完成 Red / Green / Verify 并提交固化。`GSD2-B2-ACCOUNT-CAPABILITY-SOURCE-001` 已成为已消费被依赖证据；`4ef64275 feat: 补齐余额调账独立审计查询`、`da3b4f19 feat: 补齐余额调账路由审计回链`、`0b251593 feat: 补齐账本正常余额方向护栏`、`dd442888`、`ea8f8800`、`632bd2f6`、`ca603eab`、`873e5f8c`、`a38776c5`、`bc7ffc0f`、`10853e2d`、`ae8cb8a6` 和 `e81a8a25` 保留为已消费能力证据，`da7d2ea test: 阻断契约夹具承载资金流断言` 和 `b3b9712 feat: 对齐资金底座GSD基线与交易回放能力` 只保留为 GSD-2 历史证据。 |
 | 设计 baseline | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec` 的当前可读状态；`openspec` 异常 Git 状态只作为停止条件和只读事实记录。 |
-| 活跃未完成编码计划 | `GSD2-B5-SR-CONTROL-ACTIVITY-001 / schemaDecision=ddl-backed` 已按用户确认完成首轮实现和本地 Green / Verify，尚未提交。旧候选不再作为当前编码计划，只能在新 Workflow 中被重新选择、重新编号、重新确认；AUTH 兼容 adapter、B4 remaining、wallet 授权准入、wallet route snapshot 回链、账户能力来源准入、预交易快照、支出控制准入快照、ledger guard、B5-002 route snapshot 审计回链、B5-003 独立审计查询、B7 对象级 Gate 基座、B7 清算 / 结算 consumer 和 B7 差异报告已消费。 |
+| 活跃未完成编码计划 | 当前没有活跃未完成编码计划；`GSD2-B5-SR-CONTROL-ACTIVITY-001 / schemaDecision=ddl-backed` 已按用户确认完成首轮实现、本地 Green / Verify 并提交到 `78f7f008`。旧候选不再作为当前编码计划，只能在新 Workflow 中被重新选择、重新编号、重新确认；AUTH 兼容 adapter、B4 remaining、wallet 授权准入、wallet route snapshot 回链、账户能力来源准入、预交易快照、支出控制准入快照、ledger guard、B5-002 route snapshot 审计回链、B5-003 独立审计查询、B7 对象级 Gate 基座、B7 清算 / 结算 consumer、B7 差异报告和 B5 控制活动已消费。 |
 | Owner | AI Native 流程编排负责状态、Loop、GSD 和门禁；产品架构专家负责业务目标、对象、能力、验收和金融待确认；资深架构师负责系统边界、接口、TDD、验证和编码准入。 |
 | 写入范围 | 本文、W5 P0/P1 ledger-wallet-transaction 推进计划、LWT 生产可用能力 Goal、B5 Spend Rule 控制活动确认包、Agent Loop / Plan Grant 默认授权策略、AI 代码交付闭环基线、GSD-2 单一 Grant 任务模板、`docs/TDD设计/README.md`、`docs/README.md` 和 OpenSpec tasks 状态同步。 |
 | 写入文件 | `docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-B5-SpendRule控制活动与预算投影ExecutionGrant确认包.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
-| 本轮新增写入补充 | `GSD2-B5-SR-CONTROL-ACTIVITY-001` 确认包已准备为 docs-only 下一默认候选，并同步 LWT Goal、W5、README 和 OpenSpec tasks；不授权 Java、测试、公共契约、DDL/H2 schema、Entity、Mapper、Spend Rule 规则定义实现、决策日志持久化实现、VCC facade、支付工具交易内核、Controller、HTTP/RPC、生产迁移或 Git 历史重写。 |
+| 本轮新增写入补充 | `GSD2-B5-SR-CONTROL-ACTIVITY-001` 已从确认包推进为服务层最小能力 Green / Verify / Commit，并同步 LWT Goal、W5、README 和 OpenSpec tasks；不授权继续扩 Java、测试、公共契约、DDL/H2 schema、Entity、Mapper、Spend Rule 规则定义实现、决策日志持久化实现、VCC facade、支付工具交易内核、Controller、HTTP/RPC、生产迁移或 Git 历史重写。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、源码、测试、Justfile、最近 Git 提交和旧 GSD/Grant 历史材料。 |
 | 只读参考 | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`、`openspec`、源码、测试和 Git 提交记录。 |
-| Git 策略 | B7 对象级 Gate、清算 / 结算 consumer、B7 差异报告和支出控制准入快照均已按授权提交固化；本轮 B5 确认包仍为 docs-only 准备态，未获新的 Git 授权，当前 Git 策略为 `summary_only`。 |
+| Git 策略 | B7 对象级 Gate、清算 / 结算 consumer、B7 差异报告、支出控制准入快照和 B5 控制活动均已按授权提交固化；后续新 Grant 默认 `summary_only`，除非用户再次明确授权提交。 |
 
 ## 2. 旧计划移除裁决
 
@@ -35,7 +35,7 @@
 | 旧 Agent Loop | `CLOSED_AS_HISTORY` | `GSD-GOAL-MVP-VCC-GLOBAL-FUNDS-LOOP-2026-06-11` 已关闭为历史 Loop。 |
 | 已消费 Grant | `CONSUMED_HISTORY_ONLY` | 不得复用，例如账本 002A、003、004A 和 B3 直接退款引用回放。 |
 | 未确认候选 | `BACKLOG_REFERENCE_NOT_ACTIVE_PLAN` | B2、B4、B5、B6/B8、B7、P2 VCC、P2 全球账户等候选均需在 GSD-2 中重新选择后才可进入计划。 |
-| 当前活跃编码执行队列 | `SR_CONTROL_ACTIVITY_GREEN_VERIFIED` | `GSD2-B5-SR-CONTROL-ACTIVITY-001` 已新增 Java、测试、H2 schema、公共契约、Entity 和 Mapper，并通过目标测试、支出控制准入回归、compile 和 PMD；当前没有新的能力扩展任务，下一步是按 Git 策略提交本 Task 独立切片，或重新确认新的单一 Grant。 |
+| 当前活跃编码执行队列 | `SR_CONTROL_ACTIVITY_GREEN_VERIFIED_COMMITTED` | `GSD2-B5-SR-CONTROL-ACTIVITY-001` 已新增 Java、测试、H2 schema、公共契约、Entity 和 Mapper，并通过目标测试、支出控制准入回归、compile、PMD 和 `git diff --check`，随 `78f7f008` 提交；当前没有新的能力扩展任务，下一步只能重新确认新的单一 Grant。 |
 
 清理规则：
 
@@ -67,7 +67,7 @@
 
 ## 4. 架构和代码基线
 
-背景：GSD-2 初始重置点为 `b3b9712`，后续已继续提交账户层级快照、信用账户路由闭合、GSD2 路由快照契约、DSL 契约门禁、资金责任目标主体、wallet application facade、支付工具能力准入 facade、交易投影解释、余额调账审计、对账差错闭环、对账差错处理动作守卫、对账准入消费、出款 preflight 消费、AUTH chargeback 兼容 guard、B4 投影解释 remaining 矩阵、wallet 授权准入、route snapshot 回链、ledger guard、B5-002 route snapshot 审计回链、B5-003 独立审计查询、B7 对象级 Gate 基座、B7 清算 / 结算 consumer、B7 对账差异报告、账户能力来源准入、支付工具预交易快照和支出控制准入快照，当前已提交 Git/code baseline 至 `021ee2ce`。`GSD2-B5-SR-CONTROL-ACTIVITY-001` 已准备为下一默认确认包，作为 wallet Spend Rule 控制活动与预算控制投影的下一步候选。当前需要避免继续沿用旧计划或旧基线状态，先以状态载体把最新设计、代码、任务和 OpenSpec 重新对齐。
+背景：GSD-2 初始重置点为 `b3b9712`，后续已继续提交账户层级快照、信用账户路由闭合、GSD2 路由快照契约、DSL 契约门禁、资金责任目标主体、wallet application facade、支付工具能力准入 facade、交易投影解释、余额调账审计、对账差错闭环、对账差错处理动作守卫、对账准入消费、出款 preflight 消费、AUTH chargeback 兼容 guard、B4 投影解释 remaining 矩阵、wallet 授权准入、route snapshot 回链、ledger guard、B5-002 route snapshot 审计回链、B5-003 独立审计查询、B7 对象级 Gate 基座、B7 清算 / 结算 consumer、B7 对账差异报告、账户能力来源准入、支付工具预交易快照、支出控制准入快照和 B5 Spend Rule 控制活动，当前已提交 Git/code baseline 至 `78f7f008`。当前需要避免继续沿用旧计划或旧基线状态，先以状态载体把最新设计、代码、任务和 OpenSpec 重新对齐。
 
 目标：用 GSD-2 固定当前设计、代码和任务基线，清理活跃队列，重新定义下一轮只读侦察、Gap Audit、单一 Grant 选择和 CAD 执行的顺序。
 
@@ -159,8 +159,8 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | Spec 准入 | 必须消费 `AI代码交付闭环与Spec模板基线.md` 并复制 `GSD-2-Spec-AC-Harness-CAD任务模板.md` 或等价任务卡，补齐 Spec ID、Spec 强度、AC 表、Goal / AC 映射、验证命令、CR 交接和知识回流位置。 |
 | 并行边界 | 同一时间只允许一个 Grant 进入 active；共享公共契约、状态机、fixture 或 H2 schema 的候选必须串行。 |
 | 候选队列 | 已完成 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001`、`GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002`、`GSD2-B2-FR-TARGET-001`、`GSD2-B2-WALLET-APPLICATION-FACADE-001`、`GSD2-B2-WALLET-APPLICATION-FACADE-002 / B2-PI-CAP-CAD-001`、`GSD2-B2-ACCOUNT-CAPABILITY-SOURCE-001`、`GSD2-B2-WALLET-PRE-TRANSACTION-SNAPSHOT-001`、`GSD2-B2-SPEND-CONTROL-ADMISSION-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-002`、`GSD2-B5-BALANCE-ADJUST-AUDIT-003`、`GSD2-B7-RECON-DIFFERENCE-MVP-001`、`GSD2-B7-RECON-DIFFERENCE-MVP-002`、`GSD2-B7-RECON-GATE-CONSUME-001`、`GSD2-B7-RECON-GATE-CONSUME-002`、`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001`、`GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 和 `GSD2-LD-LEDGER-GUARD-REGRESSION-001` 首轮 Green；当前以 [GSD-2-LWT-生产可用能力Goal.md](GSD-2-LWT-生产可用能力Goal.md) 作为下一轮 loop 状态载体。 |
-| 默认建议 | 若继续优先收敛 LWT 生产可用能力，`GSD2-AUTH-CHARGEBACK-TARGET-ALIGN-001` 的 contract/design-only 任务卡已补齐，`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`、`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001`、`GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001`、`GSD2-B2-ACCOUNT-CAPABILITY-SOURCE-001`、`GSD2-B2-WALLET-PRE-TRANSACTION-SNAPSHOT-001`、`GSD2-B2-SPEND-CONTROL-ADMISSION-001`、`GSD2-LD-LEDGER-GUARD-REGRESSION-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-002`、`GSD2-B5-BALANCE-ADJUST-AUDIT-003`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001`、`GSD2-B7-RECON-DIFFERENCE-REPORT-001` 和 `GSD2-B5-SR-CONTROL-ACTIVITY-001` 已消费；下一步若提交，提交 B5 控制活动独立切片，若扩能力则重新确认新的单一 Grant。 |
-| 当前默认确认包 | [GSD-2-B5-SpendRule控制活动与预算投影ExecutionGrant确认包.md](GSD-2-B5-SpendRule控制活动与预算投影ExecutionGrant确认包.md) 已从确认包进入首轮实现记录，状态 `SR_CONTROL_ACTIVITY_GREEN_VERIFIED`；`GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已由 [GSD-2-B7-对账差异报告ExecutionGrant确认包.md](GSD-2-B7-对账差异报告ExecutionGrant确认包.md) 消费并提交；[GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md](GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md) 已转为 consumer 消费结果记录；`GSD2-B2-ACCOUNT-CAPABILITY-SOURCE-001`、`GSD2-B2-WALLET-PRE-TRANSACTION-SNAPSHOT-001` 和 `GSD2-B2-SPEND-CONTROL-ADMISSION-001` 已由本轮 LWT Goal 消费为 wallet Green。 |
+| 默认建议 | 若继续优先收敛 LWT 生产可用能力，`GSD2-AUTH-CHARGEBACK-TARGET-ALIGN-001` 的 contract/design-only 任务卡已补齐，`GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001`、`GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002-REMAINING`、`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001`、`GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001`、`GSD2-B2-ACCOUNT-CAPABILITY-SOURCE-001`、`GSD2-B2-WALLET-PRE-TRANSACTION-SNAPSHOT-001`、`GSD2-B2-SPEND-CONTROL-ADMISSION-001`、`GSD2-LD-LEDGER-GUARD-REGRESSION-001`、`GSD2-B5-BALANCE-ADJUST-AUDIT-002`、`GSD2-B5-BALANCE-ADJUST-AUDIT-003`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001`、`GSD2-B7-RECON-DIFFERENCE-REPORT-001` 和 `GSD2-B5-SR-CONTROL-ACTIVITY-001` 已消费；下一步必须重新确认新的单一 Grant。 |
+| 当前默认确认包 | 当前没有默认确认包；[GSD-2-B5-SpendRule控制活动与预算投影ExecutionGrant确认包.md](GSD-2-B5-SpendRule控制活动与预算投影ExecutionGrant确认包.md) 已从确认包进入首轮实现记录，状态 `SR_CONTROL_ACTIVITY_GREEN_VERIFIED_COMMITTED`；`GSD2-B7-RECON-DIFFERENCE-REPORT-001` 已由 [GSD-2-B7-对账差异报告ExecutionGrant确认包.md](GSD-2-B7-对账差异报告ExecutionGrant确认包.md) 消费并提交；[GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md](GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md) 已转为 consumer 消费结果记录；`GSD2-B2-ACCOUNT-CAPABILITY-SOURCE-001`、`GSD2-B2-WALLET-PRE-TRANSACTION-SNAPSHOT-001` 和 `GSD2-B2-SPEND-CONTROL-ADMISSION-001` 已由本轮 LWT Goal 消费为 wallet Green。 |
 | 当前结果 | 已形成 [GSD-2-W2-单一Grant选择卡.md](GSD-2-W2-单一Grant选择卡.md)，并已由 W3A 完成只读源码定位、由 W4 完成确认包；`Execution Grant：GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 已在 2026-06-15 消费到首个 Red，随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已在当前工作树完成最小 Green 和目标回归。 |
 | 停止条件 | 用户未确认优先级、Grant 字段缺写入范围、验证命令或停止条件；或候选需要外部规则、专业确认、生产配置、联网、依赖安装、Git push、部署或不可逆操作。 |
 
@@ -213,7 +213,7 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | 写入范围 | 仅 W5 推进计划和入口状态回写，不写生产代码、测试、DDL/H2 或公共契约。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、tests、Justfile 和最近 Git 提交。 |
 | 上下文账本 | [GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md) 已把 ledger guard、账户层级、资金责任、wallet application facade、交易投影解释和余额调账审计排成依赖队列。 |
-| 当前结果 | 当前状态为 `SR_CONTROL_ACTIVITY_GREEN_VERIFIED`；账户层级来源契约、资金责任目标主体、资金责任解析 facade 和支付工具能力准入 facade 已纳入 `e81a8a25`，B4 投影解释、B5 余额调账审计和 B7 对账差错闭环已纳入 `ae8cb8a6`，B7 动作守卫已纳入 `10853e2d`，`GSD2-B7-RECON-GATE-CONSUME-001` 已在 `bc7ffc0f` 提交，`GSD2-B7-RECON-GATE-CONSUME-002` 已在 `a38776c5` 提交，`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 与 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 已在 `dd442888` 前完成本地 Green，`GSD2-LD-LEDGER-GUARD-REGRESSION-001` 已在 `0b251593` 固化，`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已在 `da3b4f19` 固化，`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在 `4ef64275` 固化，B7 对象级 Gate 基座和清算 / 结算 consumer 已在 `0d3f68dc` 固化，B7 对账差异报告已在 `a1397ddf` 固化，支出控制准入快照已在 `021ee2ce` 固化。当前 LWT 生产可用能力 Goal 已执行 `GSD2-B5-SR-CONTROL-ACTIVITY-001` 并完成本地 Green / Verify。 |
+| 当前结果 | 当前状态为 `SR_CONTROL_ACTIVITY_GREEN_VERIFIED_COMMITTED`；账户层级来源契约、资金责任目标主体、资金责任解析 facade 和支付工具能力准入 facade 已纳入 `e81a8a25`，B4 投影解释、B5 余额调账审计和 B7 对账差错闭环已纳入 `ae8cb8a6`，B7 动作守卫已纳入 `10853e2d`，`GSD2-B7-RECON-GATE-CONSUME-001` 已在 `bc7ffc0f` 提交，`GSD2-B7-RECON-GATE-CONSUME-002` 已在 `a38776c5` 提交，`GSD2-B2-WALLET-AUTHORIZATION-ADMISSION-001` 与 `GSD2-B2-WALLET-AUTHORIZATION-ROUTE-SNAPSHOT-001` 已在 `dd442888` 前完成本地 Green，`GSD2-LD-LEDGER-GUARD-REGRESSION-001` 已在 `0b251593` 固化，`GSD2-B5-BALANCE-ADJUST-AUDIT-002` 已在 `da3b4f19` 固化，`GSD2-B5-BALANCE-ADJUST-AUDIT-003` 已在 `4ef64275` 固化，B7 对象级 Gate 基座和清算 / 结算 consumer 已在 `0d3f68dc` 固化，B7 对账差异报告已在 `a1397ddf` 固化，支出控制准入快照已在 `021ee2ce` 固化，B5 Spend Rule 控制活动已在 `78f7f008` 固化。 |
 | 验证命令 | Harness checker、产品/架构结构检查、`rg` 一致性扫描和 `git diff --check`。 |
 | 停止条件 | 用户未确认 Execution Grant，或需要 Java/测试/公共契约/DDL/H2/Git/联网/生产动作。 |
 
@@ -283,7 +283,7 @@ GSD-2 的目标不是马上编码，而是先让新的状态、反馈、验证�
 | AI 交付准出 | 后续 Grant 必须列出 Spec/AC 映射、Red/Green 证据、独立验证命令、CR 交接、Not Done、知识回流和建议 commit message。 |
 | 停止条件 | 未确认新的单一 Execution Grant 前，不继续修改 Java、测试、生产 DDL、公共契约、wallet application facade、交易投影、余额调账、支付工具准入、Spend Rule、VCC、清结算真实消费方或 P2 业务；B5-003 和 B7 对象级 Gate 已消费，不得复用为审批、补事实或清结算真实消费方授权；需要 Git 授权、处置 `openspec` 异常状态、验证失败或用户调整优先级时停止。 |
 | Git 策略 | `summary_only`。 |
-| 下一 owner | 用户确认是否进入 `GSD2-B5-SR-CONTROL-ACTIVITY-001`；清算 / 结算真实消费方服务和 B7 差异报告已消费，阻断粒度沿用已完成的对象级 Gate 基座，不再复用 `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001`、`GSD2-B7-RECON-DIFFERENCE-REPORT-001`、`GSD2-B2-ACCOUNT-CAPABILITY-SOURCE-001`、`GSD2-B2-WALLET-PRE-TRANSACTION-SNAPSHOT-001` 或 `GSD2-B2-SPEND-CONTROL-ADMISSION-001`；产品架构专家确认业务用例、展示口径和 Not Done；资深架构师明确接入边界、交易/账本副作用断言、DTO、服务测试、账本护栏和验证命令。 |
+| 下一 owner | 用户确认新的单一 Grant；清算 / 结算真实消费方服务、B7 差异报告和 B5 控制活动均已消费，阻断粒度沿用已完成的对象级 Gate 基座，不再复用 `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001`、`GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001`、`GSD2-B7-RECON-DIFFERENCE-REPORT-001`、`GSD2-B2-ACCOUNT-CAPABILITY-SOURCE-001`、`GSD2-B2-WALLET-PRE-TRANSACTION-SNAPSHOT-001`、`GSD2-B2-SPEND-CONTROL-ADMISSION-001` 或 `GSD2-B5-SR-CONTROL-ACTIVITY-001`；产品架构专家确认业务用例、展示口径和 Not Done；资深架构师明确接入边界、交易/账本副作用断言、DTO、服务测试、账本护栏和验证命令。 |
 
 ## 9. 验证矩阵
 
