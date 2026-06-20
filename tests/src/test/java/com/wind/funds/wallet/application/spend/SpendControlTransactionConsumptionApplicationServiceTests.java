@@ -107,9 +107,13 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String BUSINESS_SN = "SPEND_CONTROL_TRANSACTION_001";
 
+    private static final String OTHER_BUSINESS_SN = "SPEND_CONTROL_TRANSACTION_OTHER_001";
+
     private static final String CONSUME_ACTIVITY_SN = "activity_consumed_001";
 
     private static final String CROSS_SCENE_CONSUME_ACTIVITY_SN = "activity_cross_scene_consumed_001";
+
+    private static final String CROSS_BUSINESS_SN_CONSUME_ACTIVITY_SN = "activity_cross_business_sn_consumed_001";
 
     private static final String REFUND_CONSUME_ACTIVITY_SN = "activity_refund_consumed_001";
 
@@ -138,6 +142,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private static final String FUNDS_TRANSACTION_SN = "funds_transaction_sctc_001";
 
     private static final String CROSS_SCENE_TRANSACTION_SN = "funds_transaction_sctc_cross_scene_001";
+
+    private static final String CROSS_BUSINESS_SN_TRANSACTION_SN = "funds_transaction_sctc_cross_business_sn_001";
 
     private static final String FAILED_TRANSACTION_SN = "funds_transaction_sctc_failed_001";
 
@@ -271,6 +277,32 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
         assertThat(activityCount(CROSS_SCENE_CONSUME_ACTIVITY_SN)).isZero();
         assertThat(fundsTransactionCount(CROSS_SCENE_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方把同业务场景但不同业务流水的成功资金交易事实误用于当前 Spend Rule 控制消费。
+     * 输入：已有 RESERVED 控制活动和同业务场景、不同业务流水的 CLOSED PAY 资金交易事实。
+     * 输出：请求被拒绝，不写新的控制活动。
+     * 红线：成功消费只能解释同一业务流水的交易事实，不得跨订单串用交易流水，也不得写 route、posting 或账本事实。
+     */
+    @Test
+    void testConsumeWithDifferentBusinessSnTransactionShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        insertSucceededFundsTransaction(CROSS_BUSINESS_SN_TRANSACTION_SN, OTHER_BUSINESS_SN, 60L,
+                CurrencyIsoCode.USD);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(CROSS_BUSINESS_SN_CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                        CROSS_BUSINESS_SN_TRANSACTION_SN, "sha256:sctc-cross-business-sn-consumed")))
+                .hasMessageContaining("资金交易业务流水不一致");
+
+        assertThat(activityCount(CROSS_BUSINESS_SN_CONSUME_ACTIVITY_SN)).isZero();
+        assertThat(fundsTransactionCount(CROSS_BUSINESS_SN_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 

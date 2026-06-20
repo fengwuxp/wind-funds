@@ -46,6 +46,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "控制消费不能使用退款交易事实，transactionSn = {}", request.getTransactionSn());
         assertControlActivityMatchesOriginalActivity(request, originalActivity, "控制消费");
         assertControlActivityMatchesTransaction(request, transaction, "控制消费");
+        assertConsumedTransactionBusinessSnMatches(request, transaction);
         assertEnoughRemainingControlAmount(request, originalActivity, "控制消费金额超过原占用剩余额度");
         return spendControlActivityApplicationService.recordActivity(
                 toRecordRequest(request, originalActivity, SpendControlActivityType.CONSUMED));
@@ -158,6 +159,12 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "资金交易币种不一致，transactionSn = {}", request.getTransactionSn());
         AssertUtils.isTrue(transaction.getAmount() >= request.getAmount(),
                 "{}金额超过资金交易金额，transactionSn = {}", actionName, request.getTransactionSn());
+    }
+
+    private void assertConsumedTransactionBusinessSnMatches(SpendControlTransactionConsumptionRequest request,
+                                                            FundsTransactionDTO transaction) {
+        AssertUtils.isTrue(Objects.equals(transaction.getBusinessSn(), request.getBusinessSn()),
+                "资金交易业务流水不一致，transactionSn = {}", request.getTransactionSn());
     }
 
     private void assertEnoughRemainingControlAmount(SpendControlTransactionConsumptionRequest request,
