@@ -2,6 +2,7 @@ package com.wind.funds.wallet.application.instrument;
 
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.PayOutByRailRequest;
 import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
 import org.jspecify.annotations.NonNull;
 
@@ -44,4 +45,17 @@ public interface InstrumentTransactionLifecycleApplicationService {
      */
     @NonNull String receiveByInstrument(@NonNull ReceiveByInstrumentRequest request,
                                         @NonNull WindOperator operator);
+
+    /**
+     * 通过支付工具出款 rail 入口完成准入并委派账户主体型提现或出款内核。
+     *
+     * <p>典型场景包括全球账户通过 SWIFT、local rail、ACH 等方式向外部收款人打款。
+     * 本服务只承载资金域服务层入口，具体 rail 协议、收款人详情、渠道报文和外部状态机仍属于上层业务或通道域。</p>
+     *
+     * @param request  支付工具出款 rail 请求
+     * @param operator 操作者
+     * @return 出款交易流水号
+     */
+    @NonNull String payOutByRail(@NonNull PayOutByRailRequest request,
+                                 @NonNull WindOperator operator);
 }

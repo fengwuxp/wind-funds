@@ -21,6 +21,7 @@ import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.PayOutByRailRequest;
 import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.transaction.core.Money;
@@ -67,6 +68,14 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         return directTransactionService.topup(convertToTopupRequest(request, snapshot), operator);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public @NonNull String payOutByRail(@NonNull PayOutByRailRequest request,
+                                        @NonNull WindOperator operator) {
+        validatePayOutByRailRequest(request);
+        throw new UnsupportedOperationException("支付工具出款 rail 尚未接入账户主体型提现内核");
+    }
+
     private void validateReceiveRequest(ReceiveByInstrumentRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
@@ -83,6 +92,23 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         AssertUtils.hasText(request.getBusinessScene(), "收款业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "收款业务流水号不能为空");
         AssertUtils.notNull(request.getExpectedBindingVersion(), "支付工具收款绑定版本不能为空");
+    }
+
+    private void validatePayOutByRailRequest(PayOutByRailRequest request) {
+        AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+                "支付工具出款 tenantId 与当前租户不一致");
+        AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
+        AssertUtils.notNull(request.getPayoutSourceAccountId(), "出款资金来源账户不能为空");
+        AssertUtils.notNull(request.getAmount(), "出款金额不能为空");
+        AssertUtils.isTrue(request.getAmount() > 0L, "出款金额必须大于 0");
+        AssertUtils.notNull(request.getCurrency(), "出款币种不能为空");
+        AssertUtils.hasText(request.getRailCode(), "出款 rail 编码不能为空");
+        AssertUtils.hasText(request.getReceiverReference(), "出款收款人引用不能为空");
+        AssertUtils.hasText(request.getExternalPayoutSn(), "外部出款流水不能为空");
+        AssertUtils.hasText(request.getBusinessScene(), "出款业务场景不能为空");
+        AssertUtils.hasText(request.getBusinessSn(), "出款业务流水号不能为空");
+        AssertUtils.notNull(request.getExpectedBindingVersion(), "支付工具出款绑定版本不能为空");
     }
 
     private ResolvePaymentInstrumentPreTransactionSnapshotRequest toPreTransactionRequest(

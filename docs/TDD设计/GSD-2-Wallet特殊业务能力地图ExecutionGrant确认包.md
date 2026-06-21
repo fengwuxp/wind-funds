@@ -10,15 +10,15 @@
 | 所属阶段 | GSD-2 / LWT capability goal / wallet special business capability map design consumed by instrument lifecycle contracts |
 | Owner | 产品架构专家、资深架构师、AI Native 工程流程编排共同合议；编码 Owner 在下一 Grant 再确认。 |
 | 写入范围 | 本文、TDD、OpenSpec 任务基线、wallet 支付工具生命周期服务层接口、实现和目标测试。 |
-| 写入文件 | `docs/TDD设计/GSD-2-Wallet特殊业务能力地图ExecutionGrant确认包.md`、`docs/TDD设计/支付资金底座测试驱动设计.md`、OpenSpec tasks、`InstrumentTransactionLifecycleApplicationService`、`AuthorizeByPaymentInstrumentRequest`、`ReceiveByInstrumentRequest`、`InstrumentTransactionLifecycleApplicationServiceImpl`、`InstrumentTransactionLifecycleApplicationServiceTests`。 |
+| 写入文件 | `docs/TDD设计/GSD-2-Wallet特殊业务能力地图ExecutionGrant确认包.md`、`docs/TDD设计/支付资金底座测试驱动设计.md`、OpenSpec tasks、`InstrumentTransactionLifecycleApplicationService`、`AuthorizeByPaymentInstrumentRequest`、`ReceiveByInstrumentRequest`、`PayOutByRailRequest`、`InstrumentTransactionLifecycleApplicationServiceImpl`、`InstrumentTransactionLifecycleApplicationServiceTests`。 |
 | 只读范围 | `wallet/wallet-face` application 契约、`transaction/transaction-face` canonical 交易服务、`ledger/ledger-face` 应用服务、现有 TDD 和 OpenSpec。 |
 | 只读参考 | 现有 `wallet.application`、`transaction.application`、`ledger.application`、清结算对账服务、PRD、系分、DSL、TDD 和 OpenSpec。 |
 | 禁止范围 | 不改 DDL/H2 schema、Controller、HTTP/RPC、Mapper、Entity、runtime config、交易 canonical 入参或 ledger posting；不新增统一支付工具交易内核。 |
-| 验证命令 | Red/Green：沙箱内 `just test-one InstrumentTransactionLifecycleApplicationServiceTests tests` 因嵌入式 Redis 端口绑定限制失败；非沙箱复跑已覆盖授权委派、收款成功、payment-only 拒绝和缺绑定版本拒绝 4 tests 通过；`just compile`、`just pmd`、`git diff --check` 均已通过。 |
-| 停止条件 | 需要继续扩展 `receiveByInstrument` 新场景语义、新增 `payOutByRail`、外部资金事件消费、改变交易 canonical 入参、让支付工具/预算组/Spend Rule 入账、或触碰账本分录事实时停止，等待新的独立 Execution Grant。 |
-| Execution Grant | `GSD2-WALLET-INSTRUMENT-LIFECYCLE-AUTH-FACADE-001` 已消费为支付工具生命周期授权入口委派切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-SNAPSHOT-001` 已消费为支付工具收款 route snapshot 回链切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-BINDING-VERSION-GUARD-001` 已消费为收款工具绑定版本必填硬化切片；后续能力必须另起单一 Grant。 |
+| 验证命令 | Red/Green：沙箱内 `just test-one InstrumentTransactionLifecycleApplicationServiceTests tests` 因嵌入式 Redis 端口绑定限制失败；非沙箱复跑已覆盖授权委派、收款成功、payment-only 拒绝、缺绑定版本拒绝和出款 rail 未接内核失败无资金事实副作用 5 tests 通过；`just compile`、`just pmd`、`git diff --check` 均作为本轮收口门禁。 |
+| 停止条件 | 需要继续扩展 `receiveByInstrument` 新场景语义、把 `payOutByRail` 接入真实提现/出款内核、外部资金事件消费、改变交易 canonical 入参、让支付工具/预算组/Spend Rule 入账、或触碰账本分录事实时停止，等待新的独立 Execution Grant。 |
+| Execution Grant | `GSD2-WALLET-INSTRUMENT-LIFECYCLE-AUTH-FACADE-001` 已消费为支付工具生命周期授权入口委派切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-SNAPSHOT-001` 已消费为支付工具收款 route snapshot 回链切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-BINDING-VERSION-GUARD-001` 已消费为收款工具绑定版本必填硬化切片；`GSD2-GA-PAYOUT-RAIL-CONTRACT-001` 已消费为全球账户出款 rail 服务层契约和未接内核 fail-fast guard 切片；后续能力必须另起单一 Grant。 |
 | 工程纪律 | 本轮已执行 TDD Red / Green、Review 边界复核、编译、PMD 和 diff 校验；后续继续编码仍必须按单一 Grant 执行。 |
-| Handoff | 下一轮从 `payOutByRail`、外部资金事件消费、VCC / VA 单场景、transaction 兼容债或旧 ledger 公共 CRUD API 治理中重新选择单一切片；若继续扩 `receiveByInstrument` 只能处理新场景，不得重复本轮 route snapshot 回链或绑定版本必填护栏。 |
+| Handoff | 下一轮从外部资金事件消费、VCC / VA 单场景、transaction 兼容债或旧 ledger 公共 CRUD API 治理中重新选择单一切片；若继续扩 `receiveByInstrument` 只能处理新场景，若继续扩 `payOutByRail` 必须单独确认提现/出款内核、在途、费用、清结算和对账边界。 |
 
 ## 2. 业务目标和非目标
 
@@ -70,7 +70,7 @@
 | VCC 共享卡授权 | `InstrumentTransactionLifecycleApplicationService.authorizeByInstrument` | 授权流水、卡工具引用、信用子账户或绑定快照、金额、币种、商户/MCC、Spend Rule 决策证据。 | 授权结果、route snapshot、工具快照、控制活动引用。 | 授权交易、Spend Control admission、账户能力。 | 不替换 `FundsAuthorizationTransactionService.authorize` canonical 入参。 |
 | VCC 共享卡调额 | `VccSharedCardTransactionApplicationService.adjustLimit` | 调额流水、卡工具引用、信用子账户、父账户约束、调整金额或新额度、原因。 | 调额结果、额度快照、审计引用。 | 账户能力、额度配置或控制活动。 | 调额不等于资金入账，除非发生真实父子划拨。 |
 | VA 收款 | `InstrumentTransactionLifecycleApplicationService.receiveByInstrument` | VA 引用、外部流水、金额、币种、内部资金账户绑定、付款方摘要。 | 入账结果、内部交易引用、对账引用。 | 直接交易入账、对账差异。 | VA 不持有内部余额。 |
-| 全球账户付款 | `InstrumentTransactionLifecycleApplicationService.payOutByRail` | payout 流水、账户主体、金额、币种、费用、quote、rail 引用、收款方引用。 | 出款结果、在途事实、费用交易、对账引用。 | 提现/出款、费用、在途、清结算。 | 不在 funds 内实现 SWIFT/local 协议。 |
+| 全球账户付款 | `InstrumentTransactionLifecycleApplicationService.payOutByRail` | 当前契约承载 payout 流水、支付工具引用、出款账户主体、金额、币种、rail 引用、收款方引用、外部出款流水和期望绑定版本；费用、quote 和在途状态在真实出款 Grant 中补齐。 | 当前只返回内部受理引用或失败原因；真实出款后再返回在途事实、费用交易和对账引用。 | 提现/出款、费用、在途、清结算。 | 不在 funds 内实现 SWIFT/local 协议；当前 guard 不代表真实出款已可用。 |
 | ACH/银行事件消费 | `ExternalFundsEventApplicationService.consume` | 外部事件流水、事件类型、账户主体、金额、币种、原交易引用、差异引用。 | 消费结果、内部交易或差异单引用、审计引用。 | 直接交易、退款/撤销、调账、对账。 | 不把银行文件批次当资金内核。 |
 
 接口契约要求：
@@ -193,7 +193,7 @@ stateDiagram-v2
 发布边界：
 
 1. 本轮只新增服务层生命周期授权入口委派，不发布 Controller、HTTP/RPC 或外部调用入口。
-2. 下一轮若扩 `receiveByInstrument` 场景硬化、`payOutByRail`、外部事件消费或 VCC/VA 单场景，应先以内部调用方试点接入。
+2. 下一轮若扩 `receiveByInstrument` 新场景、把 `payOutByRail` 接入真实提现/出款内核、外部事件消费或 VCC/VA 单场景，应先以内部调用方试点接入。
 3. 上线前必须补齐回滚策略、人工处理 Runbook、告警指标和最小运营后台查询口径。
 
 ## 11. 下一 Grant 候选
@@ -231,10 +231,17 @@ Execution Grant: GSD2-WALLET-INSTRUMENT-RECEIVE-BINDING-VERSION-GUARD-001
 边界：不改 Controller、HTTP/RPC、交易 canonical 账户主体、ledger posting、DDL/H2 schema、Entity、Mapper、出款、退款、ACH return、全球账户付款、VCC facade 或统一支付工具交易内核。
 ```
 
+```text
+Execution Grant: GSD2-GA-PAYOUT-RAIL-CONTRACT-001
+已消费范围：新增 InstrumentTransactionLifecycleApplicationService#payOutByRail 服务层入口和 PayOutByRailRequest，承载全球账户出款 rail 的业务流水、支付工具引用、金额、币种、rail、收款人引用、外部出款流水和期望绑定版本。
+已完成证据：Red 先证明缺 PayOutByRailRequest 时目标测试编译失败；Green 后非沙箱复跑 InstrumentTransactionLifecycleApplicationServiceTests 5 tests 通过，payOutByRail 当前在交易内核前 fail-fast，且无资金交易、route、posting、LedgerEntry、账本交易或余额投影副作用。
+边界：本切片只完成契约和 guard，不接真实提现/出款内核，不生成在途、费用、清结算或对账事实；不改 Controller、HTTP/RPC、交易 canonical 账户主体、ledger posting、DDL/H2 schema、Entity、Mapper、支付工具交易内核、ACH return、VCC facade 或外部 SWIFT/local/ACH 协议。
+```
+
 备选切片：
 
 1. `GSD2-VCC-PREPAID-FUNDING-CONTRACT-001`：只做 VCC 预付卡充值/提现服务层契约和 Red。
-2. `GSD2-GA-PAYOUT-RAIL-CONTRACT-001`：只做全球账户出款 rail 入口服务层契约和 Red。
+2. `GSD2-WALLET-EXTERNAL-FUNDS-EVENT-CONTRACT-001`：只做外部资金事件消费服务层契约和 Red。
 3. `GSD2-WALLET-AUTH-ADMISSION-COMPOSE-003`：继续强化授权准入组合链路和失败无副作用测试。
 
 ## 12. Handoff
@@ -247,6 +254,6 @@ Execution Grant: GSD2-WALLET-INSTRUMENT-RECEIVE-BINDING-VERSION-GUARD-001
 
 残余风险：
 
-1. 本轮只完成支付工具收款入口，不代表 wallet application 已整体生产可用。
-2. 特殊业务入口仍需要按场景逐个做服务层契约、TDD Red、实现、回归和验证证据；`receiveByInstrument` 不授权出款、退款、ACH return、全球账户付款或 VCC 专项生命周期。
+1. 本轮只完成支付工具授权入口、收款入口和出款 rail 契约 guard，不代表 wallet application 已整体生产可用。
+2. 特殊业务入口仍需要按场景逐个做服务层契约、TDD Red、实现、回归和验证证据；`payOutByRail` 当前不授权真实出款、在途、费用、清结算、对账或外部协议。
 3. 清结算、对账、人工处理和运营后台仍需独立切片推进。

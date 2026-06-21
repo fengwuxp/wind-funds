@@ -65,6 +65,7 @@ import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
+import com.wind.funds.wallet.model.request.PayOutByRailRequest;
 import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.service.FundingAccountService;
@@ -138,6 +139,8 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     private static final String DIRECTION_FAIL_BUSINESS_SN = "INSTRUMENT_RECEIVE_DIRECTION_FAIL";
 
     private static final String MISSING_BINDING_VERSION_BUSINESS_SN = "INSTRUMENT_RECEIVE_MISSING_BINDING_VERSION";
+
+    private static final String PAYOUT_BUSINESS_SN = "INSTRUMENT_PAYOUT_RAIL_001";
 
     private static final String AUTHORIZE_BUSINESS_SN = "INSTRUMENT_AUTHORIZE_001";
 
@@ -267,6 +270,25 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：全球账户出款 rail 入口尚未接入账户主体型提现内核。
+     * 输入：支付工具、金额、币种、rail、收款人引用、业务流水和期望绑定版本齐全。
+     * 输出：服务层入口在生成任何资金事实前失败。
+     * 红线：未完成出款内核编排前，不得生成资金交易、route、posting plan、账本交易、分录或余额投影。
+     */
+    @Test
+    void testPayOutByRailShouldFailFastBeforePayoutKernelIsEnabled() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.payOutByRail(payoutRequest(),
+                WindOperator.system()))
+                .isInstanceOf(UnsupportedOperationException.class)
+                .hasMessageContaining("支付工具出款 rail 尚未接入账户主体型提现内核");
+
+        assertNoFundsOrLedgerFacts(PAYOUT_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpInstrumentTransactionLifecycleTestData() {
         authorizationAdmissionApplicationService.reset();
@@ -283,21 +305,26 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
                     SELECT sn FROM t_ledger_transaction
-                    WHERE business_scene = ? AND business_sn IN (?, ?, ?)
+                    WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)
                 )
                 """, BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
-                MISSING_BINDING_VERSION_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
+                MISSING_BINDING_VERSION_BUSINESS_SN, PAYOUT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                PAYOUT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                PAYOUT_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
+                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                PAYOUT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                PAYOUT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                PAYOUT_BUSINESS_SN);
         jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
                 RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
@@ -446,6 +473,22 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setBusinessSn(businessSn)
                 .setExpectedBindingVersion(1)
                 .setDescription("instrument receive flow");
+    }
+
+    private PayOutByRailRequest payoutRequest() {
+        return new PayOutByRailRequest()
+                .setTenantId(TENANT_ID)
+                .setInstrumentSn(RECEIVE_INSTRUMENT_SN)
+                .setPayoutSourceAccountId(receiveAccountId())
+                .setAmount(70L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setRailCode("LOCAL")
+                .setReceiverReference("receiver_endpoint_001")
+                .setExternalPayoutSn("processor_payout_001")
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(PAYOUT_BUSINESS_SN)
+                .setExpectedBindingVersion(1)
+                .setDescription("instrument payout rail contract");
     }
 
     private AuthorizeByPaymentInstrumentRequest authorizeRequest() {
