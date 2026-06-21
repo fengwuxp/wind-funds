@@ -30,6 +30,9 @@ import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.FundingAccountType;
+import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
+import com.wind.funds.wallet.service.BudgetGroupService;
+import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -77,6 +80,10 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
     private static final String SUBJECT_TYPE = FundsSubjectType.FUNDING_ACCOUNT.name();
 
+    private static final String BUDGET_GROUP_SUBJECT_TYPE = FundsSubjectType.BUDGET_GROUP.name();
+
+    private static final String BUDGET_GROUP_SUBJECT_ID = "posting_boundary_budget";
+
     private static final CurrencyIsoCode CURRENCY = CurrencyIsoCode.USD;
 
     private static final Money TRANSACTION_AMOUNT = Money.immutable(100L, CURRENCY);
@@ -91,6 +98,9 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
+
+    @Autowired
+    private BudgetGroupService budgetGroupService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -236,6 +246,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     void testPostShouldRejectEntryLedgerSubjectCodeMismatchBeforePersistenceAndProjection() {
         Long sourceLedgerId = createLedger(
                 SOURCE_SUBJECT_ID,
+                SUBJECT_TYPE,
                 LedgerSubjectCode.FROZEN,
                 LedgerSubjectCategory.ASSET,
                 Boolean.FALSE,
@@ -263,6 +274,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     void testPostShouldRejectEntryLedgerCurrencyMismatchBeforePersistenceAndProjection() {
         Long sourceLedgerId = createLedger(
                 SOURCE_SUBJECT_ID,
+                SUBJECT_TYPE,
                 LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCategory.ASSET,
                 Boolean.FALSE,
@@ -327,6 +339,32 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 LedgerTransactionStatus.POSTED,
                 List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)))))
                 .hasMessageContaining("账本科目类别与正常余额方向不一致");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：预算组虽然存在控制账本，但被外部 LedgerTransactionSpec 作为账本分录主体提交。
+     * 输入：POSTED 交易携带 BUDGET_GROUP 分录，并绑定同主体同科目同币种的账本。
+     * 输出：入账入口在事实落库和余额投影前拒绝请求。
+     * 红线：预算组只能作为预算控制 scope 和审计上下文，不得成为核心资金账本分录主体。
+     */
+    @Test
+    void testPostShouldRejectBudgetGroupEntryBeforeLedgerFacts() {
+        seedBudgetGroup(BUDGET_GROUP_SUBJECT_ID);
+        Long budgetLedgerId = createBudgetAvailableLedger(BUDGET_GROUP_SUBJECT_ID);
+        Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> postingService.post(transaction(
+                LedgerTransactionStatus.POSTED,
+                List.of(postingPlan(List.of(
+                        creditEntry(BUDGET_GROUP_SUBJECT_ID,
+                                BUDGET_GROUP_SUBJECT_TYPE,
+                                budgetLedgerId,
+                                TRANSACTION_AMOUNT),
+                        debitEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)))))))
+                .hasMessageContaining("账本分录主体类型不允许入账");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -400,6 +438,21 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         return ledgerEntry(subjectId, ledgerId, EntrySide.CREDIT, amount, LEDGER_TRANSACTION_SN);
     }
 
+    private LedgerEntrySpec creditEntry(String subjectId,
+                                        String subjectType,
+                                        Long ledgerId,
+                                        Money amount) {
+        return ledgerEntry(subjectId,
+                subjectType,
+                ledgerId,
+                EntrySide.CREDIT,
+                amount,
+                LEDGER_TRANSACTION_SN,
+                LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCategory.ASSET,
+                null);
+    }
+
     private LedgerEntrySpec ledgerEntry(String subjectId,
                                         Long ledgerId,
                                         EntrySide entrySide,
@@ -407,6 +460,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                                         String ledgerTransactionSn) {
         return new TestLedgerEntrySpec(
                 subjectId,
+                SUBJECT_TYPE,
                 ledgerId,
                 entrySide,
                 amount,
@@ -426,6 +480,28 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                                         LedgerBalanceConstraintType balanceConstraintType) {
         return new TestLedgerEntrySpec(
                 subjectId,
+                SUBJECT_TYPE,
+                ledgerId,
+                entrySide,
+                amount,
+                ledgerTransactionSn,
+                ledgerSubjectCode,
+                ledgerSubjectCategory,
+                balanceConstraintType);
+    }
+
+    private LedgerEntrySpec ledgerEntry(String subjectId,
+                                        String subjectType,
+                                        Long ledgerId,
+                                        EntrySide entrySide,
+                                        Money amount,
+                                        String ledgerTransactionSn,
+                                        LedgerSubjectCode ledgerSubjectCode,
+                                        LedgerSubjectCategory ledgerSubjectCategory,
+                                        LedgerBalanceConstraintType balanceConstraintType) {
+        return new TestLedgerEntrySpec(
+                subjectId,
+                subjectType,
                 ledgerId,
                 entrySide,
                 amount,
@@ -438,6 +514,17 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     private Long createAvailableLedger(String subjectId) {
         return createLedger(
                 subjectId,
+                SUBJECT_TYPE,
+                LedgerSubjectCode.AVAILABLE,
+                LedgerSubjectCategory.ASSET,
+                Boolean.FALSE,
+                CURRENCY);
+    }
+
+    private Long createBudgetAvailableLedger(String subjectId) {
+        return createLedger(
+                subjectId,
+                BUDGET_GROUP_SUBJECT_TYPE,
                 LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCategory.ASSET,
                 Boolean.FALSE,
@@ -445,6 +532,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     private Long createLedger(String subjectId,
+                              String subjectType,
                               LedgerSubjectCode ledgerSubjectCode,
                               LedgerSubjectCategory ledgerSubjectCategory,
                               Boolean allowNegative,
@@ -452,7 +540,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         return ledgerService.createLedger(new CreateLedgerRequest()
                 .setTenantId(TENANT_ID)
                 .setSubjectId(subjectId)
-                .setSubjectType(SUBJECT_TYPE)
+                .setSubjectType(subjectType)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
                 .setLedgerProfileVersion(1)
                 .setLedgerSubjectCode(ledgerSubjectCode)
@@ -500,18 +588,35 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         fundingAccountMapper.insertSelective(account);
     }
 
+    private void seedBudgetGroup(String budgetGroupSn) {
+        budgetGroupService.createBudgetGroup(new CreateBudgetGroupRequest()
+                .setTenantId(TENANT_ID)
+                .setSn(budgetGroupSn)
+                .setOwnerId("owner_" + budgetGroupSn)
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setBudgetType(FundsSubjectType.BUDGET_GROUP.name())
+                .setCurrency(CURRENCY)
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setPeriodId(AccountBalancePeriodType.LIFETIME.name())
+                .setLedgerProfileCode(LedgerProfileCode.BUDGET_BASIC)
+                .setStatus(FundsAccountStatus.ACTIVE)
+                .setDescription("ledger posting boundary budget group"));
+    }
+
     private void cleanupPostingBoundaryTestData() {
         jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE ledger_transaction_sn = ?", LEDGER_TRANSACTION_SN);
         jdbcTemplate.update("DELETE FROM t_ledger_posting_plan WHERE ledger_transaction_sn = ?",
                 LEDGER_TRANSACTION_SN);
         jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE sn = ?", LEDGER_TRANSACTION_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?, ?)",
                 SOURCE_SUBJECT_ID,
                 TARGET_SUBJECT_ID,
-                MISMATCH_LEDGER_SUBJECT_ID);
+                MISMATCH_LEDGER_SUBJECT_ID,
+                BUDGET_GROUP_SUBJECT_ID);
         jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)",
                 SOURCE_SUBJECT_ID,
                 TARGET_SUBJECT_ID);
+        jdbcTemplate.update("DELETE FROM t_budget_group WHERE sn = ?", BUDGET_GROUP_SUBJECT_ID);
     }
 
     private record InvalidAmountCase(Money amount, String expectedMessage) {
@@ -644,6 +749,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     private record TestLedgerEntrySpec(String subjectId,
+                                       String subjectType,
                                        Long ledgerId,
                                        EntrySide entryType,
                                        Money amount,
@@ -660,7 +766,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
         @Override
         public String getSubjectType() {
-            return SUBJECT_TYPE;
+            return subjectType;
         }
 
         @Override
@@ -749,6 +855,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
             DefaultLedgerTransactionPostingServiceImpl.class,
             LedgerTransactionServiceImpl.class,
             LedgerServiceImpl.class,
+            BudgetGroupServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             LedgerBalanceProjectionServiceImpl.class
     })

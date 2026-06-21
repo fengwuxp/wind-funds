@@ -44,8 +44,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
 
     private static final Set<FundsSubjectType> POSTABLE_SUBJECT_TYPES = Set.of(
             FundsSubjectType.FUNDING_ACCOUNT,
-            FundsSubjectType.CREDIT_ACCOUNT,
-            FundsSubjectType.BUDGET_GROUP
+            FundsSubjectType.CREDIT_ACCOUNT
     );
 
     private final LedgerTransactionService ledgerTransactionService;
