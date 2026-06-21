@@ -609,4 +609,18 @@ Not Done：
 | 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
 | 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 22 tests 通过，组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 31 tests 通过；收口执行 `just compile`、`just pmd`、边界关键词扫描和 `git diff --check` 通过。 |
 | 当前状态 | `SR_TRANSACTION_BUDGET_PROJECTION_TARGET_ACCOUNT_GUARD_GREEN_VERIFIED`。 |
-| Not Done | 释放上限是否进一步按目标账户隔离、完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |
+| Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |
+
+### 14.15 释放上限目标账户隔离守卫补充记录（2026-06-20）
+
+本节记录 `GSD2-B5-SR-TRANSACTION-RELEASE-TARGET-ACCOUNT-GUARD-015` 的实际执行结果。该补片只补释放类控制活动写入上限按目标资金账户或信用账户隔离，并让交易消费服务在计算原占用剩余额度前识别同一 `originalActivitySn` 下历史脏派生控制活动的同源漂移；不重新打开 Controller、HTTP/RPC、支付工具 `REFUND` 能力方向、交易 canonical 入参或 ledger posting。
+
+| 字段 | 内容 |
+| --- | --- |
+| 补充任务 | `GSD2-B5-SR-TRANSACTION-RELEASE-TARGET-ACCOUNT-GUARD-015`。 |
+| 写入范围 | `SpendControlActivityApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceImpl`、`SpendControlActivityApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、推进计划、TDD 清单、docs 索引和 OpenSpec tasks 状态同步。 |
+| 已完成能力 | 释放类 `RELEASED / EXPIRED / REVERSED` 活动写入前按当前 `targetAccountId` 查询预算控制投影剩余额度，不再借用同预算组、同 Spend Rule 下其他账户的可释放额度；交易消费链路在计算原占用使用量前校验关联控制活动与原 `RESERVED` 活动的业务场景、业务流水、目标账户、币种、Spend Rule 和预算组一致，历史脏派生活动不得虚增当前账户可消费或可释放额度。 |
+| 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
+| 验证证据 | 非沙箱复跑 `SpendControlActivityApplicationServiceTests,SpendControlTransactionConsumptionApplicationServiceTests` 33 tests 通过；首轮目标测试曾因测试数据同业务流水重复插入资金交易触发唯一约束失败，已收敛为更准确的历史脏控制活动场景后通过。 |
+| 当前状态 | `SR_TRANSACTION_RELEASE_TARGET_ACCOUNT_GUARD_GREEN_VERIFIED`。 |
+| Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |

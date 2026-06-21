@@ -371,6 +371,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         List<SpendControlActivityDTO> effectiveActivities = linkedActivities.stream()
                 .filter(activity -> !Objects.equals(activity.getActivitySn(), request.getActivitySn()))
                 .toList();
+        effectiveActivities.forEach(activity -> assertLinkedActivityMatchesOriginalActivity(activity, originalActivity));
         long grossConsumedAmount = sumAmount(effectiveActivities, SpendControlActivityType.CONSUMED);
         long refundCompensatedAmount = sumAmount(effectiveActivities, SpendControlActivityType.REFUND_COMPENSATED);
         long releasedAmount = effectiveActivities.stream()
@@ -381,6 +382,39 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 grossConsumedAmount,
                 refundCompensatedAmount,
                 releasedAmount);
+    }
+
+    private void assertLinkedActivityMatchesOriginalActivity(SpendControlActivityDTO linkedActivity,
+                                                             SpendControlActivityDTO originalActivity) {
+        AssertUtils.isTrue(Objects.equals(linkedActivity.getBusinessScene(), originalActivity.getBusinessScene()),
+                "关联控制活动业务场景不一致，activitySn = {}, originalActivitySn = {}",
+                linkedActivity.getActivitySn(),
+                originalActivity.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(linkedActivity.getBusinessSn(), originalActivity.getBusinessSn()),
+                "关联控制活动业务流水不一致，activitySn = {}, originalActivitySn = {}",
+                linkedActivity.getActivitySn(),
+                originalActivity.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(linkedActivity.getTargetAccountId(), originalActivity.getTargetAccountId()),
+                "关联控制活动目标账户不一致，activitySn = {}, originalActivitySn = {}",
+                linkedActivity.getActivitySn(),
+                originalActivity.getActivitySn());
+        AssertUtils.isTrue(linkedActivity.getCurrency() == originalActivity.getCurrency(),
+                "关联控制活动币种不一致，activitySn = {}, originalActivitySn = {}",
+                linkedActivity.getActivitySn(),
+                originalActivity.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(linkedActivity.getSpendRuleId(), originalActivity.getSpendRuleId()),
+                "关联控制活动 Spend Rule 标识不一致，activitySn = {}, originalActivitySn = {}",
+                linkedActivity.getActivitySn(),
+                originalActivity.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(linkedActivity.getSpendRuleVersion(),
+                        originalActivity.getSpendRuleVersion()),
+                "关联控制活动 Spend Rule 版本不一致，activitySn = {}, originalActivitySn = {}",
+                linkedActivity.getActivitySn(),
+                originalActivity.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(linkedActivity.getBudgetGroupSn(), originalActivity.getBudgetGroupSn()),
+                "关联控制活动预算组不一致，activitySn = {}, originalActivitySn = {}",
+                linkedActivity.getActivitySn(),
+                originalActivity.getActivitySn());
     }
 
     private long sumAmount(List<SpendControlActivityDTO> activities, SpendControlActivityType activityType) {

@@ -296,7 +296,8 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .setBudgetGroupSn(request.getBudgetGroupSn())
                 .setCurrency(request.getCurrency())
                 .setSpendRuleId(request.getSpendRuleId())
-                .setSpendRuleVersion(request.getSpendRuleVersion());
+                .setSpendRuleVersion(request.getSpendRuleVersion())
+                .setTargetAccountId(request.getTargetAccountId());
         BudgetControlProjectionDTO projection = toProjection(query,
                 spendControlActivityMapper.selectListByQuery(toProjectionWrapper(query)));
         AssertUtils.isTrue(projection.getRemainingControlAmount() >= request.getAmount(),

@@ -111,6 +111,8 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
 
     private static final String SECOND_RESERVED_ACTIVITY_SN = "activity_reserved_second_account_001";
 
+    private static final String SECOND_RELEASED_ACTIVITY_SN = "activity_released_second_account_001";
+
     @Autowired
     private CreditAccountService creditAccountService;
 
@@ -340,6 +342,57 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         assertThat(projection.getReleasedAmount()).isZero();
         assertThat(projection.getRemainingControlAmount()).isEqualTo(60L);
         assertThat(projection.getLastActivitySn()).isEqualTo(RESERVED_ACTIVITY_SN);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一预算组和 Spend Rule 下其他账户仍有可释放占用。
+     * 输入：主账户已释放完毕，第二个信用账户仍有 RESERVED 控制占用，再尝试释放主账户。
+     * 输出：主账户释放请求被拒绝，不借用其他账户的剩余额度。
+     * 红线：释放类活动的写入上限必须按目标资金账户或信用账户隔离，不得跨账户释放控制占用。
+     */
+    @Test
+    void testReleaseActivityShouldGuardRemainingAmountByTargetAccountWithoutMixingAccounts() {
+        prepareSpendControlActivityData();
+        creditAccountService.createCreditAccount(createCreditAccountRequest().setSn(SECOND_CREDIT_ACCOUNT_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:activity-reserved"));
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RELEASED_ACTIVITY_SN,
+                SpendControlActivityType.RELEASED, "sha256:activity-released"));
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, SECOND_RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:activity-second-account-reserved")
+                .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
+                        FundsSubjectType.CREDIT_ACCOUNT)));
+
+        assertThatThrownBy(() -> spendControlActivityApplicationService.recordActivity(
+                recordRequest(decision, SECOND_RELEASED_ACTIVITY_SN, SpendControlActivityType.RELEASED,
+                        "sha256:activity-second-release-for-primary")))
+                .hasMessageContaining("控制释放金额超过可释放占用金额");
+
+        assertThat(activityCount(SECOND_RELEASED_ACTIVITY_SN)).isZero();
+        BudgetControlProjectionDTO primaryProjection = spendControlActivityApplicationService
+                .getBudgetControlProjection(new BudgetControlProjectionQuery()
+                        .setTenantId(TENANT_ID)
+                        .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setSpendRuleId(SPEND_RULE_ID)
+                        .setSpendRuleVersion(SPEND_RULE_VERSION)
+                        .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
+                                FundsSubjectType.CREDIT_ACCOUNT)));
+        assertThat(primaryProjection.getRemainingControlAmount()).isZero();
+        BudgetControlProjectionDTO secondProjection = spendControlActivityApplicationService
+                .getBudgetControlProjection(new BudgetControlProjectionQuery()
+                        .setTenantId(TENANT_ID)
+                        .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setSpendRuleId(SPEND_RULE_ID)
+                        .setSpendRuleVersion(SPEND_RULE_VERSION)
+                        .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
+                                FundsSubjectType.CREDIT_ACCOUNT)));
+        assertThat(secondProjection.getRemainingControlAmount()).isEqualTo(60L);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }

@@ -123,6 +123,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String INCONSISTENT_CONSUME_ACTIVITY_SN = "activity_inconsistent_consumed_001";
 
+    private static final String INCONSISTENT_LINKED_ACTIVITY_SN = "activity_inconsistent_linked_001";
+
     private static final String SMALL_CONSUME_ACTIVITY_SN = "activity_small_consumed_001";
 
     private static final String LARGE_CONSUME_ACTIVITY_SN = "activity_large_consumed_001";
@@ -584,6 +586,41 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
         assertThat(activityCount(SECOND_RELEASE_ACTIVITY_SN)).isZero();
         assertThat(activityCount(RELEASE_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FAILED_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：历史脏事实留下了同一原占用下目标账户不一致的派生控制活动。
+     * 输入：主账户已有 RESERVED 和 CONSUMED，异账户挂载 REFUND_COMPENSATED 到同一 originalActivitySn 后再尝试释放主账户。
+     * 输出：释放请求被拒绝，不借异账户补偿虚增当前账户可释放额度。
+     * 红线：交易消费链路必须按原占用目标账户解释控制活动，不能跨账户复用控制额度，也不得写 route、posting 或账本事实。
+     */
+    @Test
+    void testReleaseWithInconsistentLinkedTargetAccountShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        creditAccountService.createCreditAccount(createCreditAccountRequest().setSn(SECOND_CREDIT_ACCOUNT_SN));
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
+        spendControlActivityApplicationService.recordActivity(recordRequest(decision, INCONSISTENT_LINKED_ACTIVITY_SN,
+                SpendControlActivityType.REFUND_COMPENSATED, "sha256:sctc-inconsistent-linked")
+                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(REFUND_TRANSACTION_SN)
+                .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
+                        FundsSubjectType.CREDIT_ACCOUNT))
+                .setAmount(60L));
+        insertFundsTransaction(FAILED_TRANSACTION_SN, BUSINESS_SN,
+                DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.release(
+                consumptionRequest(RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FAILED_TRANSACTION_SN,
+                        "sha256:sctc-release-inconsistent-linked")))
+                .hasMessageContaining("关联控制活动目标账户不一致");
+
+        assertThat(activityCount(RELEASE_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(INCONSISTENT_LINKED_ACTIVITY_SN)).isOne();
         assertThat(fundsTransactionCount(FAILED_TRANSACTION_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
