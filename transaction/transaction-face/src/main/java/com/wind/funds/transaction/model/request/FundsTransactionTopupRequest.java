@@ -3,6 +3,7 @@ package com.wind.funds.transaction.model.request;
 
 import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.spec.transaction.FeeSpec;
 import com.wind.funds.wallet.FundsAccountId;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -47,6 +48,9 @@ public class FundsTransactionTopupRequest {
 
     @Schema(description = "本次交易显式手续费规则")
     private FeeSpec feeSpec;
+
+    @Schema(description = "触发本次充值的支付工具引用快照，仅用于路由追溯和投影解释，不作为账务主体")
+    private PaymentInstrumentRefSpec paymentInstrumentRef;
 
     @Schema(description = "业务流水号，充值入账凭证，例如：在线充值流水号、人工入账单流水号")
     @NotNull

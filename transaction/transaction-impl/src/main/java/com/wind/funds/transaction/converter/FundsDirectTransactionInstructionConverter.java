@@ -85,6 +85,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .instrumentRef(request.getPaymentInstrumentRef())
                 .externalAccountRef(externalAccountRef(request.getFundsSourceAccountId(), request.getChannel().name(),
                         request.getChannelTransactionSn(), request.getDescription()))
                 .businessScene(request.getBusinessScene())

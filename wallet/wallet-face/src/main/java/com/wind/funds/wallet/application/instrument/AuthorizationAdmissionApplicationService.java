@@ -21,8 +21,9 @@ public interface AuthorizationAdmissionApplicationService {
     /**
      * 通过支付工具业务入口发起授权准入并委派授权交易内核。
      *
-     * <p>这是支付工具生命周期授权场景的推荐入口名称。调用方只需要提供支付工具和业务上下文，
-     * 本服务负责解析最终资金账务主体；交易内核仍以账户主体为 canonical 入参。</p>
+     * <p>这是授权准入专项服务的主方法。跨场景新业务入口优先通过
+     * {@link InstrumentTransactionLifecycleApplicationService#authorizeByInstrument(AuthorizeByPaymentInstrumentRequest,
+     * WindOperator)} 接入，本方法供生命周期 facade 或仍直接消费授权准入专项能力的内部协作方调用。</p>
      *
      * <p>准入顺序：支付工具动作能力与绑定快照、资金责任关系、账户主体能力与状态。
      * 任一准入失败时必须在进入交易内核前中止，不生成 route、posting、LedgerEntry 或交易事实。</p>

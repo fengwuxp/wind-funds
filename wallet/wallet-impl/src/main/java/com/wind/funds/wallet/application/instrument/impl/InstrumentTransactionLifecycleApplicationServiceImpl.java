@@ -4,11 +4,14 @@ import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
+import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.application.instrument.AuthorizationAdmissionApplicationService;
 import com.wind.funds.wallet.application.instrument.InstrumentTransactionLifecycleApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
@@ -17,6 +20,7 @@ import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
+import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.transaction.core.Money;
@@ -39,9 +43,18 @@ import java.util.Map;
 public class InstrumentTransactionLifecycleApplicationServiceImpl
         implements InstrumentTransactionLifecycleApplicationService {
 
+    private final AuthorizationAdmissionApplicationService authorizationAdmissionApplicationService;
+
     private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
 
     private final FundsDirectTransactionService directTransactionService;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
+                                                 @NonNull WindOperator operator) {
+        return authorizationAdmissionApplicationService.authorizeByInstrument(request, operator);
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -69,6 +82,7 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         AssertUtils.hasText(request.getChannelTransactionSn(), "收款渠道交易流水不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "收款业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "收款业务流水号不能为空");
+        AssertUtils.notNull(request.getExpectedBindingVersion(), "支付工具收款绑定版本不能为空");
     }
 
     private ResolvePaymentInstrumentPreTransactionSnapshotRequest toPreTransactionRequest(
@@ -96,6 +110,7 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
                 .setChannelId(request.getChannelId())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
                         request.getCurrency())))
+                .setPaymentInstrumentRef(paymentInstrumentRef(snapshot))
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
                 .setContextVariables(ReadonlyContextVariables.of(receiveContext(snapshot)))
@@ -123,6 +138,50 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         values.put("fundingRelationType", snapshot.getRelationType().name());
         values.put("targetAccountId", targetAccountId.id());
         values.put("targetAccountType", targetAccountId.type());
+        return Map.copyOf(values);
+    }
+
+    private PaymentInstrumentRefSpec paymentInstrumentRef(PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
+        PaymentInstrumentCapabilityDecisionDTO instrument = snapshot.getPaymentInstrumentCapability();
+        AssertUtils.notNull(instrument, "支付工具快照不能为空");
+        assertPaymentInstrumentSnapshotReady(instrument);
+        return ImmutablePaymentInstrumentRefSpec.builder()
+                .tenantId(instrument.getTenantId())
+                .instrumentId(instrument.getInstrumentSn())
+                .instrumentType(instrument.getInstrumentType())
+                .instrumentNo(instrument.getInstrumentNo())
+                .ownerId(instrument.getOwnerId())
+                .ownerType(instrument.getOwnerType().name())
+                .currency(instrument.getCurrency().name())
+                .status(instrument.getStatus().name())
+                .bindingSnapshot(bindingSnapshot(instrument))
+                .description(instrument.getDescription())
+                .build();
+    }
+
+    private void assertPaymentInstrumentSnapshotReady(PaymentInstrumentCapabilityDecisionDTO instrument) {
+        AssertUtils.hasText(instrument.getInstrumentSn(), "支付工具快照工具号不能为空");
+        AssertUtils.hasText(instrument.getInstrumentNo(), "支付工具快照展示号不能为空");
+        AssertUtils.hasText(instrument.getOwnerId(), "支付工具快照归属主体 ID 不能为空");
+        AssertUtils.notNull(instrument.getOwnerType(), "支付工具快照归属主体类型不能为空");
+        AssertUtils.hasText(instrument.getInstrumentType(), "支付工具快照类型不能为空");
+        AssertUtils.notNull(instrument.getCurrency(), "支付工具快照币种不能为空");
+        AssertUtils.notNull(instrument.getStatus(), "支付工具快照状态不能为空");
+        AssertUtils.hasText(instrument.getBindingSn(), "支付工具绑定快照绑定号不能为空");
+        AssertUtils.notNull(instrument.getBindingVersion(), "支付工具绑定快照版本不能为空");
+        AssertUtils.notNull(instrument.getBindingRole(), "支付工具绑定快照角色不能为空");
+        AssertUtils.notNull(instrument.getSubjectType(), "支付工具绑定快照主体类型不能为空");
+        AssertUtils.hasText(instrument.getSubjectId(), "支付工具绑定快照主体 ID 不能为空");
+    }
+
+    private Map<String, Object> bindingSnapshot(PaymentInstrumentCapabilityDecisionDTO instrument) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("bindingSn", instrument.getBindingSn());
+        values.put("bindingVersion", instrument.getBindingVersion());
+        values.put("bindingRole", instrument.getBindingRole().name());
+        values.put("subjectType", instrument.getSubjectType().name());
+        values.put("subjectId", instrument.getSubjectId());
+        values.put("admissionAction", PaymentInstrumentAction.RECEIVE.name());
         return Map.copyOf(values);
     }
 }

@@ -52,6 +52,7 @@ import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
@@ -59,6 +60,7 @@ import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
@@ -82,6 +84,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -116,6 +119,8 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private static final String RECEIVE_INSTRUMENT_SN = "pi_lifecycle_va_receive";
 
+    private static final String RECEIVE_INSTRUMENT_NO = "VA-****-2468";
+
     private static final String PAYMENT_ONLY_INSTRUMENT_SN = "pi_lifecycle_payment_only";
 
     private static final String RECEIVE_BINDING_SN = "pi_lifecycle_receive_binding";
@@ -131,6 +136,12 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     private static final String RECEIVE_BUSINESS_SN = "INSTRUMENT_RECEIVE_001";
 
     private static final String DIRECTION_FAIL_BUSINESS_SN = "INSTRUMENT_RECEIVE_DIRECTION_FAIL";
+
+    private static final String MISSING_BINDING_VERSION_BUSINESS_SN = "INSTRUMENT_RECEIVE_MISSING_BINDING_VERSION";
+
+    private static final String AUTHORIZE_BUSINESS_SN = "INSTRUMENT_AUTHORIZE_001";
+
+    private static final String DELEGATED_AUTHORIZATION_SN = "delegated_instrument_authorization_sn";
 
     @Autowired
     private FundingAccountService fundingAccountService;
@@ -154,7 +165,28 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     private InstrumentTransactionLifecycleApplicationService instrumentTransactionLifecycleApplicationService;
 
     @Autowired
+    private RecordingAuthorizationAdmissionApplicationService authorizationAdmissionApplicationService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    /**
+     * 场景：统一支付工具交易生命周期入口承接授权动作。
+     * 输入：VCC/卡支付工具授权请求。
+     * 输出：生命周期入口返回授权准入专项服务委派结果，并透传原请求。
+     * 红线：本入口只做服务层门面收敛，不复制授权准入、route、posting 或 ledger 逻辑。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldDelegateAuthorizationAdmissionFacade() {
+        AuthorizeByPaymentInstrumentRequest request = authorizeRequest();
+
+        String authorizationSn = instrumentTransactionLifecycleApplicationService.authorizeByInstrument(request,
+                WindOperator.system());
+
+        assertThat(authorizationSn).isEqualTo(DELEGATED_AUTHORIZATION_SN);
+        assertThat(authorizationAdmissionApplicationService.getInvocationCount()).isOne();
+        assertThat(authorizationAdmissionApplicationService.getLastRequest()).isSameAs(request);
+    }
 
     /**
      * 场景：VA/ACH 等收款工具入口完成预交易准入后，委派账户主体型充值交易内核。
@@ -213,8 +245,31 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：收款工具入口必须携带调用方期望的绑定版本。
+     * 输入：VA 收款工具、资金责任和账户能力均有效，但请求未传 expectedBindingVersion。
+     * 输出：准入阶段拒绝，不创建资金交易、route、posting plan、账本交易或分录。
+     * 红线：收款入口不得在换绑风险下使用“无版本预期”的默认绑定继续入账。
+     */
+    @Test
+    void testReceiveByInstrumentShouldRejectMissingBindingVersionWithoutFundsFacts() {
+        createReceiveScenario();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        ReceiveByInstrumentRequest request = receiveRequest(MISSING_BINDING_VERSION_BUSINESS_SN,
+                RECEIVE_INSTRUMENT_SN)
+                .setExpectedBindingVersion(null);
+
+        assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.receiveByInstrument(request,
+                WindOperator.system()))
+                .hasMessageContaining("支付工具收款绑定版本不能为空");
+
+        assertNoFundsOrLedgerFacts(MISSING_BINDING_VERSION_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpInstrumentTransactionLifecycleTestData() {
+        authorizationAdmissionApplicationService.reset();
         cleanupInstrumentTransactionLifecycleTestData();
     }
 
@@ -228,19 +283,21 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
                     SELECT sn FROM t_ledger_transaction
-                    WHERE business_scene = ? AND business_sn IN (?, ?)
+                    WHERE business_scene = ? AND business_sn IN (?, ?, ?)
                 )
-                """, BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
+                """, BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
+                MISSING_BINDING_VERSION_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
+        jdbcTemplate.update(
+                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN);
         jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
                 RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
@@ -391,6 +448,19 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setDescription("instrument receive flow");
     }
 
+    private AuthorizeByPaymentInstrumentRequest authorizeRequest() {
+        return new AuthorizeByPaymentInstrumentRequest()
+                .setTenantId(TENANT_ID)
+                .setInstrumentSn("pi_lifecycle_authorize_card")
+                .setAmount(60L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setBusinessScene("INSTRUMENT_AUTHORIZE")
+                .setBusinessSn(AUTHORIZE_BUSINESS_SN)
+                .setApproved(Boolean.TRUE)
+                .setExpectedBindingVersion(1)
+                .setDescription("instrument lifecycle authorization flow");
+    }
+
     private FundsAccountId receiveAccountId() {
         return FundsAccountId.immutable(RECEIVE_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT);
     }
@@ -479,7 +549,25 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private void assertReceiveRouteSnapshot(String businessSn) {
         JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson(businessSn));
-        assertThat(routeSnapshot.getJSONObject("paymentInstrumentRef")).isEmpty();
+        JSONObject paymentInstrumentRef = routeSnapshot.getJSONObject("paymentInstrumentRef");
+        assertThat(paymentInstrumentRef).isNotNull().isNotEmpty();
+        assertThat(paymentInstrumentRef.getString("instrumentId")).isEqualTo(RECEIVE_INSTRUMENT_SN);
+        assertThat(paymentInstrumentRef.getString("instrumentType")).isEqualTo("VA");
+        assertThat(paymentInstrumentRef.getString("instrumentNo")).isEqualTo(RECEIVE_INSTRUMENT_NO);
+        assertThat(paymentInstrumentRef.getString("ownerId")).isEqualTo(OWNER_ID);
+        assertThat(paymentInstrumentRef.getString("ownerType")).isEqualTo(FundsAccountOwnerType.USER.name());
+        assertThat(paymentInstrumentRef.getString("currency")).isEqualTo(CurrencyIsoCode.USD.name());
+        assertThat(paymentInstrumentRef.getString("status")).isEqualTo(FundsAccountStatus.ACTIVE.name());
+        assertThat(paymentInstrumentRef.toString()).doesNotContain("va_lifecycle_2468");
+        JSONObject bindingSnapshot = paymentInstrumentRef.getJSONObject("bindingSnapshot");
+        assertThat(bindingSnapshot).isNotNull().isNotEmpty();
+        assertThat(bindingSnapshot.getString("bindingSn")).isEqualTo(RECEIVE_BINDING_SN);
+        assertThat(bindingSnapshot.getInteger("bindingVersion")).isEqualTo(1);
+        assertThat(bindingSnapshot.getString("bindingRole"))
+                .isEqualTo(PaymentInstrumentBindingRole.RECEIVE_SUBJECT.name());
+        assertThat(bindingSnapshot.getString("subjectType")).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT.name());
+        assertThat(bindingSnapshot.getString("subjectId")).isEqualTo(RECEIVE_ACCOUNT_SN);
+        assertThat(bindingSnapshot.getString("admissionAction")).isEqualTo(PaymentInstrumentAction.RECEIVE.name());
         JSONObject externalAccountRef = routeSnapshot.getJSONObject("externalAccountRef");
         assertThat(externalAccountRef).isNotNull().isNotEmpty();
         assertThat(externalAccountRef.getString("externalAccountId"))
@@ -573,5 +661,42 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
             PlatformFundingAccountServiceImpl.class
     })
     static class Config {
+
+        @Bean
+        RecordingAuthorizationAdmissionApplicationService recordingAuthorizationAdmissionApplicationService() {
+            return new RecordingAuthorizationAdmissionApplicationService();
+        }
+    }
+
+    static class RecordingAuthorizationAdmissionApplicationService implements AuthorizationAdmissionApplicationService {
+
+        private int invocationCount;
+
+        private AuthorizeByPaymentInstrumentRequest lastRequest;
+
+        @Override
+        public String authorizeByInstrument(AuthorizeByPaymentInstrumentRequest request, WindOperator operator) {
+            invocationCount++;
+            lastRequest = request;
+            return DELEGATED_AUTHORIZATION_SN;
+        }
+
+        @Override
+        public String authorizeByPaymentInstrument(AuthorizeByPaymentInstrumentRequest request, WindOperator operator) {
+            return authorizeByInstrument(request, operator);
+        }
+
+        int getInvocationCount() {
+            return invocationCount;
+        }
+
+        AuthorizeByPaymentInstrumentRequest getLastRequest() {
+            return lastRequest;
+        }
+
+        void reset() {
+            invocationCount = 0;
+            lastRequest = null;
+        }
     }
 }

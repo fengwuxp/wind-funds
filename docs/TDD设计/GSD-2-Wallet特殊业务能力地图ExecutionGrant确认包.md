@@ -10,15 +10,15 @@
 | 所属阶段 | GSD-2 / LWT capability goal / wallet special business capability map design consumed by instrument lifecycle contracts |
 | Owner | 产品架构专家、资深架构师、AI Native 工程流程编排共同合议；编码 Owner 在下一 Grant 再确认。 |
 | 写入范围 | 本文、TDD、OpenSpec 任务基线、wallet 支付工具生命周期服务层接口、实现和目标测试。 |
-| 写入文件 | `docs/TDD设计/GSD-2-Wallet特殊业务能力地图ExecutionGrant确认包.md`、`docs/TDD设计/支付资金底座测试驱动设计.md`、OpenSpec tasks、`InstrumentTransactionLifecycleApplicationService`、`ReceiveByInstrumentRequest`、`InstrumentTransactionLifecycleApplicationServiceImpl`、`InstrumentTransactionLifecycleApplicationServiceTests`。 |
+| 写入文件 | `docs/TDD设计/GSD-2-Wallet特殊业务能力地图ExecutionGrant确认包.md`、`docs/TDD设计/支付资金底座测试驱动设计.md`、OpenSpec tasks、`InstrumentTransactionLifecycleApplicationService`、`AuthorizeByPaymentInstrumentRequest`、`ReceiveByInstrumentRequest`、`InstrumentTransactionLifecycleApplicationServiceImpl`、`InstrumentTransactionLifecycleApplicationServiceTests`。 |
 | 只读范围 | `wallet/wallet-face` application 契约、`transaction/transaction-face` canonical 交易服务、`ledger/ledger-face` 应用服务、现有 TDD 和 OpenSpec。 |
 | 只读参考 | 现有 `wallet.application`、`transaction.application`、`ledger.application`、清结算对账服务、PRD、系分、DSL、TDD 和 OpenSpec。 |
 | 禁止范围 | 不改 DDL/H2 schema、Controller、HTTP/RPC、Mapper、Entity、runtime config、交易 canonical 入参或 ledger posting；不新增统一支付工具交易内核。 |
-| 验证命令 | Red/Green：非沙箱 `just test-one InstrumentTransactionLifecycleApplicationServiceTests tests` 2 tests 通过；收口：`just compile`、`just pmd`、`git diff --check`。沙箱内同测试因嵌入式 Redis 端口绑定限制失败，已按项目约规在沙箱外复跑。 |
-| 停止条件 | 需要继续新增 `receiveByInstrument`、`payOutByRail`、外部资金事件消费、改变交易 canonical 入参、让支付工具/预算组/Spend Rule 入账、或触碰账本分录事实时停止，等待新的独立 Execution Grant。 |
-| Execution Grant | `GSD2-WALLET-INSTRUMENT-LIFECYCLE-CONTRACT-001` 首个授权入口契约已消费；`GSD2-WALLET-INSTRUMENT-LIFECYCLE-CONTRACT-002` 已消费为支付工具收款入口；后续能力必须另起单一 Grant。 |
+| 验证命令 | Red/Green：沙箱内 `just test-one InstrumentTransactionLifecycleApplicationServiceTests tests` 因嵌入式 Redis 端口绑定限制失败；非沙箱复跑已覆盖授权委派、收款成功、payment-only 拒绝和缺绑定版本拒绝 4 tests 通过；`just compile`、`just pmd`、`git diff --check` 均已通过。 |
+| 停止条件 | 需要继续扩展 `receiveByInstrument` 新场景语义、新增 `payOutByRail`、外部资金事件消费、改变交易 canonical 入参、让支付工具/预算组/Spend Rule 入账、或触碰账本分录事实时停止，等待新的独立 Execution Grant。 |
+| Execution Grant | `GSD2-WALLET-INSTRUMENT-LIFECYCLE-AUTH-FACADE-001` 已消费为支付工具生命周期授权入口委派切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-SNAPSHOT-001` 已消费为支付工具收款 route snapshot 回链切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-BINDING-VERSION-GUARD-001` 已消费为收款工具绑定版本必填硬化切片；后续能力必须另起单一 Grant。 |
 | 工程纪律 | 本轮已执行 TDD Red / Green、Review 边界复核、编译、PMD 和 diff 校验；后续继续编码仍必须按单一 Grant 执行。 |
-| Handoff | 下一轮从 `receiveByInstrument`、`payOutByRail`、外部资金事件消费、VCC / VA 单场景、transaction 兼容债或旧 ledger 公共 CRUD API 治理中重新选择单一切片。 |
+| Handoff | 下一轮从 `payOutByRail`、外部资金事件消费、VCC / VA 单场景、transaction 兼容债或旧 ledger 公共 CRUD API 治理中重新选择单一切片；若继续扩 `receiveByInstrument` 只能处理新场景，不得重复本轮 route snapshot 回链或绑定版本必填护栏。 |
 
 ## 2. 业务目标和非目标
 
@@ -192,8 +192,8 @@ stateDiagram-v2
 
 发布边界：
 
-1. 本轮不发布代码能力。
-2. 下一轮若新增服务层接口，应先以灰度开关或内部调用方试点接入。
+1. 本轮只新增服务层生命周期授权入口委派，不发布 Controller、HTTP/RPC 或外部调用入口。
+2. 下一轮若扩 `receiveByInstrument` 场景硬化、`payOutByRail`、外部事件消费或 VCC/VA 单场景，应先以内部调用方试点接入。
 3. 上线前必须补齐回滚策略、人工处理 Runbook、告警指标和最小运营后台查询口径。
 
 ## 11. 下一 Grant 候选
@@ -201,9 +201,9 @@ stateDiagram-v2
 本确认包已消费首个授权入口契约：
 
 ```text
-Execution Grant: GSD2-WALLET-INSTRUMENT-LIFECYCLE-CONTRACT-001
-已消费范围：authorizeByInstrument 服务层入口契约和首批 Red / Green。
-已完成证据：Red 首次编译失败证明 AuthorizationAdmissionApplicationService 缺少 authorizeByInstrument；Green 后非沙箱复跑 AuthorizationAdmissionApplicationServiceTests 4 tests 通过。
+Execution Grant: GSD2-WALLET-INSTRUMENT-LIFECYCLE-AUTH-FACADE-001
+已消费范围：InstrumentTransactionLifecycleApplicationService#authorizeByInstrument 服务层统一授权入口、实现委派和首批 Red / Green。
+已完成证据：Red 首次编译失败证明 InstrumentTransactionLifecycleApplicationService 缺少 authorizeByInstrument；Green 后非沙箱复跑 InstrumentTransactionLifecycleApplicationServiceTests 3 tests 通过。
 边界：保留 authorizeByPaymentInstrument 兼容入口；不改交易 canonical 入参、不新增统一支付工具交易内核、不写 Controller、HTTP/RPC、ledger posting、DDL/H2 schema。
 ```
 
@@ -211,10 +211,24 @@ Execution Grant: GSD2-WALLET-INSTRUMENT-LIFECYCLE-CONTRACT-001
 
 ```text
 Execution Grant: GSD2-WALLET-INSTRUMENT-LIFECYCLE-CONTRACT-002
-目标：只在 wallet-face / wallet-impl 服务层补支付工具收款入口契约和组合测试。
+目标：只在 wallet-face / wallet-impl 服务层补支付工具收款入口场景硬化和组合测试。
 已消费范围：receiveByInstrument 服务层入口、ReceiveByInstrumentRequest、应用层准入编排、目标服务流测试和任务基线回写。
 禁止：不改 Controller、HTTP/RPC、交易 canonical 入参、ledger posting、DDL/H2 schema。
 已完成证据：InstrumentTransactionLifecycleApplicationServiceTests 覆盖支付工具收款成功和 payment-only 工具拒绝无资金事实副作用；非沙箱 `just test-one InstrumentTransactionLifecycleApplicationServiceTests tests` 2 tests 通过。
+```
+
+```text
+Execution Grant: GSD2-WALLET-INSTRUMENT-RECEIVE-SNAPSHOT-001
+已消费范围：支付工具收款入口在委派账户主体型 topup 时固化脱敏 PaymentInstrumentRef 到 route snapshot；直接充值请求只新增可选快照承载位，不改变 accountId canonical 入账主体。
+已完成证据：Red 先证明 receive route snapshot 的 paymentInstrumentRef 为空；Green 后非沙箱复跑 InstrumentTransactionLifecycleApplicationServiceTests 3 tests 通过。
+边界：不改 Controller、HTTP/RPC、交易 canonical 账户主体、ledger posting、DDL/H2 schema、出款、退款、ACH return、全球账户付款、VCC facade 或统一支付工具交易内核。
+```
+
+```text
+Execution Grant: GSD2-WALLET-INSTRUMENT-RECEIVE-BINDING-VERSION-GUARD-001
+已消费范围：ReceiveByInstrumentRequest 和 receiveByInstrument 服务层前置准入强制 expectedBindingVersion，避免收款工具换绑后无版本预期地继续使用默认绑定入账。
+已完成证据：Red 先证明缺 expectedBindingVersion 时仍会进入账户主体型 topup 并生成资金事实；Green 后非沙箱复跑 InstrumentTransactionLifecycleApplicationServiceTests 4 tests 通过，缺版本路径拒绝且无资金交易、route、posting、LedgerEntry、账本交易或余额投影副作用。
+边界：不改 Controller、HTTP/RPC、交易 canonical 账户主体、ledger posting、DDL/H2 schema、Entity、Mapper、出款、退款、ACH return、全球账户付款、VCC facade 或统一支付工具交易内核。
 ```
 
 备选切片：

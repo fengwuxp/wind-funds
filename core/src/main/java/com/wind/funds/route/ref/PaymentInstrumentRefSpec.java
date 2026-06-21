@@ -6,7 +6,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.Map;
 
 /**
- * 付款工具引用快照。
+ * 支付工具引用快照。
  */
 public interface PaymentInstrumentRefSpec {
 

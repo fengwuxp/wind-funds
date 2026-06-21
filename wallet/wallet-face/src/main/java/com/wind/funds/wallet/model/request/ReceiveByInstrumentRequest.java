@@ -68,6 +68,7 @@ public class ReceiveByInstrumentRequest {
     private String businessScene;
 
     @Schema(description = "期望支付工具绑定版本，用于防止换绑后继续使用旧快照")
+    @NotNull
     private Integer expectedBindingVersion;
 
     @Schema(description = "交易描述")
