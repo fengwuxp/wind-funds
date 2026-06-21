@@ -49,8 +49,19 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
+                                                 @NonNull WindOperator operator) {
+        return authorize(request, operator);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public @NonNull String authorizeByPaymentInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
                                                         @NonNull WindOperator operator) {
+        return authorize(request, operator);
+    }
+
+    private String authorize(AuthorizeByPaymentInstrumentRequest request, WindOperator operator) {
         validateRequest(request);
         PaymentInstrumentPreTransactionSnapshotDTO snapshot = resolveAdmissionSnapshot(request);
         FundsAccountId accountId = snapshot.getTargetAccountId();

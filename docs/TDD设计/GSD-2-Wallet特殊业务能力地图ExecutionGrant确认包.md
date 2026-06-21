@@ -7,18 +7,18 @@
 | 项 | 内容 |
 | --- | --- |
 | Task ID | `GSD2-WALLET-SPECIAL-BUSINESS-CAPABILITY-MAP-001` |
-| 所属阶段 | GSD-2 / LWT capability goal / wallet special business capability map design-only ready |
+| 所属阶段 | GSD-2 / LWT capability goal / wallet special business capability map design consumed by first auth contract |
 | Owner | 产品架构专家、资深架构师、AI Native 工程流程编排共同合议；编码 Owner 在下一 Grant 再确认。 |
-| 写入范围 | 本文、PRD、系分、DSL、TDD README、LWT Goal、OpenSpec 任务基线。 |
-| 写入文件 | `docs/TDD设计/GSD-2-Wallet特殊业务能力地图ExecutionGrant确认包.md`、PRD、系分、DSL、TDD README、LWT Goal、OpenSpec tasks。 |
+| 写入范围 | 本文、系分、LWT Goal、OpenSpec 任务基线、wallet 授权准入服务层接口、实现和目标测试。 |
+| 写入文件 | `docs/TDD设计/GSD-2-Wallet特殊业务能力地图ExecutionGrant确认包.md`、`docs/系分设计/02-交易路由钱包账目与投影系分设计.md`、LWT Goal、OpenSpec tasks、`AuthorizationAdmissionApplicationService`、`AuthorizationAdmissionApplicationServiceImpl`、`AuthorizationAdmissionApplicationServiceTests`。 |
 | 只读范围 | `wallet/wallet-face` application 契约、`transaction/transaction-face` canonical 交易服务、`ledger/ledger-face` 应用服务、现有 TDD 和 OpenSpec。 |
 | 只读参考 | 现有 `wallet.application`、`transaction.application`、`ledger.application`、清结算对账服务、PRD、系分、DSL、TDD 和 OpenSpec。 |
-| 禁止范围 | 不改 Java 生产代码、测试、DDL/H2 schema、Controller、HTTP/RPC、Mapper、Entity、runtime config；不新增统一支付工具交易内核。 |
-| 验证命令 | 文档门禁、Harness Plan 门禁、`git diff --check`；本轮是 docs-only，不运行编译。 |
-| 停止条件 | 需要新增公共 Java API、改变交易 canonical 入参、让支付工具/预算组/Spend Rule 入账、或触碰账本分录事实时停止，等待独立 Execution Grant。 |
-| Execution Grant | 本轮授权仅覆盖设计基线回写；Git 策略为本轮文档通过门禁后提交。 |
-| 工程纪律 | 下一轮编码必须执行 TDD、Review、AI 产物复核和编码红线检查；本轮只建立设计准入，不进入 Refactor 或实现。 |
-| Handoff | 下一轮从 `GSD2-WALLET-INSTRUMENT-LIFECYCLE-CONTRACT-001` 或等价单一切片恢复。 |
+| 禁止范围 | 不改 DDL/H2 schema、Controller、HTTP/RPC、Mapper、Entity、runtime config、交易 canonical 入参或 ledger posting；不新增统一支付工具交易内核。 |
+| 验证命令 | Red：`just test-one AuthorizationAdmissionApplicationServiceTests tests` 首次因缺少 `authorizeByInstrument` 编译失败；Green：非沙箱 `just test-one AuthorizationAdmissionApplicationServiceTests tests` 4 tests 通过；收口：`just compile`、`just pmd`、`git diff --check`。 |
+| 停止条件 | 需要继续新增 `receiveByInstrument`、`payOutByRail`、外部资金事件消费、改变交易 canonical 入参、让支付工具/预算组/Spend Rule 入账、或触碰账本分录事实时停止，等待新的独立 Execution Grant。 |
+| Execution Grant | `GSD2-WALLET-INSTRUMENT-LIFECYCLE-CONTRACT-001` 首个授权入口契约已被本轮消费；后续能力必须另起单一 Grant。 |
+| 工程纪律 | 本轮已执行 TDD Red / Green、Review 边界复核、编译、PMD 和 diff 校验；后续继续编码仍必须按单一 Grant 执行。 |
+| Handoff | 下一轮从 `receiveByInstrument`、`payOutByRail`、外部资金事件消费、VCC / VA 单场景、transaction 兼容债或旧 ledger 公共 CRUD API 治理中重新选择单一切片。 |
 
 ## 2. 业务目标和非目标
 
@@ -198,12 +198,21 @@ stateDiagram-v2
 
 ## 11. 下一 Grant 候选
 
-推荐下一个单一切片：
+本确认包已消费首个授权入口契约：
 
 ```text
 Execution Grant: GSD2-WALLET-INSTRUMENT-LIFECYCLE-CONTRACT-001
-目标：只在 wallet-face / wallet-impl 服务层补最小支付工具生命周期入口契约或组合测试。
-范围：authorizeByInstrument / receiveByInstrument / payOutByRail 的契约评审与首批 Red，任选一个场景先做。
+已消费范围：authorizeByInstrument 服务层入口契约和首批 Red / Green。
+已完成证据：Red 首次编译失败证明 AuthorizationAdmissionApplicationService 缺少 authorizeByInstrument；Green 后非沙箱复跑 AuthorizationAdmissionApplicationServiceTests 4 tests 通过。
+边界：保留 authorizeByPaymentInstrument 兼容入口；不改交易 canonical 入参、不新增统一支付工具交易内核、不写 Controller、HTTP/RPC、ledger posting、DDL/H2 schema。
+```
+
+后续若继续推进，只能重新确认新的单一切片：
+
+```text
+Execution Grant: GSD2-WALLET-INSTRUMENT-LIFECYCLE-CONTRACT-002
+目标：只在 wallet-face / wallet-impl 服务层补下一个最小支付工具生命周期入口契约或组合测试。
+范围：receiveByInstrument / payOutByRail / consumeExternalFundsEvent 的契约评审与首批 Red，任选一个场景先做。
 禁止：不改 Controller、HTTP/RPC、交易 canonical 入参、ledger posting、DDL/H2 schema。
 ```
 

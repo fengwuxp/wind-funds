@@ -179,7 +179,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
      * 红线：wallet 应用入口不直接写账，最终账务事实必须由标准授权交易路由和 ledger posting 链路产生。
      */
     @Test
-    void testAuthorizeByPaymentInstrumentShouldResolveAdmissionAndDelegateAuthorizationKernel() {
+    void testAuthorizeByInstrumentShouldResolveAdmissionAndDelegateAuthorizationKernel() {
         FundsAccountId creditAccount = creditAccountId();
         fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
         creditAccountService.createCreditAccount(createCreditAccountRequest());
@@ -192,7 +192,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertBucket(beforeAuthorize, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(beforeAuthorize, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
 
-        String authorizationSn = authorizationAdmissionApplicationService.authorizeByPaymentInstrument(
+        String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
                 authorizeRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperator.system());
 
         assertThat(authorizationSn).isNotBlank();
