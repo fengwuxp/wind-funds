@@ -199,8 +199,6 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(budgetGroup.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
         assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
         assertThat(budgetGroup.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
-        assertThat(budgetGroup.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.BUDGET_BASIC);
-        assertThat(budgetGroup.getLedgerIds()).isEmpty();
         assertThat(ledgers).isEmpty();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -220,8 +218,6 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(budgetGroup.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
         assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
         assertThat(budgetGroup.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
-        assertThat(budgetGroup.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.BUDGET_BASIC);
-        assertThat(budgetGroup.getLedgerIds()).isEmpty();
         assertThat(ledgers).isEmpty();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -308,40 +304,30 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.CUSTOM_CYCLE);
         assertThat(budgetGroup.getPeriodId()).isEqualTo(CUSTOM_PERIOD_ID);
         assertThat(budgetGroup.getPeriodPolicy()).isEqualTo(CUSTOM_PERIOD_POLICY);
-        assertThat(budgetGroup.getLedgerIds()).isEmpty();
         assertThat(ledgers).isEmpty();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
-    void testInitializeCustomCycleLedgersShouldRequirePeriodId() {
+    void testInitializeBudgetGroupLedgersShouldRejectEvenWhenProfileAndPeriodProvided() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> subjectLedgerInitializer.initializeRequiredLedgers(customBudgetLedgerRequest()))
-                .hasMessageContaining("非生命周期账本周期 periodId 不能为空");
+        assertThatThrownBy(() -> subjectLedgerInitializer.initializeRequiredLedgers(
+                customBudgetLedgerRequest().setPeriodId(CUSTOM_PERIOD_ID)))
+                .hasMessageContaining("预算组不是核心资金账务主体，不允许初始化账本");
 
         assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
-    void testInitializeCustomCycleLedgersShouldUseExplicitPeriodId() {
+    void testBudgetBasicProfileShouldNotBeActiveLedgerInitializationProfile() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        Map<LedgerSubjectCode, Long> ledgerIds = subjectLedgerInitializer.initializeRequiredLedgers(
-                customBudgetLedgerRequest().setPeriodId(CUSTOM_PERIOD_ID));
-        List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.BUDGET_GROUP, CUSTOM_BUDGET_GROUP_SN);
+        assertThatThrownBy(() -> defaultLedgerProfileService().getProfile(LedgerProfileCode.BUDGET_BASIC))
+                .hasMessageContaining("LedgerProfile 不存在");
 
-        assertThat(ledgerIds).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
-        assertThat(ledgers).hasSize(3);
-        assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
-                ledger,
-                FundsSubjectType.BUDGET_GROUP,
-                CUSTOM_BUDGET_GROUP_SN,
-                LedgerProfileCode.BUDGET_BASIC,
-                AccountBalancePeriodType.CUSTOM_CYCLE,
-                CUSTOM_PERIOD_ID));
-        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @BeforeEach
@@ -404,6 +390,10 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.BUDGET_BASIC)
                 .setPeriodType(AccountBalancePeriodType.CUSTOM_CYCLE);
+    }
+
+    private DefaultLedgerProfileServiceImpl defaultLedgerProfileService() {
+        return new DefaultLedgerProfileServiceImpl();
     }
 
     private List<LedgerDTO> loadLedgers(FundsSubjectType subjectType, String subjectId) {

@@ -41,15 +41,19 @@ import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryServ
 import com.wind.funds.transaction.services.impl.DelegatingFundsInstructionLifecycleRecorder;
 import com.wind.funds.transaction.ledger.DefaultLedgerPostingAssembler;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResolutionApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.AuthorizationAdmissionApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
+import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
+import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
+import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
@@ -130,6 +134,16 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private static final String DIRECTION_FAIL_BUSINESS_SN = "AUTH_ADMISSION_DIRECTION_FAIL";
 
     private static final String DECLINE_BUSINESS_SN = "AUTH_ADMISSION_DECLINE";
+
+    private static final String SPEND_REJECT_BUSINESS_SN = "AUTH_ADMISSION_SPEND_REJECT";
+
+    private static final String SPEND_RULE_ID = "sr_auth_admission_daily_limit";
+
+    private static final String SPEND_RULE_VERSION = "2026-06-21.1";
+
+    private static final String SPEND_DECISION_SN = "decision_auth_admission_001";
+
+    private static final String SPEND_DECISION_DIGEST = "sha256:auth-admission-spend-reject";
 
     @Autowired
     private CreditAccountService creditAccountService;
@@ -263,6 +277,30 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(ledgerEntryCount(DECLINE_BUSINESS_SN)).isZero();
     }
 
+    /**
+     * 场景：支付工具授权入口携带 Spend Rule 决策证据，且规则决策拒绝。
+     * 输入：支付工具、资金责任和账户能力均可用，但 Spend Rule 决策结果为 REJECTED。
+     * 输出：授权准入阶段拒绝，不创建资金交易、route、posting plan、账本交易或分录。
+     * 红线：Spend Rule 是交易前准入控制，拒绝时不得委派账户主体型授权交易内核。
+     */
+    @Test
+    void testAuthorizeByPaymentInstrumentShouldRejectSpendRuleDecisionWithoutFundsFacts() {
+        fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
+        creditAccountService.createCreditAccount(createCreditAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentDirection.PAYMENT));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
+        var before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByPaymentInstrument(
+                authorizeSpendRejectedRequest(), WindOperator.system()))
+                .hasMessageContaining("Spend Rule 准入未通过");
+
+        assertNoFundsOrLedgerFacts(SPEND_REJECT_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpAuthorizationAdmissionTestData() {
         cleanupAuthorizationAdmissionTestData();
@@ -278,20 +316,25 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
                     SELECT sn FROM t_ledger_transaction
-                    WHERE business_sn IN (?, ?, ?, ?)
+                    WHERE business_sn IN (?, ?, ?, ?, ?)
                 )
                 """, AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
-                DECLINE_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_sn IN (?, ?, ?, ?)",
-                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_sn IN (?, ?, ?, ?)",
-                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction_detail WHERE business_sn IN (?, ?, ?, ?)",
-                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_sn IN (?, ?, ?, ?)",
-                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_sn IN (?, ?, ?, ?)",
-                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN);
+                DECLINE_BUSINESS_SN, SPEND_REJECT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_sn IN (?, ?, ?, ?, ?)",
+                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
+                SPEND_REJECT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_sn IN (?, ?, ?, ?, ?)",
+                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
+                SPEND_REJECT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction_detail WHERE business_sn IN (?, ?, ?, ?, ?)",
+                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
+                SPEND_REJECT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_sn IN (?, ?, ?, ?, ?)",
+                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
+                SPEND_REJECT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_sn IN (?, ?, ?, ?, ?)",
+                AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
+                SPEND_REJECT_BUSINESS_SN);
         jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
                 PAYMENT_INSTRUMENT_SN, RECEIVE_INSTRUMENT_SN);
@@ -394,6 +437,17 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         return authorizeRequest(businessSn, instrumentSn)
                 .setApproved(Boolean.FALSE)
                 .setDeclineReason("RISK_DECLINED");
+    }
+
+    private AuthorizeByPaymentInstrumentRequest authorizeSpendRejectedRequest() {
+        return authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
+                .setSpendRuleId(SPEND_RULE_ID)
+                .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setSpendDecisionSn(SPEND_DECISION_SN)
+                .setSpendDecisionResult(SpendControlDecisionResult.REJECTED)
+                .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
+                .setBudgetGroupSn("budget_auth_admission")
+                .setSpendDecisionRejectReason("超过单卡单日授权限额");
     }
 
     private FundsAccountId creditAccountId() {
@@ -607,6 +661,9 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentCapabilityApplicationServiceImpl.class,
             FundingResponsibilityResolutionApplicationServiceImpl.class,
+            FundsAccountCapabilityApplicationServiceImpl.class,
+            PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
+            SpendControlAdmissionApplicationServiceImpl.class,
             AuthorizationAdmissionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             PlatformFundingAccountServiceImpl.class

@@ -1,6 +1,5 @@
 package com.wind.funds.wallet.dal.entities;
 
-import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
@@ -100,18 +99,6 @@ public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
      * 预算周期策略。
      */
     private String periodPolicy;
-
-    /**
-     * 账目 profile 编码快照。
-     */
-    @NotNull
-    private LedgerProfileCode ledgerProfileCode;
-
-    /**
-     * 账目 profile 版本快照。
-     */
-    @NotNull
-    private Integer ledgerProfileVersion;
 
     /**
      * 预算组状态。

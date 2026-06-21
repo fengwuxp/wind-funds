@@ -1,6 +1,5 @@
 package com.wind.funds.wallet.model.request;
 
-import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
@@ -59,9 +58,6 @@ public class CreateBudgetGroupRequest {
 
     @Schema(description = "周期策略")
     private String periodPolicy;
-
-    @Schema(description = "ledger profile 编码")
-    private LedgerProfileCode ledgerProfileCode;
 
     @Schema(description = "状态")
     private FundsAccountStatus status;

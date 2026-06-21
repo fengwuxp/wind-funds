@@ -1027,6 +1027,52 @@ class FundsDslJsonContractTests {
     }
 
     /**
+     * 场景：JSON 样例把预算组写成账本 route leg 节点。
+     * 预期：JSON 契约校验显式失败。
+     * 红线：预算组只能作为控制范围和控制投影视图，不能成为账本 route node。
+     */
+    @Test
+    void testJsonContractVerifierShouldRejectBudgetGroupRouteLegNode() {
+        JSONObject document = JSON.parseObject("""
+                {
+                  "caseId": "DSL-INVALID-BUDGET-GROUP-ROUTE-NODE-001",
+                  "instruction": {
+                    "instructionType": "AUTHORIZATION_TRANSACTION",
+                    "eventType": "AUTHORIZE",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedRoute": {
+                    "legs": [{
+                      "legType": "HOLD",
+                      "sourceNode": {
+                        "nodeRole": "SOURCE",
+                        "subjectType": "BUDGET_GROUP",
+                        "subjectId": "bg_invalid_route_node",
+                        "ledgerSubjectCode": "AVAILABLE"
+                      },
+                      "targetNode": {
+                        "nodeRole": "TARGET",
+                        "subjectType": "BUDGET_GROUP",
+                        "subjectId": "bg_invalid_route_node",
+                        "ledgerSubjectCode": "AUTHORIZATION"
+                      },
+                      "amount": { "currency": "USD", "amount": 100 },
+                      "balanceEffectType": "HOLD",
+                      "phaseCode": "AUTHORIZATION",
+                      "replayPolicy": "PARTIAL_ALLOWED"
+                    }]
+                  }
+                }
+                """);
+
+        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("RouteLeg sourceNode must be FUNDING_ACCOUNT or CREDIT_ACCOUNT");
+    }
+
+    /**
      * 场景：VCC route participant 只声明预算组类型，缺少稳定主体标识。
      * 预期：JSON 契约校验显式失败。
      * 红线：预算组可作为迁移期控制参与方快照，但不能缺失可追溯主体 ID。

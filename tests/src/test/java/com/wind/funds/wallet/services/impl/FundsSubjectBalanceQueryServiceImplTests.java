@@ -5,7 +5,9 @@ import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.wallet.dal.entities.BudgetGroup;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
+import com.wind.funds.wallet.dal.mapper.BudgetGroupMapper;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
@@ -73,6 +75,9 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
 
     @Autowired
     private FundingAccountMapper fundingAccountMapper;
+
+    @Autowired
+    private BudgetGroupMapper budgetGroupMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -354,6 +359,28 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：历史预算组记录仍存在，但目标态余额查询只接受核心资金账务主体。
+     * 输入：t_budget_group 有预算组元数据，subjectRefs 传入 BUDGET_GROUP。
+     * 输出：余额查询按资金主体不存在拒绝，不返回 initialized=false 的余额视图。
+     * 红线：预算组是控制范围，不得通过余额查询继续冒充 ledger 余额主体。
+     */
+    @Test
+    void testQueryCurrentBalancesShouldRejectBudgetGroupSubjectEvenWhenBudgetGroupExists() {
+        insertBudgetGroupWithoutLedgers();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> balanceQueryService.queryCurrentBalances(new FundsSubjectBalanceQuery()
+                .setTenantId(TENANT_ID)
+                .setSubjectRefs(List.of(FundsAccountId.immutable(UNINITIALIZED_ACCOUNT_SN,
+                        FundsSubjectType.BUDGET_GROUP)))
+                .setCurrency(CURRENCY)))
+                .hasMessageContaining("资金主体不存在");
+
+        assertThat(countLedgers()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpFundsSubjectBalanceQueryServiceTestData() {
         cleanupFundsSubjectBalanceQueryServiceTestData();
@@ -371,6 +398,7 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)",
                 UNINITIALIZED_ACCOUNT_SN,
                 SECOND_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_budget_group WHERE sn = ?", UNINITIALIZED_ACCOUNT_SN);
     }
 
     private FundsSubjectBalanceQuery balanceQuery() {
@@ -406,6 +434,22 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         insertFundingAccountWithoutLedgers(accountSn, ownerId);
         createLifetimeLedger(accountSn, LedgerSubjectCode.AVAILABLE);
         createLifetimeLedger(accountSn, LedgerSubjectCode.FROZEN);
+    }
+
+    private void insertBudgetGroupWithoutLedgers() {
+        BudgetGroup budgetGroup = new BudgetGroup();
+        budgetGroup.setSn(UNINITIALIZED_ACCOUNT_SN);
+        budgetGroup.setTenantId(TENANT_ID);
+        budgetGroup.setOwnerId(OWNER_ID);
+        budgetGroup.setOwnerType(FundsAccountOwnerType.USER);
+        budgetGroup.setBudgetType(FundsSubjectType.BUDGET_GROUP.name());
+        budgetGroup.setCurrency(CurrencyIsoCode.USD);
+        budgetGroup.setPeriodType(AccountBalancePeriodType.LIFETIME);
+        budgetGroup.setPeriodId(AccountBalancePeriodType.LIFETIME.name());
+        budgetGroup.setStatus(FundsAccountStatus.ACTIVE);
+        budgetGroup.setDescription("budget group must not be a balance subject");
+        budgetGroup.setVersion(0);
+        budgetGroupMapper.insertSelective(budgetGroup);
     }
 
     private void createLifetimeLedger(String accountSn, LedgerSubjectCode ledgerSubjectCode) {

@@ -23,6 +23,10 @@ public class RouteSubjectSupport {
         if (isExternalAccountType(accountId.type())) {
             throw new IllegalArgumentException("外部账户不能创建账务主体引用，accountId = " + accountId);
         }
+        if (isBudgetGroup(accountId)) {
+            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能创建账务主体引用，accountId = "
+                    + accountId);
+        }
         return ImmutableSubjectRef.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .subjectId(accountId.id())
@@ -56,7 +60,8 @@ public class RouteSubjectSupport {
             return LedgerProfileCode.CREDIT_BASIC;
         }
         if (Objects.equals(accountId.type(), FundsSubjectType.BUDGET_GROUP.name())) {
-            return LedgerProfileCode.BUDGET_BASIC;
+            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能解析账本 Profile，accountId = "
+                    + accountId);
         }
         if (isMerchantFundingAccountType(accountId.type())) {
             return LedgerProfileCode.FUNDING_MERCHANT;

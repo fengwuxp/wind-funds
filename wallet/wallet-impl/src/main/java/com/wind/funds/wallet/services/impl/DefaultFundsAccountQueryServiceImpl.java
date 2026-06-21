@@ -18,13 +18,10 @@ import com.wind.funds.wallet.FundsAccountOwner;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.ImmutableFundsAccount;
 import com.wind.funds.wallet.ImmutableFundsBalanceView;
-import com.wind.funds.wallet.dal.entities.BudgetGroup;
 import com.wind.funds.wallet.dal.entities.CreditAccount;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
-import com.wind.funds.wallet.dal.entities.table.BudgetGroupNameRefs;
 import com.wind.funds.wallet.dal.entities.table.CreditAccountNameRefs;
 import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
-import com.wind.funds.wallet.dal.mapper.BudgetGroupMapper;
 import com.wind.funds.wallet.dal.mapper.CreditAccountMapper;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
@@ -65,8 +62,6 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     private final FundingAccountMapper fundingAccountMapper;
 
     private final CreditAccountMapper creditAccountMapper;
-
-    private final BudgetGroupMapper budgetGroupMapper;
 
     private final LedgerService ledgerService;
 
@@ -145,8 +140,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
         if (creditAccount != null) {
             return ResolvedFundsSubject.from(creditAccount);
         }
-        BudgetGroup budgetGroup = selectBudgetGroup(accountId);
-        return budgetGroup == null ? null : ResolvedFundsSubject.from(budgetGroup);
+        return null;
     }
 
     @Nullable
@@ -160,10 +154,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                 CreditAccount account = selectCreditAccountBySn(subjectId);
                 yield account == null ? null : ResolvedFundsSubject.from(account);
             }
-            case BUDGET_GROUP -> {
-                BudgetGroup account = selectBudgetGroupBySn(subjectId);
-                yield account == null ? null : ResolvedFundsSubject.from(account);
-            }
+            case BUDGET_GROUP -> null;
         };
     }
 
@@ -213,25 +204,6 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                 .from(ref)
                 .where(ref.sn.eq(sn));
         return creditAccountMapper.selectOneByQuery(wrapper);
-    }
-
-    @Nullable
-    private BudgetGroup selectBudgetGroup(FundsAccountId accountId) {
-        BudgetGroupNameRefs ref = BudgetGroupNameRefs.budgetGroup;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.sn.eq(accountId.id()))
-                .and(ref.budgetType.eq(accountId.type()));
-        return budgetGroupMapper.selectOneByQuery(wrapper);
-    }
-
-    @Nullable
-    private BudgetGroup selectBudgetGroupBySn(String sn) {
-        BudgetGroupNameRefs ref = BudgetGroupNameRefs.budgetGroup;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.sn.eq(sn));
-        return budgetGroupMapper.selectOneByQuery(wrapper);
     }
 
     private Map<LedgerSubjectCode, Long> loadLedgerIds(ResolvedFundsSubject subject) {
@@ -433,22 +405,5 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
             );
         }
 
-        static ResolvedFundsSubject from(BudgetGroup account) {
-            return new ResolvedFundsSubject(
-                    account.getId(),
-                    account.getTenantId(),
-                    account.getSn(),
-                    FundsSubjectType.BUDGET_GROUP,
-                    account.getOwnerId(),
-                    account.getOwnerType(),
-                    account.getStatus(),
-                    account.getCurrency(),
-                    account.getLedgerProfileCode(),
-                    account.getPeriodType(),
-                    account.getPeriodId(),
-                    account.getContextVariables(),
-                    account.getVersion()
-            );
-        }
     }
 }

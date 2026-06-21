@@ -372,7 +372,7 @@ schemaDecision：contract-only
 | --- | --- |
 | 产品目标 | 将既有支出控制准入结论沉淀为可查询、可幂等、可解释的 Spend Control Activity，并从活动派生预算控制投影。 |
 | 核心对象 | `SpendControlAdmissionDecision`、`SpendControlActivity`、`BudgetControlProjection`、BudgetGroup 上下文、Spend Rule 规则证据。 |
-| 业务不变量 | BudgetGroup、Spend Rule、PaymentInstrument、父账户和外部账户不得成为 ledger subject；控制活动只表达规则、预算和审计控制事实，不表达资金交易事实。 |
+| 业务不变量 | BudgetGroup、Spend Rule、PaymentInstrument、父账户聚合视图和外部账户不得成为 ledger subject；父账户作为资金账户或信用账户节点入账时，必须由 posting plan 显式声明 `PARENT_CONTROL` 或真实父子划拨；控制活动只表达规则、预算和审计控制事实，不表达资金交易事实。 |
 | 验收种子 | 通过准入可记录活动；拒绝准入可记录拒绝原因；同流水同摘要幂等；同流水不同摘要拒绝；预算投影只展示控制占用、释放和剩余；全路径无资金事实副作用。 |
 | 产品 Not Done | Spend Rule 规则引擎、规则配置后台、运营审批、交易消费控制活动、VCC facade、完整业务策略准入、生产告警和发布 Runbook。 |
 | 待确认 | `schemaDecision=ddl-backed` 或 `contract-only`。若要声明生产可用的留痕、幂等和审计查询，推荐 `ddl-backed`。 |

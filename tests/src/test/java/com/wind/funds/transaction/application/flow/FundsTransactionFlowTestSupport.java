@@ -87,11 +87,9 @@ import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyBindingRequest;
 import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
-import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.AccountHierarchyService;
 import com.wind.funds.wallet.service.BudgetGroupService;
 import com.wind.funds.wallet.service.CreditAccountService;
-import com.wind.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
@@ -199,9 +197,6 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     @Autowired
     protected BudgetGroupService budgetGroupService;
-
-    @Autowired
-    protected SubjectLedgerInitializer subjectLedgerInitializer;
 
     @Autowired
     private LedgerTransactionMapper ledgerTransactionMapper;
@@ -407,19 +402,9 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setCurrency(CURRENCY));
     }
 
-    protected void ensureBudgetGroupControlLedgers(FundsAccountId accountId) {
+    protected void ensureBudgetGroupWithoutLedgers(FundsAccountId accountId) {
         ensureBudgetGroup(accountId);
-        if (!findLedgers(accountId).isEmpty()) {
-            return;
-        }
-        subjectLedgerInitializer.initializeRequiredLedgers(new InitializeSubjectLedgerRequest()
-                .setTenantId(TENANT_ID)
-                .setSubjectId(accountId.id())
-                .setSubjectType(FundsSubjectType.BUDGET_GROUP)
-                .setCurrency(CURRENCY)
-                .setLedgerProfileCode(LedgerProfileCode.BUDGET_BASIC)
-                .setPeriodType(AccountBalancePeriodType.LIFETIME)
-                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+        assertThat(findLedgers(accountId)).isEmpty();
     }
 
     protected void bindAccountHierarchy(FundsAccountId accountId,

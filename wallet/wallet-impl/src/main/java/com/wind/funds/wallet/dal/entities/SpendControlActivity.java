@@ -91,13 +91,11 @@ public class SpendControlActivity implements Serializable, TenantIsolationObject
     /**
      * 支付工具号。
      */
-    @NotNull
     private String instrumentSn;
 
     /**
      * 支付工具动作。
      */
-    @NotNull
     private PaymentInstrumentAction action;
 
     /**
@@ -139,19 +137,16 @@ public class SpendControlActivity implements Serializable, TenantIsolationObject
     /**
      * Spend Rule 决策流水号。
      */
-    @NotNull
     private String spendDecisionSn;
 
     /**
      * Spend Rule 决策结果。
      */
-    @NotNull
     private SpendControlDecisionResult spendDecisionResult;
 
     /**
      * Spend Rule 决策摘要。
      */
-    @NotNull
     private String spendDecisionDigest;
 
     /**
@@ -163,6 +158,21 @@ public class SpendControlActivity implements Serializable, TenantIsolationObject
      * 拒绝原因。
      */
     private String rejectReason;
+
+    /**
+     * 调整原因码。
+     */
+    private String reasonCode;
+
+    /**
+     * 操作者或系统来源。
+     */
+    private String operatorId;
+
+    /**
+     * 审批、凭证、规则发布或外部审计引用。
+     */
+    private String auditReferenceSn;
 
     /**
      * 控制活动摘要，用于同活动流水幂等一致性判断。

@@ -18,6 +18,10 @@ public enum SpendControlActivityType implements DescriptiveEnum {
 
     REJECTED_RECORDED("拒绝已记录"),
 
+    LIMIT_INCREASED("控制额度调增"),
+
+    LIMIT_DECREASED("控制额度调减"),
+
     RESERVED("控制占用"),
 
     CONSUMED("控制消耗"),

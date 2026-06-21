@@ -305,6 +305,9 @@ public final class FundsDslJsonContractVerifier {
             throw new IllegalArgumentException(path + ".nodeRole must be TARGET");
         }
         FundsSubjectType subjectType = verifyEnum(FundsSubjectType.class, node, "subjectType", path + ".subjectType");
+        if (subjectType == FundsSubjectType.BUDGET_GROUP) {
+            throw new IllegalArgumentException(routeLegNodeLabel(path) + " must be FUNDING_ACCOUNT or CREDIT_ACCOUNT");
+        }
         requireText(node, "subjectId", path + ".subjectId");
         verifyEnum(LedgerSubjectCode.class, node, "ledgerSubjectCode", path + ".ledgerSubjectCode");
         return subjectType;

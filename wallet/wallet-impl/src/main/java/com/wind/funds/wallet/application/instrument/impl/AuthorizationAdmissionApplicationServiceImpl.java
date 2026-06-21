@@ -3,34 +3,33 @@ package com.wind.funds.wallet.application.instrument.impl;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
-import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
-import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.FundsAccountQueryService;
-import com.wind.funds.wallet.application.funding.FundingResponsibilityResolutionApplicationService;
 import com.wind.funds.wallet.application.instrument.AuthorizationAdmissionApplicationService;
-import com.wind.funds.wallet.application.instrument.PaymentInstrumentCapabilityApplicationService;
+import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
+import com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
+import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
-import com.wind.funds.wallet.model.dto.FundingResponsibilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
+import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
+import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
-import com.wind.funds.wallet.model.request.ResolveFundingResponsibilityRequest;
-import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentCapabilityRequest;
+import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
+import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * 支付工具授权准入应用服务实现。
@@ -42,11 +41,9 @@ import java.util.Objects;
 @AllArgsConstructor
 public class AuthorizationAdmissionApplicationServiceImpl implements AuthorizationAdmissionApplicationService {
 
-    private final PaymentInstrumentCapabilityApplicationService paymentInstrumentCapabilityApplicationService;
+    private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
 
-    private final FundingResponsibilityResolutionApplicationService fundingResponsibilityResolutionApplicationService;
-
-    private final FundsAccountQueryService fundsAccountQueryService;
+    private final SpendControlAdmissionApplicationService spendControlAdmissionApplicationService;
 
     private final FundsAuthorizationTransactionService authorizationTransactionService;
 
@@ -55,11 +52,9 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
     public @NonNull String authorizeByPaymentInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
                                                         @NonNull WindOperator operator) {
         validateRequest(request);
-        PaymentInstrumentCapabilityDecisionDTO instrumentDecision = resolvePaymentInstrument(request);
-        FundingResponsibilityDecisionDTO fundingDecision = resolveFundingResponsibility(request, instrumentDecision);
-        assertBindingMatchesFundingSubject(instrumentDecision, fundingDecision);
-        FundsAccountId accountId = resolveTargetAccountId(fundingDecision);
-        assertAccountCanAuthorize(request, accountId);
+        PaymentInstrumentPreTransactionSnapshotDTO snapshot = resolveAdmissionSnapshot(request);
+        FundsAccountId accountId = snapshot.getTargetAccountId();
+        PaymentInstrumentCapabilityDecisionDTO instrumentDecision = snapshot.getPaymentInstrumentCapability();
         return authorizationTransactionService.authorize(convertToAuthorizeRequest(request,
                 accountId,
                 instrumentDecision), operator);
@@ -77,61 +72,81 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
         if (Boolean.FALSE.equals(request.getApproved())) {
             AssertUtils.hasText(request.getDeclineReason(), "授权拒绝原因不能为空");
         }
+        if (hasSpendControlEvidence(request)) {
+            assertCompleteSpendControlEvidence(request);
+        }
     }
 
-    private PaymentInstrumentCapabilityDecisionDTO resolvePaymentInstrument(AuthorizeByPaymentInstrumentRequest request) {
-        return paymentInstrumentCapabilityApplicationService.resolvePaymentInstrumentCapability(
-                new ResolvePaymentInstrumentCapabilityRequest()
-                        .setTenantId(request.getTenantId())
-                        .setInstrumentSn(request.getInstrumentSn())
-                        .setAction(PaymentInstrumentAction.AUTHORIZE)
-                        .setCurrency(request.getCurrency())
-                        .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
-                        .setExpectedBindingVersion(request.getExpectedBindingVersion()));
+    private boolean hasSpendControlEvidence(AuthorizeByPaymentInstrumentRequest request) {
+        return StringUtils.hasText(request.getSpendRuleId())
+                || StringUtils.hasText(request.getSpendRuleVersion())
+                || StringUtils.hasText(request.getSpendDecisionSn())
+                || request.getSpendDecisionResult() != null
+                || StringUtils.hasText(request.getSpendDecisionDigest())
+                || StringUtils.hasText(request.getBudgetGroupSn())
+                || StringUtils.hasText(request.getSpendDecisionRejectReason());
     }
 
-    private FundingResponsibilityDecisionDTO resolveFundingResponsibility(
-            AuthorizeByPaymentInstrumentRequest request,
-            PaymentInstrumentCapabilityDecisionDTO instrumentDecision) {
-        return fundingResponsibilityResolutionApplicationService.resolveFundingResponsibility(
-                new ResolveFundingResponsibilityRequest()
-                        .setTenantId(request.getTenantId())
-                        .setSpendSubjectId(instrumentDecision.getSubjectId())
-                        .setSpendSubjectType(instrumentDecision.getSubjectType())
-                        .setCurrency(request.getCurrency())
-                        .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE));
+    private void assertCompleteSpendControlEvidence(AuthorizeByPaymentInstrumentRequest request) {
+        AssertUtils.hasText(request.getSpendRuleId(), "Spend Rule 标识不能为空");
+        AssertUtils.hasText(request.getSpendRuleVersion(), "Spend Rule 版本不能为空");
+        AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
+        AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
+        AssertUtils.hasText(request.getSpendDecisionDigest(), "Spend Rule 决策摘要不能为空");
+        if (request.getSpendDecisionResult() == SpendControlDecisionResult.REJECTED) {
+            AssertUtils.hasText(request.getSpendDecisionRejectReason(), "Spend Rule 拒绝原因不能为空");
+        }
     }
 
-    private void assertBindingMatchesFundingSubject(PaymentInstrumentCapabilityDecisionDTO instrumentDecision,
-                                                    FundingResponsibilityDecisionDTO fundingDecision) {
-        AssertUtils.isTrue(Objects.equals(instrumentDecision.getSubjectId(), fundingDecision.getSpendSubjectId())
-                        && instrumentDecision.getSubjectType() == fundingDecision.getSpendSubjectType(),
-                "支付工具绑定主体与资金责任主体不一致，instrumentSn = {}, bindingSubject = {}:{}, fundingSubject = {}:{}",
-                instrumentDecision.getInstrumentSn(),
-                instrumentDecision.getSubjectType(),
-                instrumentDecision.getSubjectId(),
-                fundingDecision.getSpendSubjectType(),
-                fundingDecision.getSpendSubjectId());
+    private PaymentInstrumentPreTransactionSnapshotDTO resolveAdmissionSnapshot(
+            AuthorizeByPaymentInstrumentRequest request) {
+        if (hasSpendControlEvidence(request)) {
+            SpendControlAdmissionDecisionDTO decision =
+                    spendControlAdmissionApplicationService.resolveSpendControlAdmission(toSpendControlRequest(request));
+            AssertUtils.isTrue(Boolean.TRUE.equals(decision.getAdmitted()),
+                    "Spend Rule 准入未通过，spendDecisionSn = {}, rejectReason = {}",
+                    decision.getSpendDecisionSn(),
+                    decision.getRejectReason());
+            AssertUtils.notNull(decision.getPreTransactionSnapshot(), "Spend Rule 准入缺少预交易快照");
+            return decision.getPreTransactionSnapshot();
+        }
+        return preTransactionSnapshotApplicationService.resolvePreTransactionSnapshot(toPreTransactionRequest(request));
     }
 
-    private FundsAccountId resolveTargetAccountId(FundingResponsibilityDecisionDTO fundingDecision) {
-        AssertUtils.notNull(fundingDecision.getTargetSubjectType(), "资金责任目标主体类型不能为空");
-        AssertUtils.hasText(fundingDecision.getTargetSubjectId(), "资金责任目标主体 ID 不能为空");
-        AssertUtils.isTrue(fundingDecision.getTargetSubjectType() == FundsSubjectType.FUNDING_ACCOUNT
-                        || fundingDecision.getTargetSubjectType() == FundsSubjectType.CREDIT_ACCOUNT,
-                "授权准入资金责任目标只能是资金账户或信用账户，targetSubjectType = {}",
-                fundingDecision.getTargetSubjectType());
-        return FundsAccountId.immutable(fundingDecision.getTargetSubjectId(), fundingDecision.getTargetSubjectType());
+    private ResolvePaymentInstrumentPreTransactionSnapshotRequest toPreTransactionRequest(
+            AuthorizeByPaymentInstrumentRequest request) {
+        return new ResolvePaymentInstrumentPreTransactionSnapshotRequest()
+                .setTenantId(request.getTenantId())
+                .setInstrumentSn(request.getInstrumentSn())
+                .setAction(PaymentInstrumentAction.AUTHORIZE)
+                .setAmount(request.getAmount())
+                .setCurrency(request.getCurrency())
+                .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
+                .setExpectedBindingVersion(request.getExpectedBindingVersion())
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                .setBusinessScene(request.getBusinessScene())
+                .setBusinessSn(request.getBusinessSn());
     }
 
-    private void assertAccountCanAuthorize(AuthorizeByPaymentInstrumentRequest request, FundsAccountId accountId) {
-        FundsAccount account = fundsAccountQueryService.getAccount(accountId);
-        AssertUtils.isTrue(Objects.equals(account.getTenantId(), request.getTenantId()),
-                "授权准入账户租户不匹配，accountId = {}", accountId);
-        AssertUtils.isTrue(account.getCurrency() == request.getCurrency(),
-                "授权准入账户币种不匹配，accountId = {}, currency = {}", accountId, request.getCurrency());
-        AssertUtils.isTrue(account.canPay(),
-                "授权准入账户不具备付款能力，accountId = {}", accountId);
+    private ResolveSpendControlAdmissionRequest toSpendControlRequest(AuthorizeByPaymentInstrumentRequest request) {
+        return new ResolveSpendControlAdmissionRequest()
+                .setTenantId(request.getTenantId())
+                .setInstrumentSn(request.getInstrumentSn())
+                .setAction(PaymentInstrumentAction.AUTHORIZE)
+                .setAmount(request.getAmount())
+                .setCurrency(request.getCurrency())
+                .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
+                .setExpectedBindingVersion(request.getExpectedBindingVersion())
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                .setBusinessScene(request.getBusinessScene())
+                .setBusinessSn(request.getBusinessSn())
+                .setSpendRuleId(request.getSpendRuleId())
+                .setSpendRuleVersion(request.getSpendRuleVersion())
+                .setSpendDecisionSn(request.getSpendDecisionSn())
+                .setSpendDecisionResult(request.getSpendDecisionResult())
+                .setSpendDecisionDigest(request.getSpendDecisionDigest())
+                .setBudgetGroupSn(request.getBudgetGroupSn())
+                .setRejectReason(request.getSpendDecisionRejectReason());
     }
 
     private FundsAuthorizationTransactionAuthorizeRequest convertToAuthorizeRequest(

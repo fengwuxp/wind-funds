@@ -718,53 +718,36 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
-     * 场景：预算组发起额度调增后再调减。
-     * 输入：预算组额度调增 300、调减 120，并给齐调账原因、凭证和审批引用。
-     * 输出：只调整该预算组 LIMIT/AVAILABLE 控制账本，AUTHORIZATION、资金账户和平台资金账本不变。
-     * 预期：预算额度调整与资金账户余额调整分离，预算控制只表达额度治理，不表达实际资金沉淀。
-     * 红线：预算额度调整不得污染真实资金账户、平台 CASH/PREPAYMENT 或授权占用账本。
+     * 场景：历史调用方继续通过资金余额控制入口调整预算组额度。
+     * 输入：预算组额度调增 300，并给齐调账原因、凭证和审批引用。
+     * 输出：旧入口前置拒绝，不生成资金交易、route、posting、LedgerEntry、账本交易或余额投影事实。
+     * 预期：预算额度调整必须迁移到预算控制活动和预算控制投影入口。
+     * 红线：预算组不得再通过余额控制写入任何 ledger entry。
      */
     @Test
-    void testBudgetLimitAdjustShouldAffectOnlyBudgetControlLedgers() {
+    void testBudgetLimitAdjustShouldRejectLegacyBalanceControlEntry() {
         FundsAccountId budget = budgetGroup("budget_limit_flow");
         FundsAccountId funding = fundingAccount("funding_user");
-        ensureBudgetGroupControlLedgers(budget);
+        ensureBudgetGroupWithoutLedgers(budget);
         BalanceSnapshot before = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
 
-        adjustBalance(budget, 300L, true, "BUDGET_LIMIT_ADJUST_INCREASE");
+        assertThatThrownBy(() -> adjustBalance(budget, 300L, true, "BUDGET_LIMIT_ADJUST_INCREASE"))
+                .hasMessageContaining("预算组额度调整已迁移到预算控制活动");
 
-        BalanceSnapshot afterIncrease = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
-        assertOnlyBalanceDeltas(before, afterIncrease,
-                delta(budget, LedgerSubjectCode.LIMIT, 300L, CURRENCY),
-                delta(budget, LedgerSubjectCode.AVAILABLE, 300L, CURRENCY),
+        BalanceSnapshot afterFailure = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, afterFailure,
+                delta(budget, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
+                delta(budget, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(funding, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(funding, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
                 delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
-
-        adjustBalance(budget, 120L, false, "BUDGET_LIMIT_ADJUST_DECREASE");
-
-        BalanceSnapshot afterDecrease = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
-        assertOnlyBalanceDeltas(afterIncrease, afterDecrease,
-                delta(budget, LedgerSubjectCode.LIMIT, -120L, CURRENCY),
-                delta(budget, LedgerSubjectCode.AVAILABLE, -120L, CURRENCY),
-                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(funding, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
-                delta(funding, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
-                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
-        assertBucket(balance(budget), LedgerSubjectCode.LIMIT, 180L, CURRENCY);
-        assertBucket(balance(budget), LedgerSubjectCode.AVAILABLE, 180L, CURRENCY);
-        assertBucket(balance(budget), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(funding), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
-        assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertPostedTransactions(2);
-        assertSingleFundsAndLedgerFactsForBusinessSn("BUDGET_LIMIT_ADJUST_INCREASE", 1, 2);
-        assertSingleFundsAndLedgerFactsForBusinessSn("BUDGET_LIMIT_ADJUST_DECREASE", 1, 2);
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("BUDGET_LIMIT_ADJUST_INCREASE");
+        assertPostedTransactions(0);
     }
 
     /**
@@ -821,38 +804,26 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
-     * 场景：预算组额度调增后发起超过可调下限的调减。
-     * 输入：预算组额度调增 200、调减 260，并给齐调账原因、凭证和审批引用。
-     * 输出：调减失败，预算组 LIMIT/AVAILABLE/AUTHORIZATION 与资金账户、平台账本保持调减前状态。
-     * 预期：预算额度调减必须校验可调下限，不得破坏已建立的预算额度。
-     * 红线：失败调减不得污染真实资金账户、平台 CASH/PREPAYMENT 或留下半成功账务事实。
+     * 场景：历史调用方继续通过资金余额控制入口调减预算组额度。
+     * 输入：预算组额度调减 260，并给齐调账原因、凭证和审批引用。
+     * 输出：旧入口前置拒绝，预算组、资金账户和平台账本均无变化。
+     * 预期：预算额度调减下限校验应由预算控制活动入口负责，不再通过 ledger 余额桶表达。
+     * 红线：失败路径不得污染真实资金账户、平台 CASH/PREPAYMENT 或留下半成功账务事实。
      */
     @Test
-    void testBudgetLimitDecreaseExceedingAvailableShouldLeaveNoSideEffects() {
+    void testBudgetLimitDecreaseShouldRejectLegacyBalanceControlEntryAndLeaveNoSideEffects() {
         FundsAccountId budget = budgetGroup("budget_limit_dec_fail");
         FundsAccountId funding = fundingAccount("funding_user");
-        ensureBudgetGroupControlLedgers(budget);
+        ensureBudgetGroupWithoutLedgers(budget);
         BalanceSnapshot before = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
-
-        adjustBalance(budget, 200L, true, "BUDGET_LIMIT_DECREASE_FAIL_INCREASE");
-        BalanceSnapshot afterIncrease = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
-        LedgerFactSnapshot afterIncreaseFacts = ledgerFactSnapshot();
-        assertOnlyBalanceDeltas(before, afterIncrease,
-                delta(budget, LedgerSubjectCode.LIMIT, 200L, CURRENCY),
-                delta(budget, LedgerSubjectCode.AVAILABLE, 200L, CURRENCY),
-                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(funding, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
-                delta(funding, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
-                delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
-                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> adjustBalance(budget, 260L, false,
                 "BUDGET_LIMIT_DECREASE_FAIL_DECREASE"))
-                .hasMessageContaining("账本余额不足");
+                .hasMessageContaining("预算组额度调整已迁移到预算控制活动");
 
         BalanceSnapshot afterFailure = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
-        assertOnlyBalanceDeltas(afterIncrease, afterFailure,
+        assertOnlyBalanceDeltas(before, afterFailure,
                 delta(budget, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
                 delta(budget, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
@@ -861,16 +832,9 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 delta(funding, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
-        assertLedgerTransactionFactsUnchanged(afterIncreaseFacts);
-        assertBucket(balance(budget), LedgerSubjectCode.LIMIT, 200L, CURRENCY);
-        assertBucket(balance(budget), LedgerSubjectCode.AVAILABLE, 200L, CURRENCY);
-        assertBucket(balance(budget), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertBucket(balance(funding), LedgerSubjectCode.AVAILABLE, 0L, CURRENCY);
-        assertBucket(balance(funding), LedgerSubjectCode.FROZEN, 0L, CURRENCY);
-        assertBucket(balance(funding), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
-        assertPostedTransactions(1);
-        assertSingleFundsAndLedgerFactsForBusinessSn("BUDGET_LIMIT_DECREASE_FAIL_INCREASE", 1, 2);
-        assertFailedFundsTransactionWithoutLedgerFacts("BUDGET_LIMIT_DECREASE_FAIL_DECREASE");
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("BUDGET_LIMIT_DECREASE_FAIL_DECREASE");
+        assertPostedTransactions(0);
     }
 
     /**

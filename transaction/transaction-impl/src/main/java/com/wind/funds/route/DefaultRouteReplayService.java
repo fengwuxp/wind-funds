@@ -231,7 +231,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
             return FundsSubjectType.CREDIT_ACCOUNT;
         }
         if (Objects.equals(accountId.type(), FundsSubjectType.BUDGET_GROUP.name())) {
-            return FundsSubjectType.BUDGET_GROUP;
+            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能用于 RouteSnapshot 回放主体匹配，accountId = "
+                    + accountId);
         }
         return FundsSubjectType.FUNDING_ACCOUNT;
     }
@@ -340,7 +341,22 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         AssertUtils.notEmpty(result, replayLegRequiredMessage(replayRequest));
         AssertUtils.isTrue(selectedLegIds.isEmpty() || result.size() == selectedLegIds.size(),
                 "RouteSnapshot 回放 leg 不存在或不可回放，legIds = {}", selectedLegIds);
+        assertReplayLegSubjectsPostable(result);
         return result;
+    }
+
+    private void assertReplayLegSubjectsPostable(List<RouteLegSpec> replayLegs) {
+        for (RouteLegSpec replayLeg : replayLegs) {
+            assertReplayNodeSubjectPostable(replayLeg.getSourceNode());
+            assertReplayNodeSubjectPostable(replayLeg.getTargetNode());
+        }
+    }
+
+    private void assertReplayNodeSubjectPostable(RouteNodeSpec routeNode) {
+        FundsSubjectType subjectType = routeNode.getSubjectRef().getSubjectType();
+        AssertUtils.isTrue(subjectType == FundsSubjectType.FUNDING_ACCOUNT
+                        || subjectType == FundsSubjectType.CREDIT_ACCOUNT,
+                "预算组不是核心资金账务主体，不能作为 RouteSnapshot 回放参与方");
     }
 
     private String replayLegRequiredMessage(ReplayRequestSpec replayRequest) {
@@ -599,7 +615,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
             return RouteParticipantRole.AUTH_HOLDER;
         }
         if (subjectType == FundsSubjectType.BUDGET_GROUP) {
-            return RouteParticipantRole.BUDGET_CONTROLLER;
+            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能作为 RouteSnapshot 回放参与方");
         }
         return fallbackRole;
     }

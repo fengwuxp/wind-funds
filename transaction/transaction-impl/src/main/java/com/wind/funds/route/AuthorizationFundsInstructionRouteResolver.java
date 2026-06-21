@@ -205,11 +205,6 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                                                               FundsAccountId accountId) {
         List<FundsAccountId> subjects = new ArrayList<>();
         subjects.add(accountId);
-        FundsAccountId budgetGroupId = FundsInstructionContextReader.getValue(instruction,
-                FundsInstructionContextKeys.LINKED_BUDGET_GROUP_ID, FundsAccountId.class);
-        if (budgetGroupId != null) {
-            subjects.add(budgetGroupId);
-        }
         FundsAccountId fundingAccountId = FundsInstructionContextReader.getValue(instruction,
                 FundsInstructionContextKeys.LINKED_FUNDING_ACCOUNT_ID, FundsAccountId.class);
         if (fundingAccountId != null) {

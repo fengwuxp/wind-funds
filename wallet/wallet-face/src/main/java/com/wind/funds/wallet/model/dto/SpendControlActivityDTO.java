@@ -98,6 +98,15 @@ public class SpendControlActivityDTO implements Serializable {
     @Schema(description = "拒绝原因")
     private String rejectReason;
 
+    @Schema(description = "调整原因码")
+    private String reasonCode;
+
+    @Schema(description = "操作者或系统来源")
+    private String operatorId;
+
+    @Schema(description = "审批、凭证、规则发布或外部审计引用")
+    private String auditReferenceSn;
+
     @Schema(description = "控制活动摘要")
     private String activityDigest;
 

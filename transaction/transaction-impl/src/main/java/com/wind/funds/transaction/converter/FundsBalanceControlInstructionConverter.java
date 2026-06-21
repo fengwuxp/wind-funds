@@ -61,6 +61,9 @@ public class FundsBalanceControlInstructionConverter {
     private static final String EXTERNAL_BALANCE_ANOMALY_RESPONSIBILITY_REQUIRED_MESSAGE =
             "外部余额异常纠偏缺少责任归属引用";
 
+    private static final String BUDGET_GROUP_ADJUST_FORBIDDEN_MESSAGE =
+            "预算组额度调整已迁移到预算控制活动，不允许通过资金余额控制入账";
+
     private static final String UNFREEZE_REFERENCE_REQUIRED_MESSAGE = "余额解冻缺少原冻结单引用";
 
     private final FundsInstructionAmountSupport amountSupport;
@@ -121,6 +124,7 @@ public class FundsBalanceControlInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToAdjustInstruction(@NonNull FundsBalanceAdjustRequest request,
                                                                     @NonNull WindOperator operator) {
+        assertNotBudgetGroupAdjust(request);
         requireAdjustAuditContext(request);
         FundsTransactionEventType eventType = isLimitAdjust(request)
                 ? FundsTransactionEventType.LIMIT_ADJUST
@@ -148,6 +152,11 @@ public class FundsBalanceControlInstructionConverter {
         AssertUtils.hasText(request.getAdjustEvidenceRef(), ADJUST_EVIDENCE_REF_REQUIRED_MESSAGE);
         AssertUtils.hasText(request.getApprovalRef(), ADJUST_APPROVAL_REF_REQUIRED_MESSAGE);
         requireExternalBalanceAnomalyContext(request);
+    }
+
+    private void assertNotBudgetGroupAdjust(@NonNull FundsBalanceAdjustRequest request) {
+        AssertUtils.isFalse(FundsSubjectType.BUDGET_GROUP.name().equals(request.getAccountId().type()),
+                BUDGET_GROUP_ADJUST_FORBIDDEN_MESSAGE);
     }
 
     private void requireExternalBalanceAnomalyContext(@NonNull FundsBalanceAdjustRequest request) {
@@ -216,7 +225,7 @@ public class FundsBalanceControlInstructionConverter {
 
     private boolean isLimitAdjust(@NonNull FundsBalanceAdjustRequest request) {
         String type = request.getAccountId().type();
-        return FundsSubjectType.CREDIT_ACCOUNT.name().equals(type) || FundsSubjectType.BUDGET_GROUP.name().equals(type);
+        return FundsSubjectType.CREDIT_ACCOUNT.name().equals(type);
     }
 
     private @NonNull FundsInstructionReferenceSpec reference(@NonNull FundsInstructionReferenceType referenceType,

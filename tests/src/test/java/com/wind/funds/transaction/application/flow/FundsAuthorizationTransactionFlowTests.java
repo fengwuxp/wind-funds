@@ -42,6 +42,7 @@ import org.junit.jupiter.api.Test;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertSubjectBalanceNotInitialized;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.delta;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.snapshot;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -392,49 +393,38 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
-     * 场景：预算组已经通过余额控制获得预算额度后，被误作为授权交易账户。
-     * 输入：预算组额度调增 50，再提交预算组授权批准 10。
-     * 输出：授权请求被拒绝；预算组控制账本和平台结算账户余额保持授权前状态。
+     * 场景：预算组被误作为授权交易账户。
+     * 输入：提交预算组授权批准 10。
+     * 输出：授权请求被拒绝；预算组控制账本和平台结算账户余额保持请求前状态。
      * 预期：预算组只能作为预算控制上下文，不得被授权交易包装成资金价值主体。
      * 红线：预算组不得生成授权 route、posting、ledger entry 或余额投影。
      */
     @Test
     void testAuthorizeBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
         FundsAccountId budget = budgetGroup("auth_budget_group");
-        ensureBudgetGroupControlLedgers(budget);
+        ensureBudgetGroupWithoutLedgers(budget);
 
-        BalanceSnapshot beforeAdjust = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
-        adjustBalance(budget, 50L, true, "AUTH_BUDGET_GROUP_ADJUST");
-        BalanceSnapshot afterAdjust = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
-        assertOnlyBalanceDeltas(beforeAdjust, afterAdjust,
-                delta(budget, LedgerSubjectCode.LIMIT, 50L, CURRENCY),
-                delta(budget, LedgerSubjectCode.AVAILABLE, 50L, CURRENCY),
-                delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
-                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
-                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
-        LedgerFactSnapshot afterAdjustFacts = ledgerFactSnapshot();
+        BalanceSnapshot beforeAuthorize = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
+        LedgerFactSnapshot beforeAuthorizeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> authorize(budget, 10L, true, "AUTH_BUDGET_GROUP_AUTHORIZE"))
                 .hasMessageContaining("授权交易账户不能是预算组");
 
         BalanceSnapshot afterRejectedAuthorize = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
-        assertOnlyBalanceDeltas(afterAdjust, afterRejectedAuthorize,
+        assertOnlyBalanceDeltas(beforeAuthorize, afterRejectedAuthorize,
                 delta(budget, LedgerSubjectCode.LIMIT, 0L, CURRENCY),
                 delta(budget, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(budget, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY),
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
-        assertLedgerTransactionFactsUnchanged(afterAdjustFacts);
+        assertLedgerTransactionFactsUnchanged(beforeAuthorizeFacts);
 
-        assertBucket(balance(budget), LedgerSubjectCode.LIMIT, 50L, CURRENCY);
-        assertBucket(balance(budget), LedgerSubjectCode.AVAILABLE, 50L, CURRENCY);
-        assertBucket(balance(budget), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertSubjectBalanceNotInitialized(balance(budget));
         assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 10_000L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
-        assertPostedTransactions(1);
-        assertFundsAndLedgerFactsForBusinessSn("AUTH_BUDGET_GROUP_ADJUST", 1, 1, 1, 2);
-        assertNoPersistedTransactionFactsForBusinessSn("AUTH_BUDGET_GROUP_AUTHORIZE");
+        assertPostedTransactions(0);
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_BUDGET_GROUP_AUTHORIZE");
     }
 
     /**

@@ -1,9 +1,6 @@
 package com.wind.funds.wallet.model.request;
 
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.enums.PaymentInstrumentAction;
-import com.wind.funds.wallet.enums.SpendControlActivityType;
-import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -18,32 +15,28 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * 支出控制活动记录请求。
+ * 预算控制额度调整请求。
  *
  * @author Codex
- * @date 2026-06-20
+ * @date 2026-06-21
  */
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class RecordSpendControlActivityRequest implements Serializable {
+public class AdjustBudgetControlLimitRequest implements Serializable {
 
     @Serial
-    private static final long serialVersionUID = 5797637413300774738L;
+    private static final long serialVersionUID = -5677038236698716798L;
 
     @Schema(description = "租户 ID")
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "支出控制活动流水号，用于幂等、回放和审计追踪")
+    @Schema(description = "预算控制额度调整活动流水号，用于幂等、回放和审计追踪")
     @NotBlank
     private String activitySn;
-
-    @Schema(description = "支出控制活动类型")
-    @NotNull
-    private SpendControlActivityType activityType;
 
     @Schema(description = "业务场景")
     @NotBlank
@@ -53,25 +46,15 @@ public class RecordSpendControlActivityRequest implements Serializable {
     @NotBlank
     private String businessSn;
 
-    @Schema(description = "原支出控制活动流水号，用于交易消费、释放或退款补偿回链")
-    private String originalActivitySn;
-
-    @Schema(description = "已存在的资金交易流水号，用于交易结果消费控制活动回链")
-    private String transactionSn;
-
-    @Schema(description = "支付工具号")
+    @Schema(description = "预算组或预算控制范围标识")
     @NotBlank
-    private String instrumentSn;
+    private String budgetGroupSn;
 
-    @Schema(description = "支付工具动作")
-    @NotNull
-    private PaymentInstrumentAction action;
-
-    @Schema(description = "控制活动目标资金账户或信用账户标识")
+    @Schema(description = "预算控制额度影响的资金账户或信用账户标识")
     @NotNull
     private FundsAccountId targetAccountId;
 
-    @Schema(description = "控制金额，最小货币单位")
+    @Schema(description = "调整金额，最小货币单位")
     @NotNull
     private Long amount;
 
@@ -87,38 +70,27 @@ public class RecordSpendControlActivityRequest implements Serializable {
     @NotBlank
     private String spendRuleVersion;
 
-    @Schema(description = "Spend Rule 决策流水号")
-    @NotBlank
-    private String spendDecisionSn;
-
-    @Schema(description = "Spend Rule 决策结果")
+    @Schema(description = "是否调增，true 表示调增，false 表示调减")
     @NotNull
-    private SpendControlDecisionResult spendDecisionResult;
-
-    @Schema(description = "Spend Rule 决策摘要，用于幂等、回放和对账追踪")
-    @NotBlank
-    private String spendDecisionDigest;
-
-    @Schema(description = "预算组或预算控制范围标识")
-    private String budgetGroupSn;
-
-    @Schema(description = "拒绝原因")
-    private String rejectReason;
+    private Boolean increase;
 
     @Schema(description = "调整原因码")
+    @NotBlank
     private String reasonCode;
 
     @Schema(description = "操作者或系统来源")
+    @NotBlank
     private String operatorId;
 
     @Schema(description = "审批、凭证、规则发布或外部审计引用")
+    @NotBlank
     private String auditReferenceSn;
 
     @Schema(description = "控制活动摘要，用于幂等、回放和审计追踪")
     @NotBlank
     private String activityDigest;
 
-    @Schema(description = "控制活动说明")
+    @Schema(description = "调整说明")
     private String description;
 
     @Schema(description = "扩展上下文变量")

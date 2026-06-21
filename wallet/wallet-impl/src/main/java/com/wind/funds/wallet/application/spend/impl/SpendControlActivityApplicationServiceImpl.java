@@ -98,20 +98,26 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         AssertUtils.notNull(request.getActivityType(), "控制活动类型不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
-        AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
-        AssertUtils.notNull(request.getAction(), "支付工具动作不能为空");
         AssertUtils.notNull(request.getTargetAccountId(), "控制活动目标账户不能为空");
         AssertUtils.notNull(request.getAmount(), "控制金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "控制金额必须大于 0");
         AssertUtils.notNull(request.getCurrency(), "币种不能为空");
         AssertUtils.hasText(request.getSpendRuleId(), "Spend Rule 标识不能为空");
         AssertUtils.hasText(request.getSpendRuleVersion(), "Spend Rule 版本不能为空");
-        AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
-        AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
-        AssertUtils.hasText(request.getSpendDecisionDigest(), "Spend Rule 决策摘要不能为空");
         AssertUtils.hasText(request.getActivityDigest(), "控制活动摘要不能为空");
         assertNoSensitiveContextVariables(request.getContextVariables());
         assertTargetAccountSupported(request);
+        if (isLimitAdjustmentActivity(request.getActivityType())) {
+            AssertUtils.hasText(request.getReasonCode(), "预算控制额度调整原因码不能为空");
+            AssertUtils.hasText(request.getOperatorId(), "预算控制额度调整操作者不能为空");
+            AssertUtils.hasText(request.getAuditReferenceSn(), "预算控制额度调整审计引用不能为空");
+        } else {
+            AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
+            AssertUtils.notNull(request.getAction(), "支付工具动作不能为空");
+            AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
+            AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
+            AssertUtils.hasText(request.getSpendDecisionDigest(), "Spend Rule 决策摘要不能为空");
+        }
         if (request.getActivityType() == SpendControlActivityType.REJECTED_RECORDED) {
             AssertUtils.isTrue(request.getSpendDecisionResult() == SpendControlDecisionResult.REJECTED,
                     "拒绝控制活动必须对应拒绝决策，activitySn = {}",
@@ -176,6 +182,7 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         assertSameActivityTarget(request, existing);
         assertSameActivityAmountAndRule(request, existing);
         assertSameActivityDecision(request, existing);
+        assertSameActivityAudit(request, existing);
     }
 
     private void assertSameActivityIdentity(RecordSpendControlActivityRequest request, SpendControlActivity existing) {
@@ -237,6 +244,18 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 request.getActivitySn());
         AssertUtils.isTrue(Objects.equals(existing.getSpendDecisionDigest(), request.getSpendDecisionDigest()),
                 "控制活动流水已存在但决策摘要不一致，activitySn = {}",
+                request.getActivitySn());
+    }
+
+    private void assertSameActivityAudit(RecordSpendControlActivityRequest request, SpendControlActivity existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getReasonCode(), request.getReasonCode()),
+                "控制活动流水已存在但调整原因码不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getOperatorId(), request.getOperatorId()),
+                "控制活动流水已存在但操作者不一致，activitySn = {}",
+                request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(existing.getAuditReferenceSn(), request.getAuditReferenceSn()),
+                "控制活动流水已存在但审计引用不一致，activitySn = {}",
                 request.getActivitySn());
     }
 
@@ -312,6 +331,15 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         List<SpendControlActivity> budgetActivities = activities.stream()
                 .filter(activity -> isBudgetActivity(activity.getActivityType()))
                 .toList();
+        long limitIncreasedAmount = budgetActivities.stream()
+                .filter(activity -> activity.getActivityType() == SpendControlActivityType.LIMIT_INCREASED)
+                .mapToLong(SpendControlActivity::getAmount)
+                .sum();
+        long limitDecreasedAmount = budgetActivities.stream()
+                .filter(activity -> activity.getActivityType() == SpendControlActivityType.LIMIT_DECREASED)
+                .mapToLong(SpendControlActivity::getAmount)
+                .sum();
+        long limitAmount = limitIncreasedAmount - limitDecreasedAmount;
         long reservedAmount = budgetActivities.stream()
                 .filter(activity -> activity.getActivityType() == SpendControlActivityType.RESERVED)
                 .mapToLong(SpendControlActivity::getAmount)
@@ -329,6 +357,7 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .filter(activity -> isReleaseActivity(activity.getActivityType()))
                 .mapToLong(SpendControlActivity::getAmount)
                 .sum();
+        long remainingControlAmount = reservedAmount - consumedAmount - releasedAmount;
         SpendControlActivity lastActivity = budgetActivities.isEmpty() ? null : budgetActivities.getLast();
         return new BudgetControlProjectionDTO()
                 .setTenantId(query.getTenantId())
@@ -337,10 +366,14 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .setSpendRuleId(query.getSpendRuleId())
                 .setSpendRuleVersion(query.getSpendRuleVersion())
                 .setTargetAccountId(query.getTargetAccountId())
+                .setLimitIncreasedAmount(limitIncreasedAmount)
+                .setLimitDecreasedAmount(limitDecreasedAmount)
+                .setLimitAmount(limitAmount)
                 .setReservedAmount(reservedAmount)
                 .setConsumedAmount(consumedAmount)
                 .setReleasedAmount(releasedAmount)
-                .setRemainingControlAmount(reservedAmount - consumedAmount - releasedAmount)
+                .setRemainingControlAmount(remainingControlAmount)
+                .setAvailableControlAmount(limitAmount - remainingControlAmount)
                 .setLastActivitySn(lastActivity == null ? null : lastActivity.getActivitySn())
                 .setLastActivityAt(lastActivity == null ? null : lastActivity.getGmtCreate());
     }
@@ -368,6 +401,9 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         result.setSpendDecisionDigest(request.getSpendDecisionDigest());
         result.setBudgetGroupSn(request.getBudgetGroupSn());
         result.setRejectReason(request.getRejectReason());
+        result.setReasonCode(request.getReasonCode());
+        result.setOperatorId(request.getOperatorId());
+        result.setAuditReferenceSn(request.getAuditReferenceSn());
         result.setActivityDigest(request.getActivityDigest());
         result.setDescription(request.getDescription());
         result.setContextVariables(request.getContextVariables());
@@ -399,6 +435,9 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .setSpendDecisionDigest(entity.getSpendDecisionDigest())
                 .setBudgetGroupSn(entity.getBudgetGroupSn())
                 .setRejectReason(entity.getRejectReason())
+                .setReasonCode(entity.getReasonCode())
+                .setOperatorId(entity.getOperatorId())
+                .setAuditReferenceSn(entity.getAuditReferenceSn())
                 .setActivityDigest(entity.getActivityDigest())
                 .setDescription(entity.getDescription())
                 .setContextVariables(entity.getContextVariables());
@@ -427,12 +466,19 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
     }
 
     private boolean isBudgetActivity(SpendControlActivityType type) {
-        return type == SpendControlActivityType.RESERVED
+        return type == SpendControlActivityType.LIMIT_INCREASED
+                || type == SpendControlActivityType.LIMIT_DECREASED
+                || type == SpendControlActivityType.RESERVED
                 || type == SpendControlActivityType.CONSUMED
                 || type == SpendControlActivityType.REFUND_COMPENSATED
                 || type == SpendControlActivityType.RELEASED
                 || type == SpendControlActivityType.EXPIRED
                 || type == SpendControlActivityType.REVERSED;
+    }
+
+    private boolean isLimitAdjustmentActivity(SpendControlActivityType type) {
+        return type == SpendControlActivityType.LIMIT_INCREASED
+                || type == SpendControlActivityType.LIMIT_DECREASED;
     }
 
     private boolean isReleaseActivity(SpendControlActivityType type) {

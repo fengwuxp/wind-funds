@@ -1,12 +1,8 @@
 package com.wind.funds.wallet.services.impl;
 
-import com.wind.funds.ledger.dto.LedgerDTO;
-import com.wind.funds.ledger.query.LedgerQuery;
-import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.wallet.dal.entities.BudgetGroup;
 import com.wind.funds.wallet.dal.entities.table.BudgetGroupNameRefs;
 import com.wind.funds.wallet.dal.mapper.BudgetGroupMapper;
-import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.mapstruct.BudgetGroupConverter;
 import com.wind.funds.wallet.model.dto.BudgetGroupDTO;
 import com.wind.funds.wallet.model.query.BudgetGroupQuery;
@@ -16,19 +12,14 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
-import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 预算组服务实现。
@@ -41,8 +32,6 @@ import java.util.stream.Collectors;
 public class BudgetGroupServiceImpl implements BudgetGroupService {
 
     private final BudgetGroupMapper budgetGroupMapper;
-
-    private final LedgerService ledgerService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -109,19 +98,6 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
     }
 
     private BudgetGroupDTO toDTO(BudgetGroup entity) {
-        BudgetGroupDTO result = BudgetGroupConverter.INSTANCE.convertToBudgetGroupDTO(entity);
-        return result.setLedgerIds(loadLedgerIds(entity));
-    }
-
-    private Map<LedgerSubjectCode, Long> loadLedgerIds(BudgetGroup entity) {
-        return ledgerService.queryLedgers(new LedgerQuery()
-                        .setTenantId(entity.getTenantId())
-                        .setSubjectId(entity.getSn())
-                        .setSubjectType(FundsSubjectType.BUDGET_GROUP.name())
-                        .setCurrency(entity.getCurrency())
-                        .setPeriodType(entity.getPeriodType())
-                        .setPeriodId(entity.getPeriodId()),
-                DefaultPageQueryOptions.defaults(50)).getRecords().stream()
-                .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, LedgerDTO::getId));
+        return BudgetGroupConverter.INSTANCE.convertToBudgetGroupDTO(entity);
     }
 }

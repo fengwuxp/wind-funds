@@ -2,7 +2,7 @@
   "caseId": "DSL-AUTHORIZATION-APPROVE-MULTI-SUBJECT-001",
   "serviceAbility": "AUTHORIZATION_TRANSACTION",
   "scenarioCode": "AUTHORIZATION_APPROVE_MULTI_SUBJECT",
-  "description": "资金账户、信用账户、预算组组合授权占用",
+  "description": "资金账户、信用账户组合授权占用，预算组仅作为控制上下文",
   "instruction": {
     "tenantId": 1,
     "instructionType": "AUTHORIZATION_TRANSACTION",
@@ -27,10 +27,13 @@
     "contextVariables": {
       "authorizationSubjects": [
         "fa_user_10001_usd",
-        "ca_user_10001_usd",
-        "bg_team_90001_usd"
+        "ca_user_10001_usd"
       ],
-      "authCode": "AUTH_CODE_202605140001"
+      "authCode": "AUTH_CODE_202605140001",
+      "budgetControlScope": {
+        "budgetGroupSn": "bg_team_90001_usd",
+        "projectionSource": "SPEND_CONTROL_ACTIVITY"
+      }
     }
   },
   "expectedRoute": {
@@ -55,15 +58,6 @@
           "currency": "USD",
           "ledgerProfileCode": "CREDIT_BASIC"
         }
-      },
-      {
-        "participantRole": "BUDGET_CONTROLLER",
-        "subjectRef": {
-          "subjectType": "BUDGET_GROUP",
-          "subjectId": "bg_team_90001_usd",
-          "currency": "USD",
-          "ledgerProfileCode": "BUDGET_BASIC"
-        }
       }
     ],
     "legs": [
@@ -84,7 +78,7 @@
         },
         "amount": {
           "currency": "USD",
-          "amount": 4000
+          "amount": 7000
         },
         "balanceEffectType": "HOLD",
         "phaseCode": "AUTHORIZATION",
@@ -108,29 +102,6 @@
         "amount": {
           "currency": "USD",
           "amount": 5000
-        },
-        "balanceEffectType": "HOLD",
-        "phaseCode": "AUTHORIZATION",
-        "replayPolicy": "PARTIAL_ALLOWED"
-      },
-      {
-        "legId": "AUTHORIZATION_3",
-        "legType": "HOLD",
-        "sourceNode": {
-          "nodeRole": "SOURCE",
-          "subjectType": "BUDGET_GROUP",
-          "subjectId": "bg_team_90001_usd",
-          "ledgerSubjectCode": "AVAILABLE"
-        },
-        "targetNode": {
-          "nodeRole": "TARGET",
-          "subjectType": "BUDGET_GROUP",
-          "subjectId": "bg_team_90001_usd",
-          "ledgerSubjectCode": "AUTHORIZATION"
-        },
-        "amount": {
-          "currency": "USD",
-          "amount": 3000
         },
         "balanceEffectType": "HOLD",
         "phaseCode": "AUTHORIZATION",
@@ -159,7 +130,7 @@
             "entrySide": "DEBIT",
             "amount": {
               "currency": "USD",
-              "amount": 4000
+              "amount": 7000
             }
           },
           {
@@ -172,7 +143,7 @@
             "entrySide": "CREDIT",
             "amount": {
               "currency": "USD",
-              "amount": 4000
+              "amount": 7000
             }
           }
         ]
@@ -212,50 +183,14 @@
             }
           }
         ]
-      },
-      {
-        "planKey": "AUTHORIZATION_LEDGER_TXN_0001_3",
-        "routeLegId": "AUTHORIZATION_3",
-        "intent": "AUTHORIZATION",
-        "postingScope": "CONTROL_HOLD",
-        "balanceEffectType": "HOLD",
-        "phaseCode": "AUTHORIZATION",
-        "entries": [
-          {
-            "subjectId": "bg_team_90001_usd",
-            "subjectType": "BUDGET_GROUP",
-            "ledgerSubjectCode": "AVAILABLE",
-            "currency": "USD",
-            "periodType": "LIFETIME",
-            "periodId": "LIFETIME",
-            "entrySide": "DEBIT",
-            "amount": {
-              "currency": "USD",
-              "amount": 3000
-            }
-          },
-          {
-            "subjectId": "bg_team_90001_usd",
-            "subjectType": "BUDGET_GROUP",
-            "ledgerSubjectCode": "AUTHORIZATION",
-            "currency": "USD",
-            "periodType": "LIFETIME",
-            "periodId": "LIFETIME",
-            "entrySide": "CREDIT",
-            "amount": {
-              "currency": "USD",
-              "amount": 3000
-            }
-          }
-        ]
       }
     ]
   },
   "validation": {
     "mustPass": [
       "多主体授权整体成功或整体失败",
-      "资金账户、信用账户、预算组均使用 AVAILABLE -> AUTHORIZATION",
-      "每个 route leg 均生成平衡 posting plan"
+      "资金账户、信用账户使用 AVAILABLE -> AUTHORIZATION",
+      "预算组只作为控制上下文，不生成 route leg、posting plan 或 LedgerEntry"
     ],
     "mustFail": [
       "任一主体授权余额不足且不允许负余额",

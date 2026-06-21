@@ -1,10 +1,8 @@
 package com.wind.funds.wallet.model.dto;
 
-import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -16,7 +14,6 @@ import lombok.experimental.Accessors;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.Map;
 
 /**
  * 预算组 DTO。
@@ -70,12 +67,6 @@ public class BudgetGroupDTO implements Serializable {
     @Schema(description = "周期策略")
     private String periodPolicy;
 
-    @Schema(description = "ledger profile 编码")
-    private LedgerProfileCode ledgerProfileCode;
-
-    @Schema(description = "profile 版本")
-    private Integer ledgerProfileVersion;
-
     @Schema(description = "状态")
     private FundsAccountStatus status;
 
@@ -88,6 +79,4 @@ public class BudgetGroupDTO implements Serializable {
     @Schema(description = "乐观锁版本")
     private Integer version;
 
-    @Schema(description = "账本科目到 ledger id 的映射")
-    private Map<LedgerSubjectCode, Long> ledgerIds;
 }

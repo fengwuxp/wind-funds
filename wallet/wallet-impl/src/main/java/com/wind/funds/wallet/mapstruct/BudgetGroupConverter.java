@@ -1,14 +1,12 @@
 package com.wind.funds.wallet.mapstruct;
 
 import com.wind.funds.wallet.dal.entities.BudgetGroup;
-import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.model.dto.BudgetGroupDTO;
 import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
@@ -38,7 +36,6 @@ public interface BudgetGroupConverter {
      * @param data BudgetGroup 实例
      * @return BudgetGroupDTO 实例
      */
-    @Mapping(target = "ledgerIds", ignore = true)
     BudgetGroupDTO convertToBudgetGroupDTO(BudgetGroup data);
 
     /**
@@ -54,9 +51,6 @@ public interface BudgetGroupConverter {
         entity.setPeriodType(periodType);
         entity.setPeriodId(periodType == AccountBalancePeriodType.LIFETIME
                 ? AccountBalancePeriodType.LIFETIME.name() : request.getPeriodId());
-        entity.setLedgerProfileCode(request.getLedgerProfileCode() == null
-                ? LedgerProfileCode.BUDGET_BASIC : request.getLedgerProfileCode());
-        entity.setLedgerProfileVersion(1);
         entity.setStatus(request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus());
     }
 }

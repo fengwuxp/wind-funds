@@ -52,6 +52,13 @@ public final class FundsBalanceAssertionSupport {
                 .isEqualTo(Money.immutable(amount, currency));
     }
 
+    public static void assertSubjectBalanceNotInitialized(FundsSubjectBalanceDTO balance) {
+        assertThat(balance).as("subject balance").isNotNull();
+        assertThat(balance.getSubjectRef()).as("subject ref").isNotNull();
+        assertThat(balance.isInitialized()).as("subject %s initialized", balance.getSubjectRef()).isFalse();
+        assertThat(balance.getBalanceBuckets()).as("balance buckets").isEmpty();
+    }
+
     public static BalanceSnapshot snapshot(FundsSubjectBalanceDTO... balances) {
         return snapshot(List.of(balances));
     }

@@ -370,20 +370,21 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     /**
-     * 场景：预算组作为迁移期控制对象发起 LIMIT 与 AVAILABLE 之间的额度控制调账。
+     * 场景：预算组作为历史兼容控制对象发起 LIMIT 与 AVAILABLE 之间的额度控制调账。
      * 输入：BUDGET_GROUP 分录均绑定 CONTROL 类预算控制账本。
-     * 输出：允许入账并生成预算组控制账本分录和余额投影。
-     * 红线：只保留预算控制兼容路径，不把预算组放开为资金价值账目主体。
+     * 输出：入账入口在事实落库和余额投影前拒绝请求。
+     * 红线：预算额度调整已迁移到 Spend Control Activity 和 Budget Control Projection，
+     * BUDGET_GROUP 不得再作为任何 LedgerEntry 主体。
      */
     @Test
-    void testPostShouldAllowBudgetGroupControlEntries() {
+    void testPostShouldRejectBudgetGroupControlEntriesBeforeLedgerFacts() {
         seedBudgetGroup(BUDGET_GROUP_SUBJECT_ID);
         Long budgetLimitLedgerId = createBudgetControlLedger(BUDGET_GROUP_SUBJECT_ID, LedgerSubjectCode.LIMIT);
         Long budgetAvailableLedgerId = createBudgetControlLedger(BUDGET_GROUP_SUBJECT_ID,
                 LedgerSubjectCode.AVAILABLE);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        postingService.post(transaction(
+        assertThatThrownBy(() -> postingService.post(transaction(
                 LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
                         debitEntry(BUDGET_GROUP_SUBJECT_ID,
@@ -397,11 +398,10 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                                 budgetAvailableLedgerId,
                                 TRANSACTION_AMOUNT,
                                 LedgerSubjectCode.AVAILABLE,
-                                LedgerSubjectCategory.CONTROL))))));
+                                LedgerSubjectCategory.CONTROL)))))))
+                .hasMessageContaining("账本分录主体类型不允许入账");
 
-        assertLedgerFactDeltas(before, ledgerFactSnapshot(jdbcTemplate), 1, 1, 2);
-        assertLedgerAmounts(BUDGET_GROUP_SUBJECT_ID, LedgerSubjectCode.LIMIT, TRANSACTION_AMOUNT.getAmount(), 0L);
-        assertLedgerAmounts(BUDGET_GROUP_SUBJECT_ID, LedgerSubjectCode.AVAILABLE, 0L, TRANSACTION_AMOUNT.getAmount());
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -647,29 +647,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 ledgerId);
     }
 
-    private void assertLedgerFactDeltas(LedgerFactSnapshot before,
-                                        LedgerFactSnapshot after,
-                                        int transactionDelta,
-                                        int postingPlanDelta,
-                                        int entryDelta) {
-        assertThat(after.transactions()).hasSize(before.transactions().size() + transactionDelta);
-        assertThat(after.postingPlans()).hasSize(before.postingPlans().size() + postingPlanDelta);
-        assertThat(after.entries()).hasSize(before.entries().size() + entryDelta);
-    }
-
-    private void assertLedgerAmounts(String subjectId,
-                                     LedgerSubjectCode ledgerSubjectCode,
-                                     long debitAmount,
-                                     long creditAmount) {
-        Map<String, Object> ledger = jdbcTemplate.queryForMap("""
-                SELECT debit_amount, credit_amount
-                FROM t_ledger
-                WHERE subject_id = ? AND subject_type = ? AND ledger_subject_code = ?
-                """, subjectId, BUDGET_GROUP_SUBJECT_TYPE, ledgerSubjectCode.name());
-        assertThat(((Number) ledger.get("debit_amount")).longValue()).isEqualTo(debitAmount);
-        assertThat(((Number) ledger.get("credit_amount")).longValue()).isEqualTo(creditAmount);
-    }
-
     private Long createAvailableLedger(String subjectId, long initialBalance) {
         Long ledgerId = createAvailableLedger(subjectId);
         if (initialBalance != 0L) {
@@ -708,7 +685,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .setCurrency(CURRENCY)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name())
-                .setLedgerProfileCode(LedgerProfileCode.BUDGET_BASIC)
                 .setStatus(FundsAccountStatus.ACTIVE)
                 .setDescription("ledger posting boundary budget group"));
     }

@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.model.request;
 
+import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.transaction.core.enums.InternationalRegionCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -59,6 +60,27 @@ public class AuthorizeByPaymentInstrumentRequest {
 
     @Schema(description = "期望支付工具绑定版本，用于防止换绑后继续使用旧快照")
     private Integer expectedBindingVersion;
+
+    @Schema(description = "Spend Rule 标识，携带支出控制准入决策证据时必填")
+    private String spendRuleId;
+
+    @Schema(description = "Spend Rule 版本，携带支出控制准入决策证据时必填")
+    private String spendRuleVersion;
+
+    @Schema(description = "Spend Rule 决策流水号，携带支出控制准入决策证据时必填")
+    private String spendDecisionSn;
+
+    @Schema(description = "Spend Rule 决策结果，携带支出控制准入决策证据时必填")
+    private SpendControlDecisionResult spendDecisionResult;
+
+    @Schema(description = "Spend Rule 决策摘要，用于幂等、回放和对账追踪")
+    private String spendDecisionDigest;
+
+    @Schema(description = "预算组或预算控制范围标识，可为空")
+    private String budgetGroupSn;
+
+    @Schema(description = "Spend Rule 决策拒绝原因，仅 spendDecisionResult=REJECTED 时必填")
+    private String spendDecisionRejectReason;
 
     @Schema(description = "交易授权时间")
     private LocalDateTime authorizedTime;

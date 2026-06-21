@@ -33,6 +33,8 @@ import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.route.spec.RouteLegSpec;
+import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.route.spec.RoutingDecisionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
@@ -226,6 +228,32 @@ class DefaultRouteReplayServiceTests {
                             .containsEntry("cardBindingVersion", 1)
                             .containsEntry("cardFundingMode", "SHARED");
                 });
+    }
+
+    /**
+     * 场景：历史 RouteSnapshot 残留预算组作为 route leg 主体。
+     * 输入：退款回放引用包含 BUDGET_GROUP 节点的原路径。
+     * 输出：回放被拒绝。
+     * 预期：错误明确指向预算组不能作为回放参与方。
+     * 红线：预算组退出核心账本主体后，Route Replay 不得继续消费旧预算组 leg 生成新 route/posting。
+     */
+    @Test
+    void testResolveReplayInstructionShouldRejectLegacyBudgetGroupRouteLeg() {
+        SubjectRef budgetGroup = budgetGroup("BG-LEGACY-001");
+        SubjectRef payee = fundingAccount("PAYEE-LEGACY-001");
+        RouteSnapshotSpec legacySnapshot = routeSnapshot(paymentInstrumentRef("CARD-OLD", "old-binding"),
+                null,
+                routingDecision("ALLOC-BG-LEGACY", payee),
+                List.of(participant(RouteParticipantRole.BUDGET_CONTROLLER, budgetGroup),
+                        participant(RouteParticipantRole.PAYEE, payee)),
+                List.of(routeLeg(budgetGroup, payee)),
+                Map.of());
+        DefaultRouteReplayService replayService = new DefaultRouteReplayService(
+                new SnapshotFundsTransactionQueryService(legacySnapshot));
+
+        assertThatThrownBy(() -> replayService.resolve(replayInstruction(
+                originalTransactionReference("FT-BG-LEGACY-001"))))
+                .hasMessageContaining("预算组不是核心资金账务主体，不能作为 RouteSnapshot 回放参与方");
     }
 
     /**
@@ -449,6 +477,21 @@ class DefaultRouteReplayServiceTests {
                                             Map<String, Object> contextVariables) {
         SubjectRef payer = fundingAccount("PAYER-001");
         SubjectRef payee = fundingAccount("PAYEE-001");
+        return routeSnapshot(paymentInstrumentRef,
+                externalAccountRef,
+                routingDecision,
+                List.of(participant(RouteParticipantRole.PAYER, payer),
+                        participant(RouteParticipantRole.PAYEE, payee)),
+                List.of(routeLeg(payer, payee)),
+                contextVariables);
+    }
+
+    private RouteSnapshotSpec routeSnapshot(PaymentInstrumentRefSpec paymentInstrumentRef,
+                                            ExternalAccountRefSpec externalAccountRef,
+                                            RoutingDecisionSpec routingDecision,
+                                            List<RouteParticipantSpec> participants,
+                                            List<RouteLegSpec> legs,
+                                            Map<String, Object> contextVariables) {
         return ImmutableRouteSnapshotSpec.builder()
                 .tenantId(1L)
                 .snapshotId("SNAPSHOT-202605190002")
@@ -460,9 +503,8 @@ class DefaultRouteReplayServiceTests {
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.PAY)
                 .transactionType(DefaultFundsTransactionType.PAY)
-                .participants(List.of(participant(RouteParticipantRole.PAYER, payer),
-                        participant(RouteParticipantRole.PAYEE, payee)))
-                .legs(List.of(routeLeg(payer, payee)))
+                .participants(participants)
+                .legs(legs)
                 .routingDecision(routingDecision)
                 .paymentInstrumentRef(paymentInstrumentRef)
                 .externalAccountRef(externalAccountRef)
@@ -554,6 +596,16 @@ class DefaultRouteReplayServiceTests {
                 .subjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .currency(CurrencyIsoCode.USD.name())
                 .ledgerProfileCode("CREDIT")
+                .build();
+    }
+
+    private SubjectRef budgetGroup(String accountId) {
+        return ImmutableSubjectRef.builder()
+                .tenantId(1L)
+                .subjectId(accountId)
+                .subjectType(FundsSubjectType.BUDGET_GROUP)
+                .currency(CurrencyIsoCode.USD.name())
+                .ledgerProfileCode("BUDGET_BASIC")
                 .build();
     }
 

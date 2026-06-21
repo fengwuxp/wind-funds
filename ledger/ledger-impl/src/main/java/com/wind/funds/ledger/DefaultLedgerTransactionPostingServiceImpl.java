@@ -7,8 +7,6 @@ import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
-import com.wind.funds.ledger.enums.LedgerSubjectCategory;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
@@ -24,7 +22,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -47,12 +44,6 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     private static final Set<FundsSubjectType> POSTABLE_SUBJECT_TYPES = Set.of(
             FundsSubjectType.FUNDING_ACCOUNT,
             FundsSubjectType.CREDIT_ACCOUNT
-    );
-
-    private static final Set<LedgerSubjectCode> BUDGET_CONTROL_SUBJECT_CODES = Set.of(
-            LedgerSubjectCode.LIMIT,
-            LedgerSubjectCode.AVAILABLE,
-            LedgerSubjectCode.AUTHORIZATION
     );
 
     private final LedgerTransactionService ledgerTransactionService;
@@ -231,19 +222,8 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     }
 
     private boolean isPostableEntry(LedgerEntrySpec entry) {
-        FundsSubjectType subjectType = Arrays.stream(FundsSubjectType.values())
-                .filter(type -> type.name().equals(entry.getSubjectType()))
-                .findFirst()
-                .orElse(null);
-        if (subjectType == FundsSubjectType.BUDGET_GROUP) {
-            return isBudgetControlEntry(entry);
-        }
-        return POSTABLE_SUBJECT_TYPES.contains(subjectType);
-    }
-
-    private boolean isBudgetControlEntry(LedgerEntrySpec entry) {
-        return entry.getLedgerSubjectCategory() == LedgerSubjectCategory.CONTROL
-                && BUDGET_CONTROL_SUBJECT_CODES.contains(entry.getLedgerSubjectCode());
+        return POSTABLE_SUBJECT_TYPES.stream()
+                .anyMatch(subjectType -> subjectType.name().equals(entry.getSubjectType()));
     }
 
     private void assertAllEntriesBoundToLedgers(LedgerTransactionSpec transaction) {

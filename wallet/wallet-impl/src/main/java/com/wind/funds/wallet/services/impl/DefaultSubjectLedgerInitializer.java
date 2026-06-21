@@ -13,6 +13,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.route.enums.FundsSubjectType;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,8 @@ public class DefaultSubjectLedgerInitializer implements SubjectLedgerInitializer
     @Override
     public @NonNull Map<LedgerSubjectCode, Long> initializeRequiredLedgers(
             @NonNull InitializeSubjectLedgerRequest request) {
+        AssertUtils.isFalse(request.getSubjectType() == FundsSubjectType.BUDGET_GROUP,
+                "预算组不是核心资金账务主体，不允许初始化账本，subjectId = {}", request.getSubjectId());
         LedgerProfileDTO profile = ledgerProfileService.getProfile(request.getLedgerProfileCode());
         AssertUtils.isTrue(profile.getSubjectType() == request.getSubjectType(),
                 "LedgerProfile 主体类型不匹配，profileCode = {}, profileSubjectType = {}, subjectType = {}",
