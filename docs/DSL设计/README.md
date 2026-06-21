@@ -115,6 +115,19 @@ ScenarioFundsOperationContext
   -> canonical FundsInstruction / route / posting / ledger
 ```
 
+特殊业务入口的 DSL 承载边界如下：
+
+| 场景 | DSL 输入 | 转换后的资金动作 | 必须保留的外部引用 | 禁止表达 |
+| --- | --- | --- | --- | --- |
+| VCC 预付卡充值 | `PaymentInstrumentRef`、绑定资金子账户、外部入金引用、业务流水。 | 资金账户入账、账本分录和余额投影。 | 充值订单、processor event、外部入金流水。 | 卡号余额、VCC 账本主体、调额即入账。 |
+| VCC 预付卡提现 | 卡工具引用、资金子账户、提现目标、外部出款引用。 | 提现、在途、费用、清结算和对账。 | payout、rail、fee、quote 或退汇引用。 | 外部 accepted 即成功。 |
+| VCC 共享卡授权 | 卡工具引用、信用子账户、父账户快照、Spend Rule 决策证据。 | 账户主体型授权、冻结、退款和撤销。 | merchant、MCC、规则版本、控制活动引用。 | 替换 canonical 授权入参、共享卡号账本。 |
+| VA 收款 | VA 引用、statement line、绑定资金账户。 | 资金账户入账或对账差异。 | 银行流水、PSP 通知、付款方摘要。 | VA 内部余额。 |
+| 全球账户付款 | payout 指令、账户主体、rail、费用、quote。 | 出款、费用、在途、退汇和对账。 | SWIFT/local rail、quote、外部状态。 | 在 funds DSL 中实现 rail 协议。 |
+| ACH 或银行转账事件 | 外部事件、原交易引用、内部账户主体。 | 入账、扣账、退款、撤销、调账或差异单。 | ACH return、NOC、reversal、银行事件流水。 | Nacha/银行文件协议和外部账户敏感明文。 |
+
+DSL 的稳定不变量是：支付工具和外部 rail 只作为 `ScenarioFundsOperationContext`、`PaymentInstrumentRef`、`ExternalEventRef`、绑定快照和审计字段进入资金链路；资金交易、账本交易和账目分录仍必须落到资金账户、信用账户或平台角色解析后的平台资金账户。预算组、Spend Rule、支付工具、VA、VCC 卡号和外部账户不得成为 `SubjectRef` 的可入账主体。
+
 `authorizeByInstrument` 是 application facade 的入口命名，不改变 `FundsAuthorizationTransactionService.authorize` 的 DSL 内核语义。授权 DSL 内核继续表达已解析账户主体的资金占用、route、posting、ledger 和投影事实。
 
 支付工具与 Spend Rule 进入工程任务前，应先完成支付工具准入、资金责任解析、授权 application facade、Spend Rule 控制事实和只读投影边界核验。未形成独立工程任务前，DSL 不新增 `InstrumentTransaction`、支付工具账务主体、预算组账本主体或 Spend Rule 资金交易事实。
