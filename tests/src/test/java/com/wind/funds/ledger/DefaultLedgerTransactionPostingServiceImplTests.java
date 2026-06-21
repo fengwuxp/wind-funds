@@ -350,9 +350,9 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
      * 红线：预算组只能作为预算控制 scope 和审计上下文，不得成为核心资金账本分录主体。
      */
     @Test
-    void testPostShouldRejectBudgetGroupEntryBeforeLedgerFacts() {
+    void testPostShouldRejectBudgetGroupMoneyValueEntryBeforeLedgerFacts() {
         seedBudgetGroup(BUDGET_GROUP_SUBJECT_ID);
-        Long budgetLedgerId = createBudgetAvailableLedger(BUDGET_GROUP_SUBJECT_ID);
+        Long budgetLedgerId = createBudgetAvailableAssetLedger(BUDGET_GROUP_SUBJECT_ID);
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -367,6 +367,41 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .hasMessageContaining("账本分录主体类型不允许入账");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：预算组作为迁移期控制对象发起 LIMIT 与 AVAILABLE 之间的额度控制调账。
+     * 输入：BUDGET_GROUP 分录均绑定 CONTROL 类预算控制账本。
+     * 输出：允许入账并生成预算组控制账本分录和余额投影。
+     * 红线：只保留预算控制兼容路径，不把预算组放开为资金价值账目主体。
+     */
+    @Test
+    void testPostShouldAllowBudgetGroupControlEntries() {
+        seedBudgetGroup(BUDGET_GROUP_SUBJECT_ID);
+        Long budgetLimitLedgerId = createBudgetControlLedger(BUDGET_GROUP_SUBJECT_ID, LedgerSubjectCode.LIMIT);
+        Long budgetAvailableLedgerId = createBudgetControlLedger(BUDGET_GROUP_SUBJECT_ID,
+                LedgerSubjectCode.AVAILABLE);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        postingService.post(transaction(
+                LedgerTransactionStatus.POSTED,
+                List.of(postingPlan(List.of(
+                        debitEntry(BUDGET_GROUP_SUBJECT_ID,
+                                BUDGET_GROUP_SUBJECT_TYPE,
+                                budgetLimitLedgerId,
+                                TRANSACTION_AMOUNT,
+                                LedgerSubjectCode.LIMIT,
+                                LedgerSubjectCategory.CONTROL),
+                        creditEntry(BUDGET_GROUP_SUBJECT_ID,
+                                BUDGET_GROUP_SUBJECT_TYPE,
+                                budgetAvailableLedgerId,
+                                TRANSACTION_AMOUNT,
+                                LedgerSubjectCode.AVAILABLE,
+                                LedgerSubjectCategory.CONTROL))))));
+
+        assertLedgerFactDeltas(before, ledgerFactSnapshot(jdbcTemplate), 1, 1, 2);
+        assertLedgerAmounts(BUDGET_GROUP_SUBJECT_ID, LedgerSubjectCode.LIMIT, TRANSACTION_AMOUNT.getAmount(), 0L);
+        assertLedgerAmounts(BUDGET_GROUP_SUBJECT_ID, LedgerSubjectCode.AVAILABLE, 0L, TRANSACTION_AMOUNT.getAmount());
     }
 
     /**
@@ -453,6 +488,40 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 null);
     }
 
+    private LedgerEntrySpec creditEntry(String subjectId,
+                                        String subjectType,
+                                        Long ledgerId,
+                                        Money amount,
+                                        LedgerSubjectCode ledgerSubjectCode,
+                                        LedgerSubjectCategory ledgerSubjectCategory) {
+        return ledgerEntry(subjectId,
+                subjectType,
+                ledgerId,
+                EntrySide.CREDIT,
+                amount,
+                LEDGER_TRANSACTION_SN,
+                ledgerSubjectCode,
+                ledgerSubjectCategory,
+                null);
+    }
+
+    private LedgerEntrySpec debitEntry(String subjectId,
+                                       String subjectType,
+                                       Long ledgerId,
+                                       Money amount,
+                                       LedgerSubjectCode ledgerSubjectCode,
+                                       LedgerSubjectCategory ledgerSubjectCategory) {
+        return ledgerEntry(subjectId,
+                subjectType,
+                ledgerId,
+                EntrySide.DEBIT,
+                amount,
+                LEDGER_TRANSACTION_SN,
+                ledgerSubjectCode,
+                ledgerSubjectCategory,
+                null);
+    }
+
     private LedgerEntrySpec ledgerEntry(String subjectId,
                                         Long ledgerId,
                                         EntrySide entrySide,
@@ -521,12 +590,22 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 CURRENCY);
     }
 
-    private Long createBudgetAvailableLedger(String subjectId) {
+    private Long createBudgetAvailableAssetLedger(String subjectId) {
         return createLedger(
                 subjectId,
                 BUDGET_GROUP_SUBJECT_TYPE,
                 LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCategory.ASSET,
+                Boolean.FALSE,
+                CURRENCY);
+    }
+
+    private Long createBudgetControlLedger(String subjectId, LedgerSubjectCode subjectCode) {
+        return createLedger(
+                subjectId,
+                BUDGET_GROUP_SUBJECT_TYPE,
+                subjectCode,
+                LedgerSubjectCategory.CONTROL,
                 Boolean.FALSE,
                 CURRENCY);
     }
@@ -545,7 +624,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .setLedgerProfileVersion(1)
                 .setLedgerSubjectCode(ledgerSubjectCode)
                 .setLedgerSubjectCategory(ledgerSubjectCategory)
-                .setNormalBalanceSide(ledgerSubjectCategory.getNormalBalance())
+                .setNormalBalanceSide(normalBalanceSide(ledgerSubjectCode, ledgerSubjectCategory))
                 .setAllowNegative(allowNegative)
                 .setCurrency(currency)
                 .setSettlementPolicy("RT")
@@ -554,10 +633,41 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
     }
 
+    private EntrySide normalBalanceSide(LedgerSubjectCode ledgerSubjectCode,
+                                        LedgerSubjectCategory ledgerSubjectCategory) {
+        if (ledgerSubjectCategory != LedgerSubjectCategory.CONTROL) {
+            return ledgerSubjectCategory.getNormalBalance();
+        }
+        return ledgerSubjectCode == LedgerSubjectCode.LIMIT ? EntrySide.DEBIT : EntrySide.CREDIT;
+    }
+
     private void markLedgerNormalBalanceSide(Long ledgerId, EntrySide normalBalanceSide) {
         jdbcTemplate.update("UPDATE t_ledger SET normal_balance_side = ? WHERE id = ?",
                 normalBalanceSide.name(),
                 ledgerId);
+    }
+
+    private void assertLedgerFactDeltas(LedgerFactSnapshot before,
+                                        LedgerFactSnapshot after,
+                                        int transactionDelta,
+                                        int postingPlanDelta,
+                                        int entryDelta) {
+        assertThat(after.transactions()).hasSize(before.transactions().size() + transactionDelta);
+        assertThat(after.postingPlans()).hasSize(before.postingPlans().size() + postingPlanDelta);
+        assertThat(after.entries()).hasSize(before.entries().size() + entryDelta);
+    }
+
+    private void assertLedgerAmounts(String subjectId,
+                                     LedgerSubjectCode ledgerSubjectCode,
+                                     long debitAmount,
+                                     long creditAmount) {
+        Map<String, Object> ledger = jdbcTemplate.queryForMap("""
+                SELECT debit_amount, credit_amount
+                FROM t_ledger
+                WHERE subject_id = ? AND subject_type = ? AND ledger_subject_code = ?
+                """, subjectId, BUDGET_GROUP_SUBJECT_TYPE, ledgerSubjectCode.name());
+        assertThat(((Number) ledger.get("debit_amount")).longValue()).isEqualTo(debitAmount);
+        assertThat(((Number) ledger.get("credit_amount")).longValue()).isEqualTo(creditAmount);
     }
 
     private Long createAvailableLedger(String subjectId, long initialBalance) {

@@ -7,6 +7,8 @@ import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
+import com.wind.funds.ledger.enums.LedgerSubjectCategory;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
@@ -45,6 +47,12 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     private static final Set<FundsSubjectType> POSTABLE_SUBJECT_TYPES = Set.of(
             FundsSubjectType.FUNDING_ACCOUNT,
             FundsSubjectType.CREDIT_ACCOUNT
+    );
+
+    private static final Set<LedgerSubjectCode> BUDGET_CONTROL_SUBJECT_CODES = Set.of(
+            LedgerSubjectCode.LIMIT,
+            LedgerSubjectCode.AVAILABLE,
+            LedgerSubjectCode.AUTHORIZATION
     );
 
     private final LedgerTransactionService ledgerTransactionService;
@@ -214,7 +222,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                 .stream()
                 .map(LedgerPostingPlanSpec::getEntries)
                 .flatMap(List::stream)
-                .forEach(entry -> AssertUtils.isTrue(isPostableSubjectType(entry.getSubjectType()),
+                .forEach(entry -> AssertUtils.isTrue(isPostableEntry(entry),
                         "账本分录主体类型不允许入账，ledgerTransactionSn = {}, subjectId = {}, subjectType = {}, ledgerSubjectCode = {}",
                         entry.getLedgerTransactionSn(),
                         entry.getSubjectId(),
@@ -222,12 +230,20 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                         entry.getLedgerSubjectCode()));
     }
 
-    private boolean isPostableSubjectType(String subjectType) {
-        return Arrays.stream(FundsSubjectType.values())
-                .filter(type -> type.name().equals(subjectType))
+    private boolean isPostableEntry(LedgerEntrySpec entry) {
+        FundsSubjectType subjectType = Arrays.stream(FundsSubjectType.values())
+                .filter(type -> type.name().equals(entry.getSubjectType()))
                 .findFirst()
-                .filter(POSTABLE_SUBJECT_TYPES::contains)
-                .isPresent();
+                .orElse(null);
+        if (subjectType == FundsSubjectType.BUDGET_GROUP) {
+            return isBudgetControlEntry(entry);
+        }
+        return POSTABLE_SUBJECT_TYPES.contains(subjectType);
+    }
+
+    private boolean isBudgetControlEntry(LedgerEntrySpec entry) {
+        return entry.getLedgerSubjectCategory() == LedgerSubjectCategory.CONTROL
+                && BUDGET_CONTROL_SUBJECT_CODES.contains(entry.getLedgerSubjectCode());
     }
 
     private void assertAllEntriesBoundToLedgers(LedgerTransactionSpec transaction) {
