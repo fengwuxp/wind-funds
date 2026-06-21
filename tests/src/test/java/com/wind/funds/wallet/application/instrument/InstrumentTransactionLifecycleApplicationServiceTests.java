@@ -1,0 +1,577 @@
+package com.wind.funds.wallet.application.instrument;
+
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
+import com.capte.domain.core.operator.WindOperator;
+import com.wind.funds.AbstractFundsServiceTest;
+import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerSubjectCategory;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
+import com.wind.funds.ledger.impl.LedgerServiceImpl;
+import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
+import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
+import com.wind.funds.ledger.service.LedgerService;
+import com.wind.funds.route.AuthorizationFundsInstructionRouteResolver;
+import com.wind.funds.route.BalanceControlFundsInstructionRouteResolver;
+import com.wind.funds.route.CompositeRouteResolver;
+import com.wind.funds.route.DefaultRouteReplayService;
+import com.wind.funds.route.DefaultRouteSnapshotFactory;
+import com.wind.funds.route.TransferFundsInstructionRouteResolver;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.route.support.PlatformAccountRouteSupport;
+import com.wind.funds.route.support.RouteParticipantFactory;
+import com.wind.funds.route.support.RouteSubjectSupport;
+import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
+import com.wind.funds.transaction.application.FundsDirectTransactionService;
+import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
+import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
+import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
+import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
+import com.wind.funds.transaction.enums.FundsTransactionChannel;
+import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.ledger.DefaultLedgerPostingAssembler;
+import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
+import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
+import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
+import com.wind.funds.transaction.services.impl.DelegatingFundsInstructionLifecycleRecorder;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
+import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResolutionApplicationServiceImpl;
+import com.wind.funds.wallet.application.instrument.impl.InstrumentTransactionLifecycleApplicationServiceImpl;
+import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
+import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
+import com.wind.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.funds.wallet.enums.FundingAccountType;
+import com.wind.funds.wallet.enums.FundsAccountOwnerType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
+import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
+import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
+import com.wind.funds.wallet.dal.entities.FundingAccount;
+import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
+import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
+import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
+import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
+import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
+import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
+import com.wind.funds.wallet.service.FundingAccountService;
+import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
+import com.wind.funds.wallet.service.PaymentInstrumentService;
+import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
+import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
+import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalTime;
+import java.util.List;
+
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
+import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * 支付工具交易生命周期应用服务流程测试。
+ */
+@SpringJUnitConfig({
+        AbstractFundsServiceTest.TestInfrastructureConfig.class,
+        InstrumentTransactionLifecycleApplicationServiceTests.Config.class
+})
+@Transactional(propagation = Propagation.NOT_SUPPORTED)
+class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFundsServiceTest {
+
+    private static final String RECEIVE_ACCOUNT_SN = "inst_lifecycle_recv_acc";
+
+    private static final String CASH_MAPPING_ACCOUNT_SN = "inst_lifecycle_cash_map";
+
+    private static final String PREPAYMENT_ACCOUNT_SN = "inst_lifecycle_prepay";
+
+    private static final String RECEIVE_INSTRUMENT_SN = "pi_lifecycle_va_receive";
+
+    private static final String PAYMENT_ONLY_INSTRUMENT_SN = "pi_lifecycle_payment_only";
+
+    private static final String RECEIVE_BINDING_SN = "pi_lifecycle_receive_binding";
+
+    private static final String FUNDING_RELATION_SN = "instrument_lifecycle_receive_relation";
+
+    private static final String OWNER_ID = "owner_instrument_lifecycle";
+
+    private static final String CHANNEL_CODE = "bank_rail";
+
+    private static final String BUSINESS_SCENE = "INSTRUMENT_RECEIVE";
+
+    private static final String RECEIVE_BUSINESS_SN = "INSTRUMENT_RECEIVE_001";
+
+    private static final String DIRECTION_FAIL_BUSINESS_SN = "INSTRUMENT_RECEIVE_DIRECTION_FAIL";
+
+    @Autowired
+    private FundingAccountService fundingAccountService;
+
+    @Autowired
+    private PaymentInstrumentService paymentInstrumentService;
+
+    @Autowired
+    private SpendSubjectFundingRelationService fundingRelationService;
+
+    @Autowired
+    private FundsSubjectBalanceQueryService balanceQueryService;
+
+    @Autowired
+    private LedgerService ledgerService;
+
+    @Autowired
+    private FundingAccountMapper fundingAccountMapper;
+
+    @Autowired
+    private InstrumentTransactionLifecycleApplicationService instrumentTransactionLifecycleApplicationService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    /**
+     * 场景：VA/ACH 等收款工具入口完成预交易准入后，委派账户主体型充值交易内核。
+     * 输入：收款工具绑定资金账户，资金责任解析到同一资金账户，外部银行账户入金 80。
+     * 输出：返回充值交易号，资金账户 AVAILABLE 增加 80，并产生标准 TOPUP 交易、route 和账本事实。
+     * 红线：wallet 应用入口不直接写账，交易内核 canonical 入参仍是已解析的资金账户主体。
+     */
+    @Test
+    void testReceiveByInstrumentShouldResolveTargetAccountAndDelegateTopupKernel() {
+        createReceiveScenario();
+        FundsAccountId receiveAccount = receiveAccountId();
+        FundsSubjectBalanceDTO beforeReceive = balance(receiveAccount);
+        assertBucket(beforeReceive, LedgerSubjectCode.AVAILABLE, 0L, CurrencyIsoCode.USD);
+
+        String transactionSn = instrumentTransactionLifecycleApplicationService.receiveByInstrument(
+                receiveRequest(RECEIVE_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperator.system());
+
+        assertThat(transactionSn).isNotBlank();
+        FundsSubjectBalanceDTO afterReceive = balance(receiveAccount);
+        assertBucket(afterReceive, LedgerSubjectCode.AVAILABLE, 80L, CurrencyIsoCode.USD);
+        assertThat(fundsTransactionStatus(RECEIVE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.CLOSED.name());
+        assertThat(fundsTransactionDetailStatuses(RECEIVE_BUSINESS_SN))
+                .hasSize(3)
+                .containsOnly(FundsTransactionDetailStatus.SUCCEEDED.name());
+        assertThat(ledgerTransactionEvents(RECEIVE_BUSINESS_SN))
+                .containsExactly(FundsTransactionEventType.TOPUP.name());
+        assertThat(ledgerEntrySubjects(RECEIVE_BUSINESS_SN))
+                .contains(RECEIVE_ACCOUNT_SN, CASH_MAPPING_ACCOUNT_SN, PREPAYMENT_ACCOUNT_SN);
+        assertThat(ledgerEntrySubjectCodes(RECEIVE_BUSINESS_SN))
+                .contains(LedgerSubjectCode.AVAILABLE.name(), LedgerSubjectCode.CASH.name(),
+                        LedgerSubjectCode.PREPAYMENT.name());
+        assertThat(postingPlanCount(RECEIVE_BUSINESS_SN)).isEqualTo(2);
+        assertThat(ledgerEntryCount(RECEIVE_BUSINESS_SN)).isEqualTo(4);
+        assertThat(routeLegCount(RECEIVE_BUSINESS_SN)).isEqualTo(2);
+        assertReceiveRouteSnapshot(RECEIVE_BUSINESS_SN);
+        assertReceiveFactsKeepDirectContextMinimal(RECEIVE_BUSINESS_SN);
+    }
+
+    /**
+     * 场景：付款-only 工具不能作为收款入口。
+     * 输入：PAYMENT-only 工具发起收款。
+     * 输出：准入阶段拒绝，不创建资金交易、route、posting plan、账本交易或分录。
+     * 红线：支付工具能力不匹配时不得进入充值交易内核，不得留下半成功资金事实。
+     */
+    @Test
+    void testReceiveByInstrumentShouldRejectPaymentOnlyInstrumentWithoutFundsFacts() {
+        createReceiveAccount();
+        createPaymentOnlyInstrumentScenario();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.receiveByInstrument(
+                receiveRequest(DIRECTION_FAIL_BUSINESS_SN, PAYMENT_ONLY_INSTRUMENT_SN), WindOperator.system()))
+                .hasMessageContaining("支付工具方向不支持当前动作");
+
+        assertNoFundsOrLedgerFacts(DIRECTION_FAIL_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @BeforeEach
+    void setUpInstrumentTransactionLifecycleTestData() {
+        cleanupInstrumentTransactionLifecycleTestData();
+    }
+
+    @AfterEach
+    void tearDownInstrumentTransactionLifecycleTestData() {
+        cleanupInstrumentTransactionLifecycleTestData();
+    }
+
+    private void cleanupInstrumentTransactionLifecycleTestData() {
+        jdbcTemplate.update("""
+                DELETE FROM t_ledger_posting_plan
+                WHERE ledger_transaction_sn IN (
+                    SELECT sn FROM t_ledger_transaction
+                    WHERE business_scene = ? AND business_sn IN (?, ?)
+                )
+                """, BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
+                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn IN (?, ?)",
+                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?)",
+                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
+                RECEIVE_ACCOUNT_SN, CASH_MAPPING_ACCOUNT_SN, PREPAYMENT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?)",
+                RECEIVE_ACCOUNT_SN, CASH_MAPPING_ACCOUNT_SN, PREPAYMENT_ACCOUNT_SN);
+    }
+
+    private void createReceiveScenario() {
+        createReceiveAccount();
+        createPlatformFundingAccount(CASH_MAPPING_ACCOUNT_SN, PlatformFundingAccountRole.CASH_MAPPING);
+        createPlatformFundingAccount(PREPAYMENT_ACCOUNT_SN, PlatformFundingAccountRole.PREPAYMENT);
+        createTestLedger(cashMappingAccountId(), LedgerSubjectCode.CASH, 10_000L);
+        createTestLedger(prepaymentAccountId(), LedgerSubjectCode.PREPAYMENT, 0L);
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(RECEIVE_INSTRUMENT_SN,
+                PaymentInstrumentDirection.RECEIVE));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(RECEIVE_INSTRUMENT_SN,
+                RECEIVE_BINDING_SN));
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest(FUNDING_RELATION_SN));
+    }
+
+    private void createReceiveAccount() {
+        fundingAccountService.createFundingAccount(new CreateFundingAccountRequest()
+                .setSn(RECEIVE_ACCOUNT_SN)
+                .setTenantId(TENANT_ID)
+                .setOwnerId(OWNER_ID)
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setAccountType(FundingAccountType.GLOBAL_ACCOUNT.name())
+                .setPlatform(Boolean.FALSE)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
+                .setStatus(FundsAccountStatus.ACTIVE));
+    }
+
+    private void createPaymentOnlyInstrumentScenario() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_ONLY_INSTRUMENT_SN,
+                PaymentInstrumentDirection.PAYMENT));
+    }
+
+    private void createPlatformFundingAccount(String accountSn, PlatformFundingAccountRole role) {
+        FundingAccount account = new FundingAccount();
+        account.setTenantId(TENANT_ID);
+        account.setSn(accountSn);
+        account.setOwnerId("platform");
+        account.setOwnerType(FundsAccountOwnerType.PLATFORM);
+        account.setAccountType(role.name());
+        account.setPlatform(Boolean.TRUE);
+        account.setAccountRoleCode(role);
+        account.setCurrency(CurrencyIsoCode.USD);
+        account.setLedgerProfileCode(role.getLedgerProfileCode());
+        account.setLedgerProfileVersion(1);
+        account.setStatus(FundsAccountStatus.ACTIVE);
+        account.setDescription("instrument lifecycle platform funding account");
+        account.setVersion(0);
+        fundingAccountMapper.insertSelective(account);
+    }
+
+    private void createTestLedger(FundsAccountId accountId,
+                                  LedgerSubjectCode subjectCode,
+                                  long initialBalance) {
+        Long ledgerId = ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(accountId.id())
+                .setSubjectType(accountId.type())
+                .setLedgerProfileCode("TEST")
+                .setLedgerProfileVersion(1)
+                .setLedgerSubjectCode(subjectCode)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
+                .setNormalBalanceSide(EntrySide.CREDIT)
+                .setAllowNegative(Boolean.FALSE)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setSettlementPolicy("RT")
+                .setCutOffTime(LocalTime.MIDNIGHT)
+                .setPeriodType(AccountBalancePeriodType.LIFETIME)
+                .setPeriodId(AccountBalancePeriodType.LIFETIME.name()));
+        if (initialBalance != 0L) {
+            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
+                    .setId(ledgerId)
+                    .setCreditAmountDelta(initialBalance > 0L ? initialBalance : null)
+                    .setDebitAmountDelta(initialBalance < 0L ? -initialBalance : null));
+        }
+    }
+
+    private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
+                                                                          PaymentInstrumentDirection direction) {
+        return new CreatePaymentInstrumentRequest()
+                .setSn(instrumentSn)
+                .setTenantId(TENANT_ID)
+                .setOwnerId(OWNER_ID)
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setInstrumentType("VA")
+                .setInstrumentDirection(direction)
+                .setInstrumentNo("VA-****-2468")
+                .setChannelCode(CHANNEL_CODE)
+                .setExternalInstrumentId("va_lifecycle_2468")
+                .setCurrency(CurrencyIsoCode.USD)
+                .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
+    private CreatePaymentInstrumentBindingRequest createBindingRequest(String instrumentSn,
+                                                                       String bindingSn) {
+        return new CreatePaymentInstrumentBindingRequest()
+                .setSn(bindingSn)
+                .setTenantId(TENANT_ID)
+                .setInstrumentSn(instrumentSn)
+                .setBindingRole(PaymentInstrumentBindingRole.RECEIVE_SUBJECT)
+                .setSubjectId(RECEIVE_ACCOUNT_SN)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setPriority(10)
+                .setDefaultBinding(Boolean.TRUE)
+                .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
+    private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest(String relationSn) {
+        return new CreateSpendSubjectFundingRelationRequest()
+                .setSn(relationSn)
+                .setTenantId(TENANT_ID)
+                .setSpendSubjectId(RECEIVE_ACCOUNT_SN)
+                .setSpendSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setTargetSubjectId(RECEIVE_ACCOUNT_SN)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setRelationType(SpendSubjectFundingRelationType.SETTLEMENT_TARGET)
+                .setPriority(10)
+                .setDefaultRelation(Boolean.TRUE)
+                .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
+    private ReceiveByInstrumentRequest receiveRequest(String businessSn, String instrumentSn) {
+        return new ReceiveByInstrumentRequest()
+                .setTenantId(TENANT_ID)
+                .setInstrumentSn(instrumentSn)
+                .setAmount(80L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_lifecycle_receive",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannelCode(FundsTransactionChannel.WIRE_TRANSFER.name())
+                .setChannelTransactionSn(businessSn + "_CHANNEL")
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(businessSn)
+                .setExpectedBindingVersion(1)
+                .setDescription("instrument receive flow");
+    }
+
+    private FundsAccountId receiveAccountId() {
+        return FundsAccountId.immutable(RECEIVE_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
+    private FundsAccountId cashMappingAccountId() {
+        return FundsAccountId.immutable(CASH_MAPPING_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
+    private FundsAccountId prepaymentAccountId() {
+        return FundsAccountId.immutable(PREPAYMENT_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
+    private FundsSubjectBalanceDTO balance(FundsAccountId accountId) {
+        return balanceQueryService.getRequiredCurrentBalance(new FundsSubjectBalanceQuery()
+                .setTenantId(TENANT_ID)
+                .setSubjectRefs(List.of(accountId))
+                .setCurrency(CurrencyIsoCode.USD));
+    }
+
+    private String fundsTransactionStatus(String businessSn) {
+        return jdbcTemplate.queryForObject("""
+                SELECT status FROM t_funds_transaction
+                WHERE business_scene = ? AND business_sn = ?
+                """, String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private List<String> fundsTransactionDetailStatuses(String businessSn) {
+        return jdbcTemplate.queryForList("""
+                SELECT status FROM t_funds_transaction_detail
+                WHERE business_scene = ? AND business_sn = ?
+                ORDER BY id ASC
+                """, String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private List<String> ledgerTransactionEvents(String businessSn) {
+        return jdbcTemplate.queryForList("""
+                SELECT event_type FROM t_ledger_transaction
+                WHERE business_scene = ? AND business_sn = ?
+                ORDER BY id ASC
+                """, String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private List<String> ledgerEntrySubjects(String businessSn) {
+        return jdbcTemplate.queryForList("""
+                SELECT subject_id FROM t_ledger_entry
+                WHERE business_scene = ? AND business_sn = ?
+                ORDER BY id ASC
+                """, String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private List<String> ledgerEntrySubjectCodes(String businessSn) {
+        return jdbcTemplate.queryForList("""
+                SELECT ledger_subject_code FROM t_ledger_entry
+                WHERE business_scene = ? AND business_sn = ?
+                ORDER BY id ASC
+                """, String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private Integer postingPlanCount(String businessSn) {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM t_ledger_posting_plan p
+                JOIN t_ledger_transaction t ON p.ledger_transaction_sn = t.sn
+                WHERE t.business_scene = ? AND t.business_sn = ?
+                """, Integer.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private Integer ledgerEntryCount(String businessSn) {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM t_ledger_entry
+                WHERE business_scene = ? AND business_sn = ?
+                """, Integer.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private int routeLegCount(String businessSn) {
+        return JSON.parseObject(routeSnapshotJson(businessSn))
+                .getJSONArray("legs")
+                .size();
+    }
+
+    private String routeSnapshotJson(String businessSn) {
+        return jdbcTemplate.queryForObject("""
+                SELECT route_snapshot FROM t_funds_transaction
+                WHERE business_scene = ? AND business_sn = ?
+                """, String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private void assertReceiveRouteSnapshot(String businessSn) {
+        JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson(businessSn));
+        assertThat(routeSnapshot.getJSONObject("paymentInstrumentRef")).isEmpty();
+        JSONObject externalAccountRef = routeSnapshot.getJSONObject("externalAccountRef");
+        assertThat(externalAccountRef).isNotNull().isNotEmpty();
+        assertThat(externalAccountRef.getString("externalAccountId"))
+                .isEqualTo("external_bank_lifecycle_receive");
+        assertThat(externalAccountRef.getString("externalAccountType"))
+                .isEqualTo(DefaultFundsAccountType.EXTERNAL_BANK.name());
+        assertThat(externalAccountRef.getString("channelCode")).isEqualTo(FundsTransactionChannel.WIRE_TRANSFER.name());
+    }
+
+    private void assertReceiveFactsKeepDirectContextMinimal(String businessSn) {
+        assertThat(queryContextVariables("t_funds_transaction", businessSn))
+                .singleElement()
+                .satisfies(context -> assertThat(JSON.parseObject(context)).isEmpty());
+        assertThat(queryContextVariables("t_funds_transaction_detail", businessSn))
+                .isNotEmpty()
+                .allSatisfy(context -> assertThat(JSON.parseObject(context).keySet())
+                        .doesNotContain("instrumentSn",
+                                "instrumentAction",
+                                "instrumentBindingRole",
+                                "instrumentBindingSn",
+                                "instrumentBindingVersion",
+                                "fundingRelationSn",
+                                "fundingRelationType",
+                                "targetAccountId",
+                                "targetAccountType"));
+        assertThat(queryContextVariables("t_ledger_transaction", businessSn))
+                .singleElement()
+                .satisfies(context -> assertThat(JSON.parseObject(context)).isEmpty());
+        assertThat(queryContextVariables("t_ledger_entry", businessSn))
+                .isNotEmpty()
+                .allSatisfy(context -> assertThat(context).doesNotContain("va_lifecycle_2468"));
+    }
+
+    private List<String> queryContextVariables(String tableName, String businessSn) {
+        return jdbcTemplate.queryForList(
+                "SELECT context_variables FROM " + tableName + " WHERE business_scene = ? AND business_sn = ?",
+                String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private void assertNoFundsOrLedgerFacts(String businessSn) {
+        assertThat(countRows("t_funds_transaction", businessSn)).isZero();
+        assertThat(countRows("t_funds_transaction_detail", businessSn)).isZero();
+        assertThat(countRows("t_ledger_transaction", businessSn)).isZero();
+        assertThat(countRows("t_ledger_entry", businessSn)).isZero();
+        assertThat(postingPlanCount(businessSn)).isZero();
+    }
+
+    private int countRows(String tableName, String businessSn) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + tableName + " WHERE business_scene = ? AND business_sn = ?",
+                Integer.class, BUSINESS_SCENE, businessSn);
+    }
+
+    @Configuration
+    @Import({
+            FundsDirectTransactionInstructionConverter.class,
+            FundsBalanceControlInstructionConverter.class,
+            FundsAuthorizationInstructionConverter.class,
+            RouteParticipantFactory.class,
+            RouteSubjectSupport.class,
+            PlatformAccountRouteSupport.class,
+            DefaultRouteReplayService.class,
+            TransferFundsInstructionRouteResolver.class,
+            BalanceControlFundsInstructionRouteResolver.class,
+            AuthorizationFundsInstructionRouteResolver.class,
+            CompositeRouteResolver.class,
+            DefaultRouteSnapshotFactory.class,
+            DefaultLedgerPostingAssembler.class,
+            DefaultRoutedFundsInstructionOrchestrator.class,
+            FundsTransactionCommandServiceImpl.class,
+            LedgerServiceImpl.class,
+            LedgerTransactionServiceImpl.class,
+            LedgerBalanceProjectionServiceImpl.class,
+            DefaultLedgerTransactionPostingServiceImpl.class,
+            DefaultFundsInstructionLifecycleSaver.class,
+            DefaultFundsFrozenOrderLifecycleSaver.class,
+            DelegatingFundsInstructionLifecycleRecorder.class,
+            DefaultFundsTransactionQueryService.class,
+            DefaultLedgerProfileServiceImpl.class,
+            DefaultSubjectLedgerInitializer.class,
+            AccountHierarchyServiceImpl.class,
+            FundingAccountServiceImpl.class,
+            SpendSubjectFundingRelationServiceImpl.class,
+            PaymentInstrumentServiceImpl.class,
+            PaymentInstrumentCapabilityApplicationServiceImpl.class,
+            FundingResponsibilityResolutionApplicationServiceImpl.class,
+            FundsAccountCapabilityApplicationServiceImpl.class,
+            PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
+            InstrumentTransactionLifecycleApplicationServiceImpl.class,
+            DefaultFundsAccountQueryServiceImpl.class,
+            PlatformFundingAccountServiceImpl.class
+    })
+    static class Config {
+    }
+}
