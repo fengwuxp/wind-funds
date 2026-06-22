@@ -3,38 +3,60 @@ package com.wind.funds.wallet.application.external.impl;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
+import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.transaction.application.FundsDirectTransactionService;
+import com.wind.funds.transaction.enums.FundsTransactionChannel;
+import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
+import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.external.ExternalFundsEventApplicationService;
+import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.model.request.ConsumeExternalFundsEventRequest;
+import com.wind.transaction.core.Money;
+import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * 外部资金事件消费应用服务实现。
  *
- * <p>当前实现只提供外部事件进入资金域的服务层契约和前置护栏。真实消费链路必须在后续 Grant 中显式接入交易内核、
- * 账本过账、对账差异和审计闭环。</p>
+ * <p>当前实现只接入已确认外部入金事件到标准充值内核。扣款、退票、撤销、差异单和事件消费者仍必须由后续
+ * Grant 单独证明。</p>
  *
  * @author Codex
  * @date 2026-06-21
  */
 @Service
+@AllArgsConstructor
 public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEventApplicationService {
+
+    private static final Set<String> CONFIRMED_CREDIT_EVENT_TYPES = Set.of(
+            "ACH_CREDIT_CONFIRMED",
+            "BANK_CREDIT_CONFIRMED",
+            "EXTERNAL_CREDIT_CONFIRMED");
 
     private static final Set<String> POSTABLE_ACCOUNT_SUBJECT_TYPES = Set.of(
             FundsSubjectType.FUNDING_ACCOUNT.name(),
             FundsSubjectType.CREDIT_ACCOUNT.name());
+
+    private static final String EXTERNAL_SOURCE_ACCOUNT_ID = "external_funds_event_source";
+
+    private final FundsDirectTransactionService directTransactionService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String consume(@NonNull ConsumeExternalFundsEventRequest request,
                                    @NonNull WindOperator operator) {
         validateConsumeRequest(request);
-        throw new UnsupportedOperationException("外部资金事件消费尚未接入归一资金事实内核");
+        assertConfirmedCreditEvent(request);
+        assertFundingAccountTarget(request.getTargetAccountId());
+        return directTransactionService.topup(toTopupRequest(request), operator);
     }
 
     private void validateConsumeRequest(ConsumeExternalFundsEventRequest request) {
@@ -52,10 +74,50 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
         AssertUtils.hasText(request.getBusinessSn(), "外部资金事件业务流水号不能为空");
     }
 
+    private void assertConfirmedCreditEvent(ConsumeExternalFundsEventRequest request) {
+        AssertUtils.isTrue(CONFIRMED_CREDIT_EVENT_TYPES.contains(request.getExternalEventType()),
+                "外部资金事件类型暂不支持真实消费");
+    }
+
+    private void assertFundingAccountTarget(FundsAccountId targetAccountId) {
+        AssertUtils.isTrue(FundsSubjectType.FUNDING_ACCOUNT.name().equals(targetAccountId.type()),
+                "外部资金入金事件目标账户必须是资金账户");
+    }
+
     private void assertPostableTargetAccount(FundsAccountId targetAccountId) {
         AssertUtils.hasText(targetAccountId.id(), "外部资金事件目标账户 ID 不能为空");
         AssertUtils.hasText(targetAccountId.type(), "外部资金事件目标账户类型不能为空");
         AssertUtils.isTrue(POSTABLE_ACCOUNT_SUBJECT_TYPES.contains(targetAccountId.type()),
                 "外部资金事件目标账户必须是资金账户或信用账户");
+    }
+
+    private FundsTransactionTopupRequest toTopupRequest(ConsumeExternalFundsEventRequest request) {
+        return new FundsTransactionTopupRequest()
+                .setAccountId(request.getTargetAccountId())
+                .setFundsSourceAccountId(FundsAccountId.immutable(EXTERNAL_SOURCE_ACCOUNT_ID,
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn(request.getExternalEventSn())
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
+                        request.getCurrency())))
+                .setBusinessScene(request.getBusinessScene())
+                .setBusinessSn(request.getBusinessSn())
+                .setContextVariables(ReadonlyContextVariables.of(externalEventContext(request)))
+                .setDescription(request.getDescription());
+    }
+
+    private Map<String, Object> externalEventContext(ConsumeExternalFundsEventRequest request) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("externalEventSn", request.getExternalEventSn());
+        result.put("externalEventType", request.getExternalEventType());
+        putIfPresent(result, "originalTransactionSn", request.getOriginalTransactionSn());
+        putIfPresent(result, "reconciliationDifferenceSn", request.getReconciliationDifferenceSn());
+        return Map.copyOf(result);
+    }
+
+    private void putIfPresent(Map<String, Object> values, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            values.put(key, value);
+        }
     }
 }

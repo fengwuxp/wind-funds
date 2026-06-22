@@ -7,18 +7,18 @@
 | 项 | 内容 |
 | --- | --- |
 | Task ID | `GSD2-WALLET-SPECIAL-BUSINESS-CAPABILITY-MAP-001` |
-| 所属阶段 | GSD-2 / LWT capability goal / wallet special business capability map design consumed by instrument lifecycle contracts |
+| 所属阶段 | GSD-2 / LWT capability goal / wallet special business capability map design consumed by instrument lifecycle contracts and external credit consume |
 | Owner | 产品架构专家、资深架构师、AI Native 工程流程编排共同合议；编码 Owner 在下一 Grant 再确认。 |
 | 写入范围 | 本文、TDD、OpenSpec 任务基线、wallet 支付工具生命周期服务层接口、实现和目标测试。 |
 | 写入文件 | `docs/TDD设计/GSD-2-Wallet特殊业务能力地图ExecutionGrant确认包.md`、`docs/TDD设计/支付资金底座测试驱动设计.md`、OpenSpec tasks、`InstrumentTransactionLifecycleApplicationService`、`ExternalFundsEventApplicationService`、`AuthorizeByPaymentInstrumentRequest`、`ReceiveByInstrumentRequest`、`PayOutByRailRequest`、`ConsumeExternalFundsEventRequest`、对应 impl 和目标服务流测试。 |
 | 只读范围 | `wallet/wallet-face` application 契约、`transaction/transaction-face` canonical 交易服务、`ledger/ledger-face` 应用服务、现有 TDD 和 OpenSpec。 |
 | 只读参考 | 现有 `wallet.application`、`transaction.application`、`ledger.application`、清结算对账服务、PRD、系分、DSL、TDD 和 OpenSpec。 |
 | 禁止范围 | 不改 DDL/H2 schema、Controller、HTTP/RPC、Mapper、Entity、runtime config、交易 canonical 入参或 ledger posting；不新增统一支付工具交易内核。 |
-| 验证命令 | Red/Green：沙箱内目标服务流测试因嵌入式 Redis 端口绑定限制失败；非沙箱复跑 `InstrumentTransactionLifecycleApplicationServiceTests` 5 tests 通过，`ExternalFundsEventApplicationServiceTests` 1 test 通过；`just compile`、`just pmd`、`git diff --check` 均作为本轮收口门禁。 |
-| 停止条件 | 需要继续扩展 `receiveByInstrument` 新场景语义、把 `payOutByRail` 接入真实提现/出款内核、把 `ExternalFundsEventApplicationService#consume` 接入真实交易/调账/退款/对账内核、改变交易 canonical 入参、让支付工具/预算组/Spend Rule 入账、或触碰账本分录事实时停止，等待新的独立 Execution Grant。 |
-| Execution Grant | `GSD2-WALLET-INSTRUMENT-LIFECYCLE-AUTH-FACADE-001` 已消费为支付工具生命周期授权入口委派切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-SNAPSHOT-001` 已消费为支付工具收款 route snapshot 回链切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-BINDING-VERSION-GUARD-001` 已消费为收款工具绑定版本必填硬化切片；`GSD2-GA-PAYOUT-RAIL-CONTRACT-001` 已消费为全球账户出款 rail 服务层契约和未接内核 fail-fast guard 切片；`GSD2-WALLET-EXTERNAL-FUNDS-EVENT-CONTRACT-001` 已消费为外部资金事件消费服务层契约和未接归一资金事实内核 fail-fast guard 切片；后续能力必须另起单一 Grant。 |
+| 验证命令 | Red/Green：沙箱内目标服务流测试因嵌入式 Redis 端口绑定限制失败；非沙箱复跑 `InstrumentTransactionLifecycleApplicationServiceTests` 5 tests 通过，`ExternalFundsEventApplicationServiceTests` 3 tests 通过；`just compile`、`just pmd`、`git diff --check` 均作为本轮收口门禁。 |
+| 停止条件 | 需要继续扩展 `receiveByInstrument` 新场景语义、把 `payOutByRail` 接入真实提现/出款内核、把 `ExternalFundsEventApplicationService#consume` 扩展到外部扣账、return/NOC/reversal、信用账户还款或调额、差异单、补事实、清结算、对账、改变交易 canonical 入参、让支付工具/预算组/Spend Rule 入账、或触碰账本分录结构时停止，等待新的独立 Execution Grant。 |
+| Execution Grant | `GSD2-WALLET-INSTRUMENT-LIFECYCLE-AUTH-FACADE-001` 已消费为支付工具生命周期授权入口委派切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-SNAPSHOT-001` 已消费为支付工具收款 route snapshot 回链切片；`GSD2-WALLET-INSTRUMENT-RECEIVE-BINDING-VERSION-GUARD-001` 已消费为收款工具绑定版本必填硬化切片；`GSD2-GA-PAYOUT-RAIL-CONTRACT-001` 已消费为全球账户出款 rail 服务层契约和未接内核 fail-fast guard 切片；`GSD2-WALLET-EXTERNAL-FUNDS-EVENT-CONTRACT-001` 已消费为外部资金事件消费服务层契约和 guard 切片；`GSD2-WALLET-EXTERNAL-FUNDS-EVENT-CREDIT-CONSUME-001` 已消费为外部 confirmed credit 到资金账户的最小真实消费切片；后续能力必须另起单一 Grant。 |
 | 工程纪律 | 本轮已执行 TDD Red / Green、Review 边界复核、编译、PMD 和 diff 校验；后续继续编码仍必须按单一 Grant 执行。 |
-| Handoff | 下一轮从真实外部资金事件归一消费、VCC / VA 单场景、transaction 兼容债或旧 ledger 公共 CRUD API 治理中重新选择单一切片；若继续扩 `receiveByInstrument` 只能处理新场景，若继续扩 `payOutByRail` 必须单独确认提现/出款内核、在途、费用、清结算和对账边界。 |
+| Handoff | 下一轮从外部扣账 / return / NOC / reversal、信用账户还款或调额、VCC / VA 单场景、transaction 兼容债或旧 ledger 公共 CRUD API 治理中重新选择单一切片；若继续扩 `receiveByInstrument` 只能处理新场景，若继续扩 `payOutByRail` 必须单独确认提现/出款内核、在途、费用、清结算和对账边界。 |
 
 ## 2. 业务目标和非目标
 
@@ -71,7 +71,7 @@
 | VCC 共享卡调额 | `VccSharedCardTransactionApplicationService.adjustLimit` | 调额流水、卡工具引用、信用子账户、父账户约束、调整金额或新额度、原因。 | 调额结果、额度快照、审计引用。 | 账户能力、额度配置或控制活动。 | 调额不等于资金入账，除非发生真实父子划拨。 |
 | VA 收款 | `InstrumentTransactionLifecycleApplicationService.receiveByInstrument` | VA 引用、外部流水、金额、币种、内部资金账户绑定、付款方摘要。 | 入账结果、内部交易引用、对账引用。 | 直接交易入账、对账差异。 | VA 不持有内部余额。 |
 | 全球账户付款 | `InstrumentTransactionLifecycleApplicationService.payOutByRail` | 当前契约承载 payout 流水、支付工具引用、出款账户主体、金额、币种、rail 引用、收款方引用、外部出款流水和期望绑定版本；费用、quote 和在途状态在真实出款 Grant 中补齐。 | 当前只返回内部受理引用或失败原因；真实出款后再返回在途事实、费用交易和对账引用。 | 提现/出款、费用、在途、清结算。 | 不在 funds 内实现 SWIFT/local 协议；当前 guard 不代表真实出款已可用。 |
-| ACH/银行事件消费 | `ExternalFundsEventApplicationService.consume` | 当前契约承载外部事件流水、事件类型、目标资金/信用账户主体、金额、币种、原交易引用、差异引用和业务流水；事件方向、return/NOC/reversal、补事实和幂等摘要在真实消费 Grant 中补齐。 | 当前只返回内部资金事实引用或失败原因；真实消费后再返回内部交易、调账、退款/撤销或差异处理引用。 | 直接交易、退款/撤销、调账、对账。 | 不把银行文件批次当资金内核；当前 guard 不代表真实 ACH/银行事件消费已可用。 |
+| ACH/银行事件消费 | `ExternalFundsEventApplicationService.consume` | 当前契约承载外部事件流水、事件类型、目标资金/信用账户主体、金额、币种、原交易引用、差异引用和业务流水；已确认入金事件支持 `ACH_CREDIT_CONFIRMED`、`BANK_CREDIT_CONFIRMED`、`EXTERNAL_CREDIT_CONFIRMED` 到资金账户。事件扣账、return/NOC/reversal、信用账户还款或调额、补事实和幂等摘要仍需后续 Grant。 | confirmed credit 返回内部充值交易引用；失败返回原因且不生成资金事实。其他事件类型暂不返回内部调账、退款/撤销或差异处理引用。 | confirmed credit 复用直接交易 `topup`、route、posting 和账本分录；其他方向后续接退款/撤销、调账、对账。 | 不把银行文件批次当资金内核；当前只声明 confirmed credit 入金可用，不代表完整 ACH/银行事件消费 Done。 |
 
 接口契约要求：
 
@@ -245,10 +245,17 @@ Execution Grant: GSD2-WALLET-EXTERNAL-FUNDS-EVENT-CONTRACT-001
 边界：本切片只完成契约和 guard，不接真实 ACH/银行事件消费，不生成入账、扣账、退款、撤销、调账、差异单、清结算或对账事实；不实现 Nacha/ODFI/RDFI/银行文件协议，不改交易 canonical 账户主体、不写 Controller、HTTP/RPC、DDL/H2 schema、Entity、Mapper、ledger posting、事件消费者、outbox 或生产迁移。
 ```
 
+```text
+Execution Grant: GSD2-WALLET-EXTERNAL-FUNDS-EVENT-CREDIT-CONSUME-001
+已消费范围：在 ExternalFundsEventApplicationService#consume 既有契约上，支持 ACH_CREDIT_CONFIRMED、BANK_CREDIT_CONFIRMED、EXTERNAL_CREDIT_CONFIRMED 三类已确认外部入金事件，目标主体限定为资金账户，内部委派标准 FundsDirectTransactionService#topup。
+已完成证据：Red 先证明旧 guard 会在交易内核前失败；Green 后非沙箱复跑 ExternalFundsEventApplicationServiceTests 3 tests 通过，confirmed credit 入金会增加目标资金账户 AVAILABLE，并生成 TOPUP 资金交易、route snapshot、posting plan、LedgerTransaction 和 LedgerEntry；未授权 debit 事件和信用账户目标在交易内核前失败且无资金 / 账本副作用。
+边界：本切片只完成 confirmed credit 到资金账户的最小真实消费；不接外部扣账、return、NOC、reversal、信用账户还款或调额、差异单、补事实、清结算、对账、事件消费者、outbox、银行文件协议、Controller、HTTP/RPC、DDL/H2 schema、Entity、Mapper、交易 canonical 入参或 ledger posting 改造。
+```
+
 备选切片：
 
 1. `GSD2-VCC-PREPAID-FUNDING-CONTRACT-001`：只做 VCC 预付卡充值/提现服务层契约和 Red。
-2. `GSD2-WALLET-EXTERNAL-FUNDS-EVENT-CONSUME-KERNEL-001`：把外部资金事件消费接入真实交易、调账、退款/撤销或差异处理链路。
+2. `GSD2-WALLET-EXTERNAL-FUNDS-EVENT-DEBIT-RETURN-001`：扩展外部扣账、return、NOC 或 reversal，不复用 confirmed credit Grant。
 3. `GSD2-WALLET-AUTH-ADMISSION-COMPOSE-003`：继续强化授权准入组合链路和失败无副作用测试。
 
 ## 12. Handoff
@@ -261,6 +268,6 @@ Execution Grant: GSD2-WALLET-EXTERNAL-FUNDS-EVENT-CONTRACT-001
 
 残余风险：
 
-1. 本轮只完成支付工具授权入口、收款入口、出款 rail 契约 guard 和外部资金事件消费契约 guard，不代表 wallet application 已整体生产可用。
-2. 特殊业务入口仍需要按场景逐个做服务层契约、TDD Red、实现、回归和验证证据；`payOutByRail` 当前不授权真实出款、在途、费用、清结算、对账或外部协议，`ExternalFundsEventApplicationService#consume` 当前不授权真实 ACH/银行事件入账、扣账、退款、撤销、调账、差异单或补事实。
+1. 本轮只完成支付工具授权入口、收款入口、出款 rail 契约 guard 和外部 confirmed credit 入金消费，不代表 wallet application 已整体生产可用。
+2. 特殊业务入口仍需要按场景逐个做服务层契约、TDD Red、实现、回归和验证证据；`payOutByRail` 当前不授权真实出款、在途、费用、清结算、对账或外部协议，`ExternalFundsEventApplicationService#consume` 当前只授权 confirmed credit 到资金账户，不授权外部扣账、return、NOC、reversal、信用账户还款或调额、退款、撤销、调账、差异单或补事实。
 3. 清结算、对账、人工处理和运营后台仍需独立切片推进。
