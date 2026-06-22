@@ -148,13 +148,187 @@ B7 目标态可以描述可清分明细、清分批次、内部清算候选、�
 
 Highnote 公开发卡文档中的 financial account、ledger、ledger entry、payment card 和 financial account activity 分层，可作为本 DSL 的外部参考确认：资金和账本落在账户，卡只是访问工具，账户活动和交易事件承担卡维度归因。wind-funds DSL 因此坚持“账户入账、工具归因、控制留痕、投影查询”：`SubjectRef` 决定可入账主体，`PaymentInstrumentRef` 和 binding snapshot 决定工具归因，Spend Rule / 预算控制只产出控制证据和只读投影输入。
 
+模块归属约束：Spend Rule 的规则定义、版本、挂载、决策日志、准入、控制活动和预算控制视图归属于 `wallet` 支出控制域；`transaction` 只消费已固化 `spendRuleDecision`、控制活动引用和 route snapshot 做历史投影解释；`ledger` 只接受可入账账户主体。交易模块不得直接依赖 wallet Spend Rule application service、DAL Entity 或 Mapper 来计算、更新或解释规则。
+
 | 设计面 | 对齐口径 | 必须保持 | 工程影响 |
 | --- | --- | --- | --- |
 | DSL 主体约定 | `SubjectRef` 只承载资金账户、信用账户和平台角色解析后的平台资金账户；`PaymentInstrumentRef`、`ExternalAccountRef` 只承载工具、外部账户和脱敏引用；预算组和 Spend Rule 只承载 scope、规则快照、控制窗口和审计上下文。 | 不新增 `InstrumentTransaction`、`PaymentInstrumentTransaction` 或支付工具账务主体；内部余额钱包、平台钱包、商户钱包、返利钱包和信用额度入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照。 | 触碰 `core` 枚举、Spec、fixture 或公共 DSL 字段时，必须显式声明公共契约边界和 `fixtureLevel`。 |
 | 路由规则 | route resolver 可以消费支付工具快照、绑定快照、`FundingAllocationDecision`、预算组上下文和 Spend Rule 决策，但 route leg participant 必须是最终可入账主体。 | 工具不可用、资金责任不唯一、错币种、预算或规则拒绝时不生成 route；退款、撤销、拒付、退费和重放优先沿原 route snapshot。 | 支付工具入口、资金责任解析和交易投影应分别形成独立任务，不借直接交易红线附带修改。 |
 | 账目平衡 | `PostingPlan` 只从已解析 route 生成；`LedgerEntry.subject` 只能是资金账户、信用账户或平台角色解析后的平台资金账户；每个 posting plan 按同币种独立平衡。 | 预算组、Spend Rule、支付工具、外部账户和交易投影不得生成 ledger bucket；预算控制只生成控制证据、规则证据或只读投影视图。 | 触碰 posting assembler、账本 DSL 或账务表行时，必须补借贷平衡、`normalBalanceSide`、余额桶和 forbidden facts 断言。 |
 | 余额投影 | 账本余额投影只从 ledger entry 派生，面向资金账户、信用账户和平台角色解析后的平台资金账户；余额日志只作为观察证据。 | 不从支付工具、预算组、Spend Rule、交易投影或业务轨道事件直接投影账本余额；预算控制可有独立控制视图，但不等于账本余额。 | BudgetGroup 兼容策略、预算控制视图和余额查询迁移必须拆成独立任务。 |
-| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。支付工具型交易解释只能读取已固化的 `paymentInstrumentRef` 和 binding snapshot。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实；不得按当前工具绑定重新解释历史交易。 | 不得用交易投影通过来声明账务事实、余额投影或生产 Done；补支付工具解释时必须验证脱敏展示号、绑定版本、准入决策和敏感原文不外泄。 |
+| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、已固化 `spendRuleDecision` 快照、既有控制活动、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。支付工具型交易解释只能读取已固化的 `paymentInstrumentRef` 和 binding snapshot；Spend Rule 解释只能读取已固化的规则、版本、挂载和决策引用。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实；不得按当前工具绑定、当前规则定义或当前规则挂载重新解释历史交易，也不得在解释阶段执行规则 DSL 或脚本。 | 不得用交易投影通过来声明账务事实、余额投影或生产 Done；补支付工具解释时必须验证脱敏展示号、绑定版本、准入决策和敏感原文不外泄；补 Spend Rule 解释时必须验证规则版本、挂载版本、决策流水和拒绝原因可追溯，并证明 ruleSpec/script 不外泄。 |
+
+### Spend Rule DSL v1.1 规则版本、挂载和决策证据
+
+Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则引擎实现、Controller 报文或数据库结构。它锁定三个对象：不可变规则版本、规则挂载和决策证据。
+
+#### 规则版本 DSL
+
+```json
+{
+  "dslCaseId": "DSL-SPEND-RULE-VERSION-001",
+  "fixtureLevel": "DOC_ONLY",
+  "specType": "SpendRuleVersionSpec",
+  "ruleId": "SR-VCC-DAILY-USD-001",
+  "version": "v1",
+  "ruleType": "PERIOD_AMOUNT_LIMIT",
+  "ruleDomain": "AUTHORIZATION",
+  "display": {
+    "ruleName": "VCC USD daily spend limit",
+    "operatorReasonTemplate": "Daily spend limit exceeded",
+    "customerReasonTemplate": "The payment is above the daily card limit"
+  },
+  "matchSpec": {
+    "businessScenes": ["VCC_AUTHORIZATION"],
+    "paymentInstrumentTypes": ["VCC"],
+    "currencies": ["USD"],
+    "merchantCategory": {
+      "mode": "ALLOW_LIST",
+      "values": ["5812", "5814"]
+    },
+    "countryRegion": {
+      "mode": "DENY_LIST",
+      "values": ["XX"]
+    }
+  },
+  "counterSpec": {
+    "counterScope": "PAYMENT_INSTRUMENT",
+    "windowMode": "CALENDAR_DAY",
+    "timezone": "UTC",
+    "aggregationBasis": "AUTHORIZED_AMOUNT",
+    "nettingPolicy": "NET_REFUNDS_TO_ORIGINAL_WINDOW"
+  },
+  "limitSpec": {
+    "amountLimit": {
+      "amount": "1000.00",
+      "currency": "USD"
+    },
+    "countLimit": {
+      "maxCount": 20
+    }
+  },
+  "decisionSpec": {
+    "decisionWhenPassed": "ALLOW",
+    "decisionWhenViolated": "DECLINE",
+    "decisionWhenEvidenceMissing": "REVIEW",
+    "violationReasonCode": "DAILY_LIMIT_EXCEEDED"
+  },
+  "safetySpec": {
+    "unknownFieldPolicy": "FAIL_CLOSED",
+    "sensitiveFieldPolicy": "DIGEST_OR_MASK_ONLY",
+    "historyReplayPolicy": "USE_VERSION_AND_ASSIGNMENT_SNAPSHOT",
+    "digestAlgorithm": "SHA-256"
+  },
+  "versionDigest": "sha256:version-body"
+}
+```
+
+字段口径：
+
+| 字段 | 含义 | 验收口径 |
+| --- | --- | --- |
+| display | 可读名称和展示原因。 | 不保存完整 PAN、token、外部账户号或商户敏感原文。 |
+| matchSpec | 请求事实匹配条件。 | 不能空对象默认全量放行；缺必要证据时进入 `decisionWhenEvidenceMissing`。 |
+| counterSpec | 周期窗口和累计口径。 | 周期类规则必须明确窗口、时区、累计依据和退款净额策略。 |
+| limitSpec | 金额、次数或集合限制。 | 金额必须带币种，集合必须说明 allow list 或 deny list。 |
+| decisionSpec | 通过、违反和缺证据的裁决。 | 不允许缺省放行。 |
+| safetySpec | 未知字段、敏感字段和历史回放策略。 | 默认 fail closed，历史解释使用快照和摘要。 |
+
+#### 规则挂载 DSL
+
+```json
+{
+  "dslCaseId": "DSL-SPEND-RULE-ASSIGNMENT-001",
+  "fixtureLevel": "DOC_ONLY",
+  "specType": "SpendRuleAssignmentSpec",
+  "assignmentId": "ASG-VCC-001",
+  "ruleId": "SR-VCC-DAILY-USD-001",
+  "version": "v1",
+  "scopeRef": {
+    "scopeType": "PAYMENT_INSTRUMENT",
+    "scopeId": "PI-VCC-10001"
+  },
+  "priority": 10,
+  "conflictPolicy": "DENY_OVERRIDES",
+  "effectiveWindow": {
+    "effectiveFrom": "2026-06-22T00:00:00Z",
+    "effectiveTo": "2026-07-22T00:00:00Z"
+  },
+  "assignmentDigest": "sha256:assignment-body"
+}
+```
+
+挂载 DSL 只表达控制 scope，不输出资金责任主体。支付工具、预算组、账户层级、使用主体和业务场景都可以成为控制 scope；最终 route leg 和 LedgerEntry subject 仍必须由资金账户、信用账户或平台角色解析后的平台资金账户承担。
+
+#### 决策证据 DSL
+
+```json
+{
+  "dslCaseId": "DSL-SPEND-RULE-DECISION-001",
+  "fixtureLevel": "DOC_ONLY",
+  "specType": "SpendRuleDecisionEvidenceSpec",
+  "decisionSn": "SRD-20260622-0001",
+  "businessScene": "VCC_AUTHORIZATION",
+  "businessSn": "AUTH-20260622-0001",
+  "requestDigest": "sha256:request-facts",
+  "decisionPolicy": "DENY_OVERRIDES",
+  "finalDecision": "DECLINE",
+  "decisionReasonCode": "MERCHANT_CATEGORY_BLOCKED",
+  "decisionReasonMessage": "Merchant category is not allowed for this card",
+  "evaluatedRules": [
+    {
+      "assignmentId": "ASG-VCC-001",
+      "ruleId": "SR-VCC-DAILY-USD-001",
+      "version": "v1",
+      "decision": "ALLOW",
+      "reasonCode": "WITHIN_DAILY_LIMIT",
+      "matchedFacts": {
+        "amount": "35.00",
+        "currency": "USD",
+        "remainingAmount": "965.00"
+      },
+      "ruleDigest": "sha256:version-body"
+    },
+    {
+      "assignmentId": "ASG-MCC-001",
+      "ruleId": "SR-MCC-DENY-001",
+      "version": "v3",
+      "decision": "DECLINE",
+      "reasonCode": "MERCHANT_CATEGORY_BLOCKED",
+      "matchedFacts": {
+        "merchantCategoryCode": "7995"
+      },
+      "ruleDigest": "sha256:mcc-rule-body"
+    }
+  ],
+  "missingEvidence": [],
+  "forbiddenFacts": [
+    "NO_FUNDS_TRANSACTION_CREATED",
+    "NO_ROUTE_CREATED",
+    "NO_LEDGER_ENTRY_CREATED",
+    "NO_BALANCE_PROJECTION_CHANGED"
+  ],
+  "decisionDigest": "sha256:decision-body"
+}
+```
+
+决策证据验收口径：
+
+1. `finalDecision` 是准入结论，`evaluatedRules` 是解释材料；两者都必须保留。
+2. 多规则冲突必须记录 `decisionPolicy`，不能只保存最后一条命中规则。
+3. 拒绝或待复核时必须能证明无资金事实副作用；文档 DSL 只表达目标断言，真实证明需要后续服务层测试。
+4. 交易投影解释只能读取历史 `decisionSn`、规则版本、挂载摘要和决策摘要，不按当前规则重算。
+
+场景覆盖：
+
+| 场景 | 规则版本字段 | 挂载字段 | 决策证据字段 |
+| --- | --- | --- | --- |
+| 单笔限额 | `limitSpec.amountLimit` | `scopeRef=PAYMENT_INSTRUMENT` | `evaluatedRules.matchedFacts.amount` |
+| 周期金额限额 | `counterSpec` + `limitSpec.amountLimit` | `scopeRef=BUDGET_GROUP / ACCOUNT_HIERARCHY / PAYMENT_INSTRUMENT` | `remainingAmount`、`decisionReasonCode` |
+| 周期次数限额 | `counterSpec` + `limitSpec.countLimit` | `priority`、`conflictPolicy` | `remainingCount` 或等价摘要 |
+| MCC / 商户限制 | `matchSpec.merchantCategory` 或商户摘要 | `scopeRef=PAYMENT_INSTRUMENT / BUSINESS_SCENE` | `MERCHANT_CATEGORY_BLOCKED` |
+| 国家地区限制 | `matchSpec.countryRegion` | `scopeRef` | 地区命中摘要 |
+| 多规则裁决 | `decisionSpec` | `priority`、`conflictPolicy` | `decisionPolicy`、`evaluatedRules`、`finalDecision` |
 
 ### DSL 易用性和误用防护
 

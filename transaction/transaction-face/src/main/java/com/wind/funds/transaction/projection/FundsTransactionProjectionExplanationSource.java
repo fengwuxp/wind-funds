@@ -157,6 +157,38 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String DESCRIPTION_FIELD = "description";
 
+    private static final String SPEND_RULE_DECISION_LOG_ID_FIELD = "decisionLogId";
+
+    private static final String SPEND_RULE_ID_FIELD = "ruleId";
+
+    private static final String SPEND_RULE_VERSION_FIELD = "ruleVersion";
+
+    private static final String SPEND_RULE_ASSIGNMENT_SN_FIELD = "assignmentSn";
+
+    private static final String SPEND_RULE_SCOPE_TYPE_FIELD = "scopeType";
+
+    private static final String SPEND_RULE_SCOPE_ID_FIELD = "scopeId";
+
+    private static final String SPEND_RULE_DECISION_SN_FIELD = "decisionSn";
+
+    private static final String SPEND_RULE_DECISION_RESULT_FIELD = "decisionResult";
+
+    private static final String SPEND_RULE_DECISION_DIGEST_FIELD = "decisionDigest";
+
+    private static final String BUDGET_GROUP_SN_FIELD = "budgetGroupSn";
+
+    private static final List<String> SPEND_RULE_DECISION_EXPLAIN_FIELDS = List.of(
+            SPEND_RULE_DECISION_LOG_ID_FIELD,
+            SPEND_RULE_ID_FIELD,
+            SPEND_RULE_VERSION_FIELD,
+            SPEND_RULE_ASSIGNMENT_SN_FIELD,
+            SPEND_RULE_SCOPE_TYPE_FIELD,
+            SPEND_RULE_SCOPE_ID_FIELD,
+            SPEND_RULE_DECISION_SN_FIELD,
+            SPEND_RULE_DECISION_RESULT_FIELD,
+            SPEND_RULE_DECISION_DIGEST_FIELD,
+            BUDGET_GROUP_SN_FIELD);
+
     public FundsTransactionProjectionExplanationSource {
         AssertUtils.hasText(businessScene, "交易投影解释业务场景不能为空");
         AssertUtils.hasText(businessSn, "交易投影解释业务流水不能为空");
@@ -357,6 +389,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             refs.add("ledgerTransaction:" + ledgerTransactionSn);
         }
         addPaymentInstrumentEvidence(refs);
+        addSpendRuleDecisionEvidence(refs);
         addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF, "externalDisputeRef");
         addContextEvidence(refs, FundsInstructionContextKeys.DISPUTE_VOUCHER_REF, "disputeVoucherRef");
         addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN, "externalReferenceSn");
@@ -391,9 +424,38 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         refs.add("paymentInstrumentBinding:" + bindingSn + versionSuffix);
     }
 
+    private void addSpendRuleDecisionEvidence(@NonNull List<String> refs) {
+        Map<String, Object> decision = spendRuleDecisionContext();
+        if (decision.isEmpty()) {
+            return;
+        }
+        String ruleId = decisionText(decision, SPEND_RULE_ID_FIELD);
+        String ruleVersion = decisionText(decision, SPEND_RULE_VERSION_FIELD);
+        if (StringUtils.hasText(ruleId)) {
+            refs.add("spendRule:" + ruleId);
+        }
+        if (StringUtils.hasText(ruleId) && StringUtils.hasText(ruleVersion)) {
+            refs.add("spendRuleVersion:" + ruleId + ":" + ruleVersion);
+        }
+        addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_ASSIGNMENT_SN_FIELD, "spendRuleAssignment");
+        addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_DECISION_SN_FIELD, "spendRuleDecision");
+        addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_DECISION_LOG_ID_FIELD, "spendRuleDecisionLog");
+    }
+
+    private void addSpendRuleDecisionEvidence(@NonNull List<String> refs,
+                                              @NonNull Map<String, Object> decision,
+                                              @NonNull String field,
+                                              @NonNull String prefix) {
+        String value = decisionText(decision, field);
+        if (StringUtils.hasText(value)) {
+            refs.add(prefix + ":" + value);
+        }
+    }
+
     private @NonNull Map<String, Object> resolveExplanationContext() {
         Map<String, Object> result = new LinkedHashMap<>();
         putPaymentInstrumentRef(result);
+        putSpendRuleDecision(result);
         if (isDisputeRefund()) {
             putContextValue(result, FundsInstructionContextKeys.REFUND_MODE);
             putContextValue(result, FundsInstructionContextKeys.DISPUTE_MODE);
@@ -429,6 +491,33 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         refValues.put(BINDING_SNAPSHOT_FIELD, paymentInstrumentRef.getBindingSnapshot());
         putIfText(refValues, DESCRIPTION_FIELD, paymentInstrumentRef.getDescription());
         values.put(PAYMENT_INSTRUMENT_REF_CONTEXT_KEY, Map.copyOf(refValues));
+    }
+
+    private void putSpendRuleDecision(@NonNull Map<String, Object> values) {
+        Map<String, Object> decision = spendRuleDecisionContext();
+        if (!decision.isEmpty()) {
+            values.put(FundsInstructionContextKeys.SPEND_RULE_DECISION, Map.copyOf(decision));
+        }
+    }
+
+    private @NonNull Map<String, Object> spendRuleDecisionContext() {
+        Object value = contextVariables.get(FundsInstructionContextKeys.SPEND_RULE_DECISION);
+        if (!(value instanceof Map<?, ?> source)) {
+            return Map.of();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (String field : SPEND_RULE_DECISION_EXPLAIN_FIELDS) {
+            Object fieldValue = source.get(field);
+            if (fieldValue != null) {
+                result.put(field, fieldValue);
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private @Nullable String decisionText(@NonNull Map<String, Object> decision, @NonNull String field) {
+        Object value = decision.get(field);
+        return value == null ? null : value.toString();
     }
 
     private void putIfText(@NonNull Map<String, Object> values, @NonNull String key, @Nullable String value) {

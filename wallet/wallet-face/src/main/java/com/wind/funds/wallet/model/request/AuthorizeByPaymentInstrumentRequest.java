@@ -1,6 +1,7 @@
 package com.wind.funds.wallet.model.request;
 
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import com.wind.transaction.core.enums.InternationalRegionCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -66,6 +67,15 @@ public class AuthorizeByPaymentInstrumentRequest {
 
     @Schema(description = "Spend Rule 版本，携带支出控制准入决策证据时必填")
     private String spendRuleVersion;
+
+    @Schema(description = "Spend Rule 挂载流水号，可为空；为空时只记录规则和控制范围")
+    private String spendRuleAssignmentSn;
+
+    @Schema(description = "Spend Rule 控制范围类型，携带支出控制准入决策证据时必填")
+    private SpendRuleScopeType spendRuleScopeType;
+
+    @Schema(description = "Spend Rule 控制范围标识，携带支出控制准入决策证据时必填")
+    private String spendRuleScopeId;
 
     @Schema(description = "Spend Rule 决策流水号，携带支出控制准入决策证据时必填")
     private String spendDecisionSn;

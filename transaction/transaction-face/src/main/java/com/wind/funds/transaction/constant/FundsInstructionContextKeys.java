@@ -85,6 +85,13 @@ public final class FundsInstructionContextKeys {
     public static final String ROUTE_SNAPSHOT = "routeSnapshot";
 
     /**
+     * Spend Rule 决策最小快照，用于交易投影解释、审计和对账追踪。
+     *
+     * <p>该字段只承载已固化的规则、版本、挂载和决策引用，不承载规则 DSL 原文或脚本内容。</p>
+     */
+    public static final String SPEND_RULE_DECISION = "spendRuleDecision";
+
+    /**
      * 原权益快照 ID 摘要，用于 RouteSnapshot 回放、投影解释和审计追溯。
      *
      * <p>该字段不承载完整权益事实。</p>

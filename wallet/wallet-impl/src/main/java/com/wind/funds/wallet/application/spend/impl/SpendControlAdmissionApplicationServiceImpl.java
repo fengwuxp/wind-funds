@@ -3,11 +3,14 @@ package com.wind.funds.wallet.application.spend.impl;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
 import com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService;
+import com.wind.funds.wallet.application.spend.SpendRuleDefinitionApplicationService;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
 import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
+import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionLogRequest;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
@@ -25,14 +28,18 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
 
     private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
 
+    private final SpendRuleDefinitionApplicationService spendRuleDefinitionApplicationService;
+
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(rollbackFor = Exception.class)
     public @NonNull SpendControlAdmissionDecisionDTO resolveSpendControlAdmission(
             @NonNull ResolveSpendControlAdmissionRequest request) {
         validateRequest(request);
         PaymentInstrumentPreTransactionSnapshotDTO snapshot =
                 preTransactionSnapshotApplicationService.resolvePreTransactionSnapshot(toSnapshotRequest(request));
-        return toDecision(request, snapshot);
+        SpendRuleDecisionLogDTO decisionLog =
+                spendRuleDefinitionApplicationService.recordDecision(toDecisionLogRequest(request));
+        return toDecision(request, snapshot, decisionLog);
     }
 
     private void validateRequest(ResolveSpendControlAdmissionRequest request) {
@@ -48,6 +55,8 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
         AssertUtils.hasText(request.getSpendRuleId(), "Spend Rule 标识不能为空");
         AssertUtils.hasText(request.getSpendRuleVersion(), "Spend Rule 版本不能为空");
+        AssertUtils.notNull(request.getSpendRuleScopeType(), "Spend Rule 控制范围类型不能为空");
+        AssertUtils.hasText(request.getSpendRuleScopeId(), "Spend Rule 控制范围标识不能为空");
         AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
         AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
         AssertUtils.hasText(request.getSpendDecisionDigest(), "Spend Rule 决策摘要不能为空");
@@ -71,8 +80,29 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 .setBusinessSn(request.getBusinessSn());
     }
 
+    private RecordSpendRuleDecisionLogRequest toDecisionLogRequest(ResolveSpendControlAdmissionRequest request) {
+        return new RecordSpendRuleDecisionLogRequest()
+                .setTenantId(request.getTenantId())
+                .setDecisionSn(request.getSpendDecisionSn())
+                .setRuleId(request.getSpendRuleId())
+                .setRuleVersion(request.getSpendRuleVersion())
+                .setAssignmentSn(request.getSpendRuleAssignmentSn())
+                .setScopeType(request.getSpendRuleScopeType())
+                .setScopeId(request.getSpendRuleScopeId())
+                .setInstrumentSn(request.getInstrumentSn())
+                .setAction(request.getAction())
+                .setAmount(request.getAmount())
+                .setCurrency(request.getCurrency())
+                .setBusinessScene(request.getBusinessScene())
+                .setBusinessSn(request.getBusinessSn())
+                .setDecisionResult(request.getSpendDecisionResult())
+                .setRejectReason(request.getRejectReason())
+                .setDecisionDigest(request.getSpendDecisionDigest());
+    }
+
     private SpendControlAdmissionDecisionDTO toDecision(ResolveSpendControlAdmissionRequest request,
-                                                        PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
+                                                        PaymentInstrumentPreTransactionSnapshotDTO snapshot,
+                                                        SpendRuleDecisionLogDTO decisionLog) {
         return new SpendControlAdmissionDecisionDTO()
                 .setTenantId(request.getTenantId())
                 .setInstrumentSn(request.getInstrumentSn())
@@ -87,9 +117,13 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 .setTargetAccountId(snapshot.getTargetAccountId())
                 .setSpendRuleId(request.getSpendRuleId())
                 .setSpendRuleVersion(request.getSpendRuleVersion())
+                .setSpendRuleAssignmentSn(request.getSpendRuleAssignmentSn())
+                .setSpendRuleScopeType(request.getSpendRuleScopeType())
+                .setSpendRuleScopeId(request.getSpendRuleScopeId())
                 .setSpendDecisionSn(request.getSpendDecisionSn())
                 .setSpendDecisionResult(request.getSpendDecisionResult())
                 .setSpendDecisionDigest(request.getSpendDecisionDigest())
+                .setSpendDecisionLogId(decisionLog.getId())
                 .setBudgetGroupSn(request.getBudgetGroupSn())
                 .setRejectReason(request.getRejectReason())
                 .setPreTransactionSnapshot(snapshot);

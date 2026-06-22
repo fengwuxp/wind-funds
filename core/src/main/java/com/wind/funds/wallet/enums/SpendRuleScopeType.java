@@ -1,0 +1,24 @@
+package com.wind.funds.wallet.enums;
+
+import com.wind.common.enums.DescriptiveEnum;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+/**
+ * Spend Rule 挂载范围类型。
+ *
+ * @author Codex
+ * @date 2026-06-22
+ */
+@AllArgsConstructor
+@Getter
+public enum SpendRuleScopeType implements DescriptiveEnum {
+
+    PAYMENT_INSTRUMENT("支付工具"),
+    BUDGET_GROUP("预算组"),
+    FUNDING_ACCOUNT("资金账户"),
+    CREDIT_ACCOUNT("信用账户"),
+    BUSINESS_SCENE("业务场景");
+
+    private final String desc;
+}

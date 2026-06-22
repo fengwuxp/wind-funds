@@ -12,6 +12,7 @@ import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResol
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
+import com.wind.funds.wallet.application.spend.impl.SpendRuleDefinitionApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
@@ -20,12 +21,18 @@ import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
+import com.wind.funds.wallet.enums.SpendRuleDomain;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
+import com.wind.funds.wallet.enums.SpendRuleType;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
+import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
+import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
@@ -83,6 +90,10 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     private static final String SPEND_RULE_VERSION = "2026-06-19.1";
 
+    private static final String SPEND_RULE_ASSIGNMENT_SN = "spend_control_rule_assignment";
+
+    private static final String SPEND_RULE_DIGEST = "sha256:spend-control-rule-version";
+
     private static final String SPEND_DECISION_SN = "decision_spend_control_001";
 
     private static final String SPEND_DECISION_DIGEST = "sha256:spend-control-admission";
@@ -95,6 +106,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     @Autowired
     private SpendSubjectFundingRelationService fundingRelationService;
+
+    @Autowired
+    private SpendRuleDefinitionApplicationService spendRuleDefinitionApplicationService;
 
     @Autowired
     private SpendControlAdmissionApplicationService spendControlAdmissionApplicationService;
@@ -129,9 +143,14 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
         assertThat(decision.getSpendRuleId()).isEqualTo(SPEND_RULE_ID);
         assertThat(decision.getSpendRuleVersion()).isEqualTo(SPEND_RULE_VERSION);
+        assertThat(decision.getSpendRuleAssignmentSn()).isEqualTo(SPEND_RULE_ASSIGNMENT_SN);
+        assertThat(decision.getSpendRuleScopeType()).isEqualTo(SpendRuleScopeType.PAYMENT_INSTRUMENT);
+        assertThat(decision.getSpendRuleScopeId()).isEqualTo(PAYMENT_INSTRUMENT_SN);
         assertThat(decision.getSpendDecisionSn()).isEqualTo(SPEND_DECISION_SN);
         assertThat(decision.getSpendDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
         assertThat(decision.getSpendDecisionDigest()).isEqualTo(SPEND_DECISION_DIGEST);
+        assertThat(decision.getSpendDecisionLogId()).isNotNull();
+        assertSpendRuleDecisionLog(SpendControlDecisionResult.PASSED, null);
         assertThat(decision.getPreTransactionSnapshot().getReady()).isTrue();
         assertThat(decision.getPreTransactionSnapshot().getFundsAccountCapability().getCapabilities())
                 .containsExactly(FundsAccountCapability.PAY);
@@ -159,6 +178,8 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         assertThat(decision.getAdmitted()).isFalse();
         assertThat(decision.getSpendDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
         assertThat(decision.getRejectReason()).isEqualTo("超过单卡单日授权限额");
+        assertThat(decision.getSpendDecisionLogId()).isNotNull();
+        assertSpendRuleDecisionLog(SpendControlDecisionResult.REJECTED, "超过单卡单日授权限额");
         assertThat(decision.getTargetAccountId())
                 .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
         assertThat(decision.getPreTransactionSnapshot().getReady()).isTrue();
@@ -187,6 +208,54 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：调用方重复提交相同 Spend Rule 决策流水和摘要。
+     * 输入：同一个规则决策流水号重复准入。
+     * 输出：复用同一条决策日志，准入结果幂等。
+     * 红线：重复准入不得创建第二条决策日志、交易事实或账本事实。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldReuseSameDecisionLogForIdempotentDecisionEvidence() {
+        prepareSpendControlAdmissionData();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendControlAdmissionDecisionDTO firstDecision =
+                spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                        admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED));
+        SpendControlAdmissionDecisionDTO replayedDecision =
+                spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                        admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED));
+
+        assertThat(replayedDecision.getSpendDecisionLogId()).isEqualTo(firstDecision.getSpendDecisionLogId());
+        assertThat(decisionLogCount()).isEqualTo(1);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一 Spend Rule 决策流水被不同决策摘要复用。
+     * 输入：第一次通过，第二次使用相同决策流水但摘要不同。
+     * 输出：准入阶段拒绝。
+     * 红线：摘要冲突不得创建交易事实或账本事实。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectDecisionDigestConflictWithoutFundsSideEffect() {
+        prepareSpendControlAdmissionData();
+        spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionRequest()
+                        .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
+                        .setSpendDecisionDigest("sha256:changed-spend-control-admission")))
+                .hasMessageContaining("Spend Rule 决策流水已存在但内容不一致");
+
+        assertThat(decisionLogCount()).isEqualTo(1);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpSpendControlAdmissionTestData() {
         cleanupSpendControlAdmissionTestData();
@@ -202,9 +271,20 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
+        spendRuleDefinitionApplicationService.createDefinition(createSpendRuleDefinitionRequest());
+        spendRuleDefinitionApplicationService.publishVersion(publishSpendRuleVersionRequest());
+        spendRuleDefinitionApplicationService.assignVersion(assignSpendRuleVersionRequest());
     }
 
     private void cleanupSpendControlAdmissionTestData() {
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_log WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, SPEND_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, SPEND_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, SPEND_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn = ?",
                 PAYMENT_INSTRUMENT_SN);
@@ -228,8 +308,45 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setBusinessSn(BUSINESS_SN)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setSpendRuleAssignmentSn(SPEND_RULE_ASSIGNMENT_SN)
+                .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
+                .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_DECISION_SN)
                 .setSpendDecisionDigest(SPEND_DECISION_DIGEST);
+    }
+
+    private CreateSpendRuleDefinitionRequest createSpendRuleDefinitionRequest() {
+        return new CreateSpendRuleDefinitionRequest()
+                .setTenantId(TENANT_ID)
+                .setRuleId(SPEND_RULE_ID)
+                .setRuleName("Spend Control Admission Rule")
+                .setRuleType(SpendRuleType.AMOUNT_LIMIT)
+                .setRuleDomain(SpendRuleDomain.PAYMENT_INSTRUMENT)
+                .setDescription("支出控制准入决策消费测试规则");
+    }
+
+    private PublishSpendRuleVersionRequest publishSpendRuleVersionRequest() {
+        return new PublishSpendRuleVersionRequest()
+                .setTenantId(TENANT_ID)
+                .setRuleId(SPEND_RULE_ID)
+                .setRuleVersion(SPEND_RULE_VERSION)
+                .setRuleSpec("{\"dslCaseId\":\"DSL-SPEND-RULE-DECISION-CONSUME-001\"}")
+                .setRuleDigest(SPEND_RULE_DIGEST)
+                .setOperatorId("codex")
+                .setAuditReferenceSn("grant:GSD2-B5-SPEND-RULE-DECISION-CONSUME-001")
+                .setDescription("发布支出控制准入消费规则版本");
+    }
+
+    private AssignSpendRuleVersionRequest assignSpendRuleVersionRequest() {
+        return new AssignSpendRuleVersionRequest()
+                .setTenantId(TENANT_ID)
+                .setAssignmentSn(SPEND_RULE_ASSIGNMENT_SN)
+                .setRuleId(SPEND_RULE_ID)
+                .setRuleVersion(SPEND_RULE_VERSION)
+                .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
+                .setScopeId(PAYMENT_INSTRUMENT_SN)
+                .setPriority(10)
+                .setDescription("挂载到支付工具准入 scope");
     }
 
     private CreateCreditAccountRequest createCreditAccountRequest() {
@@ -311,6 +428,44 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 Integer.class, BUSINESS_SCENE, businessSn);
     }
 
+    private void assertSpendRuleDecisionLog(SpendControlDecisionResult decisionResult, String rejectReason) {
+        assertThat(jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*) FROM t_spend_rule_decision_log
+                        WHERE tenant_id = ? AND decision_sn = ? AND rule_id = ? AND rule_version = ?
+                          AND assignment_sn = ? AND scope_type = ? AND scope_id = ?
+                          AND instrument_sn = ? AND business_scene = ? AND business_sn = ?
+                          AND decision_result = ? AND decision_digest = ?
+                        """,
+                Integer.class,
+                TENANT_ID,
+                SPEND_DECISION_SN,
+                SPEND_RULE_ID,
+                SPEND_RULE_VERSION,
+                SPEND_RULE_ASSIGNMENT_SN,
+                SpendRuleScopeType.PAYMENT_INSTRUMENT.name(),
+                PAYMENT_INSTRUMENT_SN,
+                PAYMENT_INSTRUMENT_SN,
+                BUSINESS_SCENE,
+                BUSINESS_SN,
+                decisionResult.name(),
+                SPEND_DECISION_DIGEST)).isEqualTo(1);
+        String actualRejectReason = jdbcTemplate.queryForObject("""
+                        SELECT reject_reason FROM t_spend_rule_decision_log
+                        WHERE tenant_id = ? AND decision_sn = ?
+                        """,
+                String.class,
+                TENANT_ID,
+                SPEND_DECISION_SN);
+        assertThat(actualRejectReason).isEqualTo(rejectReason);
+    }
+
+    private Integer decisionLogCount() {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM t_spend_rule_decision_log
+                WHERE tenant_id = ? AND decision_sn = ?
+                """, Integer.class, TENANT_ID, SPEND_DECISION_SN);
+    }
+
     @Configuration
     @Import({
             LedgerServiceImpl.class,
@@ -323,6 +478,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
             FundingResponsibilityResolutionApplicationServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
             PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
+            SpendRuleDefinitionApplicationServiceImpl.class,
             SpendControlAdmissionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })

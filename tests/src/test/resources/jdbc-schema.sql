@@ -252,6 +252,111 @@ CREATE TABLE `t_spend_subject_funding_rel`
   DEFAULT CHARSET = utf8mb4 COMMENT = '支出主体资金关系表';
 
 -- ----------------------------
+-- Spend Rule 定义表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_spend_rule_definition`;
+CREATE TABLE `t_spend_rule_definition`
+(
+    `id`             BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `tenant_id`      BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `rule_id`        VARCHAR(64)  NOT NULL COMMENT 'Spend Rule 标识',
+    `rule_name`      VARCHAR(128) NOT NULL COMMENT 'Spend Rule 名称',
+    `rule_type`      VARCHAR(50)  NOT NULL COMMENT 'Spend Rule 类型',
+    `rule_domain`    VARCHAR(50)  NOT NULL COMMENT 'Spend Rule 规则域',
+    `status`         VARCHAR(50)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
+    `description`    VARCHAR(512)          DEFAULT NULL COMMENT '描述',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_spend_rule_definition_rule` (`tenant_id`, `rule_id`),
+    KEY `idx_spend_rule_definition_domain` (`tenant_id`, `rule_domain`, `status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = 'Spend Rule 定义表';
+
+-- ----------------------------
+-- Spend Rule 版本表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_spend_rule_version`;
+CREATE TABLE `t_spend_rule_version`
+(
+    `id`                 BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`         DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `tenant_id`          BIGINT(20)  NOT NULL COMMENT '租户 ID',
+    `rule_id`            VARCHAR(64) NOT NULL COMMENT 'Spend Rule 标识',
+    `rule_version`       VARCHAR(64) NOT NULL COMMENT 'Spend Rule 版本',
+    `rule_spec`          TEXT        NOT NULL COMMENT '规则规格 JSON',
+    `rule_digest`        VARCHAR(128) NOT NULL COMMENT '规则规格摘要',
+    `status`             VARCHAR(50) NOT NULL DEFAULT 'PUBLISHED' COMMENT '状态',
+    `operator_id`        VARCHAR(64) NOT NULL COMMENT '操作者',
+    `audit_reference_sn` VARCHAR(128) NOT NULL COMMENT '审计引用',
+    `description`        VARCHAR(512)         DEFAULT NULL COMMENT '描述',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_spend_rule_version_rule` (`tenant_id`, `rule_id`, `rule_version`),
+    KEY `idx_spend_rule_version_status` (`tenant_id`, `status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = 'Spend Rule 版本表';
+
+-- ----------------------------
+-- Spend Rule 挂载表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_spend_rule_assignment`;
+CREATE TABLE `t_spend_rule_assignment`
+(
+    `id`              BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `tenant_id`       BIGINT(20)  NOT NULL COMMENT '租户 ID',
+    `assignment_sn`   VARCHAR(64) NOT NULL COMMENT '规则挂载流水号',
+    `rule_id`         VARCHAR(64) NOT NULL COMMENT 'Spend Rule 标识',
+    `rule_version`    VARCHAR(64) NOT NULL COMMENT 'Spend Rule 版本',
+    `scope_type`      VARCHAR(50) NOT NULL COMMENT '挂载范围类型',
+    `scope_id`        VARCHAR(64) NOT NULL COMMENT '挂载范围标识',
+    `priority`        INT(11)     NOT NULL DEFAULT 0 COMMENT '挂载优先级',
+    `status`          VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
+    `description`     VARCHAR(512)         DEFAULT NULL COMMENT '描述',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_spend_rule_assignment_sn` (`tenant_id`, `assignment_sn`),
+    UNIQUE KEY `uk_spend_rule_assignment_scope` (`tenant_id`, `scope_type`, `scope_id`, `rule_id`, `rule_version`),
+    KEY `idx_spend_rule_assignment_rule` (`tenant_id`, `rule_id`, `rule_version`, `status`),
+    KEY `idx_spend_rule_assignment_scope` (`tenant_id`, `scope_type`, `scope_id`, `status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = 'Spend Rule 挂载表';
+
+-- ----------------------------
+-- Spend Rule 决策日志表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_spend_rule_decision_log`;
+CREATE TABLE `t_spend_rule_decision_log`
+(
+    `id`              BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `tenant_id`       BIGINT(20)  NOT NULL COMMENT '租户 ID',
+    `decision_sn`     VARCHAR(64) NOT NULL COMMENT '规则决策流水号',
+    `rule_id`         VARCHAR(64) NOT NULL COMMENT 'Spend Rule 标识',
+    `rule_version`    VARCHAR(64) NOT NULL COMMENT 'Spend Rule 版本',
+    `assignment_sn`   VARCHAR(64)          DEFAULT NULL COMMENT '规则挂载流水号',
+    `scope_type`      VARCHAR(50) NOT NULL COMMENT '控制范围类型',
+    `scope_id`        VARCHAR(64) NOT NULL COMMENT '控制范围标识',
+    `instrument_sn`   VARCHAR(64)          DEFAULT NULL COMMENT '支付工具号',
+    `action`          VARCHAR(50) NOT NULL COMMENT '支付工具动作',
+    `amount`          BIGINT(20)  NOT NULL COMMENT '交易金额',
+    `currency`        VARCHAR(10) NOT NULL COMMENT '币种',
+    `business_scene`  VARCHAR(50) NOT NULL COMMENT '业务场景',
+    `business_sn`     VARCHAR(64) NOT NULL COMMENT '业务流水号',
+    `decision_result` VARCHAR(50) NOT NULL COMMENT '规则决策结果',
+    `reject_reason`   VARCHAR(512)         DEFAULT NULL COMMENT '拒绝原因',
+    `decision_digest` VARCHAR(128) NOT NULL COMMENT '规则决策摘要',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_spend_rule_decision_log_sn` (`tenant_id`, `decision_sn`),
+    KEY `idx_spend_rule_decision_log_business` (`tenant_id`, `business_scene`, `business_sn`),
+    KEY `idx_spend_rule_decision_log_rule` (`tenant_id`, `rule_id`, `rule_version`),
+    KEY `idx_spend_rule_decision_log_scope` (`tenant_id`, `scope_type`, `scope_id`),
+    KEY `idx_spend_rule_decision_log_assignment` (`tenant_id`, `assignment_sn`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = 'Spend Rule 决策日志表';
+
+-- ----------------------------
 -- 支出控制活动表
 -- ----------------------------
 DROP TABLE IF EXISTS `t_spend_control_activity`;

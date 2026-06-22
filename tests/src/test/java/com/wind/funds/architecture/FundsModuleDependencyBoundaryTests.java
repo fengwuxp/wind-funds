@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -98,6 +99,27 @@ class FundsModuleDependencyBoundaryTests {
             String.join("/", "com", "wind", "integration", "funds"));
 
     private static final Pattern PACKAGE_DECLARATION = Pattern.compile("(?m)^package\\s+([^;]+);");
+
+    private static final List<String> TRANSACTION_SOURCE_SCAN_PATHS = List.of(
+            "transaction/transaction-face/src/main/java",
+            "transaction/transaction-impl/src/main/java");
+
+    private static final Map<String, List<String>> TRANSACTION_FORBIDDEN_SPEND_RULE_TOKENS = Map.of(
+            "wallet spend rule application service", List.of(
+                    "com.wind.funds.wallet.application.spend.",
+                    "SpendRuleDefinitionApplicationService",
+                    "SpendControlAdmissionApplicationService",
+                    "SpendControlActivityApplicationService",
+                    "SpendControlTransactionConsumptionApplicationService",
+                    "BudgetControlLimitAdjustmentApplicationService"),
+            "wallet spend rule entity or mapper", List.of(
+                    "com.wind.funds.wallet.dal.entities.SpendRule",
+                    "com.wind.funds.wallet.dal.entities.SpendControlActivity",
+                    "com.wind.funds.wallet.dal.mapper.SpendRule",
+                    "com.wind.funds.wallet.dal.mapper.SpendControlActivity"),
+            "wallet spend control projection model", List.of(
+                    "BudgetControlProjectionDTO",
+                    "BudgetControlProjectionQuery"));
 
     /**
      * 场景：core 承载资金 DSL、枚举、值对象和端口契约。
@@ -197,6 +219,31 @@ class FundsModuleDependencyBoundaryTests {
                 .isEmpty();
     }
 
+    /**
+     * 场景：Spend Rule 主能力归属于钱包支出控制域，交易模块只消费已固化决策快照。
+     * 预期：transaction 生产源码不得直接依赖 wallet 的 Spend Rule 服务、实体、Mapper 或预算控制投影模型。
+     * 红线：交易内核不能计算、更新或查询当前 Spend Rule，只能读取交易上下文中的历史快照。
+     */
+    @Test
+    void testTransactionShouldOnlyConsumeSpendRuleSnapshotsWithoutWalletRuleOwnership() throws Exception {
+        List<String> violations = new ArrayList<>();
+        for (Path javaFile : transactionJavaSourceFiles()) {
+            String content = Files.readString(javaFile);
+            for (Map.Entry<String, List<String>> forbiddenEntry : TRANSACTION_FORBIDDEN_SPEND_RULE_TOKENS.entrySet()) {
+                for (String forbiddenToken : forbiddenEntry.getValue()) {
+                    if (content.contains(forbiddenToken)) {
+                        violations.add(workspaceRoot().relativize(javaFile)
+                                + " contains " + forbiddenEntry.getKey() + " token " + forbiddenToken);
+                    }
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("transaction modules must not own wallet Spend Rule capabilities")
+                .isEmpty();
+    }
+
     private List<String> dependencyArtifactIds(Path pomPath)
             throws ParserConfigurationException, IOException, SAXException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -246,6 +293,23 @@ class FundsModuleDependencyBoundaryTests {
         List<Path> javaFiles = new ArrayList<>();
         Path root = workspaceRoot();
         for (String scanPath : FUNDS_JAVA_PACKAGE_SCAN_PATHS) {
+            Path path = root.resolve(scanPath);
+            if (!Files.exists(path)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.walk(path)) {
+                files.filter(Files::isRegularFile)
+                        .filter(javaFile -> javaFile.getFileName().toString().endsWith(".java"))
+                        .forEach(javaFiles::add);
+            }
+        }
+        return javaFiles;
+    }
+
+    private List<Path> transactionJavaSourceFiles() throws IOException {
+        List<Path> javaFiles = new ArrayList<>();
+        Path root = workspaceRoot();
+        for (String scanPath : TRANSACTION_SOURCE_SCAN_PATHS) {
             Path path = root.resolve(scanPath);
             if (!Files.exists(path)) {
                 continue;
