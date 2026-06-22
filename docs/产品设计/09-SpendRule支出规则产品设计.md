@@ -95,7 +95,7 @@ Spend Rule 的产品闭环由四类对象构成，控制活动和预算控制视
 | --- | --- | --- | --- |
 | SpendRuleDefinition | 规则定义，描述规则是什么、归谁管理、用于哪个规则域。 | ruleId、ruleCode、ruleName、ruleType、ruleDomain、ownerType、ownerId、status。 | DRAFT、ACTIVE、SUSPENDED、ARCHIVED。 |
 | SpendRuleVersion | 不可变规则版本，描述条件、额度、动作、生效窗口和摘要。 | ruleId、version、conditionSpec、limitSpec、actionSpec、effectiveFrom、effectiveTo、versionDigest。 | DRAFT、PUBLISHED、EXPIRED、RETIRED。 |
-| SpendRuleAssignment | 规则挂载，描述某一版本应用到哪个 scope、优先级和冲突策略。 | assignmentId、ruleId、version、scopeType、scopeId、priority、conflictPolicy、status。 | ACTIVE、SUSPENDED、EXPIRED、REMOVED。 |
+| SpendRuleAssignment | 规则挂载，描述某一版本应用到哪个 scope、优先级、冲突策略和生效窗口。 | assignmentId、ruleId、version、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status。 | ACTIVE、SUSPENDED、EXPIRED、REMOVED。 |
 | SpendRuleDecisionLog | 规则决策日志，描述一次请求命中了哪些规则、结果和原因。 | decisionSn、assignmentId、ruleId、version、decisionResult、rejectReason、requestDigest、decisionDigest、evaluatedAt。 | RECORDED；日志不可改写，只能追加更正或新决策。 |
 | SpendControlActivity | 规则执行后的控制活动事实，例如预留、消耗、释放、退款补偿或调整。 | activitySn、activityType、budgetScope、targetSubjectRef、amount、currency、ruleId、ruleVersion、decisionSn。 | 作为既有控制事实能力保留，不作为规则定义表。 |
 | BudgetControlProjection | 从控制活动派生的只读预算控制视图。 | reservedAmount、consumedAmount、releasedAmount、remainingControlAmount、lastActivitySn。 | 可重建、可重放、不可反写账本余额。 |

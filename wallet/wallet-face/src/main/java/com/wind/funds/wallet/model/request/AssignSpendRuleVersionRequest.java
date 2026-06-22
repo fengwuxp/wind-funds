@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.model.request;
 
+import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -12,6 +13,7 @@ import lombok.experimental.Accessors;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 /**
  * Spend Rule 版本挂载请求。
@@ -56,6 +58,18 @@ public class AssignSpendRuleVersionRequest implements Serializable {
     @Schema(description = "挂载优先级")
     @NotNull
     private Integer priority;
+
+    @Schema(description = "挂载冲突策略")
+    @NotNull
+    private SpendRuleConflictPolicy conflictPolicy;
+
+    @Schema(description = "挂载生效开始时间")
+    @NotNull
+    private LocalDateTime effectiveFrom;
+
+    @Schema(description = "挂载生效结束时间")
+    @NotNull
+    private LocalDateTime effectiveTo;
 
     @Schema(description = "描述")
     private String description;

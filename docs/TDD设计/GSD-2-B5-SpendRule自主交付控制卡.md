@@ -153,3 +153,16 @@ Spend Rule DSL v1.1 只锁三类契约：
 | 明确禁止范围 | 不处理 `assignmentSn` 强必填公共契约收紧、完整规则引擎、`wind-script` 接入、运营后台、控制活动重构、交易 canonical 入参、ledger posting、Controller、HTTP/RPC、事件消费、生产迁移、VCC facade 或 Git push。 |
 | 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定被拒；沙箱外先复现 Red，再复跑 `just test-one SpendRuleDefinitionApplicationServiceTests tests` 通过 5 tests；`just test-one SpendRuleDefinitionApplicationServiceTests,SpendControlAdmissionApplicationServiceTests,AuthorizationAdmissionApplicationServiceTests tests` 通过 15 tests。 |
 | 当前状态 | `SPEND_RULE_SERVICE_HARDEN_002_GREEN_VERIFIED`。 |
+
+## 14. `GSD2-B5-SPEND-RULE-ASSIGNMENT-CONTRACT-002` 消费记录
+
+用户继续要求使用角色自主推进控制后，本卡进入规则挂载生产契约硬化。本轮只补 Spend Rule 挂载的冲突策略和生效窗口合同，确保规则决策日志不能引用未生效或已过期的挂载；不扩展完整规则引擎、冲突裁决执行器、运营后台、交易 canonical 入参、ledger posting、Controller、HTTP/RPC、事件消费、生产迁移或 VCC facade。
+
+| 控制项 | 本轮结果 |
+| --- | --- |
+| 可自我挖掘 | 已读取 Spend Rule 独立 PRD、系分、DSL、定义服务、请求 / DTO、Entity、H2 schema、定义契约测试、支出控制准入测试和授权准入测试。 |
+| 可自我规划 | 将 `ASSIGNMENT-CONTRACT-002` 收敛为“挂载必须声明 `conflictPolicy`、`effectiveFrom`、`effectiveTo`，且决策日志引用的挂载必须当前有效”。 |
+| 自动执行范围 | `SpendRuleConflictPolicy` 枚举、`AssignSpendRuleVersionRequest`、`SpendRuleAssignmentDTO`、`SpendRuleAssignment`、H2 schema、`SpendRuleDefinitionApplicationServiceImpl` 校验与映射、目标服务层测试、PRD / TDD / OpenSpec 状态回写。 |
+| 明确禁止范围 | 不处理完整规则引擎、`wind-script` 接入、冲突裁决执行器、运营后台、控制活动重构、交易 canonical 入参、ledger posting、Controller、HTTP/RPC、事件消费、生产迁移、VCC facade 或 Git push。 |
+| 验证证据 | 非沙箱先复现 Red：缺少 `SpendRuleConflictPolicy` 导致 `SpendRuleDefinitionApplicationServiceTests` 编译失败；Green 后 `just test-one SpendRuleDefinitionApplicationServiceTests tests` 通过 7 tests；`just test-one SpendRuleDefinitionApplicationServiceTests,SpendControlAdmissionApplicationServiceTests,AuthorizationAdmissionApplicationServiceTests tests` 通过 17 tests。 |
+| 当前状态 | `SPEND_RULE_ASSIGNMENT_CONTRACT_002_GREEN_VERIFIED`。 |

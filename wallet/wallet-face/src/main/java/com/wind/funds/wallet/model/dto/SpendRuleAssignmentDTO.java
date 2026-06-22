@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.model.dto;
 
+import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -58,6 +59,15 @@ public class SpendRuleAssignmentDTO implements Serializable {
 
     @Schema(description = "挂载优先级")
     private Integer priority;
+
+    @Schema(description = "挂载冲突策略")
+    private SpendRuleConflictPolicy conflictPolicy;
+
+    @Schema(description = "挂载生效开始时间")
+    private LocalDateTime effectiveFrom;
+
+    @Schema(description = "挂载生效结束时间")
+    private LocalDateTime effectiveTo;
 
     @Schema(description = "挂载状态")
     private SpendRuleAssignmentStatus status;

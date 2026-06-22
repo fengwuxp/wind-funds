@@ -21,6 +21,7 @@ import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
+import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleType;
@@ -54,6 +55,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -97,6 +100,10 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     private static final String SPEND_DECISION_SN = "decision_spend_control_001";
 
     private static final String SPEND_DECISION_DIGEST = "sha256:spend-control-admission";
+
+    private static final LocalDateTime SPEND_RULE_EFFECTIVE_FROM = LocalDateTime.now().withNano(0).minusDays(1);
+
+    private static final LocalDateTime SPEND_RULE_EFFECTIVE_TO = LocalDateTime.now().withNano(0).plusDays(30);
 
     @Autowired
     private CreditAccountService creditAccountService;
@@ -346,6 +353,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setScopeId(PAYMENT_INSTRUMENT_SN)
                 .setPriority(10)
+                .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
+                .setEffectiveFrom(SPEND_RULE_EFFECTIVE_FROM)
+                .setEffectiveTo(SPEND_RULE_EFFECTIVE_TO)
                 .setDescription("挂载到支付工具准入 scope");
     }
 

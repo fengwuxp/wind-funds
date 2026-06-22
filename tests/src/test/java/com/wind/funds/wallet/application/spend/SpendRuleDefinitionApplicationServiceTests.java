@@ -6,6 +6,7 @@ import com.wind.funds.wallet.application.spend.impl.SpendRuleDefinitionApplicati
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
+import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
@@ -30,6 +31,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -69,6 +72,10 @@ class SpendRuleDefinitionApplicationServiceTests extends AbstractFundsServiceTes
     private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_definition_card";
 
     private static final String BUDGET_GROUP_SN = "spend_rule_definition_budget";
+
+    private static final LocalDateTime EFFECTIVE_FROM = LocalDateTime.now().withNano(0).minusDays(1);
+
+    private static final LocalDateTime EFFECTIVE_TO = LocalDateTime.now().withNano(0).plusDays(30);
 
     @Autowired
     private SpendRuleDefinitionApplicationService spendRuleDefinitionApplicationService;
@@ -128,6 +135,46 @@ class SpendRuleDefinitionApplicationServiceTests extends AbstractFundsServiceTes
     }
 
     /**
+     * 场景：Spend Rule 挂载进入生产准入。
+     * 输入：缺冲突策略、缺生效开始时间、缺生效结束时间或结束时间早于开始时间。
+     * 输出：请求被拒绝。
+     * 红线：缺冲突策略或有效期的挂载不得生产启用，失败不得产生资金事实。
+     */
+    @Test
+    void testAssignmentShouldRequireConflictPolicyAndEffectiveWindow() {
+        publishRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_no_policy",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setConflictPolicy(null)))
+                .hasMessageContaining("Spend Rule 挂载冲突策略不能为空");
+        assertThatThrownBy(() -> spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_no_from",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setEffectiveFrom(null)))
+                .hasMessageContaining("Spend Rule 挂载生效开始时间不能为空");
+        assertThatThrownBy(() -> spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_no_to",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setEffectiveTo(null)))
+                .hasMessageContaining("Spend Rule 挂载生效结束时间不能为空");
+        assertThatThrownBy(() -> spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_invalid_window",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setEffectiveFrom(EFFECTIVE_TO)
+                        .setEffectiveTo(EFFECTIVE_FROM)))
+                .hasMessageContaining("Spend Rule 挂载生效结束时间必须晚于开始时间");
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：Spend Rule 决策拒绝支付工具交易。
      * 输入：已发布规则、已挂载规则和拒绝决策日志。
      * 输出：记录拒绝决策日志。
@@ -146,6 +193,47 @@ class SpendRuleDefinitionApplicationServiceTests extends AbstractFundsServiceTes
         assertThat(decision.getDecisionSn()).isEqualTo(DECISION_SN);
         assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
         assertThat(decision.getRejectReason()).isEqualTo("超过单卡日限额");
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：交易投影和对账需要按原挂载有效期解释 Spend Rule 决策。
+     * 输入：决策日志引用未生效或已过期的挂载。
+     * 输出：请求被拒绝。
+     * 红线：不能把非当前有效挂载写入决策日志，失败不得产生资金事实。
+     */
+    @Test
+    void testDecisionShouldRejectInactiveAssignmentWindow() {
+        publishRuleVersion();
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_future",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setEffectiveFrom(LocalDateTime.now().plusDays(1))
+                        .setEffectiveTo(LocalDateTime.now().plusDays(2)));
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_expired",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN + "_expired")
+                        .setEffectiveFrom(LocalDateTime.now().minusDays(2))
+                        .setEffectiveTo(LocalDateTime.now().minusDays(1)));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendRuleDefinitionApplicationService.recordDecision(
+                rejectedDecisionRequest()
+                        .setDecisionSn(DECISION_SN + "_future")
+                        .setAssignmentSn(ASSIGNMENT_SN + "_future")))
+                .hasMessageContaining("Spend Rule 挂载未在当前时间生效");
+        assertThatThrownBy(() -> spendRuleDefinitionApplicationService.recordDecision(
+                rejectedDecisionRequest()
+                        .setDecisionSn(DECISION_SN + "_expired")
+                        .setAssignmentSn(ASSIGNMENT_SN + "_expired")
+                        .setScopeId(PAYMENT_INSTRUMENT_SN + "_expired")
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN + "_expired")))
+                .hasMessageContaining("Spend Rule 挂载未在当前时间生效");
+        assertNoSpendRuleDecisionLog(DECISION_SN + "_future");
+        assertNoSpendRuleDecisionLog(DECISION_SN + "_expired");
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -242,6 +330,9 @@ class SpendRuleDefinitionApplicationServiceTests extends AbstractFundsServiceTes
                 .setScopeType(scopeType)
                 .setScopeId(scopeId)
                 .setPriority(10)
+                .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
+                .setEffectiveFrom(EFFECTIVE_FROM)
+                .setEffectiveTo(EFFECTIVE_TO)
                 .setDescription("挂载 Spend Rule 版本");
     }
 

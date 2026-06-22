@@ -4,6 +4,7 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
+import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.integration.core.model.TenantIsolationObject;
@@ -86,6 +87,24 @@ public class SpendRuleAssignment implements Serializable, TenantIsolationObject<
      */
     @NotNull
     private Integer priority;
+
+    /**
+     * 挂载冲突策略。
+     */
+    @NotNull
+    private SpendRuleConflictPolicy conflictPolicy;
+
+    /**
+     * 挂载生效开始时间。
+     */
+    @NotNull
+    private LocalDateTime effectiveFrom;
+
+    /**
+     * 挂载生效结束时间。
+     */
+    @NotNull
+    private LocalDateTime effectiveTo;
 
     /**
      * 挂载状态。

@@ -34,6 +34,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 /**
@@ -172,6 +173,11 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
         AssertUtils.notNull(request.getScopeType(), "Spend Rule 挂载范围类型不能为空");
         AssertUtils.hasText(request.getScopeId(), "Spend Rule 挂载范围标识不能为空");
         AssertUtils.notNull(request.getPriority(), "Spend Rule 挂载优先级不能为空");
+        AssertUtils.notNull(request.getConflictPolicy(), "Spend Rule 挂载冲突策略不能为空");
+        AssertUtils.notNull(request.getEffectiveFrom(), "Spend Rule 挂载生效开始时间不能为空");
+        AssertUtils.notNull(request.getEffectiveTo(), "Spend Rule 挂载生效结束时间不能为空");
+        AssertUtils.isTrue(request.getEffectiveTo().isAfter(request.getEffectiveFrom()),
+                "Spend Rule 挂载生效结束时间必须晚于开始时间");
     }
 
     private void validateDecisionLogRequest(RecordSpendRuleDecisionLogRequest request) {
@@ -220,12 +226,21 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
         AssertUtils.isTrue(assignment.getStatus() == SpendRuleAssignmentStatus.ACTIVE,
                 "Spend Rule 挂载不可用，assignmentSn = {}",
                 request.getAssignmentSn());
+        assertAssignmentEffectiveNow(request, assignment);
         AssertUtils.isTrue(Objects.equals(assignment.getRuleId(), request.getRuleId())
                         && Objects.equals(assignment.getRuleVersion(), request.getRuleVersion())
                         && assignment.getScopeType() == request.getScopeType()
                         && Objects.equals(assignment.getScopeId(), request.getScopeId()),
                 "Spend Rule 决策日志与挂载不一致，decisionSn = {}",
                 request.getDecisionSn());
+    }
+
+    private void assertAssignmentEffectiveNow(RecordSpendRuleDecisionLogRequest request,
+                                              SpendRuleAssignment assignment) {
+        LocalDateTime now = LocalDateTime.now();
+        AssertUtils.isTrue(!now.isBefore(assignment.getEffectiveFrom()) && now.isBefore(assignment.getEffectiveTo()),
+                "Spend Rule 挂载未在当前时间生效，assignmentSn = {}",
+                request.getAssignmentSn());
     }
 
     private SpendRuleDefinition findDefinition(Long tenantId, String ruleId) {
@@ -330,7 +345,10 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
                         && Objects.equals(existing.getRuleVersion(), request.getRuleVersion())
                         && existing.getScopeType() == request.getScopeType()
                         && Objects.equals(existing.getScopeId(), request.getScopeId())
-                        && Objects.equals(existing.getPriority(), request.getPriority()),
+                        && Objects.equals(existing.getPriority(), request.getPriority())
+                        && existing.getConflictPolicy() == request.getConflictPolicy()
+                        && Objects.equals(existing.getEffectiveFrom(), request.getEffectiveFrom())
+                        && Objects.equals(existing.getEffectiveTo(), request.getEffectiveTo()),
                 "Spend Rule 挂载已存在但内容不一致，assignmentSn = {}",
                 request.getAssignmentSn());
     }
@@ -389,6 +407,9 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
         result.setScopeType(request.getScopeType());
         result.setScopeId(request.getScopeId());
         result.setPriority(request.getPriority());
+        result.setConflictPolicy(request.getConflictPolicy());
+        result.setEffectiveFrom(request.getEffectiveFrom());
+        result.setEffectiveTo(request.getEffectiveTo());
         result.setStatus(SpendRuleAssignmentStatus.ACTIVE);
         result.setDescription(request.getDescription());
         return result;
@@ -457,6 +478,9 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
                 .setScopeType(entity.getScopeType())
                 .setScopeId(entity.getScopeId())
                 .setPriority(entity.getPriority())
+                .setConflictPolicy(entity.getConflictPolicy())
+                .setEffectiveFrom(entity.getEffectiveFrom())
+                .setEffectiveTo(entity.getEffectiveTo())
                 .setStatus(entity.getStatus())
                 .setDescription(entity.getDescription());
     }
