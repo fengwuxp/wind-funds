@@ -1,14 +1,19 @@
 package com.wind.funds.wallet.application.spend;
 
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
+import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
+import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionLogRequest;
 import org.jspecify.annotations.NonNull;
+
+import java.util.List;
 
 /**
  * Spend Rule 定义应用服务。
@@ -47,6 +52,25 @@ public interface SpendRuleDefinitionApplicationService {
      * @return 规则挂载
      */
     @NonNull SpendRuleAssignmentDTO assignVersion(@NonNull AssignSpendRuleVersionRequest request);
+
+    /**
+     * 查询 Spend Rule 挂载。
+     *
+     * <p>只读能力，用于支付工具准入、预算控制、投影解释和运营排查读取挂载事实。
+     * 本方法不重新执行规则，不记录决策日志，也不创建资金交易或账本事实。</p>
+     *
+     * @param query 挂载查询条件
+     * @return 规则挂载列表
+     */
+    @NonNull List<SpendRuleAssignmentDTO> queryAssignments(@NonNull SpendRuleAssignmentQuery query);
+
+    /**
+     * 解释 Spend Rule 挂载在指定时间点的可用性。
+     *
+     * @param query 挂载解释查询条件
+     * @return 挂载解释结果
+     */
+    @NonNull SpendRuleAssignmentExplanationDTO explainAssignment(@NonNull SpendRuleAssignmentExplainQuery query);
 
     /**
      * 记录规则决策日志。

@@ -166,3 +166,16 @@ Spend Rule DSL v1.1 只锁三类契约：
 | 明确禁止范围 | 不处理完整规则引擎、`wind-script` 接入、冲突裁决执行器、运营后台、控制活动重构、交易 canonical 入参、ledger posting、Controller、HTTP/RPC、事件消费、生产迁移、VCC facade 或 Git push。 |
 | 验证证据 | 非沙箱先复现 Red：缺少 `SpendRuleConflictPolicy` 导致 `SpendRuleDefinitionApplicationServiceTests` 编译失败；Green 后 `just test-one SpendRuleDefinitionApplicationServiceTests tests` 通过 7 tests；`just test-one SpendRuleDefinitionApplicationServiceTests,SpendControlAdmissionApplicationServiceTests,AuthorizationAdmissionApplicationServiceTests tests` 通过 17 tests。 |
 | 当前状态 | `SPEND_RULE_ASSIGNMENT_CONTRACT_002_GREEN_VERIFIED`。 |
+
+## 15. `GSD2-B5-SPEND-RULE-ASSIGNMENT-QUERY-EXPLAIN-001` 消费记录
+
+用户继续要求补 Spend Rule 挂载查询和解释能力后，本卡进入挂载只读查询补齐态。本轮只补 `SpendRuleDefinitionApplicationService` 的挂载查询与挂载可用性解释，不扩展完整规则引擎、冲突裁决执行器、交易投影存储、交易 canonical 入参、ledger posting、Controller、HTTP/RPC、事件消费、生产迁移或 VCC facade。
+
+| 控制项 | 本轮结果 |
+| --- | --- |
+| 可自我挖掘 | 已读取 Spend Rule 独立 PRD、系分、定义服务、挂载 DTO、H2 服务层测试和既有服务层查询模式。 |
+| 可自我规划 | 将 `ASSIGNMENT-QUERY-EXPLAIN` 收敛为“按 tenant、scope、rule、assignment 和有效窗口查询挂载；按 assignment 解释 `EFFECTIVE`、`NOT_YET_EFFECTIVE`、`EXPIRED`、`DISABLED` 状态并返回 evidenceRefs”。 |
+| 自动执行范围 | core 解释状态枚举、wallet-face Query / DTO / application 契约、wallet-impl 只读查询实现、`SpendRuleDefinitionApplicationServiceTests` 目标 Red/Green、PRD / 系分 / TDD / OpenSpec 状态回写。 |
+| 明确禁止范围 | 不处理完整规则引擎、`wind-script` 接入、冲突裁决执行器、运营后台、控制活动重构、交易 canonical 入参、ledger posting、Controller、HTTP/RPC、事件消费 / outbox、生产迁移、VCC facade 或 Git push。 |
+| 验证证据 | 非沙箱先复现 Red：缺少 `SpendRuleAssignmentQuery`、`SpendRuleAssignmentExplainQuery`、`SpendRuleAssignmentExplanationDTO` 导致 `SpendRuleDefinitionApplicationServiceTests` 编译失败；Green 后 `just test-one SpendRuleDefinitionApplicationServiceTests tests` 通过 9 tests。 |
+| 当前状态 | `SPEND_RULE_ASSIGNMENT_QUERY_EXPLAIN_GREEN_VERIFIED`。 |

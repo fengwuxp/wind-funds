@@ -5,6 +5,7 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.application.spend.impl.SpendRuleDefinitionApplicationServiceImpl;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
+import com.wind.funds.wallet.enums.SpendRuleAssignmentExplanationStatus;
 import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
@@ -13,9 +14,12 @@ import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleType;
 import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
+import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
+import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
@@ -33,6 +37,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -53,11 +58,19 @@ class SpendRuleDefinitionApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String RULE_VERSION = "2026-06-22.1";
 
+    private static final String FUTURE_RULE_VERSION = "2026-06-22.2";
+
+    private static final String EXPIRED_RULE_VERSION = "2026-06-22.3";
+
     private static final String RULE_SPEC = """
             {"window":"DAILY","amount":10000,"currency":"USD","scope":"CARD"}
             """;
 
     private static final String RULE_DIGEST = "sha256:spend-rule-definition-contract";
+
+    private static final String FUTURE_RULE_DIGEST = "sha256:future-spend-rule-definition-contract";
+
+    private static final String EXPIRED_RULE_DIGEST = "sha256:expired-spend-rule-definition-contract";
 
     private static final String CHANGED_RULE_DIGEST = "sha256:changed-spend-rule-definition-contract";
 
@@ -239,6 +252,111 @@ class SpendRuleDefinitionApplicationServiceTests extends AbstractFundsServiceTes
     }
 
     /**
+     * 场景：准入编排需要查询某个控制范围当前可用的 Spend Rule 挂载。
+     * 输入：同一支付工具 scope 下存在当前有效、未来生效和已过期三个挂载。
+     * 输出：只返回当前有效挂载，且按优先级排序。
+     * 红线：挂载查询只读，不写决策日志、交易、route、posting、LedgerEntry 或账本余额事实。
+     */
+    @Test
+    void testQueryEffectiveAssignmentsShouldReturnOnlyCurrentScopeAssignmentsWithoutFundsSideEffect() {
+        publishThreeRuleVersions();
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN,
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setPriority(20));
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_future",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setRuleVersion(FUTURE_RULE_VERSION)
+                        .setPriority(10)
+                        .setEffectiveFrom(LocalDateTime.now().plusDays(1))
+                        .setEffectiveTo(LocalDateTime.now().plusDays(2)));
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_expired",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setRuleVersion(EXPIRED_RULE_VERSION)
+                        .setPriority(1)
+                        .setEffectiveFrom(LocalDateTime.now().minusDays(3))
+                        .setEffectiveTo(LocalDateTime.now().minusDays(2)));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        List<SpendRuleAssignmentDTO> assignments = spendRuleDefinitionApplicationService.queryAssignments(
+                new SpendRuleAssignmentQuery()
+                        .setTenantId(TENANT_ID)
+                        .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
+                        .setScopeId(PAYMENT_INSTRUMENT_SN)
+                        .setEffectiveOnly(Boolean.TRUE));
+
+        assertThat(assignments).hasSize(1);
+        assertThat(assignments.getFirst().getAssignmentSn()).isEqualTo(ASSIGNMENT_SN);
+        assertThat(assignments.getFirst().getConflictPolicy()).isEqualTo(SpendRuleConflictPolicy.DENY_OVERRIDES);
+        assertNoSpendRuleDecisionLog(DECISION_SN);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：客服、审计和投影解释需要知道某个挂载当前为什么可用或不可用。
+     * 输入：当前有效、未来生效和已过期的挂载。
+     * 输出：解释结果分别为 EFFECTIVE、NOT_YET_EFFECTIVE、EXPIRED，并携带证据引用。
+     * 红线：解释能力只读，不重新执行规则，不记录决策日志，不写交易或账本事实。
+     */
+    @Test
+    void testExplainAssignmentShouldDescribeAvailabilityWithoutFundsSideEffect() {
+        publishThreeRuleVersions();
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN,
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN));
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_future",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setRuleVersion(FUTURE_RULE_VERSION)
+                        .setEffectiveFrom(LocalDateTime.now().plusDays(1))
+                        .setEffectiveTo(LocalDateTime.now().plusDays(2)));
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN + "_expired",
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)
+                        .setRuleVersion(EXPIRED_RULE_VERSION)
+                        .setEffectiveFrom(LocalDateTime.now().minusDays(3))
+                        .setEffectiveTo(LocalDateTime.now().minusDays(2)));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleAssignmentExplanationDTO effective = spendRuleDefinitionApplicationService.explainAssignment(
+                new SpendRuleAssignmentExplainQuery()
+                        .setTenantId(TENANT_ID)
+                        .setAssignmentSn(ASSIGNMENT_SN));
+        SpendRuleAssignmentExplanationDTO future = spendRuleDefinitionApplicationService.explainAssignment(
+                new SpendRuleAssignmentExplainQuery()
+                        .setTenantId(TENANT_ID)
+                        .setAssignmentSn(ASSIGNMENT_SN + "_future"));
+        SpendRuleAssignmentExplanationDTO expired = spendRuleDefinitionApplicationService.explainAssignment(
+                new SpendRuleAssignmentExplainQuery()
+                        .setTenantId(TENANT_ID)
+                        .setAssignmentSn(ASSIGNMENT_SN + "_expired"));
+
+        assertThat(effective.getEffective()).isTrue();
+        assertThat(effective.getExplanationStatus()).isEqualTo(SpendRuleAssignmentExplanationStatus.EFFECTIVE);
+        assertThat(effective.getEvidenceRefs()).contains(
+                "spendRule:" + RULE_ID,
+                "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
+                "spendRuleAssignment:" + ASSIGNMENT_SN);
+        assertThat(future.getEffective()).isFalse();
+        assertThat(future.getExplanationStatus())
+                .isEqualTo(SpendRuleAssignmentExplanationStatus.NOT_YET_EFFECTIVE);
+        assertThat(expired.getEffective()).isFalse();
+        assertThat(expired.getExplanationStatus()).isEqualTo(SpendRuleAssignmentExplanationStatus.EXPIRED);
+        assertNoSpendRuleDecisionLog(DECISION_SN);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：支付工具范围的 Spend Rule 决策日志需要用于交易投影和对账解释。
      * 输入：控制范围是支付工具，但支付工具号缺失或与控制范围不一致。
      * 输出：请求被拒绝。
@@ -295,6 +413,14 @@ class SpendRuleDefinitionApplicationServiceTests extends AbstractFundsServiceTes
     private void publishRuleVersion() {
         spendRuleDefinitionApplicationService.createDefinition(createDefinitionRequest());
         spendRuleDefinitionApplicationService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
+    }
+
+    private void publishThreeRuleVersions() {
+        publishRuleVersion();
+        spendRuleDefinitionApplicationService.publishVersion(
+                publishVersionRequest(FUTURE_RULE_DIGEST, RULE_SPEC).setRuleVersion(FUTURE_RULE_VERSION));
+        spendRuleDefinitionApplicationService.publishVersion(
+                publishVersionRequest(EXPIRED_RULE_DIGEST, RULE_SPEC).setRuleVersion(EXPIRED_RULE_VERSION));
     }
 
     private CreateSpendRuleDefinitionRequest createDefinitionRequest() {

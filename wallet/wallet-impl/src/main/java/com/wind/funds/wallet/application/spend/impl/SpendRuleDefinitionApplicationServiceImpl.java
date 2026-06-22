@@ -16,14 +16,18 @@ import com.wind.funds.wallet.dal.mapper.SpendRuleDecisionLogMapper;
 import com.wind.funds.wallet.dal.mapper.SpendRuleDefinitionMapper;
 import com.wind.funds.wallet.dal.mapper.SpendRuleVersionMapper;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
+import com.wind.funds.wallet.enums.SpendRuleAssignmentExplanationStatus;
 import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
 import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
+import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
+import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
@@ -35,6 +39,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -125,6 +130,34 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public @NonNull List<SpendRuleAssignmentDTO> queryAssignments(
+            @NonNull SpendRuleAssignmentQuery query) {
+        validateAssignmentQuery(query);
+        return spendRuleAssignmentMapper.selectListByQuery(toAssignmentQueryWrapper(query)).stream()
+                .map(this::toAssignmentDTO)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public @NonNull SpendRuleAssignmentExplanationDTO explainAssignment(
+            @NonNull SpendRuleAssignmentExplainQuery query) {
+        validateAssignmentExplainQuery(query);
+        SpendRuleAssignment assignment = findAssignment(query.getTenantId(), query.getAssignmentSn());
+        AssertUtils.notNull(assignment, "Spend Rule 挂载不存在，assignmentSn = {}", query.getAssignmentSn());
+        LocalDateTime evaluatedAt = resolveEvaluationTime(query.getExplainAt());
+        SpendRuleAssignmentExplanationStatus status = resolveExplanationStatus(assignment, evaluatedAt);
+        return new SpendRuleAssignmentExplanationDTO()
+                .setAssignment(toAssignmentDTO(assignment))
+                .setEvaluatedAt(evaluatedAt)
+                .setEffective(status == SpendRuleAssignmentExplanationStatus.EFFECTIVE)
+                .setExplanationStatus(status)
+                .setExplanationMessage(status.getDesc())
+                .setEvidenceRefs(toAssignmentEvidenceRefs(assignment));
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull SpendRuleDecisionLogDTO recordDecision(
             @NonNull RecordSpendRuleDecisionLogRequest request) {
@@ -208,6 +241,15 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
         }
     }
 
+    private void validateAssignmentQuery(SpendRuleAssignmentQuery query) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
+    }
+
+    private void validateAssignmentExplainQuery(SpendRuleAssignmentExplainQuery query) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.hasText(query.getAssignmentSn(), "Spend Rule 挂载流水号不能为空");
+    }
+
     private void assertPublishedVersionExists(Long tenantId, String ruleId, String ruleVersion) {
         SpendRuleVersion version = findVersion(tenantId, ruleId, ruleVersion);
         AssertUtils.notNull(version, "Spend Rule 版本不存在，ruleId = {}, ruleVersion = {}", ruleId, ruleVersion);
@@ -266,6 +308,56 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
                 .from(ref)
                 .where(ref.tenantId.eq(tenantId))
                 .and(ref.assignmentSn.eq(assignmentSn)));
+    }
+
+    private QueryWrapper toAssignmentQueryWrapper(SpendRuleAssignmentQuery query) {
+        SpendRuleAssignmentNameRefs ref = SpendRuleAssignmentNameRefs.spendRuleAssignment;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(query.getTenantId()))
+                .and(ref.assignmentSn.eq(query.getAssignmentSn()))
+                .and(ref.ruleId.eq(query.getRuleId()))
+                .and(ref.ruleVersion.eq(query.getRuleVersion()))
+                .and(ref.scopeType.eq(query.getScopeType()))
+                .and(ref.scopeId.eq(query.getScopeId()))
+                .and(ref.status.eq(query.getStatus()));
+        if (Boolean.TRUE.equals(query.getEffectiveOnly())) {
+            LocalDateTime effectiveAt = resolveEvaluationTime(query.getEffectiveAt());
+            wrapper.and(ref.status.eq(SpendRuleAssignmentStatus.ACTIVE))
+                    .and(ref.effectiveFrom.le(effectiveAt))
+                    .and(ref.effectiveTo.gt(effectiveAt));
+        }
+        wrapper.orderBy(ref.priority.asc(), ref.id.asc());
+        return wrapper;
+    }
+
+    private LocalDateTime resolveEvaluationTime(LocalDateTime evaluationTime) {
+        if (evaluationTime == null) {
+            return LocalDateTime.now();
+        }
+        return evaluationTime;
+    }
+
+    private SpendRuleAssignmentExplanationStatus resolveExplanationStatus(SpendRuleAssignment assignment,
+                                                                          LocalDateTime evaluatedAt) {
+        if (assignment.getStatus() != SpendRuleAssignmentStatus.ACTIVE) {
+            return SpendRuleAssignmentExplanationStatus.DISABLED;
+        }
+        if (evaluatedAt.isBefore(assignment.getEffectiveFrom())) {
+            return SpendRuleAssignmentExplanationStatus.NOT_YET_EFFECTIVE;
+        }
+        if (!evaluatedAt.isBefore(assignment.getEffectiveTo())) {
+            return SpendRuleAssignmentExplanationStatus.EXPIRED;
+        }
+        return SpendRuleAssignmentExplanationStatus.EFFECTIVE;
+    }
+
+    private List<String> toAssignmentEvidenceRefs(SpendRuleAssignment assignment) {
+        return List.of(
+                "spendRule:" + assignment.getRuleId(),
+                "spendRuleVersion:" + assignment.getRuleId() + "@" + assignment.getRuleVersion(),
+                "spendRuleAssignment:" + assignment.getAssignmentSn(),
+                "spendRuleScope:" + assignment.getScopeType() + ":" + assignment.getScopeId());
     }
 
     private SpendRuleDecisionLog findDecisionLog(Long tenantId, String decisionSn) {

@@ -92,7 +92,7 @@ Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费
 
 | 应用服务 | 能力 | 入参 | 出参 | 边界 |
 | --- | --- | --- | --- | --- |
-| SpendRuleDefinitionApplicationService | 创建规则定义、发布不可变版本、挂载规则版本、记录决策日志。 | CreateSpendRuleDefinitionRequest、PublishSpendRuleVersionRequest、AssignSpendRuleVersionRequest、RecordSpendRuleDecisionLogRequest。 | SpendRuleDefinitionDTO、SpendRuleVersionDTO、SpendRuleAssignmentDTO、SpendRuleDecisionLogDTO。 | 只管理规则事实和决策事实；不计算复杂规则、不创建交易、不写账本。 |
+| SpendRuleDefinitionApplicationService | 创建规则定义、发布不可变版本、挂载规则版本、查询挂载、解释挂载可用性、记录决策日志。 | CreateSpendRuleDefinitionRequest、PublishSpendRuleVersionRequest、AssignSpendRuleVersionRequest、SpendRuleAssignmentQuery、SpendRuleAssignmentExplainQuery、RecordSpendRuleDecisionLogRequest。 | SpendRuleDefinitionDTO、SpendRuleVersionDTO、SpendRuleAssignmentDTO、SpendRuleAssignmentExplanationDTO、SpendRuleDecisionLogDTO。 | 只管理规则事实和决策事实；查询和解释为只读能力，不计算复杂规则、不创建交易、不写账本。 |
 | SpendControlAdmissionApplicationService | 消费外部或上层提供的 Spend Rule 决策证据，组合支付工具预交易快照形成准入结论。 | 支付工具快照、规则版本、决策流水、决策摘要、拒绝原因。 | 支出控制准入快照。 | 不持久化规则定义，不写控制活动，不更新预算投影。 |
 | SpendControlActivityApplicationService | 记录控制活动并派生预算控制投影。 | 控制活动流水、活动类型、目标主体、预算 scope、金额币种、规则引用、决策引用。 | 控制活动 DTO、预算控制投影 DTO。 | 不写资金交易、route、posting、LedgerEntry 或账本余额投影。 |
 | SpendControlTransactionConsumptionApplicationService | 交易成功、失败、撤销、过期、退款或争议后消费、释放或补偿控制活动。 | 原控制活动、资金交易引用、交易结果、退款引用。 | 交易后控制活动。 | 只桥接交易事实和控制事实，不改交易 canonical 入参。 |
