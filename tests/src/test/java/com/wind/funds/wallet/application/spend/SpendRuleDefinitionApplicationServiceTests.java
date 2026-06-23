@@ -15,11 +15,14 @@ import com.wind.funds.wallet.enums.SpendRuleType;
 import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleDecisionExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
+import com.wind.funds.wallet.model.query.SpendRuleDecisionExplainQuery;
+import com.wind.funds.wallet.model.query.SpendRuleDecisionLogQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
@@ -206,6 +209,112 @@ class SpendRuleDefinitionApplicationServiceTests extends AbstractFundsServiceTes
         assertThat(decision.getDecisionSn()).isEqualTo(DECISION_SN);
         assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
         assertThat(decision.getRejectReason()).isEqualTo("超过单卡日限额");
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：交易投影、客服和审计按业务流水读取已固化 Spend Rule 决策。
+     * 输入：同一规则下存在一条拒绝决策和一条通过决策。
+     * 输出：按业务场景和业务流水只返回对应决策。
+     * 红线：决策查询必须只读，不重新执行规则，不写交易、route、posting、LedgerEntry 或账本余额事实。
+     */
+    @Test
+    void testQuerySpendRuleDecisionsShouldFilterByBusinessWithoutFundsSideEffect() {
+        publishRuleVersion();
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
+        spendRuleDefinitionApplicationService.recordDecision(rejectedDecisionRequest());
+        spendRuleDefinitionApplicationService.recordDecision(
+                passedDecisionRequest().setBusinessSn(BUSINESS_SN + "_passed"));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        int decisionCountBefore = countSpendRuleDecisionLogs();
+
+        List<SpendRuleDecisionLogDTO> decisions = spendRuleDefinitionApplicationService.queryDecisions(
+                new SpendRuleDecisionLogQuery()
+                        .setTenantId(TENANT_ID)
+                        .setBusinessScene(BUSINESS_SCENE)
+                        .setBusinessSn(BUSINESS_SN));
+
+        assertThat(decisions).hasSize(1);
+        assertThat(decisions.getFirst().getDecisionSn()).isEqualTo(DECISION_SN);
+        assertThat(decisions.getFirst().getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(countSpendRuleDecisionLogs()).isEqualTo(decisionCountBefore);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertNoTransactionFacts(BUSINESS_SN + "_passed");
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：对账报告和客服解释某次 Spend Rule 决策为什么拒绝。
+     * 输入：已固化的拒绝决策日志。
+     * 输出：解释结果携带拒绝结论、拒绝原因和可追溯证据引用。
+     * 红线：解释能力只读，不回放规则、不调整额度、不写交易或账本事实。
+     */
+    @Test
+    void testExplainSpendRuleDecisionShouldReturnEvidenceRefsWithoutFundsSideEffect() {
+        publishRuleVersion();
+        spendRuleDefinitionApplicationService.assignVersion(
+                assignmentRequest(ASSIGNMENT_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
+        SpendRuleDecisionLogDTO recorded = spendRuleDefinitionApplicationService.recordDecision(
+                rejectedDecisionRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        int decisionCountBefore = countSpendRuleDecisionLogs();
+
+        SpendRuleDecisionExplanationDTO explanation = spendRuleDefinitionApplicationService.explainDecision(
+                new SpendRuleDecisionExplainQuery()
+                        .setTenantId(TENANT_ID)
+                        .setDecisionSn(DECISION_SN));
+
+        assertThat(explanation.getDecision().getId()).isEqualTo(recorded.getId());
+        assertThat(explanation.getAdmitted()).isFalse();
+        assertThat(explanation.getExplanationMessage()).contains("拒绝", "超过单卡日限额");
+        assertThat(explanation.getEvidenceRefs()).contains(
+                "spendRule:" + RULE_ID,
+                "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
+                "spendRuleAssignment:" + ASSIGNMENT_SN,
+                "spendRuleScope:" + SpendRuleScopeType.PAYMENT_INSTRUMENT + ":" + PAYMENT_INSTRUMENT_SN,
+                "spendRuleDecision:" + DECISION_SN,
+                "spendRuleDecisionLog:" + recorded.getId(),
+                "paymentInstrument:" + PAYMENT_INSTRUMENT_SN,
+                "spendRuleBusiness:" + BUSINESS_SCENE + ":" + BUSINESS_SN);
+        assertThat(countSpendRuleDecisionLogs()).isEqualTo(decisionCountBefore);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方误用决策日志查询做租户级全量扫描。
+     * 输入：只传 tenantId。
+     * 输出：请求被拒绝。
+     * 红线：生产服务层不得提供无业务范围的全租户决策日志扫描入口。
+     */
+    @Test
+    void testQuerySpendRuleDecisionsShouldRejectTenantOnlyScan() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendRuleDefinitionApplicationService.queryDecisions(
+                new SpendRuleDecisionLogQuery().setTenantId(TENANT_ID)))
+                .hasMessageContaining("至少提供一个 Spend Rule 决策查询条件");
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方解释不存在的决策流水。
+     * 输入：租户和不存在的 decisionSn。
+     * 输出：请求被拒绝。
+     * 红线：解释能力不得静默返回空解释，避免客服、审计或对账报告误判为规则通过。
+     */
+    @Test
+    void testExplainSpendRuleDecisionShouldRejectMissingDecision() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendRuleDefinitionApplicationService.explainDecision(
+                new SpendRuleDecisionExplainQuery()
+                        .setTenantId(TENANT_ID)
+                        .setDecisionSn(DECISION_SN + "_missing")))
+                .hasMessageContaining("Spend Rule 决策日志不存在");
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -517,6 +626,15 @@ class SpendRuleDefinitionApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID,
                 decisionSn);
         assertThat(count).isZero();
+    }
+
+    private int countSpendRuleDecisionLogs() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_spend_rule_decision_log WHERE tenant_id = ? AND rule_id = ?",
+                Integer.class,
+                TENANT_ID,
+                RULE_ID);
+        return count;
     }
 
     private Integer postingPlanCount(String businessSn) {

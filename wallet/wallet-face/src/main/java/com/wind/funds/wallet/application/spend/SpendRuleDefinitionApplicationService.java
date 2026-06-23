@@ -2,11 +2,14 @@ package com.wind.funds.wallet.application.spend;
 
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleDecisionExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
+import com.wind.funds.wallet.model.query.SpendRuleDecisionExplainQuery;
+import com.wind.funds.wallet.model.query.SpendRuleDecisionLogQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
@@ -79,4 +82,25 @@ public interface SpendRuleDefinitionApplicationService {
      * @return 规则决策日志
      */
     @NonNull SpendRuleDecisionLogDTO recordDecision(@NonNull RecordSpendRuleDecisionLogRequest request);
+
+    /**
+     * 查询 Spend Rule 决策日志。
+     *
+     * <p>只读能力，用于交易投影、客服审计、对账和规则排查读取已固化决策事实。
+     * 本方法不重新执行规则，不调整额度，不创建资金交易、账本交易或账目分录。</p>
+     *
+     * @param query 决策日志查询条件
+     * @return 规则决策日志列表
+     */
+    @NonNull List<SpendRuleDecisionLogDTO> queryDecisions(@NonNull SpendRuleDecisionLogQuery query);
+
+    /**
+     * 解释 Spend Rule 决策事实。
+     *
+     * <p>解释结果只基于已固化决策日志，不重新计算规则，也不改变交易、route、账本或余额事实。</p>
+     *
+     * @param query 决策解释查询条件
+     * @return 规则决策解释结果
+     */
+    @NonNull SpendRuleDecisionExplanationDTO explainDecision(@NonNull SpendRuleDecisionExplainQuery query);
 }

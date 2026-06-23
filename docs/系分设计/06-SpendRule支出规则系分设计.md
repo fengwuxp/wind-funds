@@ -175,7 +175,7 @@ Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费
 
 | 应用服务 | 能力 | 入参 | 出参 | 边界 |
 | --- | --- | --- | --- | --- |
-| SpendRuleDefinitionApplicationService | 创建规则定义、发布不可变版本、挂载规则版本、查询挂载、解释挂载可用性、记录决策记录。 | CreateSpendRuleDefinitionRequest、PublishSpendRuleVersionRequest、AssignSpendRuleVersionRequest、SpendRuleAssignmentQuery、SpendRuleAssignmentExplainQuery、RecordSpendRuleDecisionLogRequest。 | SpendRuleDefinitionDTO、SpendRuleVersionDTO、SpendRuleAssignmentDTO、SpendRuleAssignmentExplanationDTO、SpendRuleDecisionLogDTO。 | 只管理规则事实和决策事实；查询和解释为只读能力，不计算复杂规则、不创建交易、不写账本。当前 Request / DTO 保留 Log 兼容名。 |
+| SpendRuleDefinitionApplicationService | 创建规则定义、发布不可变版本、挂载规则版本、查询挂载、解释挂载可用性、记录决策记录、查询决策记录、解释决策事实。 | CreateSpendRuleDefinitionRequest、PublishSpendRuleVersionRequest、AssignSpendRuleVersionRequest、SpendRuleAssignmentQuery、SpendRuleAssignmentExplainQuery、RecordSpendRuleDecisionLogRequest、SpendRuleDecisionLogQuery、SpendRuleDecisionExplainQuery。 | SpendRuleDefinitionDTO、SpendRuleVersionDTO、SpendRuleAssignmentDTO、SpendRuleAssignmentExplanationDTO、SpendRuleDecisionLogDTO、SpendRuleDecisionExplanationDTO。 | 只管理规则事实和决策事实；查询和解释为只读能力，不计算复杂规则、不创建交易、不写账本。当前 Request / DTO 保留 Log 兼容名。 |
 | SpendControlAdmissionApplicationService | 消费外部或上层提供的 Spend Rule 决策证据，组合支付工具预交易快照形成准入结论。 | 支付工具快照、规则版本、决策流水、决策摘要、拒绝原因。 | 支出控制准入快照。 | 不持久化规则定义，不写控制额度变动流水，不更新预算投影。 |
 | SpendControlActivityApplicationService | 记录控制额度变动流水并派生预算控制投影。 | 控制流水、变动类型、目标主体、预算 scope、金额币种、规则引用、决策引用。 | 控制额度变动流水 DTO、预算控制投影 DTO；当前 DTO 保留 Activity 兼容名。 | 不写资金交易、route、posting、LedgerEntry 或账本余额投影。当前 Service / DTO 保留 Activity 兼容名。 |
 | SpendControlTransactionConsumptionApplicationService | 交易成功、失败、撤销、过期、退款或争议后消费、释放或补偿控制额度变动。 | 原预留流水、资金交易引用、交易结果、退款引用。 | 交易后控制额度变动流水。 | 只桥接交易事实和控制事实，不改交易 canonical 入参。 |
@@ -197,6 +197,8 @@ Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费
 | SpendRuleDefinitionApplicationService | assignVersion | AssignSpendRuleVersionRequest | SpendRuleAssignmentDTO | assignmentSn 幂等；同 scope 重复挂载按唯一约束处理。 | 版本不存在、scope 非法、冲突策略缺失、有效期非法。 | 只写规则挂载，不输出资金责任主体。 |
 | SpendRuleDefinitionApplicationService | explainAssignments | SpendRuleAssignmentExplainQuery | SpendRuleAssignmentExplanationDTO | 只读查询。 | scope 不支持、规则挂载不可用。 | 不计算复杂规则，不写决策记录或控制流水。 |
 | SpendRuleDefinitionApplicationService | recordDecision | RecordSpendRuleDecisionLogRequest | SpendRuleDecisionLogDTO | decisionSn + decisionDigest 幂等；摘要冲突拒绝。 | 决策摘要冲突、规则版本缺失、决策结果非法。 | 只写决策记录；拒绝不生成交易、route、posting 或账本事实。 |
+| SpendRuleDefinitionApplicationService | queryDecisions | SpendRuleDecisionLogQuery | List<SpendRuleDecisionLogDTO> | 只读查询；tenantId 外必须至少提供一个窄条件。 | 缺租户、缺查询条件。 | 不重算规则，不写控制流水，不生成交易、route、posting 或账本事实。 |
+| SpendRuleDefinitionApplicationService | explainDecision | SpendRuleDecisionExplainQuery | SpendRuleDecisionExplanationDTO | tenantId + decisionSn 精确查询。 | 决策记录不存在。 | 只解释历史决策事实、拒绝原因和证据引用，不反写任何事实。 |
 | SpendControlAdmissionApplicationService | admit | SpendControlAdmissionRequest | SpendControlAdmissionDecisionDTO | admissionSn 或业务请求摘要幂等。 | 缺决策证据、规则拒绝、证据摘要冲突。 | 不写规则定义，不写控制额度变动流水，不进交易内核。 |
 | SpendControlActivityApplicationService | recordActivity | RecordSpendControlActivityRequest | SpendControlActivityDTO | activitySn + activityDigest 幂等；摘要冲突拒绝。 | 历史决策兼容类型新写入拒绝、额度调减低于占用拒绝。 | 只写控制额度变动流水和派生预算控制视图，不写资金事实。 |
 | SpendControlTransactionConsumptionApplicationService | consume / release / refund | 交易结果和控制流水引用。 | SpendControlActivityDTO | 基于原控制流水、交易流水和活动摘要幂等。 | 原控制流水缺失、跨业务场景、跨目标账户、金额超限。 | 只追加控制流水，不反写交易或账本。 |
@@ -759,7 +761,7 @@ git diff --check
 
 当前已形成的首轮服务层基线：
 
-1. 规则定义、版本发布、规则挂载、挂载查询、挂载解释和决策记录已有最小 application service、DTO、Entity、Mapper、H2 schema 和目标服务流测试。
+1. 规则定义、版本发布、规则挂载、挂载查询、挂载解释、决策记录、决策记录只读查询和决策事实解释已有最小 application service、DTO、Entity、Mapper、H2 schema 和目标服务流测试。
 2. 已证明已发布版本不可变、挂载必须携带冲突策略和有效期、支付工具和预算组只作为控制 scope、规则拒绝不生成资金交易或账本副作用。
 3. 支出控制准入已消费上层决策证据并通过 `recordDecision` 固化当前单条决策记录，授权准入可以透传 Spend Rule 决策证据。
 4. 控制额度变动流水、预算额度调额、交易成功消耗、失败释放、退款补偿和预算控制投影已有服务层证据，且不反写资金交易或账本事实。
@@ -770,7 +772,7 @@ Not Done：
 
 1. 完整规则表达式解析、规则引擎和冲突合成器。
 2. 多规则 `evaluatedRules`、`decisionPolicy`、`finalDecision` 的明细持久化和冲突裁决执行器。
-3. 独立规则时间线 Query Service、运营后台、审批流和批量配置能力。
+3. 独立规则时间线 Query Service、运营后台、审批流和批量配置能力；当前只落地决策记录服务层窄查询和单条解释。
 4. 交易投影读取规则定义、版本、挂载、决策记录和控制额度变动流水的完整解释矩阵。
 5. 事件消费、outbox、生产 DDL、迁移、回滚和历史数据回填。
 6. VCC、ACH、全球账户、收单等外部规则生产适用性确认。
@@ -780,7 +782,7 @@ Not Done：
 
 | 里程碑 | 负责人 | 交付物 | 验收方式 |
 | --- | --- | --- | --- |
-| M1 规则定义闭环 | wallet owner、架构师、测试 | 规则定义、不可变版本、挂载、查询解释、决策记录服务层能力。 | `SpendRuleDefinitionApplicationServiceTests`、compile、PMD、diff。 |
+| M1 规则定义闭环 | wallet owner、架构师、测试 | 规则定义、不可变版本、挂载、查询解释、决策记录、决策查询和决策解释服务层能力。 | `SpendRuleDefinitionApplicationServiceTests`、compile、PMD、diff。 |
 | M2 决策消费闭环 | wallet owner、transaction owner、测试 | 授权前规则决策消费，拒绝无资金事实副作用。 | 授权准入和支出控制准入回归。 |
 | M2.5 控制额度变动闭环 | wallet owner、架构师、测试 | 预算额度调额、预留、消耗、释放、退款补偿和预算控制投影。 | 控制额度变动、交易消费和枚举契约测试。 |
 | M3 投影解释闭环 | transaction owner、wallet owner、测试 | 历史规则版本、挂载、决策记录和控制额度变动流水只读解释。 | 交易投影解释目标测试和只读边界测试。 |

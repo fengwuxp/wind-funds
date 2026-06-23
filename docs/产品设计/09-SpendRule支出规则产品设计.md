@@ -174,7 +174,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | 产品语义 | 当前代码载体 | 已具备的服务层证据 | 不代表 |
 | --- | --- | --- | --- |
 | 规则定义、版本和挂载 | `SpendRuleDefinitionApplicationService`、`SpendRuleVersion`、`SpendRuleAssignment`。 | 支持创建规则、发布不可变 `ruleSpec / ruleDigest` 版本、挂载 scope、查询和解释挂载。 | 不代表完整规则表达式引擎、运营后台或生产迁移已完成。 |
-| 决策记录 | `SpendRuleDecisionLog`、`RecordSpendRuleDecisionLogRequest`。 | 支持按单条 rule / assignment / scope 固化决策结果、拒绝原因和 `decisionDigest`，并证明拒绝无资金事实副作用。 | 不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细已落库。 |
+| 决策记录 | `SpendRuleDecisionLog`、`RecordSpendRuleDecisionLogRequest`、`SpendRuleDecisionLogQuery`、`SpendRuleDecisionExplainQuery`。 | 支持按单条 rule / assignment / scope 固化决策结果、拒绝原因和 `decisionDigest`，支持按决策流水、业务流水、规则、挂载、scope、支付工具和决策结果做服务层只读查询，并可输出拒绝原因和证据引用；已证明拒绝、查询和解释无资金事实副作用。 | 不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
 | 控制额度变动流水 | `SpendControlActivity`、`RecordSpendControlActivityRequest`、`SpendControlActivityType`。 | 支持调额、预留、消耗、释放、退款补偿和预算控制投影，且历史准入类 activity 不再允许新写入。 | 不代表控制事实是资金交易、账本交易或账本余额。 |
 | 预算控制投影 | `BudgetControlProjectionDTO`。 | 支持按控制流水重建 `limitAmount`、`consumedAmount`、`remainingControlAmount` 和 `availableControlAmount`。 | 不代表预算组、Spend Rule 或控制视图可以作为账务主体。 |
 
@@ -187,6 +187,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | 规则挂载 | scope、ruleId、version、priority、conflictPolicy、有效期。 | 可评估的挂载关系。 | 多规则冲突必须可解释；缺优先级或冲突策略不得生产启用。 |
 | 挂载查询与解释 | tenant、assignmentSn、scope、ruleId、version、评估时间。 | 当前有效挂载列表、挂载可用性状态和证据引用。 | 只读查询；不重新执行规则，不写决策记录，不生成资金交易或账本事实。 |
 | 决策记录 | 支付工具快照、账户主体、预算 scope、金额币种、商户、MCC、国家、时间和业务场景。 | 决策流水、结果、拒绝原因、摘要。 | 拒绝停在交易内核前；通过只代表允许继续准入。 |
+| 决策记录查询与解释 | tenant、decisionSn、businessScene、businessSn、ruleId、version、assignmentSn、scope、instrumentSn、decisionResult。 | 决策记录列表、是否准入、拒绝原因和 evidenceRefs。 | 查询必须携带 tenantId 外的窄条件；解释只读读取历史决策，不重算规则、不调整额度、不写资金事实。 |
 | 控制额度变动流水记录 | 决策结果、预算 scope、目标账户主体、金额币种、交易结果。 | 预留、消耗、释放、过期、退款补偿或调整流水。 | 不生成资金交易、账本交易、账本分录或余额投影。 |
 | 规则时间线查询 | ruleId、ruleVersion、assignmentSn、decisionSn、业务流水、时间范围。 | 规则变更、挂载变更、决策记录和控制额度变动流水时间线。 | 查询只读，不修复状态，不重新评估历史。 |
 | 交易投影解释 | 资金交易、route snapshot、支付工具快照、规则决策记录和控制额度变动流水。 | 用户、商户、运营、风控和客服可理解的规则命中解释。 | 投影不反写 route、posting、LedgerEntry 或 balance。 |

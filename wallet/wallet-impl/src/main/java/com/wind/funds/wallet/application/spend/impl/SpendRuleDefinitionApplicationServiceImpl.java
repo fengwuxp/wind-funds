@@ -23,11 +23,14 @@ import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleDecisionExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
+import com.wind.funds.wallet.model.query.SpendRuleDecisionExplainQuery;
+import com.wind.funds.wallet.model.query.SpendRuleDecisionLogQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
@@ -36,9 +39,11 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -180,6 +185,30 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
         return toDecisionLogDTO(spendRuleDecisionLogMapper.selectOneById(entity.getId()));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public @NonNull List<SpendRuleDecisionLogDTO> queryDecisions(
+            @NonNull SpendRuleDecisionLogQuery query) {
+        validateDecisionLogQuery(query);
+        return spendRuleDecisionLogMapper.selectListByQuery(toDecisionLogQueryWrapper(query)).stream()
+                .map(this::toDecisionLogDTO)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public @NonNull SpendRuleDecisionExplanationDTO explainDecision(
+            @NonNull SpendRuleDecisionExplainQuery query) {
+        validateDecisionExplainQuery(query);
+        SpendRuleDecisionLog decision = findDecisionLog(query.getTenantId(), query.getDecisionSn());
+        AssertUtils.notNull(decision, "Spend Rule 决策日志不存在，decisionSn = {}", query.getDecisionSn());
+        return new SpendRuleDecisionExplanationDTO()
+                .setDecision(toDecisionLogDTO(decision))
+                .setAdmitted(decision.getDecisionResult() == SpendControlDecisionResult.PASSED)
+                .setExplanationMessage(toDecisionExplanationMessage(decision))
+                .setEvidenceRefs(toDecisionEvidenceRefs(decision));
+    }
+
     private void validateCreateDefinitionRequest(CreateSpendRuleDefinitionRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(request.getRuleId(), "Spend Rule 标识不能为空");
@@ -248,6 +277,32 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
     private void validateAssignmentExplainQuery(SpendRuleAssignmentExplainQuery query) {
         AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(query.getAssignmentSn(), "Spend Rule 挂载流水号不能为空");
+    }
+
+    private void validateDecisionLogQuery(SpendRuleDecisionLogQuery query) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.isTrue(hasDecisionLogNarrowCondition(query),
+                "至少提供一个 Spend Rule 决策查询条件");
+    }
+
+    private void validateDecisionExplainQuery(SpendRuleDecisionExplainQuery query) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.hasText(query.getDecisionSn(), "Spend Rule 决策流水号不能为空");
+    }
+
+    private boolean hasDecisionLogNarrowCondition(SpendRuleDecisionLogQuery query) {
+        return StringUtils.hasText(query.getDecisionSn())
+                || StringUtils.hasText(query.getRuleId())
+                || StringUtils.hasText(query.getRuleVersion())
+                || StringUtils.hasText(query.getAssignmentSn())
+                || query.getScopeType() != null
+                || StringUtils.hasText(query.getScopeId())
+                || StringUtils.hasText(query.getInstrumentSn())
+                || query.getAction() != null
+                || query.getCurrency() != null
+                || StringUtils.hasText(query.getBusinessScene())
+                || StringUtils.hasText(query.getBusinessSn())
+                || query.getDecisionResult() != null;
     }
 
     private void assertPublishedVersionExists(Long tenantId, String ruleId, String ruleVersion) {
@@ -331,6 +386,26 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
         return wrapper;
     }
 
+    private QueryWrapper toDecisionLogQueryWrapper(SpendRuleDecisionLogQuery query) {
+        SpendRuleDecisionLogNameRefs ref = SpendRuleDecisionLogNameRefs.spendRuleDecisionLog;
+        return QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(query.getTenantId()))
+                .and(ref.decisionSn.eq(query.getDecisionSn()))
+                .and(ref.ruleId.eq(query.getRuleId()))
+                .and(ref.ruleVersion.eq(query.getRuleVersion()))
+                .and(ref.assignmentSn.eq(query.getAssignmentSn()))
+                .and(ref.scopeType.eq(query.getScopeType()))
+                .and(ref.scopeId.eq(query.getScopeId()))
+                .and(ref.instrumentSn.eq(query.getInstrumentSn()))
+                .and(ref.action.eq(query.getAction()))
+                .and(ref.currency.eq(query.getCurrency()))
+                .and(ref.businessScene.eq(query.getBusinessScene()))
+                .and(ref.businessSn.eq(query.getBusinessSn()))
+                .and(ref.decisionResult.eq(query.getDecisionResult()))
+                .orderBy(ref.id.asc());
+    }
+
     private LocalDateTime resolveEvaluationTime(LocalDateTime evaluationTime) {
         if (evaluationTime == null) {
             return LocalDateTime.now();
@@ -358,6 +433,32 @@ public class SpendRuleDefinitionApplicationServiceImpl implements SpendRuleDefin
                 "spendRuleVersion:" + assignment.getRuleId() + "@" + assignment.getRuleVersion(),
                 "spendRuleAssignment:" + assignment.getAssignmentSn(),
                 "spendRuleScope:" + assignment.getScopeType() + ":" + assignment.getScopeId());
+    }
+
+    private String toDecisionExplanationMessage(SpendRuleDecisionLog decision) {
+        if (decision.getDecisionResult() == SpendControlDecisionResult.REJECTED) {
+            return decision.getDecisionResult().getDesc() + "：" + decision.getRejectReason();
+        }
+        return decision.getDecisionResult().getDesc();
+    }
+
+    private List<String> toDecisionEvidenceRefs(SpendRuleDecisionLog decision) {
+        List<String> refs = new ArrayList<>();
+        refs.add("spendRule:" + decision.getRuleId());
+        refs.add("spendRuleVersion:" + decision.getRuleId() + "@" + decision.getRuleVersion());
+        if (StringUtils.hasText(decision.getAssignmentSn())) {
+            refs.add("spendRuleAssignment:" + decision.getAssignmentSn());
+        }
+        refs.add("spendRuleScope:" + decision.getScopeType() + ":" + decision.getScopeId());
+        refs.add("spendRuleDecision:" + decision.getDecisionSn());
+        if (decision.getId() != null) {
+            refs.add("spendRuleDecisionLog:" + decision.getId());
+        }
+        if (StringUtils.hasText(decision.getInstrumentSn())) {
+            refs.add("paymentInstrument:" + decision.getInstrumentSn());
+        }
+        refs.add("spendRuleBusiness:" + decision.getBusinessScene() + ":" + decision.getBusinessSn());
+        return List.copyOf(refs);
     }
 
     private SpendRuleDecisionLog findDecisionLog(Long tenantId, String decisionSn) {

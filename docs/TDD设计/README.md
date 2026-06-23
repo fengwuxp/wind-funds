@@ -128,7 +128,7 @@ Spend Rule 测试设计优先引用独立产品分册 09、系分分册 06 和 D
 
 | 测试资产 | 当前证明 | 不证明 |
 | --- | --- | --- |
-| `SpendRuleDefinitionApplicationServiceTests` | 规则版本不可变、挂载冲突策略和有效期、支付工具范围一致性、挂载查询解释、单条决策记录幂等和拒绝无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、运营后台。 |
+| `SpendRuleDefinitionApplicationServiceTests` | 规则版本不可变、挂载冲突策略和有效期、支付工具范围一致性、挂载查询解释、单条决策记录幂等、决策记录窄查询、决策事实解释和拒绝 / 查询 / 解释无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、批量规则时间线 Query Service、运营后台。 |
 | `SpendControlAdmissionApplicationServiceTests`、`AuthorizationAdmissionApplicationServiceTests` | 上层决策证据可进入准入快照和授权准入组合；拒绝停在交易内核前且无资金事实。 | 支付工具全场景生产可用、事件消费、控制额度自动占用。 |
 | `SpendControlActivityApplicationServiceTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests` | 控制额度变动流水、预算额度调额、交易成功消耗、失败释放、退款补偿、目标账户隔离和投影下限守卫。 | 账本余额、资金交易事实、生产迁移或历史脏数据修复。 |
 | `SpendControlActivityTypeContractTests` | 兼容期枚举分类集中在枚举本身，历史决策兼容类型不参与预算投影。 | 公共类名、表名、DTO 或历史枚举删除。 |
