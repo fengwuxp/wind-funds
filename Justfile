@@ -13,7 +13,27 @@ mvn-version:
 
 # Compile the full Maven reactor.
 compile:
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn compile
+    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag compile && just verify-classfiles
+
+# Verify compiled class files do not contain Eclipse JDT unresolved-compilation stubs.
+verify-classfiles:
+    #!/usr/bin/env zsh
+    set -euo pipefail
+    existing=(${(f)"$(find . \( -path "*/target/classes" -o -path "*/target/test-classes" \) -type d -print)"})
+    if (( ${#existing[@]} == 0 )); then
+        echo "No compiled classes found. Run just compile first."
+        exit 1
+    fi
+    if command -v rg >/dev/null 2>&1; then
+        matches=$(rg -a -l "Unresolved compilation" "${existing[@]}" || true)
+    else
+        matches=$(grep -R -a -l "Unresolved compilation" "${existing[@]}" || true)
+    fi
+    if [[ -n "$matches" ]]; then
+        echo "Found unresolved compilation stubs in class files:"
+        echo "$matches"
+        exit 1
+    fi
 
 # Run PMD checks.
 pmd:
@@ -39,11 +59,11 @@ _assert-surefire-reports tests marker:
 
 _run-test-classes tests module='tests':
     @just _assert-test-classes "{{tests}}"
-    @marker=$(mktemp /tmp/wind-funds-tests.XXXXXX); touch "$marker"; if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl {{module}} -am test -Dtest="{{tests}}" {{test_flags}}; mvn_status=$?; just _assert-surefire-reports "{{tests}}" "$marker"; report_status=$?; rm -f "$marker"; if (( mvn_status != 0 || report_status != 0 )); then exit 1; fi
+    @marker=$(mktemp /tmp/wind-funds-tests.XXXXXX); touch "$marker"; if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag -pl {{module}} -am test -Dtest="{{tests}}" {{test_flags}}; mvn_status=$?; just _assert-surefire-reports "{{tests}}" "$marker"; report_status=$?; rm -f "$marker"; if (( mvn_status != 0 || report_status != 0 )); then exit 1; fi; just verify-classfiles
 
 # Run all tests in one Maven module.
 test-module module='tests':
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn -pl {{module}} -am test {{test_flags}}
+    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag -pl {{module}} -am test {{test_flags}} && just verify-classfiles
 
 # Core DSL and contract tests.
 test-core tests='FundsInstructionDslContractTests,RouteDslContractTests,FundsDslJsonContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,SettlementPolicySpecTests,FundsAmountBoundaryContractTests':
@@ -81,8 +101,8 @@ test-reconciliation tests='PayoutPreflightServiceTests,ReconciliationDifferenceA
 verify-fast: mvn-version compile test-boundary test-governance test-reconciliation
 
 # Full CAD verification for the rebuilt payment funds test baseline.
-verify-cad: mvn-version compile test-core test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance test-reconciliation pmd
+verify-cad: mvn-version compile test-core test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance test-reconciliation pmd verify-classfiles
 
 # Install reactor snapshots locally when Maven plugin resolution needs local artifacts.
 install-snapshots:
-    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; fi; mvn install -DskipTests -Dmaven.test.skip=true
+    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag install -DskipTests -Dmaven.test.skip=true && just verify-classfiles

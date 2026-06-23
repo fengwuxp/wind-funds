@@ -375,7 +375,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         long grossConsumedAmount = sumAmount(effectiveActivities, SpendControlActivityType.CONSUMED);
         long refundCompensatedAmount = sumAmount(effectiveActivities, SpendControlActivityType.REFUND_COMPENSATED);
         long releasedAmount = effectiveActivities.stream()
-                .filter(activity -> isReleaseActivity(activity.getActivityType()))
+                .filter(activity -> activity.getActivityType().isReleaseActivity())
                 .mapToLong(SpendControlActivityDTO::getAmount)
                 .sum();
         return new ControlActivityUsage(originalActivity.getAmount(),
@@ -422,12 +422,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 .filter(activity -> activity.getActivityType() == activityType)
                 .mapToLong(SpendControlActivityDTO::getAmount)
                 .sum();
-    }
-
-    private boolean isReleaseActivity(SpendControlActivityType activityType) {
-        return activityType == SpendControlActivityType.RELEASED
-                || activityType == SpendControlActivityType.EXPIRED
-                || activityType == SpendControlActivityType.REVERSED;
     }
 
     private RecordSpendControlActivityRequest toRecordRequest(SpendControlTransactionConsumptionRequest request,

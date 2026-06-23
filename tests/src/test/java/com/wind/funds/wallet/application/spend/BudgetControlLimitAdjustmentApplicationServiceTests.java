@@ -19,6 +19,7 @@ import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.model.dto.BudgetControlLimitAdjustmentResultDTO;
 import com.wind.funds.wallet.model.dto.BudgetControlProjectionDTO;
 import com.wind.funds.wallet.model.dto.SpendControlActivityDTO;
+import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
 import com.wind.funds.wallet.model.query.SpendControlActivityQuery;
 import com.wind.funds.wallet.model.request.AdjustBudgetControlLimitRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
@@ -69,6 +70,10 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
     private static final String DECREASE_BUSINESS_SN = "BUDGET_LIMIT_ADJUST_DEC_001";
 
+    private static final String CONSUMED_BUSINESS_SN = "BUDGET_LIMIT_ADJUST_CONSUMED_001";
+
+    private static final String REFUND_BUSINESS_SN = "BUDGET_LIMIT_ADJUST_REFUND_001";
+
     private static final String BUDGET_GROUP_SN = "budget_control_limit_scope";
 
     private static final String SPEND_RULE_ID = "sr_budget_limit_monthly";
@@ -90,6 +95,10 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     private static final String LIMIT_DECREASE_ACTIVITY_SN = "budget_limit_decrease_001";
 
     private static final String RESERVED_ACTIVITY_SN = "budget_limit_reserved_001";
+
+    private static final String CONSUMED_ACTIVITY_SN = "budget_limit_consumed_001";
+
+    private static final String REFUND_COMPENSATED_ACTIVITY_SN = "budget_limit_refund_compensated_001";
 
     @Autowired
     private CreditAccountService creditAccountService;
@@ -222,7 +231,62 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
                 adjustRequest(LIMIT_DECREASE_ACTIVITY_SN, DECREASE_BUSINESS_SN, false,
                         "sha256:budget-limit-decrease").setAmount(50L)))
-                .hasMessageContaining("预算控制额度调减不能低于已占用控制金额");
+                .hasMessageContaining("预算控制额度调减不能低于已使用或已占用控制金额");
+
+        assertThat(activityCount(LIMIT_DECREASE_ACTIVITY_SN)).isZero();
+        assertNoTransactionFacts(DECREASE_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, beforeReject);
+    }
+
+    /**
+     * 场景：预算控制额度投影同时存在额度、占用、消耗和退款补偿。
+     * 输入：预算额度 100，先预占 60，再消费 60，随后退款补偿 40。
+     * 输出：投影展示净消费 20、未终局控制占用 40、可用控制额度 40。
+     * 红线：预算控制投影只解释 Spend Rule 控制额度，不生成资金交易、route、posting、LedgerEntry 或账本余额投影。
+     */
+    @Test
+    void testProjectionShouldDeductNetConsumedAndOccupiedAmountFromAvailableControlLimit() {
+        prepareBudgetControlLimitAdjustmentData();
+        budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
+                INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
+        spendControlActivityApplicationService.recordActivity(reservedRequest());
+        spendControlActivityApplicationService.recordActivity(consumedRequest());
+        spendControlActivityApplicationService.recordActivity(refundCompensatedRequest());
+        LedgerFactSnapshot beforeQuery = ledgerFactSnapshot(jdbcTemplate);
+
+        BudgetControlProjectionDTO projection = spendControlActivityApplicationService
+                .getBudgetControlProjection(projectionQuery());
+
+        assertThat(projection.getLimitAmount()).isEqualTo(100L);
+        assertThat(projection.getReservedAmount()).isEqualTo(60L);
+        assertThat(projection.getConsumedAmount()).isEqualTo(20L);
+        assertThat(projection.getReleasedAmount()).isZero();
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(40L);
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
+        assertNoTransactionFacts(CONSUMED_BUSINESS_SN);
+        assertNoTransactionFacts(REFUND_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, beforeQuery);
+    }
+
+    /**
+     * 场景：预算额度调减低于已使用和已占用控制金额之和。
+     * 输入：预算额度 100，预占 60 后消费 60，再尝试调减 50。
+     * 输出：调减被拒绝。
+     * 红线：已终局消费的控制金额同样占用预算额度，不能只看未释放占用。
+     */
+    @Test
+    void testDecreaseLimitShouldRejectWhenAdjustedLimitBelowConsumedAndOccupiedControlAmount() {
+        prepareBudgetControlLimitAdjustmentData();
+        budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
+                INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
+        spendControlActivityApplicationService.recordActivity(reservedRequest());
+        spendControlActivityApplicationService.recordActivity(consumedRequest());
+        LedgerFactSnapshot beforeReject = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
+                adjustRequest(LIMIT_DECREASE_ACTIVITY_SN, DECREASE_BUSINESS_SN, false,
+                        "sha256:budget-limit-decrease").setAmount(50L)))
+                .hasMessageContaining("预算控制额度调减不能低于已使用或已占用控制金额");
 
         assertThat(activityCount(LIMIT_DECREASE_ACTIVITY_SN)).isZero();
         assertNoTransactionFacts(DECREASE_BUSINESS_SN);
@@ -284,6 +348,37 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setSpendDecisionDigest("sha256:budget-limit-reserved-decision")
                 .setBudgetGroupSn(BUDGET_GROUP_SN)
                 .setActivityDigest("sha256:budget-limit-reserved");
+    }
+
+    private RecordSpendControlActivityRequest consumedRequest() {
+        return reservedRequest()
+                .setActivitySn(CONSUMED_ACTIVITY_SN)
+                .setActivityType(SpendControlActivityType.CONSUMED)
+                .setBusinessSn(CONSUMED_BUSINESS_SN)
+                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn("budget_limit_adjust_consumed_tx_001")
+                .setActivityDigest("sha256:budget-limit-consumed");
+    }
+
+    private RecordSpendControlActivityRequest refundCompensatedRequest() {
+        return reservedRequest()
+                .setActivitySn(REFUND_COMPENSATED_ACTIVITY_SN)
+                .setActivityType(SpendControlActivityType.REFUND_COMPENSATED)
+                .setBusinessSn(REFUND_BUSINESS_SN)
+                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn("budget_limit_adjust_refund_tx_001")
+                .setAmount(40L)
+                .setActivityDigest("sha256:budget-limit-refund-compensated");
+    }
+
+    private BudgetControlProjectionQuery projectionQuery() {
+        return new BudgetControlProjectionQuery()
+                .setTenantId(TENANT_ID)
+                .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setSpendRuleId(SPEND_RULE_ID)
+                .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setTargetAccountId(targetAccountId());
     }
 
     private FundsAccountId targetAccountId() {

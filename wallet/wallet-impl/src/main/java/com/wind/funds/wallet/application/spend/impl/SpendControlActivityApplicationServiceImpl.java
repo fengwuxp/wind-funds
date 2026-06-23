@@ -12,7 +12,6 @@ import com.wind.funds.wallet.dal.mapper.SpendControlActivityMapper;
 import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.funds.wallet.enums.SpendControlActivityType;
-import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.model.dto.BudgetControlProjectionDTO;
 import com.wind.funds.wallet.model.dto.SpendControlActivityDTO;
 import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
@@ -96,6 +95,9 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(request.getActivitySn(), "控制活动流水号不能为空");
         AssertUtils.notNull(request.getActivityType(), "控制活动类型不能为空");
+        AssertUtils.isFalse(request.getActivityType().isDecisionRecordCompatibilityActivity(),
+                "Spend Rule 准入决策应记录为决策日志，不应写入支出控制额度变动流水，activitySn = {}",
+                request.getActivitySn());
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
         AssertUtils.notNull(request.getTargetAccountId(), "控制活动目标账户不能为空");
@@ -107,7 +109,7 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         AssertUtils.hasText(request.getActivityDigest(), "控制活动摘要不能为空");
         assertNoSensitiveContextVariables(request.getContextVariables());
         assertTargetAccountSupported(request);
-        if (isLimitAdjustmentActivity(request.getActivityType())) {
+        if (request.getActivityType().isLimitAdjustmentActivity()) {
             AssertUtils.hasText(request.getReasonCode(), "预算控制额度调整原因码不能为空");
             AssertUtils.hasText(request.getOperatorId(), "预算控制额度调整操作者不能为空");
             AssertUtils.hasText(request.getAuditReferenceSn(), "预算控制额度调整审计引用不能为空");
@@ -118,13 +120,7 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
             AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
             AssertUtils.hasText(request.getSpendDecisionDigest(), "Spend Rule 决策摘要不能为空");
         }
-        if (request.getActivityType() == SpendControlActivityType.REJECTED_RECORDED) {
-            AssertUtils.isTrue(request.getSpendDecisionResult() == SpendControlDecisionResult.REJECTED,
-                    "拒绝控制活动必须对应拒绝决策，activitySn = {}",
-                    request.getActivitySn());
-            AssertUtils.hasText(request.getRejectReason(), "拒绝控制活动必须提供拒绝原因");
-        }
-        if (isBudgetActivity(request.getActivityType())) {
+        if (request.getActivityType().isBudgetProjectionActivity()) {
             AssertUtils.hasText(request.getBudgetGroupSn(), "预算控制活动必须提供预算组标识");
         }
     }
@@ -307,7 +303,7 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
     }
 
     private void assertReleaseAmountNotOverReserved(RecordSpendControlActivityRequest request) {
-        if (!isReleaseActivity(request.getActivityType())) {
+        if (!request.getActivityType().isReleaseActivity()) {
             return;
         }
         BudgetControlProjectionQuery query = new BudgetControlProjectionQuery()
@@ -329,7 +325,7 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
     private BudgetControlProjectionDTO toProjection(BudgetControlProjectionQuery query,
                                                     List<SpendControlActivity> activities) {
         List<SpendControlActivity> budgetActivities = activities.stream()
-                .filter(activity -> isBudgetActivity(activity.getActivityType()))
+                .filter(activity -> activity.getActivityType().isBudgetProjectionActivity())
                 .toList();
         long limitIncreasedAmount = budgetActivities.stream()
                 .filter(activity -> activity.getActivityType() == SpendControlActivityType.LIMIT_INCREASED)
@@ -354,10 +350,11 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .sum();
         long consumedAmount = grossConsumedAmount - refundCompensatedAmount;
         long releasedAmount = budgetActivities.stream()
-                .filter(activity -> isReleaseActivity(activity.getActivityType()))
+                .filter(activity -> activity.getActivityType().isReleaseActivity())
                 .mapToLong(SpendControlActivity::getAmount)
                 .sum();
         long remainingControlAmount = reservedAmount - consumedAmount - releasedAmount;
+        long availableControlAmount = limitAmount - consumedAmount - remainingControlAmount;
         SpendControlActivity lastActivity = budgetActivities.isEmpty() ? null : budgetActivities.getLast();
         return new BudgetControlProjectionDTO()
                 .setTenantId(query.getTenantId())
@@ -373,7 +370,7 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
                 .setConsumedAmount(consumedAmount)
                 .setReleasedAmount(releasedAmount)
                 .setRemainingControlAmount(remainingControlAmount)
-                .setAvailableControlAmount(limitAmount - remainingControlAmount)
+                .setAvailableControlAmount(availableControlAmount)
                 .setLastActivitySn(lastActivity == null ? null : lastActivity.getActivitySn())
                 .setLastActivityAt(lastActivity == null ? null : lastActivity.getGmtCreate());
     }
@@ -465,25 +462,4 @@ public class SpendControlActivityApplicationServiceImpl implements SpendControlA
         FundsBenefitSpecValidators.rejectInstructionContextVariables(contextVariables, "wallet");
     }
 
-    private boolean isBudgetActivity(SpendControlActivityType type) {
-        return type == SpendControlActivityType.LIMIT_INCREASED
-                || type == SpendControlActivityType.LIMIT_DECREASED
-                || type == SpendControlActivityType.RESERVED
-                || type == SpendControlActivityType.CONSUMED
-                || type == SpendControlActivityType.REFUND_COMPENSATED
-                || type == SpendControlActivityType.RELEASED
-                || type == SpendControlActivityType.EXPIRED
-                || type == SpendControlActivityType.REVERSED;
-    }
-
-    private boolean isLimitAdjustmentActivity(SpendControlActivityType type) {
-        return type == SpendControlActivityType.LIMIT_INCREASED
-                || type == SpendControlActivityType.LIMIT_DECREASED;
-    }
-
-    private boolean isReleaseActivity(SpendControlActivityType type) {
-        return type == SpendControlActivityType.RELEASED
-                || type == SpendControlActivityType.EXPIRED
-                || type == SpendControlActivityType.REVERSED;
-    }
 }

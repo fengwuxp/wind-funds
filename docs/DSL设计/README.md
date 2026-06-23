@@ -148,15 +148,17 @@ B7 目标态可以描述可清分明细、清分批次、内部清算候选、�
 
 Highnote 公开发卡文档中的 financial account、ledger、ledger entry、payment card 和 financial account activity 分层，可作为本 DSL 的外部参考确认：资金和账本落在账户，卡只是访问工具，账户活动和交易事件承担卡维度归因。wind-funds DSL 因此坚持“账户入账、工具归因、控制留痕、投影查询”：`SubjectRef` 决定可入账主体，`PaymentInstrumentRef` 和 binding snapshot 决定工具归因，Spend Rule / 预算控制只产出控制证据和只读投影输入。
 
-模块归属约束：Spend Rule 的规则定义、版本、挂载、决策日志、准入、控制活动和预算控制视图归属于 `wallet` 支出控制域；`transaction` 只消费已固化 `spendRuleDecision`、控制活动引用和 route snapshot 做历史投影解释；`ledger` 只接受可入账账户主体。交易模块不得直接依赖 wallet Spend Rule application service、DAL Entity 或 Mapper 来计算、更新或解释规则。
+模块归属约束：Spend Rule 的规则定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制视图归属于 `wallet` 支出控制域；`transaction` 只消费已固化 `spendRuleDecision`、控制额度变动引用和 route snapshot 做历史投影解释；`ledger` 只接受可入账账户主体。交易模块不得直接依赖 wallet Spend Rule application service、DAL Entity 或 Mapper 来计算、更新或解释规则。当前代码兼容名中 `SpendRuleDecisionLog` 对应产品语义 `SpendRuleDecisionRecord`，`SpendControlActivity` 对应产品语义 `SpendControlMovement`。历史兼容活动类型 `ADMISSION_RECORDED`、`REJECTED_RECORDED` 只用于存量解释，不再作为新的控制额度变动 DSL 输入；新的准入 / 拒绝证据必须进入决策记录。当前兼容期由 `SpendControlActivityType` 作为控制额度变动 DSL 类型分类契约，统一声明产品语义、预算投影参与性、调额类、释放类和决策记录兼容类。
+
+当前代码映射：Spend Rule DSL v1.1 示例均为 `fixtureLevel=DOC_ONLY`，用于锁定产品和测试契约，不等同于当前 Controller 报文、数据库列或可执行规则引擎。当前服务层把规则版本正文落到 `ruleSpec / ruleDigest`，把规则挂载流水落到 `assignmentSn`，把决策证据落到单条 `SpendRuleDecisionLog` 记录；`evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 是目标解释契约，未作为独立明细或字段完成落库。后续若把 DOC_ONLY DSL 升级为机器契约，必须新增 fixture、解析器、测试和独立 Grant。
 
 | 设计面 | 对齐口径 | 必须保持 | 工程影响 |
 | --- | --- | --- | --- |
 | DSL 主体约定 | `SubjectRef` 只承载资金账户、信用账户和平台角色解析后的平台资金账户；`PaymentInstrumentRef`、`ExternalAccountRef` 只承载工具、外部账户和脱敏引用；预算组和 Spend Rule 只承载 scope、规则快照、控制窗口和审计上下文。 | 不新增 `InstrumentTransaction`、`PaymentInstrumentTransaction` 或支付工具账务主体；内部余额钱包、平台钱包、商户钱包、返利钱包和信用额度入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照。 | 触碰 `core` 枚举、Spec、fixture 或公共 DSL 字段时，必须显式声明公共契约边界和 `fixtureLevel`。 |
 | 路由规则 | route resolver 可以消费支付工具快照、绑定快照、`FundingAllocationDecision`、预算组上下文和 Spend Rule 决策，但 route leg participant 必须是最终可入账主体。 | 工具不可用、资金责任不唯一、错币种、预算或规则拒绝时不生成 route；退款、撤销、拒付、退费和重放优先沿原 route snapshot。 | 支付工具入口、资金责任解析和交易投影应分别形成独立任务，不借直接交易红线附带修改。 |
 | 账目平衡 | `PostingPlan` 只从已解析 route 生成；`LedgerEntry.subject` 只能是资金账户、信用账户或平台角色解析后的平台资金账户；每个 posting plan 按同币种独立平衡。 | 预算组、Spend Rule、支付工具、外部账户和交易投影不得生成 ledger bucket；预算控制只生成控制证据、规则证据或只读投影视图。 | 触碰 posting assembler、账本 DSL 或账务表行时，必须补借贷平衡、`normalBalanceSide`、余额桶和 forbidden facts 断言。 |
-| 余额投影 | 账本余额投影只从 ledger entry 派生，面向资金账户、信用账户和平台角色解析后的平台资金账户；余额日志只作为观察证据。 | 不从支付工具、预算组、Spend Rule、交易投影或业务轨道事件直接投影账本余额；预算控制可有独立控制视图，但不等于账本余额。 | BudgetGroup 兼容策略、预算控制视图和余额查询迁移必须拆成独立任务。 |
-| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、已固化 `spendRuleDecision` 快照、既有控制活动、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。支付工具型交易解释只能读取已固化的 `paymentInstrumentRef` 和 binding snapshot；Spend Rule 解释只能读取已固化的规则、版本、挂载和决策引用。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实；不得按当前工具绑定、当前规则定义或当前规则挂载重新解释历史交易，也不得在解释阶段执行规则 DSL 或脚本。 | 不得用交易投影通过来声明账务事实、余额投影或生产 Done；补支付工具解释时必须验证脱敏展示号、绑定版本、准入决策和敏感原文不外泄；补 Spend Rule 解释时必须验证规则版本、挂载版本、决策流水和拒绝原因可追溯，并证明 ruleSpec/script 不外泄。 |
+| 余额投影 | 账本余额投影只从 ledger entry 派生，面向资金账户、信用账户和平台角色解析后的平台资金账户；余额日志只作为观察证据。预算控制视图从 `SpendControlMovement` 派生，`remainingControlAmount` 兼容表示未终局释放的控制占用，`availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`。 | 不从支付工具、预算组、Spend Rule、交易投影或业务轨道事件直接投影账本余额；预算控制可有独立控制视图，但不等于账本余额。 | BudgetGroup 兼容策略、预算控制视图和余额查询迁移必须拆成独立任务。 |
+| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、已固化 `spendRuleDecision` 快照、既有控制额度变动流水、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、预算组、Spend Rule 查询或过滤。支付工具型交易解释只能读取已固化的 `paymentInstrumentRef` 和 binding snapshot；Spend Rule 解释只能读取已固化的规则、版本、挂载、决策记录和控制额度变动引用。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实；不得按当前工具绑定、当前规则定义或当前规则挂载重新解释历史交易，也不得在解释阶段执行规则 DSL 或脚本。 | 不得用交易投影通过来声明账务事实、余额投影或生产 Done；补支付工具解释时必须验证脱敏展示号、绑定版本、准入决策和敏感原文不外泄；补 Spend Rule 解释时必须验证规则版本、挂载版本、决策流水和拒绝原因可追溯，并证明 ruleSpec/script 不外泄。 |
 
 ### Spend Rule DSL v1.1 规则版本、挂载和决策证据
 
@@ -170,7 +172,7 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
   "fixtureLevel": "DOC_ONLY",
   "specType": "SpendRuleVersionSpec",
   "ruleId": "SR-VCC-DAILY-USD-001",
-  "version": "v1",
+  "ruleVersion": "v1",
   "ruleType": "PERIOD_AMOUNT_LIMIT",
   "ruleDomain": "AUTHORIZATION",
   "display": {
@@ -241,9 +243,9 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
   "dslCaseId": "DSL-SPEND-RULE-ASSIGNMENT-001",
   "fixtureLevel": "DOC_ONLY",
   "specType": "SpendRuleAssignmentSpec",
-  "assignmentId": "ASG-VCC-001",
+  "assignmentSn": "ASG-VCC-001",
   "ruleId": "SR-VCC-DAILY-USD-001",
-  "version": "v1",
+  "ruleVersion": "v1",
   "scopeRef": {
     "scopeType": "PAYMENT_INSTRUMENT",
     "scopeId": "PI-VCC-10001"
@@ -277,9 +279,9 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
   "decisionReasonMessage": "Merchant category is not allowed for this card",
   "evaluatedRules": [
     {
-      "assignmentId": "ASG-VCC-001",
+      "assignmentSn": "ASG-VCC-001",
       "ruleId": "SR-VCC-DAILY-USD-001",
-      "version": "v1",
+      "ruleVersion": "v1",
       "decision": "ALLOW",
       "reasonCode": "WITHIN_DAILY_LIMIT",
       "matchedFacts": {
@@ -290,9 +292,9 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
       "ruleDigest": "sha256:version-body"
     },
     {
-      "assignmentId": "ASG-MCC-001",
+      "assignmentSn": "ASG-MCC-001",
       "ruleId": "SR-MCC-DENY-001",
-      "version": "v3",
+      "ruleVersion": "v3",
       "decision": "DECLINE",
       "reasonCode": "MERCHANT_CATEGORY_BLOCKED",
       "matchedFacts": {
@@ -316,8 +318,9 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
 
 1. `finalDecision` 是准入结论，`evaluatedRules` 是解释材料；两者都必须保留。
 2. 多规则冲突必须记录 `decisionPolicy`，不能只保存最后一条命中规则。
-3. 拒绝或待复核时必须能证明无资金事实副作用；文档 DSL 只表达目标断言，真实证明需要后续服务层测试。
+3. 拒绝或待复核时必须能证明无资金事实副作用；文档 DSL 只表达目标断言，真实证明需要服务层测试。
 4. 交易投影解释只能读取历史 `decisionSn`、规则版本、挂载摘要和决策摘要，不按当前规则重算。
+5. 当前代码只持久化单条 rule / assignment / scope 决策记录；多规则 `evaluatedRules` 明细、`decisionPolicy` 和 `finalDecision` 是目标态解释契约，不得在未落库前声明生产完成。
 
 场景覆盖：
 

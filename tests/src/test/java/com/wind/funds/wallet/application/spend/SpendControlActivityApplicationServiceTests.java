@@ -8,11 +8,7 @@ import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
-import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResolutionApplicationServiceImpl;
-import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
-import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlActivityApplicationServiceImpl;
-import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -32,7 +28,6 @@ import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
-import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
@@ -123,75 +118,51 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
     private SpendSubjectFundingRelationService fundingRelationService;
 
     @Autowired
-    private SpendControlAdmissionApplicationService spendControlAdmissionApplicationService;
-
-    @Autowired
     private SpendControlActivityApplicationService spendControlActivityApplicationService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     /**
-     * 场景：Spend Rule 准入通过后记录准入活动。
-     * 输入：支付工具、目标信用账户、规则版本和决策摘要完整。
-     * 输出：控制活动持久化并可按业务流水查询。
-     * 红线：控制活动记录不得创建资金交易、route、posting、LedgerEntry、账本交易或余额投影事实。
+     * 场景：历史准入已记录类型误入支出控制活动写入入口。
+     * 输入：准入已通过，但活动类型为 ADMISSION_RECORDED。
+     * 输出：直接拒绝写入。
+     * 红线：Spend Rule 准入决策证据应记录为决策日志，不得继续写入控制额度变动流水。
      */
     @Test
-    void testRecordAdmissionActivityShouldPersistActivityWithoutFundsSideEffect() {
+    void testRecordAdmissionCompatibilityActivityShouldRejectWithoutFundsSideEffect() {
         prepareSpendControlActivityData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
 
-        SpendControlActivityDTO activity = spendControlActivityApplicationService.recordActivity(
+        assertThatThrownBy(() -> spendControlActivityApplicationService.recordActivity(
                 recordRequest(decision, ADMISSION_ACTIVITY_SN, SpendControlActivityType.ADMISSION_RECORDED,
-                        "sha256:activity-admission-recorded"));
+                        "sha256:activity-admission-recorded")))
+                .hasMessageContaining("Spend Rule 准入决策应记录为决策日志");
 
-        assertThat(activity.getTenantId()).isEqualTo(TENANT_ID);
-        assertThat(activity.getActivitySn()).isEqualTo(ADMISSION_ACTIVITY_SN);
-        assertThat(activity.getActivityType()).isEqualTo(SpendControlActivityType.ADMISSION_RECORDED);
-        assertThat(activity.getBusinessScene()).isEqualTo(BUSINESS_SCENE);
-        assertThat(activity.getBusinessSn()).isEqualTo(BUSINESS_SN);
-        assertThat(activity.getInstrumentSn()).isEqualTo(PAYMENT_INSTRUMENT_SN);
-        assertThat(activity.getTargetAccountId())
-                .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
-        assertThat(activity.getSpendRuleId()).isEqualTo(SPEND_RULE_ID);
-        assertThat(activity.getSpendDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
-        assertThat(activity.getBudgetGroupSn()).isEqualTo(BUDGET_GROUP_SN);
-
-        List<SpendControlActivityDTO> activities = spendControlActivityApplicationService.queryActivities(
-                new SpendControlActivityQuery()
-                        .setTenantId(TENANT_ID)
-                        .setBusinessScene(BUSINESS_SCENE)
-                        .setBusinessSn(BUSINESS_SN)
-                        .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
-                                FundsSubjectType.CREDIT_ACCOUNT)));
-        assertThat(activities).extracting(SpendControlActivityDTO::getActivitySn)
-                .containsExactly(ADMISSION_ACTIVITY_SN);
+        assertThat(activityCount(ADMISSION_ACTIVITY_SN)).isZero();
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
-     * 场景：Spend Rule 准入拒绝后记录拒绝活动。
-     * 输入：拒绝决策、拒绝原因、目标账户和规则证据完整。
-     * 输出：拒绝活动持久化。
-     * 红线：业务拒绝留痕不得创建交易、route、posting、LedgerEntry 或余额投影事实。
+     * 场景：历史拒绝已记录类型误入支出控制活动写入入口。
+     * 输入：准入被拒绝，活动类型为 REJECTED_RECORDED。
+     * 输出：直接拒绝写入。
+     * 红线：拒绝原因属于 Spend Rule 决策记录，不得继续写入控制额度变动流水。
      */
     @Test
-    void testRecordRejectedActivityShouldPersistReasonWithoutFundsSideEffect() {
+    void testRecordRejectedCompatibilityActivityShouldRejectWithoutFundsSideEffect() {
         prepareSpendControlActivityData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         SpendControlAdmissionDecisionDTO decision = rejectedDecision(REJECTED_BUSINESS_SN);
 
-        SpendControlActivityDTO activity = spendControlActivityApplicationService.recordActivity(
+        assertThatThrownBy(() -> spendControlActivityApplicationService.recordActivity(
                 recordRequest(decision, REJECTED_ACTIVITY_SN, SpendControlActivityType.REJECTED_RECORDED,
-                        "sha256:activity-rejected-recorded"));
+                        "sha256:activity-rejected-recorded")))
+                .hasMessageContaining("Spend Rule 准入决策应记录为决策日志");
 
-        assertThat(activity.getActivitySn()).isEqualTo(REJECTED_ACTIVITY_SN);
-        assertThat(activity.getActivityType()).isEqualTo(SpendControlActivityType.REJECTED_RECORDED);
-        assertThat(activity.getSpendDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
-        assertThat(activity.getRejectReason()).isEqualTo("超过单卡单日授权限额");
+        assertThat(activityCount(REJECTED_ACTIVITY_SN)).isZero();
         assertNoTransactionFacts(REJECTED_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -459,15 +430,35 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
     }
 
     private SpendControlAdmissionDecisionDTO admittedDecision(String businessSn) {
-        return spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                admissionRequest(businessSn).setSpendDecisionResult(SpendControlDecisionResult.PASSED));
+        return decision(businessSn, SpendControlDecisionResult.PASSED, null);
     }
 
     private SpendControlAdmissionDecisionDTO rejectedDecision(String businessSn) {
-        return spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                admissionRequest(businessSn)
-                        .setSpendDecisionResult(SpendControlDecisionResult.REJECTED)
-                        .setRejectReason("超过单卡单日授权限额"));
+        return decision(businessSn, SpendControlDecisionResult.REJECTED, "超过单卡单日授权限额");
+    }
+
+    private SpendControlAdmissionDecisionDTO decision(String businessSn,
+                                                      SpendControlDecisionResult decisionResult,
+                                                      String rejectReason) {
+        return new SpendControlAdmissionDecisionDTO()
+                .setTenantId(TENANT_ID)
+                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setAction(PaymentInstrumentAction.AUTHORIZE)
+                .setAmount(60L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(businessSn)
+                .setAdmitted(decisionResult == SpendControlDecisionResult.PASSED)
+                .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT))
+                .setSpendRuleId(SPEND_RULE_ID)
+                .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setSpendDecisionSn(SPEND_DECISION_SN)
+                .setSpendDecisionResult(decisionResult)
+                .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
+                .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setRejectReason(rejectReason);
     }
 
     private RecordSpendControlActivityRequest recordRequest(SpendControlAdmissionDecisionDTO decision,
@@ -493,25 +484,6 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
                 .setBudgetGroupSn(decision.getBudgetGroupSn())
                 .setRejectReason(decision.getRejectReason())
                 .setActivityDigest(activityDigest);
-    }
-
-    private ResolveSpendControlAdmissionRequest admissionRequest(String businessSn) {
-        return new ResolveSpendControlAdmissionRequest()
-                .setTenantId(TENANT_ID)
-                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
-                .setAction(PaymentInstrumentAction.AUTHORIZE)
-                .setAmount(60L)
-                .setCurrency(CurrencyIsoCode.USD)
-                .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
-                .setExpectedBindingVersion(1)
-                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
-                .setBusinessScene(BUSINESS_SCENE)
-                .setBusinessSn(businessSn)
-                .setSpendRuleId(SPEND_RULE_ID)
-                .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendDecisionSn(SPEND_DECISION_SN)
-                .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
-                .setBudgetGroupSn(BUDGET_GROUP_SN);
     }
 
     private CreateCreditAccountRequest createCreditAccountRequest() {
@@ -620,11 +592,7 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
             CreditAccountServiceImpl.class,
             PaymentInstrumentServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
-            PaymentInstrumentCapabilityApplicationServiceImpl.class,
-            FundingResponsibilityResolutionApplicationServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
-            PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
-            SpendControlAdmissionApplicationServiceImpl.class,
             SpendControlActivityApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })

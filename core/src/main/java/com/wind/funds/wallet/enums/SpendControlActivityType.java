@@ -14,25 +14,70 @@ import lombok.Getter;
 @Getter
 public enum SpendControlActivityType implements DescriptiveEnum {
 
-    ADMISSION_RECORDED("准入已记录"),
+    ADMISSION_RECORDED("准入已记录", false, false, false, true),
 
-    REJECTED_RECORDED("拒绝已记录"),
+    REJECTED_RECORDED("拒绝已记录", false, false, false, true),
 
-    LIMIT_INCREASED("控制额度调增"),
+    LIMIT_INCREASED("控制额度调增", true, true, false, false),
 
-    LIMIT_DECREASED("控制额度调减"),
+    LIMIT_DECREASED("控制额度调减", true, true, false, false),
 
-    RESERVED("控制占用"),
+    RESERVED("控制占用", true, false, false, false),
 
-    CONSUMED("控制消耗"),
+    CONSUMED("控制消耗", true, false, false, false),
 
-    REFUND_COMPENSATED("退款控制补偿"),
+    REFUND_COMPENSATED("退款控制补偿", true, false, false, false),
 
-    RELEASED("控制释放"),
+    RELEASED("控制释放", true, false, true, false),
 
-    EXPIRED("控制过期"),
+    EXPIRED("控制过期", true, false, true, false),
 
-    REVERSED("控制撤销");
+    REVERSED("控制撤销", true, false, true, false);
+
+    private static final String DECISION_RECORD_PRODUCT_SEMANTIC = "SpendRuleDecisionRecord";
+
+    private static final String CONTROL_MOVEMENT_PRODUCT_SEMANTIC = "SpendControlMovement";
 
     private final String desc;
+
+    /**
+     * 是否参与预算控制投影。
+     */
+    private final boolean budgetProjectionActivity;
+
+    /**
+     * 是否属于预算控制额度调整流水。
+     */
+    private final boolean limitAdjustmentActivity;
+
+    /**
+     * 是否属于释放、过期或撤销类控制占用释放流水。
+     */
+    private final boolean releaseActivity;
+
+    /**
+     * 是否为历史决策记录兼容活动类型。
+     */
+    private final boolean decisionRecordCompatibilityActivity;
+
+    /**
+     * 是否为新的控制额度变动流水可写类型。
+     *
+     * @return true 表示可以通过控制额度变动流水入口写入
+     */
+    public boolean isControlMovementActivity() {
+        return budgetProjectionActivity;
+    }
+
+    /**
+     * 获取兼容期产品目标语义。
+     *
+     * @return 产品目标语义
+     */
+    public String getProductSemantic() {
+        if (decisionRecordCompatibilityActivity) {
+            return DECISION_RECORD_PRODUCT_SEMANTIC;
+        }
+        return CONTROL_MOVEMENT_PRODUCT_SEMANTIC;
+    }
 }

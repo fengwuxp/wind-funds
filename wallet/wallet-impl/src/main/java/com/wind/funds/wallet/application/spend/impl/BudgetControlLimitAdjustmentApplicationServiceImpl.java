@@ -113,12 +113,15 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
         if (Boolean.TRUE.equals(request.getIncrease())) {
             return;
         }
+        long committedControlAmount = beforeProjection.getConsumedAmount()
+                + beforeProjection.getRemainingControlAmount();
         long proposedLimitAmount = beforeProjection.getLimitAmount() - request.getAmount();
-        AssertUtils.isTrue(proposedLimitAmount >= beforeProjection.getRemainingControlAmount(),
-                "预算控制额度调减不能低于已占用控制金额，activitySn = {}, limitAmount = {}, occupiedAmount = {}",
+        AssertUtils.isTrue(proposedLimitAmount >= committedControlAmount,
+                "预算控制额度调减不能低于已使用或已占用控制金额，activitySn = {}, "
+                        + "limitAmount = {}, committedControlAmount = {}",
                 request.getActivitySn(),
                 proposedLimitAmount,
-                beforeProjection.getRemainingControlAmount());
+                committedControlAmount);
     }
 
     private BudgetControlLimitAdjustmentResultDTO toResult(AdjustBudgetControlLimitRequest request,

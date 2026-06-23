@@ -15,13 +15,8 @@ import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryServ
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.FundsAccountCapabilityApplicationService;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
-import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResolutionApplicationServiceImpl;
-import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
-import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlActivityApplicationServiceImpl;
-import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
-import com.wind.funds.wallet.dal.mapper.SpendControlActivityMapper;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -41,7 +36,6 @@ import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
-import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
@@ -212,9 +206,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private SpendSubjectFundingRelationService fundingRelationService;
 
     @Autowired
-    private SpendControlAdmissionApplicationService spendControlAdmissionApplicationService;
-
-    @Autowired
     private SpendControlActivityApplicationService spendControlActivityApplicationService;
 
     @Autowired
@@ -225,9 +216,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     @Autowired
     private FundsTransactionQueryService fundsTransactionQueryService;
-
-    @Autowired
-    private SpendControlActivityMapper spendControlActivityMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -1050,8 +1038,22 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     private SpendControlAdmissionDecisionDTO admittedDecision() {
-        return spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED));
+        return new SpendControlAdmissionDecisionDTO()
+                .setTenantId(TENANT_ID)
+                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setAction(PaymentInstrumentAction.AUTHORIZE)
+                .setAmount(60L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(BUSINESS_SN)
+                .setAdmitted(true)
+                .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT))
+                .setSpendRuleId(SPEND_RULE_ID)
+                .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setSpendDecisionSn(SPEND_DECISION_SN)
+                .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
+                .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
+                .setBudgetGroupSn(BUDGET_GROUP_SN);
     }
 
     private RecordSpendControlActivityRequest recordRequest(SpendControlAdmissionDecisionDTO decision,
@@ -1094,25 +1096,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setCurrency(CurrencyIsoCode.USD)
                 .setActivityDigest(activityDigest)
                 .setDescription("交易成功后消费 Spend Rule 控制占用");
-    }
-
-    private ResolveSpendControlAdmissionRequest admissionRequest() {
-        return new ResolveSpendControlAdmissionRequest()
-                .setTenantId(TENANT_ID)
-                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
-                .setAction(PaymentInstrumentAction.AUTHORIZE)
-                .setAmount(60L)
-                .setCurrency(CurrencyIsoCode.USD)
-                .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
-                .setExpectedBindingVersion(1)
-                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
-                .setBusinessScene(BUSINESS_SCENE)
-                .setBusinessSn(BUSINESS_SN)
-                .setSpendRuleId(SPEND_RULE_ID)
-                .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendDecisionSn(SPEND_DECISION_SN)
-                .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
-                .setBudgetGroupSn(BUDGET_GROUP_SN);
     }
 
     private BudgetControlProjectionQuery projectionQuery() {
@@ -1248,28 +1231,22 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     private SpendControlTransactionConsumptionApplicationService concurrentConsumptionService(int concurrentInserts) {
-        SpendControlActivityApplicationService activityService = new SpendControlActivityApplicationServiceImpl(
-                gatedSpendControlActivityMapper(concurrentInserts),
-                fundsAccountCapabilityApplicationService);
-        return new SpendControlTransactionConsumptionApplicationServiceImpl(activityService, fundsTransactionQueryService);
-    }
-
-    private SpendControlActivityMapper gatedSpendControlActivityMapper(int concurrentInserts) {
-        CountDownLatch insertReady = new CountDownLatch(concurrentInserts);
-        return (SpendControlActivityMapper) Proxy.newProxyInstance(
-                SpendControlActivityMapper.class.getClassLoader(),
-                new Class<?>[]{SpendControlActivityMapper.class},
+        CountDownLatch recordReady = new CountDownLatch(concurrentInserts);
+        SpendControlActivityApplicationService activityService = (SpendControlActivityApplicationService) Proxy.newProxyInstance(
+                SpendControlActivityApplicationService.class.getClassLoader(),
+                new Class<?>[]{SpendControlActivityApplicationService.class},
                 (proxy, method, args) -> {
-                    if ("insertSelective".equals(method.getName())) {
-                        insertReady.countDown();
-                        assertThat(insertReady.await(5, TimeUnit.SECONDS)).isTrue();
+                    if ("recordActivity".equals(method.getName())) {
+                        recordReady.countDown();
+                        assertThat(recordReady.await(5, TimeUnit.SECONDS)).isTrue();
                     }
                     try {
-                        return method.invoke(spendControlActivityMapper, args);
+                        return method.invoke(spendControlActivityApplicationService, args);
                     } catch (InvocationTargetException exception) {
                         throw exception.getCause();
                     }
                 });
+        return new SpendControlTransactionConsumptionApplicationServiceImpl(activityService, fundsTransactionQueryService);
     }
 
     private <T> T withTenant(Callable<T> command) throws Exception {
@@ -1303,11 +1280,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
             CreditAccountServiceImpl.class,
             PaymentInstrumentServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
-            PaymentInstrumentCapabilityApplicationServiceImpl.class,
-            FundingResponsibilityResolutionApplicationServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
-            PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
-            SpendControlAdmissionApplicationServiceImpl.class,
             SpendControlActivityApplicationServiceImpl.class,
             SpendControlTransactionConsumptionApplicationServiceImpl.class,
             DefaultFundsTransactionQueryService.class,
