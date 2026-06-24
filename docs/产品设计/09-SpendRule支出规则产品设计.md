@@ -173,10 +173,17 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 
 | 产品语义 | 当前代码载体 | 已具备的服务层证据 | 不代表 |
 | --- | --- | --- | --- |
-| 规则定义、版本和挂载 | `SpendRuleDefinitionApplicationService`、`SpendRuleVersion`、`SpendRuleAssignment`。 | 支持创建规则、发布不可变 `ruleSpec / ruleDigest` 版本、挂载 scope、查询和解释挂载。 | 不代表完整规则表达式引擎、运营后台或生产迁移已完成。 |
-| 决策记录 | `SpendRuleDecisionLog`、`RecordSpendRuleDecisionLogRequest`、`SpendRuleDecisionLogQuery`、`SpendRuleDecisionExplainQuery`。 | 支持按单条 rule / assignment / scope 固化决策结果、拒绝原因和 `decisionDigest`，支持按决策流水、业务流水、规则、挂载、scope、支付工具和决策结果做服务层只读查询，并可输出拒绝原因和证据引用；已证明拒绝、查询和解释无资金事实副作用。 | 不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
+| 规则定义、版本和挂载 | 当前兼容 facade `SpendRuleDefinitionApplicationService` 保留公共入口；工程分层已拆出 `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleAssignmentService`、`SpendRuleDefinitionDomainService` 和 `SpendRuleAssignmentDomainQueryService`。 | 支持创建规则、发布不可变 `ruleSpec / ruleDigest` 版本、挂载 scope、查询和解释挂载；已证明版本摘要冲突、挂载幂等、挂载只读解释和失败无资金副作用。 | 不代表完整规则表达式引擎、运营后台、生产迁移已完成；兼容 facade 仍不应继续扩成规则大服务。 |
+| 决策记录 | `SpendRuleDecisionLog`、`RecordSpendRuleDecisionLogRequest`、`SpendRuleDecisionLogQuery`、`SpendRuleDecisionExplainQuery`；服务层已拆出代码兼容名 `SpendRuleDecisionLogService`、`SpendRuleDecisionLogDomainService` 和 `SpendRuleDecisionLogDomainQueryService`。 | 支持按单条 rule / assignment / scope 固化决策结果、拒绝原因和 `decisionDigest`，支持按决策流水、业务流水、规则、挂载、scope、支付工具和决策结果做服务层只读查询，并可输出拒绝原因和证据引用；已证明拒绝、查询和解释无资金事实副作用。 | 不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
 | 控制额度变动流水 | `SpendControlActivity`、`RecordSpendControlActivityRequest`、`SpendControlActivityType`。 | 支持调额、预留、消耗、释放、退款补偿和预算控制投影，且历史准入类 activity 不再允许新写入。 | 不代表控制事实是资金交易、账本交易或账本余额。 |
 | 预算控制投影 | `BudgetControlProjectionDTO`。 | 支持按控制流水重建 `limitAmount`、`consumedAmount`、`remainingControlAmount` 和 `availableControlAmount`。 | 不代表预算组、Spend Rule 或控制视图可以作为账务主体。 |
+
+产品到工程分层口径：
+
+1. 产品文档只定义 Spend Rule 的业务对象、能力、流程、验收和风险，不强制工程服务必须全部命名为 application service。
+2. 规则定义、版本、挂载、决策记录、控制额度变动流水和预算控制投影是产品能力对象；工程上应按基础服务、领域写服务、领域读服务和场景服务分层承接。
+3. 当前 `SpendRuleDefinitionApplicationService` 是兼容代码载体，规则定义、版本、挂载、挂载查询 / 解释以及决策记录写入 / 查询 / 解释已委派到目标分层服务；后续新增能力优先落到目标分层，再由兼容 facade 委派，避免继续扩大单一规则服务。
+4. 支出控制准入、交易结果消费和支付工具生命周期入口仍属于场景服务，因为它们需要组合支付工具、资金责任、账户能力、Spend Rule 证据和交易 canonical 服务。
 
 ## 6. 能力地图
 
@@ -372,7 +379,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 
 | 验收种子 | 推荐测试资产 | 通过标准 |
 | --- | --- | --- |
-| AC-SR-001 / AC-SR-002 | SpendRuleDefinitionApplicationServiceTests | 规则定义、版本不可变、挂载 scope、冲突策略和有效期可追踪。 |
+| AC-SR-001 / AC-SR-002 | SpendRuleDefinitionDomainServiceTests、SpendRuleDefinitionApplicationServiceTests | 目标领域写服务证明规则定义、版本不可变、挂载 scope、冲突策略和有效期可追踪；兼容 facade 测试证明公共入口仍可用。 |
 | AC-SR-003 / AC-SR-004 | SpendControlAdmissionApplicationServiceTests、AuthorizationAdmissionApplicationServiceTests | 拒绝停在交易内核前，通过后仍继续账户能力、资金责任和余额校验。 |
 | AC-SR-005 | FundsTransactionProjectionExplainApplicationServiceTests | 投影只读读取历史规则版本、挂载、决策流水和控制引用，不输出敏感原文。 |
 | AC-SR-006 | SpendControlActivityApplicationServiceTests、BudgetControlLimitAdjustmentApplicationServiceTests、SpendControlTransactionConsumptionApplicationServiceTests | 控制额度变动流水可重建预算控制视图，不反写账本余额。 |

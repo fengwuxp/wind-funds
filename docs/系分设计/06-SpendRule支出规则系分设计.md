@@ -77,7 +77,7 @@
 
 技术目标：
 
-1. wallet application 能以服务层契约管理规则事实、决策事实和控制事实。
+1. wallet 服务层能以分层契约管理规则事实、决策事实和控制事实；不是所有对外服务都命名或实现为 application service。
 2. transaction 只读消费已固化 `spendRuleDecision` 和控制额度变动引用，不计算规则。
 3. ledger 对 Spend Rule、预算组、支付工具和控制 scope 保持不可入账主体护栏。
 4. 规则拒绝、摘要冲突、挂载非法、证据缺失等失败路径无 route、posting、LedgerEntry、ledger transaction 或余额投影副作用。
@@ -106,7 +106,7 @@
 
 | 追踪ID | 产品语义 | 工程承接 | 设计结论 | 验证资产 |
 | --- | --- | --- | --- | --- |
-| REQ-SR-001 | 规则定义、版本和挂载。 | SpendRuleDefinitionApplicationService、规则定义表、规则版本表、规则挂载表。 | 已发布版本不可变，挂载必须有 scope、优先级和冲突策略。 | SpendRuleDefinitionApplicationServiceTests。 |
+| REQ-SR-001 | 规则定义、版本和挂载。 | 当前兼容 facade `SpendRuleDefinitionApplicationService`、规则定义表、规则版本表、规则挂载表；目标分层拆为规则定义基础服务、规则版本领域服务、规则挂载领域 / 查询服务。 | 已发布版本不可变，挂载必须有 scope、优先级和冲突策略。 | `SpendRuleDefinitionApplicationServiceTests` 作为兼容 facade 回归；后续新增分层服务测试。 |
 | REQ-SR-002 | 决策记录和拒绝原因。 | RecordSpendRuleDecisionLogRequest、决策记录表、准入组合。 | 决策记录不可改写，同流水同摘要幂等，同流水不同摘要拒绝。 | SpendControlAdmissionApplicationServiceTests、AuthorizationAdmissionApplicationServiceTests。 |
 | REQ-SR-003 | 控制额度变动和预算控制投影。 | SpendControlActivityApplicationService、SpendControlTransactionConsumptionApplicationService、BudgetControlProjectionDTO。 | 控制额度变动流水不写账本，预算控制投影可重建。 | SpendControlActivityApplicationServiceTests、BudgetControlLimitAdjustmentApplicationServiceTests、SpendControlTransactionConsumptionApplicationServiceTests。 |
 | REQ-SR-004 | 历史交易投影解释。 | TransactionProjectionExplanationSource 和已固化 `spendRuleDecision` 快照。 | 只读解释历史版本、挂载、决策和控制引用，不执行规则 DSL。 | FundsTransactionProjectionExplainApplicationServiceTests。 |
@@ -123,7 +123,7 @@
 
 核心方案：
 
-1. 规则定义、版本、挂载和决策记录先以 `SpendRuleDefinitionApplicationService` 形成最小持久化边界。
+1. 规则定义、版本、挂载和决策记录当前以 `SpendRuleDefinitionApplicationService` 形成兼容 facade；新增能力不再扩大该 facade，目标按基础服务、领域写服务、领域读服务和场景服务分层收敛。
 2. 支出控制准入继续由 `SpendControlAdmissionApplicationService` 消费外部或上层决策证据。
 3. 控制额度变动流水和预算控制投影继续作为控制事实和只读视图，不进入 ledger posting。
 4. 交易投影解释只读取历史规则版本、挂载、决策流水和控制额度变动引用。
@@ -169,26 +169,55 @@ Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费
 3. 交易模块不得 import `SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleAssignment`、`SpendRuleDecisionLog`、`SpendControlActivity` 等 wallet DAL 实体或 Mapper；其中 `SpendRuleDecisionLog`、`SpendControlActivity` 是当前代码兼容名，产品语义分别对应 `SpendRuleDecisionRecord`、`SpendControlMovement`。
 4. 边界测试需扫描 `transaction-*` 生产源码，防止 Spend Rule 主能力反向沉入交易内核。
 
-## 5. 详细设计：应用服务能力和接口设计
+### 4.2 服务层分层基线
 
-当前最小系统闭环可先由一个 application service 承载规则定义、版本、挂载和决策记录；后续如果职责继续增大，再拆为 Definition、Assignment、Decision 三组服务。
+Spend Rule 服务层遵循资金底座统一的四类服务划分。命名后缀表达服务职责，不表达“是否能跨模块调用”：跨模块可调用的只读查询、基础维护或领域状态变更不应因为在 face 中暴露就全部命名为 application service。
 
-| 应用服务 | 能力 | 入参 | 出参 | 边界 |
+| 服务类型 | Spend Rule 目标服务 | 职责 | 当前兼容载体 |
+| --- | --- | --- | --- |
+| 基础服务 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleAssignmentService`、`SpendRuleDecisionRecordService`、`SpendControlMovementService` | 数据访问协调、基础创建、单对象读取和简单查询；允许直接访问 Mapper / Repository。 | 当前已补 `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleAssignmentService`，以及代码兼容名 `SpendRuleDecisionLogService`、`SpendControlActivityService`。 |
+| 领域写服务 | `SpendRuleDefinitionDomainService`、`SpendRuleDecisionRecordDomainService`、`SpendControlMovementDomainService` | 规则定义创建、不可变版本发布、规则挂载、决策记录幂等摘要冲突、控制额度变动规则和状态守卫。 | 当前已补 `SpendRuleDefinitionDomainService`，以及代码兼容名 `SpendRuleDecisionLogDomainService`、`SpendControlActivityDomainService`。 |
+| 领域读服务 | `SpendRuleAssignmentDomainQueryService`、`SpendRuleDecisionRecordDomainQueryService`、`SpendControlMovementDomainQueryService`、`BudgetControlProjectionDomainQueryService` | 挂载查询、挂载解释、决策记录查询、控制流水查询和预算控制投影重建；只读、不改状态。 | 当前已补 `SpendRuleAssignmentDomainQueryService`，以及代码兼容名 `SpendRuleDecisionLogDomainQueryService`、`SpendControlActivityDomainQueryService`；兼容 application service 仅负责委派。 |
+| 场景服务 | `SpendControlAdmissionApplicationService`、`SpendControlTransactionConsumptionApplicationService`、`InstrumentTransactionLifecycleApplicationService` | 授权前准入、交易后消费 / 释放 / 退款补偿、支付工具生命周期入口等跨对象用例编排和事务边界。 | 已作为 application service 保留。 |
+
+兼容策略：
+
+1. `SpendRuleDefinitionApplicationService` 当前保留为公共兼容 facade，避免立即破坏既有测试、调用方和文档证据；它不是目标态无限扩展的“规则大服务”。
+2. 新增规则定义、版本、挂载、决策记录或控制流水能力时，先判断属于基础服务、领域写服务、领域读服务还是场景服务；只有跨领域用例编排才新增或扩展 application service。
+3. 除基础服务外，领域服务、领域查询服务和 application service 不直接访问 Mapper / Repository；迁移前的兼容实现需要在任务卡中标记为技术债。
+4. 代码收敛必须采用兼容切片：先补分层接口和服务层测试，再让兼容 facade 委派目标服务，最后评估公共类名迁移；不得在同一 Grant 中改 Controller、HTTP/RPC、交易 canonical 入参、ledger posting 或生产 DDL。
+
+## 5. 详细设计：服务能力和接口设计
+
+当前最小系统闭环由 `SpendRuleDefinitionApplicationService` 和 `SpendControlActivityApplicationService` 保留公共兼容 facade。规则定义、版本发布、挂载写入、挂载查询 / 解释、决策记录写入 / 查询 / 解释、控制额度变动流水写入 / 查询和预算控制投影均已委派到目标分层服务；兼容 facade 只作为既有公共入口和回归保护，后续不能继续把所有规则能力追加到单一 application service。
+
+| 服务或组件 | 能力 | 入参 | 出参 | 边界 |
 | --- | --- | --- | --- | --- |
-| SpendRuleDefinitionApplicationService | 创建规则定义、发布不可变版本、挂载规则版本、查询挂载、解释挂载可用性、记录决策记录、查询决策记录、解释决策事实。 | CreateSpendRuleDefinitionRequest、PublishSpendRuleVersionRequest、AssignSpendRuleVersionRequest、SpendRuleAssignmentQuery、SpendRuleAssignmentExplainQuery、RecordSpendRuleDecisionLogRequest、SpendRuleDecisionLogQuery、SpendRuleDecisionExplainQuery。 | SpendRuleDefinitionDTO、SpendRuleVersionDTO、SpendRuleAssignmentDTO、SpendRuleAssignmentExplanationDTO、SpendRuleDecisionLogDTO、SpendRuleDecisionExplanationDTO。 | 只管理规则事实和决策事实；查询和解释为只读能力，不计算复杂规则、不创建交易、不写账本。当前 Request / DTO 保留 Log 兼容名。 |
+| SpendRuleDefinitionApplicationService | 当前兼容 facade：创建规则定义、发布不可变版本、挂载规则版本、查询挂载、解释挂载可用性，并委派决策记录写入、查询和解释。 | CreateSpendRuleDefinitionRequest、PublishSpendRuleVersionRequest、AssignSpendRuleVersionRequest、SpendRuleAssignmentQuery、SpendRuleAssignmentExplainQuery、RecordSpendRuleDecisionLogRequest、SpendRuleDecisionLogQuery、SpendRuleDecisionExplainQuery。 | SpendRuleDefinitionDTO、SpendRuleVersionDTO、SpendRuleAssignmentDTO、SpendRuleAssignmentExplanationDTO、SpendRuleDecisionLogDTO、SpendRuleDecisionExplanationDTO。 | 只作为兼容入口和回归保护；规则定义、版本、挂载、挂载查询 / 解释和决策记录均已委派到目标分层服务。查询和解释为只读能力，不计算复杂规则、不创建交易、不写账本。当前 Request / DTO 保留 Log 兼容名。 |
+| SpendRuleDefinitionService | 规则定义基础创建和按 ruleId 读取。 | CreateSpendRuleDefinitionRequest、tenantId、ruleId。 | SpendRuleDefinitionDTO。 | 基础服务可访问 Mapper；只做数据访问协调和 DTO 映射，不负责版本发布、挂载校验、规则执行或决策日志。 |
+| SpendRuleVersionService | 规则版本基础创建、按版本读取和已发布版本读取。 | PublishSpendRuleVersionRequest、tenantId、ruleId、ruleVersion。 | SpendRuleVersionDTO。 | 基础服务可访问 Mapper；不判断发布业务不变量，不执行规则，不生成交易或账务事实。 |
+| SpendRuleAssignmentService | 规则挂载基础创建、按 assignmentSn 读取、条件查询和有效挂载读取。 | AssignSpendRuleVersionRequest、SpendRuleAssignmentQuery、tenantId、assignmentSn。 | SpendRuleAssignmentDTO。 | 基础服务可访问 Mapper；不计算规则、不记录决策日志、不调整控制额度。 |
+| SpendRuleDefinitionDomainService | 规则定义、不可变版本和规则挂载的写侧领域不变量。 | CreateSpendRuleDefinitionRequest、PublishSpendRuleVersionRequest、AssignSpendRuleVersionRequest。 | SpendRuleDefinitionDTO、SpendRuleVersionDTO、SpendRuleAssignmentDTO。 | 不直接访问 Mapper；校验定义幂等、版本不可原地覆盖、已发布版本挂载和挂载幂等；不执行规则、不记录决策日志、不生成交易、route、posting、LedgerEntry 或余额投影。 |
+| SpendRuleAssignmentDomainQueryService | 规则挂载查询和挂载可用性解释。 | SpendRuleAssignmentQuery、SpendRuleAssignmentExplainQuery。 | SpendRuleAssignmentDTO、SpendRuleAssignmentExplanationDTO。 | 不直接访问 Mapper；只读消费已固化挂载事实，不重新执行规则、不记录决策日志、不调整控制额度。 |
+| SpendRuleDecisionLogService | 决策记录基础写入、单条读取和窄条件查询。 | RecordSpendRuleDecisionLogRequest、SpendRuleDecisionLogQuery。 | SpendRuleDecisionLogDTO。 | 基础服务可访问 Mapper；只处理数据访问协调和 DTO 映射，不承载准入编排、交易事实或账本事实。 |
+| SpendRuleDecisionLogDomainService | 决策记录领域写入，校验规则版本、挂载、有效期、支付工具 scope 一致性、幂等摘要冲突和拒绝原因语义。 | RecordSpendRuleDecisionLogRequest。 | SpendRuleDecisionLogDTO。 | 不直接访问 Mapper；不生成交易、route、posting、LedgerEntry 或余额投影。 |
+| SpendRuleDecisionLogDomainQueryService | 决策记录查询和解释。 | SpendRuleDecisionLogQuery、SpendRuleDecisionExplainQuery。 | SpendRuleDecisionLogDTO、SpendRuleDecisionExplanationDTO。 | 不直接访问 Mapper；不重算规则，不反写任何事实。 |
 | SpendControlAdmissionApplicationService | 消费外部或上层提供的 Spend Rule 决策证据，组合支付工具预交易快照形成准入结论。 | 支付工具快照、规则版本、决策流水、决策摘要、拒绝原因。 | 支出控制准入快照。 | 不持久化规则定义，不写控制额度变动流水，不更新预算投影。 |
-| SpendControlActivityApplicationService | 记录控制额度变动流水并派生预算控制投影。 | 控制流水、变动类型、目标主体、预算 scope、金额币种、规则引用、决策引用。 | 控制额度变动流水 DTO、预算控制投影 DTO；当前 DTO 保留 Activity 兼容名。 | 不写资金交易、route、posting、LedgerEntry 或账本余额投影。当前 Service / DTO 保留 Activity 兼容名。 |
+| SpendControlActivityService | 控制额度变动流水基础写入、单条读取和窄条件查询。 | RecordSpendControlActivityRequest、SpendControlActivityQuery。 | SpendControlActivityDTO。 | 基础服务可访问 Mapper；只处理数据访问协调和 DTO 映射，不承载交易后消费、预算控制规则或资金事实。当前 Service / DTO 保留 Activity 兼容名。 |
+| SpendControlActivityDomainService | 控制额度变动流水领域写入，校验目标账务主体、活动类型、幂等摘要、释放上限、调额上限和预算 scope 边界。 | RecordSpendControlActivityRequest。 | SpendControlActivityDTO。 | 不直接访问 Mapper；不写资金交易、route、posting、LedgerEntry 或账本余额投影。当前接口保留 Activity 兼容名，产品语义为 SpendControlMovementDomainService。 |
+| SpendControlActivityDomainQueryService | 控制额度变动流水查询和预算控制投影重建。 | SpendControlActivityQuery、BudgetControlProjectionQuery。 | SpendControlActivityDTO、BudgetControlProjectionDTO。 | 不直接访问 Mapper；只读消费控制事实，不反写任何资金事实。当前接口保留 Activity 兼容名，产品语义为 SpendControlMovementDomainQueryService。 |
+| SpendControlActivityApplicationService | 当前兼容 facade：记录控制额度变动流水并派生预算控制投影。 | 控制流水、变动类型、目标主体、预算 scope、金额币种、规则引用、决策引用。 | 控制额度变动流水 DTO、预算控制投影 DTO；当前 DTO 保留 Activity 兼容名。 | 只作为兼容入口和回归保护，委派 `SpendControlActivityDomainService` 和 `SpendControlActivityDomainQueryService`；不写资金交易、route、posting、LedgerEntry 或账本余额投影。当前 Service / DTO 保留 Activity 兼容名。 |
 | SpendControlTransactionConsumptionApplicationService | 交易成功、失败、撤销、过期、退款或争议后消费、释放或补偿控制额度变动。 | 原预留流水、资金交易引用、交易结果、退款引用。 | 交易后控制额度变动流水。 | 只桥接交易事实和控制事实，不改交易 canonical 入参。 |
 | TransactionProjectionExplanationSource | 读取规则决策和控制额度变动流水，生成交易投影解释。 | 资金交易、route snapshot、规则决策、控制额度变动引用、账本摘要。 | 只读解释 payload 和 evidenceRefs。 | 不重算规则，不反写事实。 |
 
 服务分层规则：
 
-1. 规则定义服务负责“规则是什么、哪个版本、挂到谁、这次决策是什么”。
-2. 准入服务负责“交易前是否允许继续”，失败必须停在交易内核前。
-3. 控制额度变动服务负责“规则执行后的金额控制证据”，例如额度调整、预留、消耗、释放、退款补偿。
-4. 投影解释服务负责“给用户、运营、财务和审计解释历史”，只能只读消费证据。
+1. 基础服务负责“规则定义、决策记录、控制流水这些对象如何被持久化和简单读取”。
+2. 领域写服务负责“版本是否可发布、挂载是否有效、控制变动是否允许、摘要是否冲突”。
+3. 领域读服务负责“挂载、决策、控制流水和预算控制投影如何查询和解释”，只能只读消费证据。
+4. 场景服务负责“交易前是否允许继续、交易后如何消费或释放控制额度、支付工具入口如何委派账户主体交易”，失败必须停在交易内核前或只追加控制事实。
 
-### 5.1 Application 接口契约
+### 5.1 当前兼容接口契约
 
 | 接口 | 方法 | 入参 | 出参 | 幂等 / 事务 | 错误语义 | 副作用边界 |
 | --- | --- | --- | --- | --- | --- | --- |

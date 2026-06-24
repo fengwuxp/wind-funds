@@ -129,10 +129,19 @@ Spend Rule 测试设计优先引用独立产品分册 09、系分分册 06 和 D
 | 测试资产 | 当前证明 | 不证明 |
 | --- | --- | --- |
 | `SpendRuleDefinitionApplicationServiceTests` | 规则版本不可变、挂载冲突策略和有效期、支付工具范围一致性、挂载查询解释、单条决策记录幂等、决策记录窄查询、决策事实解释和拒绝 / 查询 / 解释无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、批量规则时间线 Query Service、运营后台。 |
+| `SpendRuleDefinitionDomainServiceTests` | 规则定义、版本发布、规则挂载和挂载查询 / 解释已经按目标分层服务执行；覆盖版本同摘要幂等、异摘要拒绝覆盖、挂载幂等、非法挂载拒绝、查询 / 解释只读和无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、运营后台、DDL / 生产迁移。 |
 | `SpendControlAdmissionApplicationServiceTests`、`AuthorizationAdmissionApplicationServiceTests` | 上层决策证据可进入准入快照和授权准入组合；拒绝停在交易内核前且无资金事实。 | 支付工具全场景生产可用、事件消费、控制额度自动占用。 |
 | `SpendControlActivityApplicationServiceTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests` | 控制额度变动流水、预算额度调额、交易成功消耗、失败释放、退款补偿、目标账户隔离和投影下限守卫。 | 账本余额、资金交易事实、生产迁移或历史脏数据修复。 |
 | `SpendControlActivityTypeContractTests` | 兼容期枚举分类集中在枚举本身，历史决策兼容类型不参与预算投影。 | 公共类名、表名、DTO 或历史枚举删除。 |
 | `FundsTransactionProjectionExplainApplicationServiceTests` / `AuthorizationAdmissionApplicationServiceTests` | 已固化 Spend Rule 决策快照可被交易投影只读解释，不输出 `ruleSpec` 或敏感原文。 | 完整规则定义、版本、挂载、决策记录和控制额度变动流水的运营时间线。 |
+
+Spend Rule 服务层分层测试口径：
+
+1. 当前带 `ApplicationServiceTests` 后缀的测试资产优先表达兼容 facade 的回归保护，不等于目标态所有规则能力都应继续放在 application service。
+2. 后续拆分服务时，新增测试应按服务职责命名：基础服务覆盖持久化和简单读取，领域写服务覆盖版本、挂载、控制变动和摘要冲突，领域读服务覆盖查询、解释和预算控制投影，application service 覆盖准入、交易消费、支付工具生命周期等跨对象编排。
+3. 兼容 facade 委派目标分层服务后，原 `SpendRuleDefinitionApplicationServiceTests` 仍需保留为公共契约回归；新增分层服务测试不能替代 facade 兼容测试。
+4. 除基础服务测试外，领域服务、领域查询服务和 application service 测试不得要求被测对象直接访问 Mapper / Repository；如当前兼容实现仍直接访问，需要在任务卡中标注为待收敛技术债。
+5. `SpendRuleDecisionLogDomainServiceTests` 和 `SpendRuleDefinitionDomainServiceTests` 是当前分层服务测试资产，分别覆盖决策记录幂等 / 窄查询 / 失败无资金副作用，以及规则定义 / 版本 / 挂载的目标分层行为；它们与 `SpendRuleDefinitionApplicationServiceTests` 分别保护目标分层行为和兼容 facade 公共契约。
 
 Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`assignmentSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立 Execution Grant。
 
