@@ -46,9 +46,7 @@ import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResol
 import com.wind.funds.wallet.application.instrument.impl.AuthorizationAdmissionApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
-import com.wind.funds.wallet.application.spend.SpendRuleDefinitionApplicationService;
 import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
-import com.wind.funds.wallet.application.spend.impl.SpendRuleDefinitionApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -76,7 +74,9 @@ import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
+import com.wind.funds.wallet.service.SpendRuleDefinitionDomainService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
+import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
@@ -84,7 +84,17 @@ import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleAssignmentDomainQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDefinitionDomainServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogDomainQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogDomainServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -180,7 +190,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private SpendSubjectFundingRelationService fundingRelationService;
 
     @Autowired
-    private SpendRuleDefinitionApplicationService spendRuleDefinitionApplicationService;
+    private SpendRuleDefinitionDomainService spendRuleDefinitionDomainService;
 
     @Autowired
     private FundsBalanceControlService balanceControlService;
@@ -244,7 +254,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     /**
      * 场景：支付工具授权入口携带 Spend Rule 决策证据，规则准入通过后进入授权内核。
      * 输入：支付工具、资金责任、账户能力和 Spend Rule 决策均通过。
-     * 输出：交易投影解释可以展示规则、版本、挂载、scope、决策流水、结果和决策日志引用。
+     * 输出：交易投影解释可以展示规则、版本、挂载、scope、决策流水、结果和决策记录引用。
      * 红线：规则解释只读，不执行规则脚本，不读取规则原文，不新增资金或账本事实。
      */
     @Test
@@ -483,9 +493,9 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     }
 
     private void prepareSpendRuleDecisionData() {
-        spendRuleDefinitionApplicationService.createDefinition(createSpendRuleDefinitionRequest());
-        spendRuleDefinitionApplicationService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleDefinitionApplicationService.assignVersion(assignSpendRuleVersionRequest());
+        spendRuleDefinitionDomainService.createDefinition(createSpendRuleDefinitionRequest());
+        spendRuleDefinitionDomainService.publishVersion(publishSpendRuleVersionRequest());
+        spendRuleDefinitionDomainService.assignVersion(assignSpendRuleVersionRequest());
     }
 
     private CreateSpendRuleDefinitionRequest createSpendRuleDefinitionRequest() {
@@ -828,17 +838,27 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             DefaultFundsTransactionProjectionExplainApplicationService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            AccountHierarchyBindingServiceImpl.class,
             AccountHierarchyServiceImpl.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
             PaymentInstrumentServiceImpl.class,
+            PaymentInstrumentBindingServiceImpl.class,
+            PaymentInstrumentBindingHistoryServiceImpl.class,
             PaymentInstrumentCapabilityApplicationServiceImpl.class,
             FundingResponsibilityResolutionApplicationServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
             PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
             SpendControlAdmissionApplicationServiceImpl.class,
-            SpendRuleDefinitionApplicationServiceImpl.class,
+            SpendRuleDefinitionServiceImpl.class,
+            SpendRuleDefinitionDomainServiceImpl.class,
+            SpendRuleVersionServiceImpl.class,
+            SpendRuleAssignmentServiceImpl.class,
+            SpendRuleAssignmentDomainQueryServiceImpl.class,
+            SpendRuleDecisionLogServiceImpl.class,
+            SpendRuleDecisionLogDomainServiceImpl.class,
+            SpendRuleDecisionLogDomainQueryServiceImpl.class,
             AuthorizationAdmissionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             PlatformFundingAccountServiceImpl.class

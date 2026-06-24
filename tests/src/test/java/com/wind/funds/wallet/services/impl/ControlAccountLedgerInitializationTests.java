@@ -442,6 +442,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
             LedgerServiceImpl.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             BudgetGroupServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class

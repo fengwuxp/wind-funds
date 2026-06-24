@@ -95,6 +95,18 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     }
 
     @Override
+    public @NonNull CreditAccountDTO getCreditAccount(@NonNull Long tenantId, @NonNull String accountSn) {
+        CreditAccountNameRefs ref = CreditAccountNameRefs.creditAccount;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(accountSn));
+        CreditAccount result = creditAccountMapper.selectOneByQuery(wrapper);
+        AssertUtils.notNull(result, "信用账户不存在，tenantId = {}, accountSn = {}", tenantId, accountSn);
+        return toDTO(result);
+    }
+
+    @Override
     public @NonNull WindPagination<CreditAccountDTO> queryCreditAccounts(
             @NonNull CreditAccountQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options) {

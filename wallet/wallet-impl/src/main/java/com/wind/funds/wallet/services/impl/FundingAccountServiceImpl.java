@@ -86,6 +86,18 @@ public class FundingAccountServiceImpl implements FundingAccountService {
     }
 
     @Override
+    public @NonNull FundingAccountDTO getFundingAccount(@NonNull Long tenantId, @NonNull String accountSn) {
+        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(accountSn));
+        FundingAccount result = fundingAccountMapper.selectOneByQuery(wrapper);
+        AssertUtils.notNull(result, "资金账户不存在，tenantId = {}, accountSn = {}", tenantId, accountSn);
+        return toDTO(result);
+    }
+
+    @Override
     public @NonNull WindPagination<FundingAccountDTO> queryFundingAccounts(
             @NonNull FundingAccountQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options) {
@@ -97,6 +109,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
                 .and(ref.ownerId.eq(query.getOwnerId()))
                 .and(ref.ownerType.eq(query.getOwnerType()))
                 .and(ref.accountType.eq(query.getAccountType()))
+                .and(ref.platform.eq(query.getPlatform()))
                 .and(ref.accountRoleCode.eq(query.getAccountRoleCode()))
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.status.eq(query.getStatus()));

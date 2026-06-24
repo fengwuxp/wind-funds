@@ -15,7 +15,7 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * 交易结果消费支出控制活动请求。
+ * 交易结果消费控制额度变动流水请求。
  *
  * @author Codex
  * @date 2026-06-20
@@ -38,7 +38,7 @@ public class SpendControlTransactionConsumptionRequest implements Serializable {
     @NotBlank
     private String activitySn;
 
-    @Schema(description = "原支出控制活动流水号")
+    @Schema(description = "原控制额度变动流水流水号")
     @NotBlank
     private String originalActivitySn;
 

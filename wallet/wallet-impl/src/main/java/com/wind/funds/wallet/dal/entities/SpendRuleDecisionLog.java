@@ -17,7 +17,10 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * Spend Rule 决策日志。
+ * Spend Rule 决策记录。
+ *
+ * <p>产品语义为 SpendRuleDecisionRecord；当前类名保留 SpendRuleDecisionLog 是为了兼容既有表名、
+ * DTO 和测试资产，后续公共类名迁移必须由独立 Grant 明确。</p>
  *
  * @author Codex
  * @date 2026-06-22

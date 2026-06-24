@@ -1,19 +1,19 @@
 package com.wind.funds.wallet.services.impl;
 
 import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.wallet.dal.entities.CreditAccount;
-import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.entities.SpendSubjectFundingRel;
 import com.wind.funds.wallet.dal.entities.table.CreditAccountNameRefs;
 import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.wind.funds.wallet.dal.entities.table.SpendSubjectFundingRelNameRefs;
-import com.wind.funds.wallet.dal.mapper.CreditAccountMapper;
-import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.dal.mapper.SpendSubjectFundingRelMapper;
 import com.wind.funds.wallet.mapstruct.SpendSubjectFundingRelationConverter;
+import com.wind.funds.wallet.model.dto.CreditAccountDTO;
+import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
 import com.wind.funds.wallet.model.query.SpendSubjectFundingRelationQuery;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
+import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.mybatisflex.core.query.QueryCondition;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -43,9 +43,9 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
 
     private final SpendSubjectFundingRelMapper spendSubjectFundingRelMapper;
 
-    private final FundingAccountMapper fundingAccountMapper;
+    private final FundingAccountService fundingAccountService;
 
-    private final CreditAccountMapper creditAccountMapper;
+    private final CreditAccountService creditAccountService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -126,14 +126,16 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
         } else {
             request.setFundingAccountId(request.getTargetSubjectId());
         }
-        FundingAccount fundingAccount = getFundingAccount(request.getTenantId(), request.getTargetSubjectId());
+        FundingAccountDTO fundingAccount =
+                fundingAccountService.getFundingAccount(request.getTenantId(), request.getTargetSubjectId());
         assertFundingAccountCanBind(fundingAccount, request);
     }
 
     private void resolveAndValidateCreditAccountTarget(CreateSpendSubjectFundingRelationRequest request) {
         AssertUtils.isFalse(StringUtils.hasText(request.getFundingAccountId()),
                 "信用账户目标主体不得同时填写 fundingAccountId");
-        CreditAccount creditAccount = getCreditAccount(request.getTenantId(), request.getTargetSubjectId());
+        CreditAccountDTO creditAccount =
+                creditAccountService.getCreditAccount(request.getTenantId(), request.getTargetSubjectId());
         AssertUtils.isTrue(creditAccount.getStatus().canDebit(),
                 "资金责任目标主体不可用，targetSubjectType = {}, targetSubjectId = {}",
                 request.getTargetSubjectType(), request.getTargetSubjectId());
@@ -142,29 +144,7 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 request.getTargetSubjectType(), request.getTargetSubjectId());
     }
 
-    private FundingAccount getFundingAccount(Long tenantId, String fundingAccountId) {
-        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(tenantId))
-                .and(ref.sn.eq(fundingAccountId));
-        FundingAccount result = fundingAccountMapper.selectOneByQuery(wrapper);
-        AssertUtils.notNull(result, "资金账户不存在，fundingAccountId = {}", fundingAccountId);
-        return result;
-    }
-
-    private CreditAccount getCreditAccount(Long tenantId, String creditAccountId) {
-        CreditAccountNameRefs ref = CreditAccountNameRefs.creditAccount;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(tenantId))
-                .and(ref.sn.eq(creditAccountId));
-        CreditAccount result = creditAccountMapper.selectOneByQuery(wrapper);
-        AssertUtils.notNull(result, "信用账户不存在，creditAccountId = {}", creditAccountId);
-        return result;
-    }
-
-    private void assertFundingAccountCanBind(FundingAccount fundingAccount,
+    private void assertFundingAccountCanBind(FundingAccountDTO fundingAccount,
                                              CreateSpendSubjectFundingRelationRequest request) {
         AssertUtils.isTrue(fundingAccount.getStatus().canDebit(),
                 "资金账户不可作为资金来源，fundingAccountId = {}", request.getTargetSubjectId());

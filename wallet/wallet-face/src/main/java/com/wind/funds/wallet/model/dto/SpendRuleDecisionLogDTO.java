@@ -16,7 +16,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * Spend Rule 决策日志 DTO。
+ * Spend Rule 决策记录 DTO。
  *
  * @author Codex
  * @date 2026-06-22

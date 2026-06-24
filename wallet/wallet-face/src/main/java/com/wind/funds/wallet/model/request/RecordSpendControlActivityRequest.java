@@ -18,7 +18,7 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * 支出控制活动记录请求。
+ * 控制额度变动流水记录请求。
  *
  * @author Codex
  * @date 2026-06-20
@@ -37,11 +37,11 @@ public class RecordSpendControlActivityRequest implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "支出控制活动流水号，用于幂等、回放和审计追踪")
+    @Schema(description = "控制额度变动流水流水号，用于幂等、回放和审计追踪")
     @NotBlank
     private String activitySn;
 
-    @Schema(description = "支出控制活动类型")
+    @Schema(description = "控制额度变动流水类型")
     @NotNull
     private SpendControlActivityType activityType;
 
@@ -53,7 +53,7 @@ public class RecordSpendControlActivityRequest implements Serializable {
     @NotBlank
     private String businessSn;
 
-    @Schema(description = "原支出控制活动流水号，用于交易消费、释放或退款补偿回链")
+    @Schema(description = "原控制额度变动流水流水号，用于交易消费、释放或退款补偿回链")
     private String originalActivitySn;
 
     @Schema(description = "已存在的资金交易流水号，用于交易结果消费控制活动回链")

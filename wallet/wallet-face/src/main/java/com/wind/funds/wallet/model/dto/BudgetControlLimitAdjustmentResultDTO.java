@@ -29,13 +29,13 @@ public class BudgetControlLimitAdjustmentResultDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = 3762686718054235431L;
 
-    @Schema(description = "支出控制活动自增主键")
+    @Schema(description = "控制额度变动流水自增主键")
     private Long activityId;
 
-    @Schema(description = "支出控制活动流水号")
+    @Schema(description = "控制额度变动流水流水号")
     private String activitySn;
 
-    @Schema(description = "支出控制活动类型")
+    @Schema(description = "控制额度变动流水类型")
     private SpendControlActivityType activityType;
 
     @Schema(description = "租户 ID")

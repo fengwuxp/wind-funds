@@ -473,6 +473,7 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
             LedgerServiceImpl.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             FundingAccountServiceImpl.class
     })

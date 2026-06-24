@@ -72,12 +72,16 @@ import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
+import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
+import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -691,10 +695,14 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
             DefaultFundsTransactionQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            AccountHierarchyBindingServiceImpl.class,
             AccountHierarchyServiceImpl.class,
             FundingAccountServiceImpl.class,
+            CreditAccountServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
             PaymentInstrumentServiceImpl.class,
+            PaymentInstrumentBindingServiceImpl.class,
+            PaymentInstrumentBindingHistoryServiceImpl.class,
             PaymentInstrumentCapabilityApplicationServiceImpl.class,
             FundingResponsibilityResolutionApplicationServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,

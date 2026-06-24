@@ -17,7 +17,7 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * Spend Rule 决策日志记录请求。
+ * Spend Rule 决策记录记录请求。
  *
  * @author Codex
  * @date 2026-06-22

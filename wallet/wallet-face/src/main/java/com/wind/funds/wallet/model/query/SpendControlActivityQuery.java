@@ -15,7 +15,7 @@ import java.io.Serial;
 import java.io.Serializable;
 
 /**
- * 支出控制活动查询条件。
+ * 控制额度变动流水查询条件。
  *
  * @author Codex
  * @date 2026-06-20
@@ -34,10 +34,10 @@ public class SpendControlActivityQuery implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "支出控制活动流水号")
+    @Schema(description = "控制额度变动流水流水号")
     private String activitySn;
 
-    @Schema(description = "支出控制活动类型")
+    @Schema(description = "控制额度变动流水类型")
     private SpendControlActivityType activityType;
 
     @Schema(description = "业务场景")
@@ -46,7 +46,7 @@ public class SpendControlActivityQuery implements Serializable {
     @Schema(description = "业务流水号或请求幂等号")
     private String businessSn;
 
-    @Schema(description = "原支出控制活动流水号")
+    @Schema(description = "原控制额度变动流水流水号")
     private String originalActivitySn;
 
     @Schema(description = "资金交易流水号")

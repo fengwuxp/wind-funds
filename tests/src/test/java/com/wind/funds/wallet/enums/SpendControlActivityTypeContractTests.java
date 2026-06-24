@@ -36,7 +36,7 @@ class SpendControlActivityTypeContractTests {
     /**
      * 场景：额度调整、预留、消耗、退款补偿和释放类活动进入控制额度变动流水。
      * 预期：这些类型统一解释为 SpendControlMovement，并参与预算控制投影。
-     * 红线：控制额度变动流水不得退化成规则决策日志。
+     * 红线：控制额度变动流水不得退化成规则决策记录。
      */
     @Test
     void testControlMovementTypesShouldParticipateInBudgetProjection() {

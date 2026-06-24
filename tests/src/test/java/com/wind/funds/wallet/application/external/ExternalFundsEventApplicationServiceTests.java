@@ -54,7 +54,9 @@ import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
+import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
+import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
@@ -455,8 +457,10 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             DefaultFundsTransactionQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            AccountHierarchyBindingServiceImpl.class,
             AccountHierarchyServiceImpl.class,
             FundingAccountServiceImpl.class,
+            CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             PlatformFundingAccountServiceImpl.class,
             ExternalFundsEventApplicationServiceImpl.class

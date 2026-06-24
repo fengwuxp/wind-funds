@@ -17,6 +17,8 @@ import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentCapabilityRequest;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -209,6 +211,8 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
     @Configuration
     @Import({
             PaymentInstrumentServiceImpl.class,
+            PaymentInstrumentBindingServiceImpl.class,
+            PaymentInstrumentBindingHistoryServiceImpl.class,
             PaymentInstrumentCapabilityApplicationServiceImpl.class
     })
     static class Config {

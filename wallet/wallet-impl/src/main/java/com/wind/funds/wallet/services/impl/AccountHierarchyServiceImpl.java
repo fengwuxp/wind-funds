@@ -1,7 +1,6 @@
 package com.wind.funds.wallet.services.impl;
 
 import com.alibaba.fastjson2.JSONObject;
-import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.model.route.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.model.route.ImmutableSubjectRef;
@@ -10,18 +9,15 @@ import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.dal.entities.AccountHierarchyBinding;
-import com.wind.funds.wallet.dal.entities.CreditAccount;
-import com.wind.funds.wallet.dal.entities.FundingAccount;
-import com.wind.funds.wallet.dal.entities.table.AccountHierarchyBindingNameRefs;
-import com.wind.funds.wallet.dal.entities.table.CreditAccountNameRefs;
-import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
-import com.wind.funds.wallet.dal.mapper.AccountHierarchyBindingMapper;
-import com.wind.funds.wallet.dal.mapper.CreditAccountMapper;
-import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.model.dto.AccountHierarchyBindingDTO;
+import com.wind.funds.wallet.model.dto.CreditAccountDTO;
+import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyBindingRequest;
+import com.wind.funds.wallet.service.AccountHierarchyBindingService;
 import com.wind.funds.wallet.service.AccountHierarchyService;
+import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -44,11 +40,11 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
 
     private static final String DEFAULT_OPERATOR_ID = "SYSTEM";
 
-    private final AccountHierarchyBindingMapper accountHierarchyBindingMapper;
+    private final AccountHierarchyBindingService accountHierarchyBindingService;
 
-    private final FundingAccountMapper fundingAccountMapper;
+    private final FundingAccountService fundingAccountService;
 
-    private final CreditAccountMapper creditAccountMapper;
+    private final CreditAccountService creditAccountService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -58,11 +54,9 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         ResolvedAccount parentAccount = resolveRequiredAccount(request.getTenantId(), request.getParentAccountId());
         ResolvedAccount rootAccount = resolveRequiredAccount(request.getTenantId(), request.getRootAccountId());
         assertCompatibleBinding(request, account, parentAccount, rootAccount);
-        AccountHierarchyBinding entity = toEntity(request, account, parentAccount, rootAccount);
-        assertNoDuplicateActiveBinding(entity);
-        accountHierarchyBindingMapper.insertSelective(entity);
-        AssertUtils.notNull(entity.getId(), "创建账户层级绑定失败");
-        return entity.getId();
+        AccountHierarchyBindingDTO binding = toDTO(request, account, parentAccount, rootAccount);
+        assertNoDuplicateActiveBinding(binding);
+        return accountHierarchyBindingService.createAccountHierarchyBinding(binding);
     }
 
     @Override
@@ -78,26 +72,17 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         if (!isAccountSubject(accountRef.getSubjectType()) || accountRef.getTenantId() == null) {
             return Optional.empty();
         }
-        AccountHierarchyBindingNameRefs ref = AccountHierarchyBindingNameRefs.accountHierarchyBinding;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(accountRef.getTenantId()))
-                .and(ref.accountId.eq(accountRef.getSubjectId()))
-                .and(ref.accountType.eq(accountRef.getSubjectType()))
-                .and(ref.status.eq(FundsAccountStatus.ACTIVE))
-                .orderBy(ref.id.desc());
-        AccountHierarchyBinding binding = accountHierarchyBindingMapper.selectOneByQuery(wrapper);
-        if (binding == null) {
-            return Optional.empty();
-        }
-        return Optional.of(toSnapshot(accountRef, binding));
+        return accountHierarchyBindingService.findActiveAccountHierarchyBinding(accountRef.getTenantId(),
+                        accountRef.getSubjectId(),
+                        accountRef.getSubjectType())
+                .map(binding -> toSnapshot(accountRef, binding));
     }
 
-    private AccountHierarchyBinding toEntity(CreateAccountHierarchyBindingRequest request,
+    private AccountHierarchyBindingDTO toDTO(CreateAccountHierarchyBindingRequest request,
                                              ResolvedAccount account,
                                              ResolvedAccount parentAccount,
                                              ResolvedAccount rootAccount) {
-        AccountHierarchyBinding result = new AccountHierarchyBinding();
+        AccountHierarchyBindingDTO result = new AccountHierarchyBindingDTO();
         result.setSn(request.getSn());
         result.setTenantId(request.getTenantId());
         result.setAccountId(account.accountId());
@@ -114,7 +99,7 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         return result;
     }
 
-    private AccountHierarchySnapshotSpec toSnapshot(SubjectRef accountRef, AccountHierarchyBinding binding) {
+    private AccountHierarchySnapshotSpec toSnapshot(SubjectRef accountRef, AccountHierarchyBindingDTO binding) {
         return ImmutableAccountHierarchySnapshotSpec.builder()
                 .accountRef(accountRef)
                 .parentAccountRef(subjectRef(binding.getTenantId(),
@@ -155,13 +140,8 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
 
     @Nullable
     private ResolvedAccount resolveFundingAccount(Long tenantId, String accountId) {
-        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(tenantId))
-                .and(ref.sn.eq(accountId));
-        FundingAccount account = fundingAccountMapper.selectOneByQuery(wrapper);
-        return account == null ? null : new ResolvedAccount(account.getSn(),
+        FundingAccountDTO account = fundingAccountService.getFundingAccount(tenantId, accountId);
+        return new ResolvedAccount(account.getSn(),
                 FundsSubjectType.FUNDING_ACCOUNT,
                 account.getCurrency(),
                 account.getStatus());
@@ -169,13 +149,8 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
 
     @Nullable
     private ResolvedAccount resolveCreditAccount(Long tenantId, String accountId) {
-        CreditAccountNameRefs ref = CreditAccountNameRefs.creditAccount;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(tenantId))
-                .and(ref.sn.eq(accountId));
-        CreditAccount account = creditAccountMapper.selectOneByQuery(wrapper);
-        return account == null ? null : new ResolvedAccount(account.getSn(),
+        CreditAccountDTO account = creditAccountService.getCreditAccount(tenantId, accountId);
+        return new ResolvedAccount(account.getSn(),
                 FundsSubjectType.CREDIT_ACCOUNT,
                 account.getCurrency(),
                 account.getStatus());
@@ -208,19 +183,11 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
                 parseContextVariables(request.getContextVariables()));
     }
 
-    private void assertNoDuplicateActiveBinding(AccountHierarchyBinding binding) {
+    private void assertNoDuplicateActiveBinding(AccountHierarchyBindingDTO binding) {
         if (binding.getStatus() != FundsAccountStatus.ACTIVE) {
             return;
         }
-        AccountHierarchyBindingNameRefs ref = AccountHierarchyBindingNameRefs.accountHierarchyBinding;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(binding.getTenantId()))
-                .and(ref.accountId.eq(binding.getAccountId()))
-                .and(ref.accountType.eq(binding.getAccountType()))
-                .and(ref.status.eq(FundsAccountStatus.ACTIVE));
-        boolean duplicated = !accountHierarchyBindingMapper.selectListByQuery(wrapper).isEmpty();
-        AssertUtils.isFalse(duplicated,
+        AssertUtils.isFalse(accountHierarchyBindingService.existsActiveAccountHierarchyBinding(binding),
                 "账户层级绑定 ACTIVE 关系已存在，accountId = {}, accountType = {}",
                 binding.getAccountId(),
                 binding.getAccountType());

@@ -52,6 +52,17 @@ public interface FundingAccountService {
     @NonNull FundingAccountDTO getFundingAccount(@NonNull FundsAccountId accountId);
 
     /**
+     * 按租户和账户号查询资金账户。
+     *
+     * <p>能力范围：用于内部服务解析已知 FundingAccount 主体；不支持信用账户和预算组，不触发账本初始化。</p>
+     *
+     * @param tenantId 租户 ID
+     * @param accountSn 资金账户号
+     * @return 资金账户
+     */
+    @NonNull FundingAccountDTO getFundingAccount(@NonNull Long tenantId, @NonNull String accountSn);
+
+    /**
      * 分页查询资金账户。
      *
      * <p>能力范围：只读分页查询，不触发账本初始化或余额重算。</p>

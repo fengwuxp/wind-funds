@@ -12,7 +12,6 @@ import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResol
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
-import com.wind.funds.wallet.application.spend.impl.SpendRuleDefinitionApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
@@ -38,12 +37,24 @@ import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
+import com.wind.funds.wallet.service.SpendRuleDefinitionDomainService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleAssignmentDomainQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDefinitionDomainServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogDomainQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogDomainServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,7 +126,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     private SpendSubjectFundingRelationService fundingRelationService;
 
     @Autowired
-    private SpendRuleDefinitionApplicationService spendRuleDefinitionApplicationService;
+    private SpendRuleDefinitionDomainService spendRuleDefinitionDomainService;
 
     @Autowired
     private SpendControlAdmissionApplicationService spendControlAdmissionApplicationService;
@@ -218,8 +229,8 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     /**
      * 场景：调用方重复提交相同 Spend Rule 决策流水和摘要。
      * 输入：同一个规则决策流水号重复准入。
-     * 输出：复用同一条决策日志，准入结果幂等。
-     * 红线：重复准入不得创建第二条决策日志、交易事实或账本事实。
+     * 输出：复用同一条决策记录，准入结果幂等。
+     * 红线：重复准入不得创建第二条决策记录、交易事实或账本事实。
      */
     @Test
     void testResolveSpendControlAdmissionShouldReuseSameDecisionLogForIdempotentDecisionEvidence() {
@@ -278,9 +289,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
-        spendRuleDefinitionApplicationService.createDefinition(createSpendRuleDefinitionRequest());
-        spendRuleDefinitionApplicationService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleDefinitionApplicationService.assignVersion(assignSpendRuleVersionRequest());
+        spendRuleDefinitionDomainService.createDefinition(createSpendRuleDefinitionRequest());
+        spendRuleDefinitionDomainService.publishVersion(publishSpendRuleVersionRequest());
+        spendRuleDefinitionDomainService.assignVersion(assignSpendRuleVersionRequest());
     }
 
     private void cleanupSpendControlAdmissionTestData() {
@@ -481,14 +492,24 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
             LedgerServiceImpl.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             PaymentInstrumentServiceImpl.class,
+            PaymentInstrumentBindingServiceImpl.class,
+            PaymentInstrumentBindingHistoryServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
             PaymentInstrumentCapabilityApplicationServiceImpl.class,
             FundingResponsibilityResolutionApplicationServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
             PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
-            SpendRuleDefinitionApplicationServiceImpl.class,
+            SpendRuleDefinitionServiceImpl.class,
+            SpendRuleDefinitionDomainServiceImpl.class,
+            SpendRuleVersionServiceImpl.class,
+            SpendRuleAssignmentServiceImpl.class,
+            SpendRuleAssignmentDomainQueryServiceImpl.class,
+            SpendRuleDecisionLogServiceImpl.class,
+            SpendRuleDecisionLogDomainServiceImpl.class,
+            SpendRuleDecisionLogDomainQueryServiceImpl.class,
             SpendControlAdmissionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })

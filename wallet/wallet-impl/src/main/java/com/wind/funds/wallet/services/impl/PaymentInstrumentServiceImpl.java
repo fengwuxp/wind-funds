@@ -3,12 +3,7 @@ package com.wind.funds.wallet.services.impl;
 import com.alibaba.fastjson2.JSON;
 import com.wind.funds.wallet.dal.entities.PaymentInstrument;
 import com.wind.funds.wallet.dal.entities.PaymentInstrumentBinding;
-import com.wind.funds.wallet.dal.entities.PaymentInstrumentBindingHistory;
-import com.wind.funds.wallet.dal.entities.table.PaymentInstrumentBindingNameRefs;
-import com.wind.funds.wallet.dal.entities.table.PaymentInstrumentBindingHistoryNameRefs;
 import com.wind.funds.wallet.dal.entities.table.PaymentInstrumentNameRefs;
-import com.wind.funds.wallet.dal.mapper.PaymentInstrumentBindingMapper;
-import com.wind.funds.wallet.dal.mapper.PaymentInstrumentBindingHistoryMapper;
 import com.wind.funds.wallet.dal.mapper.PaymentInstrumentMapper;
 import com.wind.funds.wallet.mapstruct.PaymentInstrumentConverter;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
@@ -20,10 +15,12 @@ import com.wind.funds.wallet.model.query.PaymentInstrumentQuery;
 import com.wind.funds.wallet.model.request.ChangePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.RecordPaymentInstrumentBindingHistoryRequest;
+import com.wind.funds.wallet.model.request.UpdatePaymentInstrumentBindingRequest;
+import com.wind.funds.wallet.service.PaymentInstrumentBindingHistoryService;
+import com.wind.funds.wallet.service.PaymentInstrumentBindingService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.mybatisflex.core.query.QueryWrapper;
-import com.mybatisflex.core.update.UpdateWrapper;
-import com.mybatisflex.core.util.UpdateEntity;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
@@ -37,8 +34,6 @@ import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
 import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
-import com.wind.sequence.WindSequenceType;
-import com.wind.sequence.time.TemporalSequenceFactory;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
@@ -59,18 +54,15 @@ import java.util.Map;
 @AllArgsConstructor
 public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
 
-    private static final WindSequenceType PAYMENT_INSTRUMENT_BINDING_HISTORY_SEQUENCE_TYPE =
-            WindSequenceType.immutable("PAYMENT_INSTRUMENT_BINDING_HISTORY", "PIBH", 6);
-
     private static final String DEFAULT_CREATE_OPERATOR_ID = "SYSTEM";
 
     private static final String DEFAULT_CREATE_REASON = "CREATE_PAYMENT_INSTRUMENT_BINDING";
 
     private final PaymentInstrumentMapper paymentInstrumentMapper;
 
-    private final PaymentInstrumentBindingMapper paymentInstrumentBindingMapper;
+    private final PaymentInstrumentBindingService paymentInstrumentBindingService;
 
-    private final PaymentInstrumentBindingHistoryMapper paymentInstrumentBindingHistoryMapper;
+    private final PaymentInstrumentBindingHistoryService paymentInstrumentBindingHistoryService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -93,22 +85,20 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         assertFundingSubjectBindingTargetsFundingAccount(request);
         assertCreditSubjectBindingTargetsCreditAccount(request);
         assertBudgetSubjectBindingTargetsBudgetGroup(request);
-        PaymentInstrumentBinding entity =
-                PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBinding(request);
-        assertBindingValidityWindow(entity);
-        assertNoDuplicateActiveDefaultBinding(entity);
-        assertNoDuplicateActivePriorityBinding(entity);
-        paymentInstrumentBindingMapper.insertSelective(entity);
-        AssertUtils.notNull(entity.getId(), "创建支付工具绑定失败");
+        PaymentInstrumentBindingDTO binding = toBindingCandidate(request);
+        assertBindingValidityWindow(binding);
+        assertNoDuplicateActiveDefaultBinding(binding);
+        assertNoDuplicateActivePriorityBinding(binding);
+        Long bindingId = paymentInstrumentBindingService.createPaymentInstrumentBinding(request);
         appendBindingHistory(null,
-                entity,
+                binding,
                 PaymentInstrumentBindingChangeType.CREATE,
                 createOperatorId(request),
                 createChangeReason(request),
                 request.getRequestSn(),
                 request.getValidFrom(),
                 request.getContextVariables());
-        return entity.getId();
+        return bindingId;
     }
 
     @Override
@@ -116,19 +106,16 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     public @NonNull Long changePaymentInstrumentBinding(@NonNull ChangePaymentInstrumentBindingRequest request) {
         assertBindingChangeAuditContextPresent(request);
         assertNoSensitivePaymentInstrumentContextVariables(request.getContextVariables());
-        PaymentInstrumentBinding entity = getBindingBySn(request.getTenantId(), request.getBindingSn());
-        PaymentInstrumentBinding before = copyBinding(entity);
-        PaymentInstrumentBinding after = copyBinding(before);
+        PaymentInstrumentBindingDTO before = paymentInstrumentBindingService.getPaymentInstrumentBinding(
+                request.getTenantId(),
+                request.getBindingSn());
+        PaymentInstrumentBindingDTO after = copyBinding(before);
         applyBindingChanges(after, request);
         after.setVersion(before.getVersion() + 1);
         assertBindingValidityWindow(after);
         assertNoDuplicateActiveDefaultBinding(after);
         assertNoDuplicateActivePriorityBinding(after);
-        AssertUtils.isTrue(paymentInstrumentBindingMapper.updateByQuery(
-                        toBindingUpdateEntity(after, request),
-                        versionMatchedBinding(before)) == 1,
-                "支付工具绑定已变更，请重试，bindingSn = {}",
-                request.getBindingSn());
+        paymentInstrumentBindingService.updatePaymentInstrumentBinding(toUpdateRequest(before, after, request));
         appendBindingHistory(before,
                 after,
                 PaymentInstrumentBindingChangeType.UPDATE,
@@ -190,71 +177,18 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     public @NonNull WindPagination<PaymentInstrumentBindingDTO> queryPaymentInstrumentBindings(
             @NonNull PaymentInstrumentBindingQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options) {
-        PaymentInstrumentBindingNameRefs ref = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;
-        QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
-                .from(ref)
-                .where(ref.sn.eq(query.getSn()))
-                .and(ref.tenantId.eq(query.getTenantId()))
-                .and(ref.instrumentSn.eq(query.getInstrumentSn()))
-                .and(ref.bindingRole.eq(query.getBindingRole()))
-                .and(ref.subjectId.eq(query.getSubjectId()))
-                .and(ref.subjectType.eq(query.getSubjectType()))
-                .and(ref.currency.eq(query.getCurrency()))
-                .and(ref.defaultBinding.eq(query.getDefaultBinding()))
-                .and(ref.status.eq(query.getStatus()));
-        applyCurrentEffectiveWindow(wrapper, ref, query.getStatus());
-        applyActiveInstrumentWindow(wrapper, query);
-        wrapper.orderBy(ref.priority.asc(), ref.id.asc());
-        return MybatisQueryHelper.<PaymentInstrumentBinding, PaymentInstrumentBindingDTO>query(wrapper)
-                .counter(paymentInstrumentBindingMapper::selectCountByQuery)
-                .resultQueryFunc(paymentInstrumentBindingMapper::selectListByQuery)
-                .converter(this::toDTO)
-                .query(options);
+        return paymentInstrumentBindingService.queryPaymentInstrumentBindings(query, options);
     }
 
     @Override
     public @NonNull WindPagination<PaymentInstrumentBindingHistoryDTO> queryPaymentInstrumentBindingHistories(
             @NonNull PaymentInstrumentBindingHistoryQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options) {
-        PaymentInstrumentBindingHistoryNameRefs ref =
-                PaymentInstrumentBindingHistoryNameRefs.paymentInstrumentBindingHistory;
-        QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
-                .from(ref)
-                .where(ref.sn.eq(query.getSn()))
-                .and(ref.tenantId.eq(query.getTenantId()))
-                .and(ref.bindingSn.eq(query.getBindingSn()))
-                .and(ref.instrumentSn.eq(query.getInstrumentSn()))
-                .and(ref.changeType.eq(query.getChangeType()))
-                .and(ref.version.eq(query.getVersion()))
-                .and(ref.requestSn.eq(query.getRequestSn()));
-        return MybatisQueryHelper.<PaymentInstrumentBindingHistory, PaymentInstrumentBindingHistoryDTO>query(wrapper)
-                .counter(paymentInstrumentBindingHistoryMapper::selectCountByQuery)
-                .resultQueryFunc(paymentInstrumentBindingHistoryMapper::selectListByQuery)
-                .converter(this::toDTO)
-                .query(options);
+        return paymentInstrumentBindingHistoryService.queryPaymentInstrumentBindingHistories(query, options);
     }
 
     private PaymentInstrumentDTO toDTO(PaymentInstrument entity) {
         return PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentDTO(entity);
-    }
-
-    private PaymentInstrumentBindingDTO toDTO(PaymentInstrumentBinding entity) {
-        return PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBindingDTO(entity);
-    }
-
-    private PaymentInstrumentBindingHistoryDTO toDTO(PaymentInstrumentBindingHistory entity) {
-        return PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBindingHistoryDTO(entity);
-    }
-
-    private PaymentInstrumentBinding getBindingBySn(Long tenantId, String bindingSn) {
-        PaymentInstrumentBindingNameRefs ref = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(tenantId))
-                .and(ref.sn.eq(bindingSn));
-        PaymentInstrumentBinding result = paymentInstrumentBindingMapper.selectOneByQuery(wrapper);
-        AssertUtils.notNull(result, "支付工具绑定不存在，bindingSn = {}", bindingSn);
-        return result;
     }
 
     private PaymentInstrument getInstrumentBySn(Long tenantId, String instrumentSn) {
@@ -317,7 +251,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         AssertUtils.isTrue(validFrom.isBefore(validTo), "支付工具生效时间必须早于失效时间");
     }
 
-    private void assertBindingValidityWindow(PaymentInstrumentBinding binding) {
+    private void assertBindingValidityWindow(PaymentInstrumentBindingDTO binding) {
         if (binding.getValidFrom() == null || binding.getValidTo() == null) {
             return;
         }
@@ -332,25 +266,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         return direction == PaymentInstrumentDirection.PAYMENT || direction == PaymentInstrumentDirection.BOTH;
     }
 
-    private void assertNoDuplicateActiveDefaultBinding(PaymentInstrumentBinding binding) {
-        if (!Boolean.TRUE.equals(binding.getDefaultBinding()) || binding.getStatus() != FundsAccountStatus.ACTIVE) {
-            return;
-        }
-        PaymentInstrumentBindingNameRefs ref = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(binding.getTenantId()))
-                .and(ref.instrumentSn.eq(binding.getInstrumentSn()))
-                .and(ref.bindingRole.eq(binding.getBindingRole()))
-                .and(ref.currency.eq(binding.getCurrency()))
-                .and(ref.defaultBinding.eq(Boolean.TRUE))
-                .and(ref.status.eq(FundsAccountStatus.ACTIVE));
-        boolean duplicated = paymentInstrumentBindingMapper.selectListByQuery(wrapper).stream()
-                .filter(existing -> binding.getId() == null || !binding.getId().equals(existing.getId()))
-                .anyMatch(existing -> validityWindowsOverlap(existing.getValidFrom(),
-                        existing.getValidTo(),
-                        binding.getValidFrom(),
-                        binding.getValidTo()));
+    private void assertNoDuplicateActiveDefaultBinding(PaymentInstrumentBindingDTO binding) {
+        boolean duplicated = paymentInstrumentBindingService.existsOverlappingActiveDefaultBinding(binding);
         AssertUtils.isFalse(duplicated,
                 "默认支付工具绑定不唯一，instrumentSn = {}, bindingRole = {}, currency = {}",
                 binding.getInstrumentSn(),
@@ -358,26 +275,9 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 binding.getCurrency());
     }
 
-    private void assertNoDuplicateActivePriorityBinding(PaymentInstrumentBinding binding) {
-        if (binding.getStatus() != FundsAccountStatus.ACTIVE) {
-            return;
-        }
+    private void assertNoDuplicateActivePriorityBinding(PaymentInstrumentBindingDTO binding) {
         int priority = binding.getPriority() == null ? 0 : binding.getPriority();
-        PaymentInstrumentBindingNameRefs ref = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.tenantId.eq(binding.getTenantId()))
-                .and(ref.instrumentSn.eq(binding.getInstrumentSn()))
-                .and(ref.bindingRole.eq(binding.getBindingRole()))
-                .and(ref.currency.eq(binding.getCurrency()))
-                .and(ref.priority.eq(priority))
-                .and(ref.status.eq(FundsAccountStatus.ACTIVE));
-        boolean duplicated = paymentInstrumentBindingMapper.selectListByQuery(wrapper).stream()
-                .filter(existing -> binding.getId() == null || !binding.getId().equals(existing.getId()))
-                .anyMatch(existing -> validityWindowsOverlap(existing.getValidFrom(),
-                        existing.getValidTo(),
-                        binding.getValidFrom(),
-                        binding.getValidTo()));
+        boolean duplicated = paymentInstrumentBindingService.existsOverlappingActivePriorityBinding(binding);
         AssertUtils.isFalse(duplicated,
                 "支付工具绑定优先级冲突，instrumentSn = {}, bindingRole = {}, currency = {}, priority = {}",
                 binding.getInstrumentSn(),
@@ -386,7 +286,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 priority);
     }
 
-    private void applyBindingChanges(PaymentInstrumentBinding entity, ChangePaymentInstrumentBindingRequest request) {
+    private void applyBindingChanges(PaymentInstrumentBindingDTO entity, ChangePaymentInstrumentBindingRequest request) {
         if (request.getPriority() != null) {
             entity.setPriority(request.getPriority());
         }
@@ -410,70 +310,49 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         }
     }
 
-    private PaymentInstrumentBinding toBindingUpdateEntity(PaymentInstrumentBinding after,
-                                                           ChangePaymentInstrumentBindingRequest request) {
-        PaymentInstrumentBinding entity = UpdateEntity.of(PaymentInstrumentBinding.class);
-        UpdateWrapper<PaymentInstrumentBinding> updateWrapper = UpdateWrapper.of(entity);
-        updateWrapper.set(PaymentInstrumentBindingNameRefs.paymentInstrumentBinding.priority,
-                after.getPriority(),
-                request.getPriority() != null);
-        updateWrapper.set(PaymentInstrumentBindingNameRefs.paymentInstrumentBinding.defaultBinding,
-                after.getDefaultBinding(),
-                request.getDefaultBinding() != null);
-        updateWrapper.set(PaymentInstrumentBindingNameRefs.paymentInstrumentBinding.status,
-                after.getStatus(),
-                request.getStatus() != null);
-        updateWrapper.set(PaymentInstrumentBindingNameRefs.paymentInstrumentBinding.validFrom,
-                after.getValidFrom(),
-                request.getValidFrom() != null);
-        updateWrapper.set(PaymentInstrumentBindingNameRefs.paymentInstrumentBinding.validTo,
-                after.getValidTo(),
-                request.getValidTo() != null);
-        updateWrapper.set(PaymentInstrumentBindingNameRefs.paymentInstrumentBinding.description,
-                after.getDescription(),
-                request.getDescription() != null);
-        updateWrapper.set(PaymentInstrumentBindingNameRefs.paymentInstrumentBinding.contextVariables,
-                after.getContextVariables(),
-                request.getContextVariables() != null);
-        updateWrapper.set(PaymentInstrumentBindingNameRefs.paymentInstrumentBinding.version, after.getVersion(), true);
-        return entity;
+    private UpdatePaymentInstrumentBindingRequest toUpdateRequest(PaymentInstrumentBindingDTO before,
+                                                                  PaymentInstrumentBindingDTO after,
+                                                                  ChangePaymentInstrumentBindingRequest request) {
+        return new UpdatePaymentInstrumentBindingRequest()
+                .setId(before.getId())
+                .setTenantId(before.getTenantId())
+                .setBindingSn(before.getSn())
+                .setExpectedVersion(before.getVersion())
+                .setNextVersion(after.getVersion())
+                .setPriority(request.getPriority() == null ? null : after.getPriority())
+                .setDefaultBinding(request.getDefaultBinding() == null ? null : after.getDefaultBinding())
+                .setStatus(request.getStatus() == null ? null : after.getStatus())
+                .setValidFrom(request.getValidFrom() == null ? null : after.getValidFrom())
+                .setValidTo(request.getValidTo() == null ? null : after.getValidTo())
+                .setDescription(request.getDescription() == null ? null : after.getDescription())
+                .setContextVariables(request.getContextVariables() == null ? null : after.getContextVariables());
     }
 
-    private QueryWrapper versionMatchedBinding(PaymentInstrumentBinding before) {
-        PaymentInstrumentBindingNameRefs ref = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;
-        return QueryWrapper.create()
-                .where(ref.id.eq(before.getId()))
-                .and(ref.tenantId.eq(before.getTenantId()))
-                .and(ref.version.eq(before.getVersion()));
-    }
-
-    private void appendBindingHistory(PaymentInstrumentBinding before,
-                                      PaymentInstrumentBinding after,
+    private void appendBindingHistory(PaymentInstrumentBindingDTO before,
+                                      PaymentInstrumentBindingDTO after,
                                       PaymentInstrumentBindingChangeType changeType,
                                       String operatorId,
                                       String changeReason,
                                       String requestSn,
                                       LocalDateTime effectiveAt,
                                       String contextVariables) {
-        PaymentInstrumentBindingHistory history = new PaymentInstrumentBindingHistory();
-        history.setSn(TemporalSequenceFactory.hourNext(PAYMENT_INSTRUMENT_BINDING_HISTORY_SEQUENCE_TYPE));
-        history.setTenantId(after.getTenantId());
-        history.setBindingSn(after.getSn());
-        history.setInstrumentSn(after.getInstrumentSn());
-        history.setChangeType(changeType);
-        history.setVersion(after.getVersion());
-        history.setBeforeSnapshot(before == null ? null : snapshotBinding(before));
-        history.setAfterSnapshot(snapshotBinding(after));
-        history.setOperatorId(operatorId);
-        history.setChangeReason(changeReason);
-        history.setEffectiveAt(effectiveAt == null ? LocalDateTime.now() : effectiveAt);
-        history.setRequestSn(requestSn);
-        history.setContextVariables(contextVariables);
-        paymentInstrumentBindingHistoryMapper.insertSelective(history);
-        AssertUtils.notNull(history.getId(), "创建支付工具绑定历史失败");
+        paymentInstrumentBindingHistoryService.recordPaymentInstrumentBindingHistory(
+                new RecordPaymentInstrumentBindingHistoryRequest()
+                        .setTenantId(after.getTenantId())
+                        .setBindingSn(after.getSn())
+                        .setInstrumentSn(after.getInstrumentSn())
+                        .setChangeType(changeType)
+                        .setVersion(after.getVersion())
+                        .setBeforeSnapshot(before == null ? null : snapshotBinding(before))
+                        .setAfterSnapshot(snapshotBinding(after))
+                        .setOperatorId(operatorId)
+                        .setChangeReason(changeReason)
+                        .setEffectiveAt(effectiveAt)
+                        .setRequestSn(requestSn)
+                        .setContextVariables(contextVariables));
     }
 
-    private String snapshotBinding(PaymentInstrumentBinding binding) {
+    private String snapshotBinding(PaymentInstrumentBindingDTO binding) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put(PaymentInstrumentBinding.Fields.sn, binding.getSn());
         values.put(PaymentInstrumentBinding.Fields.instrumentSn, binding.getInstrumentSn());
@@ -490,8 +369,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         return JSON.toJSONString(values);
     }
 
-    private PaymentInstrumentBinding copyBinding(PaymentInstrumentBinding source) {
-        PaymentInstrumentBinding result = new PaymentInstrumentBinding();
+    private PaymentInstrumentBindingDTO copyBinding(PaymentInstrumentBindingDTO source) {
+        PaymentInstrumentBindingDTO result = new PaymentInstrumentBindingDTO();
         result.setId(source.getId());
         result.setGmtCreate(source.getGmtCreate());
         result.setGmtModified(source.getGmtModified());
@@ -511,6 +390,12 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         result.setDescription(source.getDescription());
         result.setContextVariables(source.getContextVariables());
         return result;
+    }
+
+    private PaymentInstrumentBindingDTO toBindingCandidate(CreatePaymentInstrumentBindingRequest request) {
+        PaymentInstrumentBinding binding =
+                PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBinding(request);
+        return PaymentInstrumentConverter.INSTANCE.convertToPaymentInstrumentBindingDTO(binding);
     }
 
     private String createOperatorId(CreatePaymentInstrumentBindingRequest request) {
@@ -544,40 +429,4 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         FundsBenefitSpecValidators.rejectInstructionContextVariables(contextVariables, "paymentInstrument");
     }
 
-    private void applyCurrentEffectiveWindow(QueryWrapper wrapper,
-                                             PaymentInstrumentBindingNameRefs ref,
-                                             FundsAccountStatus status) {
-        if (status != FundsAccountStatus.ACTIVE) {
-            return;
-        }
-        LocalDateTime now = LocalDateTime.now();
-        wrapper.and(ref.validFrom.isNull().or(ref.validFrom.le(now)))
-                .and(ref.validTo.isNull().or(ref.validTo.gt(now)));
-    }
-
-    private void applyActiveInstrumentWindow(QueryWrapper wrapper, PaymentInstrumentBindingQuery query) {
-        if (query.getStatus() != FundsAccountStatus.ACTIVE) {
-            return;
-        }
-        LocalDateTime now = LocalDateTime.now();
-        PaymentInstrumentNameRefs instrumentRef = PaymentInstrumentNameRefs.paymentInstrument;
-        QueryWrapper activeInstrument = QueryWrapper.create()
-                .select(instrumentRef.sn)
-                .from(instrumentRef)
-                .where(instrumentRef.tenantId.eq(query.getTenantId()))
-                .and(instrumentRef.status.eq(FundsAccountStatus.ACTIVE))
-                .and(instrumentRef.validFrom.isNull().or(instrumentRef.validFrom.le(now)))
-                .and(instrumentRef.validTo.isNull().or(instrumentRef.validTo.gt(now)));
-        PaymentInstrumentBindingNameRefs bindingRef = PaymentInstrumentBindingNameRefs.paymentInstrumentBinding;
-        wrapper.in(bindingRef.instrumentSn.getName(), activeInstrument);
-    }
-
-    private boolean validityWindowsOverlap(LocalDateTime leftFrom,
-                                           LocalDateTime leftTo,
-                                           LocalDateTime rightFrom,
-                                           LocalDateTime rightTo) {
-        boolean leftEndsAfterRightStarts = leftTo == null || rightFrom == null || leftTo.isAfter(rightFrom);
-        boolean rightEndsAfterLeftStarts = rightTo == null || leftFrom == null || rightTo.isAfter(leftFrom);
-        return leftEndsAfterRightStarts && rightEndsAfterLeftStarts;
-    }
 }

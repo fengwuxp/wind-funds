@@ -489,6 +489,10 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
     @Configuration
     @Import({
             LedgerServiceImpl.class,
+            DefaultLedgerProfileServiceImpl.class,
+            DefaultSubjectLedgerInitializer.class,
+            FundingAccountServiceImpl.class,
+            CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })
     static class Config {

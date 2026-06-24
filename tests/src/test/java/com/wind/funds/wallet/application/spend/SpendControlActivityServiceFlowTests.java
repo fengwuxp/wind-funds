@@ -8,7 +8,6 @@ import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
-import com.wind.funds.wallet.application.spend.impl.SpendControlActivityApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -30,12 +29,20 @@ import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequ
 import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
+import com.wind.funds.wallet.service.SpendControlActivityDomainQueryService;
+import com.wind.funds.wallet.service.SpendControlActivityDomainService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlActivityDomainQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlActivityDomainServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlActivityServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -57,14 +64,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 支出控制活动应用服务流程测试。
+ * 控制额度变动流水服务流程测试。
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
-        SpendControlActivityApplicationServiceTests.Config.class
+        SpendControlActivityServiceFlowTests.Config.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTest {
+class SpendControlActivityServiceFlowTests extends AbstractFundsServiceTest {
 
     private static final String CREDIT_ACCOUNT_SN = "sca_credit_account";
 
@@ -118,27 +125,30 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
     private SpendSubjectFundingRelationService fundingRelationService;
 
     @Autowired
-    private SpendControlActivityApplicationService spendControlActivityApplicationService;
+    private SpendControlActivityDomainService spendControlActivityDomainService;
+
+    @Autowired
+    private SpendControlActivityDomainQueryService spendControlActivityDomainQueryService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     /**
-     * 场景：历史准入已记录类型误入支出控制活动写入入口。
+     * 场景：准入已记录类型误入控制额度变动流水写入入口。
      * 输入：准入已通过，但活动类型为 ADMISSION_RECORDED。
      * 输出：直接拒绝写入。
-     * 红线：Spend Rule 准入决策证据应记录为决策日志，不得继续写入控制额度变动流水。
+     * 红线：Spend Rule 准入决策证据应记录为决策记录，不得继续写入控制额度变动流水。
      */
     @Test
-    void testRecordAdmissionCompatibilityActivityShouldRejectWithoutFundsSideEffect() {
+    void testRecordAdmissionDecisionActivityShouldRejectWithoutFundsSideEffect() {
         prepareSpendControlActivityData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
 
-        assertThatThrownBy(() -> spendControlActivityApplicationService.recordActivity(
+        assertThatThrownBy(() -> spendControlActivityDomainService.recordActivity(
                 recordRequest(decision, ADMISSION_ACTIVITY_SN, SpendControlActivityType.ADMISSION_RECORDED,
                         "sha256:activity-admission-recorded")))
-                .hasMessageContaining("Spend Rule 准入决策应记录为决策日志");
+                .hasMessageContaining("Spend Rule 准入决策应记录为决策记录");
 
         assertThat(activityCount(ADMISSION_ACTIVITY_SN)).isZero();
         assertNoTransactionFacts(BUSINESS_SN);
@@ -146,21 +156,21 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
     }
 
     /**
-     * 场景：历史拒绝已记录类型误入支出控制活动写入入口。
+     * 场景：拒绝已记录类型误入控制额度变动流水写入入口。
      * 输入：准入被拒绝，活动类型为 REJECTED_RECORDED。
      * 输出：直接拒绝写入。
      * 红线：拒绝原因属于 Spend Rule 决策记录，不得继续写入控制额度变动流水。
      */
     @Test
-    void testRecordRejectedCompatibilityActivityShouldRejectWithoutFundsSideEffect() {
+    void testRecordRejectedDecisionActivityShouldRejectWithoutFundsSideEffect() {
         prepareSpendControlActivityData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         SpendControlAdmissionDecisionDTO decision = rejectedDecision(REJECTED_BUSINESS_SN);
 
-        assertThatThrownBy(() -> spendControlActivityApplicationService.recordActivity(
+        assertThatThrownBy(() -> spendControlActivityDomainService.recordActivity(
                 recordRequest(decision, REJECTED_ACTIVITY_SN, SpendControlActivityType.REJECTED_RECORDED,
                         "sha256:activity-rejected-recorded")))
-                .hasMessageContaining("Spend Rule 准入决策应记录为决策日志");
+                .hasMessageContaining("Spend Rule 准入决策应记录为决策记录");
 
         assertThat(activityCount(REJECTED_ACTIVITY_SN)).isZero();
         assertNoTransactionFacts(REJECTED_BUSINESS_SN);
@@ -181,8 +191,8 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         RecordSpendControlActivityRequest request = recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:activity-reserved");
 
-        SpendControlActivityDTO first = spendControlActivityApplicationService.recordActivity(request);
-        SpendControlActivityDTO replayed = spendControlActivityApplicationService.recordActivity(request);
+        SpendControlActivityDTO first = spendControlActivityDomainService.recordActivity(request);
+        SpendControlActivityDTO replayed = spendControlActivityDomainService.recordActivity(request);
 
         assertThat(replayed.getId()).isEqualTo(first.getId());
         assertThat(replayed.getActivityDigest()).isEqualTo(first.getActivityDigest());
@@ -202,10 +212,10 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         prepareSpendControlActivityData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
-        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:activity-reserved"));
 
-        assertThatThrownBy(() -> spendControlActivityApplicationService.recordActivity(
+        assertThatThrownBy(() -> spendControlActivityDomainService.recordActivity(
                 recordRequest(decision, RESERVED_ACTIVITY_SN, SpendControlActivityType.RESERVED,
                         "sha256:activity-reserved-conflict")))
                 .hasMessageContaining("控制活动流水已存在但摘要不一致");
@@ -226,15 +236,15 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         prepareSpendControlActivityData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
-        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:activity-reserved"));
 
-        assertThatThrownBy(() -> spendControlActivityApplicationService.recordActivity(
+        assertThatThrownBy(() -> spendControlActivityDomainService.recordActivity(
                 recordRequest(decision, RESERVED_ACTIVITY_SN, SpendControlActivityType.RELEASED,
                         "sha256:activity-reserved")))
                 .hasMessageContaining("控制活动流水已存在但类型不一致");
 
-        List<SpendControlActivityDTO> activities = spendControlActivityApplicationService.queryActivities(
+        List<SpendControlActivityDTO> activities = spendControlActivityDomainQueryService.queryActivities(
                 new SpendControlActivityQuery().setTenantId(TENANT_ID).setActivitySn(RESERVED_ACTIVITY_SN));
         assertThat(activities).hasSize(1);
         assertThat(activities.getFirst().getActivityType()).isEqualTo(SpendControlActivityType.RESERVED);
@@ -254,12 +264,12 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         prepareSpendControlActivityData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
-        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:activity-reserved"));
-        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RELEASED_ACTIVITY_SN,
+        spendControlActivityDomainService.recordActivity(recordRequest(decision, RELEASED_ACTIVITY_SN,
                 SpendControlActivityType.RELEASED, "sha256:activity-released").setAmount(20L));
 
-        BudgetControlProjectionDTO projection = spendControlActivityApplicationService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlActivityDomainQueryService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
@@ -288,15 +298,15 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         creditAccountService.createCreditAccount(createCreditAccountRequest().setSn(SECOND_CREDIT_ACCOUNT_SN));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
-        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:activity-reserved"));
-        spendControlActivityApplicationService.recordActivity(recordRequest(decision, SECOND_RESERVED_ACTIVITY_SN,
+        spendControlActivityDomainService.recordActivity(recordRequest(decision, SECOND_RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:activity-second-account-reserved")
                 .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
                         FundsSubjectType.CREDIT_ACCOUNT))
                 .setAmount(40L));
 
-        BudgetControlProjectionDTO projection = spendControlActivityApplicationService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlActivityDomainQueryService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
@@ -329,23 +339,22 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         creditAccountService.createCreditAccount(createCreditAccountRequest().setSn(SECOND_CREDIT_ACCOUNT_SN));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
-        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:activity-reserved"));
-        spendControlActivityApplicationService.recordActivity(recordRequest(decision, RELEASED_ACTIVITY_SN,
+        spendControlActivityDomainService.recordActivity(recordRequest(decision, RELEASED_ACTIVITY_SN,
                 SpendControlActivityType.RELEASED, "sha256:activity-released"));
-        spendControlActivityApplicationService.recordActivity(recordRequest(decision, SECOND_RESERVED_ACTIVITY_SN,
+        spendControlActivityDomainService.recordActivity(recordRequest(decision, SECOND_RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:activity-second-account-reserved")
                 .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
                         FundsSubjectType.CREDIT_ACCOUNT)));
 
-        assertThatThrownBy(() -> spendControlActivityApplicationService.recordActivity(
+        assertThatThrownBy(() -> spendControlActivityDomainService.recordActivity(
                 recordRequest(decision, SECOND_RELEASED_ACTIVITY_SN, SpendControlActivityType.RELEASED,
                         "sha256:activity-second-release-for-primary")))
                 .hasMessageContaining("控制释放金额超过可释放占用金额");
 
         assertThat(activityCount(SECOND_RELEASED_ACTIVITY_SN)).isZero();
-        BudgetControlProjectionDTO primaryProjection = spendControlActivityApplicationService
-                .getBudgetControlProjection(new BudgetControlProjectionQuery()
+        BudgetControlProjectionDTO primaryProjection = spendControlActivityDomainQueryService.getBudgetControlProjection(new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
                         .setCurrency(CurrencyIsoCode.USD)
@@ -354,8 +363,7 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
                         .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
                                 FundsSubjectType.CREDIT_ACCOUNT)));
         assertThat(primaryProjection.getRemainingControlAmount()).isZero();
-        BudgetControlProjectionDTO secondProjection = spendControlActivityApplicationService
-                .getBudgetControlProjection(new BudgetControlProjectionQuery()
+        BudgetControlProjectionDTO secondProjection = spendControlActivityDomainQueryService.getBudgetControlProjection(new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
                         .setCurrency(CurrencyIsoCode.USD)
@@ -379,7 +387,7 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         prepareSpendControlActivityData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendControlActivityApplicationService.queryActivities(
+        assertThatThrownBy(() -> spendControlActivityDomainQueryService.queryActivities(
                 new SpendControlActivityQuery()
                         .setTenantId(TENANT_ID)
                         .setTargetAccountId(FundsAccountId.immutable(BUDGET_GROUP_SN,
@@ -400,7 +408,7 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
         prepareSpendControlActivityData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendControlActivityApplicationService.getBudgetControlProjection(
+        assertThatThrownBy(() -> spendControlActivityDomainQueryService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
@@ -589,11 +597,16 @@ class SpendControlActivityApplicationServiceTests extends AbstractFundsServiceTe
             LedgerServiceImpl.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             PaymentInstrumentServiceImpl.class,
+            PaymentInstrumentBindingServiceImpl.class,
+            PaymentInstrumentBindingHistoryServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
-            SpendControlActivityApplicationServiceImpl.class,
+            SpendControlActivityServiceImpl.class,
+            SpendControlActivityDomainServiceImpl.class,
+            SpendControlActivityDomainQueryServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })
     static class Config {

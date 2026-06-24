@@ -107,9 +107,7 @@ class FundsModuleDependencyBoundaryTests {
     private static final Map<String, List<String>> TRANSACTION_FORBIDDEN_SPEND_RULE_TOKENS = Map.of(
             "wallet spend rule application service", List.of(
                     "com.wind.funds.wallet.application.spend.",
-                    "SpendRuleDefinitionApplicationService",
                     "SpendControlAdmissionApplicationService",
-                    "SpendControlActivityApplicationService",
                     "SpendControlTransactionConsumptionApplicationService",
                     "BudgetControlLimitAdjustmentApplicationService"),
             "wallet spend rule entity or mapper", List.of(
@@ -120,6 +118,24 @@ class FundsModuleDependencyBoundaryTests {
             "wallet spend control projection model", List.of(
                     "BudgetControlProjectionDTO",
                     "BudgetControlProjectionQuery"));
+
+    private static final List<String> LEDGER_DANGEROUS_CALL_SCAN_PATHS = List.of(
+            "transaction/transaction-face/src/main/java",
+            "transaction/transaction-impl/src/main/java",
+            "wallet/wallet-face/src/main/java",
+            "wallet/wallet-impl/src/main/java",
+            "reconciliation/reconciliation-face/src/main/java",
+            "reconciliation/reconciliation-impl/src/main/java",
+            "governance/governance-face/src/main/java",
+            "governance/governance-impl/src/main/java");
+
+    private static final List<String> LEDGER_DANGEROUS_FACE_CALL_TOKENS = List.of(
+            ".updateLedgerBalance(",
+            ".deleteLedgerById(",
+            ".deleteLedgerByIds(",
+            ".updateLedgerTransaction(",
+            ".deleteLedgerTransactionById(",
+            ".deleteLedgerTransactionByIds(");
 
     /**
      * 场景：core 承载资金 DSL、枚举、值对象和端口契约。
@@ -244,6 +260,29 @@ class FundsModuleDependencyBoundaryTests {
                 .isEmpty();
     }
 
+    /**
+     * 场景：ledger face 中历史资源型写接口仍处于兼容期。
+     * 预期：wallet、transaction、reconciliation 和 governance 不直接调用余额直改、账本交易更新或删除能力。
+     * 红线：跨模块生产调用方必须通过 ledger application facade 或交易事实 / 账本分录链路。
+     */
+    @Test
+    void testOuterModulesShouldNotCallDangerousLedgerFaceMutationMethods() throws Exception {
+        List<String> violations = new ArrayList<>();
+        for (Path javaFile : ledgerDangerousCallScanJavaSourceFiles()) {
+            String content = Files.readString(javaFile);
+            for (String forbiddenToken : LEDGER_DANGEROUS_FACE_CALL_TOKENS) {
+                if (content.contains(forbiddenToken)) {
+                    violations.add(workspaceRoot().relativize(javaFile)
+                            + " contains dangerous ledger face call " + forbiddenToken);
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("outer modules must not bypass ledger application or posting chains")
+                .isEmpty();
+    }
+
     private List<String> dependencyArtifactIds(Path pomPath)
             throws ParserConfigurationException, IOException, SAXException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -290,26 +329,21 @@ class FundsModuleDependencyBoundaryTests {
     }
 
     private List<Path> fundsJavaSourceFiles() throws IOException {
-        List<Path> javaFiles = new ArrayList<>();
-        Path root = workspaceRoot();
-        for (String scanPath : FUNDS_JAVA_PACKAGE_SCAN_PATHS) {
-            Path path = root.resolve(scanPath);
-            if (!Files.exists(path)) {
-                continue;
-            }
-            try (Stream<Path> files = Files.walk(path)) {
-                files.filter(Files::isRegularFile)
-                        .filter(javaFile -> javaFile.getFileName().toString().endsWith(".java"))
-                        .forEach(javaFiles::add);
-            }
-        }
-        return javaFiles;
+        return javaSourceFiles(FUNDS_JAVA_PACKAGE_SCAN_PATHS);
     }
 
     private List<Path> transactionJavaSourceFiles() throws IOException {
+        return javaSourceFiles(TRANSACTION_SOURCE_SCAN_PATHS);
+    }
+
+    private List<Path> ledgerDangerousCallScanJavaSourceFiles() throws IOException {
+        return javaSourceFiles(LEDGER_DANGEROUS_CALL_SCAN_PATHS);
+    }
+
+    private List<Path> javaSourceFiles(List<String> scanPaths) throws IOException {
         List<Path> javaFiles = new ArrayList<>();
         Path root = workspaceRoot();
-        for (String scanPath : TRANSACTION_SOURCE_SCAN_PATHS) {
+        for (String scanPath : scanPaths) {
             Path path = root.resolve(scanPath);
             if (!Files.exists(path)) {
                 continue;

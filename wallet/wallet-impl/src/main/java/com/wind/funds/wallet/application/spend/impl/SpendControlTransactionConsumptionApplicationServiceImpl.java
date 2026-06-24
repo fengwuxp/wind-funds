@@ -5,13 +5,14 @@ import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
-import com.wind.funds.wallet.application.spend.SpendControlActivityApplicationService;
 import com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService;
 import com.wind.funds.wallet.enums.SpendControlActivityType;
 import com.wind.funds.wallet.model.dto.SpendControlActivityDTO;
 import com.wind.funds.wallet.model.query.SpendControlActivityQuery;
 import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
 import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
+import com.wind.funds.wallet.service.SpendControlActivityDomainQueryService;
+import com.wind.funds.wallet.service.SpendControlActivityDomainService;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
@@ -21,7 +22,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 交易结果消费支出控制活动应用服务实现。
+ * 交易结果消费控制额度变动流水应用服务实现。
  *
  * @author Codex
  * @date 2026-06-20
@@ -31,7 +32,9 @@ import java.util.Objects;
 public class SpendControlTransactionConsumptionApplicationServiceImpl
         implements SpendControlTransactionConsumptionApplicationService {
 
-    private final SpendControlActivityApplicationService spendControlActivityApplicationService;
+    private final SpendControlActivityDomainService spendControlActivityDomainService;
+
+    private final SpendControlActivityDomainQueryService spendControlActivityDomainQueryService;
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
@@ -49,7 +52,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         assertTransactionBusinessSnMatches(request, transaction);
         assertEnoughRemainingControlAmount(request, originalActivity, "控制消费金额超过原占用剩余额度");
         assertTransactionControlAmountNotExceeded(request, transaction, SpendControlActivityType.CONSUMED, "控制消费");
-        return spendControlActivityApplicationService.recordActivity(
+        return spendControlActivityDomainService.recordActivity(
                 toRecordRequest(request, originalActivity, SpendControlActivityType.CONSUMED));
     }
 
@@ -67,7 +70,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         assertTransactionBusinessSnMatches(request, transaction);
         assertEnoughRemainingControlAmount(request, originalActivity, "控制释放金额超过原占用剩余额度");
         assertTransactionControlAmountNotExceeded(request, transaction, SpendControlActivityType.RELEASED, "控制释放");
-        return spendControlActivityApplicationService.recordActivity(
+        return spendControlActivityDomainService.recordActivity(
                 toRecordRequest(request, originalActivity, SpendControlActivityType.RELEASED));
     }
 
@@ -90,7 +93,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         assertRefundDoesNotExceedNetConsumedAmount(request, originalActivity);
         assertTransactionControlAmountNotExceeded(request, transaction, SpendControlActivityType.REFUND_COMPENSATED,
                 "退款控制补偿");
-        return spendControlActivityApplicationService.recordActivity(
+        return spendControlActivityDomainService.recordActivity(
                 toRecordRequest(request, originalActivity, SpendControlActivityType.REFUND_COMPENSATED));
     }
 
@@ -109,7 +112,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
     }
 
     private SpendControlActivityDTO getOriginalReservedActivity(SpendControlTransactionConsumptionRequest request) {
-        List<SpendControlActivityDTO> activities = spendControlActivityApplicationService.queryActivities(
+        List<SpendControlActivityDTO> activities = spendControlActivityDomainQueryService.queryActivities(
                 new SpendControlActivityQuery()
                         .setTenantId(request.getTenantId())
                         .setActivitySn(request.getOriginalActivitySn()));
@@ -180,7 +183,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                                                            FundsTransactionDTO transaction,
                                                            SpendControlActivityType activityType,
                                                            String actionName) {
-        List<SpendControlActivityDTO> transactionActivities = spendControlActivityApplicationService.queryActivities(
+        List<SpendControlActivityDTO> transactionActivities = spendControlActivityDomainQueryService.queryActivities(
                 new SpendControlActivityQuery()
                         .setTenantId(request.getTenantId())
                         .setOriginalActivitySn(request.getOriginalActivitySn())
@@ -228,7 +231,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
             FundsTransactionDTO transaction) {
         AssertUtils.hasText(transaction.getReferenceTransactionSn(),
                 "退款交易必须引用原消费交易，transactionSn = {}", request.getTransactionSn());
-        List<SpendControlActivityDTO> consumedActivities = spendControlActivityApplicationService.queryActivities(
+        List<SpendControlActivityDTO> consumedActivities = spendControlActivityDomainQueryService.queryActivities(
                 new SpendControlActivityQuery()
                         .setTenantId(request.getTenantId())
                         .setOriginalActivitySn(request.getOriginalActivitySn())
@@ -323,7 +326,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
     private long sumRefundCompensatedAmountForReference(SpendControlTransactionConsumptionRequest request,
                                                        String referenceTransactionSn) {
         List<SpendControlActivityDTO> refundCompensatedActivities =
-                spendControlActivityApplicationService.queryActivities(new SpendControlActivityQuery()
+                spendControlActivityDomainQueryService.queryActivities(new SpendControlActivityQuery()
                         .setTenantId(request.getTenantId())
                         .setOriginalActivitySn(request.getOriginalActivitySn())
                         .setActivityType(SpendControlActivityType.REFUND_COMPENSATED));
@@ -364,7 +367,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     private ControlActivityUsage controlActivityUsage(SpendControlTransactionConsumptionRequest request,
                                                       SpendControlActivityDTO originalActivity) {
-        List<SpendControlActivityDTO> linkedActivities = spendControlActivityApplicationService.queryActivities(
+        List<SpendControlActivityDTO> linkedActivities = spendControlActivityDomainQueryService.queryActivities(
                 new SpendControlActivityQuery()
                         .setTenantId(request.getTenantId())
                         .setOriginalActivitySn(request.getOriginalActivitySn()));

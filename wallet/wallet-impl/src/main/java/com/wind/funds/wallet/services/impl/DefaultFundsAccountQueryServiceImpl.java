@@ -1,6 +1,5 @@
 package com.wind.funds.wallet.services.impl;
 
-import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.ledger.LedgerBalanceBucket;
@@ -18,16 +17,16 @@ import com.wind.funds.wallet.FundsAccountOwner;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.ImmutableFundsAccount;
 import com.wind.funds.wallet.ImmutableFundsBalanceView;
-import com.wind.funds.wallet.dal.entities.CreditAccount;
-import com.wind.funds.wallet.dal.entities.FundingAccount;
-import com.wind.funds.wallet.dal.entities.table.CreditAccountNameRefs;
-import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
-import com.wind.funds.wallet.dal.mapper.CreditAccountMapper;
-import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.model.dto.CreditAccountDTO;
+import com.wind.funds.wallet.model.dto.FundingAccountDTO;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
+import com.wind.funds.wallet.model.query.CreditAccountQuery;
+import com.wind.funds.wallet.model.query.FundingAccountQuery;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
+import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -59,9 +58,11 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
 
     private static final int MAX_LEDGER_BUCKET_SIZE = 50;
 
-    private final FundingAccountMapper fundingAccountMapper;
+    private static final int MAX_ACCOUNT_MATCH_SIZE = 2;
 
-    private final CreditAccountMapper creditAccountMapper;
+    private final FundingAccountService fundingAccountService;
+
+    private final CreditAccountService creditAccountService;
 
     private final LedgerService ledgerService;
 
@@ -132,11 +133,11 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
         if (subjectType != null) {
             return findBySubjectType(subjectType, accountId.id());
         }
-        FundingAccount fundingAccount = selectFundingAccount(accountId);
+        FundingAccountDTO fundingAccount = findFundingAccount(accountId);
         if (fundingAccount != null) {
             return ResolvedFundsSubject.from(fundingAccount);
         }
-        CreditAccount creditAccount = selectCreditAccount(accountId);
+        CreditAccountDTO creditAccount = findCreditAccount(accountId);
         if (creditAccount != null) {
             return ResolvedFundsSubject.from(creditAccount);
         }
@@ -147,11 +148,11 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     private ResolvedFundsSubject findBySubjectType(FundsSubjectType subjectType, String subjectId) {
         return switch (subjectType) {
             case FUNDING_ACCOUNT -> {
-                FundingAccount account = selectFundingAccountBySn(subjectId);
+                FundingAccountDTO account = findFundingAccountBySn(subjectId);
                 yield account == null ? null : ResolvedFundsSubject.from(account);
             }
             case CREDIT_ACCOUNT -> {
-                CreditAccount account = selectCreditAccountBySn(subjectId);
+                CreditAccountDTO account = findCreditAccountBySn(subjectId);
                 yield account == null ? null : ResolvedFundsSubject.from(account);
             }
             case BUDGET_GROUP -> null;
@@ -169,41 +170,45 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     }
 
     @Nullable
-    private FundingAccount selectFundingAccountBySn(String sn) {
-        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.sn.eq(sn));
-        return fundingAccountMapper.selectOneByQuery(wrapper);
+    private FundingAccountDTO findFundingAccountBySn(String sn) {
+        return querySingleFundingAccount(new FundingAccountQuery()
+                .setSn(sn));
     }
 
     @Nullable
-    private FundingAccount selectFundingAccount(FundsAccountId accountId) {
-        FundingAccountNameRefs ref = FundingAccountNameRefs.fundingAccount;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.sn.eq(accountId.id()))
-                .and(ref.accountType.eq(accountId.type()));
-        return fundingAccountMapper.selectOneByQuery(wrapper);
+    private FundingAccountDTO findFundingAccount(FundsAccountId accountId) {
+        return querySingleFundingAccount(new FundingAccountQuery()
+                .setSn(accountId.id())
+                .setAccountType(accountId.type()));
     }
 
     @Nullable
-    private CreditAccount selectCreditAccount(FundsAccountId accountId) {
-        CreditAccountNameRefs ref = CreditAccountNameRefs.creditAccount;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.sn.eq(accountId.id()))
-                .and(ref.accountType.eq(accountId.type()));
-        return creditAccountMapper.selectOneByQuery(wrapper);
+    private CreditAccountDTO findCreditAccount(FundsAccountId accountId) {
+        return querySingleCreditAccount(new CreditAccountQuery()
+                .setSn(accountId.id())
+                .setAccountType(accountId.type()));
     }
 
     @Nullable
-    private CreditAccount selectCreditAccountBySn(String sn) {
-        CreditAccountNameRefs ref = CreditAccountNameRefs.creditAccount;
-        QueryWrapper wrapper = QueryWrapper.create()
-                .from(ref)
-                .where(ref.sn.eq(sn));
-        return creditAccountMapper.selectOneByQuery(wrapper);
+    private CreditAccountDTO findCreditAccountBySn(String sn) {
+        return querySingleCreditAccount(new CreditAccountQuery()
+                .setSn(sn));
+    }
+
+    @Nullable
+    private FundingAccountDTO querySingleFundingAccount(FundingAccountQuery query) {
+        List<FundingAccountDTO> records = fundingAccountService
+                .queryFundingAccounts(query, DefaultPageQueryOptions.defaults(MAX_ACCOUNT_MATCH_SIZE))
+                .getRecords();
+        return records.isEmpty() ? null : records.getFirst();
+    }
+
+    @Nullable
+    private CreditAccountDTO querySingleCreditAccount(CreditAccountQuery query) {
+        List<CreditAccountDTO> records = creditAccountService
+                .queryCreditAccounts(query, DefaultPageQueryOptions.defaults(MAX_ACCOUNT_MATCH_SIZE))
+                .getRecords();
+        return records.isEmpty() ? null : records.getFirst();
     }
 
     private Map<LedgerSubjectCode, Long> loadLedgerIds(ResolvedFundsSubject subject) {
@@ -369,7 +374,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
             Integer version
     ) {
 
-        static ResolvedFundsSubject from(FundingAccount account) {
+        static ResolvedFundsSubject from(FundingAccountDTO account) {
             return new ResolvedFundsSubject(
                     account.getId(),
                     account.getTenantId(),
@@ -387,7 +392,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
             );
         }
 
-        static ResolvedFundsSubject from(CreditAccount account) {
+        static ResolvedFundsSubject from(CreditAccountDTO account) {
             return new ResolvedFundsSubject(
                     account.getId(),
                     account.getTenantId(),

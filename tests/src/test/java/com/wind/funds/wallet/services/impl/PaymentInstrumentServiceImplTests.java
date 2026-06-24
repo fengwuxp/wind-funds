@@ -1152,7 +1152,11 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     @Configuration
-    @Import(PaymentInstrumentServiceImpl.class)
+    @Import({
+            PaymentInstrumentServiceImpl.class,
+            PaymentInstrumentBindingServiceImpl.class,
+            PaymentInstrumentBindingHistoryServiceImpl.class
+    })
     static class Config {
     }
 }

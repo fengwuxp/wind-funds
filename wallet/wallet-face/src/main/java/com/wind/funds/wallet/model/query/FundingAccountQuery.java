@@ -39,6 +39,9 @@ public class FundingAccountQuery {
     @Schema(description = "资金账户类型")
     private String accountType;
 
+    @Schema(description = "是否平台账户")
+    private Boolean platform;
+
     @Schema(description = "平台账户角色")
     private PlatformFundingAccountRole accountRoleCode;
 

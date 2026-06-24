@@ -1,0 +1,71 @@
+package com.wind.funds.wallet.services.impl;
+
+import com.mybatisflex.core.query.QueryWrapper;
+import com.wind.common.exception.AssertUtils;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.dal.entities.AccountHierarchyBinding;
+import com.wind.funds.wallet.dal.entities.table.AccountHierarchyBindingNameRefs;
+import com.wind.funds.wallet.dal.mapper.AccountHierarchyBindingMapper;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.mapstruct.AccountHierarchyBindingConverter;
+import com.wind.funds.wallet.model.dto.AccountHierarchyBindingDTO;
+import com.wind.funds.wallet.service.AccountHierarchyBindingService;
+import lombok.AllArgsConstructor;
+import org.jspecify.annotations.NonNull;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+
+/**
+ * 账户层级绑定基础服务实现。
+ *
+ * @author Codex
+ * @date 2026-06-24
+ */
+@Service
+@AllArgsConstructor
+public class AccountHierarchyBindingServiceImpl implements AccountHierarchyBindingService {
+
+    private final AccountHierarchyBindingMapper accountHierarchyBindingMapper;
+
+    @Override
+    public @NonNull Long createAccountHierarchyBinding(@NonNull AccountHierarchyBindingDTO binding) {
+        AccountHierarchyBinding entity =
+                AccountHierarchyBindingConverter.INSTANCE.convertToAccountHierarchyBinding(binding);
+        accountHierarchyBindingMapper.insertSelective(entity);
+        AssertUtils.notNull(entity.getId(), "创建账户层级绑定失败");
+        return entity.getId();
+    }
+
+    @Override
+    public @NonNull Optional<AccountHierarchyBindingDTO> findActiveAccountHierarchyBinding(
+            @NonNull Long tenantId,
+            @NonNull String accountId,
+            @NonNull FundsSubjectType accountType) {
+        AccountHierarchyBindingNameRefs ref = AccountHierarchyBindingNameRefs.accountHierarchyBinding;
+        AccountHierarchyBinding result = accountHierarchyBindingMapper.selectOneByQuery(QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.accountId.eq(accountId))
+                .and(ref.accountType.eq(accountType))
+                .and(ref.status.eq(FundsAccountStatus.ACTIVE))
+                .orderBy(ref.id.desc()));
+        return Optional.ofNullable(result)
+                .map(AccountHierarchyBindingConverter.INSTANCE::convertToAccountHierarchyBindingDTO);
+    }
+
+    @Override
+    public boolean existsActiveAccountHierarchyBinding(@NonNull AccountHierarchyBindingDTO binding) {
+        if (binding.getStatus() != FundsAccountStatus.ACTIVE) {
+            return false;
+        }
+        AccountHierarchyBindingNameRefs ref = AccountHierarchyBindingNameRefs.accountHierarchyBinding;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(binding.getTenantId()))
+                .and(ref.accountId.eq(binding.getAccountId()))
+                .and(ref.accountType.eq(binding.getAccountType()))
+                .and(ref.status.eq(FundsAccountStatus.ACTIVE));
+        return !accountHierarchyBindingMapper.selectListByQuery(wrapper).isEmpty();
+    }
+}

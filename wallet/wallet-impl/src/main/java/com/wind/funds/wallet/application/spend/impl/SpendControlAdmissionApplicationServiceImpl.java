@@ -3,7 +3,6 @@ package com.wind.funds.wallet.application.spend.impl;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
 import com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService;
-import com.wind.funds.wallet.application.spend.SpendRuleDefinitionApplicationService;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
 import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
@@ -11,6 +10,7 @@ import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionLogRequest;
+import com.wind.funds.wallet.service.SpendRuleDecisionLogDomainService;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
@@ -28,7 +28,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
 
     private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
 
-    private final SpendRuleDefinitionApplicationService spendRuleDefinitionApplicationService;
+    private final SpendRuleDecisionLogDomainService spendRuleDecisionLogDomainService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -38,7 +38,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
         PaymentInstrumentPreTransactionSnapshotDTO snapshot =
                 preTransactionSnapshotApplicationService.resolvePreTransactionSnapshot(toSnapshotRequest(request));
         SpendRuleDecisionLogDTO decisionLog =
-                spendRuleDefinitionApplicationService.recordDecision(toDecisionLogRequest(request));
+                spendRuleDecisionLogDomainService.recordDecision(toDecisionLogRequest(request));
         return toDecision(request, snapshot, decisionLog);
     }
 

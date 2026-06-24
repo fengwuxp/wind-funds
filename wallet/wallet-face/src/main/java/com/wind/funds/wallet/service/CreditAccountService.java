@@ -52,6 +52,17 @@ public interface CreditAccountService {
     @NonNull CreditAccountDTO getCreditAccount(@NonNull FundsAccountId accountId);
 
     /**
+     * 按租户和账户号查询信用账户。
+     *
+     * <p>能力范围：用于内部服务解析已知 CreditAccount 主体；不查询资金账户和预算组，不触发额度重算。</p>
+     *
+     * @param tenantId 租户 ID
+     * @param accountSn 信用账户号
+     * @return 信用账户
+     */
+    @NonNull CreditAccountDTO getCreditAccount(@NonNull Long tenantId, @NonNull String accountSn);
+
+    /**
      * 分页查询信用账户。
      *
      * <p>能力范围：只读分页查询，不触发额度重算。</p>

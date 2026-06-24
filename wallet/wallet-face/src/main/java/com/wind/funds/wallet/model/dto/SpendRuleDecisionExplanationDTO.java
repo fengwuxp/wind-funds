@@ -27,7 +27,7 @@ public class SpendRuleDecisionExplanationDTO implements Serializable {
     @Serial
     private static final long serialVersionUID = -8718788569873955280L;
 
-    @Schema(description = "规则决策日志快照")
+    @Schema(description = "规则决策记录快照")
     private SpendRuleDecisionLogDTO decision;
 
     @Schema(description = "决策是否允许进入后续交易")

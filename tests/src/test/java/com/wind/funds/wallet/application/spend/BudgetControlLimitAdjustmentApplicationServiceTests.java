@@ -9,7 +9,6 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.BudgetControlLimitAdjustmentApplicationServiceImpl;
-import com.wind.funds.wallet.application.spend.impl.SpendControlActivityApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -25,10 +24,16 @@ import com.wind.funds.wallet.model.request.AdjustBudgetControlLimitRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.service.SpendControlActivityDomainQueryService;
+import com.wind.funds.wallet.service.SpendControlActivityDomainService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlActivityDomainQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlActivityDomainServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlActivityServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -104,7 +109,10 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     private CreditAccountService creditAccountService;
 
     @Autowired
-    private SpendControlActivityApplicationService spendControlActivityApplicationService;
+    private SpendControlActivityDomainService spendControlActivityDomainService;
+
+    @Autowired
+    private SpendControlActivityDomainQueryService spendControlActivityDomainQueryService;
 
     @Autowired
     private BudgetControlLimitAdjustmentApplicationService budgetControlLimitAdjustmentApplicationService;
@@ -148,7 +156,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThat(projection.getAvailableControlAmount()).isEqualTo(100L);
         assertThat(projection.getLastActivitySn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
 
-        List<SpendControlActivityDTO> activities = spendControlActivityApplicationService.queryActivities(
+        List<SpendControlActivityDTO> activities = spendControlActivityDomainQueryService.queryActivities(
                 new SpendControlActivityQuery()
                         .setTenantId(TENANT_ID)
                         .setActivitySn(LIMIT_INCREASE_ACTIVITY_SN));
@@ -225,7 +233,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
                 INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
-        spendControlActivityApplicationService.recordActivity(reservedRequest());
+        spendControlActivityDomainService.recordActivity(reservedRequest());
         LedgerFactSnapshot beforeReject = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
@@ -249,13 +257,13 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
                 INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
-        spendControlActivityApplicationService.recordActivity(reservedRequest());
-        spendControlActivityApplicationService.recordActivity(consumedRequest());
-        spendControlActivityApplicationService.recordActivity(refundCompensatedRequest());
+        spendControlActivityDomainService.recordActivity(reservedRequest());
+        spendControlActivityDomainService.recordActivity(consumedRequest());
+        spendControlActivityDomainService.recordActivity(refundCompensatedRequest());
         LedgerFactSnapshot beforeQuery = ledgerFactSnapshot(jdbcTemplate);
 
-        BudgetControlProjectionDTO projection = spendControlActivityApplicationService
-                .getBudgetControlProjection(projectionQuery());
+        BudgetControlProjectionDTO projection =
+                spendControlActivityDomainQueryService.getBudgetControlProjection(projectionQuery());
 
         assertThat(projection.getLimitAmount()).isEqualTo(100L);
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
@@ -279,8 +287,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
                 INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
-        spendControlActivityApplicationService.recordActivity(reservedRequest());
-        spendControlActivityApplicationService.recordActivity(consumedRequest());
+        spendControlActivityDomainService.recordActivity(reservedRequest());
+        spendControlActivityDomainService.recordActivity(consumedRequest());
         LedgerFactSnapshot beforeReject = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
@@ -437,9 +445,12 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
             LedgerServiceImpl.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
-            SpendControlActivityApplicationServiceImpl.class,
+            SpendControlActivityServiceImpl.class,
+            SpendControlActivityDomainServiceImpl.class,
+            SpendControlActivityDomainQueryServiceImpl.class,
             BudgetControlLimitAdjustmentApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })
