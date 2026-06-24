@@ -78,7 +78,6 @@ class AccountHierarchyBindingServiceImplTests extends AbstractFundsServiceTest {
                         AccountHierarchyBindingDTO::getRootAccountId,
                         AccountHierarchyBindingDTO::getCurrency,
                         AccountHierarchyBindingDTO::getStatus,
-                        AccountHierarchyBindingDTO::getVersion,
                         AccountHierarchyBindingDTO::getOperatorId)
                 .containsExactly(ACTIVE_BINDING_SN,
                         ACTIVE_ACCOUNT_ID,
@@ -87,7 +86,6 @@ class AccountHierarchyBindingServiceImplTests extends AbstractFundsServiceTest {
                         ROOT_ACCOUNT_ID,
                         CurrencyIsoCode.USD,
                         FundsAccountStatus.ACTIVE,
-                        1,
                         OPERATOR_ID);
         assertThat(accountHierarchyBindingService.existsActiveAccountHierarchyBinding(binding)).isTrue();
         assertThat(countRows("t_ledger", "subject_id", ACTIVE_ACCOUNT_ID)).isZero();
@@ -129,7 +127,6 @@ class AccountHierarchyBindingServiceImplTests extends AbstractFundsServiceTest {
                 .setRootAccountType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CURRENCY)
                 .setStatus(status)
-                .setVersion(1)
                 .setOperatorId(OPERATOR_ID)
                 .setContextVariables("{\"scenario\":\"account_hierarchy_service\"}");
     }

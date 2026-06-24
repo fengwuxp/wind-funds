@@ -69,9 +69,6 @@ public class AccountHierarchyBindingDTO implements Serializable {
     @Schema(description = "层级绑定状态")
     private FundsAccountStatus status;
 
-    @Schema(description = "乐观锁版本号")
-    private Integer version;
-
     @Schema(description = "操作人 ID")
     private String operatorId;
 

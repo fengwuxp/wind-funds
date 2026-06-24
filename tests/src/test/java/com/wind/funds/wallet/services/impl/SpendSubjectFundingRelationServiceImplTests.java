@@ -63,6 +63,11 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
     private static final String FUNDING_ACCOUNT_SN = "funding_relation_target";
 
+    private static final String LONG_FUNDING_ACCOUNT_SN =
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    private static final String LONG_RELATION_SN = "spend_funding_rel_long_subject";
+
     private static final String SECOND_FUNDING_ACCOUNT_SN = "funding_relation_second_target";
 
     private static final String THIRD_FUNDING_ACCOUNT_SN = "funding_relation_third_target";
@@ -143,6 +148,34 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertThat(loadFundingAccountLedgers())
                 .usingRecursiveFieldByFieldElementComparator()
                 .containsExactlyInAnyOrderElementsOf(fundingLedgersBefore);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldSupportSixtyFourCharSubjectRefs() {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setSn(LONG_FUNDING_ACCOUNT_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        Long relationId = fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
+                .setSn(LONG_RELATION_SN)
+                .setSpendSubjectId(LONG_FUNDING_ACCOUNT_SN)
+                .setFundingAccountId(LONG_FUNDING_ACCOUNT_SN)
+                .setTargetSubjectId(LONG_FUNDING_ACCOUNT_SN));
+
+        List<SpendSubjectFundingRelationDTO> records = fundingRelationService.querySpendSubjectFundingRelations(
+                new SpendSubjectFundingRelationQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(LONG_RELATION_SN)
+                        .setSpendSubjectId(LONG_FUNDING_ACCOUNT_SN)
+                        .setFundingAccountId(LONG_FUNDING_ACCOUNT_SN)
+                        .setTargetSubjectId(LONG_FUNDING_ACCOUNT_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+        assertThat(relationId).isPositive();
+        assertThat(records).hasSize(1);
+        assertThat(records.getFirst().getSpendSubjectId()).isEqualTo(LONG_FUNDING_ACCOUNT_SN);
+        assertThat(records.getFirst().getFundingAccountId()).isEqualTo(LONG_FUNDING_ACCOUNT_SN);
+        assertThat(records.getFirst().getTargetSubjectId()).isEqualTo(LONG_FUNDING_ACCOUNT_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -545,8 +578,9 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     private void cleanupSpendSubjectFundingRelationTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?, ?, ?, ?)",
                 RELATION_SN,
+                LONG_RELATION_SN,
                 DUPLICATE_DEFAULT_RELATION_SN,
                 PRIORITY_CONFLICT_RELATION_SN,
                 PRIORITY_ORDER_RELATION_SN);
@@ -554,15 +588,17 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 CREDIT_TARGET_RELATION_SN,
                 SUSPENDED_CREDIT_TARGET_RELATION_SN,
                 BUDGET_TARGET_RELATION_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?, ?)",
                 FUNDING_ACCOUNT_SN,
+                LONG_FUNDING_ACCOUNT_SN,
                 SECOND_FUNDING_ACCOUNT_SN,
                 THIRD_FUNDING_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
                 CREDIT_TARGET_SN,
                 SUSPENDED_CREDIT_TARGET_SN);
-        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?, ?)",
                 FUNDING_ACCOUNT_SN,
+                LONG_FUNDING_ACCOUNT_SN,
                 SECOND_FUNDING_ACCOUNT_SN,
                 THIRD_FUNDING_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn IN (?, ?)",

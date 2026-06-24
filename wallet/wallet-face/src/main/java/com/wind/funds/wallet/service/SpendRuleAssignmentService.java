@@ -1,6 +1,8 @@
 package com.wind.funds.wallet.service;
 
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
+import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.common.query.WindPagination;
@@ -9,10 +11,12 @@ import com.wind.common.query.supports.QueryOrderField;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+
 /**
- * Spend Rule 挂载基础服务。
+ * Spend Rule 挂载服务。
  *
- * <p>职责：封装规则挂载基础读取能力，为领域服务提供控制范围和状态校验依据。</p>
+ * <p>职责：封装规则挂载写入、读取、查询和只读解释能力。</p>
  *
  * <p>边界：本服务不计算规则、不记录决策记录、不调整控制额度，也不创建交易或账务事实。</p>
  *
@@ -56,6 +60,22 @@ public interface SpendRuleAssignmentService {
     @NonNull WindPagination<SpendRuleAssignmentDTO> queryAssignments(
             @NonNull SpendRuleAssignmentQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options);
+
+    /**
+     * 查询 Spend Rule 挂载。
+     *
+     * @param query 挂载查询条件
+     * @return 挂载列表
+     */
+    @NonNull List<SpendRuleAssignmentDTO> queryAssignments(@NonNull SpendRuleAssignmentQuery query);
+
+    /**
+     * 解释指定挂载在某个时间点的可用性。
+     *
+     * @param query 挂载解释查询条件
+     * @return 挂载解释结果
+     */
+    @NonNull SpendRuleAssignmentExplanationDTO explainAssignment(@NonNull SpendRuleAssignmentExplainQuery query);
 
     /**
      * 获取有效状态的 Spend Rule 挂载。

@@ -106,12 +106,6 @@ public class AccountHierarchyBinding implements Serializable, TenantIsolationObj
     private FundsAccountStatus status;
 
     /**
-     * 乐观锁版本号。
-     */
-    @NotNull
-    private Integer version;
-
-    /**
      * 操作人 ID。
      */
     private String operatorId;

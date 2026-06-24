@@ -24,15 +24,12 @@ import com.wind.funds.wallet.model.request.AdjustBudgetControlLimitRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
-import com.wind.funds.wallet.service.SpendControlActivityDomainQueryService;
-import com.wind.funds.wallet.service.SpendControlActivityDomainService;
+import com.wind.funds.wallet.service.SpendControlActivityService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendControlActivityDomainQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendControlActivityDomainServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendControlActivityServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -109,10 +106,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     private CreditAccountService creditAccountService;
 
     @Autowired
-    private SpendControlActivityDomainService spendControlActivityDomainService;
-
-    @Autowired
-    private SpendControlActivityDomainQueryService spendControlActivityDomainQueryService;
+    private SpendControlActivityService spendControlActivityService;
 
     @Autowired
     private BudgetControlLimitAdjustmentApplicationService budgetControlLimitAdjustmentApplicationService;
@@ -156,7 +150,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThat(projection.getAvailableControlAmount()).isEqualTo(100L);
         assertThat(projection.getLastActivitySn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
 
-        List<SpendControlActivityDTO> activities = spendControlActivityDomainQueryService.queryActivities(
+        List<SpendControlActivityDTO> activities = spendControlActivityService.queryActivities(
                 new SpendControlActivityQuery()
                         .setTenantId(TENANT_ID)
                         .setActivitySn(LIMIT_INCREASE_ACTIVITY_SN));
@@ -233,7 +227,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
                 INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
-        spendControlActivityDomainService.recordActivity(reservedRequest());
+        spendControlActivityService.recordActivity(reservedRequest());
         LedgerFactSnapshot beforeReject = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
@@ -257,13 +251,13 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
                 INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
-        spendControlActivityDomainService.recordActivity(reservedRequest());
-        spendControlActivityDomainService.recordActivity(consumedRequest());
-        spendControlActivityDomainService.recordActivity(refundCompensatedRequest());
+        spendControlActivityService.recordActivity(reservedRequest());
+        spendControlActivityService.recordActivity(consumedRequest());
+        spendControlActivityService.recordActivity(refundCompensatedRequest());
         LedgerFactSnapshot beforeQuery = ledgerFactSnapshot(jdbcTemplate);
 
         BudgetControlProjectionDTO projection =
-                spendControlActivityDomainQueryService.getBudgetControlProjection(projectionQuery());
+                spendControlActivityService.getBudgetControlProjection(projectionQuery());
 
         assertThat(projection.getLimitAmount()).isEqualTo(100L);
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
@@ -287,8 +281,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
                 INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
-        spendControlActivityDomainService.recordActivity(reservedRequest());
-        spendControlActivityDomainService.recordActivity(consumedRequest());
+        spendControlActivityService.recordActivity(reservedRequest());
+        spendControlActivityService.recordActivity(consumedRequest());
         LedgerFactSnapshot beforeReject = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
@@ -449,8 +443,6 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
             CreditAccountServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
             SpendControlActivityServiceImpl.class,
-            SpendControlActivityDomainServiceImpl.class,
-            SpendControlActivityDomainQueryServiceImpl.class,
             BudgetControlLimitAdjustmentApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })

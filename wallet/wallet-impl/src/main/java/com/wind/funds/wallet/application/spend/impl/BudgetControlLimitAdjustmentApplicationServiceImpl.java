@@ -10,8 +10,8 @@ import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
 import com.wind.funds.wallet.model.query.SpendControlActivityQuery;
 import com.wind.funds.wallet.model.request.AdjustBudgetControlLimitRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
-import com.wind.funds.wallet.service.SpendControlActivityDomainQueryService;
-import com.wind.funds.wallet.service.SpendControlActivityDomainService;
+import com.wind.funds.wallet.service.SpendControlActivityService;
+import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
@@ -30,9 +30,7 @@ import java.util.List;
 public class BudgetControlLimitAdjustmentApplicationServiceImpl
         implements BudgetControlLimitAdjustmentApplicationService {
 
-    private final SpendControlActivityDomainService spendControlActivityDomainService;
-
-    private final SpendControlActivityDomainQueryService spendControlActivityDomainQueryService;
+    private final SpendControlActivityService spendControlActivityService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -42,13 +40,13 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
         RecordSpendControlActivityRequest recordRequest = toRecordActivityRequest(request);
         BudgetControlProjectionQuery projectionQuery = toProjectionQuery(request);
         if (queryExistingActivity(request).isEmpty()) {
-            BudgetControlProjectionDTO beforeProjection = spendControlActivityDomainQueryService
+            BudgetControlProjectionDTO beforeProjection = spendControlActivityService
                     .getBudgetControlProjection(projectionQuery);
             assertDecreaseNotBreakOccupiedControl(request, beforeProjection);
         }
-        SpendControlActivityDTO activity = spendControlActivityDomainService.recordActivity(
+        SpendControlActivityDTO activity = spendControlActivityService.recordActivity(
                 recordRequest);
-        BudgetControlProjectionDTO projection = spendControlActivityDomainQueryService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlActivityService.getBudgetControlProjection(
                 projectionQuery);
         return toResult(request, activity, projection);
     }
@@ -69,7 +67,7 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
         AssertUtils.hasText(request.getReasonCode(), "预算控制额度调整原因码不能为空");
         AssertUtils.hasText(request.getOperatorId(), "预算控制额度调整操作者不能为空");
         AssertUtils.hasText(request.getAuditReferenceSn(), "预算控制额度调整审计引用不能为空");
-        AssertUtils.hasText(request.getActivityDigest(), "控制活动摘要不能为空");
+        SpendRuleDigestValidator.assertSha256Digest(request.getActivityDigest(), "控制活动摘要");
     }
 
     private RecordSpendControlActivityRequest toRecordActivityRequest(AdjustBudgetControlLimitRequest request) {
@@ -106,7 +104,7 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
     }
 
     private List<SpendControlActivityDTO> queryExistingActivity(AdjustBudgetControlLimitRequest request) {
-        return spendControlActivityDomainQueryService.queryActivities(new SpendControlActivityQuery()
+        return spendControlActivityService.queryActivities(new SpendControlActivityQuery()
                 .setTenantId(request.getTenantId())
                 .setActivitySn(request.getActivitySn()));
     }

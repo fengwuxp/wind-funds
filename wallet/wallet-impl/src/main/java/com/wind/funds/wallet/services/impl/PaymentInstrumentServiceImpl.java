@@ -1,6 +1,7 @@
 package com.wind.funds.wallet.services.impl;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.wind.funds.wallet.dal.entities.PaymentInstrument;
 import com.wind.funds.wallet.dal.entities.PaymentInstrumentBinding;
 import com.wind.funds.wallet.dal.entities.table.PaymentInstrumentNameRefs;
@@ -24,6 +25,7 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
+import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.funds.route.enums.FundsSubjectType;
@@ -36,6 +38,7 @@ import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 支付工具服务实现。
@@ -80,6 +84,16 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createPaymentInstrumentBinding(@NonNull CreatePaymentInstrumentBindingRequest request) {
         assertNoSensitivePaymentInstrumentContextVariables(request.getContextVariables());
+        PaymentInstrumentBindingHistoryDTO replayed = findBindingHistoryByRequestSn(
+                request.getTenantId(),
+                request.getRequestSn());
+        if (replayed != null) {
+            assertReplayHistoryMatches(replayed, PaymentInstrumentBindingChangeType.CREATE, request.getSn());
+            assertCreateReplayFieldsMatch(request, replayed);
+            return paymentInstrumentBindingService.getPaymentInstrumentBinding(
+                    request.getTenantId(),
+                    replayed.getBindingSn()).getId();
+        }
         PaymentInstrument instrument = getInstrumentBySn(request.getTenantId(), request.getInstrumentSn());
         assertInstrumentCanBind(instrument, request);
         assertFundingSubjectBindingTargetsFundingAccount(request);
@@ -106,6 +120,16 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     public @NonNull Long changePaymentInstrumentBinding(@NonNull ChangePaymentInstrumentBindingRequest request) {
         assertBindingChangeAuditContextPresent(request);
         assertNoSensitivePaymentInstrumentContextVariables(request.getContextVariables());
+        PaymentInstrumentBindingHistoryDTO replayed = findBindingHistoryByRequestSn(
+                request.getTenantId(),
+                request.getRequestSn());
+        if (replayed != null) {
+            assertReplayHistoryMatches(replayed, PaymentInstrumentBindingChangeType.UPDATE, request.getBindingSn());
+            assertChangeReplayFieldsMatch(request, replayed);
+            return paymentInstrumentBindingService.getPaymentInstrumentBinding(
+                    request.getTenantId(),
+                    replayed.getBindingSn()).getId();
+        }
         PaymentInstrumentBindingDTO before = paymentInstrumentBindingService.getPaymentInstrumentBinding(
                 request.getTenantId(),
                 request.getBindingSn());
@@ -130,6 +154,78 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     private void assertBindingChangeAuditContextPresent(ChangePaymentInstrumentBindingRequest request) {
         AssertUtils.hasText(request.getOperatorId(), "支付工具绑定变更 operatorId 不能为空");
         AssertUtils.hasText(request.getChangeReason(), "支付工具绑定变更 changeReason 不能为空");
+    }
+
+    private @Nullable PaymentInstrumentBindingHistoryDTO findBindingHistoryByRequestSn(Long tenantId,
+                                                                                      String requestSn) {
+        if (!StringUtils.hasText(requestSn)) {
+            return null;
+        }
+        return paymentInstrumentBindingHistoryService.queryPaymentInstrumentBindingHistories(
+                        new PaymentInstrumentBindingHistoryQuery()
+                                .setTenantId(tenantId)
+                                .setRequestSn(requestSn),
+                        DefaultPageQueryOptions.defaults(1))
+                .getRecords()
+                .stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void assertReplayHistoryMatches(PaymentInstrumentBindingHistoryDTO history,
+                                            PaymentInstrumentBindingChangeType expectedChangeType,
+                                            String bindingSn) {
+        AssertUtils.isTrue(history.getChangeType() == expectedChangeType
+                        && Objects.equals(history.getBindingSn(), bindingSn),
+                "支付工具绑定请求流水号已被其他变更使用，requestSn = {}",
+                history.getRequestSn());
+    }
+
+    private void assertCreateReplayFieldsMatch(CreatePaymentInstrumentBindingRequest request,
+                                               PaymentInstrumentBindingHistoryDTO history) {
+        JSONObject after = JSON.parseObject(history.getAfterSnapshot());
+        assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.instrumentSn, request.getInstrumentSn(),
+                after.getString(PaymentInstrumentBinding.Fields.instrumentSn));
+        assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.bindingRole, request.getBindingRole().name(),
+                after.getString(PaymentInstrumentBinding.Fields.bindingRole));
+        assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.subjectId, request.getSubjectId(),
+                after.getString(PaymentInstrumentBinding.Fields.subjectId));
+        assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.subjectType, request.getSubjectType().name(),
+                after.getString(PaymentInstrumentBinding.Fields.subjectType));
+        assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.currency, request.getCurrency().name(),
+                after.getString(PaymentInstrumentBinding.Fields.currency));
+        assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.priority, request.getPriority(),
+                after.getInteger(PaymentInstrumentBinding.Fields.priority));
+        assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.defaultBinding, request.getDefaultBinding(),
+                after.getBoolean(PaymentInstrumentBinding.Fields.defaultBinding));
+    }
+
+    private void assertChangeReplayFieldsMatch(ChangePaymentInstrumentBindingRequest request,
+                                               PaymentInstrumentBindingHistoryDTO history) {
+        JSONObject after = JSON.parseObject(history.getAfterSnapshot());
+        if (request.getPriority() != null) {
+            assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.priority, request.getPriority(),
+                    after.getInteger(PaymentInstrumentBinding.Fields.priority));
+        }
+        if (request.getDefaultBinding() != null) {
+            assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.defaultBinding,
+                    request.getDefaultBinding(),
+                    after.getBoolean(PaymentInstrumentBinding.Fields.defaultBinding));
+        }
+        if (request.getStatus() != null) {
+            assertReplayFieldMatches(history, PaymentInstrumentBinding.Fields.status, request.getStatus().name(),
+                    after.getString(PaymentInstrumentBinding.Fields.status));
+        }
+    }
+
+    private void assertReplayFieldMatches(PaymentInstrumentBindingHistoryDTO history,
+                                          String fieldName,
+                                          Object requestValue,
+                                          Object snapshotValue) {
+        AssertUtils.isTrue(Objects.equals(requestValue, snapshotValue),
+                "支付工具绑定请求流水号重放字段不一致，requestSn = {}, field = {}",
+                history.getRequestSn(),
+                fieldName);
     }
 
     @Override

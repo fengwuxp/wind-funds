@@ -93,7 +93,6 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         result.setRootAccountType(rootAccount.accountType());
         result.setCurrency(request.getCurrency());
         result.setStatus(request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus());
-        result.setVersion(1);
         result.setOperatorId(createOperatorId(request));
         result.setContextVariables(request.getContextVariables());
         return result;

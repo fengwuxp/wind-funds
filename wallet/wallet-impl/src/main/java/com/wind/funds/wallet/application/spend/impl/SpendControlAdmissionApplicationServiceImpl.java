@@ -10,7 +10,8 @@ import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionLogRequest;
-import com.wind.funds.wallet.service.SpendRuleDecisionLogDomainService;
+import com.wind.funds.wallet.service.SpendRuleDecisionLogService;
+import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
@@ -28,7 +29,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
 
     private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
 
-    private final SpendRuleDecisionLogDomainService spendRuleDecisionLogDomainService;
+    private final SpendRuleDecisionLogService spendRuleDecisionLogService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -38,7 +39,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
         PaymentInstrumentPreTransactionSnapshotDTO snapshot =
                 preTransactionSnapshotApplicationService.resolvePreTransactionSnapshot(toSnapshotRequest(request));
         SpendRuleDecisionLogDTO decisionLog =
-                spendRuleDecisionLogDomainService.recordDecision(toDecisionLogRequest(request));
+                spendRuleDecisionLogService.recordDecision(toDecisionLogRequest(request));
         return toDecision(request, snapshot, decisionLog);
     }
 
@@ -59,7 +60,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
         AssertUtils.hasText(request.getSpendRuleScopeId(), "Spend Rule 控制范围标识不能为空");
         AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
         AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
-        AssertUtils.hasText(request.getSpendDecisionDigest(), "Spend Rule 决策摘要不能为空");
+        SpendRuleDigestValidator.assertSha256Digest(request.getSpendDecisionDigest(), "Spend Rule 决策摘要");
         if (request.getSpendDecisionResult() == SpendControlDecisionResult.REJECTED) {
             AssertUtils.hasText(request.getRejectReason(), "Spend Rule 拒绝原因不能为空");
         }

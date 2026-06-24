@@ -78,6 +78,9 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String FUNDING_ACCOUNT_ID = "funding_pi_binding_target";
 
+    private static final String LONG_FUNDING_ACCOUNT_ID =
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+
     private static final String SECOND_FUNDING_ACCOUNT_ID = "funding_pi_binding_second";
 
     private static final String THIRD_FUNDING_ACCOUNT_ID = "funding_pi_binding_third";
@@ -87,6 +90,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private static final String CREATE_BINDING_REQUEST_SN = "req_pi_binding_create";
 
     private static final String CHANGE_BINDING_REQUEST_SN = "req_pi_binding_change";
+
+    private static final String LONG_SUBJECT_BINDING_SN = "pi_binding_service_long_subject";
+
+    private static final String LONG_SUBJECT_BINDING_REQUEST_SN = "req_pi_binding_long_subject";
 
     private static final String DUPLICATE_DEFAULT_CREATE_REQUEST_SN = "req_pi_binding_duplicate_default_create";
 
@@ -325,6 +332,42 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 });
         assertThat(countRows("t_ledger", "subject_id", BINDING_SN)).isZero();
         assertThat(countRows("t_ledger", "subject_id", PAYMENT_INSTRUMENT_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testCreatePaymentInstrumentBindingShouldSupportSixtyFourCharSubjectId() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setSn(LONG_SUBJECT_BINDING_SN)
+                .setSubjectId(LONG_FUNDING_ACCOUNT_ID)
+                .setRequestSn(LONG_SUBJECT_BINDING_REQUEST_SN));
+
+        List<PaymentInstrumentBindingDTO> records = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(LONG_SUBJECT_BINDING_SN)
+                        .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                        .setSubjectId(LONG_FUNDING_ACCOUNT_ID),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+        assertThat(records).hasSize(1);
+        assertThat(records.getFirst().getSubjectId()).isEqualTo(LONG_FUNDING_ACCOUNT_ID);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testCreatePaymentInstrumentBindingShouldReturnExistingWhenRequestSnReplayed() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        Long firstBindingId = paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        Long replayedBindingId = paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+
+        assertThat(replayedBindingId).isEqualTo(firstBindingId);
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isOne();
+        assertThat(countRows("t_payment_instrument_binding_history", "request_sn", CREATE_BINDING_REQUEST_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -1043,6 +1086,73 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    @Test
+    void testChangePaymentInstrumentBindingShouldReturnExistingWhenRequestSnReplayed() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        ChangePaymentInstrumentBindingRequest request = new ChangePaymentInstrumentBindingRequest()
+                .setBindingSn(BINDING_SN)
+                .setTenantId(TENANT_ID)
+                .setPriority(20)
+                .setDefaultBinding(Boolean.FALSE)
+                .setStatus(FundsAccountStatus.SUSPENDED)
+                .setOperatorId(OPERATOR_ID)
+                .setChangeReason("risk review")
+                .setRequestSn(CHANGE_BINDING_REQUEST_SN)
+                .setContextVariables("{\"ticket\":\"PI-007\"}");
+        Long firstChangedBindingId = paymentInstrumentService.changePaymentInstrumentBinding(request);
+        Long replayedChangedBindingId = paymentInstrumentService.changePaymentInstrumentBinding(request);
+
+        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+        assertThat(replayedChangedBindingId).isEqualTo(firstChangedBindingId);
+        assertThat(binding.getVersion()).isEqualTo(2);
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isEqualTo(2);
+        assertThat(countRows("t_payment_instrument_binding_history", "request_sn", CHANGE_BINDING_REQUEST_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testChangePaymentInstrumentBindingShouldRejectRequestSnReplayFieldDrift() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        paymentInstrumentService.changePaymentInstrumentBinding(new ChangePaymentInstrumentBindingRequest()
+                .setBindingSn(BINDING_SN)
+                .setTenantId(TENANT_ID)
+                .setPriority(20)
+                .setDefaultBinding(Boolean.FALSE)
+                .setStatus(FundsAccountStatus.SUSPENDED)
+                .setOperatorId(OPERATOR_ID)
+                .setChangeReason("risk review")
+                .setRequestSn(CHANGE_BINDING_REQUEST_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setPriority(30)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("risk review")
+                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
+                .hasMessageContaining("支付工具绑定请求流水号重放字段不一致");
+
+        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+        assertThat(binding.getPriority()).isEqualTo(20);
+        assertThat(binding.getVersion()).isEqualTo(2);
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isEqualTo(2);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpPaymentInstrumentTestData() {
         cleanupPaymentInstrumentTestData();
@@ -1054,13 +1164,15 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupPaymentInstrumentTestData() {
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?, ?, ?, ?)",
                 BINDING_SN,
+                LONG_SUBJECT_BINDING_SN,
                 DUPLICATE_DEFAULT_BINDING_SN,
                 PRIORITY_CONFLICT_BINDING_SN,
                 PRIORITY_ORDER_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?, ?, ?, ?)",
                 BINDING_SN,
+                LONG_SUBJECT_BINDING_SN,
                 DUPLICATE_DEFAULT_BINDING_SN,
                 PRIORITY_CONFLICT_BINDING_SN,
                 PRIORITY_ORDER_BINDING_SN);

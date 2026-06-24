@@ -4,12 +4,16 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
+import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.wallet.dal.entities.SpendRuleAssignment;
 import com.wind.funds.wallet.dal.entities.table.SpendRuleAssignmentNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendRuleAssignmentMapper;
+import com.wind.funds.wallet.enums.SpendRuleAssignmentExplanationStatus;
 import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
+import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.service.SpendRuleAssignmentService;
@@ -18,8 +22,10 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Spend Rule 挂载基础服务实现。
@@ -30,6 +36,8 @@ import java.time.LocalDateTime;
 @Service
 @AllArgsConstructor
 public class SpendRuleAssignmentServiceImpl implements SpendRuleAssignmentService {
+
+    private static final int ASSIGNMENT_QUERY_PAGE_SIZE = 100;
 
     private final SpendRuleAssignmentMapper spendRuleAssignmentMapper;
 
@@ -73,6 +81,31 @@ public class SpendRuleAssignmentServiceImpl implements SpendRuleAssignmentServic
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public @NonNull List<SpendRuleAssignmentDTO> queryAssignments(
+            @NonNull SpendRuleAssignmentQuery query) {
+        return queryAssignments(query, DefaultPageQueryOptions.defaults(ASSIGNMENT_QUERY_PAGE_SIZE)).getRecords();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public @NonNull SpendRuleAssignmentExplanationDTO explainAssignment(
+            @NonNull SpendRuleAssignmentExplainQuery query) {
+        validateAssignmentExplainQuery(query);
+        SpendRuleAssignmentDTO assignment = findAssignment(query.getTenantId(), query.getAssignmentSn());
+        AssertUtils.notNull(assignment, "Spend Rule 挂载不存在，assignmentSn = {}", query.getAssignmentSn());
+        LocalDateTime evaluatedAt = resolveEvaluationTime(query.getExplainAt());
+        SpendRuleAssignmentExplanationStatus status = resolveExplanationStatus(assignment, evaluatedAt);
+        return new SpendRuleAssignmentExplanationDTO()
+                .setAssignment(assignment)
+                .setEvaluatedAt(evaluatedAt)
+                .setEffective(status == SpendRuleAssignmentExplanationStatus.EFFECTIVE)
+                .setExplanationStatus(status)
+                .setExplanationMessage(status.getDesc())
+                .setEvidenceRefs(toAssignmentEvidenceRefs(assignment));
+    }
+
+    @Override
     public @NonNull SpendRuleAssignmentDTO getActiveAssignment(@NonNull Long tenantId,
                                                                @NonNull String assignmentSn) {
         SpendRuleAssignmentDTO assignment = findAssignment(tenantId, assignmentSn);
@@ -85,6 +118,11 @@ public class SpendRuleAssignmentServiceImpl implements SpendRuleAssignmentServic
 
     private void validateAssignmentQuery(SpendRuleAssignmentQuery query) {
         AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
+    }
+
+    private void validateAssignmentExplainQuery(SpendRuleAssignmentExplainQuery query) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.hasText(query.getAssignmentSn(), "Spend Rule 挂载流水号不能为空");
     }
 
     private SpendRuleAssignment findAssignmentEntity(Long tenantId, String assignmentSn) {
@@ -122,6 +160,28 @@ public class SpendRuleAssignmentServiceImpl implements SpendRuleAssignmentServic
             return LocalDateTime.now();
         }
         return evaluationTime;
+    }
+
+    private SpendRuleAssignmentExplanationStatus resolveExplanationStatus(SpendRuleAssignmentDTO assignment,
+                                                                          LocalDateTime evaluatedAt) {
+        if (assignment.getStatus() != SpendRuleAssignmentStatus.ACTIVE) {
+            return SpendRuleAssignmentExplanationStatus.DISABLED;
+        }
+        if (evaluatedAt.isBefore(assignment.getEffectiveFrom())) {
+            return SpendRuleAssignmentExplanationStatus.NOT_YET_EFFECTIVE;
+        }
+        if (!evaluatedAt.isBefore(assignment.getEffectiveTo())) {
+            return SpendRuleAssignmentExplanationStatus.EXPIRED;
+        }
+        return SpendRuleAssignmentExplanationStatus.EFFECTIVE;
+    }
+
+    private List<String> toAssignmentEvidenceRefs(SpendRuleAssignmentDTO assignment) {
+        return List.of(
+                "spendRule:" + assignment.getRuleId(),
+                "spendRuleVersion:" + assignment.getRuleId() + "@" + assignment.getRuleVersion(),
+                "spendRuleAssignment:" + assignment.getAssignmentSn(),
+                "spendRuleScope:" + assignment.getScopeType() + ":" + assignment.getScopeId());
     }
 
     private SpendRuleAssignment toEntity(AssignSpendRuleVersionRequest request) {

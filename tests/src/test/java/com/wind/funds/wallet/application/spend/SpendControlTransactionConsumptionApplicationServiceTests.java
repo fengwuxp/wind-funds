@@ -38,8 +38,7 @@ import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
 import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
-import com.wind.funds.wallet.service.SpendControlActivityDomainQueryService;
-import com.wind.funds.wallet.service.SpendControlActivityDomainService;
+import com.wind.funds.wallet.service.SpendControlActivityService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
@@ -49,8 +48,6 @@ import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendControlActivityDomainQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendControlActivityDomainServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendControlActivityServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -213,10 +210,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private SpendSubjectFundingRelationService fundingRelationService;
 
     @Autowired
-    private SpendControlActivityDomainService spendControlActivityDomainService;
-
-    @Autowired
-    private SpendControlActivityDomainQueryService spendControlActivityDomainQueryService;
+    private SpendControlActivityService spendControlActivityService;
 
     @Autowired
     private SpendControlTransactionConsumptionApplicationService spendControlTransactionConsumptionApplicationService;
@@ -240,7 +234,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testConsumeReservedControlActivityShouldRecordConsumedWithoutFundsSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
@@ -255,7 +249,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activity.getTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
         assertThat(activity.getAmount()).isEqualTo(60L);
 
-        BudgetControlProjectionDTO projection = spendControlActivityDomainQueryService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlActivityService.getBudgetControlProjection(
                 projectionQuery());
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
         assertThat(projection.getConsumedAmount()).isEqualTo(60L);
@@ -285,9 +279,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         prepareSpendControlTransactionConsumptionData();
         creditAccountService.createCreditAccount(createCreditAccountRequest().setSn(SECOND_CREDIT_ACCOUNT_SN));
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, SECOND_RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, SECOND_RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-second-account-reserved")
                 .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
                         FundsSubjectType.CREDIT_ACCOUNT))
@@ -299,7 +293,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
                         "sha256:sctc-consumed"));
 
-        BudgetControlProjectionDTO primaryProjection = spendControlActivityDomainQueryService.getBudgetControlProjection(projectionQuery()
+        BudgetControlProjectionDTO primaryProjection = spendControlActivityService.getBudgetControlProjection(projectionQuery()
                         .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
                                 FundsSubjectType.CREDIT_ACCOUNT)));
         assertThat(primaryProjection.getTargetAccountId())
@@ -310,7 +304,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(primaryProjection.getRemainingControlAmount()).isZero();
         assertThat(primaryProjection.getLastActivitySn()).isEqualTo(CONSUME_ACTIVITY_SN);
 
-        BudgetControlProjectionDTO secondProjection = spendControlActivityDomainQueryService.getBudgetControlProjection(projectionQuery()
+        BudgetControlProjectionDTO secondProjection = spendControlActivityService.getBudgetControlProjection(projectionQuery()
                         .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
                                 FundsSubjectType.CREDIT_ACCOUNT)));
         assertThat(secondProjection.getReservedAmount()).isEqualTo(40L);
@@ -332,7 +326,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testConsumeWithRefundTransactionShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_FOR_CONSUME_001",
                 DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 60L, CurrencyIsoCode.USD,
@@ -359,7 +353,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testConsumeWithDifferentBusinessSceneTransactionShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertFundsTransaction(CROSS_SCENE_TRANSACTION_SN, OTHER_BUSINESS_SCENE, BUSINESS_SN,
                 DefaultFundsTransactionType.PAY, FundsTransactionStatus.CLOSED, 60L, CurrencyIsoCode.USD, null);
@@ -385,7 +379,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testConsumeWithDifferentBusinessSnTransactionShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(CROSS_BUSINESS_SN_TRANSACTION_SN, OTHER_BUSINESS_SN, 60L,
                 CurrencyIsoCode.USD);
@@ -411,7 +405,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testConcurrentConsumeSameActivitySnWithSameDigestShouldReadBackExistingActivity() throws Exception {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
@@ -447,7 +441,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testConsumeSameTransactionOverTransactionAmountShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved").setAmount(100L));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         spendControlTransactionConsumptionApplicationService.consume(
@@ -476,7 +470,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testReleaseReservedControlActivityShouldRecordReleasedWithoutFundsSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertFundsTransaction(FAILED_TRANSACTION_SN, BUSINESS_SN,
                 DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
@@ -491,7 +485,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activity.getOriginalActivitySn()).isEqualTo(RESERVED_ACTIVITY_SN);
         assertThat(activity.getTransactionSn()).isEqualTo(FAILED_TRANSACTION_SN);
 
-        BudgetControlProjectionDTO projection = spendControlActivityDomainQueryService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlActivityService.getBudgetControlProjection(
                 projectionQuery());
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
         assertThat(projection.getConsumedAmount()).isZero();
@@ -513,7 +507,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testReleaseWithDifferentBusinessSnTransactionShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertFundsTransaction(CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN, OTHER_BUSINESS_SN,
                 DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
@@ -539,7 +533,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testReleaseWithFailedRefundTransactionShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertFundsTransaction(FAILED_REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_FAILED_001",
                 DefaultFundsTransactionType.REFUND, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD,
@@ -566,7 +560,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testReleaseSameTransactionOverTransactionAmountShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved").setAmount(100L));
         insertFundsTransaction(FAILED_TRANSACTION_SN, BUSINESS_SN,
                 DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
@@ -597,9 +591,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         prepareSpendControlTransactionConsumptionData();
         creditAccountService.createCreditAccount(createCreditAccountRequest().setSn(SECOND_CREDIT_ACCOUNT_SN));
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, INCONSISTENT_LINKED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, INCONSISTENT_LINKED_ACTIVITY_SN,
                 SpendControlActivityType.REFUND_COMPENSATED, "sha256:sctc-inconsistent-linked")
                 .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn(REFUND_TRANSACTION_SN)
@@ -631,10 +625,10 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testConsumeSameActivitySnAndDigestWithDifferentActivityTypeShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, REPLAYED_RELEASE_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, REPLAYED_RELEASE_ACTIVITY_SN,
                 SpendControlActivityType.RELEASED, "sha256:sctc-replayed-activity")
                 .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn(FUNDS_TRANSACTION_SN)
@@ -664,7 +658,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testRefundConsumedControlActivityShouldRecordCompensationWithoutFundsSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         spendControlTransactionConsumptionApplicationService.consume(
@@ -686,7 +680,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activity.getOriginalActivitySn()).isEqualTo(RESERVED_ACTIVITY_SN);
         assertThat(activity.getTransactionSn()).isEqualTo(REFUND_TRANSACTION_SN);
 
-        BudgetControlProjectionDTO projection = spendControlActivityDomainQueryService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlActivityService.getBudgetControlProjection(
                 projectionQuery());
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
         assertThat(projection.getConsumedAmount()).isEqualTo(20L);
@@ -709,7 +703,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testRefundWithoutConsumedReferenceShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         insertFundsTransaction(UNLINKED_REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_UNLINKED_001",
@@ -728,7 +722,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activityCount(CONSUME_ACTIVITY_SN)).isZero();
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
         assertThat(fundsTransactionCount(UNLINKED_REFUND_TRANSACTION_SN)).isOne();
-        BudgetControlProjectionDTO projection = spendControlActivityDomainQueryService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlActivityService.getBudgetControlProjection(
                 projectionQuery());
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
         assertThat(projection.getConsumedAmount()).isZero();
@@ -748,9 +742,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testRefundWithMissingReferencedFundsTransactionShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, CONSUME_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, CONSUME_ACTIVITY_SN,
                 SpendControlActivityType.CONSUMED, "sha256:sctc-consumed")
                 .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn(FUNDS_TRANSACTION_SN)
@@ -785,10 +779,10 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testRefundWithInconsistentReferencedConsumedActivityShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 40L, CurrencyIsoCode.USD);
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, INCONSISTENT_CONSUME_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, INCONSISTENT_CONSUME_ACTIVITY_SN,
                 SpendControlActivityType.CONSUMED, "sha256:sctc-inconsistent-consumed")
                 .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn(FUNDS_TRANSACTION_SN)
@@ -824,10 +818,10 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testRefundWithInconsistentReferencedFundsTransactionShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, OTHER_BUSINESS_SN, 40L, CurrencyIsoCode.USD);
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, CONSUME_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, CONSUME_ACTIVITY_SN,
                 SpendControlActivityType.CONSUMED, "sha256:sctc-consumed")
                 .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn(FUNDS_TRANSACTION_SN)
@@ -864,16 +858,16 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testRefundOverReferencedConsumedAmountShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(SMALL_CONSUME_TRANSACTION_SN, BUSINESS_SN, 20L, CurrencyIsoCode.USD);
         insertSucceededFundsTransaction(LARGE_CONSUME_TRANSACTION_SN, BUSINESS_SN + "_LARGE", 40L, CurrencyIsoCode.USD);
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, SMALL_CONSUME_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, SMALL_CONSUME_ACTIVITY_SN,
                 SpendControlActivityType.CONSUMED, "sha256:sctc-small-consumed")
                 .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn(SMALL_CONSUME_TRANSACTION_SN)
                 .setAmount(20L));
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, LARGE_CONSUME_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, LARGE_CONSUME_ACTIVITY_SN,
                 SpendControlActivityType.CONSUMED, "sha256:sctc-large-consumed")
                 .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn(LARGE_CONSUME_TRANSACTION_SN)
@@ -895,7 +889,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activityCount(SMALL_CONSUME_ACTIVITY_SN)).isOne();
         assertThat(activityCount(LARGE_CONSUME_ACTIVITY_SN)).isOne();
         assertThat(fundsTransactionCount(OVER_REFERENCE_REFUND_TRANSACTION_SN)).isOne();
-        BudgetControlProjectionDTO projection = spendControlActivityDomainQueryService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlActivityService.getBudgetControlProjection(
                 projectionQuery());
         assertThat(projection.getConsumedAmount()).isEqualTo(60L);
         assertThat(projection.getRemainingControlAmount()).isZero();
@@ -913,7 +907,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testRefundWithNonRefundTransactionShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         spendControlTransactionConsumptionApplicationService.consume(
@@ -929,7 +923,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activityCount(NON_REFUND_ACTIVITY_SN)).isZero();
         assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
-        BudgetControlProjectionDTO projection = spendControlActivityDomainQueryService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlActivityService.getBudgetControlProjection(
                 projectionQuery());
         assertThat(projection.getConsumedAmount()).isEqualTo(60L);
         assertThat(projection.getRemainingControlAmount()).isZero();
@@ -947,7 +941,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testRefundSameTransactionOverTransactionAmountShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved").setAmount(100L));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 100L, CurrencyIsoCode.USD);
         spendControlTransactionConsumptionApplicationService.consume(
@@ -982,7 +976,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testConsumeOverRemainingControlAmountShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         spendControlTransactionConsumptionApplicationService.consume(
@@ -1010,7 +1004,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     void testConsumeSameActivitySnWithDifferentDigestShouldFailWithoutSideEffect() {
         prepareSpendControlTransactionConsumptionData();
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlActivityDomainService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
+        spendControlActivityService.recordActivity(recordRequest(decision, RESERVED_ACTIVITY_SN,
                 SpendControlActivityType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         spendControlTransactionConsumptionApplicationService.consume(
@@ -1116,7 +1110,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     private SpendControlActivityDTO queryActivity(String activitySn) {
-        List<SpendControlActivityDTO> activities = spendControlActivityDomainQueryService.queryActivities(
+        List<SpendControlActivityDTO> activities = spendControlActivityService.queryActivities(
                 new SpendControlActivityQuery().setTenantId(TENANT_ID).setActivitySn(activitySn));
         assertThat(activities).hasSize(1);
         return activities.getFirst();
@@ -1240,23 +1234,22 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private SpendControlTransactionConsumptionApplicationService concurrentConsumptionService(int concurrentInserts) {
         CountDownLatch recordReady = new CountDownLatch(concurrentInserts);
-        SpendControlActivityDomainService activityService = (SpendControlActivityDomainService) Proxy.newProxyInstance(
-                SpendControlActivityDomainService.class.getClassLoader(),
-                new Class<?>[]{SpendControlActivityDomainService.class},
+        SpendControlActivityService activityService = (SpendControlActivityService) Proxy.newProxyInstance(
+                SpendControlActivityService.class.getClassLoader(),
+                new Class<?>[]{SpendControlActivityService.class},
                 (proxy, method, args) -> {
                     if ("recordActivity".equals(method.getName())) {
                         recordReady.countDown();
                         assertThat(recordReady.await(5, TimeUnit.SECONDS)).isTrue();
                     }
                     try {
-                        return method.invoke(spendControlActivityDomainService, args);
+                        return method.invoke(spendControlActivityService, args);
                     } catch (InvocationTargetException exception) {
                         throw exception.getCause();
                     }
                 });
         return new SpendControlTransactionConsumptionApplicationServiceImpl(
                 activityService,
-                spendControlActivityDomainQueryService,
                 fundsTransactionQueryService);
     }
 
@@ -1296,8 +1289,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
             SpendSubjectFundingRelationServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
             SpendControlActivityServiceImpl.class,
-            SpendControlActivityDomainServiceImpl.class,
-            SpendControlActivityDomainQueryServiceImpl.class,
             SpendControlTransactionConsumptionApplicationServiceImpl.class,
             DefaultFundsTransactionQueryService.class,
             DefaultFundsAccountQueryServiceImpl.class

@@ -23,6 +23,7 @@ import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
+import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -113,7 +114,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
         AssertUtils.hasText(request.getSpendRuleScopeId(), "Spend Rule 控制范围标识不能为空");
         AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
         AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
-        AssertUtils.hasText(request.getSpendDecisionDigest(), "Spend Rule 决策摘要不能为空");
+        SpendRuleDigestValidator.assertSha256Digest(request.getSpendDecisionDigest(), "Spend Rule 决策摘要");
         if (request.getSpendDecisionResult() == SpendControlDecisionResult.REJECTED) {
             AssertUtils.hasText(request.getSpendDecisionRejectReason(), "Spend Rule 拒绝原因不能为空");
         }

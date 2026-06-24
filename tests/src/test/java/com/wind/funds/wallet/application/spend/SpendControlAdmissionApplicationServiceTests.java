@@ -37,7 +37,7 @@ import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
-import com.wind.funds.wallet.service.SpendRuleDefinitionDomainService;
+import com.wind.funds.wallet.service.SpendRuleDefinitionService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
@@ -47,12 +47,8 @@ import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleAssignmentDomainQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleDefinitionDomainServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogDomainQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogDomainServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -126,7 +122,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     private SpendSubjectFundingRelationService fundingRelationService;
 
     @Autowired
-    private SpendRuleDefinitionDomainService spendRuleDefinitionDomainService;
+    private SpendRuleDefinitionService spendRuleDefinitionService;
 
     @Autowired
     private SpendControlAdmissionApplicationService spendControlAdmissionApplicationService;
@@ -289,9 +285,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
-        spendRuleDefinitionDomainService.createDefinition(createSpendRuleDefinitionRequest());
-        spendRuleDefinitionDomainService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleDefinitionDomainService.assignVersion(assignSpendRuleVersionRequest());
+        spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
+        spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
+        spendRuleDefinitionService.assignVersion(assignSpendRuleVersionRequest());
     }
 
     private void cleanupSpendControlAdmissionTestData() {
@@ -503,13 +499,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
             FundsAccountCapabilityApplicationServiceImpl.class,
             PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
             SpendRuleDefinitionServiceImpl.class,
-            SpendRuleDefinitionDomainServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
             SpendRuleAssignmentServiceImpl.class,
-            SpendRuleAssignmentDomainQueryServiceImpl.class,
             SpendRuleDecisionLogServiceImpl.class,
-            SpendRuleDecisionLogDomainServiceImpl.class,
-            SpendRuleDecisionLogDomainQueryServiceImpl.class,
             SpendControlAdmissionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })

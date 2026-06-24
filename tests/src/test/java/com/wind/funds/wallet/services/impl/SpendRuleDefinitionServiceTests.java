@@ -18,8 +18,8 @@ import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
-import com.wind.funds.wallet.service.SpendRuleAssignmentDomainQueryService;
-import com.wind.funds.wallet.service.SpendRuleDefinitionDomainService;
+import com.wind.funds.wallet.service.SpendRuleAssignmentService;
+import com.wind.funds.wallet.service.SpendRuleDefinitionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,16 +40,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Spend Rule 定义领域写服务和挂载领域读服务流程测试。
+ * Spend Rule 定义、版本、挂载和挂载解释标准基础服务流程测试。
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
-        SpendRuleDefinitionDomainServiceTests.Config.class
+        SpendRuleDefinitionServiceTests.Config.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
+class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
 
-    private static final String RULE_ID = "sr_definition_domain_daily_limit";
+    private static final String RULE_ID = "sr_definition_service_daily_limit";
 
     private static final String RULE_VERSION = "2026-06-23.1";
 
@@ -59,37 +59,37 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
 
     private static final String RULE_SPEC = "{\"window\":\"DAILY\",\"amount\":10000,\"currency\":\"USD\"}";
 
-    private static final String RULE_DIGEST = "sha256:spend-rule-definition-domain";
+    private static final String RULE_DIGEST = "sha256:spend-rule-definition-service";
 
-    private static final String FUTURE_RULE_DIGEST = "sha256:spend-rule-definition-domain-future";
+    private static final String FUTURE_RULE_DIGEST = "sha256:spend-rule-definition-service-future";
 
-    private static final String EXPIRED_RULE_DIGEST = "sha256:spend-rule-definition-domain-expired";
+    private static final String EXPIRED_RULE_DIGEST = "sha256:spend-rule-definition-service-expired";
 
-    private static final String CHANGED_RULE_DIGEST = "sha256:spend-rule-definition-domain-changed";
+    private static final String CHANGED_RULE_DIGEST = "sha256:spend-rule-definition-service-changed";
 
-    private static final String ASSIGNMENT_SN = "spend_rule_definition_domain_assignment";
+    private static final String ASSIGNMENT_SN = "spend_rule_definition_service_assignment";
 
-    private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_definition_domain_card";
+    private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_definition_service_card";
 
-    private static final String BUSINESS_SCENE = "SPEND_RULE_DEFINITION_DOMAIN";
+    private static final String BUSINESS_SCENE = "SPEND_RULE_DEFINITION_SERVICE";
 
-    private static final String BUSINESS_SN = "SPEND_RULE_DEFINITION_DOMAIN_001";
+    private static final String BUSINESS_SN = "SPEND_RULE_DEFINITION_SERVICE_001";
 
     private static final LocalDateTime EFFECTIVE_FROM = LocalDateTime.now().withNano(0).minusDays(1);
 
     private static final LocalDateTime EFFECTIVE_TO = LocalDateTime.now().withNano(0).plusDays(30);
 
     @Autowired
-    private SpendRuleDefinitionDomainService spendRuleDefinitionDomainService;
+    private SpendRuleDefinitionService spendRuleDefinitionService;
 
     @Autowired
-    private SpendRuleAssignmentDomainQueryService spendRuleAssignmentDomainQueryService;
+    private SpendRuleAssignmentService spendRuleAssignmentService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     /**
-     * 场景：领域写服务发布不可变 Spend Rule 版本。
+     * 场景：标准基础服务发布不可变 Spend Rule 版本。
      * 输入：同一版本重复发布同摘要和异摘要。
      * 输出：同摘要幂等返回，异摘要拒绝。
      * 红线：规则版本不可原地覆盖，失败不得创建资金、route、posting 或账本事实。
@@ -98,16 +98,17 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
     void testPublishVersionShouldBeIdempotentAndRejectDigestDriftWithoutFundsSideEffect() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        SpendRuleDefinitionDTO definition = spendRuleDefinitionDomainService.createDefinition(createDefinitionRequest());
+        SpendRuleDefinitionDTO definition = spendRuleDefinitionService.getDefinitionById(
+                spendRuleDefinitionService.createDefinition(createDefinitionRequest()));
         SpendRuleVersionDTO published =
-                spendRuleDefinitionDomainService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
+                spendRuleDefinitionService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
         SpendRuleVersionDTO replayed =
-                spendRuleDefinitionDomainService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
+                spendRuleDefinitionService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
 
         assertThat(definition.getStatus()).isEqualTo(SpendRuleDefinitionStatus.ACTIVE);
         assertThat(published.getStatus()).isEqualTo(SpendRuleVersionStatus.PUBLISHED);
         assertThat(replayed.getId()).isEqualTo(published.getId());
-        assertThatThrownBy(() -> spendRuleDefinitionDomainService.publishVersion(
+        assertThatThrownBy(() -> spendRuleDefinitionService.publishVersion(
                 publishVersionRequest(CHANGED_RULE_DIGEST, "{\"window\":\"MONTHLY\"}")))
                 .hasMessageContaining("Spend Rule 版本已发布但内容摘要不一致");
         assertNoTransactionFacts();
@@ -115,7 +116,7 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：领域写服务挂载已发布规则版本。
+     * 场景：标准基础服务挂载已发布规则版本。
      * 输入：同一挂载流水重复进入且内容一致。
      * 输出：重复请求返回同一条挂载。
      * 红线：挂载只生成控制事实，不创建决策记录、资金交易或账本事实。
@@ -125,11 +126,11 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
         publishRuleVersions();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        SpendRuleAssignmentDTO first = spendRuleDefinitionDomainService.assignVersion(assignmentRequest(
+        SpendRuleAssignmentDTO first = spendRuleDefinitionService.assignVersion(assignmentRequest(
                 ASSIGNMENT_SN,
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN));
-        SpendRuleAssignmentDTO replayed = spendRuleDefinitionDomainService.assignVersion(assignmentRequest(
+        SpendRuleAssignmentDTO replayed = spendRuleDefinitionService.assignVersion(assignmentRequest(
                 ASSIGNMENT_SN,
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN));
@@ -142,7 +143,7 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：领域读服务查询当前有效挂载并解释挂载状态。
+     * 场景：标准基础服务查询当前有效挂载并解释挂载状态。
      * 输入：同一支付工具 scope 下存在当前有效、未来生效和已过期挂载。
      * 输出：有效查询只返回当前挂载，解释分别返回 EFFECTIVE、NOT_YET_EFFECTIVE、EXPIRED。
      * 红线：挂载读服务只读，不记录决策记录、不创建资金交易或账本事实。
@@ -150,17 +151,17 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
     @Test
     void testQueryAndExplainAssignmentShouldBeReadOnlyWithoutFundsSideEffect() {
         publishRuleVersions();
-        spendRuleDefinitionDomainService.assignVersion(assignmentRequest(
+        spendRuleDefinitionService.assignVersion(assignmentRequest(
                 ASSIGNMENT_SN,
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN));
-        spendRuleDefinitionDomainService.assignVersion(assignmentRequest(
+        spendRuleDefinitionService.assignVersion(assignmentRequest(
                 ASSIGNMENT_SN + "_future",
                 FUTURE_RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setEffectiveFrom(LocalDateTime.now().plusDays(1))
                 .setEffectiveTo(LocalDateTime.now().plusDays(2)));
-        spendRuleDefinitionDomainService.assignVersion(assignmentRequest(
+        spendRuleDefinitionService.assignVersion(assignmentRequest(
                 ASSIGNMENT_SN + "_expired",
                 EXPIRED_RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
@@ -168,7 +169,7 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
                 .setEffectiveTo(LocalDateTime.now().minusDays(2)));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        List<SpendRuleAssignmentDTO> assignments = spendRuleAssignmentDomainQueryService.queryAssignments(
+        List<SpendRuleAssignmentDTO> assignments = spendRuleAssignmentService.queryAssignments(
                 new SpendRuleAssignmentQuery()
                         .setTenantId(TENANT_ID)
                         .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
@@ -201,22 +202,22 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
      */
     @Test
     void testAssignVersionShouldRejectInvalidRequestWithoutFundsSideEffect() {
-        spendRuleDefinitionDomainService.createDefinition(createDefinitionRequest());
-        spendRuleDefinitionDomainService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
+        spendRuleDefinitionService.createDefinition(createDefinitionRequest());
+        spendRuleDefinitionService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendRuleDefinitionDomainService.assignVersion(assignmentRequest(
+        assertThatThrownBy(() -> spendRuleDefinitionService.assignVersion(assignmentRequest(
                 ASSIGNMENT_SN + "_missing_version",
                 "missing-version",
                 PAYMENT_INSTRUMENT_SN)))
                 .hasMessageContaining("Spend Rule 版本不存在");
-        assertThatThrownBy(() -> spendRuleDefinitionDomainService.assignVersion(assignmentRequest(
+        assertThatThrownBy(() -> spendRuleDefinitionService.assignVersion(assignmentRequest(
                 ASSIGNMENT_SN + "_no_policy",
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setConflictPolicy(null)))
                 .hasMessageContaining("Spend Rule 挂载冲突策略不能为空");
-        assertThatThrownBy(() -> spendRuleDefinitionDomainService.assignVersion(assignmentRequest(
+        assertThatThrownBy(() -> spendRuleDefinitionService.assignVersion(assignmentRequest(
                 ASSIGNMENT_SN + "_invalid_window",
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
@@ -230,26 +231,26 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
     }
 
     @BeforeEach
-    void setUpSpendRuleDefinitionDomainServiceTestData() {
-        cleanupSpendRuleDefinitionDomainServiceTestData();
+    void setUpSpendRuleDefinitionServiceTestData() {
+        cleanupSpendRuleDefinitionServiceTestData();
     }
 
     @AfterEach
-    void tearDownSpendRuleDefinitionDomainServiceTestData() {
-        cleanupSpendRuleDefinitionDomainServiceTestData();
+    void tearDownSpendRuleDefinitionServiceTestData() {
+        cleanupSpendRuleDefinitionServiceTestData();
     }
 
     private void publishRuleVersions() {
-        spendRuleDefinitionDomainService.createDefinition(createDefinitionRequest());
-        spendRuleDefinitionDomainService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
-        spendRuleDefinitionDomainService.publishVersion(
+        spendRuleDefinitionService.createDefinition(createDefinitionRequest());
+        spendRuleDefinitionService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
+        spendRuleDefinitionService.publishVersion(
                 publishVersionRequest(FUTURE_RULE_DIGEST, RULE_SPEC).setRuleVersion(FUTURE_RULE_VERSION));
-        spendRuleDefinitionDomainService.publishVersion(
+        spendRuleDefinitionService.publishVersion(
                 publishVersionRequest(EXPIRED_RULE_DIGEST, RULE_SPEC).setRuleVersion(EXPIRED_RULE_VERSION));
     }
 
     private SpendRuleAssignmentExplanationDTO explainAssignment(String assignmentSn) {
-        return spendRuleAssignmentDomainQueryService.explainAssignment(
+        return spendRuleAssignmentService.explainAssignment(
                 new SpendRuleAssignmentExplainQuery()
                         .setTenantId(TENANT_ID)
                         .setAssignmentSn(assignmentSn));
@@ -262,7 +263,7 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
                 .setRuleName("VCC 单卡日限额")
                 .setRuleType(SpendRuleType.AMOUNT_LIMIT)
                 .setRuleDomain(SpendRuleDomain.PAYMENT_INSTRUMENT)
-                .setDescription("用于验证 Spend Rule 定义领域服务");
+                .setDescription("用于验证 Spend Rule 定义标准基础服务");
     }
 
     private PublishSpendRuleVersionRequest publishVersionRequest(String ruleDigest, String ruleSpec) {
@@ -294,7 +295,7 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
                 .setDescription("挂载 Spend Rule 版本");
     }
 
-    private void cleanupSpendRuleDefinitionDomainServiceTestData() {
+    private void cleanupSpendRuleDefinitionServiceTestData() {
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_log WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
@@ -345,10 +346,8 @@ class SpendRuleDefinitionDomainServiceTests extends AbstractFundsServiceTest {
     @Configuration
     @Import({
             SpendRuleDefinitionServiceImpl.class,
-            SpendRuleDefinitionDomainServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
-            SpendRuleAssignmentServiceImpl.class,
-            SpendRuleAssignmentDomainQueryServiceImpl.class
+            SpendRuleAssignmentServiceImpl.class
     })
     static class Config {
     }
