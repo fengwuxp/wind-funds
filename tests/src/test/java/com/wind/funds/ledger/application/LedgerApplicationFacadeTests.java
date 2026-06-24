@@ -40,7 +40,11 @@ import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.FundingAccountType;
+import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -491,6 +495,10 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
             DefaultLedgerTransactionPostingServiceImpl.class,
             LedgerTransactionServiceImpl.class,
             LedgerServiceImpl.class,
+            DefaultLedgerProfileServiceImpl.class,
+            DefaultSubjectLedgerInitializer.class,
+            FundingAccountServiceImpl.class,
+            CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             LedgerBalanceProjectionServiceImpl.class
     })

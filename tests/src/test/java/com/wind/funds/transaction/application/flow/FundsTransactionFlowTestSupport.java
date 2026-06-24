@@ -90,12 +90,14 @@ import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.service.AccountHierarchyService;
 import com.wind.funds.wallet.service.BudgetGroupService;
 import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
@@ -1348,7 +1350,9 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultFundsTransactionQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
+            AccountHierarchyBindingServiceImpl.class,
             AccountHierarchyServiceImpl.class,
+            FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             BudgetGroupServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,

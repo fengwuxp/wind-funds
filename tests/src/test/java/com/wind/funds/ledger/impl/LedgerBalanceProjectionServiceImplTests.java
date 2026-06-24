@@ -8,7 +8,11 @@ import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
+import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.funds.ledger.LedgerBalanceChangedEvent;
 import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
@@ -393,6 +397,10 @@ class LedgerBalanceProjectionServiceImplTests extends AbstractFundsServiceTest {
     @Configuration
     @Import({
             DefaultFundsAccountQueryServiceImpl.class,
+            DefaultLedgerProfileServiceImpl.class,
+            DefaultSubjectLedgerInitializer.class,
+            FundingAccountServiceImpl.class,
+            CreditAccountServiceImpl.class,
             LedgerServiceImpl.class,
             LedgerBalanceProjectionServiceImpl.class
     })

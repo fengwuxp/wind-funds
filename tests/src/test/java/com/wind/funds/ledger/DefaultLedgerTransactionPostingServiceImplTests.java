@@ -33,7 +33,11 @@ import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.wind.funds.wallet.service.BudgetGroupService;
 import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
+import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
+import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -942,6 +946,10 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
             LedgerTransactionServiceImpl.class,
             LedgerServiceImpl.class,
             BudgetGroupServiceImpl.class,
+            DefaultLedgerProfileServiceImpl.class,
+            DefaultSubjectLedgerInitializer.class,
+            FundingAccountServiceImpl.class,
+            CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             LedgerBalanceProjectionServiceImpl.class
     })
