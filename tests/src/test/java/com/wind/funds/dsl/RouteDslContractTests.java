@@ -77,6 +77,27 @@ class RouteDslContractTests {
     }
 
     /**
+     * 场景：预算组作为预算控制视图被误传到 RouteLeg 账务节点。
+     * 预期：RouteLeg 构造期拒绝预算组主体。
+     * 红线：预算控制对象不能进入交易事实、账务计划和账本分录链路。
+     */
+    @Test
+    void testRouteLegShouldRejectBudgetGroupSubjectNode() {
+        RouteNodeSpec fundingSource = routeNode(RouteNodeType.SUBJECT,
+                fundingAccount("FA-PAYER-001"),
+                LedgerSubjectCode.AVAILABLE,
+                RouteNodeRole.SOURCE);
+        RouteNodeSpec budgetGroupNode = routeNode(RouteNodeType.SUBJECT,
+                budgetGroup("BG-CONTROL-001"),
+                LedgerSubjectCode.AVAILABLE,
+                RouteNodeRole.TARGET);
+
+        assertThatThrownBy(() -> routeLeg(fundingSource, budgetGroupNode))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("RouteLeg targetNode must be ledger-postable");
+    }
+
+    /**
      * 场景：平台角色已经解析成具体平台资金账户。
      * 预期：Route DSL 可以表达平台资金账户节点，后续入账仍依赖具体 SubjectRef。
      * 红线：不能把“平台角色不能直接入账”误收窄成“平台资金账户节点也不可表达”。
@@ -498,6 +519,16 @@ class RouteDslContractTests {
                 .subjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .currency(CurrencyIsoCode.USD.name())
                 .ledgerProfileCode("DEFAULT")
+                .build();
+    }
+
+    private SubjectRef budgetGroup(String subjectId) {
+        return ImmutableSubjectRef.builder()
+                .tenantId(1L)
+                .subjectId(subjectId)
+                .subjectType(FundsSubjectType.BUDGET_GROUP)
+                .currency(CurrencyIsoCode.USD.name())
+                .ledgerProfileCode("CONTROL")
                 .build();
     }
 }

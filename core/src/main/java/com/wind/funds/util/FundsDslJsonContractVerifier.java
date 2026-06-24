@@ -282,8 +282,7 @@ public final class FundsDslJsonContractVerifier {
 
     private static JsonSubjectRef parseAccountHierarchySubjectRef(@Nullable Map<String, ?> subjectRef, String path) {
         JsonSubjectRef parsed = parseSubjectRef(subjectRef, path);
-        if (parsed.subjectType() != FundsSubjectType.FUNDING_ACCOUNT
-                && parsed.subjectType() != FundsSubjectType.CREDIT_ACCOUNT) {
+        if (!parsed.subjectType().isLedgerPostable()) {
             throw new IllegalArgumentException(path + ".subjectType must be FUNDING_ACCOUNT or CREDIT_ACCOUNT");
         }
         return parsed;
@@ -305,7 +304,7 @@ public final class FundsDslJsonContractVerifier {
             throw new IllegalArgumentException(path + ".nodeRole must be TARGET");
         }
         FundsSubjectType subjectType = verifyEnum(FundsSubjectType.class, node, "subjectType", path + ".subjectType");
-        if (subjectType == FundsSubjectType.BUDGET_GROUP) {
+        if (!subjectType.isLedgerPostable()) {
             throw new IllegalArgumentException(routeLegNodeLabel(path) + " must be FUNDING_ACCOUNT or CREDIT_ACCOUNT");
         }
         requireText(node, "subjectId", path + ".subjectId");
@@ -331,7 +330,7 @@ public final class FundsDslJsonContractVerifier {
     }
 
     private static boolean isCoreAccount(FundsSubjectType subjectType) {
-        return subjectType == FundsSubjectType.FUNDING_ACCOUNT || subjectType == FundsSubjectType.CREDIT_ACCOUNT;
+        return subjectType.isLedgerPostable();
     }
 
     private static JsonSubjectRef parseSubjectRef(@Nullable Map<String, ?> subjectRef, String path) {

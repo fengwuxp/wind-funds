@@ -69,6 +69,9 @@ public record ImmutableRouteLegSpec(String legId,
         if (nodeType == RouteNodeType.PAYMENT_INSTRUMENT || nodeType == RouteNodeType.EXTERNAL_ACCOUNT) {
             throw new IllegalArgumentException("RouteLeg " + fieldName + " must be ledger-postable");
         }
+        if (!node.getSubjectRef().getSubjectType().isLedgerPostable()) {
+            throw new IllegalArgumentException("RouteLeg " + fieldName + " must be ledger-postable");
+        }
     }
 
     @Override

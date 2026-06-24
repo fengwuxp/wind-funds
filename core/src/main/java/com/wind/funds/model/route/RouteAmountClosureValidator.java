@@ -72,7 +72,7 @@ final class RouteAmountClosureValidator {
     }
 
     private static boolean isCoreAccount(FundsSubjectType subjectType) {
-        return subjectType == FundsSubjectType.FUNDING_ACCOUNT || subjectType == FundsSubjectType.CREDIT_ACCOUNT;
+        return subjectType.isLedgerPostable();
     }
 
     private static void add(Map<CurrencyIsoCode, Long> target, Money amount, String overflowMessage) {

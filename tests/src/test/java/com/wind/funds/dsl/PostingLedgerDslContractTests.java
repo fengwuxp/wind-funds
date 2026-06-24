@@ -173,6 +173,32 @@ class PostingLedgerDslContractTests {
     }
 
     /**
+     * 场景：预算组兼容主体被误写入 PostingPlan。
+     * 预期：借贷金额相等也不能被视为可入账计划。
+     * 红线：预算控制对象不能绕过交易路由进入账本分录。
+     */
+    @Test
+    void testPostingPlanShouldRejectBudgetGroupEntrySubject() {
+        LedgerPostingPlanSpec budgetGroupPlan = postingPlan("PLAN-BUDGET-GROUP",
+                entry("BG-CONTROL-DEBIT",
+                        FundsSubjectType.BUDGET_GROUP.name(),
+                        LedgerSubjectCode.AVAILABLE,
+                        LedgerSubjectCategory.MEMO,
+                        "LE-DSL-001",
+                        EntrySide.DEBIT,
+                        100L),
+                entry("BG-CONTROL-CREDIT",
+                        FundsSubjectType.BUDGET_GROUP.name(),
+                        LedgerSubjectCode.AVAILABLE,
+                        LedgerSubjectCategory.MEMO,
+                        "LE-DSL-001",
+                        EntrySide.CREDIT,
+                        100L));
+
+        assertThat(budgetGroupPlan.isBalanced()).isFalse();
+    }
+
+    /**
      * 场景：PostingPlan 中出现跨币种账务分录。
      * 预期：借贷两侧同金额但币种不同不能被判定为平衡；同侧跨币种累计必须显式拒绝。
      * 红线：错币种账务计划不得进入可入账状态，也不能通过金额数值相等掩盖币种不一致。

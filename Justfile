@@ -15,6 +15,10 @@ mvn-version:
 compile:
     @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag compile && just verify-classfiles
 
+# Clean and compile the full Maven reactor, including annotation-generated code.
+clean-compile:
+    @if [[ -n "{{java_home}}" ]]; then export JAVA_HOME="{{java_home}}"; export PATH="{{java_home}}/bin:$PATH"; javac_flag="-Dmaven.compiler.executable={{java_home}}/bin/javac"; else javac_flag=""; fi; mvn -Dmaven.compiler.useIncrementalCompilation=false -Dmaven.compiler.fork=true $javac_flag clean compile && just verify-classfiles && just verify-codegen
+
 # Verify compiled class files do not contain Eclipse JDT unresolved-compilation stubs.
 verify-classfiles:
     #!/usr/bin/env zsh
@@ -32,6 +36,26 @@ verify-classfiles:
     if [[ -n "$matches" ]]; then
         echo "Found unresolved compilation stubs in class files:"
         echo "$matches"
+        exit 1
+    fi
+
+# Verify representative MyBatis-Flex and MapStruct generated classes exist after clean compile.
+verify-codegen:
+    #!/usr/bin/env zsh
+    set -euo pipefail
+    required=(
+        ledger/ledger-impl/target/classes/com/wind/funds/ledger/dal/entities/table/LedgerNameRefs.class
+        transaction/transaction-impl/target/classes/com/wind/funds/transaction/dal/entities/table/FundsTransactionNameRefs.class
+        wallet/wallet-impl/target/classes/com/wind/funds/wallet/dal/entities/table/PaymentInstrumentBindingNameRefs.class
+        wallet/wallet-impl/target/classes/com/wind/funds/wallet/mapstruct/AccountHierarchyBindingConverterImpl.class
+    )
+    missing=()
+    for file in "${required[@]}"; do
+        [[ -f "$file" ]] || missing+=("$file")
+    done
+    if (( ${#missing[@]} > 0 )); then
+        echo "Missing generated classes:"
+        printf '%s\n' "${missing[@]}"
         exit 1
     fi
 
@@ -101,7 +125,7 @@ test-reconciliation tests='PayoutPreflightServiceTests,ReconciliationDifferenceA
 verify-fast: mvn-version compile test-boundary test-governance test-reconciliation
 
 # Full CAD verification for the rebuilt payment funds test baseline.
-verify-cad: mvn-version compile test-core test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance test-reconciliation pmd verify-classfiles
+verify-cad: mvn-version clean-compile test-core test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance test-reconciliation pmd verify-classfiles verify-codegen
 
 # Install reactor snapshots locally when Maven plugin resolution needs local artifacts.
 install-snapshots:

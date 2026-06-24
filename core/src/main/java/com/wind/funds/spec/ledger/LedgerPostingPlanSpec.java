@@ -5,6 +5,7 @@ import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
+import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.transaction.core.Money;
 import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
@@ -117,6 +118,7 @@ public interface LedgerPostingPlanSpec {
     private static boolean isPostableEntry(@NonNull LedgerEntrySpec entry) {
         return StringUtils.hasText(entry.getSubjectId())
                 && StringUtils.hasText(entry.getSubjectType())
+                && FundsSubjectType.isLedgerPostableName(entry.getSubjectType())
                 && StringUtils.hasText(entry.getLedgerTransactionSn())
                 && entry.getPostingRole() != LedgerPostingRole.AGGREGATE_VIEW
                 && isPositiveEntryAmount(entry);

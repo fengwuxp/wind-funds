@@ -41,11 +41,6 @@ import java.util.stream.Collectors;
 @Component
 public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransactionPostingService {
 
-    private static final Set<FundsSubjectType> POSTABLE_SUBJECT_TYPES = Set.of(
-            FundsSubjectType.FUNDING_ACCOUNT,
-            FundsSubjectType.CREDIT_ACCOUNT
-    );
-
     private final LedgerTransactionService ledgerTransactionService;
 
     private final LedgerService ledgerService;
@@ -60,9 +55,9 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         assertAllEntriesUsePositiveAmounts(transaction);
         assertAllPostingPlansUseSingleCurrency(transaction);
         assertTransactionCurrencyMatchesPostingPlans(transaction);
+        assertAllEntriesUsePostableSubjects(transaction);
         AssertUtils.isTrue(transaction.isBalanced(), "账本交易借记、贷记金额不一致");
         assertAllPostingPlansBalanced(transaction);
-        assertAllEntriesUsePostableSubjects(transaction);
         assertAllEntriesBoundToLedgers(transaction);
         Map<Long, LedgerDTO> boundLedgers = assertAllEntriesMatchBoundLedgers(transaction);
         assertAllLedgerBalanceConstraintsSatisfied(transaction, boundLedgers);
@@ -222,8 +217,7 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
     }
 
     private boolean isPostableEntry(LedgerEntrySpec entry) {
-        return POSTABLE_SUBJECT_TYPES.stream()
-                .anyMatch(subjectType -> subjectType.name().equals(entry.getSubjectType()));
+        return FundsSubjectType.isLedgerPostableName(entry.getSubjectType());
     }
 
     private void assertAllEntriesBoundToLedgers(LedgerTransactionSpec transaction) {

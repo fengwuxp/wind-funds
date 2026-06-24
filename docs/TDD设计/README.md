@@ -147,6 +147,8 @@ Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`as
 
 涉及 Spend Rule 或资金主链路的代码切片，`just compile`、`just test-one`、`just test-module`、`just verify-fast` 和 `just verify-cad` 必须通过 classfile 错误桩扫描；`verify-classfiles` 会检查 `target/classes` 和 `target/test-classes` 中是否存在 `Unresolved compilation`，避免 Maven 命令成功但编译产物不可用。
 
+涉及注解生成链路、MapStruct converter、MyBatis-Flex `NameRefs` 或 clean build 风险时，优先执行 `just clean-compile`；该命令会从空 `target` 重新编译 reactor，并校验代表性的生成类已写入 `target/classes`。
+
 | 对齐项 | PRD 输入 | DSL 输入 | 系分输入 | TDD 必须产出 | 阻断信号 |
 | --- | --- | --- | --- | --- | --- |
 | 稳定口径 | 产品目标、使用者、规则、红线和验收矩阵。 | 稳定 caseId、字段语义、不变量和失败边界。 | 服务入口、状态机、表设计、事务、观测和安全门禁。 | `AC-*`、`DSL-*`、`TDD-*`、`RED-*` 的映射表和目标测试资产。 | 用例来自过程描述，无法追溯到产品验收、DSL case 或系分入口。 |
