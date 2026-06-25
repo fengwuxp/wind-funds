@@ -187,10 +187,10 @@ GSD-2 迁移裁决：本文保留上一轮 GSD + Goal 的证据、消费记录�
 | --- | --- | --- | --- |
 | 1 | P0 账本账目 | 账本、账目、账本交易、分录、余额投影和绑定账本约束可独立证明。 | 所有钱包、交易、VCC、全球账户和清结算都依赖账务事实。 |
 | 2 | P0 钱包账户 | 资金账户、信用账户、父子账户、账户层级快照、钱包 application facade 和资金责任解析可用。 | VCC 子账户、预付卡、共享卡、全球账户钱包都依赖账户能力。 |
-| 3 | P1 交易内核 | 直接交易、授权交易、余额控制、退款/撤销/拒付、原路径回放和交易投影保持账户主体型 canonical 能力。 | 业务入口只能委派给稳定交易内核，不能绕过账户和账本。 |
+| 3 | P1 交易内核 | 直接交易、授权交易、余额控制、退款/撤销、争议裁决资金结果、原路径回放和交易投影保持账户主体型 canonical 能力。 | 业务入口只能委派给稳定交易内核，不能绕过账户和账本。 |
 | 4 | P0 清结算与对账 | 对账差错闭环、清分、内部清算、结算锁定、出款结果和追偿能形成批次、差错和补事实白名单。 | VCC clearing、全球账户出入金、商户结算都依赖外部证据和差错闭环。 |
 | 5 | 支付工具与 Spend Rule 支持 | 工具能力准入、绑定快照、Spend Rule 决策、拒绝原因和只读投影可用。 | 它是 VCC/VA/外部钱包入口的 application facade，不是账务内核。 |
-| 6 | P2 VCC 支持 | VCC 预付卡 funding、共享卡授权、clearing、refund、chargeback 和卡账单通过资金/信用子账户接入。 | 只能在账户层级、交易内核、清结算对账满足后推进。 |
+| 6 | P2 VCC 支持 | VCC 预付卡 funding、共享卡授权、clearing、refund、争议裁决资金结果和卡账单通过资金/信用子账户接入。 | 只能在账户层级、交易内核、清结算对账满足后推进。 |
 | 7 | P2 全球账户支持 | VA 收款、全球账户付款、退汇、FX quote 引用、费用分离和外部非终态边界。 | 依赖账户、交易、对账和外部规则待确认字段。 |
 | 8 | 收单 | 保持 design-only，除非用户重新打开实现优先级。 | 当前 MVP 以 VCC 和全球收付款为主，不扩大到 acquiring。 |
 
@@ -206,7 +206,7 @@ GSD-2 迁移裁决：本文保留上一轮 GSD + Goal 的证据、消费记录�
 | 交易内核 | `PARTIAL_SERVICE_FLOW_COVERAGE_ADDED_B3_AND_ROUTE_REPLAY_VERIFIED_NOT_DONE`。Round 0 已收敛到账户主体型 canonical replay fail-fast 首切片；2026-06-11 Plan Grant 已补授权后继缺原授权事实 fail-fast 目标测试，直接 Green，说明现有 command service 在路由回放前已阻断；同日用户确认并消费 B3，直接退款原交易引用回放、独立退款事实、缺原交易失败无副作用和累计超额阻断已闭合；随后验证 `DefaultRouteReplayServiceTests` 9 tests，通过纯 route replay 边界证明当前支付工具、外部账户或资金责任变化不会覆盖原快照；随后新增直接退款原交易存在但 route snapshot 缺失的交易全链路目标测试，证明失败发生在回放解析阶段且无新资金事实、账务事实或余额副作用；本轮新增直接退款原交易 route snapshot 固化旧支付工具和旧资金责任后，后续退款仍沿原快照回放的交易 flow 目标测试，`FundsDirectTransactionFlowTests` 51 tests 通过。 | 首切片已补直接退款缺原快照和当前绑定/资金责任变化后沿原快照回放的服务级证据；交易投影解释、余额调账审计、授权/争议/VCC lifecycle 更大组合 replay flow 后续单独拆分。 | `B4-CANONICAL-REPLAY-FAILFAST`，后续再拆 `B6-TRANSACTION-PROJECTION-EXPLAIN`、`B5-BALANCE-ADJUST-AUDIT` 或新的授权/VCC lifecycle replay flow Grant。 | 新增统一 `InstrumentTransactionService`、把核心请求改成支付工具引用，或只测状态不测账务事实；B3 直接退款闭环、单个缺原事实覆盖、route replay 纯服务边界、缺原快照直接退款 flow 和本轮直接退款快照归因 flow 覆盖不能声明 B4 全部 Done；不得借 B3 已消费继续扩展其他公共契约。 |
 | 清结算与对账 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。Round 0 已收敛到对账差错闭环首切片，完整清分、清算、结算、出款和追偿仍未打开。 | 至少一条已过账交易进入对账、发现差异、生成差错、阻断清算或出款、处理后重跑或追加白名单调账事实；批次、规则版本、审批、审计和幂等齐备。 | `B7-RECON-DIFFERENCE-MVP`，后续再拆 `B7-CLEARING-GATE`、`B7-PAYOUT-EXPLAIN`、`B7-OPS-AUDIT`。 | 把结算审批当外部到账成功，把清算写成持牌清算结论，缺差错闭环、重跑幂等、补事实白名单，或一口气打开完整 B7 全量对象。 |
 | 支付工具 / Spend Rule | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`，但排在交易内核和清结算对账之后。 | 工具 RECEIVE/PAY/AUTHORIZE/REFUND/WITHDRAW 能力准入、绑定快照、Spend Rule 决策、拒绝原因、控制活动和只读投影可审计。 | `B2-PI-CAP`、`B4-AUTH-PI`、`B5-SR-CONTROL`、`B6-B8-PI-VIEW`。 | 把支付工具、预算组或 Spend Rule 写成 ledger subject，或让预算控制活动改写账本余额。 |
-| VCC MVP | `QUEUED_AFTER_P0_P1`。业务设计已收敛为卡是支付工具、背后绑定资金/信用子账户。 | 预付卡 funding、共享卡授权、clearing、refund、chargeback 和卡账单按子账户、原 route snapshot、外部事件幂等和敏感字段阻断证明。 | 依赖 `B2-ACCOUNT-HIERARCHY` 后，再选 `P2-VCC-PREPAID` 或 `P2-VCC-LIFECYCLE`。 | 直接打开 P2 VCC facade、把卡号/卡 token/父账户当账务主体，或绕过钱包、交易、账本、清结算对账。 |
+| VCC MVP | `QUEUED_AFTER_P0_P1`。业务设计已收敛为卡是支付工具、背后绑定资金/信用子账户。 | 预付卡 funding、共享卡授权、clearing、refund、争议裁决资金结果和卡账单按子账户、原 route snapshot、外部事件幂等和敏感字段阻断证明。 | 依赖 `B2-ACCOUNT-HIERARCHY` 后，再选 `P2-VCC-PREPAID` 或 `P2-VCC-LIFECYCLE`。 | 直接打开 P2 VCC facade、把卡号/卡 token/父账户当账务主体，或绕过钱包、交易、账本、清结算对账。 |
 | 全球账户 MVP | `QUEUED_AFTER_P0_P1`。外部账户、FX 端口和出款前准入有局部基线。 | VA 收款、全球账户付款、退汇、FX quote 引用、费用分离、外部非终态不入账和敏感字段最小化能形成服务级证据。 | `P2-GA-INBOUND`、`P2-GA-OUTBOUND`、`P2-GA-FX-FEE`。 | 把 submitted/accepted/processing 展示成到账或付款成功，保存完整敏感银行账户，或把资金服务做成 FX 执行系统。 |
 | 收单 | `DESIGN_ONLY_NOT_CODE_CANDIDATE`。 | 仅做产品、DSL、系分、TDD、外部规则和 PCI 边界复核。 | 无默认实现 Grant。 | 未重新打开优先级就写 capture/dispute 生产代码、测试或 DDL。 |
 
@@ -329,7 +329,7 @@ GSD-2 迁移裁决：本文保留上一轮 GSD + Goal 的证据、消费记录�
 | --- | --- |
 | Task ID | `P2-VCC-MVP` |
 | Execution Grant | 待在 `P2-VCC-PREPAID` 和 `P2-VCC-LIFECYCLE` 中选一个。 |
-| 目标 | 先支持 VCC 预付资金或共享卡授权最小闭环，再支持 clearing、refund、chargeback 和卡账单投影。 |
+| 目标 | 先支持 VCC 预付资金或共享卡授权最小闭环，再支持 clearing、refund、争议裁决资金结果和卡账单投影。 |
 | 依赖关系 | Wave 1 至 Wave 6 对应能力满足后才能声明 VCC 生产可用；若业务要求 VCC 优先，只允许先切到 Wave 2 `B2-ACCOUNT-HIERARCHY` 的 `contract-only/no-ddl` 准入 Red，用于证明卡绑定子账户、父账户快照和账目 profile，不得直接进入 P2 VCC 资金流。 |
 | 关键证据 | 卡是 PaymentInstrument，账务主体是资金/信用子账户；逆向按原 route snapshot；敏感字段阻断。 |
 | 状态 | `QUEUED_AFTER_P0_P1` |
@@ -395,7 +395,7 @@ GSD-2 迁移说明：下表从 2026-06-12 起不再是当前活跃队列，只�
 | `GSD1-LEDGER-BOUND-LEDGER` 作为钱包账户生产前置 | 已完成覆盖补齐；不再作为默认下一账本入口。 | 当前工作树 `DefaultLedgerTransactionPostingServiceImplTests` 已证明 entry 与绑定 ledger 的 subject、账目 code/category、currency 和 `ALLOW_NEGATIVE` 不匹配时，在 ledger transaction、posting plan、ledger entry 和余额投影前失败；重复 post 返回既有事实且不重复投影；目标测试 10 tests 通过。 | 只凭当前工作树测试声明钱包/账户可生产，或忽略目标测试文件未被 Git 跟踪、`BUDGET_GROUP` 兼容策略和后续余额投影强化。 |
 | `B2-ACCOUNT-HIERARCHY contract-only/no-ddl` | 可以作为 VCC 快速路径准备，但不表示账本生产 Done。 | 只允许证明账户层级字段、父账户/根账户快照、账目 profile、卡绑定摘要、application facade 命名和目标 Red 可评审。 | 账户开户真实落账、账本初始化、余额可用、父子账户汇总可生产、VCC funding 或共享卡授权 Done。 |
 | `B2-ACCOUNT-HIERARCHY ledger-snapshot-backed/service-flow-backed` | 不默认先行。 | 依赖账本当前工作树 001A/001B/002A 证据和新的账户层级 Grant；同时证明账户 profile 到 ledger 初始化、父/根账户快照、子账户 posting role、父账户只读聚合不双算、失败无半截账户/账务事实、幂等摘要和审计快照。 | 跳过账本前置、把父账户聚合当入账主体、把卡号/支付工具/预算组/Spend Rule 当 ledger subject。 |
-| VCC prepaid/shared card 后续切片 | 只能消费已确认的账户层级和资金责任快照。 | 预付卡 funding、共享卡授权、clearing、refund、chargeback 和卡账单必须回到子账户、route snapshot、交易内核和对账差错闭环；外部规则核验另行确认。 | 直接进入 P2 VCC facade、在 P2 包里平行实现账本、钱包、清结算或对账对象。 |
+| VCC prepaid/shared card 后续切片 | 只能消费已确认的账户层级和资金责任快照。 | 预付卡 funding、共享卡授权、clearing、refund、争议裁决资金结果和卡账单必须回到子账户、route snapshot、交易内核和对账差错闭环；外部规则核验另行确认。 | 直接进入 P2 VCC facade、在 P2 包里平行实现账本、钱包、清结算或对账对象。 |
 
 若授权后的目标 Red 直接 Green，只登记为覆盖补齐和生产证据增强，不强行修改生产代码；若 Red 暴露真实缺口，只允许在该 Grant 写入范围内最小修复。本文档交接门禁不构成新的 Java、测试、DDL/H2 schema、公共契约或运行时配置授权。
 

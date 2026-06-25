@@ -18,12 +18,15 @@ import java.time.LocalDateTime;
  * 该请求是历史兼容入口的请求模型，新增资金结果场景应优先使用授权完成退款请求的争议字段。
  * 继续使用本请求时，{@link #contextVariables} 必须携带拒付原因、证据引用和外部争议引用等最小审计上下文。
  *
+ * @deprecated since 2026-06-25, use {@link FundsAuthorizationTransactionRefundRequest} with dispute fields.
+ *
  * @author wuxp
  * @date 2026-05-12
  **/
+@Deprecated(since = "2026-06-25")
 @Data
 @Accessors(chain = true)
-@Schema(description = "钱包授权结算后的拒付/争议请求，用于已结算交易的争议退回，不表示授权阶段的授权拒绝")
+@Schema(description = "钱包授权结算后的拒付/争议请求，用于已结算交易的争议退回，不表示授权阶段的授权拒绝", deprecated = true)
 public class FundsAuthorizationTransactionChargebackRequest {
 
     @Schema(description = "账户 id")

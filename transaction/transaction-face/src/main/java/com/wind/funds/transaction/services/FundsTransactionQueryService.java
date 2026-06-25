@@ -1,5 +1,6 @@
 package com.wind.funds.transaction.services;
 
+import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -8,6 +9,7 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Optional;
@@ -109,6 +111,8 @@ public interface FundsTransactionQueryService {
                                              @NonNull CurrencyIsoCode currency,
                                              @Nullable String excludedBusinessScene,
                                              @Nullable String excludedBusinessSn) {
+        AssertUtils.isFalse(StringUtils.hasText(excludedBusinessScene) || StringUtils.hasText(excludedBusinessSn),
+                "带排除参数的 replay 消费金额查询必须由实现类显式支持");
         return sumConsumedReplayLegAmount(referenceTransactionSn, eventType, replayRefLegId, currency);
     }
 

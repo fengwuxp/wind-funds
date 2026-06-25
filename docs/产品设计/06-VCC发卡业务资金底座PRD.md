@@ -331,7 +331,7 @@ flowchart LR
 
 ## 11. 与资金底座主线的关系
 
-本分册作为 VCC 发卡业务的业务补充分册保留，不并入 01-05 的主线正文。这样可以避免 VCC 的 Program、Card、Cardholder、授权控制、卡组织清算和拒付语义反向污染资金底座通用内核。01-05 只吸收本分册抽象出的共性要求：授权不等于入账、卡号/PAN/token 不入账、VCC 不新增 `VCC_ACCOUNT`，卡必须绑定资金子账户或信用子账户，敏感数据最小化、原路径回放、清算和对账必须可追溯。
+本分册作为 VCC 发卡业务的业务补充分册保留，不并入 01-05 的主线正文。这样可以避免 VCC 的 Program、Card、Cardholder、授权控制、卡组织清算和争议案件语义反向污染资金底座通用内核。01-05 只吸收本分册抽象出的共性要求：授权不等于入账、卡号/PAN/token 不入账、VCC 不新增 `VCC_ACCOUNT`，卡必须绑定资金子账户或信用子账户，敏感数据最小化、原路径回放、清算和对账必须可追溯。
 
 | 原文档 | 补充方式 |
 | --- | --- |
@@ -354,7 +354,7 @@ flowchart LR
 | 支付工具注册 | 创建、激活、暂停、关闭 VCC 卡，并保存 issuer / processor 安全引用。 | 保存 `PaymentInstrumentRef`、脱敏展示、工具状态、方向、币种、能力、绑定版本、子账户引用和父账户引用。 | 把卡、卡 token、持卡人或卡组建成账本主体。 |
 | 资金责任解析 | 按服务计划、托管模式、业务审批、预算策略、预付责任、子账户 profile 和父账户约束提供上下文。 | 用 `FundingAllocationDecision` 解析 VCC 关联子账户背后的父级资金账户、父级信用账户、平台责任账户或 product funding / source account；预算组和 Spend Rule 只作为控制上下文。 | 用卡产品形态反推出账户类型，或把预算组、Spend Rule 写入 ledger subject。 |
 | 授权交易 | 接收授权请求，做来源校验、脱敏、幂等、规则上下文、商户/MCC/地区等场景归一。 | 提供 `authorizeByInstrument` 或等价 application facade，完成工具准入、绑定快照、资金责任解析、账户能力校验，再委派账户主体型授权内核。 | 把 `FundsAuthorizationTransactionService` 的 canonical 请求整体改成支付工具入参，或新增统一支付工具交易内核。 |
-| 清算、退款和拒付 | 归一 clearing、partial clearing、force capture、refund、chargeback、fee 和外部规则确认。 | 按原授权和原 route snapshot 完成 settle、release、expire、refund、差错、费用、追偿、对账和投影。 | 按当前卡绑定重新选路，或让 VCC 表替代资金交易、账本、清结算、对账事实。 |
+| 清算、退款和争议裁决资金结果 | 归一 clearing、partial clearing、force capture、refund、chargeback、fee 和外部规则确认。 | 按原授权和原 route snapshot 完成 settle、release、expire、refund、差错、费用、追偿、对账和投影；chargeback 过程本身不直接成为交易层主入口。 | 按当前卡绑定重新选路，或让 VCC 表替代资金交易、账本、清结算、对账事实。 |
 | 卡账单和运营视图 | 提供卡、持卡人、企业、服务计划和 issuer 侧解释字段。 | 通过统一交易投影按子账户、父账户、`PaymentInstrumentRef`、绑定版本、预算组、Spend Rule 和资金责任决策生成只读视图。 | 给卡号、PAN 或 token 建立独立账本、独立余额或独立资金流水事实源。 |
 
 ### 12.2 fincone-issuing 接入 wind-funds 的业务链路
@@ -433,7 +433,7 @@ VCC 业务对接建议优先依赖钱包 application facade，而不是直接调
 | 预付资金处理 | `VccPrepaidFundingApplicationService` | `com.wind.funds.wallet.application.vcc` | 外部确认入金、系统内充值、退卡或转出；写入资金子账户，不创建卡号账本或 `VCC_ACCOUNT`。 |
 | 共享卡场景编排 | `VccSharedCardTransactionApplicationService` | `com.wind.funds.wallet.application.vcc` | 共享卡授权、清算和逆向的 VCC 场景编排；卡维度账单来自交易投影。 |
 
-交易层目标态必须具备账户主体型授权释放、受控强制完成、无授权退款、拒付/争议扣回、余额控制调账审计和原路径回放能力。VCC facade 可以触发或委派这些能力，但不得把它们包装成统一支付工具交易内核，也不得让卡、卡组、预算组或 Spend Rule 成为账务主体。
+交易层目标态必须具备账户主体型授权释放、受控强制完成、无授权退款、争议裁决资金结果承接、余额控制调账审计和原路径回放能力。chargeback / dispute 仍属于案件过程，VCC facade 只在裁决需要资金处理时委派退款、追偿或清结算专项能力；不得把它们包装成统一支付工具交易内核，也不得让卡、卡组、预算组或 Spend Rule 成为账务主体。
 
 #### 13.2.1 预付卡、共享卡交易服务能力包
 

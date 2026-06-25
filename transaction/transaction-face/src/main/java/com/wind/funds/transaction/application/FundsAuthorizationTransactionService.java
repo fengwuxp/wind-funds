@@ -23,10 +23,8 @@ import org.jspecify.annotations.NullMarked;
  * （释放冻结）            ↓
  *                      Capture（扣款）
  *                           ↓
- *               ┌───────────┴───────────┐
- *               ↓                       ↓
- *          Refund（退款）        Chargeback（结算后拒付/争议）
- *          （商户发起）          （持卡人/发卡机构发起）
+ *               ↓
+ *          Refund（退款 / 争议裁决资金结果）
  * </pre>
  *
  * @author wuxp
@@ -84,16 +82,20 @@ public interface FundsAuthorizationTransactionService {
     String settleRefund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator);
 
     /**
-     * 授权结算后拒付（争议）。
+     * 授权结算后拒付（争议）兼容入口。
      * <p>
      * 用于已结算授权交易发生持卡人或发卡机构争议时，按原结算路径回放资金退回；
      * 不用于授权阶段批准失败，授权失败使用 authorize 的 approved=false 表达。
      * 该方法是历史兼容入口，新增场景应优先按争议裁决资金结果使用 {@link #settleRefund(FundsAuthorizationTransactionRefundRequest, WindOperator)}，
      * 并携带争议字段；继续使用本入口时必须携带拒付原因、证据引用和外部争议引用等最小审计上下文。
      *
+     * @deprecated since 2026-06-25, use {@link #settleRefund(FundsAuthorizationTransactionRefundRequest, WindOperator)}
+     * for adjudicated dispute results that affect funds.
+     *
      * @param request  授权结算后拒付/争议请求
      * @param operator 操作者
      * @return 交易流水号
      */
+    @Deprecated(since = "2026-06-25")
     String chargeback(FundsAuthorizationTransactionChargebackRequest request, WindOperator operator);
 }

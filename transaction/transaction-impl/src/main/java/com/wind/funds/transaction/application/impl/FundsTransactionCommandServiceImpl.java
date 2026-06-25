@@ -184,6 +184,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     }
 
     @Override
+    @Deprecated(since = "2026-06-25")
     @Transactional(rollbackFor = Exception.class)
     public String chargeback(FundsAuthorizationTransactionChargebackRequest request, WindOperator operator) {
         return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
