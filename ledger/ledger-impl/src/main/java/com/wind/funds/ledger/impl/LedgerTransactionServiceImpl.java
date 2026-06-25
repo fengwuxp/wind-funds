@@ -293,6 +293,20 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
     }
 
     @Override
+    @NonNull
+    public LedgerTransactionDTO getLedgerTransactionBySn(@NonNull Long tenantId, @NonNull String sn) {
+        AssertUtils.notNull(tenantId, "账本交易查询 tenantId 不能为空");
+        AssertUtils.hasText(sn, "账本交易流水号不能为空");
+        LedgerTransactionNameRefs ref = LedgerTransactionNameRefs.ledgerTransaction;
+        LedgerTransaction result = ledgerTransactionMapper.selectOneByQuery(QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(sn)));
+        AssertUtils.notNull(result, "账户账本交易不存在，tenantId = {}, sn = {}", tenantId, sn);
+        return LedgerConverter.INSTANCE.convertToAccountLedgerTransactionDTO(result);
+    }
+
+    @Override
     public @NonNull WindPagination<LedgerTransactionDTO> queryAccountLedgerTransactions(
             @NonNull LedgerTransactionQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options) {
@@ -398,13 +412,28 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
     }
 
     @Override
+    @NonNull
+    public LedgerEntryDTO getLedgerEntryBySn(@NonNull Long tenantId, @NonNull String sn) {
+        AssertUtils.notNull(tenantId, "账目分录查询 tenantId 不能为空");
+        AssertUtils.hasText(sn, "账目分录流水号不能为空");
+        LedgerEntryNameRefs ref = LedgerEntryNameRefs.ledgerEntry;
+        LedgerEntry result = ledgerEntryMapper.selectOneByQuery(QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(sn)));
+        AssertUtils.notNull(result, "账户账本条目不存在，tenantId = {}, sn = {}", tenantId, sn);
+        return LedgerConverter.INSTANCE.convertToLedgerEntryDTO(result);
+    }
+
+    @Override
     public @NonNull WindPagination<LedgerEntryDTO> queryLedgerEntries(
             @NonNull LedgerEntryQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options) {
         LedgerEntryNameRefs ledgerEntry = LedgerEntryNameRefs.ledgerEntry;
         QueryWrapper queryWrapper = MybatisQueryHelper.from(options).select()
                 .from(ledgerEntry)
-                .where(ledgerEntry.tenantId.eq(query.getTenantId()))
+                .where(ledgerEntry.sn.eq(query.getSn()))
+                .and(ledgerEntry.tenantId.eq(query.getTenantId()))
                 .and(ledgerEntry.subjectId.eq(query.getSubjectId()))
                 .and(ledgerEntry.subjectType.eq(query.getSubjectType()))
                 .and(ledgerEntry.ledgerSubjectCode.eq(query.getLedgerSubjectCode()))

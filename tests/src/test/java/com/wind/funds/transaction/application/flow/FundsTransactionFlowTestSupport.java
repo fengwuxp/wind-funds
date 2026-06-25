@@ -13,7 +13,6 @@ import com.wind.funds.ledger.dal.entities.table.LedgerTransactionNameRefs;
 import com.wind.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerTransactionMapper;
-import com.wind.funds.ledger.application.impl.DefaultLedgerFactQueryApplicationService;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
@@ -1342,7 +1341,6 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultFundsTransactionProjectionExplainApplicationService.class,
             FundsTransactionCommandServiceImpl.class,
             LedgerServiceImpl.class,
-            DefaultLedgerFactQueryApplicationService.class,
             LedgerTransactionServiceImpl.class,
             LedgerBalanceProjectionServiceImpl.class,
             DefaultLedgerTransactionPostingServiceImpl.class,

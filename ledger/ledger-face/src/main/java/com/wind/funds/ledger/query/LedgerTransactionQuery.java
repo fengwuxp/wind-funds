@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 @Accessors(chain = true)
 public class LedgerTransactionQuery {
 
-    @Schema(description = "账户ID")
+    @Schema(description = "账本交易流水号")
     private String sn;
 
     @Schema(description = "租户ID")

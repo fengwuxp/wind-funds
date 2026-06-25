@@ -1,11 +1,9 @@
-package com.wind.funds.ledger.application;
+package com.wind.funds.ledger.service;
 
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
-import com.wind.funds.ledger.application.impl.DefaultLedgerBalanceProjectionApplicationService;
-import com.wind.funds.ledger.application.impl.DefaultLedgerFactQueryApplicationService;
-import com.wind.funds.ledger.application.impl.DefaultLedgerPostingApplicationService;
+import com.wind.funds.ledger.LedgerTransactionPostingService;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.dto.LedgerEntryDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionDTO;
@@ -24,10 +22,8 @@ import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.ledger.query.LedgerQuery;
-import com.wind.funds.ledger.query.LedgerTransactionQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
-import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.spec.ledger.LedgerPostingPhaseSpec;
@@ -66,24 +62,25 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Ledger application facade 生产入口契约测试。
+ * 账本交易基础服务事实查询契约测试。
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestCoreInfrastructureConfig.class,
-        LedgerApplicationFacadeTests.Config.class
+        LedgerTransactionServiceFactQueryTests.Config.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
+class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
 
-    private static final String LEDGER_TRANSACTION_SN = "LT-APP-FACADE-001";
+    private static final String LEDGER_TRANSACTION_SN = "LT-TRX-SERVICE-FACT-001";
 
-    private static final String POSTING_PLAN_ID = "PLAN-APP-FACADE-001";
+    private static final String POSTING_PLAN_ID = "PLAN-TRX-SERVICE-FACT-001";
 
-    private static final String SOURCE_SUBJECT_ID = "ledger_app_facade_source";
+    private static final String SOURCE_SUBJECT_ID = "ledger_trx_service_fact_source";
 
-    private static final String TARGET_SUBJECT_ID = "ledger_app_facade_target";
+    private static final String TARGET_SUBJECT_ID = "ledger_trx_service_fact_target";
 
     private static final String SUBJECT_TYPE = FundsSubjectType.FUNDING_ACCOUNT.name();
 
@@ -91,16 +88,13 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
 
     private static final Money TRANSACTION_AMOUNT = Money.immutable(100L, CURRENCY);
 
-    private static final LocalDateTime TRANSACTION_TIME = LocalDateTime.of(2026, 6, 21, 10, 0);
+    private static final LocalDateTime TRANSACTION_TIME = LocalDateTime.of(2026, 6, 25, 10, 0);
 
     @Autowired
-    private LedgerPostingApplicationService postingApplicationService;
+    private LedgerTransactionPostingService ledgerTransactionPostingService;
 
     @Autowired
-    private LedgerFactQueryApplicationService factQueryApplicationService;
-
-    @Autowired
-    private LedgerBalanceProjectionApplicationService balanceProjectionApplicationService;
+    private LedgerTransactionService ledgerTransactionService;
 
     @Autowired
     private LedgerService ledgerService;
@@ -112,80 +106,67 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
-    void setUpLedgerApplicationFacadeTestData() {
-        cleanupLedgerApplicationFacadeTestData();
+    void setUpLedgerTransactionServiceFactQueryTestData() {
+        cleanupLedgerTransactionServiceFactQueryTestData();
     }
 
     @AfterEach
-    void tearDownLedgerApplicationFacadeTestData() {
-        cleanupLedgerApplicationFacadeTestData();
+    void tearDownLedgerTransactionServiceFactQueryTestData() {
+        cleanupLedgerTransactionServiceFactQueryTestData();
     }
 
     /**
-     * 场景：跨模块调用方只依赖 ledger application facade。
-     * 输入：ledger application 包下的公开接口。
-     * 输出：接口不暴露 update/delete 资源突变能力，也不泄漏 DAL/Mapper/Entity 类型。
-     * 红线：生产调用入口不能绕过账本交易、分录和投影链路直接更新或删除账务事实。
+     * 场景：跨模块调用方按稳定流水读取必然存在的账务事实。
+     * 输入：LedgerTransactionService 公开 get-by-sn 方法。
+     * 输出：get 方法返回确定 DTO，不返回 Optional，不暴露 DAL 类型。
+     * 红线：按 sn 或 id 的 get 查询是必然存在语义，查不到应抛异常。
      */
     @Test
-    void testLedgerApplicationFacadesShouldExposeOnlySafeCapabilities() {
-        List<Class<?>> facades = List.of(
-                LedgerPostingApplicationService.class,
-                LedgerFactQueryApplicationService.class,
-                LedgerBalanceProjectionApplicationService.class);
+    void testLedgerTransactionServiceShouldExposeStableSnGetQueriesWithoutOptional() throws NoSuchMethodException {
+        Method getTransactionBySn = LedgerTransactionService.class.getDeclaredMethod(
+                "getLedgerTransactionBySn", Long.class, String.class);
+        Method getEntryBySn = LedgerTransactionService.class.getDeclaredMethod(
+                "getLedgerEntryBySn", Long.class, String.class);
 
-        facades.forEach(facade -> {
-            assertThat(facade.getPackageName()).isEqualTo("com.wind.funds.ledger.application");
-            assertThat(facade.getDeclaredMethods())
-                    .extracting(Method::getName)
-                    .noneMatch(name -> name.startsWith("update") || name.startsWith("delete"));
-            for (Method method : facade.getDeclaredMethods()) {
-                assertThat(method.getReturnType().getName()).doesNotContain(".dal.");
-                for (Class<?> parameterType : method.getParameterTypes()) {
-                    assertThat(parameterType.getName()).doesNotContain(".dal.");
-                }
-            }
-        });
+        assertThat(getTransactionBySn.getReturnType()).isEqualTo(LedgerTransactionDTO.class);
+        assertThat(getEntryBySn.getReturnType()).isEqualTo(LedgerEntryDTO.class);
+        assertThat(getTransactionBySn.getReturnType().getName()).doesNotContain(".dal.");
+        assertThat(getEntryBySn.getReturnType().getName()).doesNotContain(".dal.");
     }
 
     /**
-     * 场景：跨模块调用方通过 application facade 执行一次已完成的账本交易入账。
-     * 输入：source / target 两个资金账户、各自 AVAILABLE 账本和一笔借贷平衡的账本交易。
-     * 输出：入账通过标准 posting service 生成事实，查询 facade 可读到账本交易和分录，余额投影 facade 可读到余额变化。
-     * 红线：application facade 只能编排标准入账与只读查询，不能暴露账本余额直接更新或事实删除入口。
+     * 场景：交易侧、清结算或对账侧需要读取一笔已落账的账务事实。
+     * 输入：source / target 两个资金账户、标准 posting gateway 和一笔借贷平衡的账本交易。
+     * 输出：基础服务可按稳定 sn 读到账本交易和分录，异租户 get 查询抛异常；余额读取继续走 LedgerService。
+     * 红线：基础查询不负责入账，不能跨租户兜底查询，也不能替代余额投影或资源初始化服务。
      */
     @Test
-    void testPostAndQueryThroughLedgerApplicationFacades() {
+    void testPostThroughGatewayAndQueryFactsByStableSn() {
         seedFundingAccount(SOURCE_SUBJECT_ID);
         seedFundingAccount(TARGET_SUBJECT_ID);
         Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
 
-        postingApplicationService.postLedgerTransaction(transaction(sourceLedgerId, targetLedgerId));
+        ledgerTransactionPostingService.post(transaction(sourceLedgerId, targetLedgerId));
 
-        LedgerTransactionDTO transaction = factQueryApplicationService.queryLedgerTransactions(
-                        new LedgerTransactionQuery()
-                                .setTenantId(TENANT_ID)
-                                .setSn(LEDGER_TRANSACTION_SN),
-                        DefaultPageQueryOptions.defaults(10))
-                .getRecords()
-                .getFirst();
-        List<LedgerEntryDTO> entries = factQueryApplicationService.queryLedgerEntries(
+        LedgerTransactionDTO transaction = ledgerTransactionService.getLedgerTransactionBySn(
+                TENANT_ID, LEDGER_TRANSACTION_SN);
+        List<LedgerEntryDTO> entries = ledgerTransactionService.queryLedgerEntries(
                         new LedgerEntryQuery()
                                 .setTenantId(TENANT_ID)
                                 .setLedgerTransactionSn(LEDGER_TRANSACTION_SN),
                         DefaultPageQueryOptions.defaults(10))
                 .getRecords();
-        List<LedgerEntryDTO> foreignTenantEntries = factQueryApplicationService.queryLedgerEntries(
+        LedgerEntryDTO firstEntry = ledgerTransactionService.getLedgerEntryBySn(TENANT_ID, entries.getFirst().getSn());
+        List<LedgerEntryDTO> foreignTenantEntries = ledgerTransactionService.queryLedgerEntries(
                         new LedgerEntryQuery()
                                 .setTenantId(TENANT_ID + 1)
                                 .setLedgerTransactionSn(LEDGER_TRANSACTION_SN),
                         DefaultPageQueryOptions.defaults(10))
                 .getRecords();
-        LedgerDTO sourceLedger = balanceProjectionApplicationService.getLedgerById(sourceLedgerId);
-        LedgerDTO targetLedger = balanceProjectionApplicationService.getLedgerById(targetLedgerId);
-        List<LedgerDTO> sourceLedgers = balanceProjectionApplicationService.queryLedgerBalances(
-                        new LedgerQuery()
+        LedgerDTO sourceLedger = ledgerService.getLedgerById(sourceLedgerId);
+        LedgerDTO targetLedger = ledgerService.getLedgerById(targetLedgerId);
+        List<LedgerDTO> sourceLedgers = ledgerService.queryLedgers(new LedgerQuery()
                                 .setSubjectId(SOURCE_SUBJECT_ID)
                                 .setSubjectType(SUBJECT_TYPE)
                                 .setLedgerSubjectCode(LedgerSubjectCode.AVAILABLE),
@@ -195,7 +176,14 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
         assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
         assertThat(transaction.getSn()).isEqualTo(LEDGER_TRANSACTION_SN);
         assertThat(entries).hasSize(2);
+        assertThat(firstEntry.getLedgerTransactionSn()).isEqualTo(LEDGER_TRANSACTION_SN);
         assertThat(foreignTenantEntries).isEmpty();
+        assertThatThrownBy(() -> ledgerTransactionService.getLedgerTransactionBySn(
+                TENANT_ID + 1, LEDGER_TRANSACTION_SN))
+                .hasMessageContaining("账户账本交易不存在");
+        assertThatThrownBy(() -> ledgerTransactionService.getLedgerEntryBySn(
+                TENANT_ID + 1, firstEntry.getSn()))
+                .hasMessageContaining("账户账本条目不存在");
         assertThat(sourceLedger.getNormalBalance()).isEqualTo(100L);
         assertThat(targetLedger.getNormalBalance()).isEqualTo(100L);
         assertThat(sourceLedgers)
@@ -251,7 +239,7 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
         FundingAccount account = new FundingAccount();
         account.setTenantId(TENANT_ID);
         account.setSn(accountSn);
-        account.setOwnerId("owner_" + accountSn);
+        account.setOwnerId(SOURCE_SUBJECT_ID.equals(accountSn) ? "owner_source" : "owner_target");
         account.setOwnerType(FundsAccountOwnerType.USER);
         account.setAccountType(FundingAccountType.USER_WALLET.getAccountType().name());
         account.setPlatform(Boolean.FALSE);
@@ -259,12 +247,12 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
         account.setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC);
         account.setLedgerProfileVersion(1);
         account.setStatus(FundsAccountStatus.ACTIVE);
-        account.setDescription("ledger application facade funding account");
+        account.setDescription("ledger transaction service fact query funding account");
         account.setVersion(0);
         fundingAccountMapper.insertSelective(account);
     }
 
-    private void cleanupLedgerApplicationFacadeTestData() {
+    private void cleanupLedgerTransactionServiceFactQueryTestData() {
         jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE ledger_transaction_sn = ?", LEDGER_TRANSACTION_SN);
         jdbcTemplate.update("DELETE FROM t_ledger_posting_plan WHERE ledger_transaction_sn = ?",
                 LEDGER_TRANSACTION_SN);
@@ -311,7 +299,7 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
 
         @Override
         public String getBusinessSn() {
-            return "BIZ-APP-FACADE-001";
+            return "BIZ-TRX-SERVICE-FACT-001";
         }
 
         @Override
@@ -321,7 +309,7 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
 
         @Override
         public String getBusinessScene() {
-            return "LEDGER_APPLICATION_FACADE";
+            return "LEDGER_TRANSACTION_SERVICE_FACT";
         }
 
         @Override
@@ -336,7 +324,7 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
 
         @Override
         public String getDescription() {
-            return "ledger application facade contract";
+            return "ledger transaction service fact query contract";
         }
 
         @Override
@@ -346,7 +334,7 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
 
         @Override
         public Map<String, Object> getContextVariables() {
-            return Map.of("traceId", "TRACE-APP-FACADE-001");
+            return Map.of("traceId", "TRACE-TRX-SERVICE-FACT-001");
         }
     }
 
@@ -379,7 +367,7 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
 
         @Override
         public Map<String, Object> getContextVariables() {
-            return Map.of("routeTraceId", "ROUTE-APP-FACADE-001");
+            return Map.of("routeTraceId", "ROUTE-TRX-SERVICE-FACT-001");
         }
     }
 
@@ -459,12 +447,12 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
 
         @Override
         public String getBusinessScene() {
-            return "LEDGER_APPLICATION_FACADE";
+            return "LEDGER_TRANSACTION_SERVICE_FACT";
         }
 
         @Override
         public String getBusinessSn() {
-            return "BIZ-APP-FACADE-001";
+            return "BIZ-TRX-SERVICE-FACT-001";
         }
 
         @Override
@@ -489,20 +477,17 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
 
         @Override
         public String getDescription() {
-            return "ledger application facade contract";
+            return "ledger transaction service fact query contract";
         }
 
         @Override
         public Map<String, Object> getContextVariables() {
-            return Map.of("ledgerEntrySn", "LE-APP-FACADE-001");
+            return Map.of("ledgerEntryTraceId", "LE-TRX-SERVICE-FACT-001");
         }
     }
 
     @Configuration
     @Import({
-            DefaultLedgerPostingApplicationService.class,
-            DefaultLedgerFactQueryApplicationService.class,
-            DefaultLedgerBalanceProjectionApplicationService.class,
             DefaultLedgerTransactionPostingServiceImpl.class,
             LedgerTransactionServiceImpl.class,
             LedgerServiceImpl.class,

@@ -8,7 +8,6 @@ import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
-import com.wind.funds.ledger.application.impl.DefaultLedgerFactQueryApplicationService;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
@@ -834,7 +833,6 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             DefaultFundsTransactionQueryService.class,
             DefaultFundsTransactionProjectionExplainApplicationService.class,
             DefaultLedgerProfileServiceImpl.class,
-            DefaultLedgerFactQueryApplicationService.class,
             DefaultSubjectLedgerInitializer.class,
             AccountHierarchyBindingServiceImpl.class,
             AccountHierarchyServiceImpl.class,
