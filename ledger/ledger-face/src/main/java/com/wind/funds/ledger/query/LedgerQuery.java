@@ -61,6 +61,9 @@ public class LedgerQuery {
     @Schema(description = "贷方累计发生额，单位：分")
     private Long creditAmount;
 
+    @Schema(description = "账本状态，例如 ACTIVE")
+    private String status;
+
     @Schema(description = "币种")
     private CurrencyIsoCode currency;
 

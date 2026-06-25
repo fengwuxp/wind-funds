@@ -2,9 +2,9 @@ package com.wind.funds.transaction.converter;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
+import com.wind.funds.ledger.application.LedgerFactQueryApplicationService;
 import com.wind.funds.ledger.dto.LedgerTransactionDTO;
 import com.wind.funds.ledger.query.LedgerTransactionQuery;
-import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
@@ -56,13 +56,13 @@ public class FundsAuthorizationInstructionConverter {
 
     private final FundsInstructionAmountSupport amountSupport;
 
-    private final LedgerTransactionService ledgerTransactionService;
+    private final LedgerFactQueryApplicationService ledgerFactQueryApplicationService;
 
     @Autowired
     public FundsAuthorizationInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService,
-                                                  @NonNull LedgerTransactionService ledgerTransactionService) {
+                                                  @NonNull LedgerFactQueryApplicationService ledgerFactQueryApplicationService) {
         this.amountSupport = new FundsInstructionAmountSupport(fundsAccountQueryService);
-        this.ledgerTransactionService = ledgerTransactionService;
+        this.ledgerFactQueryApplicationService = ledgerFactQueryApplicationService;
     }
 
     public @NonNull FundsInstructionSpec convertToAuthorizeInstruction(
@@ -349,10 +349,11 @@ public class FundsAuthorizationInstructionConverter {
 
     private @NonNull String authorizationLedgerTransactionSn(@NonNull String authorizationTransactionSn) {
         LedgerTransactionQuery query = new LedgerTransactionQuery()
+                .setTenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .setFundsTransactionSn(authorizationTransactionSn)
                 .setEventType(FundsTransactionEventType.AUTHORIZE.name());
-        List<LedgerTransactionDTO> records = ledgerTransactionService
-                .queryAccountLedgerTransactions(query, DefaultPageQueryOptions.defaults(2))
+        List<LedgerTransactionDTO> records = ledgerFactQueryApplicationService
+                .queryLedgerTransactions(query, DefaultPageQueryOptions.defaults(2))
                 .getRecords();
         AssertUtils.isTrue(records.size() == 1, "授权原账本交易不存在或不唯一，authorizationTransactionSn = {}",
                 authorizationTransactionSn);

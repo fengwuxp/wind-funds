@@ -115,6 +115,7 @@ public class LedgerServiceImpl implements LedgerService {
                 .and(ledger.allowNegative.eq(query.getAllowNegative()))
                 .and(ledger.debitAmount.eq(query.getDebitAmount()))
                 .and(ledger.creditAmount.eq(query.getCreditAmount()))
+                .and(ledger.status.eq(query.getStatus()))
                 .and(ledger.currency.eq(query.getCurrency()))
                 .and(ledger.settlementPolicy.eq(query.getSettlementPolicy()))
                 .and(ledger.cutOffTime.eq(query.getCutOffTime()))

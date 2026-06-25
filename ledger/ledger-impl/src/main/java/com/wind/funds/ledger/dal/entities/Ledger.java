@@ -123,6 +123,12 @@ public class Ledger implements Serializable, TenantIsolationObject<Long> {
     private Long creditAmount;
 
     /**
+     * 账本状态。
+     */
+    @NotNull
+    private String status;
+
+    /**
      * 币种
      */
     @NotNull

@@ -71,7 +71,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Ledger application facade 生产入口契约测试。
  */
 @SpringJUnitConfig({
-        AbstractFundsServiceTest.TestInfrastructureConfig.class,
+        AbstractFundsServiceTest.TestCoreInfrastructureConfig.class,
         LedgerApplicationFacadeTests.Config.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -164,12 +164,22 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
         postingApplicationService.postLedgerTransaction(transaction(sourceLedgerId, targetLedgerId));
 
         LedgerTransactionDTO transaction = factQueryApplicationService.queryLedgerTransactions(
-                        new LedgerTransactionQuery().setSn(LEDGER_TRANSACTION_SN),
+                        new LedgerTransactionQuery()
+                                .setTenantId(TENANT_ID)
+                                .setSn(LEDGER_TRANSACTION_SN),
                         DefaultPageQueryOptions.defaults(10))
                 .getRecords()
                 .getFirst();
         List<LedgerEntryDTO> entries = factQueryApplicationService.queryLedgerEntries(
-                        new LedgerEntryQuery().setLedgerTransactionSn(LEDGER_TRANSACTION_SN),
+                        new LedgerEntryQuery()
+                                .setTenantId(TENANT_ID)
+                                .setLedgerTransactionSn(LEDGER_TRANSACTION_SN),
+                        DefaultPageQueryOptions.defaults(10))
+                .getRecords();
+        List<LedgerEntryDTO> foreignTenantEntries = factQueryApplicationService.queryLedgerEntries(
+                        new LedgerEntryQuery()
+                                .setTenantId(TENANT_ID + 1)
+                                .setLedgerTransactionSn(LEDGER_TRANSACTION_SN),
                         DefaultPageQueryOptions.defaults(10))
                 .getRecords();
         LedgerDTO sourceLedger = balanceProjectionApplicationService.getLedgerById(sourceLedgerId);
@@ -185,6 +195,7 @@ class LedgerApplicationFacadeTests extends AbstractFundsServiceTest {
         assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
         assertThat(transaction.getSn()).isEqualTo(LEDGER_TRANSACTION_SN);
         assertThat(entries).hasSize(2);
+        assertThat(foreignTenantEntries).isEmpty();
         assertThat(sourceLedger.getNormalBalance()).isEqualTo(100L);
         assertThat(targetLedger.getNormalBalance()).isEqualTo(100L);
         assertThat(sourceLedgers)

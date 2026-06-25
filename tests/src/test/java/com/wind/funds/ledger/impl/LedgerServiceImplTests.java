@@ -92,6 +92,7 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getDebitAmount()).isZero();
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isZero();
+        assertThat(ledger.getStatus()).isEqualTo("ACTIVE");
         assertThat(ledger.getSettlementPolicy()).isEqualTo("RT");
         assertThat(ledger.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
         assertThat(ledger.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
@@ -131,6 +132,7 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getDebitAmount()).isZero();
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isZero();
+        assertThat(ledger.getStatus()).isEqualTo("ACTIVE");
         assertThat(ledger.getSettlementPolicy()).isEqualTo("RT");
         assertThat(ledger.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
         assertThat(ledger.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);

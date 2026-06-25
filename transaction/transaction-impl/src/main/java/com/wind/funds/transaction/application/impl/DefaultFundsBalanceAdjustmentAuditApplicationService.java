@@ -5,11 +5,11 @@ import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
+import com.wind.funds.ledger.application.LedgerFactQueryApplicationService;
 import com.wind.funds.ledger.dto.LedgerEntryDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionDTO;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.ledger.query.LedgerTransactionQuery;
-import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.application.FundsBalanceAdjustmentAuditApplicationService;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
@@ -51,7 +51,7 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
-    private final LedgerTransactionService ledgerTransactionService;
+    private final LedgerFactQueryApplicationService ledgerFactQueryApplicationService;
 
     @Override
     @Transactional(readOnly = true)
@@ -93,7 +93,7 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
                 transactionDTO.getSn());
         List<LedgerTransactionDTO> ledgerTransactions = queryLedgerTransactions(transactionDTO.getTenantId(),
                 transactionDTO.getSn());
-        List<LedgerEntryDTO> ledgerEntries = queryLedgerEntries(ledgerTransactions);
+        List<LedgerEntryDTO> ledgerEntries = queryLedgerEntries(transactionDTO.getTenantId(), ledgerTransactions);
         Optional<RouteSnapshotSpec> routeSnapshot = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(
                 transactionDTO.getSn());
         FundsBalanceAdjustmentAuditCompleteness completeness = completeness(routeSnapshot.isPresent(),
@@ -147,16 +147,17 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
     }
 
     private List<LedgerTransactionDTO> queryLedgerTransactions(Long tenantId, String transactionSn) {
-        return ledgerTransactionService.queryAccountLedgerTransactions(new LedgerTransactionQuery()
+        return ledgerFactQueryApplicationService.queryLedgerTransactions(new LedgerTransactionQuery()
                         .setTenantId(tenantId)
                         .setFundsTransactionSn(transactionSn),
                 DefaultPageQueryOptions.defaults(AUDIT_QUERY_PAGE_SIZE))
                 .getRecords();
     }
 
-    private List<LedgerEntryDTO> queryLedgerEntries(List<LedgerTransactionDTO> ledgerTransactions) {
+    private List<LedgerEntryDTO> queryLedgerEntries(Long tenantId, List<LedgerTransactionDTO> ledgerTransactions) {
         return ledgerTransactions.stream()
-                .flatMap(ledgerTransaction -> ledgerTransactionService.queryLedgerEntries(new LedgerEntryQuery()
+                .flatMap(ledgerTransaction -> ledgerFactQueryApplicationService.queryLedgerEntries(new LedgerEntryQuery()
+                                        .setTenantId(tenantId)
                                         .setLedgerTransactionSn(ledgerTransaction.getSn()),
                                 DefaultPageQueryOptions.defaults(AUDIT_QUERY_PAGE_SIZE))
                         .getRecords()

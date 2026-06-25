@@ -26,8 +26,8 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.jdbc.autoconfigure.ApplicationDataSourceScriptDatabaseInitializer;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceInitializationAutoConfiguration;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration;
@@ -43,9 +43,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
-import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,8 +62,6 @@ import java.util.Set;
  * 缓存、锁、国际化、SQL 审计、租户上下文和 Spring 静态上下文。业务 Bean、外部端口替身、
  * 测试数据和业务断言应由具体测试基座声明。</p>
  */
-@SpringJUnitConfig
-@Import(AbstractFundsServiceTest.TestInfrastructureConfig.class)
 @TestPropertySource(locations = {
         "classpath:application-h2.properties",
         "classpath:application-test.properties"
@@ -89,24 +87,29 @@ public abstract class AbstractFundsServiceTest {
 
     @Configuration
     @Import({
-            MybatisTestConfiguration.class,
+            TestCoreInfrastructureConfig.class,
             RedissonTemporalSequenceSupport.class,
             TestMockRedissonConfiguration.class
     })
-    @ImportAutoConfiguration({
+    public static class TestInfrastructureConfig {
+    }
+
+    @Configuration
+    @Import({
+            MybatisTestConfiguration.class,
             DataSourceTransactionManagerAutoConfiguration.class,
             JdbcTemplateAutoConfiguration.class,
             DataSourceInitializationAutoConfiguration.class,
             H2InitializationAutoConfiguration.class,
             MybatisFlexAutoConfiguration.class
     })
-    public static class TestInfrastructureConfig {
+    public static class TestCoreInfrastructureConfig {
 
         private static final Logger SQL_LOG = LoggerFactory.getLogger("mybatis-flex-sql");
 
         private final ApplicationContext applicationContext;
 
-        public TestInfrastructureConfig(ApplicationContext applicationContext) {
+        public TestCoreInfrastructureConfig(ApplicationContext applicationContext) {
             this.applicationContext = applicationContext;
         }
 
@@ -146,6 +149,18 @@ public abstract class AbstractFundsServiceTest {
         @Primary
         public JdbcTemplate jdbcTemplate(DataSource dataSource) {
             return new JdbcTemplate(dataSource);
+        }
+
+        @Bean
+        public DataSourceTransactionManager transactionManager(DataSource dataSource) {
+            return new DataSourceTransactionManager(dataSource);
+        }
+
+        @Bean
+        public ApplicationDataSourceScriptDatabaseInitializer dataSourceScriptDatabaseInitializer(
+                DataSource dataSource,
+                SqlInitializationProperties properties) {
+            return new ApplicationDataSourceScriptDatabaseInitializer(dataSource, properties);
         }
 
         @Bean

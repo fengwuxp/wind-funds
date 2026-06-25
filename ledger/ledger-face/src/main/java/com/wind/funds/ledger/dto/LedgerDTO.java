@@ -86,6 +86,10 @@ public class LedgerDTO implements Serializable {
     @NotNull
     private Long creditAmount;
 
+    @Schema(description = "账本状态，例如 ACTIVE")
+    @NotNull
+    private String status;
+
     @Schema(description = "币种")
     @NotNull
     private CurrencyIsoCode currency;

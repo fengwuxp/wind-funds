@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
+import com.wind.funds.ledger.application.impl.DefaultLedgerFactQueryApplicationService;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -456,6 +457,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
+            DefaultLedgerFactQueryApplicationService.class,
             DefaultSubjectLedgerInitializer.class,
             AccountHierarchyBindingServiceImpl.class,
             AccountHierarchyServiceImpl.class,

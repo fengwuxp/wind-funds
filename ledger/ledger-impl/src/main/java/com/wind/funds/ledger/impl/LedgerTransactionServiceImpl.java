@@ -404,7 +404,8 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         LedgerEntryNameRefs ledgerEntry = LedgerEntryNameRefs.ledgerEntry;
         QueryWrapper queryWrapper = MybatisQueryHelper.from(options).select()
                 .from(ledgerEntry)
-                .where(ledgerEntry.subjectId.eq(query.getSubjectId()))
+                .where(ledgerEntry.tenantId.eq(query.getTenantId()))
+                .and(ledgerEntry.subjectId.eq(query.getSubjectId()))
                 .and(ledgerEntry.subjectType.eq(query.getSubjectType()))
                 .and(ledgerEntry.ledgerSubjectCode.eq(query.getLedgerSubjectCode()))
                 .and(ledgerEntry.ledgerSubjectCategory.eq(query.getLedgerSubjectCategory()))
