@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * 权益让利资金结算请求。
+ * 让利出资记账交易结算请求。
  *
  * <p>该请求表达业务侧已经决策完成、需要确认入账的优惠券、代金券、支付立减或多方让利出资责任事实，
  * 不承载营销实时规则、券包库存、活动生命周期、返利、佣金或分润。</p>
@@ -20,7 +20,7 @@ import lombok.experimental.Accessors;
  * @author Codex
  * @date 2026-06-16
  */
-@Schema(description = "权益让利资金结算请求")
+@Schema(description = "让利出资记账交易结算请求")
 @Data
 @NoArgsConstructor
 @Accessors(chain = true)
@@ -49,7 +49,7 @@ public class FundsBenefitFundingSettleRequest {
     @NotNull
     private SubjectRef costBearerSubjectRef;
 
-    @Schema(description = "让利承接账务主体，例如用户或订单让利归集账目、商户清结算账户或等价被补足账户")
+    @Schema(description = "让利账务承接主体，目标态语义等同 benefitSettlementSubjectRef，例如用户或订单让利归集账目、商户清结算账户或等价被补足账户")
     @NotNull
     private SubjectRef benefitReceiverSubjectRef;
 
@@ -61,6 +61,6 @@ public class FundsBenefitFundingSettleRequest {
     @NotNull
     private FundsBenefitFundingNature fundingNature;
 
-    @Schema(description = "非关键扩展上下文，不得承载核心金额、出资分摊、券包或敏感原文")
+    @Schema(description = "非关键扩展上下文，不得承载核心金额、出资分摊、券、活动、规则来源或敏感原文")
     private ReadonlyContextVariables contextVariables;
 }

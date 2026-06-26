@@ -1,6 +1,7 @@
 package com.wind.funds.transaction.application.flow;
 
 import com.capte.domain.core.operator.WindOperator;
+import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -16,6 +17,8 @@ import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import java.util.Map;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -254,6 +257,72 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_NO_TRANSFER_001");
+    }
+
+    /**
+     * 场景：调用方试图把已删除的账务效果或来源归因字段塞进扩展上下文。
+     * 输入：contextVariables 包含 ledgerEffect。
+     * 输出：服务 fail-fast，不生成资金交易、交易明细、账务交易或分录。
+     * 红线：contextVariables 只能放轻量关联信息，不能成为核心金额、分摊或规则事实旁路。
+     */
+    @Test
+    void testSettleContextShouldRejectCoreBenefitFactsWithoutFundsOrLedgerFacts() {
+        FundsAccountId costBearer = fundingAccount("ben_context_cost");
+        FundsAccountId receiver = fundingAccount("ben_context_recv");
+        ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
+        var before = snapshot(balances(costBearer, receiver));
+
+        assertThatThrownBy(() -> benefitFundingApplicationService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_CONTEXT_CORE_FIELD_001")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of("ledgerEffect", "POSTING_REQUIRED"))),
+                WindOperator.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("ledgerEffect");
+
+        var after = snapshot(balances(costBearer, receiver));
+        assertOnlyBalanceDeltas(before, after,
+                delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_CONTEXT_CORE_FIELD_001");
+    }
+
+    /**
+     * 场景：调用方试图在退款上下文中携带当前规则来源。
+     * 输入：contextVariables 包含 rule_id。
+     * 输出：服务 fail-fast，不生成退款资金交易、交易明细、账务交易或分录。
+     * 红线：退款只能引用原让利出资交易，不能通过上下文按当前营销规则重算历史权益。
+     */
+    @Test
+    void testRefundContextShouldRejectCoreBenefitFactsWithoutFundsOrLedgerFacts() {
+        FundsAccountId costBearer = fundingAccount("ben_refund_context_cost");
+        FundsAccountId receiver = fundingAccount("ben_refund_context_recv");
+        ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
+        topup(costBearer, 100L, "BENEFIT_REFUND_CONTEXT_TOPUP");
+        String settleTransactionSn = benefitFundingApplicationService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_REFUND_CONTEXT_SETTLE_001"), WindOperator.system());
+        var beforeRefund = snapshot(balances(costBearer, receiver));
+
+        assertThatThrownBy(() -> benefitFundingApplicationService.refund(new FundsBenefitFundingRefundRequest()
+                .setTenantId(TENANT_ID)
+                .setReferenceBenefitTransactionSn(settleTransactionSn)
+                .setReferenceTransactionSn("PAY_ORDER_001")
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setBusinessScene("BENEFIT_REFUND")
+                .setBusinessSn("BENEFIT_REFUND_CONTEXT_CORE_FIELD_001")
+                .setOriginalOrderSn("ORDER_001")
+                .setRefundReason("partial order refund")
+                .setContextVariables(ReadonlyContextVariables.of(Map.of("rule_id", "RULE_001"))),
+                WindOperator.system()))
+                .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
+                .hasMessageContaining("rule_id");
+
+        var afterRefund = snapshot(balances(costBearer, receiver));
+        assertOnlyBalanceDeltas(beforeRefund, afterRefund,
+                delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_REFUND_CONTEXT_CORE_FIELD_001");
     }
 
     private FundsBenefitFundingSettleRequest settleRequest(FundsAccountId costBearer,

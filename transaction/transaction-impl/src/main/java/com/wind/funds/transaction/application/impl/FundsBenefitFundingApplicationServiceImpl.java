@@ -27,14 +27,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * 权益让利资金交易应用服务实现。
+ * 让利出资记账交易服务实现。
  *
- * <p>该实现只负责编排权益让利资金事实到标准直接交易入口，不直接写 route、posting、LedgerEntry 或余额投影。</p>
+ * <p>该实现只负责编排已决策让利出资结果到标准直接交易入口，不直接写 route、posting、LedgerEntry 或余额投影。</p>
  *
  * @author Codex
  * @date 2026-06-16
@@ -53,6 +54,21 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
 
     private static final String BENEFIT_REFUND_REASON = "benefitRefundReason";
 
+    private static final Set<String> FORBIDDEN_BENEFIT_CONTEXT_KEYS = Set.of(
+            "amount",
+            "costbearersubjectref",
+            "benefitreceiversubjectref",
+            "benefitsettlementsubjectref",
+            "fundingnature",
+            "fundingnaturecode",
+            "benefitfundingsources",
+            "ledgereffect",
+            "benefitfundingdigest",
+            "sourcetype",
+            "sourceid",
+            "ruleid",
+            "ruleversion");
+
     private static final Set<FundsBenefitFundingNature> SUPPORTED_SETTLE_FUNDING_NATURES = Set.of(
             FundsBenefitFundingNature.MERCHANT_BORNE,
             FundsBenefitFundingNature.PLATFORM_OWN_FUNDS,
@@ -67,6 +83,7 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
     public @NonNull String settle(@NonNull FundsBenefitFundingSettleRequest request,
                                   @NonNull WindOperator operator) {
         assertSettleRequest(request);
+        assertLightweightContext(request.getContextVariables());
         FundsAccountId costBearer = toAccountId(request.getCostBearerSubjectRef(), "权益让利承担方");
         FundsAccountId receiver = toAccountId(request.getBenefitReceiverSubjectRef(), "权益让利承接账务主体");
         return directTransactionService.pay(new FundsTransactionPayRequest()
@@ -85,6 +102,7 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
     public @NonNull String refund(@NonNull FundsBenefitFundingRefundRequest request,
                                   @NonNull WindOperator operator) {
         assertRefundRequest(request);
+        assertLightweightContext(request.getContextVariables());
         OriginalBenefitRoute route = originalBenefitRoute(request.getReferenceBenefitTransactionSn());
         return directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(route.costBearerAccountId())
@@ -183,6 +201,27 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
             result.putAll(contextVariables.getContextVariables());
         }
         return result;
+    }
+
+    private void assertLightweightContext(@Nullable ReadonlyContextVariables contextVariables) {
+        if (contextVariables == null || contextVariables.getContextVariables() == null) {
+            return;
+        }
+        for (String key : contextVariables.getContextVariables().keySet()) {
+            String normalizedKey = normalizeBenefitContextKey(key);
+            AssertUtils.isTrue(!FORBIDDEN_BENEFIT_CONTEXT_KEYS.contains(normalizedKey),
+                    "让利出资扩展上下文不得承载核心金额、分摊或规则事实，key = {}", key);
+        }
+    }
+
+    private static String normalizeBenefitContextKey(@Nullable String key) {
+        if (key == null) {
+            return "";
+        }
+        return key.trim()
+                .toLowerCase(Locale.ROOT)
+                .replace("_", "")
+                .replace("-", "");
     }
 
     private record OriginalBenefitRoute(FundsAccountId costBearerAccountId,
