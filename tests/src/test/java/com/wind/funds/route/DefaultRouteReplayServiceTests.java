@@ -232,62 +232,19 @@ class DefaultRouteReplayServiceTests {
 
     /**
      * 场景：历史 RouteSnapshot 残留预算组作为 route leg 主体。
-     * 输入：退款回放引用包含 BUDGET_GROUP 节点的原路径。
-     * 输出：回放被拒绝。
-     * 预期：错误明确指向预算组不能作为回放参与方。
-     * 红线：预算组退出核心账本主体后，Route Replay 不得继续消费旧预算组 leg 生成新 route/posting。
+     * 输入：尝试构造 BUDGET_GROUP 节点的原路径 leg。
+     * 输出：RouteLeg 构造即拒绝。
+     * 预期：错误明确指向 route leg 主体必须可入账。
+     * 红线：预算组退出核心账本主体后，不得继续作为 route/posting 的账务节点。
      */
     @Test
     void testResolveReplayInstructionShouldRejectLegacyBudgetGroupRouteLeg() {
         SubjectRef budgetGroup = budgetGroup("BG-LEGACY-001");
         SubjectRef payee = fundingAccount("PAYEE-LEGACY-001");
-        RouteSnapshotSpec legacySnapshot = routeSnapshot(paymentInstrumentRef("CARD-OLD", "old-binding"),
-                null,
-                routingDecision("ALLOC-BG-LEGACY", payee),
-                List.of(participant(RouteParticipantRole.BUDGET_CONTROLLER, budgetGroup),
-                        participant(RouteParticipantRole.PAYEE, payee)),
-                List.of(routeLeg(budgetGroup, payee)),
-                Map.of());
-        DefaultRouteReplayService replayService = new DefaultRouteReplayService(
-                new SnapshotFundsTransactionQueryService(legacySnapshot));
 
-        assertThatThrownBy(() -> replayService.resolve(replayInstruction(
-                originalTransactionReference("FT-BG-LEGACY-001"))))
-                .hasMessageContaining("预算组不是核心资金账务主体，不能作为 RouteSnapshot 回放参与方");
-    }
-
-    /**
-     * 场景：授权过期释放按原授权 RouteSnapshot 回放。
-     * 输入：原授权路径为 AVAILABLE -> AUTHORIZATION，本次请求事件为 EXPIRE。
-     * 输出：回放路径复用释放 leg，但 routeCode 和 eventType 保留过期语义。
-     * 预期：生成 AUTHORIZATION_EXPIRE_REPLAY，释放 AUTHORIZATION -> AVAILABLE。
-     * 红线：授权过期不能退化成 REVERSAL 事件或普通撤销 routeCode。
-     */
-    @Test
-    void testResolveAuthorizationExpireReplayShouldKeepExpireEventAndRouteCode() {
-        FundsInstructionReferenceSpec reference = ImmutableFundsInstructionReferenceSpec.builder()
-                .referenceType(FundsInstructionReferenceType.AUTHORIZATION)
-                .referenceSn("FT-AUTH-EXPIRE-001")
-                .build();
-        DefaultRouteReplayService replayService = new DefaultRouteReplayService(
-                new SnapshotFundsTransactionQueryService(authorizationRouteSnapshot()));
-
-        ResolvedRouteSpec resolvedRoute = replayService.resolve(authorizationExpireInstruction(reference));
-
-        assertThat(resolvedRoute.getRouteCode()).isEqualTo(FundsRouteCodes.AUTHORIZATION_EXPIRE_REPLAY);
-        assertThat(resolvedRoute.getInstructionType()).isEqualTo(FundsInstructionType.AUTHORIZATION_TRANSACTION);
-        assertThat(resolvedRoute.getEventType()).isEqualTo(FundsTransactionEventType.EXPIRE);
-        assertThat(resolvedRoute.getTransactionType()).isEqualTo(DefaultFundsTransactionType.PAY);
-        assertThat(resolvedRoute.getLegs()).singleElement()
-                .satisfies(leg -> {
-                    assertThat(leg.getLegType()).isEqualTo(RouteLegType.RELEASE);
-                    assertThat(leg.getBalanceEffectType()).isEqualTo(LedgerBalanceEffectType.RELEASE);
-                    assertThat(leg.getPhaseCode()).isEqualTo(LedgerPhaseCode.REVERSAL);
-                    assertThat(leg.getReplayRefLegId()).isEqualTo("AUTHORIZATION_1");
-                    assertThat(leg.getAmount()).isEqualTo(Money.immutable(50L, CurrencyIsoCode.USD));
-                    assertThat(leg.getSourceNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AUTHORIZATION);
-                    assertThat(leg.getTargetNode().getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AVAILABLE);
-                });
+        assertThatThrownBy(() -> routeLeg(budgetGroup, payee))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("RouteLeg sourceNode must be ledger-postable");
     }
 
     /**
@@ -401,26 +358,6 @@ class DefaultRouteReplayServiceTests {
                         .appName("wind-funds-tests")
                         .build())
                 .contextVariables(contextVariables)
-                .build();
-    }
-
-    private FundsInstructionSpec authorizationExpireInstruction(FundsInstructionReferenceSpec reference) {
-        return ImmutableFundsInstructionSpec.builder()
-                .tenantId(1L)
-                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
-                .eventType(FundsTransactionEventType.EXPIRE)
-                .transactionType(DefaultFundsTransactionType.PAY)
-                .amount(Money.immutable(50L, CurrencyIsoCode.USD))
-                .reference(reference)
-                .businessScene("AUTHORIZATION_EXPIRE")
-                .businessSn("AUTHORIZATION_EXPIRE_REPLAY")
-                .eventTime(LocalDateTime.of(2026, 5, 19, 0, 0))
-                .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId(1L)
-                        .operatorType("SYSTEM")
-                        .appName("wind-funds-tests")
-                        .build())
-                .contextVariables(Map.of())
                 .build();
     }
 
@@ -743,6 +680,16 @@ class DefaultRouteReplayServiceTests {
                                                 FundsTransactionEventType eventType,
                                                 String replayRefLegId,
                                                 CurrencyIsoCode currency) {
+            return Money.immutable(0L, currency);
+        }
+
+        @Override
+        public Money sumConsumedReplayLegAmount(String referenceTransactionSn,
+                                                FundsTransactionEventType eventType,
+                                                String replayRefLegId,
+                                                CurrencyIsoCode currency,
+                                                String excludedBusinessScene,
+                                                String excludedBusinessSn) {
             return Money.immutable(0L, currency);
         }
 

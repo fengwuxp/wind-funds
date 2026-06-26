@@ -2,8 +2,6 @@ package com.wind.funds.transaction.application;
 
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
@@ -52,18 +50,6 @@ public interface FundsAuthorizationTransactionService {
     String reversal(FundsAuthorizationTransactionReversalRequest request, WindOperator operator);
 
     /**
-     * 账户交易授权过期释放。
-     *
-     * <p>用于系统按授权有效期释放剩余授权占用；底层账务路径可复用释放路径，
-     * 但事件、终态、原因和审计必须保留过期语义。</p>
-     *
-     * @param request  授权交易过期释放请求
-     * @param operator 操作者
-     * @return 交易流水号
-     */
-    String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator operator);
-
-    /**
      * 交易完成（结算）
      *
      * @param request  交易授权完成请求
@@ -81,21 +67,4 @@ public interface FundsAuthorizationTransactionService {
      */
     String settleRefund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator);
 
-    /**
-     * 授权结算后拒付（争议）兼容入口。
-     * <p>
-     * 用于已结算授权交易发生持卡人或发卡机构争议时，按原结算路径回放资金退回；
-     * 不用于授权阶段批准失败，授权失败使用 authorize 的 approved=false 表达。
-     * 该方法是历史兼容入口，新增场景应优先按争议裁决资金结果使用 {@link #settleRefund(FundsAuthorizationTransactionRefundRequest, WindOperator)}，
-     * 并携带争议字段；继续使用本入口时必须携带拒付原因、证据引用和外部争议引用等最小审计上下文。
-     *
-     * @deprecated since 2026-06-25, use {@link #settleRefund(FundsAuthorizationTransactionRefundRequest, WindOperator)}
-     * for adjudicated dispute results that affect funds.
-     *
-     * @param request  授权结算后拒付/争议请求
-     * @param operator 操作者
-     * @return 交易流水号
-     */
-    @Deprecated(since = "2026-06-25")
-    String chargeback(FundsAuthorizationTransactionChargebackRequest request, WindOperator operator);
 }

@@ -67,8 +67,6 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String DISPLAY_STATUS_DISPUTE_REFUNDED = "DISPUTE_REFUNDED";
 
-    private static final String DISPLAY_STATUS_COMPAT_CHARGEBACK_REFUNDED = "COMPAT_CHARGEBACK_REFUNDED";
-
     private static final String DISPLAY_STATUS_DECLINED = "DECLINED";
 
     private static final String DISPLAY_STATUS_FAILED = "FAILED";
@@ -102,8 +100,6 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String STATUS_MEANING_DISPUTE_REFUND_POSTED = "DISPUTE_REFUND_POSTED";
 
-    private static final String STATUS_MEANING_COMPAT_CHARGEBACK_POSTED = "COMPAT_CHARGEBACK_POSTED";
-
     private static final String STATUS_MEANING_FACT_PROCESSING = "FACT_PROCESSING";
 
     private static final String STATUS_MEANING_FACT_FAILED = "FACT_FAILED";
@@ -126,10 +122,6 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
     private static final String UNAVAILABLE_BALANCE_FREEZE_NOT_CONSUMPTION = "BALANCE_FREEZE_IS_NOT_CONSUMPTION";
 
     private static final String UNAVAILABLE_TRANSACTION_FAILED = "TRANSACTION_FAILED";
-
-    private static final String CHARGEBACK_REASON_CONTEXT_KEY = "chargebackReason";
-
-    private static final String CHARGEBACK_EVIDENCE_REF_CONTEXT_KEY = "evidenceRef";
 
     private static final String PAYMENT_INSTRUMENT_REF_CONTEXT_KEY = "paymentInstrumentRef";
 
@@ -236,7 +228,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         return switch (eventType) {
             case AUTHORIZE -> StringUtils.hasText(ledgerTransactionSn) ? FACT_STATUS_HELD : FACT_STATUS_REJECTED;
             case FREEZE -> FACT_STATUS_HELD;
-            case REVERSAL, EXPIRE, UNFREEZE -> FACT_STATUS_RELEASED;
+            case REVERSAL, UNFREEZE -> FACT_STATUS_RELEASED;
             default -> StringUtils.hasText(ledgerTransactionSn)
                     ? FACT_STATUS_POSTED
                     : FACT_STATUS_COMPLETED_NO_LEDGER;
@@ -256,9 +248,6 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         if (isNoAuthRefund()) {
             return DISPLAY_STATUS_NO_AUTH_REFUNDED;
         }
-        if (isCompatChargeback()) {
-            return DISPLAY_STATUS_COMPAT_CHARGEBACK_REFUNDED;
-        }
         if (isRefundEvent()) {
             return DISPLAY_STATUS_REFUNDED;
         }
@@ -267,7 +256,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
                     ? DISPLAY_STATUS_AUTHORIZED_HOLD
                     : DISPLAY_STATUS_DECLINED;
             case FREEZE -> DISPLAY_STATUS_FROZEN;
-            case REVERSAL, EXPIRE, UNFREEZE -> DISPLAY_STATUS_RELEASED;
+            case REVERSAL, UNFREEZE -> DISPLAY_STATUS_RELEASED;
             default -> DISPLAY_STATUS_SUCCEEDED;
         };
     }
@@ -301,9 +290,6 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         if (isNoAuthRefund()) {
             return STATUS_MEANING_NO_AUTH_REFUND_POSTED;
         }
-        if (isCompatChargeback()) {
-            return STATUS_MEANING_COMPAT_CHARGEBACK_POSTED;
-        }
         if (isRefundEvent()) {
             return STATUS_MEANING_FUNDS_REFUNDED;
         }
@@ -312,7 +298,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
                     ? STATUS_MEANING_AUTHORIZATION_HELD_NOT_CAPTURED
                     : STATUS_MEANING_AUTHORIZATION_DECLINED_NO_FUNDS_POSTED;
             case FREEZE -> STATUS_MEANING_BALANCE_FROZEN_NOT_CONSUMED;
-            case REVERSAL, EXPIRE, UNFREEZE -> STATUS_MEANING_FUNDS_RELEASED;
+            case REVERSAL, UNFREEZE -> STATUS_MEANING_FUNDS_RELEASED;
             default -> StringUtils.hasText(ledgerTransactionSn)
                     ? STATUS_MEANING_FUNDS_POSTED
                     : STATUS_MEANING_COMPLETED_WITHOUT_LEDGER;
@@ -393,7 +379,6 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF, "externalDisputeRef");
         addContextEvidence(refs, FundsInstructionContextKeys.DISPUTE_VOUCHER_REF, "disputeVoucherRef");
         addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN, "externalReferenceSn");
-        addContextEvidence(refs, CHARGEBACK_EVIDENCE_REF_CONTEXT_KEY, "chargebackEvidenceRef");
         return List.copyOf(refs);
     }
 
@@ -466,10 +451,6 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             putContextValue(result, FundsInstructionContextKeys.REFUND_MODE);
             putContextValue(result, FundsInstructionContextKeys.EXTERNAL_REFERENCE_SN);
             putContextValue(result, FundsInstructionContextKeys.REFUND_REASON);
-        } else if (isCompatChargeback()) {
-            putContextValue(result, CHARGEBACK_REASON_CONTEXT_KEY);
-            putContextValue(result, CHARGEBACK_EVIDENCE_REF_CONTEXT_KEY);
-            putContextValue(result, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF);
         }
         return Map.copyOf(result);
     }
@@ -549,10 +530,6 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         return eventType == FundsTransactionEventType.AUTH_REFUND
                 && FundsInstructionContextKeys.REFUND_MODE_NO_AUTH.equals(
                 contextString(FundsInstructionContextKeys.REFUND_MODE));
-    }
-
-    private boolean isCompatChargeback() {
-        return eventType == FundsTransactionEventType.CHARGEBACK;
     }
 
     private boolean isRefundEvent() {

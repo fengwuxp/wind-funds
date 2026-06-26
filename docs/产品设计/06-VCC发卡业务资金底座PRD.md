@@ -69,7 +69,7 @@ VCC 发卡业务的核心不是“发一张虚拟卡”，而是企业、团队�
 
 | 能力 | 说明 | 分册内优先级 | 交付形态 | 验收标准 |
 | --- | --- | --- | --- | --- |
-| VCC 授权资金链 | 授权批准、拒绝、占用、撤销、过期释放、部分完成和清算入账的资金语义。 | P0 | 场景交易 pack + 资金动作契约 | 授权不等于入账，拒绝无账务副作用，清算能回指原授权。 |
+| VCC 授权资金链 | 授权批准、拒绝、占用、可信撤销、部分完成、清算入账和过期异常处理的资金语义。 | P0 | 场景交易 pack + 资金动作契约 | 授权不等于入账，拒绝无账务副作用，清算能回指原授权；过期只是业务或运营状态，资金释放必须来自可信 reversal、清算剩余释放、差错单或人工补事实。 |
 | VCC 钱包账户 | VCC 关联子账户、企业主账户、预算组、Spend Rule、授权占用和可用余额展示。 | P0 | 钱包、账目和支出控制视图复用 | 资金子账户和信用子账户的 AVAILABLE、AUTHORIZATION、FROZEN、CLEARING 等账目可解释；多张共享卡通过各自子账户受同一主账户约束；预算组和 Spend Rule 的控制视图可解释但不入账。 |
 | VCC 账本和投影 | 卡交易从授权到清算、退款、拒付的账本和解释视图。 | P0 | 账本分录、余额投影、交易投影 | 每个金额变化能追溯到 route snapshot 和 ledger entry。 |
 | VCC 对账和争议 | 授权、清算、退款、拒付、费用和外部文件差异处理。 | P1 | 对账批次、差错单、证据引用 | 差异可分类、处理、核销和重跑。 |
@@ -200,7 +200,7 @@ mindmap
 
 | 对象 | 字段口径 | 生命周期 | 不变量 |
 | --- | --- | --- | --- |
-| VCC Authorization | authorizationId、cardRef、cardholderRef、merchant、amount、currency、decision、declineReason、externalRef。 | REQUESTED、APPROVED、DECLINED、REVERSED、EXPIRED、SETTLED、PARTIALLY_SETTLED、DISPUTED。 | 授权批准只占用 AUTHORIZATION，不代表入账。 |
+| VCC Authorization | authorizationId、cardRef、cardholderRef、merchant、amount、currency、decision、declineReason、externalRef。 | REQUESTED、APPROVED、DECLINED、REVERSED、EXPIRED、SETTLED、PARTIALLY_SETTLED、DISPUTED。 | 授权批准只占用 AUTHORIZATION，不代表入账；EXPIRED 是 VCC 业务侧等待超时或运营展示状态，不等同资金层释放事件。 |
 | VCC Clearing Event | originalAuthorizationRef、presentmentRef、amount、currency、fee、businessDate、networkRef。 | RECEIVED、MATCHED、POSTING_READY、POSTED、EXCEPTION。 | 必须回指原授权或说明 forced post。 |
 | VCC Dispute Case | originalTransactionRef、reasonCode、evidenceRef、amount、deadline、result。 | OPEN、EVIDENCE_REQUIRED、SUBMITTED、WON、LOST、CLOSED。 | 不得混同 refund 和 chargeback。 |
 | VCC 关联子账户 | childAccountRef、parentAccountRef、rootAccountRef、accountHolderRef、accountType、accountPurpose、currency、ledgerProfile、fundingSourceRef、creditSourceRef、productFundingRef、status、openedAt、closedAt。 | PENDING、ACTIVE、SUSPENDED、CLOSED。 | 是资金账户或信用账户的子账户；预付卡绑定资金子账户，共享卡绑定信用子账户；卡号、PAN、token 和持卡人不是主体。 |
@@ -214,7 +214,7 @@ mindmap
 | REQUESTED | 授权批准 | 卡状态、额度、预算、风控和幂等通过。 | 生成授权资金动作，AVAILABLE -> AUTHORIZATION。 | APPROVED | 不允许绕过卡/主体检查直接占用。 |
 | REQUESTED | 授权拒绝 | 余额不足、规则拒绝、风险拒绝、外部拒绝。 | 记录拒绝原因，不生成 route、posting、entry。 | DECLINED | 拒绝后不得补写授权分录。 |
 | APPROVED | 撤销 | 外部 reversal 或业务取消。 | 释放全部或部分 AUTHORIZATION。 | REVERSED | 撤销金额不得超过剩余占用。 |
-| APPROVED | 过期 | 授权到期且无 clearing。 | 释放剩余 AUTHORIZATION。 | EXPIRED | 已清算金额不得被过期释放。 |
+| APPROVED | 过期 | 授权到期且无 clearing。 | 进入过期异常、提醒、对账差错候选或人工处理；资金层不因到期自动释放。 | EXPIRED | 已清算金额不得被过期释放；如需释放剩余占用，必须由可信 reversal、清算剩余释放或差错补事实触发。 |
 | APPROVED | 清算入账 | clearing 匹配原授权。 | 核销占用并生成实际入账或费用分录。 | SETTLED / PARTIALLY_SETTLED | clearing 缺原授权需进入 forced post 审批或异常。 |
 | SETTLED | 退款 | 原交易可退且外部引用完整。 | 基于原 route snapshot 生成退款。 | REFUNDED | 不得按当前卡绑定重新选路。 |
 | SETTLED | 拒付 | 外部 chargeback 或 dispute 结果。 | 生成拒付扣回、费用、追偿或准备金动作。 | DISPUTED | 不得与普通退款合并处理。 |
@@ -244,7 +244,7 @@ flowchart LR
 | 场景 | 触发条件 | 处理逻辑 | 人工处理 | 审计和验收 |
 | --- | --- | --- | --- | --- |
 | 授权撤销 | 外部 reversal 或业务取消。 | 释放剩余 AUTHORIZATION。 | 金额不一致时进入异常复核。 | 证明释放不改变跨主体资金归属。 |
-| 授权过期 | 到期无 clearing。 | 自动释放剩余 AUTHORIZATION。 | 大额或异常商户可人工复核。 | 证明已清算部分不被释放。 |
+| 授权过期 | 到期无 clearing。 | 不自动释放资金；进入提醒、异常复核、对账差错候选或等待可信 reversal / 清算结果。 | 大额或异常商户必须人工复核。 | 证明过期本身不生成 route、posting、LedgerEntry 或余额变化。 |
 | 部分清算 | clearing 金额小于授权剩余。 | 核销部分占用，剩余继续占用或释放。 | 规则待确认时人工处理。 | 分录和投影可解释剩余占用。 |
 | 迟到 clearing | 授权已过期或已释放后收到 clearing。 | 匹配原授权并进入异常或 forced post 审批。 | 需要运营、财务和合规复核。 | 不允许静默入账。 |
 | 拒付 | 外部 chargeback。 | 独立 dispute case，生成扣回、费用或追偿。 | 证据包、时限和责任方人工处理。 | 不与 refund 混用，不重复扣回。 |
@@ -445,7 +445,7 @@ VCC 业务对接建议优先依赖钱包 application facade，而不是直接调
 | 资金责任决策 | 从卡、使用人、部门、项目、预算组、Spend Rule、子账户、父账户、预付责任和托管模式解析唯一资金责任来源。 | 共享卡授权、预付卡授权、充值、退款、退卡。 | `FundingAllocationDecision`、子账户、父账户、责任来源、规则版本和审计原因。 | 不把预算组、卡号、PAN、token、持卡人、issuer 账户或 `VCC_ACCOUNT` 写成账本主体。 |
 | 授权准入 | 使用支付工具引用发起授权，并委派账户主体型授权内核。 | VCC 消费授权、共享卡多使用人授权、预付卡消费授权。 | 授权批准、授权拒绝、授权占用或拒绝事实。 | 不改 `FundsAuthorizationTransactionService.authorize` 的 canonical 入参。 |
 | 清算处理 | 对原授权做全额清算、部分清算、容差内 overcapture、费用入账或受控强制完成。 | 卡网络 clearing、processor presentment、费用文件。 | 清算交易、授权核销、费用分录、差错候选。 | 不按当前绑定重新选路，不用清算文件反推新授权。 |
-| 授权释放 | 处理 reversal、void、expire、未使用金额释放。 | 商户撤销、授权过期、部分清算后剩余释放。 | 同主体 `AUTHORIZATION -> AVAILABLE` 释放。 | 不表达消费、扣款、跨主体转移或退款。 |
+| 授权释放 | 处理可信 reversal、void、清算剩余释放或经差错确认的未使用金额释放。 | 商户撤销、部分清算后剩余释放、人工差错补事实。 | 同主体 `AUTHORIZATION -> AVAILABLE` 释放。 | 不表达消费、扣款、跨主体转移或退款；不因 expire 状态自动释放。 |
 | 逆向与争议 | 处理 refund、chargeback、representment、费用扣回和追偿。 | 商户退款、拒付、争议败诉/胜诉、费用回补。 | 原路径退款、争议扣回、追偿或人工差错。 | 不把 chargeback 当普通 refund，不允许重复损失。 |
 | 预付资金入金 | 处理外部确认入金、系统内钱包充值、平台责任确认。 | prepaid virtual card 首充、充值、on-demand funding 回补。 | 资金子账户 `AVAILABLE` 增加，并固化父账户、背后资金责任来源或内部转账完成事实。 | 未确认外部事件不得增加可用余额。 |
 | 预付资金退回 | 处理退卡余额、提现、资金退回、余额转出。 | 卡关闭、合同终止、外部退回、用户申请退卡。 | 资金子账户转出、提现或退款事实。 | issuer 卡余额摘要不能直接触发扣款。 |

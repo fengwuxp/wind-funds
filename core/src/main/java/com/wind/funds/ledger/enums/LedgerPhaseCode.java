@@ -78,11 +78,6 @@ public enum LedgerPhaseCode implements DescriptiveEnum {
     REFUND("退款"),
 
     /**
-     * 拒付
-     */
-    CHARGEBACK("拒付"),
-
-    /**
      * 调账
      */
     ADJUSTMENT("调账");

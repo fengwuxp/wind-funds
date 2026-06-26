@@ -6,19 +6,21 @@
 
 本文最初是编码授权确认包。用户明确回复 `Execution Grant：GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` 后，已允许进入对应 Red / Green / Review / Verify；本轮消费结果见第 14 节。第 1 至 13 节继续保留为该 Grant 的授权边界、禁止事项和回放审计依据。
 
+2026-06-26 目标态已重新裁决：独立 `chargeback` 入口不再保留，并与 `expire` 一起进入移除队列。本文后续关于“保留兼容、不删除公共方法、不改 `CHARGEBACK` 分支”的文字只作为历史执行记录，不再作为当前设计、代码或任务阻断。
+
 | 字段 | 内容 |
 | --- | --- |
 | Task ID | `GSD2-AUTH-CHARGEBACK-COMPAT-ADAPTER-001` |
-| 原子任务 | 为现有 `FundsAuthorizationTransactionService#chargeback` 建立兼容入口策略：保留兼容、不扩张目标态、不表达授权拒绝、不绕过争议退款目标口径。 |
+| 原子任务 | 历史任务：曾为现有 `FundsAuthorizationTransactionService#chargeback` 建立兼容入口策略；已被 2026-06-26 `expire` / 独立 `chargeback` 移除裁决覆盖。 |
 | 所属阶段 | GSD-2 / AUTH compatibility adapter / CAD candidate confirmation。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
 | Loop ID | `GSD2-LWT-PRODUCTION-CAPABILITY-LOOP-2026-06-18` |
-| 当前状态 | `GREEN_VERIFIED_SUMMARY_ONLY` |
+| 当前状态 | `SUPERSEDED_BY_20260626_REMOVAL_DECISION`；历史状态为 `GREEN_VERIFIED_SUMMARY_ONLY`。 |
 | Git / code baseline | `a38776c5 feat: 接入出款准入对账门禁`。 |
 | Owner | AI Native 流程编排负责 Goal、Loop、状态和停止条件；产品架构专家负责 dispute / chargeback 产品语义、运营审计和验收；资深架构师负责接口兼容、TDD、Review、Refactor、编码红线、AI 产物复核、验证命令和后续实现。 |
 | Wave 边界 | 本确认包只准备一个兼容入口原子任务；不得并行推进 B4 投影解释扩展、wallet facade、ledger guard、B7 清算/结算 gate、B5 审计扩展或 P2 VCC。 |
 | 执行顺序 / 依赖关系 | 依赖 `GSD2-AUTH-CHARGEBACK-TARGET-ALIGN-001` 已完成；本 Grant 若确认，先写兼容入口 Red，再做最小 guard / deprecated / 文档化实现，最后回写 LWT Goal、W5 和 OpenSpec tasks。 |
-| 授权范围 | 确认后仅允许处理现有 `chargeback` 兼容入口的契约说明、最小 guard、兼容测试和必要的投影/查询解释衔接；不得删除公共方法、不得破坏历史调用、不得引入完整 dispute case。 |
+| 授权范围 | 历史授权曾仅允许处理现有 `chargeback` 兼容入口的契约说明、最小 guard、兼容测试和必要的投影/查询解释衔接；当前不再授权保留独立入口，目标态以 `settleRefund / AUTH_REFUND` 承接争议资金结果。 |
 | 写入范围 | 本文、LWT Goal、GSD-2 工作流、P0/P1 LWT 推进计划、TDD README、docs README 和 OpenSpec tasks 的状态同步；确认 Grant 后的候选代码写入范围见第 7 节。 |
 | 写入文件 | `docs/TDD设计/GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md`、`docs/TDD设计/GSD-2-LWT-生产可用能力Goal.md`、`docs/TDD设计/GSD-2-新基线工作流规划.md`、`docs/TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md`、`docs/TDD设计/README.md`、`docs/README.md`、`openspec/changes/tdd-baseline-reset/tasks.md`。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、transaction-face、transaction-impl、route replay、ledger posting、projection explain、tests、AGENTS.md、历史 B4 授权后继准入卡。 |
@@ -29,7 +31,7 @@
 
 ## 2. 背景、目标和非目标
 
-背景：目标语义任务卡已经明确 dispute / chargeback 是争议案件过程，不是默认独立资金结果。有资金影响时，目标态应由 `settleRefund` 携带争议字段承接；无资金影响时，不生成 route、posting、LedgerEntry、余额变化或新的资金交易事实。当前代码仍保留 `FundsAuthorizationTransactionService#chargeback`、`FundsAuthorizationTransactionChargebackRequest`、`FundsTransactionEventType.CHARGEBACK` 和 route replay `CHARGEBACK` 分支，因此需要一个低风险兼容入口策略，避免新调用方继续把它当成目标态主入口。
+背景：目标语义任务卡已经明确 dispute / chargeback 是争议案件过程，不是默认独立资金结果。有资金影响时，目标态应由 `settleRefund` 携带争议字段承接；无资金影响时，不生成 route、posting、LedgerEntry、余额变化或新的资金交易事实。本任务创建时，代码仍保留 `FundsAuthorizationTransactionService#chargeback`、`FundsAuthorizationTransactionChargebackRequest`、`FundsTransactionEventType.CHARGEBACK` 和 route replay `CHARGEBACK` 分支，因此当时需要一个低风险兼容入口策略，避免新调用方继续把它当成目标态主入口。2026-06-26 后，上述独立入口和分支已进入移除目标态，本文仅保留历史授权和审计记录。
 
 业务目标：保留历史兼容能力，同时让产品、运营、财务、风控、研发和测试能清楚区分普通退款、争议裁决退款、兼容 chargeback 事件、授权拒绝和无资金影响争议。
 

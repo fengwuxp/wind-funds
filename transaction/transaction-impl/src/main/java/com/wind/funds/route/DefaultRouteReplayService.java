@@ -315,12 +315,11 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private RouteReplayType resolveReplayType(FundsTransactionEventType eventType) {
         return switch (eventType) {
-            case REVERSAL, EXPIRE -> RouteReplayType.RELEASE_HOLD;
+            case REVERSAL -> RouteReplayType.RELEASE_HOLD;
             case SETTLE -> RouteReplayType.AUTHORIZATION_SETTLEMENT;
             case AUTH_REFUND -> RouteReplayType.AUTHORIZATION_REFUND;
             case REFUND -> RouteReplayType.REFUND;
             case FEE_REFUND -> RouteReplayType.FEE_REFUND;
-            case CHARGEBACK -> RouteReplayType.CHARGEBACK;
             case UNFREEZE -> RouteReplayType.UNFREEZE;
             default -> throw new IllegalArgumentException("unsupported replay eventType: " + eventType);
         };
@@ -386,8 +385,6 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
             case AUTHORIZATION_SETTLEMENT -> buildAuthorizationSettlementLeg(snapshot, sourceLeg, replayRequest, sequence);
             case AUTHORIZATION_REFUND, REFUND, FEE_REFUND -> buildRefundLeg(snapshot, sourceLeg, replayRequest,
                     sequence, RouteLegType.RESTORE, LedgerPhaseCode.REFUND);
-            case CHARGEBACK -> buildRefundLeg(snapshot, sourceLeg, replayRequest, sequence, RouteLegType.RESTORE,
-                    LedgerPhaseCode.CHARGEBACK);
         };
     }
 
@@ -636,13 +633,10 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private String resolveRouteCode(ReplayRequestSpec replayRequest) {
         return switch (replayRequest.getReplayType()) {
-            case RELEASE_HOLD -> replayRequest.getEventType() == FundsTransactionEventType.EXPIRE
-                    ? FundsRouteCodes.AUTHORIZATION_EXPIRE_REPLAY
-                    : FundsRouteCodes.AUTHORIZATION_REVERSAL_REPLAY;
+            case RELEASE_HOLD -> FundsRouteCodes.AUTHORIZATION_REVERSAL_REPLAY;
             case AUTHORIZATION_SETTLEMENT -> FundsRouteCodes.AUTHORIZATION_SETTLE_REPLAY;
             case AUTHORIZATION_REFUND -> FundsRouteCodes.AUTHORIZATION_REFUND_REPLAY;
             case REFUND, FEE_REFUND -> FundsRouteCodes.DIRECT_REFUND_REPLAY;
-            case CHARGEBACK -> FundsRouteCodes.CHARGEBACK_REPLAY;
             case UNFREEZE -> FundsRouteCodes.BALANCE_UNFREEZE_REPLAY;
         };
     }
@@ -663,7 +657,6 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
             case AUTHORIZATION_REFUND -> FundsTransactionEventType.AUTH_REFUND;
             case REFUND -> FundsTransactionEventType.REFUND;
             case FEE_REFUND -> FundsTransactionEventType.FEE_REFUND;
-            case CHARGEBACK -> FundsTransactionEventType.CHARGEBACK;
             case UNFREEZE -> FundsTransactionEventType.UNFREEZE;
         };
     }
@@ -671,7 +664,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     private DefaultFundsTransactionType resolveTransactionType(RouteSnapshotSpec snapshot,
                                                               ReplayRequestSpec replayRequest) {
         return switch (replayRequest.getReplayType()) {
-            case AUTHORIZATION_REFUND, REFUND, FEE_REFUND, CHARGEBACK -> DefaultFundsTransactionType.REFUND;
+            case AUTHORIZATION_REFUND, REFUND, FEE_REFUND -> DefaultFundsTransactionType.REFUND;
             default -> snapshot.getTransactionType();
         };
     }

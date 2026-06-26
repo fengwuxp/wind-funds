@@ -279,11 +279,10 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         FundsTransactionEventType eventType = resolvedRoute.getEventType();
         return switch (eventType) {
             case AUTHORIZE -> LedgerPostingIntentType.AUTHORIZATION;
-            case REVERSAL, EXPIRE -> LedgerPostingIntentType.AUTHORIZATION_REVERSAL;
+            case REVERSAL -> LedgerPostingIntentType.AUTHORIZATION_REVERSAL;
             case SETTLE -> LedgerPostingIntentType.AUTHORIZATION_SETTLEMENT;
             case AUTH_REFUND, REFUND -> LedgerPostingIntentType.REFUND;
             case FEE_REFUND -> LedgerPostingIntentType.FEE_REFUND;
-            case CHARGEBACK -> LedgerPostingIntentType.REVERSAL;
             case FREEZE -> LedgerPostingIntentType.HOLD;
             case UNFREEZE -> LedgerPostingIntentType.AUTHORIZATION_REVERSAL;
             case BALANCE_ADJUST, LIMIT_ADJUST -> LedgerPostingIntentType.ADJUSTMENT;

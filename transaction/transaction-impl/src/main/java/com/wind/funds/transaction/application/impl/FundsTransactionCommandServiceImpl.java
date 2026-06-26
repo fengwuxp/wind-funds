@@ -5,8 +5,6 @@ import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
@@ -162,14 +160,6 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String expire(FundsAuthorizationTransactionExpireRequest request, WindOperator operator) {
-        return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
-                () -> authorizationInstructionConverter.convertToExpireInstruction(request, operator),
-                this::assertAuthorizationRemainingAmountSufficient);
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
     public String settle(FundsAuthorizationTransactionSettleRequest request, WindOperator operator) {
         return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
                 () -> authorizationInstructionConverter.convertToSettleInstruction(request, operator),
@@ -181,14 +171,6 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     public String settleRefund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator) {
         return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
                 () -> authorizationInstructionConverter.convertToSettleRefundInstruction(request, operator));
-    }
-
-    @Override
-    @Deprecated(since = "2026-06-25")
-    @Transactional(rollbackFor = Exception.class)
-    public String chargeback(FundsAuthorizationTransactionChargebackRequest request, WindOperator operator) {
-        return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
-                () -> authorizationInstructionConverter.convertToChargebackInstruction(request, operator));
     }
 
     private @NonNull String execute(@NonNull FundsInstructionSpec instruction) {

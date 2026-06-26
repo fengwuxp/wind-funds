@@ -37,7 +37,7 @@ flowchart TD
 
 | 差距 | 影响 | 处理方式 |
 | --- | --- | --- |
-| 授权 `EXPIRE` 事件和服务入口已闭合 | 授权过期需要与外部撤销区分。 | 已由 `b0666ba feat: 补齐授权过期释放 canonical 能力` 按 B4-TRX-EXPIRE 单一授权闭合；后续只作为授权生命周期回归基线，不再作为待实现差距。 |
+| 授权 `EXPIRE` 事件和服务入口已作废 | 授权过期、超时或通道未返回不是可信资金事实，不能与外部可信撤销混用。 | `b0666ba feat: 补齐授权过期释放 canonical 能力` 只保留为历史实现痕迹；2026-06-26 目标态裁决要求移除 `expire` 服务入口、`EXPIRE` 事件和 `EXPIRED` 终态，释放占用必须由可信撤销、余额调整或对账差错补事实承接。 |
 | `settle` 强制完成首轮 canonical 能力已闭合 | `616dac1` 和 `3825466` 已证明 FORCE 模式、内部受信策略、上限、原因、外部原事实引用、凭证、审计、普通完成与 FORCE 分支隔离，以及失败无资金副作用。现有普通完成仍依赖内部原授权流水，首轮 FORCE 不携带 `authorizationTransactionSn`、不构造 `AUTHORIZATION` reference、不查询原授权账本交易。 | 后续只作为 B4 授权交易回归基线；若要扩展生产策略引擎、审批流、额度窗口、带原授权 overcapture、外部清算文件或运营审批系统，必须另起单一 MVP Execution Grant。 |
 | `settleRefund` 无授权退款模式引用和审计字段需复核 | 无前置授权但有可追溯外部引用时，需要可证明不补造授权占用且可追溯；当前扫描确认普通授权链退款仍依赖 `authorizationTransactionSn`、`AUTHORIZATION` reference 和原授权/原完成 route replay。 | 归入 B4 授权交易覆盖索引；进入编码时按单一 MVP 任务授权，并显式确认 `authorizationTransactionSn` 空值语义、`externalReferenceSn`、退款原因、操作者/审计字段和 `NO_AUTH` 内部上下文标签；普通授权链退款继续要求内部授权流水，NO_AUTH 模式不得携带或查询内部授权流水。 |
 | 权益资金事实 DSL 已从旧快照契约重基线，生产链路仍需分段闭合 | 旧 `FundsBenefitSnapshotSpec`、组件、引用、退款策略、稳定摘要对象和 JSON 夹具曾作为 B1-10 历史契约承载基线；当前目标态已由 `GSD2-BENEFIT-FUNDING-TRANSACTION-REBASE-001`、`GSD2-BENEFIT-FUNDING-TRANSACTION-IMPL-001` 和 `GSD2-BENEFIT-LEGACY-SNAPSHOT-REMOVE-001` 重基线为 `FundsBenefitFundingApplicationService`、权益资金请求模型、来源引用、旧字段拒绝和历史摘要兼容。即使契约与首个 `POSTING_REQUIRED` 切片通过，直接交易、授权、退款回放、清结算和对账也不能自动声明已实现；Phase 2/3 必须补 Phase 能力边界、任务切片、`fixtureLevel`、权益事实源、零实付表达和专业确认准入。 | 后续 route、posting、replay、清结算和对账必须拆成独立 MVP 任务消费；不得恢复旧快照 DSL 作为公共契约。 |
@@ -59,7 +59,7 @@ flowchart TD
 
 1. 公共契约字段新增、删除或目标态语义调整。
 2. 枚举新增、状态机变更和数据库表结构变更。
-3. 无授权直接退款对历史数据、幂等键、外部凭证和对账解释的影响；授权过期已在 B4-TRX-EXPIRE 中补齐账户主体型 canonical 能力，强制完成首轮已在 B4-FORCE-SETTLE 中闭合，后续若扩展并发、投影解释、生产策略引擎、审批快照、带原授权 overcapture 或业务 facade 仍需单独授权。
+3. 无授权直接退款对历史数据、幂等键、外部凭证和对账解释的影响；授权过期不再作为资金交易 canonical 能力，强制完成首轮已在 B4-FORCE-SETTLE 中闭合，后续若扩展并发、投影解释、生产策略引擎、审批快照、带原授权 overcapture 或业务 facade 仍需单独授权。
 4. Route Replay、交易投影正常入口、交易投影治理重放、余额重建和归档续跑是否会产生边界混用。
 5. 03 清结算与对账、B8 资金数据治理是否进入本轮实现；默认顺序为先 02，再 03，再由 B8 按独立 Execution Grant 承接。
 6. 是否开启 CAD Mode、Git 策略和 Execution Grant。

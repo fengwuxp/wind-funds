@@ -21,8 +21,6 @@ public enum RouteReplayType implements DescriptiveEnum {
 
     FEE_REFUND("费用退款"),
 
-    CHARGEBACK("拒付"),
-
     UNFREEZE("解冻");
 
     private final String desc;

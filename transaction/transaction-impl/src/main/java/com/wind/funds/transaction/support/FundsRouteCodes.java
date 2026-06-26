@@ -43,15 +43,11 @@ public final class FundsRouteCodes {
 
     public static final String AUTHORIZATION_REVERSAL_REPLAY = "AUTHORIZATION_REVERSAL_REPLAY";
 
-    public static final String AUTHORIZATION_EXPIRE_REPLAY = "AUTHORIZATION_EXPIRE_REPLAY";
-
     public static final String AUTHORIZATION_SETTLE_REPLAY = "AUTHORIZATION_SETTLE_REPLAY";
 
     public static final String AUTHORIZATION_REFUND_REPLAY = "AUTHORIZATION_REFUND_REPLAY";
 
     public static final String DIRECT_REFUND_REPLAY = "DIRECT_REFUND_REPLAY";
-
-    public static final String CHARGEBACK_REPLAY = "CHARGEBACK_REPLAY";
 
     public static final String BALANCE_UNFREEZE_REPLAY = "BALANCE_UNFREEZE_REPLAY";
 

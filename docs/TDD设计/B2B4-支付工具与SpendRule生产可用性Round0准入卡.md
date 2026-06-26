@@ -124,7 +124,7 @@ Request/DTO 默认落 `com.wind.funds.wallet.model.request` 和 `com.wind.funds.
 
 | 交易层能力 | 是否可后续完善 | 典型写入范围 | 禁止混入 |
 | --- | --- | --- | --- |
-| 授权过期释放 | 已完成 B4-TRX-EXPIRE 基础能力，后续只作为回归基线或扩展切片。 | `FundsAuthorizationTransactionService#expire`、`FundsAuthorizationTransactionExpireRequest`、`EXPIRE` 事件、transaction-impl、route replay、授权流测试已由 `b0666ba` 闭合。 | 支付工具主体入参、卡账本、预算组入账；不得借过期释放扩展强制完成、无授权退款或 VCC 生命周期。 |
+| 授权过期不入资金交易 | `B4-TRX-EXPIRE` 历史实现已被 2026-06-26 目标态裁决覆盖，不再作为回归基线或扩展切片。 | 目标态移除 `FundsAuthorizationTransactionService#expire`、`FundsAuthorizationTransactionExpireRequest`、`EXPIRE` 事件、transaction-impl 过期分支、route replay 过期分支和授权过期释放测试。 | 不得借过期状态生成 route、posting、LedgerEntry 或余额变化；释放占用必须由可信撤销、余额调整或对账差错补事实承接。 |
 | 受控强制完成 | 已完成 B4-FORCE-SETTLE 首轮能力，后续只作为回归基线或扩展切片。 | settle 请求、策略字段、审计字段、金额边界测试已由 `616dac1` 和 `3825466` 闭合。 | 用强制完成伪造授权占用或绕过原路径；不得借回归扩展策略引擎、审批流或支付工具入口。 |
 | 无授权直接退款 | 已完成 B4-NO-AUTH-REFUND 首轮能力，后续只作为回归基线或扩展切片。 | `authorizationTransactionSn` 空值语义、`externalReferenceSn`、退款原因、操作者/审计、`NO_AUTH` 内部上下文标签、外部引用路由回退和失败无副作用测试已由 `006bcaa`、`818da34` 和 `967586c` 闭合。 | 缺外部引用、缺原因或缺审计仍静默退款，携带内部授权流水，按当前工具绑定选路；不得借回归扩展运营审批、累计退款控制或完整 dispute case。 |
 | 拒付和争议扣回 | 可以，B4 或 P2-VCC-LIFECYCLE 切片。 | chargeback 或等价逆向请求、原因/凭证/阶段、重复损失防护测试。 | 与授权拒绝或普通 refund 混同。 |

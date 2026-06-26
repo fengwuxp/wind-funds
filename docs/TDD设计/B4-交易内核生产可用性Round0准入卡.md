@@ -18,7 +18,7 @@
 | 系分入口 | `docs/系分设计/02-交易路由钱包账目与投影系分设计.md` 的交易服务契约、route replay、余额控制、交易投影、钱包 application facade 和模块边界。 |
 | TDD 入口 | `docs/TDD设计/支付资金底座测试驱动设计.md` 的直接交易、授权交易、余额控制、route replay、交易投影和 Red 选择顺序；`A1-直接交易事实红线准入卡.md`、`B4-授权后继能力Round0准入卡.md` 和 `B2B4-支付工具与SpendRule生产可用性Round0准入卡.md` 作为前置拆分依据。 |
 | OpenSpec 入口 | `openspec/project.md` 和 `openspec/changes/tdd-baseline-reset/tasks.md` 的当前任务优先级、DoR、B3/B4/B5/B6 覆盖索引和 GSD + Goal 基线。 |
-| 当前代码证据 | A1 直接交易已有服务级 H2 回归资产；B3 直接退款原交易引用回放已通过独立 Grant 补齐 `referenceTransactionSn`、原 route snapshot 部分回放、独立退款事实和超额/缺原事实失败无副作用测试；2026-06-11 Plan Grant 已补原交易存在但 route snapshot 缺失时直接退款全链路失败无副作用测试，并补直接退款在原 route snapshot 固化旧支付工具和旧资金责任后沿原快照回放的 flow 覆盖；B4 授权过期释放、强制完成、无授权退款、争议退款可区分性和授权后继并发竞争已进入代码基线；route replay、交易投影和余额控制已有局部测试。上述证据只能作为回归资产，不能直接声明交易内核所有生产红线已 Done。 |
+| 当前代码证据 | A1 直接交易已有服务级 H2 回归资产；B3 直接退款原交易引用回放已通过独立 Grant 补齐 `referenceTransactionSn`、原 route snapshot 部分回放、独立退款事实和超额/缺原事实失败无副作用测试；2026-06-11 Plan Grant 已补原交易存在但 route snapshot 缺失时直接退款全链路失败无副作用测试，并补直接退款在原 route snapshot 固化旧支付工具和旧资金责任后沿原快照回放的 flow 覆盖；B4 强制完成、无授权退款、争议退款可区分性和授权后继并发竞争已进入代码基线；授权过期释放只作为历史实现痕迹，2026-06-26 目标态已裁决移除 `expire` 入口、`EXPIRE` 事件和 `EXPIRED` 终态；route replay、交易投影和余额控制已有局部测试。上述证据只能作为回归资产，不能直接声明交易内核所有生产红线已 Done。 |
 
 ## 3. grantCandidate
 
@@ -64,7 +64,7 @@
 | 场景 | 本卡允许进入 Round 0 的内容 | 本卡不允许声明 |
 | --- | --- | --- |
 | 直接交易逆向 | 退款、退费和撤销必须引用原资金事实、原 route snapshot 和原 ledger transaction；缺原事实失败无副作用。 | 完整清结算追偿、外部通道退款规则或支付工具入口。 |
-| 授权后继 | 完成、撤销、过期、释放、退款和争议语义只作为账户主体型回归和 replay 红线输入。 | 替换授权 canonical 请求、完整 VCC processor lifecycle 或独立 chargeback case。 |
+| 授权后继 | 完成、可信撤销、释放、退款和争议语义只作为账户主体型回归和 replay 红线输入；授权过期不再作为资金交易后继事件。 | 替换授权 canonical 请求、完整 VCC processor lifecycle 或独立 chargeback case。 |
 | 余额控制 | 冻结、解冻继续证明同主体余额桶控制；余额调整必须独立证明审批、原因、凭证、幂等和失败无副作用。 | 用支付工具、预算组、父账户汇总或 Spend Rule 作为余额主体。 |
 | Route replay | 原路径缺失、原快照缺失、当前绑定变化、当前资金责任变化时 fail-fast。 | 根据当前支付工具、当前预算组、当前 Spend Rule 或当前默认责任重新选路。 |
 | 交易投影 | 查询和重放只读解释普通交易、无授权退款、争议退款、拒绝、释放和失败原因。 | 投影反写交易事实、账本事实或余额事实。 |

@@ -3,8 +3,6 @@ package com.wind.funds.dsl;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.transaction.model.request.CreateFundsFrozenOrderRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionChargebackRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionExpireRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
@@ -43,8 +41,6 @@ class FundsTransactionRequestContextVariablesContractTests {
     private static final List<Class<?>> TRANSACTION_REQUEST_PACKAGE_TYPES = List.of(
             CreateFundsFrozenOrderRequest.class,
             FundsAuthorizationTransactionAuthorizeRequest.class,
-            FundsAuthorizationTransactionChargebackRequest.class,
-            FundsAuthorizationTransactionExpireRequest.class,
             FundsAuthorizationTransactionRefundRequest.class,
             FundsAuthorizationTransactionReversalRequest.class,
             FundsAuthorizationTransactionSettleRequest.class,
@@ -102,18 +98,10 @@ class FundsTransactionRequestContextVariablesContractTests {
                     FundsAuthorizationTransactionReversalRequest::new,
                     FundsAuthorizationTransactionReversalRequest::setContextVariables,
                     FundsAuthorizationTransactionReversalRequest::getContextVariables),
-            new RequestContextCase<>(FundsAuthorizationTransactionExpireRequest.class,
-                    FundsAuthorizationTransactionExpireRequest::new,
-                    FundsAuthorizationTransactionExpireRequest::setContextVariables,
-                    FundsAuthorizationTransactionExpireRequest::getContextVariables),
             new RequestContextCase<>(FundsAuthorizationTransactionRefundRequest.class,
                     FundsAuthorizationTransactionRefundRequest::new,
                     FundsAuthorizationTransactionRefundRequest::setContextVariables,
                     FundsAuthorizationTransactionRefundRequest::getContextVariables),
-            new RequestContextCase<>(FundsAuthorizationTransactionChargebackRequest.class,
-                    FundsAuthorizationTransactionChargebackRequest::new,
-                    FundsAuthorizationTransactionChargebackRequest::setContextVariables,
-                    FundsAuthorizationTransactionChargebackRequest::getContextVariables),
             new RequestContextCase<>(FundsBalanceFreezeRequest.class,
                     FundsBalanceFreezeRequest::new,
                     FundsBalanceFreezeRequest::setContextVariables,

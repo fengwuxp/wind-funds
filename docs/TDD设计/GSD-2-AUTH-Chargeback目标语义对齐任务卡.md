@@ -6,6 +6,8 @@
 
 本文不是新的 PRD，不替代产品设计、DSL 设计、系分设计或 TDD 设计；也不是编码授权、测试写入授权、DDL/H2 schema 授权、公共契约变更授权或 Git 授权。本文只允许低风险文档、索引、OpenSpec tasks 和 LWT Goal 状态同步。
 
+2026-06-26 目标态已重新裁决：独立 `chargeback` 入口不再保留，并与 `expire` 一起进入移除队列。本文后续关于“现有兼容入口保留、不删除、不改造”的文字只作为历史语义对齐记录，不再作为当前设计、代码或任务阻断。
+
 | 字段 | 内容 |
 | --- | --- |
 | Task ID | `GSD2-AUTH-CHARGEBACK-TARGET-ALIGN-001` |
@@ -13,7 +15,7 @@
 | 所属阶段 | GSD-2 / AUTH semantic alignment / contract-design-only。 |
 | Goal ID | `GSD2-GOAL-LWT-PRODUCTION-CAPABILITY-2026-06-18` |
 | Loop ID | `GSD2-LWT-PRODUCTION-CAPABILITY-LOOP-2026-06-18` |
-| 当前状态 | `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED` |
+| 当前状态 | `SUPERSEDED_BY_20260626_REMOVAL_DECISION`；历史状态为 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`。 |
 | Git / code baseline | `a38776c5 feat: 接入出款准入对账门禁`。 |
 | Owner | AI Native 流程编排负责状态、Loop 和停止条件；产品架构专家负责争议、退款、拒付、运营、财务和验收口径；资深架构师负责现有代码锚点、契约边界、Red 候选和验证命令；用户确认是否进入后续单一 Execution Grant。 |
 | Wave 边界 | 本任务只做 contract/design-only 语义对齐、状态同步和下一 Grant 草案；不得写 Java、测试、DDL/H2 schema、公共契约、Entity、Mapper、枚举、状态机、运行时配置或 Git。 |
@@ -27,7 +29,7 @@
 
 ## 2. 背景、目标和非目标
 
-背景：当前 TDD 已明确 `dispute / chargeback` 是案件过程。用户胜诉、部分胜诉或业务决策需要退款时，资金路径应通过完成后退款承接；用户败诉或无需资金处理时，不生成 route、posting、LedgerEntry、余额变化或新的交易事实。与此同时，代码中仍保留 `FundsAuthorizationTransactionService#chargeback`、`FundsAuthorizationTransactionChargebackRequest`、`FundsTransactionEventType.CHARGEBACK`、route replay 的 `CHARGEBACK` 分支和 `declinedAmount` 累计字段，这些现有兼容入口容易被误读为新的目标态。
+背景：当前 TDD 已明确 `dispute / chargeback` 是案件过程。用户胜诉、部分胜诉或业务决策需要退款时，资金路径应通过完成后退款承接；用户败诉或无需资金处理时，不生成 route、posting、LedgerEntry、余额变化或新的交易事实。本文创建时，代码中仍保留 `FundsAuthorizationTransactionService#chargeback`、`FundsAuthorizationTransactionChargebackRequest`、`FundsTransactionEventType.CHARGEBACK`、route replay 的 `CHARGEBACK` 分支和 `declinedAmount` 累计字段，这些兼容入口容易被误读为新的目标态。2026-06-26 后，独立 `chargeback` 入口与 `expire` 一起进入移除目标态，本文仅保留历史语义对齐记录。
 
 业务目标：让产品、运营、财务、风控、研发和测试统一理解争议过程、资金结果和账务影响之间的边界，避免后续编码把 chargeback 做成独立资金内核入口，或把授权拒绝、普通退款、争议裁决退款和无资金影响争议混在一起。
 

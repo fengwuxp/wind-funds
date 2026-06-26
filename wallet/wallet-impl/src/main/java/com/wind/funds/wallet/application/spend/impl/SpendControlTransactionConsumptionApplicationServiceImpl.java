@@ -140,9 +140,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
     private void assertReleasableTransaction(SpendControlTransactionConsumptionRequest request,
                                              FundsTransactionDTO transaction) {
         AssertUtils.isTrue(transaction.getStatus() == FundsTransactionStatus.FAILED
-                        || transaction.getStatus() == FundsTransactionStatus.REJECTED
-                        || transaction.getStatus() == FundsTransactionStatus.EXPIRED,
-                "控制释放必须使用失败、拒绝或过期交易事实，transactionSn = {}", request.getTransactionSn());
+                        || transaction.getStatus() == FundsTransactionStatus.REJECTED,
+                "控制释放必须使用失败或拒绝交易事实，transactionSn = {}", request.getTransactionSn());
     }
 
     private void assertControlActivityMatchesOriginalActivity(SpendControlTransactionConsumptionRequest request,
