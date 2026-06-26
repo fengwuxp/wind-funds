@@ -8,6 +8,7 @@ import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
+import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.instrument.AuthorizationAdmissionApplicationService;
@@ -73,7 +74,12 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
     public @NonNull String payOutByRail(@NonNull PayOutByRailRequest request,
                                         @NonNull WindOperator operator) {
         validatePayOutByRailRequest(request);
-        throw new UnsupportedOperationException("支付工具出款 rail 尚未接入账户主体型提现内核");
+        PaymentInstrumentPreTransactionSnapshotDTO snapshot =
+                preTransactionSnapshotApplicationService.resolvePreTransactionSnapshot(toPreTransactionRequest(request));
+        AssertUtils.isTrue(Boolean.TRUE.equals(snapshot.getReady()), "支付工具出款预交易快照未就绪");
+        AssertUtils.equals(request.getPayoutSourceAccountId(), snapshot.getTargetAccountId(),
+                "支付工具出款资金来源账户与预交易快照目标账户不一致");
+        return directTransactionService.withdraw(convertToWithdrawRequest(request, snapshot), operator);
     }
 
     private void validateReceiveRequest(ReceiveByInstrumentRequest request) {
@@ -100,10 +106,15 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
                 "支付工具出款 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
         AssertUtils.notNull(request.getPayoutSourceAccountId(), "出款资金来源账户不能为空");
+        AssertUtils.notNull(request.getPayeeAccountId(), "出款外部收款账户不能为空");
+        AssertUtils.isTrue(DefaultFundsAccountType.isExternalAccount(request.getPayeeAccountId()),
+                "出款外部收款账户必须是外部账户");
+        AssertUtils.hasText(request.getReferenceFreezeSn(), "出款提现冻结流水号不能为空");
         AssertUtils.notNull(request.getAmount(), "出款金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "出款金额必须大于 0");
         AssertUtils.notNull(request.getCurrency(), "出款币种不能为空");
         AssertUtils.hasText(request.getRailCode(), "出款 rail 编码不能为空");
+        WalletExternalFundsRailSupport.requirePayoutRailCode(request.getRailCode());
         AssertUtils.hasText(request.getReceiverReference(), "出款收款人引用不能为空");
         AssertUtils.hasText(request.getExternalPayoutSn(), "外部出款流水不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "出款业务场景不能为空");
@@ -126,6 +137,21 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
                 .setBusinessSn(request.getBusinessSn());
     }
 
+    private ResolvePaymentInstrumentPreTransactionSnapshotRequest toPreTransactionRequest(
+            PayOutByRailRequest request) {
+        return new ResolvePaymentInstrumentPreTransactionSnapshotRequest()
+                .setTenantId(request.getTenantId())
+                .setInstrumentSn(request.getInstrumentSn())
+                .setAction(PaymentInstrumentAction.WITHDRAW)
+                .setAmount(request.getAmount())
+                .setCurrency(request.getCurrency())
+                .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
+                .setExpectedBindingVersion(request.getExpectedBindingVersion())
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                .setBusinessScene(request.getBusinessScene())
+                .setBusinessSn(request.getBusinessSn());
+    }
+
     private FundsTransactionTopupRequest convertToTopupRequest(ReceiveByInstrumentRequest request,
                                                                PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
         return new FundsTransactionTopupRequest()
@@ -143,6 +169,21 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
                 .setDescription(request.getDescription());
     }
 
+    private FundsTransactionWithdrawRequest convertToWithdrawRequest(
+            PayOutByRailRequest request,
+            PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
+        return new FundsTransactionWithdrawRequest()
+                .setAccountId(snapshot.getTargetAccountId())
+                .setPayeeId(request.getPayeeAccountId())
+                .setReferenceFreezeSn(request.getReferenceFreezeSn())
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
+                        request.getCurrency())))
+                .setBusinessScene(request.getBusinessScene())
+                .setBusinessSn(request.getBusinessSn())
+                .setContextVariables(ReadonlyContextVariables.of(payoutContext(request, snapshot)))
+                .setDescription(request.getDescription());
+    }
+
     private Map<String, Object> receiveContext(PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
         PaymentInstrumentCapabilityDecisionDTO instrument = snapshot.getPaymentInstrumentCapability();
         FundsAccountId targetAccountId = snapshot.getTargetAccountId();
@@ -156,6 +197,30 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         values.put("fundingRelationType", snapshot.getRelationType().name());
         values.put("targetAccountId", targetAccountId.id());
         values.put("targetAccountType", targetAccountId.type());
+        return Map.copyOf(values);
+    }
+
+    private Map<String, Object> payoutContext(PayOutByRailRequest request,
+                                              PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
+        PaymentInstrumentCapabilityDecisionDTO instrument = snapshot.getPaymentInstrumentCapability();
+        FundsAccountId targetAccountId = snapshot.getTargetAccountId();
+        FundsAccountId payeeAccountId = request.getPayeeAccountId();
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("instrumentSn", snapshot.getInstrumentSn());
+        values.put("instrumentAction", PaymentInstrumentAction.WITHDRAW.name());
+        values.put("instrumentBindingRole", snapshot.getBindingRole().name());
+        values.put("instrumentBindingSn", instrument.getBindingSn());
+        values.put("instrumentBindingVersion", instrument.getBindingVersion());
+        values.put("fundingRelationSn", snapshot.getFundingResponsibility().getRelationSn());
+        values.put("fundingRelationType", snapshot.getRelationType().name());
+        values.put("targetAccountId", targetAccountId.id());
+        values.put("targetAccountType", targetAccountId.type());
+        values.put("payoutRailCode", WalletExternalFundsRailSupport.requirePayoutRailCode(request.getRailCode()));
+        values.put("receiverReference", request.getReceiverReference());
+        values.put("externalPayoutSn", request.getExternalPayoutSn());
+        values.put("referenceFreezeSn", request.getReferenceFreezeSn());
+        values.put("payeeAccountId", payeeAccountId.id());
+        values.put("payeeAccountType", payeeAccountId.type());
         return Map.copyOf(values);
     }
 

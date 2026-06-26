@@ -40,6 +40,14 @@ public class PayOutByRailRequest {
     @NotNull
     private FundsAccountId payoutSourceAccountId;
 
+    @Schema(description = "外部收款账户主体，交易内核要求为外部账户")
+    @NotNull
+    private FundsAccountId payeeAccountId;
+
+    @Schema(description = "提现冻结流水号，引用已确认的出款资金预留")
+    @NotBlank
+    private String referenceFreezeSn;
+
     @Schema(description = "出款金额，最小货币单位")
     @NotNull
     private Long amount;

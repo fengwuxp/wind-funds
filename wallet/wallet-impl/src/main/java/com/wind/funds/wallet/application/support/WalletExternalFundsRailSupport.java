@@ -6,6 +6,7 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 钱包外部资金 rail 与交易渠道解析工具。
@@ -44,6 +45,17 @@ public final class WalletExternalFundsRailSupport {
             new ExternalCreditRailDecision("EXTERNAL_RAIL", FundsTransactionChannel.WIRE_TRANSFER)
     );
 
+    private static final Set<String> PAYOUT_RAIL_CODES = Set.of(
+            "ACH",
+            "ACH_RAIL",
+            "LOCAL",
+            "LOCAL_BANK",
+            "SWIFT",
+            "WIRE",
+            "WIRE_RAIL",
+            FundsTransactionChannel.WIRE_TRANSFER.name()
+    );
+
     private WalletExternalFundsRailSupport() {
         throw new AssertionError();
     }
@@ -56,6 +68,15 @@ public final class WalletExternalFundsRailSupport {
                 channelCode,
                 CHANNEL_ALIASES.keySet());
         return result;
+    }
+
+    public static @NonNull String requirePayoutRailCode(@NonNull String railCode) {
+        String normalizedCode = normalize(railCode);
+        AssertUtils.isTrue(PAYOUT_RAIL_CODES.contains(normalizedCode),
+                "出款 rail 编码不支持，railCode = {}，支持的出款 rail = {}",
+                railCode,
+                PAYOUT_RAIL_CODES);
+        return normalizedCode;
     }
 
     public static @NonNull ExternalCreditRailDecision requireConfirmedCreditRailDecision(

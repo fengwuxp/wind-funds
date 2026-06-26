@@ -28,6 +28,7 @@ import com.wind.funds.route.support.RouteParticipantFactory;
 import com.wind.funds.route.support.RouteSubjectSupport;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
+import com.wind.funds.transaction.application.FundsBalanceControlService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
 import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
@@ -38,6 +39,7 @@ import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.ledger.DefaultLedgerPostingAssembler;
+import com.wind.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
@@ -85,6 +87,7 @@ import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServic
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
+import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -129,9 +132,17 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private static final String PAYMENT_ONLY_INSTRUMENT_SN = "pi_lifecycle_payment_only";
 
+    private static final String PAYOUT_INSTRUMENT_SN = "pi_lifecycle_payout";
+
+    private static final String PAYOUT_INSTRUMENT_NO = "VA-PAYOUT-1357";
+
     private static final String RECEIVE_BINDING_SN = "pi_lifecycle_receive_binding";
 
+    private static final String PAYOUT_BINDING_SN = "pi_lifecycle_payout_binding";
+
     private static final String FUNDING_RELATION_SN = "instrument_lifecycle_receive_relation";
+
+    private static final String PAYOUT_FUNDING_RELATION_SN = "instrument_lifecycle_payout_relation";
 
     private static final String OWNER_ID = "owner_instrument_lifecycle";
 
@@ -151,6 +162,10 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private static final String PAYOUT_BUSINESS_SN = "INSTRUMENT_PAYOUT_RAIL_001";
 
+    private static final String UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN = "INSTRUMENT_PAYOUT_RAIL_UNSUPPORTED";
+
+    private static final String PAYOUT_FREEZE_BUSINESS_SN = "INSTRUMENT_PAYOUT_RAIL_FREEZE";
+
     private static final String AUTHORIZE_BUSINESS_SN = "INSTRUMENT_AUTHORIZE_001";
 
     private static final String DELEGATED_AUTHORIZATION_SN = "delegated_instrument_authorization_sn";
@@ -166,6 +181,9 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     @Autowired
     private FundsSubjectBalanceQueryService balanceQueryService;
+
+    @Autowired
+    private FundsBalanceControlService balanceControlService;
 
     @Autowired
     private LedgerService ledgerService;
@@ -304,21 +322,68 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     }
 
     /**
-     * 场景：全球账户出款 rail 入口尚未接入账户主体型提现内核。
-     * 输入：支付工具、金额、币种、rail、收款人引用、业务流水和期望绑定版本齐全。
-     * 输出：服务层入口在生成任何资金事实前失败。
-     * 红线：未完成出款内核编排前，不得生成资金交易、route、posting plan、账本交易、分录或余额投影。
+     * 场景：全球账户出款 rail 入口完成预交易准入后，委派账户主体型提现内核。
+     * 输入：出款工具绑定资金账户，资金责任解析到同一资金账户，账户已先入账 80 并冻结 70。
+     * 输出：返回提现交易号，资金账户 FROZEN 扣减 70，并产生标准 WITHDRAW 交易、route 和账本事实。
+     * 红线：wallet 应用入口不直接写账；提现确认必须引用已冻结资金，不能二次扣减 AVAILABLE。
      */
     @Test
-    void testPayOutByRailShouldFailFastBeforePayoutKernelIsEnabled() {
+    void testPayOutByRailShouldResolveTargetAccountAndDelegateWithdrawKernel() {
+        createReceiveScenario();
+        instrumentTransactionLifecycleApplicationService.receiveByInstrument(
+                receiveRequest(RECEIVE_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperator.system());
+        createPayoutInstrumentScenario();
+        FundsAccountId receiveAccount = receiveAccountId();
+        String freezeSn = freezeForPayout(receiveAccount);
+        FundsSubjectBalanceDTO afterFreeze = balance(receiveAccount);
+        assertBucket(afterFreeze, LedgerSubjectCode.AVAILABLE, 10L, CurrencyIsoCode.USD);
+        assertBucket(afterFreeze, LedgerSubjectCode.FROZEN, 70L, CurrencyIsoCode.USD);
+
+        String transactionSn = instrumentTransactionLifecycleApplicationService.payOutByRail(
+                payoutRequest().setReferenceFreezeSn(freezeSn), WindOperator.system());
+
+        assertThat(transactionSn).isNotBlank();
+        FundsSubjectBalanceDTO afterPayout = balance(receiveAccount);
+        assertBucket(afterPayout, LedgerSubjectCode.AVAILABLE, 10L, CurrencyIsoCode.USD);
+        assertBucket(afterPayout, LedgerSubjectCode.FROZEN, 0L, CurrencyIsoCode.USD);
+        assertThat(fundsTransactionStatus(PAYOUT_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.CLOSED.name());
+        assertThat(fundsTransactionDetailStatuses(PAYOUT_BUSINESS_SN))
+                .hasSize(3)
+                .containsOnly(FundsTransactionDetailStatus.SUCCEEDED.name());
+        assertThat(ledgerTransactionEvents(PAYOUT_BUSINESS_SN))
+                .containsExactly(FundsTransactionEventType.WITHDRAW.name());
+        assertThat(ledgerEntrySubjects(PAYOUT_BUSINESS_SN))
+                .contains(RECEIVE_ACCOUNT_SN, CASH_MAPPING_ACCOUNT_SN, PREPAYMENT_ACCOUNT_SN);
+        assertThat(ledgerEntrySubjectCodes(PAYOUT_BUSINESS_SN))
+                .contains(LedgerSubjectCode.FROZEN.name(), LedgerSubjectCode.CASH.name(),
+                        LedgerSubjectCode.PREPAYMENT.name());
+        assertThat(postingPlanCount(PAYOUT_BUSINESS_SN)).isEqualTo(2);
+        assertThat(ledgerEntryCount(PAYOUT_BUSINESS_SN)).isEqualTo(4);
+        assertThat(routeLegCount(PAYOUT_BUSINESS_SN)).isEqualTo(2);
+        assertPayoutRouteSnapshot(PAYOUT_BUSINESS_SN);
+    }
+
+    /**
+     * 场景：全球账户出款 rail 入口收到未知 rail 编码。
+     * 输入：请求字段齐全，但 railCode 为 mystery_rail。
+     * 输出：服务层入口给出可读拒绝原因，不进入预交易快照和提现内核。
+     * 红线：非法 rail 不得生成资金交易、route、posting plan、账本交易或分录。
+     */
+    @Test
+    void testPayOutByRailShouldRejectUnsupportedRailCodeWithoutFundsFacts() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        PayOutByRailRequest request = payoutRequest()
+                .setBusinessSn(UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN)
+                .setRailCode("mystery_rail")
+                .setReferenceFreezeSn("freeze_not_used_for_unknown_rail");
 
-        assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.payOutByRail(payoutRequest(),
+        assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.payOutByRail(request,
                 WindOperator.system()))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("支付工具出款 rail 尚未接入账户主体型提现内核");
+                .hasMessageContaining("出款 rail 编码不支持")
+                .hasMessageContaining("mystery_rail")
+                .hasMessageContaining("支持的出款 rail");
 
-        assertNoFundsOrLedgerFacts(PAYOUT_BUSINESS_SN);
+        assertNoFundsOrLedgerFacts(UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -338,35 +403,42 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
                     SELECT sn FROM t_ledger_transaction
-                    WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)
+                    WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)
                 )
                 """, BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
-                MISSING_BINDING_VERSION_BUSINESS_SN, UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
+                MISSING_BINDING_VERSION_BUSINESS_SN, UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN,
+                UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN, PAYOUT_FREEZE_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN, UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN,
+                PAYOUT_FREEZE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
+                "DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN, UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN,
+                PAYOUT_FREEZE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
+                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN, UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN,
+                PAYOUT_FREEZE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
+                "DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN, UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN,
+                PAYOUT_FREEZE_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
-                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn IN (?, ?)",
-                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?)",
-                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN, UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN,
+                PAYOUT_FREEZE_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?)",
+                FUNDING_RELATION_SN, PAYOUT_FUNDING_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?, ?)",
+                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN, PAYOUT_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn IN (?, ?, ?)",
+                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN, PAYOUT_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?)",
+                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN, PAYOUT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
                 RECEIVE_ACCOUNT_SN, CASH_MAPPING_ACCOUNT_SN, PREPAYMENT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?)",
@@ -384,6 +456,15 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(RECEIVE_INSTRUMENT_SN,
                 RECEIVE_BINDING_SN));
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest(FUNDING_RELATION_SN));
+    }
+
+    private void createPayoutInstrumentScenario() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYOUT_INSTRUMENT_SN,
+                PaymentInstrumentDirection.PAYMENT, PAYOUT_INSTRUMENT_NO));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(PAYOUT_INSTRUMENT_SN,
+                PAYOUT_BINDING_SN, PaymentInstrumentBindingRole.PAYMENT_SUBJECT));
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest(
+                PAYOUT_FUNDING_RELATION_SN, SpendSubjectFundingRelationType.FUNDING_SOURCE));
     }
 
     private void createReceiveAccount() {
@@ -450,6 +531,12 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
                                                                           PaymentInstrumentDirection direction) {
+        return createPaymentInstrumentRequest(instrumentSn, direction, RECEIVE_INSTRUMENT_NO);
+    }
+
+    private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
+                                                                          PaymentInstrumentDirection direction,
+                                                                          String instrumentNo) {
         return new CreatePaymentInstrumentRequest()
                 .setSn(instrumentSn)
                 .setTenantId(TENANT_ID)
@@ -457,21 +544,34 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setInstrumentType("VA")
                 .setInstrumentDirection(direction)
-                .setInstrumentNo("VA-****-2468")
+                .setInstrumentNo(instrumentNo)
                 .setChannelCode(CHANNEL_CODE)
-                .setExternalInstrumentId("va_lifecycle_2468")
+                .setExternalInstrumentId(externalInstrumentId(instrumentSn))
                 .setCurrency(CurrencyIsoCode.USD)
                 .setStatus(FundsAccountStatus.ACTIVE);
     }
 
+    private String externalInstrumentId(String instrumentSn) {
+        if (RECEIVE_INSTRUMENT_SN.equals(instrumentSn)) {
+            return "va_lifecycle_2468";
+        }
+        return instrumentSn + "_external";
+    }
+
     private CreatePaymentInstrumentBindingRequest createBindingRequest(String instrumentSn,
                                                                        String bindingSn) {
+        return createBindingRequest(instrumentSn, bindingSn, PaymentInstrumentBindingRole.RECEIVE_SUBJECT);
+    }
+
+    private CreatePaymentInstrumentBindingRequest createBindingRequest(String instrumentSn,
+                                                                       String bindingSn,
+                                                                       PaymentInstrumentBindingRole bindingRole) {
         return new CreatePaymentInstrumentBindingRequest()
                 .setSn(bindingSn)
                 .setRequestSn(bindingSn + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(instrumentSn)
-                .setBindingRole(PaymentInstrumentBindingRole.RECEIVE_SUBJECT)
+                .setBindingRole(bindingRole)
                 .setSubjectId(RECEIVE_ACCOUNT_SN)
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
@@ -481,6 +581,12 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     }
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest(String relationSn) {
+        return createFundingRelationRequest(relationSn, SpendSubjectFundingRelationType.SETTLEMENT_TARGET);
+    }
+
+    private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest(
+            String relationSn,
+            SpendSubjectFundingRelationType relationType) {
         return new CreateSpendSubjectFundingRelationRequest()
                 .setSn(relationSn)
                 .setTenantId(TENANT_ID)
@@ -489,7 +595,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setTargetSubjectId(RECEIVE_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setRelationType(SpendSubjectFundingRelationType.SETTLEMENT_TARGET)
+                .setRelationType(relationType)
                 .setPriority(10)
                 .setDefaultRelation(Boolean.TRUE)
                 .setStatus(FundsAccountStatus.ACTIVE);
@@ -515,8 +621,9 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     private PayOutByRailRequest payoutRequest() {
         return new PayOutByRailRequest()
                 .setTenantId(TENANT_ID)
-                .setInstrumentSn(RECEIVE_INSTRUMENT_SN)
+                .setInstrumentSn(PAYOUT_INSTRUMENT_SN)
                 .setPayoutSourceAccountId(receiveAccountId())
+                .setPayeeAccountId(payoutPayeeAccountId())
                 .setAmount(70L)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setRailCode("LOCAL")
@@ -526,6 +633,15 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setBusinessSn(PAYOUT_BUSINESS_SN)
                 .setExpectedBindingVersion(1)
                 .setDescription("instrument payout rail contract");
+    }
+
+    private String freezeForPayout(FundsAccountId accountId) {
+        return balanceControlService.freeze(new FundsBalanceFreezeRequest()
+                .setAccountId(accountId)
+                .setAmount(Money.immutable(70L, CurrencyIsoCode.USD))
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(PAYOUT_FREEZE_BUSINESS_SN)
+                .setDescription("instrument payout freeze"), WindOperator.system());
     }
 
     private AuthorizeByPaymentInstrumentRequest authorizeRequest() {
@@ -551,6 +667,10 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private FundsAccountId prepaymentAccountId() {
         return FundsAccountId.immutable(PREPAYMENT_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
+    private FundsAccountId payoutPayeeAccountId() {
+        return FundsAccountId.immutable("external_bank_lifecycle_payout", DefaultFundsAccountType.EXTERNAL_BANK);
     }
 
     private FundsSubjectBalanceDTO balance(FundsAccountId accountId) {
@@ -680,6 +800,16 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         assertThat(queryContextVariables("t_ledger_entry", businessSn))
                 .isNotEmpty()
                 .allSatisfy(context -> assertThat(context).doesNotContain("va_lifecycle_2468"));
+    }
+
+    private void assertPayoutRouteSnapshot(String businessSn) {
+        JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson(businessSn));
+        JSONObject externalAccountRef = routeSnapshot.getJSONObject("externalAccountRef");
+        assertThat(externalAccountRef).isNotNull().isNotEmpty();
+        assertThat(externalAccountRef.getString("externalAccountId"))
+                .isEqualTo("external_bank_lifecycle_payout");
+        assertThat(externalAccountRef.getString("externalAccountType"))
+                .isEqualTo(DefaultFundsAccountType.EXTERNAL_BANK.name());
     }
 
     private List<String> queryContextVariables(String tableName, String businessSn) {
