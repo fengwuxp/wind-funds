@@ -12,8 +12,7 @@ import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.application.FundsBenefitFundingApplicationService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
-import com.wind.funds.transaction.enums.FundsBenefitLedgerEffect;
-import com.wind.funds.transaction.model.dto.FundsBenefitFundingSourceDTO;
+import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
@@ -30,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * 权益让利资金交易应用服务实现。
@@ -47,15 +47,16 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
 
     private static final String BENEFIT_FUNDING_NATURE_CODE = "benefitFundingNatureCode";
 
-    private static final String BENEFIT_LEDGER_EFFECT_CODE = "benefitLedgerEffectCode";
-
     private static final String BENEFIT_ORIGINAL_ORDER_SN = "benefitOriginalOrderSn";
 
     private static final String BENEFIT_REFERENCE_TRANSACTION_SN = "benefitReferenceTransactionSn";
 
-    private static final String BENEFIT_SOURCE_SUMMARY = "benefitFundingSources";
-
     private static final String BENEFIT_REFUND_REASON = "benefitRefundReason";
+
+    private static final Set<FundsBenefitFundingNature> SUPPORTED_SETTLE_FUNDING_NATURES = Set.of(
+            FundsBenefitFundingNature.MERCHANT_BORNE,
+            FundsBenefitFundingNature.PLATFORM_OWN_FUNDS,
+            FundsBenefitFundingNature.PARTNER_FUNDED);
 
     private final FundsDirectTransactionService directTransactionService;
 
@@ -67,7 +68,7 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
                                   @NonNull WindOperator operator) {
         assertSettleRequest(request);
         FundsAccountId costBearer = toAccountId(request.getCostBearerSubjectRef(), "权益让利承担方");
-        FundsAccountId receiver = toAccountId(request.getBenefitReceiverSubjectRef(), "权益让利受益方");
+        FundsAccountId receiver = toAccountId(request.getBenefitReceiverSubjectRef(), "权益让利承接账务主体");
         return directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(costBearer)
                 .setPayeeId(receiver)
@@ -105,14 +106,13 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
         AssertUtils.hasText(request.getBusinessSn(), "权益让利业务流水不能为空");
         AssertUtils.hasText(request.getOriginalOrderSn(), "权益让利原始订单号不能为空");
         AssertUtils.notNull(request.getCostBearerSubjectRef(), "权益让利承担方不能为空");
-        AssertUtils.notNull(request.getBenefitReceiverSubjectRef(), "权益让利受益方不能为空");
+        AssertUtils.notNull(request.getBenefitReceiverSubjectRef(), "权益让利承接账务主体不能为空");
         AssertUtils.notNull(request.getAmount(), "权益让利金额不能为空");
         AssertUtils.isTrue(request.getAmount().getAmount() > 0, "权益让利金额必须大于 0");
         AssertUtils.notNull(request.getFundingNature(), "权益让利资金性质不能为空");
-        AssertUtils.notNull(request.getLedgerEffect(), "权益让利账务效果不能为空");
-        AssertUtils.isTrue(request.getLedgerEffect() == FundsBenefitLedgerEffect.POSTING_REQUIRED,
-                "权益让利账务效果暂仅支持 POSTING_REQUIRED，ledgerEffect = {}", request.getLedgerEffect());
-        AssertUtils.notEmpty(request.getBenefitFundingSources(), "权益让利来源不能为空");
+        AssertUtils.isTrue(SUPPORTED_SETTLE_FUNDING_NATURES.contains(request.getFundingNature()),
+                "权益让利结算仅支持平台、商户或合作方出资责任记账，不支持返利、佣金、分润、储值负债释放或无资金转移解释事实，fundingNature = {}",
+                request.getFundingNature());
     }
 
     private void assertRefundRequest(@NonNull FundsBenefitFundingRefundRequest request) {
@@ -140,7 +140,7 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
         RouteLegSpec leg = sourceLeg.get();
         return new OriginalBenefitRoute(
                 toAccountId(leg.getSourceNode().getSubjectRef(), "原权益让利承担方"),
-                toAccountId(leg.getTargetNode().getSubjectRef(), "原权益让利受益方"),
+                toAccountId(leg.getTargetNode().getSubjectRef(), "原权益让利承接账务主体"),
                 leg.getTargetNode().getLedgerSubjectCode());
     }
 
@@ -157,15 +157,10 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
         Map<String, Object> result = mergeContext(request.getContextVariables());
         result.put(BENEFIT_FUNDING, Boolean.TRUE);
         result.put(BENEFIT_FUNDING_NATURE_CODE, request.getFundingNature().name());
-        result.put(BENEFIT_LEDGER_EFFECT_CODE, request.getLedgerEffect().name());
         result.put(BENEFIT_ORIGINAL_ORDER_SN, request.getOriginalOrderSn());
         if (request.getReferenceTransactionSn() != null) {
             result.put(BENEFIT_REFERENCE_TRANSACTION_SN, request.getReferenceTransactionSn());
         }
-        result.put(BENEFIT_SOURCE_SUMMARY, request.getBenefitFundingSources()
-                .stream()
-                .map(this::sourceSummary)
-                .toList());
         return Map.copyOf(result);
     }
 
@@ -188,27 +183,6 @@ public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFu
             result.putAll(contextVariables.getContextVariables());
         }
         return result;
-    }
-
-    private Map<String, Object> sourceSummary(@NonNull FundsBenefitFundingSourceDTO source) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        if (source.getSourceType() != null) {
-            result.put("sourceType", source.getSourceType().name());
-        }
-        if (source.getSourceId() != null) {
-            result.put("sourceId", source.getSourceId());
-        }
-        if (source.getRuleId() != null) {
-            result.put("ruleId", source.getRuleId());
-        }
-        if (source.getRuleVersion() != null) {
-            result.put("sourceRuleRefVersion", source.getRuleVersion());
-        }
-        if (source.getAmount() != null) {
-            result.put("sourceContributionMinor", source.getAmount().getAmount());
-            result.put("sourceContributionCurrency", source.getAmount().getCurrency().name());
-        }
-        return Map.copyOf(result);
     }
 
     private record OriginalBenefitRoute(FundsAccountId costBearerAccountId,

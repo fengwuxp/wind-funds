@@ -9,18 +9,13 @@ import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.transaction.application.FundsBenefitFundingApplicationService;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
-import com.wind.funds.transaction.enums.FundsBenefitFundingSourceType;
-import com.wind.funds.transaction.enums.FundsBenefitLedgerEffect;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.model.dto.FundsBenefitFundingSourceDTO;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -41,7 +36,7 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
     private FundsBenefitFundingApplicationService benefitFundingApplicationService;
 
     /**
-     * 场景：平台或商户责任账户向用户权益余额账户入账让利，随后发生部分退款和业务取消退款。
+     * 场景：平台营销资金账户向让利承接账目记录优惠金额，随后发生部分退款和业务取消退款。
      * 输入：让利方充值 100；权益资金结算 30；退款 10；取消退款 5。
      * 输出：三笔权益资金交易均返回资金交易流水，并通过标准 route、交易事实和账本分录入账。
      * 红线：权益服务不得绕过直接交易链路写 LedgerEntry；逆向事件必须引用原权益资金交易回放。
@@ -115,28 +110,150 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
     }
 
     /**
-     * 场景：业务侧传入展示优惠、商户折扣等不需要入账的权益解释事实。
-     * 输入：账务效果为 NO_LEDGER。
+     * 场景：调用方试图把返利、储值或用户权益余额入账伪装成让利结算。
+     * 输入：资金性质为 USER_BENEFIT_BALANCE。
      * 输出：服务 fail-fast，不生成资金交易、交易明细、账务交易或分录。
-     * 红线：不能为了返回交易流水而伪造无账务资金交易事实。
+     * 红线：本服务只处理优惠、代金券、支付立减等让利结算，不处理返利、佣金、分润或用户余额入账。
      */
     @Test
-    void testSettleWithNonPostingEffectShouldFailWithoutFundsOrLedgerFacts() {
-        FundsAccountId costBearer = fundingAccount("ben_no_cost");
-        FundsAccountId receiver = fundingAccount("ben_no_recv");
+    void testSettleWithUserBenefitBalanceShouldFailWithoutFundsOrLedgerFacts() {
+        FundsAccountId costBearer = fundingAccount("ben_rebate_cost");
+        FundsAccountId receiver = fundingAccount("ben_rebate_recv");
         ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         var before = snapshot(balances(costBearer, receiver));
 
         assertThatThrownBy(() -> benefitFundingApplicationService.settle(settleRequest(costBearer, receiver, 20L,
-                "BENEFIT_NO_LEDGER_001").setLedgerEffect(FundsBenefitLedgerEffect.NO_LEDGER), WindOperator.system()))
-                .hasMessageContaining("权益让利账务效果");
+                "BENEFIT_REBATE_001").setFundingNature(FundsBenefitFundingNature.USER_BENEFIT_BALANCE),
+                WindOperator.system()))
+                .hasMessageContaining("不支持返利、佣金、分润、储值负债释放或无资金转移解释事实");
 
         var after = snapshot(balances(costBearer, receiver));
         assertOnlyBalanceDeltas(before, after,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
                 delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
-        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_NO_LEDGER_001");
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_REBATE_001");
+    }
+
+    /**
+     * 场景：商户承担优惠券或支付立减，资金底座记录商户让利的出资责任账目。
+     * 输入：资金性质为 MERCHANT_BORNE。
+     * 输出：生成一笔从商户让利责任账户到用户让利账目的标准资金交易和账务分录。
+     * 红线：商户承担让利不能被误拦截成无账务展示优惠。
+     */
+    @Test
+    void testSettleWithMerchantBorneBenefitShouldPostFundingResponsibility() {
+        FundsAccountId merchantCostBearer = fundingAccount("ben_merchant_cost");
+        FundsAccountId userBenefit = fundingAccount("ben_user_benefit");
+        ensureLedger(merchantCostBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(userBenefit, LedgerSubjectCode.SETTLEMENT);
+
+        topup(merchantCostBearer, 100L, "BENEFIT_MERCHANT_TOPUP");
+        var afterTopup = snapshot(balances(merchantCostBearer, userBenefit));
+
+        String transactionSn = benefitFundingApplicationService.settle(settleRequest(merchantCostBearer, userBenefit, 25L,
+                "BENEFIT_MERCHANT_BORNE_001").setFundingNature(FundsBenefitFundingNature.MERCHANT_BORNE),
+                WindOperator.system());
+
+        assertThat(transactionSn).isNotBlank();
+        var afterSettle = snapshot(balances(merchantCostBearer, userBenefit));
+        assertOnlyBalanceDeltas(afterTopup, afterSettle,
+                delta(merchantCostBearer, LedgerSubjectCode.AVAILABLE, -25L, CURRENCY),
+                delta(userBenefit, LedgerSubjectCode.SETTLEMENT, 25L, CURRENCY));
+        assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_MERCHANT_BORNE_001", 2, 2);
+        assertLedgerFactsFollowRouteSnapshot("BENEFIT_MERCHANT_BORNE_001");
+        assertLedgerEventAndBuckets("BENEFIT_MERCHANT_BORNE_001", FundsTransactionEventType.PAY,
+                LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.SETTLEMENT);
+    }
+
+    /**
+     * 场景：平台和商户共同承担同一订单优惠，后续分别按原出资事实退款。
+     * 输入：平台出资 20，商户出资 10，退款时分别冲回 5 和 3。
+     * 输出：每个出资方都有独立结算交易流水，退款按各自原权益资金交易回放。
+     * 红线：多方出资不能合并成一笔丢失出资方的资金事实，也不能退款时按当前规则重算分摊。
+     */
+    @Test
+    void testMultipleContributorsShouldSettleAndRefundByOriginalBenefitTransaction() {
+        FundsAccountId platformCostBearer = fundingAccount("ben_multi_platform");
+        FundsAccountId merchantCostBearer = fundingAccount("ben_multi_merchant");
+        FundsAccountId receiver = fundingAccount("ben_multi_receiver");
+        ensureLedger(platformCostBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(merchantCostBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
+
+        topup(platformCostBearer, 100L, "BENEFIT_MULTI_PLATFORM_TOPUP");
+        topup(merchantCostBearer, 100L, "BENEFIT_MULTI_MERCHANT_TOPUP");
+        var afterTopup = snapshot(balances(platformCostBearer, merchantCostBearer, receiver));
+
+        String platformTransactionSn = benefitFundingApplicationService.settle(
+                settleRequest(platformCostBearer, receiver, 20L, "BENEFIT_MULTI_PLATFORM_SETTLE_001")
+                        .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS),
+                WindOperator.system());
+        String merchantTransactionSn = benefitFundingApplicationService.settle(
+                settleRequest(merchantCostBearer, receiver, 10L, "BENEFIT_MULTI_MERCHANT_SETTLE_001")
+                        .setFundingNature(FundsBenefitFundingNature.MERCHANT_BORNE),
+                WindOperator.system());
+
+        var afterSettle = snapshot(balances(platformCostBearer, merchantCostBearer, receiver));
+        assertOnlyBalanceDeltas(afterTopup, afterSettle,
+                delta(platformCostBearer, LedgerSubjectCode.AVAILABLE, -20L, CURRENCY),
+                delta(merchantCostBearer, LedgerSubjectCode.AVAILABLE, -10L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.SETTLEMENT, 30L, CURRENCY));
+        assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_MULTI_PLATFORM_SETTLE_001", 2, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_MULTI_MERCHANT_SETTLE_001", 2, 2);
+
+        benefitFundingApplicationService.refund(new FundsBenefitFundingRefundRequest()
+                .setTenantId(TENANT_ID)
+                .setReferenceBenefitTransactionSn(platformTransactionSn)
+                .setReferenceTransactionSn("PAY_ORDER_001")
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setBusinessScene("BENEFIT_REFUND")
+                .setBusinessSn("BENEFIT_MULTI_PLATFORM_REFUND_001")
+                .setOriginalOrderSn("ORDER_001")
+                .setRefundReason("partial order refund"), WindOperator.system());
+        benefitFundingApplicationService.refund(new FundsBenefitFundingRefundRequest()
+                .setTenantId(TENANT_ID)
+                .setReferenceBenefitTransactionSn(merchantTransactionSn)
+                .setReferenceTransactionSn("PAY_ORDER_001")
+                .setAmount(Money.immutable(3L, CURRENCY))
+                .setBusinessScene("BENEFIT_REFUND")
+                .setBusinessSn("BENEFIT_MULTI_MERCHANT_REFUND_001")
+                .setOriginalOrderSn("ORDER_001")
+                .setRefundReason("partial order refund"), WindOperator.system());
+
+        var afterRefund = snapshot(balances(platformCostBearer, merchantCostBearer, receiver));
+        assertOnlyBalanceDeltas(afterSettle, afterRefund,
+                delta(platformCostBearer, LedgerSubjectCode.AVAILABLE, 5L, CURRENCY),
+                delta(merchantCostBearer, LedgerSubjectCode.AVAILABLE, 3L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.SETTLEMENT, -8L, CURRENCY));
+        assertThat(fundsTransaction(platformTransactionSn).getRefundedAmount()).isEqualTo(5L);
+        assertThat(fundsTransaction(merchantTransactionSn).getRefundedAmount()).isEqualTo(3L);
+    }
+
+    /**
+     * 场景：调用方试图把展示优惠、商户折扣或平台券不补足商户等解释事实伪装成入账结算。
+     * 输入：资金性质为 NO_FUNDS_TRANSFER。
+     * 输出：服务 fail-fast，不生成资金交易、交易明细、账务交易或分录。
+     * 红线：无资金转移的优惠解释事实不能进入会真实入账的权益让利结算入口。
+     */
+    @Test
+    void testSettleWithNoFundsTransferNatureShouldFailWithoutFundsOrLedgerFacts() {
+        FundsAccountId costBearer = fundingAccount("ben_no_transfer_cost");
+        FundsAccountId receiver = fundingAccount("ben_no_transfer_recv");
+        ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
+        var before = snapshot(balances(costBearer, receiver));
+
+        assertThatThrownBy(() -> benefitFundingApplicationService.settle(settleRequest(costBearer, receiver, 20L,
+                "BENEFIT_NO_TRANSFER_001").setFundingNature(FundsBenefitFundingNature.NO_FUNDS_TRANSFER),
+                WindOperator.system()))
+                .hasMessageContaining("无资金转移解释事实");
+
+        var after = snapshot(balances(costBearer, receiver));
+        assertOnlyBalanceDeltas(before, after,
+                delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_NO_TRANSFER_001");
     }
 
     private FundsBenefitFundingSettleRequest settleRequest(FundsAccountId costBearer,
@@ -152,14 +269,7 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
                 .setCostBearerSubjectRef(subjectRef(costBearer))
                 .setBenefitReceiverSubjectRef(subjectRef(receiver))
                 .setAmount(Money.immutable(amount, CURRENCY))
-                .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS)
-                .setLedgerEffect(FundsBenefitLedgerEffect.POSTING_REQUIRED)
-                .setBenefitFundingSources(List.of(new FundsBenefitFundingSourceDTO()
-                        .setSourceType(FundsBenefitFundingSourceType.COUPON)
-                        .setSourceId("COUPON_001")
-                        .setRuleId("RULE_001")
-                        .setRuleVersion("v1")
-                        .setAmount(Money.immutable(amount, CURRENCY))));
+                .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS);
     }
 
     private SubjectRef subjectRef(FundsAccountId accountId) {

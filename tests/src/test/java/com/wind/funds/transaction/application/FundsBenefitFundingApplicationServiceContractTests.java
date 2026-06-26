@@ -1,8 +1,6 @@
 package com.wind.funds.transaction.application;
 
 import com.capte.domain.core.operator.WindOperator;
-import com.wind.funds.transaction.enums.FundsBenefitFundingSourceType;
-import com.wind.funds.transaction.model.dto.FundsBenefitFundingSourceDTO;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
 import org.junit.jupiter.api.Test;
@@ -47,12 +45,13 @@ class FundsBenefitFundingApplicationServiceContractTests {
     }
 
     /**
-     * 场景：权益让利事实从业务、订单或营销系统进入资金底座。
-     * 预期：请求模型一等表达让利方、受益方、金额、来源引用、原订单或交易引用和业务场景。
-     * 红线：入口不要求调用方构造完整复杂权益快照、确认审批状态或外部摘要，也不把营销规则、券实例或支付工具当账务主体。
+     * 场景：业务、订单或营销系统已经完成让利决策和分摊。
+     * 预期：请求模型一等表达成本承担主体、让利承接账务主体、金额、资金性质、原订单或交易引用和业务场景。
+     * 红线：入口不要求调用方构造完整复杂权益快照、确认审批状态或外部摘要；
+     * 也不把用户、营销规则、券实例、来源归因或支付工具当账务主体。
      */
     @Test
-    void testSettleRequestShouldModelBenefitFundingFactsWithoutHeavySnapshotDependency()
+    void testSettleRequestShouldModelBenefitContributionWithoutMarketingAttribution()
             throws NoSuchMethodException {
         List<String> getterNames = Arrays.stream(FundsBenefitFundingSettleRequest.class.getMethods())
                 .map(Method::getName)
@@ -67,9 +66,13 @@ class FundsBenefitFundingApplicationServiceContractTests {
                         "getCostBearerSubjectRef",
                         "getBenefitReceiverSubjectRef",
                         "getAmount",
-                        "getBenefitFundingSources")
+                        "getFundingNature")
                 .doesNotContain("getBenefitSnapshot",
                         "getBenefitTransactionSn",
+                        "getBenefitFundingSources",
+                        "getLedgerEffect",
+                        "getRebateAccountRef",
+                        "getCommissionParticipantRef",
                         "getConfirmationStatus",
                         "getConfirmationReferenceSn",
                         "getBenefitFundingDigest",
@@ -100,29 +103,6 @@ class FundsBenefitFundingApplicationServiceContractTests {
                         "getConfirmationReferenceSn",
                         "getBenefitFundingDigest",
                         "getDescription");
-    }
-
-    /**
-     * 场景：一笔让利可能由券、规则、活动、代金券或支付立减共同构成。
-     * 预期：来源引用可以携带来源类型、来源标识、规则版本和对应金额。
-     */
-    @Test
-    void testBenefitFundingSourceShouldCarryMinimalTraceFields()
-            throws NoSuchMethodException {
-        List<String> getterNames = Arrays.stream(FundsBenefitFundingSourceDTO.class.getMethods())
-                .map(Method::getName)
-                .toList();
-
-        assertThat(getterNames)
-                .contains("getSourceType",
-                        "getSourceId",
-                        "getRuleId",
-                        "getRuleVersion",
-                        "getAmount");
-        assertThat(getterNames)
-                .doesNotContain("getExternalDecisionId");
-        assertThat(FundsBenefitFundingSourceDTO.class.getMethod("getSourceType").getReturnType())
-                .isEqualTo(FundsBenefitFundingSourceType.class);
     }
 
     private List<String> serviceMethodNames() {

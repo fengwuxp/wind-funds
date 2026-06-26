@@ -185,7 +185,7 @@ Capte 业务会覆盖 VCC 发卡、全球收付款、收单、平台内部交易
 | --- | --- | --- | --- |
 | 业务产品层 | 业务订单、卡授权、ACH 或银行转账指令、提现申请、商户结算申请、争议单 | 业务系统自己的单据和状态；ACH 指令、Debit 授权、文件批次和通道状态不属于资金底座事实源。 | 由业务系统决定 |
 | 交易接入层 | 资金指令、资金交易、交易明细 | 底座接收业务资金事实的统一入口。 | 是，记录资金侧事实 |
-| 权益语义层 | 权益让利资金事实、权益金额组件、权益来源引用、退款、业务取消和人工纠错处置 | 承接订单、交易业务系统或营销权益系统已经决策完成的优惠券、代金券、平台补贴、商户让利和储值权益结果。 | 权益资金交易和等价不可变事实是回放事实 |
+| 权益语义层 | 权益让利资金事实、权益金额组件、原事实引用、退款、业务取消和人工纠错处置 | 承接订单、交易业务系统或营销权益系统已经决策完成的优惠券、代金券、平台补贴、商户让利和储值权益结果。 | 权益资金交易和等价不可变事实是回放事实 |
 | 权益资金承接层 | 营销账户、营销成本账户、营销负债账户、合作方补贴账户、营销留置账户 | 把已决策权益中有真实资金、负债、成本或清结算影响的组件落到可记账责任账户；不计算券规则，不维护券包生命周期。 | 账户配置和账务事实是事实，余额来自账本 |
 | 余额控制层 | 冻结单、冻结动作、余额调整动作、预算控制动作 | 表达冻结、解冻、部分释放、到期释放，以及同主体资金账户余额调整、信用账户额度调整和预算/支出规则调整。 | 是，记录控制事实 |
 | 钱包账户层 | 钱包账户域、资金账户、信用账户、预算组、Spend Rule、平台资金账户角色解析、支付工具引用 | 表达主体、账户、余额桶、额度、预算范围、支出规则、绑定关系和展示口径。 | 账户和规则配置是事实，余额来自账本 |
@@ -293,7 +293,7 @@ erDiagram
 对象关系的核心判断：
 
 1. 资金指令只是入口，真正的事实分为资金交易、冻结单和余额调整动作。
-2. 权益资金事实只承接已决策结果；商户让利、平台补贴、代金券核销、储值权益和退款处置必须通过权益组件、来源引用和历史摘要解释。
+2. 权益资金事实只承接已决策结果；商户让利、平台补贴、代金券核销、储值权益和退款处置必须通过原订单、原资金交易、原权益资金交易或历史摘要解释。
 3. 资金交易、route snapshot、posting plan、账本交易和分录构成写入证据链。
 4. 余额调整动作只表达同主体资金余额、信用额度或预算规则控制；跨主体价值转移仍由资金交易和调账事实证据承接。
 5. 余额投影和交易投影都从事实派生，只读可重建。
@@ -440,8 +440,8 @@ mindmap
 | P0 | 清分、清算与对账 | 运营闭环中的对账、清分、内部清算、差错、核销和追偿。 | `reconciliation-face`、`reconciliation-impl` 或确认后的等价对账清算模块；通过 transaction 和 ledger 引用资金事实。 | 清分明细和清算候选不入账；差错不直接改历史分录或余额；对账是清分、清算、结算和出款的基础准入。 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`RED-030` 至 `RED-039`；`CLS-GATE-*`、`TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`。 |
 | P0 | 资金数据治理证据 | Manifest、checkpoint、watermark、余额重建、冷热查询和差异报告。 | `governance-face`、`governance-impl` 或确认后的等价治理模块；余额检查点和水位归属账本模块协作。 | 冷热位置变化不改变事实身份；余额重建只从账本事实恢复；资金冷事实不是在线报表库。 | `AC-ARCH-*`、`AC-ARCH-009`、`RED-016` 至 `RED-019`、`RED-029`；`GOV-GATE-*`、`TDD-GOV-*`、`TDD-ARCH-*`、`TDD-ARCH-010`。 |
 | P1 | 交易接入 | 交易入口和资金事实链起点，承接直接交易、授权交易、余额控制和幂等。 | `transaction-face`、`transaction-impl`、`core` 指令和枚举。 | 记录资金侧事实、生命周期和请求摘要；不替代业务订单、外部通道状态机或运营工单。 | `AC-IN-*`、`AC-OUT-*`、`AC-PAY-*`、`AC-AUTH-*`、`AC-CTRL-*`；`TDD-DIR-*`、`TDD-AUTH-*`、`TDD-CTRL-*`。 |
-| P1 | 权益语义 | 交易入口上的已决策权益结果，解释谁给谁让了多少钱、订单金额、用户实付、商户应收、零实付准入、退款处置、使用者解释视图和证据边界。 | `FundsBenefitFundingApplicationService`、权益让利资金交易请求、权益来源引用、交易事实、route snapshot、posting context；历史 `benefitSnapshotId` 和 `stableDigest` 仅作为只读摘要追溯字段。 | 只承接订单、业务系统或营销权益系统已决策结果；不计算券规则、不维护券包生命周期、不用当前规则重算历史权益；不恢复 `FundsInstruction.benefitSnapshot` 或旧权益快照 DSL；含权益生产批次必须先完成权益准入证明、使用者解释视图、证据最小化和外部规则核验状态。 | `AC-BEN-*`、`RED-050` 至 `RED-066`；`DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`。 |
-| P1 | 权益营销账户 | 已决策权益中有资金、负债、成本或清结算影响的金额组件的账户化承接。 | 资金账户或平台责任资金账户 profile、`costBearerSubjectRef`、`benefitReceiverSubjectRef`、权益来源引用和 posting context。 | `NO_LEDGER` 组件可做账户化归因和统计但不生成分录；`POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 组件才可进入 route/posting；不承接营销规则计算或券包生命周期；进入编码前必须确认账户 profile、专业确认状态、事实源和退款回放策略。 | `DSL-BENEFIT-MARKETING-ACCOUNT-001`；`TDD-BEN-MKT-*`、`TDD-BEN-RED-031` 至 `TDD-BEN-RED-033`。 |
+| P1 | 权益语义 | 交易入口上的已决策权益结果，解释谁给谁让了多少钱、订单金额、用户实付、商户应收、零实付准入、退款处置、使用者解释视图和证据边界。 | `FundsBenefitFundingApplicationService`、权益让利资金交易请求、交易事实、route snapshot、posting context；历史 `benefitSnapshotId` 和 `stableDigest` 仅作为只读摘要追溯字段。 | 只承接订单、业务系统或营销权益系统已决策结果；不计算券规则、不维护券包生命周期、不用当前规则重算历史权益；不恢复 `FundsInstruction.benefitSnapshot` 或旧权益快照 DSL；含权益生产批次必须先完成权益准入证明、使用者解释视图、证据最小化和外部规则核验状态。 | `AC-BEN-*`、`RED-050` 至 `RED-066`；`DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`。 |
+| P1 | 权益营销账户 | 已决策权益中有资金、负债、成本或清结算影响的金额组件的账户化承接。 | 资金账户或平台责任资金账户 profile、`costBearerSubjectRef`、`benefitReceiverSubjectRef`、原订单或原交易引用和 posting context。 | `NO_LEDGER` 组件可做账户化归因和统计但不生成分录；`POSTING_REQUIRED`、`HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 组件才可进入 route/posting；不承接营销规则计算或券包生命周期；进入编码前必须确认账户 profile、专业确认状态、事实源和退款回放策略。 | `DSL-BENEFIT-MARKETING-ACCOUNT-001`；`TDD-BEN-MKT-*`、`TDD-BEN-RED-031` 至 `TDD-BEN-RED-033`。 |
 | P1 | 资金路由 | 资金事实到参与方、账目、账本周期和 route snapshot 的转译层。 | `RouteResolver`、`RouteSnapshot`、`FundingAllocationDecision`。 | 只解析路径和固化决策；不写交易事实、不写账本分录、不在缺快照时重新选路。 | `AC-ROUTE-*`、`RED-043` 至 `RED-045`；`TDD-ROUTE-*`、`TDD-RED-003`。 |
 | P1 | 交易投影 | 用户账单、商户账单、运营时间线、财务核对视图和指标项输入。 | transaction projection、reporting metric input boundary。 | 只读派生和可重放；不能写交易、路由、账本、余额事实、清结算对象、正式财务报表或监管报送。 | `AC-VIEW-*`、`AC-RPT-*`；`TDD-VIEW-*`、`TDD-METRIC-*`。 |
 | P1 | 指标项输入 | 指标项、业务问题、使用者、推荐事实来源和只读边界。 | reporting metric input boundary；报表指标模块另行承接。 | 指标只读观察，不推进余额水位或替代 Manifest，不反写资金事实。 | `AC-RPT-*`、`TDD-METRIC-*`。 |
@@ -478,7 +478,7 @@ mindmap
 | --- | --- | --- | --- | --- | --- |
 | 钱包账户、支付工具、资金账户、信用账户、预算组、Spend Rule 和账本账目 | P0 | `AC-PI-*`、`AC-CTRL-*`、`AC-BALLOG-*`、`RED-043` 至 `RED-049`、`RED-067` | DSL 主体、支付工具、资金责任解析、账本周期、支出规则；02 系分；`TDD-WALLET-*`、`TDD-LEDGER-*`、`TDD-ROUTE-*`。 | 资金主体、工具绑定、账本初始化、支出控制配置、余额断言和模块边界必须可解释、可测试、可审计。 | 不得把 `FundingAccount` 扩大为信用账户、预算组、Spend Rule、支付工具或钱包标识的统一父类；不得让外部账户、工具、预算组或规则对象入账。 |
 | 直接交易、授权交易、余额控制、资金路由和交易投影 | P1 | `AC-IN-*`、`AC-PAY-*`、`AC-MER-*`、`AC-AUTH-*`、`AC-CTRL-*`、`AC-ROUTE-*`、`AC-VIEW-*` | `DSL-DIRECT-*`、`DSL-AUTH-*`、`DSL-BALANCE-CONTROL-*`、route replay；02 系分；`TDD-DIR-*`、`TDD-AUTH-*`、`TDD-CTRL-*`、`TDD-REPLAY-*`。 | 交易入口、状态机、route snapshot、posting plan、幂等、原路径回放、并发和失败无副作用必须闭合。 | 不得抢跑 P0 主体和账本不变量；不得在缺 route snapshot 时重新选路；不得让投影或报表反写事实。 |
-| 权益金额组件 | P1 | `AC-BEN-001` 至 `AC-BEN-019`、`RED-050` 至 `RED-066` | `FundsBenefitFundingApplicationService`、权益让利资金交易请求、权益来源引用、02/03 系分；`TDD-BEN-*`、`TDD-BEN-RED-*`。 | 权益准入证明、原权益资金交易事实源、闭合角色、伴随指令、补充事实、审计证据包、解释视图和外部规则核验状态必须可追溯。 | 不得在资金底座重算券、重算当前营销规则、静默补平权益差异，或用请求样例替代生产可回放事实。 |
+| 权益金额组件 | P1 | `AC-BEN-001` 至 `AC-BEN-019`、`RED-050` 至 `RED-066` | `FundsBenefitFundingApplicationService`、权益让利资金交易请求、原事实引用、02/03 系分；`TDD-BEN-*`、`TDD-BEN-RED-*`。 | 权益准入证明、原权益资金交易事实源、闭合角色、伴随指令、补充事实、审计证据包、解释视图和外部规则核验状态必须可追溯。 | 不得在资金底座重算券、重算当前营销规则、静默补平权益差异，或用请求样例替代生产可回放事实。 |
 | 清分、清算、结算、出款和对账 | P0 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`AC-ADJ-*`、`RED-030` 至 `RED-039` | `DSL-SETTLEMENT-*`、03 系分；`TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-B7-RED-*`。 | 对账任务、匹配结果、差错单、清分明细、清算批次、结算单、出款单、追偿单、审批审计和职责分离必须成体系。 | 不得把清分候选直接入账；不得把外部 accepted/submitted/processing 展示为到账；不得直接改历史分录或绕过重新对账关闭差错。 |
 | 资金数据治理、余额快照、交易重放和指标边界 | P0/P1 | `AC-ARCH-*`、`AC-REPLAY-*`、`AC-RPT-*`、`RED-016` 至 `RED-019`、`RED-034`、`RED-040` 至 `RED-042` | `DSL-GOVERNANCE-*`、04 系分；`TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`、`TDD-B8-RED-*`。 | Manifest、checkpoint、watermark、coverage mode、differenceReport、manualResolutionRef、冷热读取、脱敏和审计必须可验证。 | 不得缺 Manifest 推进水位；不得用普通指标快照替代余额确认；不得让治理任务反写资金事实或让数仓绕过治理读取冷事实。 |
 | VCC、全球账户和收单业务能力包 | P2 | `VCC-AC-*`、`GA-AC-*`、`ACQ-AC-*` 及对应 `*-RED-*` | 06/07/08 分册、P2 业务能力包 DSL 准入卡、业务系分补充；`TDD-P2-*` 和 P0/P1 回归。 | 业务分册、场景 pack、归一资金动作、外部引用脱敏字段、P0/P1 回归范围、外部规则核验状态和业务专项验收必须完整。 | 不得新增平行钱包、平行账本、平行清结算、平行对账或平行归档链路；不得把卡、VA、PSP、银行账户或通道对象当账本主体。 |
