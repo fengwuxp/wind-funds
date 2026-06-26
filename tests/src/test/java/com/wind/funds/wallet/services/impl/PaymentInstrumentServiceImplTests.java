@@ -38,6 +38,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -74,6 +79,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String PRIORITY_ORDER_BINDING_SN = "pi_binding_service_priority_order";
 
+    private static final String CONCURRENT_DEFAULT_BINDING_SN = "pi_binding_service_default_concurrent";
+
     private static final String OWNER_ID = "owner_pi_service";
 
     private static final String FUNDING_ACCOUNT_ID = "funding_pi_binding_target";
@@ -104,6 +111,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private static final String PRIORITY_CONFLICT_CHANGE_REQUEST_SN = "req_pi_binding_priority_conflict_change";
 
     private static final String PRIORITY_ORDER_CREATE_REQUEST_SN = "req_pi_binding_priority_order_create";
+
+    private static final String CONCURRENT_DEFAULT_CREATE_REQUEST_SN = "req_pi_binding_default_concurrent_create";
 
     private static final String INSTRUMENT_TYPE_CARD = "CARD";
 
@@ -371,6 +380,26 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：运营创建支付工具绑定时缺少幂等流水。
+     * 输入：requestSn 为空的绑定创建请求。
+     * 输出：创建被拒绝，不留下绑定当前态或历史证据。
+     * 红线：支付工具绑定创建必须可幂等、可回放、可对账追踪，缺流水时不得写入任何资金事实。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldRejectMissingRequestSnWithoutBindingMutation() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
+                .setRequestSn("   ")))
+                .hasMessageContaining("支付工具绑定创建 requestSn 不能为空");
+
+        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @Test
     void testCreatePaymentInstrumentBindingShouldRejectUnavailableInstrumentWithoutRouteCandidate() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
@@ -629,6 +658,54 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", DUPLICATE_DEFAULT_BINDING_SN))
                 .isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：两个外部请求并发把同一支付工具、绑定角色和币种创建为当前 ACTIVE 默认绑定。
+     * 输入：两个不同绑定 SN、不同主体和不同 requestSn 同时提交，且绑定窗口重叠。
+     * 输出：只有一个默认绑定创建成功，另一个被默认唯一性拒绝；DB guard scope 只生成一行。
+     * 红线：并发下不得同时留下两个当前默认候选，也不得写入账本事实。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldSerializeConcurrentDefaultCandidates() throws Exception {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<BindingAttemptResult> first = executor.submit(concurrentBindingAttempt(startGate,
+                    createBindingRequest()));
+            Future<BindingAttemptResult> second = executor.submit(concurrentBindingAttempt(startGate,
+                    createSecondBindingRequest()
+                            .setSn(CONCURRENT_DEFAULT_BINDING_SN)
+                            .setSubjectId(THIRD_FUNDING_ACCOUNT_ID)
+                            .setRequestSn(CONCURRENT_DEFAULT_CREATE_REQUEST_SN)
+                            .setDefaultBinding(Boolean.TRUE)));
+
+            startGate.countDown();
+
+            List<BindingAttemptResult> results = List.of(first.get(), second.get());
+            List<PaymentInstrumentBindingDTO> defaults = paymentInstrumentService.queryPaymentInstrumentBindings(
+                    new PaymentInstrumentBindingQuery()
+                            .setTenantId(TENANT_ID)
+                            .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                            .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                            .setCurrency(CurrencyIsoCode.USD)
+                            .setDefaultBinding(Boolean.TRUE)
+                            .setStatus(FundsAccountStatus.ACTIVE),
+                    DefaultPageQueryOptions.defaults(10)).getRecords();
+
+            assertThat(results).filteredOn(BindingAttemptResult::succeeded).hasSize(1);
+            assertThat(results).filteredOn(result -> !result.succeeded())
+                    .singleElement()
+                    .satisfies(result -> assertThat(result.message()).contains("默认支付工具绑定不唯一"));
+            assertThat(defaults).singleElement();
+            assertThat(countRows("t_payment_instrument_binding_guard", "instrument_sn", PAYMENT_INSTRUMENT_SN))
+                    .isOne();
+            assertLedgerFactsUnchanged(jdbcTemplate, before);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     /**
@@ -907,6 +984,39 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：运营变更支付工具绑定时缺少幂等流水。
+     * 输入：已存在 ACTIVE 绑定，变更请求 requestSn 为空。
+     * 输出：变更被拒绝，绑定当前态和历史证据保持不变。
+     * 红线：支付工具绑定变更必须可幂等、可回放、可对账追踪，缺流水时不得改写候选池。
+     */
+    @Test
+    void testChangePaymentInstrumentBindingShouldRejectMissingRequestSnWithoutHistoryMutation() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
+                new ChangePaymentInstrumentBindingRequest()
+                        .setBindingSn(BINDING_SN)
+                        .setTenantId(TENANT_ID)
+                        .setPriority(20)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("risk review")
+                        .setRequestSn("   ")))
+                .hasMessageContaining("支付工具绑定变更 requestSn 不能为空");
+
+        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSn(BINDING_SN),
+                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
+        assertThat(binding.getPriority()).isEqualTo(10);
+        assertThat(binding.getVersion()).isEqualTo(1);
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：运营变更支付工具绑定时把当前态改成倒置或空的生效窗口。
      * 输入：已存在 ACTIVE 绑定，变更请求设置 validTo 早于或等于 validFrom。
      * 输出：变更被拒绝，绑定当前态和历史证据保持不变。
@@ -1164,18 +1274,22 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupPaymentInstrumentTestData() {
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?, ?, ?, ?, ?)",
                 BINDING_SN,
                 LONG_SUBJECT_BINDING_SN,
                 DUPLICATE_DEFAULT_BINDING_SN,
+                CONCURRENT_DEFAULT_BINDING_SN,
                 PRIORITY_CONFLICT_BINDING_SN,
                 PRIORITY_ORDER_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?, ?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?, ?, ?, ?, ?)",
                 BINDING_SN,
                 LONG_SUBJECT_BINDING_SN,
                 DUPLICATE_DEFAULT_BINDING_SN,
+                CONCURRENT_DEFAULT_BINDING_SN,
                 PRIORITY_CONFLICT_BINDING_SN,
                 PRIORITY_ORDER_BINDING_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_guard WHERE instrument_sn IN (?)",
+                PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
                 RAW_PAYMENT_INSTRUMENT_SN,
@@ -1244,6 +1358,19 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setRequestSn(PRIORITY_ORDER_CREATE_REQUEST_SN);
     }
 
+    private Callable<BindingAttemptResult> concurrentBindingAttempt(CountDownLatch startGate,
+                                                                    CreatePaymentInstrumentBindingRequest request) {
+        return () -> {
+            startGate.await();
+            try {
+                paymentInstrumentService.createPaymentInstrumentBinding(request);
+                return new BindingAttemptResult(true, null);
+            } catch (RuntimeException ex) {
+                return new BindingAttemptResult(false, ex.getMessage());
+            }
+        };
+    }
+
     private void assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(Object value) {
         assertThat(value.toString())
                 .doesNotContain("instrumentNo")
@@ -1267,8 +1394,12 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     @Import({
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
-            PaymentInstrumentBindingHistoryServiceImpl.class
+            PaymentInstrumentBindingHistoryServiceImpl.class,
+            PaymentInstrumentBindingConcurrencyGuard.class
     })
     static class Config {
+    }
+
+    private record BindingAttemptResult(boolean succeeded, String message) {
     }
 }

@@ -1080,6 +1080,8 @@ VCC 交易是授权交易的典型接入场景，但 VCC 卡、卡号、PAN、to
 
 拒付/争议 DSL 口径：dispute / chargeback 是案件过程，不是资金底座默认交易结果。`settleRefund / AUTH_REFUND` 的争议字段、外部引用、凭证、audit、projection 和 idempotency digest 用于承接裁决后的退款结果，并区分普通授权链退款、`NO_AUTH` 退款和授权拒绝；请求侧不恢复 `refundMode`，`DISPUTE` 只作为资金指令内部上下文标签。用户败诉或无需资金处理时，DSL 只允许保留案件引用、审计和投影解释，不生成 route、posting、LedgerEntry 或余额变化。平台、商户或外部机构之间的追偿、准备金抵扣、争议费用或后续结算扣减由清结算、对账或争议专项 DSL 承接，不反向要求授权交易层新增 `chargeback` 主入口。独立 `chargeback` 只能作为历史兼容或内部适配资产，不能反向要求成为目标态主入口；完整争议运营、representment、裁决状态机、外部规则或旧 `chargeback` API 物理移除需要独立工程任务承接。
 
+公共 API 退役不由 DSL 目标态自动推导；旧 `chargeback` 入口的仓库内调用方扫描、历史兼容测试裁决和目标测试迁移已按 `GSD2-TRX-CHARGEBACK-PUBLIC-API-EXIT-PLAN-001` 完成，但删除 readiness 结论为 `DELETE_READINESS_NOT_READY`。物理移除前仍必须完成跨仓库依赖扫描、历史 `CHARGEBACK` 事实解释回归、发布兼容、版本废弃窗口和回滚策略确认。
+
 VCC 授权接入口径：
 
 | VCC 交易信息 | DSL 承接位置 | 资金底座含义 | 红线 |

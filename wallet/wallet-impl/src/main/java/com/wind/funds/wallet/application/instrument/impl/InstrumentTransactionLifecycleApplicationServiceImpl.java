@@ -7,13 +7,13 @@ import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
-import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.instrument.AuthorizationAdmissionApplicationService;
 import com.wind.funds.wallet.application.instrument.InstrumentTransactionLifecycleApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
+import com.wind.funds.wallet.application.support.WalletExternalFundsRailSupport;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
@@ -131,7 +131,7 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         return new FundsTransactionTopupRequest()
                 .setAccountId(snapshot.getTargetAccountId())
                 .setFundsSourceAccountId(request.getFundsSourceAccountId())
-                .setChannel(resolveTransactionChannel(request.getChannelCode()))
+                .setChannel(WalletExternalFundsRailSupport.resolveReceiveChannel(request.getChannelCode()))
                 .setChannelTransactionSn(request.getChannelTransactionSn())
                 .setChannelId(request.getChannelId())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
@@ -141,14 +141,6 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
                 .setBusinessSn(request.getBusinessSn())
                 .setContextVariables(ReadonlyContextVariables.of(receiveContext(snapshot)))
                 .setDescription(request.getDescription());
-    }
-
-    private FundsTransactionChannel resolveTransactionChannel(String channelCode) {
-        try {
-            return FundsTransactionChannel.valueOf(channelCode);
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("收款渠道编码不支持，channelCode = " + channelCode, ex);
-        }
     }
 
     private Map<String, Object> receiveContext(PaymentInstrumentPreTransactionSnapshotDTO snapshot) {

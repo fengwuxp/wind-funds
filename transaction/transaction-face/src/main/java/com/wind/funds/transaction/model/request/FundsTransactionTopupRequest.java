@@ -39,7 +39,7 @@ public class FundsTransactionTopupRequest {
     @NotNull
     private String channelTransactionSn;
 
-    @Schema(description = "渠道方标识")
+    @Schema(description = "渠道方或外部 rail 标识，写入 route snapshot 的 externalAccountRef.providerCode")
     private String channelId;
 
     @Schema(description = "充值交易金额")

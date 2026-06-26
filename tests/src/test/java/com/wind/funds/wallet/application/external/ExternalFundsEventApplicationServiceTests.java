@@ -125,9 +125,9 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
 
     /**
      * 场景：ACH、银行文件或渠道回调确认一笔外部入金，wallet 外部事件入口归一后委派标准充值内核。
-     * 输入：ACH_CREDIT_CONFIRMED、资金账户、外部事件流水、金额、币种和业务流水。
+     * 输入：ach_credit_confirmed、资金账户、外部事件流水、金额、币种和业务流水。
      * 输出：返回内部充值交易号，目标资金账户 AVAILABLE 增加，并生成标准 TOPUP 交易、route 和账本事实。
-     * 红线：外部事件入口只做服务层归一编排，不直接写交易事实或账本事实。
+     * 红线：外部事件入口负责把外部事件类型归一为交易渠道，不直接写交易事实或账本事实。
      */
     @Test
     void testConsumeConfirmedCreditEventShouldDelegateTopupKernel() {
@@ -298,7 +298,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         return new ConsumeExternalFundsEventRequest()
                 .setTenantId(TENANT_ID)
                 .setExternalEventSn("bank_event_001")
-                .setExternalEventType("ACH_CREDIT_CONFIRMED")
+                .setExternalEventType("ach_credit_confirmed")
                 .setTargetAccountId(targetAccountId())
                 .setAmount(90L)
                 .setCurrency(CurrencyIsoCode.USD)
@@ -374,6 +374,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(externalAccountRef.getString("externalAccountId")).isEqualTo(EXTERNAL_SOURCE_ACCOUNT_SN);
         assertThat(externalAccountRef.getString("externalAccountType"))
                 .isEqualTo("EXTERNAL_BANK");
+        assertThat(externalAccountRef.getString("providerCode")).isEqualTo("ACH_RAIL");
         assertThat(externalAccountRef.getString("channelCode")).isEqualTo("WIRE_TRANSFER");
         assertThat(externalAccountRef.getJSONObject("contextVariables")
                 .getString("externalTransactionId")).isEqualTo("bank_event_001");

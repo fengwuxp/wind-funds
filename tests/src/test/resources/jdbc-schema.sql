@@ -185,6 +185,26 @@ CREATE TABLE `t_payment_instrument_binding`
   DEFAULT CHARSET = utf8mb4 COMMENT = '支付工具绑定表';
 
 -- ----------------------------
+-- 支付工具绑定并发保护表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_payment_instrument_binding_guard`;
+CREATE TABLE `t_payment_instrument_binding_guard`
+(
+    `id`             BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `tenant_id`      BIGINT(20)  NOT NULL COMMENT '租户 ID',
+    `instrument_sn`  VARCHAR(64) NOT NULL COMMENT '工具号',
+    `binding_role`   VARCHAR(50) NOT NULL COMMENT '绑定角色',
+    `currency`       VARCHAR(10) NOT NULL COMMENT '币种',
+    `guard_type`     VARCHAR(50) NOT NULL COMMENT '保护类型',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_payment_instrument_binding_guard_scope`
+        (`tenant_id`, `instrument_sn`, `binding_role`, `currency`, `guard_type`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '支付工具绑定并发保护表';
+
+-- ----------------------------
 -- 支付工具绑定历史表
 -- ----------------------------
 DROP TABLE IF EXISTS `t_payment_instrument_binding_history`;

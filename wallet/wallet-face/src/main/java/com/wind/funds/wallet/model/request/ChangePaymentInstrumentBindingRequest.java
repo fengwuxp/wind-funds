@@ -62,7 +62,8 @@ public class ChangePaymentInstrumentBindingRequest {
     @NotBlank
     private String changeReason;
 
-    @Schema(description = "请求号")
+    @Schema(description = "请求号，用于支付工具绑定变更幂等、回放和对账追踪")
+    @NotBlank
     private String requestSn;
 
     @Schema(description = "生效时间")

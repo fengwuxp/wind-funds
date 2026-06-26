@@ -229,7 +229,7 @@ git diff --check
 历史待确认及消费裁决：
 
 - 用户已确认按推荐策略 `COMPAT_GUARD_NO_BEHAVIOR_BREAK` 执行，本 Grant 已消费。
-- 公共方法和请求类只补充 JavaDoc 兼容说明，不增加 `@Deprecated`，避免破坏当前公共契约。
+- 本 Grant 消费时公共方法和请求类只补充 JavaDoc 兼容说明；后续 `GSD2-TRX-CHARGEBACK-ENTRY-DEPRECATION-001` 已单独完成 `@Deprecated` 标注，公共 API 退出计划以 `GSD2-TRX-CHARGEBACK-PUBLIC-API-EXIT-PLAN-001` 为准。
 - 不新增可选请求字段；最小审计上下文复用 `contextVariables` 中的 `chargebackReason`、`evidenceRef` 和 `externalDisputeRef`。
 - 完整查询解释矩阵转入候选 `GSD2-B4-TRANSACTION-PROJECTION-EXPLAIN-002`。
 - P2 VCC、收单或 B7 清结算专项仍后续独立承接完整案件、证据、追偿和准备金。

@@ -1648,7 +1648,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
      * 红线：拒付不得被压缩成授权拒绝，不得丢失原授权账本引用、原因、凭证和外部争议引用。
      */
     @Test
-    void testAuthorizationChargebackShouldReplaySettlePathAndPreserveAuditContext() {
+    void testCompatChargebackShouldReplaySettlePathAndPreserveAuditContext() {
         FundsAccountId user = fundingAccount("funding_user");
         BalanceSnapshot before = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
 
@@ -1754,7 +1754,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
      * 红线：缺审计上下文不得生成 CHARGEBACK 交易、route、posting、LedgerEntry 或余额投影副作用。
      */
     @Test
-    void testAuthorizationChargebackMissingExternalDisputeRefShouldRejectAndLeaveNoSideEffects() {
+    void testCompatChargebackMissingExternalDisputeRefShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
         topup(user, 100L, "AUTH_CHARGEBACK_MISSING_REF_TOPUP");
@@ -1797,20 +1797,20 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
     /**
      * 场景：用户授权 80 后只完成 50，平台结算户另有充足余额时尝试拒付 60。
-     * 输入：A 充值并授权 80、完成 50；B 另完成 100 使平台 SETTLEMENT 余额充足；A 拒付 60。
-     * 输出：A 拒付请求失败，A/B/平台余额、交易累计和账务事实保持失败前状态。
-     * 预期：拒付以本交易已完成可回退金额为上限，不以授权金额或平台总余额为上限。
-     * 红线：失败拒付不得借用其他交易沉淀在 SETTLEMENT 的余额，不得写入 CHARGEBACK 账务事实。
+     * 输入：A 充值并授权 80、完成 50；B 另完成 100 使平台 SETTLEMENT 余额充足；A 争议退款 60。
+     * 输出：A 争议退款请求失败，A/B/平台余额、交易累计和账务事实保持失败前状态。
+     * 预期：争议退款以本交易已完成可回退金额为上限，不以授权金额或平台总余额为上限。
+     * 红线：失败争议退款不得借用其他交易沉淀在 SETTLEMENT 的余额，不得写入 AUTH_REFUND 账务事实。
      */
     @Test
-    void testAuthorizationChargebackExceedingSettledAmountShouldLeaveNoSideEffects() {
+    void testAuthorizationDisputeRefundExceedingSettledAmountShouldLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
         FundsAccountId reserveUser = fundingAccount("settlement_reserve_user");
         ensureLedger(reserveUser, LedgerSubjectCode.AVAILABLE);
         ensureLedger(reserveUser, LedgerSubjectCode.AUTHORIZATION);
 
         BalanceSnapshot beforeTopup = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
-        topup(user, 100L, "AUTH_CHARGEBACK_EXCEED_TOPUP");
+        topup(user, 100L, "AUTH_DISPUTE_REFUND_EXCEED_TOPUP");
         BalanceSnapshot afterTopup = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(beforeTopup, afterTopup,
                 delta(user, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY),
@@ -1820,7 +1820,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
-        String authorizationSn = authorize(user, 80L, true, "AUTH_CHARGEBACK_EXCEED_AUTHORIZE");
+        String authorizationSn = authorize(user, 80L, true, "AUTH_DISPUTE_REFUND_EXCEED_AUTHORIZE");
         BalanceSnapshot afterAuthorize = snapshot(balances(user, reserveUser, cashMappingAccount(),
                 settlementAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterAuthorize,
@@ -1831,7 +1831,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
-        settleAuthorization(user, 50L, authorizationSn, "AUTH_CHARGEBACK_EXCEED_CAPTURE");
+        settleAuthorization(user, 50L, authorizationSn, "AUTH_DISPUTE_REFUND_EXCEED_CAPTURE");
         BalanceSnapshot afterSettle = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(afterAuthorize, afterSettle,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
@@ -1841,7 +1841,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 50L, CURRENCY));
 
-        topup(reserveUser, 100L, "AUTH_CHARGEBACK_EXCEED_RESERVE_TOPUP");
+        topup(reserveUser, 100L, "AUTH_DISPUTE_REFUND_EXCEED_RESERVE_TOPUP");
         BalanceSnapshot afterReserveTopup = snapshot(balances(user, reserveUser, cashMappingAccount(),
                 settlementAccount()));
         assertOnlyBalanceDeltas(afterSettle, afterReserveTopup,
@@ -1853,7 +1853,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         String reserveAuthorizationSn = authorize(reserveUser, 100L, true,
-                "AUTH_CHARGEBACK_EXCEED_RESERVE_AUTHORIZE");
+                "AUTH_DISPUTE_REFUND_EXCEED_RESERVE_AUTHORIZE");
         BalanceSnapshot afterReserveAuthorize = snapshot(balances(user, reserveUser, cashMappingAccount(),
                 settlementAccount()));
         assertOnlyBalanceDeltas(afterReserveTopup, afterReserveAuthorize,
@@ -1865,7 +1865,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
 
         settleAuthorization(reserveUser, 100L, reserveAuthorizationSn,
-                "AUTH_CHARGEBACK_EXCEED_RESERVE_CAPTURE");
+                "AUTH_DISPUTE_REFUND_EXCEED_RESERVE_CAPTURE");
 
         BalanceSnapshot beforeFailure = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(afterReserveAuthorize, beforeFailure,
@@ -1883,19 +1883,8 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(cashMappingAccount()), LedgerSubjectCode.CASH, 9_800L, CURRENCY);
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 150L, CURRENCY);
 
-        assertThatThrownBy(() -> authorizationTransactionService.chargeback(
-                new FundsAuthorizationTransactionChargebackRequest()
-                        .setAccountId(user)
-                        .setAmount(Money.immutable(60L, CURRENCY))
-                        .setAuthorizationTransactionSn(authorizationSn)
-                        .setBusinessScene("AUTHORIZATION_CHARGEBACK")
-                        .setBusinessSn("AUTH_CHARGEBACK_EXCEED_RETURN")
-                        .setDescription("authorization chargeback exceed")
-                        .setContextVariables(WritableContextVariables.of(Map.of(
-                                "chargebackReason", "CARDHOLDER_DISPUTE",
-                                "evidenceRef", "CHARGEBACK_EVIDENCE_EXCEED_202605290001",
-                                FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF,
-                                "CHARGEBACK_CASE_EXCEED_202605290001"))),
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(
+                disputeRefundRequest(user, 60L, authorizationSn, "AUTH_DISPUTE_REFUND_EXCEED_RETURN"),
                 WindOperator.system()))
                 .hasMessageContaining("资金交易已结算可回退金额不足");
 
@@ -1927,14 +1916,14 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         FundsTransactionEventType.TOPUP.name(),
                         FundsTransactionEventType.AUTHORIZE.name(),
                         FundsTransactionEventType.SETTLE.name());
-        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_TOPUP", 3, 4);
-        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_AUTHORIZE", 1, 2);
-        assertFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_CAPTURE", 0, 2, 1, 2);
-        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_RESERVE_TOPUP", 3, 4);
-        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_RESERVE_AUTHORIZE", 1, 2);
-        assertFundsAndLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_RESERVE_CAPTURE", 0, 2, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_EXCEED_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_EXCEED_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_EXCEED_CAPTURE", 0, 2, 1, 2);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_EXCEED_RESERVE_TOPUP", 3, 4);
+        assertSingleFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_EXCEED_RESERVE_AUTHORIZE", 1, 2);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_EXCEED_RESERVE_CAPTURE", 0, 2, 1, 2);
         assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
-        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_CHARGEBACK_EXCEED_RETURN");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_DISPUTE_REFUND_EXCEED_RETURN");
     }
 
     /**
@@ -2551,14 +2540,14 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
-     * 场景：授权完成后拒付使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
-     * 输入：充值 100、授权批准 80、完成 50、拒付 30，随后同流水同金额重试，再同流水改金额为 31。
-     * 输出：同摘要重试返回同一授权交易流水；摘要冲突抛错；余额和账务事实保持第一次拒付后的状态。
-     * 预期：授权拒付幂等必须保护原授权引用、拒付金额、拒付原因和原完成路径回放摘要。
-     * 红线：同业务流水不同拒付请求不得重复回补 AVAILABLE、不得重复扣减 SETTLEMENT 或污染 declinedAmount。
+     * 场景：兼容 chargeback 使用相同业务流水重复提交，第二次请求摘要一致时复用原交易，摘要不一致时拒绝。
+     * 输入：充值 100、授权批准 80、完成 50、兼容 chargeback 30，随后同流水同金额重试，再同流水改金额为 31。
+     * 输出：同摘要重试返回同一授权交易流水；摘要冲突抛错；余额和账务事实保持第一次兼容 chargeback 后的状态。
+     * 预期：兼容 chargeback 幂等必须保护原授权引用、金额、原因和原完成路径回放摘要。
+     * 红线：同业务流水不同兼容 chargeback 请求不得重复回补 AVAILABLE、不得重复扣减 SETTLEMENT 或污染 declinedAmount。
      */
     @Test
-    void testAuthorizationChargebackSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
+    void testCompatChargebackSameBusinessSnWithDifferentRequestShouldRejectAndLeaveNoSideEffects() {
         FundsAccountId user = fundingAccount("funding_user");
 
         BalanceSnapshot beforeTopup = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
@@ -2586,7 +2575,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 50L, CURRENCY));
 
-        String firstChargebackSn = chargebackAuthorization(user, 30L, authorizationSn,
+        String firstChargebackSn = compatChargebackAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_CHARGEBACK_RETURN");
         BalanceSnapshot afterFirstChargeback = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(afterSettle, afterFirstChargeback,
@@ -2596,7 +2585,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY));
         LedgerFactSnapshot afterFirstChargebackFacts = ledgerFactSnapshot();
 
-        String retryChargebackSn = chargebackAuthorization(user, 30L, authorizationSn,
+        String retryChargebackSn = compatChargebackAuthorization(user, 30L, authorizationSn,
                 "AUTH_IDEMPOTENT_CHARGEBACK_RETURN");
         BalanceSnapshot afterRetryChargeback = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
 
@@ -2607,7 +2596,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
                 delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
         assertLedgerTransactionFactsUnchanged(afterFirstChargebackFacts);
-        assertThatThrownBy(() -> chargebackAuthorization(user, 31L, authorizationSn,
+        assertThatThrownBy(() -> compatChargebackAuthorization(user, 31L, authorizationSn,
                 "AUTH_IDEMPOTENT_CHARGEBACK_RETURN"))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
@@ -2798,10 +2787,10 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         }
     }
 
-    private String chargebackAuthorization(FundsAccountId accountId,
-                                           long amount,
-                                           String authorizationTransactionSn,
-                                           String businessSn) {
+    private String compatChargebackAuthorization(FundsAccountId accountId,
+                                                 long amount,
+                                                 String authorizationTransactionSn,
+                                                 String businessSn) {
         return authorizationTransactionService.chargeback(new FundsAuthorizationTransactionChargebackRequest()
                 .setAccountId(accountId)
                 .setAmount(Money.immutable(amount, CURRENCY))

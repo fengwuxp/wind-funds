@@ -143,9 +143,9 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | 字段 | 内容 |
 | --- | --- |
 | 当前 Wave / Task | 已消费的被依赖能力包括 wallet 授权准入、授权 route snapshot 回链、账户能力来源、支付工具预交易快照、支出控制准入、ledger guard、B5 余额调账审计、B7 gate / consumer / report、Spend Rule 控制活动、Spend Rule 定义契约、预算组非建账、交易消费支出控制活动、并发幂等硬化、退款释放守卫、退款事实守卫、退款补偿入口守卫、退款已消费引用守卫、退款引用净消费上限守卫、退款引用已消费一致性守卫、交易事实累计解释金额守卫、控制活动幂等语义一致性守卫、退款引用原交易业务一致性守卫、预算控制投影目标账户隔离守卫和释放上限目标账户隔离守卫。 |
-| 当前状态 | `SPEND_RULE_DECISION_CONSUME_GREEN_VERIFIED` |
-| 下一建议 Grant | 暂无默认编码建议；`GSD2-B5-SPEND-RULE-DEFINITION-CONTRACT-001` 和 `GSD2-B5-SPEND-RULE-DECISION-CONSUME-001` 已消费。若继续 Spend Rule，优先重新确认 `GSD2-B5-SPEND-RULE-PROJECTION-EXPLAIN-001`、完整规则引擎、事件消费 / outbox 或生产迁移等新单一 Grant；其他候选仍可在 `payOutByRail`、外部资金事件消费、新 VA 收款场景、VCC facade、B7 报告扩展、完整清结算生命周期、生产迁移或其他服务层单一切片中重新确认。 |
-| 下一 Red | 需由下一 Grant 决定；若选择投影解释，首批 Red 推荐证明历史交易只读取当时规则版本、挂载和决策流水，不按当前规则重算。不得复用 `SpendRuleDefinitionApplicationServiceTests`、`SpendControlAdmissionApplicationServiceTests`、`AuthorizationAdmissionApplicationServiceTests` 或 `SpendControlTransactionConsumptionApplicationServiceTests` 扩本 Grant，也不得外推为完整规则引擎、支付工具 `REFUND` 方向裁决、事件消费或生产迁移。 |
+| 当前状态 | `WALLET_INSTRUMENT_BINDING_GUARD_SCHEMA_READY` |
+| 下一建议 Grant | 本轮已消费 `GSD2-WALLET-INSTRUMENT-BINDING-UNIQUENESS-001` 的绑定幂等和默认绑定 DB guard：支付工具绑定创建 / 变更 `requestSn` 已成为 face 必填契约和服务层强校验；ACTIVE 默认绑定创建 / 变更已通过 guard 表唯一行和 `FOR UPDATE` 串行化兜住并发竞态，缺流水或重复默认绑定失败且不写绑定当前态、绑定历史或账本事实；`t_payment_instrument_binding_guard` 已在 `tests/src/test/resources/jdbc-schema.sql` 测试 schema、Entity、Mapper 和服务层 guard 中对齐。若继续 wallet，下一推荐在 `GSD2-GA-PAYOUT-RAIL-KERNEL-INTEGRATION-001`、外部扣账 / return / NOC / reversal、信用账户事件、VCC / VA 单场景、事件消费者 / outbox 或生产迁移执行评审之间重新选择单一 Grant。 |
+| 下一 Red | 若继续真实出款，首批 Red 推荐证明：`payOutByRail` 能把已确认出款请求解析到账户主体型提现 / 出款内核，并在未知 rail、缺费用口径、缺清结算 gate 或账户能力不足时失败无资金事实、route、posting、LedgerEntry、账本交易或余额投影副作用。不得混入外部扣账、return/NOC/reversal、信用账户还款 / 调额、事件消费者、outbox、Controller、HTTP/RPC、交易 canonical 入参或 ledger posting 扩张。 |
 | 写入范围 | 来源契约已写入 core port、wallet-face/impl、H2 schema、授权路由接入和目标测试；资金责任目标主体已写入 wallet Request/DTO/Query、Entity、H2 schema、资源服务校验和目标测试；wallet application facade 首轮已写入资金责任解析契约、支付工具能力准入契约、账户能力来源契约、支付工具预交易快照契约、支出控制准入契约、支付工具授权准入契约、Request/DTO、实现、route snapshot 回链和目标测试；Spend Rule 定义契约已写入 core 枚举、wallet-face application / Request / DTO、wallet-impl Entity / Mapper / Service、H2 schema 和目标服务流测试；本轮 Spend Rule 文档拆分已写入产品 09、系分 06、入口 README、主线 02 引用收口和任务状态，不新增代码或 schema；ledger guard 首轮已写入 `LedgerNormalBalanceGuard`、账本创建、入账、余额投影入口和目标测试；B4 投影解释已写入 transaction-face projection 查询契约、解释来源、transaction-impl 查询实现和服务流测试；B5 余额调账审计已写入 balance adjust 请求审计字段、外部异常来源类型、instruction context keys、转换器校验/透传、route snapshot 审计摘要和服务流测试；B7 差错闭环已写入 reconciliation application 契约、Request/DTO、差错枚举、Entity/Mapper、H2 schema 和服务流测试；B7 准入消费已写入 reconciliation gate application 契约、Request/DTO、决策枚举、Mapper 只读查询、实现和服务测试；B7 出款准入消费已写入 `PayoutOrderServiceImpl` gate 调用、阻断原因映射、证据合并和服务流测试；B7 对象级 Gate 已写入差错阻断对象字段、H2 schema、Mapper 对象级查询、gate 返回字段和目标测试；B7 清算 / 结算 consumer 已写入 reconciliation-face 请求/结果/服务契约、reconciliation-impl 只读实现和目标服务流测试。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger、wallet、transaction、core、tests、Justfile、AGENTS.md、最近 Git 提交和历史准入卡。 |
 | 验证命令 | wallet 授权准入、route snapshot 回链、账户能力来源、预交易快照和支出控制准入已执行目标服务流、组合回归、`compile`、`pmd`、`git diff --check` 和状态结构检查；Spend Rule 定义契约已执行 `SpendRuleDefinitionApplicationServiceTests` 3 tests，沙箱内因 embedded Redis 端口绑定受限失败后已在沙箱外复跑通过，并继续以 `compile`、`pmd` 和 `git diff --check` 收口；ledger guard 已执行目标 ledger 测试、`test-ledger`、`compile`、`pmd` 和结构检查；B5-002 已执行目标 Red/Green、`FundsBalanceAdjustAuditFlowTests`、`test-balance-control`、`compile`、`pmd` 和 `git diff --check`；B5-003 已执行 `LedgerDtoContextVariablesContractTests`、`FundsBalanceAdjustAuditFlowTests`、`test-balance-control`、`test-boundary`、`test-transaction`、`compile` 和 `pmd`；B5 控制活动已执行 `SpendControlActivityApplicationServiceTests`、`SpendControlAdmissionApplicationServiceTests`、`compile`、`pmd` 和 `git diff --check`；B5 交易消费、并发幂等、退款释放守卫、退款事实守卫、退款补偿入口守卫、退款已消费引用守卫、业务场景一致性守卫、成功消费业务流水一致性守卫、失败释放业务流水一致性守卫、退款引用净消费上限守卫、退款引用已消费一致性守卫、交易事实累计解释金额守卫、控制活动幂等语义一致性守卫和退款引用原交易业务一致性守卫已执行 `SpendControlTransactionConsumptionApplicationServiceTests` 21 tests、服务层组合回归 28 tests、`compile`、`pmd`、`git diff --check` 和边界扫描；B7 对象级 Gate 和清算 / 结算 consumer 已执行目标测试、`test-reconciliation`、`compile` 和 `pmd`。B4 remaining、B5-001、B7 和 `e81a8a25 verify-cad` 保留为历史已消费验证证据；下一 Grant 后运行对应目标测试、`just compile`、`git diff --check`，必要时补分组测试和 `pmd`。 |
@@ -460,3 +460,30 @@ Wave 边界：本文最初只做任务规划和设计落地；用户后续已确
 | 验证证据 | 非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 33 tests 通过；收口执行 `just compile`、`just pmd`、边界关键词扫描和 `git diff --check`。 |
 | 当前状态 | `SR_TRANSACTION_RELEASE_TARGET_ACCOUNT_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实和支付工具 `REFUND` 方向裁决。 |
+
+## 29. Wallet application 能力闭环 CR 任务落账（2026-06-25）
+
+本节记录本轮角色 CR 后的任务重排，不替代新的编码 Grant。
+
+| 字段 | 内容 |
+| --- | --- |
+| 补充任务 | `GSD2-WALLET-CAPABILITY-SURFACE-CLEANUP-001`。 |
+| 已完成能力 | 将 wallet application 能力面拆成业务 lifecycle facade、外部资金事件 facade、只读解析 / 准入服务、交易后控制消费服务和基础服务，并明确 `payOutByRail` 当前为 guard-only，`ExternalFundsEventApplicationService#consume` 当前只支持 confirmed credit 到资金账户；本轮已补 rail / channel 语义解析和事件映射解释，避免业务 rail 直接透传为交易层 enum 实现细节。 |
+| 下一推荐编码 Grant | `GSD2-GA-PAYOUT-RAIL-KERNEL-INTEGRATION-001`、外部扣账 / return / NOC / reversal、信用账户事件、VCC / VA 单场景、事件消费者 / outbox 或生产迁移执行评审，需重新确认单一 Grant。 |
+| 推荐 Red | 真实出款内核衔接、外部逆向事件、信用账户事件或生产迁移任选其一，不得复用本轮默认绑定 guard Grant 扩张。 |
+| 禁止范围确认 | 本轮未写 Controller、HTTP/RPC、交易 canonical 入参、ledger posting、真实出款、外部扣账、return/NOC/reversal、信用账户还款 / 调额、事件消费者、outbox、生产数据库执行或 Git。 |
+| 当前状态 | `WALLET_INSTRUMENT_BINDING_GUARD_SCHEMA_READY`。 |
+
+## 30. 支付工具默认绑定测试 schema 对齐纠偏（2026-06-25）
+
+本节记录默认绑定 guard 表 DDL 落点纠偏结果。项目约定 `tests/src/test/resources/jdbc-schema.sql` 是 H2/MySQL Mode 测试表结构来源；系分目录只描述表职责和字段约束，不单独沉淀生产 SQL。生产数据库迁移执行仍由独立发布 / DBA 流程承接。
+
+| 字段 | 内容 |
+| --- | --- |
+| 补充任务 | `GSD2-WALLET-INSTRUMENT-BINDING-SCHEMA-ALIGN-001`。 |
+| 已完成能力 | 确认 `tests/src/test/resources/jdbc-schema.sql` 已包含 `t_payment_instrument_binding_guard`、主键和 `uk_payment_instrument_binding_guard_scope`，可支撑当前服务层 H2 测试和并发保护回归。 |
+| 写入范围 | 删除误加的 `docs/系分设计/production-ddl` 目录引用，回写系分、LWT Goal、P0/P1 计划和 OpenSpec tasks 状态。 |
+| 禁止范围确认 | 未执行生产数据库迁移，未改 Java、测试、H2 schema、Entity、Mapper、Controller、HTTP/RPC、交易 canonical 入参、ledger posting、真实出款、外部扣账、return/NOC/reversal、信用账户事件、事件消费者、outbox 或 Git。 |
+| 验证证据 | `git diff --check`。 |
+| 当前状态 | `WALLET_INSTRUMENT_BINDING_GUARD_SCHEMA_READY`。 |
+| 下一候选 | 若要真正执行生产迁移，必须另起 DBA / 发布 Grant，补备份、执行窗口、回滚、环境验证和应用版本发布顺序；若继续业务能力，优先从真实出款内核衔接、外部逆向事件、信用账户事件或 VCC / VA 单场景中择一。 |

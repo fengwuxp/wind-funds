@@ -87,7 +87,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .exchangeRate(amount.exchangeRate())
                 .instrumentRef(request.getPaymentInstrumentRef())
                 .externalAccountRef(externalAccountRef(request.getFundsSourceAccountId(), request.getChannel().name(),
-                        request.getChannelTransactionSn(), request.getDescription()))
+                        request.getChannelTransactionSn(), request.getChannelId(), request.getDescription()))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -236,7 +236,8 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
-                .externalAccountRef(externalAccountRef(request.getPayeeId(), null, null, request.getDescription()))
+                .externalAccountRef(externalAccountRef(request.getPayeeId(), null, null, null,
+                        request.getDescription()))
                 .reference(reference(FundsInstructionReferenceType.FREEZE_ORDER, request.getReferenceFreezeSn(), null))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
@@ -309,6 +310,7 @@ public class FundsDirectTransactionInstructionConverter {
     private @NonNull ExternalAccountRefSpec externalAccountRef(@NonNull FundsAccountId externalAccountId,
                                                                @Nullable String channelCode,
                                                                @Nullable String externalTransactionId,
+                                                               @Nullable String providerCode,
                                                                @Nullable String description) {
         Map<String, Object> contextVariables = externalTransactionId == null
                 ? Map.of()
@@ -317,6 +319,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .externalAccountId(externalAccountId.id())
                 .externalAccountType(externalAccountId.type())
                 .externalAccountNo(externalAccountId.id())
+                .providerCode(providerCode)
                 .channelCode(channelCode)
                 .description(description)
                 .contextVariables(contextVariables)

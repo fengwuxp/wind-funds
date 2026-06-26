@@ -16,6 +16,7 @@ import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentCapabilityRequest;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingConcurrencyGuard;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
@@ -189,6 +190,7 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
         return new CreatePaymentInstrumentBindingRequest()
                 .setSn(PAYMENT_BINDING_SN)
+                .setRequestSn(PAYMENT_BINDING_SN + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                 .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
@@ -210,6 +212,7 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
 
     @Configuration
     @Import({
+            PaymentInstrumentBindingConcurrencyGuard.class,
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
             PaymentInstrumentBindingHistoryServiceImpl.class,

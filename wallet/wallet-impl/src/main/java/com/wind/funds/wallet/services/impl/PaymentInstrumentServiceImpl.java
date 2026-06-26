@@ -68,6 +68,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
 
     private final PaymentInstrumentBindingHistoryService paymentInstrumentBindingHistoryService;
 
+    private final PaymentInstrumentBindingConcurrencyGuard paymentInstrumentBindingConcurrencyGuard;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createPaymentInstrument(@NonNull CreatePaymentInstrumentRequest request) {
@@ -83,6 +85,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createPaymentInstrumentBinding(@NonNull CreatePaymentInstrumentBindingRequest request) {
+        assertBindingCreateRequestSnPresent(request);
         assertNoSensitivePaymentInstrumentContextVariables(request.getContextVariables());
         PaymentInstrumentBindingHistoryDTO replayed = findBindingHistoryByRequestSn(
                 request.getTenantId(),
@@ -101,6 +104,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         assertBudgetSubjectBindingTargetsBudgetGroup(request);
         PaymentInstrumentBindingDTO binding = toBindingCandidate(request);
         assertBindingValidityWindow(binding);
+        paymentInstrumentBindingConcurrencyGuard.lockActiveDefaultBindingScope(binding);
         assertNoDuplicateActiveDefaultBinding(binding);
         assertNoDuplicateActivePriorityBinding(binding);
         Long bindingId = paymentInstrumentBindingService.createPaymentInstrumentBinding(request);
@@ -118,6 +122,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull Long changePaymentInstrumentBinding(@NonNull ChangePaymentInstrumentBindingRequest request) {
+        assertBindingChangeRequestSnPresent(request);
         assertBindingChangeAuditContextPresent(request);
         assertNoSensitivePaymentInstrumentContextVariables(request.getContextVariables());
         PaymentInstrumentBindingHistoryDTO replayed = findBindingHistoryByRequestSn(
@@ -137,6 +142,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         applyBindingChanges(after, request);
         after.setVersion(before.getVersion() + 1);
         assertBindingValidityWindow(after);
+        paymentInstrumentBindingConcurrencyGuard.lockActiveDefaultBindingScope(after);
         assertNoDuplicateActiveDefaultBinding(after);
         assertNoDuplicateActivePriorityBinding(after);
         paymentInstrumentBindingService.updatePaymentInstrumentBinding(toUpdateRequest(before, after, request));
@@ -154,6 +160,14 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
     private void assertBindingChangeAuditContextPresent(ChangePaymentInstrumentBindingRequest request) {
         AssertUtils.hasText(request.getOperatorId(), "支付工具绑定变更 operatorId 不能为空");
         AssertUtils.hasText(request.getChangeReason(), "支付工具绑定变更 changeReason 不能为空");
+    }
+
+    private void assertBindingCreateRequestSnPresent(CreatePaymentInstrumentBindingRequest request) {
+        AssertUtils.hasText(request.getRequestSn(), "支付工具绑定创建 requestSn 不能为空");
+    }
+
+    private void assertBindingChangeRequestSnPresent(ChangePaymentInstrumentBindingRequest request) {
+        AssertUtils.hasText(request.getRequestSn(), "支付工具绑定变更 requestSn 不能为空");
     }
 
     private @Nullable PaymentInstrumentBindingHistoryDTO findBindingHistoryByRequestSn(Long tenantId,

@@ -79,6 +79,7 @@ import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
+import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingConcurrencyGuard;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
@@ -136,6 +137,8 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private static final String CHANNEL_CODE = "bank_rail";
 
+    private static final String CHANNEL_ID = "bank_rail_provider";
+
     private static final String BUSINESS_SCENE = "INSTRUMENT_RECEIVE";
 
     private static final String RECEIVE_BUSINESS_SN = "INSTRUMENT_RECEIVE_001";
@@ -143,6 +146,8 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     private static final String DIRECTION_FAIL_BUSINESS_SN = "INSTRUMENT_RECEIVE_DIRECTION_FAIL";
 
     private static final String MISSING_BINDING_VERSION_BUSINESS_SN = "INSTRUMENT_RECEIVE_MISSING_BINDING_VERSION";
+
+    private static final String UNSUPPORTED_CHANNEL_BUSINESS_SN = "INSTRUMENT_RECEIVE_UNSUPPORTED_CHANNEL";
 
     private static final String PAYOUT_BUSINESS_SN = "INSTRUMENT_PAYOUT_RAIL_001";
 
@@ -197,9 +202,9 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     /**
      * 场景：VA/ACH 等收款工具入口完成预交易准入后，委派账户主体型充值交易内核。
-     * 输入：收款工具绑定资金账户，资金责任解析到同一资金账户，外部银行账户入金 80。
+     * 输入：收款工具绑定资金账户，资金责任解析到同一资金账户，外部银行账户通过 bank_rail 入金 80。
      * 输出：返回充值交易号，资金账户 AVAILABLE 增加 80，并产生标准 TOPUP 交易、route 和账本事实。
-     * 红线：wallet 应用入口不直接写账，交易内核 canonical 入参仍是已解析的资金账户主体。
+     * 红线：wallet 应用入口负责把业务 rail 解析为交易层渠道，不直接写账；交易内核 canonical 入参仍是已解析的资金账户主体。
      */
     @Test
     void testReceiveByInstrumentShouldResolveTargetAccountAndDelegateTopupKernel() {
@@ -230,6 +235,30 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         assertThat(routeLegCount(RECEIVE_BUSINESS_SN)).isEqualTo(2);
         assertReceiveRouteSnapshot(RECEIVE_BUSINESS_SN);
         assertReceiveFactsKeepDirectContextMinimal(RECEIVE_BUSINESS_SN);
+    }
+
+    /**
+     * 场景：收款入口收到未知 rail / channel 编码。
+     * 输入：支付工具、绑定版本和资金责任均有效，但 channelCode 为 mystery_rail。
+     * 输出：服务层入口给出可读的渠道拒绝原因，不泄露 Java enum valueOf 实现细节。
+     * 红线：非法 rail 不得进入交易内核，不得生成资金交易、route、posting plan、账本交易或分录。
+     */
+    @Test
+    void testReceiveByInstrumentShouldRejectUnsupportedRailCodeWithoutFundsFacts() {
+        createReceiveScenario();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        ReceiveByInstrumentRequest request = receiveRequest(UNSUPPORTED_CHANNEL_BUSINESS_SN,
+                RECEIVE_INSTRUMENT_SN)
+                .setChannelCode("mystery_rail");
+
+        assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.receiveByInstrument(request,
+                WindOperator.system()))
+                .hasMessageContaining("收款渠道编码不支持")
+                .hasMessageContaining("mystery_rail")
+                .hasMessageContaining("支持的收款渠道");
+
+        assertNoFundsOrLedgerFacts(UNSUPPORTED_CHANNEL_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -309,26 +338,28 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
                     SELECT sn FROM t_ledger_transaction
-                    WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)
+                    WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)
                 )
                 """, BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
-                MISSING_BINDING_VERSION_BUSINESS_SN, PAYOUT_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                MISSING_BINDING_VERSION_BUSINESS_SN, UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                PAYOUT_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                PAYOUT_BUSINESS_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                "DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                PAYOUT_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
+        jdbcTemplate.update(
+                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                PAYOUT_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
+        jdbcTemplate.update(
+                "DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                PAYOUT_BUSINESS_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN);
         jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
                 RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
@@ -437,6 +468,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                                                                        String bindingSn) {
         return new CreatePaymentInstrumentBindingRequest()
                 .setSn(bindingSn)
+                .setRequestSn(bindingSn + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(instrumentSn)
                 .setBindingRole(PaymentInstrumentBindingRole.RECEIVE_SUBJECT)
@@ -471,8 +503,9 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setCurrency(CurrencyIsoCode.USD)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_lifecycle_receive",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannelCode(FundsTransactionChannel.WIRE_TRANSFER.name())
+                .setChannelCode(CHANNEL_CODE)
                 .setChannelTransactionSn(businessSn + "_CHANNEL")
+                .setChannelId(CHANNEL_ID)
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(businessSn)
                 .setExpectedBindingVersion(1)
@@ -621,6 +654,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .isEqualTo("external_bank_lifecycle_receive");
         assertThat(externalAccountRef.getString("externalAccountType"))
                 .isEqualTo(DefaultFundsAccountType.EXTERNAL_BANK.name());
+        assertThat(externalAccountRef.getString("providerCode")).isEqualTo(CHANNEL_ID);
         assertThat(externalAccountRef.getString("channelCode")).isEqualTo(FundsTransactionChannel.WIRE_TRANSFER.name());
     }
 
@@ -700,6 +734,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
+            PaymentInstrumentBindingConcurrencyGuard.class,
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
             PaymentInstrumentBindingHistoryServiceImpl.class,

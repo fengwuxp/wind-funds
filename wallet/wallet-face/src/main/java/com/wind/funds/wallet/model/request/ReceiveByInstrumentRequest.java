@@ -48,7 +48,7 @@ public class ReceiveByInstrumentRequest {
     @NotNull
     private FundsAccountId fundsSourceAccountId;
 
-    @Schema(description = "收款渠道编码，对应交易层可识别的资金交易渠道")
+    @Schema(description = "收款 rail 或 channel 编码，可传交易层渠道或钱包支持的业务 rail 别名，例如 BANK_RAIL、ACH、WIRE_TRANSFER")
     @NotBlank
     private String channelCode;
 
@@ -56,7 +56,7 @@ public class ReceiveByInstrumentRequest {
     @NotBlank
     private String channelTransactionSn;
 
-    @Schema(description = "渠道方标识")
+    @Schema(description = "渠道方或外部 rail 标识，写入 route snapshot 的 externalAccountRef.providerCode")
     private String channelId;
 
     @Schema(description = "业务流水号，通常为外部入金流水号或请求幂等号")

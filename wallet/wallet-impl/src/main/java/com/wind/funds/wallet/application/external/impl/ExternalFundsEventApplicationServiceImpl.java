@@ -6,11 +6,12 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
-import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.external.ExternalFundsEventApplicationService;
+import com.wind.funds.wallet.application.support.WalletExternalFundsRailSupport;
+import com.wind.funds.wallet.application.support.WalletExternalFundsRailSupport.ExternalCreditRailDecision;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.model.request.ConsumeExternalFundsEventRequest;
 import com.wind.transaction.core.Money;
@@ -36,11 +37,6 @@ import java.util.Set;
 @AllArgsConstructor
 public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEventApplicationService {
 
-    private static final Set<String> CONFIRMED_CREDIT_EVENT_TYPES = Set.of(
-            "ACH_CREDIT_CONFIRMED",
-            "BANK_CREDIT_CONFIRMED",
-            "EXTERNAL_CREDIT_CONFIRMED");
-
     private static final Set<String> POSTABLE_ACCOUNT_SUBJECT_TYPES = Set.of(
             FundsSubjectType.FUNDING_ACCOUNT.name(),
             FundsSubjectType.CREDIT_ACCOUNT.name());
@@ -54,9 +50,10 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
     public @NonNull String consume(@NonNull ConsumeExternalFundsEventRequest request,
                                    @NonNull WindOperator operator) {
         validateConsumeRequest(request);
-        assertConfirmedCreditEvent(request);
+        ExternalCreditRailDecision railDecision =
+                WalletExternalFundsRailSupport.requireConfirmedCreditRailDecision(request.getExternalEventType());
         assertFundingAccountTarget(request.getTargetAccountId());
-        return directTransactionService.topup(toTopupRequest(request), operator);
+        return directTransactionService.topup(toTopupRequest(request, railDecision), operator);
     }
 
     private void validateConsumeRequest(ConsumeExternalFundsEventRequest request) {
@@ -74,11 +71,6 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
         AssertUtils.hasText(request.getBusinessSn(), "外部资金事件业务流水号不能为空");
     }
 
-    private void assertConfirmedCreditEvent(ConsumeExternalFundsEventRequest request) {
-        AssertUtils.isTrue(CONFIRMED_CREDIT_EVENT_TYPES.contains(request.getExternalEventType()),
-                "外部资金事件类型暂不支持真实消费");
-    }
-
     private void assertFundingAccountTarget(FundsAccountId targetAccountId) {
         AssertUtils.isTrue(FundsSubjectType.FUNDING_ACCOUNT.name().equals(targetAccountId.type()),
                 "外部资金入金事件目标账户必须是资金账户");
@@ -91,25 +83,30 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
                 "外部资金事件目标账户必须是资金账户或信用账户");
     }
 
-    private FundsTransactionTopupRequest toTopupRequest(ConsumeExternalFundsEventRequest request) {
+    private FundsTransactionTopupRequest toTopupRequest(ConsumeExternalFundsEventRequest request,
+                                                        ExternalCreditRailDecision railDecision) {
         return new FundsTransactionTopupRequest()
                 .setAccountId(request.getTargetAccountId())
                 .setFundsSourceAccountId(FundsAccountId.immutable(EXTERNAL_SOURCE_ACCOUNT_ID,
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(railDecision.transactionChannel())
                 .setChannelTransactionSn(request.getExternalEventSn())
+                .setChannelId(railDecision.externalRailCode())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
                         request.getCurrency())))
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
-                .setContextVariables(ReadonlyContextVariables.of(externalEventContext(request)))
+                .setContextVariables(ReadonlyContextVariables.of(externalEventContext(request, railDecision)))
                 .setDescription(request.getDescription());
     }
 
-    private Map<String, Object> externalEventContext(ConsumeExternalFundsEventRequest request) {
+    private Map<String, Object> externalEventContext(ConsumeExternalFundsEventRequest request,
+                                                     ExternalCreditRailDecision railDecision) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("externalEventSn", request.getExternalEventSn());
         result.put("externalEventType", request.getExternalEventType());
+        result.put("externalRailCode", railDecision.externalRailCode());
+        result.put("transactionChannel", railDecision.transactionChannel().name());
         putIfPresent(result, "originalTransactionSn", request.getOriginalTransactionSn());
         putIfPresent(result, "reconciliationDifferenceSn", request.getReconciliationDifferenceSn());
         return Map.copyOf(result);

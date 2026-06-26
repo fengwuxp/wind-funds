@@ -93,6 +93,7 @@
 | P1 交易能力设计 | 01、02、05 | 直接交易、授权交易、余额控制和交易投影的服务入口、生命周期、route snapshot、失败无副作用、只读投影和回归测试。 |
 | P2 业务支持设计 | 01、02、03、04、05；对应产品 PRD 06、07 或 08 | 场景交易 capability pack 的业务状态、外部引用、脱敏、乱序重复处理和 P0/P1 回归影响；不得改变统一资金内核边界。 |
 | Spend Rule 支出规则设计 | 01、02、05、06；对应产品 PRD 09 和 DSL README 的 Spend Rule DSL v1.1 | 规则定义、不可变版本、规则挂载、决策日志、DSL v1.1 结构化契约、控制活动、预算控制投影、交易投影解释和拒绝无资金副作用；不得改变交易 canonical 入参或 ledger posting 主体。 |
+| 测试 schema 对齐评审 | 对应系分表设计章节、[tests/src/test/resources/jdbc-schema.sql](../../tests/src/test/resources/jdbc-schema.sql) 和 TDD 任务卡 | 确认 H2/MySQL Mode 测试表结构、Entity、Mapper 和服务测试一致；生产迁移由独立发布 / DBA 流程承接。 |
 | MVP 任务设计 | 对应产品 `mvpScenario`、DSL caseId、目标 TDD Red 和任务说明 | 只输出 MVP 必须的服务入口、状态机、事务、幂等、账务断言、查询解释和失败无副作用；扩展项进入未覆盖范围或独立任务。 |
 | ACH 或银行转账支撑边界评审 | 01、05、产品设计/ACH与银行转账资金底座支持边界、01-系分设计总览、05-测试观测安全与金融红线 | 确认 ACH/银行转账只是外部轨道输入；资金底座只承接归一资金事实、外部引用、对账差错、追偿、调账核销和审计；不实现 ACH 协议、Nacha/ODFI/RDFI 规则、文件批次、Debit 授权、return code、NOC 或 reversal 规则。 |
 | 对账清算模块设计 | 01、03、05 | 先确认对账任务、匹配结果、差错闭环、重新对账和审计；再推进清分、清算、结算、出款和追偿。 |

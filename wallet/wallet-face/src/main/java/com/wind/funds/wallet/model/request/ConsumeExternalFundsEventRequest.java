@@ -36,7 +36,7 @@ public class ConsumeExternalFundsEventRequest {
     @NotBlank
     private String externalEventSn;
 
-    @Schema(description = "外部资金事件类型，例如 ACH_CREDIT_CONFIRMED、BANK_DEBIT_CONFIRMED")
+    @Schema(description = "外部资金事件类型，例如 ACH_CREDIT_CONFIRMED、BANK_CREDIT_CONFIRMED；大小写和横线由钱包层归一")
     @NotBlank
     private String externalEventType;
 
