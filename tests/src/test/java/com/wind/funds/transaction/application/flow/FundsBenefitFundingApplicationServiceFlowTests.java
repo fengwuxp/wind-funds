@@ -170,6 +170,67 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
     }
 
     /**
+     * 场景：平台补足商户、平台直补用户、合作方出资共同出现在让利方案中。
+     * 输入：平台向商户结算主体出资 40，平台向用户可记账补贴账户出资 15，
+     * 合作方向订单让利归集主体出资 8。
+     * 输出：每组成本承担主体和让利承接账务主体分别形成独立资金交易、账本分录和余额影响。
+     * 红线：让利承接方可以是商户、用户或订单归集账目，但必须是可记账主体，
+     * 不能退化为营销用户或券来源。
+     */
+    @Test
+    void testSettleScenarioMatrixShouldRecordConcreteContributionPairs() {
+        FundsAccountId platformMarketing = fundingAccount("ben_matrix_platform");
+        FundsAccountId partnerCostBearer = fundingAccount("ben_matrix_partner");
+        FundsAccountId merchantSettlement = fundingAccount("ben_matrix_merchant");
+        FundsAccountId userSubsidy = fundingAccount("ben_matrix_user");
+        FundsAccountId orderBenefitPool = fundingAccount("ben_matrix_order");
+        ensureLedger(platformMarketing, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(partnerCostBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(merchantSettlement, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(userSubsidy, LedgerSubjectCode.SETTLEMENT);
+        ensureLedger(orderBenefitPool, LedgerSubjectCode.SETTLEMENT);
+
+        topup(platformMarketing, 100L, "BENEFIT_MATRIX_PLATFORM_TOPUP");
+        topup(partnerCostBearer, 100L, "BENEFIT_MATRIX_PARTNER_TOPUP");
+        var afterTopup = snapshot(balances(platformMarketing,
+                partnerCostBearer,
+                merchantSettlement,
+                userSubsidy,
+                orderBenefitPool));
+
+        String platformToMerchantSn = benefitFundingApplicationService.settle(
+                settleRequest(platformMarketing, merchantSettlement, 40L, "BENEFIT_MATRIX_PLATFORM_MERCHANT_001")
+                        .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS),
+                WindOperator.system());
+        String platformToUserSn = benefitFundingApplicationService.settle(
+                settleRequest(platformMarketing, userSubsidy, 15L, "BENEFIT_MATRIX_PLATFORM_USER_001")
+                        .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS),
+                WindOperator.system());
+        String partnerToOrderSn = benefitFundingApplicationService.settle(
+                settleRequest(partnerCostBearer, orderBenefitPool, 8L, "BENEFIT_MATRIX_PARTNER_ORDER_001")
+                        .setFundingNature(FundsBenefitFundingNature.PARTNER_FUNDED),
+                WindOperator.system());
+
+        assertThat(platformToMerchantSn).isNotBlank();
+        assertThat(platformToUserSn).isNotBlank();
+        assertThat(partnerToOrderSn).isNotBlank();
+        var afterSettle = snapshot(balances(platformMarketing,
+                partnerCostBearer,
+                merchantSettlement,
+                userSubsidy,
+                orderBenefitPool));
+        assertOnlyBalanceDeltas(afterTopup, afterSettle,
+                delta(platformMarketing, LedgerSubjectCode.AVAILABLE, -55L, CURRENCY),
+                delta(partnerCostBearer, LedgerSubjectCode.AVAILABLE, -8L, CURRENCY),
+                delta(merchantSettlement, LedgerSubjectCode.SETTLEMENT, 40L, CURRENCY),
+                delta(userSubsidy, LedgerSubjectCode.SETTLEMENT, 15L, CURRENCY),
+                delta(orderBenefitPool, LedgerSubjectCode.SETTLEMENT, 8L, CURRENCY));
+        assertBenefitSettleFacts("BENEFIT_MATRIX_PLATFORM_MERCHANT_001");
+        assertBenefitSettleFacts("BENEFIT_MATRIX_PLATFORM_USER_001");
+        assertBenefitSettleFacts("BENEFIT_MATRIX_PARTNER_ORDER_001");
+    }
+
+    /**
      * 场景：平台和商户共同承担同一订单优惠，后续分别按原出资事实退款。
      * 输入：平台出资 20，商户出资 10，退款时分别冲回 5 和 3。
      * 输出：每个出资方都有独立结算交易流水，退款按各自原权益资金交易回放。
@@ -359,5 +420,12 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
         assertThat(entriesOf(transaction))
                 .extracting(LedgerEntry::getLedgerSubjectCode)
                 .containsExactlyInAnyOrder(sourceBucket, targetBucket);
+    }
+
+    private void assertBenefitSettleFacts(String businessSn) {
+        assertSingleFundsAndLedgerFactsForBusinessSn(businessSn, 2, 2);
+        assertLedgerFactsFollowRouteSnapshot(businessSn);
+        assertLedgerEventAndBuckets(businessSn, FundsTransactionEventType.PAY,
+                LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.SETTLEMENT);
     }
 }
