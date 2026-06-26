@@ -137,7 +137,7 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
 
         assertThat(replayed.getId()).isEqualTo(first.getId());
         assertThat(countAssignments()).isEqualTo(1);
-        assertNoDecisionLog();
+        assertNoDecisionRecord();
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -189,7 +189,7 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
                 "spendRuleAssignment:" + ASSIGNMENT_SN);
-        assertNoDecisionLog();
+        assertNoDecisionRecord();
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -225,7 +225,7 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 .setEffectiveTo(EFFECTIVE_FROM)))
                 .hasMessageContaining("Spend Rule 挂载生效结束时间必须晚于开始时间");
         assertThat(countAssignments()).isZero();
-        assertNoDecisionLog();
+        assertNoDecisionRecord();
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -296,7 +296,7 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupSpendRuleDefinitionServiceTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_log WHERE tenant_id = ? AND rule_id = ?",
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
@@ -313,9 +313,9 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 """, Integer.class, TENANT_ID, RULE_ID);
     }
 
-    private void assertNoDecisionLog() {
+    private void assertNoDecisionRecord() {
         Integer count = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM t_spend_rule_decision_log
+                SELECT COUNT(*) FROM t_spend_rule_decision_record
                 WHERE tenant_id = ? AND rule_id = ?
                 """, Integer.class, TENANT_ID, RULE_ID);
         assertThat(count).isZero();

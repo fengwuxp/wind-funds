@@ -90,7 +90,7 @@ import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDecisionRecordServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
 import com.wind.transaction.core.Money;
@@ -357,7 +357,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 authorizeSpendRejectedRequest(), WindOperator.system()))
                 .hasMessageContaining("Spend Rule 准入未通过");
 
-        assertSpendRuleDecisionLog();
+        assertSpendRuleDecisionRecord();
         assertNoFundsOrLedgerFacts(SPEND_REJECT_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -373,7 +373,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     }
 
     private void cleanupAuthorizationAdmissionTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_log WHERE tenant_id = ? AND rule_id = ?",
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
@@ -766,16 +766,16 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .containsEntry("decisionResult", SpendControlDecisionResult.PASSED.name())
                 .containsEntry("decisionDigest", SPEND_PASS_DECISION_DIGEST)
                 .containsEntry("budgetGroupSn", "budget_auth_admission");
-        assertThat(spendRuleDecision).containsKey("decisionLogId");
+        assertThat(spendRuleDecision).containsKey("decisionRecordId");
         assertThat(explanation.payload().toString())
                 .doesNotContain("dslCaseId")
                 .doesNotContain("script");
     }
 
-    private void assertSpendRuleDecisionLog() {
+    private void assertSpendRuleDecisionRecord() {
         assertThat(jdbcTemplate.queryForObject("""
                 SELECT COUNT(*)
-                FROM t_spend_rule_decision_log
+                FROM t_spend_rule_decision_record
                 WHERE tenant_id = ?
                   AND decision_sn = ?
                   AND rule_id = ?
@@ -853,7 +853,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
             SpendRuleAssignmentServiceImpl.class,
-            SpendRuleDecisionLogServiceImpl.class,
+            SpendRuleDecisionRecordServiceImpl.class,
             AuthorizationAdmissionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             PlatformFundingAccountServiceImpl.class

@@ -34,13 +34,13 @@ public class SpendControlTransactionConsumptionRequest implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "本次控制消费、释放或补偿活动流水号")
+    @Schema(description = "本次控制消费、释放或补偿变动流水号")
     @NotBlank
-    private String activitySn;
+    private String movementSn;
 
     @Schema(description = "原控制额度变动流水流水号")
     @NotBlank
-    private String originalActivitySn;
+    private String originalMovementSn;
 
     @Schema(description = "已存在的资金交易流水号")
     @NotBlank
@@ -54,7 +54,7 @@ public class SpendControlTransactionConsumptionRequest implements Serializable {
     @NotBlank
     private String businessSn;
 
-    @Schema(description = "控制活动目标资金账户或信用账户标识")
+    @Schema(description = "控制额度变动目标资金账户或信用账户标识")
     @NotNull
     private FundsAccountId targetAccountId;
 
@@ -66,11 +66,11 @@ public class SpendControlTransactionConsumptionRequest implements Serializable {
     @NotNull
     private CurrencyIsoCode currency;
 
-    @Schema(description = "控制活动摘要，用于幂等、回放和审计追踪")
+    @Schema(description = "控制额度变动摘要，用于幂等、回放和审计追踪")
     @NotBlank
-    private String activityDigest;
+    private String movementDigest;
 
-    @Schema(description = "控制活动说明")
+    @Schema(description = "控制额度变动说明")
     private String description;
 
     @Schema(description = "扩展上下文变量")

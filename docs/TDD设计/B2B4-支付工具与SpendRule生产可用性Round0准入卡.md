@@ -519,7 +519,7 @@ Git 策略：auto_commit
 | --- | --- |
 | 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
 | 兼容代码基线 | 当前可定位的是 `BudgetGroupService` / `BudgetGroupServiceImpl`、`BUDGET_GROUP` ledger profile、余额控制调账和预算组余额查询等兼容路径；`FundsBalanceControlFailureFlowTests` 与 `ControlAccountLedgerInitializationTests` 可作为旧预算组账务兼容回归资产。 |
-| 目标缺口 | 当前未发现 `SpendRuleDecisionLog`、`SpendControlActivity`、Spend Rule application facade、规则版本决策模型或预算控制投影生产模型；既有预算组创建初始化 ledger bucket、`BUDGET_GROUP` 余额桶和预算组额度调账，不能证明目标态 Spend Rule 控制事实已生产可用。 |
+| 目标缺口 | 当前未发现 `SpendRuleDecisionRecord`、`SpendControlMovement`、Spend Rule application facade、规则版本决策模型或预算控制投影生产模型；既有预算组创建初始化 ledger bucket、`BUDGET_GROUP` 余额桶和预算组额度调账，不能证明目标态 Spend Rule 控制事实已生产可用。 |
 | 语义裁决 | B5 目标只表达规则决策、拒绝原因、控制活动、预算预留释放和只读控制投影；预算组、Spend Rule、规则命中和控制活动不得成为 route leg、posting、LedgerEntry 或账本余额主体。旧 BudgetGroup ledger 路径只能作为兼容差距和回归保护，不得写成目标态 Done。 |
 | schemaDecision | 进入编码前必须在 `contract-only` 与 `ddl-backed` 中二选一。`contract-only` 只允许新增 application facade 契约、Request/DTO 和目标 Red；`ddl-backed` 必须显式授权 DDL/H2 schema、Entity、Mapper、唯一键、幂等摘要和投影表字段。未选择前不写 B5 Java、测试或表结构。 |
 | 首批 Red | `R0-SR-001A`：MCC、商户、时间窗、频次、单笔金额、累计金额或规则版本拒绝时必须产生可审计规则决策和拒绝原因，且无 route、posting、LedgerEntry、余额投影或资金交易副作用。 |
@@ -539,7 +539,7 @@ Git 策略：auto_commit
 | `owner` | 资深架构师负责工程执行；产品架构专家负责规则拒绝原因、控制活动、预算口径和 Not Done 语义复核。 |
 | `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `5a0ee17 docs: 补齐资金责任候选包` 及本节提交点。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
 | `mvpScenario` | 业务入口提交支付工具、使用主体、预算上下文、Spend Rule 规则版本、金额币种和业务流水；系统在 application facade 中完成规则决策。拒绝时只留下规则决策、拒绝原因和审计；批准或授权后继时只记录控制活动和预算控制投影，不生成资金事实。 |
-| `businessAdmission` | 产品锚点为支付工具与 Spend Rule 生产可用性裁决；DSL 锚点为 `SpendRuleDecisionLog`、`SpendControlActivity` 和只读预算控制投影；系分锚点为 `SpendRuleControlApplicationService`；TDD 锚点为 `R0-SR-001`、`R0-SR-002`。 |
+| `businessAdmission` | 产品锚点为支付工具与 Spend Rule 生产可用性裁决；DSL 锚点为 `SpendRuleDecisionRecord`、`SpendControlMovement` 和只读预算控制投影；系分锚点为 `SpendRuleControlApplicationService`；TDD 锚点为 `R0-SR-001`、`R0-SR-002`。 |
 | `schemaDecision` | 待确认，必须二选一：`contract-only` 或 `ddl-backed`。默认不允许 DDL/H2 schema；若选择 `ddl-backed`，Grant 必须列明表、字段、索引、唯一约束、Entity、Mapper 和 H2 fixture。 |
 | `firstRedSet` | `R0-SR-001A`：MCC、商户、时间窗、频次、单笔金额、累计金额或规则版本拒绝仍继续授权或付款必须失败；拒绝必须可审计，且无 route、posting、LedgerEntry、余额投影或资金交易副作用。 |
 | `secondRedSet` | `R0-SR-002A`：授权预留、撤销、过期、部分完成和退款释放缺幂等、缺并发保护、更新预算组 ledger bucket 或生成资金交易事实时必须失败。 |
@@ -579,7 +579,7 @@ Git 策略：auto_commit
 | 当前状态 | `ROUND0_READY_NOT_CODE_AUTHORIZED`。 |
 | 局部代码基线 | `FundsTransactionProjectionPublisher`、`FundsTransactionProjectionPublishContext` 和 `FundsTransactionProjectionExplanation` 已表达交易主写链路成功后的正常只读投影发布入口；`DefaultRoutedFundsInstructionOrchestratorProjectionTests` 覆盖付款、授权占用、授权拒绝和投影失败不回滚事实；`DefaultRouteReplayServiceTests` 覆盖原路径快照、支付工具快照、外部账户和资金责任快照回放；`FundsProjectionReplayServiceTests` 覆盖交易投影有界重放、影子/正式模式和差异报告边界。 |
 | 目标缺口 | 当前未形成支付工具维度流水 query DTO、预算控制视图、规则命中时间线、支付工具绑定版本查询投影、Spend Rule 控制投影或面向运营/财务的统一解释查询；治理重放已有局部边界，但不等于完整 B8 Manifest、余额快照、指标水位或大数据消费边界 Done。 |
-| 语义裁决 | B6/B8-PI-VIEW 只读解释必须消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影、重放结果、差异报告或查询 DTO 反写成 route、posting、LedgerEntry、余额投影或资金交易事实。 |
+| 语义裁决 | B6/B8-PI-VIEW 只读解释必须消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionRecord`、`SpendControlMovement`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影、重放结果、差异报告或查询 DTO 反写成 route、posting、LedgerEntry、余额投影或资金交易事实。 |
 | schemaDecision | 进入编码前必须在 `query-contract-only` 与 `projection-store-backed` 中二选一。`query-contract-only` 只允许新增查询契约、DTO 和目标 Red；`projection-store-backed` 必须显式授权 DDL/H2 schema、Entity、Mapper、索引、checkpoint、影子表或正式投影表。未选择前不写 B6/B8 Java、测试或表结构。 |
 | 首批 Red | `R0-PI-002A`：工具换绑、解绑、暂停或能力变化后，历史退款、撤销、退费或拒付按当前绑定、当前默认资金责任或当前工具能力重选路必须失败；解释视图必须使用原 route snapshot、原工具快照、原绑定版本和原资金责任决策。 |
 | 次批 Red | `R0-PI-002B`：交易投影或治理重放把支付工具流水、预算控制视图、规则命中时间线写回资金事实、账本事实、余额投影、正式治理 apply 或无界全量重放时必须失败。 |
@@ -598,7 +598,7 @@ Git 策略：auto_commit
 | `owner` | 资深架构师负责工程执行；产品架构专家负责使用者解释视图、支付工具流水口径、预算控制视图和 Not Done 语义复核。 |
 | `authorityBaseline` | 确认时 Git HEAD；当前候选至少要求包含 `053a6a0 docs: 补齐规则控制候选包` 及本节提交点。若确认前出现新的未提交文档变更，必须先提交或列入本 Grant 附件。 |
 | `mvpScenario` | 运营、财务或业务方查询某个支付工具、共享卡、VCC、预算上下文或规则命中时间线时，系统只从交易事实、原 route snapshot、原工具快照、资金责任决策、Spend Rule 决策、控制活动和账本摘要构建解释视图。逆向交易或重放必须沿原快照解释，缺失快照时失败或进入人工处理，不按当前绑定关系重新选路。 |
-| `businessAdmission` | 产品锚点为支付工具流水、预算控制视图和可解释输出；DSL 锚点为原 route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity` 和 transaction projection；系分锚点为交易投影正常发布与治理重放边界；TDD 锚点为 `R0-PI-002`。 |
+| `businessAdmission` | 产品锚点为支付工具流水、预算控制视图和可解释输出；DSL 锚点为原 route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionRecord`、`SpendControlMovement` 和 transaction projection；系分锚点为交易投影正常发布与治理重放边界；TDD 锚点为 `R0-PI-002`。 |
 | `schemaDecision` | 待确认，必须二选一：`query-contract-only` 或 `projection-store-backed`。默认不允许 DDL/H2 schema；若选择 `projection-store-backed`，Grant 必须列明表、字段、索引、唯一约束、Entity、Mapper、H2 fixture、checkpoint 和重放模式。 |
 | `firstRedSet` | `R0-PI-002A`：历史退款、撤销、退费或拒付按当前绑定、当前默认资金责任、当前工具能力或当前规则重新解释必须失败；必须使用原 route snapshot、原工具快照、原绑定版本、原资金责任决策和原控制证据。 |
 | `secondRedSet` | `R0-PI-002B`：投影解释、支付工具流水或治理重放写回 route、posting、LedgerEntry、余额投影、资金交易事实，或无界全量重放、正式 apply 越权时必须失败。 |

@@ -13,7 +13,7 @@
 | 可自我挖掘 | 读取并对齐 Spend Rule 独立 PRD、系分分册、DSL README、TDD README、OpenSpec tasks 和上一轮 CR 结论。 |
 | 可自我规划 | 将 CR 结论拆成规则版本 JSON、规则挂载 JSON、决策证据 JSON、场景验证、可解释性和任务基线同步。 |
 | 可自动执行 | 修改产品设计、系分设计、DSL 设计、TDD 索引和 OpenSpec 任务记录；补充 docs-only 验证证据。 |
-| 必须人工确认 | 进入编码、修改公共 Java 契约、修改数据库表结构、引入规则引擎、接入控制活动新模型、处理 `SpendControlActivity` 重构、修改交易 canonical 入参、让 Spend Rule 进入 ledger posting、提交 Git。 |
+| 必须人工确认 | 进入编码、修改公共 Java 契约、修改数据库表结构、引入规则引擎、接入控制活动新模型、处理 `SpendControlMovement` 重构、修改交易 canonical 入参、让 Spend Rule 进入 ledger posting、提交 Git。 |
 | 置信度 | 产品、系分、DSL docs-only 规格锁定为高；生产可用为中，需要后续服务层真实链路、H2 schema、目标测试和验证命令证明。 |
 
 ## 3. 本轮 CR 消费结论
@@ -24,7 +24,7 @@
 | 编码前必须确认 Spend Rule spec。 | 本轮锁定 DSL v1.1，先定义规则版本、挂载和决策证据三个契约。 |
 | JSON 需要能覆盖多规则、周期限额、次数限额、商户 / MCC / 国家 / 时间窗口等通用实践。 | DSL v1.1 引入 `matchSpec`、`counterSpec`、`limitSpec`、`decisionSpec`、`safetySpec` 和 `evaluatedRules`。 |
 | 可读性和可解释性不足会影响客服、运营、风控和审计。 | 规则版本增加 `display`，决策证据增加 `decisionReasonCode`、`decisionReasonMessage`、`matchedFacts`、`missingEvidence` 和摘要字段。 |
-| `SpendControlActivity` 设计待定。 | 本轮只把它作为既有控制事实消费方，不改模型、不扩展行为、不作为规则定义来源。 |
+| `SpendControlMovement` 设计待定。 | 本轮只把它作为既有控制事实消费方，不改模型、不扩展行为、不作为规则定义来源。 |
 
 ## 4. DSL v1.1 规格锁定
 
@@ -58,7 +58,7 @@ Spend Rule DSL v1.1 只锁三类契约：
 | 时间窗口限制 | 覆盖。 | `matchSpec.timeWindow`、`counterSpec.timezone`。 |
 | 多规则同时命中 | 覆盖。 | `assignment.priority`、`conflictPolicy`、`decisionPolicy`、`evaluatedRules`。 |
 | 授权拒绝无资金副作用 | 需要后续测试证明。 | DSL 只提供 `finalDecision=DECLINE` 和 forbidden facts，不能替代服务层断言。 |
-| 交易后控制活动消费 | 不在本轮扩展。 | 后续由 `SpendControlActivity` 或交易消费服务任务承接。 |
+| 交易后控制活动消费 | 不在本轮扩展。 | 后续由 `SpendControlMovement` 或交易消费服务任务承接。 |
 
 ## 6. 验收口径
 
@@ -77,7 +77,7 @@ Spend Rule DSL v1.1 只锁三类契约：
 | --- | --- | --- |
 | `GSD2-B5-SPEND-RULE-DECISION-CONSUME-001` | 将规则决策证据接入钱包准入或支付工具生命周期入口。 | 不处理规则引擎、DDL 迁移、Controller、HTTP/RPC、ledger posting。 |
 | `GSD2-B5-SPEND-RULE-PROJECTION-EXPLAIN-001` | 将决策证据和控制活动纳入交易投影解释。 | 不重算历史规则，不反写交易、route、posting、entry 或余额。 |
-| `GSD2-B5-SPEND-RULE-SERVICE-HARDEN-001` | 硬化规则定义、版本、挂载和决策日志服务层。 | 不扩展 `SpendControlActivity` 待定设计，不做运营后台。 |
+| `GSD2-B5-SPEND-RULE-SERVICE-HARDEN-001` | 硬化规则定义、版本、挂载和决策日志服务层。 | 不扩展 `SpendControlMovement` 待定设计，不做运营后台。 |
 
 ## 8. 本轮验证
 
@@ -95,7 +95,7 @@ Spend Rule DSL v1.1 只锁三类契约：
 | 控制项 | 本轮结果 |
 | --- | --- |
 | 可自我挖掘 | 已读取 Spend Rule 定义契约、支出控制准入、支付工具授权准入、目标服务流测试和 H2 schema。 |
-| 可自我规划 | 将 `DECISION-CONSUME` 收敛为“准入服务记录 `SpendRuleDecisionLog`，授权门面透传 assignment / scope / decision evidence”。 |
+| 可自我规划 | 将 `DECISION-CONSUME` 收敛为“准入服务记录 `SpendRuleDecisionRecord`，授权门面透传 assignment / scope / decision evidence”。 |
 | 自动执行范围 | `wallet-face` 请求 / DTO、`wallet-impl` 支出控制准入和授权准入组合、目标服务层测试、TDD / OpenSpec 状态回写。 |
 | 明确禁止范围 | 不处理规则引擎、运营后台、控制活动重构、交易 canonical 入参、ledger posting、Controller、HTTP/RPC、事件消费、生产迁移、VCC facade 或 Git push。 |
 | 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定被拒；沙箱外复跑 `just test-one SpendControlAdmissionApplicationServiceTests,AuthorizationAdmissionApplicationServiceTests tests`，9 tests 通过。 |

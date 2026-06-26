@@ -1,0 +1,502 @@
+package com.wind.funds.wallet.services.impl;
+
+import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.query.QueryColumn;
+import com.wind.common.exception.AssertUtils;
+import com.wind.common.query.WindPagination;
+import com.wind.common.query.WindQuery;
+import com.wind.common.query.supports.DefaultPageQueryOptions;
+import com.wind.common.query.supports.QueryOrderField;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.FundsAccount;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountQueryService;
+import com.wind.funds.wallet.dal.entities.SpendControlMovement;
+import com.wind.funds.wallet.dal.mapper.SpendControlMovementMapper;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
+import com.wind.funds.wallet.mapstruct.SpendControlMovementConverter;
+import com.wind.funds.wallet.model.dto.BudgetControlProjectionDTO;
+import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
+import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
+import com.wind.funds.wallet.model.query.SpendControlMovementQuery;
+import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
+import com.wind.funds.wallet.service.SpendControlMovementService;
+import com.wind.funds.wallet.support.SpendRuleDigestValidator;
+import com.wind.mybatis.flex.MybatisQueryHelper;
+import lombok.AllArgsConstructor;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * 控制额度变动流水服务实现。
+ *
+ * @author Codex
+ * @date 2026-06-23
+ */
+@Service
+@AllArgsConstructor
+public class SpendControlMovementServiceImpl implements SpendControlMovementService {
+
+    private static final int CONTROL_MOVEMENT_QUERY_PAGE_SIZE = 500;
+
+    private static final String TABLE_NAME = SpendControlMovement.TABLE_NAME;
+
+    private static final QueryColumn ID = new QueryColumn(TABLE_NAME, "id");
+
+    private static final QueryColumn TENANT_ID = new QueryColumn(TABLE_NAME, "tenant_id");
+
+    private static final QueryColumn MOVEMENT_SN = new QueryColumn(TABLE_NAME, "movement_sn");
+
+    private static final QueryColumn MOVEMENT_TYPE = new QueryColumn(TABLE_NAME, "movement_type");
+
+    private static final QueryColumn BUSINESS_SCENE = new QueryColumn(TABLE_NAME, "business_scene");
+
+    private static final QueryColumn BUSINESS_SN = new QueryColumn(TABLE_NAME, "business_sn");
+
+    private static final QueryColumn ORIGINAL_MOVEMENT_SN = new QueryColumn(TABLE_NAME, "original_movement_sn");
+
+    private static final QueryColumn TRANSACTION_SN = new QueryColumn(TABLE_NAME, "transaction_sn");
+
+    private static final QueryColumn INSTRUMENT_SN = new QueryColumn(TABLE_NAME, "instrument_sn");
+
+    private static final QueryColumn CURRENCY = new QueryColumn(TABLE_NAME, "currency");
+
+    private static final QueryColumn SPEND_RULE_ID = new QueryColumn(TABLE_NAME, "spend_rule_id");
+
+    private static final QueryColumn SPEND_RULE_VERSION = new QueryColumn(TABLE_NAME, "spend_rule_version");
+
+    private static final QueryColumn BUDGET_GROUP_SN = new QueryColumn(TABLE_NAME, "budget_group_sn");
+
+    private static final QueryColumn TARGET_SUBJECT_ID = new QueryColumn(TABLE_NAME, "target_subject_id");
+
+    private static final QueryColumn TARGET_SUBJECT_TYPE = new QueryColumn(TABLE_NAME, "target_subject_type");
+
+    private final SpendControlMovementMapper spendControlMovementMapper;
+
+    private final FundsAccountQueryService fundsAccountQueryService;
+
+    private @NonNull Long insertSpendControlMovement(@NonNull RecordSpendControlMovementRequest request) {
+        SpendControlMovement entity = SpendControlMovementConverter.INSTANCE.convertToSpendControlMovement(request);
+        spendControlMovementMapper.insertSelective(entity);
+        AssertUtils.notNull(entity.getId(), "记录控制额度变动流水失败，movementSn = {}", request.getMovementSn());
+        return entity.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public @NonNull SpendControlMovementDTO recordMovement(@NonNull RecordSpendControlMovementRequest request) {
+        validateIdempotencyBoundary(request);
+        SpendControlMovementDTO existing = findSpendControlMovement(request.getTenantId(), request.getMovementSn());
+        if (existing != null) {
+            assertSameMovement(request, existing);
+            return existing;
+        }
+        validateRecordRequest(request);
+        assertReleaseAmountNotOverReserved(request);
+        try {
+            Long id = insertSpendControlMovement(request);
+            return getSpendControlMovementById(id);
+        } catch (DataIntegrityViolationException exception) {
+            return readIdempotentMovementAfterInsertConflict(request, exception);
+        }
+    }
+
+    @Override
+    public @NonNull SpendControlMovementDTO getSpendControlMovementById(@NonNull Long id) {
+        SpendControlMovement result = spendControlMovementMapper.selectOneById(id);
+        AssertUtils.notNull(result, "控制额度变动流水不存在，id = {}", id);
+        return toDTO(result);
+    }
+
+    @Override
+    public @Nullable SpendControlMovementDTO findSpendControlMovement(@NonNull Long tenantId,
+                                                                      @NonNull String movementSn) {
+        SpendControlMovement entity = findMovementEntity(tenantId, movementSn);
+        if (entity == null) {
+            return null;
+        }
+        return toDTO(entity);
+    }
+
+    @Override
+    public @NonNull WindPagination<SpendControlMovementDTO> querySpendControlMovements(
+            @NonNull SpendControlMovementQuery query,
+            @NonNull WindQuery<? extends QueryOrderField> options) {
+        return MybatisQueryHelper.<SpendControlMovement, SpendControlMovementDTO>query(toQueryWrapper(query, options))
+                .counter(spendControlMovementMapper::selectCountByQuery)
+                .resultQueryFunc(spendControlMovementMapper::selectListByQuery)
+                .converter(this::toDTO)
+                .query(options);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public @NonNull List<SpendControlMovementDTO> queryMovements(@NonNull SpendControlMovementQuery query) {
+        validateQuery(query);
+        return queryMovementsByPage(query);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public @NonNull BudgetControlProjectionDTO getBudgetControlProjection(
+            @NonNull BudgetControlProjectionQuery query) {
+        validateProjectionQuery(query);
+        return toProjection(query, queryBudgetProjectionMovements(query));
+    }
+
+    private void validateIdempotencyBoundary(RecordSpendControlMovementRequest request) {
+        AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.hasText(request.getMovementSn(), "控制额度变动流水号不能为空");
+        SpendRuleDigestValidator.assertSha256Digest(request.getMovementDigest(), "控制额度变动摘要");
+    }
+
+    private void validateRecordRequest(RecordSpendControlMovementRequest request) {
+        AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.hasText(request.getMovementSn(), "控制额度变动流水号不能为空");
+        AssertUtils.notNull(request.getMovementType(), "控制额度变动类型不能为空");
+        AssertUtils.isFalse(request.getMovementType().isDecisionRecordType(),
+                "Spend Rule 准入决策应记录为决策记录，不应写入控制额度变动流水，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
+        AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
+        AssertUtils.notNull(request.getTargetAccountId(), "控制额度变动目标账户不能为空");
+        AssertUtils.notNull(request.getAmount(), "控制金额不能为空");
+        AssertUtils.isTrue(request.getAmount() > 0L, "控制金额必须大于 0");
+        AssertUtils.notNull(request.getCurrency(), "币种不能为空");
+        AssertUtils.hasText(request.getSpendRuleId(), "Spend Rule 标识不能为空");
+        AssertUtils.hasText(request.getSpendRuleVersion(), "Spend Rule 版本不能为空");
+        SpendRuleDigestValidator.assertSha256Digest(request.getMovementDigest(), "控制额度变动摘要");
+        assertNoSensitiveContextVariables(request.getContextVariables());
+        assertTargetAccountSupported(request);
+        if (request.getMovementType().isLimitAdjustmentMovement()) {
+            AssertUtils.hasText(request.getReasonCode(), "预算控制额度调整原因码不能为空");
+            AssertUtils.hasText(request.getOperatorId(), "预算控制额度调整操作者不能为空");
+            AssertUtils.hasText(request.getAuditReferenceSn(), "预算控制额度调整审计引用不能为空");
+        } else {
+            AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
+            AssertUtils.notNull(request.getAction(), "支付工具动作不能为空");
+            AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
+            AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
+            SpendRuleDigestValidator.assertSha256Digest(request.getSpendDecisionDigest(), "Spend Rule 决策摘要");
+        }
+        if (request.getMovementType().isBudgetProjectionMovement()) {
+            AssertUtils.hasText(request.getBudgetGroupSn(), "预算控制额度变动必须提供预算组标识");
+        }
+    }
+
+    private void assertTargetAccountSupported(RecordSpendControlMovementRequest request) {
+        assertSupportedTargetSubjectType(targetSubjectType(request.getTargetAccountId()));
+        FundsAccount account = fundsAccountQueryService.getAccount(request.getTargetAccountId());
+        AssertUtils.isTrue(Objects.equals(account.getTenantId(), request.getTenantId()),
+                "控制额度变动目标账户租户不匹配，accountId = {}，tenantId = {}",
+                request.getTargetAccountId(),
+                request.getTenantId());
+        AssertUtils.isTrue(account.getCurrency() == request.getCurrency(),
+                "控制额度变动目标账户币种不匹配，accountId = {}，currency = {}",
+                request.getTargetAccountId(),
+                request.getCurrency());
+    }
+
+    private SpendControlMovementDTO readIdempotentMovementAfterInsertConflict(
+            RecordSpendControlMovementRequest request,
+            DataIntegrityViolationException exception) {
+        SpendControlMovementDTO existing = findSpendControlMovement(request.getTenantId(), request.getMovementSn());
+        if (existing == null) {
+            throw exception;
+        }
+        assertSameMovement(request, existing);
+        return existing;
+    }
+
+    private void assertSameMovement(RecordSpendControlMovementRequest request, SpendControlMovementDTO existing) {
+        assertSameMovementDigest(request, existing);
+        AssertUtils.notNull(request.getTargetAccountId(), "控制额度变动目标账户不能为空");
+        assertSameMovementIdentity(request, existing);
+        assertSameMovementTarget(request, existing);
+        assertSameMovementAmountAndRule(request, existing);
+        assertSameMovementDecision(request, existing);
+        assertSameMovementAudit(request, existing);
+    }
+
+    private void assertSameMovementIdentity(RecordSpendControlMovementRequest request,
+                                            SpendControlMovementDTO existing) {
+        AssertUtils.isTrue(existing.getMovementType() == request.getMovementType(),
+                "控制额度变动流水已存在但类型不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getBusinessScene(), request.getBusinessScene()),
+                "控制额度变动流水已存在但业务场景不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getBusinessSn(), request.getBusinessSn()),
+                "控制额度变动流水已存在但业务流水不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getOriginalMovementSn(), request.getOriginalMovementSn()),
+                "控制额度变动流水已存在但原控制额度变动流水不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getTransactionSn(), request.getTransactionSn()),
+                "控制额度变动流水已存在但资金交易流水不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getInstrumentSn(), request.getInstrumentSn()),
+                "控制额度变动流水已存在但支付工具号不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(existing.getAction() == request.getAction(),
+                "控制额度变动流水已存在但支付工具动作不一致，movementSn = {}",
+                request.getMovementSn());
+    }
+
+    private void assertSameMovementTarget(RecordSpendControlMovementRequest request,
+                                          SpendControlMovementDTO existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getTargetAccountId(), request.getTargetAccountId()),
+                "控制额度变动流水已存在但目标账户不一致，movementSn = {}",
+                request.getMovementSn());
+    }
+
+    private void assertSameMovementAmountAndRule(RecordSpendControlMovementRequest request,
+                                                 SpendControlMovementDTO existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getAmount(), request.getAmount()),
+                "控制额度变动流水已存在但控制金额不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(existing.getCurrency() == request.getCurrency(),
+                "控制额度变动流水已存在但币种不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getSpendRuleId(), request.getSpendRuleId()),
+                "控制额度变动流水已存在但 Spend Rule 标识不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getSpendRuleVersion(), request.getSpendRuleVersion()),
+                "控制额度变动流水已存在但 Spend Rule 版本不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getBudgetGroupSn(), request.getBudgetGroupSn()),
+                "控制额度变动流水已存在但预算组标识不一致，movementSn = {}",
+                request.getMovementSn());
+    }
+
+    private void assertSameMovementDecision(RecordSpendControlMovementRequest request,
+                                            SpendControlMovementDTO existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getSpendDecisionSn(), request.getSpendDecisionSn()),
+                "控制额度变动流水已存在但决策流水不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(existing.getSpendDecisionResult() == request.getSpendDecisionResult(),
+                "控制额度变动流水已存在但决策结果不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getSpendDecisionDigest(), request.getSpendDecisionDigest()),
+                "控制额度变动流水已存在但决策摘要不一致，movementSn = {}",
+                request.getMovementSn());
+    }
+
+    private void assertSameMovementAudit(RecordSpendControlMovementRequest request,
+                                         SpendControlMovementDTO existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getReasonCode(), request.getReasonCode()),
+                "控制额度变动流水已存在但调整原因码不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getOperatorId(), request.getOperatorId()),
+                "控制额度变动流水已存在但操作者不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getAuditReferenceSn(), request.getAuditReferenceSn()),
+                "控制额度变动流水已存在但审计引用不一致，movementSn = {}",
+                request.getMovementSn());
+    }
+
+    private void assertSameMovementDigest(RecordSpendControlMovementRequest request,
+                                          SpendControlMovementDTO existing) {
+        AssertUtils.isTrue(Objects.equals(existing.getMovementDigest(), request.getMovementDigest()),
+                "控制额度变动流水已存在但摘要不一致，movementSn = {}",
+                request.getMovementSn());
+    }
+
+    private void assertReleaseAmountNotOverReserved(RecordSpendControlMovementRequest request) {
+        if (!request.getMovementType().isReleaseMovement()) {
+            return;
+        }
+        long remainingControlAmount = remainingControlAmount(queryBudgetProjectionMovements(
+                new BudgetControlProjectionQuery()
+                        .setTenantId(request.getTenantId())
+                        .setBudgetGroupSn(request.getBudgetGroupSn())
+                        .setCurrency(request.getCurrency())
+                        .setSpendRuleId(request.getSpendRuleId())
+                        .setSpendRuleVersion(request.getSpendRuleVersion())
+                        .setTargetAccountId(request.getTargetAccountId())));
+        AssertUtils.isTrue(remainingControlAmount >= request.getAmount(),
+                "控制释放金额超过可释放占用金额，movementSn = {}, remainingControlAmount = {}, amount = {}",
+                request.getMovementSn(),
+                remainingControlAmount,
+                request.getAmount());
+    }
+
+    private void validateQuery(SpendControlMovementQuery query) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.isTrue(hasNarrowCondition(query), "控制额度变动流水查询必须至少提供一个过滤条件");
+        if (query.getTargetAccountId() != null) {
+            assertSupportedTargetSubjectType(targetSubjectType(query.getTargetAccountId()));
+        }
+    }
+
+    private void validateProjectionQuery(BudgetControlProjectionQuery query) {
+        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.hasText(query.getBudgetGroupSn(), "预算组标识不能为空");
+        AssertUtils.notNull(query.getCurrency(), "币种不能为空");
+        if (query.getTargetAccountId() != null) {
+            assertSupportedTargetSubjectType(targetSubjectType(query.getTargetAccountId()));
+        }
+    }
+
+    private List<SpendControlMovementDTO> queryBudgetProjectionMovements(BudgetControlProjectionQuery query) {
+        return queryMovementsByPage(new SpendControlMovementQuery()
+                .setTenantId(query.getTenantId())
+                .setBudgetGroupSn(query.getBudgetGroupSn())
+                .setCurrency(query.getCurrency())
+                .setSpendRuleId(query.getSpendRuleId())
+                .setSpendRuleVersion(query.getSpendRuleVersion())
+                .setTargetAccountId(query.getTargetAccountId()));
+    }
+
+    private List<SpendControlMovementDTO> queryMovementsByPage(SpendControlMovementQuery query) {
+        WindPagination<SpendControlMovementDTO> page = querySpendControlMovements(
+                query,
+                DefaultPageQueryOptions.defaults(CONTROL_MOVEMENT_QUERY_PAGE_SIZE));
+        AssertUtils.isTrue(page.getTotal() <= CONTROL_MOVEMENT_QUERY_PAGE_SIZE,
+                "控制额度变动流水查询超过单次读取上限，tenantId = {}, total = {}",
+                query.getTenantId(),
+                page.getTotal());
+        return page.getRecords();
+    }
+
+    private BudgetControlProjectionDTO toProjection(BudgetControlProjectionQuery query,
+                                                    List<SpendControlMovementDTO> movements) {
+        List<SpendControlMovementDTO> budgetMovements = budgetProjectionMovements(movements);
+        long limitIncreasedAmount = sumByType(budgetMovements, SpendControlMovementType.LIMIT_INCREASED);
+        long limitDecreasedAmount = sumByType(budgetMovements, SpendControlMovementType.LIMIT_DECREASED);
+        long limitAmount = limitIncreasedAmount - limitDecreasedAmount;
+        long reservedAmount = sumByType(budgetMovements, SpendControlMovementType.RESERVED);
+        long consumedAmount = consumedAmount(budgetMovements);
+        long releasedAmount = releasedAmount(budgetMovements);
+        long remainingControlAmount = reservedAmount - consumedAmount - releasedAmount;
+        long availableControlAmount = limitAmount - consumedAmount - remainingControlAmount;
+        SpendControlMovementDTO lastActivity = budgetMovements.isEmpty() ? null : budgetMovements.getLast();
+        return new BudgetControlProjectionDTO()
+                .setTenantId(query.getTenantId())
+                .setBudgetGroupSn(query.getBudgetGroupSn())
+                .setCurrency(query.getCurrency())
+                .setSpendRuleId(query.getSpendRuleId())
+                .setSpendRuleVersion(query.getSpendRuleVersion())
+                .setTargetAccountId(query.getTargetAccountId())
+                .setLimitIncreasedAmount(limitIncreasedAmount)
+                .setLimitDecreasedAmount(limitDecreasedAmount)
+                .setLimitAmount(limitAmount)
+                .setReservedAmount(reservedAmount)
+                .setConsumedAmount(consumedAmount)
+                .setReleasedAmount(releasedAmount)
+                .setRemainingControlAmount(remainingControlAmount)
+                .setAvailableControlAmount(availableControlAmount)
+                .setLastMovementSn(lastActivity == null ? null : lastActivity.getMovementSn())
+                .setLastMovementAt(lastActivity == null ? null : lastActivity.getGmtCreate());
+    }
+
+    private boolean hasNarrowCondition(SpendControlMovementQuery query) {
+        return StringUtils.hasText(query.getMovementSn())
+                || query.getMovementType() != null
+                || StringUtils.hasText(query.getBusinessScene())
+                || StringUtils.hasText(query.getBusinessSn())
+                || StringUtils.hasText(query.getOriginalMovementSn())
+                || StringUtils.hasText(query.getTransactionSn())
+                || StringUtils.hasText(query.getInstrumentSn())
+                || query.getTargetAccountId() != null
+                || query.getCurrency() != null
+                || StringUtils.hasText(query.getSpendRuleId())
+                || StringUtils.hasText(query.getSpendRuleVersion())
+                || StringUtils.hasText(query.getBudgetGroupSn());
+    }
+
+    private List<SpendControlMovementDTO> budgetProjectionMovements(List<SpendControlMovementDTO> movements) {
+        return movements.stream()
+                .filter(activity -> activity.getMovementType().isBudgetProjectionMovement())
+                .toList();
+    }
+
+    private long remainingControlAmount(List<SpendControlMovementDTO> movements) {
+        List<SpendControlMovementDTO> budgetMovements = budgetProjectionMovements(movements);
+        return sumByType(budgetMovements, SpendControlMovementType.RESERVED)
+                - consumedAmount(budgetMovements)
+                - releasedAmount(budgetMovements);
+    }
+
+    private long consumedAmount(List<SpendControlMovementDTO> movements) {
+        long grossConsumedAmount = sumByType(movements, SpendControlMovementType.CONSUMED);
+        long refundCompensatedAmount = sumByType(movements, SpendControlMovementType.REFUND_COMPENSATED);
+        return grossConsumedAmount - refundCompensatedAmount;
+    }
+
+    private long releasedAmount(List<SpendControlMovementDTO> movements) {
+        return movements.stream()
+                .filter(movement -> movement.getMovementType().isReleaseMovement())
+                .mapToLong(SpendControlMovementDTO::getAmount)
+                .sum();
+    }
+
+    private long sumByType(List<SpendControlMovementDTO> movements, SpendControlMovementType movementType) {
+        return movements.stream()
+                .filter(movement -> movement.getMovementType() == movementType)
+                .mapToLong(SpendControlMovementDTO::getAmount)
+                .sum();
+    }
+
+    private void assertNoSensitiveContextVariables(String contextVariables) {
+        WalletContextVariablesValidator.assertNoSensitiveContextVariables(contextVariables);
+    }
+
+    private SpendControlMovement findMovementEntity(Long tenantId, String movementSn) {
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(TABLE_NAME)
+                .where(TENANT_ID.eq(tenantId))
+                .and(MOVEMENT_SN.eq(movementSn));
+        return spendControlMovementMapper.selectOneByQuery(wrapper);
+    }
+
+    private QueryWrapper toQueryWrapper(SpendControlMovementQuery query,
+                                        WindQuery<? extends QueryOrderField> options) {
+        QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
+                .from(TABLE_NAME)
+                .where(TENANT_ID.eq(query.getTenantId()))
+                .and(MOVEMENT_SN.eq(query.getMovementSn()))
+                .and(MOVEMENT_TYPE.eq(query.getMovementType()))
+                .and(BUSINESS_SCENE.eq(query.getBusinessScene()))
+                .and(BUSINESS_SN.eq(query.getBusinessSn()))
+                .and(ORIGINAL_MOVEMENT_SN.eq(query.getOriginalMovementSn()))
+                .and(TRANSACTION_SN.eq(query.getTransactionSn()))
+                .and(INSTRUMENT_SN.eq(query.getInstrumentSn()))
+                .and(CURRENCY.eq(query.getCurrency()))
+                .and(SPEND_RULE_ID.eq(query.getSpendRuleId()))
+                .and(SPEND_RULE_VERSION.eq(query.getSpendRuleVersion()))
+                .and(BUDGET_GROUP_SN.eq(query.getBudgetGroupSn()));
+        if (query.getTargetAccountId() != null) {
+            wrapper.and(TARGET_SUBJECT_ID.eq(query.getTargetAccountId().id()))
+                    .and(TARGET_SUBJECT_TYPE.eq(targetSubjectType(query.getTargetAccountId())));
+        }
+        wrapper.orderBy(ID.asc());
+        return wrapper;
+    }
+
+    private SpendControlMovementDTO toDTO(SpendControlMovement entity) {
+        return SpendControlMovementConverter.INSTANCE.convertToSpendControlMovementDTO(entity);
+    }
+
+    private FundsSubjectType targetSubjectType(FundsAccountId accountId) {
+        boolean matched = Arrays.stream(FundsSubjectType.values())
+                .anyMatch(type -> type.name().equals(accountId.type()));
+        AssertUtils.isTrue(matched, "控制额度变动目标账户类型非法，targetAccountId = {}", accountId);
+        return FundsSubjectType.valueOf(accountId.type());
+    }
+
+    private void assertSupportedTargetSubjectType(FundsSubjectType subjectType) {
+        AssertUtils.isTrue(subjectType == FundsSubjectType.FUNDING_ACCOUNT
+                        || subjectType == FundsSubjectType.CREDIT_ACCOUNT,
+                "控制额度变动目标只能是资金账户或信用账户，targetSubjectType = {}",
+                subjectType);
+    }
+}

@@ -1,7 +1,7 @@
 package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.enums.SpendControlActivityType;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -30,13 +30,13 @@ public class BudgetControlLimitAdjustmentResultDTO implements Serializable {
     private static final long serialVersionUID = 3762686718054235431L;
 
     @Schema(description = "控制额度变动流水自增主键")
-    private Long activityId;
+    private Long movementId;
 
     @Schema(description = "控制额度变动流水流水号")
-    private String activitySn;
+    private String movementSn;
 
     @Schema(description = "控制额度变动流水类型")
-    private SpendControlActivityType activityType;
+    private SpendControlMovementType movementType;
 
     @Schema(description = "租户 ID")
     private Long tenantId;
@@ -77,8 +77,8 @@ public class BudgetControlLimitAdjustmentResultDTO implements Serializable {
     @Schema(description = "审批、凭证、规则发布或外部审计引用")
     private String auditReferenceSn;
 
-    @Schema(description = "控制活动摘要")
-    private String activityDigest;
+    @Schema(description = "控制额度变动摘要")
+    private String movementDigest;
 
     @Schema(description = "预算控制投影")
     private BudgetControlProjectionDTO projection;

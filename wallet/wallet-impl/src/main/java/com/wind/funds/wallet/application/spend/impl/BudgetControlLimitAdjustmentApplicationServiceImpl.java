@@ -2,15 +2,15 @@ package com.wind.funds.wallet.application.spend.impl;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.wallet.application.spend.BudgetControlLimitAdjustmentApplicationService;
-import com.wind.funds.wallet.enums.SpendControlActivityType;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.model.dto.BudgetControlLimitAdjustmentResultDTO;
 import com.wind.funds.wallet.model.dto.BudgetControlProjectionDTO;
-import com.wind.funds.wallet.model.dto.SpendControlActivityDTO;
+import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
 import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
-import com.wind.funds.wallet.model.query.SpendControlActivityQuery;
+import com.wind.funds.wallet.model.query.SpendControlMovementQuery;
 import com.wind.funds.wallet.model.request.AdjustBudgetControlLimitRequest;
-import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
-import com.wind.funds.wallet.service.SpendControlActivityService;
+import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
+import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -30,30 +30,30 @@ import java.util.List;
 public class BudgetControlLimitAdjustmentApplicationServiceImpl
         implements BudgetControlLimitAdjustmentApplicationService {
 
-    private final SpendControlActivityService spendControlActivityService;
+    private final SpendControlMovementService spendControlMovementService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull BudgetControlLimitAdjustmentResultDTO adjustLimit(
             @NonNull AdjustBudgetControlLimitRequest request) {
         validateRequest(request);
-        RecordSpendControlActivityRequest recordRequest = toRecordActivityRequest(request);
+        RecordSpendControlMovementRequest recordRequest = toRecordMovementRequest(request);
         BudgetControlProjectionQuery projectionQuery = toProjectionQuery(request);
-        if (queryExistingActivity(request).isEmpty()) {
-            BudgetControlProjectionDTO beforeProjection = spendControlActivityService
+        if (queryExistingMovement(request).isEmpty()) {
+            BudgetControlProjectionDTO beforeProjection = spendControlMovementService
                     .getBudgetControlProjection(projectionQuery);
             assertDecreaseNotBreakOccupiedControl(request, beforeProjection);
         }
-        SpendControlActivityDTO activity = spendControlActivityService.recordActivity(
+        SpendControlMovementDTO activity = spendControlMovementService.recordMovement(
                 recordRequest);
-        BudgetControlProjectionDTO projection = spendControlActivityService.getBudgetControlProjection(
+        BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
                 projectionQuery);
         return toResult(request, activity, projection);
     }
 
     private void validateRequest(AdjustBudgetControlLimitRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.hasText(request.getActivitySn(), "预算控制额度调整活动流水号不能为空");
+        AssertUtils.hasText(request.getMovementSn(), "预算控制额度调整变动流水号不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
         AssertUtils.hasText(request.getBudgetGroupSn(), "预算组标识不能为空");
@@ -67,16 +67,16 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
         AssertUtils.hasText(request.getReasonCode(), "预算控制额度调整原因码不能为空");
         AssertUtils.hasText(request.getOperatorId(), "预算控制额度调整操作者不能为空");
         AssertUtils.hasText(request.getAuditReferenceSn(), "预算控制额度调整审计引用不能为空");
-        SpendRuleDigestValidator.assertSha256Digest(request.getActivityDigest(), "控制活动摘要");
+        SpendRuleDigestValidator.assertSha256Digest(request.getMovementDigest(), "控制额度变动摘要");
     }
 
-    private RecordSpendControlActivityRequest toRecordActivityRequest(AdjustBudgetControlLimitRequest request) {
-        return new RecordSpendControlActivityRequest()
+    private RecordSpendControlMovementRequest toRecordMovementRequest(AdjustBudgetControlLimitRequest request) {
+        return new RecordSpendControlMovementRequest()
                 .setTenantId(request.getTenantId())
-                .setActivitySn(request.getActivitySn())
-                .setActivityType(Boolean.TRUE.equals(request.getIncrease())
-                        ? SpendControlActivityType.LIMIT_INCREASED
-                        : SpendControlActivityType.LIMIT_DECREASED)
+                .setMovementSn(request.getMovementSn())
+                .setMovementType(Boolean.TRUE.equals(request.getIncrease())
+                        ? SpendControlMovementType.LIMIT_INCREASED
+                        : SpendControlMovementType.LIMIT_DECREASED)
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
                 .setTargetAccountId(request.getTargetAccountId())
@@ -88,7 +88,7 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 .setReasonCode(request.getReasonCode())
                 .setOperatorId(request.getOperatorId())
                 .setAuditReferenceSn(request.getAuditReferenceSn())
-                .setActivityDigest(request.getActivityDigest())
+                .setMovementDigest(request.getMovementDigest())
                 .setDescription(request.getDescription())
                 .setContextVariables(request.getContextVariables());
     }
@@ -103,10 +103,10 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 .setTargetAccountId(request.getTargetAccountId());
     }
 
-    private List<SpendControlActivityDTO> queryExistingActivity(AdjustBudgetControlLimitRequest request) {
-        return spendControlActivityService.queryActivities(new SpendControlActivityQuery()
+    private List<SpendControlMovementDTO> queryExistingMovement(AdjustBudgetControlLimitRequest request) {
+        return spendControlMovementService.queryMovements(new SpendControlMovementQuery()
                 .setTenantId(request.getTenantId())
-                .setActivitySn(request.getActivitySn()));
+                .setMovementSn(request.getMovementSn()));
     }
 
     private void assertDecreaseNotBreakOccupiedControl(AdjustBudgetControlLimitRequest request,
@@ -118,20 +118,20 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 + beforeProjection.getRemainingControlAmount();
         long proposedLimitAmount = beforeProjection.getLimitAmount() - request.getAmount();
         AssertUtils.isTrue(proposedLimitAmount >= committedControlAmount,
-                "预算控制额度调减不能低于已使用或已占用控制金额，activitySn = {}, "
+                "预算控制额度调减不能低于已使用或已占用控制金额，movementSn = {}, "
                         + "limitAmount = {}, committedControlAmount = {}",
-                request.getActivitySn(),
+                request.getMovementSn(),
                 proposedLimitAmount,
                 committedControlAmount);
     }
 
     private BudgetControlLimitAdjustmentResultDTO toResult(AdjustBudgetControlLimitRequest request,
-                                                           SpendControlActivityDTO activity,
+                                                           SpendControlMovementDTO activity,
                                                            BudgetControlProjectionDTO projection) {
         return new BudgetControlLimitAdjustmentResultDTO()
-                .setActivityId(activity.getId())
-                .setActivitySn(activity.getActivitySn())
-                .setActivityType(activity.getActivityType())
+                .setMovementId(activity.getId())
+                .setMovementSn(activity.getMovementSn())
+                .setMovementType(activity.getMovementType())
                 .setTenantId(activity.getTenantId())
                 .setBusinessScene(activity.getBusinessScene())
                 .setBusinessSn(activity.getBusinessSn())
@@ -145,7 +145,7 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 .setReasonCode(activity.getReasonCode())
                 .setOperatorId(activity.getOperatorId())
                 .setAuditReferenceSn(activity.getAuditReferenceSn())
-                .setActivityDigest(activity.getActivityDigest())
+                .setMovementDigest(activity.getMovementDigest())
                 .setProjection(projection);
     }
 }

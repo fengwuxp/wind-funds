@@ -9,14 +9,14 @@ import com.wind.funds.wallet.enums.SpendRuleDomain;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleType;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionExplanationDTO;
-import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleDecisionRecordDTO;
 import com.wind.funds.wallet.model.query.SpendRuleDecisionExplainQuery;
-import com.wind.funds.wallet.model.query.SpendRuleDecisionLogQuery;
+import com.wind.funds.wallet.model.query.SpendRuleDecisionRecordQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
-import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionLogRequest;
-import com.wind.funds.wallet.service.SpendRuleDecisionLogService;
+import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
+import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -43,26 +43,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
-        SpendRuleDecisionLogServiceTests.Config.class
+        SpendRuleDecisionRecordServiceTests.Config.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
+class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
 
-    private static final String RULE_ID = "sr_decision_log_service_daily_limit";
+    private static final String RULE_ID = "sr_decision_record_service_daily_limit";
 
     private static final String RULE_VERSION = "2026-06-23.1";
 
-    private static final String RULE_DIGEST = "sha256:spend-rule-decision-log-service";
+    private static final String RULE_DIGEST = "sha256:spend-rule-decision-record-service";
 
-    private static final String ASSIGNMENT_SN = "spend_rule_decision_log_service_assignment";
+    private static final String ASSIGNMENT_SN = "spend_rule_decision_record_service_assignment";
 
-    private static final String DECISION_SN = "spend_rule_decision_log_service_001";
+    private static final String DECISION_SN = "spend_rule_decision_record_service_001";
 
-    private static final String BUSINESS_SCENE = "SPEND_RULE_DECISION_LOG_SERVICE";
+    private static final String BUSINESS_SCENE = "SPEND_RULE_DECISION_RECORD_SERVICE";
 
-    private static final String BUSINESS_SN = "SPEND_RULE_DECISION_LOG_SERVICE_001";
+    private static final String BUSINESS_SN = "SPEND_RULE_DECISION_RECORD_SERVICE_001";
 
-    private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_decision_log_service_card";
+    private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_decision_record_service_card";
 
     private static final LocalDateTime EFFECTIVE_FROM = LocalDateTime.now().withNano(0).minusDays(1);
 
@@ -72,7 +72,7 @@ class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
     private SpendRuleDefinitionService spendRuleDefinitionService;
 
     @Autowired
-    private SpendRuleDecisionLogService spendRuleDecisionLogService;
+    private SpendRuleDecisionRecordService spendRuleDecisionRecordService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -88,14 +88,14 @@ class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
         prepareRuleVersionAndAssignment();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        SpendRuleDecisionLogDTO decision =
-                spendRuleDecisionLogService.recordDecision(rejectedDecisionRequest());
-        List<SpendRuleDecisionLogDTO> decisions = spendRuleDecisionLogService.queryDecisions(
-                new SpendRuleDecisionLogQuery()
+        SpendRuleDecisionRecordDTO decision =
+                spendRuleDecisionRecordService.recordDecision(rejectedDecisionRequest());
+        List<SpendRuleDecisionRecordDTO> decisions = spendRuleDecisionRecordService.queryDecisions(
+                new SpendRuleDecisionRecordQuery()
                         .setTenantId(TENANT_ID)
                         .setBusinessScene(BUSINESS_SCENE)
                         .setBusinessSn(BUSINESS_SN));
-        SpendRuleDecisionExplanationDTO explanation = spendRuleDecisionLogService.explainDecision(
+        SpendRuleDecisionExplanationDTO explanation = spendRuleDecisionRecordService.explainDecision(
                 new SpendRuleDecisionExplainQuery()
                         .setTenantId(TENANT_ID)
                         .setDecisionSn(DECISION_SN));
@@ -123,15 +123,15 @@ class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
      * 红线：幂等回放不得新增第二条决策记录，也不得创建资金或账务事实。
      */
     @Test
-    void testRecordDecisionShouldReuseIdempotentDecisionLogWithoutFundsSideEffect() {
+    void testRecordDecisionShouldReuseIdempotentDecisionRecordWithoutFundsSideEffect() {
         prepareRuleVersionAndAssignment();
-        SpendRuleDecisionLogDTO first = spendRuleDecisionLogService.recordDecision(rejectedDecisionRequest());
+        SpendRuleDecisionRecordDTO first = spendRuleDecisionRecordService.recordDecision(rejectedDecisionRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        SpendRuleDecisionLogDTO replayed = spendRuleDecisionLogService.recordDecision(rejectedDecisionRequest());
+        SpendRuleDecisionRecordDTO replayed = spendRuleDecisionRecordService.recordDecision(rejectedDecisionRequest());
 
         assertThat(replayed.getId()).isEqualTo(first.getId());
-        assertThat(countDecisionLogs()).isEqualTo(1);
+        assertThat(countDecisionRecords()).isEqualTo(1);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -146,8 +146,8 @@ class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
     void testQueryDecisionsShouldRejectTenantOnlyScan() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendRuleDecisionLogService.queryDecisions(
-                new SpendRuleDecisionLogQuery().setTenantId(TENANT_ID)))
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.queryDecisions(
+                new SpendRuleDecisionRecordQuery().setTenantId(TENANT_ID)))
                 .hasMessageContaining("至少提供一个 Spend Rule 决策查询条件");
 
         assertNoTransactionFacts(BUSINESS_SN);
@@ -155,13 +155,13 @@ class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
     }
 
     @BeforeEach
-    void setUpDecisionLogServiceTestData() {
-        cleanupDecisionLogServiceTestData();
+    void setUpDecisionRecordServiceTestData() {
+        cleanupDecisionRecordServiceTestData();
     }
 
     @AfterEach
-    void tearDownDecisionLogServiceTestData() {
-        cleanupDecisionLogServiceTestData();
+    void tearDownDecisionRecordServiceTestData() {
+        cleanupDecisionRecordServiceTestData();
     }
 
     private void prepareRuleVersionAndAssignment() {
@@ -207,8 +207,8 @@ class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
                 .setDescription("挂载 Spend Rule 版本");
     }
 
-    private RecordSpendRuleDecisionLogRequest rejectedDecisionRequest() {
-        return new RecordSpendRuleDecisionLogRequest()
+    private RecordSpendRuleDecisionRecordRequest rejectedDecisionRequest() {
+        return new RecordSpendRuleDecisionRecordRequest()
                 .setTenantId(TENANT_ID)
                 .setDecisionSn(DECISION_SN)
                 .setRuleId(RULE_ID)
@@ -227,8 +227,8 @@ class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
                 .setDecisionDigest("sha256:decision-log-service-rejected");
     }
 
-    private void cleanupDecisionLogServiceTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_log WHERE tenant_id = ? AND rule_id = ?",
+    private void cleanupDecisionRecordServiceTestData() {
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
@@ -260,9 +260,9 @@ class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
                 Integer.class, BUSINESS_SCENE, businessSn);
     }
 
-    private int countDecisionLogs() {
+    private int countDecisionRecords() {
         return jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM t_spend_rule_decision_log
+                SELECT COUNT(*) FROM t_spend_rule_decision_record
                 WHERE tenant_id = ? AND decision_sn = ?
                 """, Integer.class, TENANT_ID, DECISION_SN);
     }
@@ -272,7 +272,7 @@ class SpendRuleDecisionLogServiceTests extends AbstractFundsServiceTest {
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
             SpendRuleAssignmentServiceImpl.class,
-            SpendRuleDecisionLogServiceImpl.class
+            SpendRuleDecisionRecordServiceImpl.class
     })
     static class Config {
     }

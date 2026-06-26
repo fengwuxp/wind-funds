@@ -6,12 +6,12 @@ import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService;
-import com.wind.funds.wallet.enums.SpendControlActivityType;
-import com.wind.funds.wallet.model.dto.SpendControlActivityDTO;
-import com.wind.funds.wallet.model.query.SpendControlActivityQuery;
-import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
+import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
+import com.wind.funds.wallet.model.query.SpendControlMovementQuery;
+import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
 import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
-import com.wind.funds.wallet.service.SpendControlActivityService;
+import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -32,94 +32,94 @@ import java.util.Objects;
 public class SpendControlTransactionConsumptionApplicationServiceImpl
         implements SpendControlTransactionConsumptionApplicationService {
 
-    private final SpendControlActivityService spendControlActivityService;
+    private final SpendControlMovementService spendControlMovementService;
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull SpendControlActivityDTO consume(@NonNull SpendControlTransactionConsumptionRequest request) {
+    public @NonNull SpendControlMovementDTO consume(@NonNull SpendControlTransactionConsumptionRequest request) {
         validateTransactionControlRequest(request);
-        SpendControlActivityDTO originalActivity = getOriginalReservedActivity(request);
+        SpendControlMovementDTO originalMovement = getOriginalReservedMovement(request);
         FundsTransactionDTO transaction = getExistingFundsTransaction(request);
         assertClosedTransaction(request, transaction);
         AssertUtils.isTrue(transaction.getTransactionType() != DefaultFundsTransactionType.REFUND,
                 "控制消费不能使用退款交易事实，transactionSn = {}", request.getTransactionSn());
-        assertControlActivityMatchesOriginalActivity(request, originalActivity, "控制消费");
-        assertControlActivityMatchesTransaction(request, transaction, "控制消费");
+        assertControlMovementMatchesOriginalMovement(request, originalMovement, "控制消费");
+        assertControlMovementMatchesTransaction(request, transaction, "控制消费");
         assertTransactionBusinessSnMatches(request, transaction);
-        assertEnoughRemainingControlAmount(request, originalActivity, "控制消费金额超过原占用剩余额度");
-        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlActivityType.CONSUMED, "控制消费");
-        return spendControlActivityService.recordActivity(
-                toRecordRequest(request, originalActivity, SpendControlActivityType.CONSUMED));
+        assertEnoughRemainingControlAmount(request, originalMovement, "控制消费金额超过原占用剩余额度");
+        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlMovementType.CONSUMED, "控制消费");
+        return spendControlMovementService.recordMovement(
+                toRecordRequest(request, originalMovement, SpendControlMovementType.CONSUMED));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull SpendControlActivityDTO release(@NonNull SpendControlTransactionConsumptionRequest request) {
+    public @NonNull SpendControlMovementDTO release(@NonNull SpendControlTransactionConsumptionRequest request) {
         validateTransactionControlRequest(request);
-        SpendControlActivityDTO originalActivity = getOriginalReservedActivity(request);
+        SpendControlMovementDTO originalMovement = getOriginalReservedMovement(request);
         FundsTransactionDTO transaction = getExistingFundsTransaction(request);
         assertReleasableTransaction(request, transaction);
         AssertUtils.isTrue(transaction.getTransactionType() != DefaultFundsTransactionType.REFUND,
                 "控制释放不能使用退款交易事实，transactionSn = {}", request.getTransactionSn());
-        assertControlActivityMatchesOriginalActivity(request, originalActivity, "控制释放");
-        assertControlActivityMatchesTransaction(request, transaction, "控制释放");
+        assertControlMovementMatchesOriginalMovement(request, originalMovement, "控制释放");
+        assertControlMovementMatchesTransaction(request, transaction, "控制释放");
         assertTransactionBusinessSnMatches(request, transaction);
-        assertEnoughRemainingControlAmount(request, originalActivity, "控制释放金额超过原占用剩余额度");
-        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlActivityType.RELEASED, "控制释放");
-        return spendControlActivityService.recordActivity(
-                toRecordRequest(request, originalActivity, SpendControlActivityType.RELEASED));
+        assertEnoughRemainingControlAmount(request, originalMovement, "控制释放金额超过原占用剩余额度");
+        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlMovementType.RELEASED, "控制释放");
+        return spendControlMovementService.recordMovement(
+                toRecordRequest(request, originalMovement, SpendControlMovementType.RELEASED));
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull SpendControlActivityDTO refund(@NonNull SpendControlTransactionConsumptionRequest request) {
+    public @NonNull SpendControlMovementDTO refund(@NonNull SpendControlTransactionConsumptionRequest request) {
         validateTransactionControlRequest(request);
-        SpendControlActivityDTO originalActivity = getOriginalReservedActivity(request);
+        SpendControlMovementDTO originalMovement = getOriginalReservedMovement(request);
         FundsTransactionDTO transaction = getExistingFundsTransaction(request);
         assertClosedTransaction(request, transaction);
         AssertUtils.isTrue(transaction.getTransactionType() == DefaultFundsTransactionType.REFUND,
                 "退款控制补偿必须使用退款交易事实，transactionSn = {}", request.getTransactionSn());
-        assertControlActivityMatchesOriginalActivity(request, originalActivity, "退款控制补偿");
-        assertControlActivityMatchesTransaction(request, transaction, "退款控制补偿");
-        List<SpendControlActivityDTO> referencedConsumedActivities = assertRefundReferencesConsumedTransaction(request,
+        assertControlMovementMatchesOriginalMovement(request, originalMovement, "退款控制补偿");
+        assertControlMovementMatchesTransaction(request, transaction, "退款控制补偿");
+        List<SpendControlMovementDTO> referencedConsumedMovements = assertRefundReferencesConsumedTransaction(request,
                 transaction);
         assertRefundReferenceTransactionValid(request, transaction);
-        assertReferencedConsumedActivitiesMatchOriginalActivity(originalActivity, referencedConsumedActivities);
-        assertRefundDoesNotExceedReferencedConsumedAmount(request, transaction, referencedConsumedActivities);
-        assertRefundDoesNotExceedNetConsumedAmount(request, originalActivity);
-        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlActivityType.REFUND_COMPENSATED,
+        assertReferencedConsumedMovementsMatchOriginalMovement(originalMovement, referencedConsumedMovements);
+        assertRefundDoesNotExceedReferencedConsumedAmount(request, transaction, referencedConsumedMovements);
+        assertRefundDoesNotExceedNetConsumedAmount(request, originalMovement);
+        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlMovementType.REFUND_COMPENSATED,
                 "退款控制补偿");
-        return spendControlActivityService.recordActivity(
-                toRecordRequest(request, originalActivity, SpendControlActivityType.REFUND_COMPENSATED));
+        return spendControlMovementService.recordMovement(
+                toRecordRequest(request, originalMovement, SpendControlMovementType.REFUND_COMPENSATED));
     }
 
     private void validateTransactionControlRequest(SpendControlTransactionConsumptionRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.hasText(request.getActivitySn(), "控制活动流水号不能为空");
-        AssertUtils.hasText(request.getOriginalActivitySn(), "原控制活动流水号不能为空");
+        AssertUtils.hasText(request.getMovementSn(), "控制额度变动流水号不能为空");
+        AssertUtils.hasText(request.getOriginalMovementSn(), "原控制额度变动流水号不能为空");
         AssertUtils.hasText(request.getTransactionSn(), "资金交易流水号不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
-        AssertUtils.notNull(request.getTargetAccountId(), "控制活动目标账户不能为空");
+        AssertUtils.notNull(request.getTargetAccountId(), "控制额度变动目标账户不能为空");
         AssertUtils.notNull(request.getAmount(), "控制金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "控制金额必须大于 0");
         AssertUtils.notNull(request.getCurrency(), "币种不能为空");
-        SpendRuleDigestValidator.assertSha256Digest(request.getActivityDigest(), "控制活动摘要");
+        SpendRuleDigestValidator.assertSha256Digest(request.getMovementDigest(), "控制额度变动摘要");
     }
 
-    private SpendControlActivityDTO getOriginalReservedActivity(SpendControlTransactionConsumptionRequest request) {
-        List<SpendControlActivityDTO> activities = spendControlActivityService.queryActivities(
-                new SpendControlActivityQuery()
+    private SpendControlMovementDTO getOriginalReservedMovement(SpendControlTransactionConsumptionRequest request) {
+        List<SpendControlMovementDTO> movements = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery()
                         .setTenantId(request.getTenantId())
-                        .setActivitySn(request.getOriginalActivitySn()));
-        AssertUtils.isTrue(activities.size() == 1,
-                "原控制活动不存在，originalActivitySn = {}", request.getOriginalActivitySn());
-        SpendControlActivityDTO originalActivity = activities.getFirst();
-        AssertUtils.isTrue(originalActivity.getActivityType() == SpendControlActivityType.RESERVED,
-                "原控制活动必须是 RESERVED，originalActivitySn = {}", request.getOriginalActivitySn());
-        return originalActivity;
+                        .setMovementSn(request.getOriginalMovementSn()));
+        AssertUtils.isTrue(movements.size() == 1,
+                "原控制额度变动不存在，originalMovementSn = {}", request.getOriginalMovementSn());
+        SpendControlMovementDTO originalMovement = movements.getFirst();
+        AssertUtils.isTrue(originalMovement.getMovementType() == SpendControlMovementType.RESERVED,
+                "原控制额度变动必须是 RESERVED，originalMovementSn = {}", request.getOriginalMovementSn());
+        return originalMovement;
     }
 
     private FundsTransactionDTO getExistingFundsTransaction(SpendControlTransactionConsumptionRequest request) {
@@ -144,22 +144,22 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "控制释放必须使用失败或拒绝交易事实，transactionSn = {}", request.getTransactionSn());
     }
 
-    private void assertControlActivityMatchesOriginalActivity(SpendControlTransactionConsumptionRequest request,
-                                                              SpendControlActivityDTO originalActivity,
+    private void assertControlMovementMatchesOriginalMovement(SpendControlTransactionConsumptionRequest request,
+                                                              SpendControlMovementDTO originalMovement,
                                                               String actionName) {
-        AssertUtils.isTrue(Objects.equals(originalActivity.getBusinessScene(), request.getBusinessScene()),
-                "{}业务场景不一致，activitySn = {}", actionName, request.getActivitySn());
-        AssertUtils.isTrue(Objects.equals(originalActivity.getBusinessSn(), request.getBusinessSn()),
-                "{}业务流水不一致，activitySn = {}", actionName, request.getActivitySn());
-        AssertUtils.isTrue(Objects.equals(originalActivity.getTargetAccountId(), request.getTargetAccountId()),
-                "{}目标账户不一致，activitySn = {}", actionName, request.getActivitySn());
-        AssertUtils.isTrue(originalActivity.getCurrency() == request.getCurrency(),
-                "{}币种不一致，activitySn = {}", actionName, request.getActivitySn());
-        AssertUtils.isTrue(originalActivity.getAmount() >= request.getAmount(),
-                "{}金额超过原占用金额，activitySn = {}", actionName, request.getActivitySn());
+        AssertUtils.isTrue(Objects.equals(originalMovement.getBusinessScene(), request.getBusinessScene()),
+                "{}业务场景不一致，movementSn = {}", actionName, request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(originalMovement.getBusinessSn(), request.getBusinessSn()),
+                "{}业务流水不一致，movementSn = {}", actionName, request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(originalMovement.getTargetAccountId(), request.getTargetAccountId()),
+                "{}目标账户不一致，movementSn = {}", actionName, request.getMovementSn());
+        AssertUtils.isTrue(originalMovement.getCurrency() == request.getCurrency(),
+                "{}币种不一致，movementSn = {}", actionName, request.getMovementSn());
+        AssertUtils.isTrue(originalMovement.getAmount() >= request.getAmount(),
+                "{}金额超过原占用金额，movementSn = {}", actionName, request.getMovementSn());
     }
 
-    private void assertControlActivityMatchesTransaction(SpendControlTransactionConsumptionRequest request,
+    private void assertControlMovementMatchesTransaction(SpendControlTransactionConsumptionRequest request,
                                                          FundsTransactionDTO transaction,
                                                          String actionName) {
         AssertUtils.isTrue(Objects.equals(transaction.getBusinessScene(), request.getBusinessScene()),
@@ -178,67 +178,67 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     private void assertTransactionControlAmountNotExceeded(SpendControlTransactionConsumptionRequest request,
                                                            FundsTransactionDTO transaction,
-                                                           SpendControlActivityType activityType,
+                                                           SpendControlMovementType movementType,
                                                            String actionName) {
-        List<SpendControlActivityDTO> transactionActivities = spendControlActivityService.queryActivities(
-                new SpendControlActivityQuery()
+        List<SpendControlMovementDTO> transactionMovements = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery()
                         .setTenantId(request.getTenantId())
-                        .setOriginalActivitySn(request.getOriginalActivitySn())
-                        .setActivityType(activityType)
+                        .setOriginalMovementSn(request.getOriginalMovementSn())
+                        .setMovementType(movementType)
                         .setTransactionSn(request.getTransactionSn()));
-        long usedTransactionAmount = transactionActivities.stream()
-                .filter(activity -> !Objects.equals(activity.getActivitySn(), request.getActivitySn()))
-                .mapToLong(SpendControlActivityDTO::getAmount)
+        long usedTransactionAmount = transactionMovements.stream()
+                .filter(activity -> !Objects.equals(activity.getMovementSn(), request.getMovementSn()))
+                .mapToLong(SpendControlMovementDTO::getAmount)
                 .sum();
         long remainingTransactionAmount = transaction.getAmount() - usedTransactionAmount;
         AssertUtils.isTrue(remainingTransactionAmount >= request.getAmount(),
-                "{}累计金额超过资金交易金额，activitySn = {}, transactionSn = {}, "
+                "{}累计金额超过资金交易金额，movementSn = {}, transactionSn = {}, "
                         + "remainingTransactionAmount = {}, amount = {}",
                 actionName,
-                request.getActivitySn(),
+                request.getMovementSn(),
                 request.getTransactionSn(),
                 remainingTransactionAmount,
                 request.getAmount());
     }
 
     private void assertEnoughRemainingControlAmount(SpendControlTransactionConsumptionRequest request,
-                                                    SpendControlActivityDTO originalActivity,
+                                                    SpendControlMovementDTO originalMovement,
                                                     String message) {
-        ControlActivityUsage usage = controlActivityUsage(request, originalActivity);
+        ControlMovementUsage usage = controlMovementUsage(request, originalMovement);
         AssertUtils.isTrue(usage.remainingAmount() >= request.getAmount(),
-                "{}, activitySn = {}, remainingControlAmount = {}, amount = {}",
+                "{}, movementSn = {}, remainingControlAmount = {}, amount = {}",
                 message,
-                request.getActivitySn(),
+                request.getMovementSn(),
                 usage.remainingAmount(),
                 request.getAmount());
     }
 
     private void assertRefundDoesNotExceedNetConsumedAmount(SpendControlTransactionConsumptionRequest request,
-                                                            SpendControlActivityDTO originalActivity) {
-        ControlActivityUsage usage = controlActivityUsage(request, originalActivity);
+                                                            SpendControlMovementDTO originalMovement) {
+        ControlMovementUsage usage = controlMovementUsage(request, originalMovement);
         AssertUtils.isTrue(usage.netConsumedAmount() >= request.getAmount(),
-                "退款控制补偿金额超过已消费控制金额，activitySn = {}, netConsumedAmount = {}, amount = {}",
-                request.getActivitySn(),
+                "退款控制补偿金额超过已消费控制金额，movementSn = {}, netConsumedAmount = {}, amount = {}",
+                request.getMovementSn(),
                 usage.netConsumedAmount(),
                 request.getAmount());
     }
 
-    private List<SpendControlActivityDTO> assertRefundReferencesConsumedTransaction(
+    private List<SpendControlMovementDTO> assertRefundReferencesConsumedTransaction(
             SpendControlTransactionConsumptionRequest request,
             FundsTransactionDTO transaction) {
         AssertUtils.hasText(transaction.getReferenceTransactionSn(),
                 "退款交易必须引用原消费交易，transactionSn = {}", request.getTransactionSn());
-        List<SpendControlActivityDTO> consumedActivities = spendControlActivityService.queryActivities(
-                new SpendControlActivityQuery()
+        List<SpendControlMovementDTO> consumedMovements = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery()
                         .setTenantId(request.getTenantId())
-                        .setOriginalActivitySn(request.getOriginalActivitySn())
-                        .setActivityType(SpendControlActivityType.CONSUMED)
+                        .setOriginalMovementSn(request.getOriginalMovementSn())
+                        .setMovementType(SpendControlMovementType.CONSUMED)
                         .setTransactionSn(transaction.getReferenceTransactionSn()));
-        AssertUtils.isFalse(consumedActivities.isEmpty(),
-                "退款交易未关联已消费控制活动，transactionSn = {}, referenceTransactionSn = {}",
+        AssertUtils.isFalse(consumedMovements.isEmpty(),
+                "退款交易未关联已消费控制额度变动，transactionSn = {}, referenceTransactionSn = {}",
                 request.getTransactionSn(),
                 transaction.getReferenceTransactionSn());
-        return consumedActivities;
+        return consumedMovements;
     }
 
     private void assertRefundReferenceTransactionValid(SpendControlTransactionConsumptionRequest request,
@@ -276,45 +276,45 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 refundTransaction.getReferenceTransactionSn());
     }
 
-    private void assertReferencedConsumedActivitiesMatchOriginalActivity(
-            SpendControlActivityDTO originalActivity,
-            List<SpendControlActivityDTO> referencedConsumedActivities) {
-        for (SpendControlActivityDTO consumedActivity : referencedConsumedActivities) {
-            AssertUtils.isTrue(Objects.equals(consumedActivity.getBusinessScene(), originalActivity.getBusinessScene()),
-                    "被引用已消费控制活动业务场景不一致，activitySn = {}, originalActivitySn = {}",
-                    consumedActivity.getActivitySn(),
-                    originalActivity.getActivitySn());
-            AssertUtils.isTrue(Objects.equals(consumedActivity.getBusinessSn(), originalActivity.getBusinessSn()),
-                    "被引用已消费控制活动业务流水不一致，activitySn = {}, originalActivitySn = {}",
-                    consumedActivity.getActivitySn(),
-                    originalActivity.getActivitySn());
-            AssertUtils.isTrue(Objects.equals(consumedActivity.getTargetAccountId(),
-                            originalActivity.getTargetAccountId()),
-                    "被引用已消费控制活动目标账户不一致，activitySn = {}, originalActivitySn = {}",
-                    consumedActivity.getActivitySn(),
-                    originalActivity.getActivitySn());
-            AssertUtils.isTrue(consumedActivity.getCurrency() == originalActivity.getCurrency(),
-                    "被引用已消费控制活动币种不一致，activitySn = {}, originalActivitySn = {}",
-                    consumedActivity.getActivitySn(),
-                    originalActivity.getActivitySn());
+    private void assertReferencedConsumedMovementsMatchOriginalMovement(
+            SpendControlMovementDTO originalMovement,
+            List<SpendControlMovementDTO> referencedConsumedMovements) {
+        for (SpendControlMovementDTO consumedMovement : referencedConsumedMovements) {
+            AssertUtils.isTrue(Objects.equals(consumedMovement.getBusinessScene(), originalMovement.getBusinessScene()),
+                    "被引用已消费控制额度变动业务场景不一致，movementSn = {}, originalMovementSn = {}",
+                    consumedMovement.getMovementSn(),
+                    originalMovement.getMovementSn());
+            AssertUtils.isTrue(Objects.equals(consumedMovement.getBusinessSn(), originalMovement.getBusinessSn()),
+                    "被引用已消费控制额度变动业务流水不一致，movementSn = {}, originalMovementSn = {}",
+                    consumedMovement.getMovementSn(),
+                    originalMovement.getMovementSn());
+            AssertUtils.isTrue(Objects.equals(consumedMovement.getTargetAccountId(),
+                            originalMovement.getTargetAccountId()),
+                    "被引用已消费控制额度变动目标账户不一致，movementSn = {}, originalMovementSn = {}",
+                    consumedMovement.getMovementSn(),
+                    originalMovement.getMovementSn());
+            AssertUtils.isTrue(consumedMovement.getCurrency() == originalMovement.getCurrency(),
+                    "被引用已消费控制额度变动币种不一致，movementSn = {}, originalMovementSn = {}",
+                    consumedMovement.getMovementSn(),
+                    originalMovement.getMovementSn());
         }
     }
 
     private void assertRefundDoesNotExceedReferencedConsumedAmount(
             SpendControlTransactionConsumptionRequest request,
             FundsTransactionDTO transaction,
-            List<SpendControlActivityDTO> referencedConsumedActivities) {
-        long referencedConsumedAmount = referencedConsumedActivities.stream()
-                .filter(activity -> !Objects.equals(activity.getActivitySn(), request.getActivitySn()))
-                .mapToLong(SpendControlActivityDTO::getAmount)
+            List<SpendControlMovementDTO> referencedConsumedMovements) {
+        long referencedConsumedAmount = referencedConsumedMovements.stream()
+                .filter(activity -> !Objects.equals(activity.getMovementSn(), request.getMovementSn()))
+                .mapToLong(SpendControlMovementDTO::getAmount)
                 .sum();
         long referencedRefundCompensatedAmount = sumRefundCompensatedAmountForReference(request,
                 transaction.getReferenceTransactionSn());
         long referencedNetConsumedAmount = referencedConsumedAmount - referencedRefundCompensatedAmount;
         AssertUtils.isTrue(referencedNetConsumedAmount >= request.getAmount(),
-                "退款控制补偿金额超过被引用已消费控制金额，activitySn = {}, referenceTransactionSn = {}, "
+                "退款控制补偿金额超过被引用已消费控制金额，movementSn = {}, referenceTransactionSn = {}, "
                         + "referencedNetConsumedAmount = {}, amount = {}",
-                request.getActivitySn(),
+                request.getMovementSn(),
                 transaction.getReferenceTransactionSn(),
                 referencedNetConsumedAmount,
                 request.getAmount());
@@ -322,136 +322,136 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     private long sumRefundCompensatedAmountForReference(SpendControlTransactionConsumptionRequest request,
                                                        String referenceTransactionSn) {
-        List<SpendControlActivityDTO> refundCompensatedActivities =
-                spendControlActivityService.queryActivities(new SpendControlActivityQuery()
+        List<SpendControlMovementDTO> refundCompensatedMovements =
+                spendControlMovementService.queryMovements(new SpendControlMovementQuery()
                         .setTenantId(request.getTenantId())
-                        .setOriginalActivitySn(request.getOriginalActivitySn())
-                        .setActivityType(SpendControlActivityType.REFUND_COMPENSATED));
+                        .setOriginalMovementSn(request.getOriginalMovementSn())
+                        .setMovementType(SpendControlMovementType.REFUND_COMPENSATED));
         long refundCompensatedAmount = 0L;
-        for (SpendControlActivityDTO activity : refundCompensatedActivities) {
-            if (Objects.equals(activity.getActivitySn(), request.getActivitySn())) {
+        for (SpendControlMovementDTO activity : refundCompensatedMovements) {
+            if (Objects.equals(activity.getMovementSn(), request.getMovementSn())) {
                 continue;
             }
-            if (refundActivityReferencesConsumedTransaction(request, activity, referenceTransactionSn)) {
+            if (refundMovementReferencesConsumedTransaction(request, activity, referenceTransactionSn)) {
                 refundCompensatedAmount += activity.getAmount();
             }
         }
         return refundCompensatedAmount;
     }
 
-    private boolean refundActivityReferencesConsumedTransaction(SpendControlTransactionConsumptionRequest request,
-                                                               SpendControlActivityDTO activity,
+    private boolean refundMovementReferencesConsumedTransaction(SpendControlTransactionConsumptionRequest request,
+                                                               SpendControlMovementDTO activity,
                                                                String referenceTransactionSn) {
         AssertUtils.hasText(activity.getTransactionSn(),
-                "退款控制补偿活动缺少资金交易流水，activitySn = {}", activity.getActivitySn());
+                "退款控制补偿活动缺少资金交易流水，movementSn = {}", activity.getMovementSn());
         FundsTransactionDTO refundTransaction = fundsTransactionQueryService.queryFundsTransaction(
                         activity.getTransactionSn())
                 .orElse(null);
         AssertUtils.notNull(refundTransaction,
-                "退款控制补偿活动缺少资金交易事实，activitySn = {}, transactionSn = {}",
-                activity.getActivitySn(),
+                "退款控制补偿活动缺少资金交易事实，movementSn = {}, transactionSn = {}",
+                activity.getMovementSn(),
                 activity.getTransactionSn());
         AssertUtils.isTrue(Objects.equals(refundTransaction.getTenantId(), request.getTenantId()),
-                "退款控制补偿活动资金交易租户不一致，activitySn = {}, transactionSn = {}",
-                activity.getActivitySn(),
+                "退款控制补偿活动资金交易租户不一致，movementSn = {}, transactionSn = {}",
+                activity.getMovementSn(),
                 activity.getTransactionSn());
         AssertUtils.isTrue(refundTransaction.getTransactionType() == DefaultFundsTransactionType.REFUND,
-                "退款控制补偿活动必须关联退款交易事实，activitySn = {}, transactionSn = {}",
-                activity.getActivitySn(),
+                "退款控制补偿活动必须关联退款交易事实，movementSn = {}, transactionSn = {}",
+                activity.getMovementSn(),
                 activity.getTransactionSn());
         return Objects.equals(refundTransaction.getReferenceTransactionSn(), referenceTransactionSn);
     }
 
-    private ControlActivityUsage controlActivityUsage(SpendControlTransactionConsumptionRequest request,
-                                                      SpendControlActivityDTO originalActivity) {
-        List<SpendControlActivityDTO> linkedActivities = spendControlActivityService.queryActivities(
-                new SpendControlActivityQuery()
+    private ControlMovementUsage controlMovementUsage(SpendControlTransactionConsumptionRequest request,
+                                                      SpendControlMovementDTO originalMovement) {
+        List<SpendControlMovementDTO> linkedMovements = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery()
                         .setTenantId(request.getTenantId())
-                        .setOriginalActivitySn(request.getOriginalActivitySn()));
-        List<SpendControlActivityDTO> effectiveActivities = linkedActivities.stream()
-                .filter(activity -> !Objects.equals(activity.getActivitySn(), request.getActivitySn()))
+                        .setOriginalMovementSn(request.getOriginalMovementSn()));
+        List<SpendControlMovementDTO> effectiveMovements = linkedMovements.stream()
+                .filter(activity -> !Objects.equals(activity.getMovementSn(), request.getMovementSn()))
                 .toList();
-        effectiveActivities.forEach(activity -> assertLinkedActivityMatchesOriginalActivity(activity, originalActivity));
-        long grossConsumedAmount = sumAmount(effectiveActivities, SpendControlActivityType.CONSUMED);
-        long refundCompensatedAmount = sumAmount(effectiveActivities, SpendControlActivityType.REFUND_COMPENSATED);
-        long releasedAmount = effectiveActivities.stream()
-                .filter(activity -> activity.getActivityType().isReleaseActivity())
-                .mapToLong(SpendControlActivityDTO::getAmount)
+        effectiveMovements.forEach(activity -> assertLinkedMovementMatchesOriginalMovement(activity, originalMovement));
+        long grossConsumedAmount = sumAmount(effectiveMovements, SpendControlMovementType.CONSUMED);
+        long refundCompensatedAmount = sumAmount(effectiveMovements, SpendControlMovementType.REFUND_COMPENSATED);
+        long releasedAmount = effectiveMovements.stream()
+                .filter(activity -> activity.getMovementType().isReleaseMovement())
+                .mapToLong(SpendControlMovementDTO::getAmount)
                 .sum();
-        return new ControlActivityUsage(originalActivity.getAmount(),
+        return new ControlMovementUsage(originalMovement.getAmount(),
                 grossConsumedAmount,
                 refundCompensatedAmount,
                 releasedAmount);
     }
 
-    private void assertLinkedActivityMatchesOriginalActivity(SpendControlActivityDTO linkedActivity,
-                                                             SpendControlActivityDTO originalActivity) {
-        AssertUtils.isTrue(Objects.equals(linkedActivity.getBusinessScene(), originalActivity.getBusinessScene()),
-                "关联控制活动业务场景不一致，activitySn = {}, originalActivitySn = {}",
-                linkedActivity.getActivitySn(),
-                originalActivity.getActivitySn());
-        AssertUtils.isTrue(Objects.equals(linkedActivity.getBusinessSn(), originalActivity.getBusinessSn()),
-                "关联控制活动业务流水不一致，activitySn = {}, originalActivitySn = {}",
-                linkedActivity.getActivitySn(),
-                originalActivity.getActivitySn());
-        AssertUtils.isTrue(Objects.equals(linkedActivity.getTargetAccountId(), originalActivity.getTargetAccountId()),
-                "关联控制活动目标账户不一致，activitySn = {}, originalActivitySn = {}",
-                linkedActivity.getActivitySn(),
-                originalActivity.getActivitySn());
-        AssertUtils.isTrue(linkedActivity.getCurrency() == originalActivity.getCurrency(),
-                "关联控制活动币种不一致，activitySn = {}, originalActivitySn = {}",
-                linkedActivity.getActivitySn(),
-                originalActivity.getActivitySn());
-        AssertUtils.isTrue(Objects.equals(linkedActivity.getSpendRuleId(), originalActivity.getSpendRuleId()),
-                "关联控制活动 Spend Rule 标识不一致，activitySn = {}, originalActivitySn = {}",
-                linkedActivity.getActivitySn(),
-                originalActivity.getActivitySn());
-        AssertUtils.isTrue(Objects.equals(linkedActivity.getSpendRuleVersion(),
-                        originalActivity.getSpendRuleVersion()),
-                "关联控制活动 Spend Rule 版本不一致，activitySn = {}, originalActivitySn = {}",
-                linkedActivity.getActivitySn(),
-                originalActivity.getActivitySn());
-        AssertUtils.isTrue(Objects.equals(linkedActivity.getBudgetGroupSn(), originalActivity.getBudgetGroupSn()),
-                "关联控制活动预算组不一致，activitySn = {}, originalActivitySn = {}",
-                linkedActivity.getActivitySn(),
-                originalActivity.getActivitySn());
+    private void assertLinkedMovementMatchesOriginalMovement(SpendControlMovementDTO linkedMovement,
+                                                             SpendControlMovementDTO originalMovement) {
+        AssertUtils.isTrue(Objects.equals(linkedMovement.getBusinessScene(), originalMovement.getBusinessScene()),
+                "关联控制额度变动业务场景不一致，movementSn = {}, originalMovementSn = {}",
+                linkedMovement.getMovementSn(),
+                originalMovement.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(linkedMovement.getBusinessSn(), originalMovement.getBusinessSn()),
+                "关联控制额度变动业务流水不一致，movementSn = {}, originalMovementSn = {}",
+                linkedMovement.getMovementSn(),
+                originalMovement.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(linkedMovement.getTargetAccountId(), originalMovement.getTargetAccountId()),
+                "关联控制额度变动目标账户不一致，movementSn = {}, originalMovementSn = {}",
+                linkedMovement.getMovementSn(),
+                originalMovement.getMovementSn());
+        AssertUtils.isTrue(linkedMovement.getCurrency() == originalMovement.getCurrency(),
+                "关联控制额度变动币种不一致，movementSn = {}, originalMovementSn = {}",
+                linkedMovement.getMovementSn(),
+                originalMovement.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(linkedMovement.getSpendRuleId(), originalMovement.getSpendRuleId()),
+                "关联控制额度变动 Spend Rule 标识不一致，movementSn = {}, originalMovementSn = {}",
+                linkedMovement.getMovementSn(),
+                originalMovement.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(linkedMovement.getSpendRuleVersion(),
+                        originalMovement.getSpendRuleVersion()),
+                "关联控制额度变动 Spend Rule 版本不一致，movementSn = {}, originalMovementSn = {}",
+                linkedMovement.getMovementSn(),
+                originalMovement.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(linkedMovement.getBudgetGroupSn(), originalMovement.getBudgetGroupSn()),
+                "关联控制额度变动预算组不一致，movementSn = {}, originalMovementSn = {}",
+                linkedMovement.getMovementSn(),
+                originalMovement.getMovementSn());
     }
 
-    private long sumAmount(List<SpendControlActivityDTO> activities, SpendControlActivityType activityType) {
-        return activities.stream()
-                .filter(activity -> activity.getActivityType() == activityType)
-                .mapToLong(SpendControlActivityDTO::getAmount)
+    private long sumAmount(List<SpendControlMovementDTO> movements, SpendControlMovementType movementType) {
+        return movements.stream()
+                .filter(activity -> activity.getMovementType() == movementType)
+                .mapToLong(SpendControlMovementDTO::getAmount)
                 .sum();
     }
 
-    private RecordSpendControlActivityRequest toRecordRequest(SpendControlTransactionConsumptionRequest request,
-                                                              SpendControlActivityDTO originalActivity,
-                                                              SpendControlActivityType activityType) {
-        return new RecordSpendControlActivityRequest()
+    private RecordSpendControlMovementRequest toRecordRequest(SpendControlTransactionConsumptionRequest request,
+                                                              SpendControlMovementDTO originalMovement,
+                                                              SpendControlMovementType movementType) {
+        return new RecordSpendControlMovementRequest()
                 .setTenantId(request.getTenantId())
-                .setActivitySn(request.getActivitySn())
-                .setActivityType(activityType)
+                .setMovementSn(request.getMovementSn())
+                .setMovementType(movementType)
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
-                .setOriginalActivitySn(request.getOriginalActivitySn())
+                .setOriginalMovementSn(request.getOriginalMovementSn())
                 .setTransactionSn(request.getTransactionSn())
-                .setInstrumentSn(originalActivity.getInstrumentSn())
-                .setAction(originalActivity.getAction())
+                .setInstrumentSn(originalMovement.getInstrumentSn())
+                .setAction(originalMovement.getAction())
                 .setTargetAccountId(request.getTargetAccountId())
                 .setAmount(request.getAmount())
                 .setCurrency(request.getCurrency())
-                .setSpendRuleId(originalActivity.getSpendRuleId())
-                .setSpendRuleVersion(originalActivity.getSpendRuleVersion())
-                .setSpendDecisionSn(originalActivity.getSpendDecisionSn())
-                .setSpendDecisionResult(originalActivity.getSpendDecisionResult())
-                .setSpendDecisionDigest(originalActivity.getSpendDecisionDigest())
-                .setBudgetGroupSn(originalActivity.getBudgetGroupSn())
-                .setActivityDigest(request.getActivityDigest())
+                .setSpendRuleId(originalMovement.getSpendRuleId())
+                .setSpendRuleVersion(originalMovement.getSpendRuleVersion())
+                .setSpendDecisionSn(originalMovement.getSpendDecisionSn())
+                .setSpendDecisionResult(originalMovement.getSpendDecisionResult())
+                .setSpendDecisionDigest(originalMovement.getSpendDecisionDigest())
+                .setBudgetGroupSn(originalMovement.getBudgetGroupSn())
+                .setMovementDigest(request.getMovementDigest())
                 .setDescription(request.getDescription())
                 .setContextVariables(request.getContextVariables());
     }
 
-    private record ControlActivityUsage(long originalReservedAmount,
+    private record ControlMovementUsage(long originalReservedAmount,
                                         long grossConsumedAmount,
                                         long refundCompensatedAmount,
                                         long releasedAmount) {

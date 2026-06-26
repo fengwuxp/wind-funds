@@ -15,23 +15,23 @@ import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionExplanationDTO;
-import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleDecisionRecordDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
 import com.wind.funds.wallet.model.query.SpendRuleDecisionExplainQuery;
-import com.wind.funds.wallet.model.query.SpendRuleDecisionLogQuery;
+import com.wind.funds.wallet.model.query.SpendRuleDecisionRecordQuery;
 import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
-import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionLogRequest;
+import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
 import com.wind.funds.wallet.service.SpendRuleAssignmentService;
-import com.wind.funds.wallet.service.SpendRuleDecisionLogService;
+import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
 import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDecisionRecordServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -106,7 +106,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     private SpendRuleAssignmentService spendRuleAssignmentService;
 
     @Autowired
-    private SpendRuleDecisionLogService spendRuleDecisionLogService;
+    private SpendRuleDecisionRecordService spendRuleDecisionRecordService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -215,7 +215,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 assignmentRequest(ASSIGNMENT_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        SpendRuleDecisionLogDTO decision = spendRuleDecisionLogService.recordDecision(
+        SpendRuleDecisionRecordDTO decision = spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest());
 
         assertThat(decision.getDecisionSn()).isEqualTo(DECISION_SN);
@@ -236,14 +236,14 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         publishRuleVersion();
         spendRuleDefinitionService.assignVersion(
                 assignmentRequest(ASSIGNMENT_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
-        spendRuleDecisionLogService.recordDecision(rejectedDecisionRequest());
-        spendRuleDecisionLogService.recordDecision(
+        spendRuleDecisionRecordService.recordDecision(rejectedDecisionRequest());
+        spendRuleDecisionRecordService.recordDecision(
                 passedDecisionRequest().setBusinessSn(BUSINESS_SN + "_passed"));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        int decisionCountBefore = countSpendRuleDecisionLogs();
+        int decisionCountBefore = countSpendRuleDecisionRecords();
 
-        List<SpendRuleDecisionLogDTO> decisions = spendRuleDecisionLogService.queryDecisions(
-                new SpendRuleDecisionLogQuery()
+        List<SpendRuleDecisionRecordDTO> decisions = spendRuleDecisionRecordService.queryDecisions(
+                new SpendRuleDecisionRecordQuery()
                         .setTenantId(TENANT_ID)
                         .setBusinessScene(BUSINESS_SCENE)
                         .setBusinessSn(BUSINESS_SN));
@@ -251,7 +251,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(decisions).hasSize(1);
         assertThat(decisions.getFirst().getDecisionSn()).isEqualTo(DECISION_SN);
         assertThat(decisions.getFirst().getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
-        assertThat(countSpendRuleDecisionLogs()).isEqualTo(decisionCountBefore);
+        assertThat(countSpendRuleDecisionRecords()).isEqualTo(decisionCountBefore);
         assertNoTransactionFacts(BUSINESS_SN);
         assertNoTransactionFacts(BUSINESS_SN + "_passed");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -268,12 +268,12 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         publishRuleVersion();
         spendRuleDefinitionService.assignVersion(
                 assignmentRequest(ASSIGNMENT_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
-        SpendRuleDecisionLogDTO recorded = spendRuleDecisionLogService.recordDecision(
+        SpendRuleDecisionRecordDTO recorded = spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        int decisionCountBefore = countSpendRuleDecisionLogs();
+        int decisionCountBefore = countSpendRuleDecisionRecords();
 
-        SpendRuleDecisionExplanationDTO explanation = spendRuleDecisionLogService.explainDecision(
+        SpendRuleDecisionExplanationDTO explanation = spendRuleDecisionRecordService.explainDecision(
                 new SpendRuleDecisionExplainQuery()
                         .setTenantId(TENANT_ID)
                         .setDecisionSn(DECISION_SN));
@@ -287,10 +287,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 "spendRuleAssignment:" + ASSIGNMENT_SN,
                 "spendRuleScope:" + SpendRuleScopeType.PAYMENT_INSTRUMENT + ":" + PAYMENT_INSTRUMENT_SN,
                 "spendRuleDecision:" + DECISION_SN,
-                "spendRuleDecisionLog:" + recorded.getId(),
+                "spendRuleDecisionRecord:" + recorded.getId(),
                 "paymentInstrument:" + PAYMENT_INSTRUMENT_SN,
                 "spendRuleBusiness:" + BUSINESS_SCENE + ":" + BUSINESS_SN);
-        assertThat(countSpendRuleDecisionLogs()).isEqualTo(decisionCountBefore);
+        assertThat(countSpendRuleDecisionRecords()).isEqualTo(decisionCountBefore);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -305,8 +305,8 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     void testQuerySpendRuleDecisionsShouldRejectTenantOnlyScan() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendRuleDecisionLogService.queryDecisions(
-                new SpendRuleDecisionLogQuery().setTenantId(TENANT_ID)))
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.queryDecisions(
+                new SpendRuleDecisionRecordQuery().setTenantId(TENANT_ID)))
                 .hasMessageContaining("至少提供一个 Spend Rule 决策查询条件");
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -322,7 +322,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     void testExplainSpendRuleDecisionShouldRejectMissingDecision() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendRuleDecisionLogService.explainDecision(
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.explainDecision(
                 new SpendRuleDecisionExplainQuery()
                         .setTenantId(TENANT_ID)
                         .setDecisionSn(DECISION_SN + "_missing")))
@@ -354,20 +354,20 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                         .setEffectiveTo(LocalDateTime.now().minusDays(1)));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendRuleDecisionLogService.recordDecision(
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest()
                         .setDecisionSn(DECISION_SN + "_future")
                         .setAssignmentSn(ASSIGNMENT_SN + "_future")))
                 .hasMessageContaining("Spend Rule 挂载未在当前时间生效");
-        assertThatThrownBy(() -> spendRuleDecisionLogService.recordDecision(
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest()
                         .setDecisionSn(DECISION_SN + "_expired")
                         .setAssignmentSn(ASSIGNMENT_SN + "_expired")
                         .setScopeId(PAYMENT_INSTRUMENT_SN + "_expired")
                         .setInstrumentSn(PAYMENT_INSTRUMENT_SN + "_expired")))
                 .hasMessageContaining("Spend Rule 挂载未在当前时间生效");
-        assertNoSpendRuleDecisionLog(DECISION_SN + "_future");
-        assertNoSpendRuleDecisionLog(DECISION_SN + "_expired");
+        assertNoSpendRuleDecisionRecord(DECISION_SN + "_future");
+        assertNoSpendRuleDecisionRecord(DECISION_SN + "_expired");
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -414,7 +414,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(assignments).hasSize(1);
         assertThat(assignments.getFirst().getAssignmentSn()).isEqualTo(ASSIGNMENT_SN);
         assertThat(assignments.getFirst().getConflictPolicy()).isEqualTo(SpendRuleConflictPolicy.DENY_OVERRIDES);
-        assertNoSpendRuleDecisionLog(DECISION_SN);
+        assertNoSpendRuleDecisionRecord(DECISION_SN);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -472,7 +472,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 .isEqualTo(SpendRuleAssignmentExplanationStatus.NOT_YET_EFFECTIVE);
         assertThat(expired.getEffective()).isFalse();
         assertThat(expired.getExplanationStatus()).isEqualTo(SpendRuleAssignmentExplanationStatus.EXPIRED);
-        assertNoSpendRuleDecisionLog(DECISION_SN);
+        assertNoSpendRuleDecisionRecord(DECISION_SN);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -490,10 +490,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 assignmentRequest(ASSIGNMENT_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendRuleDecisionLogService.recordDecision(
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest().setInstrumentSn(null)))
                 .hasMessageContaining("支付工具范围的 Spend Rule 决策必须携带支付工具号");
-        assertThatThrownBy(() -> spendRuleDecisionLogService.recordDecision(
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest().setInstrumentSn(PAYMENT_INSTRUMENT_SN + "_other")))
                 .hasMessageContaining("Spend Rule 决策支付工具号与控制范围不一致");
         assertNoTransactionFacts(BUSINESS_SN);
@@ -513,10 +513,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 assignmentRequest(ASSIGNMENT_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendRuleDecisionLogService.recordDecision(
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
                 passedDecisionRequest().setRejectReason("误携带拒绝原因")))
                 .hasMessageContaining("非拒绝 Spend Rule 决策不能携带拒绝原因");
-        assertNoSpendRuleDecisionLog(DECISION_SN + "_passed");
+        assertNoSpendRuleDecisionRecord(DECISION_SN + "_passed");
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -583,8 +583,8 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 .setDescription("挂载 Spend Rule 版本");
     }
 
-    private RecordSpendRuleDecisionLogRequest rejectedDecisionRequest() {
-        return new RecordSpendRuleDecisionLogRequest()
+    private RecordSpendRuleDecisionRecordRequest rejectedDecisionRequest() {
+        return new RecordSpendRuleDecisionRecordRequest()
                 .setTenantId(TENANT_ID)
                 .setDecisionSn(DECISION_SN)
                 .setRuleId(RULE_ID)
@@ -603,7 +603,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 .setDecisionDigest("sha256:spend-rule-rejected-decision");
     }
 
-    private RecordSpendRuleDecisionLogRequest passedDecisionRequest() {
+    private RecordSpendRuleDecisionRecordRequest passedDecisionRequest() {
         return rejectedDecisionRequest()
                 .setDecisionSn(DECISION_SN + "_passed")
                 .setAmount(9000L)
@@ -613,7 +613,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupSpendRuleDefinitionTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_log WHERE tenant_id = ? AND rule_id = ?",
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
@@ -631,18 +631,18 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(countRows("t_ledger_entry", businessSn)).isZero();
     }
 
-    private void assertNoSpendRuleDecisionLog(String decisionSn) {
+    private void assertNoSpendRuleDecisionRecord(String decisionSn) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM t_spend_rule_decision_log WHERE tenant_id = ? AND decision_sn = ?",
+                "SELECT COUNT(*) FROM t_spend_rule_decision_record WHERE tenant_id = ? AND decision_sn = ?",
                 Integer.class,
                 TENANT_ID,
                 decisionSn);
         assertThat(count).isZero();
     }
 
-    private int countSpendRuleDecisionLogs() {
+    private int countSpendRuleDecisionRecords() {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM t_spend_rule_decision_log WHERE tenant_id = ? AND rule_id = ?",
+                "SELECT COUNT(*) FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 Integer.class,
                 TENANT_ID,
                 RULE_ID);
@@ -668,7 +668,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
             SpendRuleAssignmentServiceImpl.class,
-            SpendRuleDecisionLogServiceImpl.class
+            SpendRuleDecisionRecordServiceImpl.class
     })
     static class Config {
     }

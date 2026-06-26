@@ -209,7 +209,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
             return Map.of();
         }
         Map<String, Object> values = new LinkedHashMap<>();
-        putIfNotNull(values, "decisionLogId", spendControlDecision.getSpendDecisionLogId());
+        putIfNotNull(values, "decisionRecordId", spendControlDecision.getSpendDecisionRecordId());
         putIfText(values, "ruleId", spendControlDecision.getSpendRuleId());
         putIfText(values, "ruleVersion", spendControlDecision.getSpendRuleVersion());
         putIfText(values, "assignmentSn", spendControlDecision.getSpendRuleAssignmentSn());

@@ -346,10 +346,10 @@ CREATE TABLE `t_spend_rule_assignment`
   DEFAULT CHARSET = utf8mb4 COMMENT = 'Spend Rule 挂载表';
 
 -- ----------------------------
--- Spend Rule 决策日志表
+-- Spend Rule 决策记录表
 -- ----------------------------
-DROP TABLE IF EXISTS `t_spend_rule_decision_log`;
-CREATE TABLE `t_spend_rule_decision_log`
+DROP TABLE IF EXISTS `t_spend_rule_decision_record`;
+CREATE TABLE `t_spend_rule_decision_record`
 (
     `id`              BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
     `gmt_create`      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -370,29 +370,29 @@ CREATE TABLE `t_spend_rule_decision_log`
     `reject_reason`   VARCHAR(512)         DEFAULT NULL COMMENT '拒绝原因',
     `decision_digest` VARCHAR(128) NOT NULL COMMENT '规则决策摘要',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_spend_rule_decision_log_sn` (`tenant_id`, `decision_sn`),
-    KEY `idx_spend_rule_decision_log_business` (`tenant_id`, `business_scene`, `business_sn`),
-    KEY `idx_spend_rule_decision_log_rule` (`tenant_id`, `rule_id`, `rule_version`),
-    KEY `idx_spend_rule_decision_log_scope` (`tenant_id`, `scope_type`, `scope_id`),
-    KEY `idx_spend_rule_decision_log_assignment` (`tenant_id`, `assignment_sn`)
+    UNIQUE KEY `uk_spend_rule_decision_record_sn` (`tenant_id`, `decision_sn`),
+    KEY `idx_spend_rule_decision_record_business` (`tenant_id`, `business_scene`, `business_sn`),
+    KEY `idx_spend_rule_decision_record_rule` (`tenant_id`, `rule_id`, `rule_version`),
+    KEY `idx_spend_rule_decision_record_scope` (`tenant_id`, `scope_type`, `scope_id`),
+    KEY `idx_spend_rule_decision_record_assignment` (`tenant_id`, `assignment_sn`)
 ) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4 COMMENT = 'Spend Rule 决策日志表';
+  DEFAULT CHARSET = utf8mb4 COMMENT = 'Spend Rule 决策记录表';
 
 -- ----------------------------
--- 支出控制活动表
+-- 支出控制额度变动表
 -- ----------------------------
-DROP TABLE IF EXISTS `t_spend_control_activity`;
-CREATE TABLE `t_spend_control_activity`
+DROP TABLE IF EXISTS `t_spend_control_movement`;
+CREATE TABLE `t_spend_control_movement`
 (
     `id`                    BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
     `gmt_create`            DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `gmt_modified`          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
-    `activity_sn`           VARCHAR(64) NOT NULL COMMENT '控制活动流水号',
+    `movement_sn`           VARCHAR(64) NOT NULL COMMENT '控制额度变动流水号',
     `tenant_id`             BIGINT(20)  NOT NULL COMMENT '租户 ID',
-    `activity_type`         VARCHAR(50) NOT NULL COMMENT '控制活动类型',
+    `movement_type`         VARCHAR(50) NOT NULL COMMENT '控制额度变动类型',
     `business_scene`        VARCHAR(50) NOT NULL COMMENT '业务场景',
     `business_sn`           VARCHAR(64) NOT NULL COMMENT '业务号',
-    `original_activity_sn`  VARCHAR(64)          DEFAULT NULL COMMENT '原支出控制活动流水号',
+    `original_movement_sn`  VARCHAR(64)          DEFAULT NULL COMMENT '原支出控制额度变动流水号',
     `transaction_sn`        VARCHAR(64)          DEFAULT NULL COMMENT '资金交易流水号',
     `instrument_sn`         VARCHAR(64)          DEFAULT NULL COMMENT '支付工具号',
     `action`                VARCHAR(50)          DEFAULT NULL COMMENT '支付工具动作',
@@ -410,21 +410,21 @@ CREATE TABLE `t_spend_control_activity`
     `reason_code`           VARCHAR(64)          DEFAULT NULL COMMENT '调整原因码',
     `operator_id`           VARCHAR(64)          DEFAULT NULL COMMENT '操作者或系统来源',
     `audit_reference_sn`    VARCHAR(128)         DEFAULT NULL COMMENT '审批、凭证、规则发布或外部审计引用',
-    `activity_digest`       VARCHAR(128) NOT NULL COMMENT '控制活动摘要',
+    `movement_digest`       VARCHAR(128) NOT NULL COMMENT '控制额度变动摘要',
     `description`           VARCHAR(512)         DEFAULT NULL COMMENT '描述',
     `context_variables`     TEXT                 DEFAULT NULL COMMENT '扩展上下文',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_spend_control_activity_sn` (`tenant_id`, `activity_sn`),
-    KEY `idx_spend_control_activity_business` (`tenant_id`, `business_scene`, `business_sn`),
-    KEY `idx_spend_control_activity_original` (`tenant_id`, `original_activity_sn`),
-    KEY `idx_spend_control_activity_transaction` (`tenant_id`, `transaction_sn`),
-    KEY `idx_spend_control_activity_instrument` (`tenant_id`, `instrument_sn`, `action`),
-    KEY `idx_spend_control_activity_target` (`tenant_id`, `target_subject_type`, `target_subject_id`),
-    KEY `idx_spend_control_activity_budget` (`tenant_id`, `budget_group_sn`, `currency`),
-    KEY `idx_spend_control_activity_rule` (`tenant_id`, `spend_rule_id`, `spend_rule_version`),
-    KEY `idx_spend_control_activity_created` (`gmt_create`)
+    UNIQUE KEY `uk_spend_control_movement_sn` (`tenant_id`, `movement_sn`),
+    KEY `idx_spend_control_movement_business` (`tenant_id`, `business_scene`, `business_sn`),
+    KEY `idx_spend_control_movement_original` (`tenant_id`, `original_movement_sn`),
+    KEY `idx_spend_control_movement_transaction` (`tenant_id`, `transaction_sn`),
+    KEY `idx_spend_control_movement_instrument` (`tenant_id`, `instrument_sn`, `action`),
+    KEY `idx_spend_control_movement_target` (`tenant_id`, `target_subject_type`, `target_subject_id`),
+    KEY `idx_spend_control_movement_budget` (`tenant_id`, `budget_group_sn`, `currency`),
+    KEY `idx_spend_control_movement_rule` (`tenant_id`, `spend_rule_id`, `spend_rule_version`),
+    KEY `idx_spend_control_movement_created` (`gmt_create`)
 ) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4 COMMENT = '支出控制活动表';
+  DEFAULT CHARSET = utf8mb4 COMMENT = '支出控制额度变动表';
 
 -- ----------------------------
 -- 资金交易表

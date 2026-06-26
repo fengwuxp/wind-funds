@@ -7,7 +7,7 @@ import org.jspecify.annotations.NonNull;
 /**
  * 预算控制额度调整应用服务。
  *
- * <p>职责：把预算组和 Spend Rule 的额度调整记录为控制活动事实，并返回由控制活动
+ * <p>职责：把预算组和 Spend Rule 的额度调整记录为控制额度变动事实，并返回由控制额度变动
  * 派生的预算控制投影。</p>
  *
  * <p>边界：本服务不创建资金交易、route snapshot、账本交易、账目分录、余额投影或

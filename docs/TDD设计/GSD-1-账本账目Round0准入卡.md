@@ -164,7 +164,7 @@
 | 下一 Grant 建议 | `Execution Grant：GSD1-LEDGER-BUDGET-GROUP-COMPAT-GUARD` / `GSD1-LD-RED-004A`，级别为 `contract-only + characterization-regression`，先证明预算组只允许出现在预算控制兼容场景，不允许进入直接交易、授权交易、出入金、退款、清结算或对账补事实的资金价值路由。 |
 | 004A 允许写入建议 | 若用户确认，只允许写目标测试或最小 route / transaction guard：优先保护预算控制现有行为，再补“直接交易或授权资金路由不得接受 BudgetGroup 作为 payer / payee / funding subject”的 Red；只有 Red 证明真实缺口时，才允许在交易路由入口做最小阻断。 |
 | 004A 禁止写入 | 不删 `FundsSubjectType.BUDGET_GROUP`，不改 DDL/H2 schema，不迁移 `BudgetGroupServiceImpl`，不改预算组 ledger 初始化，不改 Spend Rule 生产模型，不改支付工具、VCC、全球账户、清结算对账或 governance apply。 |
-| 后续退出条件 | 待 `B5-SR-CONTROL` 或等价预算控制视图、`SpendControlActivity`、`SpendRuleDecisionLog` 和预算控制投影生产模型形成后，再另起 `GSD1-LD-RED-004B` 评估是否删除预算组 control ledger 兼容路径或把它降级为只读迁移别名。 |
+| 后续退出条件 | 待 `B5-SR-CONTROL` 或等价预算控制视图、`SpendControlMovement`、`SpendRuleDecisionRecord` 和预算控制投影生产模型形成后，再另起 `GSD1-LD-RED-004B` 评估是否删除预算组 control ledger 兼容路径或把它降级为只读迁移别名。 |
 
 ## 11. verificationPlan
 

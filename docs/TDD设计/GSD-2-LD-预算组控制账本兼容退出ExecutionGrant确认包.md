@@ -12,9 +12,9 @@
 | 当前状态 | `BUDGET_GROUP_LEDGER_COMPAT_CLEANUP_GREEN_VERIFIED` |
 | Owner | 产品架构专家负责预算组和 Spend Rule 产品语义、验收和 Not Done；资深架构师负责 ledger 边界、服务契约、迁移顺序、TDD、Review 和验证；AI Native 流程编排负责上下文账本、Grant 串行和交接。 |
 | 写入范围 | Phase 1 写 wallet-face application/spend 契约、Request/DTO、wallet-impl application/spend 实现、Spend Control Activity 控制事实字段、H2 测试 schema 和目标测试；Phase 2 写 ledger posting 主体准入、余额控制预算组旧入口拒绝、目标测试和状态文档；Phase 3 写预算组 ledger profile 清理、显式初始化拒绝、预算组余额查询拒绝、route replay 可入账主体守卫、DSL 夹具、H2 schema、目标测试和状态文档。 |
-| 写入文件 | `wallet/wallet-face/src/main/java/com/wind/funds/wallet/application/spend/BudgetControlLimitAdjustmentApplicationService.java`、`wallet/wallet-face/src/main/java/com/wind/funds/wallet/model/request/AdjustBudgetControlLimitRequest.java`、`wallet/wallet-face/src/main/java/com/wind/funds/wallet/model/dto/BudgetControlLimitAdjustmentResultDTO.java`、`wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application/spend/impl/BudgetControlLimitAdjustmentApplicationServiceImpl.java`、`SpendControlActivity` 相关 Request/DTO/Entity/投影/枚举、`ledger/ledger-impl/src/main/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImpl.java`、`ledger/ledger-impl/src/main/java/com/wind/funds/ledger/impl/DefaultLedgerProfileServiceImpl.java`、`ledger/ledger-impl/src/main/java/com/wind/funds/ledger/impl/DefaultSubjectLedgerInitializer.java`、`transaction/transaction-impl/src/main/java/com/wind/funds/transaction/converter/FundsBalanceControlInstructionConverter.java`、`transaction/transaction-impl/src/main/java/com/wind/funds/route/DefaultRouteReplayService.java`、`transaction/transaction-impl/src/main/java/com/wind/funds/route/support/RouteSubjectSupport.java`、`wallet/wallet-impl/src/main/java/com/wind/funds/wallet/impl/DefaultFundsAccountQueryServiceImpl.java`、`wallet/wallet-face` / `wallet/wallet-impl` 预算组模型、`core` DSL 契约、H2 schema、目标测试和状态文档。 |
+| 写入文件 | `wallet/wallet-face/src/main/java/com/wind/funds/wallet/application/spend/BudgetControlLimitAdjustmentApplicationService.java`、`wallet/wallet-face/src/main/java/com/wind/funds/wallet/model/request/AdjustBudgetControlLimitRequest.java`、`wallet/wallet-face/src/main/java/com/wind/funds/wallet/model/dto/BudgetControlLimitAdjustmentResultDTO.java`、`wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application/spend/impl/BudgetControlLimitAdjustmentApplicationServiceImpl.java`、`SpendControlMovement` 相关 Request/DTO/Entity/投影/枚举、`ledger/ledger-impl/src/main/java/com/wind/funds/ledger/DefaultLedgerTransactionPostingServiceImpl.java`、`ledger/ledger-impl/src/main/java/com/wind/funds/ledger/impl/DefaultLedgerProfileServiceImpl.java`、`ledger/ledger-impl/src/main/java/com/wind/funds/ledger/impl/DefaultSubjectLedgerInitializer.java`、`transaction/transaction-impl/src/main/java/com/wind/funds/transaction/converter/FundsBalanceControlInstructionConverter.java`、`transaction/transaction-impl/src/main/java/com/wind/funds/route/DefaultRouteReplayService.java`、`transaction/transaction-impl/src/main/java/com/wind/funds/route/support/RouteSubjectSupport.java`、`wallet/wallet-impl/src/main/java/com/wind/funds/wallet/impl/DefaultFundsAccountQueryServiceImpl.java`、`wallet/wallet-face` / `wallet/wallet-impl` 预算组模型、`core` DSL 契约、H2 schema、目标测试和状态文档。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、ledger posting、wallet Spend Control、transaction balance control、现有预算组测试和 Git/code baseline。 |
-| 只读参考 | `docs/产品设计/01-PRD总览.md`、`docs/DSL设计/README.md`、`docs/系分设计/02-交易路由钱包账目与投影系分设计.md`、`DefaultLedgerTransactionPostingServiceImpl`、`FundsBalanceControlInstructionConverter`、`DefaultLedgerProfileServiceImpl`、`SpendControlActivityApplicationService`、`DefaultLedgerTransactionPostingServiceImplTests`、`FundsBalanceControlFailureFlowTests`。 |
+| 只读参考 | `docs/产品设计/01-PRD总览.md`、`docs/DSL设计/README.md`、`docs/系分设计/02-交易路由钱包账目与投影系分设计.md`、`DefaultLedgerTransactionPostingServiceImpl`、`FundsBalanceControlInstructionConverter`、`DefaultLedgerProfileServiceImpl`、`SpendControlMovementApplicationService`、`DefaultLedgerTransactionPostingServiceImplTests`、`FundsBalanceControlFailureFlowTests`。 |
 | 上下文账本 | [GSD-2-LWT-生产可用能力Goal.md](GSD-2-LWT-生产可用能力Goal.md)、OpenSpec `tdd-baseline-reset` tasks 和本确认包。 |
 | Git 策略 | 本轮为 `summary_only`，已完成代码和文档验证但未执行 Git 提交；若用户要求提交，再按当前工作树、验证结果和提交范围单独处理。 |
 
@@ -79,7 +79,7 @@
 
 - `BudgetGroup`：预算 scope、展示和审计边界。
 - `SpendRule`：授权前控制规则和决策证据。
-- `SpendControlActivity`：控制事实，包括额度调整、预留、消耗、释放、退款补偿。
+- `SpendControlMovement`：控制事实，包括额度调整、预留、消耗、释放、退款补偿。
 - `BudgetControlProjection`：只读控制投影，不替代资金余额。
 - `LedgerEntry`：只能表达资金账户、信用账户或明确授权资金主体的账本分录。
 
@@ -116,10 +116,10 @@
 接口契约和入参出参建议：
 
 - 下一轮首选新增或扩展 wallet application / spend application 服务层能力，表达预算额度调整控制事实。
-- 请求入参应包含 `tenantId`、`budgetGroupId`、`targetAccountId`、`amount`、`currency`、`increase`、`activitySn`、`businessScene`、`businessSn`、`reasonCode`、`operator` 和审计引用。
+- 请求入参应包含 `tenantId`、`budgetGroupId`、`targetAccountId`、`amount`、`currency`、`increase`、`movementSn`、`businessScene`、`businessSn`、`reasonCode`、`operator` 和审计引用。
 - 出参应返回控制活动流水、预算组、目标账户、调整方向、控制投影摘要和幂等结果。
 - 错误码或异常必须区分预算组不存在、目标账户不一致、币种不一致、重复流水异摘要、金额非法和兼容路径禁用。
-- 幂等键建议使用 `tenantId + activitySn`，同摘要回放返回既有控制活动，异摘要拒绝。
+- 幂等键建议使用 `tenantId + movementSn`，同摘要回放返回既有控制活动，异摘要拒绝。
 - 兼容口径：旧 `BUDGET_GROUP` ledger control entry 只作为迁移期兼容，不作为新调用方入口。
 
 数据方案和一致性：
@@ -211,7 +211,7 @@ TDD 证据：
 已消费 Red / Green：
 
 1. `BudgetControlLimitAdjustmentApplicationServiceTests`：预算额度上调成功后，只新增控制活动和预算控制投影，不新增资金交易、route、posting、LedgerEntry、账本交易或余额投影。
-2. 同一 `activitySn` 同摘要重复请求返回既有控制活动；异摘要重复请求拒绝且无资金副作用。
+2. 同一 `movementSn` 同摘要重复请求返回既有控制活动；异摘要重复请求拒绝且无资金副作用。
 3. 调减后 `limitAmount` 低于当前已占用控制额时 fail-fast，失败路径不写控制活动或资金事实。
 
 第二批 Red 已消费，Phase 3 兼容清理已消费：
@@ -251,7 +251,7 @@ AI 产物复核：实现后必须核对 PRD、DSL、系分和 TDD 是否仍保�
 代码验证候选：
 
 1. `just test-one BudgetControlLimitAdjustmentApplicationServiceTests tests`
-2. `just test-one SpendControlActivityApplicationServiceTests tests`
+2. `just test-one SpendControlMovementApplicationServiceTests tests`
 3. `just test-one DefaultLedgerTransactionPostingServiceImplTests tests`
 4. `just test-one FundsBalanceControlFailureFlowTests tests`
 5. `just test-ledger`
@@ -268,7 +268,7 @@ AI 产物复核：实现后必须核对 PRD、DSL、系分和 TDD 是否仍保�
 本轮已执行验证：
 
 1. `just test-one BudgetControlLimitAdjustmentApplicationServiceTests tests`：4 tests 通过。
-2. `just test-one SpendControlActivityApplicationServiceTests tests`：10 tests 通过。
+2. `just test-one SpendControlMovementApplicationServiceTests tests`：10 tests 通过。
 3. `just test-one SpendControlTransactionConsumptionApplicationServiceTests tests`：23 tests 通过。
 4. `just test-one DefaultLedgerTransactionPostingServiceImplTests tests`：13 tests 通过。
 5. `just test-one FundsBalanceControlFailureFlowTests tests`：19 tests 通过。

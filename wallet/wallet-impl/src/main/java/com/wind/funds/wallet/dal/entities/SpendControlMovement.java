@@ -6,7 +6,7 @@ import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
-import com.wind.funds.wallet.enums.SpendControlActivityType;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -20,20 +20,17 @@ import java.time.LocalDateTime;
 /**
  * 控制额度变动流水。
  *
- * <p>产品语义为 SpendControlMovement；当前类名保留 SpendControlActivity 是为了兼容既有表名、
- * DTO 和测试资产，后续公共类名迁移必须由独立 Grant 明确。</p>
- *
  * @author Codex
  * @date 2026-06-20
  */
 @Data
-@Table(SpendControlActivity.TABLE_NAME)
-public class SpendControlActivity implements Serializable, TenantIsolationObject<Long> {
+@Table(SpendControlMovement.TABLE_NAME)
+public class SpendControlMovement implements Serializable, TenantIsolationObject<Long> {
 
     @Serial
     private static final long serialVersionUID = -9026190484962394413L;
 
-    public static final String TABLE_NAME = "t_spend_control_activity";
+    public static final String TABLE_NAME = "t_spend_control_movement";
 
     /**
      * 自增主键。
@@ -55,7 +52,7 @@ public class SpendControlActivity implements Serializable, TenantIsolationObject
      * 控制额度变动流水号，用于幂等、回放和审计追踪。
      */
     @NotNull
-    private String activitySn;
+    private String movementSn;
 
     /**
      * 租户 ID。
@@ -67,7 +64,7 @@ public class SpendControlActivity implements Serializable, TenantIsolationObject
      * 控制额度变动类型。
      */
     @NotNull
-    private SpendControlActivityType activityType;
+    private SpendControlMovementType movementType;
 
     /**
      * 业务场景。
@@ -84,10 +81,10 @@ public class SpendControlActivity implements Serializable, TenantIsolationObject
     /**
      * 原控制额度变动流水号，用于交易消费、释放或退款补偿回链。
      */
-    private String originalActivitySn;
+    private String originalMovementSn;
 
     /**
-     * 已存在的资金交易流水号，用于交易结果消费控制活动回链。
+     * 已存在的资金交易流水号，用于交易结果消费控制额度变动回链。
      */
     private String transactionSn;
 
@@ -181,7 +178,7 @@ public class SpendControlActivity implements Serializable, TenantIsolationObject
      * 控制额度变动摘要，用于同流水幂等一致性判断。
      */
     @NotNull
-    private String activityDigest;
+    private String movementDigest;
 
     /**
      * 控制额度变动说明。

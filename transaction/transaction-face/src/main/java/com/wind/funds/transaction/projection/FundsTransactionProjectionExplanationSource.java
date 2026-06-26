@@ -149,7 +149,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String DESCRIPTION_FIELD = "description";
 
-    private static final String SPEND_RULE_DECISION_LOG_ID_FIELD = "decisionLogId";
+    private static final String SPEND_RULE_DECISION_RECORD_ID_FIELD = "decisionRecordId";
 
     private static final String SPEND_RULE_ID_FIELD = "ruleId";
 
@@ -170,7 +170,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
     private static final String BUDGET_GROUP_SN_FIELD = "budgetGroupSn";
 
     private static final List<String> SPEND_RULE_DECISION_EXPLAIN_FIELDS = List.of(
-            SPEND_RULE_DECISION_LOG_ID_FIELD,
+            SPEND_RULE_DECISION_RECORD_ID_FIELD,
             SPEND_RULE_ID_FIELD,
             SPEND_RULE_VERSION_FIELD,
             SPEND_RULE_ASSIGNMENT_SN_FIELD,
@@ -424,7 +424,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         }
         addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_ASSIGNMENT_SN_FIELD, "spendRuleAssignment");
         addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_DECISION_SN_FIELD, "spendRuleDecision");
-        addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_DECISION_LOG_ID_FIELD, "spendRuleDecisionLog");
+        addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_DECISION_RECORD_ID_FIELD, "spendRuleDecisionRecord");
     }
 
     private void addSpendRuleDecisionEvidence(@NonNull List<String> refs,

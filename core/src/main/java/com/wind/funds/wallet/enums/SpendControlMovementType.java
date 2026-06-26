@@ -5,14 +5,14 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * 支出控制活动类型。
+ * 支出控制额度变动类型。
  *
  * @author Codex
  * @date 2026-06-20
  */
 @AllArgsConstructor
 @Getter
-public enum SpendControlActivityType implements DescriptiveEnum {
+public enum SpendControlMovementType implements DescriptiveEnum {
 
     ADMISSION_RECORDED("准入已记录", false, false, false, true),
 
@@ -43,30 +43,30 @@ public enum SpendControlActivityType implements DescriptiveEnum {
     /**
      * 是否参与预算控制投影。
      */
-    private final boolean budgetProjectionActivity;
+    private final boolean budgetProjectionMovement;
 
     /**
      * 是否属于预算控制额度调整流水。
      */
-    private final boolean limitAdjustmentActivity;
+    private final boolean limitAdjustmentMovement;
 
     /**
      * 是否属于释放、过期或撤销类控制占用释放流水。
      */
-    private final boolean releaseActivity;
+    private final boolean releaseMovement;
 
     /**
-     * 是否为历史决策记录兼容活动类型。
+     * 是否为历史决策记录兼容变动类型。
      */
-    private final boolean decisionRecordCompatibilityActivity;
+    private final boolean decisionRecordType;
 
     /**
      * 是否为新的控制额度变动流水可写类型。
      *
      * @return true 表示可以通过控制额度变动流水入口写入
      */
-    public boolean isControlMovementActivity() {
-        return budgetProjectionActivity;
+    public boolean isControlMovement() {
+        return budgetProjectionMovement;
     }
 
     /**
@@ -75,7 +75,7 @@ public enum SpendControlActivityType implements DescriptiveEnum {
      * @return 产品目标语义
      */
     public String getProductSemantic() {
-        if (decisionRecordCompatibilityActivity) {
+        if (decisionRecordType) {
             return DECISION_RECORD_PRODUCT_SEMANTIC;
         }
         return CONTROL_MOVEMENT_PRODUCT_SEMANTIC;

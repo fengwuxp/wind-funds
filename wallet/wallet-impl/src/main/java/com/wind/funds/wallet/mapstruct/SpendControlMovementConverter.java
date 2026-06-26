@@ -3,9 +3,9 @@ package com.wind.funds.wallet.mapstruct;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.dal.entities.SpendControlActivity;
-import com.wind.funds.wallet.model.dto.SpendControlActivityDTO;
-import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
+import com.wind.funds.wallet.dal.entities.SpendControlMovement;
+import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
+import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -16,34 +16,34 @@ import org.mapstruct.factory.Mappers;
 import java.util.Arrays;
 
 /**
- * SpendControlActivity model converter.
+ * SpendControlMovement model converter.
  *
  * @author Codex
  * @date 2026-06-23
  */
 @Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
-public interface SpendControlActivityConverter {
+public interface SpendControlMovementConverter {
 
-    SpendControlActivityConverter INSTANCE = Mappers.getMapper(SpendControlActivityConverter.class);
+    SpendControlMovementConverter INSTANCE = Mappers.getMapper(SpendControlMovementConverter.class);
 
     /**
-     * RecordSpendControlActivityRequest convert to SpendControlActivity.
+     * RecordSpendControlMovementRequest convert to SpendControlMovement.
      *
      * @param request 记录请求
-     * @return SpendControlActivity 实例
+     * @return SpendControlMovement 实例
      */
     @Mapping(target = "targetSubjectId", ignore = true)
     @Mapping(target = "targetSubjectType", ignore = true)
-    SpendControlActivity convertToSpendControlActivity(RecordSpendControlActivityRequest request);
+    SpendControlMovement convertToSpendControlMovement(RecordSpendControlMovementRequest request);
 
     /**
-     * SpendControlActivity convert to SpendControlActivityDTO.
+     * SpendControlMovement convert to SpendControlMovementDTO.
      *
-     * @param data SpendControlActivity 实例
-     * @return SpendControlActivityDTO 实例
+     * @param data SpendControlMovement 实例
+     * @return SpendControlMovementDTO 实例
      */
     @Mapping(target = "targetAccountId", ignore = true)
-    SpendControlActivityDTO convertToSpendControlActivityDTO(SpendControlActivity data);
+    SpendControlMovementDTO convertToSpendControlMovementDTO(SpendControlMovement data);
 
     /**
      * Fill target subject fields after same-name field mapping.
@@ -52,8 +52,8 @@ public interface SpendControlActivityConverter {
      * @param entity 控制额度变动流水实体
      */
     @AfterMapping
-    default void fillTargetSubject(RecordSpendControlActivityRequest request,
-                                   @MappingTarget SpendControlActivity entity) {
+    default void fillTargetSubject(RecordSpendControlMovementRequest request,
+                                   @MappingTarget SpendControlMovement entity) {
         FundsAccountId targetAccountId = request.getTargetAccountId();
         if (targetAccountId == null) {
             return;
@@ -69,8 +69,8 @@ public interface SpendControlActivityConverter {
      * @param dto 控制额度变动流水 DTO
      */
     @AfterMapping
-    default void fillTargetAccountId(SpendControlActivity data,
-                                     @MappingTarget SpendControlActivityDTO dto) {
+    default void fillTargetAccountId(SpendControlMovement data,
+                                     @MappingTarget SpendControlMovementDTO dto) {
         if (data.getTargetSubjectId() == null || data.getTargetSubjectType() == null) {
             return;
         }
@@ -86,7 +86,7 @@ public interface SpendControlActivityConverter {
     default FundsSubjectType resolveSubjectType(FundsAccountId accountId) {
         boolean matched = Arrays.stream(FundsSubjectType.values())
                 .anyMatch(type -> type.name().equals(accountId.type()));
-        AssertUtils.isTrue(matched, "控制活动目标账户类型非法，targetAccountId = {}", accountId);
+        AssertUtils.isTrue(matched, "控制额度变动目标账户类型非法，targetAccountId = {}", accountId);
         return FundsSubjectType.valueOf(accountId.type());
     }
 }

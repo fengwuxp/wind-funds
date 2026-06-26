@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class SpendRuleDecisionLogDTO implements Serializable {
+public class SpendRuleDecisionRecordDTO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 2313659530108474289L;

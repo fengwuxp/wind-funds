@@ -4,7 +4,7 @@
 
 本文是 `GSD2-B5-SPEND-RULE-DESIGN-CLOSURE-001` 的角色 Loop 任务卡，用于把本轮 Spend Rule CR 结论落成可交接的产品、系分、DSL 和 TDD 设计闭环。
 
-本文只授权低风险文档、任务和状态回写；不授权 Java、测试、DDL/H2 schema、Entity、Mapper、Controller、HTTP/RPC、公共契约、运行时配置或 Git 操作。`SpendControlActivity` 设计暂不继续推进，本轮不删除、不重写、不扩展既有控制活动实现。
+本文只授权低风险文档、任务和状态回写；不授权 Java、测试、DDL/H2 schema、Entity、Mapper、Controller、HTTP/RPC、公共契约、运行时配置或 Git 操作。`SpendControlMovement` 设计暂不继续推进，本轮不删除、不重写、不扩展既有控制活动实现。
 
 | 字段 | 内容 |
 | --- | --- |
@@ -16,7 +16,7 @@
 | 当前状态 | `DESIGN_CLOSURE_READY_NOT_CODE_AUTHORIZED` |
 | Owner | 产品架构专家负责规则语义、场景和验收；资深架构师负责模块边界、对象结构、测试准入和停止条件；AI Native 流程编排负责状态回写。 |
 | 写入范围 | PRD、DSL、系分、TDD 任务卡、TDD README、LWT Goal、P0/P1 推进计划、docs README 和 OpenSpec tasks。 |
-| 禁止范围 | `SpendControlActivity` 扩展、交易消费控制活动、完整规则引擎实现、Java、测试、DDL/H2、Entity、Mapper、Controller、HTTP/RPC、交易 canonical 入参、ledger posting、VCC facade、事件消费 / outbox、生产迁移。 |
+| 禁止范围 | `SpendControlMovement` 扩展、交易消费控制活动、完整规则引擎实现、Java、测试、DDL/H2、Entity、Mapper、Controller、HTTP/RPC、交易 canonical 入参、ledger posting、VCC facade、事件消费 / outbox、生产迁移。 |
 | Git 策略 | `summary_only`；本任务不包含提交授权。 |
 
 ## 2. 角色 Loop 裁决
@@ -24,7 +24,7 @@
 | 角色 | 裁决 | 落地动作 |
 | --- | --- | --- |
 | 产品架构专家 | Spend Rule 不是资金账户、信用账户、预算组或支付工具的替代品；它是针对工具、预算 scope、账户或业务场景的支出规则配置和准入决策能力。 | PRD 只保留定义、版本、挂载、决策日志、只读投影和生产可用阻断，不保留过程争论。 |
-| 资深架构师 | 规则闭环应先补 `SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleAssignment`、`SpendRuleDecisionLog` 四层；`SpendControlActivity` 保留为既有控制事实能力，不作为本轮写入目标。 | 系分补四层对象、字段、边界、命名口径和后续编码准入；DSL 明确历史交易不得按当前规则重新解释。 |
+| 资深架构师 | 规则闭环应先补 `SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleAssignment`、`SpendRuleDecisionRecord` 四层；`SpendControlMovement` 保留为既有控制事实能力，不作为本轮写入目标。 | 系分补四层对象、字段、边界、命名口径和后续编码准入；DSL 明确历史交易不得按当前规则重新解释。 |
 | AI Native 流程编排 | 本轮属于产研交付视图的 docs-only Plan Grant，不进入 CAD 编码。 | TDD、Goal 和 OpenSpec 记录任务、禁止范围、恢复入口和验证命令。 |
 
 ## 2.1 现状、约束和影响范围
@@ -35,7 +35,7 @@
 
 核心决策：
 
-1. Spend Rule 先建“规则定义、不可变版本、规则挂载、决策日志”四层，不把既有 `SpendControlActivity` 继续扩成规则引擎。
+1. Spend Rule 先建“规则定义、不可变版本、规则挂载、决策日志”四层，不把既有 `SpendControlMovement` 继续扩成规则引擎。
 2. 规则定义和规则版本解决“规则是什么、当时是什么版本”；规则挂载解决“规则应用到谁、优先级是什么”；决策日志解决“这次请求为什么通过、拒绝或复核”。
 3. 交易投影只能读取当时固化的版本、挂载和决策流水，不得按当前规则定义、当前规则挂载或当前工具绑定重算历史。
 4. 后续编码必须单一 Grant 推进，先从契约和 Red 测试证明规则版本不可原地覆盖、规则挂载不输出资金责任主体、规则拒绝无资金事实副作用。
@@ -54,7 +54,7 @@
 非目标：
 
 1. 不实现完整规则引擎、表达式解析器、运营后台或审批流。
-2. 不继续扩展 `SpendControlActivity`、预算控制投影或交易消费控制活动。
+2. 不继续扩展 `SpendControlMovement`、预算控制投影或交易消费控制活动。
 3. 不新增资金交易、route、posting、LedgerEntry、账本交易或余额投影事实。
 4. 不改变直接交易、授权交易、余额控制的账户主体 canonical 入参。
 
@@ -65,7 +65,7 @@
 | `SpendRuleDefinition` | 规则定义，描述规则是什么、归谁管理、用于哪个规则域。 | `ruleId`、`ruleCode`、`ruleName`、`ruleType`、`ruleDomain`、`ownerType`、`ownerId`、`status`。 | 不保存实时决策结果，不直接绑定卡或账户。 |
 | `SpendRuleVersion` | 不可变规则版本，描述条件、额度、动作和生效窗口。 | `ruleId`、`version`、`conditionSpec`、`limitSpec`、`actionSpec`、`effectiveFrom`、`effectiveTo`、`versionDigest`。 | 发布后不得原地覆盖；历史交易只按当时版本解释。 |
 | `SpendRuleAssignment` | 规则挂载，描述某个版本应用到哪个 scope 以及如何排序。 | `assignmentId`、`ruleId`、`version`、`scopeType`、`scopeId`、`priority`、`conflictPolicy`、`status`。 | 不作为资金责任主体，不生成账本分录。 |
-| `SpendRuleDecisionLog` | 规则决策日志，描述一次请求命中了什么规则和结果。 | `decisionSn`、`assignmentId`、`ruleId`、`version`、`decisionResult`、`rejectReason`、`requestDigest`、`decisionDigest`、`evaluatedAt`。 | 不创建交易事实，不替代控制活动，不反写 route、posting 或 ledger。 |
+| `SpendRuleDecisionRecord` | 规则决策日志，描述一次请求命中了什么规则和结果。 | `decisionSn`、`assignmentId`、`ruleId`、`version`、`decisionResult`、`rejectReason`、`requestDigest`、`decisionDigest`、`evaluatedAt`。 | 不创建交易事实，不替代控制活动，不反写 route、posting 或 ledger。 |
 
 字段命名口径：
 
@@ -90,7 +90,7 @@
 1. 运营创建 `SpendRuleDefinition`，明确规则域、规则类型、规则归属和业务可读 `ruleCode`。
 2. 运营发布 `SpendRuleVersion`，固化条件、额度、动作、生效窗口和 `versionDigest`。
 3. 运营把某个版本通过 `SpendRuleAssignment` 挂载到支付工具、预算 scope、账户、账户层级或业务场景，并设置优先级和冲突策略。
-4. 授权、付款或收款前，准入服务读取支付工具快照、账户主体、金额、币种、商户、MCC、国家、时间和业务场景，形成 `SpendRuleDecisionLog`。
+4. 授权、付款或收款前，准入服务读取支付工具快照、账户主体、金额、币种、商户、MCC、国家、时间和业务场景，形成 `SpendRuleDecisionRecord`。
 5. 决策通过时继续委派账户主体型交易内核；决策拒绝时停在交易内核前，只留下拒绝决策日志和审计证据。
 6. 交易投影或客服查询只读取当时版本、挂载和决策流水，解释历史规则命中，不重新评估当前规则。
 
@@ -115,7 +115,7 @@
 
 | 候选接口 | 入参 | 出参 | 错误码和幂等 | 兼容要求 |
 | --- | --- | --- | --- | --- |
-| `SpendRuleDefinitionApplicationService` | 规则定义、版本发布请求、租户和操作者。 | 规则定义、版本、发布结果。 | `ruleId + version` 幂等；已发布版本禁止覆盖。 | 不复用 `SpendControlActivity` 作为规则定义表。 |
+| `SpendRuleDefinitionApplicationService` | 规则定义、版本发布请求、租户和操作者。 | 规则定义、版本、发布结果。 | `ruleId + version` 幂等；已发布版本禁止覆盖。 | 不复用 `SpendControlMovement` 作为规则定义表。 |
 | `SpendRuleAssignmentApplicationService` | scope、ruleId、version、priority、conflictPolicy。 | 挂载结果和挂载版本。 | `assignmentId` 幂等；冲突策略缺失时报错。 | scope 不能输出资金责任主体。 |
 | `SpendRuleDecisionApplicationService` | 支付工具快照、账户主体、金额、币种、商户、MCC、国家、时间和业务场景。 | 决策流水、结果、拒绝原因、摘要。 | `decisionSn` 或请求摘要幂等；摘要冲突拒绝。 | 拒绝路径必须停在交易内核前。 |
 
@@ -169,7 +169,7 @@
 | --- | --- |
 | schemaDecision | 是否允许新增规则定义、版本、挂载和决策日志表。 |
 | writeScope | 是否允许写 `wallet-face`、`wallet-impl`、`tests` 和 H2 schema。 |
-| noWriteScope | 不写 `SpendControlActivity`、交易 canonical 入参、ledger posting、Controller、HTTP/RPC、事件消费或生产迁移。 |
+| noWriteScope | 不写 `SpendControlMovement`、交易 canonical 入参、ledger posting、Controller、HTTP/RPC、事件消费或生产迁移。 |
 | verification | 至少包含目标服务流测试、`just compile`、`just pmd` 和 `git diff --check`；涉及 wallet 组合准入时追加相邻回归。 |
 
 ## 8. 验证
@@ -214,7 +214,7 @@ git diff --check
 
 ## 11. `GSD2-B5-SPEND-RULE-DECISION-CONSUME-001` 消费记录
 
-本节记录用户确认后的独立编码 Grant。本轮目标是让 Spend Rule 决策不再只停留在调用方口头证据中，而是在支出控制准入和支付工具授权准入链路里固化为 `SpendRuleDecisionLog`，同时保持交易 canonical 入参和账本事实边界不变。
+本节记录用户确认后的独立编码 Grant。本轮目标是让 Spend Rule 决策不再只停留在调用方口头证据中，而是在支出控制准入和支付工具授权准入链路里固化为 `SpendRuleDecisionRecord`，同时保持交易 canonical 入参和账本事实边界不变。
 
 | 字段 | 内容 |
 | --- | --- |

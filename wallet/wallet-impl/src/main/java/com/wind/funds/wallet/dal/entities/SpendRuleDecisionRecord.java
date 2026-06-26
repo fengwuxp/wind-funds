@@ -19,20 +19,17 @@ import java.time.LocalDateTime;
 /**
  * Spend Rule 决策记录。
  *
- * <p>产品语义为 SpendRuleDecisionRecord；当前类名保留 SpendRuleDecisionLog 是为了兼容既有表名、
- * DTO 和测试资产，后续公共类名迁移必须由独立 Grant 明确。</p>
- *
  * @author Codex
  * @date 2026-06-22
  */
 @Data
-@Table(SpendRuleDecisionLog.TABLE_NAME)
-public class SpendRuleDecisionLog implements Serializable, TenantIsolationObject<Long> {
+@Table(SpendRuleDecisionRecord.TABLE_NAME)
+public class SpendRuleDecisionRecord implements Serializable, TenantIsolationObject<Long> {
 
     @Serial
     private static final long serialVersionUID = 3126579531735774083L;
 
-    public static final String TABLE_NAME = "t_spend_rule_decision_log";
+    public static final String TABLE_NAME = "t_spend_rule_decision_record";
 
     /**
      * 自增主键。

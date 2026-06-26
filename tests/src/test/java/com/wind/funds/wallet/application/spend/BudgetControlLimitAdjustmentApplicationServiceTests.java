@@ -13,24 +13,24 @@ import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
-import com.wind.funds.wallet.enums.SpendControlActivityType;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.model.dto.BudgetControlLimitAdjustmentResultDTO;
 import com.wind.funds.wallet.model.dto.BudgetControlProjectionDTO;
-import com.wind.funds.wallet.model.dto.SpendControlActivityDTO;
+import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
 import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
-import com.wind.funds.wallet.model.query.SpendControlActivityQuery;
+import com.wind.funds.wallet.model.query.SpendControlMovementQuery;
 import com.wind.funds.wallet.model.request.AdjustBudgetControlLimitRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
-import com.wind.funds.wallet.model.request.RecordSpendControlActivityRequest;
+import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
-import com.wind.funds.wallet.service.SpendControlActivityService;
+import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendControlActivityServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlMovementServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -106,7 +106,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     private CreditAccountService creditAccountService;
 
     @Autowired
-    private SpendControlActivityService spendControlActivityService;
+    private SpendControlMovementService spendControlMovementService;
 
     @Autowired
     private BudgetControlLimitAdjustmentApplicationService budgetControlLimitAdjustmentApplicationService;
@@ -117,7 +117,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     /**
      * 场景：运营调增预算控制额度。
      * 输入：预算组、Spend Rule、目标信用账户、规则版本、原因、操作者和审批引用完整。
-     * 输出：写入额度调增控制活动，并从控制活动派生预算控制投影。
+     * 输出：写入额度调增控制额度变动，并从控制额度变动派生预算控制投影。
      * 红线：预算额度调整不创建资金交易、route、posting、LedgerEntry、账本交易或余额投影事实。
      */
     @Test
@@ -129,8 +129,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 adjustRequest(LIMIT_INCREASE_ACTIVITY_SN, INCREASE_BUSINESS_SN, true,
                         "sha256:budget-limit-increase"));
 
-        assertThat(result.getActivitySn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
-        assertThat(result.getActivityType()).isEqualTo(SpendControlActivityType.LIMIT_INCREASED);
+        assertThat(result.getMovementSn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
+        assertThat(result.getMovementType()).isEqualTo(SpendControlMovementType.LIMIT_INCREASED);
         assertThat(result.getBudgetGroupSn()).isEqualTo(BUDGET_GROUP_SN);
         assertThat(result.getTargetAccountId()).isEqualTo(targetAccountId());
         assertThat(result.getAmount()).isEqualTo(100L);
@@ -148,15 +148,15 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThat(projection.getReleasedAmount()).isZero();
         assertThat(projection.getRemainingControlAmount()).isZero();
         assertThat(projection.getAvailableControlAmount()).isEqualTo(100L);
-        assertThat(projection.getLastActivitySn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
+        assertThat(projection.getLastMovementSn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
 
-        List<SpendControlActivityDTO> activities = spendControlActivityService.queryActivities(
-                new SpendControlActivityQuery()
+        List<SpendControlMovementDTO> movements = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery()
                         .setTenantId(TENANT_ID)
-                        .setActivitySn(LIMIT_INCREASE_ACTIVITY_SN));
-        assertThat(activities).singleElement()
+                        .setMovementSn(LIMIT_INCREASE_ACTIVITY_SN));
+        assertThat(movements).singleElement()
                 .satisfies(activity -> {
-                    assertThat(activity.getActivityType()).isEqualTo(SpendControlActivityType.LIMIT_INCREASED);
+                    assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.LIMIT_INCREASED);
                     assertThat(activity.getInstrumentSn()).isNull();
                     assertThat(activity.getAction()).isNull();
                     assertThat(activity.getReasonCode()).isEqualTo(REASON_CODE);
@@ -169,8 +169,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
     /**
      * 场景：同一预算额度调整流水按相同摘要重放。
-     * 输入：同一 tenantId + activitySn + activityDigest 重复提交。
-     * 输出：返回既有控制活动和同一投影，不新增重复记录。
+     * 输入：同一 tenantId + movementSn + movementDigest 重复提交。
+     * 输出：返回既有控制额度变动和同一投影，不新增重复记录。
      * 红线：幂等重放不得创建任何资金事实。
      */
     @Test
@@ -185,8 +185,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         BudgetControlLimitAdjustmentResultDTO replayed = budgetControlLimitAdjustmentApplicationService.adjustLimit(
                 request);
 
-        assertThat(replayed.getActivityId()).isEqualTo(first.getActivityId());
-        assertThat(replayed.getActivityDigest()).isEqualTo(first.getActivityDigest());
+        assertThat(replayed.getMovementId()).isEqualTo(first.getMovementId());
+        assertThat(replayed.getMovementDigest()).isEqualTo(first.getMovementDigest());
         assertThat(activityCount(LIMIT_REPLAY_ACTIVITY_SN)).isOne();
         assertThat(replayed.getProjection().getLimitAmount()).isEqualTo(100L);
         assertNoTransactionFacts(REPLAY_BUSINESS_SN);
@@ -195,8 +195,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
     /**
      * 场景：同一预算额度调整流水按不同摘要重放。
-     * 输入：同一 tenantId + activitySn 但 activityDigest 不同。
-     * 输出：拒绝写入，已有控制活动保持不变。
+     * 输入：同一 tenantId + movementSn 但 movementDigest 不同。
+     * 输出：拒绝写入，已有控制额度变动保持不变。
      * 红线：异摘要冲突不得创建资金交易、route、posting、LedgerEntry、账本交易或余额投影。
      */
     @Test
@@ -209,7 +209,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
                 adjustRequest(LIMIT_REPLAY_ACTIVITY_SN, REPLAY_BUSINESS_SN, true,
                         "sha256:budget-limit-replay-conflict")))
-                .hasMessageContaining("控制活动流水已存在但摘要不一致");
+                .hasMessageContaining("控制额度变动流水已存在但摘要不一致");
 
         assertThat(activityCount(LIMIT_REPLAY_ACTIVITY_SN)).isOne();
         assertNoTransactionFacts(REPLAY_BUSINESS_SN);
@@ -227,7 +227,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
                 INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
-        spendControlActivityService.recordActivity(reservedRequest());
+        spendControlMovementService.recordMovement(reservedRequest());
         LedgerFactSnapshot beforeReject = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
@@ -251,13 +251,13 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
                 INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
-        spendControlActivityService.recordActivity(reservedRequest());
-        spendControlActivityService.recordActivity(consumedRequest());
-        spendControlActivityService.recordActivity(refundCompensatedRequest());
+        spendControlMovementService.recordMovement(reservedRequest());
+        spendControlMovementService.recordMovement(consumedRequest());
+        spendControlMovementService.recordMovement(refundCompensatedRequest());
         LedgerFactSnapshot beforeQuery = ledgerFactSnapshot(jdbcTemplate);
 
         BudgetControlProjectionDTO projection =
-                spendControlActivityService.getBudgetControlProjection(projectionQuery());
+                spendControlMovementService.getBudgetControlProjection(projectionQuery());
 
         assertThat(projection.getLimitAmount()).isEqualTo(100L);
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
@@ -281,8 +281,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
                 INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"));
-        spendControlActivityService.recordActivity(reservedRequest());
-        spendControlActivityService.recordActivity(consumedRequest());
+        spendControlMovementService.recordMovement(reservedRequest());
+        spendControlMovementService.recordMovement(consumedRequest());
         LedgerFactSnapshot beforeReject = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
@@ -309,13 +309,13 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         creditAccountService.createCreditAccount(createCreditAccountRequest());
     }
 
-    private AdjustBudgetControlLimitRequest adjustRequest(String activitySn,
+    private AdjustBudgetControlLimitRequest adjustRequest(String movementSn,
                                                           String businessSn,
                                                           boolean increase,
-                                                          String activityDigest) {
+                                                          String movementDigest) {
         return new AdjustBudgetControlLimitRequest()
                 .setTenantId(TENANT_ID)
-                .setActivitySn(activitySn)
+                .setMovementSn(movementSn)
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(businessSn)
                 .setBudgetGroupSn(BUDGET_GROUP_SN)
@@ -328,14 +328,14 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setReasonCode(REASON_CODE)
                 .setOperatorId(OPERATOR_ID)
                 .setAuditReferenceSn(AUDIT_REFERENCE_SN)
-                .setActivityDigest(activityDigest);
+                .setMovementDigest(movementDigest);
     }
 
-    private RecordSpendControlActivityRequest reservedRequest() {
-        return new RecordSpendControlActivityRequest()
+    private RecordSpendControlMovementRequest reservedRequest() {
+        return new RecordSpendControlMovementRequest()
                 .setTenantId(TENANT_ID)
-                .setActivitySn(RESERVED_ACTIVITY_SN)
-                .setActivityType(SpendControlActivityType.RESERVED)
+                .setMovementSn(RESERVED_ACTIVITY_SN)
+                .setMovementType(SpendControlMovementType.RESERVED)
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(RESERVED_BUSINESS_SN)
                 .setInstrumentSn("budget_limit_adjust_card")
@@ -349,28 +349,28 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
                 .setSpendDecisionDigest("sha256:budget-limit-reserved-decision")
                 .setBudgetGroupSn(BUDGET_GROUP_SN)
-                .setActivityDigest("sha256:budget-limit-reserved");
+                .setMovementDigest("sha256:budget-limit-reserved");
     }
 
-    private RecordSpendControlActivityRequest consumedRequest() {
+    private RecordSpendControlMovementRequest consumedRequest() {
         return reservedRequest()
-                .setActivitySn(CONSUMED_ACTIVITY_SN)
-                .setActivityType(SpendControlActivityType.CONSUMED)
+                .setMovementSn(CONSUMED_ACTIVITY_SN)
+                .setMovementType(SpendControlMovementType.CONSUMED)
                 .setBusinessSn(CONSUMED_BUSINESS_SN)
-                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn("budget_limit_adjust_consumed_tx_001")
-                .setActivityDigest("sha256:budget-limit-consumed");
+                .setMovementDigest("sha256:budget-limit-consumed");
     }
 
-    private RecordSpendControlActivityRequest refundCompensatedRequest() {
+    private RecordSpendControlMovementRequest refundCompensatedRequest() {
         return reservedRequest()
-                .setActivitySn(REFUND_COMPENSATED_ACTIVITY_SN)
-                .setActivityType(SpendControlActivityType.REFUND_COMPENSATED)
+                .setMovementSn(REFUND_COMPENSATED_ACTIVITY_SN)
+                .setMovementType(SpendControlMovementType.REFUND_COMPENSATED)
                 .setBusinessSn(REFUND_BUSINESS_SN)
-                .setOriginalActivitySn(RESERVED_ACTIVITY_SN)
+                .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn("budget_limit_adjust_refund_tx_001")
                 .setAmount(40L)
-                .setActivityDigest("sha256:budget-limit-refund-compensated");
+                .setMovementDigest("sha256:budget-limit-refund-compensated");
     }
 
     private BudgetControlProjectionQuery projectionQuery() {
@@ -401,15 +401,15 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     }
 
     private void cleanupBudgetControlLimitAdjustmentTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_control_activity WHERE business_scene = ?", BUSINESS_SCENE);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE business_scene = ?", BUSINESS_SCENE);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", CREDIT_ACCOUNT_SN);
     }
 
-    private int activityCount(String activitySn) {
+    private int activityCount(String movementSn) {
         return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM t_spend_control_activity WHERE tenant_id = ? AND activity_sn = ?",
-                Integer.class, TENANT_ID, activitySn);
+                "SELECT COUNT(*) FROM t_spend_control_movement WHERE tenant_id = ? AND movement_sn = ?",
+                Integer.class, TENANT_ID, movementSn);
     }
 
     private void assertNoTransactionFacts(String businessSn) {
@@ -442,7 +442,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
-            SpendControlActivityServiceImpl.class,
+            SpendControlMovementServiceImpl.class,
             BudgetControlLimitAdjustmentApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })

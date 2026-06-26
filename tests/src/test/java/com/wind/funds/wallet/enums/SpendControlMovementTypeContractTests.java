@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Spend Rule 控制额度变动类型契约测试。
  */
-class SpendControlActivityTypeContractTests {
+class SpendControlMovementTypeContractTests {
 
     /**
      * 场景：历史准入和拒绝活动类型仍存在于枚举中。
@@ -18,18 +18,18 @@ class SpendControlActivityTypeContractTests {
      */
     @Test
     void testDecisionRecordCompatibilityTypesShouldNotBeControlMovements() {
-        EnumSet<SpendControlActivityType> decisionRecordCompatibilityTypes = EnumSet.of(
-                SpendControlActivityType.ADMISSION_RECORDED,
-                SpendControlActivityType.REJECTED_RECORDED);
+        EnumSet<SpendControlMovementType> decisionRecordCompatibilityTypes = EnumSet.of(
+                SpendControlMovementType.ADMISSION_RECORDED,
+                SpendControlMovementType.REJECTED_RECORDED);
 
         assertThat(decisionRecordCompatibilityTypes)
                 .allSatisfy(type -> {
                     assertThat(type.getProductSemantic()).isEqualTo("SpendRuleDecisionRecord");
-                    assertThat(type.isDecisionRecordCompatibilityActivity()).isTrue();
-                    assertThat(type.isBudgetProjectionActivity()).isFalse();
-                    assertThat(type.isControlMovementActivity()).isFalse();
-                    assertThat(type.isLimitAdjustmentActivity()).isFalse();
-                    assertThat(type.isReleaseActivity()).isFalse();
+                    assertThat(type.isDecisionRecordType()).isTrue();
+                    assertThat(type.isBudgetProjectionMovement()).isFalse();
+                    assertThat(type.isControlMovement()).isFalse();
+                    assertThat(type.isLimitAdjustmentMovement()).isFalse();
+                    assertThat(type.isReleaseMovement()).isFalse();
                 });
     }
 
@@ -40,16 +40,16 @@ class SpendControlActivityTypeContractTests {
      */
     @Test
     void testControlMovementTypesShouldParticipateInBudgetProjection() {
-        EnumSet<SpendControlActivityType> movementTypes = EnumSet.complementOf(EnumSet.of(
-                SpendControlActivityType.ADMISSION_RECORDED,
-                SpendControlActivityType.REJECTED_RECORDED));
+        EnumSet<SpendControlMovementType> movementTypes = EnumSet.complementOf(EnumSet.of(
+                SpendControlMovementType.ADMISSION_RECORDED,
+                SpendControlMovementType.REJECTED_RECORDED));
 
         assertThat(movementTypes)
                 .allSatisfy(type -> {
                     assertThat(type.getProductSemantic()).isEqualTo("SpendControlMovement");
-                    assertThat(type.isControlMovementActivity()).isTrue();
-                    assertThat(type.isBudgetProjectionActivity()).isTrue();
-                    assertThat(type.isDecisionRecordCompatibilityActivity()).isFalse();
+                    assertThat(type.isControlMovement()).isTrue();
+                    assertThat(type.isBudgetProjectionMovement()).isTrue();
+                    assertThat(type.isDecisionRecordType()).isFalse();
                 });
     }
 
@@ -59,12 +59,12 @@ class SpendControlActivityTypeContractTests {
      */
     @Test
     void testLimitAdjustmentTypesShouldBeExplicitSubsetOfControlMovements() {
-        assertThat(SpendControlActivityType.LIMIT_INCREASED.isLimitAdjustmentActivity()).isTrue();
-        assertThat(SpendControlActivityType.LIMIT_DECREASED.isLimitAdjustmentActivity()).isTrue();
+        assertThat(SpendControlMovementType.LIMIT_INCREASED.isLimitAdjustmentMovement()).isTrue();
+        assertThat(SpendControlMovementType.LIMIT_DECREASED.isLimitAdjustmentMovement()).isTrue();
         assertThat(EnumSet.complementOf(EnumSet.of(
-                        SpendControlActivityType.LIMIT_INCREASED,
-                        SpendControlActivityType.LIMIT_DECREASED)))
-                .noneMatch(SpendControlActivityType::isLimitAdjustmentActivity);
+                        SpendControlMovementType.LIMIT_INCREASED,
+                        SpendControlMovementType.LIMIT_DECREASED)))
+                .noneMatch(SpendControlMovementType::isLimitAdjustmentMovement);
     }
 
     /**
@@ -73,17 +73,17 @@ class SpendControlActivityTypeContractTests {
      */
     @Test
     void testReleaseTypesShouldBeExplicitSubsetOfControlMovements() {
-        EnumSet<SpendControlActivityType> releaseTypes = EnumSet.of(
-                SpendControlActivityType.RELEASED,
-                SpendControlActivityType.EXPIRED,
-                SpendControlActivityType.REVERSED);
+        EnumSet<SpendControlMovementType> releaseTypes = EnumSet.of(
+                SpendControlMovementType.RELEASED,
+                SpendControlMovementType.EXPIRED,
+                SpendControlMovementType.REVERSED);
 
         assertThat(releaseTypes)
                 .allSatisfy(type -> {
-                    assertThat(type.isReleaseActivity()).isTrue();
-                    assertThat(type.isControlMovementActivity()).isTrue();
+                    assertThat(type.isReleaseMovement()).isTrue();
+                    assertThat(type.isControlMovement()).isTrue();
                 });
         assertThat(EnumSet.complementOf(releaseTypes))
-                .noneMatch(SpendControlActivityType::isReleaseActivity);
+                .noneMatch(SpendControlMovementType::isReleaseMovement);
     }
 }

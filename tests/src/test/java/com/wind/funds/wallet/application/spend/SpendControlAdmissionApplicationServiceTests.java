@@ -50,7 +50,7 @@ import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleDecisionLogServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleDecisionRecordServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -164,8 +164,8 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         assertThat(decision.getSpendDecisionSn()).isEqualTo(SPEND_DECISION_SN);
         assertThat(decision.getSpendDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
         assertThat(decision.getSpendDecisionDigest()).isEqualTo(SPEND_DECISION_DIGEST);
-        assertThat(decision.getSpendDecisionLogId()).isNotNull();
-        assertSpendRuleDecisionLog(SpendControlDecisionResult.PASSED, null);
+        assertThat(decision.getSpendDecisionRecordId()).isNotNull();
+        assertSpendRuleDecisionRecord(SpendControlDecisionResult.PASSED, null);
         assertThat(decision.getPreTransactionSnapshot().getReady()).isTrue();
         assertThat(decision.getPreTransactionSnapshot().getFundsAccountCapability().getCapabilities())
                 .containsExactly(FundsAccountCapability.PAY);
@@ -193,8 +193,8 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         assertThat(decision.getAdmitted()).isFalse();
         assertThat(decision.getSpendDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
         assertThat(decision.getRejectReason()).isEqualTo("超过单卡单日授权限额");
-        assertThat(decision.getSpendDecisionLogId()).isNotNull();
-        assertSpendRuleDecisionLog(SpendControlDecisionResult.REJECTED, "超过单卡单日授权限额");
+        assertThat(decision.getSpendDecisionRecordId()).isNotNull();
+        assertSpendRuleDecisionRecord(SpendControlDecisionResult.REJECTED, "超过单卡单日授权限额");
         assertThat(decision.getTargetAccountId())
                 .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
         assertThat(decision.getPreTransactionSnapshot().getReady()).isTrue();
@@ -230,7 +230,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
      * 红线：重复准入不得创建第二条决策记录、交易事实或账本事实。
      */
     @Test
-    void testResolveSpendControlAdmissionShouldReuseSameDecisionLogForIdempotentDecisionEvidence() {
+    void testResolveSpendControlAdmissionShouldReuseSameDecisionRecordForIdempotentDecisionEvidence() {
         prepareSpendControlAdmissionData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -241,8 +241,8 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 spendControlAdmissionApplicationService.resolveSpendControlAdmission(
                         admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED));
 
-        assertThat(replayedDecision.getSpendDecisionLogId()).isEqualTo(firstDecision.getSpendDecisionLogId());
-        assertThat(decisionLogCount()).isEqualTo(1);
+        assertThat(replayedDecision.getSpendDecisionRecordId()).isEqualTo(firstDecision.getSpendDecisionRecordId());
+        assertThat(decisionRecordCount()).isEqualTo(1);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -266,7 +266,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                         .setSpendDecisionDigest("sha256:changed-spend-control-admission")))
                 .hasMessageContaining("Spend Rule 决策流水已存在但内容不一致");
 
-        assertThat(decisionLogCount()).isEqualTo(1);
+        assertThat(decisionRecordCount()).isEqualTo(1);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -292,7 +292,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     }
 
     private void cleanupSpendControlAdmissionTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_log WHERE tenant_id = ? AND rule_id = ?",
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
@@ -447,9 +447,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 Integer.class, BUSINESS_SCENE, businessSn);
     }
 
-    private void assertSpendRuleDecisionLog(SpendControlDecisionResult decisionResult, String rejectReason) {
+    private void assertSpendRuleDecisionRecord(SpendControlDecisionResult decisionResult, String rejectReason) {
         assertThat(jdbcTemplate.queryForObject("""
-                        SELECT COUNT(*) FROM t_spend_rule_decision_log
+                        SELECT COUNT(*) FROM t_spend_rule_decision_record
                         WHERE tenant_id = ? AND decision_sn = ? AND rule_id = ? AND rule_version = ?
                           AND assignment_sn = ? AND scope_type = ? AND scope_id = ?
                           AND instrument_sn = ? AND business_scene = ? AND business_sn = ?
@@ -469,7 +469,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 decisionResult.name(),
                 SPEND_DECISION_DIGEST)).isEqualTo(1);
         String actualRejectReason = jdbcTemplate.queryForObject("""
-                        SELECT reject_reason FROM t_spend_rule_decision_log
+                        SELECT reject_reason FROM t_spend_rule_decision_record
                         WHERE tenant_id = ? AND decision_sn = ?
                         """,
                 String.class,
@@ -478,9 +478,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         assertThat(actualRejectReason).isEqualTo(rejectReason);
     }
 
-    private Integer decisionLogCount() {
+    private Integer decisionRecordCount() {
         return jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM t_spend_rule_decision_log
+                SELECT COUNT(*) FROM t_spend_rule_decision_record
                 WHERE tenant_id = ? AND decision_sn = ?
                 """, Integer.class, TENANT_ID, SPEND_DECISION_SN);
     }
@@ -504,7 +504,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
             SpendRuleAssignmentServiceImpl.class,
-            SpendRuleDecisionLogServiceImpl.class,
+            SpendRuleDecisionRecordServiceImpl.class,
             SpendControlAdmissionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })

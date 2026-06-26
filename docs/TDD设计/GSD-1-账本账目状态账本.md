@@ -34,7 +34,7 @@
 | Harness | `openspec/changes/tdd-baseline-reset/tasks.md` | 记录任务账本、任务优先级和批次授权口径。 |
 | TDD 索引 | `docs/TDD设计/README.md` | 记录 GSD-1 文档阅读顺序。 |
 
-## 4. decisionLog
+## 4. decisionRecord
 
 | 日期 | 决策 | 影响 |
 | --- | --- | --- |

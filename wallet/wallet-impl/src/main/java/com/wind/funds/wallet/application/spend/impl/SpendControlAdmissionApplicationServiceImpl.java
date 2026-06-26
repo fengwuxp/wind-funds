@@ -6,11 +6,11 @@ import com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationS
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
 import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
-import com.wind.funds.wallet.model.dto.SpendRuleDecisionLogDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleDecisionRecordDTO;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
-import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionLogRequest;
-import com.wind.funds.wallet.service.SpendRuleDecisionLogService;
+import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
+import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -29,7 +29,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
 
     private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
 
-    private final SpendRuleDecisionLogService spendRuleDecisionLogService;
+    private final SpendRuleDecisionRecordService spendRuleDecisionRecordService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -38,9 +38,9 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
         validateRequest(request);
         PaymentInstrumentPreTransactionSnapshotDTO snapshot =
                 preTransactionSnapshotApplicationService.resolvePreTransactionSnapshot(toSnapshotRequest(request));
-        SpendRuleDecisionLogDTO decisionLog =
-                spendRuleDecisionLogService.recordDecision(toDecisionLogRequest(request));
-        return toDecision(request, snapshot, decisionLog);
+        SpendRuleDecisionRecordDTO decisionRecord =
+                spendRuleDecisionRecordService.recordDecision(toDecisionRecordRequest(request));
+        return toDecision(request, snapshot, decisionRecord);
     }
 
     private void validateRequest(ResolveSpendControlAdmissionRequest request) {
@@ -81,8 +81,8 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 .setBusinessSn(request.getBusinessSn());
     }
 
-    private RecordSpendRuleDecisionLogRequest toDecisionLogRequest(ResolveSpendControlAdmissionRequest request) {
-        return new RecordSpendRuleDecisionLogRequest()
+    private RecordSpendRuleDecisionRecordRequest toDecisionRecordRequest(ResolveSpendControlAdmissionRequest request) {
+        return new RecordSpendRuleDecisionRecordRequest()
                 .setTenantId(request.getTenantId())
                 .setDecisionSn(request.getSpendDecisionSn())
                 .setRuleId(request.getSpendRuleId())
@@ -103,7 +103,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
 
     private SpendControlAdmissionDecisionDTO toDecision(ResolveSpendControlAdmissionRequest request,
                                                         PaymentInstrumentPreTransactionSnapshotDTO snapshot,
-                                                        SpendRuleDecisionLogDTO decisionLog) {
+                                                        SpendRuleDecisionRecordDTO decisionRecord) {
         return new SpendControlAdmissionDecisionDTO()
                 .setTenantId(request.getTenantId())
                 .setInstrumentSn(request.getInstrumentSn())
@@ -124,7 +124,7 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 .setSpendDecisionSn(request.getSpendDecisionSn())
                 .setSpendDecisionResult(request.getSpendDecisionResult())
                 .setSpendDecisionDigest(request.getSpendDecisionDigest())
-                .setSpendDecisionLogId(decisionLog.getId())
+                .setSpendDecisionRecordId(decisionRecord.getId())
                 .setBudgetGroupSn(request.getBudgetGroupSn())
                 .setRejectReason(request.getRejectReason())
                 .setPreTransactionSnapshot(snapshot);

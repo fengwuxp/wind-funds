@@ -51,8 +51,8 @@
 | 能力域 | 前台能力 | 后台能力 | 数据能力 |
 | --- | --- | --- | --- |
 | 支出控制准入 | 调用方提交支付工具、动作、金额、业务场景和外部 Spend Rule 决策证据。 | 校验预交易快照、资金责任、账户能力和外部决策结果。 | `SpendControlAdmissionDecisionDTO`、支付工具快照、账户能力快照、资金责任决策。 |
-| 控制活动 | 记录允许、拒绝、占用、释放、过期、撤销、退款释放等控制动作。 | 幂等、摘要一致性、活动链路、原因和证据引用。 | activitySn、activityType、businessSn、spendRuleId、spendRuleVersion、spendDecisionSn、spendDecisionDigest、amount、currency、targetAccountId、budgetGroupSn。 |
-| 预算控制投影 | 查询预算组或规则维度的控制占用和释放结果。 | 从控制活动派生只读控制余额，不反写资金余额。 | reservedAmount、releasedAmount、remainingControlAmount、lastActivitySn、lastActivityAt。 |
+| 控制活动 | 记录允许、拒绝、占用、释放、过期、撤销、退款释放等控制动作。 | 幂等、摘要一致性、活动链路、原因和证据引用。 | movementSn、movementType、businessSn、spendRuleId、spendRuleVersion、spendDecisionSn、spendDecisionDigest、amount、currency、targetAccountId、budgetGroupSn。 |
+| 预算控制投影 | 查询预算组或规则维度的控制占用和释放结果。 | 从控制活动派生只读控制余额，不反写资金余额。 | reservedAmount、releasedAmount、remainingControlAmount、lastMovementSn、lastMovementAt。 |
 | 交易和账本 | 本切片不写交易或账本，只作为后续交易前后控制证据。 | 若后续交易消费控制活动，必须另起 Grant 连接交易事实。 | 无 route、posting、LedgerEntry、ledger balance 写入。 |
 
 ## 4. 业务对象、状态和字段口径
@@ -60,7 +60,7 @@
 业务对象：
 
 - `SpendControlAdmissionDecision`：既有准入结论，说明支付工具、资金责任目标、账户能力和外部决策证据是否允许本次支出。
-- `SpendControlActivity`：新增目标对象，用于记录一次控制事实，例如准入记录、预算占用、预算释放、拒绝、过期、撤销或退款释放。
+- `SpendControlMovement`：新增目标对象，用于记录一次控制事实，例如准入记录、预算占用、预算释放、拒绝、过期、撤销或退款释放。
 - `BudgetControlProjection`：新增目标视图，用于从控制活动派生预算控制占用状态。
 - `BudgetGroup`：预算范围或控制视图，不是账务主体。
 - `SpendRule`：规则和策略版本，不是账务主体。
@@ -78,7 +78,7 @@
 
 字段口径：
 
-1. `activitySn` 是控制活动幂等流水，不等同交易流水。
+1. `movementSn` 是控制活动幂等流水，不等同交易流水。
 2. `businessScene + businessSn` 是业务追溯入口，不替代活动流水。
 3. `targetAccountId` 或等价目标主体来自预交易快照，不允许调用方把预算组、Spend Rule 或支付工具直接作为入账主体。
 4. `spendRuleId + spendRuleVersion + spendDecisionSn + spendDecisionDigest` 只表达规则决策证据。
@@ -97,7 +97,7 @@
 异常流程：
 
 1. 缺少准入决策证据时，控制活动记录必须 fail-fast。
-2. 同一 `activitySn` 重复提交且摘要一致时返回既有记录；摘要不一致时拒绝。
+2. 同一 `movementSn` 重复提交且摘要一致时返回既有记录；摘要不一致时拒绝。
 3. 释放金额不得超过同一控制链路的已占用金额。
 4. 找不到原占用活动时不得创建释放投影。
 5. 任何失败路径均不得生成资金交易、route、posting、LedgerEntry 或余额投影。
@@ -107,7 +107,7 @@
 | 规则 | 触发条件 | 判断逻辑 | 优先级 | 版本 |
 | --- | --- | --- | --- | --- |
 | 控制活动主体 | 创建任一控制活动 | 必须解析到资金账户或信用账户目标主体，BudgetGroup 和 Spend Rule 只能作控制维度。 | P0 | GSD2-B5 |
-| 幂等 | 同一 `activitySn` 重复提交 | 摘要一致返回既有结果，摘要不一致失败。 | P0 | GSD2-B5 |
+| 幂等 | 同一 `movementSn` 重复提交 | 摘要一致返回既有结果，摘要不一致失败。 | P0 | GSD2-B5 |
 | 无账务副作用 | 记录或查询控制活动 | 不创建资金交易、route、posting、LedgerEntry、ledger transaction 或余额投影。 | P0 | GSD2-B5 |
 | 预算投影 | 记录占用或释放 | 只更新控制投影，不表达真实资金余额。 | P0 | GSD2-B5 |
 | schemaDecision | 进入编码前 | `contract-only` 只落契约 Red；`ddl-backed` 才能声明控制活动和投影具备持久化最小闭环。 | P1 | GSD2 |
@@ -117,7 +117,7 @@
 核心决策：
 
 1. 落点在 `wallet` application 层，不落在 `transaction` 内核。Spend Rule 控制活动是交易前后控制证据，不是资金交易事实。
-2. 服务命名推荐 `SpendControlActivityApplicationService`，不推荐 `InstrumentTransactionService` 或交易层支付工具统一服务。
+2. 服务命名推荐 `SpendControlMovementApplicationService`，不推荐 `InstrumentTransactionService` 或交易层支付工具统一服务。
 3. 首轮推荐 `ddl-backed`，因为控制活动和预算控制投影若不可持久化，就无法支撑生产审计、幂等、回放和对账追踪。
 4. 若用户选择 `contract-only`，只允许落 face 契约、Request/DTO 和 Red，不声明生产可用闭环。
 5. 预算控制投影可先从控制活动最小派生，后续是否拆独立 projection store 需要新的 Grant。
@@ -139,40 +139,40 @@ Execution Grant：GSD2-B5-SR-CONTROL-ACTIVITY-001
 schemaDecision：ddl-backed
 ```
 
-`ddl-backed` 的首轮最小存储边界限定为 `t_spend_control_activity`。`BudgetControlProjectionDTO` 首轮由控制活动聚合派生，不单独新增 `t_budget_control_projection`；若后续需要独立 projection store、异步投影、批量重算或性能优化，需要新的 Execution Grant。
+`ddl-backed` 的首轮最小存储边界限定为 `t_spend_control_movement`。`BudgetControlProjectionDTO` 首轮由控制活动聚合派生，不单独新增 `t_budget_control_projection`；若后续需要独立 projection store、异步投影、批量重算或性能优化，需要新的 Execution Grant。
 
 接口契约候选：
 
 | 契约 | 入参 | 出参 | 错误码或失败路径 | 幂等 |
 | --- | --- | --- | --- | --- |
-| `recordActivity` | `RecordSpendControlActivityRequest` | `SpendControlActivityDTO` | 缺目标主体、缺准入证据、非法金额、重复摘要不一致。 | `tenantId + activitySn` |
-| `queryActivities` | `SpendControlActivityQuery` | `List<SpendControlActivityDTO>` | 查询条件非法或越权。 | 只读 |
+| `recordMovement` | `RecordSpendControlMovementRequest` | `SpendControlMovementDTO` | 缺目标主体、缺准入证据、非法金额、重复摘要不一致。 | `tenantId + movementSn` |
+| `queryMovements` | `SpendControlMovementQuery` | `List<SpendControlMovementDTO>` | 查询条件非法或越权。 | 只读 |
 | `getBudgetControlProjection` | `BudgetControlProjectionQuery` | `BudgetControlProjectionDTO` | 缺预算组或币种条件时拒绝。 | 只读 |
 
 候选包和文件落点：
 
 | 类型 | 推荐路径 |
 | --- | --- |
-| face service | `wallet/wallet-face/src/main/java/com/wind/funds/wallet/application/spend/SpendControlActivityApplicationService.java` |
+| face service | `wallet/wallet-face/src/main/java/com/wind/funds/wallet/application/spend/SpendControlMovementApplicationService.java` |
 | request/query/dto | `wallet/wallet-face/src/main/java/com/wind/funds/wallet/model/request`、`model/query`、`model/dto` |
 | enum | `core/src/main/java/com/wind/funds/wallet/enums` 或 wallet-face 当前枚举落点，需遵循现有依赖方向。 |
 | impl | `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application/spend/impl` |
 | entity/mapper | 仅在 `schemaDecision=ddl-backed` 时进入 `wallet/wallet-impl`。 |
 | H2 schema | 仅在 `schemaDecision=ddl-backed` 时更新 `tests/src/test/resources/jdbc-schema.sql`。 |
-| tests | `tests/src/test/java/com/wind/funds/wallet/application/spend/SpendControlActivityApplicationServiceTests.java` |
+| tests | `tests/src/test/java/com/wind/funds/wallet/application/spend/SpendControlMovementApplicationServiceTests.java` |
 
 ### 6.2 只读源码 Gap Audit（2026-06-19）
 
 | 源码锚点 | 当前证据 | 对本 Grant 的结论 |
 | --- | --- | --- |
 | `SpendControlAdmissionApplicationService` | 仅暴露 `resolveSpendControlAdmission`，职责是组合支付工具预交易快照与外部 Spend Rule 决策证据。 | 已具备控制活动的上游准入快照来源，但不是控制活动记录服务。 |
-| `ResolveSpendControlAdmissionRequest` / `SpendControlAdmissionDecisionDTO` | 已包含 `spendRuleId`、`spendRuleVersion`、`spendDecisionSn`、`spendDecisionDigest`、`budgetGroupSn`、`targetAccountId` 和预交易快照。 | 可作为 `RecordSpendControlActivityRequest` 的来源证据；不应重复设计一套规则计算入参。 |
+| `ResolveSpendControlAdmissionRequest` / `SpendControlAdmissionDecisionDTO` | 已包含 `spendRuleId`、`spendRuleVersion`、`spendDecisionSn`、`spendDecisionDigest`、`budgetGroupSn`、`targetAccountId` 和预交易快照。 | 可作为 `RecordSpendControlMovementRequest` 的来源证据；不应重复设计一套规则计算入参。 |
 | `SpendControlAdmissionApplicationServiceImpl` | `@Transactional(readOnly = true)`，只调用 `PaymentInstrumentPreTransactionSnapshotApplicationService` 并返回决策 DTO。 | 当前实现没有持久化 activity、预算占用、释放或投影；首个 Red 应证明这一缺口。 |
 | `SpendControlAdmissionApplicationServiceTests` | 已覆盖规则通过、规则拒绝、缺少规则证据，并断言不创建资金交易、route、posting、LedgerEntry、账本交易或余额投影。 | 可作为 B5 Green 后的回归护栏；新增控制活动测试必须继续证明无资金事实副作用。 |
-| 字段命名对齐 | 既有准入 Request / DTO 已采用 `spendRuleId`、`spendRuleVersion`、`spendDecisionSn` 和 `spendDecisionDigest`。 | 下一轮 `RecordSpendControlActivityRequest` 应沿用该命名；`ruleId`、`ruleVersion`、`decisionSn`、`decisionDigest` 仅可作为产品概念简写，不作为代码字段建议。 |
-| `tests/src/test/resources/jdbc-schema.sql` | 当前未发现 `t_spend_control_activity` 或 `t_budget_control_projection`。 | `ddl-backed` 时首轮必须补 `t_spend_control_activity` 最小 H2 schema；预算控制投影建议先由活动聚合派生，除非 Grant 显式列名独立投影表。 |
-| `wallet` / `transaction` / `ledger` / `core` 源码搜索 | 当前未发现 `SpendControlActivityApplicationService`、`RecordSpendControlActivityRequest`、`SpendControlActivityDTO`、`BudgetControlProjectionDTO` 或对应 Mapper / Entity。 | 首个 Red 应落在服务层契约缺失或 Spring 注入缺失，不从 transaction 或 ledger 反向补事实。 |
-| `Justfile` | 已有 `test-one`、wallet application 相关目标测试和 `test-boundary` / `test-balance-control` 分组；没有单独 Spend Control 分组。 | 本 Grant 初期使用 `just test-one SpendControlActivityApplicationServiceTests tests` 和组合回归即可；是否新增分组不作为首轮必要条件。 |
+| 字段命名对齐 | 既有准入 Request / DTO 已采用 `spendRuleId`、`spendRuleVersion`、`spendDecisionSn` 和 `spendDecisionDigest`。 | 下一轮 `RecordSpendControlMovementRequest` 应沿用该命名；`ruleId`、`ruleVersion`、`decisionSn`、`decisionDigest` 仅可作为产品概念简写，不作为代码字段建议。 |
+| `tests/src/test/resources/jdbc-schema.sql` | 当前未发现 `t_spend_control_movement` 或 `t_budget_control_projection`。 | `ddl-backed` 时首轮必须补 `t_spend_control_movement` 最小 H2 schema；预算控制投影建议先由活动聚合派生，除非 Grant 显式列名独立投影表。 |
+| `wallet` / `transaction` / `ledger` / `core` 源码搜索 | 当前未发现 `SpendControlMovementApplicationService`、`RecordSpendControlMovementRequest`、`SpendControlMovementDTO`、`BudgetControlProjectionDTO` 或对应 Mapper / Entity。 | 首个 Red 应落在服务层契约缺失或 Spring 注入缺失，不从 transaction 或 ledger 反向补事实。 |
+| `Justfile` | 已有 `test-one`、wallet application 相关目标测试和 `test-boundary` / `test-balance-control` 分组；没有单独 Spend Control 分组。 | 本 Grant 初期使用 `just test-one SpendControlMovementApplicationServiceTests tests` 和组合回归即可；是否新增分组不作为首轮必要条件。 |
 
 ### 6.3 ddl-backed 可实现性审计（2026-06-19）
 
@@ -180,19 +180,19 @@ schemaDecision：ddl-backed
 
 | 审计项 | 当前证据 | 对首轮实现的约束 |
 | --- | --- | --- |
-| face 包结构 | `wallet/wallet-face/src/main/java/com/wind/funds/wallet/application/spend`、`model/request`、`model/query`、`model/dto` 已存在。 | `SpendControlActivityApplicationService` 和配套 Request / Query / DTO 可沿用现有 wallet application facade 结构，不需要新增模块或反向依赖。 |
+| face 包结构 | `wallet/wallet-face/src/main/java/com/wind/funds/wallet/application/spend`、`model/request`、`model/query`、`model/dto` 已存在。 | `SpendControlMovementApplicationService` 和配套 Request / Query / DTO 可沿用现有 wallet application facade 结构，不需要新增模块或反向依赖。 |
 | impl 包结构 | `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application/spend/impl` 已承载 `SpendControlAdmissionApplicationServiceImpl`。 | 新实现应落同包，优先消费既有准入 DTO 和预交易快照，不搬到 `services/impl` 资源服务层。 |
-| DAL 包结构 | `wallet-impl` 已有 `dal/entities` 与 `dal/mapper`，现有 `PaymentInstrument`、`FundingAccount` 等 Entity 使用 `@Table`、`@Id`、`@Column(tenantId = true)` 和中文字段注释，Mapper 使用 MyBatis Flex `BaseMapper`。 | `ddl-backed` 首轮若新增 `SpendControlActivity` Entity / Mapper，应复用该样板；Entity 字段必须有中文注释，Mapper 只暴露必要查询，不使用 `LambdaQueryWrapper`。 |
-| H2 schema | `tests/src/test/resources/jdbc-schema.sql` 已包含 funding / credit / budget / instrument / transaction / ledger / reconciliation 表，当前没有 `t_spend_control_activity`。 | 首轮只补 `t_spend_control_activity`；不补 `t_budget_control_projection`，预算控制投影从活动聚合派生。 |
+| DAL 包结构 | `wallet-impl` 已有 `dal/entities` 与 `dal/mapper`，现有 `PaymentInstrument`、`FundingAccount` 等 Entity 使用 `@Table`、`@Id`、`@Column(tenantId = true)` 和中文字段注释，Mapper 使用 MyBatis Flex `BaseMapper`。 | `ddl-backed` 首轮若新增 `SpendControlMovement` Entity / Mapper，应复用该样板；Entity 字段必须有中文注释，Mapper 只暴露必要查询，不使用 `LambdaQueryWrapper`。 |
+| H2 schema | `tests/src/test/resources/jdbc-schema.sql` 已包含 funding / credit / budget / instrument / transaction / ledger / reconciliation 表，当前没有 `t_spend_control_movement`。 | 首轮只补 `t_spend_control_movement`；不补 `t_budget_control_projection`，预算控制投影从活动聚合派生。 |
 | 现有准入实现 | `SpendControlAdmissionApplicationServiceImpl` 使用 `AssertUtils` 做入参强约束，`@Transactional(readOnly = true)` 调用预交易快照并返回准入 DTO。 | 控制活动写入实现应使用 `@Transactional(rollbackFor = Exception.class)`；查询和投影使用只读事务；校验沿用 `AssertUtils`。 |
-| 测试样板 | wallet application 测试已继承 `AbstractFundsServiceTest`，并能断言 `t_funds_transaction`、route、posting、`t_ledger_transaction`、`t_ledger_entry` 和余额投影无新增事实。 | `SpendControlActivityApplicationServiceTests` 必须复用该无副作用断言方式，不用 mock 代替内部 Spring Bean。 |
+| 测试样板 | wallet application 测试已继承 `AbstractFundsServiceTest`，并能断言 `t_funds_transaction`、route、posting、`t_ledger_transaction`、`t_ledger_entry` 和余额投影无新增事实。 | `SpendControlMovementApplicationServiceTests` 必须复用该无副作用断言方式，不用 mock 代替内部 Spring Bean。 |
 
 Red 准入调整：
 
-1. `SpendControlActivityApplicationServiceTests` 首个 Red 必须复用或模拟既有 `SpendControlAdmissionDecisionDTO`，证明“准入结论可被记录为控制活动”，而不是重新实现 Spend Rule 规则计算。
-2. `RecordSpendControlActivityRequest` 的 MVP 字段以可审计和幂等为准：`tenantId`、`activitySn`、`activityType`、`businessScene`、`businessSn`、`targetAccountId`、`amount`、`currency`、`spendRuleId`、`spendRuleVersion`、`spendDecisionSn`、`spendDecisionDigest`、`budgetGroupSn` 和活动摘要；不引入专业确认、运营审批、外部规则引擎或交易内核字段。
-3. `BudgetControlProjectionDTO` 首轮只表达控制口径的 `reservedAmount`、`releasedAmount`、`remainingControlAmount`、`lastActivitySn` 和 `lastActivityAt`，不得包含 ledger balance、available balance 或 frozen balance 字段。
-4. 幂等 Red 必须覆盖同一 `tenantId + activitySn` 重放：摘要一致返回既有活动，摘要不一致拒绝，且两类路径均无资金事实副作用。
+1. `SpendControlMovementApplicationServiceTests` 首个 Red 必须复用或模拟既有 `SpendControlAdmissionDecisionDTO`，证明“准入结论可被记录为控制活动”，而不是重新实现 Spend Rule 规则计算。
+2. `RecordSpendControlMovementRequest` 的 MVP 字段以可审计和幂等为准：`tenantId`、`movementSn`、`movementType`、`businessScene`、`businessSn`、`targetAccountId`、`amount`、`currency`、`spendRuleId`、`spendRuleVersion`、`spendDecisionSn`、`spendDecisionDigest`、`budgetGroupSn` 和活动摘要；不引入专业确认、运营审批、外部规则引擎或交易内核字段。
+3. `BudgetControlProjectionDTO` 首轮只表达控制口径的 `reservedAmount`、`releasedAmount`、`remainingControlAmount`、`lastMovementSn` 和 `lastMovementAt`，不得包含 ledger balance、available balance 或 frozen balance 字段。
+4. 幂等 Red 必须覆盖同一 `tenantId + movementSn` 重放：摘要一致返回既有活动，摘要不一致拒绝，且两类路径均无资金事实副作用。
 5. 若实现过程中发现需要修改 `FundsDirectTransactionService`、`FundsAuthorizationTransactionService`、`FundsBalanceControlService`、ledger subject、BudgetGroup ledger 兼容语义或任何 Controller / HTTP / RPC，立即停止并重新申请 Grant。
 
 ### 6.4 编码样板和首轮切片边界（只读复核）
@@ -201,21 +201,21 @@ Red 准入调整：
 
 应用服务样板：
 
-1. face 契约放在 `wallet-face` 的 `application/spend` 包，方法以业务用例命名，MVP 保留 `recordActivity`、`queryActivities` 和 `getBudgetControlProjection`；不使用 default 方法，除非能证明默认实现不会隐藏业务失败路径。
+1. face 契约放在 `wallet-face` 的 `application/spend` 包，方法以业务用例命名，MVP 保留 `recordMovement`、`queryMovements` 和 `getBudgetControlProjection`；不使用 default 方法，除非能证明默认实现不会隐藏业务失败路径。
 2. Request、Query、DTO 放在既有 `wallet-face` model 包，字段使用 Jakarta Validation 表达外部输入边界；实现层仍使用 `AssertUtils` 做可信前最后一道强约束。
 3. impl 放在 `wallet-impl/application/spend/impl`，写入方法使用 `@Transactional(rollbackFor = Exception.class)`，查询和投影方法使用 `@Transactional(readOnly = true)`。
 4. 服务只消费既有准入结论、规则证据和目标账户主体，不重新计算 Spend Rule，不调用 transaction 或 ledger 写接口，不创建 route、posting、LedgerEntry、ledger transaction、余额投影或交易投影。
 
 `ddl-backed` 持久化样板：
 
-1. 首轮只允许新增 `t_spend_control_activity`；`BudgetControlProjectionDTO` 从活动聚合派生，不新增 `t_budget_control_projection`，除非用户另行确认新的 projection store Grant。
+1. 首轮只允许新增 `t_spend_control_movement`；`BudgetControlProjectionDTO` 从活动聚合派生，不新增 `t_budget_control_projection`，除非用户另行确认新的 projection store Grant。
 2. Entity 放在 `wallet-impl` 的 DAL entity 包，Mapper 放在 DAL mapper 包；遵循 MyBatis Flex `@Table`、`BaseMapper`、`insertSelective` 和 `XxxRefs` 查询样板，不使用 `LambdaQueryWrapper`。
 3. Entity 成员字段必须有中文注释，说明字段用途、幂等边界、审计意义或来源限制；不得用注释替代字段命名。
-4. 唯一约束建议为 `tenant_id + activity_sn`，查询索引至少覆盖业务流水、目标账户主体、预算组、规则和活动时间；字段不存储外部账户敏感原文。
+4. 唯一约束建议为 `tenant_id + movement_sn`，查询索引至少覆盖业务流水、目标账户主体、预算组、规则和活动时间；字段不存储外部账户敏感原文。
 
 首轮服务流测试样板：
 
-1. 测试类落在 `tests/src/test/java/com/wind/funds/wallet/application/spend/SpendControlActivityApplicationServiceTests.java`，继承 `AbstractFundsServiceTest`，优先使用真实 Spring Bean 和 H2 schema。
+1. 测试类落在 `tests/src/test/java/com/wind/funds/wallet/application/spend/SpendControlMovementApplicationServiceTests.java`，继承 `AbstractFundsServiceTest`，优先使用真实 Spring Bean 和 H2 schema。
 2. 每个资金安全相关断言都需要证明无副作用：控制活动记录、拒绝记录、幂等重放、摘要冲突和预算投影查询均不得新增资金交易、route、posting、LedgerEntry、ledger transaction 或余额投影事实。
 3. 首轮至少覆盖允许准入活动、拒绝准入活动、同流水同摘要幂等、同流水不同摘要拒绝、预算控制投影从活动派生五类场景。
 4. 若测试需要构造支付工具、资金责任或账户能力上下文，优先复用既有 wallet application 测试样板；不得为了测试方便新增内存版生产 Service。
@@ -229,7 +229,7 @@ Red 准入调整：
 
 数据方案：
 
-- `ddl-backed` 推荐最小表为 `t_spend_control_activity`，首轮可不单独建 projection 表，而是由活动聚合派生预算控制投影。
+- `ddl-backed` 推荐最小表为 `t_spend_control_movement`，首轮可不单独建 projection 表，而是由活动聚合派生预算控制投影。
 - 如果首轮性能或查询复杂度需要投影表，必须在 Grant 中显式列名 `t_budget_control_projection`，并补幂等和一致性测试。
 - 事务边界应限定在控制活动和控制投影自身，不跨 transaction 或 ledger 事实。
 - 一致性以活动流水幂等、摘要校验和投影派生为核心；失败时不做资金补偿，因为本切片不写资金事实。
@@ -253,7 +253,7 @@ Red 准入调整：
 
 | Red ID | 目标 | 最小失败证明 |
 | --- | --- | --- |
-| `RED-GSD2-B5-SR-CONTROL-ACTIVITY-001` | 证明当前缺少控制活动持久化和查询能力。 | 新增 `SpendControlActivityApplicationServiceTests`，调用目标服务记录通过准入活动，当前编译或 Spring 注入失败。 |
+| `RED-GSD2-B5-SR-CONTROL-ACTIVITY-001` | 证明当前缺少控制活动持久化和查询能力。 | 新增 `SpendControlMovementApplicationServiceTests`，调用目标服务记录通过准入活动，当前编译或 Spring 注入失败。 |
 | `RED-GSD2-B5-SR-CONTROL-ACTIVITY-002` | 证明拒绝准入活动可留痕且无资金副作用。 | 当前没有服务或持久化记录可返回拒绝原因。 |
 | `RED-GSD2-B5-BUDGET-PROJECTION-001` | 证明预算控制投影可从活动派生。 | 当前无法查询控制占用和释放后的只读投影。 |
 
@@ -261,9 +261,9 @@ Red 准入调整：
 
 显式 Grant 后的建议验证顺序：
 
-1. `just test-one SpendControlActivityApplicationServiceTests tests`
+1. `just test-one SpendControlMovementApplicationServiceTests tests`
 2. `just test-one SpendControlAdmissionApplicationServiceTests tests`
-3. `just test-one SpendControlActivityApplicationServiceTests,SpendControlAdmissionApplicationServiceTests,PaymentInstrumentPreTransactionSnapshotApplicationServiceTests tests`
+3. `just test-one SpendControlMovementApplicationServiceTests,SpendControlAdmissionApplicationServiceTests,PaymentInstrumentPreTransactionSnapshotApplicationServiceTests tests`
 4. 若触碰 H2 schema、Entity、Mapper 或投影持久化，追加 `just test-balance-control` 和 `just test-boundary`。
 5. `just compile`
 6. `just pmd`
@@ -283,9 +283,9 @@ Red 准入调整：
 | 步骤 | Maker 动作 | Checker 口径 | 停止点 |
 | --- | --- | --- | --- |
 | 1. Pick | 读取本确认包、LWT Goal、W5 推进计划、OpenSpec tasks、`SpendControlAdmissionApplicationServiceTests` 和 `tests/src/test/resources/jdbc-schema.sql`。 | 确认当前工作树可解释，且用户已明确 `schemaDecision=ddl-backed` 或 `contract-only`。 | 未确认 `schemaDecision`、目标文件有冲突或需要 Git 历史操作时停止。 |
-| 2. Red | 新增 `SpendControlActivityApplicationServiceTests`，先写“通过准入活动可记录并查询，且无资金事实副作用”的失败用例。 | Red 必须因服务契约、DTO、实现或 schema 缺失失败，不得通过放宽断言制造假红。 | Red 不能证明控制活动缺口，或必须修改交易/账本内核才能成立时停止。 |
-| 3. Contract | 按 `schemaDecision` 新增 `SpendControlActivityApplicationService`、`RecordSpendControlActivityRequest`、`SpendControlActivityQuery`、`BudgetControlProjectionQuery`、`SpendControlActivityDTO` 和 `BudgetControlProjectionDTO`。 | 字段沿用 `spendRuleId`、`spendRuleVersion`、`spendDecisionSn`、`spendDecisionDigest`；不新增 default 方法；Request/Query 使用 Jakarta Validation。 | 需要 Controller、HTTP/RPC、消息、规则引擎或交易 canonical 入参时停止。 |
-| 4. Green | `ddl-backed` 时补 `t_spend_control_activity`、Entity、Mapper 和 wallet-impl 服务；`contract-only` 时只补契约 Red，不写持久化 Green。 | `ddl-backed` 首轮只允许一张活动表；预算投影从活动聚合派生；实现使用 `AssertUtils`、`@Transactional` 和 MyBatis Flex 既有样板。 | 需要 `t_budget_control_projection`、异步投影、批量重算或生产迁移时停止。 |
+| 2. Red | 新增 `SpendControlMovementApplicationServiceTests`，先写“通过准入活动可记录并查询，且无资金事实副作用”的失败用例。 | Red 必须因服务契约、DTO、实现或 schema 缺失失败，不得通过放宽断言制造假红。 | Red 不能证明控制活动缺口，或必须修改交易/账本内核才能成立时停止。 |
+| 3. Contract | 按 `schemaDecision` 新增 `SpendControlMovementApplicationService`、`RecordSpendControlMovementRequest`、`SpendControlMovementQuery`、`BudgetControlProjectionQuery`、`SpendControlMovementDTO` 和 `BudgetControlProjectionDTO`。 | 字段沿用 `spendRuleId`、`spendRuleVersion`、`spendDecisionSn`、`spendDecisionDigest`；不新增 default 方法；Request/Query 使用 Jakarta Validation。 | 需要 Controller、HTTP/RPC、消息、规则引擎或交易 canonical 入参时停止。 |
+| 4. Green | `ddl-backed` 时补 `t_spend_control_movement`、Entity、Mapper 和 wallet-impl 服务；`contract-only` 时只补契约 Red，不写持久化 Green。 | `ddl-backed` 首轮只允许一张活动表；预算投影从活动聚合派生；实现使用 `AssertUtils`、`@Transactional` 和 MyBatis Flex 既有样板。 | 需要 `t_budget_control_projection`、异步投影、批量重算或生产迁移时停止。 |
 | 5. Extend | 补拒绝活动、同流水同摘要幂等、同流水不同摘要拒绝、预算控制投影派生测试。 | 每个测试都必须断言无资金交易、route、posting、LedgerEntry、ledger transaction 或余额投影副作用。 | 任何失败路径写入资金事实、账本事实或交易事实时停止。 |
 | 6. Review / Refactor | 只在本 Grant 范围内整理命名、字段注释、DTO 构造和 mapper 查询；不做旁路重构。 | 架构师 CR 先看资金主体、无账务副作用、幂等、失败路径、字段注释和模块依赖方向。 | 发现 BudgetGroup、Spend Rule、PaymentInstrument 或父账户被写为 ledger subject 时停止。 |
 | 7. Verify | 按第 8 节执行目标测试、准入回归、组合回归、compile、pmd 和 `git diff --check`。 | 验证结果必须写回 LWT Goal 和 OpenSpec tasks；失败需说明是否可在 Grant 范围内修复。 | 验证失败且无法在本 Grant 范围修复时停止。 |
@@ -293,10 +293,10 @@ Red 准入调整：
 
 最小 Green 判定：
 
-1. `recordActivity` 能记录通过和拒绝两类控制活动。
-2. `queryActivities` 能按活动流水、业务流水、目标账户、预算组或规则证据查询。
+1. `recordMovement` 能记录通过和拒绝两类控制活动。
+2. `queryMovements` 能按活动流水、业务流水、目标账户、预算组或规则证据查询。
 3. `getBudgetControlProjection` 能从 `RESERVED` 与 `RELEASED` 活动派生控制口径投影。
-4. `tenantId + activitySn` 幂等稳定，摘要冲突拒绝。
+4. `tenantId + movementSn` 幂等稳定，摘要冲突拒绝。
 5. 目标测试能证明全链路无资金事实、交易事实、route、posting、LedgerEntry、ledger transaction 或余额投影副作用。
 
 ## 9. 风险、待确认和发布边界
@@ -360,7 +360,7 @@ schemaDecision：contract-only
 
 1. `git status --short` 可解释，无目标文件冲突。
 2. 当前基线仍为 `021ee2ce feat: 补齐支出控制准入快照` 或用户明确接受后续提交差异。
-3. 首个 Red 落在 `SpendControlActivityApplicationServiceTests`。
+3. 首个 Red 落在 `SpendControlMovementApplicationServiceTests`。
 4. 写入范围和 `schemaDecision` 与用户授权一致。
 5. 验证命令和停止条件已写入本确认包。
 
@@ -371,7 +371,7 @@ schemaDecision：contract-only
 | 字段 | 内容 |
 | --- | --- |
 | 产品目标 | 将既有支出控制准入结论沉淀为可查询、可幂等、可解释的 Spend Control Activity，并从活动派生预算控制投影。 |
-| 核心对象 | `SpendControlAdmissionDecision`、`SpendControlActivity`、`BudgetControlProjection`、BudgetGroup 上下文、Spend Rule 规则证据。 |
+| 核心对象 | `SpendControlAdmissionDecision`、`SpendControlMovement`、`BudgetControlProjection`、BudgetGroup 上下文、Spend Rule 规则证据。 |
 | 业务不变量 | BudgetGroup、Spend Rule、PaymentInstrument、父账户聚合视图和外部账户不得成为 ledger subject；父账户作为资金账户或信用账户节点入账时，必须由 posting plan 显式声明 `PARENT_CONTROL` 或真实父子划拨；控制活动只表达规则、预算和审计控制事实，不表达资金交易事实。 |
 | 验收种子 | 通过准入可记录活动；拒绝准入可记录拒绝原因；同流水同摘要幂等；同流水不同摘要拒绝；预算投影只展示控制占用、释放和剩余；全路径无资金事实副作用。 |
 | 产品 Not Done | Spend Rule 规则引擎、规则配置后台、运营审批、交易消费控制活动、VCC facade、完整业务策略准入、生产告警和发布 Runbook。 |
@@ -387,8 +387,8 @@ schemaDecision：contract-only
 | 状态载体 | 本确认包、LWT Goal、W5 推进计划、GSD-2 工作流入口、TDD README、docs README、OpenSpec tasks。 |
 | 写入范围 | 用户确认后，按 `schemaDecision` 写 wallet-face application/spend 契约、Request/Query/DTO、必要 enum、wallet-impl application/spend 实现、必要 Entity/Mapper、tests H2 schema、目标服务流测试和状态文档回写。 |
 | 只读范围 | PRD、DSL、系分、TDD、OpenSpec、wallet、transaction、ledger、core、reconciliation、tests、Justfile、AGENTS.md 和最近 Git 提交。 |
-| 首个 Red | `SpendControlActivityApplicationServiceTests` 证明当前缺少控制活动记录、查询、幂等和预算控制投影能力。 |
-| 验证命令 | `just test-one SpendControlActivityApplicationServiceTests tests`、`just test-one SpendControlAdmissionApplicationServiceTests tests`、必要组合回归、`just compile`、`just pmd`、`git diff --check`。 |
+| 首个 Red | `SpendControlMovementApplicationServiceTests` 证明当前缺少控制活动记录、查询、幂等和预算控制投影能力。 |
+| 验证命令 | `just test-one SpendControlMovementApplicationServiceTests tests`、`just test-one SpendControlAdmissionApplicationServiceTests tests`、必要组合回归、`just compile`、`just pmd`、`git diff --check`。 |
 | 授权缺口 | 未确认 `Execution Grant：GSD2-B5-SR-CONTROL-ACTIVITY-001` 与 `schemaDecision` 前，不进入 Java、测试、DDL/H2 schema、公共契约、Entity、Mapper 或 Git。 |
 | Git 策略 | 当前 `summary_only`；若后续用户要求提交，只能在 Red / Green / Verify 通过后提交本 Task 独立切片。 |
 | 停止条件 | 需要修改交易 canonical 入参、ledger subject、BudgetGroup ledger 兼容语义、Controller、HTTP/RPC、生产迁移、外部规则最终结论或真实资金操作时停止。 |
@@ -412,7 +412,7 @@ schemaDecision：contract-only
 | 字段 | 内容 |
 | --- | --- |
 | 当前阶段 | 等待用户确认 Grant 与 `schemaDecision`；只能做只读 Gap Audit 或 docs-only 状态维护。 |
-| TDD 顺序 | 先写 `SpendControlActivityApplicationServiceTests` 首个 Red，再按 `schemaDecision` 补契约、实现、持久化和投影。 |
+| TDD 顺序 | 先写 `SpendControlMovementApplicationServiceTests` 首个 Red，再按 `schemaDecision` 补契约、实现、持久化和投影。 |
 | 实现限制 | 不复算 Spend Rule；只消费既有准入结论和外部规则证据；不写 transaction / ledger 事实；不把预算控制投影命名成余额。 |
 | 验证者 | 目标测试、既有支出控制准入回归、资金事实副作用断言、结构检查和人工 CR。 |
 | 失败回写 | Red 不成立、写入范围漂移或 `schemaDecision` 不匹配时，回写本确认包第 9 至 11 节和 LWT Goal 第 8.1 节。 |
@@ -439,7 +439,7 @@ schemaDecision：contract-only
 复核结论：
 
 1. 授权前工作树可解释：当时未发现 Java、SQL、POM 或 Justfile 未提交变更；未提交差异仍是 B5 设计、任务和恢复入口文档对齐。
-2. 授权前源码缺口成立：当时 `wallet`、`core`、`transaction`、`ledger`、`reconciliation` 和 `tests` 中未发现 `SpendControlActivityApplicationService`、`RecordSpendControlActivityRequest`、`SpendControlActivityDTO`、`BudgetControlProjectionDTO`、`t_spend_control_activity` 或 `t_budget_control_projection`，因此首个 Red 可以落在服务层契约、Spring 注入或 schema 缺失。
+2. 授权前源码缺口成立：当时 `wallet`、`core`、`transaction`、`ledger`、`reconciliation` 和 `tests` 中未发现 `SpendControlMovementApplicationService`、`RecordSpendControlMovementRequest`、`SpendControlMovementDTO`、`BudgetControlProjectionDTO`、`t_spend_control_movement` 或 `t_budget_control_projection`，因此首个 Red 可以落在服务层契约、Spring 注入或 schema 缺失。
 3. 上游字段口径仍一致：既有 `ResolveSpendControlAdmissionRequest` 和 `SpendControlAdmissionDecisionDTO` 继续使用 `spendRuleId`、`spendRuleVersion`、`spendDecisionSn`、`spendDecisionDigest`、`budgetGroupSn` 和 `targetAccountId`。
 4. 结构门禁已通过：本文的 Harness、产品架构和系统架构结构检查通过，`git diff --check` 通过。
 5. 随后用户已确认 `Execution Grant：GSD2-B5-SR-CONTROL-ACTIVITY-001` + `schemaDecision：ddl-backed`，本确认包已被 13.2 的实现和验证记录消费。
@@ -450,14 +450,14 @@ schemaDecision：contract-only
 
 已落地内容：
 
-1. 新增 `SpendControlActivityApplicationService`、`RecordSpendControlActivityRequest`、`SpendControlActivityQuery`、`BudgetControlProjectionQuery`、`SpendControlActivityDTO`、`BudgetControlProjectionDTO` 和 `SpendControlActivityType`。
-2. 新增 `SpendControlActivity` Entity、`SpendControlActivityMapper`、`SpendControlActivityApplicationServiceImpl` 和 H2 `t_spend_control_activity`。
-3. 新增 `SpendControlActivityApplicationServiceTests`，覆盖准入活动记录、拒绝活动记录、同流水同摘要幂等、同流水不同摘要拒绝、预算控制投影从活动派生，并断言无资金交易、route、posting、LedgerEntry、账本交易或余额投影副作用。
+1. 新增 `SpendControlMovementApplicationService`、`RecordSpendControlMovementRequest`、`SpendControlMovementQuery`、`BudgetControlProjectionQuery`、`SpendControlMovementDTO`、`BudgetControlProjectionDTO` 和 `SpendControlMovementType`。
+2. 新增 `SpendControlMovement` Entity、`SpendControlMovementMapper`、`SpendControlMovementApplicationServiceImpl` 和 H2 `t_spend_control_movement`。
+3. 新增 `SpendControlMovementApplicationServiceTests`，覆盖准入活动记录、拒绝活动记录、同流水同摘要幂等、同流水不同摘要拒绝、预算控制投影从活动派生，并断言无资金交易、route、posting、LedgerEntry、账本交易或余额投影副作用。
 
 当前验证状态：
 
 1. 本地 Maven 依赖缓存已恢复可解析状态，随后目标测试和仓库级验证均能进入新增 wallet 代码编译与执行阶段。
-2. `just test-one SpendControlActivityApplicationServiceTests tests` 通过，6 tests 覆盖准入活动记录、拒绝活动记录、同流水同摘要幂等、同流水不同摘要拒绝、预算控制投影从活动派生，以及查询侧拒绝非资金账户 / 信用账户目标主体。
+2. `just test-one SpendControlMovementApplicationServiceTests tests` 通过，6 tests 覆盖准入活动记录、拒绝活动记录、同流水同摘要幂等、同流水不同摘要拒绝、预算控制投影从活动派生，以及查询侧拒绝非资金账户 / 信用账户目标主体。
 3. `just test-one SpendControlAdmissionApplicationServiceTests tests` 通过，3 tests 证明既有支出控制准入链路未被本切片破坏。
 4. `just compile` 和 `just pmd` 通过；本状态迁移为 `SR_CONTROL_ACTIVITY_GREEN_VERIFIED`。
 

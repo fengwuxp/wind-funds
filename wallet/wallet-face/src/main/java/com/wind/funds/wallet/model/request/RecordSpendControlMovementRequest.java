@@ -2,7 +2,7 @@ package com.wind.funds.wallet.model.request;
 
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
-import com.wind.funds.wallet.enums.SpendControlActivityType;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -28,7 +28,7 @@ import java.io.Serializable;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class RecordSpendControlActivityRequest implements Serializable {
+public class RecordSpendControlMovementRequest implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 5797637413300774738L;
@@ -39,11 +39,11 @@ public class RecordSpendControlActivityRequest implements Serializable {
 
     @Schema(description = "控制额度变动流水流水号，用于幂等、回放和审计追踪")
     @NotBlank
-    private String activitySn;
+    private String movementSn;
 
     @Schema(description = "控制额度变动流水类型")
     @NotNull
-    private SpendControlActivityType activityType;
+    private SpendControlMovementType movementType;
 
     @Schema(description = "业务场景")
     @NotBlank
@@ -54,9 +54,9 @@ public class RecordSpendControlActivityRequest implements Serializable {
     private String businessSn;
 
     @Schema(description = "原控制额度变动流水流水号，用于交易消费、释放或退款补偿回链")
-    private String originalActivitySn;
+    private String originalMovementSn;
 
-    @Schema(description = "已存在的资金交易流水号，用于交易结果消费控制活动回链")
+    @Schema(description = "已存在的资金交易流水号，用于交易结果消费控制额度变动回链")
     private String transactionSn;
 
     @Schema(description = "支付工具号")
@@ -67,7 +67,7 @@ public class RecordSpendControlActivityRequest implements Serializable {
     @NotNull
     private PaymentInstrumentAction action;
 
-    @Schema(description = "控制活动目标资金账户或信用账户标识")
+    @Schema(description = "控制额度变动目标资金账户或信用账户标识")
     @NotNull
     private FundsAccountId targetAccountId;
 
@@ -114,11 +114,11 @@ public class RecordSpendControlActivityRequest implements Serializable {
     @Schema(description = "审批、凭证、规则发布或外部审计引用")
     private String auditReferenceSn;
 
-    @Schema(description = "控制活动摘要，用于幂等、回放和审计追踪")
+    @Schema(description = "控制额度变动摘要，用于幂等、回放和审计追踪")
     @NotBlank
-    private String activityDigest;
+    private String movementDigest;
 
-    @Schema(description = "控制活动说明")
+    @Schema(description = "控制额度变动说明")
     private String description;
 
     @Schema(description = "扩展上下文变量")

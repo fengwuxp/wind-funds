@@ -50,7 +50,7 @@
 | 能力域 | 前台能力 | 后台能力 | 数据能力 |
 | --- | --- | --- | --- |
 | Spend Rule 准入 | 判断某次支付工具动作是否允许进入交易。 | 组合外部规则决策、支付工具预交易快照、账户能力和资金责任。 | `SpendControlAdmissionDecisionDTO`、预交易快照、规则决策摘要。 |
-| 控制活动 | 记录准入、拒绝、预留、释放、过期和撤销。 | 幂等记录、查询和预算控制投影派生。 | `SpendControlActivity`、`BudgetControlProjectionDTO`。 |
+| 控制活动 | 记录准入、拒绝、预留、释放、过期和撤销。 | 幂等记录、查询和预算控制投影派生。 | `SpendControlMovement`、`BudgetControlProjectionDTO`。 |
 | 交易消费控制活动 | 交易结果触发控制活动消耗、释放、退款释放或冲正。 | 服务层桥接交易结果和控制活动，不反写交易事实或账本事实。 | 原控制活动引用、交易引用、消费/释放活动、投影解释。 |
 | 交易和账本 | 直接交易、授权交易、退款和余额控制继续生成资金事实。 | 交易内核仍以账户主体为 canonical 入参，ledger 只维护账本事实。 | Funds transaction、route snapshot、ledger transaction、LedgerEntry、余额投影。 |
 
@@ -58,7 +58,7 @@
 
 业务对象：
 
-1. `SpendControlActivity`：支出控制活动事实，当前已承载准入、拒绝、预留、释放、过期和撤销。
+1. `SpendControlMovement`：支出控制活动事实，当前已承载准入、拒绝、预留、释放、过期和撤销。
 2. `FundsTransaction`：资金交易事实，是交易生命周期和账务链路的主事实。
 3. `RouteSnapshot`：交易路由快照，承载支付工具引用、绑定版本、资金责任和 route context。
 4. `BudgetControlProjection`：由控制活动派生的只读控制投影，不替代资金账户或信用账户余额。
@@ -68,7 +68,7 @@
 
 - 控制活动目标主体只能是资金账户或信用账户。
 - 交易结果引用建议包含原交易流水、原控制活动流水、业务流水、支付工具号、动作、规则标识、规则版本和决策摘要。
-- 当前 `SpendControlActivityType` 没有交易成功后的“控制消耗”语义。建议下一 Grant 增补 `CONSUMED`，避免把成功消耗和失败释放都压到 `RELEASED`。
+- 当前 `SpendControlMovementType` 没有交易成功后的“控制消耗”语义。建议下一 Grant 增补 `CONSUMED`，避免把成功消耗和失败释放都压到 `RELEASED`。
 
 生命周期：
 
@@ -116,9 +116,9 @@
 
 现状和约束：
 
-1. `SpendControlActivityApplicationService` 已能记录活动并派生预算控制投影。
-2. `SpendControlActivityType` 只有 `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`RELEASED`、`EXPIRED` 和 `REVERSED`。
-3. `RecordSpendControlActivityRequest` 与 `t_spend_control_activity` 暂无原交易引用字段。
+1. `SpendControlMovementApplicationService` 已能记录活动并派生预算控制投影。
+2. `SpendControlMovementType` 只有 `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`RELEASED`、`EXPIRED` 和 `REVERSED`。
+3. `RecordSpendControlMovementRequest` 与 `t_spend_control_movement` 暂无原交易引用字段。
 4. 交易内核继续以 `FundsAccountId` / 账户主体为 canonical 入参。
 
 核心决策和取舍：
@@ -134,25 +134,25 @@
 
 进入本 Grant 前需要吸收以下 CR 结论：
 
-1. `SpendControlActivityApplicationService` 当前只覆盖控制活动记录和预算控制投影派生，尚未覆盖交易成功后的控制消耗；本 Grant 的 P0 目标就是补 `CONSUMED` 或等价消耗语义，以及 `consumedAmount` 或等价投影口径。
+1. `SpendControlMovementApplicationService` 当前只覆盖控制活动记录和预算控制投影派生，尚未覆盖交易成功后的控制消耗；本 Grant 的 P0 目标就是补 `CONSUMED` 或等价消耗语义，以及 `consumedAmount` 或等价投影口径。
 2. `AuthorizationAdmissionApplicationService` 当前应被理解为“支付工具授权内核准入 baseline”，不是完整的“支付工具 + Spend Rule + 控制活动 + 授权交易”业务编排入口；后续完整入口必须先消费支出控制准入 / 控制活动，再委派账户主体型交易服务。
 3. 支付工具 `REFUND` 动作方向在当前实现中存在口径差异：支付工具能力检查按付款方向推断，预交易快照按收款能力判断。本 Grant 首轮不重构支付工具 `REFUND` 能力规则，只处理“已有资金退款交易事实之后的控制补偿 / 释放”。
 4. 若本切片需要新增或复用账户能力判断，应优先消费 `FundsAccountCapabilityApplicationService` 的应用层决策，避免直接散落 `FundsAccount#canPay`、`canReceive` 或 `canWithdraw` 判断导致策略漂移。
-5. 控制活动幂等不能只覆盖串行 `select then insert`；若沿用 `tenantId + activitySn` 唯一约束，服务实现需在并发重复写入冲突时读取既有活动并比较摘要，同摘要回放、异摘要拒绝。
+5. 控制活动幂等不能只覆盖串行 `select then insert`；若沿用 `tenantId + movementSn` 唯一约束，服务实现需在并发重复写入冲突时读取既有活动并比较摘要，同摘要回放、异摘要拒绝。
 
 ### 7.2 源码预检校准
 
-本轮只读源码预检确认：`GSD2-B5-SR-CONTROL-ACTIVITY-001` 已完成首轮实现，旧确认包中“控制活动服务、DTO、H2 表不存在”的历史证据已经过期。下一轮 Red 不能再写成“缺 `SpendControlActivityApplicationService` 或缺 `t_spend_control_activity`”，必须收敛到交易结果消费控制活动的真实缺口。
+本轮只读源码预检确认：`GSD2-B5-SR-CONTROL-ACTIVITY-001` 已完成首轮实现，旧确认包中“控制活动服务、DTO、H2 表不存在”的历史证据已经过期。下一轮 Red 不能再写成“缺 `SpendControlMovementApplicationService` 或缺 `t_spend_control_movement`”，必须收敛到交易结果消费控制活动的真实缺口。
 
 | 预检项 | 当前证据 | 对下一 Red 的影响 |
 | --- | --- | --- |
-| 控制活动服务 | 已存在 `wallet-face` 的 `SpendControlActivityApplicationService` 和 `wallet-impl` 的 `SpendControlActivityApplicationServiceImpl`。 | Red 应证明缺交易消费服务或缺消费语义，而不是缺控制活动记录服务。 |
-| 控制活动模型 | 已存在 `RecordSpendControlActivityRequest`、`SpendControlActivityDTO`、`BudgetControlProjectionDTO`、`SpendControlActivity` Entity 和 `SpendControlActivityMapper`。 | Green 应复用控制活动模型并做最小扩展，不另起平行模型。 |
-| H2 表结构 | `tests/src/test/resources/jdbc-schema.sql` 已存在 `t_spend_control_activity`，包含 `tenant_id + activity_sn` 唯一键、业务号、支付工具、目标主体、金额、币种、规则和摘要字段。 | `activity-schema-backed` 首轮只应在该表上补交易消费必要字段，不新增独立投影表。 |
-| 活动类型 | `SpendControlActivityType` 当前只有 `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`RELEASED`、`EXPIRED`、`REVERSED`。 | 必须新增 `CONSUMED` 或等价成功消耗语义，避免交易成功被解释为释放。 |
+| 控制活动服务 | 已存在 `wallet-face` 的 `SpendControlMovementApplicationService` 和 `wallet-impl` 的 `SpendControlMovementApplicationServiceImpl`。 | Red 应证明缺交易消费服务或缺消费语义，而不是缺控制活动记录服务。 |
+| 控制活动模型 | 已存在 `RecordSpendControlMovementRequest`、`SpendControlMovementDTO`、`BudgetControlProjectionDTO`、`SpendControlMovement` Entity 和 `SpendControlMovementMapper`。 | Green 应复用控制活动模型并做最小扩展，不另起平行模型。 |
+| H2 表结构 | `tests/src/test/resources/jdbc-schema.sql` 已存在 `t_spend_control_movement`，包含 `tenant_id + movement_sn` 唯一键、业务号、支付工具、目标主体、金额、币种、规则和摘要字段。 | `activity-schema-backed` 首轮只应在该表上补交易消费必要字段，不新增独立投影表。 |
+| 活动类型 | `SpendControlMovementType` 当前只有 `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`RELEASED`、`EXPIRED`、`REVERSED`。 | 必须新增 `CONSUMED` 或等价成功消耗语义，避免交易成功被解释为释放。 |
 | 投影字段 | `BudgetControlProjectionDTO` 当前只有 `reservedAmount`、`releasedAmount` 和 `remainingControlAmount`。 | 若首轮交付声明交易成功消耗可解释，需要补 `consumedAmount` 或等价口径，并重新定义 remaining 计算。 |
-| 原事实回链 | `RecordSpendControlActivityRequest`、DTO、Entity 和 H2 表当前没有原控制活动流水、原交易流水或退款交易流水字段。 | 本 Grant 的 `activity-schema-backed` 最小字段应围绕 `originalActivitySn`、`transactionSn` 和必要业务引用展开。 |
-| mapper 包路径 | 当前 mapper 包为 `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/dal/mapper/SpendControlActivityMapper.java`。 | 后续写入范围应使用 `dal/mapper`，不要误写为 `dal/mappers`。 |
+| 原事实回链 | `RecordSpendControlMovementRequest`、DTO、Entity 和 H2 表当前没有原控制活动流水、原交易流水或退款交易流水字段。 | 本 Grant 的 `activity-schema-backed` 最小字段应围绕 `originalMovementSn`、`transactionSn` 和必要业务引用展开。 |
+| mapper 包路径 | 当前 mapper 包为 `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/dal/mapper/SpendControlMovementMapper.java`。 | 后续写入范围应使用 `dal/mapper`，不要误写为 `dal/mappers`。 |
 
 源码预检后的首个 Red 建议：
 
@@ -165,15 +165,15 @@
 
 | 候选接口 | 候选方法 | 入参 | 出参 | 幂等 |
 | --- | --- | --- | --- | --- |
-| `SpendControlTransactionConsumptionApplicationService` | `consume` | 交易成功或授权完成后的控制消费请求。 | 控制活动 DTO 或消费结果 DTO。 | `tenantId + activitySn` |
-| `SpendControlTransactionConsumptionApplicationService` | `release` | 交易失败、撤销、过期或未成交终局后的控制释放请求。 | 控制活动 DTO 或释放结果 DTO。 | `tenantId + activitySn` |
-| `SpendControlTransactionConsumptionApplicationService` | `refund` | 退款或争议退款后的控制补偿请求。 | 控制活动 DTO 或退款控制结果 DTO。 | `tenantId + activitySn` |
+| `SpendControlTransactionConsumptionApplicationService` | `consume` | 交易成功或授权完成后的控制消费请求。 | 控制活动 DTO 或消费结果 DTO。 | `tenantId + movementSn` |
+| `SpendControlTransactionConsumptionApplicationService` | `release` | 交易失败、撤销、过期或未成交终局后的控制释放请求。 | 控制活动 DTO 或释放结果 DTO。 | `tenantId + movementSn` |
+| `SpendControlTransactionConsumptionApplicationService` | `refund` | 退款或争议退款后的控制补偿请求。 | 控制活动 DTO 或退款控制结果 DTO。 | `tenantId + movementSn` |
 
 候选入参最小字段：
 
 1. `tenantId`
-2. `activitySn`
-3. `originalActivitySn`
+2. `movementSn`
+3. `originalMovementSn`
 4. `transactionSn`
 5. `businessScene`
 6. `businessSn`
@@ -181,13 +181,13 @@
 8. `targetAccountId`
 9. `amount`
 10. `currency`
-11. `activityDigest`
+11. `movementDigest`
 12. `description`
 
 数据方案：
 
 - `contract-only`：只补接口、Red 和文档，不改 Entity / Mapper / H2 schema。适合进一步验证模型，但不能形成生产可用消费事实。
-- `activity-schema-backed`：在 `t_spend_control_activity` 上补原活动引用、交易引用和消费语义字段。推荐作为首轮可交付方案。
+- `activity-schema-backed`：在 `t_spend_control_movement` 上补原活动引用、交易引用和消费语义字段。推荐作为首轮可交付方案。
 - `new-table-backed`：新增独立交易控制消费表。当前不推荐，除非后续证明控制消费生命周期明显独立于控制活动事实。
 
 事务边界和一致性：
@@ -218,7 +218,7 @@
 | `RED-GSD2-B5-SR-TXN-CONSUME-002` | 交易失败或撤销后释放控制占用。 | 只能释放既有预留，释放金额不得超过未关闭预留。 |
 | `RED-GSD2-B5-SR-TXN-CONSUME-003` | 退款或争议退款回链原交易和原控制活动。 | 记录补偿型控制活动，可解释原消费和退款关系。 |
 | `RED-GSD2-B5-SR-TXN-CONSUME-004` | 原控制活动缺失、币种不一致或目标账户不一致。 | fail-fast，且无交易、route、posting、LedgerEntry、账本交易或余额投影副作用。 |
-| `RED-GSD2-B5-SR-TXN-CONSUME-005` | 同一 `tenantId + activitySn` 重放或并发重复写入。 | 同摘要幂等返回既有活动；不同摘要或事实漂移拒绝；并发唯一键冲突不得生成重复活动。 |
+| `RED-GSD2-B5-SR-TXN-CONSUME-005` | 同一 `tenantId + movementSn` 重放或并发重复写入。 | 同摘要幂等返回既有活动；不同摘要或事实漂移拒绝；并发唯一键冲突不得生成重复活动。 |
 | `RED-GSD2-B5-SR-TXN-CONSUME-006` | 使用退款事实做控制补偿。 | 只解释已有退款交易事实和原消费控制活动的关系，不修改支付工具 `REFUND` 能力方向，不创建新的资金退款事实。 |
 
 验收场景：
@@ -279,11 +279,11 @@ AI 产物复核：
 
 | 层 | 候选文件 |
 | --- | --- |
-| core | `core/src/main/java/com/wind/funds/wallet/enums/SpendControlActivityType.java` |
+| core | `core/src/main/java/com/wind/funds/wallet/enums/SpendControlMovementType.java` |
 | face service | `wallet/wallet-face/src/main/java/com/wind/funds/wallet/application/spend/SpendControlTransactionConsumptionApplicationService.java` |
 | face model | `wallet/wallet-face/src/main/java/com/wind/funds/wallet/model/request/*SpendControl*Transaction*Request.java`、`wallet/wallet-face/src/main/java/com/wind/funds/wallet/model/dto/*SpendControl*Transaction*DTO.java` |
 | impl | `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application/spend/impl/*SpendControl*Transaction*ApplicationServiceImpl.java` |
-| dal | `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/dal/entities/SpendControlActivity.java`、`wallet/wallet-impl/src/main/java/com/wind/funds/wallet/dal/mapper/SpendControlActivityMapper.java` |
+| dal | `wallet/wallet-impl/src/main/java/com/wind/funds/wallet/dal/entities/SpendControlMovement.java`、`wallet/wallet-impl/src/main/java/com/wind/funds/wallet/dal/mapper/SpendControlMovementMapper.java` |
 | test schema | `tests/src/test/resources/jdbc-schema.sql` |
 | tests | `tests/src/test/java/com/wind/funds/wallet/application/spend/SpendControlTransactionConsumptionApplicationServiceTests.java`、必要的相邻支出控制活动回归。 |
 | docs | 本文、LWT Goal、W5 推进计划、TDD 设计、OpenSpec tasks。 |
@@ -310,7 +310,7 @@ AI 产物复核：
 后续编码验证建议：
 
 1. `just test-one SpendControlTransactionConsumptionApplicationServiceTests tests`
-2. `just test-one SpendControlActivityApplicationServiceTests tests`
+2. `just test-one SpendControlMovementApplicationServiceTests tests`
 3. `just test-one SpendControlAdmissionApplicationServiceTests tests`
 4. `just compile`
 5. `just pmd`
@@ -338,7 +338,7 @@ AI 产物复核：
 Execution Grant：GSD2-B5-SR-TRANSACTION-CONSUME-001
 schemaDecision：activity-schema-backed
 refundActionDecision：control-compensation-only
-范围：在服务层补齐交易结果消费 Spend Rule 控制活动的最小能力，允许写 wallet-face application/spend 契约、Request/DTO、必要 SpendControlActivityType 扩展、wallet-impl application/spend 实现、必要 H2 schema/Entity/Mapper 字段扩展、目标服务流测试和状态文档回写。
+范围：在服务层补齐交易结果消费 Spend Rule 控制活动的最小能力，允许写 wallet-face application/spend 契约、Request/DTO、必要 SpendControlMovementType 扩展、wallet-impl application/spend 实现、必要 H2 schema/Entity/Mapper 字段扩展、目标服务流测试和状态文档回写。
 禁止：不写 Controller、HTTP/RPC，不改交易 canonical 入参，不新增统一支付工具交易内核，不做完整规则引擎、VCC facade、清结算、补事实、生产迁移或 Git push；不修改支付工具 REFUND 能力方向，退款只作为已有退款资金事实后的控制补偿。
 ```
 
@@ -375,11 +375,11 @@ schemaDecision：contract-only
 | --- | --- | --- | --- |
 | 1. Pick | 读取本文、LWT Goal、W5 推进计划、OpenSpec tasks 和当前源码，确认工作树没有 Java、SQL、POM 或 `Justfile` 未解释差异。 | 只选择 `GSD2-B5-SR-TRANSACTION-CONSUME-001` 一个切片；`schemaDecision=activity-schema-backed`、`refundActionDecision=control-compensation-only` 已由用户确认。 | 发现用户改动冲突、Grant 缺字段或工作树混入无关代码变更时停止。 |
 | 2. Red | 新增 `SpendControlTransactionConsumptionApplicationServiceTests`，先写成功交易消费 `RESERVED` 控制活动的失败用例。 | Red 应因缺服务、缺 `CONSUMED` 类型、缺原活动 / 原交易字段或缺 `consumedAmount` 投影口径失败。 | Red 需要修改交易 canonical 入参、ledger posting 或支付工具 `REFUND` 方向才能成立时停止。 |
-| 3. Contract | 补 `SpendControlTransactionConsumptionApplicationService`、消费 / 释放 / 退款请求和结果 DTO、必要 `SpendControlActivityType` 扩展。 | 契约只表达交易结果消费控制活动；入参必须含 `tenantId`、`activitySn`、`originalActivitySn`、`transactionSn`、目标主体、金额币种和摘要。 | 字段膨胀到规则引擎、运营审批、外部事件消费或统一支付工具交易 facade 时停止。 |
-| 4. Green | 在现有 `t_spend_control_activity`、Entity、Mapper 和活动服务基础上完成最小实现。 | 能记录 `CONSUMED`，回链原 `RESERVED` 活动和交易流水，并派生 `consumedAmount` 或等价投影；失败路径不写资金交易、route、posting、LedgerEntry、账本交易或余额投影。 | 需要新增独立 projection store、交易事实写入或账本事实写入时停止。 |
+| 3. Contract | 补 `SpendControlTransactionConsumptionApplicationService`、消费 / 释放 / 退款请求和结果 DTO、必要 `SpendControlMovementType` 扩展。 | 契约只表达交易结果消费控制活动；入参必须含 `tenantId`、`movementSn`、`originalMovementSn`、`transactionSn`、目标主体、金额币种和摘要。 | 字段膨胀到规则引擎、运营审批、外部事件消费或统一支付工具交易 facade 时停止。 |
+| 4. Green | 在现有 `t_spend_control_movement`、Entity、Mapper 和活动服务基础上完成最小实现。 | 能记录 `CONSUMED`，回链原 `RESERVED` 活动和交易流水，并派生 `consumedAmount` 或等价投影；失败路径不写资金交易、route、posting、LedgerEntry、账本交易或余额投影。 | 需要新增独立 projection store、交易事实写入或账本事实写入时停止。 |
 | 5. Extend | 补交易失败 / 撤销 / 过期释放、退款或争议退款控制补偿、幂等重放和摘要冲突用例。 | 释放金额不得超过未关闭预留；退款补偿只解释已有退款资金事实和原消费活动关系；并发唯一键冲突需读取既有活动并比较摘要。 | 需要自动消息补偿、outbox、运营后台、生产迁移或历史补数时停止。 |
 | 6. Review | 用资深架构师视角检查模块边界、事务边界、失败无副作用、幂等和字段注释。 | wallet 只做服务层桥接，transaction canonical 入参不变，ledger 不被控制活动反向污染，实体字段符合注释约规。 | 出现 default 方法兜底、内存版业务实现、绕过 application facade 或预算组 / 支付工具入账时停止。 |
-| 7. Verify | 运行目标测试、相邻回归、compile、pmd 和 diff 检查。 | 至少通过 `just test-one SpendControlTransactionConsumptionApplicationServiceTests tests`、`just test-one SpendControlActivityApplicationServiceTests tests`、`just test-one SpendControlAdmissionApplicationServiceTests tests`、`just compile`、`just pmd`、`git diff --check`。 | 验证失败且无法在本 Grant 写入范围内修复时停止并回写失败证据。 |
+| 7. Verify | 运行目标测试、相邻回归、compile、pmd 和 diff 检查。 | 至少通过 `just test-one SpendControlTransactionConsumptionApplicationServiceTests tests`、`just test-one SpendControlMovementApplicationServiceTests tests`、`just test-one SpendControlAdmissionApplicationServiceTests tests`、`just compile`、`just pmd`、`git diff --check`。 | 验证失败且无法在本 Grant 写入范围内修复时停止并回写失败证据。 |
 | 8. Handoff | 回写本文、LWT Goal、W5 推进计划、TDD README、docs README 和 OpenSpec tasks。 | 记录 Red / Green / Verify 证据、Not Done、残余风险和建议提交切片；不声明完整 Spend Rule、VCC facade、事件消费或生产发布 Done。 | 发现需要扩新能力时另起单一 Grant，不在本轮追加。 |
 
 ## 14. Grant 消费执行记录（2026-06-20）
@@ -393,12 +393,12 @@ schemaDecision：contract-only
 | refundActionDecision | `control-compensation-only`。 |
 | 新增服务层能力 | 新增 `SpendControlTransactionConsumptionApplicationService`，提供 `consume`、`release`、`refund` 三个服务层方法，用于把既有资金交易结果转换为支出控制活动消费、释放或退款补偿事实。 |
 | 活动语义 | 新增 `CONSUMED` 表达成功交易消耗预留控制；新增 `REFUND_COMPENSATED` 表达已有退款资金事实后的控制补偿，不改变支付工具退款方向。 |
-| 回链字段 | 在控制活动请求、DTO、Entity 和 H2 测试表中补 `originalActivitySn` 与 `transactionSn`，用于回链原预留活动和资金交易事实。 |
+| 回链字段 | 在控制活动请求、DTO、Entity 和 H2 测试表中补 `originalMovementSn` 与 `transactionSn`，用于回链原预留活动和资金交易事实。 |
 | 投影解释 | `BudgetControlProjectionDTO` 补 `consumedAmount`；预算控制投影按 `reserved - netConsumed - released` 解释剩余控制额度。 |
 | 无副作用边界 | 目标服务只记录控制活动，不创建或修改资金交易、route snapshot、posting、LedgerEntry、账本交易、余额投影或交易 canonical 请求。 |
 | Red 证据 | 首次运行 `SpendControlTransactionConsumptionApplicationServiceTests` 因缺服务、请求和实现类型失败，符合 Red 预期。 |
 | Green 证据 | `SpendControlTransactionConsumptionApplicationServiceTests` 覆盖消费、失败释放、退款补偿、超额拒绝、摘要冲突幂等边界和并发唯一键冲突回读，6 tests 通过。 |
-| 相邻回归 | `SpendControlActivityApplicationServiceTests` 6 tests 通过；`SpendControlAdmissionApplicationServiceTests` 3 tests 通过。 |
+| 相邻回归 | `SpendControlMovementApplicationServiceTests` 6 tests 通过；`SpendControlAdmissionApplicationServiceTests` 3 tests 通过。 |
 | 编译与规约 | `just compile`、`just pmd` 和 `git diff --check` 均通过；沙箱内 embedded Redis 端口限制已按项目经验在非沙箱权限下复跑确认。 |
 | 当前状态 | `SR_TRANSACTION_CONSUME_CONCURRENCY_GREEN_VERIFIED_COMMITTED`。 |
 
@@ -406,7 +406,7 @@ schemaDecision：contract-only
 
 ```bash
 WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just test-one SpendControlTransactionConsumptionApplicationServiceTests tests
-WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just test-one SpendControlActivityApplicationServiceTests tests
+WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just test-one SpendControlMovementApplicationServiceTests tests
 WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just test-one SpendControlAdmissionApplicationServiceTests tests
 WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just compile
 WIND_FUNDS_JAVA_HOME=/Users/wuxp/Library/Java/JavaVirtualMachines/corretto-21.0.11/Contents/Home just pmd
@@ -429,10 +429,10 @@ Not Done：
 | --- | --- |
 | Execution Grant | `GSD2-B5-SR-TRANSACTION-CONSUME-CONCURRENCY-001`。 |
 | 写入范围 | `wallet-impl` 控制活动记录服务、交易消费目标服务流并发测试和状态文档。 |
-| Red 证据 | 非沙箱环境首次运行新增并发用例时，第二个并发请求因 `tenantId + activitySn` 唯一键冲突抛出 `DuplicateKeyException`。 |
-| Green 证据 | `SpendControlActivityApplicationServiceImpl` 捕获并发唯一键冲突后回读既有活动并比较摘要；同摘要返回既有活动，不同摘要沿用摘要冲突拒绝。 |
+| Red 证据 | 非沙箱环境首次运行新增并发用例时，第二个并发请求因 `tenantId + movementSn` 唯一键冲突抛出 `DuplicateKeyException`。 |
+| Green 证据 | `SpendControlMovementApplicationServiceImpl` 捕获并发唯一键冲突后回读既有活动并比较摘要；同摘要返回既有活动，不同摘要沿用摘要冲突拒绝。 |
 | 无副作用证据 | 并发测试断言只保留一条 `CONSUMED` 控制活动、一条资金交易事实，且 route、posting、LedgerEntry、账本交易和余额投影不变化。 |
-| 验证证据 | `SpendControlTransactionConsumptionApplicationServiceTests`、`SpendControlActivityApplicationServiceTests`、`SpendControlAdmissionApplicationServiceTests` 服务层组合回归 15 tests 通过；`just compile`、`just pmd`、`git diff --check` 和边界关键词扫描通过。 |
+| 验证证据 | `SpendControlTransactionConsumptionApplicationServiceTests`、`SpendControlMovementApplicationServiceTests`、`SpendControlAdmissionApplicationServiceTests` 服务层组合回归 15 tests 通过；`just compile`、`just pmd`、`git diff --check` 和边界关键词扫描通过。 |
 | 当前状态 | `SR_TRANSACTION_CONSUME_CONCURRENCY_GREEN_VERIFIED_COMMITTED`。 |
 
 ### 14.2 退款事实守卫补充记录（2026-06-20）
@@ -537,7 +537,7 @@ Not Done：
 | 写入范围 | `SpendControlTransactionConsumptionApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、TDD 清单和 OpenSpec tasks 状态同步。 |
 | 已完成能力 | `refund` 要求退款交易引用到的已消费控制活动必须与原 `RESERVED` 控制活动在业务场景、业务流水、目标账户和币种上同源一致；历史脏事实或绕过入口留下的不一致 `CONSUMED` 控制活动不得作为退款补偿依据。 |
 | 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
-| 验证证据 | 非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 15 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 21 tests 通过；收口执行 `just compile`、`just pmd`、`git diff --check` 和边界关键词扫描。 |
+| 验证证据 | 非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 15 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlMovementApplicationServiceTests` 21 tests 通过；收口执行 `just compile`、`just pmd`、`git diff --check` 和边界关键词扫描。 |
 | 当前状态 | `SR_TRANSACTION_REFUND_REFERENCED_CONSUMED_CONSISTENCY_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实和支付工具 `REFUND` 方向裁决。 |
 
@@ -549,9 +549,9 @@ Not Done：
 | --- | --- |
 | 补充任务 | `GSD2-B5-SR-TRANSACTION-CONTROL-TRANSACTION-AMOUNT-GUARD-010`。 |
 | 写入范围 | `SpendControlTransactionConsumptionApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、TDD 清单和 OpenSpec tasks 状态同步。 |
-| 已完成能力 | 同一 `tenantId + originalActivitySn + transactionSn + activityType` 下，除当前幂等 `activitySn` 外，既有控制活动金额加本次请求金额不得超过对应资金交易金额；成功消费、失败释放和退款控制补偿均走同一服务层守卫。 |
+| 已完成能力 | 同一 `tenantId + originalMovementSn + transactionSn + movementType` 下，除当前幂等 `movementSn` 外，既有控制活动金额加本次请求金额不得超过对应资金交易金额；成功消费、失败释放和退款控制补偿均走同一服务层守卫。 |
 | 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
-| 验证证据 | 非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 18 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 24 tests 通过；收口执行 `just compile`、`just pmd`、`git diff --check` 和边界关键词扫描。 |
+| 验证证据 | 非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 18 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlMovementApplicationServiceTests` 24 tests 通过；收口执行 `just compile`、`just pmd`、`git diff --check` 和边界关键词扫描。 |
 | 当前状态 | `SR_TRANSACTION_CONTROL_TRANSACTION_AMOUNT_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实和支付工具 `REFUND` 方向裁决。 |
 
@@ -562,10 +562,10 @@ Not Done：
 | 字段 | 内容 |
 | --- | --- |
 | 补充任务 | `GSD2-B5-SR-TRANSACTION-CONSUME-IDEMPOTENCY-SEMANTIC-GUARD-011`。 |
-| 写入范围 | `SpendControlActivityApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceTests`、`SpendControlActivityApplicationServiceTests`、本文、LWT Goal、TDD 清单和 OpenSpec tasks 状态同步。 |
-| 已完成能力 | 控制活动幂等回放不再只比较 `activityDigest`；同一 `tenantId + activitySn + activityDigest` 还必须保持活动类型、业务场景、业务流水、原活动、交易流水、支付工具、目标账户、金额、币种、Spend Rule 和决策证据一致。 |
+| 写入范围 | `SpendControlMovementApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceTests`、`SpendControlMovementApplicationServiceTests`、本文、LWT Goal、TDD 清单和 OpenSpec tasks 状态同步。 |
+| 已完成能力 | 控制活动幂等回放不再只比较 `movementDigest`；同一 `tenantId + movementSn + movementDigest` 还必须保持活动类型、业务场景、业务流水、原活动、交易流水、支付工具、目标账户、金额、币种、Spend Rule 和决策证据一致。 |
 | 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
-| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 19 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 26 tests 通过；收口执行 `just compile`、`just pmd`、`git diff --check` 和边界关键词扫描。 |
+| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 19 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlMovementApplicationServiceTests` 26 tests 通过；收口执行 `just compile`、`just pmd`、`git diff --check` 和边界关键词扫描。 |
 | 当前状态 | `SR_TRANSACTION_CONSUME_IDEMPOTENCY_SEMANTIC_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |
 
@@ -579,7 +579,7 @@ Not Done：
 | 写入范围 | `SpendControlTransactionConsumptionApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、TDD 清单、docs 索引和 OpenSpec tasks 状态同步。 |
 | 已完成能力 | `refund` 不再只凭历史 `CONSUMED` 控制活动回链生成 `REFUND_COMPENSATED`；退款交易的 `referenceTransactionSn` 必须能查询到真实原消费资金交易，且原交易租户一致、不是另一笔 `REFUND`、状态为 `CLOSED`、币种与请求一致。 |
 | 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
-| 验证证据 | 非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 20 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 27 tests 通过；收口执行 `just compile`、`just pmd` 和 `git diff --check`。 |
+| 验证证据 | 非沙箱先复现 Red 为 `Expecting code to raise a throwable`，Green 后复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 20 tests 通过；组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlMovementApplicationServiceTests` 27 tests 通过；收口执行 `just compile`、`just pmd` 和 `git diff --check`。 |
 | 当前状态 | `SR_TRANSACTION_REFUND_REFERENCE_FACT_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |
 
@@ -593,7 +593,7 @@ Not Done：
 | 写入范围 | `SpendControlTransactionConsumptionApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、TDD 清单、docs 索引和 OpenSpec tasks 状态同步。 |
 | 已完成能力 | `refund` 在校验退款交易引用原消费资金交易存在、租户、类型、状态和币种之后，进一步要求原消费资金交易的 `businessScene` 和 `businessSn` 与当前控制补偿请求一致；历史脏交易事实或跨订单原交易不得被退款控制补偿复用。 |
 | 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
-| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 21 tests 通过，组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 28 tests 通过；收口执行 `just compile`、`just pmd` 和 `git diff --check`。 |
+| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 21 tests 通过，组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlMovementApplicationServiceTests` 28 tests 通过；收口执行 `just compile`、`just pmd` 和 `git diff --check`。 |
 | 当前状态 | `SR_TRANSACTION_REFUND_REFERENCE_FACT_BUSINESS_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |
 
@@ -604,23 +604,23 @@ Not Done：
 | 字段 | 内容 |
 | --- | --- |
 | 补充任务 | `GSD2-B5-SR-TRANSACTION-BUDGET-PROJECTION-TARGET-ACCOUNT-GUARD-014`。 |
-| 写入范围 | `BudgetControlProjectionQuery`、`BudgetControlProjectionDTO`、`SpendControlActivityApplicationServiceImpl`、`SpendControlActivityApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、推进计划、TDD 清单、docs 索引和 OpenSpec tasks 状态同步。 |
+| 写入范围 | `BudgetControlProjectionQuery`、`BudgetControlProjectionDTO`、`SpendControlMovementApplicationServiceImpl`、`SpendControlMovementApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、推进计划、TDD 清单、docs 索引和 OpenSpec tasks 状态同步。 |
 | 已完成能力 | 预算控制投影可传入 `targetAccountId`，按目标资金账户或信用账户过滤控制活动；不传时仍保留预算控制范围级聚合投影。交易消费服务测试证明同预算组、同 Spend Rule 下其他账户或其他卡的 `RESERVED` 控制活动不会污染当前账户的 `CONSUMED` 投影解释。 |
 | 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
-| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 22 tests 通过，组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlActivityApplicationServiceTests` 31 tests 通过；收口执行 `just compile`、`just pmd`、边界关键词扫描和 `git diff --check` 通过。 |
+| 验证证据 | 沙箱内目标测试因 embedded Redis 端口绑定限制失败；非沙箱复跑 `SpendControlTransactionConsumptionApplicationServiceTests` 22 tests 通过，组合回归 `SpendControlTransactionConsumptionApplicationServiceTests,SpendControlMovementApplicationServiceTests` 31 tests 通过；收口执行 `just compile`、`just pmd`、边界关键词扫描和 `git diff --check` 通过。 |
 | 当前状态 | `SR_TRANSACTION_BUDGET_PROJECTION_TARGET_ACCOUNT_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |
 
 ### 14.15 释放上限目标账户隔离守卫补充记录（2026-06-20）
 
-本节记录 `GSD2-B5-SR-TRANSACTION-RELEASE-TARGET-ACCOUNT-GUARD-015` 的实际执行结果。该补片只补释放类控制活动写入上限按目标资金账户或信用账户隔离，并让交易消费服务在计算原占用剩余额度前识别同一 `originalActivitySn` 下历史脏派生控制活动的同源漂移；不重新打开 Controller、HTTP/RPC、支付工具 `REFUND` 能力方向、交易 canonical 入参或 ledger posting。
+本节记录 `GSD2-B5-SR-TRANSACTION-RELEASE-TARGET-ACCOUNT-GUARD-015` 的实际执行结果。该补片只补释放类控制活动写入上限按目标资金账户或信用账户隔离，并让交易消费服务在计算原占用剩余额度前识别同一 `originalMovementSn` 下历史脏派生控制活动的同源漂移；不重新打开 Controller、HTTP/RPC、支付工具 `REFUND` 能力方向、交易 canonical 入参或 ledger posting。
 
 | 字段 | 内容 |
 | --- | --- |
 | 补充任务 | `GSD2-B5-SR-TRANSACTION-RELEASE-TARGET-ACCOUNT-GUARD-015`。 |
-| 写入范围 | `SpendControlActivityApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceImpl`、`SpendControlActivityApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、推进计划、TDD 清单、docs 索引和 OpenSpec tasks 状态同步。 |
+| 写入范围 | `SpendControlMovementApplicationServiceImpl`、`SpendControlTransactionConsumptionApplicationServiceImpl`、`SpendControlMovementApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、本文、LWT Goal、推进计划、TDD 清单、docs 索引和 OpenSpec tasks 状态同步。 |
 | 已完成能力 | 释放类 `RELEASED / EXPIRED / REVERSED` 活动写入前按当前 `targetAccountId` 查询预算控制投影剩余额度，不再借用同预算组、同 Spend Rule 下其他账户的可释放额度；交易消费链路在计算原占用使用量前校验关联控制活动与原 `RESERVED` 活动的业务场景、业务流水、目标账户、币种、Spend Rule 和预算组一致，历史脏派生活动不得虚增当前账户可消费或可释放额度。 |
 | 禁止范围确认 | 未写 Controller、HTTP/RPC、统一支付工具交易内核、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造、route resolver、route replay、posting assembler、ledger posting、DDL/H2 schema、Entity、Mapper、生产迁移或 Git push。 |
-| 验证证据 | 非沙箱复跑 `SpendControlActivityApplicationServiceTests,SpendControlTransactionConsumptionApplicationServiceTests` 33 tests 通过；首轮目标测试曾因测试数据同业务流水重复插入资金交易触发唯一约束失败，已收敛为更准确的历史脏控制活动场景后通过。 |
+| 验证证据 | 非沙箱复跑 `SpendControlMovementApplicationServiceTests,SpendControlTransactionConsumptionApplicationServiceTests` 33 tests 通过；首轮目标测试曾因测试数据同业务流水重复插入资金交易触发唯一约束失败，已收敛为更准确的历史脏控制活动场景后通过。 |
 | 当前状态 | `SR_TRANSACTION_RELEASE_TARGET_ACCOUNT_GUARD_GREEN_VERIFIED`。 |
 | Not Done | 完整 Spend Rule 规则引擎、事件消费 / outbox、自动告警、补偿重试、运营后台、生产 DDL、历史补数、VCC facade、清结算补事实、支付工具 `REFUND` 方向裁决和历史脏数据迁移。 |

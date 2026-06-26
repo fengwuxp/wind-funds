@@ -34,9 +34,9 @@ public class AdjustBudgetControlLimitRequest implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "预算控制额度调整活动流水号，用于幂等、回放和审计追踪")
+    @Schema(description = "预算控制额度调整变动流水号，用于幂等、回放和审计追踪")
     @NotBlank
-    private String activitySn;
+    private String movementSn;
 
     @Schema(description = "业务场景")
     @NotBlank
@@ -86,9 +86,9 @@ public class AdjustBudgetControlLimitRequest implements Serializable {
     @NotBlank
     private String auditReferenceSn;
 
-    @Schema(description = "控制活动摘要，用于幂等、回放和审计追踪")
+    @Schema(description = "控制额度变动摘要，用于幂等、回放和审计追踪")
     @NotBlank
-    private String activityDigest;
+    private String movementDigest;
 
     @Schema(description = "调整说明")
     private String description;

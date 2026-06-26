@@ -2,7 +2,7 @@ package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
-import com.wind.funds.wallet.enums.SpendControlActivityType;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,7 +27,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class SpendControlActivityDTO implements Serializable {
+public class SpendControlMovementDTO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = -6508030574142134935L;
@@ -45,10 +45,10 @@ public class SpendControlActivityDTO implements Serializable {
     private Long tenantId;
 
     @Schema(description = "控制额度变动流水流水号")
-    private String activitySn;
+    private String movementSn;
 
     @Schema(description = "控制额度变动流水类型")
-    private SpendControlActivityType activityType;
+    private SpendControlMovementType movementType;
 
     @Schema(description = "业务场景")
     private String businessScene;
@@ -57,7 +57,7 @@ public class SpendControlActivityDTO implements Serializable {
     private String businessSn;
 
     @Schema(description = "原控制额度变动流水流水号")
-    private String originalActivitySn;
+    private String originalMovementSn;
 
     @Schema(description = "已存在的资金交易流水号")
     private String transactionSn;
@@ -68,7 +68,7 @@ public class SpendControlActivityDTO implements Serializable {
     @Schema(description = "支付工具动作")
     private PaymentInstrumentAction action;
 
-    @Schema(description = "控制活动目标资金账户或信用账户标识")
+    @Schema(description = "控制额度变动目标资金账户或信用账户标识")
     private FundsAccountId targetAccountId;
 
     @Schema(description = "控制金额，最小货币单位")
@@ -107,10 +107,10 @@ public class SpendControlActivityDTO implements Serializable {
     @Schema(description = "审批、凭证、规则发布或外部审计引用")
     private String auditReferenceSn;
 
-    @Schema(description = "控制活动摘要")
-    private String activityDigest;
+    @Schema(description = "控制额度变动摘要")
+    private String movementDigest;
 
-    @Schema(description = "控制活动说明")
+    @Schema(description = "控制额度变动说明")
     private String description;
 
     @Schema(description = "扩展上下文变量")

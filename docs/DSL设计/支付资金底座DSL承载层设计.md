@@ -951,7 +951,7 @@ Replay 语义边界：
 | 投影 | 来源 | 禁止 |
 | --- | --- | --- |
 | `BalanceProjection` | `LedgerEntry`、检查点、水位、归档清单。 | 不读交易视图反推余额。 |
-| `TransactionView` | 资金交易事实、冻结单、路径快照、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionLog`、`SpendControlActivity`、账本分录摘要、授权拒绝事实、清结算和对账差错。 | 不写账，不修正余额，不把支付工具、预算组或 Spend Rule 提升为资金事实源；授权拒绝只形成拒绝解释，不生成资金事实。 |
+| `TransactionView` | 资金交易事实、冻结单、路径快照、`paymentInstrumentRef`、`FundingAllocationDecision`、`SpendRuleDecisionRecord`、`SpendControlMovement`、账本分录摘要、授权拒绝事实、清结算和对账差错。 | 不写账，不修正余额，不把支付工具、预算组或 Spend Rule 提升为资金事实源；授权拒绝只形成拒绝解释，不生成资金事实。 |
 | 报表指标输入 | 指标项、业务问题、推荐事实来源和口径引用。 | 只作为报表指标模块输入，不反向污染资金事实，不复用归档水位或重放 checkpoint。 |
 
 `TransactionView` 的多维查询字段只表达视图索引和解释维度：
@@ -962,18 +962,18 @@ Replay 语义边界：
 | 资金账户 | `SubjectRef=FUNDING_ACCOUNT`、LedgerEntry、BalanceProjection。 | 资金账户流水和余额变更解释。 | 从交易视图反写余额或补分录。 |
 | 信用账户 | `SubjectRef=CREDIT_ACCOUNT`、信用账目分录、授权占用事实。 | 授权额度流水、信用账单、负债解释视图。 | 把额度展示成用户自有现金。 |
 | 预算组 | BudgetGroup 上下文、预算控制视图、预留和释放证据。 | 预算使用视图、预算维度账单、预算差异报告。 | 预算组作为 route leg、posting plan 或 `LedgerEntry` 主体。 |
-| Spend Rule | rule snapshot、规则决策日志、Spend Control Activity。 | 规则命中时间线、拒绝原因、预留/释放解释视图。 | 规则通过等同资金可用，或规则记录直接生成资金交易。 |
+| Spend Rule | rule snapshot、规则决策记录、Spend Control Movement。 | 规则命中时间线、拒绝原因、预留/释放解释视图。 | 规则通过等同资金可用，或规则记录直接生成资金交易。 |
 
-Spend Control Activity 是控制事实 DSL，不是资金事实 DSL。它只描述某个业务流水在某个规则版本、预算 scope 和目标账户主体下发生了准入记录、拒绝记录、预算预留、交易成功消耗、预算释放、过期、撤销或退款释放等控制事件。它可以作为 `TransactionView` 的输入，也可以派生预算控制投影；但不能生成 `RouteLeg`、`PostingPlan`、`LedgerEntry`、`LedgerTransaction` 或 `BalanceProjection`。
+Spend Control Movement 是控制事实 DSL，不是资金事实 DSL。它只描述某个业务流水在某个规则版本、预算 scope 和目标账户主体下发生了准入记录、拒绝记录、预算预留、交易成功消耗、预算释放、过期、撤销或退款释放等控制事件。它可以作为 `TransactionView` 的输入，也可以派生预算控制投影；但不能生成 `RouteLeg`、`PostingPlan`、`LedgerEntry`、`LedgerTransaction` 或 `BalanceProjection`。
 
 | 控制事实 DSL 字段 | 含义 | 禁止 |
 | --- | --- | --- |
-| `activitySn` | 控制活动幂等流水。 | 复用资金交易流水替代控制活动流水。 |
-| `activityType` | `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`CONSUMED`、`RELEASED`、`EXPIRED`、`REVERSED` 等控制动作；`CONSUMED` 是下一 Grant 推荐的交易成功消耗语义，是否进入代码以授权为准。 | 用控制动作表达真实资金消费、入账、冻结或调账；把交易成功消耗和失败释放混用同一活动类型。 |
+| `movementSn` | 控制额度变动幂等流水。 | 复用资金交易流水替代控制额度变动流水。 |
+| `movementType` | `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`CONSUMED`、`RELEASED`、`EXPIRED`、`REVERSED` 等控制动作；`CONSUMED` 是下一 Grant 推荐的交易成功消耗语义，是否进入代码以授权为准。 | 用控制动作表达真实资金消费、入账、冻结或调账；把交易成功消耗和失败释放混用同一变动类型。 |
 | `targetSubjectRef` | 已解析资金账户、信用账户或平台角色解析后的平台资金账户。 | 预算组、Spend Rule、支付工具、卡号、PAN、token 或外部账户成为目标主体。 |
 | `budgetGroupRef` / `ruleRef` | 预算 scope、规则 ID、规则版本和规则决策证据。 | 规则通过直接生成 route、posting、entry 或余额投影。 |
-| `transactionRef` / `originalActivityRef` | 交易后控制消费、释放或退款释放时回链原资金交易和原控制活动。 | 缺原控制活动或原交易时补写控制消费事实，或由控制活动反向修改交易事实。 |
-| `activityDigest` | 控制活动摘要，用于幂等、回放和对账追踪。 | 用摘要替代核心字段校验，或允许同流水不同摘要覆盖旧事实。 |
+| `transactionRef` / `originalMovementRef` | 交易后控制消费、释放或退款释放时回链原资金交易和原控制额度变动。 | 缺原控制额度变动或原交易时补写控制消费事实，或由控制额度变动反向修改交易事实。 |
+| `movementDigest` | 控制额度变动摘要，用于幂等、回放和对账追踪。 | 用摘要替代核心字段校验，或允许同流水不同摘要覆盖旧事实。 |
 
 ### 7.9 扩展与治理 DSL 边界
 
@@ -981,7 +981,7 @@ Spend Control Activity 是控制事实 DSL，不是资金事实 DSL。它只描�
 | --- | --- | --- |
 | Spend Controls / 发卡授权控制扩展 | 作为授权前策略结果写入 `contextVariables`、规则版本和拒绝原因。 | 只决定授权是否可进入 `AUTHORIZE`，不生成 route、posting 或 entry；spend-rule window 不等同于账本周期。 |
 | 归档和余额重建 | 通过 `BalanceProjection`、检查点、水位、归档清单、差异报告和人工处理引用承接。 | 只校验、重算或重建投影；人工处理只能审批、补证据、缩小范围、重跑或关闭差异，不改变历史分录。 |
-| 多维交易投影查询 | 通过 `TransactionView`、`PaymentInstrumentRef`、`SubjectRef`、BudgetGroup 上下文、Spend Rule 快照、规则决策日志和预算控制投影承接。 | 只生成只读账单、控制时间线或差异报告；查询维度不能成为资金事实源、route leg 或 `LedgerEntry` 主体。 |
+| 多维交易投影查询 | 通过 `TransactionView`、`PaymentInstrumentRef`、`SubjectRef`、BudgetGroup 上下文、Spend Rule 快照、规则决策记录和预算控制投影承接。 | 只生成只读账单、控制时间线或差异报告；查询维度不能成为资金事实源、route leg 或 `LedgerEntry` 主体。 |
 | 交易投影重放 | 通过 `TransactionView`、重放范围、重放模式、差异报告和人工处理引用承接。 | 只修复只读视图；人工处理不能补写交易事实、账本事实或余额事实。 |
 | 报表指标输入 | 只保留指标项、业务问题、口径引用和推荐事实来源。 | 指标采集、计算、调度、存储、展示、导出和订阅由报表指标模块实现，不进入资金主链路，不复用归档、重建或重放控制对象。 |
 
@@ -1375,7 +1375,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-BENEFIT-CLEARING-RECONCILIATION-001` | 含权益交易进入清结算和对账。 | 清分候选、金额项、组件引用、营销核销引用和规则版本。 | 只拆分和核对金额项，不直接写资金事实；差异进入差错单。 | 权益差异静默补平、清分候选生成 LedgerEntry、补贴和本金净额混记。 |
 | `DSL-GOVERNANCE-ARCHIVE-MANIFEST-001` | 统一治理任务和资金归档 Manifest 状态隔离。 | `governanceTask`、`archiveRequest`、`archiveManifest`。 | 不生成 route/posting；统一任务完成不等于 Manifest 完成。 | 用统一任务号替代 Manifest、缺 checkpoint/watermark 仍归档成功。 |
 | `DSL-GOVERNANCE-PROJECTION-REPLAY-001` | 交易投影重放边界。 | `projectionReplayTask`、`differenceReport`、`manualResolutionRef`、`replayCheckpoint`。 | 只读事实并修复交易投影；正式覆盖必须有范围、审批、差异报告、人工处理闭环和 checkpoint。 | 无范围全量在线重放、重放生成资金交易、LedgerEntry 或绕过差异报告直接改投影事实。 |
-| `DSL-TRANSACTION-VIEW-MULTI-DIMENSION-001` | 多维交易投影查询。 | `TransactionView`、`PaymentInstrumentRef`、`SubjectRef`、BudgetGroup 上下文、Spend Rule 快照、规则决策日志和预算控制投影。 | 同一资金事实可按支付工具、资金账户、信用账户、预算组和 Spend Rule 生成只读账单、控制时间线或差异报告。 | 查询维度被写成资金事实源、route leg、posting plan 或 LedgerEntry 主体；交易投影反写交易、路由、账本或余额。 |
+| `DSL-TRANSACTION-VIEW-MULTI-DIMENSION-001` | 多维交易投影查询。 | `TransactionView`、`PaymentInstrumentRef`、`SubjectRef`、BudgetGroup 上下文、Spend Rule 快照、规则决策记录和预算控制投影。 | 同一资金事实可按支付工具、资金账户、信用账户、预算组和 Spend Rule 生成只读账单、控制时间线或差异报告。 | 查询维度被写成资金事实源、route leg、posting plan 或 LedgerEntry 主体；交易投影反写交易、路由、账本或余额。 |
 | `DSL-GOVERNANCE-BALANCE-SNAPSHOT-001` | 账本余额快照确认。 | `BalanceSnapshotVerifyRef`、coverage mode、Manifest 引用。 | 余额快照只证明余额水位和归档门禁；冷区和混合覆盖必须校验 Manifest。 | 普通指标快照替代余额快照、缺 Manifest 进入 `VERIFIED`。 |
 | `DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001` | 普通指标快照边界。 | `metricSnapshot` 和指标水位。 | 只属于报表指标发布上下文，不推进余额水位、Manifest 或重放 checkpoint。 | 指标水位替代资金水位、指标质量报告替代资金差异报告。 |
 | `DSL-GOVERNANCE-BIG-DATA-ARCHIVE-BOUNDARY-001` | 大数据消费边界；caseId 保留历史 archive 命名。 | 治理读取请求、导出快照引用、Manifest 摘要、脱敏策略、digest、审计引用和报表数仓消费方。 | 报表数仓、离线指标或经营分析只能只读消费治理导出或授权读取结果；资金冷归档仍是事实留存和重放证据，不是在线报表库。 | 报表数仓直接扫资金冷归档、反写交易/账目/余额/清结算/对账/投影事实，或用指标快照推进资金水位、替代余额快照或交易重放 checkpoint。 |

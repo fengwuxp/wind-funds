@@ -121,7 +121,7 @@ ScenarioFundsOperationContext
 | --- | --- | --- | --- | --- |
 | VCC 预付卡充值 | `PaymentInstrumentRef`、绑定资金子账户、外部入金引用、业务流水。 | 资金账户入账、账本分录和余额投影。 | 充值订单、processor event、外部入金流水。 | 卡号余额、VCC 账本主体、调额即入账。 |
 | VCC 预付卡提现 | 卡工具引用、资金子账户、提现目标、外部出款引用。 | 提现、在途、费用、清结算和对账。 | payout、rail、fee、quote 或退汇引用。 | 外部 accepted 即成功。 |
-| VCC 共享卡授权 | 卡工具引用、信用子账户、父账户快照、Spend Rule 决策证据。 | 账户主体型授权、冻结、退款和撤销。 | merchant、MCC、规则版本、控制活动引用。 | 替换 canonical 授权入参、共享卡号账本。 |
+| VCC 共享卡授权 | 卡工具引用、信用子账户、父账户快照、Spend Rule 决策证据。 | 账户主体型授权、冻结、退款和撤销。 | merchant、MCC、规则版本、控制额度变动引用。 | 替换 canonical 授权入参、共享卡号账本。 |
 | VA 收款 | VA 引用、statement line、绑定资金账户。 | 资金账户入账或对账差异。 | 银行流水、PSP 通知、付款方摘要。 | VA 内部余额。 |
 | 全球账户付款 | payout 指令、账户主体、rail、费用、quote。 | 出款、费用、在途、退汇和对账。 | SWIFT/local rail、quote、外部状态。 | 在 funds DSL 中实现 rail 协议。 |
 | ACH 或银行转账事件 | 外部事件、原交易引用、内部账户主体。 | 入账、扣账、退款、撤销、调账或差异单。 | ACH return、NOC、reversal、银行事件流水。 | Nacha/银行文件协议和外部账户敏感明文。 |
@@ -148,9 +148,9 @@ B7 目标态可以描述可清分明细、清分批次、内部清算候选、�
 
 Highnote 公开发卡文档中的 financial account、ledger、ledger entry、payment card 和 financial account activity 分层，可作为本 DSL 的外部参考确认：资金和账本落在账户，卡只是访问工具，账户活动和交易事件承担卡维度归因。wind-funds DSL 因此坚持“账户入账、工具归因、控制留痕、投影查询”：`SubjectRef` 决定可入账主体，`PaymentInstrumentRef` 和 binding snapshot 决定工具归因，Spend Rule / 预算控制只产出控制证据和只读投影输入。
 
-模块归属约束：Spend Rule 的规则定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制视图归属于 `wallet` 支出控制域；`transaction` 只消费已固化 `spendRuleDecision`、控制额度变动引用和 route snapshot 做历史投影解释；`ledger` 只接受可入账账户主体。交易模块不得直接依赖 wallet Spend Rule application service、DAL Entity 或 Mapper 来计算、更新或解释规则。当前代码兼容名中 `SpendRuleDecisionLog` 对应产品语义 `SpendRuleDecisionRecord`，`SpendControlActivity` 对应产品语义 `SpendControlMovement`。历史兼容活动类型 `ADMISSION_RECORDED`、`REJECTED_RECORDED` 只用于存量解释，不再作为新的控制额度变动 DSL 输入；新的准入 / 拒绝证据必须进入决策记录。当前兼容期由 `SpendControlActivityType` 作为控制额度变动 DSL 类型分类契约，统一声明产品语义、预算投影参与性、调额类、释放类和决策记录兼容类。
+模块归属约束：Spend Rule 的规则定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制视图归属于 `wallet` 支出控制域；`transaction` 只消费已固化 `spendRuleDecision`、控制额度变动引用和 route snapshot 做历史投影解释；`ledger` 只接受可入账账户主体。交易模块不得直接依赖 wallet Spend Rule application service、DAL Entity 或 Mapper 来计算、更新或解释规则。公共类名、表名和字段统一使用 `SpendRuleDecisionRecord`、`SpendControlMovement`、`movementSn`、`movementType` 和 `movementDigest` 等最终交付名。历史兼容变动类型 `ADMISSION_RECORDED`、`REJECTED_RECORDED` 只用于存量解释，不再作为新的控制额度变动 DSL 输入；新的准入 / 拒绝证据必须进入决策记录。`SpendControlMovementType` 作为控制额度变动 DSL 类型分类契约，统一声明预算投影参与性、调额类、释放类和决策记录兼容类。
 
-当前代码映射：Spend Rule DSL v1.1 示例均为 `fixtureLevel=DOC_ONLY`，用于锁定产品和测试契约，不等同于当前 Controller 报文、数据库列或可执行规则引擎。当前服务层把规则版本正文落到 `ruleSpec / ruleDigest`，把规则挂载流水落到 `assignmentSn`，把决策证据落到单条 `SpendRuleDecisionLog` 记录；`evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 是目标解释契约，未作为独立明细或字段完成落库。后续若把 DOC_ONLY DSL 升级为机器契约，必须新增 fixture、解析器、测试和独立 Grant。
+当前代码映射：Spend Rule DSL v1.1 示例均为 `fixtureLevel=DOC_ONLY`，用于锁定产品和测试契约，不等同于当前 Controller 报文、数据库列或可执行规则引擎。当前服务层把规则版本正文落到 `ruleSpec / ruleDigest`，把规则挂载流水落到 `assignmentSn`，把决策证据落到单条 `SpendRuleDecisionRecord` 记录；`evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 是目标解释契约，未作为独立明细或字段完成落库。后续若把 DOC_ONLY DSL 升级为机器契约，必须新增 fixture、解析器、测试和独立 Grant。
 
 | 设计面 | 对齐口径 | 必须保持 | 工程影响 |
 | --- | --- | --- | --- |

@@ -1,7 +1,7 @@
 package com.wind.funds.wallet.model.query;
 
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.enums.SpendControlActivityType;
+import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -25,7 +25,7 @@ import java.io.Serializable;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class SpendControlActivityQuery implements Serializable {
+public class SpendControlMovementQuery implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 3347119266449879712L;
@@ -35,10 +35,10 @@ public class SpendControlActivityQuery implements Serializable {
     private Long tenantId;
 
     @Schema(description = "控制额度变动流水流水号")
-    private String activitySn;
+    private String movementSn;
 
     @Schema(description = "控制额度变动流水类型")
-    private SpendControlActivityType activityType;
+    private SpendControlMovementType movementType;
 
     @Schema(description = "业务场景")
     private String businessScene;
@@ -47,7 +47,7 @@ public class SpendControlActivityQuery implements Serializable {
     private String businessSn;
 
     @Schema(description = "原控制额度变动流水流水号")
-    private String originalActivitySn;
+    private String originalMovementSn;
 
     @Schema(description = "资金交易流水号")
     private String transactionSn;
@@ -55,7 +55,7 @@ public class SpendControlActivityQuery implements Serializable {
     @Schema(description = "支付工具号")
     private String instrumentSn;
 
-    @Schema(description = "控制活动目标资金账户或信用账户标识")
+    @Schema(description = "控制额度变动目标资金账户或信用账户标识")
     private FundsAccountId targetAccountId;
 
     @Schema(description = "币种")

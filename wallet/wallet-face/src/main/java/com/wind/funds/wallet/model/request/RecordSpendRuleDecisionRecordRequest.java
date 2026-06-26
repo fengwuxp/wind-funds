@@ -27,7 +27,7 @@ import java.io.Serializable;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class RecordSpendRuleDecisionLogRequest implements Serializable {
+public class RecordSpendRuleDecisionRecordRequest implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1635838997807266435L;

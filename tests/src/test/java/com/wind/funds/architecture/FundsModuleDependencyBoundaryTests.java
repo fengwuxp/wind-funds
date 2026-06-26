@@ -112,9 +112,9 @@ class FundsModuleDependencyBoundaryTests {
                     "BudgetControlLimitAdjustmentApplicationService"),
             "wallet spend rule entity or mapper", List.of(
                     "com.wind.funds.wallet.dal.entities.SpendRule",
-                    "com.wind.funds.wallet.dal.entities.SpendControlActivity",
+                    "com.wind.funds.wallet.dal.entities.SpendControlMovement",
                     "com.wind.funds.wallet.dal.mapper.SpendRule",
-                    "com.wind.funds.wallet.dal.mapper.SpendControlActivity"),
+                    "com.wind.funds.wallet.dal.mapper.SpendControlMovement"),
             "wallet spend control projection model", List.of(
                     "BudgetControlProjectionDTO",
                     "BudgetControlProjectionQuery"));
