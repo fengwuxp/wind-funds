@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * 权益让利资金应用门面契约测试。
  */
-class FundsBenefitFundingApplicationServiceContractTests {
+class FundsBenefitContributionTransactionServiceContractTests {
 
     /**
      * 场景：业务侧已经完成优惠、代金券、支付立减或商户让利决策。
@@ -22,12 +22,12 @@ class FundsBenefitFundingApplicationServiceContractTests {
      * 红线：不得停留在“资金责任准备”DTO，也不得新增独立 marketing transaction lifecycle。
      */
     @Test
-    void testBenefitFundingApplicationServiceShouldExposeTransactionCommandContract()
+    void testBenefitContributionTransactionServiceShouldExposeTransactionCommandContract()
             throws NoSuchMethodException {
-        Method settleMethod = FundsBenefitFundingApplicationService.class.getMethod("settle",
+        Method settleMethod = FundsBenefitContributionTransactionService.class.getMethod("settle",
                 FundsBenefitFundingSettleRequest.class,
                 WindOperator.class);
-        Method refundMethod = FundsBenefitFundingApplicationService.class.getMethod("refund",
+        Method refundMethod = FundsBenefitContributionTransactionService.class.getMethod("refund",
                 FundsBenefitFundingRefundRequest.class,
                 WindOperator.class);
 
@@ -106,7 +106,7 @@ class FundsBenefitFundingApplicationServiceContractTests {
     }
 
     private List<String> serviceMethodNames() {
-        return Arrays.stream(FundsBenefitFundingApplicationService.class.getDeclaredMethods())
+        return Arrays.stream(FundsBenefitContributionTransactionService.class.getDeclaredMethods())
                 .map(Method::getName)
                 .toList();
     }

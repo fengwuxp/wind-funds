@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * @date 2026-06-16
  */
 @NullMarked
-public interface FundsBenefitFundingApplicationService {
+public interface FundsBenefitContributionTransactionService {
 
     /**
      * 记录一笔让利出资入账交易。

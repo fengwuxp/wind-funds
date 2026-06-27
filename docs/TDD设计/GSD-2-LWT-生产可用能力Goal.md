@@ -565,3 +565,23 @@ Wave 边界和依赖关系：Wave 0 只做状态和任务基线；Wave 1 只做�
 | `GSD2-WALLET-BUSINESS-FACADE-NAMING-002` | `authorizeByPaymentInstrument` 等兼容入口和 `InstrumentTransactionLifecycleApplicationService` 的目标入口容易造成使用面重复。 | 产品架构专家主责对外语言，资深架构师主责公共契约兼容退出。 | 先保持兼容，不做删除；后续若要收敛命名，必须扫描调用方、确认发布窗口和退出策略。 | `BACKLOG_COMPAT_EXIT_REQUIRED`。 |
 
 角色合议结论：本轮已消费 `GSD2-WALLET-INSTRUMENT-BINDING-UNIQUENESS-001` 的绑定幂等、默认绑定 DB guard 和生产 DDL 基线三个最小阶段，并已消费 `GSD2-GA-PAYOUT-RAIL-KERNEL-INTEGRATION-001` 的出款 rail 到账户主体型提现内核接入切片。下一轮若继续 wallet，推荐在出款费用 / 在途 / 清结算 / 对账生命周期、外部扣账 / return / NOC / reversal、信用账户还款 / 调额、VCC / VA 单场景、事件消费者 / outbox 或生产 DDL 执行评审之间重新选择单一 Grant。
+
+## 15. 让利出资服务命名迁移任务调整（2026-06-27）
+
+本节承接让利出资服务重命名讨论。用户已明确授权真实重命名；本轮将 Java 公共契约、实现、测试和文档统一到 `FundsBenefitContributionTransactionService`，不保留旧名同义空壳服务。
+
+| Task ID | CR 结论 | 角色 Owner | 建议推进方式 | 当前状态 |
+| --- | --- | --- | --- | --- |
+| `GSD2-BENEFIT-CONTRIBUTION-SERVICE-NAMING-001` | 现有服务职责已收敛为让利出资记账交易服务，`Funding` 命名容易被误解为资金来源归因；`Contribution` 更贴近“出资方贡献让利成本”的目标语义。 | 产品架构专家主责对外语义，资深架构师主责公共契约兼容退出。 | 已完成真实重命名：`transaction-face` 暴露 `FundsBenefitContributionTransactionService`，`transaction-impl` 提供 `FundsBenefitContributionTransactionServiceImpl`，契约测试和流程测试同步改名。旧 `ledgerEffect`、`benefitFundingSources` 和已删除 wind-funds 来源类型口径不再作为优惠券资金适配字段或 owner 决策项。禁止新增同义空壳服务、平行生命周期、批量 API、营销归因、字段重命名或 route/posting/ledger 行为变更。 | `RENAMED_TO_FUNDS_BENEFIT_CONTRIBUTION_TRANSACTION_SERVICE`。 |
+
+### 15.1 跨仓库同步 Handoff
+
+本 Handoff 已完成 `capte-domain` 同步验证；本轮进一步完成 wind-funds Java 公共契约真实改名。当前调用名为 `FundsBenefitContributionTransactionService`。
+
+| 同步对象 | 最小调整 | 验证 |
+| --- | --- | --- |
+| `capte-domain/docs/系分设计/通用优惠券系分设计.md`、`docs/ai-orchestration/order-coupon-gsd/*.md` | 文档统一说明当前 Java 调用为 `FundsBenefitContributionTransactionService.settle/refund`；删除把 `ledgerEffect` 或 `benefitFundingSources` 作为 wind-funds settle 必填字段、适配字段或 owner 决策项的旧口径。 | `rg "ledgerEffect|benefitFundingSources"` 不得出现当前适配口径残留；源码扫描不得出现旧服务类名。 |
+| `capte-domain/docs/ai-orchestration/order-coupon-gsd/08-cpn-benefit-funding-001-execution-grant-request.md` | 请求字段基线收敛为 `costBearerSubjectRef`、`benefitReceiverSubjectRef`、`amount`、`fundingNature`；真实入账成为 wind-funds 隐含语义，不再让优惠券域冻结或映射 `ledgerEffect`。 | 复核 `001D-2/001D-3` owner 决策包仍保留主体映射、受益账务主体来源、稳定业务键、失败补偿、对账、告警和人工接管。 |
+| `capte-domain` 优惠券与生产门禁测试 | 更新只为守住优惠券域不暴露 wind-funds 主体、资金性质、执行状态和影子资金事实；不再要求 GSD 或 Grant 文档保留 `ledgerEffect`。订单通用上下文中与让利出资无关的 `ledgerEffect` 负向断言不在本任务范围内。 | 目标测试优先跑 `CouponFaceContractShapeTests`、`CouponImplContractBoundaryTests`、`ProductionReadinessBoundaryTests`；如未改 Java 生产代码，可先用 `git diff --check` 和目标测试收口。 |
+
+本轮同步证据：wind-funds 已通过 `just verify-slice FundsBenefitContributionTransactionServiceContractTests,FundsBenefitContributionTransactionServiceFlowTests tests`，13 个用例通过；`git diff --check` 通过；源码和测试扫描未发现旧服务类名残留。`capte-domain` 已通过优惠券 GSD/系分旧字段和旧服务名残留扫描、`git diff --check`，但本轮 Maven 目标测试在 `capte-domain-tests` 的无关 testCompile 阶段被 approval/dingtalk/analytics 既有缺失符号阻断，未进入目标边界测试执行。wind-funds 本轮只做真实服务重命名，不新增同义包装服务。

@@ -10,7 +10,7 @@ import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.transaction.application.FundsBenefitFundingApplicationService;
+import com.wind.funds.transaction.application.FundsBenefitContributionTransactionService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
 import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
@@ -42,7 +42,7 @@ import java.util.Set;
  */
 @Service
 @AllArgsConstructor
-public class FundsBenefitFundingApplicationServiceImpl implements FundsBenefitFundingApplicationService {
+public class FundsBenefitContributionTransactionServiceImpl implements FundsBenefitContributionTransactionService {
 
     private static final String BENEFIT_FUNDING = "benefitFunding";
 

@@ -37,7 +37,7 @@ import com.wind.funds.transaction.DefaultRoutedFundsInstructionOrchestrator;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.application.FundsBalanceControlService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
-import com.wind.funds.transaction.application.impl.FundsBenefitFundingApplicationServiceImpl;
+import com.wind.funds.transaction.application.impl.FundsBenefitContributionTransactionServiceImpl;
 import com.wind.funds.transaction.application.impl.DefaultFundsBalanceAdjustmentAuditApplicationService;
 import com.wind.funds.transaction.application.impl.FundsTransactionCommandServiceImpl;
 import com.wind.funds.transaction.projection.impl.DefaultFundsTransactionProjectionExplainApplicationService;
@@ -1320,7 +1320,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultRouteSnapshotFactory.class,
             DefaultLedgerPostingAssembler.class,
             DefaultRoutedFundsInstructionOrchestrator.class,
-            FundsBenefitFundingApplicationServiceImpl.class,
+            FundsBenefitContributionTransactionServiceImpl.class,
             DefaultFundsBalanceAdjustmentAuditApplicationService.class,
             DefaultFundsTransactionProjectionExplainApplicationService.class,
             FundsTransactionCommandServiceImpl.class,
