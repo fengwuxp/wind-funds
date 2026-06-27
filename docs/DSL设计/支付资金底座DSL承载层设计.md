@@ -513,7 +513,7 @@ FX 边界：
 | `eventTime` | 是 | 事实发生时间。 |
 | `operator` | 是 | 操作者快照。 |
 | `reference` | 条件必填 | 后续事件必须引用原事实或原快照。 |
-| `benefitFundingRef` | 条件必填 | 交易使用优惠券、代金券、平台补贴、商户让利、储值券或其他权益抵扣且需要资金底座记账、退款、业务取消、人工纠错或对账时必填，引用权益让利资金交易或等价不可变事实；无权益交易为空。 |
+| `benefitContributionRef` | 条件必填 | 交易使用优惠券、代金券、平台补贴、商户让利、储值券或其他权益抵扣且需要资金底座记账、退款、业务取消、人工纠错或对账时必填，引用权益让利资金交易或等价不可变事实；无权益交易为空。 |
 | `contextVariables` | 是 | 补充上下文，不能隐藏必填主语义。 |
 | `riskAndComplianceRef` | 条件必填 | 涉及资质、法域、客户资金、备付金、跨境、外汇、敏感数据、外部规则或高危人工动作时必填，记录规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方、确认状态、审批或证据引用；不得保存敏感原文。 |
 
@@ -1031,7 +1031,7 @@ Spend Control Movement 是控制事实 DSL，不是资金事实 DSL。它只描�
 
 | 用例 | 资金交易结构 | 权益 DSL 重点 | 开发承接 | 测试承接 |
 | --- | --- | --- | --- | --- |
-| 无权益交易目标态 | 任意 `FundsInstruction`。 | `benefitFundingRef` 或等价权益资金事实引用为空。 | 交易、授权、余额控制和退款保持主语义。 | `TDD-BEN-001`。 |
+| 无权益交易目标态 | 任意 `FundsInstruction`。 | `benefitContributionRef` 或等价权益资金事实引用为空。 | 交易、授权、余额控制和退款保持主语义。 | `TDD-BEN-001`。 |
 | 商户优惠券支付 | `DIRECT_TRANSACTION / PAY`，`amount=userPayAmount`。 | 非入账商户让利解释事实，不调用让利出资记账交易服务。 | 不生成权益 route leg 或 posting；清结算可展示商户让利。 | `DSL-BENEFIT-MERCHANT-DISCOUNT-001`、`TDD-BEN-DIR-001`。 |
 | 平台补贴券补足商户 | `DIRECT_TRANSACTION / PAY` + 平台补贴组件。 | `FundsBenefitContributionTransactionService#settle`，平台资金账户向商户待清算或补贴承接主体出资。 | 生成独立补贴 leg 或明确独立伴随指令；不得和本金净额混记。 | `DSL-BENEFIT-PLATFORM-SUBSIDY-001`、`TDD-BEN-DIR-002`。 |
 | 平台券不补足商户 | `DIRECT_TRANSACTION / PAY`。 | 非入账展示或清分解释事实，不调用让利出资记账交易服务。 | 平台券只影响用户实付和商户应收，不形成补贴资金路径；通过订单事实和商户应收口径解释，不误记平台成本。 | `DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001`、`TDD-BEN-DIR-003`。 |
