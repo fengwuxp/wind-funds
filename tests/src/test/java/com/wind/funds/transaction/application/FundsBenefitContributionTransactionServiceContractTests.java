@@ -1,8 +1,8 @@
 package com.wind.funds.transaction.application;
 
 import com.capte.domain.core.operator.WindOperator;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitContributionRefundRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitContributionSettleRequest;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -25,10 +25,10 @@ class FundsBenefitContributionTransactionServiceContractTests {
     void testBenefitContributionTransactionServiceShouldExposeTransactionCommandContract()
             throws NoSuchMethodException {
         Method settleMethod = FundsBenefitContributionTransactionService.class.getMethod("settle",
-                FundsBenefitFundingSettleRequest.class,
+                FundsBenefitContributionSettleRequest.class,
                 WindOperator.class);
         Method refundMethod = FundsBenefitContributionTransactionService.class.getMethod("refund",
-                FundsBenefitFundingRefundRequest.class,
+                FundsBenefitContributionRefundRequest.class,
                 WindOperator.class);
 
         assertThat(settleMethod.getReturnType()).isEqualTo(String.class);
@@ -53,7 +53,7 @@ class FundsBenefitContributionTransactionServiceContractTests {
     @Test
     void testSettleRequestShouldModelBenefitContributionWithoutMarketingAttribution()
             throws NoSuchMethodException {
-        List<String> getterNames = Arrays.stream(FundsBenefitFundingSettleRequest.class.getMethods())
+        List<String> getterNames = Arrays.stream(FundsBenefitContributionSettleRequest.class.getMethods())
                 .map(Method::getName)
                 .toList();
 
@@ -86,7 +86,7 @@ class FundsBenefitContributionTransactionServiceContractTests {
      */
     @Test
     void testRefundRequestShouldReferenceOriginalBenefitFundingTransaction() {
-        List<String> refundGetterNames = Arrays.stream(FundsBenefitFundingRefundRequest.class.getMethods())
+        List<String> refundGetterNames = Arrays.stream(FundsBenefitContributionRefundRequest.class.getMethods())
                 .map(Method::getName)
                 .toList();
 

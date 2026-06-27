@@ -13,8 +13,8 @@ import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.application.FundsBenefitContributionTransactionService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitContributionRefundRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitContributionSettleRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -80,7 +80,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull String settle(@NonNull FundsBenefitFundingSettleRequest request,
+    public @NonNull String settle(@NonNull FundsBenefitContributionSettleRequest request,
                                   @NonNull WindOperator operator) {
         assertSettleRequest(request);
         assertLightweightContext(request.getContextVariables());
@@ -99,7 +99,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull String refund(@NonNull FundsBenefitFundingRefundRequest request,
+    public @NonNull String refund(@NonNull FundsBenefitContributionRefundRequest request,
                                   @NonNull WindOperator operator) {
         assertRefundRequest(request);
         assertLightweightContext(request.getContextVariables());
@@ -116,7 +116,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                 .setDescription("benefit funding refund"), operator);
     }
 
-    private void assertSettleRequest(@NonNull FundsBenefitFundingSettleRequest request) {
+    private void assertSettleRequest(@NonNull FundsBenefitContributionSettleRequest request) {
         AssertUtils.notNull(request.getTenantId(), "权益让利 tenantId 不能为空");
         AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
                 "权益让利 tenantId 与当前租户不一致");
@@ -133,7 +133,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                 request.getFundingNature());
     }
 
-    private void assertRefundRequest(@NonNull FundsBenefitFundingRefundRequest request) {
+    private void assertRefundRequest(@NonNull FundsBenefitContributionRefundRequest request) {
         AssertUtils.notNull(request.getTenantId(), "权益让利退款 tenantId 不能为空");
         AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
                 "权益让利退款 tenantId 与当前租户不一致");
@@ -171,7 +171,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         return FundsAccountId.immutable(subjectRef.getSubjectId(), subjectRef.getSubjectType().name());
     }
 
-    private Map<String, Object> settleContext(@NonNull FundsBenefitFundingSettleRequest request) {
+    private Map<String, Object> settleContext(@NonNull FundsBenefitContributionSettleRequest request) {
         Map<String, Object> result = mergeContext(request.getContextVariables());
         result.put(BENEFIT_FUNDING, Boolean.TRUE);
         result.put(BENEFIT_FUNDING_NATURE_CODE, request.getFundingNature().name());
@@ -182,7 +182,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         return Map.copyOf(result);
     }
 
-    private Map<String, Object> refundContext(@NonNull FundsBenefitFundingRefundRequest request) {
+    private Map<String, Object> refundContext(@NonNull FundsBenefitContributionRefundRequest request) {
         Map<String, Object> result = mergeContext(request.getContextVariables());
         result.put(BENEFIT_FUNDING, Boolean.TRUE);
         result.put(BENEFIT_ORIGINAL_ORDER_SN, request.getOriginalOrderSn());

@@ -24,7 +24,7 @@ import lombok.experimental.Accessors;
 @Data
 @NoArgsConstructor
 @Accessors(chain = true)
-public class FundsBenefitFundingSettleRequest {
+public class FundsBenefitContributionSettleRequest {
 
     @Schema(description = "租户 ID")
     @NotNull

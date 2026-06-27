@@ -553,8 +553,8 @@ DSL 契约统一使用 `instrumentSn` 和 `instrumentDisplayNo`：前者作为�
 | 对象 | 用途 | 边界 |
 | --- | --- | --- |
 | `FundsBenefitContributionTransactionService` | 当前 Java 公共契约中的让利出资记账交易服务，提供 `settle`、`refund`，返回资金交易流水号。 | 和直接交易服务处于同一抽象层级；不直接写 route、posting、LedgerEntry 或余额投影。 |
-| `FundsBenefitFundingSettleRequest` | 表达已决策出资方到让利承接账务主体的一笔入账交易。 | 只承载业务流水、原订单或原交易引用、成本承担主体、让利承接账务主体、金额和资金性质；不承载完整营销规则、券包库存、最优券计算或来源归因列表。 |
-| `FundsBenefitFundingRefundRequest` | 表达原让利出资交易的退款、业务取消、人工纠错或反向冲销。 | 必须引用原让利出资交易流水号；不得携带当前重新计算的权益结果作为资金事实来源。 |
+| `FundsBenefitContributionSettleRequest` | 表达已决策出资方到让利承接账务主体的一笔入账交易。 | 只承载业务流水、原订单或原交易引用、成本承担主体、让利承接账务主体、金额和资金性质；不承载完整营销规则、券包库存、最优券计算或来源归因列表。 |
+| `FundsBenefitContributionRefundRequest` | 表达原让利出资交易的退款、业务取消、人工纠错或反向冲销。 | 必须引用原让利出资交易流水号；不得携带当前重新计算的权益结果作为资金事实来源。 |
 
 职责边界：券能不能退、是否返券、是否作废、是否补贴冲回，仍由业务层、订单层、营销权益系统或运营审批链路决策。资金底座只校验已决策让利出资结果是否具备交易、记账、路由、清结算、对账和回放所需证据。
 
@@ -594,8 +594,8 @@ transaction/transaction-face/src/main/java/com/wind/funds/transaction/applicatio
   FundsBenefitContributionTransactionService.java
 
 transaction/transaction-face/src/main/java/com/wind/funds/transaction/model/request/
-  FundsBenefitFundingSettleRequest.java
-  FundsBenefitFundingRefundRequest.java
+  FundsBenefitContributionSettleRequest.java
+  FundsBenefitContributionRefundRequest.java
 
 transaction/transaction-face/src/main/java/com/wind/funds/transaction/enums/
   FundsBenefitFundingNature.java
@@ -628,11 +628,11 @@ transaction/transaction-face/src/main/java/com/wind/funds/transaction/enums/
 ```mermaid
 classDiagram
     class FundsBenefitContributionTransactionService {
-      +String settle(FundsBenefitFundingSettleRequest request)
-      +String refund(FundsBenefitFundingRefundRequest request)
+      +String settle(FundsBenefitContributionSettleRequest request)
+      +String refund(FundsBenefitContributionRefundRequest request)
     }
 
-    class FundsBenefitFundingSettleRequest {
+    class FundsBenefitContributionSettleRequest {
       +String businessScene
       +String businessSn
       +String originalOrderSn
@@ -643,7 +643,7 @@ classDiagram
       +FundsBenefitFundingNature fundingNature
     }
 
-    class FundsBenefitFundingRefundRequest {
+    class FundsBenefitContributionRefundRequest {
       +String referenceBenefitTransactionSn
       +Money amount
       +String businessScene
@@ -652,8 +652,8 @@ classDiagram
       +String refundReason
     }
 
-    FundsBenefitContributionTransactionService --> FundsBenefitFundingSettleRequest
-    FundsBenefitContributionTransactionService --> FundsBenefitFundingRefundRequest
+    FundsBenefitContributionTransactionService --> FundsBenefitContributionSettleRequest
+    FundsBenefitContributionTransactionService --> FundsBenefitContributionRefundRequest
 ```
 
 接口草图用于约束公共契约骨架；字段完整语义、必填条件和默认值以 transaction-face Java 契约为准。
@@ -661,10 +661,10 @@ classDiagram
 ```java
 public interface FundsBenefitContributionTransactionService {
 
-    @NonNull String settle(@NonNull FundsBenefitFundingSettleRequest request,
+    @NonNull String settle(@NonNull FundsBenefitContributionSettleRequest request,
                            @NonNull WindOperator operator);
 
-    @NonNull String refund(@NonNull FundsBenefitFundingRefundRequest request,
+    @NonNull String refund(@NonNull FundsBenefitContributionRefundRequest request,
                            @NonNull WindOperator operator);
 }
 ```
@@ -1367,7 +1367,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
   "acceptanceIds": ["AC-BEN-FUNDING-001"],
   "tddIds": ["TDD-BEN-FUNDING-001"],
   "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#权益让利资金交易"],
-  "benefitFundingSettleRequest": {
+  "benefitContributionSettleRequest": {
     "tenantId": 1,
     "businessScene": "PLATFORM_SUBSIDY",
     "businessSn": "BEN_SETTLE_202606160001",

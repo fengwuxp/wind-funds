@@ -1,8 +1,8 @@
 package com.wind.funds.transaction.application;
 
 import com.capte.domain.core.operator.WindOperator;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitContributionRefundRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitContributionSettleRequest;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
 
@@ -42,7 +42,7 @@ public interface FundsBenefitContributionTransactionService {
      * @return 资金交易流水号
      */
     @NonNull String settle(
-            @NonNull FundsBenefitFundingSettleRequest request,
+            @NonNull FundsBenefitContributionSettleRequest request,
             @NonNull WindOperator operator);
 
     /**
@@ -56,7 +56,7 @@ public interface FundsBenefitContributionTransactionService {
      * @return 资金交易流水号
      */
     @NonNull String refund(
-            @NonNull FundsBenefitFundingRefundRequest request,
+            @NonNull FundsBenefitContributionRefundRequest request,
             @NonNull WindOperator operator);
 
 }

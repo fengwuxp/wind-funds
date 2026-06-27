@@ -22,7 +22,7 @@ import lombok.experimental.Accessors;
 @Data
 @NoArgsConstructor
 @Accessors(chain = true)
-public class FundsBenefitFundingRefundRequest {
+public class FundsBenefitContributionRefundRequest {
 
     @Schema(description = "租户 ID")
     @NotNull

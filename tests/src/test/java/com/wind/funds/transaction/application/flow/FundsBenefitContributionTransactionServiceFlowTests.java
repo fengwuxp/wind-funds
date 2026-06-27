@@ -12,8 +12,8 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.application.FundsBenefitContributionTransactionService;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingRefundRequest;
-import com.wind.funds.transaction.model.request.FundsBenefitFundingSettleRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitContributionRefundRequest;
+import com.wind.funds.transaction.model.request.FundsBenefitContributionSettleRequest;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
@@ -68,7 +68,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertLedgerEventAndBuckets("BENEFIT_SETTLE_001", FundsTransactionEventType.PAY,
                 LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.SETTLEMENT);
 
-        String refundTransactionSn = benefitContributionTransactionService.refund(new FundsBenefitFundingRefundRequest()
+        String refundTransactionSn = benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
                 .setReferenceBenefitTransactionSn(settleTransactionSn)
                 .setReferenceTransactionSn("PAY_ORDER_001")
@@ -88,7 +88,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertLedgerEventAndBuckets("BENEFIT_REFUND_001", FundsTransactionEventType.REFUND,
                 LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
 
-        String cancelRefundTransactionSn = benefitContributionTransactionService.refund(new FundsBenefitFundingRefundRequest()
+        String cancelRefundTransactionSn = benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
                 .setReferenceBenefitTransactionSn(settleTransactionSn)
                 .setReferenceTransactionSn("PAY_ORDER_001")
@@ -314,7 +314,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_MULTI_PLATFORM_SETTLE_001", 2, 2);
         assertSingleFundsAndLedgerFactsForBusinessSn("BENEFIT_MULTI_MERCHANT_SETTLE_001", 2, 2);
 
-        benefitContributionTransactionService.refund(new FundsBenefitFundingRefundRequest()
+        benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
                 .setReferenceBenefitTransactionSn(platformTransactionSn)
                 .setReferenceTransactionSn("PAY_ORDER_001")
@@ -323,7 +323,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setBusinessSn("BENEFIT_MULTI_PLATFORM_REFUND_001")
                 .setOriginalOrderSn("ORDER_001")
                 .setRefundReason("partial order refund"), WindOperator.system());
-        benefitContributionTransactionService.refund(new FundsBenefitFundingRefundRequest()
+        benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
                 .setReferenceBenefitTransactionSn(merchantTransactionSn)
                 .setReferenceTransactionSn("PAY_ORDER_001")
@@ -356,7 +356,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         var before = snapshot(balances(costBearer, receiver));
 
-        assertThatThrownBy(() -> benefitContributionTransactionService.refund(new FundsBenefitFundingRefundRequest()
+        assertThatThrownBy(() -> benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
                 .setReferenceBenefitTransactionSn("BENEFIT_TXN_MISSING_ORIGINAL_001")
                 .setReferenceTransactionSn("PAY_ORDER_001")
@@ -446,7 +446,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 "BENEFIT_REFUND_CONTEXT_SETTLE_001"), WindOperator.system());
         var beforeRefund = snapshot(balances(costBearer, receiver));
 
-        assertThatThrownBy(() -> benefitContributionTransactionService.refund(new FundsBenefitFundingRefundRequest()
+        assertThatThrownBy(() -> benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
                 .setReferenceBenefitTransactionSn(settleTransactionSn)
                 .setReferenceTransactionSn("PAY_ORDER_001")
@@ -467,11 +467,11 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_REFUND_CONTEXT_CORE_FIELD_001");
     }
 
-    private FundsBenefitFundingSettleRequest settleRequest(FundsAccountId costBearer,
+    private FundsBenefitContributionSettleRequest settleRequest(FundsAccountId costBearer,
                                                            FundsAccountId receiver,
                                                            long amount,
                                                            String businessSn) {
-        return new FundsBenefitFundingSettleRequest()
+        return new FundsBenefitContributionSettleRequest()
                 .setTenantId(TENANT_ID)
                 .setBusinessScene("BENEFIT_SETTLE")
                 .setBusinessSn(businessSn)
