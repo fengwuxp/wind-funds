@@ -295,6 +295,39 @@ class FundsBenefitFundingApplicationServiceFlowTests extends FundsTransactionFlo
     }
 
     /**
+     * 场景：退款引用不存在的原让利出资交易。
+     * 输入：referenceBenefitTransactionSn 指向不存在的交易流水。
+     * 输出：服务 fail-fast，不补造历史出资事实，也不生成退款资金事实。
+     * 红线：让利出资退款必须按原交易 RouteSnapshot 回放，缺原事实时不得重新路由或自行分摊。
+     */
+    @Test
+    void testRefundWithMissingOriginalBenefitTransactionShouldFailWithoutFundsOrLedgerFacts() {
+        FundsAccountId costBearer = fundingAccount("ben_missing_cost");
+        FundsAccountId receiver = fundingAccount("ben_missing_recv");
+        ensureLedger(costBearer, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
+        var before = snapshot(balances(costBearer, receiver));
+
+        assertThatThrownBy(() -> benefitFundingApplicationService.refund(new FundsBenefitFundingRefundRequest()
+                .setTenantId(TENANT_ID)
+                .setReferenceBenefitTransactionSn("BENEFIT_TXN_MISSING_ORIGINAL_001")
+                .setReferenceTransactionSn("PAY_ORDER_001")
+                .setAmount(Money.immutable(5L, CURRENCY))
+                .setBusinessScene("BENEFIT_REFUND")
+                .setBusinessSn("BENEFIT_MISSING_ORIGINAL_REFUND_001")
+                .setOriginalOrderSn("ORDER_001")
+                .setRefundReason("missing original benefit contribution"), WindOperator.system()))
+                .hasMessageContaining("原权益让利资金交易 RouteSnapshot 不存在")
+                .hasMessageContaining("BENEFIT_TXN_MISSING_ORIGINAL_001");
+
+        var after = snapshot(balances(costBearer, receiver));
+        assertOnlyBalanceDeltas(before, after,
+                delta(costBearer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(receiver, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertNoFundsOrLedgerFactsForBusinessSn("BENEFIT_MISSING_ORIGINAL_REFUND_001");
+    }
+
+    /**
      * 场景：调用方试图把展示优惠、商户折扣或平台券不补足商户等解释事实伪装成入账结算。
      * 输入：资金性质为 NO_FUNDS_TRANSFER。
      * 输出：服务 fail-fast，不生成资金交易、交易明细、账务交易或分录。
