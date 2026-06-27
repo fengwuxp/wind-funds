@@ -69,16 +69,15 @@ MVP 评审时优先回答四个问题：
 | 设计宣讲 | 本 README、产品设计 README、系分设计 README、用户接入指南。 | 共同语言、能力边界、P0/P1/P2 优先级和评审安排。 |
 | 产品或接入评审 | 产品设计、用户接入指南、资金事实说明卡、接入评审清单。 | 业务目标、能力成熟度、接入结论、补齐清单和待确认项。 |
 | 系分和 TDD 准入 | DSL 设计、系分设计、TDD 设计、产品验收矩阵；涉及 Spend Rule 时补读产品设计 09 和系分设计 06。 | 服务入口、系统边界、首批 Red、资金不变量断言和验证命令。 |
-| GSD + Goal 推进 | [TDD设计/GSD-2-新基线工作流规划.md](TDD设计/GSD-2-新基线工作流规划.md)、[TDD设计/GSD-2-W1-基线差距审计.md](TDD设计/GSD-2-W1-基线差距审计.md)、[TDD设计/GSD-2-W2-单一Grant选择卡.md](TDD设计/GSD-2-W2-单一Grant选择卡.md)、[TDD设计/GSD-2-W3-B2账户层级CAD准入草案.md](TDD设计/GSD-2-W3-B2账户层级CAD准入草案.md)、[TDD设计/GSD-2-W4-B2账户层级ExecutionGrant确认包.md](TDD设计/GSD-2-W4-B2账户层级ExecutionGrant确认包.md)、[TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md](TDD设计/GSD-2-P0P1-LedgerWalletTransaction推进计划.md)、[TDD设计/GSD-2-LWT-生产可用能力Goal.md](TDD设计/GSD-2-LWT-生产可用能力Goal.md)、[TDD设计/GSD-2-B5-余额调账审计扩展ExecutionGrant确认包.md](TDD设计/GSD-2-B5-余额调账审计扩展ExecutionGrant确认包.md)、[TDD设计/GSD-2-B5-SpendRule控制活动与预算投影ExecutionGrant确认包.md](TDD设计/GSD-2-B5-SpendRule控制活动与预算投影ExecutionGrant确认包.md)、[TDD设计/GSD-2-B5-交易消费支出控制活动ExecutionGrant确认包.md](TDD设计/GSD-2-B5-交易消费支出控制活动ExecutionGrant确认包.md)、[TDD设计/GSD-2-B5-SpendRule设计闭环ExecutionGrant确认包.md](TDD设计/GSD-2-B5-SpendRule设计闭环ExecutionGrant确认包.md)、[TDD设计/GSD-2-B7-清算结算Gate消费ExecutionGrant确认包.md](TDD设计/GSD-2-B7-清算结算Gate消费ExecutionGrant确认包.md)、[TDD设计/GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md](TDD设计/GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md)、[TDD设计/GSD-2-B7-对账差异报告ExecutionGrant确认包.md](TDD设计/GSD-2-B7-对账差异报告ExecutionGrant确认包.md)、[TDD设计/GSD-2-AUTH-Chargeback目标语义对齐任务卡.md](TDD设计/GSD-2-AUTH-Chargeback目标语义对齐任务卡.md)、[TDD设计/GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md](TDD设计/GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md)、[TDD设计/GSD-2-AUTH-Chargeback公共API退出计划任务卡.md](TDD设计/GSD-2-AUTH-Chargeback公共API退出计划任务卡.md)、[TDD设计/GSD-2-B7-PRD系分合议预审与三卡交接.md](TDD设计/GSD-2-B7-PRD系分合议预审与三卡交接.md)、[TDD设计/GSD-2-AgentLoop-PlanGrant默认授权策略.md](TDD设计/GSD-2-AgentLoop-PlanGrant默认授权策略.md)、[TDD设计/AI代码交付闭环与Spec模板基线.md](TDD设计/AI代码交付闭环与Spec模板基线.md)、[TDD设计/GSD-2-Spec-AC-Harness-CAD任务模板.md](TDD设计/GSD-2-Spec-AC-Harness-CAD任务模板.md)、[TDD设计/GSD-Goal-生产可用MVP推进计划.md](TDD设计/GSD-Goal-生产可用MVP推进计划.md)、OpenSpec/Harness。 | GSD-2 是 2026-06-12 之后的活跃工作流入口；W1/W2/W3/W4 是历史消费证据。当前恢复入口以 LWT 生产可用能力 Goal 为准；账户层级、资金责任、支付工具能力准入、账户能力来源准入、支付工具预交易快照、支出控制准入快照、支付工具授权准入、交易投影解释、余额调账审计、B7 差错闭环、动作守卫、准入消费、出款 preflight、ledger 正常余额方向 guard、B5 route snapshot 审计回链、B5 独立审计查询、B7 对象级 Gate、清算 / 结算只读 consumer、B7 对账差异报告、Spend Rule 控制活动、Spend Rule 定义契约、预算组非建账、交易消费支出控制活动、并发幂等、退款释放守卫、退款事实守卫、退款补偿入口守卫、退款已消费引用守卫、业务场景一致性守卫、成功消费业务流水一致性守卫、失败释放业务流水一致性守卫、退款引用净消费上限守卫、退款引用已消费一致性守卫、交易事实累计解释金额守卫、控制活动幂等语义一致性守卫、退款引用原交易业务一致性守卫、预算控制投影目标账户隔离守卫和释放上限目标账户隔离守卫均已完成首轮 Green / Verify / Commit。`GSD2-B5-SPEND-RULE-DEFINITION-CONTRACT-001` 已消费，继续 Spend Rule 编码需重新选择决策消费或投影解释等新的单一 Grant；旧 `chargeback` 公共 API 退役治理已进入 `GSD2-TRX-CHARGEBACK-PUBLIC-API-EXIT-PLAN-001`，调用方扫描已完成，`GSD2-TRX-CHARGEBACK-TEST-MIGRATION-001` 已完成首轮测试迁移；剩余测试调用已裁决为兼容回归，公共 API 删除 readiness 已评估为不 ready；跨仓库依赖扫描、历史解释回归、发布兼容、版本废弃窗口和回滚策略未完成前，不得直接删除公共 API。 |
-| 编码或生产 Done 判定 | Execution Grant、OpenSpec/Harness、实现证据、测试、DDL/H2、审计和外部确认。 | 写入范围闭合、验证通过、残余风险和 Not Done 清单。 |
+| 编码或生产 Done 判定 | 当前 OpenSpec 规格、实现证据、测试、DDL/H2、审计和外部确认。 | 写入范围闭合、验证通过、残余风险和 Not Done 清单。 |
 
 | 使用场景 | 先用材料 | 会议产出 | 能得出的结论 | 不能得出的结论 |
 | --- | --- | --- | --- | --- |
 | 产品和研发宣讲 | 本 README、产品设计 README、系分设计 README、用户接入指南的宣讲提纲。 | 共同语言、能力边界、P0/P1/P2 优先级、主要图形路径和评审安排。 | 团队理解 wind-funds 的定位、可支撑能力和禁止边界。 | 不能证明代码已实现、外部规则已确认或可以直接上线。 |
 | 产品设计评审 | 产品设计 01-05、业务补充分册 06-08、Spend Rule 专项 09、ACH 边界文档、产品图形化产物。 | 产品目标、业务对象、主流程、异常流程、风险、验收矩阵和待确认项。 | PRD 是否完整、可理解、可进入 DSL/系分/TDD 拆解。 | 不能替代系分可开发性、测试资产和生产验证。 |
-| 系分设计评审 | DSL 设计、系分设计 01-06、系分图形化产物、模块依赖和职责边界图。 | 模块边界、服务入口、表职责、状态机、事务边界、观测审计和编码准入缺口。 | 系分是否满足产品目标和规则，是否可进入 TDD 分析。 | 不能替代 Execution Grant、实现证据、DDL/H2 或验证结果。 |
-| TDD 准入评审 | 产品验收矩阵、DSL caseId、系分章节、TDD 设计和红线清单。 | 目标测试资产、首批 Red、断言最小集、验证命令和不覆盖范围。 | 是否可以开始 TDD 分析或准备 MVP 编码任务授权。 | 不能在缺少 Execution Grant 时写生产代码、测试代码或 schema。 |
-| 接入评审会 | 用户接入指南、资金事实说明卡、接入申请、接入评审清单和图形化辅助阅读。 | 通过、带条件通过或阻断；补齐清单、负责人、时间点和是否允许准备 Execution Grant。 | 某个业务接入需求能不能进入下一阶段。 | 不能替代上线审批、合规确认、财务确认或生产 Done。 |
+| 系分设计评审 | DSL 设计、系分设计 01-06、系分图形化产物、模块依赖和职责边界图。 | 模块边界、服务入口、表职责、状态机、事务边界、观测审计和编码准入缺口。 | 系分是否满足产品目标和规则，是否可进入 TDD 分析。 | 不能替代工程任务边界、实现证据、DDL/H2 或验证结果。 |
+| TDD 准入评审 | 产品验收矩阵、DSL caseId、系分章节、TDD 设计和红线清单。 | 目标测试资产、首批 Red、断言最小集、验证命令和不覆盖范围。 | 是否可以开始 TDD 分析或准备 MVP 编码任务授权。 | 不能在缺少明确工程任务边界时写生产代码、测试代码或 schema。 |
+| 接入评审会 | 用户接入指南、资金事实说明卡、接入申请、接入评审清单和图形化辅助阅读。 | 通过、带条件通过或阻断；补齐清单、负责人、时间点和是否允许准备工程任务。 | 某个业务接入需求能不能进入下一阶段。 | 不能替代上线审批、合规确认、财务确认或生产 Done。 |
 
 ## 图形化产物
 
@@ -121,7 +120,7 @@ flowchart LR
 | 服务入口、模块边界、状态机、表职责、事务、幂等和观测如何落地。 | 系分设计 01-06；涉及 Spend Rule 时以系分 06 为专项落点，系分 02 只保留交易主链路消费规则证据的边界。 | 产品设计给目标和规则，DSL 给契约语义，TDD 给验证证据。 |
 | 哪些用例、红线、余额断言、幂等断言和验证命令必须覆盖。 | TDD 设计和产品验收矩阵。 | 产品、DSL、系分提供输入，TDD 不发明业务目标、DSL 字段或系统接口。 |
 | 业务接入方如何准备材料、填事实说明卡和通过接入评审。 | 用户接入指南。 | 用户接入指南只做使用者翻译，不替代 PRD、DSL、系分或 TDD 权威口径。 |
-| 是否可以编码、是否可以上线、是否可以声明生产 Done。 | Execution Grant、OpenSpec/Harness、实现证据、测试和外部确认共同裁决。 | 设计文档只能作为准入输入，不能单独授权代码、测试、DDL 或上线。 |
+| 是否可以编码、是否可以上线、是否可以声明生产 Done。 | 当前工程任务边界、OpenSpec 规格、实现证据、测试和外部确认共同裁决. | 设计文档只能作为准入输入，不能单独授权代码、测试、DDL 或上线。 |
 
 ### 四层对齐裁决入口
 
@@ -183,13 +182,13 @@ flowchart LR
 | 系分可开发性 | 每个实现切片都有服务入口、表职责、状态、幂等键、事务边界、观测指标和失败副作用。 | 表设计过粗、接口和状态落点不清、实现时需要临时决定公共契约。 | 系分 README 的实现承接清单和各分册表设计章节。 |
 | TDD 可验证性 | 每个 MVP 任务有 AC/DSL/TDD/RED 显式映射、最小断言集、失败无副作用和验证命令。 | 只说明测试范围，未说明要证明哪些资金事实。 | TDD 设计的覆盖证明卡和测试证据链。 |
 | 可理解性 | 评审角色能按固定路径读文档，并能用同一术语解释产品、DSL、系分和 TDD。 | 同一概念多名、周期混用、授权完成和商户结算混用。 | 本文件统一术语映射和各 README 阅读顺序。 |
-| 交付门禁 | 编码前有 MVP 任务准入卡，明确范围、允许触碰项、TDD 清单、验证命令和待确认不覆盖范围。 | 跳过 Execution Grant，直接把设计包当作全量编码授权。 | OpenSpec Harness Plan 和下方 MVP 任务准入卡。 |
+| 交付门禁 | 编码前有 MVP 工程任务边界，明确范围、允许触碰项、TDD 清单、验证命令和待确认不覆盖范围。 | 跳过 Execution Grant，直接把设计包当作全量编码授权。 | OpenSpec、任务说明和下方 MVP 工程任务边界模板。 |
 
 ## 按角色使用路径
 
 不同角色使用本设计包时关注点不同，但最终都必须回到同一条证据链：产品场景、DSL 契约、系分落点和 TDD 断言。
 
-快速评审时先读本文件的准入评估总控、统一术语映射和 MVP 任务准入卡；再按角色进入对应分册。不要从任意长表开始评审，否则容易只看到字段或用例，忽略资金语义和红线。
+快速评审时先读本文件的准入评估总控、统一术语映射和 MVP 工程任务边界模板；再按角色进入对应分册。不要从任意长表开始评审，否则容易只看到字段或用例，忽略资金语义和红线。
 
 | 使用者 | 先读 | 必须拿到的结论 | 不应跳过 |
 | --- | --- | --- | --- |
@@ -231,7 +230,7 @@ flowchart LR
 | 外部规则 | 外部机构、卡组织、ACH、银行、PSP、Highnote、Stripe 等公开资料只作参考；上线前必须确认规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方和确认状态。 |
 | 编码入口 | 进入编码实现必须先做代码、测试、DDL 和现有行为差距复核，再拆分开发任务。 |
 
-## MVP 任务准入卡
+## MVP 工程任务边界模板
 
 任何设计落地、TDD 分析或编码任务开始前，必须先把任务裁剪为一个 MVP 切片，并把下列信息写入 Execution Grant 或等价任务说明。缺任一项时，不能把本设计包理解为编码授权；设计任务缺任一项时，只能作为评审输入或差距复核。
 
@@ -272,15 +271,13 @@ A0 只读核验页至少输出下列字段：
 
 | 输出项 | 填写口径 |
 | --- | --- |
-| `authorityBaseline` | 本轮采用的 docs、OpenSpec、Harness Plan、Git 提交点和未提交变更清单。 |
+| `authorityBaseline` | 本轮采用的 docs、OpenSpec、Git 提交点和未提交变更清单。 |
 | `codeBaseline` | 现有代码、测试、H2 schema、DDL、公共契约和运行时配置是否能承接目标场景。 |
 | `targetAssets` | 可能新增、恢复或复用的测试类、fixture、H2 数据准备、服务入口和验证命令。 |
 | `schemaNeed` | 是否需要新增或修改表、索引、唯一键、Entity、Mapper、H2 schema 或测试资源。 |
 | `firstRedCandidateSet` | 建议进入 A1 至 A4、B7、B8 或 P2 的首批 Red 候选及失败断言。 |
 | `noWriteScope` | A0 不写生产代码、测试代码、DDL/H2 schema、运行时配置；未授权能力只读复核。 |
 | `nextExecutionGrantRequest` | 如果继续编码，下一步需要用户确认的单一任务切片、写入范围、验证命令和停止条件。 |
-
-本设计包的 A0 标准输出页见 [TDD设计/A0-编码准入基线核验.md](TDD设计/A0-编码准入基线核验.md)。后续进入编码时，应先以该页复核当前工作树、代码能力、测试资产、H2 schema、验证环境和首批 Red，再由用户确认单一 Execution Grant。
 
 A0 的跨层字段承接如下。任一字段在 PRD、DSL、系分、TDD 或 OpenSpec 中找不到落点时，当前轮次只能继续补设计或做差距复核。
 
@@ -293,29 +290,27 @@ A0 的跨层字段承接如下。任一字段在 PRD、DSL、系分、TDD 或 Op
 
 | 推荐切片 | 目标 | 最小必须证明 | 不纳入本任务 |
 | --- | --- | --- | --- |
-| A0 基线核验 | 复核工作树、OpenSpec/Harness、现有测试资产、H2 schema 和验证环境。 | 能说明本任务 authority baseline、可写范围、只读范围、验证命令和停止条件。 | 不写生产代码、测试代码、DDL/H2 schema 或运行时配置。 |
+| A0 基线核验 | 复核工作树、OpenSpec、现有测试资产、H2 schema 和验证环境。 | 能说明本任务 authority baseline、可写范围、只读范围、验证命令和停止条件。 | 不写生产代码、测试代码、DDL/H2 schema 或运行时配置。 |
 | A1 直接交易事实红线 | 先补强或恢复直接交易主链路。 | 成功交易同时证明交易状态、route snapshot、posting plan、ledger transaction、ledger entry、余额投影、幂等和审计；失败场景证明不生成半截事实。 | 不新增清结算、对账、治理、归档表或服务。 |
 | A2 授权交易 | 在 A1 证据链稳定后推进授权完成、撤销、过期、部分完成、退款和拒付。 | 授权拒绝不写 route/entry；累计完成不超授权；撤销和过期释放剩余占用；逆向沿原 route snapshot。 | 不引入 P2 业务特殊链路，不把商户结算单或出款单混入授权完成。 |
 | A3 余额控制 | 单独证明冻结、解冻、调整和失败路径不改变资金语义。 | 冻结只做同主体 `AVAILABLE <-> FROZEN` 控制；解冻不产生跨主体转移；余额不足、规则不唯一和重复请求无副作用。 | 不把冻结表达为消费；不把对账差错调账混入余额控制，除非独立授权。 |
 | A4 DSL caseId 执行化 | 把本任务新增或变更的 DSL caseId 盘点到 fixture 和测试资产。 | 每个 caseId 标注 `fixtureLevel`、fixture 路径、目标测试类、核心断言和 Not Done；只有被测试读取并断言通过后才声明机器契约通过。 | 不把文档 JSON、`CONTRACT_ONLY` 或未读取 fixture 当生产 Done 证据。 |
-| B4 授权后继能力 Round 0 | 记录 B4-TRX-EXPIRE、B4-FORCE-SETTLE、B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT 和 B4-AUTH-RACE 已闭合后的授权后继能力基线；授权支付工具应用入口、授权占券和权益生命周期、完整争议运营或清结算追偿 case 仍需另行选择独立 Execution Grant。 | [TDD设计/B4-授权后继能力Round0准入卡.md](TDD设计/B4-授权后继能力Round0准入卡.md)、B4-FS/B4-NAR/B4-CB/B4-RACE、既有授权交易和 route replay 回归；B4-NO-AUTH-REFUND 已由 `006bcaa` / `818da34` / `967586c` 转为回归证据，B4-AUTH-RACE 已由 `47c5269` 转为回归证据。 | 不混入支付工具 facade、VCC 生命周期、Spend Rule 表、清结算对账、治理 apply 或 P2 轨道协议；B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT 和 B4-AUTH-RACE 不再作为当前默认恢复入口，未确认新的单一 Execution Grant 前不写 Red、生产代码、DDL/H2 schema 或运行时配置。 |
-| B2/B4 支付工具与 Spend Rule Round 0 | 验证账户层级、支付工具能力准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影是否具备进入独立 Execution Grant 的条件；VCC 优先时先看 `B2-ACCOUNT-HIERARCHY`，再看 `B2-FR-TARGET`，不直接打开 P2 VCC；`B4-AUTH-PI-CAD-001` 已完成只读 Round 0、Grant 候选包和 `cad-candidate` 结构门禁复核，但仍未获得编码授权。 | [TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md)、R0-PI/R0-FR/R0-AUTH/R0-SR、既有支付工具和资金责任测试回归；`B2-FR-TARGET-CAD-001` 的首批 Red 候选为 `R0-FR-TARGET-001`，B4-AUTH-PI 的首批 Red 候选为 `R0-AUTH-001`。 | 不替换交易 canonical 请求，不新增统一支付工具交易服务，不把支付工具、预算组或 Spend Rule 做成账务主体，不混入清结算对账、治理 apply 或 P2 轨道协议；未确认新的单一 Execution Grant 前不写 Java、测试、DDL/H2 schema 或运行时配置。 |
 | B7 清结算与对账 | 独立开启清分、清算、结算、出款、对账和差错闭环落地。 | 独立 OpenSpec change、独立 Execution Grant、`CLS-GATE-*`、`TDD-B7-RED-*`、DDL/H2 范围、服务级 H2 流程、并发重跑、权限审计和外部规则核验。 | 不混入 A0-A4；未授权不得新增清结算或对账生产写入。 |
 | B8 资金数据治理 | 独立开启事实留存、重放、余额快照、差异报告和指标只读边界落地。 | 独立 Execution Grant、`GOV-GATE-*`、`TDD-B8-RED-*`、治理物理落点、Manifest、checkpoint、watermark、dry-run/apply、范围锁和指标水位隔离测试。 | 不混入 A0-A4；未授权不得创建空壳治理模块或让治理任务反写资金事实。 |
 | P2 业务能力包 | 在 P0/P1 主链路回归稳定后承接 VCC、全球账户、ACH 或收单业务。 | 只补场景交易 capability pack、外部引用、状态映射、脱敏证据、规则待确认和 P0/P1 回归矩阵。 | 不新增平行钱包、平行账本、平行清结算、平行对账或平行归档。 |
 
-首轮编码入口统一为 A0 至 A4。历史权益 DSL 契约承载基线不默认重开；如本轮触碰权益金额组件，必须在 A4 中列明本任务 caseId、fixture 级别、事实源、退款分摊、解释视图、证据最小化和外部规则状态。B4 授权后继能力、B2/B4 支付工具与 Spend Rule 生产可用性都必须先按各自 Round 0 准入卡拆成独立切片；B7/B8 只做 TDD 分析和独立授权准备，未获得独立 Execution Grant 前不得进入写入范围。
+首轮编码入口统一为 A0 至 A4。历史权益 DSL 契约承载基线不默认重开；如本轮触碰权益金额组件，必须在 A4 中列明本任务 caseId、fixture 级别、事实源、退款分摊、解释视图、证据最小化和外部规则状态。B4 授权后继能力、B2/B4 支付工具与 Spend Rule 生产可用性都必须按新的工程任务边界拆成独立切片；B7/B8 只做 TDD 分析和独立授权准备，未获得独立 Execution Grant 前不得进入写入范围。
 
 ### Execution Grant 字段映射
 
-OpenSpec change、Harness Plan 或任务说明可以使用下列字段名承接准入卡。字段缺失时，只能做设计、Round 0、TDD 分析、契约草案或 dry-run，不能进入生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
+OpenSpec change 或任务说明可以使用下列字段名承接准入内容。字段缺失时，只能做设计、TDD 分析、契约草案或 dry-run，不能进入生产代码、测试代码、DDL/H2 schema 或运行时配置写入。
 
 | 字段 | 对应准入内容 |
 | --- | --- |
 | `businessAdmission` | 产品目标、使用者、业务事实、可见结果、资金动作、成功/失败终态、验收 ID 和明确不做范围。 |
 | `mvpScenario` | 本任务服务的使用者、资金事实、最小闭环、成功终态、失败终态和不得声明的扩展能力。 |
 | `abilityBatch` | MVP 任务目标、能力域、PRD 验收 ID、DSL caseId、系分章节、TDD 用例和红线编号。 |
-| `authorityBaseline` | docs、OpenSpec、Harness Plan、Git 提交点、未提交变更清单和允许读取文件。 |
+| `authorityBaseline` | docs、OpenSpec、Git 提交点、未提交变更清单和允许读取文件。 |
 | `writeScope` | 允许修改的模块、包、公共契约、枚举、Request/Query/DTO、状态机、表结构、H2 schema、测试资源和运行时配置。 |
 | `noWriteScope` | 只读范围、禁止范围、不得触碰的资金语义、外部协议、历史事实和 Not Done 结论。 |
 | `physicalLanding` | 复用既有模块、新增 face/impl、暂不落物理模块或 contract-only；依赖方向、端口边界、DTO、Entity、Mapper 和边界测试。 |
@@ -342,7 +337,7 @@ OpenSpec change、Harness Plan 或任务说明可以使用下列字段名承接�
 
 资金不变量卡必须引用 DSL 的 [资金场景借贷平衡与账务期望表](DSL设计/支付资金底座DSL承载层设计.md#51-资金场景借贷平衡与账务期望表)。完整借贷表只在 DSL 维护；PRD 只保留产品资金影响摘要，系分和 TDD 只承接引用和验证要求。凡涉及金额变化、余额桶变化、清结算、对账差错、权益金额、调账、出款、归档重放或投影重建，Execution Grant 需要说明本任务命中哪些表行、哪些行不适用，以及参与方账户示例、账户类型、借贷平衡公式、余额影响和对应 TDD 断言。
 
-### A0 基线核验卡
+### A0 基线核验模板
 
 A0 是进入编码前的只读核验任务，用于把设计、规格、任务和当前工程状态对齐成同一条 authority baseline。A0 不写生产代码、测试代码、DDL/H2 schema 或运行时配置；发现缺口时只输出差距、扩权建议、首批 Red 建议和停止条件。
 
@@ -350,7 +345,7 @@ A0 是进入编码前的只读核验任务，用于把设计、规格、任务�
 | --- | --- | --- | --- | --- |
 | Git 基线和工作树 | 当前分支、最近提交、未提交变更、未跟踪文件和本任务允许读取范围。 | `git status --short`、`git rev-parse --short HEAD`、本任务说明。 | 能区分已冻结基线、用户既有变更和本任务可触碰范围。 | 工作树存在会影响判断的未知代码或 schema 变更，且无法确认来源。 |
 | 文档基线 | PRD、DSL、系分、TDD 是否都能反查本任务 AC、DSL case、服务入口和 Red。 | 四类 README、专题分册、交叉映射表。 | 目标能力没有孤立 PRD、孤立 DSL、孤立系分或孤立测试。 | 任一侧缺失导致无法说明资金事实、系统落点或测试证据。 |
-| OpenSpec / Harness | 是否已有 change、plan、Execution Grant 或等价任务说明。 | OpenSpec/Harness 文件、任务说明、人工确认记录。 | 能写清 `abilityBatch`、`authorityBaseline`、`writeScope`、`noWriteScope` 和 `firstRedSet`。 | 缺 Execution Grant 但准备写代码、测试、schema 或运行时配置。 |
+| OpenSpec / 任务说明 | 是否已有 change、Execution Grant 或等价任务说明。 | OpenSpec 文件、任务说明、人工确认记录。 | 能写清 `abilityBatch`、`authorityBaseline`、`writeScope`、`noWriteScope` 和 `firstRedSet`。 | 缺 Execution Grant 但准备写代码、测试、schema 或运行时配置。 |
 | 现有代码范围 | 目标模块、公共契约、表结构、测试资产和边界测试是否可定位。 | `core`、`wallet-*`、`transaction-*`、`ledger-*`、`tests` 的只读复核结果。 | 能说明本任务只读范围、可改范围和禁止范围。 | 需要改公共契约、状态机或表结构但未授权。 |
 | H2 / DDL 现状 | 本任务是否触碰持久化、Mapper、Entity、查询或状态字段。 | `tests/src/test/resources/jdbc-schema.sql` 和目标表设计差距。 | 不触碰数据库时写明不适用；触碰数据库时 DDL/H2 写入范围已授权。 | 生产表或 H2 schema 需要变更但未纳入 `writeScope`。 |
 | 目标测试资产 | 首批 Red、目标测试类、fixture、验证命令和最小资金断言。 | TDD Red 卡、DSL 执行化盘点、现有测试类清单。 | 每个资金变化都有状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、route、posting、entry、projection、借贷平衡、余额影响、幂等和审计断言计划。 | 只能证明接口不报错、状态变化或 entry 数量。 |
@@ -368,7 +363,7 @@ A0 输出必须形成一页可评审结论，而不是零散检查记录。建�
 | `firstRedProposal` | 首批 Red、目标测试类、核心断言和验证命令。 |
 | `stopReasons` | 需要回到产品、DSL、系分、TDD、外部规则确认或独立 Execution Grant 的触发条件。 |
 
-### TDD 分析准入卡
+### TDD 分析边界模板
 
 进入 TDD 分析不等于进入编码。TDD 分析只允许产出测试资产设计、首批 Red 排序、DDL/H2 范围、服务级测试范围、边界测试、外部规则核验和残余风险矩阵；生产代码、测试代码、DDL/H2 schema 和运行时配置写入仍必须等待 Execution Grant。
 
@@ -388,7 +383,7 @@ A0 输出必须形成一页可评审结论，而不是零散检查记录。建�
 | 状态 | 可作为 | 不可作为 |
 | --- | --- | --- |
 | 评审输入态 | 设计讨论、CR 输入、差距复核材料。 | 冻结基线、Execution Grant 依据、Done 证据。 |
-| 基线准入态 | 已提交或明确纳入基线的设计、OpenSpec、Harness Plan 和测试要求。 | 生产 Done 证据，除非同步具备代码、测试、DDL/H2、验证命令和审计证据包。 |
+| 基线准入态 | 已提交或明确纳入基线的设计、OpenSpec、任务边界和测试要求。 | 生产 Done 证据，除非同步具备代码、测试、DDL/H2、验证命令和审计证据包。 |
 | 生产交付态 | MVP 任务范围内实现、测试、验证、审批、审计证据和残余风险闭合后的交付结论。 | 超出 Execution Grant 范围的能力完成声明。 |
 
 | 设计域 | 目标一致性 | 生产交付判定 | 进入生产交付前必须补齐 |
@@ -400,19 +395,19 @@ A0 输出必须形成一页可评审结论，而不是零散检查记录。建�
 
 ### 生产交付签出证据包
 
-生产交付签出不是一份新 PRD 或一张图，而是一组能让产品、架构、测试、SRE、财务、风控、安全和合规共同复核的证据。每个 MVP 任务进入生产交付评审前，必须把下列证据汇总到任务说明、OpenSpec/Harness、发布评审或交付说明中。
+生产交付签出不是一份新 PRD 或一张图，而是一组能让产品、架构、测试、SRE、财务、风控、安全和合规共同复核的证据。每个 MVP 任务进入生产交付评审前，必须把下列证据汇总到任务说明、OpenSpec、发布评审或交付说明中。
 
 | 证据项 | 必须包含 | 缺失时结论 |
 | --- | --- | --- |
 | 产品签出 | `productGoal`、`mvpScenario`、验收 ID、使用者解释、外部规则状态、Not Done 范围和业务 owner。 | 不能声明产品可交付，只能作为设计输入态。 |
-| 架构签出 | 服务入口、模块边界、公共契约、表/索引、状态机、事务边界、幂等、补偿、观测、安全和 ADR/取舍记录。 | 不能进入 Harness/GSD/CAD 或生产发布评审。 |
+| 架构签出 | 服务入口、模块边界、公共契约、表/索引、状态机、事务边界、幂等、补偿、观测、安全和 ADR/取舍记录。 | 不能进入 CAD 或生产发布评审。 |
 | 资金证据 | 主体、账户类型、账目、币种、route snapshot、posting plan、LedgerEntry、余额投影、借贷平衡、幂等和失败无副作用。 | 涉及资金变化时阻断。 |
 | 测试验证 | 首批 Red 变绿、服务级测试、契约测试、边界测试、H2/DDL、静态检查和本任务验证命令。 | Not Done；未执行时必须说明环境限制和替代证据。 |
 | 运行证据 | 指标、日志、trace、告警、Dashboard、Runbook、灰度开关、回滚或暂停动作和人工兜底。 | 涉及生产行为时阻断或降级为 Conditional Done。 |
 | 专业确认 | 法务、合规、财务、税务、通道、银行、卡组织、安全或数据责任人的确认状态、适用范围、有效期和脱敏证据引用。 | 影响资金释放、出款、敏感数据或外部规则时阻断。 |
 | 残余风险 | 未覆盖范围、已知缺口、回退方案、下一门禁、风险接受人和复核时间。 | 不得声明 Done。 |
 
-首轮编码从 A0 基线核验进入：先复核钱包账户、支付工具、账本、账目、余额投影、现有测试资产、工作树和验证环境，再由用户确认 A1 至 A4 的 Execution Grant。A1 至 A4 只覆盖交易主链路、授权、余额控制和 DSL 执行化；支付工具与 Spend Rule 生产可用性必须先走 B2/B4 Round 0 准入卡；B7/B8 仍只进入 TDD 分析和独立授权准备。
+首轮编码从 A0 基线核验进入：先复核钱包账户、支付工具、账本、账目、余额投影、现有测试资产、工作树和验证环境，再由用户确认 A1 至 A4 的 Execution Grant。A1 至 A4 只覆盖交易主链路、授权、余额控制和 DSL 执行化；支付工具与 Spend Rule 生产可用性必须重新定义独立任务边界；B7/B8 仍只进入 TDD 分析和独立授权准备。
 
 ### 生产 Done 证据门禁
 
@@ -442,11 +437,11 @@ MVP 任务交付说明应显式给出 Done 判定，避免只列测试结果却�
 
 ### 跨文档生产证据链
 
-生产交付不能只引用某一份文档。每个 MVP 任务的交付说明必须能同时串起产品验收、DSL 契约、系分落点、TDD 断言、OpenSpec/Harness 授权和实际验证结果。
+生产交付不能只引用某一份文档。每个 MVP 任务的交付说明必须能同时串起产品验收、DSL 契约、系分落点、TDD 断言、OpenSpec/任务边界和实际验证结果。
 
-| 设计域 | PRD 证据 | DSL 证据 | 系分证据 | TDD 证据 | OpenSpec/Harness 证据 | 生产完成证据 |
+| 设计域 | PRD 证据 | DSL 证据 | 系分证据 | TDD 证据 | OpenSpec/任务边界证据 | 生产完成证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 02 交易、路由、钱包、账目与投影 | 产品 02、产品 05 的 AC/RED，含权益金额组件 AC-BEN、权益准入红线、视图防误导和证据边界。 | 直接交易、授权、余额控制、支付工具、权益快照、Route Replay、Posting/Ledger、投影、解释视图相关 `DSL-*`。 | 系分 02 的服务契约、状态机、表设计、权益快照分期落点、编码准入决策卡、投影、安全和红线章节。 | A0 至 A4 的目标测试资产、权益红线、权益准入证明、解释视图、证据最小化、外部规则核验和并发用例。 | OpenSpec spec、Harness A0 至 A4、Execution Grant 的 Phase/Fixture/事实源/零实付/专业确认/解释视图/证据最小化/规则核验字段。 | 代码、测试、H2 schema、验证命令、覆盖清单、审计证据、脱敏校验、外部规则确认和残余风险均已列明。 |
+| 02 交易、路由、钱包、账目与投影 | 产品 02、产品 05 的 AC/RED，含权益金额组件 AC-BEN、权益准入红线、视图防误导和证据边界。 | 直接交易、授权、余额控制、支付工具、权益快照、Route Replay、Posting/Ledger、投影、解释视图相关 `DSL-*`。 | 系分 02 的服务契约、状态机、表设计、权益快照分期落点、编码准入决策、投影、安全和红线章节。 | A0 至 A4 的目标测试资产、权益红线、权益准入证明、解释视图、证据最小化、外部规则核验和并发用例。 | OpenSpec spec、Execution Grant 的 Phase/Fixture/事实源/零实付/专业确认/解释视图/证据最小化/规则核验字段。 | 代码、测试、H2 schema、验证命令、覆盖清单、审计证据、脱敏校验、外部规则确认和残余风险均已列明。 |
 | 03 清结算与对账 | 产品 03、产品 05 的清分、清算、结算、出款、对账、权益差错 AC/RED，包含 `AC-SET-006` 至 `AC-SET-009`。 | 清结算确认、结算锁定、出款前准入门禁、出款结果、外部非终态、出款解释状态、权益金额项、对账差错调账和结算策略相关 `DSL-*`。 | 系分 03 的对象状态机、服务 API、`checkPayoutPreflight`、`PayoutOrderDTO`、表设计、权益金额项、阻断守卫、补偿和非功能。 | `CLS-GATE-*`、`TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-SETTLE-004`、`TDD-SETTLE-005`、`TDD-RECON-*`、`TDD-BEN-CLS-*`、清结算并发和红线用例。 | 独立 OpenSpec change、清结算与对账 Execution Grant。 | DDL/H2、Entity/Mapper、服务实现、服务级 H2 流程测试、`PayoutPreflightTests`、`PayoutExplainabilityTests`、外部规则确认和人工处理闭环。 |
 | B8 资金数据治理边界 | 产品 02 的余额和交易投影、产品 03 的批次视图重放、产品 05 的治理门禁和指标只读 AC/RED，包含 `AC-ARCH-008` 异常人工处理和 `AC-ARCH-009` 大数据消费边界；产品 04 仅为拆分索引。 | Manifest、投影重放、权益快照留存、账本余额快照、指标快照边界、差异报告、人工处理、大数据消费边界相关 `DSL-*`。 | 系分 04 的资金数据治理逻辑边界、API、表设计、权益冷热读取、差异报告、人工处理入口、治理读取或导出快照和只读红线。 | `GOV-GATE-*`、`TDD-B8-RED-*`、`TDD-ARCH-*`、`TDD-ARCH-009`、`TDD-ARCH-010`、`TDD-REPLAY-*`、`TDD-METRIC-*`、`TDD-BEN-REPLAY-*`、重放并发和红线用例。 | 独立治理 Execution Grant。 | Manifest、checkpoint、watermark、范围锁、差异报告、人工处理闭环、治理导出快照、dry-run/apply、回滚/续跑和边界测试。 |
 | 外部规则和敏感数据 | PRD 01 待确认项和外部规则责任矩阵。 | 规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方、确认状态和脱敏字段。 | 系分 05 的权限、安全、审计和外部协议边界。 | 敏感数据、权限、导出、轨道/FX 和合规红线用例。 | Execution Grant 的待确认边界、人工确认点和审计证据包。 | 规则确认记录、脱敏验证、审计验证、证据引用和未覆盖范围说明；证据引用不得保存敏感原文。 |
@@ -516,4 +511,4 @@ MVP 任务交付说明应显式给出 Done 判定，避免只列测试结果却�
 | P0 钱包、账本、账目、余额投影、对账、清分、清算、结算、账本余额快照和资金数据治理证据 | 条件准入或未准入，取决于对应 Execution Grant。 | 钱包、账本、账目和余额投影可作为基础事实条件准入候选；清结算与对账、资金数据治理可进入 TDD 分析，但仍需独立 OpenSpec change 和 Execution Grant，不得因 P0 优先级被默认授权进入编码。 |
 | P1 直接交易、授权交易、余额控制、交易投影和重投影 | 条件准入。 | 只允许在冻结基线后，通过 A1 至 A4 的 Execution Grant 逐切片进入；每个切片必须列明写入范围、公共契约、DDL/H2、目标测试、验证命令和不覆盖范围。涉及交易投影或重投影时，必须在对应切片列明投影断言、重投影验证和只读边界。 |
 | P2 VCC、全球账户和收单业务支持 | 不开放默认编码准入。 | 只能通过业务专项 PRD、系分、TDD 和 Execution Grant 使用资金底座能力；不得把业务模式、轨道协议、风控或合规结论沉入统一资金内核。ACH 或银行转账只作为上层业务或外部轨道输入，资金底座只承接归一资金事实、外部引用、对账差错、追偿、调账核销和审计；若业务专项使用 ACH 或银行转账，必须回挂 `ACH-BOUNDARY-001` 至 `ACH-BOUNDARY-006`、`AC-RAIL-002A` 至 `AC-RAIL-007`、`TDD-RAIL-002` 至 `TDD-RAIL-007`。 |
-| 代码和测试变更 | 当前不授权。 | 本次范围只覆盖设计文档、OpenSpec 和 Harness Plan；生产代码、测试代码、DDL/H2 schema 或运行时配置的写入必须等待明确编码授权。 |
+| 代码和测试变更 | 当前不授权。 | 本次范围只覆盖设计文档和 OpenSpec；生产代码、测试代码、DDL/H2 schema 或运行时配置的写入必须等待明确编码授权。 |

@@ -8,9 +8,9 @@ OpenSpec / Superpowers / Harness 在本项目中的定位：
 
 1. OpenSpec 定目标：把当前最终版设计转成可开发、可测试、可评审的能力规格。
 2. Superpowers 保纪律：以测试驱动设计、Review、Refactor、金融红线和验证门禁约束后续编码。
-3. Harness 管协作：按 MVP 任务切片拆分写入范围、只读范围、验证命令和人工确认点。
+3. 工程任务边界管协作：按 MVP 任务切片拆分写入范围、只读范围、验证命令和人工确认点。
 
-项目决策和协作结论必须回到 `docs/`、`openspec/`、Harness Plan、Git 提交点或用户确认，不依赖外部记忆层作为编码准入或验收依据。
+项目决策和协作结论必须回到 `docs/`、`openspec/`、Git 提交点或用户确认，不依赖外部记忆层作为编码准入或验收依据。
 
 产品架构准入锚点：业务目标是让支付资金底座的后续编码只消费已确认的资金事实、对象、流程、规则和验收口径；用户价值是让产品、运营、财务和研发能从同一份规格基线判断当前任务是否可进入单一 Execution Grant。业务对象、对象模型、字段口径、生命周期和状态以产品设计、DSL、系分和 TDD 为准；业务流程必须区分主流程、异常流程和人工兜底。规则矩阵必须写清触发条件、判断逻辑、优先级、版本、审计和验收来源。
 
@@ -37,19 +37,13 @@ OpenSpec / Superpowers / Harness 在本项目中的定位：
 | 系分 | `docs/系分设计/README.md` | 判断模块边界、服务能力、表设计、状态机和非功能要求。 |
 | TDD | `docs/TDD设计/支付资金底座测试驱动设计.md` | 判断测试顺序、测试分层、红线用例和进入编码前检查项。 |
 | OpenSpec | `openspec/specs/payment-funds-foundation/spec.md` | 把上述设计压缩成后续开发基线。 |
-| Harness | `openspec/changes/tdd-baseline-reset/tasks.md` | 按 TDD 拆分后续 MVP 任务切片、覆盖索引和验证门禁。 |
 
 ### 3.1 当前对齐点
 
 | 基线 | 当前对齐点 | 说明 |
 | --- | --- | --- |
-| 上一设计交付基线 | `30b1a00 docs: 冻结权益快照设计基线` | 产品设计、DSL 设计、系分设计和 TDD 设计已完成权益快照合并与基线冻结，可作为本轮准入复核输入。 |
-| 当前编码准备基线 | 最新已提交设计和任务对齐输入以确认时 Git HEAD 为准；`270122e docs: 刷新 CAD 准入基线`、`9456ab6 docs: 对齐 A0 准入与代码基线`、`4a7ef12 docs: 固化代码准入 CR 基线` 和 `f99800b docs: 对齐代码 CR 任务基线` 只保留为历史准入证据，不再作为当前恢复入口。当前有效输入聚焦 B1-10 契约承载、A0/A1 准入证据、B2/B4 支付工具与 Spend Rule Round 0、B4 授权后继能力闭环提交，以及 `openspec/changes/tdd-baseline-reset/tasks.md` 的最新任务账本。 | B4 历史局部代码能力中，`b0666ba` / `f99f3a3` 授权过期释放已被 2026-06-26 目标态裁决覆盖：`expire` 是不可信错误状态，不再作为资金交易入口、事件或终态；`chargeback` 独立入口同轮进入移除队列。仍作为回归基线保留的是 `616dac1` / `3825466` 授权强制完成、`006bcaa` / `818da34` 无授权退款最小契约、`949b24a` 授权争议退款可区分性和 `47c5269` 授权后继并发竞争；`4d5f9c2` 与本轮任务账本已回写对应 GSD-CAD handoff。当前设计基线不得自动等同为授权支付工具应用入口代码完成、钱包 application facade 代码完成、资金责任目标字段迁移完成、预算组账务主体化兼容缺口关闭、完整争议运营或清结算追偿 case、含权益生产链路、清结算对账、资金数据治理、指标治理或任一未授权 MVP 编码 Done 证据。 |
-| 当前 A0/A1 准入证据 | `4f0a43e docs: 记录 A0 只读验证证据`、`26144cc docs: 补齐 A1 直接交易准入卡`、`4dbad21 docs: 记录 CAD 完整验证证据`、`52f116f docs: 记录 A1 现有覆盖扫描`、`dbba956 docs: 记录 A1 门禁复核证据`。 | 这些提交只作为 A1 直接交易事实红线 Execution Grant 的确认输入；其中 `52f116f` 记录既有测试覆盖扫描和目标测试通过证据，`dbba956` 记录证据链同步后的 `just verify-cad` 完整门禁复核；未获用户确认前，不授权生产代码、测试代码、DDL/H2 schema 或运行时配置写入。 |
-| 当前任务账本状态 | 已消费的 B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT、B4-AUTH-RACE、过期恢复入口和旧候选包只作为历史证据，不再作为当前默认任务计划；当前没有默认可继续编码的 B4 Grant。 | 后续编码必须确认一个单一 Execution Grant；未纳入 Grant 的文档变更、代码变更或草稿参考，不能作为冻结编码基线、生产 Done 证据或可写范围授权。 |
-| 规格任务基线 | `openspec/project.md`、`openspec/specs/payment-funds-foundation/spec.md`、`openspec/changes/tdd-baseline-reset/tasks.md` | 本次把目标态设计、当前代码和能力域准入重新对齐；后续编码仍需按能力域授予 Execution Grant。 |
-| 代码能力基线 | 截至 `47c5269`，B1-10 权益快照 DSL 契约、契约测试、JSON 夹具、请求摘要、稳定摘要、账务计划装配器长 ID、预算组默认周期 `LIFETIME`、账务事实断言、钱包边界、交易稳定摘要、治理投影重放边界、出款前准入候选实现、CAD 完整验证门禁、提现/解冻红线、余额日志证据、路由事实边界、交易投影解释、权益回放摘要、治理重放差异校验、资金事实红线、敏感上下文阻断、上下文不可变性、失败无副作用、费用幂等、外部账户主体阻断、支付工具绑定对象约束、钱包入口文档口径、授权强制完成、无授权退款、争议退款可区分性和授权并发竞争首轮能力已纳入局部基线；授权过期释放只作为历史实现痕迹，不再属于目标态代码能力。 | 共享承载已有 DSL 契约测试和 B1-10 权益快照契约承载基线，基础事实已有支付工具、绑定历史、资金责任解析关系（历史表名、服务名或字段仍可能使用 funding relation 命名）、账务计划装配器、预算组默认周期 `LIFETIME`、余额投影、上下文敏感字段阻断、支付工具绑定对象约束和主链路事实红线局部基线；交易与读模型已有直接交易、授权强制完成、无授权退款、争议退款可区分性、授权并发竞争首轮闭环、局部边界测试、解释摘要和重放差异校验；`expire` 与独立 `chargeback` 入口进入目标态移除队列，不再作为可恢复交易能力；出款前准入候选实现只作为清结算与对账差距复核输入，清结算与对账、资金数据治理、完整争议运营或清结算追偿 case 和支付工具授权应用入口仍是独立待落地域。 |
-| B4 授权后继当前恢复入口 | B4-DISPUTE-SEMANTIC-ALIGNMENT 已由 `949b24a` 闭合并由 `4d5f9c2` 回写任务账本；B4-AUTH-RACE 已由 `47c5269` 闭合；B4-NO-AUTH-REFUND、B4-DISPUTE 旧恢复入口和 Grant 候选包都不再作为当前恢复入口。当前没有可直接恢复的 B4 默认编码入口。 | 下一轮若选择授权支付工具应用入口、授权权益生命周期、完整争议运营或清结算追偿 case、余额控制调账、原路径回放或其他候选，必须另起 Round 0 或新的单一 Execution Grant。 |
+| 当前设计基线 | `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计/支付资金底座测试驱动设计.md` 和 `openspec/specs/payment-funds-foundation/spec.md`。 | 过程性 GSD/Goal/Harness/Grant 任务规划已清理，不再作为恢复入口。 |
+| 当前代码基线 | 最新 Git HEAD 和源码测试。 | 是否编码、验证或生产 Done 以新的显式任务边界和实际测试结果为准。 |
 | 导出附件 | `docs/*.zip` 等导出包不作为 Source of Truth。 | 评审、编码和测试只以 Markdown、OpenSpec、源码、测试和 Git 提交点为准。 |
 
 ### 3.2 生产交付判定
@@ -66,37 +60,9 @@ OpenSpec / Superpowers / Harness 在本项目中的定位：
 
 | 项 | 结论 | 执行口径 |
 | --- | --- | --- |
-| 设计基线 | 最新已提交设计和任务对齐输入以确认时 Git HEAD 为准；`270122e` 是上一完整 CAD 验证证据提交；`81a7ecb`、`4a7ef12`、`f99800b` 和 `9456ab6` 保留为历史准入证据。 | 后续 MVP 编码任务若要采用资金责任解析、支付工具投影、授权支付工具应用入口、钱包 DDD 应用层、资金责任目标字段、BudgetGroup/Spend Rule 控制上下文、核心设计骨架、代码 CR 差异、B2/B4 准入口径和钱包入口收敛，必须引用确认时 Git HEAD，或在 Execution Grant 的 `authorityBaseline` 中显式列为基线附件。 |
-| A0 至 A4 MVP 基础任务 | 可在 Execution Grant 下进入。 | 每个任务必须写明 `mvpScenario`、产品验收、DSL caseId、系分章节、TDD 用例、红线编号、写入范围、验证命令和 Not Done 条件；B1 至 B6 只作为覆盖索引，不作为一次性授权范围。 |
-| 2026-05-31 代码准入 CR | 历史裁决中 `A1 直接交易事实红线` 曾是当时最接近可确认的单一 Execution Grant；交易 canonical 入口保持账户主体型，不需要改为支付工具引用。B2/B4/B5/B6 只能先做独立 Round 0 或单一 Execution Grant：钱包 application facade、资金责任目标字段、BudgetGroup 兼容策略和预算控制投影不能混成一次写入。2026-06-02 恢复入口 `B4-NO-AUTH-REFUND` / `B4-NAR-CAD-001` 已由 `006bcaa feat: 补齐无授权退款 canonical 能力` 消费并闭合。 | 若用户只说“继续编码”但未确认具体 Execution Grant，默认不得写生产代码、测试代码、DDL/H2 schema 或运行时配置；可继续做只读差距复核，或请用户在 A1/B2/B4/B5/B6 中另行确认一个最小切片。 |
-| 2026-05-31 B2/B4 准入口径修复 | 支付工具、钱包 application facade 和授权支付工具入口的文档阻断已关闭：外部工具和工具快照才使用 `PaymentInstrumentRef`，内部余额钱包、信用额度、返利钱包和商户钱包等业务入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照；`PaymentInstrumentCapabilityApplicationService` 只做能力准入和快照，不承接注册或绑定变更；TDD 显式纳入 `AC-AUTH-000`。 | 该修复允许 B2/B4 进入独立 Round 0 或单一 Execution Grant 准备，但仍不等于编码授权；后续若新增 application facade、Request/DTO、幂等摘要、H2/DDL 或测试资产，Execution Grant 必须单独列明写入范围和验证命令。 |
-| 2026-05-31 钱包入口二次收敛 | 内部余额钱包、平台钱包、商户钱包、返利钱包和信用额度入口不再按“钱包标识=支付工具”读取；内部入口解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照，外部钱包端点、通道 token、卡、VA 和外部账户才使用 `PaymentInstrumentRef` / `ExternalAccountRef`。 | 该收敛只消除 PRD/DSL/系分/TDD/OpenSpec 读法分叉，不新增编码授权；若后续要实现钱包入口 facade、工具准入快照或请求模型，仍必须走 B2/B4 的单一 Execution Grant。 |
-| 2026-05-31 本轮编码准入复核 | 工作树在复核起点为 clean，上一完整 CAD 验证证据提交为 `270122e`。本轮只刷新准入引用：钱包/交易 application facade 仍未落地，资金责任关系仍以 `fundingAccountId` 兼容字段为主，BudgetGroup 兼容路径仍存在，交易 canonical 请求仍是账户主体型；支付工具绑定对象约束和钱包入口文档口径已进入局部基线。 | 可把 A1 推进到“用户确认态”，但不能把本轮复核解释为 A1 自动授权；B2/B4/B5/B6 仍需各自 Round 0 或单一 Execution Grant；B7/B8/P2 仍只进入 TDD 分析和独立授权准备。 |
-| 2026-06-02/03 B4 授权后继能力代码基线 | B4-TRX-EXPIRE 曾由 `b0666ba` 闭合，但 2026-06-26 重新裁决为不可信错误状态并进入移除队列；当前目标态不再支持 `expire` 服务入口、`EXPIRE` 事件或 `EXPIRED` 终态。B4-FORCE-SETTLE 首轮账户主体型 canonical 能力已由 `616dac1` 闭合，策略红线已由 `3825466` 加固；B4-NO-AUTH-REFUND 已闭合并经 CR 收缩为资金层最小契约；B4-DISPUTE-SEMANTIC-ALIGNMENT 已由 `949b24a` 闭合。普通完成与 FORCE 分支已切开；无授权退款以空原授权流水进入 no-auth 语义；争议退款通过 `settleRefund / AUTH_REFUND` 的 `disputeMode`、`disputeReason`、`disputeVoucherRef`、`externalDisputeRef` 和内部 `DISPUTE` 上下文保留可区分性，不恢复请求 `refundMode`，也不再保留独立 `chargeback` 交易入口。 | B4-FORCE-SETTLE、B4-NO-AUTH-REFUND 和 B4-DISPUTE-SEMANTIC-ALIGNMENT 只作为回归基线；到期、超时或通道未返回只能进入提醒、差错候选或运营处理，不能直接生成资金事实；授权支付工具 application facade、授权占券和权益生命周期、完整争议运营或清结算追偿 case、VCC、Spend Rule、清结算对账和治理 apply 仍不开放默认编码准入。 |
-| 2026-06-03 B4-AUTH-PI GSD-CAD Round 0 | 本轮自动推进只读复核把下一候选收敛为 `B4-AUTH-INSTRUMENT-APPLICATION` / `B4-AUTH-PI` 授权支付工具应用入口。代码扫描确认 `FundsAuthorizationTransactionService#authorize` 和 `FundsAuthorizationTransactionAuthorizeRequest.accountId` 仍是账户主体型 canonical 内核，`wallet-face` 当前只有 `PaymentInstrumentService`、`SpendSubjectFundingRelationService` 等资源服务，未发现 `AuthorizationAdmissionApplicationService` 或 `authorizeByInstrument` 生产入口。 | 当前状态为 `ROUND0_READY_NOT_CODE_AUTHORIZED`。后续若用户确认新的单一 Execution Grant，首批 Red 应从 `R0-AUTH-001` 开始，证明 application facade 先做工具、绑定、Spend Rule、资金责任和账户能力准入，批准后委派账户主体型授权内核，拒绝无 route、posting、LedgerEntry、projection 或敏感上下文副作用；未确认前不写 Java、测试、DDL/H2 schema、公共契约或运行时配置。 |
-| 2026-06-03 B4-AUTH-PI Grant 候选包 | `docs/TDD设计/B2B4-支付工具与SpendRule生产可用性Round0准入卡.md#82-authinstrumentgrantcandidate2026-06-03` 已补齐 `B4-AUTH-PI-CAD-001` 可确认包，列明 Owner、authority baseline、写入范围、只读范围、首批 Red、验证命令、Git 策略、禁止事项和停止条件。 | 该包只是 `READY_TO_CONFIRM_NOT_CODE_AUTHORIZED`，不等于用户已确认 Execution Grant。后续只有用户明确确认 `Execution Grant：B4-AUTH-PI` 后，才允许写授权 application facade Red 和最小实现；否则继续保持 Round 0 / summary_only。 |
-| P0 清结算与对账 | 可进入 TDD 分析；编码不开放。 | TDD 分析必须产出 `CLS-GATE-*`、`TDD-B7-RED-*`、DDL/H2 范围、服务级 H2 流程、并发重跑、权限审计、使用者解释、外部规则和 Not Done 矩阵；只有独立 OpenSpec change、模块/表/接口确认和 Execution Grant 完成后，才能切到编码态。 |
-| P0/P1 资金数据治理 | 可进入 TDD 分析；编码不开放。 | TDD 分析必须产出 `GOV-GATE-*`、`TDD-B8-RED-*`、治理物理落点候选、Manifest/H2 范围、dry-run/apply、指标水位隔离、治理导出和大数据消费边界测试矩阵；只有独立 Execution Grant 明确 Manifest、checkpoint、watermark、差异报告、人工处理、回滚/续跑和边界测试后，才能进入编码态。 |
-| 本轮任务清理 | 只清理过时任务基线、任务计划和无效恢复入口。 | 不授权新切片；生产代码、测试代码、DDL/H2 schema、运行时配置均不纳入本轮写入范围。 |
-
-首轮编码推荐路径：先做 A0 基线核验，确认钱包账户、支付工具、账本、账目、余额投影和现有测试资产可承接，再由用户按 A1 至 A4 中的单一 MVP 任务切片确认 Execution Grant。B1 至 B8 只作为覆盖索引和历史任务编号，不作为新的默认开工授权；B7/B8 仍需独立 TDD 分析和 Execution Grant。A0 标准输出页见 `docs/TDD设计/A0-编码准入基线核验.md`，后续 Execution Grant 应引用该页的 `authorityBaseline`、`codeBaseline`、`targetAssets`、`schemaNeed`、`firstRedCandidateSet` 和 `nextExecutionGrantRequest`。截至 2026-06-03，B4-FORCE-SETTLE、B4-NO-AUTH-REFUND、B4-DISPUTE-SEMANTIC-ALIGNMENT 和 B4-AUTH-RACE 已进入代码基线；B4-TRX-EXPIRE 已被 2026-06-26 重新裁决为目标态移除项，不得再作为可恢复能力。下一轮 GSD-CAD 不再默认恢复这些已消费的 B4 任务包。`B4-AUTH-PI-CAD-001` 已具备可确认的 Grant 候选包，但尚未获得编码授权；后续若继续编码，必须先由用户确认 `Execution Grant：B4-AUTH-PI` 或重新选择其他单一 Execution Grant。
-
-### 3.4 Execution Grant 最小字段
-
-Execution Grant 必须是可执行授权，不是口头“可以开始”。字段缺失时，本任务只能做设计、Round 0、契约草案或 dry-run。
-
-| 字段 | 必填口径 |
-| --- | --- |
-| 业务驱动准入页 | `productGoal`、`businessQuestion`、`mvpScenario`、资金事实、使用者可见结果、成功/失败终态、产品验收 ID、DSL caseId、系分章节和明确不做范围。 |
-| MVP 场景和任务切片 | `mvpScenario`、A0 至 A4、B7、B8 或 P2 业务专项；不得混合授权。B1 至 B8 的细项编号只作为覆盖索引引用。 |
-| 基线附件 | docs、OpenSpec、Harness Plan、Git 提交点、未提交变更清单和允许读取文件。 |
-| 写入范围 | 生产代码、测试代码、公共契约、枚举、Request/Query/DTO、状态机、表结构、H2 schema、运行时配置的允许项和禁止项。 |
-| 物理落点 | 模块、包、face/impl、端口、依赖方向、DTO/Entity/Mapper 归属和边界测试范围。 |
-| 首批 Red | Red ID、目标测试资产、失败断言、验证命令和必须先失败的证据。 |
-| 资金不变量 | 主体、账目、币种、周期、route、posting、entry、projection、幂等、失败无副作用和审计断言。 |
-| 运营治理门禁 | 清结算、对账、出款、归档、重放、指标水位、白名单、Manifest、checkpoint、差异报告和人工处理入口。 |
-| 外部规则核验 | 规则来源、版本或发布日期、生效日期、适用主体或范围、适用法域、核验日期、确认方和确认状态。 |
-| 验证和停止条件 | 目标验证命令、`just test-boundary` 或等效边界检查、PMD/完整验证口径、失败停止条件和 Not Done 判定。 |
+| 设计基线 | 当前稳定设计包和 OpenSpec spec 是唯一规格输入。 | 过程任务卡、历史 Grant 和状态账本已清理，不再作为编码恢复入口。 |
+| 编码授权 | 需要新的明确工程任务边界。 | 任务必须说明 MVP 场景、写入范围、禁止范围、目标测试资产、验证命令和 Not Done 条件。 |
+| P2 与收单能力 | VCC、全球账户、支付工具和收单支持仍排在后续能力；收单只做设计，不开放默认实现。 | 缺少独立设计和任务边界时只能做产品、DSL、系分或 contract-only 验证。 |
 
 ## 四、后续开发 Definition of Ready
 
@@ -108,12 +74,12 @@ Execution Grant 必须是可执行授权，不是口头“可以开始”。字�
 4. 明确是否涉及公共契约、枚举、表结构、状态机、金额、权限、审计或生产行为。
 5. 明确验证命令；无法执行时必须说明环境、依赖或私有仓库限制。
 6. 涉及资金红线、表结构、外部协议、清结算对象或归档重放时设置人工确认点。
-7. 当前设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果已作为独立检查点冻结；若后续存在未提交的设计、OpenSpec 或 Harness Plan 变更，必须先提交或在 Execution Grant 中显式纳入本任务基线附件，未冻结前不得把后续编码实现混入同一轮交付。
+7. 当前设计基线、OpenSpec 基线 和旧测试清理结果已作为独立检查点冻结；若后续存在未提交的设计 或 OpenSpec 变更，必须先提交或在 Execution Grant 中显式纳入本任务基线附件，未冻结前不得把后续编码实现混入同一轮交付。
 8. 若本任务需要修改公共契约、枚举、服务入口、Request/Query/DTO、状态机或表结构，Execution Grant 必须显式写明“允许修改公共契约/新增枚举或事件/新增服务入口/扩展 Request/Query/DTO/修改状态机/表结构/新增模块”的取值和范围。
 9. 若本任务触碰生产行为、外部结果回调、并发写入、余额锁定、清结算批次、归档重放或报表口径，Execution Grant 必须补齐容量假设、并发和锁策略、观测告警、回滚或补偿方案。
 10. 若本任务触碰清结算、对账、出款、差错、补事实、冲正、调账或追偿，并允许通过交易层追加资金事实，Execution Grant 必须列出运营补事实命令白名单、来源单据、审批号、证据引用、幂等键、原事实引用、操作者、原因、可撤销边界和失败无副作用测试；未列入白名单的运营动作不得生成资金事实。
 11. 若本任务触碰模块边界、能力域归属、事实端口层、公共依赖方向、投影反写边界或资金数据治理能力的物理落点，Execution Grant 必须显式声明受影响 ADR、治理物理落点选择、依赖方向、公共契约范围、DDL/H2 schema 范围、Mapper/Entity 归属、指标水位隔离测试、边界测试范围、`just test-boundary` 或等效静态检查命令。
-12. 编码准入或重大设计 CR 前，以当前 Source of Truth、Harness Plan、Git 提交点和用户确认作为执行依据；若发现规格缺口，先补齐权威文档或人工确认点。
+12. 编码准入或重大设计 CR 前，以当前 Source of Truth、Git 提交点和用户确认作为执行依据；若发现规格缺口，先补齐权威文档或人工确认点。
 13. 若工作树存在未提交变更，Execution Grant 必须列出允许读取和允许写入的未提交文件；未列入的变更只能作为草稿参考，不得作为冻结基线或 Done 证据。
 14. 若本任务涉及平台补贴、储值券、预付券、礼品卡、客户资金、商户待结算资金、负债、备付或财务收入成本口径，Execution Grant 必须记录财务、税务、会计、合规或法务确认状态；未确认时只能进入契约或设计验证，不得进入生产资金流 Done 结论。
 15. 若本任务涉及含权益交易的 route/posting/replay、清结算、对账、投影、归档、冷热读取或治理重放消费，Execution Grant 必须声明 Phase 能力边界、JSON 夹具级别、权益资金事实源、零实付表达、平台补贴表达、独立伴随指令原子性、储值预付口径、退款分摊粒度、退款分摊确定性规则版本、分摊依据、稳定组件顺序、舍入模式、尾差归属、组件剩余额度版本、幂等摘要字段、并发保护、历史无权益资金事实处理策略、补充权益事实模型、专业确认状态、审计证据包、使用者解释视图、证据最小化和外部规则核验状态；外部规则核验状态必须至少包含规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方和确认状态；缺任一项时不得进入生产资金流 Done 结论。
@@ -172,6 +138,6 @@ DoD 检查步骤：
 
 ## 六、语言与协作规则
 
-OpenSpec、Superpowers 和 Harness 协作摘要默认使用简体中文。代码标识符、协议字段、枚举、命令、包名、类名和第三方产品名保持英文原文。
+OpenSpec、Superpowers 协作摘要默认使用简体中文。代码标识符、协议字段、枚举、命令、包名、类名和第三方产品名保持英文原文。
 
-本目录只记录规格与协作基线。进入 CAD Mode 仍需要单独确认 Execution Grant、Git 策略、人工确认点和停止条件；具备完整本地验证条件时，以 `just verify-cad` 作为 CAD 轮次的完整门禁命令。
+本目录只记录规格与协作基线。进入 CAD Mode 仍需要单独确认工程任务边界、Git 策略、人工确认点和停止条件；具备完整本地验证条件时，以 `just verify-cad` 作为 CAD 轮次的完整门禁命令。

@@ -35,7 +35,7 @@ P0、P1、P2 仍按能力优先级组织，但进入编码时不按大批次一�
 
 | 任务切片 | 能力优先级 | 授权口径 |
 | --- | --- | --- |
-| A0 | P0/P1/P2 准入核验 | 只读复核设计、OpenSpec、任务、代码、测试、H2 schema 和工作树；不写生产代码、测试代码或 DDL/H2。 |
+| A0 | P0/P1/P2 准入核验 | 只读复核设计、OpenSpec、任务边界、代码、测试、H2 schema 和工作树；不写生产代码、测试代码或 DDL/H2。 |
 | A1 至 A4 | P0/P1 最小闭环 | DSL、钱包、账本、账目、余额投影、直接交易、授权交易、余额控制、路由回放、交易投影和权益资金流必须按单一场景授权。 |
 | B7 独立任务 | P0 运营账务闭环 | PRD、DSL、系分和 TDD 已可作为系分交付输入；清结算与对账编码必须另起授权，不混入交易入口实现。 |
 | B8 独立任务 | P0/P1 治理闭环 | 事实留存、大数据消费边界和账本余额快照是 P0；交易投影重放是 P1 读模型治理；二者必须明确范围、水位、Manifest 和差异处理。 |
@@ -45,7 +45,7 @@ P2 业务专项进入编码前必须单独补 Execution Grant。授权中至少�
 
 ACH 或银行转账不作为 P2 新增业务专项默认进入资金底座。若 VCC、全球账户、收单或平台出款后续使用 ACH 轨道，Execution Grant 必须证明 ACH 业务或通道适配层已经完成业务归属、指令、授权、文件、批次、return、NOC、reversal、外部受理状态、敏感数据最小化和外部规则解释；资金底座只允许承接归一资金事实、外部引用、对账差错、追偿、调账核销和审计，不得在 `core`、`transaction-*`、`wallet-*` 或 `ledger-*` 中实现 ACH 协议、Nacha 规则或银行账户敏感数据能力。
 
-ACH 轨道进入任何 MVP 编码任务前必须回挂产品 `ACH-BOUNDARY-001` 至 `ACH-BOUNDARY-006`、`AC-RAIL-002A` 至 `AC-RAIL-007`、DSL P2 业务能力包准入卡和 TDD `TDD-RAIL-002` 至 `TDD-RAIL-007`。缺少上层解释、外部规则核验状态、脱敏字段白名单、回单或文件摘要边界、return/NOC/reversal 处理责任方、或 submitted/accepted/processing 与到账成功的展示隔离时，只能停留在产品、DSL、系分、TDD 或 contract-only 验证，不得声明生产资金流 Done。
+ACH 轨道进入任何 MVP 编码任务前必须回挂产品 `ACH-BOUNDARY-001` 至 `ACH-BOUNDARY-006`、`AC-RAIL-002A` 至 `AC-RAIL-007`、DSL P2 业务能力包边界和 TDD `TDD-RAIL-002` 至 `TDD-RAIL-007`。缺少上层解释、外部规则核验状态、脱敏字段白名单、回单或文件摘要边界、return/NOC/reversal 处理责任方、或 submitted/accepted/processing 与到账成功的展示隔离时，只能停留在产品、DSL、系分、TDD 或 contract-only 验证，不得声明生产资金流 Done。
 
 | 业务专项 | 可复用的资金底座能力 | 进入编码前必须证明 | Not Done 红线 |
 | --- | --- | --- | --- |
@@ -55,7 +55,7 @@ ACH 轨道进入任何 MVP 编码任务前必须回挂产品 `ACH-BOUNDARY-001` 
 
 ## 三、非目标
 
-1. 不恢复历史过程规格、旧 Harness 计划或旧测试断言。
+1. 不恢复历史过程规格、旧任务规划或旧测试断言。
 2. 不在资金底座内实现报表指标模块内部计算、调度、存储和展示。
 3. 不把通道协议、卡组织规则、ACH/Nacha 规则、银行协议、ACH 文件批次、Debit 授权、return code/NOC/reversal 解释或合规结论写成默认实现。
 4. 不把退款待处理、业务取消、未来时间事件、乱序事件等上层业务编排场景作为资金底座默认 DSL 场景。
@@ -91,7 +91,7 @@ ACH 轨道进入任何 MVP 编码任务前必须回挂产品 `ACH-BOUNDARY-001` 
 | 支付工具绑定 | 工具和付款主体、收款主体、信用账户、预算组或真实资金账户之间的候选关系；只用于路由候选和快照，不直接入账。 |
 | 支出主体资金责任解析关系 | 支出主体、支付工具、信用账户、预算组或 Spend Rule 上下文到最终内部资金或额度责任主体的解析关系；最终结果只能是资金账户、信用账户或平台账户角色解析后的平台资金账户。不计算 spend rules，不执行扣款，不写分录；预算组和 Spend Rule 只提供 scope、规则条件、规则版本和审计解释，不能作为资金池或 `LedgerEntry` 主体。`FundingAccount` 只表示真实资金账户，不得泛化承载信用账户、预算组、支付工具或钱包标识。历史代码、表名或服务名可继续使用 funding relation 兼容命名，但规格语义以资金责任解析为准。 |
 | 支付工具与 Spend Rule 生产可用性 | 支付工具资源管理、绑定历史和 DSL 契约只能证明局部基线。生产可用必须另外证明 application facade 准入、资金责任唯一决策、账户能力来源、预交易快照、Spend Rule 规则版本和决策证据、Spend Control Movement、预算控制投影、失败无 route/posting/entry、只读投影重放和相关测试证据闭合。`GSD2-B2-WALLET-PRE-TRANSACTION-SNAPSHOT-001` 已证明支付工具预交易快照可组合工具能力、资金责任和账户能力；`GSD2-B2-SPEND-CONTROL-ADMISSION-001` 已证明 wallet application facade 能消费外部 Spend Rule 决策证据并输出支出控制准入快照，且无资金事实副作用。缺完整规则定义、决策记录持久化、控制额度变动和预算投影证据时，不得声明预算控制或 Spend Rule 引擎生产可用。 |
-| 支付工具与 Spend Rule Round 0 | 支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影必须拆成独立切片评审。Round 0 可以使用 `B2B4-支付工具与SpendRule生产可用性Round0准入卡` 作为输入，但只能输出是否建议进入某一个单一 Execution Grant；不得一次性授权 B2、B4、B5、B6 和 B8 全部目标态。B2-FR 已在 `GSD2-B2-FR-TARGET-001` 首轮选择 `targetSubjectType + targetSubjectId` 并完成资源关系服务流 Green；支付工具能力准入、账户能力来源、预交易快照和支出控制准入快照已完成首轮 Green。后续完整 Spend Rule 控制额度变动、预算控制投影和 B6/B8 仍必须限定交易投影输入来源，不能把投影通过写成账务事实、余额事实或生产 Done。 |
+| 支付工具与 Spend Rule 任务边界 | 支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影必须拆成独立切片评审。不得一次性授权 B2、B4、B5、B6 和 B8 全部目标态。支付工具能力准入、账户能力来源、预交易快照和支出控制准入快照已有首轮代码证据；后续完整 Spend Rule 控制额度变动、预算控制投影和 B6/B8 仍必须限定交易投影输入来源，不能把投影通过写成账务事实、余额事实或生产 Done。 |
 | 让利出资记账交易 | `FundsBenefitContributionTransactionService` 及其 `settle/refund` 请求，只承接业务侧、订单侧或营销权益系统已决策的优惠券、代金券、支付立减、平台、商户或合作方给用户让利的出资责任结果；请求模型仅保留业务流水、原订单或原交易引用、成本承担主体、让利承接账务主体、金额和资金性质等最小资金事实；`settle` 即表示本次让利出资需要入账，`benefitReceiverSubjectRef` 是当前资金路径的目标账务主体，目标态语义更接近 `benefitSettlementSubjectRef`，不等同于营销系统中的用户实体；多方出资按出资方拆成多笔 `settle`，退款分别引用原让利出资交易调用 `refund`；不计算券规则，不判断券是否可用，不维护券生命周期，不保存券、活动或规则来源归因，不处理返利、佣金、分润、储值负债释放或用户余额入账。 |
 | 权益金额组件 | 单个商户让利、平台补贴、代金券抵扣或合作方补贴金额项；必须标记闭合角色、账务效果、资金性质、承担方、让利承接账务主体和退款处置。 |
 | `NO_LEDGER` 权益 | 商户让利、展示优惠等无独立资金流组件，只能进入快照、清分展示、对账解释或投影辅助，不得生成 route leg、posting 或 ledger entry。 |
@@ -182,10 +182,10 @@ TDD 落地顺序同时受能力优先级和 Execution Grant 约束：P0 先保�
 4. 不用旧测试通过证明新设计通过。
 5. 发现产品、DSL、系分、TDD 不一致时，先补设计，再继续编码。
 6. 重构只能在测试保护下发生，不改变外部可观察行为。
-7. 设计基线、OpenSpec 基线、Harness Plan 和旧测试清理结果必须先形成独立交付检查点；未冻结前不得进入具体生产代码实现。
+7. 设计基线、OpenSpec 基线、任务边界和旧测试清理结果必须先形成独立交付检查点；未冻结前不得进入具体生产代码实现。
 8. 所有资金变化测试必须覆盖相关金额临界值；同一资金对象存在多事件推进时，必须评估并发竞争用例，不能只用顺序执行证明安全。
 
-## 八、Harness 门禁
+## 八、工程任务门禁
 
 每个开发任务必须声明：
 
@@ -197,15 +197,15 @@ TDD 落地顺序同时受能力优先级和 Execution Grant 约束：P0 先保�
 | 验证命令 | 至少包含 `just mvn-version`、`just compile` 和本任务相关测试命令；CAD 自动模式或完整基线复核优先使用 `just verify-cad`；无法运行需说明。 |
 | 人工确认点 | 公共契约、表结构、枚举、资金红线、清结算对象、运营补事实命令白名单、权益退款分摊确定性规则、治理物理落点、归档重放、外部规则。 |
 
-### Round 0 和 Execution Grant 字段
+### Execution Grant 字段
 
-Round 0 是编码前核验，不是编码授权。Execution Grant 必须至少绑定以下字段；字段缺失时，本规格只能作为设计和 TDD 输入，不能作为生产代码、测试代码、DDL/H2 schema 或运行时配置写入依据。
+编码前核验不是编码授权。Execution Grant 必须至少绑定以下字段；字段缺失时，本规格只能作为设计和 TDD 输入，不能作为生产代码、测试代码、DDL/H2 schema 或运行时配置写入依据。
 
 | 字段 | 要求 |
 | --- | --- |
 | mvpScenario | 本任务服务的使用者、资金事实、最小闭环和不得声明的扩展能力。 |
 | abilityBatch | A0 至 A4、B7、B8 或 P2 业务专项；B1 至 B8 细项只能作为覆盖索引，不得混合授权。 |
-| authorityBaseline | PRD、DSL、系分、TDD、OpenSpec、Harness Plan、Git 提交点和允许读取的未提交文件。 |
+| authorityBaseline | PRD、DSL、系分、TDD、OpenSpec、Git 提交点和允许读取的未提交文件。 |
 | writeScope | 允许修改的模块、包、公共契约、枚举、Request/Query/DTO、状态机、表结构、H2 schema、测试资源和运行时配置。 |
 | noWriteScope | 明确禁止修改的模块、对象、资金语义和 Done 结论。 |
 | physicalLanding | 复用既有模块、新增 face/impl、暂不落物理模块或 contract-only；同时声明依赖方向、端口边界、DTO、Entity、Mapper 和边界测试。 |

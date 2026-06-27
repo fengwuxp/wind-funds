@@ -6,15 +6,14 @@
 - 文档状态：Review
 - owner：wallet owner、transaction owner、ledger owner、架构 owner、测试 owner、产品 owner
 - 发布日期：2026-06-23
-- 评审结论摘要：本文是 Spend Rule 支出规则系统分析设计文档，只保留当前有效系统边界、接口、数据、状态、事务、非功能、测试、Not Done 和研发计划；历史讨论、被拒方案和 Grant 消费过程进入 TDD Goal、OpenSpec tasks 或专项任务卡。
+- 评审结论摘要：本文是 Spend Rule 支出规则系统分析设计文档，只保留当前有效系统边界、接口、数据、状态、事务、非功能、测试、Not Done 和研发计划；过程性任务规划、历史讨论和被拒方案不再作为当前交付材料保留。
 - 影响范围：wallet application、wallet impl 规则事实和控制事实、transaction 投影解释只读消费、ledger 入账主体护栏、tests 服务层和边界测试。
-- 过程记录链接：[../TDD设计/GSD-2-LWT-生产可用能力Goal.md](../TDD设计/GSD-2-LWT-生产可用能力Goal.md)、[../../openspec/changes/tdd-baseline-reset/tasks.md](../../openspec/changes/tdd-baseline-reset/tasks.md)
 
 ## 系分模板追踪索引
 
 | 系分模板项 | 本文落点 | 裁剪说明 |
 | --- | --- | --- |
-| 文档状态与版本信息 | 文档状态与版本信息 | 只保留当前版本和过程记录链接，不保留修订流水。 |
+| 文档状态与版本信息 | 文档状态与版本信息 | 只保留当前版本和有效系统结论，不保留过程记录或修订流水。 |
 | 一、需求背景 | 2 需求背景、目标与边界，2.1 产品语义输入 | 承接产品 PRD 09，不重复产品讨论过程。 |
 | 二、目标 | 2.2 业务目标、技术目标和非目标 | 明确服务层、可观测、失败无副作用和非目标。 |
 | 三、概要设计 | 3 概要设计、核心方案和设计结论 | 包含边界、核心方案、取舍和业务驱动追踪。 |
@@ -827,5 +826,3 @@ Not Done：
 - PRD：[../产品设计/09-SpendRule支出规则产品设计.md](../产品设计/09-SpendRule支出规则产品设计.md)
 - DSL：[../DSL设计/README.md#spend-rule-dsl-v11-规则版本挂载和决策证据](../DSL设计/README.md#spend-rule-dsl-v11-规则版本挂载和决策证据)
 - TDD：[../TDD设计/README.md](../TDD设计/README.md)
-- Goal 状态：[../TDD设计/GSD-2-LWT-生产可用能力Goal.md](../TDD设计/GSD-2-LWT-生产可用能力Goal.md)
-- OpenSpec tasks：[../../openspec/changes/tdd-baseline-reset/tasks.md](../../openspec/changes/tdd-baseline-reset/tasks.md)

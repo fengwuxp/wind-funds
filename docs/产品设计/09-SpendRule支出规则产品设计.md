@@ -6,11 +6,10 @@
 - 文档状态：Review
 - owner：wallet 支出控制产品 owner、资金产品 owner、架构 owner、测试 owner
 - 发布日期：2026-06-23
-- 评审结论摘要：本文作为 Spend Rule 支出规则的产品 PRD 主文档，保留当前有效产品结论、规则边界、验收和待确认项；讨论过程、历史争议和被拒方案进入 TDD Goal、OpenSpec tasks 或专项 Grant 卡。
+- 评审结论摘要：本文作为 Spend Rule 支出规则的产品 PRD 主文档，保留当前有效产品结论、规则边界、验收和待确认项；过程性任务规划、历史争议和被拒方案不再作为当前交付材料保留。
 - 目标读者：产品、业务、运营、风控、客服、财务、审计、测试、架构师和研发。
 - 需要决策：确认 Spend Rule 的产品边界、产品能力、验收口径和是否允许进入后续单一编码 Grant。
 - 当前可信度：产品语义、模块归属、控制事实和资金红线已确认；完整规则引擎、运营后台、生产迁移、外部规则适用性仍为待确认。
-- 过程记录链接：[../TDD设计/GSD-2-LWT-生产可用能力Goal.md](../TDD设计/GSD-2-LWT-生产可用能力Goal.md)、[../../openspec/changes/tdd-baseline-reset/tasks.md](../../openspec/changes/tdd-baseline-reset/tasks.md)
 
 ## PRD 模板追踪索引
 

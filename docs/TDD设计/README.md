@@ -28,48 +28,11 @@ MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可�
 
 ## 阅读顺序
 
-本 README 只作为 TDD 设计入口。过程记录、任务排队和编码授权边界保存在对应准入卡、GSD 计划、OpenSpec change tasks 和状态账本中。
+本 README 只作为 TDD 设计入口。任务规划、状态账本、Grant 确认包和阶段推进材料已清理；当前只保留稳定测试设计口径。
 
 | 顺序 | 文档 | 作用 |
 | --- | --- | --- |
 | 1 | [支付资金底座测试驱动设计.md](支付资金底座测试驱动设计.md) | 定义测试驱动设计原则、模块测试矩阵、场景用例、红线用例、目标测试资产和执行门禁。 |
-| 2 | [A0-编码准入基线核验.md](A0-编码准入基线核验.md) | 编码前只读核验页，用于整理 authority baseline、code baseline、target assets、schemaNeed、首批 Red 候选和工程任务建议。 |
-| 3 | [GSD-2-新基线工作流规划.md](GSD-2-新基线工作流规划.md) | 2026-06-12 之后的活跃 Loop + GSD + Goal 新基线入口，用于清零旧活跃未完成计划、重建设计/代码/任务基线和规划新 Workflow。 |
-| 4 | [GSD-2-W1-基线差距审计.md](GSD-2-W1-基线差距审计.md) | GSD-2 Wave 1 最新基线差距审计，记录当前 Git/code baseline、已完成证据、仍未 Done 的能力缺口和下一单一 Grant 推荐。 |
-| 5 | [GSD-2-W2-单一Grant选择卡.md](GSD-2-W2-单一Grant选择卡.md) | GSD-2 Wave 2 单一 Grant 选择历史记录；当时推荐的 `GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 已被后续 W3/W4 和账户层级来源契约切片消费，不再代表当前下一候选。 |
-| 6 | [GSD-2-W3-B2账户层级CAD准入草案.md](GSD-2-W3-B2账户层级CAD准入草案.md) | GSD-2 Wave 3 B2 账户层级只读源码定位和 CAD 准入历史草案，确认 DSL/value object/JSON/replay 已有局部证据，并把当时下一 Red 收窄到真实服务流生成、保存、回放和失败无副作用。 |
-| 7 | [GSD-2-W4-B2账户层级ExecutionGrant确认包.md](GSD-2-W4-B2账户层级ExecutionGrant确认包.md) | GSD-2 Wave 4 B2 账户层级 Execution Grant 确认包历史记录；`GSD2-B2-ACCOUNT-HIERARCHY-CONTRACT-001` 已被首个 Red 消费，随后 `GSD2-B2-ACCOUNT-HIERARCHY-SOURCE-CONTRACT-002` 已完成本地 Green。 |
-| 8 | [GSD-2-P0P1-LedgerWalletTransaction推进计划.md](GSD-2-P0P1-LedgerWalletTransaction推进计划.md) | GSD-2 Wave 5 P0/P1 ledger、wallet、transaction 优先推进计划，当前账户层级、资金责任、支付工具能力准入、账户能力来源准入、支付工具预交易快照、支出控制准入快照、支付工具授权准入、交易投影解释、余额调账审计、B7 差错闭环、动作守卫、准入消费、出款 preflight 首个消费方接入、ledger 固定账目类别正常余额方向 guard、B5 route snapshot 审计回链、B5 独立审计查询、B7 对象级 Gate 基座、清算 / 结算只读 consumer、B7 差异报告、Spend Rule 控制活动、预算组非建账、交易消费支出控制活动、预算控制投影目标账户隔离守卫和释放上限目标账户隔离守卫均已完成首轮 Green / Verify / Commit；当前没有可复用默认确认包，继续推进需重新选择新的单一 Grant。 |
-| 9 | [GSD-2-LWT-生产可用能力Goal.md](GSD-2-LWT-生产可用能力Goal.md) | 当前活跃 LWT `Loop + Goal` 状态载体，把 ledger、wallet、transaction 和 reconciliation 的 Ready / Conditional Ready / Not Done / Blocker、下一 Grant 候选和停止条件聚合到一张可持续推进的 Goal 卡；第 1.1 节明确父 Goal、LWT 子 Goal、当前可执行状态和历史证据状态的恢复映射，第 1.2 节记录 docs-only Progress Ledger 和无进展计数。 |
-| 9.0.1 | [GSD-2-Wallet特殊业务能力地图ExecutionGrant确认包.md](GSD-2-Wallet特殊业务能力地图ExecutionGrant确认包.md) | `GSD2-WALLET-SPECIAL-BUSINESS-CAPABILITY-MAP-001` 的设计型确认包，明确 VCC 预付卡、VCC 共享卡、VA 收款、全球账户付款、ACH 或银行转账等特殊业务入口如何由 wallet application 或上层业务包解释，再委派账户主体型 transaction canonical service、ledger posting 和清结算对账；本文件只授权设计基线，不授权 Java、测试、DDL/H2 schema、Controller、HTTP/RPC 或统一支付工具交易内核。 |
-| 9.1 | [GSD-2-LD-预算组控制账本兼容退出ExecutionGrant确认包.md](GSD-2-LD-预算组控制账本兼容退出ExecutionGrant确认包.md) | `GSD2-LD-BUDGET-GROUP-CONTROL-COMPAT-EXIT-001`、`GSD2-LD-BUDGET-GROUP-CONTROL-POSTING-FORBID-001` 和 `GSD2-B2-BUDGET-GROUP-LEDGER-COMPAT-CLEANUP-001` 的角色 Loop 确认与消费记录：裁决采用 `staged-control-view-backed`。Phase 1 已新增预算额度调额控制活动 / 预算控制投影替代入口并完成服务层验证；Phase 2 已硬禁任意 `BUDGET_GROUP` LedgerEntry 主体，并让预算组旧余额控制调额入口前置拒绝且无资金事实副作用；Phase 3 已清理旧 profile、显式初始化、余额查询和 replay 语义。当前状态为 `BUDGET_GROUP_LEDGER_COMPAT_CLEANUP_GREEN_VERIFIED`；生产历史数据迁移、公共 API 删除或枚举删除必须另起 Grant。 |
-| 10 | [GSD-2-B5-余额调账审计扩展ExecutionGrant确认包.md](GSD-2-B5-余额调账审计扩展ExecutionGrant确认包.md) | `GSD2-B5-BALANCE-ADJUST-AUDIT-003` 的确认和消费记录，已把首个子切片收敛并落地为余额调账独立审计查询最小服务流；第 13 节记录 Red/Green、验证命令、敏感字段安全、查询无资金副作用、Not Done 和下一候选。本 Grant 已消费，不得复用为运营审批、补事实、清结算或 Git 授权。 |
-| 10.1 | [GSD-2-B5-SpendRule控制活动与预算投影ExecutionGrant确认包.md](GSD-2-B5-SpendRule控制活动与预算投影ExecutionGrant确认包.md) | `GSD2-B5-SR-CONTROL-ACTIVITY-001` 的确认和首轮执行记录：在支出控制准入快照已提交到 `021ee2ce` 后，把 wallet 下一步收敛为 Spend Rule 控制额度变动流水与预算控制投影最小服务层能力；当前代码兼容名仍为 `SpendControlMovement`。本轮已新增契约、实现、H2 schema 和目标服务流测试，当前状态为 `SR_CONTROL_ACTIVITY_GREEN_VERIFIED`，已通过目标服务流 6 tests、支出控制准入回归 3 tests、compile 和 PMD。 |
-| 10.2 | [GSD-2-B5-交易消费支出控制活动ExecutionGrant确认包.md](GSD-2-B5-交易消费支出控制活动ExecutionGrant确认包.md) | `GSD2-B5-SR-TRANSACTION-CONSUME-001`、`GSD2-B5-SR-TRANSACTION-CONSUME-CONCURRENCY-001`、退款释放守卫、退款事实守卫、退款补偿入口守卫、退款已消费引用守卫、业务场景一致性守卫、成功消费业务流水一致性守卫、失败释放业务流水一致性守卫、退款引用净消费上限守卫、退款引用已消费一致性守卫、交易事实累计解释金额守卫、控制额度变动流水幂等语义一致性守卫、退款引用原交易业务一致性守卫、预算控制投影目标账户隔离守卫和释放上限目标账户隔离守卫的确认和消费记录：在支出控制准入、支付工具预交易快照、控制额度变动流水、预算控制投影和账户主体型交易内核均已形成首轮证据后，已补齐交易成功消耗、失败释放、已有退款资金事实后的控制补偿、同流水同摘要并发唯一键冲突回读既有活动、`REFUND` 交易事实不得被 `consume/release` 降级为普通控制流水、非 `REFUND` 交易事实不得被 `refund` 降级为退款控制补偿、退款交易缺少对应 `CONSUMED` 控制流水时不得生成退款控制补偿、跨业务场景交易不得消费当前 Spend Rule 控制占用、同场景其他业务流水的成功交易不得串用当前控制流水，同场景其他业务流水的失败交易不得释放当前控制流水、退款补偿金额不得超过退款交易引用的已消费控制净额、被引用已消费控制流水必须与原控制流水同源一致、同一原控制流水下同一资金交易流水累计解释金额不得超过资金交易金额、同一控制流水和摘要不得被不同业务语义复用、退款交易引用的原消费资金交易必须真实存在并满足租户、类型、状态、币种、业务场景和业务流水一致性、交易消费后的预算控制投影按目标账户查询时不得混入同预算组或同 Spend Rule 下其他账户活动，以及释放类控制流水写入上限不得混入其他目标账户的占用。当前状态为 `SR_TRANSACTION_RELEASE_TARGET_ACCOUNT_GUARD_GREEN_VERIFIED`；本 Grant 不授权完整 Spend Rule 规则引擎、事件消费 / outbox、Controller、HTTP/RPC、支付工具 `REFUND` 方向重裁决、交易 canonical 入参改造或 ledger posting。 |
-| 10.3 | [GSD-2-B5-SpendRule设计闭环ExecutionGrant确认包.md](GSD-2-B5-SpendRule设计闭环ExecutionGrant确认包.md) | `GSD2-B5-SPEND-RULE-DESIGN-CLOSURE-001` 的 docs-only 任务卡和 `GSD2-B5-SPEND-RULE-DEFINITION-CONTRACT-001` 的消费记录：Spend Rule 已收敛为规则定义、不可变版本、规则挂载、决策记录（当前代码兼容名 `SpendRuleDecisionRecord`）和准入证据闭环；产品权威见 [../产品设计/09-SpendRule支出规则产品设计.md](../产品设计/09-SpendRule支出规则产品设计.md)，系分权威见 [../系分设计/06-SpendRule支出规则系分设计.md](../系分设计/06-SpendRule支出规则系分设计.md)；本轮已补最小服务层契约、H2 schema 和目标服务流测试，后续控制额度变动流水、预算投影和交易消费证据分别由 10.1 / 10.2 及后续硬化记录承接，仍不授权完整规则引擎、Controller、HTTP/RPC、交易 canonical 入参、ledger posting 或生产迁移。 |
-| 10.4 | [GSD-2-B5-SpendRule自主交付控制卡.md](GSD-2-B5-SpendRule自主交付控制卡.md) | `GSD2-B5-SPEND-RULE-SPEC-LOCK-001` 的 docs-only 自主交付控制卡：在进入下一轮编码前锁定 Spend Rule DSL v1.1，明确规则版本、规则挂载和决策证据 JSON 规格，覆盖 `matchSpec`、`counterSpec`、`limitSpec`、`decisionSpec`、`safetySpec`、`evaluatedRules`、`decisionPolicy` 和 forbidden facts；本卡不授权 Java、测试、DDL/H2 schema、Controller、HTTP/RPC、交易 canonical 入参、ledger posting、事件消费、生产迁移或 Git。 |
-| 11 | [GSD-2-B7-清算结算Gate消费ExecutionGrant确认包.md](GSD-2-B7-清算结算Gate消费ExecutionGrant确认包.md) | `GSD2-B7-RECON-CLEARING-SETTLEMENT-GATE-CONSUME-001` 已按 `scopeDecision=object-scope-schema-backed` 完成对象级 Gate 基座：差错事实、DTO、H2 schema、Mapper 和 gate 查询支持对象精确命中，并兼容历史类型级差错。本文件记录确认、消费结果和 Not Done；后续清算 / 结算真实消费方、差异报告、补事实、生产迁移或 Git 仍需新的单一 Grant。 |
-| 11.1 | [GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md](GSD-2-B7-清算结算真实消费方ExecutionGrant确认包.md) | `GSD2-B7-RECON-CLEARING-SETTLEMENT-CONSUMER-SERVICE-001` 的确认和消费记录：已新增清算 / 结算只读 gate consumer 服务，复用对象级 `ReconciliationGate` 基座，目标测试证明阻断、条件放行、非法请求拒绝和无账务副作用；本 Grant 已在 `0d3f68dc` 提交固化，不授权完整清结算、补事实、运营审批或生产迁移。 |
-| 11.2 | [GSD-2-B7-对账差异报告ExecutionGrant确认包.md](GSD-2-B7-对账差异报告ExecutionGrant确认包.md) | `GSD2-B7-RECON-DIFFERENCE-REPORT-001` 的确认和消费记录：已新增单笔只读差异报告查询，解释差错状态、阻断对象、处理动作、重跑结果、gate 决策和证据引用，覆盖报告视图开关、处理动作证据不完整、缺重跑结果和历史类型级差错缺 gate 决策；第 13 节记录 Red/Green、验证命令、查询无账务副作用、服务层边界和 Not Done。本 Grant 已消费并提交，不得复用为批次报告、运营后台、导出、Controller、HTTP/RPC、补事实、完整清结算或 Git 授权。 |
-| 12 | [GSD-2-AUTH-Chargeback目标语义对齐任务卡.md](GSD-2-AUTH-Chargeback目标语义对齐任务卡.md) | 授权 dispute / chargeback 目标语义任务卡：确认 dispute / chargeback 是案件过程，不是资金交易能力；资金层只消费裁决后的资金结果，需要退款时由 `settleRefund` 争议字段承接，无资金影响时不调用交易入口。 |
-| 13 | [GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md](GSD-2-AUTH-Chargeback兼容入口ExecutionGrant确认包.md) | 授权 chargeback 兼容入口历史确认和消费记录；当前已被 2026-06-26 的 `expire + chargeback` 移除裁决覆盖，不再作为活跃兼容入口。 |
-| 13.1 | [GSD-2-AUTH-Chargeback公共API退出计划任务卡.md](GSD-2-AUTH-Chargeback公共API退出计划任务卡.md) | `GSD2-TRX-CHARGEBACK-PUBLIC-API-EXIT-PLAN-001` 的历史退出计划、测试迁移和 readiness 评估；当前公共 `chargeback` API、请求模型、`CHARGEBACK` 事件和 route replay 分支已进入移除队列并随本轮执行移除。后续只保留 `settleRefund / AUTH_REFUND` 争议字段作为资金结果入口。 |
-| 14 | [GSD-2-B7-PRD系分合议预审与三卡交接.md](GSD-2-B7-PRD系分合议预审与三卡交接.md) | B7 对账差错动作守卫 Green 后的 PRD / 系分合议预审和三卡交接；`GSD2-B7-RECON-GATE-CONSUME-001` 与 `GSD2-B7-RECON-GATE-CONSUME-002` 已由后续代码切片消费并完成本地 Green，本文件保留为该切片授权前交接证据。 |
-| 15 | [GSD-2-AgentLoop-PlanGrant默认授权策略.md](GSD-2-AgentLoop-PlanGrant默认授权策略.md) | Agent Loop Engineering 和 GSD/CAD 默认低风险 Plan Grant 授权策略入口，说明可默认推进的文档/状态/任务卡范围，以及必须显式确认的代码、测试、DDL、Git、OpenSpec 状态和生产边界。 |
-| 16 | [AI代码交付闭环与Spec模板基线.md](AI代码交付闭环与Spec模板基线.md) | AI 代码交付闭环和 Spec 模板准入入口，用于约束后续 Grant 的 Spec 强度、AC 映射、Harness、独立验证、CR 交接、知识回流和停止条件。 |
-| 17 | [GSD-2-Spec-AC-Harness-CAD任务模板.md](GSD-2-Spec-AC-Harness-CAD任务模板.md) | GSD-2 单一 Grant 可填写模板，用于把 Spec、AC、Red、Harness、CAD Loop、CR 交接、交付证据和建议提交切片压到同一张任务卡。 |
-| 18 | [GSD-Goal-生产可用MVP推进计划.md](GSD-Goal-生产可用MVP推进计划.md) | 上一轮 GSD + Goal 生产可用 MVP 推进历史基线，保留证据、消费记录、Not Done 边界和 handoff；不再作为当前活跃计划。 |
-| 19 | [GSD-1-账本账目Round0准入卡.md](GSD-1-账本账目Round0准入卡.md) | 账本、账目、posting、ledger entry 和余额投影的历史准入输入；后续若重新选择需在 GSD-2 下重新确认 Grant。 |
-| 20 | [GSD-1-账本账目Wave1执行计划.md](GSD-1-账本账目Wave1执行计划.md) | 账本账目 Wave 执行历史计划和目标 Red 分解。 |
-| 21 | [GSD-1-账本账目状态账本.md](GSD-1-账本账目状态账本.md) | 账本账目跨会话状态、决策日志、验证矩阵、handoff 和下一决策历史记录。 |
-| 22 | [GSD-1-账本账目代码库理解结论包.md](GSD-1-账本账目代码库理解结论包.md) | 账本账目代码入口、调用关系、既有覆盖、验证策略和残余风险。 |
-| 23 | [GSD-1-账本账目ExecutionGrant确认卡.md](GSD-1-账本账目ExecutionGrant确认卡.md) | 账本账目工程授权和消费记录，作为任务历史材料，不替代 TDD 权威设计。 |
-| 24 | [A1-直接交易事实红线准入卡.md](A1-直接交易事实红线准入卡.md) | 直接交易事实红线、覆盖验收、写入边界、Red 集合、验证命令和停止条件。 |
-| 25 | [B4-授权后继能力Round0准入卡.md](B4-授权后继能力Round0准入卡.md) | 授权后继能力、无授权退款、争议裁决资金结果和并发竞争的任务准入历史材料。 |
-| 26 | [B4-交易内核生产可用性Round0准入卡.md](B4-交易内核生产可用性Round0准入卡.md) | 账户主体型 canonical 交易内核生产可用补强、原路径回放和缺快照 fail-fast 的历史准入材料。 |
-| 27 | [B2B4-支付工具与SpendRule生产可用性Round0准入卡.md](B2B4-支付工具与SpendRule生产可用性Round0准入卡.md) | 账户层级、支付工具应用准入、资金责任解析、授权支付工具入口、Spend Rule 控制和只读投影的历史准入材料。 |
-| 28 | [B7-清结算与对账Round0准入卡.md](B7-清结算与对账Round0准入卡.md) | 对账来源标准化、匹配强度、差错闭环、动作守卫、准入消费、账龄升级、重跑幂等、白名单补事实准入和最小 DDL/H2 范围的历史准入材料。 |
-| 29 | [P2-业务能力包Round0准入卡.md](P2-业务能力包Round0准入卡.md) | VCC、全球账户、收单等 P2 业务专项进入资金底座前的历史准入材料。 |
 
 ## 契约输入
 
