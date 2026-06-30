@@ -349,7 +349,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
             return;
         }
         AssertUtils.isTrue(request.getSubjectType() == FundsSubjectType.BUDGET_GROUP,
-                "预算控制主体绑定必须指向预算组，bindingSn = {}, subjectType = {}",
+                "预算控制范围绑定必须指向 BUDGET_GROUP 兼容类型，bindingSn = {}, subjectType = {}",
                 request.getSn(),
                 request.getSubjectType());
     }

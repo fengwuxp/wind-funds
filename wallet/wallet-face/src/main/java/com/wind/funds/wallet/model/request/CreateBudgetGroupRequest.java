@@ -14,7 +14,9 @@ import lombok.ToString;
 import lombok.experimental.Accessors;
 
 /**
- * 创建预算组请求。
+ * 创建预算控制范围请求。
+ *
+ * <p>BudgetGroup 是历史兼容名，目标语义为 Spend Rule 可引用的支出控制 scope，不是账务主体。</p>
  *
  * @author Codex
  * @date 2026-05-07
@@ -26,7 +28,7 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 public class CreateBudgetGroupRequest {
 
-    @Schema(description = "预算组号")
+    @Schema(description = "预算控制范围标识，兼容字段名为预算组号")
     @NotBlank
     private String sn;
 
@@ -34,29 +36,29 @@ public class CreateBudgetGroupRequest {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "归属主体 ID")
+    @Schema(description = "预算控制范围归属主体 ID")
     @NotBlank
     private String ownerId;
 
-    @Schema(description = "归属主体类型")
+    @Schema(description = "预算控制范围归属主体类型")
     @NotNull
     private FundsAccountOwnerType ownerType;
 
-    @Schema(description = "预算类型")
+    @Schema(description = "预算控制范围业务类型")
     @NotBlank
     private String budgetType;
 
-    @Schema(description = "币种")
+    @Schema(description = "控制币种")
     @NotNull
     private CurrencyIsoCode currency;
 
-    @Schema(description = "周期类型")
+    @Schema(description = "控制周期类型")
     private AccountBalancePeriodType periodType;
 
     @Schema(description = "周期标识，periodType 不为 LIFETIME 时必填")
     private String periodId;
 
-    @Schema(description = "周期策略")
+    @Schema(description = "控制周期策略")
     private String periodPolicy;
 
     @Schema(description = "状态")

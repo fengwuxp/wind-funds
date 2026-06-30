@@ -46,7 +46,7 @@ public class AdjustBudgetControlLimitRequest implements Serializable {
     @NotBlank
     private String businessSn;
 
-    @Schema(description = "预算组或预算控制范围标识")
+    @Schema(description = "预算控制范围标识，兼容字段名为预算组号")
     @NotBlank
     private String budgetGroupSn;
 
@@ -77,10 +77,6 @@ public class AdjustBudgetControlLimitRequest implements Serializable {
     @Schema(description = "调整原因码")
     @NotBlank
     private String reasonCode;
-
-    @Schema(description = "操作者或系统来源")
-    @NotBlank
-    private String operatorId;
 
     @Schema(description = "审批、凭证、规则发布或外部审计引用")
     @NotBlank

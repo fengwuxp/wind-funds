@@ -281,7 +281,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：同一预算组和 Spend Rule 下存在多个目标账户控制额度变动。
+     * 场景：同一预算控制范围和 Spend Rule 下存在多个目标账户控制额度变动。
      * 输入：两个信用账户分别记录控制占用。
      * 输出：传入目标账户查询投影时，只返回该账户的控制占用。
      * 红线：预算组级投影可以汇总，但账户级投影不得把其他账户或其他卡的控制占用混入。
@@ -322,7 +322,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：同一预算组和 Spend Rule 下其他账户仍有可释放占用。
+     * 场景：同一预算控制范围和 Spend Rule 下其他账户仍有可释放占用。
      * 输入：主账户已释放完毕，第二个信用账户仍有 RESERVED 控制占用，再尝试释放主账户。
      * 输出：主账户释放请求被拒绝，不借用其他账户的剩余额度。
      * 红线：释放类变动的写入上限必须按目标资金账户或信用账户隔离，不得跨账户释放控制占用。

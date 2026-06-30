@@ -1,4 +1,4 @@
-package com.wind.funds.transaction.ledger;
+package com.wind.funds.ledger.posting;
 
 import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;

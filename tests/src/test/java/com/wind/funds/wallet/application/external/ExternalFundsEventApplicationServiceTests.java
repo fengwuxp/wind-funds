@@ -35,13 +35,13 @@ import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionCon
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
-import com.wind.funds.transaction.ledger.DefaultLedgerPostingAssembler;
+import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
 import com.wind.funds.transaction.services.impl.DelegatingFundsInstructionLifecycleRecorder;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.application.external.impl.ExternalFundsEventApplicationServiceImpl;
+import com.wind.funds.transaction.application.external.impl.ExternalFundsEventApplicationServiceImpl;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.enums.FundingAccountType;
@@ -58,6 +58,7 @@ import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultLedgerFactQueryService;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
@@ -456,6 +457,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
+            DefaultLedgerFactQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
             AccountHierarchyBindingServiceImpl.class,

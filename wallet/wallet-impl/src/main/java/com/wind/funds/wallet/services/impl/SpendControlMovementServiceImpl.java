@@ -339,7 +339,7 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
 
     private void validateProjectionQuery(BudgetControlProjectionQuery query) {
         AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.hasText(query.getBudgetGroupSn(), "预算组标识不能为空");
+        AssertUtils.hasText(query.getBudgetGroupSn(), "预算控制范围标识不能为空");
         AssertUtils.notNull(query.getCurrency(), "币种不能为空");
         if (query.getTargetAccountId() != null) {
             assertSupportedTargetSubjectType(targetSubjectType(query.getTargetAccountId()));

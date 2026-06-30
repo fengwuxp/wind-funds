@@ -1,4 +1,4 @@
-package com.wind.funds.wallet.application.instrument.impl;
+package com.wind.funds.transaction.application.instrument.impl;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
@@ -178,6 +178,7 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
                 .setReferenceFreezeSn(request.getReferenceFreezeSn())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
                         request.getCurrency())))
+                .setPaymentInstrumentRef(paymentInstrumentRef(snapshot))
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
                 .setContextVariables(ReadonlyContextVariables.of(payoutContext(request, snapshot)))
@@ -237,7 +238,7 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
                 .ownerType(instrument.getOwnerType().name())
                 .currency(instrument.getCurrency().name())
                 .status(instrument.getStatus().name())
-                .bindingSnapshot(bindingSnapshot(instrument))
+                .bindingSnapshot(bindingSnapshot(snapshot, instrument))
                 .description(instrument.getDescription())
                 .build();
     }
@@ -257,14 +258,15 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         AssertUtils.hasText(instrument.getSubjectId(), "支付工具绑定快照主体 ID 不能为空");
     }
 
-    private Map<String, Object> bindingSnapshot(PaymentInstrumentCapabilityDecisionDTO instrument) {
+    private Map<String, Object> bindingSnapshot(PaymentInstrumentPreTransactionSnapshotDTO snapshot,
+                                                PaymentInstrumentCapabilityDecisionDTO instrument) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("bindingSn", instrument.getBindingSn());
         values.put("bindingVersion", instrument.getBindingVersion());
         values.put("bindingRole", instrument.getBindingRole().name());
         values.put("subjectType", instrument.getSubjectType().name());
         values.put("subjectId", instrument.getSubjectId());
-        values.put("admissionAction", PaymentInstrumentAction.RECEIVE.name());
+        values.put("admissionAction", snapshot.getAction().name());
         return Map.copyOf(values);
     }
 }

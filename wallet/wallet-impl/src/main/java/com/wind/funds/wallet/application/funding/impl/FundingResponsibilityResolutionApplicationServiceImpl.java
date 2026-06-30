@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.application.funding.impl;
 
+import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.wallet.application.funding.FundingResponsibilityResolutionApplicationService;
@@ -59,6 +60,8 @@ public class FundingResponsibilityResolutionApplicationServiceImpl
 
     private void validateRequest(ResolveFundingResponsibilityRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+                "资金责任解析 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getSpendSubjectId(), "支出控制主体 ID 不能为空");
         AssertUtils.notNull(request.getSpendSubjectType(), "支出控制主体类型不能为空");
         AssertUtils.notNull(request.getCurrency(), "币种不能为空");

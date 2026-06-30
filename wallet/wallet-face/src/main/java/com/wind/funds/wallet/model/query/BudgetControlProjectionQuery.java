@@ -34,7 +34,7 @@ public class BudgetControlProjectionQuery implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "预算组或预算控制范围标识")
+    @Schema(description = "预算控制范围标识，兼容字段名为预算组号")
     @NotBlank
     private String budgetGroupSn;
 

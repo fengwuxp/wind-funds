@@ -142,6 +142,18 @@ class FundsAccountCapabilityApplicationServiceTests extends AbstractFundsService
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    @Test
+    void testResolveFundsAccountCapabilityShouldRejectTenantMismatchWithoutLedgerSideEffect() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> capabilityApplicationService.resolveFundsAccountCapability(
+                resolveRequest(RECEIVE_ONLY_FUNDING_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT)
+                        .setTenantId(TENANT_ID + 1)))
+                .hasMessageContaining("资金账户能力准入 tenantId 与当前租户不一致");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpFundsAccountCapabilityApplicationServiceTestData() {
         cleanupFundsAccountCapabilityApplicationServiceTestData();

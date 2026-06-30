@@ -161,6 +161,24 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：预交易快照请求租户与当前线程租户不一致。
+     * 输入：当前线程租户为 1，请求 tenantId 为 2。
+     * 输出：应用层入口直接拒绝。
+     * 红线：预交易快照不能为跨租户请求组合后续交易准入材料。
+     */
+    @Test
+    void testResolvePreTransactionSnapshotShouldRejectTenantMismatchWithoutFundsSideEffect() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> snapshotApplicationService.resolvePreTransactionSnapshot(
+                snapshotRequest(PAYMENT_INSTRUMENT_SN).setTenantId(TENANT_ID + 1)))
+                .hasMessageContaining("支付工具预交易快照 tenantId 与当前租户不一致");
+
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpPaymentInstrumentPreTransactionSnapshotTestData() {
         cleanupPaymentInstrumentPreTransactionSnapshotTestData();

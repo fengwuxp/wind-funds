@@ -12,8 +12,8 @@ import lombok.experimental.Accessors;
 /**
  * 让利出资退款请求。
  *
- * <p>退款、业务取消、人工纠错或反向冲销都用于对已经入账的权益让利资金交易进行反向资金影响，
- * 必须引用原权益让利资金交易流水号。</p>
+ * <p>退款、业务取消、人工纠错或反向冲销都用于对已经入账的让利出资记账交易进行反向资金影响，
+ * 必须引用原让利出资记账交易流水号。</p>
  *
  * @author Codex
  * @date 2026-06-16
@@ -28,7 +28,7 @@ public class FundsBenefitContributionRefundRequest {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "被退款的原权益让利资金交易流水号")
+    @Schema(description = "被退款的原让利出资记账交易流水号")
     @NotBlank
     private String referenceBenefitTransactionSn;
 

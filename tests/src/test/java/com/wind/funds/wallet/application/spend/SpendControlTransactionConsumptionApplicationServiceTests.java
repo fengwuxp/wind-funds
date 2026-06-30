@@ -15,7 +15,7 @@ import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryServ
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.FundsAccountCapabilityApplicationService;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
-import com.wind.funds.wallet.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
+import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -201,6 +201,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String FAILED_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_failed_001";
 
+    private static final String TENANT_MISMATCH_ACTIVITY_SN = "activity_tenant_mismatch_001";
+
     @Autowired
     private CreditAccountService creditAccountService;
 
@@ -270,7 +272,32 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     /**
-     * 场景：同一预算组和 Spend Rule 下存在多个目标账户，交易成功只消费其中一个账户的控制占用。
+     * 场景：控制额度消费请求租户与当前线程租户不一致。
+     * 输入：当前线程租户为 1，请求 tenantId 为 2。
+     * 输出：应用层入口直接拒绝，不写控制额度变动、资金交易或账本事实。
+     * 红线：交易结果消费、释放或退款补偿写控制事实前必须守住租户边界。
+     */
+    @Test
+    void testConsumeShouldRejectTenantMismatchWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(TENANT_MISMATCH_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-tenant-mismatch").setTenantId(TENANT_ID + 1)))
+                .hasMessageContaining("控制额度变动 tenantId 与当前租户不一致");
+
+        assertThat(activityCount(TENANT_MISMATCH_ACTIVITY_SN)).isZero();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一预算控制范围和 Spend Rule 下存在多个目标账户，交易成功只消费其中一个账户的控制占用。
      * 输入：两个信用账户分别存在 RESERVED 控制额度变动，其中一个账户发生成功资金交易并记录 CONSUMED。
      * 输出：按目标账户查询预算控制投影时，只解释该账户的占用和消费。
      * 红线：交易消费服务不得让同预算组下其他账户或其他卡的控制额度变动污染当前账户投影。

@@ -19,7 +19,7 @@ import com.wind.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
-import com.wind.funds.transaction.ledger.LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec;
+import com.wind.funds.ledger.posting.LedgerTransactionSpecFactory.DefaultLedgerTransactionSpec;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -175,7 +175,7 @@ class PostingLedgerDslContractTests {
     /**
      * 场景：预算组兼容主体被误写入 PostingPlan。
      * 预期：借贷金额相等也不能被视为可入账计划。
-     * 红线：预算控制对象不能绕过交易路由进入账本分录。
+     * 红线：预算控制范围不能绕过交易路由进入账本分录。
      */
     @Test
     void testPostingPlanShouldRejectBudgetGroupEntrySubject() {

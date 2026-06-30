@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 权益让利资金交易应用服务流程测试。
+ * 让利出资记账交易应用服务流程测试。
  *
  * <p>验证权益让利应用服务不直接写账务事实，而是委派标准直接交易链路生成 route snapshot、
  * 交易事实、posting plan、ledger entry 和余额影响。</p>
@@ -41,9 +41,9 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
 
     /**
      * 场景：平台营销资金账户向让利承接账目记录优惠金额，随后发生部分退款和业务取消退款。
-     * 输入：让利方充值 100；权益资金结算 30；退款 10；取消退款 5。
-     * 输出：三笔权益资金交易均返回资金交易流水，并通过标准 route、交易事实和账本分录入账。
-     * 红线：权益服务不得绕过直接交易链路写 LedgerEntry；逆向事件必须引用原权益资金交易回放。
+     * 输入：让利方充值 100；让利出资结算 30；退款 10；取消退款 5。
+     * 输出：三笔让利出资交易均返回资金交易流水，并通过标准 route、交易事实和账本分录入账。
+     * 红线：本服务不得绕过直接交易链路写 LedgerEntry；逆向事件必须引用原让利出资记账交易回放。
      */
     @Test
     void testSettleAndRefundShouldPostThroughStandardTransactionLedgerChain() {
@@ -67,6 +67,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertLedgerFactsFollowRouteSnapshot("BENEFIT_SETTLE_001");
         assertLedgerEventAndBuckets("BENEFIT_SETTLE_001", FundsTransactionEventType.PAY,
                 LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.SETTLEMENT);
+        assertBenefitContributionDescription(settleTransactionSn, "benefit contribution settle");
 
         String refundTransactionSn = benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
@@ -87,6 +88,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertLedgerFactsFollowRouteSnapshot("BENEFIT_REFUND_001");
         assertLedgerEventAndBuckets("BENEFIT_REFUND_001", FundsTransactionEventType.REFUND,
                 LedgerSubjectCode.SETTLEMENT, LedgerSubjectCode.AVAILABLE);
+        assertBenefitContributionDescription(refundTransactionSn, "benefit contribution refund");
 
         String cancelRefundTransactionSn = benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
@@ -281,7 +283,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
     /**
      * 场景：平台和商户共同承担同一订单优惠，后续分别按原出资事实退款。
      * 输入：平台出资 20，商户出资 10，退款时分别冲回 5 和 3。
-     * 输出：每个出资方都有独立结算交易流水，退款按各自原权益资金交易回放。
+     * 输出：每个出资方都有独立结算交易流水，退款按各自原让利出资记账交易回放。
      * 红线：多方出资不能合并成一笔丢失出资方的资金事实，也不能退款时按当前规则重算分摊。
      */
     @Test
@@ -365,7 +367,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setBusinessSn("BENEFIT_MISSING_ORIGINAL_REFUND_001")
                 .setOriginalOrderSn("ORDER_001")
                 .setRefundReason("missing original benefit contribution"), WindOperator.system()))
-                .hasMessageContaining("原权益让利资金交易 RouteSnapshot 不存在")
+                .hasMessageContaining("原让利出资记账交易 RouteSnapshot 不存在")
                 .hasMessageContaining("BENEFIT_TXN_MISSING_ORIGINAL_001");
 
         var after = snapshot(balances(costBearer, receiver));
@@ -508,5 +510,13 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertLedgerFactsFollowRouteSnapshot(businessSn);
         assertLedgerEventAndBuckets(businessSn, FundsTransactionEventType.PAY,
                 LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.SETTLEMENT);
+    }
+
+    private void assertBenefitContributionDescription(String transactionSn, String expectedDescription) {
+        var transaction = fundsTransaction(transactionSn);
+        assertThat(transaction.getDescription()).isEqualTo(expectedDescription);
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
+                .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getDescription())
+                        .isEqualTo(expectedDescription));
     }
 }

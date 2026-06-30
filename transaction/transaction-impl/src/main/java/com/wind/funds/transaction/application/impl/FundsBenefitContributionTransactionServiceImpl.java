@@ -44,9 +44,10 @@ import java.util.Set;
 @AllArgsConstructor
 public class FundsBenefitContributionTransactionServiceImpl implements FundsBenefitContributionTransactionService {
 
-    private static final String BENEFIT_FUNDING = "benefitFunding";
+    // 该上下文 key 参与资金交易幂等摘要，已落库名称保持稳定。
+    private static final String BENEFIT_CONTRIBUTION_COMPATIBILITY_MARKER = "benefitFunding";
 
-    private static final String BENEFIT_FUNDING_NATURE_CODE = "benefitFundingNatureCode";
+    private static final String BENEFIT_CONTRIBUTION_FUNDING_NATURE_COMPATIBILITY_CODE = "benefitFundingNatureCode";
 
     private static final String BENEFIT_ORIGINAL_ORDER_SN = "benefitOriginalOrderSn";
 
@@ -94,7 +95,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
                 .setContextVariables(ReadonlyContextVariables.of(settleContext(request)))
-                .setDescription("benefit funding settle"), operator);
+                .setDescription("benefit contribution settle"), operator);
     }
 
     @Override
@@ -113,7 +114,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
                 .setContextVariables(ReadonlyContextVariables.of(refundContext(request)))
-                .setDescription("benefit funding refund"), operator);
+                .setDescription("benefit contribution refund"), operator);
     }
 
     private void assertSettleRequest(@NonNull FundsBenefitContributionSettleRequest request) {
@@ -137,7 +138,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         AssertUtils.notNull(request.getTenantId(), "权益让利退款 tenantId 不能为空");
         AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
                 "权益让利退款 tenantId 与当前租户不一致");
-        AssertUtils.hasText(request.getReferenceBenefitTransactionSn(), "原权益让利资金交易流水不能为空");
+        AssertUtils.hasText(request.getReferenceBenefitTransactionSn(), "原让利出资记账交易流水不能为空");
         AssertUtils.notNull(request.getAmount(), "权益让利退款金额不能为空");
         AssertUtils.isTrue(request.getAmount().getAmount() > 0, "权益让利退款金额必须大于 0");
         AssertUtils.hasText(request.getBusinessScene(), "权益让利退款业务场景不能为空");
@@ -147,13 +148,13 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     private OriginalBenefitRoute originalBenefitRoute(@NonNull String referenceBenefitTransactionSn) {
         RouteSnapshotSpec snapshot = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(referenceBenefitTransactionSn)
-                .orElseThrow(() -> new IllegalArgumentException("原权益让利资金交易 RouteSnapshot 不存在，transactionSn = "
+                .orElseThrow(() -> new IllegalArgumentException("原让利出资记账交易 RouteSnapshot 不存在，transactionSn = "
                         + referenceBenefitTransactionSn));
         Optional<RouteLegSpec> sourceLeg = snapshot.getLegs()
                 .stream()
                 .filter(leg -> leg.getLegType() == RouteLegType.INTERNAL_TRANSFER)
                 .findFirst();
-        AssertUtils.isTrue(sourceLeg.isPresent(), "原权益让利资金交易缺少可回放的资金路径，transactionSn = {}",
+        AssertUtils.isTrue(sourceLeg.isPresent(), "原让利出资记账交易缺少可回放的资金路径，transactionSn = {}",
                 referenceBenefitTransactionSn);
         RouteLegSpec leg = sourceLeg.get();
         return new OriginalBenefitRoute(
@@ -173,8 +174,8 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     private Map<String, Object> settleContext(@NonNull FundsBenefitContributionSettleRequest request) {
         Map<String, Object> result = mergeContext(request.getContextVariables());
-        result.put(BENEFIT_FUNDING, Boolean.TRUE);
-        result.put(BENEFIT_FUNDING_NATURE_CODE, request.getFundingNature().name());
+        result.put(BENEFIT_CONTRIBUTION_COMPATIBILITY_MARKER, Boolean.TRUE);
+        result.put(BENEFIT_CONTRIBUTION_FUNDING_NATURE_COMPATIBILITY_CODE, request.getFundingNature().name());
         result.put(BENEFIT_ORIGINAL_ORDER_SN, request.getOriginalOrderSn());
         if (request.getReferenceTransactionSn() != null) {
             result.put(BENEFIT_REFERENCE_TRANSACTION_SN, request.getReferenceTransactionSn());
@@ -184,7 +185,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     private Map<String, Object> refundContext(@NonNull FundsBenefitContributionRefundRequest request) {
         Map<String, Object> result = mergeContext(request.getContextVariables());
-        result.put(BENEFIT_FUNDING, Boolean.TRUE);
+        result.put(BENEFIT_CONTRIBUTION_COMPATIBILITY_MARKER, Boolean.TRUE);
         result.put(BENEFIT_ORIGINAL_ORDER_SN, request.getOriginalOrderSn());
         if (request.getReferenceTransactionSn() != null) {
             result.put(BENEFIT_REFERENCE_TRANSACTION_SN, request.getReferenceTransactionSn());

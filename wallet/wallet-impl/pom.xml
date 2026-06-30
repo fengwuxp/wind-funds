@@ -25,10 +25,6 @@
             <groupId>com.wind.funds</groupId>
             <artifactId>capte-funds-wallet-face</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.wind.funds</groupId>
-            <artifactId>capte-funds-transaction-face</artifactId>
-        </dependency>
     </dependencies>
 
 </project>

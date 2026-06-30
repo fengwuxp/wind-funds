@@ -38,7 +38,7 @@ import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
-import com.wind.funds.transaction.ledger.DefaultLedgerPostingAssembler;
+import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
@@ -47,7 +47,7 @@ import com.wind.funds.transaction.services.impl.DelegatingFundsInstructionLifecy
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResolutionApplicationServiceImpl;
-import com.wind.funds.wallet.application.instrument.impl.InstrumentTransactionLifecycleApplicationServiceImpl;
+import com.wind.funds.transaction.application.instrument.impl.InstrumentTransactionLifecycleApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
@@ -78,6 +78,7 @@ import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultLedgerFactQueryService;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
@@ -804,6 +805,24 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private void assertPayoutRouteSnapshot(String businessSn) {
         JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson(businessSn));
+        JSONObject paymentInstrumentRef = routeSnapshot.getJSONObject("paymentInstrumentRef");
+        assertThat(paymentInstrumentRef).isNotNull().isNotEmpty();
+        assertThat(paymentInstrumentRef.getString("instrumentId")).isEqualTo(PAYOUT_INSTRUMENT_SN);
+        assertThat(paymentInstrumentRef.getString("instrumentType")).isEqualTo("VA");
+        assertThat(paymentInstrumentRef.getString("instrumentNo")).isEqualTo(PAYOUT_INSTRUMENT_NO);
+        assertThat(paymentInstrumentRef.getString("ownerId")).isEqualTo(OWNER_ID);
+        assertThat(paymentInstrumentRef.getString("ownerType")).isEqualTo(FundsAccountOwnerType.USER.name());
+        assertThat(paymentInstrumentRef.getString("currency")).isEqualTo(CurrencyIsoCode.USD.name());
+        assertThat(paymentInstrumentRef.getString("status")).isEqualTo(FundsAccountStatus.ACTIVE.name());
+        JSONObject bindingSnapshot = paymentInstrumentRef.getJSONObject("bindingSnapshot");
+        assertThat(bindingSnapshot).isNotNull().isNotEmpty();
+        assertThat(bindingSnapshot.getString("bindingSn")).isEqualTo(PAYOUT_BINDING_SN);
+        assertThat(bindingSnapshot.getInteger("bindingVersion")).isEqualTo(1);
+        assertThat(bindingSnapshot.getString("bindingRole"))
+                .isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name());
+        assertThat(bindingSnapshot.getString("subjectType")).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT.name());
+        assertThat(bindingSnapshot.getString("subjectId")).isEqualTo(RECEIVE_ACCOUNT_SN);
+        assertThat(bindingSnapshot.getString("admissionAction")).isEqualTo(PaymentInstrumentAction.WITHDRAW.name());
         JSONObject externalAccountRef = routeSnapshot.getJSONObject("externalAccountRef");
         assertThat(externalAccountRef).isNotNull().isNotEmpty();
         assertThat(externalAccountRef.getString("externalAccountId"))
@@ -857,6 +876,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
+            DefaultLedgerFactQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
             AccountHierarchyBindingServiceImpl.class,
@@ -895,11 +915,6 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
             invocationCount++;
             lastRequest = request;
             return DELEGATED_AUTHORIZATION_SN;
-        }
-
-        @Override
-        public String authorizeByPaymentInstrument(AuthorizeByPaymentInstrumentRequest request, WindOperator operator) {
-            return authorizeByInstrument(request, operator);
         }
 
         int getInvocationCount() {

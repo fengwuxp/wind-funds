@@ -12,7 +12,6 @@ import com.wind.common.locks.LockFactory;
 import com.wind.common.spring.SpringEventPublishUtils;
 import com.wind.common.spring.SpringApplicationContextUtils;
 import com.wind.integration.infrastructure.locks.LockTemplate;
-import com.wind.integration.infrastructure.redisson.RedissonTemporalSequenceSupport;
 import com.wind.mybatis.convert.LocaleTypeHandler;
 import com.wind.mybatis.encrypt.AbstractEncryptBaseTypeHandler;
 import com.wind.server.i18n.WindMessageSourceProperties;
@@ -87,9 +86,7 @@ public abstract class AbstractFundsServiceTest {
 
     @Configuration
     @Import({
-            TestCoreInfrastructureConfig.class,
-            RedissonTemporalSequenceSupport.class,
-            TestMockRedissonConfiguration.class
+            TestCoreInfrastructureConfig.class
     })
     public static class TestInfrastructureConfig {
     }

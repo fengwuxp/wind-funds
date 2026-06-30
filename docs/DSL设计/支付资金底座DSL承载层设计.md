@@ -147,7 +147,7 @@ DSL 主文档只记录目标契约、字段边界和验收红线。若后续扩�
 | --- | --- | --- | --- | --- |
 | 直接交易 | 已确认资金账户、信用账户或平台账户角色；业务入口参数可作为选择来源，支付工具可作为引用补充。 | `FundsInstruction`、`SubjectRef`、`ResolvedRoute`。 | 业务事实、原交易引用、业务入口选择来源、外部账户或支付工具脱敏引用。 | 把内部余额钱包、信用额度、返利钱包或商户钱包强行包装成支付工具；按当前工具绑定重算历史退款路径。 |
 | 授权交易 | 优先允许从 `PaymentInstrumentRef` 或等价工具引用进入应用准入。 | 批准后必须解析为 `SubjectRef` 和 `FundingAllocationDecision`。 | 工具状态、绑定版本、使用主体、预算组、Spend Rule、资金责任决策、拒绝原因或授权占用路径。 | 支付工具、预算组或 Spend Rule 成为 ledger subject；授权拒绝生成 route 或 entry。 |
-| 余额控制 | 账户主体、冻结来源、调整来源或预算控制对象。 | 资金账户余额桶、信用账户额度桶或预算型 Spend Rule 控制视图。 | 审批、凭证、原因、规则版本、控制窗口。 | 用工具号冻结余额，或用余额控制表达跨主体价值转移。 |
+| 余额控制 | 账户主体、冻结来源、调整来源或预算控制范围。 | 资金账户余额桶、信用账户额度桶或预算型 Spend Rule 控制视图。 | 审批、凭证、原因、规则版本、控制窗口。 | 用工具号冻结余额，或用余额控制表达跨主体价值转移。 |
 
 直接交易退款的 DSL 引用分层如下：
 
@@ -375,16 +375,16 @@ flowchart TD
 
 ### 6.1 可入账主体与控制上下文
 
-本规范默认只允许 `FUNDING_ACCOUNT` 和 `CREDIT_ACCOUNT` 进入账本分录；VCC 发卡场景必须先解析到资金子账户或信用子账户，不新增 `VCC_ACCOUNT` 账本主体；BudgetGroup 与 Spend Rule 只作为预算控制上下文、规则快照和审计证据：
+本规范默认只允许 `FUNDING_ACCOUNT` 和 `CREDIT_ACCOUNT` 进入账本分录；VCC 发卡场景必须先解析到资金子账户或信用子账户，不新增 `VCC_ACCOUNT` 账本主体；预算控制范围（BudgetGroup 兼容名）与 Spend Rule 只作为预算控制上下文、规则快照和审计证据：
 
 | 对象 | 定义 | 典型账目或控制证据 |
 | --- | --- | --- |
 | `FUNDING_ACCOUNT` | 承载真实资金余额或平台责任余额的资金账户。 | `AVAILABLE`、`FROZEN`、`AUTHORIZATION`、`CLEARING`、`SETTLEMENT`、`IN_TRANSIT`、`CASH`、`PREPAYMENT`、`FEE`、`ADJUSTMENT` |
 | `CREDIT_ACCOUNT` | 承载授信额度、可用额度和授权占用的控制账户。 | `LIMIT`、`AVAILABLE`、`AUTHORIZATION` |
 | VCC 关联子账户 | 发卡场景中的资金子账户或信用子账户；外部别名 Card Account / Financial Account / VCC Account 进入 DSL 后统一映射为 `FUNDING_ACCOUNT` 或 `CREDIT_ACCOUNT` 的具体子账户。 | 资金子账户可使用 `AVAILABLE`、`AUTHORIZATION`、`FROZEN`、`CLEARING`、`SETTLEMENT`、`IN_TRANSIT`、`FEE`、`ADJUSTMENT`；信用子账户可使用 `LIMIT`、`AVAILABLE`、`AUTHORIZATION` 及经确认的费用或争议账目。 |
-| BudgetGroup 上下文 | 预算范围、负责人、展示、规则归属和审计维度；不作为 `LedgerEntry` 主体，也不作为可入账 `FundsSubjectType` 使用。 | 预算型 Spend Rule、控制窗口、规则版本和占用证据 |
+| BudgetGroup 上下文 | 预算控制范围、负责人、展示、规则归属和审计维度；不作为 `LedgerEntry` 主体，也不作为可入账 `FundsSubjectType` 使用。 | 预算型 Spend Rule、控制窗口、规则版本和占用证据 |
 
-`FUNDING_ACCOUNT` 只表示真实资金账户、平台责任资金账户或经明确 profile 标识的资金子账户，不是所有钱包账户的统一父类。需要统一表达核心账务主体时，`SubjectRef` / `FundsSubjectType` / 可入账主体抽象只能承载资金账户、信用账户，以及平台账户角色解析后的平台资金账户；VCC 卡背后的内部对象必须通过 `AccountHierarchySnapshot` 声明子账户、父账户和层级版本。需要表达预算范围和支出控制时，使用 BudgetGroup 上下文、Spend Rule 快照和控制证据；需要表达前台支付方式时，内部钱包入口先解析为 `SubjectRef`、`BenefitSnapshot` 或等价不可变快照，卡、PAN、token、VA、外部钱包端点和通道 token 才使用 `PaymentInstrumentRef` 或 `ExternalAccountRef`。不得把信用额度、预算控制、钱包标识或支付工具写成普通 `FUNDING_ACCOUNT` 来绕过主体类型校验，也不得把卡号、PAN、token、预算组、Spend Rule 或 `VCC_ACCOUNT` 写成 `LedgerEntry` 主体。
+`FUNDING_ACCOUNT` 只表示真实资金账户、平台责任资金账户或经明确 profile 标识的资金子账户，不是所有钱包账户的统一父类。需要统一表达核心账务主体时，`SubjectRef` / `FundsSubjectType` / 可入账主体抽象只能承载资金账户、信用账户，以及平台账户角色解析后的平台资金账户；VCC 卡背后的内部对象必须通过 `AccountHierarchySnapshot` 声明子账户、父账户和层级版本。需要表达预算控制范围和支出控制时，使用 BudgetGroup 上下文、Spend Rule 快照和控制证据；需要表达前台支付方式时，内部钱包入口先解析为 `SubjectRef`、`BenefitSnapshot` 或等价不可变快照，卡、PAN、token、VA、外部钱包端点和通道 token 才使用 `PaymentInstrumentRef` 或 `ExternalAccountRef`。不得把信用额度、预算控制、钱包标识或支付工具写成普通 `FUNDING_ACCOUNT` 来绕过主体类型校验，也不得把卡号、PAN、token、预算组、Spend Rule 或 `VCC_ACCOUNT` 写成 `LedgerEntry` 主体。
 
 内部主体能力语义：
 
@@ -603,24 +603,24 @@ transaction/transaction-face/src/main/java/com/wind/funds/transaction/enums/
 
 旧重型权益快照 DSL 已从 core 目标契约中移除：不再提供 `FundsInstruction.benefitSnapshot`、`FundsBenefitSnapshotSpec`、组件、引用、退款策略和稳定摘要对象。目标态只保留让利出资记账交易和通用请求摘要；历史 route、投影或对账中已固化的 `benefitSnapshotId`、`stableDigest` 只能作为只读摘要追溯字段，不能恢复为完整旧 DSL。
 
-营销账户字段承接建议：
+营销/让利账户字段承接建议：
 
-| 字段或对象 | 营销账户语义 | 边界 |
+| 字段或对象 | 营销/让利账户语义 | 边界 |
 | --- | --- | --- |
-| `costBearerSubjectRef` | 指向承担本组件让利、补贴、权益负债或合作方责任的资金账户、平台责任资金账户或等价营销账户 profile，是资金底座的 canonical 账务责任主体。 | 不能指向支付工具、活动、券实例、用户经营主体或商户经营主体；业务归因通过账户 profile、账目维度、业务单据和权益引用追溯。 |
-| `benefitReceiverSubjectRef` | 指向本次让利出资交易的让利承接账务主体，例如用户或订单维度让利归集账目、商户待清算主体或等价被补足账户。 | 是当前资金路径的目标主体，不等同于营销系统中的用户实体；不作为营销规则或券包状态。 |
-| `fundingAccountRoleCode` | 表达平台营销成本、权益负债、合作方补贴、营销留置等平台账户角色。 | 角色必须先解析成可入账账户；角色本身不直接入账。 |
+| `costBearerSubjectRef` | 指向已解析的成本承担账务主体，例如平台营销资金账户、商户让利责任账户、合作方补贴账户或等价可入账账户 profile。 | 不能指向支付工具、活动、券实例、营销规则、用户或商户经营主体；单个平台营销账户只适合平台自有补贴，不能合并商户或合作方出资。 |
+| `benefitReceiverSubjectRef` | 指向本次让利出资交易的让利承接账务主体，例如商户清结算账户、用户补贴账户或订单维度让利归集账目。 | 是当前资金路径的结算目标主体，不等同于营销系统中的收券用户；不作为营销规则或券包状态。 |
+| `fundingNature` | 区分平台自有资金、商户承担、合作方出资等成本性质。 | 与账户引用共同用于 route、posting 和对账解释；不替代账户主体，也不承载活动、券或规则来源。 |
 
-营销账户不替代让利出资记账交易。让利出资记账交易保存“某个已决策出资方，向某个让利承接账务主体，出资多少钱”；营销账户只回答“需要入账的资金责任落到哪个账户 profile”。没有原让利出资交易或等价不可变事实时，后续退款、业务取消、清结算、对账和投影不得只凭营销账户重新构造历史让利。
+营销/让利账户不替代让利出资记账交易。让利出资记账交易保存“某个已决策出资方，向某个让利承接账务主体，出资多少钱”；营销/让利账户只回答“该出资方的成本责任落到哪个可入账账户”。券、活动、规则、核销流水和分摊来源由上游保留；没有原让利出资交易或等价不可变事实时，后续退款、业务取消、清结算、对账和投影不得只凭营销账户重新构造历史让利。
 
-营销账户服务入口边界：
+营销/让利账户服务入口边界：
 
 | 边界 | DSL 裁决 |
 | --- | --- |
 | 禁止新增权益交易 DSL 服务入口 | 不新增 `FundsMarketingTransactionService`、`authorizeBenefit`、`settleBenefit`、`refundBenefit` 等平行交易入口；权益授权、结算和退款必须落回现有直接交易、授权交易、退款和清结算生命周期。 |
 | 让利出资记账交易服务 | 当前 Java 公共契约为 `FundsBenefitContributionTransactionService`，提供 `settle`、`refund`，返回资金交易流水号。 |
-| 不设置独立来源归因解析服务 | 请求已经携带成本承担主体、让利承接账务主体和资金性质；券、活动、规则和分摊来源由上游保留，资金底座不新增 `BenefitFundingResolutionService` 或 `benefitFundingSources`。 |
-| guard 在 route/posting 前失败 | `MarketingAccountGuard` 必须在 route leg、posting plan 或 LedgerEntry 生成前阻断缺账户引用、缺账户 profile 和无资金转移解释事实误入账；专业确认属于生产准入或审计证据，不作为公共交易请求字段。 |
+| 不设置独立来源归因解析服务 | 请求已经携带成本承担主体、让利承接账务主体和资金性质；券、活动、规则和分摊来源由上游保留，资金底座不新增来源归因解析服务或 `benefitFundingSources`。 |
+| 账户解析在进入本服务前完成 | 调用方必须把活动、券、规则或业务主体解析为可记账 `SubjectRef`；缺成本承担主体、缺承接主体或无真实入账影响时，应在 route leg、posting plan 或 LedgerEntry 生成前失败。 |
 | 事实进入既有资金链路 | 让利出资影响通过让利出资记账交易、route snapshot、posting context 和交易事实表达；不得新增独立 marketing transaction 指令类型替代原交易生命周期。 |
 
 #### 7.2.1.2 对象关系和接口草图
@@ -749,7 +749,7 @@ Route、Posting 和 Replay 消费顺序：
 | 补偿策略 | 主成功伴随失败、伴随成功主失败、重复提交、超时未知和人工接管的处理方式。 | 交易状态机、差错单、清结算阻断、Runbook。 | 部分成功被展示为普通成功或清结算 Done。 |
 | 投影合并键 | `projectionMergeKey` 或等价业务组键。 | 用户账单、商户账单、运营时间线、财务核对视图、指标项输入和归档重放。 | 伴随指令在投影、清分或对账中丢失。 |
 
-历史补充权益事实只用于缺原权益让利资金交易的受控解释，不是补造原始事实。它可以是独立表、治理差异报告中的追加事实，或等价不可变存储，但必须满足：只追加、不覆盖；包含原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系；被撤销、证据缺失、范围不匹配或 digest 冲突时不得参与退款、对账、归档正式执行或治理重放正式执行。
+历史补充权益事实只用于缺原让利出资记账交易的受控解释，不是补造原始事实。它可以是独立表、治理差异报告中的追加事实，或等价不可变存储，但必须满足：只追加、不覆盖；包含原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系；被撤销、证据缺失、范围不匹配或 digest 冲突时不得参与退款、对账、归档正式执行或治理重放正式执行。
 
 审计证据包必须在最终写入前参与校验。预检时有效的确认状态，在 posting、refund、settlement confirmation、archive 正式执行或 governance replay 正式执行前仍需重新读取确认状态、有效期、适用范围、撤销/变更记录和脱敏证据引用；dry-run 成功不能作为正式执行证据。
 
@@ -782,7 +782,7 @@ Route、Posting 和 Replay 消费顺序：
 | C01 | `Money` 是否允许 `userPayAmount=0`。 | 决定零实付订单是单指令表达，还是拆成补贴或代金券资金事实；未确认前不得声明零实付生产资金流完成。 |
 | C02 | 平台补贴作为同一资金指令额外 leg，还是独立伴随指令。 | 决定 route resolver、幂等键、交易投影粒度和逆向生命周期；未确认前只能保留 DSL 目标场景。 |
 | C03 | `RouteSnapshotSpec` 是否新增权益资金交易引用或等价摘要。 | 决定 replay 是否需要回查交易事实，以及归档后如何回放；生产链路必须选择 route snapshot、交易事实快照、独立权益事实表或等价不可变存储之一。 |
-| C04 | 平台补贴账户是否进入 `PlatformAccountsSnapshotSpec`。 | 可使用 `costBearerSubjectRef` 或 `fundingAccountRoleCode` 表达引用，但生产账务口径必须明确平台成本账户角色；未确认前不得把平台补贴与用户本金净额混记。 |
+| C04 | 平台补贴账户是否进入 `PlatformAccountsSnapshotSpec`。 | 可使用 `costBearerSubjectRef` 和账户 profile 表达引用，也可由平台账户快照承接解析结果；生产账务口径必须明确平台成本账户角色，未确认前不得把平台补贴与用户本金净额混记。 |
 | C05 | 储值、礼品卡、预付代金券是否纳入当前一期。 | 决定是否需要负债账户、预收待付口径和财务确认；未确认前不得按普通平台券处理。 |
 | C06 | 退款分摊是否必须支持商品行。 | 决定是否需要 `quoteSn` 和商品行权益明细；未确认前部分退款只能采用已明确的非商品行策略。 |
 | C07 | 历史无权益资金交易或等价不可变事实时如何逆向处理。 | 决定迁移、人工处理和对账差错策略；未确认前默认失败或进入人工处理，不按当前营销规则重算。 |
@@ -933,7 +933,7 @@ Replay 语义边界：
 | 支付工具 | `PaymentInstrumentRef`、binding snapshot、external reference。 | 工具流水、卡账单、VA 入金/出金视图、原路径回放索引。 | 工具作为 `LedgerEntry` 主体或余额主体。 |
 | 资金账户 | `SubjectRef=FUNDING_ACCOUNT`、LedgerEntry、BalanceProjection。 | 资金账户流水和余额变更解释。 | 从交易视图反写余额或补分录。 |
 | 信用账户 | `SubjectRef=CREDIT_ACCOUNT`、信用账目分录、授权占用事实。 | 授权额度流水、信用账单、负债解释视图。 | 把额度展示成用户自有现金。 |
-| 预算组 | BudgetGroup 上下文、预算控制视图、预留和释放证据。 | 预算使用视图、预算维度账单、预算差异报告。 | 预算组作为 route leg、posting plan 或 `LedgerEntry` 主体。 |
+| 预算控制范围 | BudgetGroup 上下文、预算控制视图、预留和释放证据。 | 预算使用视图、预算维度账单、预算差异报告。 | 预算控制范围作为 route leg、posting plan 或 `LedgerEntry` 主体。 |
 | Spend Rule | rule snapshot、规则决策记录、Spend Control Movement。 | 规则命中时间线、拒绝原因、预留/释放解释视图。 | 规则通过等同资金可用，或规则记录直接生成资金交易。 |
 
 Spend Control Movement 是控制事实 DSL，不是资金事实 DSL。它只描述某个业务流水在某个规则版本、预算 scope 和目标账户主体下发生了准入记录、拒绝记录、预算预留、交易成功消耗、预算释放、过期、撤销或退款释放等控制事件。它可以作为 `TransactionView` 的输入，也可以派生预算控制投影；但不能生成 `RouteLeg`、`PostingPlan`、`LedgerEntry`、`LedgerTransaction` 或 `BalanceProjection`。
@@ -943,7 +943,7 @@ Spend Control Movement 是控制事实 DSL，不是资金事实 DSL。它只描�
 | `movementSn` | 控制额度变动幂等流水。 | 复用资金交易流水替代控制额度变动流水。 |
 | `movementType` | `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`CONSUMED`、`RELEASED`、`EXPIRED`、`REVERSED` 等控制动作；`CONSUMED` 是下一 Grant 推荐的交易成功消耗语义，是否进入代码以授权为准。 | 用控制动作表达真实资金消费、入账、冻结或调账；把交易成功消耗和失败释放混用同一变动类型。 |
 | `targetSubjectRef` | 已解析资金账户、信用账户或平台角色解析后的平台资金账户。 | 预算组、Spend Rule、支付工具、卡号、PAN、token 或外部账户成为目标主体。 |
-| `budgetGroupRef` / `ruleRef` | 预算 scope、规则 ID、规则版本和规则决策证据。 | 规则通过直接生成 route、posting、entry 或余额投影。 |
+| `budgetGroupRef` / `ruleRef` | 预算控制 scope、规则 ID、规则版本和规则决策证据。 | 规则通过直接生成 route、posting、entry 或余额投影。 |
 | `transactionRef` / `originalMovementRef` | 交易后控制消费、释放或退款释放时回链原资金交易和原控制额度变动。 | 缺原控制额度变动或原交易时补写控制消费事实，或由控制额度变动反向修改交易事实。 |
 | `movementDigest` | 控制额度变动摘要，用于幂等、回放和对账追踪。 | 用摘要替代核心字段校验，或允许同流水不同摘要覆盖旧事实。 |
 
@@ -1040,7 +1040,7 @@ Spend Control Movement 是控制事实 DSL，不是资金事实 DSL。它只描�
 | 不退券但冲补贴 | `REFUND` 或 `AUTH_REFUND` 引用原权益资金交易。 | `NO_REFUND + REVERSE_SUBSIDY`。 | 用户侧不返券，资金侧按原补贴资金事实冲回。 | `DSL-BENEFIT-REFUND-NO-COUPON-001`、`TDD-BEN-REFUND-001`。 |
 | 不退券且不冲补贴 | `REFUND` 或清结算差错处理。 | `NO_REFUND + RETAIN_SUBSIDY`。 | 需要财务、会计或合同确认，保留规则版本和审计。 | `DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001`、`TDD-BEN-REFUND-002`。 |
 | 部分退款分摊权益 | `REFUND` 或 `AUTH_REFUND`。 | `partialRefundStrategy`、`refundRuleVersion`、稳定组件顺序、舍入模式和尾差归属固化原策略。 | 按原快照的商品行、比例、现金优先、权益优先或不可退优先分摊；同一输入重试结果一致，累计不超过组件剩余额度。 | `DSL-BENEFIT-PARTIAL-REFUND-001`、`TDD-BEN-REFUND-003`、`TDD-BEN-REFUND-005`、`TDD-BEN-RACE-001`。 |
-| 缺原权益资金事实的逆向事件 | `REFUND`、`REVERSAL`、清结算或对账差错处理。 | 原交易被判断为含权益，但缺原权益让利资金交易或等价不可变事实。 | 失败或进入人工处理，不调用当前营销规则。 | `TDD-BEN-REPLAY-001`。 |
+| 缺原让利出资事实的逆向事件 | `REFUND`、`REVERSAL`、清结算或对账差错处理。 | 原交易被判断为含权益，但缺原让利出资记账交易或等价不可变事实。 | 失败或进入人工处理，不调用当前营销规则。 | `TDD-BEN-REPLAY-001`。 |
 
 ### 9.2 授权交易用例族
 
@@ -1329,17 +1329,17 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-PAYMENT-INSTRUMENT-SHARED-CARD-001` | shared card 授权、可信撤销、完成和退款；过期不入资金交易。 | `PaymentInstrumentRef`、`SubjectRef(CREDIT_ACCOUNT)`、`AccountHierarchySnapshot`、binding snapshot、cardholder/department/project 上下文、BudgetGroup 上下文、Spend Rule 快照和资金责任决策。 | 共享卡是使用模式；每张卡绑定一个信用子账户，多卡共享通过同一父账户约束，后续事件沿原快照回放，不读取当前绑定重选路。 | 共享卡、卡号或持卡人入账、缺信用子账户、缺父账户快照、缺绑定版本、当前换绑影响历史退款，或过期直接生成资金事实。 |
 | `DSL-PAYMENT-INSTRUMENT-FAIL-001` | 支付工具不可用或资金责任不唯一。 | command validation 和 route failure boundary。 | 失败无副作用，不生成 route/posting/entry。 | 自动换路、自动改绑定、失败仍写账。 |
 | `DSL-PAYMENT-INSTRUMENT-REPLAY-001` | 工具换绑后退款、撤销、退费或拒付。 | 原 route snapshot、原工具快照和原费用 leg。 | 后续事件沿原路径回放，不读取当前绑定关系重选路。 | 退款入到新绑定账户、缺快照兜底重选路、累计超额。 |
-| `DSL-BENEFIT-FUNDING-SETTLE-001` | 优惠让利出资记账最小契约。 | `FundsBenefitContributionTransactionService#settle` 请求，包含成本承担主体、让利承接账务主体、金额、资金性质和原订单或交易引用。 | JSON 可表达谁承担成本、让利结果落到哪个账务承接主体、让了多少钱；`settle` 即真实入账交易。 | 恢复 `FundsInstruction.benefitSnapshot`、把核心金额和责任塞入 `contextVariables`、补贴与本金净额混记、把用户余额入账或返利分润塞进本服务。 |
+| `DSL-BENEFIT-CONTRIBUTION-SETTLE-001` | 优惠让利出资记账最小契约。 | `FundsBenefitContributionTransactionService#settle` 请求，包含成本承担主体、让利承接账务主体、金额、资金性质和原订单或交易引用。 | JSON 可表达谁承担成本、让利结果落到哪个账务承接主体、让了多少钱；`settle` 即真实入账交易。 | 恢复 `FundsInstruction.benefitSnapshot`、把核心金额和责任塞入 `contextVariables`、补贴与本金净额混记、把用户余额入账或返利分润塞进本服务。 |
 | `DSL-BENEFIT-MERCHANT-DISCOUNT-001` | 商户优惠券不入账。 | 非入账商户让利解释事实，由订单、清分、商户账单或对账解释承接。 | 商户让利进入清结算展示、商户账单或投影归因，不调用让利出资记账交易服务，不生成权益 posting。 | 商户让利生成 LedgerEntry、商户应收无法解释。 |
 | `DSL-BENEFIT-PLATFORM-SUBSIDY-001` | 平台补贴券补足商户。 | `FundsBenefitContributionTransactionService#settle`，成本承担主体为平台营销资金账户或等价责任账户。 | 补贴形成独立权益资金交易或伴随资金事实；本金和补贴拆分。 | 补贴与本金净额混记、缺平台资金来源、缺规则版本。 |
 | `DSL-BENEFIT-PLATFORM-NO-SETTLEMENT-001` | 平台券不补足商户。 | 展示优惠仅用于降低用户实付和商户应收，不生成补贴资金事实。 | 不调用让利出资记账交易服务，不生成平台补贴 leg，不误生成平台补贴成本。 | 展示优惠被误当平台资金支出。 |
 | `DSL-BENEFIT-PREPAID-VOUCHER-001` | 储值、预付或礼品卡代金券。 | 独立负债、预收待付或用户权益余额口径，不复用当前优惠让利结算入口。 | 按独立能力处理；专业口径未确认前不进入资金流生产完成口径。 | 储值券按普通优惠券处理、缺负债口径仍通过 `FundsBenefitContributionTransactionService#settle` 入账。 |
-| `DSL-BENEFIT-MARKETING-ACCOUNT-001` | 营销账户承接有资金影响的优惠让利组件。 | `costBearerSubjectRef`、`benefitReceiverSubjectRef`、`fundingAccountRoleCode`、账户 profile、专业确认引用和权益组件摘要。 | 平台补贴、合作方补贴、补贴冲回和待确认留置必须能解析到资金账户、平台责任资金账户或等价营销账户 profile；`benefitReceiverSubjectRef` 表达让利承接账务主体，非入账解释事实不得解析成分录。 | 把营销账户当支付工具、营销规则系统或券库存；把展示优惠和商户让利默认入账；把用户余额入账或返利分润塞进本服务；缺营销账户仍放行。 |
+| `DSL-BENEFIT-MARKETING-ACCOUNT-001` | 营销/让利账户承接有资金影响的优惠让利出资。 | `costBearerSubjectRef`、`benefitReceiverSubjectRef`、`fundingNature`、账户 profile 和原订单或原交易引用。 | 平台、商户或合作方出资必须先解析到各自可入账主体；`benefitReceiverSubjectRef` 表达让利承接账务主体；非入账解释事实不得解析成分录。 | 把营销账户当支付工具、营销规则系统或券库存；用一个全局平台营销账户合并商户或合作方出资；把展示优惠和无真实入账商户让利默认入账；把用户余额入账或返利分润塞进本服务。 |
 | `DSL-BENEFIT-AUTH-HOLD-001` | 授权时占券、完成时核销。 | 授权占用引用或原权益只读摘要。 | 授权阶段只固化权益占用，完成核销，可信撤销或差错补事实释放；过期不作为资金交易释放事实。 | 授权拒绝核销权益、授权阶段进入商户清算、过期直接核销或释放权益资金事实。 |
 | `DSL-BENEFIT-REFUND-NO-COUPON-001` | 不退券但冲补贴。 | `NO_REFUND + REVERSE_SUBSIDY`。 | 用户侧不返券，资金侧冲回补贴或减少商户应收。 | 用一个布尔值混淆用户侧和资金侧处置。 |
 | `DSL-BENEFIT-REFUND-RETAIN-SUBSIDY-001` | 不退券且不冲补贴。 | `NO_REFUND + RETAIN_SUBSIDY`。 | 保留补贴成本或合同口径，必须有规则版本和专业确认。 | 未确认财务口径仍自动放行。 |
 | `DSL-BENEFIT-PARTIAL-REFUND-001` | 部分退款权益分摊。 | `partialRefundStrategy`、组件级 `refundPolicy`、规则版本、稳定组件顺序、舍入模式和尾差归属。 | 多次退款按原策略累计闭合；同一输入重试结果一致；尾差由确定性规则吸收且不超组件剩余额度。 | 按当前活动规则重算、累计超额、尾差静默补平或由当前执行顺序随机分摊。 |
-| `DSL-BENEFIT-MISSING-FUNDING-FACT-REPLAY-001` | 缺原权益资金事实的逆向处理。 | 原交易缺权益资金交易、原 route 摘要或经审批补充事实。 | 失败或人工处理，不调用当前营销规则。 | 当前规则重算、补造历史权益结果。 |
+| `DSL-BENEFIT-MISSING-CONTRIBUTION-FACT-REPLAY-001` | 缺原让利出资事实的逆向处理。 | 原交易缺让利出资交易、原 route 摘要或经审批补充事实。 | 失败或人工处理，不调用当前营销规则。 | 当前规则重算、补造历史权益结果。 |
 | `DSL-BENEFIT-COMPANION-INSTRUCTION-001` | 独立伴随权益指令原子性。 | 伴随指令组、主从角色、原子性模式、补偿策略、投影合并键。 | 主交易和伴随指令可按同一业务组幂等、补偿、投影和对账；部分成功进入差错或补偿。 | 缺组键、缺补偿策略、部分成功静默成功、伴随指令丢失在投影或清分中。 |
 | `DSL-BENEFIT-SUPPLEMENTAL-FACT-001` | 历史补充权益事实。 | 原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系。 | 只追加补充事实，用于退款、差错、对账、归档读取或治理重放解释。 | 覆盖原交易、原 route snapshot、原账本事实；缺证据仍参与 settle 或 refund。 |
 | `DSL-BENEFIT-AUDIT-EVIDENCE-001` | 专业确认和审计证据包最终校验。 | 确认方、确认时间、结论版本、适用范围、有效期、脱敏证据引用、撤销或变更处理、审计责任人。 | 最终写入前重校验，失效时阻断、降级或转人工。 | dry-run 替代 settle 证据；过期、撤销、范围不匹配或敏感原文仍放行。 |
@@ -1360,13 +1360,13 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 
 ```json
 {
-  "caseId": "DSL-BENEFIT-FUNDING-SETTLE-001",
+  "caseId": "DSL-BENEFIT-CONTRIBUTION-SETTLE-001",
   "fixtureLevel": "CONTRACT_ONLY",
-  "scenarioCode": "BENEFIT_FUNDING_PLATFORM_SUBSIDY_SETTLE",
+  "scenarioCode": "BENEFIT_CONTRIBUTION_PLATFORM_SUBSIDY_SETTLE",
   "targetTestClass": "FundsBenefitContributionTransactionServiceContractTests",
-  "acceptanceIds": ["AC-BEN-FUNDING-001"],
-  "tddIds": ["TDD-BEN-FUNDING-001"],
-  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#权益让利资金交易"],
+  "acceptanceIds": ["AC-BEN-001"],
+  "tddIds": ["TDD-BEN-004"],
+  "systemDesignRefs": ["02-交易路由钱包账目与投影系分设计#让利出资记账交易能力落点"],
   "benefitContributionSettleRequest": {
     "tenantId": 1,
     "businessScene": "PLATFORM_SUBSIDY",
@@ -1493,7 +1493,7 @@ JSON 契约用例按 `fixtureLevel` 分为契约夹具和资金流夹具。两�
 | 让利出资记账交易契约 | 无权益交易遵循空值语义；有资金影响的优惠让利出资必须通过 `FundsBenefitContributionTransactionService` 或等价不可变事实保存成本承担主体、让利承接账务主体、金额和资金性质。 |
 | 权益金额闭合 | 让利出资记账交易和等价事实只能承接业务侧已决策结果；商户应收、逆向处置、只读展示项和平台补贴不得混入同一净额公式。 |
 | 权益生产门禁 | `FundsInstruction.benefitSnapshot` 已移除；生产链路必须证明权益资金交易、route snapshot、posting context、清分金额项、对账差错或交易投影中有可追溯摘要。 |
-| 营销账户契约 | 有资金影响权益组件必须能解析到资金账户、平台责任资金账户或等价营销账户 profile，并在 route snapshot、posting context 或等价不可变事实中保留账户引用、账户 profile、专业确认状态和权益组件摘要。 |
+| 营销/让利账户契约 | 有资金影响的优惠让利出资必须能解析到平台营销资金账户、商户让利责任账户、合作方补贴账户等可入账主体，并在 route snapshot、posting context 或等价不可变事实中保留账户引用、资金性质和原交易引用。 |
 | posting 平衡 | 每个 `PostingPlan` 独立平衡，整笔交易平衡。 |
 | replay 边界 | 缺原 route 快照失败，不读取当前绑定关系重新选路。 |
 | 权益 replay 边界 | 缺原权益资金事实、原 route 摘要或经审批补充事实的退款、可信撤销、拒付/争议结果、清结算重跑和对账差错必须失败或人工处理，不按当前营销规则重算；授权过期不作为资金交易 replay 事件。 |
@@ -1528,8 +1528,8 @@ JSON 契约用例按 `fixtureLevel` 分为契约夹具和资金流夹具。两�
 | 按当前营销规则重算历史权益 | 会导致退款、撤销、清结算和对账结果与原交易事实不一致；授权过期不应触发资金层权益重算。 |
 | 把所有权益组件默认纳入订单抵扣闭合 | 平台补足商户、储值负债、补贴冲回、不可退权益和展示项有不同闭合公式。 |
 | 平台补贴、本金、手续费或代金券净额混记 | 会破坏 posting 独立平衡、清结算拆分、对账核销和成本归集。 |
-| 把营销账户当作营销规则、券包库存或支付工具 | 营销账户只承接已决策权益的资金责任和账务归因，不计算券规则、不保存券生命周期，也不作为支付入口。 |
-| 有资金影响权益缺营销账户仍进入生产资金流 | 平台补贴、储值负债释放、合作方补贴、补贴冲回和营销留置必须有可回放账户引用和专业确认状态；缺失时只能 contract-only、阻断或转人工。 |
+| 把营销/让利账户当作营销规则、券包库存或支付工具 | 营销/让利账户只承接已决策优惠让利的成本责任，不计算券规则、不保存券生命周期，也不作为支付入口。 |
+| 有真实入账影响的让利缺成本承担账户仍进入生产资金流 | 平台补贴、商户承担和合作方补贴必须有可回放的成本承担主体、承接账务主体和原交易引用；缺失时只能 contract-only、阻断或转人工。 |
 
 ## 十四、评审清单
 
@@ -1538,7 +1538,7 @@ JSON 契约用例按 `fixtureLevel` 分为契约夹具和资金流夹具。两�
 | 产品评审 | 场景是否覆盖充值、付款、转账、退款、费用、授权、冻结、调额、清结算和对账差错。 |
 | 资金语义评审 | 主体、账目、金额、FX、route、posting 和投影边界是否清晰。 |
 | 权益语义评审 | 权益让利资金事实是否只承接已决策结果；`fundingNature`、成本承担主体、让利承接账务主体、金额和退款处置引用是否能解释每个资金影响。 |
-| 营销账户评审 | 有资金影响的权益组件是否解析到资金账户、平台责任资金账户或等价营销账户 profile；平台补贴、商户让利、权益负债、合作方补贴和营销留置是否分开；`NO_LEDGER` 组件是否没有误入账。 |
+| 营销/让利账户评审 | 有资金影响的优惠让利出资是否解析到平台营销资金账户、商户让利责任账户或合作方补贴账户；平台、商户、合作方出资是否分开；非入账展示优惠是否没有误入账。 |
 | 权益生产评审 | 是否区分契约承载、route/posting 消费和生产链路 Done；是否证明原权益资金事实或历史摘要能被退款、可信撤销、拒付/争议结果、清结算、对账和交易投影重放取回；是否避免把授权过期当资金事实。 |
 | 系分评审 | `instruction`、`route`、`snapshot`、`posting`、`entry`、`projection` 的职责是否单一。 |
 | 测试评审 | 是否有可解析 JSON 契约样例；是否覆盖成功、失败、幂等、余额变化、replay、digest、权益资金事实、无权益空值语义和缺原权益事实失败。 |

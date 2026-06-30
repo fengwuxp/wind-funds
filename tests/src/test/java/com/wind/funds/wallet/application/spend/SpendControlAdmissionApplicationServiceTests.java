@@ -97,6 +97,8 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     private static final String BUSINESS_SN = "SPEND_CONTROL_ADMISSION_001";
 
+    private static final String TENANT_MISMATCH_BUSINESS_SN = "SPEND_CONTROL_ADMISSION_TENANT_MISMATCH";
+
     private static final String SPEND_RULE_ID = "sr_vcc_daily_limit";
 
     private static final String SPEND_RULE_VERSION = "2026-06-19.1";
@@ -220,6 +222,28 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .hasMessageContaining("Spend Rule 版本不能为空");
 
         assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：Spend Rule 准入请求租户与当前线程租户不一致。
+     * 输入：当前线程租户为 1，请求 tenantId 为 2。
+     * 输出：应用层入口直接拒绝，不写决策记录、资金交易或账本事实。
+     * 红线：控制准入写决策记录前必须守住租户边界。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectTenantMismatchWithoutSideEffect() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionRequest()
+                        .setTenantId(TENANT_ID + 1)
+                        .setBusinessSn(TENANT_MISMATCH_BUSINESS_SN)
+                        .setSpendDecisionResult(SpendControlDecisionResult.PASSED)))
+                .hasMessageContaining("支出控制准入 tenantId 与当前租户不一致");
+
+        assertThat(decisionRecordCount()).isZero();
+        assertNoTransactionFacts(TENANT_MISMATCH_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 

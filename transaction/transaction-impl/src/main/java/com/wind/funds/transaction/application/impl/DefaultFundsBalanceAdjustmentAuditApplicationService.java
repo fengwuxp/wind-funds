@@ -4,12 +4,6 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.common.exception.AssertUtils;
-import com.wind.common.query.supports.DefaultPageQueryOptions;
-import com.wind.funds.ledger.dto.LedgerEntryDTO;
-import com.wind.funds.ledger.dto.LedgerTransactionDTO;
-import com.wind.funds.ledger.query.LedgerEntryQuery;
-import com.wind.funds.ledger.query.LedgerTransactionQuery;
-import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.application.FundsBalanceAdjustmentAuditApplicationService;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
@@ -20,6 +14,9 @@ import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.model.query.FundsBalanceAdjustmentAuditQuery;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
+import com.wind.funds.wallet.model.dto.LedgerEntryFactDTO;
+import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
+import com.wind.funds.wallet.service.LedgerFactQueryService;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -51,7 +48,7 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
-    private final LedgerTransactionService ledgerTransactionService;
+    private final LedgerFactQueryService ledgerFactQueryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -91,9 +88,9 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
         assertTenantMatched(tenantId, transactionDTO.getTenantId());
         List<FundsTransactionDetailDTO> details = fundsTransactionQueryService.queryFundsTransactionDetails(
                 transactionDTO.getSn());
-        List<LedgerTransactionDTO> ledgerTransactions = queryLedgerTransactions(transactionDTO.getTenantId(),
+        List<LedgerTransactionFactDTO> ledgerTransactions = queryLedgerTransactions(transactionDTO.getTenantId(),
                 transactionDTO.getSn());
-        List<LedgerEntryDTO> ledgerEntries = queryLedgerEntries(transactionDTO.getTenantId(), ledgerTransactions);
+        List<LedgerEntryFactDTO> ledgerEntries = queryLedgerEntries(transactionDTO.getTenantId(), ledgerTransactions);
         Optional<RouteSnapshotSpec> routeSnapshot = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(
                 transactionDTO.getSn());
         FundsBalanceAdjustmentAuditCompleteness completeness = completeness(routeSnapshot.isPresent(),
@@ -114,7 +111,7 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
                 .setLedgerTransactionCount(ledgerTransactions.size())
                 .setLedgerEntryCount(ledgerEntries.size())
                 .setLedgerTransactionSns(ledgerTransactions.stream()
-                        .map(LedgerTransactionDTO::getSn)
+                        .map(LedgerTransactionFactDTO::getSn)
                         .toList())
                 .setLedgerEntries(ledgerEntries.stream()
                         .map(this::toEntryAudit)
@@ -146,21 +143,16 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
                 "余额调账审计交易租户不匹配");
     }
 
-    private List<LedgerTransactionDTO> queryLedgerTransactions(Long tenantId, String transactionSn) {
-        return ledgerTransactionService.queryAccountLedgerTransactions(new LedgerTransactionQuery()
-                        .setTenantId(tenantId)
-                        .setFundsTransactionSn(transactionSn),
-                DefaultPageQueryOptions.defaults(AUDIT_QUERY_PAGE_SIZE))
-                .getRecords();
+    private List<LedgerTransactionFactDTO> queryLedgerTransactions(Long tenantId, String transactionSn) {
+        return ledgerFactQueryService.queryLedgerTransactions(tenantId, transactionSn, null, AUDIT_QUERY_PAGE_SIZE);
     }
 
-    private List<LedgerEntryDTO> queryLedgerEntries(Long tenantId, List<LedgerTransactionDTO> ledgerTransactions) {
+    private List<LedgerEntryFactDTO> queryLedgerEntries(Long tenantId,
+                                                        List<LedgerTransactionFactDTO> ledgerTransactions) {
         return ledgerTransactions.stream()
-                .flatMap(ledgerTransaction -> ledgerTransactionService.queryLedgerEntries(new LedgerEntryQuery()
-                                        .setTenantId(tenantId)
-                                        .setLedgerTransactionSn(ledgerTransaction.getSn()),
-                                DefaultPageQueryOptions.defaults(AUDIT_QUERY_PAGE_SIZE))
-                        .getRecords()
+                .flatMap(ledgerTransaction -> ledgerFactQueryService.queryLedgerEntries(tenantId,
+                                ledgerTransaction.getSn(),
+                                AUDIT_QUERY_PAGE_SIZE)
                         .stream())
                 .toList();
     }
@@ -177,7 +169,7 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
         return FundsBalanceAdjustmentAuditCompleteness.COMPLETE;
     }
 
-    private @Nullable String primaryLedgerTransactionSn(List<LedgerTransactionDTO> ledgerTransactions,
+    private @Nullable String primaryLedgerTransactionSn(List<LedgerTransactionFactDTO> ledgerTransactions,
                                                         List<FundsTransactionDetailDTO> details) {
         Optional<String> detailLedgerTransactionSn = details.stream()
                 .map(FundsTransactionDetailDTO::getLedgerTransactionSn)
@@ -187,7 +179,7 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
                 ? null : ledgerTransactions.getFirst().getSn());
     }
 
-    private FundsBalanceAdjustmentAuditDTO.LedgerEntryAuditDTO toEntryAudit(LedgerEntryDTO entry) {
+    private FundsBalanceAdjustmentAuditDTO.LedgerEntryAuditDTO toEntryAudit(LedgerEntryFactDTO entry) {
         return new FundsBalanceAdjustmentAuditDTO.LedgerEntryAuditDTO()
                 .setLedgerEntrySn(entry.getSn())
                 .setLedgerTransactionSn(entry.getLedgerTransactionSn())
@@ -201,8 +193,8 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
                 .setEntryType(entry.getEntryType())
                 .setBalanceConstraintType(entry.getBalanceConstraintType())
                 .setBalanceEffectType(entry.getBalanceEffectType())
-                .setAmount(entry.getAmount() == null ? null : entry.getAmount().getAmount())
-                .setCurrency(entry.getAmount() == null ? null : entry.getAmount().getCurrency().name());
+                .setAmount(entry.getAmount())
+                .setCurrency(entry.getCurrency());
     }
 
     private Map<String, Object> auditContext(FundsTransactionDTO transaction,

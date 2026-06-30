@@ -129,7 +129,7 @@ wind-funds 是支付资金底座，不是 VCC、全球账户、ACH、收单、�
 | 钱包账户、FundingAccount、CreditAccount、BudgetGroup、平台账户角色 | 可进入接入准备；编码仍需 Execution Grant、目标测试资产和验证命令闭合。 | PRD 01/02、系分 01/02、TDD 账户和钱包矩阵。 | `wallet-face` 已有 FundingAccount、CreditAccount、BudgetGroup、PlatformFundingAccount、SubjectLedgerInitializer、FundsSubjectBalanceQuery 等服务。 | 必须先完成主体、币种、账户类型、账本 Profile、平台账户角色和余额桶映射。 |
 | 支付工具和资金责任解析关系 | 可进入接入准备；编码仍需 Execution Grant、目标测试资产和验证命令闭合。 | PRD 02 支付工具设计、DSL 支付工具和 route 承载、TDD WALLET/ROUTE 用例。 | `PaymentInstrumentService`、`SpendSubjectFundingRelationService` 已提供工具、绑定、绑定历史和资金责任解析关系入口。 | 支付工具只做引用和路由输入，不表达余额；敏感值必须脱敏或摘要化。 |
 | 直接交易 | 可进入接入准备；编码仍需 Execution Grant、目标测试资产和验证命令闭合。 | PRD 02 直接交易、DSL DIRECT、系分 02、TDD DIR。 | `FundsDirectTransactionService` 已提供 topup、transfer、pay、refund、withdraw、fee、refundFee。 | 每个请求必须具备业务流水、幂等键、主体、金额、币种、操作者和来源引用；失败必须无 route、posting、entry 副作用。 |
-| 授权交易 | 可进入接入准备；编码仍需 Execution Grant、目标测试资产和验证命令闭合。 | PRD 02 授权交易、DSL AUTH、系分 02、TDD AUTH。 | `FundsAuthorizationTransactionService` 已提供 authorize、reversal、settle、settleRefund、chargeback。 | 必须区分 authorize、settle、reversal、expire、refund、chargeback；后续事件必须引用原授权或原 route snapshot。 |
+| 授权交易 | 可进入接入准备；编码仍需 Execution Grant、目标测试资产和验证命令闭合。 | PRD 02 授权交易、DSL AUTH、系分 02、TDD AUTH。 | `FundsAuthorizationTransactionService` 已提供 authorize、reversal、settle、settleRefund。 | 必须区分 authorize、settle、reversal、settleRefund、授权拒绝和争议裁决资金结果；授权过期不作为资金交易入口，争议/拒付需要资金处理时通过 `settleRefund` 携带上下文承接；后续事件必须引用原授权或原 route snapshot。 |
 | 余额控制 | 可进入接入准备；编码仍需 Execution Grant、目标测试资产和验证命令闭合。 | PRD 02 余额控制、DSL BALANCE_CONTROL、系分 02、TDD CTRL。 | `FundsBalanceControlService` 已提供 freeze、unfreeze、adjust。 | 冻结和解冻只做同主体控制；adjust 必须有来源、审批、凭证、币种和周期约束，不承接跨主体价值转移。 |
 | 账本过账、账本查询和余额投影 | 可作为接入验收事实源使用，生产写入仍通过交易编排进入。 | PRD 02 账本账目和余额投影、DSL Posting/Ledger、系分 02、TDD LEDGER/VIEW。 | `ledger-face` 和 `core` 已有 LedgerTransaction、LedgerEntry、LedgerPosting、LedgerBalanceProjection 相关契约和实现。 | 业务接入方不得直接提交 ledger entry；账本写入应由 route/posting 编排产生。历史 `update/delete` 类账本接口不作为业务接入入口。 |
 | 权益金额组件和权益资金事实 | 可做契约接入和专项准入；资金流消费需要 Phase/Batch 授权。 | PRD 02 权益金额组件、DSL BENEFIT、TDD BEN。 | `FundsBenefitContributionTransactionService`、权益资金请求模型、旧 `benefitSnapshot` 字段拒绝测试和历史摘要兼容测试已存在。 | 必须说明 `fixtureLevel`、权益资金事实源、金额闭合、退款分摊、外部规则核验、审计证据包和使用者解释视图。 |
@@ -264,8 +264,11 @@ wind-funds 是支付资金底座，不是 VCC、全球账户、ACH、收单、�
 | 初始化账本 | `SubjectLedgerInitializer`、`LedgerProfileService` | 显式建账、账本 Profile 和 required ledger 初始化。 | 在交易路由中隐式自动建账。 |
 | 管理支付工具 | `PaymentInstrumentService` | 工具元数据、绑定、换绑和绑定历史；VCC、prepaid virtual card 和 shared card 都先进入工具体系。 | 把工具当余额账户、账本主体或保存敏感原文。 |
 | 维护资金责任解析关系 | `SpendSubjectFundingRelationService` | 信用账户、预算组、Spend Rule、支付工具或使用主体到资金账户、信用账户或平台账户角色的解析关系。 | 用作交易状态机、Spend Rule 决策入口、扣款入口或账本修正入口。 |
+| 解析钱包准入快照 | `PaymentInstrumentPreTransactionSnapshotApplicationService`、`PaymentInstrumentCapabilityApplicationService`、`FundingResponsibilityResolutionApplicationService`、`FundsAccountCapabilityApplicationService`、`SpendControlAdmissionApplicationService` | 支付工具能力、绑定版本、资金责任、账户能力和外部 Spend Rule 决策证据的只读准入快照。 | 把准入快照当交易事实、账本事实或余额事实，或由调用方拼多个资源服务绕过 application facade。 |
+| 支付工具交易生命周期 | `InstrumentTransactionLifecycleApplicationService` | VCC/卡授权、VA/ACH/外部钱包收款、全球账户出款 rail 等需要从工具引用解析到账务主体后再委派交易内核的用例。 | 调用方自行拼 `PaymentInstrumentService`、`SpendSubjectFundingRelationService`、账户服务和交易服务完成授权、收款或出款。 |
+| 外部确认资金事件入账 | `ExternalFundsEventApplicationService.consume` | ACH、银行或外部账户 confirmed credit 事件归一后委派标准 `topup`，并保留外部 rail/provider 解释快照。 | 未确认外部事件、外部扣账、return/NOC/reversal 或差错调整直接写资金交易和账本事实。 |
 | 直接交易 | `FundsDirectTransactionService` | topup、transfer、pay、refund、withdraw、fee、refundFee。 | 用于冻结、授权占用、清结算批次状态推进或归档重放。 |
-| 授权交易 | `FundsAuthorizationTransactionService` | authorize、reversal、settle、settleRefund、chargeback。 | 授权拒绝后继续生成账务事实，或缺原事实时重新选路。 |
+| 授权交易 | `FundsAuthorizationTransactionService` | authorize、reversal、settle、settleRefund。 | 授权拒绝后继续生成账务事实，缺原事实时重新选路，或把授权过期/争议案件过程建成独立资金交易入口。 |
 | 余额控制 | `FundsBalanceControlService` | freeze、unfreeze、adjust。 | 跨主体价值转移，或把冻结动作当扣款。 |
 | 交易查询 | `FundsTransactionQueryService` | 交易、明细、已消费 replay leg 查询。 | 用查询结果反向修交易事实或账本事实。 |
 | 账本查询和过账证据 | `LedgerTransactionService`、`LedgerBalanceProjectionService` | 查询账本交易、分录和余额投影，作为验收证据。 | 业务方直接构造 ledger entry 入账，或用 update/delete 接口修业务资金结果。 |
@@ -396,7 +399,7 @@ Round 0 的输出不是代码任务，而是接入结论：通过、带条件通
 | 入口 | 适用场景 | 关键断言 |
 | --- | --- | --- |
 | 直接交易 | topup、transfer、pay、refund、withdraw、fee、refundFee。 | 状态、金额、账户类型、`normalBalanceSide`、route、posting、entry、balance projection、借贷平衡、余额影响、幂等、审计和失败无副作用。 |
-| 授权交易 | authorize、reversal、settle、settleRefund、chargeback。 | 授权批准占用，拒绝无副作用；后续事件引用原授权或原 route snapshot。 |
+| 授权交易 | authorize、reversal、settle、settleRefund。 | 授权批准占用，拒绝无副作用；完成、撤销、完成后退款和争议裁决资金结果引用原授权或原 route snapshot。 |
 | 余额控制 | freeze、unfreeze、adjust。 | 冻结不改变归属；解冻不超过冻结剩余；adjust 不承接跨主体价值转移。 |
 
 #### 6.5.1 充值、提现和转账快速判定
@@ -612,7 +615,7 @@ verificationAndStop:
 
 ### 7.2 授权交易
 
-适用场景：卡授权、共享额度授权、预算授权、授权完成、撤销、过期、完成后退款和拒付。
+适用场景：卡授权、共享额度授权、预算授权、授权完成、撤销、完成后退款，以及争议/拒付裁决后需要资金处理的退款或扣回结果。
 
 接入要求：
 
@@ -620,8 +623,8 @@ verificationAndStop:
 | --- | --- |
 | 授权创建 | `authorize` 必须区分 approved 和 declined；declined 不得生成 route、posting 或 ledger entry。 |
 | 授权占用 | 授权成功表达 `AVAILABLE -> AUTHORIZATION`，不等于商户已结算或资金已出款。 |
-| 后续事件 | `reversal`、`settle`、`settleRefund`、`chargeback` 必须引用原授权或原 route snapshot。 |
-| 金额边界 | 累计完成、撤销、退款或拒付不得超过原授权或已完成剩余额度。 |
+| 后续事件 | `reversal`、`settle`、`settleRefund` 必须引用原授权或原 route snapshot；争议/拒付是案件过程，资金结果默认通过 `settleRefund` 携带原因、凭证和外部案件引用承接。 |
+| 金额边界 | 累计完成、撤销、退款或争议裁决资金结果不得超过原授权或已完成剩余额度。 |
 | 展示 | 不得把授权占用展示为最终消费；必须有事实状态、展示状态和操作状态。 |
 
 ### 7.3 余额控制

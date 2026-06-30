@@ -34,20 +34,4 @@ public interface AuthorizationAdmissionApplicationService {
      */
     @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
                                           @NonNull WindOperator operator);
-
-    /**
-     * 通过支付工具发起授权准入并委派授权交易内核。
-     *
-     * <p>兼容既有服务层命名，新业务接入优先使用 {@link #authorizeByInstrument(AuthorizeByPaymentInstrumentRequest,
-     * WindOperator)} 表达支付工具生命周期授权入口。</p>
-     *
-     * <p>准入顺序：支付工具动作能力与绑定快照、资金责任关系、账户主体能力与状态。
-     * 任一准入失败时必须在进入交易内核前中止，不生成 route、posting、LedgerEntry 或交易事实。</p>
-     *
-     * @param request  支付工具授权请求
-     * @param operator 操作者
-     * @return 授权交易流水号
-     */
-    @NonNull String authorizeByPaymentInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
-                                                 @NonNull WindOperator operator);
 }

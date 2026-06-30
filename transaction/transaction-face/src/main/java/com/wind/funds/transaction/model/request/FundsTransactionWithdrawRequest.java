@@ -1,6 +1,7 @@
 package com.wind.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.spec.transaction.FeeSpec;
 import com.wind.funds.wallet.FundsAccountId;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -36,6 +37,9 @@ public class FundsTransactionWithdrawRequest {
 
     @Schema(description = "本次交易显式手续费规则")
     private FeeSpec feeSpec;
+
+    @Schema(description = "触发本次提现的支付工具引用快照，仅用于路由追溯和投影解释，不作为账务主体")
+    private PaymentInstrumentRefSpec paymentInstrumentRef;
 
     @Schema(description = "业务流水号，提现凭证，例如：提现申请单流水号")
     @NotNull

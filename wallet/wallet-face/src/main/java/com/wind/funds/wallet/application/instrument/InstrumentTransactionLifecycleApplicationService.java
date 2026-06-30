@@ -15,6 +15,9 @@ import org.jspecify.annotations.NonNull;
  * <p>边界：本服务不改变 transaction 层 canonical 入参；交易事实、route、账本交易、分录和余额投影仍由
  * 账户主体型交易服务和 ledger posting 链路生成。</p>
  *
+ * <p>观测：准入通过后仅把支付工具、绑定版本、资金责任和目标账务主体等轻量快照写入交易上下文，
+ * 供投影解释、审计和对账定位；不得在上下文承载敏感工具明文、金额分摊或规则原文。</p>
+ *
  * @author Codex
  * @date 2026-06-21
  */

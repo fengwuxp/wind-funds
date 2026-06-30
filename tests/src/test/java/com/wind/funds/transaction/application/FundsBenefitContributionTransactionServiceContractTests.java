@@ -80,12 +80,12 @@ class FundsBenefitContributionTransactionServiceContractTests {
     }
 
     /**
-     * 场景：权益让利退款、业务取消或人工纠错需要引用原权益资金交易。
+     * 场景：权益让利退款、业务取消或人工纠错需要引用原让利出资记账交易。
      * 预期：逆向请求以原交易流水号、本次业务流水号和金额作为回放、幂等和审计入口。
      * 红线：逆向请求不重新携带当前权益工具或确认状态，避免调用方按当前规则重算历史权益。
      */
     @Test
-    void testRefundRequestShouldReferenceOriginalBenefitFundingTransaction() {
+    void testRefundRequestShouldReferenceOriginalBenefitContributionTransaction() {
         List<String> refundGetterNames = Arrays.stream(FundsBenefitContributionRefundRequest.class.getMethods())
                 .map(Method::getName)
                 .toList();

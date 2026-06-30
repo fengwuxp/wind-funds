@@ -32,7 +32,7 @@ public class BudgetControlProjectionDTO implements Serializable {
     @Schema(description = "租户 ID")
     private Long tenantId;
 
-    @Schema(description = "预算组或预算控制范围标识")
+    @Schema(description = "预算控制范围标识，兼容字段名为预算组号")
     private String budgetGroupSn;
 
     @Schema(description = "币种")

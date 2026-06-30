@@ -98,7 +98,7 @@ public class ResolveSpendControlAdmissionRequest {
     @NotBlank
     private String spendDecisionDigest;
 
-    @Schema(description = "预算组或预算控制范围标识，可为空")
+    @Schema(description = "预算控制范围标识，兼容字段名为预算组号，可为空")
     private String budgetGroupSn;
 
     @Schema(description = "拒绝原因，仅 Spend Rule 决策拒绝时必填")

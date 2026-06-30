@@ -56,7 +56,7 @@ import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
-import com.wind.funds.transaction.ledger.DefaultLedgerPostingAssembler;
+import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
@@ -94,6 +94,7 @@ import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
+import com.wind.funds.wallet.services.impl.DefaultLedgerFactQueryService;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
@@ -1328,6 +1329,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             LedgerTransactionServiceImpl.class,
             LedgerBalanceProjectionServiceImpl.class,
             DefaultLedgerTransactionPostingServiceImpl.class,
+            DefaultLedgerFactQueryService.class,
             DefaultFundsInstructionLifecycleSaver.class,
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,

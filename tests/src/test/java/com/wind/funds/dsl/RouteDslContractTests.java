@@ -79,7 +79,7 @@ class RouteDslContractTests {
     /**
      * 场景：预算组作为预算控制视图被误传到 RouteLeg 账务节点。
      * 预期：RouteLeg 构造期拒绝预算组主体。
-     * 红线：预算控制对象不能进入交易事实、账务计划和账本分录链路。
+     * 红线：预算控制范围不能进入交易事实、账务计划和账本分录链路。
      */
     @Test
     void testRouteLegShouldRejectBudgetGroupSubjectNode() {

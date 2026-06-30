@@ -75,7 +75,7 @@ class RouteResolverFactBoundaryTests {
             "com.wind.funds.ledger.service.",
             "com.wind.funds.transaction.application.",
             "com.wind.funds.transaction.dal.",
-            "com.wind.funds.transaction.ledger.",
+            "com.wind.funds.ledger.posting.",
             "com.wind.funds.transaction.services.impl.");
 
     /**

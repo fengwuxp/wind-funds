@@ -1,5 +1,7 @@
 package com.wind.funds.wallet.application.spend.impl;
 
+import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.capte.domain.core.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.wallet.application.spend.BudgetControlLimitAdjustmentApplicationService;
 import com.wind.funds.wallet.enums.SpendControlMovementType;
@@ -35,9 +37,10 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull BudgetControlLimitAdjustmentResultDTO adjustLimit(
-            @NonNull AdjustBudgetControlLimitRequest request) {
+            @NonNull AdjustBudgetControlLimitRequest request,
+            @NonNull WindOperator operator) {
         validateRequest(request);
-        RecordSpendControlMovementRequest recordRequest = toRecordMovementRequest(request);
+        RecordSpendControlMovementRequest recordRequest = toRecordMovementRequest(request, operator);
         BudgetControlProjectionQuery projectionQuery = toProjectionQuery(request);
         if (queryExistingMovement(request).isEmpty()) {
             BudgetControlProjectionDTO beforeProjection = spendControlMovementService
@@ -53,10 +56,12 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
 
     private void validateRequest(AdjustBudgetControlLimitRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+                "预算控制额度调整 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getMovementSn(), "预算控制额度调整变动流水号不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
-        AssertUtils.hasText(request.getBudgetGroupSn(), "预算组标识不能为空");
+        AssertUtils.hasText(request.getBudgetGroupSn(), "预算控制范围标识不能为空");
         AssertUtils.notNull(request.getTargetAccountId(), "预算控制额度目标账户不能为空");
         AssertUtils.notNull(request.getAmount(), "调整金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "调整金额必须大于 0");
@@ -65,12 +70,12 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
         AssertUtils.hasText(request.getSpendRuleVersion(), "Spend Rule 版本不能为空");
         AssertUtils.notNull(request.getIncrease(), "预算控制额度调整方向不能为空");
         AssertUtils.hasText(request.getReasonCode(), "预算控制额度调整原因码不能为空");
-        AssertUtils.hasText(request.getOperatorId(), "预算控制额度调整操作者不能为空");
         AssertUtils.hasText(request.getAuditReferenceSn(), "预算控制额度调整审计引用不能为空");
         SpendRuleDigestValidator.assertSha256Digest(request.getMovementDigest(), "控制额度变动摘要");
     }
 
-    private RecordSpendControlMovementRequest toRecordMovementRequest(AdjustBudgetControlLimitRequest request) {
+    private RecordSpendControlMovementRequest toRecordMovementRequest(AdjustBudgetControlLimitRequest request,
+                                                                      WindOperator operator) {
         return new RecordSpendControlMovementRequest()
                 .setTenantId(request.getTenantId())
                 .setMovementSn(request.getMovementSn())
@@ -86,11 +91,16 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 .setSpendRuleVersion(request.getSpendRuleVersion())
                 .setBudgetGroupSn(request.getBudgetGroupSn())
                 .setReasonCode(request.getReasonCode())
-                .setOperatorId(request.getOperatorId())
+                .setOperatorId(operatorId(operator))
                 .setAuditReferenceSn(request.getAuditReferenceSn())
                 .setMovementDigest(request.getMovementDigest())
                 .setDescription(request.getDescription())
                 .setContextVariables(request.getContextVariables());
+    }
+
+    private String operatorId(WindOperator operator) {
+        AssertUtils.notNull(operator.getOperatorId(), "预算控制额度调整操作者不能为空");
+        return String.valueOf(operator.getOperatorId());
     }
 
     private BudgetControlProjectionQuery toProjectionQuery(AdjustBudgetControlLimitRequest request) {

@@ -140,6 +140,18 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    @Test
+    void testResolvePaymentInstrumentCapabilityShouldRejectTenantMismatchWithoutLedgerSideEffect() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> capabilityApplicationService.resolvePaymentInstrumentCapability(resolveRequest()
+                .setTenantId(TENANT_ID + 1)))
+                .hasMessageContaining("支付工具能力准入 tenantId 与当前租户不一致");
+
+        assertThat(countBindingHistoryRows()).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpPaymentInstrumentCapabilityTestData() {
         cleanupPaymentInstrumentCapabilityTestData();

@@ -138,6 +138,17 @@ class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFun
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    @Test
+    void testResolveFundingResponsibilityShouldRejectTenantMismatchWithoutLedgerSideEffect() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> resolutionApplicationService.resolveFundingResponsibility(resolveRequest()
+                .setTenantId(TENANT_ID + 1)))
+                .hasMessageContaining("资金责任解析 tenantId 与当前租户不一致");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     @BeforeEach
     void setUpFundingResponsibilityResolutionTestData() {
         cleanupFundingResponsibilityResolutionTestData();

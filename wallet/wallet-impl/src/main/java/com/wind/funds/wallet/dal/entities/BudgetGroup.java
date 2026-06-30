@@ -17,7 +17,9 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 预算组。
+ * 预算控制范围。
+ *
+ * <p>BudgetGroup 是历史兼容名，目标语义为 Spend Rule 可引用的支出控制 scope，不是账务主体。</p>
  *
  * @author Codex
  * @date 2026-05-07
@@ -48,7 +50,7 @@ public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
     private LocalDateTime gmtModified;
 
     /**
-     * 预算组流水号。
+     * 预算控制范围标识，兼容字段名为预算组流水号。
      */
     @NotNull
     private String sn;
@@ -60,54 +62,54 @@ public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
     private Long tenantId;
 
     /**
-     * 预算归属主体 ID。
+     * 预算控制范围归属主体 ID。
      */
     @NotNull
     private String ownerId;
 
     /**
-     * 预算归属主体类型。
+     * 预算控制范围归属主体类型。
      */
     @NotNull
     private FundsAccountOwnerType ownerType;
 
     /**
-     * 预算组业务类型。
+     * 预算控制范围业务类型。
      */
     @NotNull
     private String budgetType;
 
     /**
-     * 预算币种。
+     * 控制币种。
      */
     @NotNull
     private CurrencyIsoCode currency;
 
     /**
-     * 预算周期类型。
+     * 控制周期类型。
      */
     @NotNull
     private AccountBalancePeriodType periodType;
 
     /**
-     * 预算周期标识。
+     * 控制周期标识。
      */
     @NotNull
     private String periodId;
 
     /**
-     * 预算周期策略。
+     * 控制周期策略。
      */
     private String periodPolicy;
 
     /**
-     * 预算组状态。
+     * 预算控制范围状态。
      */
     @NotNull
     private FundsAccountStatus status;
 
     /**
-     * 预算组说明。
+     * 预算控制范围说明。
      */
     private String description;
 

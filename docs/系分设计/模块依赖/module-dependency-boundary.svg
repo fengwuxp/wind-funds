@@ -45,8 +45,8 @@
 
   <rect x="80" y="520" width="1340" height="168" class="group"/>
   <text x="105" y="554" class="section">实现层</text>
-  <rect x="145" y="585" width="230" height="64" class="box teal"/><text x="260" y="611" text-anchor="middle" class="label">wallet-impl</text><text x="260" y="633" text-anchor="middle" class="sub">依赖 wallet-face / transaction-face / ledger-face / core</text>
-  <rect x="430" y="585" width="260" height="64" class="box blue"/><text x="560" y="611" text-anchor="middle" class="label">transaction-impl</text><text x="560" y="633" text-anchor="middle" class="sub">依赖 transaction-face / ledger-face / core</text>
+  <rect x="145" y="585" width="230" height="64" class="box teal"/><text x="260" y="611" text-anchor="middle" class="label">wallet-impl</text><text x="260" y="633" text-anchor="middle" class="sub">依赖 wallet-face / ledger-face / core</text>
+  <rect x="430" y="585" width="260" height="64" class="box blue"/><text x="560" y="611" text-anchor="middle" class="label">transaction-impl</text><text x="560" y="633" text-anchor="middle" class="sub">依赖 transaction-face / wallet-face / core</text>
   <rect x="745" y="585" width="230" height="64" class="box green"/><text x="860" y="611" text-anchor="middle" class="label">ledger-impl</text><text x="860" y="633" text-anchor="middle" class="sub">依赖 ledger-face / core</text>
   <rect x="1030" y="585" width="260" height="64" class="box orange"/><text x="1160" y="611" text-anchor="middle" class="label">reconciliation-impl</text><text x="1160" y="633" text-anchor="middle" class="sub">依赖 face / core；补事实走白名单命令</text>
 

@@ -1,4 +1,4 @@
-package com.wind.funds.transaction.ledger;
+package com.wind.funds.ledger.posting;
 
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.query.LedgerQuery;

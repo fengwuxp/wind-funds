@@ -86,7 +86,7 @@ public class AuthorizeByPaymentInstrumentRequest {
     @Schema(description = "Spend Rule 决策摘要，用于幂等、回放和对账追踪")
     private String spendDecisionDigest;
 
-    @Schema(description = "预算组或预算控制范围标识，可为空")
+    @Schema(description = "预算控制范围标识，兼容字段名为预算组号，可为空")
     private String budgetGroupSn;
 
     @Schema(description = "Spend Rule 决策拒绝原因，仅 spendDecisionResult=REJECTED 时必填")

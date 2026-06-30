@@ -30,6 +30,7 @@ class WalletLayerBoundaryTests {
 
     private static final List<String> IMPL_FORBIDDEN_ARTIFACTS = List.of(
             "capte-funds-ledger-impl",
+            "capte-funds-transaction-face",
             "capte-funds-transaction-impl");
 
     /**
@@ -47,9 +48,9 @@ class WalletLayerBoundaryTests {
     }
 
     /**
-     * 场景：wallet-impl 作为产品门面实现，需要编排钱包契约、交易契约和账务契约。
-     * 预期：impl 依赖 face 契约和必要基础设施，不穿透到交易或账务实现包。
-     * 红线：钱包层不能绕过 transaction/ledger 的服务契约直接耦合实现事实。
+     * 场景：wallet-impl 作为钱包资源和准入能力实现。
+     * 预期：impl 依赖 wallet/ledger 契约和必要基础设施，不反向依赖交易契约或交易实现。
+     * 红线：钱包实现不能代持交易用例编排，也不能绕过交易层写入资金事实。
      */
     @Test
     void testWalletImplShouldUseFaceContractsWithoutImplDependencies() throws Exception {
@@ -58,8 +59,7 @@ class WalletLayerBoundaryTests {
 
         assertThat(dependencyArtifactIds)
                 .contains("capte-funds-wallet-face",
-                        "capte-funds-ledger-face",
-                        "capte-funds-transaction-face");
+                        "capte-funds-ledger-face");
         assertThat(dependencyArtifactIds).doesNotContain(IMPL_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
     }
 

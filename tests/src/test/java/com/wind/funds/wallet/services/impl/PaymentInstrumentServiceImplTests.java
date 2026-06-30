@@ -482,10 +482,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：运营把支付工具的预算控制主体绑定误配置为资金账户或信用账户。
+     * 场景：运营把支付工具的预算控制范围绑定误配置为资金账户或信用账户。
      * 输入：bindingRole = BUDGET_SUBJECT，但 subjectType 不是 BUDGET_GROUP。
      * 输出：创建被拒绝，不留下绑定候选或历史。
-     * 红线：预算控制绑定只能指向预算组控制上下文，不能包装成资金或信用责任主体。
+     * 红线：预算控制范围绑定只能指向 BUDGET_GROUP 兼容控制上下文，不能包装成资金或信用责任主体。
      */
     @Test
     void testCreatePaymentInstrumentBindingShouldRejectNonBudgetGroupAsBudgetSubject() {
@@ -495,11 +495,11 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setBindingRole(PaymentInstrumentBindingRole.BUDGET_SUBJECT)
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)))
-                .hasMessageContaining("预算控制主体绑定必须指向预算组");
+                .hasMessageContaining("预算控制范围绑定必须指向 BUDGET_GROUP 兼容类型");
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setBindingRole(PaymentInstrumentBindingRole.BUDGET_SUBJECT)
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)))
-                .hasMessageContaining("预算控制主体绑定必须指向预算组");
+                .hasMessageContaining("预算控制范围绑定必须指向 BUDGET_GROUP 兼容类型");
 
         assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
         assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();

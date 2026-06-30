@@ -92,7 +92,7 @@ public class SpendControlMovementDTO implements Serializable {
     @Schema(description = "Spend Rule 决策摘要")
     private String spendDecisionDigest;
 
-    @Schema(description = "预算组或预算控制范围标识")
+    @Schema(description = "预算控制范围标识，兼容字段名为预算组号")
     private String budgetGroupSn;
 
     @Schema(description = "拒绝原因")

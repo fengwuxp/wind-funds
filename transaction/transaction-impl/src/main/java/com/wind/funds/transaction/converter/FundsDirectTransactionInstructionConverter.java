@@ -236,6 +236,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .instrumentRef(request.getPaymentInstrumentRef())
                 .externalAccountRef(externalAccountRef(request.getPayeeId(), null, null, null,
                         request.getDescription()))
                 .reference(reference(FundsInstructionReferenceType.FREEZE_ORDER, request.getReferenceFreezeSn(), null))

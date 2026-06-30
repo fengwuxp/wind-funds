@@ -156,7 +156,7 @@ Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费
 | 包或模块 | 允许 | 禁止 |
 | --- | --- | --- |
 | `wallet/wallet-face` | 暴露 Spend Rule 定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制投影契约。 | 直接写交易事实、账本分录或余额投影。 |
-| `wallet/wallet-impl` | 持久化规则事实和控制事实，组合支付工具、账户能力、资金责任和交易 canonical 服务。 | 绕过 transaction/ledger 契约直接写交易表、route、posting 或 LedgerEntry。 |
+| `wallet/wallet-impl` | 持久化规则事实和控制事实，提供支付工具、账户能力、资金责任和准入证据。 | 依赖 transaction-face/impl，或直接写交易表、route、posting、LedgerEntry。 |
 | `transaction-face / transaction-impl` | 读取 `spendRuleDecision`、route snapshot、控制额度变动引用等已固化证据用于历史解释。 | 依赖 `wallet.application.spend` 服务、规则定义 / 挂载 / 决策记录 Entity 或 Mapper，或在交易内核内执行 Spend Rule。 |
 | `ledger` | 校验可入账主体并过账资金账户、信用账户或平台资金账户。 | 为 Spend Rule、预算组、支付工具或控制 scope 建账、过账或投影余额。 |
 | `core` | 承载必要枚举和 DSL 值对象。 | 引入 DAL、Spring Bean、规则执行器或具体服务实现。 |

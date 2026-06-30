@@ -38,27 +38,37 @@
 | `core` | 资金 DSL、账本/路由/交易/钱包核心契约、枚举、值对象和端口。禁止依赖 DAL、Web、具体业务实现。 |
 | `ledger/ledger-face` | 账务服务对外契约，提供账本、账本交易、分录查询与写入请求模型。 |
 | `ledger/ledger-impl` | 账务实现，包含账本、账本交易、分录、余额投影、MapStruct 和 Mapper。 |
-| `transaction/transaction-face` | 资金交易、资金账户、预算组、支付工具、路由生命周期等契约。 |
-| `transaction/transaction-impl` | 资金交易编排、路由解析、快照、资金账户、交易记录和生命周期保存实现。 |
-| `wallet/wallet-face` | 钱包交易、授权、冻结、解冻、退款、转账、充值、提现等产品契约。 |
-| `wallet/wallet-impl` | 钱包产品门面实现，把钱包请求转换为资金指令并交给交易编排。 |
+| `transaction/transaction-face` | 资金交易、授权交易、余额控制、让利出资、交易查询和生命周期等契约。 |
+| `transaction/transaction-impl` | 资金交易编排、路由解析、快照、交易记录和生命周期保存实现；承接需要交易内核的 wallet-face 应用入口实现。 |
+| `wallet/wallet-face` | 钱包账户、支付工具、资金责任、支出控制、账户能力和支付工具交易入口等产品契约。 |
+| `wallet/wallet-impl` | 钱包资源、账户、支付工具、资金责任、Spend Rule/预算控制和账本事实只读查询等实现；不创建资金交易事实。 |
+| `reconciliation/reconciliation-face` | 清结算与对账能力契约，提供对账、清算准入、差错和审计引用等接口。 |
+| `reconciliation/reconciliation-impl` | 清结算与对账实现，只通过 face/core 消费交易和账本事实，不反向依赖其他模块实现。 |
+| `governance/governance-face` | 资金数据治理、归档、重放、差异报告和生产修复控制面契约。 |
+| `governance/governance-impl` | 治理实现，只通过 face/port 编排、引用和校验交易、账本、对账事实，不反写资金事实。 |
 | `tests` | 资金域测试、契约测试、架构边界测试和 H2 表结构测试资源。 |
 | `dependencies` | 依赖聚合/BOM，只管理依赖，不写业务代码。 |
 
 强制依赖方向：
 
 ```text
-wallet-face / transaction-face / ledger-face
+wallet-face / transaction-face / ledger-face / reconciliation-face / governance-face
     -> core / capte-domain-core
 
-wallet-impl
-    -> wallet-face / transaction-face / core
-
 transaction-impl
-    -> transaction-face / ledger-face / core / infrastructure
+    -> transaction-face / wallet-face / core / infrastructure
+
+wallet-impl
+    -> wallet-face / ledger-face / core / infrastructure
 
 ledger-impl
     -> ledger-face / core / infrastructure
+
+reconciliation-impl
+    -> reconciliation-face / transaction-face / ledger-face / core / infrastructure
+
+governance-impl
+    -> governance-face / transaction-face / ledger-face / reconciliation-face / core / infrastructure
 
 tests
     -> impl / face / core
@@ -67,7 +77,9 @@ tests
 资金域边界：
 
 - `*-face` 不依赖 `*-impl`；生产模块不得依赖 `tests`。
-- `wallet` 作为产品门面，只编排资金指令，不直接写交易事实或账本事实。
+- `wallet-impl` 只维护钱包资源、准入、控制事实和账本事实只读聚合，不依赖 `transaction-face`，不创建资金交易事实；需要交易内核的 wallet-face 应用入口由 `transaction-impl` 实现。
+- `transaction-impl` 可以依赖 `wallet-face` 消费钱包准入、支付工具、资金责任和支出控制契约，但不得依赖 `wallet-impl`、钱包 DAL、Mapper 或钱包内部实现包。
+- `reconciliation-impl` 和 `governance-impl` 是横向对账/治理能力，只能通过 `*-face`、core port 或只读证据引用消费主链事实；允许依赖 `transaction-face`、`ledger-face`、`reconciliation-face`，禁止依赖其他模块 `*-impl`、DAL、Mapper 或反写交易、账本、钱包事实。
 - `route` 只解析资金路径，不直接写交易事实或账本事实。
 - `ledger` 只维护账本事实和账本投影，不反向持有业务交易生命周期状态。
 - 资金域 Java 包名和源码路径统一使用 `com.wind.funds` / `com/wind/funds`；不得恢复历史 Capte funds 包根或旧 Wind integration funds 包根。`com.capte.domain` 仍是外部领域依赖边界，可按模块依赖约束保留。

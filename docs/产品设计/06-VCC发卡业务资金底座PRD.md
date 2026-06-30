@@ -428,8 +428,8 @@ VCC 业务对接建议优先依赖钱包 application facade，而不是直接调
 | --- | --- | --- | --- |
 | 工具能力准入 | `PaymentInstrumentCapabilityApplicationService` | `com.wind.funds.wallet.application.instrument` | VCC、共享卡、预付卡动作前置准入，输出工具准入快照。 |
 | 资金责任决策 | `FundingResponsibilityResolutionApplicationService` | `com.wind.funds.wallet.application.funding` | 从卡、使用人、预算组、Spend Rule、预付责任和平台角色解析最终资金或额度责任主体。 |
-| 授权准入 | `AuthorizationAdmissionApplicationService` | `com.wind.funds.wallet.application.instrument` | `authorizeByInstrument` 或等价入口；批准后委派账户主体型授权内核。 |
-| 清算/释放/逆向 | `InstrumentTransactionLifecycleApplicationService` | `com.wind.funds.wallet.application.instrument` | settlement、release、refund、chargeback 按原授权和原 route snapshot 回放。 |
+| 支付工具交易生命周期 | `InstrumentTransactionLifecycleApplicationService` | `com.wind.funds.wallet.application.instrument` | `authorizeByInstrument` 承接 VCC/共享卡/预付卡授权入口；settlement、release、refund、chargeback 按原授权和原 route snapshot 回放；授权内部委派准入专项服务。 |
+| 授权准入专项协作 | `AuthorizationAdmissionApplicationService` | `com.wind.funds.wallet.application.instrument` | 作为生命周期入口内部协作，组合工具准入、绑定、资金责任、账户能力和 Spend Rule 决策证据；不作为跨业务统一交易入口。 |
 | 预付资金处理 | `VccPrepaidFundingApplicationService` | `com.wind.funds.wallet.application.vcc` | 外部确认入金、系统内充值、退卡或转出；写入资金子账户，不创建卡号账本或 `VCC_ACCOUNT`。 |
 | 共享卡场景编排 | `VccSharedCardTransactionApplicationService` | `com.wind.funds.wallet.application.vcc` | 共享卡授权、清算和逆向的 VCC 场景编排；卡维度账单来自交易投影。 |
 
@@ -475,11 +475,11 @@ VCC 业务对接建议优先依赖钱包 application facade，而不是直接调
 flowchart TD
     A["fincone-issuing / 发卡适配层<br/>提交 VCC 业务事件"] --> B{"事件类型"}
     B -->|预付入金 / 系统内充值| C["VccPrepaidFundingApplicationService<br/>确认入金、来源和幂等键"]
-    B -->|授权请求| D["AuthorizationAdmissionApplicationService<br/>工具准入、绑定和规则决策"]
-    B -->|清算 / 撤销 / 退款 / 拒付| E["VccInstrumentLifecycleApplicationService<br/>读取原授权和原 route snapshot"]
+    B -->|授权请求| D["InstrumentTransactionLifecycleApplicationService<br/>authorizeByInstrument"]
+    B -->|清算 / 撤销 / 退款 / 拒付| E["InstrumentTransactionLifecycleApplicationService<br/>读取原授权和原 route snapshot"]
     C --> F["解析资金子账户<br/>父账户 / PlatformFunding / 外部确认"]
-    D --> G["解析 PaymentInstrumentRef<br/>使用人 / 绑定版本 / 预算组 / Spend Rule"]
-    G --> H["解析信用/资金子账户<br/>FundingAllocationDecision"]
+    D --> G["AuthorizationAdmissionApplicationService<br/>工具准入 / 绑定 / 规则决策"]
+    G --> H["解析信用/资金子账户<br/>PaymentInstrumentRef / FundingAllocationDecision"]
     E --> I["回放原快照<br/>原子账户 / 原父账户 / 原工具快照"]
     F --> J["账户主体型交易内核<br/>FUND_IN / TRANSFER / UNLOAD"]
     H --> K["账户主体型授权内核<br/>AUTHORIZE"]

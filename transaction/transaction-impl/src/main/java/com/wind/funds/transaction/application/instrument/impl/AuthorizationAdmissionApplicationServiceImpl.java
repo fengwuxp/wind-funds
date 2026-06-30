@@ -1,5 +1,6 @@
-package com.wind.funds.wallet.application.instrument.impl;
+package com.wind.funds.transaction.application.instrument.impl;
 
+import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
@@ -9,7 +10,6 @@ import com.wind.funds.transaction.application.FundsAuthorizationTransactionServi
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
-import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.instrument.AuthorizationAdmissionApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
 import com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService;
@@ -58,27 +58,18 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
         return authorize(request, operator);
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    public @NonNull String authorizeByPaymentInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
-                                                        @NonNull WindOperator operator) {
-        return authorize(request, operator);
-    }
-
     private String authorize(AuthorizeByPaymentInstrumentRequest request, WindOperator operator) {
         validateRequest(request);
         AuthorizationAdmissionDecision admissionDecision = resolveAdmissionDecision(request);
-        FundsAccountId accountId = admissionDecision.snapshot().getTargetAccountId();
-        PaymentInstrumentCapabilityDecisionDTO instrumentDecision =
-                admissionDecision.snapshot().getPaymentInstrumentCapability();
         return authorizationTransactionService.authorize(convertToAuthorizeRequest(request,
-                accountId,
-                instrumentDecision,
+                admissionDecision.snapshot(),
                 admissionDecision.spendControlDecision()), operator);
     }
 
     private void validateRequest(AuthorizeByPaymentInstrumentRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+                "支付工具授权 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
         AssertUtils.notNull(request.getAmount(), "授权金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "授权金额必须大于 0");
@@ -176,11 +167,10 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
 
     private FundsAuthorizationTransactionAuthorizeRequest convertToAuthorizeRequest(
             AuthorizeByPaymentInstrumentRequest request,
-            FundsAccountId accountId,
-            PaymentInstrumentCapabilityDecisionDTO instrumentDecision,
+            PaymentInstrumentPreTransactionSnapshotDTO snapshot,
             @Nullable SpendControlAdmissionDecisionDTO spendControlDecision) {
         return new FundsAuthorizationTransactionAuthorizeRequest()
-                .setAccountId(accountId)
+                .setAccountId(snapshot.getTargetAccountId())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
                         request.getCurrency())))
                 .setBusinessSn(request.getBusinessSn())
@@ -189,18 +179,35 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
                 .setAuthorizedTime(request.getAuthorizedTime())
                 .setTransactionCountry(request.getTransactionCountry())
                 .setDeclineReason(request.getDeclineReason())
-                .setPaymentInstrumentRef(paymentInstrumentRef(request, instrumentDecision))
-                .setContextVariables(spendRuleContextVariables(spendControlDecision))
+                .setPaymentInstrumentRef(paymentInstrumentRef(request, snapshot.getPaymentInstrumentCapability()))
+                .setContextVariables(admissionContextVariables(snapshot, spendControlDecision))
                 .setDescription(request.getDescription());
     }
 
-    private @Nullable ReadonlyContextVariables spendRuleContextVariables(
+    private @NonNull ReadonlyContextVariables admissionContextVariables(
+            PaymentInstrumentPreTransactionSnapshotDTO snapshot,
             @Nullable SpendControlAdmissionDecisionDTO spendControlDecision) {
+        Map<String, Object> values = new LinkedHashMap<>(walletAdmissionContext(snapshot));
         Map<String, Object> decision = spendRuleDecisionSnapshot(spendControlDecision);
-        if (decision.isEmpty()) {
-            return null;
+        if (!decision.isEmpty()) {
+            values.put(FundsInstructionContextKeys.SPEND_RULE_DECISION, decision);
         }
-        return ReadonlyContextVariables.of(Map.of(FundsInstructionContextKeys.SPEND_RULE_DECISION, decision));
+        return ReadonlyContextVariables.of(values);
+    }
+
+    private @NonNull Map<String, Object> walletAdmissionContext(PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
+        PaymentInstrumentCapabilityDecisionDTO instrument = snapshot.getPaymentInstrumentCapability();
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("instrumentSn", snapshot.getInstrumentSn());
+        values.put("instrumentAction", PaymentInstrumentAction.AUTHORIZE.name());
+        values.put("instrumentBindingRole", snapshot.getBindingRole().name());
+        values.put("instrumentBindingSn", instrument.getBindingSn());
+        values.put("instrumentBindingVersion", instrument.getBindingVersion());
+        values.put("fundingRelationSn", snapshot.getFundingResponsibility().getRelationSn());
+        values.put("fundingRelationType", snapshot.getRelationType().name());
+        values.put("targetAccountId", snapshot.getTargetAccountId().id());
+        values.put("targetAccountType", snapshot.getTargetAccountId().type());
+        return Map.copyOf(values);
     }
 
     private @NonNull Map<String, Object> spendRuleDecisionSnapshot(
