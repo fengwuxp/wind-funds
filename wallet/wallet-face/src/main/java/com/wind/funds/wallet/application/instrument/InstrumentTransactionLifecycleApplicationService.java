@@ -10,7 +10,8 @@ import org.jspecify.annotations.NonNull;
  * 支付工具交易生命周期应用服务。
  *
  * <p>职责：面向 VCC、卡、VA、ACH、电子钱包端点、VCC 入金端点等支付工具业务入口，完成工具能力、
- * 绑定快照、资金责任和账户能力准入，再委派账户主体型交易内核。</p>
+ * 绑定快照、资金责任和账户能力准入，再委派账户主体型交易内核。外部接入支付工具授权、收款或出款
+ * rail 时应优先使用本生命周期 facade；专项准入服务只作为内部协作入口。</p>
  *
  * <p>边界：本服务不改变 transaction 层 canonical 入参；交易事实、route、账本交易、分录和余额投影仍由
  * 账户主体型交易服务和 ledger posting 链路生成。</p>
@@ -27,7 +28,8 @@ public interface InstrumentTransactionLifecycleApplicationService {
      * 通过支付工具授权入口完成准入并委派授权交易内核。
      *
      * <p>典型场景包括 VCC/卡授权、外部钱包授权或通道 token 授权等。
-     * 授权准入、支付工具解析、资金责任解析、账户能力校验和 Spend Rule 准入仍由授权准入专项服务负责。</p>
+     * 授权准入、支付工具解析、资金责任解析、账户能力校验和 Spend Rule 准入仍由授权准入专项服务负责；
+     * 外部调用方不应绕过本生命周期入口自行拼接专项准入和交易内核。</p>
      *
      * @param request  支付工具授权请求
      * @param operator 操作者

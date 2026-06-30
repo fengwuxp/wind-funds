@@ -24,7 +24,7 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 public class BudgetGroupQuery {
 
-    @Schema(description = "预算控制范围标识，兼容字段名为预算组号")
+    @Schema(description = "预算控制范围标识，历史字段名仍为预算组号，不表示账务主体")
     private String sn;
 
     @Schema(description = "租户 ID")

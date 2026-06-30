@@ -67,6 +67,6 @@ public class SpendControlMovementQuery implements Serializable {
     @Schema(description = "Spend Rule 版本")
     private String spendRuleVersion;
 
-    @Schema(description = "预算控制范围标识，兼容字段名为预算组号")
+    @Schema(description = "预算控制范围标识，历史字段名 budgetGroupSn，不表示账务主体")
     private String budgetGroupSn;
 }

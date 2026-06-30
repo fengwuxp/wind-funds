@@ -42,7 +42,7 @@ public class BudgetGroupDTO implements Serializable {
     @Schema(description = "修改时间")
     private LocalDateTime gmtModified;
 
-    @Schema(description = "预算控制范围标识，兼容字段名为预算组号")
+    @Schema(description = "预算控制范围标识，历史字段名仍为预算组号，不表示账务主体")
     private String sn;
 
     @Schema(description = "租户 ID")

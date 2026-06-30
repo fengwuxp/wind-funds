@@ -50,7 +50,7 @@ public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
     private LocalDateTime gmtModified;
 
     /**
-     * 预算控制范围标识，兼容字段名为预算组流水号。
+     * 预算控制范围标识，历史字段名为预算组流水号，不表达账务主体。
      */
     @NotNull
     private String sn;

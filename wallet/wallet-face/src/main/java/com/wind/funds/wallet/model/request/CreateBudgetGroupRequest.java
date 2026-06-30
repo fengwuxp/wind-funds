@@ -28,7 +28,7 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 public class CreateBudgetGroupRequest {
 
-    @Schema(description = "预算控制范围标识，兼容字段名为预算组号")
+    @Schema(description = "预算控制范围标识，历史字段名仍为预算组号，不表示账务主体")
     @NotBlank
     private String sn;
 
