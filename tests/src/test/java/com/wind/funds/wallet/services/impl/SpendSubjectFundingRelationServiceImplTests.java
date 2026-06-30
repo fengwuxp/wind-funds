@@ -547,26 +547,6 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
-    /**
-     * 场景：运营误把预算组配置为最终资金责任主体。
-     * 输入：targetSubjectType = BUDGET_GROUP。
-     * 输出：创建被拒绝。
-     * 红线：预算组和 Spend Rule 只能做控制和解释，不能成为最终资金责任主体。
-     */
-    @Test
-    void testCreateSpendSubjectFundingRelationShouldRejectBudgetGroupTargetSubjectWithoutRelation() {
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createCreditTargetRelationRequest()
-                .setSn(BUDGET_TARGET_RELATION_SN)
-                .setTargetSubjectType(FundsSubjectType.BUDGET_GROUP)
-                .setTargetSubjectId("budget_relation_target")))
-                .hasMessageContaining("资金责任目标主体类型不支持");
-
-        assertThat(countRows("t_spend_subject_funding_rel", "sn", BUDGET_TARGET_RELATION_SN)).isZero();
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
     @BeforeEach
     void setUpSpendSubjectFundingRelationTestData() {
         cleanupSpendSubjectFundingRelationTestData();

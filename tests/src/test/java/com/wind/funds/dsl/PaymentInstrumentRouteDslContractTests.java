@@ -125,18 +125,6 @@ class PaymentInstrumentRouteDslContractTests {
                         LedgerSubjectCode.AVAILABLE,
                         10,
                         "SHARED_CARD_REAL_FUNDING_ACCOUNT")));
-        RoutingDecisionSpec sharedCardBudgetGroupFundingAccount = routingDecision("SHARED_CARD_BUDGET_GROUP_FUNDING_ACCOUNT",
-                List.of(fundingAllocation("ALLOC-BUDGET",
-                                budgetGroup("BG-AUTH-001"),
-                                LedgerSubjectCode.AVAILABLE,
-                                10,
-                                "BUDGET_CONTROL"),
-                        fundingAllocation("ALLOC-BUDGET-FA",
-                                fundingAccount("FA-AUTH-003"),
-                                LedgerSubjectCode.AVAILABLE,
-                                20,
-                                "REAL_FUNDING_ACCOUNT")));
-
         assertThat(fundingAccountOnly.getFundingAllocations())
                 .extracting(item -> item.getSubjectRef().getSubjectType())
                 .containsExactly(FundsSubjectType.FUNDING_ACCOUNT);
@@ -144,9 +132,6 @@ class PaymentInstrumentRouteDslContractTests {
         assertThat(sharedCardFundingAccount.getFundingAllocations())
                 .extracting(item -> item.getSubjectRef().getSubjectType())
                 .containsExactly(FundsSubjectType.FUNDING_ACCOUNT);
-        assertThat(sharedCardBudgetGroupFundingAccount.getFundingAllocations())
-                .extracting(item -> item.getSubjectRef().getSubjectType())
-                .containsExactly(FundsSubjectType.BUDGET_GROUP, FundsSubjectType.FUNDING_ACCOUNT);
     }
 
     /**
@@ -243,21 +228,6 @@ class PaymentInstrumentRouteDslContractTests {
         assertThat(serializedHierarchy.getJSONObject("contextVariables").getString("accountPurpose"))
                 .isEqualTo("VCC_SHARED_CARD");
         assertThat(document.toJSONString()).doesNotContain("4242424242424242");
-    }
-
-    /**
-     * 场景：业务侧误把预算组当作账户层级中的实际落账账户。
-     * 预期：账户层级快照构造期拒绝。
-     * 红线：预算组是控制范围，不是资金或信用账户，不能进入账户层级作为落账主体。
-     */
-    @Test
-    void testAccountHierarchySnapshotShouldRejectBudgetGroupAsAccountRef() {
-        assertThatThrownBy(() -> accountHierarchySnapshot(budgetGroup("BG-VCC-001"),
-                fundingAccount("FA-VCC-PARENT-002"),
-                fundingAccount("FA-VCC-PARENT-002"),
-                Map.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("account hierarchy subject must be funding or credit account");
     }
 
     /**
@@ -511,10 +481,10 @@ class PaymentInstrumentRouteDslContractTests {
                                 10,
                                 "REAL_FUNDING_ACCOUNT"),
                         fundingAllocation("ALLOC-FA-02",
-                                budgetGroup("BG-DUP-001"),
+                                fundingAccount("FA-DUP-002"),
                                 LedgerSubjectCode.AVAILABLE,
                                 10,
-                                "BUDGET_CONTROL"))))
+                                "REAL_FUNDING_ACCOUNT"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("funding allocation priority must be unique");
     }
@@ -875,10 +845,6 @@ class PaymentInstrumentRouteDslContractTests {
 
     private SubjectRef creditAccount(String subjectId) {
         return subjectRef(subjectId, FundsSubjectType.CREDIT_ACCOUNT);
-    }
-
-    private SubjectRef budgetGroup(String subjectId) {
-        return subjectRef(subjectId, FundsSubjectType.BUDGET_GROUP);
     }
 
     private SubjectRef subjectRef(String subjectId, FundsSubjectType subjectType) {

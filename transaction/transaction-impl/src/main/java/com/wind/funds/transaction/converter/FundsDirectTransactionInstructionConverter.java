@@ -31,7 +31,6 @@ import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
-import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -50,6 +49,8 @@ import java.util.Map;
 public class FundsDirectTransactionInstructionConverter {
 
     private static final String EXTERNAL_TRANSACTION_ID = "externalTransactionId";
+
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
 
     private final PlatformFundingAccountService platformFundingAccountService;
 
@@ -356,7 +357,7 @@ public class FundsDirectTransactionInstructionConverter {
     }
 
     private void assertNotBudgetGroup(@NonNull FundsAccountId accountId, @NonNull String message) {
-        AssertUtils.isFalse(FundsSubjectType.BUDGET_GROUP.name().equals(accountId.type()), message);
+        AssertUtils.isFalse(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE.equals(accountId.type()), message);
     }
 
     private @NonNull FundsOperationActorSpec operationActor(@NonNull WindOperator operator) {

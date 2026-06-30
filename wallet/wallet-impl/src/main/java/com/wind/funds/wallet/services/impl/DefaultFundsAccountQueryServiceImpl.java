@@ -155,7 +155,6 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                 CreditAccountDTO account = findCreditAccountBySn(subjectId);
                 yield account == null ? null : ResolvedFundsSubject.from(account);
             }
-            case BUDGET_GROUP -> null;
         };
     }
 

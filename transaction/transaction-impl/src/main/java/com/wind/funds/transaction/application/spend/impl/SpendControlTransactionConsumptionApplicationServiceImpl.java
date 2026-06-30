@@ -418,6 +418,10 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "关联控制额度变动预算组不一致，movementSn = {}, originalMovementSn = {}",
                 linkedMovement.getMovementSn(),
                 originalMovement.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(linkedMovement.getPeriodId(), originalMovement.getPeriodId()),
+                "关联控制额度变动周期不一致，movementSn = {}, originalMovementSn = {}",
+                linkedMovement.getMovementSn(),
+                originalMovement.getMovementSn());
     }
 
     private long sumAmount(List<SpendControlMovementDTO> movements, SpendControlMovementType movementType) {
@@ -448,7 +452,9 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 .setSpendDecisionSn(originalMovement.getSpendDecisionSn())
                 .setSpendDecisionResult(originalMovement.getSpendDecisionResult())
                 .setSpendDecisionDigest(originalMovement.getSpendDecisionDigest())
+                .setControlScopeId(originalMovement.getControlScopeId())
                 .setBudgetGroupSn(originalMovement.getBudgetGroupSn())
+                .setPeriodId(originalMovement.getPeriodId())
                 .setMovementDigest(request.getMovementDigest())
                 .setDescription(request.getDescription())
                 .setContextVariables(request.getContextVariables());

@@ -406,6 +406,7 @@ CREATE TABLE `t_spend_control_movement`
     `spend_decision_result` VARCHAR(50)          DEFAULT NULL COMMENT 'Spend Rule 决策结果',
     `spend_decision_digest` VARCHAR(128)         DEFAULT NULL COMMENT 'Spend Rule 决策摘要',
     `budget_group_sn`       VARCHAR(64)          DEFAULT NULL COMMENT '预算组或控制范围标识',
+    `period_id`             VARCHAR(64)          DEFAULT NULL COMMENT '控制周期标识',
     `reject_reason`         VARCHAR(512)         DEFAULT NULL COMMENT '拒绝原因',
     `reason_code`           VARCHAR(64)          DEFAULT NULL COMMENT '调整原因码',
     `operator_id`           VARCHAR(64)          DEFAULT NULL COMMENT '操作者或系统来源',
@@ -420,7 +421,7 @@ CREATE TABLE `t_spend_control_movement`
     KEY `idx_spend_control_movement_transaction` (`tenant_id`, `transaction_sn`),
     KEY `idx_spend_control_movement_instrument` (`tenant_id`, `instrument_sn`, `action`),
     KEY `idx_spend_control_movement_target` (`tenant_id`, `target_subject_type`, `target_subject_id`),
-    KEY `idx_spend_control_movement_budget` (`tenant_id`, `budget_group_sn`, `currency`),
+    KEY `idx_spend_control_movement_budget` (`tenant_id`, `budget_group_sn`, `period_id`, `currency`),
     KEY `idx_spend_control_movement_rule` (`tenant_id`, `spend_rule_id`, `spend_rule_version`),
     KEY `idx_spend_control_movement_created` (`gmt_create`)
 ) ENGINE = InnoDB

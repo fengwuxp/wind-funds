@@ -66,6 +66,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private static final String REPLAY_LEG_ID_SEPARATOR = "_";
 
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+
     private static final String REPLAY_REFERENCE_REQUIRED_MESSAGE = "RouteSnapshot 回放事件缺少原路径引用";
 
     private static final String REPLAY_LEG_REQUIRED_MESSAGE = "RouteSnapshot 没有可回放的 RouteLeg";
@@ -230,7 +232,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
             return FundsSubjectType.CREDIT_ACCOUNT;
         }
-        if (Objects.equals(accountId.type(), FundsSubjectType.BUDGET_GROUP.name())) {
+        if (Objects.equals(accountId.type(), LEGACY_BUDGET_GROUP_ACCOUNT_TYPE)) {
             throw new IllegalArgumentException("预算组不是核心资金账务主体，不能用于 RouteSnapshot 回放主体匹配，accountId = "
                     + accountId);
         }
@@ -610,9 +612,6 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         FundsSubjectType subjectType = node.getSubjectRef().getSubjectType();
         if (subjectType == FundsSubjectType.CREDIT_ACCOUNT) {
             return RouteParticipantRole.AUTH_HOLDER;
-        }
-        if (subjectType == FundsSubjectType.BUDGET_GROUP) {
-            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能作为 RouteSnapshot 回放参与方");
         }
         return fallbackRole;
     }

@@ -16,7 +16,6 @@ import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
-import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
@@ -45,6 +44,8 @@ public class FundsAuthorizationInstructionConverter {
     private static final String TRUSTED_FORCE_SETTLE_POLICY_CODE = "B4_FORCE_SETTLE_OPS";
 
     private static final long TRUSTED_FORCE_SETTLE_LIMIT_AMOUNT = 60L;
+
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
 
     private final FundsInstructionAmountSupport amountSupport;
 
@@ -300,7 +301,7 @@ public class FundsAuthorizationInstructionConverter {
     }
 
     private void assertNotBudgetGroup(@NonNull FundsAccountId accountId, @NonNull String message) {
-        AssertUtils.isFalse(FundsSubjectType.BUDGET_GROUP.name().equals(accountId.type()), message);
+        AssertUtils.isFalse(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE.equals(accountId.type()), message);
     }
 
     private @NonNull FundsOperationActorSpec operationActor(@NonNull WindOperator operator) {

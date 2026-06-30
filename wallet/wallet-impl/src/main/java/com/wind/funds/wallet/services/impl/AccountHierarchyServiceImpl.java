@@ -131,7 +131,6 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         ResolvedAccount result = switch (subjectType) {
             case FUNDING_ACCOUNT -> resolveFundingAccount(tenantId, accountId.id());
             case CREDIT_ACCOUNT -> resolveCreditAccount(tenantId, accountId.id());
-            case BUDGET_GROUP -> null;
         };
         AssertUtils.notNull(result, "账户层级绑定账户不存在，accountId = {}", accountId);
         return result;

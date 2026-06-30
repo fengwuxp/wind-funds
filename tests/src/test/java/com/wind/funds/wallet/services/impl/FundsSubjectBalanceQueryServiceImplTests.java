@@ -53,6 +53,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest {
 
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+
     private static final String UNINITIALIZED_ACCOUNT_SN = "fbal_query_uninit";
 
     private static final String SECOND_ACCOUNT_SN = "fbal_query_second";
@@ -373,7 +375,7 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         assertThatThrownBy(() -> balanceQueryService.queryCurrentBalances(new FundsSubjectBalanceQuery()
                 .setTenantId(TENANT_ID)
                 .setSubjectRefs(List.of(FundsAccountId.immutable(UNINITIALIZED_ACCOUNT_SN,
-                        FundsSubjectType.BUDGET_GROUP)))
+                        LEGACY_BUDGET_GROUP_ACCOUNT_TYPE)))
                 .setCurrency(CURRENCY)))
                 .hasMessageContaining("资金主体不存在");
 
@@ -442,7 +444,7 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         budgetGroup.setTenantId(TENANT_ID);
         budgetGroup.setOwnerId(OWNER_ID);
         budgetGroup.setOwnerType(FundsAccountOwnerType.USER);
-        budgetGroup.setBudgetType(FundsSubjectType.BUDGET_GROUP.name());
+        budgetGroup.setBudgetType(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE);
         budgetGroup.setCurrency(CurrencyIsoCode.USD);
         budgetGroup.setPeriodType(AccountBalancePeriodType.LIFETIME);
         budgetGroup.setPeriodId(AccountBalancePeriodType.LIFETIME.name());

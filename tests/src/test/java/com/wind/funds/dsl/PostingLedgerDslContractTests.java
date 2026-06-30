@@ -42,6 +42,8 @@ class PostingLedgerDslContractTests {
 
     private static final LocalDateTime TRANSACTION_TIME = LocalDateTime.of(2026, 5, 20, 10, 0);
 
+    private static final String LEGACY_BUDGET_GROUP_SUBJECT_TYPE = "BUDGET_GROUP";
+
     /**
      * 场景：一个 route leg 或控制意图生成一组借贷分录。
      * 预期：PostingPlan 只有在分录非空、金额为正且借贷相等时才算平衡。
@@ -181,14 +183,14 @@ class PostingLedgerDslContractTests {
     void testPostingPlanShouldRejectBudgetGroupEntrySubject() {
         LedgerPostingPlanSpec budgetGroupPlan = postingPlan("PLAN-BUDGET-GROUP",
                 entry("BG-CONTROL-DEBIT",
-                        FundsSubjectType.BUDGET_GROUP.name(),
+                        LEGACY_BUDGET_GROUP_SUBJECT_TYPE,
                         LedgerSubjectCode.AVAILABLE,
                         LedgerSubjectCategory.MEMO,
                         "LE-DSL-001",
                         EntrySide.DEBIT,
                         100L),
                 entry("BG-CONTROL-CREDIT",
-                        FundsSubjectType.BUDGET_GROUP.name(),
+                        LEGACY_BUDGET_GROUP_SUBJECT_TYPE,
                         LedgerSubjectCode.AVAILABLE,
                         LedgerSubjectCategory.MEMO,
                         "LE-DSL-001",

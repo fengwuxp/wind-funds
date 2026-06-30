@@ -25,10 +25,8 @@ import com.wind.funds.wallet.model.dto.BudgetGroupDTO;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
-import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.BudgetGroupService;
 import com.wind.funds.wallet.service.CreditAccountService;
-import com.wind.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +73,8 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     private static final String CUSTOM_PERIOD_POLICY = "CONTRACT_H1_RULE_V1";
 
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+
     private static final String OWNER_ID = "owner_control_basic";
 
     private static final String UNQUOTED_PAYMENT_CONTEXT_VARIABLES =
@@ -100,9 +100,6 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Autowired
     private BudgetGroupService budgetGroupService;
-
-    @Autowired
-    private SubjectLedgerInitializer subjectLedgerInitializer;
 
     @Autowired
     private FundsAccountQueryService fundsAccountQueryService;
@@ -193,9 +190,15 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         Long budgetGroupId = budgetGroupService.createBudgetGroup(createBudgetGroupRequest());
 
         BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
-        List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.BUDGET_GROUP, BUDGET_GROUP_SN);
+        BudgetGroupDTO controlScope = budgetGroupService.getBudgetControlScope(
+                TENANT_ID,
+                BUDGET_GROUP_SN,
+                DefaultFundsAccountType.BUDGET_GROUP.name());
+        List<LedgerDTO> ledgers = loadLedgers(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE, BUDGET_GROUP_SN);
 
         assertThat(budgetGroup.getSn()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(controlScope.getId()).isEqualTo(budgetGroupId);
+        assertThat(controlScope.getSn()).isEqualTo(BUDGET_GROUP_SN);
         assertThat(budgetGroup.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
         assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
         assertThat(budgetGroup.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
@@ -212,7 +215,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .setPeriodId(MONTHLY_PERIOD_ID));
 
         BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
-        List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.BUDGET_GROUP, BUDGET_GROUP_SN);
+        List<LedgerDTO> ledgers = loadLedgers(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE, BUDGET_GROUP_SN);
 
         assertThat(budgetGroup.getSn()).isEqualTo(BUDGET_GROUP_SN);
         assertThat(budgetGroup.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
@@ -298,25 +301,13 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 customCycleBudgetGroupRequest().setPeriodId(CUSTOM_PERIOD_ID));
 
         BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
-        List<LedgerDTO> ledgers = loadLedgers(FundsSubjectType.BUDGET_GROUP, CUSTOM_BUDGET_GROUP_SN);
+        List<LedgerDTO> ledgers = loadLedgers(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE, CUSTOM_BUDGET_GROUP_SN);
 
         assertThat(budgetGroup.getSn()).isEqualTo(CUSTOM_BUDGET_GROUP_SN);
         assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.CUSTOM_CYCLE);
         assertThat(budgetGroup.getPeriodId()).isEqualTo(CUSTOM_PERIOD_ID);
         assertThat(budgetGroup.getPeriodPolicy()).isEqualTo(CUSTOM_PERIOD_POLICY);
         assertThat(ledgers).isEmpty();
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    @Test
-    void testInitializeBudgetGroupLedgersShouldRejectEvenWhenProfileAndPeriodProvided() {
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> subjectLedgerInitializer.initializeRequiredLedgers(
-                customBudgetLedgerRequest().setPeriodId(CUSTOM_PERIOD_ID)))
-                .hasMessageContaining("预算组不是核心资金账务主体，不允许初始化账本");
-
-        assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -382,25 +373,19 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .setPeriodPolicy(CUSTOM_PERIOD_POLICY);
     }
 
-    private InitializeSubjectLedgerRequest customBudgetLedgerRequest() {
-        return new InitializeSubjectLedgerRequest()
-                .setTenantId(TENANT_ID)
-                .setSubjectId(CUSTOM_BUDGET_GROUP_SN)
-                .setSubjectType(FundsSubjectType.BUDGET_GROUP)
-                .setCurrency(CurrencyIsoCode.USD)
-                .setLedgerProfileCode(LedgerProfileCode.BUDGET_BASIC)
-                .setPeriodType(AccountBalancePeriodType.CUSTOM_CYCLE);
-    }
-
     private DefaultLedgerProfileServiceImpl defaultLedgerProfileService() {
         return new DefaultLedgerProfileServiceImpl();
     }
 
     private List<LedgerDTO> loadLedgers(FundsSubjectType subjectType, String subjectId) {
+        return loadLedgers(subjectType.name(), subjectId);
+    }
+
+    private List<LedgerDTO> loadLedgers(String subjectType, String subjectId) {
         return ledgerService.queryLedgers(new LedgerQuery()
                         .setTenantId(TENANT_ID)
                         .setSubjectId(subjectId)
-                        .setSubjectType(subjectType.name())
+                        .setSubjectType(subjectType)
                         .setCurrency(CurrencyIsoCode.USD),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
     }

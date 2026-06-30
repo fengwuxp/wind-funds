@@ -70,6 +70,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+
     private static final String CREDIT_ACCOUNT_SN = "sca_credit_account";
 
     private static final String SECOND_CREDIT_ACCOUNT_SN = "sca_second_credit_account";
@@ -99,6 +101,10 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     private static final String SPEND_DECISION_DIGEST = "sha256:spend-control-activity";
 
     private static final String BUDGET_GROUP_SN = "budget_spend_control_movement";
+
+    private static final String PERIOD_ID = "2026-07";
+
+    private static final String NEXT_PERIOD_ID = "2026-08";
 
     private static final String ADMISSION_ACTIVITY_SN = "activity_admission_recorded_001";
 
@@ -267,6 +273,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
                         .setSpendRuleVersion(SPEND_RULE_VERSION));
@@ -304,6 +311,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
                         .setSpendRuleVersion(SPEND_RULE_VERSION)
@@ -316,6 +324,49 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(projection.getConsumedAmount()).isZero();
         assertThat(projection.getReleasedAmount()).isZero();
         assertThat(projection.getRemainingControlAmount()).isEqualTo(60L);
+        assertThat(projection.getLastMovementSn()).isEqualTo(RESERVED_ACTIVITY_SN);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一控制范围跨周期刷新额度。
+     * 输入：2026-07 和 2026-08 分别记录额度初始化和占用。
+     * 输出：按控制范围 + 周期标识查询时，只聚合指定周期的控制流水。
+     * 红线：周期额度查询不得混入其他周期，也不得为预算控制范围生成账本事实。
+     */
+    @Test
+    void testBudgetControlProjectionShouldFilterByControlScopeAndPeriod() {
+        prepareSpendControlMovementData();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
+        spendControlMovementService.recordMovement(limitIncreaseRequest("limit_july", PERIOD_ID, 100L,
+                "sha256:limit-july"));
+        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED, "sha256:activity-reserved").setPeriodId(PERIOD_ID));
+        spendControlMovementService.recordMovement(limitIncreaseRequest("limit_august", NEXT_PERIOD_ID, 300L,
+                "sha256:limit-august"));
+        spendControlMovementService.recordMovement(recordRequest(decision, "activity_reserved_august",
+                SpendControlMovementType.RESERVED, "sha256:activity-reserved-august")
+                .setPeriodId(NEXT_PERIOD_ID)
+                .setAmount(80L));
+
+        BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
+                new BudgetControlProjectionQuery()
+                        .setTenantId(TENANT_ID)
+                        .setControlScopeId(BUDGET_GROUP_SN)
+                        .setPeriodId(PERIOD_ID)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
+                                FundsSubjectType.CREDIT_ACCOUNT)));
+
+        assertThat(projection.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(projection.getBudgetGroupSn()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(projection.getPeriodId()).isEqualTo(PERIOD_ID);
+        assertThat(projection.getLimitAmount()).isEqualTo(100L);
+        assertThat(projection.getReservedAmount()).isEqualTo(60L);
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(60L);
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
         assertThat(projection.getLastMovementSn()).isEqualTo(RESERVED_ACTIVITY_SN);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -351,6 +402,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         BudgetControlProjectionDTO primaryProjection = spendControlMovementService.getBudgetControlProjection(new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
                         .setSpendRuleVersion(SPEND_RULE_VERSION)
@@ -360,6 +412,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         BudgetControlProjectionDTO secondProjection = spendControlMovementService.getBudgetControlProjection(new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
                         .setSpendRuleVersion(SPEND_RULE_VERSION)
@@ -385,7 +438,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 new SpendControlMovementQuery()
                         .setTenantId(TENANT_ID)
                         .setTargetAccountId(FundsAccountId.immutable(BUDGET_GROUP_SN,
-                                FundsSubjectType.BUDGET_GROUP))))
+                                LEGACY_BUDGET_GROUP_ACCOUNT_TYPE))))
                 .hasMessageContaining("控制额度变动目标只能是资金账户或信用账户");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -406,9 +459,10 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setTargetAccountId(FundsAccountId.immutable(BUDGET_GROUP_SN,
-                                FundsSubjectType.BUDGET_GROUP))))
+                                LEGACY_BUDGET_GROUP_ACCOUNT_TYPE))))
                 .hasMessageContaining("控制额度变动目标只能是资金账户或信用账户");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -483,8 +537,34 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setSpendDecisionSn(decision.getSpendDecisionSn())
                 .setSpendDecisionResult(decision.getSpendDecisionResult())
                 .setSpendDecisionDigest(decision.getSpendDecisionDigest())
+                .setControlScopeId(decision.getBudgetGroupSn())
                 .setBudgetGroupSn(decision.getBudgetGroupSn())
+                .setPeriodId(PERIOD_ID)
                 .setRejectReason(decision.getRejectReason())
+                .setMovementDigest(movementDigest);
+    }
+
+    private RecordSpendControlMovementRequest limitIncreaseRequest(String movementSn,
+                                                                   String periodId,
+                                                                   Long amount,
+                                                                   String movementDigest) {
+        return new RecordSpendControlMovementRequest()
+                .setTenantId(TENANT_ID)
+                .setMovementSn(movementSn)
+                .setMovementType(SpendControlMovementType.LIMIT_INCREASED)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(movementSn + "_business")
+                .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT))
+                .setAmount(amount)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setSpendRuleId(SPEND_RULE_ID)
+                .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setControlScopeId(BUDGET_GROUP_SN)
+                .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setPeriodId(periodId)
+                .setReasonCode("PERIOD_LIMIT_REFRESH")
+                .setOperatorId("period-limit-scheduler")
+                .setAuditReferenceSn("period-limit-refresh:" + periodId)
                 .setMovementDigest(movementDigest);
     }
 
@@ -547,7 +627,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupSpendControlMovementTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE instrument_sn = ?", PAYMENT_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE business_scene = ?", BUSINESS_SCENE);
         jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn = ?",
                 PAYMENT_INSTRUMENT_SN);

@@ -42,13 +42,29 @@ public interface BudgetGroupService {
     @NonNull BudgetGroupDTO getBudgetGroupById(@NonNull Long id);
 
     /**
-     * 根据预算控制范围标识查询。
+     * 根据目标语义查询预算控制范围。
      *
-     * <p>能力范围：按兼容标识查询预算控制范围，不查询信用账户或真实资金账户。</p>
+     * <p>能力范围：按 Spend Rule 可引用的控制范围标识查询，不查询信用账户或真实资金账户。</p>
+     *
+     * @param tenantId 租户 ID
+     * @param controlScopeId 预算控制范围标识
+     * @param budgetType 预算控制范围业务类型
+     * @return 预算控制范围
+     */
+    @NonNull BudgetGroupDTO getBudgetControlScope(@NonNull Long tenantId,
+                                                  @NonNull String controlScopeId,
+                                                  @NonNull String budgetType);
+
+    /**
+     * 根据历史兼容标识查询预算控制范围。
+     *
+     * <p>能力范围：仅保留给旧调用方兼容，预算控制范围不再作为资金账户建模。</p>
      *
      * @param accountId 预算控制范围兼容标识
      * @return 预算控制范围
+     * @deprecated 预算控制范围不是资金账户标识；新代码请使用 {@link #getBudgetControlScope(Long, String, String)}。
      */
+    @Deprecated(since = "1.0.1", forRemoval = false)
     @NonNull BudgetGroupDTO getBudgetGroup(@NonNull FundsAccountId accountId);
 
     /**

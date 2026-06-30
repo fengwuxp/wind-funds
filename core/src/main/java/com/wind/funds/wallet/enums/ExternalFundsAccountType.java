@@ -47,6 +47,8 @@ public enum ExternalFundsAccountType implements DescriptiveEnum {
      */
     MERCHANT(DefaultFundsAccountType.EXTERNAL_MERCHANT, "外部商户账户");
 
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+
     private static final Map<DefaultFundsAccountType, ExternalFundsAccountType> BY_DEFAULT_ACCOUNT_TYPE =
             Arrays.stream(values())
                     .collect(Collectors.toUnmodifiableMap(ExternalFundsAccountType::getAccountType,
@@ -55,7 +57,7 @@ public enum ExternalFundsAccountType implements DescriptiveEnum {
     private static final Set<String> NON_EXTERNAL_ACCOUNT_TYPE_NAMES = Set.of(
             FundsSubjectType.FUNDING_ACCOUNT.name(),
             FundsSubjectType.CREDIT_ACCOUNT.name(),
-            FundsSubjectType.BUDGET_GROUP.name(),
+            LEGACY_BUDGET_GROUP_ACCOUNT_TYPE,
             RouteNodeType.SUBJECT.name(),
             RouteNodeType.PAYMENT_INSTRUMENT.name(),
             RouteNodeType.PLATFORM_FUNDING_ACCOUNT.name()

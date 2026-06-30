@@ -31,7 +31,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -74,6 +73,8 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
     private static final QueryColumn SPEND_RULE_VERSION = new QueryColumn(TABLE_NAME, "spend_rule_version");
 
     private static final QueryColumn BUDGET_GROUP_SN = new QueryColumn(TABLE_NAME, "budget_group_sn");
+
+    private static final QueryColumn PERIOD_ID = new QueryColumn(TABLE_NAME, "period_id");
 
     private static final QueryColumn TARGET_SUBJECT_ID = new QueryColumn(TABLE_NAME, "target_subject_id");
 
@@ -188,12 +189,13 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
             SpendRuleDigestValidator.assertSha256Digest(request.getSpendDecisionDigest(), "Spend Rule 决策摘要");
         }
         if (request.getMovementType().isBudgetProjectionMovement()) {
-            AssertUtils.hasText(request.getBudgetGroupSn(), "预算控制额度变动必须提供预算组标识");
+            AssertUtils.hasText(controlScopeId(request), "预算控制额度变动必须提供控制范围标识");
+            AssertUtils.hasText(request.getPeriodId(), "预算控制额度变动必须提供周期标识");
         }
     }
 
     private void assertTargetAccountSupported(RecordSpendControlMovementRequest request) {
-        assertSupportedTargetSubjectType(targetSubjectType(request.getTargetAccountId()));
+        targetSubjectType(request.getTargetAccountId());
         FundsAccount account = fundsAccountQueryService.getAccount(request.getTargetAccountId());
         AssertUtils.isTrue(Objects.equals(account.getTenantId(), request.getTenantId()),
                 "控制额度变动目标账户租户不匹配，accountId = {}，tenantId = {}",
@@ -272,8 +274,11 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         AssertUtils.isTrue(Objects.equals(existing.getSpendRuleVersion(), request.getSpendRuleVersion()),
                 "控制额度变动流水已存在但 Spend Rule 版本不一致，movementSn = {}",
                 request.getMovementSn());
-        AssertUtils.isTrue(Objects.equals(existing.getBudgetGroupSn(), request.getBudgetGroupSn()),
-                "控制额度变动流水已存在但预算组标识不一致，movementSn = {}",
+        AssertUtils.isTrue(Objects.equals(existing.getBudgetGroupSn(), controlScopeId(request)),
+                "控制额度变动流水已存在但控制范围标识不一致，movementSn = {}",
+                request.getMovementSn());
+        AssertUtils.isTrue(Objects.equals(existing.getPeriodId(), request.getPeriodId()),
+                "控制额度变动流水已存在但控制周期标识不一致，movementSn = {}",
                 request.getMovementSn());
     }
 
@@ -317,7 +322,9 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         long remainingControlAmount = remainingControlAmount(queryBudgetProjectionMovements(
                 new BudgetControlProjectionQuery()
                         .setTenantId(request.getTenantId())
-                        .setBudgetGroupSn(request.getBudgetGroupSn())
+                        .setControlScopeId(controlScopeId(request))
+                        .setBudgetGroupSn(controlScopeId(request))
+                        .setPeriodId(request.getPeriodId())
                         .setCurrency(request.getCurrency())
                         .setSpendRuleId(request.getSpendRuleId())
                         .setSpendRuleVersion(request.getSpendRuleVersion())
@@ -333,23 +340,26 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         AssertUtils.isTrue(hasNarrowCondition(query), "控制额度变动流水查询必须至少提供一个过滤条件");
         if (query.getTargetAccountId() != null) {
-            assertSupportedTargetSubjectType(targetSubjectType(query.getTargetAccountId()));
+            targetSubjectType(query.getTargetAccountId());
         }
     }
 
     private void validateProjectionQuery(BudgetControlProjectionQuery query) {
         AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.hasText(query.getBudgetGroupSn(), "预算控制范围标识不能为空");
+        AssertUtils.hasText(controlScopeId(query), "预算控制范围标识不能为空");
+        AssertUtils.hasText(query.getPeriodId(), "预算控制周期标识不能为空");
         AssertUtils.notNull(query.getCurrency(), "币种不能为空");
         if (query.getTargetAccountId() != null) {
-            assertSupportedTargetSubjectType(targetSubjectType(query.getTargetAccountId()));
+            targetSubjectType(query.getTargetAccountId());
         }
     }
 
     private List<SpendControlMovementDTO> queryBudgetProjectionMovements(BudgetControlProjectionQuery query) {
         return queryMovementsByPage(new SpendControlMovementQuery()
                 .setTenantId(query.getTenantId())
-                .setBudgetGroupSn(query.getBudgetGroupSn())
+                .setControlScopeId(controlScopeId(query))
+                .setBudgetGroupSn(controlScopeId(query))
+                .setPeriodId(query.getPeriodId())
                 .setCurrency(query.getCurrency())
                 .setSpendRuleId(query.getSpendRuleId())
                 .setSpendRuleVersion(query.getSpendRuleVersion())
@@ -379,9 +389,12 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         long remainingControlAmount = reservedAmount - consumedAmount - releasedAmount;
         long availableControlAmount = limitAmount - consumedAmount - remainingControlAmount;
         SpendControlMovementDTO lastActivity = budgetMovements.isEmpty() ? null : budgetMovements.getLast();
+        String controlScopeId = controlScopeId(query);
         return new BudgetControlProjectionDTO()
                 .setTenantId(query.getTenantId())
-                .setBudgetGroupSn(query.getBudgetGroupSn())
+                .setControlScopeId(controlScopeId)
+                .setBudgetGroupSn(controlScopeId)
+                .setPeriodId(query.getPeriodId())
                 .setCurrency(query.getCurrency())
                 .setSpendRuleId(query.getSpendRuleId())
                 .setSpendRuleVersion(query.getSpendRuleVersion())
@@ -410,7 +423,9 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 || query.getCurrency() != null
                 || StringUtils.hasText(query.getSpendRuleId())
                 || StringUtils.hasText(query.getSpendRuleVersion())
-                || StringUtils.hasText(query.getBudgetGroupSn());
+                || StringUtils.hasText(query.getControlScopeId())
+                || StringUtils.hasText(query.getBudgetGroupSn())
+                || StringUtils.hasText(query.getPeriodId());
     }
 
     private List<SpendControlMovementDTO> budgetProjectionMovements(List<SpendControlMovementDTO> movements) {
@@ -460,6 +475,7 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
 
     private QueryWrapper toQueryWrapper(SpendControlMovementQuery query,
                                         WindQuery<? extends QueryOrderField> options) {
+        String controlScopeId = controlScopeId(query);
         QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
                 .from(TABLE_NAME)
                 .where(TENANT_ID.eq(query.getTenantId()))
@@ -473,7 +489,8 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 .and(CURRENCY.eq(query.getCurrency()))
                 .and(SPEND_RULE_ID.eq(query.getSpendRuleId()))
                 .and(SPEND_RULE_VERSION.eq(query.getSpendRuleVersion()))
-                .and(BUDGET_GROUP_SN.eq(query.getBudgetGroupSn()));
+                .and(BUDGET_GROUP_SN.eq(controlScopeId))
+                .and(PERIOD_ID.eq(query.getPeriodId()));
         if (query.getTargetAccountId() != null) {
             wrapper.and(TARGET_SUBJECT_ID.eq(query.getTargetAccountId().id()))
                     .and(TARGET_SUBJECT_TYPE.eq(targetSubjectType(query.getTargetAccountId())));
@@ -486,17 +503,32 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         return SpendControlMovementConverter.INSTANCE.convertToSpendControlMovementDTO(entity);
     }
 
-    private FundsSubjectType targetSubjectType(FundsAccountId accountId) {
-        boolean matched = Arrays.stream(FundsSubjectType.values())
-                .anyMatch(type -> type.name().equals(accountId.type()));
-        AssertUtils.isTrue(matched, "控制额度变动目标账户类型非法，targetAccountId = {}", accountId);
-        return FundsSubjectType.valueOf(accountId.type());
+    private String controlScopeId(RecordSpendControlMovementRequest request) {
+        return resolveControlScopeId(request.getControlScopeId(), request.getBudgetGroupSn());
     }
 
-    private void assertSupportedTargetSubjectType(FundsSubjectType subjectType) {
-        AssertUtils.isTrue(subjectType == FundsSubjectType.FUNDING_ACCOUNT
-                        || subjectType == FundsSubjectType.CREDIT_ACCOUNT,
-                "控制额度变动目标只能是资金账户或信用账户，targetSubjectType = {}",
-                subjectType);
+    private String controlScopeId(BudgetControlProjectionQuery query) {
+        return resolveControlScopeId(query.getControlScopeId(), query.getBudgetGroupSn());
+    }
+
+    private String controlScopeId(SpendControlMovementQuery query) {
+        return resolveControlScopeId(query.getControlScopeId(), query.getBudgetGroupSn());
+    }
+
+    private String resolveControlScopeId(String controlScopeId, String budgetGroupSn) {
+        if (StringUtils.hasText(controlScopeId) && StringUtils.hasText(budgetGroupSn)) {
+            AssertUtils.equals(controlScopeId, budgetGroupSn, "控制范围标识与预算组历史字段不一致");
+        }
+        if (StringUtils.hasText(controlScopeId)) {
+            return controlScopeId;
+        }
+        return budgetGroupSn;
+    }
+
+    private FundsSubjectType targetSubjectType(FundsAccountId accountId) {
+        boolean supported = FundsSubjectType.FUNDING_ACCOUNT.name().equals(accountId.type())
+                || FundsSubjectType.CREDIT_ACCOUNT.name().equals(accountId.type());
+        AssertUtils.isTrue(supported, "控制额度变动目标只能是资金账户或信用账户，targetAccountId = {}", accountId);
+        return FundsSubjectType.valueOf(accountId.type());
     }
 }

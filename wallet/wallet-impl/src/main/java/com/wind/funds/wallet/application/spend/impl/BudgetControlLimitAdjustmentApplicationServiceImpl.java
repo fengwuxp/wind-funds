@@ -18,6 +18,7 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -61,7 +62,8 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
         AssertUtils.hasText(request.getMovementSn(), "预算控制额度调整变动流水号不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
-        AssertUtils.hasText(request.getBudgetGroupSn(), "预算控制范围标识不能为空");
+        AssertUtils.hasText(controlScopeId(request), "预算控制范围标识不能为空");
+        AssertUtils.hasText(request.getPeriodId(), "预算控制周期标识不能为空");
         AssertUtils.notNull(request.getTargetAccountId(), "预算控制额度目标账户不能为空");
         AssertUtils.notNull(request.getAmount(), "调整金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "调整金额必须大于 0");
@@ -89,7 +91,9 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 .setCurrency(request.getCurrency())
                 .setSpendRuleId(request.getSpendRuleId())
                 .setSpendRuleVersion(request.getSpendRuleVersion())
-                .setBudgetGroupSn(request.getBudgetGroupSn())
+                .setControlScopeId(controlScopeId(request))
+                .setBudgetGroupSn(controlScopeId(request))
+                .setPeriodId(request.getPeriodId())
                 .setReasonCode(request.getReasonCode())
                 .setOperatorId(operatorId(operator))
                 .setAuditReferenceSn(request.getAuditReferenceSn())
@@ -106,7 +110,9 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
     private BudgetControlProjectionQuery toProjectionQuery(AdjustBudgetControlLimitRequest request) {
         return new BudgetControlProjectionQuery()
                 .setTenantId(request.getTenantId())
-                .setBudgetGroupSn(request.getBudgetGroupSn())
+                .setControlScopeId(controlScopeId(request))
+                .setBudgetGroupSn(controlScopeId(request))
+                .setPeriodId(request.getPeriodId())
                 .setCurrency(request.getCurrency())
                 .setSpendRuleId(request.getSpendRuleId())
                 .setSpendRuleVersion(request.getSpendRuleVersion())
@@ -145,7 +151,9 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 .setTenantId(activity.getTenantId())
                 .setBusinessScene(activity.getBusinessScene())
                 .setBusinessSn(activity.getBusinessSn())
+                .setControlScopeId(activity.getControlScopeId())
                 .setBudgetGroupSn(activity.getBudgetGroupSn())
+                .setPeriodId(activity.getPeriodId())
                 .setTargetAccountId(activity.getTargetAccountId())
                 .setAmount(activity.getAmount())
                 .setCurrency(activity.getCurrency())
@@ -157,5 +165,16 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 .setAuditReferenceSn(activity.getAuditReferenceSn())
                 .setMovementDigest(activity.getMovementDigest())
                 .setProjection(projection);
+    }
+
+    private String controlScopeId(AdjustBudgetControlLimitRequest request) {
+        if (StringUtils.hasText(request.getControlScopeId()) && StringUtils.hasText(request.getBudgetGroupSn())) {
+            AssertUtils.equals(request.getControlScopeId(), request.getBudgetGroupSn(),
+                    "控制范围标识与预算组历史字段不一致");
+        }
+        if (StringUtils.hasText(request.getControlScopeId())) {
+            return request.getControlScopeId();
+        }
+        return request.getBudgetGroupSn();
     }
 }

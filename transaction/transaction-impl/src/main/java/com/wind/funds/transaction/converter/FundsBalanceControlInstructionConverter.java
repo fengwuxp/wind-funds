@@ -64,6 +64,8 @@ public class FundsBalanceControlInstructionConverter {
     private static final String BUDGET_GROUP_ADJUST_FORBIDDEN_MESSAGE =
             "预算组额度调整已迁移到预算控制活动，不允许通过资金余额控制入账";
 
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+
     private static final String UNFREEZE_REFERENCE_REQUIRED_MESSAGE = "余额解冻缺少原冻结单引用";
 
     private final FundsInstructionAmountSupport amountSupport;
@@ -155,7 +157,7 @@ public class FundsBalanceControlInstructionConverter {
     }
 
     private void assertNotBudgetGroupAdjust(@NonNull FundsBalanceAdjustRequest request) {
-        AssertUtils.isFalse(FundsSubjectType.BUDGET_GROUP.name().equals(request.getAccountId().type()),
+        AssertUtils.isFalse(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE.equals(request.getAccountId().type()),
                 BUDGET_GROUP_ADJUST_FORBIDDEN_MESSAGE);
     }
 

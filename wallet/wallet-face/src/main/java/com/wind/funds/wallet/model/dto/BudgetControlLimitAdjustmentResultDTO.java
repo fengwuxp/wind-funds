@@ -47,8 +47,14 @@ public class BudgetControlLimitAdjustmentResultDTO implements Serializable {
     @Schema(description = "业务流水号或请求幂等号")
     private String businessSn;
 
+    @Schema(description = "控制范围标识，目标语义名；当前兼容映射到历史字段 budgetGroupSn")
+    private String controlScopeId;
+
     @Schema(description = "预算控制范围标识，历史字段名 budgetGroupSn，不表示账务主体")
     private String budgetGroupSn;
+
+    @Schema(description = "控制周期标识，例如 2026-07")
+    private String periodId;
 
     @Schema(description = "预算控制额度影响的资金账户或信用账户标识")
     private FundsAccountId targetAccountId;

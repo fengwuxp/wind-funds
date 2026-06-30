@@ -18,6 +18,7 @@ import com.wind.funds.wallet.FundsAccountId;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,14 +64,36 @@ public class BudgetGroupServiceImpl implements BudgetGroupService {
     }
 
     @Override
+    public @NonNull BudgetGroupDTO getBudgetControlScope(@NonNull Long tenantId,
+                                                         @NonNull String controlScopeId,
+                                                         @NonNull String budgetType) {
+        AssertUtils.notNull(tenantId, "租户 ID 不能为空");
+        AssertUtils.hasText(controlScopeId, "预算控制范围标识不能为空");
+        AssertUtils.hasText(budgetType, "预算控制范围业务类型不能为空");
+        return findBudgetControlScope(tenantId, controlScopeId, budgetType);
+    }
+
+    @Override
+    @Deprecated(since = "1.0.1", forRemoval = false)
     public @NonNull BudgetGroupDTO getBudgetGroup(@NonNull FundsAccountId accountId) {
+        AssertUtils.notNull(accountId, "预算控制范围兼容标识不能为空");
+        AssertUtils.hasText(accountId.id(), "预算控制范围标识不能为空");
+        AssertUtils.hasText(accountId.type(), "预算控制范围业务类型不能为空");
+        return findBudgetControlScope(null, accountId.id(), accountId.type());
+    }
+
+    private BudgetGroupDTO findBudgetControlScope(@Nullable Long tenantId, String controlScopeId, String budgetType) {
         BudgetGroupNameRefs ref = BudgetGroupNameRefs.budgetGroup;
         QueryWrapper wrapper = QueryWrapper.create()
                 .from(ref)
-                .where(ref.sn.eq(accountId.id()))
-                .and(ref.budgetType.eq(accountId.type()));
+                .where(ref.sn.eq(controlScopeId))
+                .and(ref.budgetType.eq(budgetType));
+        if (tenantId != null) {
+            wrapper.and(ref.tenantId.eq(tenantId));
+        }
         BudgetGroup result = budgetGroupMapper.selectOneByQuery(wrapper);
-        AssertUtils.notNull(result, "预算组不存在，accountId = {}", accountId);
+        AssertUtils.notNull(result, "预算控制范围不存在，controlScopeId = {}, budgetType = {}",
+                controlScopeId, budgetType);
         return toDTO(result);
     }
 

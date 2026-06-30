@@ -155,6 +155,11 @@ public class SpendControlMovement implements Serializable, TenantIsolationObject
     private String budgetGroupSn;
 
     /**
+     * 控制周期标识，用于周期额度当前查询和历史追溯。
+     */
+    private String periodId;
+
+    /**
      * 拒绝原因。
      */
     private String rejectReason;

@@ -12,6 +12,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
+import org.springframework.util.StringUtils;
 
 import java.util.Arrays;
 
@@ -58,6 +59,7 @@ public interface SpendControlMovementConverter {
         if (targetAccountId == null) {
             return;
         }
+        entity.setBudgetGroupSn(resolveControlScopeId(request.getControlScopeId(), request.getBudgetGroupSn()));
         entity.setTargetSubjectId(targetAccountId.id());
         entity.setTargetSubjectType(resolveSubjectType(targetAccountId));
     }
@@ -74,7 +76,25 @@ public interface SpendControlMovementConverter {
         if (data.getTargetSubjectId() == null || data.getTargetSubjectType() == null) {
             return;
         }
+        dto.setControlScopeId(data.getBudgetGroupSn());
         dto.setTargetAccountId(FundsAccountId.immutable(data.getTargetSubjectId(), data.getTargetSubjectType()));
+    }
+
+    /**
+     * Resolve target semantic control scope to existing storage field.
+     *
+     * @param controlScopeId 目标语义控制范围
+     * @param budgetGroupSn 历史字段
+     * @return 兼容后的控制范围标识
+     */
+    default String resolveControlScopeId(String controlScopeId, String budgetGroupSn) {
+        if (StringUtils.hasText(controlScopeId) && StringUtils.hasText(budgetGroupSn)) {
+            AssertUtils.equals(controlScopeId, budgetGroupSn, "控制范围标识与预算组历史字段不一致");
+        }
+        if (StringUtils.hasText(controlScopeId)) {
+            return controlScopeId;
+        }
+        return budgetGroupSn;
     }
 
     /**

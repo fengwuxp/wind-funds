@@ -175,50 +175,6 @@ class FundsAmountBoundaryContractTests {
     }
 
     /**
-     * 场景：共享卡 + 预算组 + 资金账户模型同时带预算控制和真实资金来源。
-     * 预期：预算组 allocation 不表达真实资金沉淀，不参与真实资金合计闭合；资金账户必须闭合。
-     * 红线：不能把预算组金额当作现金来源来掩盖真实资金账户不闭合。
-     */
-    @Test
-    void testBudgetGroupAllocationShouldNotReplaceFundingAccountClosure() {
-        assertThatThrownBy(() -> resolvedRoute(routeLeg(100L),
-                routingDecision(List.of(fundingAllocation("ALLOC-BUDGET-001",
-                                subjectRef("BG-001", FundsSubjectType.BUDGET_GROUP),
-                                100L,
-                                10,
-                                "BUDGET_CONTROL"),
-                        fundingAllocation("ALLOC-FA-001",
-                                subjectRef("FA-FUNDING-001", FundsSubjectType.FUNDING_ACCOUNT),
-                                80L,
-                                20,
-                                "REAL_FUNDING_ACCOUNT")))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("core account allocation amount must equal consume route amount");
-
-        ImmutableResolvedRouteSpec validRoute = resolvedRoute(routeLeg(100L),
-                routingDecision(List.of(fundingAllocation("ALLOC-BUDGET-002",
-                                subjectRef("BG-002", FundsSubjectType.BUDGET_GROUP),
-                                100L,
-                                10,
-                                "BUDGET_CONTROL"),
-                        fundingAllocation("ALLOC-FA-002",
-                                subjectRef("FA-FUNDING-002", FundsSubjectType.FUNDING_ACCOUNT),
-                                100L,
-                                20,
-                                "REAL_FUNDING_ACCOUNT"))));
-        assertThat(validRoute.getLegs()).singleElement()
-                .satisfies(leg -> assertThat(leg.getAmount()).isEqualTo(Money.immutable(100L, CURRENCY)));
-        assertThat(validRoute.getRoutingDecision()).satisfies(decision -> {
-            assertThat(decision.getFundingAllocations())
-                    .extracting(allocation -> allocation.getSubjectRef().getSubjectType())
-                    .containsExactly(FundsSubjectType.BUDGET_GROUP, FundsSubjectType.FUNDING_ACCOUNT);
-            assertThat(decision.getFundingAllocations())
-                    .extracting(FundingAllocationDecisionSpec::getAmount)
-                    .containsExactly(Money.immutable(100L, CURRENCY), Money.immutable(100L, CURRENCY));
-        });
-    }
-
-    /**
      * 场景：多个真实资金账户 route leg 在同币种下累计超过系统可表达上限。
      * 预期：累计过程必须显式失败，不能发生 long 溢出后继续比较闭合结果。
      * 红线：批量路由、清结算或归档重放汇总不得用溢出后的金额入账或发布快照。

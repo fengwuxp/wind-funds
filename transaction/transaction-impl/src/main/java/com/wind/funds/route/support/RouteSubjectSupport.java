@@ -19,6 +19,8 @@ import java.util.Objects;
 @Component
 public class RouteSubjectSupport {
 
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+
     public @NonNull SubjectRef createSubjectRef(@NonNull FundsAccountId accountId) {
         if (isExternalAccountType(accountId.type())) {
             throw new IllegalArgumentException("外部账户不能创建账务主体引用，accountId = " + accountId);
@@ -38,8 +40,9 @@ public class RouteSubjectSupport {
         if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
             return FundsSubjectType.CREDIT_ACCOUNT;
         }
-        if (Objects.equals(accountId.type(), FundsSubjectType.BUDGET_GROUP.name())) {
-            return FundsSubjectType.BUDGET_GROUP;
+        if (isBudgetGroup(accountId)) {
+            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能解析账务主体类型，accountId = "
+                    + accountId);
         }
         return FundsSubjectType.FUNDING_ACCOUNT;
     }
@@ -49,8 +52,9 @@ public class RouteSubjectSupport {
         if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
             return RouteParticipantRole.AUTH_HOLDER;
         }
-        if (Objects.equals(accountId.type(), FundsSubjectType.BUDGET_GROUP.name())) {
-            return RouteParticipantRole.BUDGET_CONTROLLER;
+        if (isBudgetGroup(accountId)) {
+            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能解析路由参与方，accountId = "
+                    + accountId);
         }
         return sourceSide ? RouteParticipantRole.PAYER : RouteParticipantRole.PAYEE;
     }
@@ -59,7 +63,7 @@ public class RouteSubjectSupport {
         if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
             return LedgerProfileCode.CREDIT_BASIC;
         }
-        if (Objects.equals(accountId.type(), FundsSubjectType.BUDGET_GROUP.name())) {
+        if (isBudgetGroup(accountId)) {
             throw new IllegalArgumentException("预算组不是核心资金账务主体，不能解析账本 Profile，accountId = "
                     + accountId);
         }
@@ -79,7 +83,7 @@ public class RouteSubjectSupport {
     }
 
     public boolean isBudgetGroup(@NonNull FundsAccountId accountId) {
-        return Objects.equals(accountId.type(), FundsSubjectType.BUDGET_GROUP.name());
+        return Objects.equals(accountId.type(), LEGACY_BUDGET_GROUP_ACCOUNT_TYPE);
     }
 
     private boolean isExternalAccountType(String accountType) {

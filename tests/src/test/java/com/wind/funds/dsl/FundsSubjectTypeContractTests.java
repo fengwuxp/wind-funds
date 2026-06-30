@@ -11,15 +11,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FundsSubjectTypeContractTests {
 
     /**
-     * 场景：调用方判断资金主体是否允许进入核心账本。
-     * 预期：资金账户和信用账户可入账，预算组只作为预算控制视图兼容主体。
-     * 红线：预算组、Spend Rule 或其他控制对象不得被误用为真实账务主体。
+     * 场景：调用方枚举资金主体类型。
+     * 预期：资金主体只包含资金账户和信用账户。
+     * 红线：预算组、Spend Rule 或其他控制对象不得进入资金主体枚举。
      */
     @Test
     void testFundsSubjectTypeShouldExposeLedgerPostableSemantics() {
+        assertThat(FundsSubjectType.values())
+                .containsExactly(FundsSubjectType.FUNDING_ACCOUNT, FundsSubjectType.CREDIT_ACCOUNT);
         assertThat(FundsSubjectType.FUNDING_ACCOUNT.isLedgerPostable()).isTrue();
         assertThat(FundsSubjectType.CREDIT_ACCOUNT.isLedgerPostable()).isTrue();
-        assertThat(FundsSubjectType.BUDGET_GROUP.isLedgerPostable()).isFalse();
-        assertThat(FundsSubjectType.BUDGET_GROUP.isControlScopeOnly()).isTrue();
+        assertThat(FundsSubjectType.isLedgerPostableName("BUDGET_GROUP")).isFalse();
     }
 }

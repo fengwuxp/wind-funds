@@ -40,8 +40,6 @@ public class DefaultSubjectLedgerInitializer implements SubjectLedgerInitializer
     @Override
     public @NonNull Map<LedgerSubjectCode, Long> initializeRequiredLedgers(
             @NonNull InitializeSubjectLedgerRequest request) {
-        AssertUtils.isFalse(request.getSubjectType() == FundsSubjectType.BUDGET_GROUP,
-                "预算组不是核心资金账务主体，不允许初始化账本，subjectId = {}", request.getSubjectId());
         LedgerProfileDTO profile = ledgerProfileService.getProfile(request.getLedgerProfileCode());
         AssertUtils.isTrue(profile.getSubjectType() == request.getSubjectType(),
                 "LedgerProfile 主体类型不匹配，profileCode = {}, profileSubjectType = {}, subjectType = {}",

@@ -231,23 +231,6 @@ class DefaultRouteReplayServiceTests {
     }
 
     /**
-     * 场景：历史 RouteSnapshot 残留预算组作为 route leg 主体。
-     * 输入：尝试构造 BUDGET_GROUP 节点的原路径 leg。
-     * 输出：RouteLeg 构造即拒绝。
-     * 预期：错误明确指向 route leg 主体必须可入账。
-     * 红线：预算组退出核心账本主体后，不得继续作为 route/posting 的账务节点。
-     */
-    @Test
-    void testResolveReplayInstructionShouldRejectLegacyBudgetGroupRouteLeg() {
-        SubjectRef budgetGroup = budgetGroup("BG-LEGACY-001");
-        SubjectRef payee = fundingAccount("PAYEE-LEGACY-001");
-
-        assertThatThrownBy(() -> routeLeg(budgetGroup, payee))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("RouteLeg sourceNode must be ledger-postable");
-    }
-
-    /**
      * 场景：历史含权益原交易发起退款回放，但原 RouteSnapshot 没有原权益快照摘要。
      * 输入：退款指令仅引用原交易，原路径快照 context 为空。
      * 输出：解析器拒绝回放。
@@ -533,16 +516,6 @@ class DefaultRouteReplayServiceTests {
                 .subjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .currency(CurrencyIsoCode.USD.name())
                 .ledgerProfileCode("CREDIT")
-                .build();
-    }
-
-    private SubjectRef budgetGroup(String accountId) {
-        return ImmutableSubjectRef.builder()
-                .tenantId(1L)
-                .subjectId(accountId)
-                .subjectType(FundsSubjectType.BUDGET_GROUP)
-                .currency(CurrencyIsoCode.USD.name())
-                .ledgerProfileCode("BUDGET_BASIC")
                 .build();
     }
 

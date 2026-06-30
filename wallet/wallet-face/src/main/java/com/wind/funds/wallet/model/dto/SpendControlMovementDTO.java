@@ -92,8 +92,14 @@ public class SpendControlMovementDTO implements Serializable {
     @Schema(description = "Spend Rule 决策摘要")
     private String spendDecisionDigest;
 
+    @Schema(description = "控制范围标识，目标语义名；当前兼容映射到历史字段 budgetGroupSn")
+    private String controlScopeId;
+
     @Schema(description = "预算控制范围标识，历史字段名 budgetGroupSn，不表示账务主体")
     private String budgetGroupSn;
+
+    @Schema(description = "控制周期标识，例如 2026-07")
+    private String periodId;
 
     @Schema(description = "拒绝原因")
     private String rejectReason;

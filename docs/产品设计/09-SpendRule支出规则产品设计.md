@@ -148,8 +148,8 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | SpendRuleVersion | 不可变规则版本，描述规则规格 JSON、裁决动作和摘要。 | ruleId、ruleVersion、ruleSpec、ruleDigest；ruleSpec 可承载 display、matchSpec、counterSpec、limitSpec、decisionSpec、safetySpec。 | DRAFT、PUBLISHED、EXPIRED、RETIRED。 |
 | SpendRuleAssignment | 规则挂载，描述某一版本应用到哪个 scope、优先级、冲突策略和生效窗口。 | assignmentSn、ruleId、ruleVersion、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status。 | ACTIVE、SUSPENDED、EXPIRED、REMOVED。 |
 | SpendRuleDecisionRecord | 规则决策记录，描述一次请求的规则版本、挂载、范围、结果和原因。 | decisionSn、assignmentSn、ruleId、ruleVersion、scopeType、scopeId、instrumentSn、action、amount、currency、businessScene、businessSn、decisionResult、rejectReason、decisionDigest。 | RECORDED；记录不可改写，只能追加更正或新决策。 |
-| SpendControlMovement | 规则执行后的控制额度变动流水，例如额度调整、预留、消耗、释放或退款补偿。 | movementSn、movementType、targetSubjectRef、amount、currency、spendRuleId、spendRuleVersion、spendDecisionSn、budgetGroupSn、movementDigest。 | 作为既有控制事实能力保留，不作为规则定义表。 |
-| BudgetControlProjection | 从控制额度变动流水派生的只读预算控制视图。 | reservedAmount、consumedAmount、releasedAmount、remainingControlAmount、availableControlAmount、lastMovementSn。 | 可重建、可重放、不可反写账本余额。 |
+| SpendControlMovement | 规则执行后的控制额度变动流水，例如额度调整、预留、消耗、释放或退款补偿。 | movementSn、movementType、targetSubjectRef、amount、currency、spendRuleId、spendRuleVersion、spendDecisionSn、controlScopeId / budgetGroupSn、periodId、movementDigest。 | 作为既有控制事实能力保留，不作为规则定义表。 |
+| BudgetControlProjection | 从控制额度变动流水派生的只读预算控制视图。 | controlScopeId / budgetGroupSn、periodId、reservedAmount、consumedAmount、releasedAmount、remainingControlAmount、availableControlAmount、lastMovementSn。 | 可重建、可重放、不可反写账本余额。 |
 
 命名和兼容口径：
 
@@ -160,6 +160,8 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 5. `remainingControlAmount` 在当前 DTO 中表达“未终局释放的控制占用”，后续如改名为 `occupiedControlAmount` 需单独评估兼容。
 6. `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`；其中 `consumedAmount` 为已消费减退款补偿后的净消耗。
 7. `SpendControlMovementType` 统一承载“是否参与预算控制投影、是否为调额类、是否为释放类、是否为决策记录兼容类型”的分类口径；服务实现不得再各自硬编码一套类型解释。
+8. `controlScopeId` 是预算控制范围的目标语义名，当前公共契约兼容 `budgetGroupSn`；两者同时出现时必须一致，落库仍映射到 `budget_group_sn`。
+9. `periodId` 是 Spend Rule 控制周期标识，例如 `2026-07`，用于当前周期和历史周期查询；它不是账本周期 bucket，不会生成预算组账本。
 
 命名口径：
 
@@ -174,8 +176,8 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | --- | --- | --- | --- |
 | 规则定义、版本和挂载 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleAssignmentService`。 | 支持创建规则、发布不可变 `ruleSpec / ruleDigest` 版本、挂载 scope、查询和解释挂载；已证明版本摘要冲突、挂载幂等、挂载只读解释和失败无资金副作用。 | 不代表完整规则表达式引擎、运营后台、生产迁移已完成；不再保留规则大 application facade 或旧式领域命名服务作为目标入口。 |
 | 决策记录 | `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendRuleDecisionRecordQuery`、`SpendRuleDecisionExplainQuery`、`SpendRuleDecisionRecordService`。 | 支持按单条 rule / assignment / scope 固化决策结果、拒绝原因和 `decisionDigest`，支持按决策流水、业务流水、规则、挂载、scope、支付工具和决策结果做服务层只读查询，并可输出拒绝原因和证据引用；已证明拒绝、查询和解释无资金事实副作用。 | 不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
-| 控制额度变动流水 | `SpendControlMovement`、`RecordSpendControlMovementRequest`、`SpendControlMovementType`。 | 支持调额、预留、消耗、释放、退款补偿和预算控制投影，且历史准入类 activity 不再允许新写入。 | 不代表控制事实是资金交易、账本交易或账本余额。 |
-| 预算控制投影 | `BudgetControlProjectionDTO`。 | 支持按控制流水重建 `limitAmount`、`consumedAmount`、`remainingControlAmount` 和 `availableControlAmount`。 | 不代表预算组、Spend Rule 或控制视图可以作为账务主体。 |
+| 控制额度变动流水 | `SpendControlMovement`、`RecordSpendControlMovementRequest`、`SpendControlMovementType`。 | 支持调额、预留、消耗、释放、退款补偿和预算控制投影；周期额度流水携带 `controlScopeId`、`periodId`，且历史准入类 activity 不再允许新写入。 | 不代表控制事实是资金交易、账本交易或账本余额。 |
+| 预算控制投影 | `BudgetControlProjectionDTO`。 | 支持按 `controlScopeId + periodId` 查询当前或历史周期，并按控制流水重建 `limitAmount`、`consumedAmount`、`remainingControlAmount` 和 `availableControlAmount`。 | 不代表预算组、Spend Rule 或控制视图可以作为账务主体。 |
 
 产品到工程分层口径：
 
@@ -194,7 +196,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | 挂载查询与解释 | tenant、assignmentSn、scope、ruleId、version、评估时间。 | 当前有效挂载列表、挂载可用性状态和证据引用。 | 只读查询；不重新执行规则，不写决策记录，不生成资金交易或账本事实。 |
 | 决策记录 | 支付工具快照、账户主体、预算 scope、金额币种、商户、MCC、国家、时间和业务场景。 | 决策流水、结果、拒绝原因、摘要。 | 拒绝停在交易内核前；通过只代表允许继续准入。 |
 | 决策记录查询与解释 | tenant、decisionSn、businessScene、businessSn、ruleId、version、assignmentSn、scope、instrumentSn、decisionResult。 | 决策记录列表、是否准入、拒绝原因和 evidenceRefs。 | 查询必须携带 tenantId 外的窄条件；解释只读读取历史决策，不重算规则、不调整额度、不写资金事实。 |
-| 控制额度变动流水记录 | 决策结果、预算 scope、目标账户主体、金额币种、交易结果。 | 预留、消耗、释放、过期、退款补偿或调整流水。 | 不生成资金交易、账本交易、账本分录或余额投影。 |
+| 控制额度变动流水记录 | 决策结果、控制范围、周期标识、目标账户主体、金额币种、交易结果。 | 预留、消耗、释放、过期、退款补偿或调整流水。 | 不生成资金交易、账本交易、账本分录或余额投影。 |
 | 规则时间线查询 | ruleId、ruleVersion、assignmentSn、decisionSn、业务流水、时间范围。 | 规则变更、挂载变更、决策记录和控制额度变动流水时间线。 | 查询只读，不修复状态，不重新评估历史。 |
 | 交易投影解释 | 资金交易、route snapshot、支付工具快照、规则决策记录和控制额度变动流水。 | 用户、商户、运营、风控和客服可理解的规则命中解释。 | 投影不反写 route、posting、LedgerEntry 或 balance。 |
 
@@ -334,7 +336,7 @@ Spend Rule DSL v1.1 先锁定规则版本、规则挂载和决策证据三类契
 | AC-SR-003 | 授权前规则拒绝。 | 返回拒绝原因、规则版本、决策流水和审计摘要。 | 生成 route、posting、LedgerEntry、资金交易扣款或余额投影。 |
 | AC-SR-004 | 规则通过后继续交易准入。 | 交易链路继续校验支付工具、账户能力、资金责任和余额/额度。 | 把规则通过当作资金可用或授权成功。 |
 | AC-SR-005 | 历史交易投影解释规则命中。 | 只读取当时版本、挂载和决策流水。 | 按当前规则或当前工具绑定重算历史。 |
-| AC-SR-006 | 预算控制视图查询。 | 展示 reserved、consumed、released、remaining 等控制口径。 | 展示为账本 AVAILABLE、FROZEN、AUTHORIZATION 或 SETTLEMENT。 |
+| AC-SR-006 | 预算控制视图查询。 | 按 `controlScopeId + periodId` 展示当前或历史周期的 reserved、consumed、released、remaining 等控制口径。 | 展示为账本 AVAILABLE、FROZEN、AUTHORIZATION 或 SETTLEMENT。 |
 
 验收标准：
 

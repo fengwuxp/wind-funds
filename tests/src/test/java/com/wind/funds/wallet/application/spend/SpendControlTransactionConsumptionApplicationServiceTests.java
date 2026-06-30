@@ -169,6 +169,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String BUDGET_GROUP_SN = "budget_sctc";
 
+    private static final String PERIOD_ID = "2026-07";
+
     private static final String FUNDS_TRANSACTION_SN = "funds_transaction_sctc_001";
 
     private static final String CROSS_SCENE_TRANSACTION_SN = "funds_transaction_sctc_cross_scene_001";
@@ -250,6 +252,8 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.CONSUMED);
         assertThat(activity.getOriginalMovementSn()).isEqualTo(RESERVED_ACTIVITY_SN);
         assertThat(activity.getTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
+        assertThat(activity.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(activity.getPeriodId()).isEqualTo(PERIOD_ID);
         assertThat(activity.getAmount()).isEqualTo(60L);
 
         BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
@@ -1106,7 +1110,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setSpendDecisionSn(decision.getSpendDecisionSn())
                 .setSpendDecisionResult(decision.getSpendDecisionResult())
                 .setSpendDecisionDigest(decision.getSpendDecisionDigest())
+                .setControlScopeId(decision.getBudgetGroupSn())
                 .setBudgetGroupSn(decision.getBudgetGroupSn())
+                .setPeriodId(PERIOD_ID)
                 .setMovementDigest(movementDigest);
     }
 
@@ -1131,7 +1137,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private BudgetControlProjectionQuery projectionQuery() {
         return new BudgetControlProjectionQuery()
                 .setTenantId(TENANT_ID)
+                .setControlScopeId(BUDGET_GROUP_SN)
                 .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setPeriodId(PERIOD_ID)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION);

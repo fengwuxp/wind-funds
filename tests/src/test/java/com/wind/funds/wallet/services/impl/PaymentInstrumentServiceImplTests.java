@@ -437,30 +437,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：运营把支付工具的真实资金主体绑定误配置为预算组。
-     * 输入：bindingRole = FUNDING_SUBJECT，但 subjectType = BUDGET_GROUP。
-     * 输出：创建被拒绝，不留下绑定候选或历史。
-     * 红线：预算组只能作为预算控制上下文，不得被支付工具绑定包装成最终真实资金主体。
-     */
-    @Test
-    void testCreatePaymentInstrumentBindingShouldRejectBudgetGroupAsFundingSubject() {
-        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
-                .setSubjectType(FundsSubjectType.BUDGET_GROUP)))
-                .hasMessageContaining("真实资金主体绑定必须指向资金账户");
-
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：运营把支付工具的信用控制主体绑定误配置为资金账户或预算组。
+     * 场景：运营把支付工具的信用控制主体绑定误配置为资金账户。
      * 输入：bindingRole = CREDIT_SUBJECT，但 subjectType 不是 CREDIT_ACCOUNT。
      * 输出：创建被拒绝，不留下绑定候选或历史。
-     * 红线：信用控制主体只能指向信用账户，不能用资金账户或预算组替代额度责任主体。
+     * 红线：信用控制主体只能指向信用账户，不能用资金账户替代额度责任主体。
      */
     @Test
     void testCreatePaymentInstrumentBindingShouldRejectNonCreditAccountAsCreditSubject() {
@@ -471,10 +451,6 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setBindingRole(PaymentInstrumentBindingRole.CREDIT_SUBJECT)
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)))
                 .hasMessageContaining("信用控制主体绑定必须指向信用账户");
-        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
-                .setBindingRole(PaymentInstrumentBindingRole.CREDIT_SUBJECT)
-                .setSubjectType(FundsSubjectType.BUDGET_GROUP)))
-                .hasMessageContaining("信用控制主体绑定必须指向信用账户");
 
         assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
         assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
@@ -482,24 +458,24 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：运营把支付工具的预算控制范围绑定误配置为资金账户或信用账户。
-     * 输入：bindingRole = BUDGET_SUBJECT，但 subjectType 不是 BUDGET_GROUP。
+     * 场景：运营尝试用支付工具绑定维护预算控制范围。
+     * 输入：bindingRole = BUDGET_SUBJECT。
      * 输出：创建被拒绝，不留下绑定候选或历史。
-     * 红线：预算控制范围绑定只能指向 BUDGET_GROUP 兼容控制上下文，不能包装成资金或信用责任主体。
+     * 红线：预算组是 Spend Rule / Spend Control 的控制范围对象，不通过支付工具资金主体绑定维护。
      */
     @Test
-    void testCreatePaymentInstrumentBindingShouldRejectNonBudgetGroupAsBudgetSubject() {
+    void testCreatePaymentInstrumentBindingShouldRejectBudgetSubjectBinding() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setBindingRole(PaymentInstrumentBindingRole.BUDGET_SUBJECT)
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)))
-                .hasMessageContaining("预算控制范围绑定必须指向 BUDGET_GROUP 兼容类型");
+                .hasMessageContaining("预算控制范围不通过支付工具资金主体绑定维护");
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setBindingRole(PaymentInstrumentBindingRole.BUDGET_SUBJECT)
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)))
-                .hasMessageContaining("预算控制范围绑定必须指向 BUDGET_GROUP 兼容类型");
+                .hasMessageContaining("预算控制范围不通过支付工具资金主体绑定维护");
 
         assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
         assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();

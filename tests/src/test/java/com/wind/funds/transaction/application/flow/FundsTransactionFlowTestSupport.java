@@ -163,6 +163,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     private static final int MAX_LEDGER_BUCKET_SIZE = 50;
 
+    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+
     private static final List<String> FLOW_TEST_TABLES = List.of(
             "t_ledger_entry",
             "t_ledger_posting_plan",
@@ -391,7 +393,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     }
 
     protected void ensureBudgetGroup(FundsAccountId accountId) {
-        assertThat(accountId.type()).isEqualTo(FundsSubjectType.BUDGET_GROUP.name());
+        assertThat(accountId.type()).isEqualTo(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE);
         if (budgetGroupExists(accountId.id())) {
             return;
         }
@@ -1124,7 +1126,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     }
 
     protected static FundsAccountId budgetGroup(String accountId) {
-        return FundsAccountId.immutable(accountId, FundsSubjectType.BUDGET_GROUP.name());
+        return FundsAccountId.immutable(accountId, LEGACY_BUDGET_GROUP_ACCOUNT_TYPE);
     }
 
     protected static FundsAccountId cashMappingAccount() {

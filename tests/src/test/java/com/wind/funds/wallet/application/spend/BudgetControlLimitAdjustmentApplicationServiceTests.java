@@ -81,6 +81,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
     private static final String BUDGET_GROUP_SN = "budget_control_limit_scope";
 
+    private static final String PERIOD_ID = "2026-07";
+
     private static final String SPEND_RULE_ID = "sr_budget_limit_monthly";
 
     private static final String SPEND_RULE_VERSION = "2026-06-21.1";
@@ -134,7 +136,9 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
         assertThat(result.getMovementSn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
         assertThat(result.getMovementType()).isEqualTo(SpendControlMovementType.LIMIT_INCREASED);
+        assertThat(result.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
         assertThat(result.getBudgetGroupSn()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(result.getPeriodId()).isEqualTo(PERIOD_ID);
         assertThat(result.getTargetAccountId()).isEqualTo(targetAccountId());
         assertThat(result.getAmount()).isEqualTo(100L);
         assertThat(result.getIncrease()).isTrue();
@@ -143,6 +147,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThat(result.getAuditReferenceSn()).isEqualTo(AUDIT_REFERENCE_SN);
 
         BudgetControlProjectionDTO projection = result.getProjection();
+        assertThat(projection.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(projection.getPeriodId()).isEqualTo(PERIOD_ID);
         assertThat(projection.getLimitIncreasedAmount()).isEqualTo(100L);
         assertThat(projection.getLimitDecreasedAmount()).isZero();
         assertThat(projection.getLimitAmount()).isEqualTo(100L);
@@ -162,6 +168,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                     assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.LIMIT_INCREASED);
                     assertThat(activity.getInstrumentSn()).isNull();
                     assertThat(activity.getAction()).isNull();
+                    assertThat(activity.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+                    assertThat(activity.getPeriodId()).isEqualTo(PERIOD_ID);
                     assertThat(activity.getReasonCode()).isEqualTo(REASON_CODE);
                     assertThat(activity.getOperatorId()).isEqualTo(OPERATOR_ID);
                     assertThat(activity.getAuditReferenceSn()).isEqualTo(AUDIT_REFERENCE_SN);
@@ -342,7 +350,9 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setMovementSn(movementSn)
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(businessSn)
+                .setControlScopeId(BUDGET_GROUP_SN)
                 .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setPeriodId(PERIOD_ID)
                 .setTargetAccountId(targetAccountId())
                 .setAmount(100L)
                 .setCurrency(CurrencyIsoCode.USD)
@@ -371,7 +381,9 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setSpendDecisionSn("decision_budget_limit_reserved_001")
                 .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
                 .setSpendDecisionDigest("sha256:budget-limit-reserved-decision")
+                .setControlScopeId(BUDGET_GROUP_SN)
                 .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setPeriodId(PERIOD_ID)
                 .setMovementDigest("sha256:budget-limit-reserved");
     }
 
@@ -399,7 +411,9 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     private BudgetControlProjectionQuery projectionQuery() {
         return new BudgetControlProjectionQuery()
                 .setTenantId(TENANT_ID)
+                .setControlScopeId(BUDGET_GROUP_SN)
                 .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setPeriodId(PERIOD_ID)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)

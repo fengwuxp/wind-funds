@@ -27,6 +27,7 @@ import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
+import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.FundingAccountType;
@@ -84,7 +85,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
     private static final String SUBJECT_TYPE = FundsSubjectType.FUNDING_ACCOUNT.name();
 
-    private static final String BUDGET_GROUP_SUBJECT_TYPE = FundsSubjectType.BUDGET_GROUP.name();
+    private static final String BUDGET_GROUP_SUBJECT_TYPE = "BUDGET_GROUP";
 
     private static final String BUDGET_GROUP_SUBJECT_ID = "posting_boundary_budget";
 
@@ -685,7 +686,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .setSn(budgetGroupSn)
                 .setOwnerId("owner_" + budgetGroupSn)
                 .setOwnerType(FundsAccountOwnerType.USER)
-                .setBudgetType(FundsSubjectType.BUDGET_GROUP.name())
+                .setBudgetType(DefaultFundsAccountType.BUDGET_GROUP.name())
                 .setCurrency(CURRENCY)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name())

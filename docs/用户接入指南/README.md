@@ -140,10 +140,25 @@
 推荐入口：
 
 1. `SpendControlAdmissionApplicationService.resolve`
-2. 交易层入口
-3. `SpendControlTransactionConsumptionApplicationService` 记录消费事实
+2. `BudgetControlLimitAdjustmentApplicationService.adjustLimit` 记录周期控制额度调增或调减
+3. 交易层入口
+4. `SpendControlTransactionConsumptionApplicationService` 记录消费、释放或退款补偿事实
 
-BudgetGroup 是控制范围，不是账本主体。
+BudgetGroup 是控制范围，不是账本主体。接入侧优先使用 `controlScopeId + periodId` 查询额度；`budgetGroupSn` 只是历史字段兼容名。
+
+典型周期额度流程：
+
+```mermaid
+flowchart LR
+    A["Spend Rule 设置周期额度"] --> B["周期刷新任务生成 LIMIT_INCREASED"]
+    B --> C["授权前记录 RESERVED"]
+    C --> D["交易成功记录 CONSUMED"]
+    C --> E["交易失败记录 RELEASED"]
+    D --> F["退款成功记录 REFUND_COMPENSATED"]
+    B --> G["按 controlScopeId + periodId 查询预算控制投影"]
+```
+
+实际用例：2026-07 月度预算范围 `BG-SALES-2026` 刷新 10000 USD 控制额度，调度任务调用 `adjustLimit` 写入 `LIMIT_INCREASED`，请求携带 `controlScopeId=BG-SALES-2026`、`periodId=2026-07`。一笔企业卡授权通过后写入 `RESERVED 6000`；交易成功后 `consume` 写入 `CONSUMED 6000` 并继承原 `periodId`。查询 `BudgetControlProjectionQuery(controlScopeId=BG-SALES-2026, periodId=2026-07, currency=USD)` 返回该周期控制视图；查询 `periodId=2026-08` 不会混入 7 月流水。
 
 验证锚点：`SpendControlAdmissionApplicationServiceTests`、`SpendControlMovementServiceFlowTests`、`SpendControlTransactionConsumptionApplicationServiceTests`。
 
