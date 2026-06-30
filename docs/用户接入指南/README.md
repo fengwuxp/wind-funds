@@ -1,157 +1,213 @@
 # wind-funds 用户接入指南
 
-## 目录定位
+## 1. 定位
 
-本目录面向 wind-funds 的业务接入方、研发、测试、运营、财务、风控、安全和合规评审方，说明上层业务如何接入资金底座，以及接入前必须确认哪些资金语义、系统边界、验收证据和生产红线。
+本文面向要接入 `ledger`、`wallet`、`transaction` 三个主链模块的业务系统和内部研发。它只说明当前代码中已有公共契约和测试证明过的接入方式，不承诺 VCC、全球账户、收单、清结算、对账、归档或治理的生产接入。
 
-本目录不是 PRD、DSL、系分或 TDD 的替代品：
+接入方只依赖 `core`、`ledger-face`、`wallet-face`、`transaction-face`。不要依赖 `*-impl`、Entity、Mapper、内部状态机或测试工具类。
 
-| 文档层 | 负责回答 | 本目录如何使用 |
-| --- | --- | --- |
-| 产品设计 | wind-funds 是什么、解决什么问题、能力边界在哪里。 | 作为业务接入目标和能力边界来源。 |
-| DSL 设计 | 业务资金事实如何结构化成资金指令、路由快照、账务计划和分录。 | 作为接入字段、事实闭环和禁止项来源。 |
-| 系分设计 | 能力落到哪些模块、接口、表、状态机、事务和观测。 | 作为接入实现可行性和系统边界来源。 |
-| TDD 设计 | 每个资金能力如何被测试证明。 | 作为接入验收、红线测试和验证命令来源。 |
+## 2. 模块边界
 
-## 文档清单
+| 模块 | 定位 | 接入方能做 | 接入方不能做 |
+| --- | --- | --- | --- |
+| `ledger` | 账本事实和余额投影。 | 查询账本、账本交易、分录和余额投影；在底层服务级测试中验证过账事实。 | 业务方不直接拼分录、不直接改余额、不把投影当事实源。 |
+| `wallet` | 账户、支付工具、资金责任、支出控制和准入快照。 | 建模资金账户/信用账户，解析账户能力、支付工具能力、资金责任和 Spend Rule 决策。 | 不创建交易事实，不写 route、posting、ledger entry 或余额投影。 |
+| `transaction` | 标准资金交易、授权交易、余额控制、让利出资记账和外部确认入金消费。 | 提交已经成立的资金事实，由交易层编排路由、账务和账本影响。 | 不接收页面动作、审批中、通道处理中或外部非终态。 |
 
-| 文档 | 用途 |
+依赖方向是 `transaction -> wallet -> ledger`。横向治理或对账能力只能通过 face/core 只读消费事实，不反写主链事实。
+
+## 3. 接入顺序
+
+1. 先确认业务事实已经成立：谁的钱、什么动作、金额、币种、幂等键、来源引用和操作者。
+2. 先走 `wallet` 建模或准入：账户能力、支付工具能力、资金责任、Spend Rule 决策。
+3. 再走 `transaction` 产生资金事实：直接交易、授权交易、余额控制、让利出资、外部确认入金。
+4. 最后用 `ledger` 和投影查询验收：账本交易、分录、余额桶、幂等和失败无副作用。
+
+如果第 1 步说不清，不进入 wind-funds。
+
+## 4. 能力矩阵
+
+| 能力 | 公共入口 | 已验证场景 | 主要测试 |
+| --- | --- | --- | --- |
+| 账本基础 | `LedgerService`、`LedgerTransactionService` | 建账、过账、按 SN 查询交易/分录、余额投影。 | `LedgerServiceImplTests`、`LedgerTransactionServiceImplTests`、`DefaultLedgerPostingAssemblerTests`、`LedgerBalanceProjectionServiceImplTests` |
+| 账户和余额查询 | `FundsAccountCapabilityApplicationService`、`FundsSubjectBalanceQueryService` | 账户能力准入、余额查询、账本 profile 初始化。 | `FundsAccountCapabilityApplicationServiceTests`、`FundsSubjectBalanceQueryServiceImplTests`、`LedgerProfileContractTests`、`ControlAccountLedgerInitializationTests` |
+| 支付工具 | `PaymentInstrumentCapabilityApplicationService`、`PaymentInstrumentPreTransactionSnapshotApplicationService` | 支付工具能力、绑定快照、交易前快照。 | `PaymentInstrumentCapabilityApplicationServiceTests`、`PaymentInstrumentPreTransactionSnapshotApplicationServiceTests`、`PaymentInstrumentServiceImplTests` |
+| 资金责任 | `FundingResponsibilityResolutionApplicationService` | 按关系解析默认资金责任主体。 | `FundingResponsibilityResolutionApplicationServiceTests`、`SpendSubjectFundingRelationServiceImplTests` |
+| 支出控制 | `SpendControlAdmissionApplicationService`、`BudgetControlLimitAdjustmentApplicationService`、`SpendControlTransactionConsumptionApplicationService` | Spend Rule 准入、预算控制调整、交易消费记录。 | `SpendControlAdmissionApplicationServiceTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、`SpendRuleDefinitionServiceFlowTests` |
+| 直接交易 | `FundsDirectTransactionService` | 充值、转账、付款、退款、提现、手续费、退费。 | `FundsDirectTransactionFlowTests`、`FundsTransactionFeeFlowTests`、`FundsTransferPayWithdrawChainFlowTests` |
+| 授权交易 | `FundsAuthorizationTransactionService` | 授权、撤销、完成、完成后退款。 | `FundsAuthorizationTransactionFlowTests` |
+| 余额控制 | `FundsBalanceControlService` | 冻结、解冻、受控调整；冻结不表达扣款。 | `FundsBalanceControlFailureFlowTests`、`FundsFrozenOrderServiceImplTests`、`FundsWithdrawalSuccessFlowTests`、`FundsWithdrawalAfterPartialUnfreezeFlowTests` |
+| 让利出资记账 | `FundsBenefitContributionTransactionService` | 平台/商户/合作方已决策让利出资入账和按原交易冲回。 | `FundsBenefitContributionTransactionServiceContractTests`、`FundsBenefitContributionTransactionServiceFlowTests` |
+| 外部确认入金 | `ExternalFundsEventApplicationService` | 已确认外部入金消费为标准充值，目标必须是资金账户。 | `ExternalFundsEventApplicationServiceTests` |
+
+## 5. 业务事实说明卡
+
+每个接入场景先填这 10 项，填不满就不要拆研发任务。
+
+| 项 | 必填内容 |
 | --- | --- |
-| [wind-funds用户接入指南.md](wind-funds用户接入指南.md) | 接入总览、能力边界、概念映射、接入流程、场景指南、成熟度评估、验收矩阵和准入模板。 |
-| [接入样例.md](接入样例.md) | 用商户订单收款、提现前冻结后确认出款两个样例演示资金事实说明卡、概念映射、伪请求、验收证据和阻断项如何填写。 |
-| [FAQ与误用排查.md](FAQ与误用排查.md) | 解释常见概念问题和误用场景，帮助接入方在提交评审前自查阻断项。 |
-| [宣讲提纲.md](宣讲提纲.md) | 供产品、研发、测试、运营和风控安全团队宣讲使用，提供 30 分钟和 60 分钟讲法。 |
-| [接入评审清单.md](接入评审清单.md) | 供评审会使用，明确会前输入、参会角色、评审流程、规则矩阵、结论判定和会议纪要模板。 |
-| [资金事实说明卡模板.md](资金事实说明卡模板.md) | 供接入方填写单个业务动作的资金事实、主体、账户类型、`normalBalanceSide`、金额、路由、账务影响、借贷平衡、余额影响、失败处理和验收证据。 |
-| [接入申请模板.md](接入申请模板.md) | 供接入方提交接入申请、外部规则核验、设计映射、生产准入补充和评审结论。 |
+| 业务动作 | topup、transfer、pay、refund、withdraw、fee、authorize、reversal、settle、settleRefund、freeze、unfreeze、adjust、benefit settle/refund、external confirmed credit。 |
+| 资金主体 | 成本承担方、资金流出方、资金流入方、授权主体或冻结主体。 |
+| 账户类型 | FundingAccount、CreditAccount、平台账户角色解析结果；BudgetGroup、Spend Rule、PaymentInstrument 只能是控制或引用。 |
+| 金额币种 | 金额必须为正，币种和精度必须能和账户、账本 profile 对齐。 |
+| 幂等 | 业务流水、请求摘要、重复提交和同键不同摘要处理。 |
+| 来源引用 | 订单、提现单、授权单、外部事件、原交易 SN 或原冻结单 SN。 |
+| 操作者 | 使用 `WindOperator`，不要塞进 request 字段。 |
+| 准入快照 | 账户能力、支付工具能力、资金责任、Spend Rule 决策或原 route snapshot。 |
+| 账务验收 | 交易状态、route、posting、ledger transaction、ledger entry、余额桶变化。 |
+| 失败验收 | 准入失败、幂等冲突、余额不足、路由失败、外部非终态不得留下错误资金事实。 |
 
-## 10 分钟阅读路径
+## 6. 常用接入路径
 
-首次评审或宣讲时，不建议从长表格逐行开始。先用下表完成角色分流，再回到主指南和模板补证据。
+### 6.1 用户或商户入金
 
-| 角色 | 先读 | 10 分钟内要拿到的结论 | 产出 |
-| --- | --- | --- | --- |
-| 产品和业务负责人 | 本 README、主指南 1-3、接入样例、FAQ 与误用排查 | 业务是否应该进入 wind-funds，属于基础能力、专项准入还是业务能力包。 | 接入目标、非目标、业务事实和能力成熟度判断。 |
-| 研发和架构 | 主指南 3、5、6、8、接入样例、FAQ 与误用排查 | 能否只依赖 `core`、`*-face` 和授权公共契约，是否需要工程变更边界。 | 服务入口清单、公共契约影响、写入范围和验证命令草案。 |
-| 测试 | 主指南 6、8、9、资金事实说明卡模板、接入评审清单、FAQ 与误用排查 | 正向、逆向、失败、幂等、并发、重放和红线如何验收。 | 接入验收矩阵、目标测试资产和必须失败用例。 |
-| 运营、财务、风控、安全和合规 | 主指南 2、6.8、7.4、8.5、9、接入申请模板、接入评审清单、FAQ 与误用排查 | 外部规则、敏感数据、审批、差错、出款、Runbook 和审计是否闭合。 | 待确认项、阻断条件、人工处理入口和审计证据包。 |
+适用条件：外部资金已经确认到账，目标是内部资金账户。
 
-## 接入产品架构摘要
+推荐入口：
 
-本 README 的业务目标是把上层业务接入需求转成统一、可评审、可测试、可授权的资金接入材料。用户价值是让业务、产品、研发、测试、运营、财务、风控和安全合规方在同一张材料上判断能不能接、怎么接、哪些必须阻断。非目标是不替代 PRD、DSL、系分、TDD、API 文档、合规结论、会计结论或上线审批；成功指标是接入方能输出资金事实说明卡、接入申请、接入验收矩阵、资金不变量引用、风险待确认项和工程变更边界草案。
+1. `FundsAccountCapabilityApplicationService.resolveFundsAccountCapability`
+2. `FundsDirectTransactionService.topup`
+3. 查询 `LedgerTransactionService` 或余额投影验收
 
-| 能力域 | 接入方要准备 | wind-funds 承接 | 不承接 |
-| --- | --- | --- | --- |
-| 业务事实准入 | 业务目标、业务动作、主体、账户类型、`normalBalanceSide`、金额、币种、幂等键、来源引用、借贷平衡摘要、余额影响摘要和验收方。 | 判断业务事实是否已经成立，形成接入结论和能力成熟度。 | 页面动作、审批中状态、外部非终态或通道处理中状态。 |
-| 账户和账务映射 | 业务对象、对象模型、字段口径、账户示例、账户类型、余额桶、资金归属、支出控制上下文和内部能力选择。 | 按真实资金、授信额度、预算控制、支付工具四类需求映射 FundingAccount、CreditAccount、BudgetGroup、Spend Rule、PaymentInstrument、RouteSnapshot、PostingPlan、LedgerEntry 和 Projection，并标明哪些对象只是控制或查询维度。 | 业务方直接定义内部科目、直接写账本分录、改余额投影，或按 VCC 预付卡、共享卡等产品形态反推账户类型。 |
-| 交易和余额控制 | 主流程、逆向流程、异常流程、状态、触发条件、判断逻辑和失败原因。 | 承接直接交易、授权交易、冻结、解冻、调整、投影解释和失败无副作用验收。 | 把冻结当扣款、授权当最终消费、外部账户当内部账户。 |
-| 对账清结算专项 | 对账来源、清分清算口径、结算出款条件、差错责任、审批凭证和审计证据。 | 进入专项工程变更边界和 TDD 分析，形成规则矩阵、人工兜底和验收边界。 | 未授权时直接承诺生产出款、自动调账或完整清结算生命周期。 |
-| 归档重放和治理 | Manifest、checkpoint、watermark、重放范围、差异报告、指标口径和数据口径。 | 作为只读治理和生产准入材料，约束归档、重放、余额快照和指标输入边界。 | 用指标快照替代账本余额确认，或让治理任务反写资金事实。 |
-| 生产准入 | 权限、审计、告警、Runbook、灰度、回滚、发布和外部规则待确认项。 | 输出风险清单、确认方、补齐时点、未完成交付边界和工程变更边界材料。 | 替代上线审批、法务合规确认、财务会计确认或持牌机构确认。 |
+如果来源是外部事件，可用 `ExternalFundsEventApplicationService.consume`，但当前只支持 confirmed credit -> funding account。
 
-| 业务对象 | 生命周期和状态口径 | 接入评审必须看 |
-| --- | --- | --- |
-| 业务事实 | 从业务确认、接入评审、TDD 准入到 工程变更边界；状态必须区分已成立、待确认、外部非终态和阻断。 | 事实是否足够稳定，能否作为资金指令输入。 |
-| 资金主体和账户 | 从主体识别、账户映射、账目 bucket 到余额投影；状态不得和业务页面状态混用。 | 账户类型、`normalBalanceSide`、余额桶影响是否回挂 DSL 权威表。 |
-| 资金动作 | 从直接交易、授权、冻结、解冻、调整到逆向事件；状态机必须区分成功、失败、撤销、过期和人工处理。 | 失败是否无 route、posting、entry、projection 副作用。 |
-| 运营处理对象 | 从对账差异、清分清算、结算出款、追偿到人工兜底；状态必须区分事实状态、展示状态和操作状态。 | 规则版本、审批、证据、审计和外部规则确认是否闭合。 |
-| 治理对象 | 从归档申请、Manifest、checkpoint、watermark、重放任务到差异报告；状态必须区分 dry-run、apply、暂停和人工处理。 | 是否保持只读边界，是否禁止治理反写资金事实。 |
+验证锚点：`FundsDirectTransactionFlowTests`、`ExternalFundsEventApplicationServiceTests`。
 
-## 内部能力选择速查
+### 6.2 内部转账、付款、退款和提现
 
-接入方先判断自己要解决的是“钱、额度、预算还是工具”的问题，再选择 wind-funds 能力。卡产品形态、钱包入口或外部账户名称不能反推账户类型。
+适用条件：资金事实已经成立，出入方都是可解析的内部账务主体，或者提现目标只是外部引用。
 
-| 使用者问题 | 应选能力 | 最少材料 | 禁止口径 |
-| --- | --- | --- | --- |
-| 我要记录真实资金、商户待清算、平台现金、预收待付、手续费或差错责任。 | FundingAccount | owner、币种、账户能力、账本 Profile、余额桶、责任来源和审计引用。 | 用 FundingAccount 表达信用额度、预算控制、卡工具、VA、外部银行账户或钱包标识。 |
-| 我要管理授信额度、可用额度和授权占用。 | CreditAccount | 授信 owner、额度周期、LIMIT、AVAILABLE、AUTHORIZATION、调额来源和规则版本。 | 当作现金账户、商户待结算账户或共享卡本体。 |
-| 我要限制部门、项目、员工卡或共享卡一段周期内能花多少。 | BudgetGroup + 预算型 Spend Rule | 预算 owner、scope、币种、规则窗口、控制额度、规则版本、优先级和审计。 | 当作真实资金池、账本主体、外部支付工具或信用额度本身。 |
-| 我要接入卡、VCC、预付卡、共享卡、VA、银行账户、外部钱包或 PSP token。 | PaymentInstrument + binding + FundingAllocationDecision + 账户层级快照 | 工具引用、脱敏展示、绑定版本、使用主体、资金责任解析关系、资金子账户或信用子账户、父账户约束、规则版本和原路径快照。 | 因 prepaid/shared/VCC 名称自动创建 `VCC_ACCOUNT`、卡号账户、预算组或账本主体，或未完成账户层级准入就声明 VCC 子账户生产可用。 |
+推荐入口：
 
-## 使用顺序
-
-1. 先读接入指南的定位、能力成熟度和接入红线，判断业务是否应该接入 wind-funds。
-2. 再看 [接入样例.md](接入样例.md)，确认资金事实说明卡和伪请求应该填到什么粒度。
-3. 再用 [FAQ与误用排查.md](FAQ与误用排查.md) 自查概念混用、流程断点和资金红线。
-4. 再填写 [资金事实说明卡模板.md](资金事实说明卡模板.md) 和 [接入申请模板.md](接入申请模板.md)。
-5. 评审会按 [接入评审清单.md](接入评审清单.md) 走，形成通过、带条件通过或阻断结论。
-6. 宣讲或跨团队同步时使用 [宣讲提纲.md](宣讲提纲.md)。
-7. 最后回到 PRD、DSL、系分和 TDD 设计，补齐产品验收 ID、DSL caseId、系分章节、TDD 用例和工程变更边界。
-
-## 从宣讲到准入的闭环
-
-接入指南的目标不是让接入方“读懂文档”，而是把业务接入需求转成可评审、可测试、可授权的交付材料。一次完整接入至少经过下列闭环：
-
-| 阶段 | 输入 | 必须产出 | 不能跳过 |
-| --- | --- | --- | --- |
-| 宣讲 | 本 README、主指南、宣讲提纲和图形化辅助阅读。 | 共同语言、能力边界、首个候选接入场景和材料负责人。 | 不把宣讲结论当成评审通过或编码授权。 |
-| 预填材料 | 资金事实说明卡、接入申请模板、接入样例和 FAQ。 | 资金事实、概念映射、能力成熟度、外部规则和验收证据草案。 | 不在主体、金额、幂等、route、posting 或验收缺失时进入评审会。 |
-| 接入评审 | 接入评审清单、预填材料和权威设计映射。 | 通过、带条件通过或阻断结论，以及会后交付物。 | 不在评审会上临时决定 API、表结构、公共枚举或生产启用。 |
-| TDD 准入 | 评审纪要、验收矩阵、PRD AC/RED、DSL caseId 和系分章节。 | 目标测试资产、首批 Red、验证命令、回归范围和不覆盖项。 | 不只按接口联调成功验收资金变化。 |
-| 工程变更边界 | TDD 准入结果、写入范围、只读范围、验证命令和停止条件。 | 编码授权边界、可改文件类型、验证策略、残余风险和回退条件。 | 不把设计包或接入评审结论直接当成代码修改许可。 |
-
-## 图形化辅助阅读
-
-接入评审时可以先用下列图建立共同语言，再回到 PRD、DSL、系分和 TDD 正文补证据。图只帮助理解，不替代正文契约和工程变更边界。
-
-| 读者或场景 | 建议先看 | 解决的问题 |
-| --- | --- | --- |
-| 产品、业务和运营先判断是否该接入 | [产品架构图](../产品设计/产品架构图/wind-funds-product-architecture.svg)、[产品边界能力图](../产品设计/产品边界能力图/vcc-global-ach-acquiring-boundary-capability-map.svg) | wind-funds 是什么、能支撑哪些业务、哪些能力不能沉入资金底座。 |
-| 研发和架构判断系统边界 | [系分分层架构](../系分设计/架构设计/system-layered-architecture.svg)、[模块依赖与禁止方向](../系分设计/模块依赖/module-dependency-boundary.svg)、[职责边界矩阵](../系分设计/职责边界/responsibility-boundary-matrix.svg) | 接入方只能依赖哪些契约，哪些写入必须等待 工程变更边界。 |
-| 测试和产品核对交易入口 | [直接交易流程](../产品设计/产品流程图/direct-transaction-flow.svg)、[授权交易流程](../产品设计/产品流程图/authorization-transaction-flow.svg)、[余额控制流程](../产品设计/产品流程图/balance-control-flow.svg) | 正向、授权、冻结、解冻、退款、拒付和失败无副作用如何验收。 |
-| 运营、财务和风控核对清结算闭环 | [对账流程](../产品设计/产品流程图/reconciliation-flow.svg)、[清结算流程](../产品设计/产品流程图/clearing-settlement-flow.svg)、[对账清结算系统流程](../系分设计/系统流程/reconciliation-settlement-flow.svg) | 差异、清分、清算、结算、出款、追偿、人工处理和审计如何闭环。 |
-| 数据、SRE 和安全核对治理门禁 | [归档重放流程](../产品设计/产品流程图/big-data-archive-replay-flow.svg)、[治理观测门禁](../系分设计/治理观测/governance-observability-gates.svg) | 归档、重放、指标只读、首批 Red、权限审计、Runbook 和生产准入如何证明。 |
-
-## 和权威设计包的关系
-
-| 接入指南内容 | 上游权威来源 | 下游使用方式 |
-| --- | --- | --- |
-| 产品定位、能力边界和 P0/P1/P2 优先级 | `docs/产品设计` | 判断业务是否应该接入，以及接入能力属于基础能力、专项准入还是业务能力包。 |
-| 资金事实、route、posting、entry、projection 和治理 caseId | `docs/DSL设计` | 填写接入申请中的 DSL caseId，约束公共契约和测试夹具。 |
-| 账户示例、账户类型、`normalBalanceSide`、借贷平衡、余额影响和失败红线 | [../DSL设计/支付资金底座DSL承载层设计.md#51-资金场景借贷平衡与账务期望表](../DSL设计/支付资金底座DSL承载层设计.md#51-资金场景借贷平衡与账务期望表) | 填写资金事实说明卡、接入验收矩阵和工程变更边界的资金不变量，不从接入样例、PRD 摘要或系分说明二次推导账务口径。 |
-| 服务入口、模块边界、表结构、状态机、事务、观测和回滚 | `docs/系分设计` | 拆解 工程变更边界的写入范围、只读范围、验证命令和停止条件。 |
-| 正向、逆向、失败、幂等、并发、重放和红线用例 | `docs/TDD设计` | 形成接入验收矩阵，证明资金变化不是只靠接口返回。 |
-| 当前代码、DDL/H2、测试资产和验证命令 | `core`、`*-face`、`*-impl`、`tests` | 只在获得 工程变更边界后进入编码差距复核和实现。 |
-
-## 快速准入检查
-
-| 检查项 | 通过标准 |
+| 场景 | 入口 |
 | --- | --- |
-| 业务事实 | 业务动作已经成立或已被上层业务归一，不能只是页面操作、审批中、通道处理中或外部非终态。 |
-| 资金边界 | 能说明谁的钱、因为什么业务变化、当前归属谁、最终归属谁、哪些只是外部引用。 |
-| 四流视图 | 能拆清业务流、支付信息流、账户/账务流和真实资金流，且明确 wind-funds 只承接资金底座职责。 |
-| 接口边界 | 只依赖 `core`、`*-face` 和授权的公共契约，不依赖 `*-impl`、Entity、Mapper 或内部状态机。 |
-| 账务闭环 | 能证明 route、posting、ledger entry、balance projection、transaction projection 和审计可追溯。 |
-| 失败闭环 | 能说明准入失败、幂等冲突、路由失败、账务失败、投影失败、外部非终态和对账差错如何处理。 |
-| 验收证据 | 能给出 PRD AC/RED、DSL caseId、系分章节、TDD 用例、验证命令和残余风险。 |
+| 内部转账 | `FundsDirectTransactionService.transfer` |
+| 付款 | `FundsDirectTransactionService.pay` |
+| 退款 | `FundsDirectTransactionService.refund` |
+| 提现 | `FundsDirectTransactionService.withdraw` |
+| 手续费 | `FundsDirectTransactionService.fee`、`refundFee` |
 
-## 接入验收门禁
+验证锚点：`FundsDirectTransactionFlowTests`、`FundsWithdrawalSuccessFlowTests`、`FundsWithdrawalRejectionFlowTests`、`FundsTransactionFeeFlowTests`。
 
-接入指南的验收标准不是“材料齐了”或“接口调通了”，而是业务、产品、研发、测试、运营、财务、风控和安全合规方能对同一笔资金动作给出一致结论。
+### 6.3 授权交易
 
-| 验收项 | 测试场景 | 边界路径 | 异常路径 |
-| --- | --- | --- | --- |
-| 对象分类清楚 | FundingAccount、CreditAccount 和平台账户角色能说明资金责任；BudgetGroup、Spend Rule 和 PaymentInstrument 能说明控制或引用作用。 | 共享卡、预付卡、VA、外部账户和钱包标识先作为工具或引用；VCC 卡交易前必须解析到资金子账户或信用子账户，并固化父账户和绑定快照。 | 预算组、Spend Rule、支付工具、外部账户、`VCC_ACCOUNT` 或卡号账户被当作 LedgerEntry 主体时阻断。 |
-| 资金事实闭环 | route、posting、LedgerEntry、余额投影、交易投影和审计引用能回挂 PRD、DSL、系分和 TDD。 | 授权、冻结、待清算、结算中、出款中和归档重放状态各自可解释。 | 准入失败、幂等冲突、路由失败、账务失败和外部非终态不得留下错误资金事实。 |
-| 评审结论可执行 | 接入评审能输出通过、带条件通过或阻断，并标明工程变更边界的写入范围、只读范围、验证命令和停止条件。 | 缺外部规则确认、缺目标测试资产或缺生产 Runbook 时只能带条件通过或阻断。 | 未获得工程变更边界时不得修改公共契约、DDL/H2、生产代码、测试代码或运行时配置。 |
+适用条件：先占用额度或余额，再按后续事件撤销、完成或退款。
 
-## 接入交付包
+推荐入口：
 
-业务接入方进入编码前，至少需要准备以下材料：
+| 阶段 | 入口 | 说明 |
+| --- | --- | --- |
+| 授权 | `authorize` | 授权拒绝不得生成 route、posting 或 ledger entry。 |
+| 撤销 | `reversal` | 释放原授权占用。 |
+| 完成 | `settle` | 基于原授权路径完成，不按当前绑定重新选路。 |
+| 完成后退款 | `settleRefund` | 引用原完成事实。 |
 
-| 材料 | 作用 |
+验证锚点：`FundsAuthorizationTransactionFlowTests`。
+
+### 6.4 冻结、解冻和调整
+
+适用条件：表达同一主体余额控制或有审批凭证的余额调整。
+
+推荐入口：
+
+| 场景 | 入口 | 禁止项 |
+| --- | --- | --- |
+| 冻结 | `FundsBalanceControlService.freeze` | 不能表达消费或跨主体转移。 |
+| 解冻 | `FundsBalanceControlService.unfreeze` | 不能超过原冻结事实。 |
+| 调整 | `FundsBalanceControlService.adjust` | 不能替代付款、退款、提现或对账差错闭环。 |
+
+验证锚点：`FundsBalanceControlFailureFlowTests`、`FundsFrozenOrderServiceImplTests`。
+
+### 6.5 支付工具和资金责任准入
+
+适用条件：业务入口先拿到卡、外部账户、VA、PSP token 或支付工具引用，需要解析可用性和最终资金责任。
+
+推荐入口：
+
+1. `PaymentInstrumentCapabilityApplicationService.resolvePaymentInstrumentCapability`
+2. `PaymentInstrumentPreTransactionSnapshotApplicationService`
+3. `FundingResponsibilityResolutionApplicationService.resolveFundingResponsibility`
+4. 交易层入口
+
+支付工具不是账户。它只提供引用、绑定和路由输入。
+
+验证锚点：`PaymentInstrumentCapabilityApplicationServiceTests`、`PaymentInstrumentPreTransactionSnapshotApplicationServiceTests`、`FundingResponsibilityResolutionApplicationServiceTests`。
+
+### 6.6 Spend Rule 和预算控制
+
+适用条件：需要在交易前固化支出控制决策，或记录交易消费对控制范围的影响。
+
+推荐入口：
+
+1. `SpendControlAdmissionApplicationService.resolve`
+2. 交易层入口
+3. `SpendControlTransactionConsumptionApplicationService` 记录消费事实
+
+BudgetGroup 是控制范围，不是账本主体。
+
+验证锚点：`SpendControlAdmissionApplicationServiceTests`、`SpendControlMovementServiceFlowTests`、`SpendControlTransactionConsumptionApplicationServiceTests`。
+
+### 6.7 让利出资记账
+
+适用条件：上游已经决策完成平台、商户或合作方承担多少让利成本，本服务只记录出资方账目交易。
+
+推荐入口：
+
+| 场景 | 入口 |
 | --- | --- |
-| [资金事实说明卡](资金事实说明卡模板.md) | 说明业务事实、主体、资金归属、账户类型、`normalBalanceSide`、金额、币种、幂等、路由、账务、投影、借贷平衡、余额影响和异常处理。 |
-| 能力成熟度判断 | 判断本次使用的是可接入能力、专项准入能力，还是只能进入 TDD 分析的能力。 |
-| 概念映射表 | 把业务单据、用户、商户、支付工具、外部账户、预算组和 Spend Rule 映射到 wind-funds 概念，并说明哪些对象是资金账务主体、哪些对象只是控制或查询维度。 |
-| 资金不变量和借贷平衡引用 | 回挂 DSL 资金场景借贷平衡与账务期望表，说明本接入命中哪些表行、哪些行不适用、账户类型、借贷平衡、余额影响和 TDD 断言。 |
-| 接入验收矩阵 | 明确状态、金额、账户类型、`normalBalanceSide`、route、posting、entry、projection、借贷平衡、余额影响、幂等、审计和红线测试。 |
-| [FAQ 与误用排查](FAQ与误用排查.md) | 识别支付工具当账户、冻结当扣款、授权当消费、外部非终态当成功、差错直接改账等误用。 |
-| [宣讲提纲](宣讲提纲.md) | 支撑产品和研发团队宣讲，帮助跨团队形成共同语言。 |
-| [接入评审清单](接入评审清单.md) | 组织评审会，确认参会角色、会前输入、规则矩阵、结论判定和会议纪要。 |
-| 工程变更边界 | 声明写入范围、只读范围、公共契约、DDL/H2、测试要求、验证命令和停止条件。 |
-| [接入申请](接入申请模板.md) 和生产准入材料 | 声明容量/SLA、权限矩阵、审计字段、告警阈值、Runbook、灰度回滚和外部规则核验状态。 |
+| 记录出资 | `FundsBenefitContributionTransactionService.settle` |
+| 冲回出资 | `FundsBenefitContributionTransactionService.refund` |
 
-## 交付边界
+多方出资就多次调用 `settle`，不要批量 API，也不要把多个出资方合并到一个营销账户。
 
-本目录只定义接入指导、准入检查和评估结论，不替代法务、合规、财务、税务、审计、通道、银行、卡组织、ACH 或持牌机构的最终确认。涉及真实资金、客户资金、商户待结算资金、个人信息、金融数据、跨境、外汇、卡组织、ACH、银行或 PSP 规则时，接入方必须提供规则来源、版本或发布日期、生效日期、适用范围、核验日期、确认方和确认状态。
+验证锚点：`FundsBenefitContributionTransactionServiceContractTests`、`FundsBenefitContributionTransactionServiceFlowTests`。
+
+## 7. 禁止路径
+
+| 禁止项 | 原因 |
+| --- | --- |
+| 业务方直接依赖 `ledger-impl`、`wallet-impl`、`transaction-impl`。 | 破坏模块边界，绕过公共契约。 |
+| 业务方直接写 ledger entry 或改余额投影。 | 破坏账本事实源。 |
+| 把支付工具、外部账户、VA、卡号、BudgetGroup、Spend Rule 当作 ledger subject。 | 它们只是引用或控制范围。 |
+| 把冻结当消费、扣款或提现成功。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`。 |
+| 授权拒绝后继续生成 route、posting 或 ledger entry。 | 拒绝不是资金事实。 |
+| 用 `contextVariables` 承载核心金额、分摊、账户或规则事实。 | 核心事实必须是强字段或稳定引用。 |
+| 外部 pending、审批中、通道处理中直接入账。 | 还没有成立资金事实。 |
+
+## 8. 验证命令
+
+接入文档或代码变更至少跑相关切片。只改本文档时可跑边界和相关场景测试，不必每次全量。
+
+| 变更范围 | 推荐命令 |
+| --- | --- |
+| ledger 接入说明或账本事实 | `just verify-slice DefaultLedgerPostingAssemblerTests,LedgerServiceImplTests,LedgerTransactionServiceImplTests,LedgerBalanceProjectionServiceImplTests tests` |
+| wallet 接入说明 | `just verify-slice FundsAccountCapabilityApplicationServiceTests,PaymentInstrumentCapabilityApplicationServiceTests,FundingResponsibilityResolutionApplicationServiceTests,SpendControlAdmissionApplicationServiceTests tests` |
+| transaction 接入说明 | `just verify-slice FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,FundsBalanceControlFailureFlowTests tests` |
+| 让利或外部入金说明 | `just verify-slice FundsBenefitContributionTransactionServiceContractTests,FundsBenefitContributionTransactionServiceFlowTests,ExternalFundsEventApplicationServiceTests tests` |
+| 模块边界 | `just test-boundary` |
+| 收口 | `just verify-cad` |
+
+## 9. 接入申请最小模板
+
+```text
+业务动作：
+使用入口：
+业务流水/幂等键：
+操作者：
+资金主体：
+账户类型：
+金额/币种：
+支付工具或外部引用：
+准入快照：
+原交易或原冻结引用：
+预期余额桶变化：
+预期账本交易/分录：
+失败无副作用要求：
+对应测试类：
+验证命令：
+不接入范围：
+```
+
+## 10. 当前不在本指南承诺范围
+
+清结算、对账、归档、重放、指标治理、VCC 产品化、全球账户、ACH、收单和通道协议适配不在本文接入承诺范围内。它们可以消费本文三层主链事实，但需要单独的产品设计、系统设计、TDD 和工程变更边界。
