@@ -1,4 +1,4 @@
-package com.wind.funds.wallet.model.request;
+package com.wind.funds.transaction.model.request;
 
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -14,8 +14,9 @@ import lombok.experimental.Accessors;
 /**
  * 外部资金事件消费请求。
  *
- * <p>该请求用于承载 ACH、银行文件、渠道回调或第三方钱包回调等外部资金事件的最小资金域语义；
- * 不替代交易层账户主体型请求，也不表示银行文件批次本身可以进入资金内核。</p>
+ * <p>该请求承载外部确认入金事件的最小交易语义。当前仅支持 confirmed credit 入金到内部资金账户，
+ * 并委派标准 topup 内核。外部扣账、return/NOC/reversal、信用账户还款或调额、差错调整等场景，
+ * 必须先明确事件方向、原交易引用和账务主体语义后再扩展。</p>
  *
  * @author Codex
  * @date 2026-06-21
@@ -36,11 +37,11 @@ public class ConsumeExternalFundsEventRequest {
     @NotBlank
     private String externalEventSn;
 
-    @Schema(description = "外部资金事件类型，例如 ACH_CREDIT_CONFIRMED、BANK_CREDIT_CONFIRMED；大小写和横线由钱包层归一")
+    @Schema(description = "外部资金事件类型，例如 ACH_CREDIT_CONFIRMED、BANK_CREDIT_CONFIRMED；大小写和横线由外部事件消费入口归一")
     @NotBlank
     private String externalEventType;
 
-    @Schema(description = "外部事件影响的内部资金账户或信用账户主体")
+    @Schema(description = "已确认外部入金影响的内部资金账户主体，仅支持 FUNDING_ACCOUNT")
     @NotNull
     private FundsAccountId targetAccountId;
 

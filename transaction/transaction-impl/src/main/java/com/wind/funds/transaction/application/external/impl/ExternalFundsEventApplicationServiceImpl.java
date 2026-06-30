@@ -5,15 +5,15 @@ import com.capte.domain.core.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.transaction.application.ExternalFundsEventApplicationService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
+import com.wind.funds.transaction.model.request.ConsumeExternalFundsEventRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.application.external.ExternalFundsEventApplicationService;
 import com.wind.funds.wallet.application.support.WalletExternalFundsRailSupport;
 import com.wind.funds.wallet.application.support.WalletExternalFundsRailSupport.ExternalCreditRailDecision;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
-import com.wind.funds.wallet.model.request.ConsumeExternalFundsEventRequest;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * 外部资金事件消费应用服务实现。
@@ -37,10 +36,6 @@ import java.util.Set;
 @AllArgsConstructor
 public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEventApplicationService {
 
-    private static final Set<String> POSTABLE_ACCOUNT_SUBJECT_TYPES = Set.of(
-            FundsSubjectType.FUNDING_ACCOUNT.name(),
-            FundsSubjectType.CREDIT_ACCOUNT.name());
-
     private static final String EXTERNAL_SOURCE_ACCOUNT_ID = "external_funds_event_source";
 
     private final FundsDirectTransactionService directTransactionService;
@@ -52,7 +47,6 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
         validateConsumeRequest(request);
         ExternalCreditRailDecision railDecision =
                 WalletExternalFundsRailSupport.requireConfirmedCreditRailDecision(request.getExternalEventType());
-        assertFundingAccountTarget(request.getTargetAccountId());
         return directTransactionService.topup(toTopupRequest(request, railDecision), operator);
     }
 
@@ -63,7 +57,7 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
         AssertUtils.hasText(request.getExternalEventSn(), "外部资金事件流水不能为空");
         AssertUtils.hasText(request.getExternalEventType(), "外部资金事件类型不能为空");
         AssertUtils.notNull(request.getTargetAccountId(), "外部资金事件目标账户不能为空");
-        assertPostableTargetAccount(request.getTargetAccountId());
+        assertFundingAccountTarget(request.getTargetAccountId());
         AssertUtils.notNull(request.getAmount(), "外部资金事件金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "外部资金事件金额必须大于 0");
         AssertUtils.notNull(request.getCurrency(), "外部资金事件币种不能为空");
@@ -72,15 +66,10 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
     }
 
     private void assertFundingAccountTarget(FundsAccountId targetAccountId) {
-        AssertUtils.isTrue(FundsSubjectType.FUNDING_ACCOUNT.name().equals(targetAccountId.type()),
-                "外部资金入金事件目标账户必须是资金账户");
-    }
-
-    private void assertPostableTargetAccount(FundsAccountId targetAccountId) {
         AssertUtils.hasText(targetAccountId.id(), "外部资金事件目标账户 ID 不能为空");
         AssertUtils.hasText(targetAccountId.type(), "外部资金事件目标账户类型不能为空");
-        AssertUtils.isTrue(POSTABLE_ACCOUNT_SUBJECT_TYPES.contains(targetAccountId.type()),
-                "外部资金事件目标账户必须是资金账户或信用账户");
+        AssertUtils.isTrue(FundsSubjectType.FUNDING_ACCOUNT.name().equals(targetAccountId.type()),
+                "外部资金入金事件目标账户必须是资金账户");
     }
 
     private FundsTransactionTopupRequest toTopupRequest(ConsumeExternalFundsEventRequest request,

@@ -1,4 +1,4 @@
-package com.wind.funds.wallet.application.external;
+package com.wind.funds.transaction.application.external;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
@@ -36,6 +36,7 @@ import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
+import com.wind.funds.transaction.application.ExternalFundsEventApplicationService;
 import com.wind.funds.transaction.services.impl.DefaultFundsFrozenOrderLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsInstructionLifecycleSaver;
 import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryService;
@@ -49,7 +50,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
-import com.wind.funds.wallet.model.request.ConsumeExternalFundsEventRequest;
+import com.wind.funds.transaction.model.request.ConsumeExternalFundsEventRequest;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.service.FundingAccountService;

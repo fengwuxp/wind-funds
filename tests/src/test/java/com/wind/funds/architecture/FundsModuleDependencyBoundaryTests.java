@@ -408,6 +408,25 @@ class FundsModuleDependencyBoundaryTests {
     }
 
     /**
+     * 场景：外部资金事件消费会生成标准交易和账本事实。
+     * 预期：公共契约归属 transaction-face，不再放在 wallet-face 的 application 入口下。
+     * 红线：wallet application 只解释支付工具、账户能力和支出控制，不承载交易事实消费入口。
+     */
+    @Test
+    void testExternalFundsEventContractShouldBelongToTransactionFace() {
+        Path root = workspaceRoot();
+
+        assertThat(root.resolve("transaction/transaction-face/src/main/java/com/wind/funds/transaction/application/"
+                + "ExternalFundsEventApplicationService.java")).exists();
+        assertThat(root.resolve("transaction/transaction-face/src/main/java/com/wind/funds/transaction/model/request/"
+                + "ConsumeExternalFundsEventRequest.java")).exists();
+        assertThat(root.resolve("wallet/wallet-face/src/main/java/com/wind/funds/wallet/application/external/"
+                + "ExternalFundsEventApplicationService.java")).doesNotExist();
+        assertThat(root.resolve("wallet/wallet-face/src/main/java/com/wind/funds/wallet/model/request/"
+                + "ConsumeExternalFundsEventRequest.java")).doesNotExist();
+    }
+
+    /**
      * 场景：ledger face 中历史资源型写接口仍处于兼容期。
      * 预期：wallet、transaction、reconciliation 和 governance 不直接调用余额直改、账本交易更新或删除能力。
      * 红线：跨模块生产调用方必须通过 ledger application facade 或交易事实 / 账本分录链路。
