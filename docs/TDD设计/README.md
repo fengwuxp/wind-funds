@@ -20,15 +20,15 @@
 
 成功标准：任一工程任务都能从 `AC-*`、`DSL-*`、`TDD-*`、`RED-*` 反查到目标测试资产、真实执行路径、核心断言、验证命令、未覆盖项和残余风险；无法证明的范围必须写成未覆盖范围、带条件通过或不适用原因。
 
-## MVP TDD 约规
+## 最小交付约规
 
-TDD 默认先证明 MVP 切片，而不是一次性铺大全量目标态。每个测试设计任务只覆盖最小闭环所需的正向、逆向、异常、幂等和红线路径；其他业务扩展、外部协议、清结算深水区、资金数据治理、运营后台和报表能力必须写成未覆盖范围或独立能力域。
+TDD 默认先证明最小交付切片，而不是一次性铺大全量目标态。每个测试设计任务只覆盖最小闭环所需的正向、逆向、异常、幂等和红线路径；其他业务扩展、外部协议、清结算深水区、资金数据治理、运营后台和报表能力必须写成未覆盖范围或独立能力域。
 
-MVP 测试必须优先证明资金不变量：状态正确、route snapshot 可追溯、posting plan 平衡、LedgerEntry 可核对、余额投影正确、重复请求无副作用、失败不产生半截事实。若一个测试只能证明接口不报错、状态变化或数量变化，不能作为 MVP 完成证据。
+最小交付测试必须优先证明资金不变量：状态正确、route snapshot 可追溯、posting plan 平衡、LedgerEntry 可核对、余额投影正确、重复请求无副作用、失败不产生半截事实。若一个测试只能证明接口不报错、状态变化或数量变化，不能作为最小交付完成证据。
 
 ## 阅读顺序
 
-本 README 只作为 TDD 设计入口。任务规划、状态账本、Grant 确认包和阶段推进材料已清理；当前只保留稳定测试设计口径。
+本 README 只作为 TDD 设计入口。工程规划、状态账本、工程边界确认包和阶段推进材料已清理；当前只保留稳定测试设计口径。
 
 | 顺序 | 文档 | 作用 |
 | --- | --- | --- |
@@ -74,7 +74,7 @@ TDD 设计的准入目标是证明设计已经能转成真实测试资产和验�
 | 评估维度 | TDD 侧必须证明 | 阻断信号 |
 | --- | --- | --- |
 | 可用性 | 产品场景能转成可执行或可转化的测试用例，包含输入事实、前置数据、动作和期望结果。 | 场景只能人工理解，无法写测试数据和断言。 |
-| MVP 裁剪 | 只选择最小闭环测试集，能证明目标场景成功、失败、幂等和红线；扩展能力有未覆盖说明。 | 为未来扩展提前铺大量测试，或把清结算、归档、P2 业务混进交易主线 Red。 |
+| 最小交付裁剪 | 只选择最小闭环测试集，能证明目标场景成功、失败、幂等和红线；扩展能力有未覆盖说明。 | 为未来扩展提前铺大量测试，或把清结算、归档、P2 业务混进交易主线 Red。 |
 | 资金安全 | 有资金变化的用例同时断言状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、余额桶、route snapshot、posting plan、ledger entry、balance projection、借贷平衡、余额影响和幂等。 | 只断言交易状态、entry 数量或“不报错”。 |
 | 金融红线 | 外部账户入账、敏感信息泄露、授权拒绝写账、冻结表达消费、投影反写事实、无审批调账等必须失败。 | 红线只写在文档里，没有 TDD-RED 用例或明确不适用原因。 |
 | 易用性 | 用户账单、商户账单、运营时间线、错误原因和审计查询有测试或断言来源。 | 只测后台内部对象，不证明使用者能理解结果。 |
@@ -107,7 +107,7 @@ Spend Rule 服务层分层测试口径：
 4. application service 测试不得要求被测对象直接访问 Mapper / Repository；基础服务测试可以覆盖 Mapper-backed 真实服务行为。
 5. `SpendRuleDecisionRecordServiceTests`、`SpendRuleDefinitionServiceTests` 和 `SpendRuleDefinitionServiceFlowTests` 是当前服务测试资产，分别覆盖决策记录幂等 / 窄查询 / 失败无资金副作用，以及规则定义 / 版本 / 挂载的标准基础服务和服务流行为。
 
-Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`assignmentSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立 Execution Grant。
+Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`assignmentSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立工程变更边界。
 
 涉及 Spend Rule 或资金主链路的代码切片，`just compile`、`just test-one`、`just test-module`、`just verify-fast` 和 `just verify-cad` 必须通过 classfile 错误桩扫描；`verify-classfiles` 会检查 `target/classes` 和 `target/test-classes` 中是否存在 `Unresolved compilation`，避免 Maven 命令成功但编译产物不可用。
 
@@ -125,9 +125,9 @@ Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`as
 
 授权支付工具入口只允许测试 application facade 的准入、解析、快照和委派，不允许把账户主体型 `FundsAuthorizationTransactionService.authorize` 请求替换为支付工具引用。支付工具生命周期授权入口已作为服务层最小切片落到 `InstrumentTransactionLifecycleApplicationService#authorizeByInstrument`，该统一入口只委派 `AuthorizationAdmissionApplicationService` 完成工具准入、资金责任、账户能力和 Spend Rule 决策证据校验；支付工具收款入口已作为服务层最小切片落到 `InstrumentTransactionLifecycleApplicationService#receiveByInstrument`：VA、ACH 或外部钱包端点收款先解析工具和账户能力，再委派账户主体型 `FundsDirectTransactionService#topup`，并把脱敏 `PaymentInstrumentRef` 固化到 route snapshot 用于审计和投影解释；收款请求必须携带 `expectedBindingVersion`，缺版本必须在交易内核前失败且无资金事实副作用。不改变交易 canonical 账户主体，不给 VA、卡或外部账户建账。P2 场景如 VCC 预付卡充值、共享卡调额、全球账户付款和 ACH/银行转账事件，必须先经业务能力包解释成归一资金事实，再复用 P1/P0 测试资产。
 
-授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核通过授权后继准入卡承接强制完成、无授权退款、争议裁决资金结果承接和并发竞争；支付工具与 Spend Rule 的生产可用性通过支付工具准入卡承接工具准入、资金责任解析、授权 application facade、Spend Rule 控制和只读投影。支付工具及周边支持队列整体排在账本账目、钱包基础能力和交易内核之后；未形成独立工程任务前，TDD 只能继续做差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
+授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核通过授权后继准入卡承接强制完成、无授权退款、争议裁决资金结果承接和并发竞争；支付工具与 Spend Rule 的生产可用性通过支付工具准入卡承接工具准入、资金责任解析、授权 application facade、Spend Rule 控制和只读投影。支付工具及周边支持队列整体排在账本账目、钱包基础能力和交易内核之后；未形成独立工程边界前，TDD 只能继续做差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 
-资金责任目标字段已在 `GSD2-B2-FR-TARGET-001` 首轮选择并落地 `targetSubjectType + targetSubjectId`，允许资源关系表达资金账户和信用账户目标主体；平台角色责任主体、完整 `FundingAllocationDecision` 摘要、route snapshot、账户层级快照和回放断言仍需后续 Grant。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、`SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleAssignment`、`SpendRuleDecisionRecord` / `SpendRuleDecisionRecord`、`SpendControlMovement` / `SpendControlMovement`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产 Done。
+资金责任目标字段已统一为并落地 `targetSubjectType + targetSubjectId`，允许资源关系表达资金账户和信用账户目标主体；平台角色责任主体、完整 `FundingAllocationDecision` 摘要、route snapshot、账户层级快照和回放断言仍需后续工程边界。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、`SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleAssignment`、`SpendRuleDecisionRecord` / `SpendRuleDecisionRecord`、`SpendControlMovement` / `SpendControlMovement`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产交付完成。
 
 ## 生产验证准入口径
 
@@ -174,10 +174,10 @@ TDD 设计区分“目标测试资产”和“执行证据”。目标测试资�
 
 | 裁剪规则 | 必须满足 | 不满足时处理 |
 | --- | --- | --- |
-| 一个 Red 对应一个业务问题 | 能反查 `businessQuestion`、`mvpScenario`、产品验收 ID 和 DSL caseId。 | 回到产品或 DSL，不写测试。 |
+| 一个 Red 对应一个业务问题 | 能反查 `businessQuestion`、`deliveryScenario`、产品验收 ID 和 DSL caseId。 | 回到产品或 DSL，不写测试。 |
 | 一个 Red 证明一个最小资金不变量 | 至少覆盖适用的主体、账户类型、`normalBalanceSide`、账目、金额、币种、route、posting、entry、projection、幂等和审计。 | 缩小场景或补资金事实表。 |
 | 失败路径必须有 forbidden facts | 明确不允许半截 route、posting、entry、投影、外部出款、敏感导出、治理反写或重复资金副作用。 | 先补失败无副作用断言。 |
-| 不把能力域混在一起 | A1-A4、B7、B8、P2 只能单独授权；清结算深水区、资金数据治理、业务专项不得混入交易主线 Red。 | 拆成独立 Red 候选和独立工程任务。 |
+| 不把能力域混在一起 | A1-A4、B7、B8、P2 只能单独授权；清结算深水区、资金数据治理、业务专项不得混入交易主线 Red。 | 拆成独立 Red 候选和独立工程边界。 |
 | 测试资产要真实可落地 | 指定目标测试类、真实执行路径、fixture/H2 数据、替身边界和验证命令。 | 只能做 TDD 分析或 contract-only。 |
 | 停止条件先写清 | 红灯不符合预期、公共契约/表结构越界、外部规则未确认、生产风险升高时如何停止。 | 不进入 Green 实现。 |
 
@@ -189,13 +189,13 @@ TDD 设计区分“目标测试资产”和“执行证据”。目标测试资�
 
 A0 基线核验阶段不写测试代码，但必须输出 `redCandidateSet`、`targetAssets`、`schemaNeed`、`minimumAssertions` 和 `testStopReasons`。只有工程任务明确写入范围后，才把候选 Red 转成实际测试写入。
 
-### MVP 任务测试卡
+### 最小交付任务测试卡
 
-每个 MVP 任务进入实现前，TDD 需要输出一张最小测试卡，避免任务被测试范围反向放大。
+每个最小交付任务进入实现前，TDD 需要输出一张最小测试卡，避免任务被测试范围反向放大。
 
 | 输出项 | 填写口径 |
 | --- | --- |
-| `mvpScenario` | 目标场景、入口动作、成功终态、失败终态和不覆盖范围。 |
+| `deliveryScenario` | 目标场景、入口动作、成功终态、失败终态和不覆盖范围。 |
 | `firstRedSet` | 只覆盖最小闭环的 Red；每个 Red 写清失败断言、目标测试类和验证命令。 |
 | `coreAssertions` | 状态、route snapshot、posting plan、LedgerEntry、余额投影、幂等、审计和失败无副作用中的适用断言。 |
 | `outOfScope` | 清结算深水区、资金数据治理、P2 业务、外部协议、完整运营后台和报表等不进入当前任务的范围。 |

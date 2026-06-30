@@ -160,7 +160,7 @@ DSL 主文档只记录目标契约、字段边界和验收红线。若后续扩�
 
 VCC、多级账户或父子账户相关 DSL 字段进入 fixture、Spec 或公共字段变更前，必须由账户层级工程任务确认 `AccountHierarchySnapshot`、`PostingRole`、父账户 / 根账户快照、层级版本、账目 profile、父账户是否允许 `PARENT_CONTROL` 分录、H2/DDL 范围和回放断言。未确认前，DSL 只能把这些对象作为目标态设计和 contract-only 约束，不能声明发卡账务、父账户汇总或父子账户账单已经生产可用。
 
-资金责任目标字段已在 `GSD2-B2-FR-TARGET-001` 首轮选择 `targetSubjectType + targetSubjectId`，资源关系可表达资金账户和信用账户目标主体。后续若要让 `FundingAllocationDecision` 正式声明平台角色解析后的平台资金账户以及 VCC 关联资金/信用子账户责任主体，必须继续同步 TDD、DSL fixture、摘要、route snapshot、账户层级快照和回放断言。
+资金责任目标字段统一使用 `targetSubjectType + targetSubjectId`，资源关系可表达资金账户和信用账户目标主体。若要让 `FundingAllocationDecision` 正式声明平台角色解析后的平台资金账户以及 VCC 关联资金/信用账户责任主体，必须同步 TDD、DSL fixture、摘要、route snapshot、账户层级快照和回放断言。
 
 ### 3.1 能力域到 DSL 承载和契约证据矩阵
 
@@ -292,14 +292,14 @@ flowchart TD
 | 授权撤销 | `AUTHORIZATION_TRANSACTION / REVERSAL`。 |
 | 授权过期不入资金交易 | 不生成 `AUTHORIZATION_TRANSACTION / EXPIRE`；到期、超时或通道未返回只进入提醒、差错候选或运营处理。 |
 | 直接交易退款或授权完成后退款 | `DIRECT_TRANSACTION / REFUND` 或授权链退款事件。 |
-| 争议拒付或追偿 | 首轮默认通过 `AUTHORIZATION_TRANSACTION / AUTH_REFUND` 携带拒付或争议原因、凭证、外部引用和审计上下文承接；差错追偿事实或独立 `CHARGEBACK` 入口只在后续专项 Grant 中确认。 |
+| 争议拒付或追偿 | 默认通过 `AUTHORIZATION_TRANSACTION / AUTH_REFUND` 携带拒付或争议原因、凭证、外部引用和审计上下文承接；差错追偿事实或独立 `CHARGEBACK` 入口必须由专项设计和工程边界确认。 |
 | 冻结 | `BALANCE_CONTROL / FREEZE`。 |
 | 解冻或到期释放 | `BALANCE_CONTROL / UNFREEZE`。 |
 | 资金账户余额调整 | `BALANCE_CONTROL / ADJUST`。 |
 | 外部余额异常纠偏 | `BALANCE_CONTROL / ADJUST`，必须携带外部终局事件、外部余额快照、差错单或审批、凭证和重新对账引用。 |
 | 信用额度或预算调整 | `BALANCE_CONTROL / LIMIT_ADJUST`。 |
 | 清算批次确认 / 清算确认 | `DIRECT_TRANSACTION / CLEARING_CONFIRM` 或清结算 DSL 对象；清分确认和清算候选只作为清结算对象，不进入 route/posting。 |
-| 收益分润清分与清算确认 | 清分确认和收益候选只作为清结算对象；收益清算批次确认使用 `DIRECT_TRANSACTION / CLEARING_CONFIRM` 或后续 Grant 命名的收益清算确认事件进入 route/posting。 |
+| 收益分润清分与清算确认 | 清分确认和收益候选只作为清结算对象；收益清算批次确认使用 `DIRECT_TRANSACTION / CLEARING_CONFIRM` 或经专项设计确认的收益清算确认事件进入 route/posting。 |
 | 结算锁定 | `DIRECT_TRANSACTION / SETTLEMENT_LOCK`。 |
 | 外部出款受理或在途 | `DIRECT_TRANSACTION / PAYOUT_SUBMITTED` 或出款状态事实。 |
 | 出款成功 | `DIRECT_TRANSACTION / PAYOUT_SUCCEEDED`。 |
@@ -358,7 +358,7 @@ flowchart TD
 | 外部余额异常纠偏 | 目标资金账户 `AVAILABLE` 或 `ADJUSTMENT`；外部钱包、VCC 发卡行、发卡处理商或第三方余额系统差异责任账户。 | 目标余额桶通常为负债/CREDIT；差异责任、挂账、成本或应收按审批结论和账户 profile 配置。 | 若外部终局事实证明我侧应下调可用：借目标资金账户 `AVAILABLE`；贷差异责任、挂账、平台成本、应收或外部差异账户。若外部终局事实证明我侧少记可用：借差异来源；贷目标资金账户 `AVAILABLE`。 | 可用余额按外部终局事实纠偏，允许进入负可用；差异责任或挂账同步变化，并进入风控、追偿、抵扣或人工处理。 | 只承接已终局或差错单确认的外部余额差异；pending、accepted、processing、人工备注或可疑口径不得入账；不得跨主体转移损失，不得把负余额当作可继续消费额度。`TDD-CTRL-012`、`TDD-CTRL-ERR-007`、`TDD-RECON-016`。 |
 | 信用额度或预算规则调整 | 信用账户 `LIMIT`、`AVAILABLE`、`AUTHORIZATION`；预算组下的 Spend Rule 控制额度、窗口和占用证据。 | 信用账户额度桶按 `LedgerProfile` 配置；预算规则不作为 `LedgerEntry` 主体，不等同现金资产。 | 信用增额常见为借 `LIMIT`、贷 `AVAILABLE`；降额按原配置反向；预算规则调整只更新控制视图和规则快照，不生成预算组主体分录。 | 可用额度或预算控制额度增加/减少，不产生现金沉淀。 | 账本周期缺失、规则窗口缺失、超额、越权或重复冲突失败无副作用；预算组和 Spend Rule 不得被当作资金余额主体。`TDD-CTRL-*`。 |
 | 清算批次确认 / 清算确认 | 商户 `CLEARING`；商户 `AVAILABLE`；风险准备金、费用扣减或保留款账户。 | 商户余额桶通常为负债/CREDIT；费用收入为 REVENUE/CREDIT；准备金按责任或挂账配置。 | 借：商户 `CLEARING` 总额；贷：商户 `AVAILABLE` 净额、平台费用或风险准备金等目标账目。 | 待清算减少；可用、费用、准备金或扣减账目按清算批次金额项增加。 | 清分确认和清算候选不入账；退款中、争议中、风控冻结、重大差错、候选未锁定或批次未确认不得进入清算确认。`TDD-CLS-*`、`TDD-RECON-*`。 |
-| 收益分润清算确认 | 平台分润成本、员工激励成本、合作方分润成本或收益来源账户；用户代理、平台员工或合作方解析后的资金账户或员工应付账户 `AVAILABLE`。 | 成本账户通常为 EXPENSE/DEBIT；收益参与方 `AVAILABLE` 或员工应付账户通常为负债/CREDIT；合作方账户按 profile 配置。 | 平台额外奖励场景：借平台分润成本或员工激励成本；贷收益参与方 `AVAILABLE` 或员工应付账户 `AVAILABLE`。从佣金池分出场景：必须先形成用户代理净佣金和员工二级分润两个金额项，再分别入账，不静默扣减。 | 清算确认后收益参与方可用或员工应付增加；平台成本或约定收益来源同步变化；清分和候选阶段余额不变。 | MVP 只支持两级归因验收；缺交易利润或 GMV 口径、归因快照、规则版本、审批、专业确认或收益参与方账户解析时不得入账。`TDD-B7-REVSHARE-*`、`TDD-CLS-*`、`TDD-RECON-*`。 |
+| 收益分润清算确认 | 平台分润成本、员工激励成本、合作方分润成本或收益来源账户；用户代理、平台员工或合作方解析后的资金账户或员工应付账户 `AVAILABLE`。 | 成本账户通常为 EXPENSE/DEBIT；收益参与方 `AVAILABLE` 或员工应付账户通常为负债/CREDIT；合作方账户按 profile 配置。 | 平台额外奖励场景：借平台分润成本或员工激励成本；贷收益参与方 `AVAILABLE` 或员工应付账户 `AVAILABLE`。从佣金池分出场景：必须先形成用户代理净佣金和员工二级分润两个金额项，再分别入账，不静默扣减。 | 清算确认后收益参与方可用或员工应付增加；平台成本或约定收益来源同步变化；清分和候选阶段余额不变。 | 最小交付只支持两级归因验收；缺交易利润或 GMV 口径、归因快照、规则版本、审批、专业确认或收益参与方账户解析时不得入账。`TDD-B7-REVSHARE-*`、`TDD-CLS-*`、`TDD-RECON-*`。 |
 | 结算锁定 | 商户 `AVAILABLE`、商户 `SETTLEMENT`。 | 两个余额桶通常为负债/CREDIT。 | 借：商户 `AVAILABLE`；贷：商户 `SETTLEMENT`。 | 可用减少，结算锁定增加；总责任不变。 | `SETTLEMENT` 是出款中或结算处理中余额桶，不等于授权链路 `SETTLE` 事件；锁定后不得重复结算。`TDD-SETTLE-*`。 |
 | 外部出款受理或在途 | 商户 `SETTLEMENT`；商户或平台 `IN_TRANSIT` 责任桶；外部银行账户只做引用。 | `SETTLEMENT` 和 `IN_TRANSIT` 默认按负债/CREDIT 承接；若未来改为在途资产，必须单独补 DSL 行和 TDD 断言。 | 采用责任在途桶时，借：`SETTLEMENT`；贷：`IN_TRANSIT`。不采用在途桶时不生成新的资金分录，只记录外部非终态引用。 | 采用在途桶：结算锁定减少，在途责任增加；不采用在途桶：余额不变。 | submitted、accepted、message sent 或 processing 不等于到账成功。`TDD-SETTLE-*`、`TDD-RAIL-*`。 |
 | 出款成功 | 商户 `SETTLEMENT` 或 `IN_TRANSIT`；平台现金/备付镜像 `CASH` 或外部回单现金映射。 | 商户锁定/在途通常为负债/CREDIT；平台现金为资产/DEBIT。 | 借：商户 `SETTLEMENT` 或 `IN_TRANSIT`；贷：平台 `CASH` 或付款资产镜像。 | 商户结算责任减少；平台现金资产减少；外部付款结果可追溯。 | 不得重复关闭；必须能证明商户结算负债减少和外部付款结果一致。`TDD-SETTLE-*`。 |
@@ -433,7 +433,7 @@ VCC、prepaid virtual card 和 shared card 的 DSL 处理顺序是：先用 `Pay
 | `WITHDRAW` | 低流动性账户 -> 高流动性账户。 | 提现、出款或内部余额退回外部银行 / 支付机构 / 主资金账户。 | 来源账户流动性等级、目标账户流动性等级、同名或同一实控主体校验结果、出款申请、外部终态或失败退回证据。 |
 | `TRANSFER` | 同流动性等级账户之间。 | 同层资金账户之间的价值转移。 | 双方账户流动性等级、同名或不同名关系、业务授权、幂等键和审计引用。 |
 
-充值和提现默认要求同名、同主体或同一实控主体；转账可以同名也可以不同名。不同名转账必须有业务关系、权限、风控、合规和审计证据。账户流动性等级或同名关系无法确认时，DSL 只能保留待确认字段或 contract-only 样例，不得声明生产资金流 Done。
+充值和提现默认要求同名、同主体或同一实控主体；转账可以同名也可以不同名。不同名转账必须有业务关系、权限、风控、合规和审计证据。账户流动性等级或同名关系无法确认时，DSL 只能保留待确认字段或 contract-only 样例，不得声明生产资金流交付完成。
 
 主体归属判定顺序：
 
@@ -729,7 +729,7 @@ public interface FundsBenefitContributionTransactionService {
 | 能力范围 | 可声明完成 | 不可声明完成 |
 | --- | --- | --- |
 | 公共契约 | `FundsBenefitContributionTransactionService` 暴露 `settle/refund`，请求模型能表达成本承担主体、让利承接账务主体、金额、资金性质、原订单或交易引用。 | route、posting、replay、清结算或对账已经完整消费权益让利资金事实；或已具备批量结算 API。 |
-| route/posting 消费 | MVP 已支持 `settle` 结算和退款型逆向处理通过标准直接交易、route、posting、ledger 链路形成独立资金影响；无资金转移解释事实暂 fail-fast 且无资金或账务副作用。 | 补贴、本金、手续费或代金券净额混记；缺资金责任主体仍放行；把 `HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 或非入账权益解释事实声明为已具备生产资金流可用。 |
+| route/posting 消费 | 最小交付已支持 `settle` 结算和退款型逆向处理通过标准直接交易、route、posting、ledger 链路形成独立资金影响；无资金转移解释事实暂 fail-fast 且无资金或账务副作用。 | 补贴、本金、手续费或代金券净额混记；缺资金责任主体仍放行；把 `HOLD_ONLY`、`RELEASE_ONLY`、`REVERSAL_REQUIRED` 或非入账权益解释事实声明为已具备生产资金流可用。 |
 | replay/清结算/对账/投影/归档消费 | 原交易事实、route snapshot 或等价不可变事实能取回原权益资金交易流水号、出资方、承接账务主体、金额、资金性质、专业确认状态、审计证据引用和外部规则核验引用。 | 退款、业务取消、可信撤销、清结算重跑、对账差错、投影重放、归档读取或治理重放按当前营销规则重算。 |
 
 Route、Posting 和 Replay 消费顺序：
@@ -746,7 +746,7 @@ Route、Posting 和 Replay 消费顺序：
 | --- | --- | --- | --- |
 | 伴随指令组 | `companionGroupSn`、主从角色、主交易引用、伴随指令引用。 | route、posting、幂等、交易投影、清分、对账、归档。 | 主交易和伴随指令各自孤立成功，查询或对账无法聚合。 |
 | 原子性模式 | 同事务、同业务组幂等加补偿或 Saga 补偿。 | 编排器、幂等服务、补偿任务、审计。 | 未选模式仍声明生产可用。 |
-| 补偿策略 | 主成功伴随失败、伴随成功主失败、重复提交、超时未知和人工接管的处理方式。 | 交易状态机、差错单、清结算阻断、Runbook。 | 部分成功被展示为普通成功或清结算 Done。 |
+| 补偿策略 | 主成功伴随失败、伴随成功主失败、重复提交、超时未知和人工接管的处理方式。 | 交易状态机、差错单、清结算阻断、Runbook。 | 部分成功被展示为普通成功或清结算交付完成。 |
 | 投影合并键 | `projectionMergeKey` 或等价业务组键。 | 用户账单、商户账单、运营时间线、财务核对视图、指标项输入和归档重放。 | 伴随指令在投影、清分或对账中丢失。 |
 
 历史补充权益事实只用于缺原让利出资记账交易的受控解释，不是补造原始事实。它可以是独立表、治理差异报告中的追加事实，或等价不可变存储，但必须满足：只追加、不覆盖；包含原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系；被撤销、证据缺失、范围不匹配或 digest 冲突时不得参与退款、对账、归档正式执行或治理重放正式执行。
@@ -941,7 +941,7 @@ Spend Control Movement 是控制事实 DSL，不是资金事实 DSL。它只描�
 | 控制事实 DSL 字段 | 含义 | 禁止 |
 | --- | --- | --- |
 | `movementSn` | 控制额度变动幂等流水。 | 复用资金交易流水替代控制额度变动流水。 |
-| `movementType` | `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`CONSUMED`、`RELEASED`、`EXPIRED`、`REVERSED` 等控制动作；`CONSUMED` 是下一 Grant 推荐的交易成功消耗语义，是否进入代码以授权为准。 | 用控制动作表达真实资金消费、入账、冻结或调账；把交易成功消耗和失败释放混用同一变动类型。 |
+| `movementType` | `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`CONSUMED`、`RELEASED`、`EXPIRED`、`REVERSED` 等控制动作；`CONSUMED` 表示交易成功后的控制额度消耗，是否写入实现以工程边界和测试证据为准。 | 用控制动作表达真实资金消费、入账、冻结或调账；把交易成功消耗和失败释放混用同一变动类型。 |
 | `targetSubjectRef` | 已解析资金账户、信用账户或平台角色解析后的平台资金账户。 | 预算组、Spend Rule、支付工具、卡号、PAN、token 或外部账户成为目标主体。 |
 | `budgetGroupRef` / `ruleRef` | 预算控制 scope、规则 ID、规则版本和规则决策证据。 | 规则通过直接生成 route、posting、entry 或余额投影。 |
 | `transactionRef` / `originalMovementRef` | 交易后控制消费、释放或退款释放时回链原资金交易和原控制额度变动。 | 缺原控制额度变动或原交易时补写控制消费事实，或由控制额度变动反向修改交易事实。 |
@@ -1050,7 +1050,7 @@ VCC 交易是授权交易的典型接入场景，但 VCC 卡、卡号、PAN、to
 
 预付卡和共享卡不引入“卡号主体”“共享卡主体”或独立 `VCC_ACCOUNT` 主体。prepaid virtual card 仍通过 `instrumentRef` 表达卡工具，通过 `SubjectRef(FUNDING_ACCOUNT)` 表达预付余额所在资金子账户，通过 `AccountHierarchySnapshot` 表达父账户约束，通过资金责任解析关系、route participant 或外部确认引用表达背后资金来源；shared card 仍通过 `instrumentRef`、binding snapshot、cardholder/department/project 上下文、BudgetGroup 上下文、Spend Rule 快照、`SubjectRef(CREDIT_ACCOUNT)`、`AccountHierarchySnapshot` 和 `FundingAllocationDecision` 表达使用模式。储值券、礼品卡或预付代金券属于权益、负债或预收待付语义，使用权益资金事实或等价不可变事实承接，不自动归入 VCC DSL。
 
-拒付/争议 DSL 口径：dispute / chargeback 是案件过程，不是资金底座默认交易结果。`settleRefund / AUTH_REFUND` 的争议字段、外部引用、凭证、audit、projection 和 idempotency digest 用于承接裁决后的退款结果，并区分普通授权链退款、`NO_AUTH` 退款和授权拒绝；请求侧不恢复 `refundMode`，`DISPUTE` 只作为资金指令内部上下文标签。用户败诉或无需资金处理时，DSL 只允许保留案件引用、审计和投影解释，不生成 route、posting、LedgerEntry 或余额变化。平台、商户或外部机构之间的追偿、准备金抵扣、争议费用或后续结算扣减由清结算、对账或争议专项 DSL 承接，不反向要求授权交易层新增 `chargeback` 主入口。独立 `chargeback` 只能作为历史兼容或内部适配资产，不能反向要求成为目标态主入口；完整争议运营、representment、裁决状态机、外部规则或旧 `chargeback` API 物理移除需要独立工程任务承接。
+拒付/争议 DSL 口径：dispute / chargeback 是案件过程，不是资金底座默认交易结果。`settleRefund / AUTH_REFUND` 的争议字段、外部引用、凭证、audit、projection 和 idempotency digest 用于承接裁决后的退款结果，并区分普通授权链退款、`NO_AUTH` 退款和授权拒绝；请求侧不恢复 `refundMode`，`DISPUTE` 只作为资金指令内部上下文标签。用户败诉或无需资金处理时，DSL 只允许保留案件引用、审计和投影解释，不生成 route、posting、LedgerEntry 或余额变化。平台、商户或外部机构之间的追偿、准备金抵扣、争议费用或后续结算扣减由清结算、对账或争议专项 DSL 承接，不反向要求授权交易层新增 `chargeback` 主入口。独立 `chargeback` 只能作为历史兼容或内部适配资产，不能反向要求成为目标态主入口；完整争议运营、representment、裁决状态机、外部规则或旧 `chargeback` API 物理移除需要独立工程边界承接。
 
 公共 API 退役已由 2026-06-26 目标态重新裁决覆盖：旧 `chargeback` 独立入口不再保留，`FundsAuthorizationTransactionService#chargeback`、请求模型、独立事件和 replay 分支进入移除；历史退出计划任务卡只保留审计过程，不再作为删除阻断。后续如需读取旧数据或外部争议案件，应由归档、迁移、清结算对账或上层 dispute case 专项承接，不恢复交易内核 `chargeback` 主入口。
 
@@ -1085,7 +1085,7 @@ VCC 授权接入口径：
 | 授权后全额完成 | 必须 | 授权占用一次性全部转为实际消费或清算结果。 | `SETTLE`，`settle`。 | 授权剩余归零；收款方或清算桶正确增加；不触碰 `LIMIT`。 |
 | 授权后部分完成 | 必须 | 只完成部分授权金额，保留剩余可完成或可释放金额。 | `SETTLE`，`settle`。 | 累计完成金额不超过授权金额；剩余授权正确；每次 posting 独立平衡。 |
 | 多次完成或拆单完成 | 必须 | 同一授权可被多笔清算或拆单事件逐步完成。 | 多次 `settle`，同一原授权引用。 | 多次完成累计正确；重复通知幂等；完成明细数量正确；不重复创建授权主记录。 |
-| 强制完成 | 必须 | 外部没有前置授权，但确认发生了必须入账的消费结果。 | 使用 `settle` 的强制完成模式承接；首轮 FORCE 模式不依赖 `authorizationTransactionSn`，而依赖外部原事实引用和受信策略或审批快照。 | 不伪造授权占用；允许透支必须有受信策略或审批快照、上限、原因、外部原事实引用、凭证和审计；不污染授权占用生命周期。 |
+| 强制完成 | 必须 | 外部没有前置授权，但确认发生了必须入账的消费结果。 | 使用 `settle` 的强制完成模式承接；初始 FORCE 模式不依赖 `authorizationTransactionSn`，而依赖外部原事实引用和受信策略或审批快照。 | 不伪造授权占用；允许透支必须有受信策略或审批快照、上限、原因、外部原事实引用、凭证和审计；不污染授权占用生命周期。 |
 
 #### 9.2.3 授权链退款用例
 
@@ -1228,7 +1228,7 @@ VCC 授权接入口径：
 | 白名单字段 | 命令或等价事件、来源单据、审批号、证据引用、幂等键、原事实引用、操作者、原因、可撤销边界和失败无副作用断言。 |
 | 夹具级别 | 本批是否新增资金流夹具；若只做设计或 contract-only，不能声明 route、posting、ledger entry、清结算或对账生产可用。 |
 | 专业确认状态 | 涉及客户资金、商户待结算资金、平台补贴、储值/预付、税务、会计、合同、银行、通道、卡组织、KYC/KYB/AML、跨境或外汇时，规则未确认不得驱动自动资金处理。 |
-| 使用者解释字段 | 事实状态、展示状态、操作状态、不可操作原因、下一步动作、责任方、到期重查和脱敏证据引用；缺失时不能作为放行依据。 |
+| 使用者解释字段 | 事实状态、展示状态、操作状态、不可操作原因、后续处理动作、责任方、到期重查和脱敏证据引用；缺失时不能作为放行依据。 |
 | 职责分离字段 | 发起人、复核人、审批人、确认方、租户/主体边界、查看原因、导出水印和审计引用；高危动作不得由单一无复核动作完成。 |
 
 清结算与对账的 DSL 边界：
@@ -1308,7 +1308,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-DIRECT-OVERDRAFT-001` | 受控透支和禁止透支边界。 | 后置费用可按策略透支；普通付款余额不足失败。 | 有策略时允许受控负 `AVAILABLE` 并记录治理信息；无策略不生成 route/posting。 | 无策略静默透支、余额不足失败仍写账、负余额继续自由消费。 |
 | `DSL-REVERSE-REFUND-FEE-001` | 原路径退款与手续费退回。 | `REFUND`、`FEE_REFUND` 引用原交易、原 route snapshot 和原费用 leg。 | 退款和退费沿原路径反向，累计金额不超过原可退金额。 | 工具换绑后按当前关系重选路、累计退款超额、退费无原费用 leg。 |
 | `DSL-AUTH-LIFECYCLE-001` | 授权批准、完成、可信撤销、过期不入资金交易和拒绝。 | `AUTHORIZATION_TRANSACTION` 的 `AUTHORIZE/SETTLE/REVERSAL/DECLINE`；不提供 `EXPIRE`。 | 批准占用 `AUTHORIZATION`；完成进入收款方或商户 `CLEARING`；可信撤销释放剩余占用；过期、超时或通道未返回不生成 route/posting/entry；拒绝不生成 route/posting/entry。 | 完成金额超过剩余授权、拒绝写账、过期生成资金事实或释放已完成金额。 |
-| `DSL-AUTH-FORCE-CAPTURE-001` | 无授权强制完成。 | `SETTLE` 强制完成模式，必须带受信策略或审批快照、上限、原因、外部原事实引用、凭证和审计；首轮 FORCE 模式不得依赖内部原授权流水。 | 不伪造授权占用；按强制完成策略生成明确资金事实；普通完成和 FORCE 完成请求摘要可区分。 | 无策略强制完成、超上限完成、缺外部原事实、缺凭证、缺审计、FORCE 模式回退普通授权完成路径。 |
+| `DSL-AUTH-FORCE-CAPTURE-001` | 无授权强制完成。 | `SETTLE` 强制完成模式，必须带受信策略或审批快照、上限、原因、外部原事实引用、凭证和审计；初始 FORCE 模式不得依赖内部原授权流水。 | 不伪造授权占用；按强制完成策略生成明确资金事实；普通完成和 FORCE 完成请求摘要可区分。 | 无策略强制完成、超上限完成、缺外部原事实、缺凭证、缺审计、FORCE 模式回退普通授权完成路径。 |
 | `DSL-AUTH-REFUND-001` | 授权链退款、无授权直接退款和争议类退款原因承接。 | 普通授权链退款引用原授权完成事实和完成路径；无授权退款以空原授权流水进入 no-auth 语义，携带 `externalReferenceSn`、退款原因、操作者和审计；争议类退款必须保留拒付/争议原因、外部引用、凭证和审计上下文。 | 已完成金额内退款沿完成 route snapshot 反向；无授权退款不补造授权占用，基于外部引用反向回补；查询、投影、审计和幂等摘要能区分普通退款、无授权退款、争议类退款和授权拒绝。 | 按当前绑定关系退款、退款超过已完成金额、无授权退款缺外部引用/原因/审计仍入账、无授权退款携带内部授权流水，或把争议退款压缩成不可区分的普通退款。 |
 | `DSL-AUTHORIZATION-CONTROL-SPEND-RULE-DECLINE-001` | 发卡授权控制扩展的支出规则拒绝。 | `contextVariables.authorizationControlDecision`、拒绝原因、命中规则和规则版本。 | 只记录授权前控制拒绝事实；不生成 route、posting、entry；spend-rule window 不等同于账本周期。 | 规则拒绝后仍入账、缺规则版本或拒绝原因、把支出规则窗口当作账本周期。 |
 | `DSL-BALANCE-CONTROL-FREEZE-001` | 冻结、部分解冻、冻结到期释放。 | `BALANCE_CONTROL` 只在同主体 bucket 内移动。 | `AVAILABLE <-> FROZEN`，不表达消费或跨主体价值转移。 | 冻结写成交易消费、跨主体冻结、解冻超过冻结剩余。 |
@@ -1343,7 +1343,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-BENEFIT-COMPANION-INSTRUCTION-001` | 独立伴随权益指令原子性。 | 伴随指令组、主从角色、原子性模式、补偿策略、投影合并键。 | 主交易和伴随指令可按同一业务组幂等、补偿、投影和对账；部分成功进入差错或补偿。 | 缺组键、缺补偿策略、部分成功静默成功、伴随指令丢失在投影或清分中。 |
 | `DSL-BENEFIT-SUPPLEMENTAL-FACT-001` | 历史补充权益事实。 | 原交易引用、补录来源、审批、复核、digest、版本、适用范围和撤销关系。 | 只追加补充事实，用于退款、差错、对账、归档读取或治理重放解释。 | 覆盖原交易、原 route snapshot、原账本事实；缺证据仍参与 settle 或 refund。 |
 | `DSL-BENEFIT-AUDIT-EVIDENCE-001` | 专业确认和审计证据包最终校验。 | 确认方、确认时间、结论版本、适用范围、有效期、脱敏证据引用、撤销或变更处理、审计责任人。 | 最终写入前重校验，失效时阻断、降级或转人工。 | dry-run 替代 settle 证据；过期、撤销、范围不匹配或敏感原文仍放行。 |
-| `DSL-BENEFIT-EXPLAINABLE-VIEW-001` | 含权益视图可理解且不误导。 | 视图类型、来源事实、事实状态、展示状态、操作状态、状态含义、不可操作原因、下一步动作、脱敏证据引用和外部规则核验引用。 | 用户、商户、运营、财务和审计视图只读解释资金状态，敏感证据只展示脱敏摘要或 reference。 | 授权占用、冻结、待清算、出款受理、补充事实或未确认规则被展示为已完成资金结果，或缺操作状态仍展示可操作。 |
+| `DSL-BENEFIT-EXPLAINABLE-VIEW-001` | 含权益视图可理解且不误导。 | 视图类型、来源事实、事实状态、展示状态、操作状态、状态含义、不可操作原因、后续处理动作、脱敏证据引用和外部规则核验引用。 | 用户、商户、运营、财务和审计视图只读解释资金状态，敏感证据只展示脱敏摘要或 reference。 | 授权占用、冻结、待清算、出款受理、补充事实或未确认规则被展示为已完成资金结果，或缺操作状态仍展示可操作。 |
 | `DSL-BENEFIT-CLEARING-RECONCILIATION-001` | 含权益交易进入清结算和对账。 | 清分候选、金额项、组件引用、营销核销引用和规则版本。 | 只拆分和核对金额项，不直接写资金事实；差异进入差错单。 | 权益差异静默补平、清分候选生成 LedgerEntry、补贴和本金净额混记。 |
 | `DSL-GOVERNANCE-ARCHIVE-MANIFEST-001` | 统一治理任务和资金归档 Manifest 状态隔离。 | `governanceTask`、`archiveRequest`、`archiveManifest`。 | 不生成 route/posting；统一任务完成不等于 Manifest 完成。 | 用统一任务号替代 Manifest、缺 checkpoint/watermark 仍归档成功。 |
 | `DSL-GOVERNANCE-PROJECTION-REPLAY-001` | 交易投影重放边界。 | `projectionReplayTask`、`differenceReport`、`manualResolutionRef`、`replayCheckpoint`。 | 只读事实并修复交易投影；正式覆盖必须有范围、审批、差异报告、人工处理闭环和 checkpoint。 | 无范围全量在线重放、重放生成资金交易、LedgerEntry 或绕过差异报告直接改投影事实。 |
@@ -1499,7 +1499,7 @@ JSON 契约用例按 `fixtureLevel` 分为契约夹具和资金流夹具。两�
 | 权益 replay 边界 | 缺原权益资金事实、原 route 摘要或经审批补充事实的退款、可信撤销、拒付/争议结果、清结算重跑和对账差错必须失败或人工处理，不按当前营销规则重算；授权过期不作为资金交易 replay 事件。 |
 | 工具换绑边界 | 退款、撤销、退费或拒付必须按原 route snapshot 和原工具快照回放。 |
 | 结算策略 | `SettlementPolicy` 解析失败、空表达式或未知策略必须显式失败，不能降级为实时结算。 |
-| 治理任务边界 | 统一治理任务、资金归档 Manifest、余额水位、账本余额快照、普通指标快照和交易投影重放 checkpoint 状态独立，治理任务不生成资金路径或账务分录。 |
+| 治理工程边界 | 统一治理任务、资金归档 Manifest、余额水位、账本余额快照、普通指标快照和交易投影重放 checkpoint 状态独立，治理任务不生成资金路径或账务分录。 |
 | 账本余额快照 | `HOT_ONLY`、`COLD_MANIFEST`、`MIXED` 覆盖模式分别校验；冷区和混合覆盖缺 Manifest 必须失败；普通指标快照不能替代余额快照。 |
 | 普通指标快照 | 只属于报表指标模块的发布和质量上下文；指标水位不得推进余额水位、修改归档 Manifest 或替代交易投影重放 checkpoint。 |
 | 授权拒绝 | 不生成 route、posting、entry。 |
@@ -1539,7 +1539,7 @@ JSON 契约用例按 `fixtureLevel` 分为契约夹具和资金流夹具。两�
 | 资金语义评审 | 主体、账目、金额、FX、route、posting 和投影边界是否清晰。 |
 | 权益语义评审 | 权益让利资金事实是否只承接已决策结果；`fundingNature`、成本承担主体、让利承接账务主体、金额和退款处置引用是否能解释每个资金影响。 |
 | 营销/让利账户评审 | 有资金影响的优惠让利出资是否解析到平台营销资金账户、商户让利责任账户或合作方补贴账户；平台、商户、合作方出资是否分开；非入账展示优惠是否没有误入账。 |
-| 权益生产评审 | 是否区分契约承载、route/posting 消费和生产链路 Done；是否证明原权益资金事实或历史摘要能被退款、可信撤销、拒付/争议结果、清结算、对账和交易投影重放取回；是否避免把授权过期当资金事实。 |
+| 权益生产评审 | 是否区分契约承载、route/posting 消费和生产链路交付完成；是否证明原权益资金事实或历史摘要能被退款、可信撤销、拒付/争议结果、清结算、对账和交易投影重放取回；是否避免把授权过期当资金事实。 |
 | 系分评审 | `instruction`、`route`、`snapshot`、`posting`、`entry`、`projection` 的职责是否单一。 |
 | 测试评审 | 是否有可解析 JSON 契约样例；是否覆盖成功、失败、幂等、余额变化、replay、digest、权益资金事实、无权益空值语义和缺原权益事实失败。 |
 | 运营与审计评审 | 差错、调账、退费、拒付、清结算结果是否具备来源、操作者、凭证和核销路径。 |

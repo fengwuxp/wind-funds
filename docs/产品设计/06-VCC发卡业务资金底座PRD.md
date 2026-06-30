@@ -350,7 +350,7 @@ flowchart LR
 | 业务问题 | fincone-issuing 承接 | wind-funds 承接 | 不允许的实现 |
 | --- | --- | --- | --- |
 | 开卡和卡生命周期 | Program、逻辑 BIN、Physical BIN Candidate、持卡人、开卡订单、开卡任务、卡状态同步和 issuer webhook。 | 仅在开卡费用、首次充值、VCC 关联子账户初始化、资金冻结、退款或资金责任需要时提供账户、交易和余额能力。 | 在 `wind-funds` 内实现 Program、BIN、Card、Cardholder 或 issuer 协议。 |
-| VCC 关联子账户建立 | 确认卡产品资金模式、账户归属、币种、账目 profile、父账户、背后资金责任来源和外部 account 引用。 | 建立或引用资金子账户/信用子账户，并初始化必要账本、账目和资金责任关系；具体代码落地由独立工程任务承接。 | 用卡号、PAN、token、卡组、持卡人或 `VCC_ACCOUNT` 直接建账。 |
+| VCC 关联子账户建立 | 确认卡产品资金模式、账户归属、币种、账目 profile、父账户、背后资金责任来源和外部 account 引用。 | 建立或引用资金子账户/信用子账户，并初始化必要账本、账目和资金责任关系；具体代码落地由独立工程边界承接。 | 用卡号、PAN、token、卡组、持卡人或 `VCC_ACCOUNT` 直接建账。 |
 | 支付工具注册 | 创建、激活、暂停、关闭 VCC 卡，并保存 issuer / processor 安全引用。 | 保存 `PaymentInstrumentRef`、脱敏展示、工具状态、方向、币种、能力、绑定版本、子账户引用和父账户引用。 | 把卡、卡 token、持卡人或卡组建成账本主体。 |
 | 资金责任解析 | 按服务计划、托管模式、业务审批、预算策略、预付责任、子账户 profile 和父账户约束提供上下文。 | 用 `FundingAllocationDecision` 解析 VCC 关联子账户背后的父级资金账户、父级信用账户、平台责任账户或 product funding / source account；预算组和 Spend Rule 只作为控制上下文。 | 用卡产品形态反推出账户类型，或把预算组、Spend Rule 写入 ledger subject。 |
 | 授权交易 | 接收授权请求，做来源校验、脱敏、幂等、规则上下文、商户/MCC/地区等场景归一。 | 提供 `authorizeByInstrument` 或等价 application facade，完成工具准入、绑定快照、资金责任解析、账户能力校验，再委派账户主体型授权内核。 | 把 `FundsAuthorizationTransactionService` 的 canonical 请求整体改成支付工具入参，或新增统一支付工具交易内核。 |
@@ -371,7 +371,7 @@ flowchart LR
 | 切片 | 目标 | 首批准入问题 | 允许落地点 | 不混入 |
 | --- | --- | --- | --- | --- |
 | A0 契约冻结 | 冻结 VCC 接入 DTO 语义、子账户/父账户语义、幂等键、requestDigest、敏感字段、错误类别和外部引用。 | VCC 输入是否都能映射为安全引用、资金子账户/信用子账户、父账户、支付工具、资金责任、授权或清算动作。 | PRD、DSL、系分、TDD、OpenSpec、接口伪契约。 | 生产代码、DDL、真实资金写入。 |
-| B2-ACCOUNT-HIERARCHY | 资金账户/信用账户父子结构和 VCC 关联子账户建模。 | 是否允许新增或调整父账户、子账户、accountPurpose、账目 profile、账本初始化、H2/DDL 和兼容迁移。 | DSL、系分、TDD、OpenSpec、接口伪契约；代码需独立工程任务授权。 | 卡生命周期、issuer 协议、支付工具交易内核、`VCC_ACCOUNT` 主体类型。 |
+| B2-ACCOUNT-HIERARCHY | 资金账户/信用账户父子结构和 VCC 关联子账户建模。 | 是否允许新增或调整父账户、子账户、accountPurpose、账目 profile、账本初始化、H2/DDL 和兼容迁移。 | DSL、系分、TDD、OpenSpec、接口伪契约；代码需独立工程边界授权。 | 卡生命周期、issuer 协议、支付工具交易内核、`VCC_ACCOUNT` 主体类型。 |
 | B2-PI-CAP | 支付工具能力准入。 | 工具状态、方向、币种、动作能力、绑定版本和敏感字段是否可判定。 | wallet application facade、DTO、契约测试。 | 授权状态机、Spend Rule 表、清结算。 |
 | B2-FR | 资金责任目标主体解析。 | 子账户、父账户和背后资金责任来源是否用 `targetSubjectType + targetSubjectId` 或等价主体引用表达。 | 资金责任关系契约、route snapshot、TDD fixture。 | 字段策略混用、直接交易、清结算、P2 轨道协议。 |
 | B4-AUTH-PI | 支付工具授权入口。 | `authorizeByInstrument` 是否只做 application facade 并委派账户主体型内核。 | 授权准入 facade、委派适配、拒绝无副作用测试。 | 替换授权内核 canonical 请求、完整 VCC 发卡。 |
@@ -614,9 +614,9 @@ VCC 对账不追求把供应商账单、授权、清算、费用、资金流水�
 
 ### 13.7 工程准入和 TDD 种子
 
-本节仍是设计基线，不自动授予编码权限。进入编码前必须选择一个最小切片，并由独立工程任务明确写入范围、DDL/H2、公共契约、测试类和验证命令。
+本节仍是设计基线，不自动授予编码权限。进入编码前必须选择一个最小切片，并由独立工程边界明确写入范围、DDL/H2、公共契约、测试类和验证命令。
 
-若业务要求优先推进 VCC、共享卡或预付卡，产品侧只允许先切到账户层级 `contract-only/no-ddl` 准入，证明卡绑定资金/信用子账户、父账户快照、账目 profile、绑定摘要和失败无副作用。该快速路径不代表 `P2-VCC-PREPAID`、`P2-VCC-LIFECYCLE`、清结算对账、支付工具准入或 VCC 生产资金流可声明 Done。
+若业务要求优先推进 VCC、共享卡或预付卡，产品侧只允许先切到账户层级 `contract-only/no-ddl` 准入，证明卡绑定资金/信用子账户、父账户快照、账目 profile、绑定摘要和失败无副作用。该快速路径不代表 `P2-VCC-PREPAID`、`P2-VCC-LIFECYCLE`、清结算对账、支付工具准入或 VCC 生产资金流可声明交付完成。
 
 | 切片 | TDD 种子 | 必须证明 |
 | --- | --- | --- |
