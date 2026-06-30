@@ -137,12 +137,15 @@
 
 适用条件：需要在交易前固化支出控制决策，或记录交易消费对控制范围的影响。
 
+当前接入口径：接入方先完成规则判断或外部风控判断，`wallet` 只固化 Spend Rule 决策证据、控制额度流水和只读投影；如接入方只需要单条已发布规则的轻量评估，可先调用 `SpendRuleEvaluationApplicationService.evaluate` 覆盖单笔金额、周期金额可用额度、周期次数和 MCC 黑白名单判断，再把最终决策证据交给准入服务固化。本文不承诺 Highnote 式托管规则引擎、velocity 窗口执行器或协同授权 webhook。
+
 推荐入口：
 
-1. `SpendControlAdmissionApplicationService.resolve`
-2. `BudgetControlLimitAdjustmentApplicationService.adjustLimit` 记录周期控制额度调增或调减
-3. 交易层入口
-4. `SpendControlTransactionConsumptionApplicationService` 记录消费、释放或退款补偿事实
+1. `SpendRuleEvaluationApplicationService.evaluate` 可选只读评估单条已发布规则
+2. `SpendControlAdmissionApplicationService.resolve` 固化最终支出控制决策
+3. `BudgetControlLimitAdjustmentApplicationService.adjustLimit` 记录周期控制额度调增或调减
+4. 交易层入口
+5. `SpendControlTransactionConsumptionApplicationService` 记录消费、释放或退款补偿事实
 
 BudgetGroup 是控制范围，不是账本主体。接入侧优先使用 `controlScopeId + periodId` 查询额度；`budgetGroupSn` 只是历史字段兼容名。
 

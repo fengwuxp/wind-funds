@@ -109,6 +109,28 @@ Spend Rule 服务层分层测试口径：
 
 Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`assignmentSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立工程变更边界。
 
+Highnote Spend Controls 对齐后的任务源以产品分册 09 的 `SR-HN-*` 为准。`SR-HN-001` 已同步“上游决策、wallet 固化证据、transaction 消费快照”的接入口径；`SR-HN-002` 已进入最小可执行规则 TDD，当前已落地单笔限额正反向评估、周期金额可用额度不足拒绝、周期次数达到上限拒绝和 MCC 黑白名单评估，并持续断言拒绝无资金事实副作用。
+
+SR-HN-002 最小测试卡：
+
+| 输出项 | 本轮结论 |
+| --- | --- |
+| `deliveryScenario` | 接入方需要一个可选轻量 Spend Rule evaluator，在进入现有准入服务前判断单条已发布规则是否通过；评估通过后仍由上游携带决策证据调用 `SpendControlAdmissionApplicationService` 固化。 |
+| `firstRedSet` | `SR-HN-002-RED-001` 至 `SR-HN-002-RED-005`。 |
+| `coreAssertions` | evaluator 只返回 `PASSED` / `REJECTED`、拒绝原因和决策摘要候选；不得写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 |
+| `outOfScope` | 多规则冲突合成、表达式引擎、脚本、运营后台、协同授权 webhook、外部风控协议、rolling window、生产调度重置和 DDL。 |
+| `nextGate` | SR-HN-002 当前收口；后续优先进入 SR-HN-003 控制窗口模型，商户 ID、国家、POS、PAN entry、CVV、AVS、多规则冲突和表达式引擎均另拆任务。 |
+
+SR-HN-002 首批 Red 候选：
+
+| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SR-HN-002-RED-001 | 单笔授权金额超过单笔限额时，接入方能否在交易内核前得到拒绝结论？ | 规则拒绝不得产生任何资金事实或控制事实。 | evaluator 返回 `REJECTED`，拒绝原因为单笔限额超限，决策摘要可稳定重放。 | 不写 `t_spend_rule_decision_record`、`t_spend_control_movement`、`t_funds_transaction`、route、posting、LedgerEntry。 | 金额 101 USD、单笔限额 100 USD；拒绝原因明确；调用前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 公共 evaluator 契约未确认，或测试只能通过改准入服务职责实现。 |
+| SR-HN-002-RED-002 | 当前周期可用额度不足时，是否能在交易内核前拒绝？ | 周期金额判断只读消费预算控制投影，不扣减余额、不预留额度。 | evaluator 读取 `BudgetControlProjectionDTO` 后返回 `REJECTED`。 | 不新增控制额度变动流水，不修改投影来源流水，不写资金事实。 | 周期限额 100 USD，已占用 80 USD，请求 30 USD；断言可用额度不足拒绝，且同周期控制流水仍为 2 条。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要新增 DDL 或把预算控制投影改成账本余额。 |
+| SR-HN-002-RED-003 | 当前周期次数达到上限时，是否能拒绝下一笔授权？ | 次数控制只基于同一 `controlScopeId + periodId + ruleId + ruleVersion` 下的既有控制流水按原始占用流水去重计数，不新增资金事实。 | evaluator 返回 `REJECTED`，拒绝原因为周期次数超限。 | 不写决策记录、控制额度变动、交易或账本事实。 | 周期次数上限 3，已有 3 条同周期消费或占用控制尝试，请求第 4 笔拒绝；同一授权 RESERVED 后 CONSUMED 不重复计数。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 现有流水无法表达稳定计数口径，或需要新增聚合表。 |
+| SR-HN-002-RED-004 | MCC 在黑名单或不在白名单时，是否能拒绝？ | MCC 判断只使用请求事实和规则规格，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED`，拒绝原因说明 MCC 不允许。 | 不写任何资金事实、决策记录或控制流水。 | 请求 MCC 为 `7995` 且 deny list 包含 `7995` 时拒绝；allow list 只包含 `5812` 而请求 MCC 为 `7995` 时拒绝；断言拒绝前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 后续新增商户 ID、国家、POS、PAN entry、CVV 或 AVS 时另拆任务。 |
+| SR-HN-002-RED-005 | 所有已实现最小规则均通过时，是否能返回可被准入服务消费的通过证据？ | 通过结论仍然不代表交易成功，也不自动写入准入决策记录。 | evaluator 返回 `PASSED`、空拒绝原因和稳定决策摘要候选。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry。 | 当前已实现单笔限额满足时摘要重复评估稳定一致；MCC allow list 命中时通过且无资金事实副作用。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要多规则冲突合成或外部风控确认才能判断通过。 |
+
 涉及 Spend Rule 或资金主链路的代码切片，`just compile`、`just test-one`、`just test-module`、`just verify-fast` 和 `just verify-cad` 必须通过 classfile 错误桩扫描；`verify-classfiles` 会检查 `target/classes` 和 `target/test-classes` 中是否存在 `Unresolved compilation`，避免 Maven 命令成功但编译产物不可用。
 
 涉及注解生成链路、MapStruct converter、MyBatis-Flex `NameRefs` 或 clean build 风险时，优先执行 `just clean-compile`；该命令会从空 `target` 重新编译 reactor，并校验代表性的生成类已写入 `target/classes`。

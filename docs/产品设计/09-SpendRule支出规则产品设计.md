@@ -364,6 +364,29 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 4. 控制额度变动流水生产迁移和历史数据回填。
 5. VCC、ACH、全球账户或收单外部规则的生产适用性。
 
+### 12.1 Highnote Spend Controls 对齐后的任务计划
+
+本计划只承接 Highnote Spend Rules、Velocity Controls 和 Collaborative Authorization 对齐后的差距，不代表已授权实现完整托管式规则平台。当前基线继续定位为“规则事实、决策证据、控制额度流水和只读投影”，后续按单一工程边界逐片推进。
+
+| 任务ID | 目标 | Owner | 最小交付 | 验证方式 | 停止条件 |
+| --- | --- | --- | --- | --- | --- |
+| SR-HN-001 | 明确对外接入口径：当前先支持上游已决策的 Spend Rule 证据和控制额度事实，不声明托管式规则引擎。 | 产品 owner、架构 owner。 | 用户接入指南、TDD 入口和系分入口同步说明“上游决策、wallet 固化证据、transaction 消费快照”。 | 文档 diff、现有 Spend Rule 服务层测试清单可反查。 | 发现需要新增公共 API、DTO 字段或 DDL 时停止，转工程边界评审。 |
+| SR-HN-002 | 补最小可执行规则切片，只覆盖单笔限额、周期金额、周期次数和 MCC 黑白名单。 | 架构 owner、wallet owner、测试 owner。 | 规则执行只作为可选轻量 evaluator，不引入表达式引擎、脚本沙箱或运营后台。 | 新增最小 TDD：超单笔拒绝、周期超额拒绝、次数超限拒绝、MCC 拒绝和拒绝无资金事实副作用。 | 需要多规则复杂冲突、脚本、外部风控或卡组织正式规则时停止。 |
+| SR-HN-003 | 将 velocity control 收敛为控制窗口模型，不复用账本周期，不新增预算组账本。 | 产品 owner、架构 owner、wallet owner。 | 明确 `windowType`、`periodId`、时区和重置口径，复用 `SpendControlMovement` 和预算控制投影。 | 控制窗口 TDD 证明当前周期和历史周期可查询，跨周期、跨账户、跨 scope 不串账。 | 需要 rolling window、cooldown 或生产调度重置时停止，拆独立任务。 |
+| SR-HN-004 | 评估协同授权接入边界，只定义本系统消费外部 approve / decline 证据的契约。 | 产品 owner、风控 owner、架构 owner。 | 保持 `SpendControlAdmissionApplicationService` 消费外部决策证据；不内建 webhook 注册、验签、超时和 stand-in。 | 准入测试证明外部拒绝无 route、posting、LedgerEntry，外部通过仍需账户能力和资金责任校验。 | 一旦要做 webhook endpoint、HMAC、超时兜底或模拟工具，转外部接入工程边界。 |
+| SR-HN-005 | 多规则裁决证据升级评审。 | 产品 owner、架构 owner、测试 owner。 | 评估 `evaluatedRules`、`decisionPolicy`、`finalDecision` 是否进入公共契约或仅保留在内部解释 payload。 | 先补契约评审和 TDD Red，不直接改公共 DTO。 | 涉及公共契约破坏性变更、数据迁移或历史决策回填时停止。 |
+
+SR-HN-002 当前推进边界与已落地切片：
+
+1. 最小 evaluator 只输出规则评估结论，不写 Spend Rule 决策记录、控制额度变动流水、资金交易、route、posting、LedgerEntry 或账本投影。
+2. `SpendControlAdmissionApplicationService` 继续保持“消费上游决策证据并固化控制事实”的现有职责，不扩展为规则执行入口。
+3. 当前已新增独立 wallet evaluator 契约，单笔切片输入已发布的 `ruleId`、`ruleVersion`、交易金额、币种、支付工具动作和业务流水，读取已发布 `ruleSpec.limitSpec.amountLimit`，输出 `PASSED` / `REJECTED`、拒绝原因和决策摘要候选。
+4. 当前已落地单笔限额超限拒绝、限额内通过、摘要稳定、周期金额可用额度不足拒绝、周期次数达到上限拒绝，以及 MCC 黑白名单拒绝 / 通过；周期金额通过 `controlScopeId`、`periodId` 和可选 `targetAccountId` 只读复用 `BudgetControlProjectionDTO`，周期次数通过同一控制范围和周期下的既有控制占用 / 消耗流水按原始占用流水去重计数，MCC 通过 `EvaluateSpendRuleRequest.merchantCategoryCode` 和 `ruleSpec.limitSpec.merchantCategoryControl` 判断，均不新增控制流水或资金事实。
+5. `merchantCategoryControl.deniedMccCodes` 和 `allowedMccCodes` 缺省时按空集合处理；黑名单命中优先拒绝，白名单非空且未命中时拒绝。
+6. 若发现需要新增数据库字段、规则运营后台、外部风控协议、协同授权 webhook、rolling window 或复杂多规则裁决，应停止 SR-HN-002，拆成独立工程边界。
+
+当前进度：SR-HN-001 文档口径已同步；SR-HN-002 已落地单笔限额、周期金额、周期次数和 MCC 黑白名单 evaluator 代码切片。下一步优先进入 SR-HN-003 velocity control / 控制窗口模型，不在 SR-HN-002 内继续扩展规则引擎。
+
 ## 13. 产品到架构和 TDD 交接
 
 业务驱动架构交接包：

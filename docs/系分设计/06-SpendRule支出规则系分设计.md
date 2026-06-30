@@ -801,6 +801,22 @@ git diff --check
 6. VCC、ACH、全球账户、收单等外部规则生产适用性确认。
 7. 生产权限模型、灰度开关、告警、Runbook、数据迁移和回滚演练。
 
+Highnote Spend Controls 对齐后的后续工程边界以产品分册 09 的 `SR-HN-*` 为准。首轮 `SR-HN-001` 只同步接入口径和未完成边界；后续若进入最小 evaluator、velocity 窗口或协同授权接入，必须按单一工程任务重新确认 writeScope、schemaDecision、targetTests 和停止条件。
+
+SR-HN-002 工程交接卡：
+
+| 项 | 结论 |
+| --- | --- |
+| Task ID | SR-HN-002-SPEND-RULE-LIGHTWEIGHT-EVALUATOR |
+| 目标 | 补一个可选轻量 evaluator，只判断单条已发布 Spend Rule 在当前请求事实下是否通过，不替代外部风控或完整规则引擎。 |
+| 当前 writeScope | `wallet-face` 已新增独立 evaluator 公共契约、Request 和 DTO；`wallet-impl` 已新增单笔限额、周期金额只读投影、周期次数只读计数和 MCC 黑白名单评估实现；`tests` 已新增服务层 H2 流程测试。 |
+| readScope | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendControlMovementService`、`BudgetControlProjectionDTO`、`SpendControlAdmissionApplicationService`、现有 Spend Rule 流程测试。 |
+| 禁止范围 | 不修改 `SpendControlAdmissionApplicationService` 的“消费外部决策证据”职责；不新增 DDL；不引入表达式引擎、脚本、运营后台、webhook、外部风控协议或多规则冲突合成。 |
+| schemaDecision | 已落地单笔限额切片使用已存在的 `ruleSpec.limitSpec.amountLimit` JSON；已落地周期金额切片通过 `counterSpec + limitSpec.amountLimit` 读取预算控制投影；已落地周期次数切片通过 `counterSpec + limitSpec.countLimit.maxCount` 读取同一控制范围和周期下的控制占用 / 消耗流水，并按原始占用流水去重；已落地 MCC 切片通过 `EvaluateSpendRuleRequest.merchantCategoryCode` 和 `ruleSpec.limitSpec.merchantCategoryControl.deniedMccCodes / allowedMccCodes` 判断，不新增 DDL。 |
+| targetTests | `SpendRuleEvaluationApplicationServiceTests` 已覆盖单笔限额超限拒绝、限额内通过、摘要稳定、周期金额可用额度不足拒绝、周期次数达到上限拒绝、同一授权占用后消费不重复计数、MCC 黑名单命中拒绝、白名单未命中拒绝、白名单命中通过和无资金事实副作用；回归 `SpendControlAdmissionApplicationServiceTests` 证明准入服务职责未漂移。 |
+| 验证命令 | 原子实现优先 `just test-one SpendRuleEvaluationApplicationServiceTests tests`；若新增公共契约，再执行 `just compile` 和相关 wallet spend control 回归。 |
+| 停止条件 | 需要破坏公共兼容、改表、改交易 canonical 入参、引入规则引擎或让 transaction 执行 Spend Rule 时停止。 |
+
 ## 14. 能力状态和生产未覆盖项
 
 | 能力域 | 当前证据 | 生产准入前还需 | 验证入口 |
