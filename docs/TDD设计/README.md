@@ -109,7 +109,7 @@ Spend Rule 服务层分层测试口径：
 
 Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`assignmentSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立工程变更边界。
 
-Highnote Spend Controls 对齐后的任务源以产品分册 09 的 `SR-HN-*` 为准。`SR-HN-001` 已同步“上游决策、wallet 固化证据、transaction 消费快照”的接入口径；`SR-HN-002` 已落地最小可执行规则 TDD；`SR-HN-003` 至 `SR-HN-005` 分别补齐控制窗口、外部决策证据和多规则最终裁决摘要的测试与契约锚点，并持续断言不得产生越界资金事实。
+Highnote Spend Controls 对齐后的任务源以产品分册 09 的 `SR-HN-*` 为准。`SR-HN-001` 已同步“上游决策、wallet 固化证据、transaction 消费快照”的接入口径；`SR-HN-002` 已落地最小可执行规则 TDD；`SR-HN-003` 至 `SR-HN-005` 分别补齐控制窗口、外部决策证据和多规则最终裁决摘要的测试与契约锚点，并持续断言不得产生越界资金事实。准入 / 授权公共请求优先使用 `controlScopeId` 表达控制范围，`budgetGroupSn` 仅作为兼容字段参与同值校验和历史映射。
 
 SR-HN-002 最小测试卡：
 

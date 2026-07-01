@@ -151,7 +151,7 @@
 4. 交易层入口
 5. `SpendControlTransactionConsumptionApplicationService` 记录消费、释放或退款补偿事实
 
-BudgetGroup 是控制范围，不是账本主体。接入侧优先使用 `controlScopeId + periodId` 查询额度；`budgetGroupSn` 只是历史字段兼容名。
+BudgetGroup 是控制范围，不是账本主体。接入侧优先使用 `controlScopeId + periodId` 查询额度，并在准入 / 授权请求中优先传 `controlScopeId`；`budgetGroupSn` 只是历史字段兼容名，若与 `controlScopeId` 同时传入必须保持一致。
 
 典型周期额度流程：
 
