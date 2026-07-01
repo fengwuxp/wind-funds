@@ -111,6 +111,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String POS_CATEGORY_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-pos-category-allow";
 
+    private static final String CVV_REQUIRED_RULE_ID = "sr_evaluation_cvv_required";
+
+    private static final String CVV_REQUIRED_RULE_DIGEST = "sha256:spend-rule-evaluation-cvv-required";
+
     private static final String CONTROL_SCOPE_ID = "scope_spend_rule_evaluation";
 
     private static final String PERIOD_ID = "2026-07";
@@ -179,6 +183,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String POS_CATEGORY_ALLOW_RULE_SPEC = """
             {"limitSpec":{"pointOfServiceCategoryControl":{"allowedPointOfServiceCategories":["AUTOMATED_FUEL_DISPENSER"]}}}
+            """;
+
+    private static final String CVV_REQUIRED_RULE_SPEC = """
+            {"limitSpec":{"cvvControl":{"required":true}}}
             """;
 
     @Autowired
@@ -674,6 +682,60 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：电商卡要求持卡人在交易时提供 CVV。
+     * 输入：规则要求 CVV，请求未提供 CVV 事实。
+     * 输出：返回拒绝评估结论。
+     * 红线：CVV 规则只接收是否提供 CVV 的布尔事实，不保存 CVV 原文，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateCvvRequiredMissingShouldRejectWithoutFundsSideEffect() {
+        publishCvvRequiredRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(CVV_REQUIRED_RULE_ID)
+                        .setCvvProvided(false));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("未提供 CVV");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(CVV_REQUIRED_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(CVV_REQUIRED_RULE_ID);
+        assertThat(countSpendControlMovement(CVV_REQUIRED_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：电商卡要求 CVV 且请求已提供 CVV 事实。
+     * 输入：规则要求 CVV，请求提供 CVV 事实。
+     * 输出：返回通过评估结论。
+     * 红线：评估通过仍不代表授权成功，不保存 CVV 原文，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateCvvRequiredProvidedShouldPassWithoutFundsSideEffect() {
+        publishCvvRequiredRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(CVV_REQUIRED_RULE_ID)
+                        .setCvvProvided(true));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(CVV_REQUIRED_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(CVV_REQUIRED_RULE_ID);
+        assertThat(countSpendControlMovement(CVV_REQUIRED_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     private void assertNoEvaluationSideEffects(LedgerFactSnapshot before) {
         assertNoSpendRuleDecisionRecord();
         assertNoSpendControlMovement();
@@ -761,6 +823,11 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     private void publishPosCategoryAllowRuleVersion() {
         publishRuleVersion(POS_CATEGORY_ALLOW_RULE_ID, POS_CATEGORY_ALLOW_RULE_DIGEST,
                 POS_CATEGORY_ALLOW_RULE_SPEC, SpendRuleType.POINT_OF_SERVICE_CATEGORY, "POS 类别白名单控制");
+    }
+
+    private void publishCvvRequiredRuleVersion() {
+        publishRuleVersion(CVV_REQUIRED_RULE_ID, CVV_REQUIRED_RULE_DIGEST, CVV_REQUIRED_RULE_SPEC,
+                SpendRuleType.CVV_REQUIRED, "CVV 必填控制");
     }
 
     private void publishRuleVersion(String ruleId, String ruleDigest, String ruleSpec) {
@@ -865,156 +932,39 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     }
 
     private void cleanupSpendRuleEvaluationTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, PERIOD_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, COUNT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, MCC_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, MCC_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, COUNTRY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, MERCHANT_ID_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, POS_CATEGORY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
-                TENANT_ID, POS_CATEGORY_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PERIOD_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MCC_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MCC_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNTRY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MERCHANT_ID_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, POS_CATEGORY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, POS_CATEGORY_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PERIOD_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MCC_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MCC_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNTRY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MERCHANT_ID_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, POS_CATEGORY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, POS_CATEGORY_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PERIOD_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MCC_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MCC_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNTRY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MERCHANT_ID_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, POS_CATEGORY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, POS_CATEGORY_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PERIOD_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MCC_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MCC_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNTRY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MERCHANT_ID_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, POS_CATEGORY_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
-                TENANT_ID, POS_CATEGORY_ALLOW_RULE_ID);
+        for (String ruleId : spendRuleEvaluationRuleIds()) {
+            jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                    TENANT_ID, ruleId);
+            jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
+                    TENANT_ID, ruleId);
+            jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                    TENANT_ID, ruleId);
+            jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                    TENANT_ID, ruleId);
+            jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                    TENANT_ID, ruleId);
+        }
+    }
+
+    private String[] spendRuleEvaluationRuleIds() {
+        return new String[]{
+                RULE_ID,
+                PERIOD_RULE_ID,
+                COUNT_RULE_ID,
+                MCC_RULE_ID,
+                MCC_ALLOW_RULE_ID,
+                COUNTRY_RULE_ID,
+                COUNTRY_ALLOW_RULE_ID,
+                CARD_DATA_INPUT_RULE_ID,
+                CARD_DATA_INPUT_ALLOW_RULE_ID,
+                MERCHANT_ID_RULE_ID,
+                MERCHANT_ID_ALLOW_RULE_ID,
+                PAN_ENTRY_MODE_RULE_ID,
+                PAN_ENTRY_MODE_ALLOW_RULE_ID,
+                POS_CATEGORY_RULE_ID,
+                POS_CATEGORY_ALLOW_RULE_ID,
+                CVV_REQUIRED_RULE_ID
+        };
     }
 
     private void assertNoSpendRuleDecisionRecord() {

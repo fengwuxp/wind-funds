@@ -59,6 +59,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String CARD_DATA_INPUT_CAPABILITY_REJECT_REASON = "卡数据输入能力不允许";
 
+    private static final String CVV_REQUIRED_REJECT_REASON = "未提供 CVV";
+
     private static final String PAN_ENTRY_MODE_REJECT_REASON = "PAN 录入方式不允许";
 
     private static final String POINT_OF_SERVICE_CATEGORY_REJECT_REASON = "POS 类别不允许";
@@ -79,6 +81,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY = "cardDataInputCapabilityControl";
 
+    private static final String CVV_CONTROL_KEY = "cvvControl";
+
     private static final String PAN_ENTRY_MODE_CONTROL_KEY = "panEntryModeControl";
 
     private static final String POINT_OF_SERVICE_CATEGORY_CONTROL_KEY = "pointOfServiceCategoryControl";
@@ -88,6 +92,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String CURRENCY_KEY = "currency";
 
     private static final String MAX_COUNT_KEY = "maxCount";
+
+    private static final String REQUIRED_KEY = "required";
 
     private static final String DENIED_MCC_CODES_KEY = "deniedMccCodes";
 
@@ -177,6 +183,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return evaluateCardDataInputCapability(request, cardDataInputCapabilityControlOf(ruleSpec));
         }
+        if (hasCvvControl(ruleSpec)) {
+            return evaluateCvvRequired(request, cvvRequiredOf(ruleSpec));
+        }
         if (hasPanEntryModeControl(ruleSpec)) {
             return evaluatePanEntryMode(request, panEntryModeControlOf(ruleSpec));
         }
@@ -237,6 +246,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private boolean hasCardDataInputCapabilityControl(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         return limitSpec != null && limitSpec.getJSONObject(CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY) != null;
+    }
+
+    private boolean hasCvvControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(CVV_CONTROL_KEY) != null;
     }
 
     private boolean hasPanEntryModeControl(JSONObject ruleSpec) {
@@ -326,6 +340,16 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 normalizedCodes(panEntryModeControl, ALLOWED_PAN_ENTRY_MODES_KEY));
     }
 
+    private CvvRequired cvvRequiredOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject cvvControl = limitSpec.getJSONObject(CVV_CONTROL_KEY);
+        AssertUtils.notNull(cvvControl, "Spend Rule 规则规格缺少 limitSpec.cvvControl");
+        Boolean required = cvvControl.getBoolean(REQUIRED_KEY);
+        AssertUtils.notNull(required, "Spend Rule CVV 必填配置不能为空");
+        return new CvvRequired(required);
+    }
+
     private PointOfServiceCategoryControl pointOfServiceCategoryControlOf(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
@@ -406,6 +430,14 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         }
         if (!control.allowedCardDataInputCapabilities().isEmpty()
                 && !control.allowedCardDataInputCapabilities().contains(cardDataInputCapability)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
+    private SpendControlDecisionResult evaluateCvvRequired(EvaluateSpendRuleRequest request,
+                                                           CvvRequired cvvRequired) {
+        if (cvvRequired.required() && !Boolean.TRUE.equals(request.getCvvProvided())) {
             return SpendControlDecisionResult.REJECTED;
         }
         return SpendControlDecisionResult.PASSED;
@@ -512,6 +544,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return CARD_DATA_INPUT_CAPABILITY_REJECT_REASON;
         }
+        if (hasCvvControl(ruleSpec)) {
+            return CVV_REQUIRED_REJECT_REASON;
+        }
         if (hasPanEntryModeControl(ruleSpec)) {
             return PAN_ENTRY_MODE_REJECT_REASON;
         }
@@ -570,6 +605,7 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("cardDataInputCapability", request.getCardDataInputCapability() == null
                 ? ""
                 : normalizeUpperCode(request.getCardDataInputCapability()));
+        digestValues.put("cvvProvided", request.getCvvProvided() == null ? "" : request.getCvvProvided());
         digestValues.put("panEntryMode", request.getPanEntryMode() == null
                 ? ""
                 : normalizeUpperCode(request.getPanEntryMode()));
@@ -621,6 +657,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private record CardDataInputCapabilityControl(Set<String> deniedCardDataInputCapabilities,
                                                   Set<String> allowedCardDataInputCapabilities) {
+    }
+
+    private record CvvRequired(Boolean required) {
     }
 
     private record PanEntryModeControl(Set<String> deniedPanEntryModes, Set<String> allowedPanEntryModes) {

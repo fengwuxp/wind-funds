@@ -20,6 +20,7 @@ public enum SpendRuleType implements DescriptiveEnum {
     MERCHANT_ID("商户标识控制"),
     COUNTRY("国家或地区控制"),
     CARD_DATA_INPUT_CAPABILITY("卡数据输入能力控制"),
+    CVV_REQUIRED("CVV 必填控制"),
     PAN_ENTRY_MODE("PAN 录入方式控制"),
     POINT_OF_SERVICE_CATEGORY("POS 类别控制"),
     CURRENCY("币种控制"),
