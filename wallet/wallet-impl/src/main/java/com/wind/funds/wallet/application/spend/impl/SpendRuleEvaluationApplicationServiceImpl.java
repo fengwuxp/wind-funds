@@ -59,6 +59,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String CARD_DATA_INPUT_CAPABILITY_REJECT_REASON = "卡数据输入能力不允许";
 
+    private static final String CARD_TRANSACTION_PROCESSING_TYPE_REJECT_REASON = "卡交易处理类型不允许";
+
     private static final String CVV_REQUIRED_REJECT_REASON = "未提供 CVV";
 
     private static final String PAN_ENTRY_MODE_REJECT_REASON = "PAN 录入方式不允许";
@@ -80,6 +82,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String MERCHANT_COUNTRY_CONTROL_KEY = "merchantCountryControl";
 
     private static final String CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY = "cardDataInputCapabilityControl";
+
+    private static final String CARD_TRANSACTION_PROCESSING_TYPE_CONTROL_KEY = "cardTransactionProcessingTypeControl";
 
     private static final String CVV_CONTROL_KEY = "cvvControl";
 
@@ -110,6 +114,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String DENIED_CARD_DATA_INPUT_CAPABILITIES_KEY = "deniedCardDataInputCapabilities";
 
     private static final String ALLOWED_CARD_DATA_INPUT_CAPABILITIES_KEY = "allowedCardDataInputCapabilities";
+
+    private static final String DENIED_CARD_TRANSACTION_PROCESSING_TYPES_KEY = "deniedCardTransactionProcessingTypes";
+
+    private static final String ALLOWED_CARD_TRANSACTION_PROCESSING_TYPES_KEY = "allowedCardTransactionProcessingTypes";
 
     private static final String DENIED_PAN_ENTRY_MODES_KEY = "deniedPanEntryModes";
 
@@ -183,6 +191,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return evaluateCardDataInputCapability(request, cardDataInputCapabilityControlOf(ruleSpec));
         }
+        if (hasCardTransactionProcessingTypeControl(ruleSpec)) {
+            return evaluateCardTransactionProcessingType(request, cardTransactionProcessingTypeControlOf(ruleSpec));
+        }
         if (hasCvvControl(ruleSpec)) {
             return evaluateCvvRequired(request, cvvRequiredOf(ruleSpec));
         }
@@ -246,6 +257,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private boolean hasCardDataInputCapabilityControl(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         return limitSpec != null && limitSpec.getJSONObject(CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY) != null;
+    }
+
+    private boolean hasCardTransactionProcessingTypeControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(CARD_TRANSACTION_PROCESSING_TYPE_CONTROL_KEY) != null;
     }
 
     private boolean hasCvvControl(JSONObject ruleSpec) {
@@ -328,6 +344,18 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return new CardDataInputCapabilityControl(
                 normalizedCodes(cardDataInputCapabilityControl, DENIED_CARD_DATA_INPUT_CAPABILITIES_KEY),
                 normalizedCodes(cardDataInputCapabilityControl, ALLOWED_CARD_DATA_INPUT_CAPABILITIES_KEY));
+    }
+
+    private CardTransactionProcessingTypeControl cardTransactionProcessingTypeControlOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject cardTransactionProcessingTypeControl =
+                limitSpec.getJSONObject(CARD_TRANSACTION_PROCESSING_TYPE_CONTROL_KEY);
+        AssertUtils.notNull(cardTransactionProcessingTypeControl,
+                "Spend Rule 规则规格缺少 limitSpec.cardTransactionProcessingTypeControl");
+        return new CardTransactionProcessingTypeControl(
+                normalizedCodes(cardTransactionProcessingTypeControl, DENIED_CARD_TRANSACTION_PROCESSING_TYPES_KEY),
+                normalizedCodes(cardTransactionProcessingTypeControl, ALLOWED_CARD_TRANSACTION_PROCESSING_TYPES_KEY));
     }
 
     private PanEntryModeControl panEntryModeControlOf(JSONObject ruleSpec) {
@@ -430,6 +458,21 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         }
         if (!control.allowedCardDataInputCapabilities().isEmpty()
                 && !control.allowedCardDataInputCapabilities().contains(cardDataInputCapability)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
+    private SpendControlDecisionResult evaluateCardTransactionProcessingType(
+            EvaluateSpendRuleRequest request,
+            CardTransactionProcessingTypeControl control) {
+        AssertUtils.hasText(request.getCardTransactionProcessingType(), "卡交易处理类型规则评估处理类型不能为空");
+        String processingType = normalizeUpperCode(request.getCardTransactionProcessingType());
+        if (control.deniedCardTransactionProcessingTypes().contains(processingType)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        if (!control.allowedCardTransactionProcessingTypes().isEmpty()
+                && !control.allowedCardTransactionProcessingTypes().contains(processingType)) {
             return SpendControlDecisionResult.REJECTED;
         }
         return SpendControlDecisionResult.PASSED;
@@ -544,6 +587,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return CARD_DATA_INPUT_CAPABILITY_REJECT_REASON;
         }
+        if (hasCardTransactionProcessingTypeControl(ruleSpec)) {
+            return CARD_TRANSACTION_PROCESSING_TYPE_REJECT_REASON;
+        }
         if (hasCvvControl(ruleSpec)) {
             return CVV_REQUIRED_REJECT_REASON;
         }
@@ -605,6 +651,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("cardDataInputCapability", request.getCardDataInputCapability() == null
                 ? ""
                 : normalizeUpperCode(request.getCardDataInputCapability()));
+        digestValues.put("cardTransactionProcessingType", request.getCardTransactionProcessingType() == null
+                ? ""
+                : normalizeUpperCode(request.getCardTransactionProcessingType()));
         digestValues.put("cvvProvided", request.getCvvProvided() == null ? "" : request.getCvvProvided());
         digestValues.put("panEntryMode", request.getPanEntryMode() == null
                 ? ""
@@ -657,6 +706,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private record CardDataInputCapabilityControl(Set<String> deniedCardDataInputCapabilities,
                                                   Set<String> allowedCardDataInputCapabilities) {
+    }
+
+    private record CardTransactionProcessingTypeControl(Set<String> deniedCardTransactionProcessingTypes,
+                                                        Set<String> allowedCardTransactionProcessingTypes) {
     }
 
     private record CvvRequired(Boolean required) {

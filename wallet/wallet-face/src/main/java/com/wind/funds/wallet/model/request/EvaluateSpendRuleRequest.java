@@ -75,6 +75,9 @@ public class EvaluateSpendRuleRequest implements Serializable {
     @Schema(description = "卡数据输入能力，卡数据输入能力规则评估时必填，例如 EMV_CHIP、MAGNETIC_STRIPE")
     private String cardDataInputCapability;
 
+    @Schema(description = "卡交易处理类型，卡交易处理类型规则评估时必填，例如 CASH、PIN_CHANGE")
+    private String cardTransactionProcessingType;
+
     @Schema(description = "是否已提供 CVV 事实，CVV 必填规则评估时必填；不得传入 CVV 原文")
     private Boolean cvvProvided;
 

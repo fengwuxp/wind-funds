@@ -115,6 +115,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String CVV_REQUIRED_RULE_DIGEST = "sha256:spend-rule-evaluation-cvv-required";
 
+    private static final String PROCESSING_TYPE_RULE_ID = "sr_evaluation_processing_type";
+
+    private static final String PROCESSING_TYPE_RULE_DIGEST = "sha256:spend-rule-evaluation-processing-type";
+
+    private static final String PROCESSING_TYPE_ALLOW_RULE_ID = "sr_evaluation_processing_type_allow";
+
+    private static final String PROCESSING_TYPE_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-processing-type-allow";
+
     private static final String CONTROL_SCOPE_ID = "scope_spend_rule_evaluation";
 
     private static final String PERIOD_ID = "2026-07";
@@ -187,6 +195,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String CVV_REQUIRED_RULE_SPEC = """
             {"limitSpec":{"cvvControl":{"required":true}}}
+            """;
+
+    private static final String PROCESSING_TYPE_RULE_SPEC = """
+            {"limitSpec":{"cardTransactionProcessingTypeControl":{"deniedCardTransactionProcessingTypes":["PIN_CHANGE"],"allowedCardTransactionProcessingTypes":[]}}}
+            """;
+
+    private static final String PROCESSING_TYPE_ALLOW_RULE_SPEC = """
+            {"limitSpec":{"cardTransactionProcessingTypeControl":{"allowedCardTransactionProcessingTypes":["CASH"]}}}
             """;
 
     @Autowired
@@ -736,6 +752,60 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：企业卡拒绝 PIN 变更类处理类型。
+     * 输入：规则拒绝卡交易处理类型 PIN_CHANGE，请求评估处理类型为 pin_change。
+     * 输出：大小写归一化后返回拒绝评估结论。
+     * 红线：处理类型评估只读请求事实和已发布规则版本，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateCardTransactionProcessingTypeDeniedShouldRejectWithoutFundsSideEffect() {
+        publishProcessingTypeRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(PROCESSING_TYPE_RULE_ID)
+                        .setCardTransactionProcessingType("pin_change"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("卡交易处理类型不允许");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(PROCESSING_TYPE_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(PROCESSING_TYPE_RULE_ID);
+        assertThat(countSpendControlMovement(PROCESSING_TYPE_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：企业卡只允许取现类处理类型。
+     * 输入：规则只允许卡交易处理类型 CASH，请求评估处理类型为 cash。
+     * 输出：大小写归一化后返回通过评估结论。
+     * 红线：评估通过仍不代表授权成功，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateCardTransactionProcessingTypeAllowListHitShouldPassWithoutFundsSideEffect() {
+        publishProcessingTypeAllowRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(PROCESSING_TYPE_ALLOW_RULE_ID)
+                        .setCardTransactionProcessingType("cash"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(PROCESSING_TYPE_ALLOW_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(PROCESSING_TYPE_ALLOW_RULE_ID);
+        assertThat(countSpendControlMovement(PROCESSING_TYPE_ALLOW_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     private void assertNoEvaluationSideEffects(LedgerFactSnapshot before) {
         assertNoSpendRuleDecisionRecord();
         assertNoSpendControlMovement();
@@ -828,6 +898,17 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     private void publishCvvRequiredRuleVersion() {
         publishRuleVersion(CVV_REQUIRED_RULE_ID, CVV_REQUIRED_RULE_DIGEST, CVV_REQUIRED_RULE_SPEC,
                 SpendRuleType.CVV_REQUIRED, "CVV 必填控制");
+    }
+
+    private void publishProcessingTypeRuleVersion() {
+        publishRuleVersion(PROCESSING_TYPE_RULE_ID, PROCESSING_TYPE_RULE_DIGEST, PROCESSING_TYPE_RULE_SPEC,
+                SpendRuleType.CARD_TRANSACTION_PROCESSING_TYPE, "卡交易处理类型黑名单控制");
+    }
+
+    private void publishProcessingTypeAllowRuleVersion() {
+        publishRuleVersion(PROCESSING_TYPE_ALLOW_RULE_ID, PROCESSING_TYPE_ALLOW_RULE_DIGEST,
+                PROCESSING_TYPE_ALLOW_RULE_SPEC, SpendRuleType.CARD_TRANSACTION_PROCESSING_TYPE,
+                "卡交易处理类型白名单控制");
     }
 
     private void publishRuleVersion(String ruleId, String ruleDigest, String ruleSpec) {
@@ -963,7 +1044,9 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 PAN_ENTRY_MODE_ALLOW_RULE_ID,
                 POS_CATEGORY_RULE_ID,
                 POS_CATEGORY_ALLOW_RULE_ID,
-                CVV_REQUIRED_RULE_ID
+                CVV_REQUIRED_RULE_ID,
+                PROCESSING_TYPE_RULE_ID,
+                PROCESSING_TYPE_ALLOW_RULE_ID
         };
     }
 
