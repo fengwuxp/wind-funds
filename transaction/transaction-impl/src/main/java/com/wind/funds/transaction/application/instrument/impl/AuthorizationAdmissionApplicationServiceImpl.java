@@ -94,6 +94,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
                 || StringUtils.hasText(request.getSpendDecisionSn())
                 || request.getSpendDecisionResult() != null
                 || StringUtils.hasText(request.getSpendDecisionDigest())
+                || StringUtils.hasText(request.getControlScopeId())
                 || StringUtils.hasText(request.getBudgetGroupSn())
                 || StringUtils.hasText(request.getSpendDecisionRejectReason());
     }
@@ -161,6 +162,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
                 .setSpendDecisionSn(request.getSpendDecisionSn())
                 .setSpendDecisionResult(request.getSpendDecisionResult())
                 .setSpendDecisionDigest(request.getSpendDecisionDigest())
+                .setControlScopeId(request.getControlScopeId())
                 .setBudgetGroupSn(request.getBudgetGroupSn())
                 .setRejectReason(request.getSpendDecisionRejectReason());
     }
@@ -229,6 +231,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
             values.put("decisionResult", spendControlDecision.getSpendDecisionResult().name());
         }
         putIfText(values, "decisionDigest", spendControlDecision.getSpendDecisionDigest());
+        putIfText(values, "controlScopeId", spendControlDecision.getControlScopeId());
         putIfText(values, "budgetGroupSn", spendControlDecision.getBudgetGroupSn());
         return Map.copyOf(values);
     }

@@ -99,6 +99,9 @@ public class ResolveSpendControlAdmissionRequest {
     @NotBlank
     private String spendDecisionDigest;
 
+    @Schema(description = "控制范围标识，目标语义名；当前兼容映射到历史字段 budgetGroupSn，可为空")
+    private String controlScopeId;
+
     @Schema(description = "预算控制范围标识，历史字段名 budgetGroupSn，不表示账务主体，可为空")
     private String budgetGroupSn;
 

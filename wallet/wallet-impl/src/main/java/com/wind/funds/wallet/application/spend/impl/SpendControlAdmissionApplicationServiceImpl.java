@@ -17,6 +17,7 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * 支出控制准入应用服务实现。
@@ -66,6 +67,10 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
         SpendRuleDigestValidator.assertSha256Digest(request.getSpendDecisionDigest(), "Spend Rule 决策摘要");
         if (request.getSpendDecisionResult() == SpendControlDecisionResult.REJECTED) {
             AssertUtils.hasText(request.getRejectReason(), "Spend Rule 拒绝原因不能为空");
+        }
+        if (StringUtils.hasText(request.getControlScopeId()) && StringUtils.hasText(request.getBudgetGroupSn())) {
+            AssertUtils.equals(request.getControlScopeId(), request.getBudgetGroupSn(),
+                    "控制范围标识与预算组历史字段不一致");
         }
     }
 
@@ -128,8 +133,16 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 .setSpendDecisionResult(request.getSpendDecisionResult())
                 .setSpendDecisionDigest(request.getSpendDecisionDigest())
                 .setSpendDecisionRecordId(decisionRecord.getId())
-                .setBudgetGroupSn(request.getBudgetGroupSn())
+                .setControlScopeId(controlScopeId(request))
+                .setBudgetGroupSn(controlScopeId(request))
                 .setRejectReason(request.getRejectReason())
                 .setPreTransactionSnapshot(snapshot);
+    }
+
+    private String controlScopeId(ResolveSpendControlAdmissionRequest request) {
+        if (StringUtils.hasText(request.getControlScopeId())) {
+            return request.getControlScopeId();
+        }
+        return request.getBudgetGroupSn();
     }
 }

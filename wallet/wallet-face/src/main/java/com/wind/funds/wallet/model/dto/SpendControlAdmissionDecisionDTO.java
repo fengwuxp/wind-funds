@@ -87,11 +87,14 @@ public class SpendControlAdmissionDecisionDTO implements Serializable {
     @Schema(description = "Spend Rule 决策结果")
     private SpendControlDecisionResult spendDecisionResult;
 
-    @Schema(description = "Spend Rule 决策摘要，用于幂等、回放和对账追踪")
+    @Schema(description = "Spend Rule 最终决策摘要，用于幂等、回放和对账追踪")
     private String spendDecisionDigest;
 
     @Schema(description = "已固化的 Spend Rule 决策记录主键")
     private Long spendDecisionRecordId;
+
+    @Schema(description = "控制范围标识，目标语义名；当前兼容映射到历史字段 budgetGroupSn")
+    private String controlScopeId;
 
     @Schema(description = "预算控制范围标识，历史字段名 budgetGroupSn，不表示账务主体")
     private String budgetGroupSn;

@@ -167,6 +167,8 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String SPEND_RULE_DECISION_DIGEST_FIELD = "decisionDigest";
 
+    private static final String CONTROL_SCOPE_ID_FIELD = "controlScopeId";
+
     private static final String BUDGET_GROUP_SN_FIELD = "budgetGroupSn";
 
     private static final List<String> SPEND_RULE_DECISION_EXPLAIN_FIELDS = List.of(
@@ -179,6 +181,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             SPEND_RULE_DECISION_SN_FIELD,
             SPEND_RULE_DECISION_RESULT_FIELD,
             SPEND_RULE_DECISION_DIGEST_FIELD,
+            CONTROL_SCOPE_ID_FIELD,
             BUDGET_GROUP_SN_FIELD);
 
     public FundsTransactionProjectionExplanationSource {
