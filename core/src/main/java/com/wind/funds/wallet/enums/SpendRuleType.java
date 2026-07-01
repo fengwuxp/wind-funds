@@ -21,6 +21,7 @@ public enum SpendRuleType implements DescriptiveEnum {
     COUNTRY("国家或地区控制"),
     CARD_DATA_INPUT_CAPABILITY("卡数据输入能力控制"),
     PAN_ENTRY_MODE("PAN 录入方式控制"),
+    POINT_OF_SERVICE_CATEGORY("POS 类别控制"),
     CURRENCY("币种控制"),
     TIME_WINDOW("时间窗口控制"),
     COMPOSITE("组合规则");

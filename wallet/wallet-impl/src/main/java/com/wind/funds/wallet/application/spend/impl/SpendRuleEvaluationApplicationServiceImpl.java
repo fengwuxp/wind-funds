@@ -61,6 +61,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String PAN_ENTRY_MODE_REJECT_REASON = "PAN 录入方式不允许";
 
+    private static final String POINT_OF_SERVICE_CATEGORY_REJECT_REASON = "POS 类别不允许";
+
     private static final String COUNTER_SPEC_KEY = "counterSpec";
 
     private static final String LIMIT_SPEC_KEY = "limitSpec";
@@ -78,6 +80,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY = "cardDataInputCapabilityControl";
 
     private static final String PAN_ENTRY_MODE_CONTROL_KEY = "panEntryModeControl";
+
+    private static final String POINT_OF_SERVICE_CATEGORY_CONTROL_KEY = "pointOfServiceCategoryControl";
 
     private static final String AMOUNT_KEY = "amount";
 
@@ -104,6 +108,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String DENIED_PAN_ENTRY_MODES_KEY = "deniedPanEntryModes";
 
     private static final String ALLOWED_PAN_ENTRY_MODES_KEY = "allowedPanEntryModes";
+
+    private static final String DENIED_POINT_OF_SERVICE_CATEGORIES_KEY = "deniedPointOfServiceCategories";
+
+    private static final String ALLOWED_POINT_OF_SERVICE_CATEGORIES_KEY = "allowedPointOfServiceCategories";
 
     private final SpendRuleVersionService spendRuleVersionService;
 
@@ -172,6 +180,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasPanEntryModeControl(ruleSpec)) {
             return evaluatePanEntryMode(request, panEntryModeControlOf(ruleSpec));
         }
+        if (hasPointOfServiceCategoryControl(ruleSpec)) {
+            return evaluatePointOfServiceCategory(request, pointOfServiceCategoryControlOf(ruleSpec));
+        }
         if (hasMerchantIdControl(ruleSpec)) {
             return evaluateMerchantId(request, merchantIdControlOf(ruleSpec));
         }
@@ -231,6 +242,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private boolean hasPanEntryModeControl(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         return limitSpec != null && limitSpec.getJSONObject(PAN_ENTRY_MODE_CONTROL_KEY) != null;
+    }
+
+    private boolean hasPointOfServiceCategoryControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(POINT_OF_SERVICE_CATEGORY_CONTROL_KEY) != null;
     }
 
     private MerchantCategoryControl merchantCategoryControlOf(JSONObject ruleSpec) {
@@ -308,6 +324,17 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return new PanEntryModeControl(
                 normalizedCodes(panEntryModeControl, DENIED_PAN_ENTRY_MODES_KEY),
                 normalizedCodes(panEntryModeControl, ALLOWED_PAN_ENTRY_MODES_KEY));
+    }
+
+    private PointOfServiceCategoryControl pointOfServiceCategoryControlOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject pointOfServiceCategoryControl = limitSpec.getJSONObject(POINT_OF_SERVICE_CATEGORY_CONTROL_KEY);
+        AssertUtils.notNull(pointOfServiceCategoryControl,
+                "Spend Rule 规则规格缺少 limitSpec.pointOfServiceCategoryControl");
+        return new PointOfServiceCategoryControl(
+                normalizedCodes(pointOfServiceCategoryControl, DENIED_POINT_OF_SERVICE_CATEGORIES_KEY),
+                normalizedCodes(pointOfServiceCategoryControl, ALLOWED_POINT_OF_SERVICE_CATEGORIES_KEY));
     }
 
     private Set<String> normalizedCodes(JSONObject control, String key) {
@@ -398,6 +425,20 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return SpendControlDecisionResult.PASSED;
     }
 
+    private SpendControlDecisionResult evaluatePointOfServiceCategory(EvaluateSpendRuleRequest request,
+                                                                      PointOfServiceCategoryControl control) {
+        AssertUtils.hasText(request.getPointOfServiceCategory(), "POS 类别规则评估 POS 类别不能为空");
+        String pointOfServiceCategory = normalizeUpperCode(request.getPointOfServiceCategory());
+        if (control.deniedPointOfServiceCategories().contains(pointOfServiceCategory)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        if (!control.allowedPointOfServiceCategories().isEmpty()
+                && !control.allowedPointOfServiceCategories().contains(pointOfServiceCategory)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
     private SpendControlDecisionResult evaluatePeriodCountLimit(EvaluateSpendRuleRequest request,
                                                                 CountLimit countLimit) {
         AssertUtils.hasText(request.getControlScopeId(), "周期次数规则评估控制范围标识不能为空");
@@ -474,6 +515,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasPanEntryModeControl(ruleSpec)) {
             return PAN_ENTRY_MODE_REJECT_REASON;
         }
+        if (hasPointOfServiceCategoryControl(ruleSpec)) {
+            return POINT_OF_SERVICE_CATEGORY_REJECT_REASON;
+        }
         if (hasMerchantIdControl(ruleSpec)) {
             return MERCHANT_ID_REJECT_REASON;
         }
@@ -529,6 +573,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("panEntryMode", request.getPanEntryMode() == null
                 ? ""
                 : normalizeUpperCode(request.getPanEntryMode()));
+        digestValues.put("pointOfServiceCategory", request.getPointOfServiceCategory() == null
+                ? ""
+                : normalizeUpperCode(request.getPointOfServiceCategory()));
         digestValues.put("controlScopeId", request.getControlScopeId() == null ? "" : request.getControlScopeId());
         digestValues.put("periodId", request.getPeriodId() == null ? "" : request.getPeriodId());
         digestValues.put("targetAccountId", targetAccountDigest(request));
@@ -577,5 +624,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     }
 
     private record PanEntryModeControl(Set<String> deniedPanEntryModes, Set<String> allowedPanEntryModes) {
+    }
+
+    private record PointOfServiceCategoryControl(Set<String> deniedPointOfServiceCategories,
+                                                 Set<String> allowedPointOfServiceCategories) {
     }
 }

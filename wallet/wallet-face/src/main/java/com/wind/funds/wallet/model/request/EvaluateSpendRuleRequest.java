@@ -78,6 +78,9 @@ public class EvaluateSpendRuleRequest implements Serializable {
     @Schema(description = "PAN 录入方式，PAN 录入方式规则评估时必填，例如 MANUAL、CONTACTLESS")
     private String panEntryMode;
 
+    @Schema(description = "POS 类别，POS 类别规则评估时必填，例如 AUTOMATED_TELLER_MACHINE、AUTOMATED_FUEL_DISPENSER")
+    private String pointOfServiceCategory;
+
     @Schema(description = "控制范围标识，周期金额或周期次数规则评估时必填")
     private String controlScopeId;
 
