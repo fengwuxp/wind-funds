@@ -59,6 +59,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String CARD_DATA_INPUT_CAPABILITY_REJECT_REASON = "卡数据输入能力不允许";
 
+    private static final String PAN_ENTRY_MODE_REJECT_REASON = "PAN 录入方式不允许";
+
     private static final String COUNTER_SPEC_KEY = "counterSpec";
 
     private static final String LIMIT_SPEC_KEY = "limitSpec";
@@ -74,6 +76,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String MERCHANT_COUNTRY_CONTROL_KEY = "merchantCountryControl";
 
     private static final String CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY = "cardDataInputCapabilityControl";
+
+    private static final String PAN_ENTRY_MODE_CONTROL_KEY = "panEntryModeControl";
 
     private static final String AMOUNT_KEY = "amount";
 
@@ -96,6 +100,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String DENIED_CARD_DATA_INPUT_CAPABILITIES_KEY = "deniedCardDataInputCapabilities";
 
     private static final String ALLOWED_CARD_DATA_INPUT_CAPABILITIES_KEY = "allowedCardDataInputCapabilities";
+
+    private static final String DENIED_PAN_ENTRY_MODES_KEY = "deniedPanEntryModes";
+
+    private static final String ALLOWED_PAN_ENTRY_MODES_KEY = "allowedPanEntryModes";
 
     private final SpendRuleVersionService spendRuleVersionService;
 
@@ -161,6 +169,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return evaluateCardDataInputCapability(request, cardDataInputCapabilityControlOf(ruleSpec));
         }
+        if (hasPanEntryModeControl(ruleSpec)) {
+            return evaluatePanEntryMode(request, panEntryModeControlOf(ruleSpec));
+        }
         if (hasMerchantIdControl(ruleSpec)) {
             return evaluateMerchantId(request, merchantIdControlOf(ruleSpec));
         }
@@ -215,6 +226,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private boolean hasCardDataInputCapabilityControl(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         return limitSpec != null && limitSpec.getJSONObject(CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY) != null;
+    }
+
+    private boolean hasPanEntryModeControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(PAN_ENTRY_MODE_CONTROL_KEY) != null;
     }
 
     private MerchantCategoryControl merchantCategoryControlOf(JSONObject ruleSpec) {
@@ -282,6 +298,16 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return new CardDataInputCapabilityControl(
                 normalizedCodes(cardDataInputCapabilityControl, DENIED_CARD_DATA_INPUT_CAPABILITIES_KEY),
                 normalizedCodes(cardDataInputCapabilityControl, ALLOWED_CARD_DATA_INPUT_CAPABILITIES_KEY));
+    }
+
+    private PanEntryModeControl panEntryModeControlOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject panEntryModeControl = limitSpec.getJSONObject(PAN_ENTRY_MODE_CONTROL_KEY);
+        AssertUtils.notNull(panEntryModeControl, "Spend Rule 规则规格缺少 limitSpec.panEntryModeControl");
+        return new PanEntryModeControl(
+                normalizedCodes(panEntryModeControl, DENIED_PAN_ENTRY_MODES_KEY),
+                normalizedCodes(panEntryModeControl, ALLOWED_PAN_ENTRY_MODES_KEY));
     }
 
     private Set<String> normalizedCodes(JSONObject control, String key) {
@@ -353,6 +379,20 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         }
         if (!control.allowedCardDataInputCapabilities().isEmpty()
                 && !control.allowedCardDataInputCapabilities().contains(cardDataInputCapability)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
+    private SpendControlDecisionResult evaluatePanEntryMode(EvaluateSpendRuleRequest request,
+                                                            PanEntryModeControl control) {
+        AssertUtils.hasText(request.getPanEntryMode(), "PAN 录入方式规则评估录入方式不能为空");
+        String panEntryMode = normalizeUpperCode(request.getPanEntryMode());
+        if (control.deniedPanEntryModes().contains(panEntryMode)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        if (!control.allowedPanEntryModes().isEmpty()
+                && !control.allowedPanEntryModes().contains(panEntryMode)) {
             return SpendControlDecisionResult.REJECTED;
         }
         return SpendControlDecisionResult.PASSED;
@@ -431,6 +471,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return CARD_DATA_INPUT_CAPABILITY_REJECT_REASON;
         }
+        if (hasPanEntryModeControl(ruleSpec)) {
+            return PAN_ENTRY_MODE_REJECT_REASON;
+        }
         if (hasMerchantIdControl(ruleSpec)) {
             return MERCHANT_ID_REJECT_REASON;
         }
@@ -483,6 +526,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("cardDataInputCapability", request.getCardDataInputCapability() == null
                 ? ""
                 : normalizeUpperCode(request.getCardDataInputCapability()));
+        digestValues.put("panEntryMode", request.getPanEntryMode() == null
+                ? ""
+                : normalizeUpperCode(request.getPanEntryMode()));
         digestValues.put("controlScopeId", request.getControlScopeId() == null ? "" : request.getControlScopeId());
         digestValues.put("periodId", request.getPeriodId() == null ? "" : request.getPeriodId());
         digestValues.put("targetAccountId", targetAccountDigest(request));
@@ -528,5 +574,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private record CardDataInputCapabilityControl(Set<String> deniedCardDataInputCapabilities,
                                                   Set<String> allowedCardDataInputCapabilities) {
+    }
+
+    private record PanEntryModeControl(Set<String> deniedPanEntryModes, Set<String> allowedPanEntryModes) {
     }
 }

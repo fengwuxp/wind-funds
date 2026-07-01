@@ -95,6 +95,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String MERCHANT_ID_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-merchant-id-allow";
 
+    private static final String PAN_ENTRY_MODE_RULE_ID = "sr_evaluation_pan_entry_mode";
+
+    private static final String PAN_ENTRY_MODE_RULE_DIGEST = "sha256:spend-rule-evaluation-pan-entry-mode";
+
+    private static final String PAN_ENTRY_MODE_ALLOW_RULE_ID = "sr_evaluation_pan_entry_mode_allow";
+
+    private static final String PAN_ENTRY_MODE_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-pan-entry-mode-allow";
+
     private static final String CONTROL_SCOPE_ID = "scope_spend_rule_evaluation";
 
     private static final String PERIOD_ID = "2026-07";
@@ -147,6 +155,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String MERCHANT_ID_ALLOW_RULE_SPEC = """
             {"limitSpec":{"merchantIdControl":{"allowedMerchantIds":["MID-CONTRACT-001"]}}}
+            """;
+
+    private static final String PAN_ENTRY_MODE_RULE_SPEC = """
+            {"limitSpec":{"panEntryModeControl":{"deniedPanEntryModes":["MANUAL"],"allowedPanEntryModes":[]}}}
+            """;
+
+    private static final String PAN_ENTRY_MODE_ALLOW_RULE_SPEC = """
+            {"limitSpec":{"panEntryModeControl":{"allowedPanEntryModes":["CONTACTLESS"]}}}
             """;
 
     @Autowired
@@ -534,6 +550,60 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：企业卡拒绝手工录入卡信息交易。
+     * 输入：规则拒绝 PAN 录入方式 MANUAL，请求评估 PAN 录入方式为 manual。
+     * 输出：大小写归一化后返回拒绝评估结论。
+     * 红线：PAN 录入方式评估只读请求事实和已发布规则版本，不保存 PAN 原文，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluatePanEntryModeDeniedShouldRejectWithoutFundsSideEffect() {
+        publishPanEntryModeRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(PAN_ENTRY_MODE_RULE_ID)
+                        .setPanEntryMode("manual"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("PAN 录入方式不允许");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(PAN_ENTRY_MODE_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(PAN_ENTRY_MODE_RULE_ID);
+        assertThat(countSpendControlMovement(PAN_ENTRY_MODE_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：企业卡只允许非接触式录入。
+     * 输入：规则只允许 PAN 录入方式 CONTACTLESS，请求评估 PAN 录入方式为 contactless。
+     * 输出：大小写归一化后返回通过评估结论。
+     * 红线：评估通过仍不代表授权成功，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluatePanEntryModeAllowListHitShouldPassWithoutFundsSideEffect() {
+        publishPanEntryModeAllowRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(PAN_ENTRY_MODE_ALLOW_RULE_ID)
+                        .setPanEntryMode("contactless"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(PAN_ENTRY_MODE_ALLOW_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(PAN_ENTRY_MODE_ALLOW_RULE_ID);
+        assertThat(countSpendControlMovement(PAN_ENTRY_MODE_ALLOW_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     private void assertNoEvaluationSideEffects(LedgerFactSnapshot before) {
         assertNoSpendRuleDecisionRecord();
         assertNoSpendControlMovement();
@@ -601,6 +671,16 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     private void publishMerchantIdAllowRuleVersion() {
         publishRuleVersion(MERCHANT_ID_ALLOW_RULE_ID, MERCHANT_ID_ALLOW_RULE_DIGEST, MERCHANT_ID_ALLOW_RULE_SPEC,
                 SpendRuleType.MERCHANT_ID, "商户标识白名单控制");
+    }
+
+    private void publishPanEntryModeRuleVersion() {
+        publishRuleVersion(PAN_ENTRY_MODE_RULE_ID, PAN_ENTRY_MODE_RULE_DIGEST, PAN_ENTRY_MODE_RULE_SPEC,
+                SpendRuleType.PAN_ENTRY_MODE, "PAN 录入方式黑名单控制");
+    }
+
+    private void publishPanEntryModeAllowRuleVersion() {
+        publishRuleVersion(PAN_ENTRY_MODE_ALLOW_RULE_ID, PAN_ENTRY_MODE_ALLOW_RULE_DIGEST,
+                PAN_ENTRY_MODE_ALLOW_RULE_SPEC, SpendRuleType.PAN_ENTRY_MODE, "PAN 录入方式白名单控制");
     }
 
     private void publishRuleVersion(String ruleId, String ruleDigest, String ruleSpec) {
@@ -727,6 +807,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MERCHANT_ID_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
                 TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
@@ -749,6 +833,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MERCHANT_ID_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
@@ -771,6 +859,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MERCHANT_ID_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
@@ -793,6 +885,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MERCHANT_ID_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
@@ -815,6 +911,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MERCHANT_ID_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, PAN_ENTRY_MODE_ALLOW_RULE_ID);
     }
 
     private void assertNoSpendRuleDecisionRecord() {

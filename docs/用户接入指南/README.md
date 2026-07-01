@@ -137,13 +137,15 @@
 
 适用条件：需要在交易前固化支出控制决策，或记录交易消费对控制范围的影响。
 
-当前接入口径：接入方先完成规则判断或外部风控判断，`wallet` 只固化 Spend Rule 决策证据、控制额度流水和只读投影；如接入方只需要单条已发布规则的轻量评估，可先调用 `SpendRuleEvaluationApplicationService.evaluate` 覆盖单笔金额、周期金额可用额度、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单和商户标识黑白名单判断，再把最终决策证据交给准入服务固化。本文不承诺 Highnote 式托管规则引擎、velocity 窗口执行器或协同授权 webhook。
+当前接入口径：接入方先完成规则判断或外部风控判断，`wallet` 只固化 Spend Rule 决策证据、控制额度流水和只读投影；如接入方只需要单条已发布规则的轻量评估，可先调用 `SpendRuleEvaluationApplicationService.evaluate` 覆盖单笔金额、周期金额可用额度、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、商户标识黑白名单和 PAN 录入方式黑白名单判断，再把最终决策证据交给准入服务固化。本文不承诺 Highnote 式托管规则引擎、velocity 窗口执行器或协同授权 webhook。
 
 外部风控或协同授权的 approve / decline 只作为最终决策证据进入 `SpendControlAdmissionApplicationService.resolve`。`REJECTED` 会在交易内核前停止；`PASSED` 仍然必须继续通过支付工具绑定、账户能力和资金责任校验，不能被接入方理解为资金可用、授权成功或已经完成交易。
 
-多规则裁决由上游负责合成。接入方如果同时评估单笔限额、MCC、商户标识、国家地区、卡数据输入能力和外部风控，只把最终 `decisionSn`、`decisionResult`、`decisionDigest` 和 `rejectReason` 传入 wallet；`evaluatedRules`、`decisionPolicy`、`finalDecision` 等明细当前不进入公共契约，保留在上游证据系统中。
+多规则裁决由上游负责合成。接入方如果同时评估单笔限额、MCC、商户标识、国家地区、卡数据输入能力、PAN 录入方式和外部风控，只把最终 `decisionSn`、`decisionResult`、`decisionDigest` 和 `rejectReason` 传入 wallet；`evaluatedRules`、`decisionPolicy`、`finalDecision` 等明细当前不进入公共契约，保留在上游证据系统中。
 
 商户标识场景示例：企业采购卡只允许合作商户 `MID-CONTRACT-001`，接入方发布 `ruleSpec.limitSpec.merchantIdControl.allowedMerchantIds=["MID-CONTRACT-001"]`，授权前调用 `evaluate` 时传入 `merchantId`。命中白名单只得到 `PASSED` 评估结论；仍需继续走支付工具、账户能力和资金责任准入。若发布 `deniedMerchantIds=["MID-RISK-001"]` 且请求命中该 MID，则返回 `REJECTED` 且不产生交易或账本事实。
+
+PAN 录入方式场景示例：企业卡禁止手工录入卡信息，接入方发布 `ruleSpec.limitSpec.panEntryModeControl.deniedPanEntryModes=["MANUAL"]`，授权前调用 `evaluate` 时传入 `panEntryMode=manual`。命中黑名单返回 `REJECTED`，且不保存 PAN 原文、不产生交易或账本事实。若只允许非接触式交易，可发布 `allowedPanEntryModes=["CONTACTLESS"]`，命中后仅得到 `PASSED` 评估结论，后续仍需继续准入和交易链路。
 
 推荐入口：
 

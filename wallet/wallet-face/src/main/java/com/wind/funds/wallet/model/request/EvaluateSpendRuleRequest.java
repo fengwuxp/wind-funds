@@ -75,6 +75,9 @@ public class EvaluateSpendRuleRequest implements Serializable {
     @Schema(description = "卡数据输入能力，卡数据输入能力规则评估时必填，例如 EMV_CHIP、MAGNETIC_STRIPE")
     private String cardDataInputCapability;
 
+    @Schema(description = "PAN 录入方式，PAN 录入方式规则评估时必填，例如 MANUAL、CONTACTLESS")
+    private String panEntryMode;
+
     @Schema(description = "控制范围标识，周期金额或周期次数规则评估时必填")
     private String controlScopeId;
 
