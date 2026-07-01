@@ -66,6 +66,9 @@ public class EvaluateSpendRuleRequest implements Serializable {
     @Schema(description = "商户类别码 MCC，商户类别规则评估时必填")
     private String merchantCategoryCode;
 
+    @Schema(description = "商户标识 MID，商户标识规则评估时必填")
+    private String merchantId;
+
     @Schema(description = "商户国家或地区代码，商户国家规则评估时必填，例如 US")
     private String merchantCountryCode;
 

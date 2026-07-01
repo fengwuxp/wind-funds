@@ -53,6 +53,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String MERCHANT_CATEGORY_REJECT_REASON = "商户类别不允许";
 
+    private static final String MERCHANT_ID_REJECT_REASON = "商户标识不允许";
+
     private static final String MERCHANT_COUNTRY_REJECT_REASON = "商户国家不允许";
 
     private static final String CARD_DATA_INPUT_CAPABILITY_REJECT_REASON = "卡数据输入能力不允许";
@@ -67,6 +69,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String MERCHANT_CATEGORY_CONTROL_KEY = "merchantCategoryControl";
 
+    private static final String MERCHANT_ID_CONTROL_KEY = "merchantIdControl";
+
     private static final String MERCHANT_COUNTRY_CONTROL_KEY = "merchantCountryControl";
 
     private static final String CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY = "cardDataInputCapabilityControl";
@@ -80,6 +84,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String DENIED_MCC_CODES_KEY = "deniedMccCodes";
 
     private static final String ALLOWED_MCC_CODES_KEY = "allowedMccCodes";
+
+    private static final String DENIED_MERCHANT_IDS_KEY = "deniedMerchantIds";
+
+    private static final String ALLOWED_MERCHANT_IDS_KEY = "allowedMerchantIds";
 
     private static final String DENIED_COUNTRY_CODES_KEY = "deniedCountryCodes";
 
@@ -153,6 +161,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return evaluateCardDataInputCapability(request, cardDataInputCapabilityControlOf(ruleSpec));
         }
+        if (hasMerchantIdControl(ruleSpec)) {
+            return evaluateMerchantId(request, merchantIdControlOf(ruleSpec));
+        }
         if (hasMerchantCountryControl(ruleSpec)) {
             return evaluateMerchantCountry(request, merchantCountryControlOf(ruleSpec));
         }
@@ -191,6 +202,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return limitSpec != null && limitSpec.getJSONObject(MERCHANT_CATEGORY_CONTROL_KEY) != null;
     }
 
+    private boolean hasMerchantIdControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(MERCHANT_ID_CONTROL_KEY) != null;
+    }
+
     private boolean hasMerchantCountryControl(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         return limitSpec != null && limitSpec.getJSONObject(MERCHANT_COUNTRY_CONTROL_KEY) != null;
@@ -217,6 +233,27 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
             return Set.of();
         }
         return codes.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private MerchantIdControl merchantIdControlOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject merchantIdControl = limitSpec.getJSONObject(MERCHANT_ID_CONTROL_KEY);
+        AssertUtils.notNull(merchantIdControl, "Spend Rule 规则规格缺少 limitSpec.merchantIdControl");
+        return new MerchantIdControl(
+                merchantIds(merchantIdControl, DENIED_MERCHANT_IDS_KEY),
+                merchantIds(merchantIdControl, ALLOWED_MERCHANT_IDS_KEY));
+    }
+
+    private Set<String> merchantIds(JSONObject merchantIdControl, String key) {
+        List<String> merchantIds = merchantIdControl.getList(key, String.class);
+        if (merchantIds == null) {
+            return Set.of();
+        }
+        return merchantIds.stream()
                 .filter(StringUtils::hasText)
                 .map(String::trim)
                 .collect(Collectors.toUnmodifiableSet());
@@ -274,6 +311,20 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         }
         if (!control.allowedMccCodes().isEmpty()
                 && !control.allowedMccCodes().contains(request.getMerchantCategoryCode())) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
+    private SpendControlDecisionResult evaluateMerchantId(EvaluateSpendRuleRequest request,
+                                                          MerchantIdControl control) {
+        AssertUtils.hasText(request.getMerchantId(), "商户标识规则评估 MID 不能为空");
+        String merchantId = request.getMerchantId().trim();
+        if (control.deniedMerchantIds().contains(merchantId)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        if (!control.allowedMerchantIds().isEmpty()
+                && !control.allowedMerchantIds().contains(merchantId)) {
             return SpendControlDecisionResult.REJECTED;
         }
         return SpendControlDecisionResult.PASSED;
@@ -380,6 +431,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return CARD_DATA_INPUT_CAPABILITY_REJECT_REASON;
         }
+        if (hasMerchantIdControl(ruleSpec)) {
+            return MERCHANT_ID_REJECT_REASON;
+        }
         if (hasMerchantCountryControl(ruleSpec)) {
             return MERCHANT_COUNTRY_REJECT_REASON;
         }
@@ -423,6 +477,7 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("businessSn", request.getBusinessSn());
         digestValues.put("merchantCategoryCode",
                 request.getMerchantCategoryCode() == null ? "" : request.getMerchantCategoryCode());
+        digestValues.put("merchantId", request.getMerchantId() == null ? "" : request.getMerchantId().trim());
         digestValues.put("merchantCountryCode",
                 request.getMerchantCountryCode() == null ? "" : normalizeUpperCode(request.getMerchantCountryCode()));
         digestValues.put("cardDataInputCapability", request.getCardDataInputCapability() == null
@@ -463,6 +518,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     }
 
     private record MerchantCategoryControl(Set<String> deniedMccCodes, Set<String> allowedMccCodes) {
+    }
+
+    private record MerchantIdControl(Set<String> deniedMerchantIds, Set<String> allowedMerchantIds) {
     }
 
     private record MerchantCountryControl(Set<String> deniedCountryCodes, Set<String> allowedCountryCodes) {

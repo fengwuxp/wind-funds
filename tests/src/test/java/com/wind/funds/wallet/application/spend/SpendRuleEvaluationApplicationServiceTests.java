@@ -87,6 +87,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String CARD_DATA_INPUT_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-card-data-input-allow";
 
+    private static final String MERCHANT_ID_RULE_ID = "sr_evaluation_merchant_id";
+
+    private static final String MERCHANT_ID_RULE_DIGEST = "sha256:spend-rule-evaluation-merchant-id";
+
+    private static final String MERCHANT_ID_ALLOW_RULE_ID = "sr_evaluation_merchant_id_allow";
+
+    private static final String MERCHANT_ID_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-merchant-id-allow";
+
     private static final String CONTROL_SCOPE_ID = "scope_spend_rule_evaluation";
 
     private static final String PERIOD_ID = "2026-07";
@@ -131,6 +139,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String CARD_DATA_INPUT_ALLOW_RULE_SPEC = """
             {"limitSpec":{"cardDataInputCapabilityControl":{"allowedCardDataInputCapabilities":["EMV_CHIP"]}}}
+            """;
+
+    private static final String MERCHANT_ID_RULE_SPEC = """
+            {"limitSpec":{"merchantIdControl":{"deniedMerchantIds":["MID-RISK-001"],"allowedMerchantIds":[]}}}
+            """;
+
+    private static final String MERCHANT_ID_ALLOW_RULE_SPEC = """
+            {"limitSpec":{"merchantIdControl":{"allowedMerchantIds":["MID-CONTRACT-001"]}}}
             """;
 
     @Autowired
@@ -464,6 +480,60 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：企业卡拒绝风险商户标识。
+     * 输入：规则拒绝商户标识 MID-RISK-001，请求评估商户标识为 MID-RISK-001。
+     * 输出：返回拒绝评估结论。
+     * 红线：商户标识评估只读请求事实和已发布规则版本，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateMerchantIdDeniedShouldRejectWithoutFundsSideEffect() {
+        publishMerchantIdRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(MERCHANT_ID_RULE_ID)
+                        .setMerchantId("MID-RISK-001"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("商户标识不允许");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(MERCHANT_ID_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(MERCHANT_ID_RULE_ID);
+        assertThat(countSpendControlMovement(MERCHANT_ID_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：企业卡只允许指定合作商户标识。
+     * 输入：规则只允许商户标识 MID-CONTRACT-001，请求评估商户标识为 MID-CONTRACT-001。
+     * 输出：返回通过评估结论。
+     * 红线：评估通过仍不代表授权成功，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateMerchantIdAllowListHitShouldPassWithoutFundsSideEffect() {
+        publishMerchantIdAllowRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(MERCHANT_ID_ALLOW_RULE_ID)
+                        .setMerchantId("MID-CONTRACT-001"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(MERCHANT_ID_ALLOW_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(MERCHANT_ID_ALLOW_RULE_ID);
+        assertThat(countSpendControlMovement(MERCHANT_ID_ALLOW_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     private void assertNoEvaluationSideEffects(LedgerFactSnapshot before) {
         assertNoSpendRuleDecisionRecord();
         assertNoSpendControlMovement();
@@ -521,6 +591,16 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     private void publishCardDataInputAllowRuleVersion() {
         publishRuleVersion(CARD_DATA_INPUT_ALLOW_RULE_ID, CARD_DATA_INPUT_ALLOW_RULE_DIGEST,
                 CARD_DATA_INPUT_ALLOW_RULE_SPEC, SpendRuleType.CARD_DATA_INPUT_CAPABILITY, "卡数据输入能力白名单控制");
+    }
+
+    private void publishMerchantIdRuleVersion() {
+        publishRuleVersion(MERCHANT_ID_RULE_ID, MERCHANT_ID_RULE_DIGEST, MERCHANT_ID_RULE_SPEC,
+                SpendRuleType.MERCHANT_ID, "商户标识黑名单控制");
+    }
+
+    private void publishMerchantIdAllowRuleVersion() {
+        publishRuleVersion(MERCHANT_ID_ALLOW_RULE_ID, MERCHANT_ID_ALLOW_RULE_DIGEST, MERCHANT_ID_ALLOW_RULE_SPEC,
+                SpendRuleType.MERCHANT_ID, "商户标识白名单控制");
     }
 
     private void publishRuleVersion(String ruleId, String ruleDigest, String ruleSpec) {
@@ -643,6 +723,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, CARD_DATA_INPUT_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
                 TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                TENANT_ID, MERCHANT_ID_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
@@ -661,6 +745,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, CARD_DATA_INPUT_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, MERCHANT_ID_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
@@ -679,6 +767,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, CARD_DATA_INPUT_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, MERCHANT_ID_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
@@ -697,6 +789,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, CARD_DATA_INPUT_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, MERCHANT_ID_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
@@ -715,6 +811,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, CARD_DATA_INPUT_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, MERCHANT_ID_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, MERCHANT_ID_ALLOW_RULE_ID);
     }
 
     private void assertNoSpendRuleDecisionRecord() {
