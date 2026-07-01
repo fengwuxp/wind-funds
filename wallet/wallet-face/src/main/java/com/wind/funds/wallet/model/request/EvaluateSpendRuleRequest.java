@@ -69,6 +69,9 @@ public class EvaluateSpendRuleRequest implements Serializable {
     @Schema(description = "商户国家或地区代码，商户国家规则评估时必填，例如 US")
     private String merchantCountryCode;
 
+    @Schema(description = "卡数据输入能力，卡数据输入能力规则评估时必填，例如 EMV_CHIP、MAGNETIC_STRIPE")
+    private String cardDataInputCapability;
+
     @Schema(description = "控制范围标识，周期金额或周期次数规则评估时必填")
     private String controlScopeId;
 

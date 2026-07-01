@@ -79,6 +79,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String COUNTRY_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-country-allow";
 
+    private static final String CARD_DATA_INPUT_RULE_ID = "sr_evaluation_card_data_input";
+
+    private static final String CARD_DATA_INPUT_RULE_DIGEST = "sha256:spend-rule-evaluation-card-data-input";
+
+    private static final String CARD_DATA_INPUT_ALLOW_RULE_ID = "sr_evaluation_card_data_input_allow";
+
+    private static final String CARD_DATA_INPUT_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-card-data-input-allow";
+
     private static final String CONTROL_SCOPE_ID = "scope_spend_rule_evaluation";
 
     private static final String PERIOD_ID = "2026-07";
@@ -115,6 +123,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String COUNTRY_ALLOW_RULE_SPEC = """
             {"limitSpec":{"merchantCountryControl":{"allowedCountryCodes":["US"]}}}
+            """;
+
+    private static final String CARD_DATA_INPUT_RULE_SPEC = """
+            {"limitSpec":{"cardDataInputCapabilityControl":{"deniedCardDataInputCapabilities":["MAGNETIC_STRIPE"],"allowedCardDataInputCapabilities":[]}}}
+            """;
+
+    private static final String CARD_DATA_INPUT_ALLOW_RULE_SPEC = """
+            {"limitSpec":{"cardDataInputCapabilityControl":{"allowedCardDataInputCapabilities":["EMV_CHIP"]}}}
             """;
 
     @Autowired
@@ -394,6 +410,60 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：企业员工卡拒绝磁条降级交易。
+     * 输入：规则拒绝卡数据输入能力 MAGNETIC_STRIPE，请求评估卡数据输入能力为 MAGNETIC_STRIPE。
+     * 输出：返回拒绝评估结论。
+     * 红线：卡数据输入能力评估只读请求事实和已发布规则版本，不保存 PAN/CVV，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateCardDataInputCapabilityDeniedShouldRejectWithoutFundsSideEffect() {
+        publishCardDataInputRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(CARD_DATA_INPUT_RULE_ID)
+                        .setCardDataInputCapability("MAGNETIC_STRIPE"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("卡数据输入能力不允许");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(CARD_DATA_INPUT_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(CARD_DATA_INPUT_RULE_ID);
+        assertThat(countSpendControlMovement(CARD_DATA_INPUT_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：企业员工卡允许芯片交易。
+     * 输入：规则只允许卡数据输入能力 EMV_CHIP，请求评估卡数据输入能力为 emv_chip。
+     * 输出：大小写归一化后返回通过评估结论。
+     * 红线：评估通过仍不代表授权成功，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateCardDataInputCapabilityAllowListHitShouldPassWithoutFundsSideEffect() {
+        publishCardDataInputAllowRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(CARD_DATA_INPUT_ALLOW_RULE_ID)
+                        .setCardDataInputCapability("emv_chip"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(CARD_DATA_INPUT_ALLOW_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(CARD_DATA_INPUT_ALLOW_RULE_ID);
+        assertThat(countSpendControlMovement(CARD_DATA_INPUT_ALLOW_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     private void assertNoEvaluationSideEffects(LedgerFactSnapshot before) {
         assertNoSpendRuleDecisionRecord();
         assertNoSpendControlMovement();
@@ -441,6 +511,16 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     private void publishCountryAllowRuleVersion() {
         publishRuleVersion(COUNTRY_ALLOW_RULE_ID, COUNTRY_ALLOW_RULE_DIGEST, COUNTRY_ALLOW_RULE_SPEC,
                 SpendRuleType.COUNTRY, "商户国家白名单控制");
+    }
+
+    private void publishCardDataInputRuleVersion() {
+        publishRuleVersion(CARD_DATA_INPUT_RULE_ID, CARD_DATA_INPUT_RULE_DIGEST, CARD_DATA_INPUT_RULE_SPEC,
+                SpendRuleType.CARD_DATA_INPUT_CAPABILITY, "卡数据输入能力黑名单控制");
+    }
+
+    private void publishCardDataInputAllowRuleVersion() {
+        publishRuleVersion(CARD_DATA_INPUT_ALLOW_RULE_ID, CARD_DATA_INPUT_ALLOW_RULE_DIGEST,
+                CARD_DATA_INPUT_ALLOW_RULE_SPEC, SpendRuleType.CARD_DATA_INPUT_CAPABILITY, "卡数据输入能力白名单控制");
     }
 
     private void publishRuleVersion(String ruleId, String ruleDigest, String ruleSpec) {
@@ -559,6 +639,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, COUNTRY_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
                 TENANT_ID, COUNTRY_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
@@ -573,6 +657,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, COUNTRY_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, COUNTRY_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
@@ -587,6 +675,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, COUNTRY_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, COUNTRY_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
@@ -601,6 +693,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, COUNTRY_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, COUNTRY_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
@@ -615,6 +711,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, COUNTRY_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, COUNTRY_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, CARD_DATA_INPUT_ALLOW_RULE_ID);
     }
 
     private void assertNoSpendRuleDecisionRecord() {

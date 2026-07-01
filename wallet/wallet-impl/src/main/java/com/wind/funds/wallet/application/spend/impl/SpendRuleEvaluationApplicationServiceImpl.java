@@ -55,6 +55,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String MERCHANT_COUNTRY_REJECT_REASON = "商户国家不允许";
 
+    private static final String CARD_DATA_INPUT_CAPABILITY_REJECT_REASON = "卡数据输入能力不允许";
+
     private static final String COUNTER_SPEC_KEY = "counterSpec";
 
     private static final String LIMIT_SPEC_KEY = "limitSpec";
@@ -66,6 +68,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String MERCHANT_CATEGORY_CONTROL_KEY = "merchantCategoryControl";
 
     private static final String MERCHANT_COUNTRY_CONTROL_KEY = "merchantCountryControl";
+
+    private static final String CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY = "cardDataInputCapabilityControl";
 
     private static final String AMOUNT_KEY = "amount";
 
@@ -80,6 +84,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String DENIED_COUNTRY_CODES_KEY = "deniedCountryCodes";
 
     private static final String ALLOWED_COUNTRY_CODES_KEY = "allowedCountryCodes";
+
+    private static final String DENIED_CARD_DATA_INPUT_CAPABILITIES_KEY = "deniedCardDataInputCapabilities";
+
+    private static final String ALLOWED_CARD_DATA_INPUT_CAPABILITIES_KEY = "allowedCardDataInputCapabilities";
 
     private final SpendRuleVersionService spendRuleVersionService;
 
@@ -142,6 +150,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     }
 
     private SpendControlDecisionResult evaluateRule(EvaluateSpendRuleRequest request, JSONObject ruleSpec) {
+        if (hasCardDataInputCapabilityControl(ruleSpec)) {
+            return evaluateCardDataInputCapability(request, cardDataInputCapabilityControlOf(ruleSpec));
+        }
         if (hasMerchantCountryControl(ruleSpec)) {
             return evaluateMerchantCountry(request, merchantCountryControlOf(ruleSpec));
         }
@@ -185,6 +196,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return limitSpec != null && limitSpec.getJSONObject(MERCHANT_COUNTRY_CONTROL_KEY) != null;
     }
 
+    private boolean hasCardDataInputCapabilityControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY) != null;
+    }
+
     private MerchantCategoryControl merchantCategoryControlOf(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
@@ -217,13 +233,28 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     }
 
     private Set<String> countryCodes(JSONObject merchantCountryControl, String key) {
-        List<String> codes = merchantCountryControl.getList(key, String.class);
+        return normalizedCodes(merchantCountryControl, key);
+    }
+
+    private CardDataInputCapabilityControl cardDataInputCapabilityControlOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject cardDataInputCapabilityControl = limitSpec.getJSONObject(CARD_DATA_INPUT_CAPABILITY_CONTROL_KEY);
+        AssertUtils.notNull(cardDataInputCapabilityControl,
+                "Spend Rule 规则规格缺少 limitSpec.cardDataInputCapabilityControl");
+        return new CardDataInputCapabilityControl(
+                normalizedCodes(cardDataInputCapabilityControl, DENIED_CARD_DATA_INPUT_CAPABILITIES_KEY),
+                normalizedCodes(cardDataInputCapabilityControl, ALLOWED_CARD_DATA_INPUT_CAPABILITIES_KEY));
+    }
+
+    private Set<String> normalizedCodes(JSONObject control, String key) {
+        List<String> codes = control.getList(key, String.class);
         if (codes == null) {
             return Set.of();
         }
         return codes.stream()
                 .filter(StringUtils::hasText)
-                .map(SpendRuleEvaluationApplicationServiceImpl::normalizeCountryCode)
+                .map(SpendRuleEvaluationApplicationServiceImpl::normalizeUpperCode)
                 .collect(Collectors.toUnmodifiableSet());
     }
 
@@ -251,12 +282,26 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private SpendControlDecisionResult evaluateMerchantCountry(EvaluateSpendRuleRequest request,
                                                                MerchantCountryControl control) {
         AssertUtils.hasText(request.getMerchantCountryCode(), "商户国家规则评估国家代码不能为空");
-        String merchantCountryCode = normalizeCountryCode(request.getMerchantCountryCode());
+        String merchantCountryCode = normalizeUpperCode(request.getMerchantCountryCode());
         if (control.deniedCountryCodes().contains(merchantCountryCode)) {
             return SpendControlDecisionResult.REJECTED;
         }
         if (!control.allowedCountryCodes().isEmpty()
                 && !control.allowedCountryCodes().contains(merchantCountryCode)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
+    private SpendControlDecisionResult evaluateCardDataInputCapability(EvaluateSpendRuleRequest request,
+                                                                       CardDataInputCapabilityControl control) {
+        AssertUtils.hasText(request.getCardDataInputCapability(), "卡数据输入能力规则评估卡数据输入能力不能为空");
+        String cardDataInputCapability = normalizeUpperCode(request.getCardDataInputCapability());
+        if (control.deniedCardDataInputCapabilities().contains(cardDataInputCapability)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        if (!control.allowedCardDataInputCapabilities().isEmpty()
+                && !control.allowedCardDataInputCapabilities().contains(cardDataInputCapability)) {
             return SpendControlDecisionResult.REJECTED;
         }
         return SpendControlDecisionResult.PASSED;
@@ -332,14 +377,17 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (result == SpendControlDecisionResult.PASSED) {
             return null;
         }
-        if (hasCountLimit(ruleSpec)) {
-            return PERIOD_COUNT_REJECT_REASON;
+        if (hasCardDataInputCapabilityControl(ruleSpec)) {
+            return CARD_DATA_INPUT_CAPABILITY_REJECT_REASON;
         }
         if (hasMerchantCountryControl(ruleSpec)) {
             return MERCHANT_COUNTRY_REJECT_REASON;
         }
         if (hasMerchantCategoryControl(ruleSpec)) {
             return MERCHANT_CATEGORY_REJECT_REASON;
+        }
+        if (hasCountLimit(ruleSpec)) {
+            return PERIOD_COUNT_REJECT_REASON;
         }
         return hasCounterSpec(ruleSpec) ? PERIOD_AMOUNT_REJECT_REASON : AMOUNT_LIMIT_REJECT_REASON;
     }
@@ -376,7 +424,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("merchantCategoryCode",
                 request.getMerchantCategoryCode() == null ? "" : request.getMerchantCategoryCode());
         digestValues.put("merchantCountryCode",
-                request.getMerchantCountryCode() == null ? "" : normalizeCountryCode(request.getMerchantCountryCode()));
+                request.getMerchantCountryCode() == null ? "" : normalizeUpperCode(request.getMerchantCountryCode()));
+        digestValues.put("cardDataInputCapability", request.getCardDataInputCapability() == null
+                ? ""
+                : normalizeUpperCode(request.getCardDataInputCapability()));
         digestValues.put("controlScopeId", request.getControlScopeId() == null ? "" : request.getControlScopeId());
         digestValues.put("periodId", request.getPeriodId() == null ? "" : request.getPeriodId());
         digestValues.put("targetAccountId", targetAccountDigest(request));
@@ -401,8 +452,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         }
     }
 
-    private static String normalizeCountryCode(String countryCode) {
-        return countryCode.trim().toUpperCase(Locale.ROOT);
+    private static String normalizeUpperCode(String code) {
+        return code.trim().toUpperCase(Locale.ROOT);
     }
 
     private record AmountLimit(Long amount, CurrencyIsoCode currency) {
@@ -415,5 +466,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     }
 
     private record MerchantCountryControl(Set<String> deniedCountryCodes, Set<String> allowedCountryCodes) {
+    }
+
+    private record CardDataInputCapabilityControl(Set<String> deniedCardDataInputCapabilities,
+                                                  Set<String> allowedCardDataInputCapabilities) {
     }
 }
