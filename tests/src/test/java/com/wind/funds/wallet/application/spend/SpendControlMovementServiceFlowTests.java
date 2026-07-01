@@ -102,6 +102,8 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     private static final String BUDGET_GROUP_SN = "budget_spend_control_movement";
 
+    private static final String SECOND_BUDGET_GROUP_SN = "budget_spend_control_movement_second";
+
     private static final String PERIOD_ID = "2026-07";
 
     private static final String NEXT_PERIOD_ID = "2026-08";
@@ -330,10 +332,10 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：同一控制范围跨周期刷新额度。
-     * 输入：2026-07 和 2026-08 分别记录额度初始化和占用。
-     * 输出：按控制范围 + 周期标识查询时，只聚合指定周期的控制流水。
-     * 红线：周期额度查询不得混入其他周期，也不得为预算控制范围生成账本事实。
+     * 场景：同一控制范围跨周期刷新额度，且同周期存在另一控制范围。
+     * 输入：2026-07 和 2026-08 分别记录额度初始化和占用；另一控制范围也在 2026-07 记录额度和占用。
+     * 输出：按控制范围 + 周期标识查询时，可直接查询当前或历史周期，并且不串入其他控制范围。
+     * 红线：控制窗口只由 controlScopeId + periodId 精确定位，不得混入其他周期、其他控制范围，也不得生成账本事实。
      */
     @Test
     void testBudgetControlProjectionShouldFilterByControlScopeAndPeriod() {
@@ -350,8 +352,17 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 SpendControlMovementType.RESERVED, "sha256:activity-reserved-august")
                 .setPeriodId(NEXT_PERIOD_ID)
                 .setAmount(80L));
+        spendControlMovementService.recordMovement(limitIncreaseRequest("limit_second_scope_july", PERIOD_ID, 500L,
+                "sha256:limit-second-scope-july")
+                .setControlScopeId(SECOND_BUDGET_GROUP_SN)
+                .setBudgetGroupSn(SECOND_BUDGET_GROUP_SN));
+        spendControlMovementService.recordMovement(recordRequest(decision, "activity_reserved_second_scope_july",
+                SpendControlMovementType.RESERVED, "sha256:activity-reserved-second-scope-july")
+                .setControlScopeId(SECOND_BUDGET_GROUP_SN)
+                .setBudgetGroupSn(SECOND_BUDGET_GROUP_SN)
+                .setAmount(200L));
 
-        BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
+        BudgetControlProjectionDTO historicalProjection = spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
                         .setControlScopeId(BUDGET_GROUP_SN)
@@ -359,15 +370,40 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                         .setCurrency(CurrencyIsoCode.USD)
                         .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
                                 FundsSubjectType.CREDIT_ACCOUNT)));
+        BudgetControlProjectionDTO currentProjection = spendControlMovementService.getBudgetControlProjection(
+                new BudgetControlProjectionQuery()
+                        .setTenantId(TENANT_ID)
+                        .setControlScopeId(BUDGET_GROUP_SN)
+                        .setPeriodId(NEXT_PERIOD_ID)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
+                                FundsSubjectType.CREDIT_ACCOUNT)));
+        BudgetControlProjectionDTO secondScopeProjection = spendControlMovementService.getBudgetControlProjection(
+                new BudgetControlProjectionQuery()
+                        .setTenantId(TENANT_ID)
+                        .setControlScopeId(SECOND_BUDGET_GROUP_SN)
+                        .setPeriodId(PERIOD_ID)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
+                                FundsSubjectType.CREDIT_ACCOUNT)));
 
-        assertThat(projection.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
-        assertThat(projection.getBudgetGroupSn()).isEqualTo(BUDGET_GROUP_SN);
-        assertThat(projection.getPeriodId()).isEqualTo(PERIOD_ID);
-        assertThat(projection.getLimitAmount()).isEqualTo(100L);
-        assertThat(projection.getReservedAmount()).isEqualTo(60L);
-        assertThat(projection.getRemainingControlAmount()).isEqualTo(60L);
-        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
-        assertThat(projection.getLastMovementSn()).isEqualTo(RESERVED_ACTIVITY_SN);
+        assertThat(historicalProjection.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(historicalProjection.getBudgetGroupSn()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(historicalProjection.getPeriodId()).isEqualTo(PERIOD_ID);
+        assertThat(historicalProjection.getLimitAmount()).isEqualTo(100L);
+        assertThat(historicalProjection.getReservedAmount()).isEqualTo(60L);
+        assertThat(historicalProjection.getRemainingControlAmount()).isEqualTo(60L);
+        assertThat(historicalProjection.getAvailableControlAmount()).isEqualTo(40L);
+        assertThat(historicalProjection.getLastMovementSn()).isEqualTo(RESERVED_ACTIVITY_SN);
+        assertThat(currentProjection.getPeriodId()).isEqualTo(NEXT_PERIOD_ID);
+        assertThat(currentProjection.getLimitAmount()).isEqualTo(300L);
+        assertThat(currentProjection.getReservedAmount()).isEqualTo(80L);
+        assertThat(currentProjection.getAvailableControlAmount()).isEqualTo(220L);
+        assertThat(currentProjection.getLastMovementSn()).isEqualTo("activity_reserved_august");
+        assertThat(secondScopeProjection.getControlScopeId()).isEqualTo(SECOND_BUDGET_GROUP_SN);
+        assertThat(secondScopeProjection.getLimitAmount()).isEqualTo(500L);
+        assertThat(secondScopeProjection.getReservedAmount()).isEqualTo(200L);
+        assertThat(secondScopeProjection.getAvailableControlAmount()).isEqualTo(300L);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }

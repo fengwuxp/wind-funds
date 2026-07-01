@@ -109,7 +109,7 @@ Spend Rule 服务层分层测试口径：
 
 Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`assignmentSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立工程变更边界。
 
-Highnote Spend Controls 对齐后的任务源以产品分册 09 的 `SR-HN-*` 为准。`SR-HN-001` 已同步“上游决策、wallet 固化证据、transaction 消费快照”的接入口径；`SR-HN-002` 已进入最小可执行规则 TDD，当前已落地单笔限额正反向评估、周期金额可用额度不足拒绝、周期次数达到上限拒绝和 MCC 黑白名单评估，并持续断言拒绝无资金事实副作用。
+Highnote Spend Controls 对齐后的任务源以产品分册 09 的 `SR-HN-*` 为准。`SR-HN-001` 已同步“上游决策、wallet 固化证据、transaction 消费快照”的接入口径；`SR-HN-002` 已落地最小可执行规则 TDD；`SR-HN-003` 至 `SR-HN-005` 分别补齐控制窗口、外部决策证据和多规则最终裁决摘要的测试与契约锚点，并持续断言不得产生越界资金事实。
 
 SR-HN-002 最小测试卡：
 
@@ -119,7 +119,7 @@ SR-HN-002 最小测试卡：
 | `firstRedSet` | `SR-HN-002-RED-001` 至 `SR-HN-002-RED-005`。 |
 | `coreAssertions` | evaluator 只返回 `PASSED` / `REJECTED`、拒绝原因和决策摘要候选；不得写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 |
 | `outOfScope` | 多规则冲突合成、表达式引擎、脚本、运营后台、协同授权 webhook、外部风控协议、rolling window、生产调度重置和 DDL。 |
-| `nextGate` | SR-HN-002 当前收口；后续优先进入 SR-HN-003 控制窗口模型，商户 ID、国家、POS、PAN entry、CVV、AVS、多规则冲突和表达式引擎均另拆任务。 |
+| `nextGate` | SR-HN-002 当前收口；商户 ID、国家、POS、PAN entry、CVV、AVS、多规则冲突和表达式引擎均另拆任务。 |
 
 SR-HN-002 首批 Red 候选：
 
@@ -130,6 +130,56 @@ SR-HN-002 首批 Red 候选：
 | SR-HN-002-RED-003 | 当前周期次数达到上限时，是否能拒绝下一笔授权？ | 次数控制只基于同一 `controlScopeId + periodId + ruleId + ruleVersion` 下的既有控制流水按原始占用流水去重计数，不新增资金事实。 | evaluator 返回 `REJECTED`，拒绝原因为周期次数超限。 | 不写决策记录、控制额度变动、交易或账本事实。 | 周期次数上限 3，已有 3 条同周期消费或占用控制尝试，请求第 4 笔拒绝；同一授权 RESERVED 后 CONSUMED 不重复计数。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 现有流水无法表达稳定计数口径，或需要新增聚合表。 |
 | SR-HN-002-RED-004 | MCC 在黑名单或不在白名单时，是否能拒绝？ | MCC 判断只使用请求事实和规则规格，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED`，拒绝原因说明 MCC 不允许。 | 不写任何资金事实、决策记录或控制流水。 | 请求 MCC 为 `7995` 且 deny list 包含 `7995` 时拒绝；allow list 只包含 `5812` 而请求 MCC 为 `7995` 时拒绝；断言拒绝前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 后续新增商户 ID、国家、POS、PAN entry、CVV 或 AVS 时另拆任务。 |
 | SR-HN-002-RED-005 | 所有已实现最小规则均通过时，是否能返回可被准入服务消费的通过证据？ | 通过结论仍然不代表交易成功，也不自动写入准入决策记录。 | evaluator 返回 `PASSED`、空拒绝原因和稳定决策摘要候选。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry。 | 当前已实现单笔限额满足时摘要重复评估稳定一致；MCC allow list 命中时通过且无资金事实副作用。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要多规则冲突合成或外部风控确认才能判断通过。 |
+
+SR-HN-003 控制窗口测试卡：
+
+| 输出项 | 本轮结论 |
+| --- | --- |
+| `deliveryScenario` | 周期额度不复用账本周期、不生成预算组账本；接入方直接用 `controlScopeId + periodId` 查询当前或历史控制窗口。 |
+| `firstRedSet` | `SR-HN-003-RED-001`。 |
+| `coreAssertions` | 当前周期和历史周期只需替换 `periodId`；同周期不同 `controlScopeId`、不同目标账户不得串账；投影查询不得写交易、route、posting、LedgerEntry 或账本余额。 |
+| `outOfScope` | 新增 `windowType` 字段、rolling window、cooldown、生产调度、时区计算器、表达式引擎和 DDL。 |
+| `nextGate` | 若要支持滚动窗口或调度自动刷新，再拆单独工程任务；当前最小控制窗口以 `periodId` 作为外部已决策窗口标识。 |
+
+SR-HN-003 首批 Red 候选：
+
+| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SR-HN-003-RED-001 | 当前周期和历史周期额度是否能用周期标识直接查询，且不串入其他周期、账户或控制范围？ | Spend Rule 控制窗口只派生控制投影，不生成账本余额或预算组账本。 | `BudgetControlProjectionQuery(controlScopeId, periodId, currency, targetAccountId)` 返回指定窗口的额度、占用、剩余和可用控制额度。 | 不写资金交易、route、posting、LedgerEntry；不把其他周期、其他账户、其他 `controlScopeId` 的流水混入。 | 2026-07 和 2026-08 分别能返回各自额度；另一个 `controlScopeId` 的同周期流水不影响主控制范围；查询后资金事实不变。 | `SpendControlMovementServiceFlowTests`，已落地。 | `just test-one SpendControlMovementServiceFlowTests tests`。 | 需要 rolling window、cooldown、时区换算或生产调度刷新。 |
+
+SR-HN-004 外部决策证据接入测试卡：
+
+| 输出项 | 本轮结论 |
+| --- | --- |
+| `deliveryScenario` | 上游规则服务、外部风控或协同授权服务已经给出 approve / decline，本系统只消费最终决策证据并固化准入事实。 |
+| `firstRedSet` | `SR-HN-004-RED-001`、`SR-HN-004-RED-002`。 |
+| `coreAssertions` | 外部 decline 停在交易内核前且无 route、posting、LedgerEntry；外部 approve 仍必须先通过支付工具、账户能力和资金责任校验，不能直接代表资金可用或授权成功。 |
+| `outOfScope` | webhook endpoint、HMAC、外部风控协议、超时 stand-in、模拟器、多规则裁决和 DDL。 |
+| `nextGate` | 若需要平台托管协同授权协议，再拆外部接入工程任务；当前公共契约只保留最终决策流水、结果、摘要和拒绝原因。 |
+
+SR-HN-004 首批 Red 候选：
+
+| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SR-HN-004-RED-001 | 外部 decline 后是否能在交易内核前停止？ | 外部拒绝不得创建任何交易或账本事实。 | 返回 `admitted=false`，固化决策流水、规则版本、摘要和拒绝原因。 | 不写资金交易、route、posting、LedgerEntry 或余额投影。 | 支付工具、账户能力和资金责任均可用；上游结果为 `REJECTED`；断言拒绝原因、决策记录和资金事实不变。 | `SpendControlAdmissionApplicationServiceTests`，已落地。 | `just test-one SpendControlAdmissionApplicationServiceTests tests`。 | 需要新增外部回调协议字段或 webhook。 |
+| SR-HN-004-RED-002 | 外部 approve 是否会绕过 wallet 准入链？ | 外部通过只是一条规则证据，不代表资金责任、账户能力或授权交易成功。 | 默认资金责任缺失时准入失败，且不固化决策记录。 | 不写决策记录、资金交易、route、posting、LedgerEntry 或余额投影。 | 携带 `PASSED` 决策证据；支付工具和账户存在但默认资金责任关系缺失；断言失败原因和无副作用。 | `SpendControlAdmissionApplicationServiceTests`，已落地。 | `just test-one SpendControlAdmissionApplicationServiceTests tests`。 | 需要把外部 approve 解释成直接授权成功。 |
+
+SR-HN-005 多规则裁决证据契约评审卡：
+
+| 输出项 | 本轮结论 |
+| --- | --- |
+| `deliveryScenario` | 上游已经完成多规则裁决，本系统当前只需要消费最终决策流水、结果、摘要和拒绝原因，支持准入、幂等、回放和对账追踪。 |
+| `contractDecision` | `evaluatedRules`、`decisionPolicy`、`finalDecision` 暂不进入 `ResolveSpendControlAdmissionRequest` 或 `RecordSpendRuleDecisionRecordRequest` 公共字段；如需表达多规则明细，先由上游把完整裁决证据纳入 `decisionDigest` 的摘要源。 |
+| `coreAssertions` | 最终摘要不能替代明细可解释性；但在公共契约升级前，本系统不得伪造、截断或重算上游多规则明细。 |
+| `outOfScope` | 新增公共 DTO 字段、DDL、历史决策回填、多规则冲突合成器、规则引擎和内部解释 payload 落库。 |
+| `nextGate` | 只有接入方明确要求本系统保存并查询多规则明细时，才新增字段、表结构、兼容策略和可执行测试。 |
+
+SR-HN-005 首批 Red 候选：
+
+| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SR-HN-005-RED-001 | 当前公共契约是否足以消费上游多规则最终裁决？ | 多规则裁决证据只是准入控制事实，不创建资金交易或账本事实。 | 接入方传入最终 `decisionSn/result/digest/rejectReason`，准入服务只固化最终决策记录。 | 不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段、DDL 或解释 payload 落库。 | 公共 request 注释明确摘要可代表多规则裁决证据；完整明细由上游保存。 | `ResolveSpendControlAdmissionRequest`、`RecordSpendRuleDecisionRecordRequest` 注释，已落地。 | `just compile`。 | 接入方要求本系统查询或回放每条规则明细。 |
+| SR-HN-005-RED-002 | 如果未来需要本系统解释多规则明细，应证明什么？ | 历史解释必须读取当时固化证据，不按当前规则重算。 | 能查询每条 evaluated rule、裁决策略和最终决策，并能脱敏展示拒绝原因。 | 不泄露敏感商户原文、卡号、token、外部账户或风控模型细节；不改变既有最终决策幂等。 | 先补公共契约、DDL 兼容、脱敏和历史回放测试，再实现落库。 | 待授权，当前不落地。 | 待授权后定义。 | 涉及破坏性公共契约变更、历史迁移或敏感字段存储。 |
 
 涉及 Spend Rule 或资金主链路的代码切片，`just compile`、`just test-one`、`just test-module`、`just verify-fast` 和 `just verify-cad` 必须通过 classfile 错误桩扫描；`verify-classfiles` 会检查 `target/classes` 和 `target/test-classes` 中是否存在 `Unresolved compilation`，避免 Maven 命令成功但编译产物不可用。
 

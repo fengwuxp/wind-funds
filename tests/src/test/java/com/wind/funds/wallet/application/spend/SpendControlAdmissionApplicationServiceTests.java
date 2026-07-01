@@ -176,8 +176,8 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     }
 
     /**
-     * 场景：支付工具预交易快照通过，但 Spend Rule 决策拒绝。
-     * 输入：支付工具和账户能力可用，规则决策结果为拒绝，并带有拒绝原因。
+     * 场景：支付工具预交易快照通过，但上游或外部 Spend Rule 决策拒绝。
+     * 输入：支付工具和账户能力可用，上游最终规则决策结果为拒绝，并带有拒绝原因。
      * 输出：返回 admitted=false 的准入决策，不抛出系统异常。
      * 红线：业务拒绝不得创建交易、route、posting、LedgerEntry 或余额投影事实。
      */
@@ -200,6 +200,27 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         assertThat(decision.getTargetAccountId())
                 .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
         assertThat(decision.getPreTransactionSnapshot().getReady()).isTrue();
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：上游或外部 Spend Rule 决策通过，但 wallet 资金责任基础事实缺失。
+     * 输入：携带 PASSED 决策证据，支付工具绑定和账户存在，但默认资金责任关系不存在。
+     * 输出：准入停在预交易快照阶段，不固化 Spend Rule 决策记录。
+     * 红线：外部 approve 不代表资金可用，不能绕过支付工具、账户能力和资金责任校验。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectExternalApproveWhenFundingResponsibilityMissingWithoutSideEffect() {
+        prepareSpendControlAdmissionData();
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED)))
+                .hasMessageContaining("默认资金责任关系不存在");
+
+        assertThat(decisionRecordCount()).isZero();
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }

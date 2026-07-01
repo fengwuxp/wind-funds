@@ -94,7 +94,8 @@ public class ResolveSpendControlAdmissionRequest {
     @NotNull
     private SpendControlDecisionResult spendDecisionResult;
 
-    @Schema(description = "Spend Rule 决策摘要，用于幂等、回放和对账追踪")
+    @Schema(description = "Spend Rule 最终决策摘要，用于幂等、回放和对账追踪；"
+            + "可代表上游多规则裁决证据摘要，当前公共契约不展开 evaluatedRules、decisionPolicy 或 finalDecision 明细")
     @NotBlank
     private String spendDecisionDigest;
 

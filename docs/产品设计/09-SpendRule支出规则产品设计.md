@@ -385,7 +385,7 @@ SR-HN-002 当前推进边界与已落地切片：
 5. `merchantCategoryControl.deniedMccCodes` 和 `allowedMccCodes` 缺省时按空集合处理；黑名单命中优先拒绝，白名单非空且未命中时拒绝。
 6. 若发现需要新增数据库字段、规则运营后台、外部风控协议、协同授权 webhook、rolling window 或复杂多规则裁决，应停止 SR-HN-002，拆成独立工程边界。
 
-当前进度：SR-HN-001 文档口径已同步；SR-HN-002 已落地单笔限额、周期金额、周期次数和 MCC 黑白名单 evaluator 代码切片。下一步优先进入 SR-HN-003 velocity control / 控制窗口模型，不在 SR-HN-002 内继续扩展规则引擎。
+当前进度：SR-HN-001 文档口径已同步；SR-HN-002 已落地单笔限额、周期金额、周期次数和 MCC 黑白名单 evaluator 代码切片；SR-HN-003 已补控制窗口 TDD 锚点，当前以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，证明跨周期、跨账户、跨控制范围不串账；SR-HN-004 已补外部 approve / decline 决策证据准入 TDD 锚点，确认外部拒绝无资金事实副作用，外部通过仍不得绕过支付工具、账户能力和资金责任校验；SR-HN-005 已完成公共契约评审，当前只消费最终决策流水、结果、摘要和拒绝原因，不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段。后续仍不在 SR-HN-002 至 SR-HN-005 范围内扩展规则引擎、rolling window、cooldown、生产调度、webhook、外部风控协议或多规则明细落库。
 
 ## 13. 产品到架构和 TDD 交接
 

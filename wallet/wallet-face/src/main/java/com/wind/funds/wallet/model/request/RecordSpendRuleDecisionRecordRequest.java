@@ -89,7 +89,8 @@ public class RecordSpendRuleDecisionRecordRequest implements Serializable {
     @Schema(description = "拒绝原因")
     private String rejectReason;
 
-    @Schema(description = "规则决策摘要")
+    @Schema(description = "规则最终决策摘要；"
+            + "可代表上游多规则裁决证据摘要，当前公共契约不展开 evaluatedRules、decisionPolicy 或 finalDecision 明细")
     @NotBlank
     private String decisionDigest;
 }
