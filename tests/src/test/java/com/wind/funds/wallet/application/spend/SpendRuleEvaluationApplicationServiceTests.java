@@ -71,6 +71,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String MCC_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-mcc-allow";
 
+    private static final String COUNTRY_RULE_ID = "sr_evaluation_country";
+
+    private static final String COUNTRY_RULE_DIGEST = "sha256:spend-rule-evaluation-country";
+
+    private static final String COUNTRY_ALLOW_RULE_ID = "sr_evaluation_country_allow";
+
+    private static final String COUNTRY_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-country-allow";
+
     private static final String CONTROL_SCOPE_ID = "scope_spend_rule_evaluation";
 
     private static final String PERIOD_ID = "2026-07";
@@ -99,6 +107,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String MCC_ALLOW_RULE_SPEC = """
             {"limitSpec":{"merchantCategoryControl":{"allowedMccCodes":["5812"]}}}
+            """;
+
+    private static final String COUNTRY_RULE_SPEC = """
+            {"limitSpec":{"merchantCountryControl":{"deniedCountryCodes":["CU","IR"],"allowedCountryCodes":[]}}}
+            """;
+
+    private static final String COUNTRY_ALLOW_RULE_SPEC = """
+            {"limitSpec":{"merchantCountryControl":{"allowedCountryCodes":["US"]}}}
             """;
 
     @Autowired
@@ -324,6 +340,60 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：商户国家黑名单规则命中拒绝。
+     * 输入：规则拒绝国家 CU，请求评估商户国家为 CU。
+     * 输出：返回拒绝评估结论。
+     * 红线：国家评估只读请求事实和已发布规则版本，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateMerchantCountryDeniedShouldRejectWithoutFundsSideEffect() {
+        publishCountryRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(COUNTRY_RULE_ID)
+                        .setMerchantCountryCode("CU"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("商户国家不允许");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(COUNTRY_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(COUNTRY_RULE_ID);
+        assertThat(countSpendControlMovement(COUNTRY_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：商户国家命中白名单规则。
+     * 输入：规则只允许国家 US，请求评估商户国家为 us。
+     * 输出：返回通过评估结论。
+     * 红线：国家大小写归一化后判断，评估通过仍不代表授权成功。
+     */
+    @Test
+    void testEvaluateMerchantCountryAllowListHitShouldPassWithoutFundsSideEffect() {
+        publishCountryAllowRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(COUNTRY_ALLOW_RULE_ID)
+                        .setMerchantCountryCode("us"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(COUNTRY_ALLOW_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(COUNTRY_ALLOW_RULE_ID);
+        assertThat(countSpendControlMovement(COUNTRY_ALLOW_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     private void assertNoEvaluationSideEffects(LedgerFactSnapshot before) {
         assertNoSpendRuleDecisionRecord();
         assertNoSpendControlMovement();
@@ -361,6 +431,16 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     private void publishMccAllowRuleVersion() {
         publishRuleVersion(MCC_ALLOW_RULE_ID, MCC_ALLOW_RULE_DIGEST, MCC_ALLOW_RULE_SPEC,
                 SpendRuleType.MERCHANT_CATEGORY, "MCC 白名单控制");
+    }
+
+    private void publishCountryRuleVersion() {
+        publishRuleVersion(COUNTRY_RULE_ID, COUNTRY_RULE_DIGEST, COUNTRY_RULE_SPEC,
+                SpendRuleType.COUNTRY, "商户国家黑名单控制");
+    }
+
+    private void publishCountryAllowRuleVersion() {
+        publishRuleVersion(COUNTRY_ALLOW_RULE_ID, COUNTRY_ALLOW_RULE_DIGEST, COUNTRY_ALLOW_RULE_SPEC,
+                SpendRuleType.COUNTRY, "商户国家白名单控制");
     }
 
     private void publishRuleVersion(String ruleId, String ruleDigest, String ruleSpec) {
@@ -475,6 +555,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MCC_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
                 TENANT_ID, MCC_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                TENANT_ID, COUNTRY_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE tenant_id = ? AND spend_rule_id = ?",
+                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
@@ -485,6 +569,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MCC_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, MCC_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, COUNTRY_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
@@ -495,6 +583,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MCC_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, MCC_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, COUNTRY_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
@@ -505,6 +597,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MCC_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, MCC_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, COUNTRY_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
@@ -515,6 +611,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 TENANT_ID, MCC_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, MCC_ALLOW_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, COUNTRY_RULE_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
+                TENANT_ID, COUNTRY_ALLOW_RULE_ID);
     }
 
     private void assertNoSpendRuleDecisionRecord() {

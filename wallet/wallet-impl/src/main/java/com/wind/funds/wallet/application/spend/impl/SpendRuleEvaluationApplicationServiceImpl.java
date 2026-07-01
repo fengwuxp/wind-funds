@@ -27,6 +27,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -52,6 +53,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String MERCHANT_CATEGORY_REJECT_REASON = "商户类别不允许";
 
+    private static final String MERCHANT_COUNTRY_REJECT_REASON = "商户国家不允许";
+
     private static final String COUNTER_SPEC_KEY = "counterSpec";
 
     private static final String LIMIT_SPEC_KEY = "limitSpec";
@@ -62,6 +65,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String MERCHANT_CATEGORY_CONTROL_KEY = "merchantCategoryControl";
 
+    private static final String MERCHANT_COUNTRY_CONTROL_KEY = "merchantCountryControl";
+
     private static final String AMOUNT_KEY = "amount";
 
     private static final String CURRENCY_KEY = "currency";
@@ -71,6 +76,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String DENIED_MCC_CODES_KEY = "deniedMccCodes";
 
     private static final String ALLOWED_MCC_CODES_KEY = "allowedMccCodes";
+
+    private static final String DENIED_COUNTRY_CODES_KEY = "deniedCountryCodes";
+
+    private static final String ALLOWED_COUNTRY_CODES_KEY = "allowedCountryCodes";
 
     private final SpendRuleVersionService spendRuleVersionService;
 
@@ -133,6 +142,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     }
 
     private SpendControlDecisionResult evaluateRule(EvaluateSpendRuleRequest request, JSONObject ruleSpec) {
+        if (hasMerchantCountryControl(ruleSpec)) {
+            return evaluateMerchantCountry(request, merchantCountryControlOf(ruleSpec));
+        }
         if (hasMerchantCategoryControl(ruleSpec)) {
             return evaluateMerchantCategory(request, merchantCategoryControlOf(ruleSpec));
         }
@@ -168,6 +180,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return limitSpec != null && limitSpec.getJSONObject(MERCHANT_CATEGORY_CONTROL_KEY) != null;
     }
 
+    private boolean hasMerchantCountryControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(MERCHANT_COUNTRY_CONTROL_KEY) != null;
+    }
+
     private MerchantCategoryControl merchantCategoryControlOf(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
@@ -189,6 +206,27 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    private MerchantCountryControl merchantCountryControlOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject merchantCountryControl = limitSpec.getJSONObject(MERCHANT_COUNTRY_CONTROL_KEY);
+        AssertUtils.notNull(merchantCountryControl, "Spend Rule 规则规格缺少 limitSpec.merchantCountryControl");
+        return new MerchantCountryControl(
+                countryCodes(merchantCountryControl, DENIED_COUNTRY_CODES_KEY),
+                countryCodes(merchantCountryControl, ALLOWED_COUNTRY_CODES_KEY));
+    }
+
+    private Set<String> countryCodes(JSONObject merchantCountryControl, String key) {
+        List<String> codes = merchantCountryControl.getList(key, String.class);
+        if (codes == null) {
+            return Set.of();
+        }
+        return codes.stream()
+                .filter(StringUtils::hasText)
+                .map(SpendRuleEvaluationApplicationServiceImpl::normalizeCountryCode)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
     private SpendControlDecisionResult evaluateSingleAmountLimit(EvaluateSpendRuleRequest request,
                                                                  AmountLimit amountLimit) {
         if (request.getAmount() > amountLimit.amount()) {
@@ -205,6 +243,20 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         }
         if (!control.allowedMccCodes().isEmpty()
                 && !control.allowedMccCodes().contains(request.getMerchantCategoryCode())) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
+    private SpendControlDecisionResult evaluateMerchantCountry(EvaluateSpendRuleRequest request,
+                                                               MerchantCountryControl control) {
+        AssertUtils.hasText(request.getMerchantCountryCode(), "商户国家规则评估国家代码不能为空");
+        String merchantCountryCode = normalizeCountryCode(request.getMerchantCountryCode());
+        if (control.deniedCountryCodes().contains(merchantCountryCode)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        if (!control.allowedCountryCodes().isEmpty()
+                && !control.allowedCountryCodes().contains(merchantCountryCode)) {
             return SpendControlDecisionResult.REJECTED;
         }
         return SpendControlDecisionResult.PASSED;
@@ -283,6 +335,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasCountLimit(ruleSpec)) {
             return PERIOD_COUNT_REJECT_REASON;
         }
+        if (hasMerchantCountryControl(ruleSpec)) {
+            return MERCHANT_COUNTRY_REJECT_REASON;
+        }
         if (hasMerchantCategoryControl(ruleSpec)) {
             return MERCHANT_CATEGORY_REJECT_REASON;
         }
@@ -320,6 +375,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("businessSn", request.getBusinessSn());
         digestValues.put("merchantCategoryCode",
                 request.getMerchantCategoryCode() == null ? "" : request.getMerchantCategoryCode());
+        digestValues.put("merchantCountryCode",
+                request.getMerchantCountryCode() == null ? "" : normalizeCountryCode(request.getMerchantCountryCode()));
         digestValues.put("controlScopeId", request.getControlScopeId() == null ? "" : request.getControlScopeId());
         digestValues.put("periodId", request.getPeriodId() == null ? "" : request.getPeriodId());
         digestValues.put("targetAccountId", targetAccountDigest(request));
@@ -344,6 +401,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         }
     }
 
+    private static String normalizeCountryCode(String countryCode) {
+        return countryCode.trim().toUpperCase(Locale.ROOT);
+    }
+
     private record AmountLimit(Long amount, CurrencyIsoCode currency) {
     }
 
@@ -351,5 +412,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     }
 
     private record MerchantCategoryControl(Set<String> deniedMccCodes, Set<String> allowedMccCodes) {
+    }
+
+    private record MerchantCountryControl(Set<String> deniedCountryCodes, Set<String> allowedCountryCodes) {
     }
 }
