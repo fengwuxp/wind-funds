@@ -67,6 +67,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String POINT_OF_SERVICE_CATEGORY_REJECT_REASON = "POS 类别不允许";
 
+    private static final String POSTAL_CODE_VERIFICATION_REJECT_REASON = "邮编校验结果不允许";
+
     private static final String COUNTER_SPEC_KEY = "counterSpec";
 
     private static final String LIMIT_SPEC_KEY = "limitSpec";
@@ -90,6 +92,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String PAN_ENTRY_MODE_CONTROL_KEY = "panEntryModeControl";
 
     private static final String POINT_OF_SERVICE_CATEGORY_CONTROL_KEY = "pointOfServiceCategoryControl";
+
+    private static final String POSTAL_CODE_VERIFICATION_CONTROL_KEY = "postalCodeVerificationControl";
 
     private static final String AMOUNT_KEY = "amount";
 
@@ -126,6 +130,10 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String DENIED_POINT_OF_SERVICE_CATEGORIES_KEY = "deniedPointOfServiceCategories";
 
     private static final String ALLOWED_POINT_OF_SERVICE_CATEGORIES_KEY = "allowedPointOfServiceCategories";
+
+    private static final String DENIED_VERIFICATION_RESULTS_KEY = "deniedVerificationResults";
+
+    private static final String ALLOWED_VERIFICATION_RESULTS_KEY = "allowedVerificationResults";
 
     private final SpendRuleVersionService spendRuleVersionService;
 
@@ -203,6 +211,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasPointOfServiceCategoryControl(ruleSpec)) {
             return evaluatePointOfServiceCategory(request, pointOfServiceCategoryControlOf(ruleSpec));
         }
+        if (hasPostalCodeVerificationControl(ruleSpec)) {
+            return evaluatePostalCodeVerification(request, postalCodeVerificationControlOf(ruleSpec));
+        }
         if (hasMerchantIdControl(ruleSpec)) {
             return evaluateMerchantId(request, merchantIdControlOf(ruleSpec));
         }
@@ -277,6 +288,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private boolean hasPointOfServiceCategoryControl(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         return limitSpec != null && limitSpec.getJSONObject(POINT_OF_SERVICE_CATEGORY_CONTROL_KEY) != null;
+    }
+
+    private boolean hasPostalCodeVerificationControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(POSTAL_CODE_VERIFICATION_CONTROL_KEY) != null;
     }
 
     private MerchantCategoryControl merchantCategoryControlOf(JSONObject ruleSpec) {
@@ -387,6 +403,17 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return new PointOfServiceCategoryControl(
                 normalizedCodes(pointOfServiceCategoryControl, DENIED_POINT_OF_SERVICE_CATEGORIES_KEY),
                 normalizedCodes(pointOfServiceCategoryControl, ALLOWED_POINT_OF_SERVICE_CATEGORIES_KEY));
+    }
+
+    private PostalCodeVerificationControl postalCodeVerificationControlOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject postalCodeVerificationControl = limitSpec.getJSONObject(POSTAL_CODE_VERIFICATION_CONTROL_KEY);
+        AssertUtils.notNull(postalCodeVerificationControl,
+                "Spend Rule 规则规格缺少 limitSpec.postalCodeVerificationControl");
+        return new PostalCodeVerificationControl(
+                normalizedCodes(postalCodeVerificationControl, DENIED_VERIFICATION_RESULTS_KEY),
+                normalizedCodes(postalCodeVerificationControl, ALLOWED_VERIFICATION_RESULTS_KEY));
     }
 
     private Set<String> normalizedCodes(JSONObject control, String key) {
@@ -514,6 +541,20 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return SpendControlDecisionResult.PASSED;
     }
 
+    private SpendControlDecisionResult evaluatePostalCodeVerification(EvaluateSpendRuleRequest request,
+                                                                      PostalCodeVerificationControl control) {
+        AssertUtils.hasText(request.getPostalCodeVerificationResult(), "邮编校验规则评估校验结果不能为空");
+        String verificationResult = normalizeUpperCode(request.getPostalCodeVerificationResult());
+        if (control.deniedVerificationResults().contains(verificationResult)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        if (!control.allowedVerificationResults().isEmpty()
+                && !control.allowedVerificationResults().contains(verificationResult)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
     private SpendControlDecisionResult evaluatePeriodCountLimit(EvaluateSpendRuleRequest request,
                                                                 CountLimit countLimit) {
         AssertUtils.hasText(request.getControlScopeId(), "周期次数规则评估控制范围标识不能为空");
@@ -599,6 +640,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasPointOfServiceCategoryControl(ruleSpec)) {
             return POINT_OF_SERVICE_CATEGORY_REJECT_REASON;
         }
+        if (hasPostalCodeVerificationControl(ruleSpec)) {
+            return POSTAL_CODE_VERIFICATION_REJECT_REASON;
+        }
         if (hasMerchantIdControl(ruleSpec)) {
             return MERCHANT_ID_REJECT_REASON;
         }
@@ -661,6 +705,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("pointOfServiceCategory", request.getPointOfServiceCategory() == null
                 ? ""
                 : normalizeUpperCode(request.getPointOfServiceCategory()));
+        digestValues.put("postalCodeVerificationResult", request.getPostalCodeVerificationResult() == null
+                ? ""
+                : normalizeUpperCode(request.getPostalCodeVerificationResult()));
         digestValues.put("controlScopeId", request.getControlScopeId() == null ? "" : request.getControlScopeId());
         digestValues.put("periodId", request.getPeriodId() == null ? "" : request.getPeriodId());
         digestValues.put("targetAccountId", targetAccountDigest(request));
@@ -720,5 +767,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private record PointOfServiceCategoryControl(Set<String> deniedPointOfServiceCategories,
                                                  Set<String> allowedPointOfServiceCategories) {
+    }
+
+    private record PostalCodeVerificationControl(Set<String> deniedVerificationResults,
+                                                 Set<String> allowedVerificationResults) {
     }
 }

@@ -123,6 +123,17 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String PROCESSING_TYPE_ALLOW_RULE_DIGEST = "sha256:spend-rule-evaluation-processing-type-allow";
 
+    private static final String POSTAL_CODE_VERIFICATION_RULE_ID = "sr_evaluation_postal_code_verification";
+
+    private static final String POSTAL_CODE_VERIFICATION_RULE_DIGEST =
+            "sha256:spend-rule-evaluation-postal-code-verification";
+
+    private static final String POSTAL_CODE_VERIFICATION_ALLOW_RULE_ID =
+            "sr_evaluation_postal_code_verification_allow";
+
+    private static final String POSTAL_CODE_VERIFICATION_ALLOW_RULE_DIGEST =
+            "sha256:spend-rule-evaluation-postal-code-verification-allow";
+
     private static final String CONTROL_SCOPE_ID = "scope_spend_rule_evaluation";
 
     private static final String PERIOD_ID = "2026-07";
@@ -203,6 +214,14 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String PROCESSING_TYPE_ALLOW_RULE_SPEC = """
             {"limitSpec":{"cardTransactionProcessingTypeControl":{"allowedCardTransactionProcessingTypes":["CASH"]}}}
+            """;
+
+    private static final String POSTAL_CODE_VERIFICATION_RULE_SPEC = """
+            {"limitSpec":{"postalCodeVerificationControl":{"deniedVerificationResults":["NO_MATCH"],"allowedVerificationResults":[]}}}
+            """;
+
+    private static final String POSTAL_CODE_VERIFICATION_ALLOW_RULE_SPEC = """
+            {"limitSpec":{"postalCodeVerificationControl":{"allowedVerificationResults":["MATCH"]}}}
             """;
 
     @Autowired
@@ -806,6 +825,60 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：电商卡要求 AVS 邮编校验命中，拒绝邮编校验不匹配的授权。
+     * 输入：规则拒绝邮编校验结果 NO_MATCH，请求评估结果为 no_match。
+     * 输出：大小写归一化后返回拒绝评估结论。
+     * 红线：邮编校验规则只接收 AVS 校验结果，不保存邮编或街道地址原文，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluatePostalCodeVerificationNoMatchShouldRejectWithoutFundsSideEffect() {
+        publishPostalCodeVerificationRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(POSTAL_CODE_VERIFICATION_RULE_ID)
+                        .setPostalCodeVerificationResult("no_match"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("邮编校验结果不允许");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(POSTAL_CODE_VERIFICATION_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(POSTAL_CODE_VERIFICATION_RULE_ID);
+        assertThat(countSpendControlMovement(POSTAL_CODE_VERIFICATION_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：电商卡只允许 AVS 邮编校验匹配的授权。
+     * 输入：规则只允许邮编校验结果 MATCH，请求评估结果为 match。
+     * 输出：大小写归一化后返回通过评估结论。
+     * 红线：评估通过仍不代表授权成功，不保存邮编或街道地址原文，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluatePostalCodeVerificationAllowListHitShouldPassWithoutFundsSideEffect() {
+        publishPostalCodeVerificationAllowRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(POSTAL_CODE_VERIFICATION_ALLOW_RULE_ID)
+                        .setPostalCodeVerificationResult("match"));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(POSTAL_CODE_VERIFICATION_ALLOW_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(POSTAL_CODE_VERIFICATION_ALLOW_RULE_ID);
+        assertThat(countSpendControlMovement(POSTAL_CODE_VERIFICATION_ALLOW_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     private void assertNoEvaluationSideEffects(LedgerFactSnapshot before) {
         assertNoSpendRuleDecisionRecord();
         assertNoSpendControlMovement();
@@ -909,6 +982,18 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         publishRuleVersion(PROCESSING_TYPE_ALLOW_RULE_ID, PROCESSING_TYPE_ALLOW_RULE_DIGEST,
                 PROCESSING_TYPE_ALLOW_RULE_SPEC, SpendRuleType.CARD_TRANSACTION_PROCESSING_TYPE,
                 "卡交易处理类型白名单控制");
+    }
+
+    private void publishPostalCodeVerificationRuleVersion() {
+        publishRuleVersion(POSTAL_CODE_VERIFICATION_RULE_ID, POSTAL_CODE_VERIFICATION_RULE_DIGEST,
+                POSTAL_CODE_VERIFICATION_RULE_SPEC, SpendRuleType.POSTAL_CODE_VERIFICATION,
+                "邮编校验结果黑名单控制");
+    }
+
+    private void publishPostalCodeVerificationAllowRuleVersion() {
+        publishRuleVersion(POSTAL_CODE_VERIFICATION_ALLOW_RULE_ID, POSTAL_CODE_VERIFICATION_ALLOW_RULE_DIGEST,
+                POSTAL_CODE_VERIFICATION_ALLOW_RULE_SPEC, SpendRuleType.POSTAL_CODE_VERIFICATION,
+                "邮编校验结果白名单控制");
     }
 
     private void publishRuleVersion(String ruleId, String ruleDigest, String ruleSpec) {
@@ -1046,7 +1131,9 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 POS_CATEGORY_ALLOW_RULE_ID,
                 CVV_REQUIRED_RULE_ID,
                 PROCESSING_TYPE_RULE_ID,
-                PROCESSING_TYPE_ALLOW_RULE_ID
+                PROCESSING_TYPE_ALLOW_RULE_ID,
+                POSTAL_CODE_VERIFICATION_RULE_ID,
+                POSTAL_CODE_VERIFICATION_ALLOW_RULE_ID
         };
     }
 
