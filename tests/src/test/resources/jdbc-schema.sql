@@ -423,6 +423,7 @@ CREATE TABLE `t_spend_control_movement`
     KEY `idx_spend_control_movement_target` (`tenant_id`, `target_subject_type`, `target_subject_id`),
     KEY `idx_spend_control_movement_budget` (`tenant_id`, `budget_group_sn`, `period_id`, `currency`),
     KEY `idx_spend_control_movement_rule` (`tenant_id`, `spend_rule_id`, `spend_rule_version`),
+    KEY `idx_spend_control_movement_rolling_count` (`tenant_id`, `budget_group_sn`, `currency`, `spend_rule_id`, `spend_rule_version`, `target_subject_type`, `target_subject_id`, `gmt_create`),
     KEY `idx_spend_control_movement_created` (`gmt_create`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '支出控制额度变动表';

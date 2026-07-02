@@ -1,7 +1,6 @@
 package com.wind.funds.wallet.services.impl;
 
 import com.mybatisflex.core.query.QueryWrapper;
-import com.mybatisflex.core.query.QueryColumn;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
@@ -12,6 +11,7 @@ import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.dal.entities.SpendControlMovement;
+import com.wind.funds.wallet.dal.entities.table.SpendControlMovementNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendControlMovementMapper;
 import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.mapstruct.SpendControlMovementConverter;
@@ -45,40 +45,6 @@ import java.util.Objects;
 public class SpendControlMovementServiceImpl implements SpendControlMovementService {
 
     private static final int CONTROL_MOVEMENT_QUERY_PAGE_SIZE = 500;
-
-    private static final String TABLE_NAME = SpendControlMovement.TABLE_NAME;
-
-    private static final QueryColumn ID = new QueryColumn(TABLE_NAME, "id");
-
-    private static final QueryColumn TENANT_ID = new QueryColumn(TABLE_NAME, "tenant_id");
-
-    private static final QueryColumn MOVEMENT_SN = new QueryColumn(TABLE_NAME, "movement_sn");
-
-    private static final QueryColumn MOVEMENT_TYPE = new QueryColumn(TABLE_NAME, "movement_type");
-
-    private static final QueryColumn BUSINESS_SCENE = new QueryColumn(TABLE_NAME, "business_scene");
-
-    private static final QueryColumn BUSINESS_SN = new QueryColumn(TABLE_NAME, "business_sn");
-
-    private static final QueryColumn ORIGINAL_MOVEMENT_SN = new QueryColumn(TABLE_NAME, "original_movement_sn");
-
-    private static final QueryColumn TRANSACTION_SN = new QueryColumn(TABLE_NAME, "transaction_sn");
-
-    private static final QueryColumn INSTRUMENT_SN = new QueryColumn(TABLE_NAME, "instrument_sn");
-
-    private static final QueryColumn CURRENCY = new QueryColumn(TABLE_NAME, "currency");
-
-    private static final QueryColumn SPEND_RULE_ID = new QueryColumn(TABLE_NAME, "spend_rule_id");
-
-    private static final QueryColumn SPEND_RULE_VERSION = new QueryColumn(TABLE_NAME, "spend_rule_version");
-
-    private static final QueryColumn BUDGET_GROUP_SN = new QueryColumn(TABLE_NAME, "budget_group_sn");
-
-    private static final QueryColumn PERIOD_ID = new QueryColumn(TABLE_NAME, "period_id");
-
-    private static final QueryColumn TARGET_SUBJECT_ID = new QueryColumn(TABLE_NAME, "target_subject_id");
-
-    private static final QueryColumn TARGET_SUBJECT_TYPE = new QueryColumn(TABLE_NAME, "target_subject_type");
 
     private final SpendControlMovementMapper spendControlMovementMapper;
 
@@ -425,7 +391,9 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 || StringUtils.hasText(query.getSpendRuleVersion())
                 || StringUtils.hasText(query.getControlScopeId())
                 || StringUtils.hasText(query.getBudgetGroupSn())
-                || StringUtils.hasText(query.getPeriodId());
+                || StringUtils.hasText(query.getPeriodId())
+                || query.getGmtCreateMin() != null
+                || query.getGmtCreateMax() != null;
     }
 
     private List<SpendControlMovementDTO> budgetProjectionMovements(List<SpendControlMovementDTO> movements) {
@@ -466,36 +434,40 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
     }
 
     private SpendControlMovement findMovementEntity(Long tenantId, String movementSn) {
+        SpendControlMovementNameRefs ref = SpendControlMovementNameRefs.spendControlMovement;
         QueryWrapper wrapper = QueryWrapper.create()
-                .from(TABLE_NAME)
-                .where(TENANT_ID.eq(tenantId))
-                .and(MOVEMENT_SN.eq(movementSn));
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.movementSn.eq(movementSn));
         return spendControlMovementMapper.selectOneByQuery(wrapper);
     }
 
     private QueryWrapper toQueryWrapper(SpendControlMovementQuery query,
                                         WindQuery<? extends QueryOrderField> options) {
+        SpendControlMovementNameRefs ref = SpendControlMovementNameRefs.spendControlMovement;
         String controlScopeId = controlScopeId(query);
         QueryWrapper wrapper = MybatisQueryHelper.from(options).select()
-                .from(TABLE_NAME)
-                .where(TENANT_ID.eq(query.getTenantId()))
-                .and(MOVEMENT_SN.eq(query.getMovementSn()))
-                .and(MOVEMENT_TYPE.eq(query.getMovementType()))
-                .and(BUSINESS_SCENE.eq(query.getBusinessScene()))
-                .and(BUSINESS_SN.eq(query.getBusinessSn()))
-                .and(ORIGINAL_MOVEMENT_SN.eq(query.getOriginalMovementSn()))
-                .and(TRANSACTION_SN.eq(query.getTransactionSn()))
-                .and(INSTRUMENT_SN.eq(query.getInstrumentSn()))
-                .and(CURRENCY.eq(query.getCurrency()))
-                .and(SPEND_RULE_ID.eq(query.getSpendRuleId()))
-                .and(SPEND_RULE_VERSION.eq(query.getSpendRuleVersion()))
-                .and(BUDGET_GROUP_SN.eq(controlScopeId))
-                .and(PERIOD_ID.eq(query.getPeriodId()));
+                .from(ref)
+                .where(ref.tenantId.eq(query.getTenantId()))
+                .and(ref.movementSn.eq(query.getMovementSn()))
+                .and(ref.movementType.eq(query.getMovementType()))
+                .and(ref.businessScene.eq(query.getBusinessScene()))
+                .and(ref.businessSn.eq(query.getBusinessSn()))
+                .and(ref.originalMovementSn.eq(query.getOriginalMovementSn()))
+                .and(ref.transactionSn.eq(query.getTransactionSn()))
+                .and(ref.instrumentSn.eq(query.getInstrumentSn()))
+                .and(ref.currency.eq(query.getCurrency()))
+                .and(ref.spendRuleId.eq(query.getSpendRuleId()))
+                .and(ref.spendRuleVersion.eq(query.getSpendRuleVersion()))
+                .and(ref.budgetGroupSn.eq(controlScopeId))
+                .and(ref.periodId.eq(query.getPeriodId()))
+                .and(ref.gmtCreate.ge(query.getGmtCreateMin()))
+                .and(ref.gmtCreate.le(query.getGmtCreateMax()));
         if (query.getTargetAccountId() != null) {
-            wrapper.and(TARGET_SUBJECT_ID.eq(query.getTargetAccountId().id()))
-                    .and(TARGET_SUBJECT_TYPE.eq(targetSubjectType(query.getTargetAccountId())));
+            wrapper.and(ref.targetSubjectId.eq(query.getTargetAccountId().id()))
+                    .and(ref.targetSubjectType.eq(targetSubjectType(query.getTargetAccountId())));
         }
-        wrapper.orderBy(ID.asc());
+        wrapper.orderBy(ref.id.asc());
         return wrapper;
     }
 

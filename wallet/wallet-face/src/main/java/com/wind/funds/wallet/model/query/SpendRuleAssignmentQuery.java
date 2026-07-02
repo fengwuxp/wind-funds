@@ -43,10 +43,14 @@ public class SpendRuleAssignmentQuery implements Serializable {
     @Schema(description = "Spend Rule 版本")
     private String ruleVersion;
 
-    @Schema(description = "挂载范围类型")
+    @Schema(description = "挂载范围类型。payment card 映射 PAYMENT_INSTRUMENT；"
+            + "financial account 映射 FUNDING_ACCOUNT 或 CREDIT_ACCOUNT；"
+            + "authorized user、cardholder、员工或账户层级映射 ACCOUNT_HIERARCHY；"
+            + "card product 可按产品侧稳定场景映射 BUSINESS_SCENE。")
     private SpendRuleScopeType scopeType;
 
-    @Schema(description = "挂载范围标识")
+    @Schema(description = "挂载范围标识，必须是系统内稳定引用，"
+            + "不得是卡号、PAN、CVV 或外部账户敏感原文。")
     private String scopeId;
 
     @Schema(description = "挂载状态")

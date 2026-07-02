@@ -14,6 +14,7 @@ import lombok.experimental.Accessors;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 /**
  * Spend Rule 规则评估请求。
@@ -90,12 +91,18 @@ public class EvaluateSpendRuleRequest implements Serializable {
     @Schema(description = "AVS 邮编校验结果，邮编校验规则评估时必填，例如 MATCH、NO_MATCH；不得传入邮编原文")
     private String postalCodeVerificationResult;
 
-    @Schema(description = "控制范围标识，周期金额或周期次数规则评估时必填")
+    @Schema(description = "授权发生时间，时间窗口或滚动窗口次数规则评估时必填；"
+            + "由调用方按业务或规则时区归一化后传入")
+    private LocalDateTime authorizationTime;
+
+    @Schema(description = "控制范围标识，周期金额、周期次数或滚动窗口次数规则评估时必填")
     private String controlScopeId;
 
-    @Schema(description = "控制周期标识，例如 2026-07；周期金额或周期次数规则评估时必填")
+    @Schema(description = "控制周期标识，例如 2026-07；周期金额或周期次数规则评估时必填，"
+            + "滚动窗口次数不使用")
     private String periodId;
 
-    @Schema(description = "控制目标资金账户或信用账户标识，周期金额或周期次数规则评估时可传入账户级范围")
+    @Schema(description = "控制目标资金账户或信用账户标识，"
+            + "周期金额、周期次数或滚动窗口次数规则评估时可传入账户级范围")
     private FundsAccountId targetAccountId;
 }

@@ -35,9 +35,12 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Spend Rule 规则评估应用服务流程测试。
@@ -62,6 +65,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     private static final String COUNT_RULE_ID = "sr_evaluation_period_count";
 
     private static final String COUNT_RULE_DIGEST = "sha256:spend-rule-evaluation-period-count";
+
+    private static final String ROLLING_COUNT_RULE_ID = "sr_evaluation_rolling_count";
+
+    private static final String ROLLING_COUNT_RULE_DIGEST = "sha256:spend-rule-evaluation-rolling-count";
 
     private static final String MCC_RULE_ID = "sr_evaluation_mcc";
 
@@ -134,6 +141,18 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     private static final String POSTAL_CODE_VERIFICATION_ALLOW_RULE_DIGEST =
             "sha256:spend-rule-evaluation-postal-code-verification-allow";
 
+    private static final String CURRENCY_RULE_ID = "sr_evaluation_currency";
+
+    private static final String CURRENCY_RULE_DIGEST = "sha256:spend-rule-evaluation-currency";
+
+    private static final String TIME_WINDOW_RULE_ID = "sr_evaluation_time_window";
+
+    private static final String TIME_WINDOW_RULE_DIGEST = "sha256:spend-rule-evaluation-time-window";
+
+    private static final String MULTI_CONTROL_RULE_ID = "sr_evaluation_multi_control";
+
+    private static final String MULTI_CONTROL_RULE_DIGEST = "sha256:spend-rule-evaluation-multi-control";
+
     private static final String CONTROL_SCOPE_ID = "scope_spend_rule_evaluation";
 
     private static final String PERIOD_ID = "2026-07";
@@ -154,6 +173,10 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private static final String COUNT_RULE_SPEC = """
             {"counterSpec":{"windowMode":"CALENDAR_MONTH","aggregationBasis":"AUTHORIZATION_COUNT"},"limitSpec":{"countLimit":{"maxCount":3}}}
+            """;
+
+    private static final String ROLLING_COUNT_RULE_SPEC = """
+            {"counterSpec":{"windowMode":"ROLLING","windowSizeMinutes":15,"aggregationBasis":"AUTHORIZATION_COUNT"},"limitSpec":{"countLimit":{"maxCount":3}}}
             """;
 
     private static final String MCC_RULE_SPEC = """
@@ -224,6 +247,18 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
             {"limitSpec":{"postalCodeVerificationControl":{"allowedVerificationResults":["MATCH"]}}}
             """;
 
+    private static final String CURRENCY_RULE_SPEC = """
+            {"limitSpec":{"currencyControl":{"allowedCurrencies":["USD"],"deniedCurrencies":["EUR"]}}}
+            """;
+
+    private static final String TIME_WINDOW_RULE_SPEC = """
+            {"limitSpec":{"timeWindowControl":{"allowedWindows":[{"startTime":"09:00","endTime":"18:00"}]}}}
+            """;
+
+    private static final String MULTI_CONTROL_RULE_SPEC = """
+            {"limitSpec":{"amountLimit":{"amount":100,"currency":"USD"},"currencyControl":{"allowedCurrencies":["USD"]}}}
+            """;
+
     @Autowired
     private SpendRuleDefinitionService spendRuleDefinitionService;
 
@@ -280,6 +315,29 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertThat(first.getRuleVersion()).isEqualTo(RULE_VERSION);
         assertThat(first.getAmount()).isEqualTo(100L);
         assertNoEvaluationSideEffects(before);
+    }
+
+    /**
+     * 场景：接入方误把多个控制项放进同一个已发布规则规格。
+     * 输入：同一 ruleSpec 同时包含单笔金额限额和币种白名单，请求币种允许但金额超限。
+     * 输出：评估服务 fail-fast，要求上游拆成多条规则并合成最终裁决。
+     * 红线：不得静默只评估一个控制项并放过另一个控制项；失败仍不写决策记录、控制流水或资金事实。
+     */
+    @Test
+    void testEvaluateMultiControlRuleSpecShouldFailFastWithoutFundsSideEffect() {
+        publishMultiControlRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(MULTI_CONTROL_RULE_ID)
+                        .setAmount(101L)))
+                .hasMessageContaining("仅支持单一控制项");
+
+        assertNoSpendRuleDecisionRecord(MULTI_CONTROL_RULE_ID);
+        assertThat(countSpendControlMovement(MULTI_CONTROL_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -362,6 +420,70 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
         assertThat(countSpendControlMovement(COUNT_RULE_ID)).isEqualTo(3);
         assertNoSpendRuleDecisionRecord(COUNT_RULE_ID);
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：企业卡 15 分钟滚动窗口内授权次数达到上限。
+     * 输入：滚动窗口次数上限 3，过去 15 分钟已有 3 笔授权占用流水，请求评估下一笔授权。
+     * 输出：返回拒绝评估结论。
+     * 红线：滚动窗口评估只读既有控制流水，不要求周期标识，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateRollingCountLimitShouldRejectByWindowMovementsWithoutFundsSideEffect() {
+        LocalDateTime authorizationTime = LocalDateTime.of(2026, 7, 1, 10, 0);
+        publishRollingCountRuleVersion();
+        insertSpendControlMovement(ROLLING_COUNT_RULE_ID, "rolling_count_001", SpendControlMovementType.RESERVED,
+                1L, authorizationTime.minusMinutes(14));
+        insertSpendControlMovement(ROLLING_COUNT_RULE_ID, "rolling_count_002", SpendControlMovementType.RESERVED,
+                1L, authorizationTime.minusMinutes(10));
+        insertSpendControlMovement(ROLLING_COUNT_RULE_ID, "rolling_count_003", SpendControlMovementType.RESERVED,
+                1L, authorizationTime.minusMinutes(1));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRollingCountRequest(authorizationTime));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("滚动窗口次数超限");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(ROLLING_COUNT_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertThat(countSpendControlMovement(ROLLING_COUNT_RULE_ID)).isEqualTo(3);
+        assertNoSpendRuleDecisionRecord(ROLLING_COUNT_RULE_ID);
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：企业卡历史授权均已滑出 15 分钟滚动窗口。
+     * 输入：滚动窗口次数上限 3，既有 3 笔授权占用流水均早于窗口起点。
+     * 输出：返回通过评估结论。
+     * 红线：滚动窗口不退化为周期次数统计，不因同周期历史流水误拒绝当前授权。
+     */
+    @Test
+    void testEvaluateRollingCountLimitShouldIgnoreMovementsBeforeWindowStart() {
+        LocalDateTime authorizationTime = LocalDateTime.of(2026, 7, 1, 10, 0);
+        publishRollingCountRuleVersion();
+        insertSpendControlMovement(ROLLING_COUNT_RULE_ID, "rolling_count_old_001",
+                SpendControlMovementType.RESERVED, 1L, authorizationTime.minusMinutes(16));
+        insertSpendControlMovement(ROLLING_COUNT_RULE_ID, "rolling_count_old_002",
+                SpendControlMovementType.RESERVED, 1L, authorizationTime.minusMinutes(20));
+        insertSpendControlMovement(ROLLING_COUNT_RULE_ID, "rolling_count_old_003",
+                SpendControlMovementType.RESERVED, 1L, authorizationTime.minusMinutes(30));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRollingCountRequest(authorizationTime));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(ROLLING_COUNT_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertThat(countSpendControlMovement(ROLLING_COUNT_RULE_ID)).isEqualTo(3);
+        assertNoSpendRuleDecisionRecord(ROLLING_COUNT_RULE_ID);
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -879,6 +1001,114 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：企业卡只允许指定币种授权。
+     * 输入：规则允许 USD 且拒绝 EUR，请求评估币种为 EUR。
+     * 输出：返回拒绝评估结论。
+     * 红线：币种控制只读请求事实和已发布规则版本，不新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateCurrencyDeniedShouldRejectWithoutFundsSideEffect() {
+        publishCurrencyRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(CURRENCY_RULE_ID)
+                        .setCurrency(CurrencyIsoCode.EUR));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("币种不允许");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(CURRENCY_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(CURRENCY_RULE_ID);
+        assertThat(countSpendControlMovement(CURRENCY_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：企业卡使用允许币种授权。
+     * 输入：规则允许 USD 且拒绝 EUR，请求评估币种为 USD。
+     * 输出：返回通过评估结论。
+     * 红线：评估通过只是准入前候选证据，不代表资金可用或授权成功。
+     */
+    @Test
+    void testEvaluateCurrencyAllowedShouldPassWithoutFundsSideEffect() {
+        publishCurrencyRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(CURRENCY_RULE_ID)
+                        .setCurrency(CurrencyIsoCode.USD));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(CURRENCY_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(CURRENCY_RULE_ID);
+        assertThat(countSpendControlMovement(CURRENCY_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：企业卡只允许工作时间段授权。
+     * 输入：规则允许 09:00 到 18:00，请求评估时间为 20:30。
+     * 输出：返回拒绝评估结论。
+     * 红线：时间窗口控制只判断调用方传入的本地业务时间，不做时区换算、调度重置或资金事实写入。
+     */
+    @Test
+    void testEvaluateTimeWindowOutsideAllowedWindowShouldRejectWithoutFundsSideEffect() {
+        publishTimeWindowRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(TIME_WINDOW_RULE_ID)
+                        .setAuthorizationTime(LocalDateTime.of(2026, 7, 2, 20, 30)));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(decision.getRejectReason()).isEqualTo("时间窗口不允许");
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(TIME_WINDOW_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(TIME_WINDOW_RULE_ID);
+        assertThat(countSpendControlMovement(TIME_WINDOW_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：企业卡在允许的工作时间段内授权。
+     * 输入：规则允许 09:00 到 18:00，请求评估时间为 09:00。
+     * 输出：返回通过评估结论。
+     * 红线：窗口起点闭区间、终点开区间；评估通过仍不代表授权成功。
+     */
+    @Test
+    void testEvaluateTimeWindowAtAllowedWindowStartShouldPassWithoutFundsSideEffect() {
+        publishTimeWindowRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(TIME_WINDOW_RULE_ID)
+                        .setAuthorizationTime(LocalDateTime.of(2026, 7, 2, 9, 0)));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(TIME_WINDOW_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(TIME_WINDOW_RULE_ID);
+        assertThat(countSpendControlMovement(TIME_WINDOW_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
     private void assertNoEvaluationSideEffects(LedgerFactSnapshot before) {
         assertNoSpendRuleDecisionRecord();
         assertNoSpendControlMovement();
@@ -906,6 +1136,11 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
 
     private void publishCountRuleVersion() {
         publishRuleVersion(COUNT_RULE_ID, COUNT_RULE_DIGEST, COUNT_RULE_SPEC, SpendRuleType.COUNT_LIMIT, "周期次数限额");
+    }
+
+    private void publishRollingCountRuleVersion() {
+        publishRuleVersion(ROLLING_COUNT_RULE_ID, ROLLING_COUNT_RULE_DIGEST, ROLLING_COUNT_RULE_SPEC,
+                SpendRuleType.COUNT_LIMIT, "滚动窗口次数限额");
     }
 
     private void publishMccRuleVersion() {
@@ -996,6 +1231,21 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 "邮编校验结果白名单控制");
     }
 
+    private void publishCurrencyRuleVersion() {
+        publishRuleVersion(CURRENCY_RULE_ID, CURRENCY_RULE_DIGEST, CURRENCY_RULE_SPEC,
+                SpendRuleType.CURRENCY, "币种控制");
+    }
+
+    private void publishTimeWindowRuleVersion() {
+        publishRuleVersion(TIME_WINDOW_RULE_ID, TIME_WINDOW_RULE_DIGEST, TIME_WINDOW_RULE_SPEC,
+                SpendRuleType.TIME_WINDOW, "时间窗口控制");
+    }
+
+    private void publishMultiControlRuleVersion() {
+        publishRuleVersion(MULTI_CONTROL_RULE_ID, MULTI_CONTROL_RULE_DIGEST, MULTI_CONTROL_RULE_SPEC,
+                SpendRuleType.AMOUNT_LIMIT, "复合控制规则");
+    }
+
     private void publishRuleVersion(String ruleId, String ruleDigest, String ruleSpec) {
         publishRuleVersion(ruleId, ruleDigest, ruleSpec, SpendRuleType.AMOUNT_LIMIT, "单笔授权限额");
     }
@@ -1043,6 +1293,13 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 .setTargetAccountId(FundsAccountId.immutable(TARGET_ACCOUNT_ID, FundsSubjectType.CREDIT_ACCOUNT));
     }
 
+    private EvaluateSpendRuleRequest evaluateRollingCountRequest(LocalDateTime authorizationTime) {
+        return evaluatePeriodRequest()
+                .setRuleId(ROLLING_COUNT_RULE_ID)
+                .setPeriodId(null)
+                .setAuthorizationTime(authorizationTime);
+    }
+
     private void insertSpendControlMovement(String movementSn,
                                             SpendControlMovementType movementType,
                                             Long amount) {
@@ -1060,17 +1317,38 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                                             String movementSn,
                                             SpendControlMovementType movementType,
                                             Long amount,
+                                            LocalDateTime movementTime) {
+        insertSpendControlMovement(ruleId, movementSn, movementType, amount, null, null, movementTime);
+    }
+
+    private void insertSpendControlMovement(String ruleId,
+                                            String movementSn,
+                                            SpendControlMovementType movementType,
+                                            Long amount,
                                             String originalMovementSn,
                                             String transactionSn) {
+        insertSpendControlMovement(ruleId, movementSn, movementType, amount, originalMovementSn, transactionSn, null);
+    }
+
+    private void insertSpendControlMovement(String ruleId,
+                                            String movementSn,
+                                            SpendControlMovementType movementType,
+                                            Long amount,
+                                            String originalMovementSn,
+                                            String transactionSn,
+                                            LocalDateTime movementTime) {
+        LocalDateTime occurredAt = movementTime == null ? LocalDateTime.now() : movementTime;
         jdbcTemplate.update("""
                 INSERT INTO t_spend_control_movement(
-                    movement_sn, tenant_id, movement_type, business_scene, business_sn,
+                    gmt_create, gmt_modified, movement_sn, tenant_id, movement_type, business_scene, business_sn,
                     original_movement_sn, transaction_sn, instrument_sn, action, target_subject_id,
                     target_subject_type, amount, currency, spend_rule_id, spend_rule_version,
                     spend_decision_sn, spend_decision_result, spend_decision_digest, budget_group_sn,
                     period_id, reason_code, operator_id, audit_reference_sn, movement_digest)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
+                occurredAt,
+                occurredAt,
                 movementSn,
                 TENANT_ID,
                 movementType.name(),
@@ -1133,7 +1411,11 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 PROCESSING_TYPE_RULE_ID,
                 PROCESSING_TYPE_ALLOW_RULE_ID,
                 POSTAL_CODE_VERIFICATION_RULE_ID,
-                POSTAL_CODE_VERIFICATION_ALLOW_RULE_ID
+                POSTAL_CODE_VERIFICATION_ALLOW_RULE_ID,
+                CURRENCY_RULE_ID,
+                TIME_WINDOW_RULE_ID,
+                MULTI_CONTROL_RULE_ID,
+                ROLLING_COUNT_RULE_ID
         };
     }
 

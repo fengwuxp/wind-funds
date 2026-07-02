@@ -13,6 +13,7 @@ import lombok.experimental.Accessors;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 /**
  * 控制额度变动流水查询条件。
@@ -75,4 +76,10 @@ public class SpendControlMovementQuery implements Serializable {
 
     @Schema(description = "控制周期标识，例如 2026-07")
     private String periodId;
+
+    @Schema(description = "创建时间最小值，含边界")
+    private LocalDateTime gmtCreateMin;
+
+    @Schema(description = "创建时间最大值，含边界")
+    private LocalDateTime gmtCreateMax;
 }

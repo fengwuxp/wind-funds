@@ -498,6 +498,9 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | idx_spend_control_movement_target | 普通索引 | tenant_id, target_subject_type, target_subject_id | 按目标账户查询预算控制投影。 |
 | idx_spend_control_movement_budget | 普通索引 | tenant_id, budget_group_sn, period_id, currency | 按控制范围和周期查询预算控制投影。 |
 | idx_spend_control_movement_rule | 普通索引 | tenant_id, spend_rule_id, spend_rule_version | 按规则版本查询控制流水。 |
+| idx_spend_control_movement_rolling_count | 普通索引 | tenant_id, budget_group_sn, currency, spend_rule_id, spend_rule_version, target_subject_type, target_subject_id, gmt_create | 支撑滚动窗口次数 evaluator 的窄范围只读查询。 |
+
+滚动窗口次数 evaluator 需要按 `tenant_id + budget_group_sn + currency + spend_rule_id + spend_rule_version + target_subject_type + target_subject_id + gmt_create` 组合读取控制流水。当前 H2 schema 已补齐目标组合索引，只证明服务层和测试基线具备对应访问路径；生产启用前仍必须同步真实 DDL、执行计划和慢查询风险评审，未完成前不得把该 evaluator 声明为生产强一致频控能力。
 
 | 当前 movementType | 目标语义 | 是否参与预算控制投影 | 说明 |
 | --- | --- | --- | --- |
@@ -803,17 +806,56 @@ git diff --check
 
 Highnote Spend Controls 对齐后的后续工程边界以产品分册 09 的 `SR-HN-*` 为准。首轮 `SR-HN-001` 只同步接入口径和未完成边界；后续若进入最小 evaluator、velocity 窗口或协同授权接入，必须按单一工程任务重新确认 writeScope、schemaDecision、targetTests 和停止条件。
 
+SR-HN-006 工程交接卡：
+
+| 项 | 结论 |
+| --- | --- |
+| Task ID | SR-HN-006-SPEND-RULE-SCOPE-MAPPING |
+| 目标 | 明确 Highnote payment card、financial account、authorized user/cardholder 和 card product 在 wind-funds Spend Rule 挂载范围中的映射。 |
+| 当前 writeScope | `core` 新增 `SpendRuleScopeType.ACCOUNT_HIERARCHY`；`wallet-face` 补充挂载和查询公共契约注释；`tests` 补服务层挂载、查询和解释 TDD。 |
+| readScope | `SpendRuleDefinitionService`、`SpendRuleAssignmentService`、`AssignSpendRuleVersionRequest`、`SpendRuleAssignmentQuery`、现有资金事实断言支撑。 |
+| schemaDecision | 不新增 DDL。`scope_type` 继续保存枚举名，`scope_id` 继续保存系统内稳定引用；payment card 用 `PAYMENT_INSTRUMENT`，financial account 用 `FUNDING_ACCOUNT` 或 `CREDIT_ACCOUNT`，authorized user/cardholder/员工/账户层级用 `ACCOUNT_HIERARCHY`，card product 按产品侧稳定场景用 `BUSINESS_SCENE`。 |
+| targetTests | `SpendRuleDefinitionServiceTests#testAssignVersionShouldSupportHighnoteScopeMappingsWithoutFundsSideEffect`。 |
+| 验证命令 | `just test-one SpendRuleDefinitionServiceTests tests`。 |
+| 停止条件 | 需要新增授权用户主数据、卡产品主数据、改表、改交易 canonical 入参或让 scope 成为资金主体 / 账本主体时停止。 |
+
+SR-HN-007 工程交接卡：
+
+| 项 | 结论 |
+| --- | --- |
+| Task ID | SR-HN-007-SPEND-RULE-CURRENCY-TIME-WINDOW-EVALUATOR |
+| 目标 | 补齐 Highnote Spend Rules 中常见的币种控制和授权时间窗口控制，保持 wallet evaluator 只读、单条规则和无资金事实副作用。 |
+| 当前 writeScope | `wallet-face` 为 `EvaluateSpendRuleRequest` 补充 `authorizationTime`；`wallet-impl` 增加 `currencyControl` 和 `timeWindowControl` 评估；`tests` 补服务层场景 TDD；文档同步接入口径。 |
+| readScope | `SpendRuleEvaluationApplicationService`、`SpendRuleEvaluationApplicationServiceImpl`、`SpendRuleEvaluationApplicationServiceTests`、产品分册 09、TDD README、用户接入指南。 |
+| schemaDecision | 不新增 DDL。币种控制读取 `ruleSpec.limitSpec.currencyControl.deniedCurrencies / allowedCurrencies` 和请求 `currency`；时间窗口读取 `ruleSpec.limitSpec.timeWindowControl.allowedWindows[].startTime / endTime` 和请求 `authorizationTime` 的本地时间。窗口起点包含、终点不包含；跨日窗口支持；`startTime == endTime` 视为非法配置。 |
+| targetTests | `SpendRuleEvaluationApplicationServiceTests#testEvaluateCurrencyDeniedShouldRejectWithoutFundsSideEffect`、`testEvaluateCurrencyAllowedShouldPassWithoutFundsSideEffect`、`testEvaluateTimeWindowOutsideAllowedWindowShouldRejectWithoutFundsSideEffect`、`testEvaluateTimeWindowAtAllowedWindowStartShouldPassWithoutFundsSideEffect`。 |
+| 验证命令 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 |
+| 停止条件 | 需要时区换算、节假日、cooldown、生产调度、规则运营后台、多规则冲突合成、DDL 或交易层执行 Spend Rule 时停止。 |
+
+SR-HN-008 工程交接卡：
+
+| 项 | 结论 |
+| --- | --- |
+| Task ID | SR-HN-008-SPEND-RULE-ROLLING-COUNT-EVALUATOR |
+| 目标 | 补齐 Highnote velocity controls 中最小滚动窗口次数判断，保持 wallet evaluator 只读、单条规则和无资金事实副作用。 |
+| 当前 writeScope | `wallet-face` 为 `SpendControlMovementQuery` 增加可选 `gmtCreateMin / gmtCreateMax` 查询条件；`wallet-impl` 增加 `counterSpec.windowMode=ROLLING` + `windowSizeMinutes` 的次数评估；`tests` 补服务层场景 TDD；文档同步接入口径。 |
+| readScope | `SpendRuleEvaluationApplicationService`、`SpendRuleEvaluationApplicationServiceImpl`、`SpendControlMovementService`、`SpendRuleEvaluationApplicationServiceTests`、产品分册 09、TDD README、用户接入指南。 |
+| schemaDecision | 不新增 DDL，不新增调度，不新增聚合表。滚动窗口读取 `ruleSpec.counterSpec.windowMode=ROLLING`、`windowSizeMinutes` 和 `limitSpec.countLimit.maxCount`，以请求 `authorizationTime` 为窗口结束时间，按同一 `tenantId + controlScopeId + currency + ruleId + ruleVersion + targetAccountId` 查询既有 `SpendControlMovement`，用 `gmtCreate` 限定窗口内流水，并按原始占用流水去重计数；该评估是只读候选判断，不把 evaluate 和 RESERVED 写入合并为强一致事务。 |
+| targetTests | `SpendRuleEvaluationApplicationServiceTests#testEvaluateRollingCountLimitShouldRejectByWindowMovementsWithoutFundsSideEffect`、`testEvaluateRollingCountLimitShouldIgnoreMovementsBeforeWindowStart`。 |
+| 验证命令 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 |
+| 停止条件 | 需要 rolling amount、cooldown、独立窗口聚合表、生产调度、时区换算、强一致频控拦截、复杂组合规则、生产 DDL / 索引校验或交易层执行 Spend Rule 时停止。 |
+
 SR-HN-002 工程交接卡：
 
 | 项 | 结论 |
 | --- | --- |
 | Task ID | SR-HN-002-SPEND-RULE-LIGHTWEIGHT-EVALUATOR |
 | 目标 | 补一个可选轻量 evaluator，只判断单条已发布 Spend Rule 在当前请求事实下是否通过，不替代外部风控或完整规则引擎。 |
-| 当前 writeScope | `wallet-face` 已新增独立 evaluator 公共契约、Request 和 DTO；`wallet-impl` 已新增单笔限额、周期金额只读投影、周期次数只读计数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果评估实现；`tests` 已新增服务层 H2 流程测试。 |
+| 当前 writeScope | `wallet-face` 已新增独立 evaluator 公共契约、Request 和 DTO；`wallet-impl` 已新增单笔限额、周期金额只读投影、周期次数只读计数、滚动窗口次数只读计数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填、AVS 邮编校验结果、币种黑白名单和本地授权时间窗口评估实现；`tests` 已新增服务层 H2 流程测试。 |
 | readScope | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendControlMovementService`、`BudgetControlProjectionDTO`、`SpendControlAdmissionApplicationService`、现有 Spend Rule 流程测试。 |
 | 禁止范围 | 不修改 `SpendControlAdmissionApplicationService` 的“消费外部决策证据”职责；不新增 DDL；不引入表达式引擎、脚本、运营后台、webhook、外部风控协议或多规则冲突合成。 |
-| schemaDecision | 已落地单笔限额切片使用已存在的 `ruleSpec.limitSpec.amountLimit` JSON；已落地周期金额切片通过 `counterSpec + limitSpec.amountLimit` 读取预算控制投影；已落地周期次数切片通过 `counterSpec + limitSpec.countLimit.maxCount` 读取同一控制范围和周期下的控制占用 / 消耗流水，并按原始占用流水去重；已落地 MCC 切片通过 `EvaluateSpendRuleRequest.merchantCategoryCode` 和 `ruleSpec.limitSpec.merchantCategoryControl.deniedMccCodes / allowedMccCodes` 判断；已落地商户国家切片通过 `EvaluateSpendRuleRequest.merchantCountryCode` 和 `ruleSpec.limitSpec.merchantCountryControl.deniedCountryCodes / allowedCountryCodes` 判断；已落地卡数据输入能力切片通过 `EvaluateSpendRuleRequest.cardDataInputCapability` 和 `ruleSpec.limitSpec.cardDataInputCapabilityControl.deniedCardDataInputCapabilities / allowedCardDataInputCapabilities` 判断；已落地卡交易处理类型切片通过 `EvaluateSpendRuleRequest.cardTransactionProcessingType` 和 `ruleSpec.limitSpec.cardTransactionProcessingTypeControl.deniedCardTransactionProcessingTypes / allowedCardTransactionProcessingTypes` 判断；已落地商户标识切片通过 `EvaluateSpendRuleRequest.merchantId` 和 `ruleSpec.limitSpec.merchantIdControl.deniedMerchantIds / allowedMerchantIds` 判断；已落地 PAN 录入方式切片通过 `EvaluateSpendRuleRequest.panEntryMode` 和 `ruleSpec.limitSpec.panEntryModeControl.deniedPanEntryModes / allowedPanEntryModes` 判断；已落地 POS 类别切片通过 `EvaluateSpendRuleRequest.pointOfServiceCategory` 和 `ruleSpec.limitSpec.pointOfServiceCategoryControl.deniedPointOfServiceCategories / allowedPointOfServiceCategories` 判断；已落地 CVV 必填切片通过 `EvaluateSpendRuleRequest.cvvProvided` 和 `ruleSpec.limitSpec.cvvControl.required` 判断；已落地 AVS 邮编校验结果切片通过 `EvaluateSpendRuleRequest.postalCodeVerificationResult` 和 `ruleSpec.limitSpec.postalCodeVerificationControl.deniedVerificationResults / allowedVerificationResults` 判断，不新增 DDL，不保存 CVV、邮编或街道地址原文。 |
-| targetTests | `SpendRuleEvaluationApplicationServiceTests` 已覆盖单笔限额超限拒绝、限额内通过、摘要稳定、周期金额可用额度不足拒绝、周期次数达到上限拒绝、同一授权占用后消费不重复计数、MCC 黑名单命中拒绝、白名单未命中拒绝、白名单命中通过、商户国家黑名单命中拒绝、白名单命中通过、卡数据输入能力黑名单命中拒绝、白名单命中通过、卡交易处理类型黑名单命中拒绝、卡交易处理类型白名单命中通过、商户标识黑名单命中拒绝、商户标识白名单命中通过、PAN 录入方式黑名单命中拒绝、PAN 录入方式白名单命中通过、POS 类别黑名单命中拒绝、POS 类别白名单命中通过、CVV 必填缺失拒绝、CVV 已提供通过、AVS 邮编校验结果不匹配拒绝、AVS 邮编校验结果匹配通过和无资金事实副作用；回归 `SpendControlAdmissionApplicationServiceTests` 证明准入服务职责未漂移。 |
+| schemaDecision | 已落地单笔限额切片使用已存在的 `ruleSpec.limitSpec.amountLimit` JSON；已落地周期金额切片通过 `counterSpec + limitSpec.amountLimit` 读取预算控制投影；已落地周期次数切片通过 `counterSpec + limitSpec.countLimit.maxCount` 读取同一控制范围和周期下的控制占用 / 消耗流水，并按原始占用流水去重；已落地滚动窗口次数切片通过 `counterSpec.windowMode=ROLLING + windowSizeMinutes + limitSpec.countLimit.maxCount` 读取窗口内控制占用 / 消耗流水，并按原始占用流水去重；已落地 MCC 切片通过 `EvaluateSpendRuleRequest.merchantCategoryCode` 和 `ruleSpec.limitSpec.merchantCategoryControl.deniedMccCodes / allowedMccCodes` 判断；已落地商户国家切片通过 `EvaluateSpendRuleRequest.merchantCountryCode` 和 `ruleSpec.limitSpec.merchantCountryControl.deniedCountryCodes / allowedCountryCodes` 判断；已落地卡数据输入能力切片通过 `EvaluateSpendRuleRequest.cardDataInputCapability` 和 `ruleSpec.limitSpec.cardDataInputCapabilityControl.deniedCardDataInputCapabilities / allowedCardDataInputCapabilities` 判断；已落地卡交易处理类型切片通过 `EvaluateSpendRuleRequest.cardTransactionProcessingType` 和 `ruleSpec.limitSpec.cardTransactionProcessingTypeControl.deniedCardTransactionProcessingTypes / allowedCardTransactionProcessingTypes` 判断；已落地商户标识切片通过 `EvaluateSpendRuleRequest.merchantId` 和 `ruleSpec.limitSpec.merchantIdControl.deniedMerchantIds / allowedMerchantIds` 判断；已落地 PAN 录入方式切片通过 `EvaluateSpendRuleRequest.panEntryMode` 和 `ruleSpec.limitSpec.panEntryModeControl.deniedPanEntryModes / allowedPanEntryModes` 判断；已落地 POS 类别切片通过 `EvaluateSpendRuleRequest.pointOfServiceCategory` 和 `ruleSpec.limitSpec.pointOfServiceCategoryControl.deniedPointOfServiceCategories / allowedPointOfServiceCategories` 判断；已落地 CVV 必填切片通过 `EvaluateSpendRuleRequest.cvvProvided` 和 `ruleSpec.limitSpec.cvvControl.required` 判断；已落地 AVS 邮编校验结果切片通过 `EvaluateSpendRuleRequest.postalCodeVerificationResult` 和 `ruleSpec.limitSpec.postalCodeVerificationControl.deniedVerificationResults / allowedVerificationResults` 判断；已落地币种切片通过 `EvaluateSpendRuleRequest.currency` 和 `ruleSpec.limitSpec.currencyControl.deniedCurrencies / allowedCurrencies` 判断；已落地时间窗口切片通过 `EvaluateSpendRuleRequest.authorizationTime` 和 `ruleSpec.limitSpec.timeWindowControl.allowedWindows` 判断，不新增 DDL，不保存 CVV、邮编或街道地址原文。 |
+| targetTests | `SpendRuleEvaluationApplicationServiceTests` 已覆盖单笔限额超限拒绝、限额内通过、摘要稳定、周期金额可用额度不足拒绝、周期次数达到上限拒绝、同一授权占用后消费不重复计数、滚动窗口次数达到上限拒绝、窗口外历史流水不误拒绝、MCC 黑名单命中拒绝、白名单未命中拒绝、白名单命中通过、商户国家黑名单命中拒绝、白名单命中通过、卡数据输入能力黑名单命中拒绝、白名单命中通过、卡交易处理类型黑名单命中拒绝、卡交易处理类型白名单命中通过、商户标识黑名单命中拒绝、商户标识白名单命中通过、PAN 录入方式黑名单命中拒绝、PAN 录入方式白名单命中通过、POS 类别黑名单命中拒绝、POS 类别白名单命中通过、CVV 必填缺失拒绝、CVV 已提供通过、AVS 邮编校验结果不匹配拒绝、AVS 邮编校验结果匹配通过、币种拒绝、币种通过、时间窗口拒绝、时间窗口起点通过和无资金事实副作用；回归 `SpendControlAdmissionApplicationServiceTests` 证明准入服务职责未漂移。 |
 | 验证命令 | 原子实现优先 `just test-one SpendRuleEvaluationApplicationServiceTests tests`；若新增公共契约，再执行 `just compile` 和相关 wallet spend control 回归。 |
 | 停止条件 | 需要破坏公共兼容、改表、改交易 canonical 入参、引入规则引擎或让 transaction 执行 Spend Rule 时停止。 |
 
@@ -825,7 +867,7 @@ SR-HN-002 工程交接卡：
 | 决策消费闭环 | 授权前规则决策可被准入链路消费，拒绝路径无资金事实副作用。 | 完整业务策略准入、外部规则适用性确认和更完整的组合回归。 | 授权准入和支出控制准入回归。 |
 | 控制额度变动闭环 | 预算额度调额、预留、消耗、释放、退款补偿和预算控制投影已有服务层证据。 | 事件消费、outbox、历史数据回填、生产告警和 Runbook。 | 控制额度变动、交易消费和枚举契约测试。 |
 | 投影解释闭环 | 交易投影解释已有只读边界和敏感信息保护基础。 | 历史规则版本、挂载、决策记录和控制额度变动流水的完整解释矩阵。 | 交易投影解释目标测试和只读边界测试。 |
-| 生产启用准备 | 系分已定义生产准入口径。 | 生产 DDL、迁移、权限、审计、告警、Runbook、灰度和回滚策略。 | 生产变更评审、数据校验、灰度验收和回滚演练。 |
+| 生产启用准备 | 系分已定义生产准入口径。 | 生产 DDL、滚动窗口查询索引、迁移、权限、审计、告警、Runbook、灰度和回滚策略。 | 生产变更评审、数据校验、慢查询评审、灰度验收和回滚演练。 |
 
 本分册只声明上述证据和缺口，不把初始服务层证据外推为完整规则引擎、生产迁移、运营后台或外部通道规则生产适用性。
 

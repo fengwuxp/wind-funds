@@ -1,13 +1,13 @@
 package com.wind.funds.wallet.services.impl;
 
 import com.mybatisflex.core.query.QueryWrapper;
-import com.mybatisflex.core.query.QueryColumn;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.wallet.dal.entities.SpendRuleDecisionRecord;
+import com.wind.funds.wallet.dal.entities.table.SpendRuleDecisionRecordNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendRuleDecisionRecordMapper;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
@@ -46,36 +46,6 @@ import java.util.Objects;
 public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionRecordService {
 
     private static final int DECISION_RECORD_QUERY_PAGE_SIZE = 100;
-
-    private static final String TABLE_NAME = SpendRuleDecisionRecord.TABLE_NAME;
-
-    private static final QueryColumn ID = new QueryColumn(TABLE_NAME, "id");
-
-    private static final QueryColumn TENANT_ID = new QueryColumn(TABLE_NAME, "tenant_id");
-
-    private static final QueryColumn DECISION_SN = new QueryColumn(TABLE_NAME, "decision_sn");
-
-    private static final QueryColumn RULE_ID = new QueryColumn(TABLE_NAME, "rule_id");
-
-    private static final QueryColumn RULE_VERSION = new QueryColumn(TABLE_NAME, "rule_version");
-
-    private static final QueryColumn ASSIGNMENT_SN = new QueryColumn(TABLE_NAME, "assignment_sn");
-
-    private static final QueryColumn SCOPE_TYPE = new QueryColumn(TABLE_NAME, "scope_type");
-
-    private static final QueryColumn SCOPE_ID = new QueryColumn(TABLE_NAME, "scope_id");
-
-    private static final QueryColumn INSTRUMENT_SN = new QueryColumn(TABLE_NAME, "instrument_sn");
-
-    private static final QueryColumn ACTION = new QueryColumn(TABLE_NAME, "action");
-
-    private static final QueryColumn CURRENCY = new QueryColumn(TABLE_NAME, "currency");
-
-    private static final QueryColumn BUSINESS_SCENE = new QueryColumn(TABLE_NAME, "business_scene");
-
-    private static final QueryColumn BUSINESS_SN = new QueryColumn(TABLE_NAME, "business_sn");
-
-    private static final QueryColumn DECISION_RESULT = new QueryColumn(TABLE_NAME, "decision_result");
 
     private final SpendRuleDecisionRecordMapper spendRuleDecisionRecordMapper;
 
@@ -301,30 +271,32 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
     }
 
     private SpendRuleDecisionRecord findDecisionRecordEntity(Long tenantId, String decisionSn) {
+        SpendRuleDecisionRecordNameRefs ref = SpendRuleDecisionRecordNameRefs.spendRuleDecisionRecord;
         return spendRuleDecisionRecordMapper.selectOneByQuery(QueryWrapper.create()
-                .from(TABLE_NAME)
-                .where(TENANT_ID.eq(tenantId))
-                .and(DECISION_SN.eq(decisionSn)));
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.decisionSn.eq(decisionSn)));
     }
 
     private QueryWrapper toDecisionRecordQueryWrapper(SpendRuleDecisionRecordQuery query,
                                                    WindQuery<? extends QueryOrderField> options) {
+        SpendRuleDecisionRecordNameRefs ref = SpendRuleDecisionRecordNameRefs.spendRuleDecisionRecord;
         return MybatisQueryHelper.from(options).select()
-                .from(TABLE_NAME)
-                .where(TENANT_ID.eq(query.getTenantId()))
-                .and(DECISION_SN.eq(query.getDecisionSn()))
-                .and(RULE_ID.eq(query.getRuleId()))
-                .and(RULE_VERSION.eq(query.getRuleVersion()))
-                .and(ASSIGNMENT_SN.eq(query.getAssignmentSn()))
-                .and(SCOPE_TYPE.eq(query.getScopeType()))
-                .and(SCOPE_ID.eq(query.getScopeId()))
-                .and(INSTRUMENT_SN.eq(query.getInstrumentSn()))
-                .and(ACTION.eq(query.getAction()))
-                .and(CURRENCY.eq(query.getCurrency()))
-                .and(BUSINESS_SCENE.eq(query.getBusinessScene()))
-                .and(BUSINESS_SN.eq(query.getBusinessSn()))
-                .and(DECISION_RESULT.eq(query.getDecisionResult()))
-                .orderBy(ID.asc());
+                .from(ref)
+                .where(ref.tenantId.eq(query.getTenantId()))
+                .and(ref.decisionSn.eq(query.getDecisionSn()))
+                .and(ref.ruleId.eq(query.getRuleId()))
+                .and(ref.ruleVersion.eq(query.getRuleVersion()))
+                .and(ref.assignmentSn.eq(query.getAssignmentSn()))
+                .and(ref.scopeType.eq(query.getScopeType()))
+                .and(ref.scopeId.eq(query.getScopeId()))
+                .and(ref.instrumentSn.eq(query.getInstrumentSn()))
+                .and(ref.action.eq(query.getAction()))
+                .and(ref.currency.eq(query.getCurrency()))
+                .and(ref.businessScene.eq(query.getBusinessScene()))
+                .and(ref.businessSn.eq(query.getBusinessSn()))
+                .and(ref.decisionResult.eq(query.getDecisionResult()))
+                .orderBy(ref.id.asc());
     }
 
     private SpendRuleDecisionRecord toDecisionRecordEntity(RecordSpendRuleDecisionRecordRequest request) {

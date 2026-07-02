@@ -137,11 +137,13 @@
 
 适用条件：需要在交易前固化支出控制决策，或记录交易消费对控制范围的影响。
 
-当前接入口径：接入方先完成规则判断或外部风控判断，`wallet` 只固化 Spend Rule 决策证据、控制额度流水和只读投影；如接入方只需要单条已发布规则的轻量评估，可先调用 `SpendRuleEvaluationApplicationService.evaluate` 覆盖单笔金额、周期金额可用额度、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果判断，再把最终决策证据交给准入服务固化。本文不承诺 Highnote 式托管规则引擎、velocity 窗口执行器或协同授权 webhook。
+当前接入口径：接入方先完成规则判断或外部风控判断，`wallet` 只固化 Spend Rule 决策证据、控制额度流水和只读投影；如接入方只需要单条已发布规则的轻量评估，可先调用 `SpendRuleEvaluationApplicationService.evaluate` 覆盖单笔金额、周期金额可用额度、周期次数、滚动窗口次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填、AVS 邮编校验结果、币种黑白名单和本地授权时间窗口判断，再把最终决策证据交给准入服务固化。每个被 `evaluate` 的 `ruleSpec` 只允许一个可执行控制项；金额、MCC、币种、时间窗口等组合裁决需要拆成多条规则由上游合成最终结果。该 evaluator 只提供只读候选评估，不提供并发强一致授权拦截；本文不承诺 Highnote 式托管规则引擎、rolling amount、cooldown、生产调度或协同授权 webhook。
 
 外部风控或协同授权的 approve / decline 只作为最终决策证据进入 `SpendControlAdmissionApplicationService.resolve`。`REJECTED` 会在交易内核前停止；`PASSED` 仍然必须继续通过支付工具绑定、账户能力和资金责任校验，不能被接入方理解为资金可用、授权成功或已经完成交易。
 
-多规则裁决由上游负责合成。接入方如果同时评估单笔限额、MCC、商户标识、国家地区、卡数据输入能力、卡交易处理类型、PAN 录入方式、POS 类别、CVV 必填、AVS 邮编校验结果和外部风控，只把最终 `decisionSn`、`decisionResult`、`decisionDigest` 和 `rejectReason` 传入 wallet；`evaluatedRules`、`decisionPolicy`、`finalDecision` 等明细当前不进入公共契约，保留在上游证据系统中。
+多规则裁决由上游负责合成。接入方如果同时评估单笔限额、MCC、商户标识、国家地区、卡数据输入能力、卡交易处理类型、PAN 录入方式、POS 类别、CVV 必填、AVS 邮编校验结果、币种、时间窗口、滚动窗口次数和外部风控，只把最终 `decisionSn`、`decisionResult`、`decisionDigest` 和 `rejectReason` 传入 wallet；`evaluatedRules`、`decisionPolicy`、`finalDecision` 等明细当前不进入公共契约，保留在上游证据系统中。
+
+规则挂载范围按本系统稳定对象表达，不直接暴露外部产品名：Highnote payment card 映射 `SpendRuleScopeType.PAYMENT_INSTRUMENT`，`scopeId` 使用支付工具流水；financial account 映射 `FUNDING_ACCOUNT` 或 `CREDIT_ACCOUNT`，`scopeId` 使用资金账户或信用账户流水；authorized user、cardholder、员工或账户层级映射 `ACCOUNT_HIERARCHY`，`scopeId` 使用企业员工、持卡人或账户层级的系统内稳定引用；card product 可按产品侧稳定场景映射 `BUSINESS_SCENE`。这些范围只用于规则挂载、查询和解释，不是资金主体、资金责任主体或账本主体。
 
 商户标识场景示例：企业采购卡只允许合作商户 `MID-CONTRACT-001`，接入方发布 `ruleSpec.limitSpec.merchantIdControl.allowedMerchantIds=["MID-CONTRACT-001"]`，授权前调用 `evaluate` 时传入 `merchantId`。命中白名单只得到 `PASSED` 评估结论；仍需继续走支付工具、账户能力和资金责任准入。若发布 `deniedMerchantIds=["MID-RISK-001"]` 且请求命中该 MID，则返回 `REJECTED` 且不产生交易或账本事实。
 
@@ -154,6 +156,12 @@ POS 类别场景示例：企业差旅卡禁止 ATM 终端交易，接入方发�
 CVV 必填场景示例：电商卡要求交易时提供 CVV，接入方发布 `ruleSpec.limitSpec.cvvControl.required=true`，授权前调用 `evaluate` 时只传入 `cvvProvided=false` 或 `true`。未提供时返回 `REJECTED`，拒绝原因为未提供 CVV；已提供时返回 `PASSED`。本接口不得传入 CVV 原文，也不会保存 CVV、PAN 或其他卡敏感值。
 
 AVS 邮编校验结果场景示例：电商卡要求账单邮编校验匹配，接入方发布 `ruleSpec.limitSpec.postalCodeVerificationControl.allowedVerificationResults=["MATCH"]`，授权前调用 `evaluate` 时只传入 `postalCodeVerificationResult=match` 或 `no_match`。`NO_MATCH` 命中拒绝时返回 `REJECTED`，拒绝原因为邮编校验结果不允许；`MATCH` 命中白名单时仅得到 `PASSED` 评估结论。接口只接收 AVS 校验结果，不接收或保存邮编、街道地址、PAN 或 CVV 原文。
+
+币种控制场景示例：企业卡只允许美元授权，接入方发布 `ruleSpec.limitSpec.currencyControl.allowedCurrencies=["USD"]`，授权前调用 `evaluate` 时传入 `currency=USD` 或其他 ISO 币种。命中允许币种时仅得到 `PASSED` 评估结论；若发布 `deniedCurrencies=["EUR"]` 且请求币种为 `EUR`，返回 `REJECTED`，拒绝原因为币种不允许，且不产生交易、控制流水或账本事实。本接口只判断请求币种，不做外汇换算、币种精度换算或账户余额校验。
+
+本地授权时间窗口场景示例：企业卡只允许工作时间授权，接入方发布 `ruleSpec.limitSpec.timeWindowControl.allowedWindows=[{"startTime":"09:00","endTime":"18:00"}]`，授权前按业务或规则时区把授权时间归一化后传入 `authorizationTime`。窗口按起点包含、终点不包含解释，`09:00` 返回 `PASSED`，`20:30` 返回 `REJECTED`，拒绝原因为时间窗口不允许。接口不做时区换算、节假日判断或生产调度刷新。
+
+滚动窗口次数场景示例：企业卡限制最近 15 分钟最多 3 次授权，接入方发布 `ruleSpec.counterSpec.windowMode=ROLLING`、`ruleSpec.counterSpec.windowSizeMinutes=15`、`ruleSpec.limitSpec.countLimit.maxCount=3`，授权前传入同一 `controlScopeId`、目标账户、币种和已归一化的 `authorizationTime`。evaluator 会只读既有 `SpendControlMovement` 中同规则、同控制范围、同账户、同币种且创建时间落在窗口内的 RESERVED / CONSUMED 流水，并按原始占用流水去重计数。窗口内已有 3 笔时返回 `REJECTED`，拒绝原因为滚动窗口次数超限；历史流水都已滑出窗口时返回 `PASSED`。该能力不生成控制流水或资金事实，也不提供并发强一致频控拦截；若授权链路要求强一致阻断，必须由交易 / 准入编排在同一事务或锁定边界内完成评估、准入和 RESERVED 写入。该能力不支持 rolling amount、cooldown 或生产调度刷新。
 
 推荐入口：
 

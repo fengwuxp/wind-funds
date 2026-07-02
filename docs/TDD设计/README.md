@@ -94,10 +94,21 @@ Spend Rule 测试设计优先引用独立产品分册 09、系分分册 06 和 D
 | --- | --- | --- |
 | `SpendRuleDefinitionServiceFlowTests` | 规则版本不可变、挂载冲突策略和有效期、支付工具范围一致性、挂载查询解释、单条决策记录幂等、决策记录窄查询、决策事实解释和拒绝 / 查询 / 解释无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、批量规则时间线 Query Service、运营后台。 |
 | `SpendRuleDefinitionServiceTests` | 规则定义、版本发布、规则挂载和挂载查询 / 解释已经按目标分层服务执行；覆盖版本同摘要幂等、异摘要拒绝覆盖、挂载幂等、非法挂载拒绝、查询 / 解释只读和无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、运营后台、DDL / 生产迁移。 |
-| `SpendControlAdmissionApplicationServiceTests`、`AuthorizationAdmissionApplicationServiceTests` | 上层决策证据可进入准入快照和授权准入组合；拒绝停在交易内核前且无资金事实。 | 支付工具全场景生产可用、事件消费、控制额度自动占用。 |
+| `SpendControlAdmissionApplicationServiceTests`、`AuthorizationAdmissionApplicationServiceTests` | 上层决策证据可进入准入快照和授权准入组合；拒绝停在交易内核前且无资金事实；已证明上游多规则最终裁决摘要可被准入服务按最终 `decisionSn/result/digest/rejectReason` 固化。 | 多规则冲突合成器、多规则明细落库、支付工具全场景生产可用、事件消费、控制额度自动占用。 |
 | `SpendControlMovementServiceFlowTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests` | 控制额度变动流水、预算额度调额、交易成功消耗、失败释放、退款补偿、目标账户隔离和投影下限守卫。 | 账本余额、资金交易事实、生产迁移或历史脏数据修复。 |
+| `WalletSpendControlsAcceptanceFlowTests` | 真实接入方视角串起已发布规则、单规则评估、准入决策固化、周期额度初始化、预留、交易成功消费、退款补偿和 `controlScopeId + periodId` 历史窗口查询，并持续证明不写 route、posting、LedgerEntry 或账本余额事实。 | 多规则冲突合成器、协同授权 webhook、rolling amount、cooldown、强一致频控拦截、生产调度、运营后台或完整卡产品平台。 |
 | `SpendControlMovementTypeContractTests` | 兼容期枚举分类集中在枚举本身，历史决策兼容类型不参与预算投影。 | 公共类名、表名、DTO 或历史枚举删除。 |
 | `FundsTransactionProjectionExplainApplicationServiceTests` / `AuthorizationAdmissionApplicationServiceTests` | 已固化 Spend Rule 决策快照可被交易投影只读解释，不输出 `ruleSpec` 或敏感原文。 | 完整规则定义、版本、挂载、决策记录和控制额度变动流水的运营时间线。 |
+
+Spend Controls 接入验收测试卡：
+
+| 输出项 | 本轮结论 |
+| --- | --- |
+| `deliveryScenario` | 企业钱包或员工卡接入方需要验证 wallet spend controls 是否能作为受控生产接入组件：规则先发布并挂载，单规则 evaluator 只读给出候选证据，准入服务固化最终决策，周期额度由控制流水派生，交易结果由 transaction 层回链消费或退款补偿。 |
+| `targetAssets` | `WalletSpendControlsAcceptanceFlowTests#testWalletSpendControlsShouldSupportMonthlyAuthorizationLifecycleWithoutLedgerSideEffect`。 |
+| `coreAssertions` | 评估通过不代表授权成功；准入通过只代表可进入交易内核；额度初始化、预留、消费和退款补偿只写 Spend Control 事实；当前和历史控制窗口通过 `controlScopeId + periodId` 查询；全链路不得创建或修改 route、posting、LedgerEntry 或账本余额事实。 |
+| `verificationCommand` | `just test-one WalletSpendControlsAcceptanceFlowTests tests`。 |
+| `outOfScope` | 多规则编排器、规则表达式引擎、外部协同授权协议、节假日、rolling amount、cooldown、强一致频控拦截、生产调度重置、运营后台、DDL / 索引迁移和真实卡组织规则确认。 |
 
 Spend Rule 服务层分层测试口径：
 
@@ -109,7 +120,7 @@ Spend Rule 服务层分层测试口径：
 
 Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`assignmentSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立工程变更边界。
 
-Highnote Spend Controls 对齐后的任务源以产品分册 09 的 `SR-HN-*` 为准。`SR-HN-001` 已同步“上游决策、wallet 固化证据、transaction 消费快照”的接入口径；`SR-HN-002` 已落地最小可执行规则 TDD；`SR-HN-003` 至 `SR-HN-005` 分别补齐控制窗口、外部决策证据和多规则最终裁决摘要的测试与契约锚点，并持续断言不得产生越界资金事实。准入 / 授权公共请求优先使用 `controlScopeId` 表达控制范围，`budgetGroupSn` 仅作为兼容字段参与同值校验和历史映射。
+Highnote Spend Controls 对齐后的任务源以产品分册 09 的 `SR-HN-*` 为准。`SR-HN-001` 已同步“上游决策、wallet 固化证据、transaction 消费快照”的接入口径；`SR-HN-002` 已落地最小可执行规则 TDD；`SR-HN-003` 至 `SR-HN-005` 分别补齐控制窗口、外部决策证据和多规则最终裁决摘要的测试与契约锚点；`SR-HN-006` 已补齐 Highnote 对象到 wind-funds 挂载范围的语义测试；`SR-HN-007` 已补齐币种控制和本地授权时间窗口 evaluator 测试；`SR-HN-008` 已补齐滚动窗口次数 evaluator 测试，并持续断言不得产生越界资金事实；它只证明只读候选评估和 H2 测试 schema 的目标索引基线，不证明并发强一致频控拦截或真实生产 DDL / 慢查询评审已完成。准入 / 授权公共请求优先使用 `controlScopeId` 表达控制范围，`budgetGroupSn` 仅作为兼容字段参与同值校验和历史映射。
 
 SR-HN-002 最小测试卡：
 
@@ -118,7 +129,7 @@ SR-HN-002 最小测试卡：
 | `deliveryScenario` | 接入方需要一个可选轻量 Spend Rule evaluator，在进入现有准入服务前判断单条已发布规则是否通过；评估通过后仍由上游携带决策证据调用 `SpendControlAdmissionApplicationService` 固化。 |
 | `firstRedSet` | `SR-HN-002-RED-001` 至 `SR-HN-002-RED-013`。 |
 | `coreAssertions` | evaluator 只返回 `PASSED` / `REJECTED`、拒绝原因和决策摘要候选；不得写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 |
-| `outOfScope` | 多规则冲突合成、表达式引擎、脚本、运营后台、协同授权 webhook、外部风控协议、rolling window、生产调度重置和 DDL。 |
+| `outOfScope` | 多规则冲突合成、表达式引擎、脚本、运营后台、协同授权 webhook、外部风控协议、rolling amount、cooldown、强一致频控拦截、生产调度重置和 DDL / 索引迁移。 |
 | `nextGate` | SR-HN-002 当前收口；AVS 街道地址、多规则冲突和表达式引擎均另拆任务。 |
 
 SR-HN-002 首批 Red 候选：
@@ -139,6 +150,42 @@ SR-HN-002 首批 Red 候选：
 | SR-HN-002-RED-012 | 企业卡能否按卡交易处理类型拒绝 PIN 变更，或只允许取现类处理类型？ | 卡交易处理类型判断只使用请求事实和规则规格，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为卡交易处理类型不允许。 | 不写任何资金事实、决策记录或控制流水。 | 请求 `pin_change` 命中 deny list `PIN_CHANGE` 时拒绝；allow list 包含 `CASH` 且请求 `cash` 时通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址、conditional rule 或 velocity control 需另拆任务。 |
 | SR-HN-002-RED-013 | 电商卡能否按 AVS 邮编校验结果拒绝校验不匹配的授权，只允许校验匹配的授权？ | 邮编校验判断只使用 AVS 结果事实，不接收、不保存邮编或街道地址原文，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为邮编校验结果不允许。 | 不写任何资金事实、决策记录或控制流水；不写完整 PAN、CVV、邮编或街道地址原文。 | 请求 `no_match` 命中 deny list `NO_MATCH` 时拒绝；allow list 包含 `MATCH` 且请求 `match` 时通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址、conditional rule 或 velocity control 需另拆任务。 |
 
+SR-HN-007 币种和本地授权时间窗口测试卡：
+
+| 输出项 | 本轮结论 |
+| --- | --- |
+| `deliveryScenario` | 接入方需要按授权币种或本地业务时间段在交易内核前做单条已发布规则的轻量拒绝。 |
+| `firstRedSet` | `SR-HN-007-RED-001` 至 `SR-HN-007-RED-004`。 |
+| `coreAssertions` | evaluator 只读请求事实和已发布规则版本；时间由调用方按业务或规则时区归一化后传入；不得写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 |
+| `outOfScope` | 时区换算、节假日、cooldown、生产调度、复杂组合规则、DDL 和交易层执行 Spend Rule。 |
+| `nextGate` | SR-HN-007 当前收口；滚动窗口次数由 SR-HN-008 承接，节假日、rolling amount 或 cooldown 另拆窗口日历 / velocity 工程任务。 |
+
+SR-HN-007 首批 Red 候选：
+
+| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SR-HN-007-RED-001 | 企业卡只允许指定授权币种时，非允许币种能否在交易内核前拒绝？ | 币种控制只使用请求币种和规则规格，不触发资金或控制事实写入。 | `currencyControl.deniedCurrencies=["EUR"]` 且请求 `currency=EUR` 时 evaluator 返回 `REJECTED`，拒绝原因为币种不允许。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 拒绝前后资金事实计数不变，决策摘要稳定生成。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateCurrencyDeniedShouldRejectWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要外汇换算、币种精度换算或账户余额校验。 |
+| SR-HN-007-RED-002 | 企业卡只允许工作时间段授权时，窗口外请求能否拒绝？ | 时间窗口控制只使用调用方传入的本地授权时间，不做时区换算或调度重置。 | `allowedWindows=[09:00,18:00)` 且请求 `20:30` 时 evaluator 返回 `REJECTED`，拒绝原因为时间窗口不允许。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 拒绝前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateTimeWindowOutsideAllowedWindowShouldRejectWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要节假日、时区数据库、夏令时或业务日历。 |
+| SR-HN-007-RED-003 | 企业卡在允许窗口起点授权时，能否返回通过且不误写事实？ | 通过评估不代表授权成功，只是准入前候选证据。 | `allowedWindows=[09:00,18:00)` 且请求 `09:00` 时 evaluator 返回 `PASSED`。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 窗口起点闭区间、终点开区间；通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateTimeWindowAtAllowedWindowStartShouldPassWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要把通过评估解释为交易成功或资金可用。 |
+| SR-HN-007-RED-004 | 企业卡使用允许币种授权时，能否返回通过且不误写事实？ | 通过评估不代表资金可用或授权成功。 | `currencyControl.allowedCurrencies=["USD"]` 且请求 `currency=USD` 时 evaluator 返回 `PASSED`。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateCurrencyAllowedShouldPassWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要外汇换算、币种精度换算或账户余额校验。 |
+
+SR-HN-008 滚动窗口次数测试卡：
+
+| 输出项 | 本轮结论 |
+| --- | --- |
+| `deliveryScenario` | 接入方需要按最近 N 分钟授权次数在交易内核前做单条已发布规则的轻量拒绝。 |
+| `firstRedSet` | `SR-HN-008-RED-001`、`SR-HN-008-RED-002`。 |
+| `coreAssertions` | evaluator 只读请求事实、已发布规则版本和既有 `SpendControlMovement`；滚动窗口由请求 `authorizationTime` 锚定，不依赖 `periodId`；不得写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 |
+| `outOfScope` | rolling amount、cooldown、独立窗口聚合表、生产调度、时区换算、强一致频控拦截、复杂组合规则、生产 DDL / 索引校验和交易层执行 Spend Rule。 |
+| `nextGate` | SR-HN-008 当前收口；若要做金额滚动窗口、冷却时间或高吞吐窗口聚合，另拆 velocity 工程任务。 |
+
+SR-HN-008 首批 Red 候选：
+
+| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SR-HN-008-RED-001 | 企业卡最近 15 分钟授权次数达到上限时，能否拒绝下一笔授权？ | 滚动窗口次数控制只读既有控制流水，不创建新的控制或资金事实。 | `counterSpec.windowMode=ROLLING`、`windowSizeMinutes=15`、`countLimit.maxCount=3`，窗口内已有 3 笔时 evaluator 返回 `REJECTED`，拒绝原因为滚动窗口次数超限。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 请求 `authorizationTime=2026-07-01T10:00`，既有 09:46、09:50、09:59 三笔窗口内 RESERVED 流水；拒绝前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateRollingCountLimitShouldRejectByWindowMovementsWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要强一致频控拦截、新增聚合表、调度重置、生产 DDL / 索引校验或交易层执行 Spend Rule。 |
+| SR-HN-008-RED-002 | 企业卡历史授权都已滑出 15 分钟窗口时，能否不误拒绝当前授权？ | 滚动窗口不能退化成同规则全历史次数或周期次数统计。 | 窗口外已有 3 笔同规则控制流水时 evaluator 返回 `PASSED`。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 请求 `authorizationTime=2026-07-01T10:00`，既有 09:44、09:40、09:30 三笔窗口外 RESERVED 流水；通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateRollingCountLimitShouldIgnoreMovementsBeforeWindowStart`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要 rolling amount、cooldown 或时区换算。 |
+
 SR-HN-003 控制窗口测试卡：
 
 | 输出项 | 本轮结论 |
@@ -146,14 +193,14 @@ SR-HN-003 控制窗口测试卡：
 | `deliveryScenario` | 周期额度不复用账本周期、不生成预算组账本；接入方直接用 `controlScopeId + periodId` 查询当前或历史控制窗口。 |
 | `firstRedSet` | `SR-HN-003-RED-001`。 |
 | `coreAssertions` | 当前周期和历史周期只需替换 `periodId`；同周期不同 `controlScopeId`、不同目标账户不得串账；投影查询不得写交易、route、posting、LedgerEntry 或账本余额。 |
-| `outOfScope` | 新增 `windowType` 字段、rolling window、cooldown、生产调度、时区计算器、表达式引擎和 DDL。 |
-| `nextGate` | 若要支持滚动窗口或调度自动刷新，再拆单独工程任务；当前最小控制窗口以 `periodId` 作为外部已决策窗口标识。 |
+| `outOfScope` | 新增 `windowType` 字段、rolling amount、cooldown、生产调度、时区计算器、表达式引擎和 DDL。 |
+| `nextGate` | 若要支持滚动金额窗口、冷却时间或调度自动刷新，再拆单独工程任务；当前最小控制窗口以 `periodId` 作为外部已决策窗口标识。 |
 
 SR-HN-003 首批 Red 候选：
 
 | redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SR-HN-003-RED-001 | 当前周期和历史周期额度是否能用周期标识直接查询，且不串入其他周期、账户或控制范围？ | Spend Rule 控制窗口只派生控制投影，不生成账本余额或预算组账本。 | `BudgetControlProjectionQuery(controlScopeId, periodId, currency, targetAccountId)` 返回指定窗口的额度、占用、剩余和可用控制额度。 | 不写资金交易、route、posting、LedgerEntry；不把其他周期、其他账户、其他 `controlScopeId` 的流水混入。 | 2026-07 和 2026-08 分别能返回各自额度；另一个 `controlScopeId` 的同周期流水不影响主控制范围；查询后资金事实不变。 | `SpendControlMovementServiceFlowTests`，已落地。 | `just test-one SpendControlMovementServiceFlowTests tests`。 | 需要 rolling window、cooldown、时区换算或生产调度刷新。 |
+| SR-HN-003-RED-001 | 当前周期和历史周期额度是否能用周期标识直接查询，且不串入其他周期、账户或控制范围？ | Spend Rule 控制窗口只派生控制投影，不生成账本余额或预算组账本。 | `BudgetControlProjectionQuery(controlScopeId, periodId, currency, targetAccountId)` 返回指定窗口的额度、占用、剩余和可用控制额度。 | 不写资金交易、route、posting、LedgerEntry；不把其他周期、其他账户、其他 `controlScopeId` 的流水混入。 | 2026-07 和 2026-08 分别能返回各自额度；另一个 `controlScopeId` 的同周期流水不影响主控制范围；查询后资金事实不变。 | `SpendControlMovementServiceFlowTests`，已落地。 | `just test-one SpendControlMovementServiceFlowTests tests`。 | 需要 rolling amount、cooldown、时区换算或生产调度刷新。 |
 
 SR-HN-004 外部决策证据接入测试卡：
 
@@ -186,8 +233,24 @@ SR-HN-005 首批 Red 候选：
 
 | redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SR-HN-005-RED-001 | 当前公共契约是否足以消费上游多规则最终裁决？ | 多规则裁决证据只是准入控制事实，不创建资金交易或账本事实。 | 接入方传入最终 `decisionSn/result/digest/rejectReason`，准入服务只固化最终决策记录。 | 不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段、DDL 或解释 payload 落库。 | 公共 request 注释明确摘要可代表多规则裁决证据；完整明细由上游保存。 | `ResolveSpendControlAdmissionRequest`、`RecordSpendRuleDecisionRecordRequest` 注释，已落地。 | `just compile`。 | 接入方要求本系统查询或回放每条规则明细。 |
+| SR-HN-005-RED-001 | 当前公共契约是否足以消费上游多规则最终裁决？ | 多规则裁决证据只是准入控制事实，不创建资金交易或账本事实。 | 接入方传入最终 `decisionSn/result/digest/rejectReason`，准入服务只固化最终决策记录。 | 不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段、DDL 或解释 payload 落库。 | 上游按 `DENY_OVERRIDES` 产出最终拒绝摘要；准入服务固化最终流水、摘要、结果和拒绝原因；断言不写资金交易、route、posting、LedgerEntry 或账本余额事实。 | `SpendControlAdmissionApplicationServiceTests#testResolveSpendControlAdmissionShouldConsumeUpstreamMultiRuleFinalDecisionDigest`，已落地。 | `just test-one SpendControlAdmissionApplicationServiceTests tests`。 | 接入方要求本系统查询或回放每条规则明细。 |
 | SR-HN-005-RED-002 | 如果未来需要本系统解释多规则明细，应证明什么？ | 历史解释必须读取当时固化证据，不按当前规则重算。 | 能查询每条 evaluated rule、裁决策略和最终决策，并能脱敏展示拒绝原因。 | 不泄露敏感商户原文、卡号、token、外部账户或风控模型细节；不改变既有最终决策幂等。 | 先补公共契约、DDL 兼容、脱敏和历史回放测试，再实现落库。 | 待授权，当前不落地。 | 待授权后定义。 | 涉及破坏性公共契约变更、历史迁移或敏感字段存储。 |
+
+SR-HN-006 挂载范围语义测试卡：
+
+| 输出项 | 本轮结论 |
+| --- | --- |
+| `deliveryScenario` | 接入方需要把 Highnote 的 payment card、financial account、authorized user/cardholder 和 card product 映射到 wind-funds 已有 Spend Rule 挂载范围。 |
+| `firstRedSet` | `SR-HN-006-RED-001`。 |
+| `coreAssertions` | `payment card -> PAYMENT_INSTRUMENT`；`financial account -> FUNDING_ACCOUNT / CREDIT_ACCOUNT`；`authorized user / cardholder / 员工 / 账户层级 -> ACCOUNT_HIERARCHY`；`card product -> BUSINESS_SCENE`。 |
+| `outOfScope` | 新增授权用户主数据、卡产品主数据、DDL、交易 canonical 入参或账本主体。 |
+| `nextGate` | 只有接入方要求本系统管理授权用户或卡产品生命周期时，才拆独立对象模型和迁移任务。 |
+
+SR-HN-006 首批 Red 候选：
+
+| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SR-HN-006-RED-001 | Highnote payment card、financial account、authorized user/cardholder 和 card product 是否能被稳定映射并查询解释？ | 挂载范围只是控制 scope，不是资金主体、资金责任主体或账本主体。 | 同一规则版本可挂载到 `PAYMENT_INSTRUMENT`、`FUNDING_ACCOUNT`、`CREDIT_ACCOUNT`、`ACCOUNT_HIERARCHY` 和 `BUSINESS_SCENE`，并可按 scope 精确查询。 | 不写决策记录、资金交易、route、posting、LedgerEntry 或账本余额；不保存卡号、PAN、CVV、邮编、街道地址或外部账户敏感原文。 | 查询每个 scope 只返回本 scope 挂载；账户层级解释包含 `spendRuleScope:ACCOUNT_HIERARCHY:<scopeId>`；调用前后资金事实不变。 | `SpendRuleDefinitionServiceTests`，已落地。 | `just test-one SpendRuleDefinitionServiceTests tests`。 | 需要新增授权用户主数据、卡产品主数据、DDL 或把 scope 作为账本主体。 |
 
 涉及 Spend Rule 或资金主链路的代码切片，`just compile`、`just test-one`、`just test-module`、`just verify-fast` 和 `just verify-cad` 必须通过 classfile 错误桩扫描；`verify-classfiles` 会检查 `target/classes` 和 `target/test-classes` 中是否存在 `Unresolved compilation`，避免 Maven 命令成功但编译产物不可用。
 

@@ -25,6 +25,8 @@ import org.springframework.util.StringUtils;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
@@ -51,6 +53,8 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String PERIOD_COUNT_REJECT_REASON = "周期次数超限";
 
+    private static final String ROLLING_COUNT_REJECT_REASON = "滚动窗口次数超限";
+
     private static final String MERCHANT_CATEGORY_REJECT_REASON = "商户类别不允许";
 
     private static final String MERCHANT_ID_REJECT_REASON = "商户标识不允许";
@@ -68,6 +72,13 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private static final String POINT_OF_SERVICE_CATEGORY_REJECT_REASON = "POS 类别不允许";
 
     private static final String POSTAL_CODE_VERIFICATION_REJECT_REASON = "邮编校验结果不允许";
+
+    private static final String CURRENCY_REJECT_REASON = "币种不允许";
+
+    private static final String TIME_WINDOW_REJECT_REASON = "时间窗口不允许";
+
+    private static final String MULTIPLE_CONTROL_UNSUPPORTED_MESSAGE =
+            "Spend Rule evaluator 仅支持单一控制项，复杂多规则裁决由上游合成";
 
     private static final String COUNTER_SPEC_KEY = "counterSpec";
 
@@ -95,11 +106,21 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String POSTAL_CODE_VERIFICATION_CONTROL_KEY = "postalCodeVerificationControl";
 
+    private static final String CURRENCY_CONTROL_KEY = "currencyControl";
+
+    private static final String TIME_WINDOW_CONTROL_KEY = "timeWindowControl";
+
     private static final String AMOUNT_KEY = "amount";
 
     private static final String CURRENCY_KEY = "currency";
 
     private static final String MAX_COUNT_KEY = "maxCount";
+
+    private static final String WINDOW_MODE_KEY = "windowMode";
+
+    private static final String WINDOW_SIZE_MINUTES_KEY = "windowSizeMinutes";
+
+    private static final String ROLLING_WINDOW_MODE = "ROLLING";
 
     private static final String REQUIRED_KEY = "required";
 
@@ -135,6 +156,16 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private static final String ALLOWED_VERIFICATION_RESULTS_KEY = "allowedVerificationResults";
 
+    private static final String DENIED_CURRENCIES_KEY = "deniedCurrencies";
+
+    private static final String ALLOWED_CURRENCIES_KEY = "allowedCurrencies";
+
+    private static final String ALLOWED_WINDOWS_KEY = "allowedWindows";
+
+    private static final String START_TIME_KEY = "startTime";
+
+    private static final String END_TIME_KEY = "endTime";
+
     private final SpendRuleVersionService spendRuleVersionService;
 
     private final SpendControlMovementService spendControlMovementService;
@@ -148,6 +179,7 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
                 request.getRuleId(),
                 request.getRuleVersion());
         JSONObject ruleSpec = ruleSpecOf(version.getRuleSpec());
+        assertSingleExecutableControl(ruleSpec);
         SpendControlDecisionResult result = evaluateRule(request, ruleSpec);
         String rejectReason = rejectReason(result, ruleSpec);
         return toDecision(request, result, rejectReason);
@@ -169,6 +201,27 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         JSONObject result = JSON.parseObject(ruleSpec);
         AssertUtils.notNull(result, "Spend Rule 规则规格不能为空");
         return result;
+    }
+
+    private void assertSingleExecutableControl(JSONObject ruleSpec) {
+        long controlCount = List.of(
+                        hasCardDataInputCapabilityControl(ruleSpec),
+                        hasCardTransactionProcessingTypeControl(ruleSpec),
+                        hasCvvControl(ruleSpec),
+                        hasPanEntryModeControl(ruleSpec),
+                        hasPointOfServiceCategoryControl(ruleSpec),
+                        hasPostalCodeVerificationControl(ruleSpec),
+                        hasCurrencyControl(ruleSpec),
+                        hasTimeWindowControl(ruleSpec),
+                        hasMerchantIdControl(ruleSpec),
+                        hasMerchantCountryControl(ruleSpec),
+                        hasMerchantCategoryControl(ruleSpec),
+                        hasCountLimit(ruleSpec),
+                        hasAmountLimit(ruleSpec))
+                .stream()
+                .filter(Boolean::booleanValue)
+                .count();
+        AssertUtils.isTrue(controlCount <= 1L, MULTIPLE_CONTROL_UNSUPPORTED_MESSAGE);
     }
 
     private AmountLimit amountLimitOf(JSONObject ruleSpec) {
@@ -195,6 +248,15 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return new CountLimit(maxCount);
     }
 
+    private RollingWindow rollingWindowOf(JSONObject ruleSpec) {
+        JSONObject counterSpec = ruleSpec.getJSONObject(COUNTER_SPEC_KEY);
+        AssertUtils.notNull(counterSpec, "Spend Rule 滚动窗口规则规格缺少 counterSpec");
+        Integer windowSizeMinutes = counterSpec.getInteger(WINDOW_SIZE_MINUTES_KEY);
+        AssertUtils.notNull(windowSizeMinutes, "Spend Rule 滚动窗口分钟数不能为空");
+        AssertUtils.isTrue(windowSizeMinutes > 0, "Spend Rule 滚动窗口分钟数必须大于 0");
+        return new RollingWindow(windowSizeMinutes);
+    }
+
     private SpendControlDecisionResult evaluateRule(EvaluateSpendRuleRequest request, JSONObject ruleSpec) {
         if (hasCardDataInputCapabilityControl(ruleSpec)) {
             return evaluateCardDataInputCapability(request, cardDataInputCapabilityControlOf(ruleSpec));
@@ -214,6 +276,12 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasPostalCodeVerificationControl(ruleSpec)) {
             return evaluatePostalCodeVerification(request, postalCodeVerificationControlOf(ruleSpec));
         }
+        if (hasCurrencyControl(ruleSpec)) {
+            return evaluateCurrency(request, currencyControlOf(ruleSpec));
+        }
+        if (hasTimeWindowControl(ruleSpec)) {
+            return evaluateTimeWindow(request, timeWindowControlOf(ruleSpec));
+        }
         if (hasMerchantIdControl(ruleSpec)) {
             return evaluateMerchantId(request, merchantIdControlOf(ruleSpec));
         }
@@ -224,7 +292,11 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
             return evaluateMerchantCategory(request, merchantCategoryControlOf(ruleSpec));
         }
         if (hasCountLimit(ruleSpec)) {
-            return evaluatePeriodCountLimit(request, countLimitOf(ruleSpec));
+            CountLimit countLimit = countLimitOf(ruleSpec);
+            if (isRollingWindowCounter(ruleSpec)) {
+                return evaluateRollingCountLimit(request, countLimit, rollingWindowOf(ruleSpec));
+            }
+            return evaluatePeriodCountLimit(request, countLimit);
         }
         AmountLimit amountLimit = amountLimitOf(ruleSpec);
         assertSameCurrency(request, amountLimit);
@@ -245,9 +317,23 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return ruleSpec.getJSONObject(COUNTER_SPEC_KEY) != null;
     }
 
+    private boolean isRollingWindowCounter(JSONObject ruleSpec) {
+        JSONObject counterSpec = ruleSpec.getJSONObject(COUNTER_SPEC_KEY);
+        if (counterSpec == null) {
+            return false;
+        }
+        String windowMode = counterSpec.getString(WINDOW_MODE_KEY);
+        return StringUtils.hasText(windowMode) && ROLLING_WINDOW_MODE.equals(normalizeUpperCode(windowMode));
+    }
+
     private boolean hasCountLimit(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         return limitSpec != null && limitSpec.getJSONObject(COUNT_LIMIT_KEY) != null;
+    }
+
+    private boolean hasAmountLimit(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(AMOUNT_LIMIT_KEY) != null;
     }
 
     private boolean hasMerchantCategoryControl(JSONObject ruleSpec) {
@@ -293,6 +379,16 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private boolean hasPostalCodeVerificationControl(JSONObject ruleSpec) {
         JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
         return limitSpec != null && limitSpec.getJSONObject(POSTAL_CODE_VERIFICATION_CONTROL_KEY) != null;
+    }
+
+    private boolean hasCurrencyControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(CURRENCY_CONTROL_KEY) != null;
+    }
+
+    private boolean hasTimeWindowControl(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        return limitSpec != null && limitSpec.getJSONObject(TIME_WINDOW_CONTROL_KEY) != null;
     }
 
     private MerchantCategoryControl merchantCategoryControlOf(JSONObject ruleSpec) {
@@ -414,6 +510,51 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return new PostalCodeVerificationControl(
                 normalizedCodes(postalCodeVerificationControl, DENIED_VERIFICATION_RESULTS_KEY),
                 normalizedCodes(postalCodeVerificationControl, ALLOWED_VERIFICATION_RESULTS_KEY));
+    }
+
+    private CurrencyControl currencyControlOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject currencyControl = limitSpec.getJSONObject(CURRENCY_CONTROL_KEY);
+        AssertUtils.notNull(currencyControl, "Spend Rule 规则规格缺少 limitSpec.currencyControl");
+        return new CurrencyControl(
+                currencies(currencyControl, DENIED_CURRENCIES_KEY),
+                currencies(currencyControl, ALLOWED_CURRENCIES_KEY));
+    }
+
+    private Set<CurrencyIsoCode> currencies(JSONObject control, String key) {
+        List<String> codes = control.getList(key, String.class);
+        if (codes == null) {
+            return Set.of();
+        }
+        return codes.stream()
+                .filter(StringUtils::hasText)
+                .map(SpendRuleEvaluationApplicationServiceImpl::normalizeUpperCode)
+                .map(CurrencyIsoCode::valueOf)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private TimeWindowControl timeWindowControlOf(JSONObject ruleSpec) {
+        JSONObject limitSpec = ruleSpec.getJSONObject(LIMIT_SPEC_KEY);
+        AssertUtils.notNull(limitSpec, "Spend Rule 规则规格缺少 limitSpec");
+        JSONObject timeWindowControl = limitSpec.getJSONObject(TIME_WINDOW_CONTROL_KEY);
+        AssertUtils.notNull(timeWindowControl, "Spend Rule 规则规格缺少 limitSpec.timeWindowControl");
+        List<JSONObject> windows = timeWindowControl.getList(ALLOWED_WINDOWS_KEY, JSONObject.class);
+        AssertUtils.isTrue(windows != null && !windows.isEmpty(), "Spend Rule 时间窗口不能为空");
+        return new TimeWindowControl(windows.stream()
+                .map(this::timeWindowOf)
+                .collect(Collectors.toUnmodifiableList()));
+    }
+
+    private TimeWindow timeWindowOf(JSONObject window) {
+        String startTime = window.getString(START_TIME_KEY);
+        String endTime = window.getString(END_TIME_KEY);
+        AssertUtils.hasText(startTime, "Spend Rule 时间窗口开始时间不能为空");
+        AssertUtils.hasText(endTime, "Spend Rule 时间窗口结束时间不能为空");
+        LocalTime parsedStartTime = LocalTime.parse(startTime);
+        LocalTime parsedEndTime = LocalTime.parse(endTime);
+        AssertUtils.isTrue(!parsedStartTime.equals(parsedEndTime), "Spend Rule 时间窗口开始和结束时间不能相同");
+        return new TimeWindow(parsedStartTime, parsedEndTime);
     }
 
     private Set<String> normalizedCodes(JSONObject control, String key) {
@@ -555,6 +696,27 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return SpendControlDecisionResult.PASSED;
     }
 
+    private SpendControlDecisionResult evaluateCurrency(EvaluateSpendRuleRequest request,
+                                                        CurrencyControl control) {
+        CurrencyIsoCode currency = request.getCurrency();
+        if (control.deniedCurrencies().contains(currency)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        if (!control.allowedCurrencies().isEmpty() && !control.allowedCurrencies().contains(currency)) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
+    private SpendControlDecisionResult evaluateTimeWindow(EvaluateSpendRuleRequest request,
+                                                          TimeWindowControl control) {
+        AssertUtils.notNull(request.getAuthorizationTime(), "时间窗口规则评估授权时间不能为空");
+        LocalTime authorizationTime = request.getAuthorizationTime().toLocalTime();
+        boolean matched = control.allowedWindows().stream()
+                .anyMatch(window -> window.contains(authorizationTime));
+        return matched ? SpendControlDecisionResult.PASSED : SpendControlDecisionResult.REJECTED;
+    }
+
     private SpendControlDecisionResult evaluatePeriodCountLimit(EvaluateSpendRuleRequest request,
                                                                 CountLimit countLimit) {
         AssertUtils.hasText(request.getControlScopeId(), "周期次数规则评估控制范围标识不能为空");
@@ -576,12 +738,63 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         return SpendControlDecisionResult.PASSED;
     }
 
+    private SpendControlDecisionResult evaluateRollingCountLimit(EvaluateSpendRuleRequest request,
+                                                                 CountLimit countLimit,
+                                                                 RollingWindow rollingWindow) {
+        AssertUtils.hasText(request.getControlScopeId(), "滚动窗口次数规则评估控制范围标识不能为空");
+        AssertUtils.notNull(request.getAuthorizationTime(), "滚动窗口次数规则评估授权时间不能为空");
+        LocalDateTime windowStart = rollingWindowStart(request, rollingWindow);
+        List<SpendControlMovementDTO> movements = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery()
+                        .setTenantId(request.getTenantId())
+                        .setControlScopeId(request.getControlScopeId())
+                        .setBudgetGroupSn(request.getControlScopeId())
+                        .setCurrency(request.getCurrency())
+                        .setSpendRuleId(request.getRuleId())
+                        .setSpendRuleVersion(request.getRuleVersion())
+                        .setTargetAccountId(request.getTargetAccountId())
+                        .setGmtCreateMin(windowStart)
+                        .setGmtCreateMax(request.getAuthorizationTime()));
+        long usedCount = rollingWindowUsageCount(movements, request.getAuthorizationTime(), rollingWindow);
+        if (usedCount >= countLimit.maxCount()) {
+            return SpendControlDecisionResult.REJECTED;
+        }
+        return SpendControlDecisionResult.PASSED;
+    }
+
     private long periodUsageCount(List<SpendControlMovementDTO> movements) {
         return movements.stream()
                 .filter(this::isCountedPeriodMovement)
                 .map(this::periodUsageIdentity)
                 .distinct()
                 .count();
+    }
+
+    private long rollingWindowUsageCount(List<SpendControlMovementDTO> movements,
+                                         LocalDateTime authorizationTime,
+                                         RollingWindow rollingWindow) {
+        LocalDateTime windowStart = rollingWindowStart(authorizationTime, rollingWindow);
+        return movements.stream()
+                .filter(this::isCountedPeriodMovement)
+                .filter(movement -> isWithinRollingWindow(movement, windowStart, authorizationTime))
+                .map(this::periodUsageIdentity)
+                .distinct()
+                .count();
+    }
+
+    private LocalDateTime rollingWindowStart(EvaluateSpendRuleRequest request, RollingWindow rollingWindow) {
+        return rollingWindowStart(request.getAuthorizationTime(), rollingWindow);
+    }
+
+    private LocalDateTime rollingWindowStart(LocalDateTime authorizationTime, RollingWindow rollingWindow) {
+        return authorizationTime.minusMinutes(rollingWindow.windowSizeMinutes());
+    }
+
+    private boolean isWithinRollingWindow(SpendControlMovementDTO movement,
+                                          LocalDateTime windowStart,
+                                          LocalDateTime authorizationTime) {
+        LocalDateTime movementTime = movement.getGmtCreate();
+        return movementTime != null && !movementTime.isBefore(windowStart) && !movementTime.isAfter(authorizationTime);
     }
 
     private boolean isCountedPeriodMovement(SpendControlMovementDTO movement) {
@@ -643,6 +856,12 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         if (hasPostalCodeVerificationControl(ruleSpec)) {
             return POSTAL_CODE_VERIFICATION_REJECT_REASON;
         }
+        if (hasCurrencyControl(ruleSpec)) {
+            return CURRENCY_REJECT_REASON;
+        }
+        if (hasTimeWindowControl(ruleSpec)) {
+            return TIME_WINDOW_REJECT_REASON;
+        }
         if (hasMerchantIdControl(ruleSpec)) {
             return MERCHANT_ID_REJECT_REASON;
         }
@@ -653,7 +872,7 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
             return MERCHANT_CATEGORY_REJECT_REASON;
         }
         if (hasCountLimit(ruleSpec)) {
-            return PERIOD_COUNT_REJECT_REASON;
+            return isRollingWindowCounter(ruleSpec) ? ROLLING_COUNT_REJECT_REASON : PERIOD_COUNT_REJECT_REASON;
         }
         return hasCounterSpec(ruleSpec) ? PERIOD_AMOUNT_REJECT_REASON : AMOUNT_LIMIT_REJECT_REASON;
     }
@@ -708,6 +927,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("postalCodeVerificationResult", request.getPostalCodeVerificationResult() == null
                 ? ""
                 : normalizeUpperCode(request.getPostalCodeVerificationResult()));
+        digestValues.put("authorizationTime", request.getAuthorizationTime() == null
+                ? ""
+                : request.getAuthorizationTime().toString());
         digestValues.put("controlScopeId", request.getControlScopeId() == null ? "" : request.getControlScopeId());
         digestValues.put("periodId", request.getPeriodId() == null ? "" : request.getPeriodId());
         digestValues.put("targetAccountId", targetAccountDigest(request));
@@ -742,6 +964,9 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private record CountLimit(Integer maxCount) {
     }
 
+    private record RollingWindow(Integer windowSizeMinutes) {
+    }
+
     private record MerchantCategoryControl(Set<String> deniedMccCodes, Set<String> allowedMccCodes) {
     }
 
@@ -771,5 +996,21 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
 
     private record PostalCodeVerificationControl(Set<String> deniedVerificationResults,
                                                  Set<String> allowedVerificationResults) {
+    }
+
+    private record CurrencyControl(Set<CurrencyIsoCode> deniedCurrencies, Set<CurrencyIsoCode> allowedCurrencies) {
+    }
+
+    private record TimeWindowControl(List<TimeWindow> allowedWindows) {
+    }
+
+    private record TimeWindow(LocalTime startTime, LocalTime endTime) {
+
+        private boolean contains(LocalTime time) {
+            if (startTime.isBefore(endTime)) {
+                return !time.isBefore(startTime) && time.isBefore(endTime);
+            }
+            return !time.isBefore(startTime) || time.isBefore(endTime);
+        }
     }
 }

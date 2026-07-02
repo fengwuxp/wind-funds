@@ -18,7 +18,8 @@ public enum SpendRuleScopeType implements DescriptiveEnum {
     BUDGET_GROUP("预算组"),
     FUNDING_ACCOUNT("资金账户"),
     CREDIT_ACCOUNT("信用账户"),
-    BUSINESS_SCENE("业务场景");
+    BUSINESS_SCENE("业务场景"),
+    ACCOUNT_HIERARCHY("账户层级或使用主体控制范围");
 
     private final String desc;
 }

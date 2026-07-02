@@ -71,6 +71,14 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
 
     private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_definition_service_card";
 
+    private static final String FUNDING_ACCOUNT_SCOPE_ID = "funding_account_spend_rule_scope_001";
+
+    private static final String CREDIT_ACCOUNT_SCOPE_ID = "credit_account_spend_rule_scope_001";
+
+    private static final String ACCOUNT_HIERARCHY_SCOPE_ID = "employee_cardholder_spend_rule_scope_001";
+
+    private static final String CARD_PRODUCT_SCOPE_ID = "CARD_PRODUCT_TRAVEL";
+
     private static final String BUSINESS_SCENE = "SPEND_RULE_DEFINITION_SERVICE";
 
     private static final String BUSINESS_SN = "SPEND_RULE_DEFINITION_SERVICE_001";
@@ -195,6 +203,61 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：Highnote payment card、financial account、authorized user/cardholder、card product 映射到本系统挂载范围。
+     * 输入：同一规则版本分别挂载到支付工具、资金账户、信用账户、账户层级和业务场景。
+     * 输出：按 scope 精确查询，账户层级解释保留本系统 scope 证据引用。
+     * 红线：这些挂载只是控制事实，不得创建决策记录、资金交易或账本事实，也不得把授权使用人当作资金主体。
+     */
+    @Test
+    void testAssignVersionShouldSupportHighnoteScopeMappingsWithoutFundsSideEffect() {
+        publishRuleVersions();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        spendRuleDefinitionService.assignVersion(assignmentRequest(
+                ASSIGNMENT_SN + "_payment_card",
+                RULE_VERSION,
+                PAYMENT_INSTRUMENT_SN,
+                SpendRuleScopeType.PAYMENT_INSTRUMENT));
+        spendRuleDefinitionService.assignVersion(assignmentRequest(
+                ASSIGNMENT_SN + "_funding_account",
+                RULE_VERSION,
+                FUNDING_ACCOUNT_SCOPE_ID,
+                SpendRuleScopeType.FUNDING_ACCOUNT));
+        spendRuleDefinitionService.assignVersion(assignmentRequest(
+                ASSIGNMENT_SN + "_credit_account",
+                RULE_VERSION,
+                CREDIT_ACCOUNT_SCOPE_ID,
+                SpendRuleScopeType.CREDIT_ACCOUNT));
+        spendRuleDefinitionService.assignVersion(assignmentRequest(
+                ASSIGNMENT_SN + "_account_hierarchy",
+                RULE_VERSION,
+                ACCOUNT_HIERARCHY_SCOPE_ID,
+                SpendRuleScopeType.ACCOUNT_HIERARCHY));
+        spendRuleDefinitionService.assignVersion(assignmentRequest(
+                ASSIGNMENT_SN + "_card_product",
+                RULE_VERSION,
+                CARD_PRODUCT_SCOPE_ID,
+                SpendRuleScopeType.BUSINESS_SCENE));
+
+        assertThat(queryAssignmentSns(SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN))
+                .containsExactly(ASSIGNMENT_SN + "_payment_card");
+        assertThat(queryAssignmentSns(SpendRuleScopeType.FUNDING_ACCOUNT, FUNDING_ACCOUNT_SCOPE_ID))
+                .containsExactly(ASSIGNMENT_SN + "_funding_account");
+        assertThat(queryAssignmentSns(SpendRuleScopeType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SCOPE_ID))
+                .containsExactly(ASSIGNMENT_SN + "_credit_account");
+        assertThat(queryAssignmentSns(SpendRuleScopeType.ACCOUNT_HIERARCHY, ACCOUNT_HIERARCHY_SCOPE_ID))
+                .containsExactly(ASSIGNMENT_SN + "_account_hierarchy");
+        assertThat(queryAssignmentSns(SpendRuleScopeType.BUSINESS_SCENE, CARD_PRODUCT_SCOPE_ID))
+                .containsExactly(ASSIGNMENT_SN + "_card_product");
+        assertThat(explainAssignment(ASSIGNMENT_SN + "_account_hierarchy").getEvidenceRefs())
+                .contains("spendRuleScope:" + SpendRuleScopeType.ACCOUNT_HIERARCHY + ":"
+                        + ACCOUNT_HIERARCHY_SCOPE_ID);
+        assertNoDecisionRecord();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：挂载未发布版本或缺少有效窗口。
      * 输入：不存在的版本、缺冲突策略、结束时间早于开始时间。
      * 输出：请求被拒绝。
@@ -281,18 +344,36 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
     private AssignSpendRuleVersionRequest assignmentRequest(String assignmentSn,
                                                             String ruleVersion,
                                                             String scopeId) {
+        return assignmentRequest(assignmentSn, ruleVersion, scopeId, SpendRuleScopeType.PAYMENT_INSTRUMENT);
+    }
+
+    private AssignSpendRuleVersionRequest assignmentRequest(String assignmentSn,
+                                                            String ruleVersion,
+                                                            String scopeId,
+                                                            SpendRuleScopeType scopeType) {
         return new AssignSpendRuleVersionRequest()
                 .setTenantId(TENANT_ID)
                 .setAssignmentSn(assignmentSn)
                 .setRuleId(RULE_ID)
                 .setRuleVersion(ruleVersion)
-                .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
+                .setScopeType(scopeType)
                 .setScopeId(scopeId)
                 .setPriority(10)
                 .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
                 .setEffectiveFrom(EFFECTIVE_FROM)
                 .setEffectiveTo(EFFECTIVE_TO)
                 .setDescription("挂载 Spend Rule 版本");
+    }
+
+    private List<String> queryAssignmentSns(SpendRuleScopeType scopeType, String scopeId) {
+        return spendRuleAssignmentService.queryAssignments(new SpendRuleAssignmentQuery()
+                        .setTenantId(TENANT_ID)
+                        .setScopeType(scopeType)
+                        .setScopeId(scopeId)
+                        .setEffectiveOnly(Boolean.TRUE))
+                .stream()
+                .map(SpendRuleAssignmentDTO::getAssignmentSn)
+                .toList();
     }
 
     private void cleanupSpendRuleDefinitionServiceTestData() {
