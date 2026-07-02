@@ -110,6 +110,18 @@ Spend Controls 接入验收测试卡：
 | `verificationCommand` | `just test-one WalletSpendControlsAcceptanceFlowTests tests`。 |
 | `outOfScope` | 多规则编排器、规则表达式引擎、外部协同授权协议、节假日、rolling amount、cooldown、强一致频控拦截、生产调度重置、运营后台、DDL / 索引迁移和真实卡组织规则确认。 |
 
+Spend Controls 生产准入审计与 Runbook 测试卡：
+
+| 输出项 | 本轮结论 |
+| --- | --- |
+| `deliveryScenario` | 已有 Spend Controls 服务层能力进入受控生产试点前，需要证明规则变更、最终决策、控制窗口、异常信号和恢复动作能被审计和验收。 |
+| `currentEvidence` | `SpendRuleDefinitionServiceTests` 证明规则定义、版本和挂载幂等 / 摘要冲突；`SpendControlAdmissionApplicationServiceTests` 证明外部决策证据固化和拒绝无资金事实；`SpendControlMovementServiceFlowTests` 证明控制窗口按 `controlScopeId + periodId` 可追溯；`WalletSpendControlsAcceptanceFlowTests` 证明接入方视角主链闭环无账本副作用。 |
+| `productionGap` | 当前测试不证明运营后台、审批流、生产 DDL / 索引、告警平台、Runbook 执行器、历史回填或强一致频控拦截已经完成。 |
+| `firstRedSet` | 摘要冲突无审计、缺冲突策略仍生产挂载、准入拒绝异常无告警、控制投影缺证据仍自动授权、滚动窗口慢查询无降级、迁移失败无停止和恢复验收。 |
+| `coreAssertions` | 规则变更可追踪操作者、原因、摘要、scope 和生效窗口；Runbook 信号必须有发现方式、owner、止血动作和恢复验收；所有失败和止血路径不得生成 route、posting、LedgerEntry 或账本余额事实。 |
+| `verificationCommand` | 文档-only 切片执行 `git diff --check`；进入代码或 schema 时执行 `just verify-slice SpendRuleDefinitionServiceTests,SpendControlAdmissionApplicationServiceTests,SpendControlMovementServiceFlowTests,WalletSpendControlsAcceptanceFlowTests tests`。 |
+| `outOfScope` | 不新增公共契约，不新增审计表，不承诺运营后台、生产告警、生产迁移、历史回填或上线审批完成。 |
+
 Spend Rule 服务层分层测试口径：
 
 1. 当前带 `ApplicationServiceTests` 后缀的测试资产表达跨对象场景编排，不代表所有规则能力都应放在 application service。

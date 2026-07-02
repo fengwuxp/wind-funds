@@ -14,9 +14,12 @@ import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
 import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 /**
@@ -27,6 +30,7 @@ import org.springframework.util.StringUtils;
  */
 @Service
 @AllArgsConstructor
+@Slf4j
 public class SpendControlAdmissionApplicationServiceImpl implements SpendControlAdmissionApplicationService {
 
     private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
@@ -42,7 +46,30 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 preTransactionSnapshotApplicationService.resolvePreTransactionSnapshot(toSnapshotRequest(request));
         SpendRuleDecisionRecordDTO decisionRecord =
                 spendRuleDecisionRecordService.recordDecision(toDecisionRecordRequest(request));
-        return toDecision(request, snapshot, decisionRecord);
+        SpendControlAdmissionDecisionDTO decision = toDecision(request, snapshot, decisionRecord);
+        logAfterCommit(() -> log.info("支出控制准入决策已固化，tenantId={}, businessScene={}, businessSn={}, action={}, amount={}, "
+                        + "currency={}, spendRuleId={}, spendRuleVersion={}, spendDecisionSn={}, decisionResult={}, "
+                        + "admitted={}, targetAccountType={}",
+                request.getTenantId(), request.getBusinessScene(), request.getBusinessSn(), request.getAction(),
+                request.getAmount(), request.getCurrency(), request.getSpendRuleId(), request.getSpendRuleVersion(),
+                request.getSpendDecisionSn(), request.getSpendDecisionResult(), decision.getAdmitted(),
+                snapshot.getTargetAccountId() == null ? null : snapshot.getTargetAccountId().type()));
+        return decision;
+    }
+
+    private void logAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()
+                || !TransactionSynchronizationManager.isActualTransactionActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private void validateRequest(ResolveSpendControlAdmissionRequest request) {

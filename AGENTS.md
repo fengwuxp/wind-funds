@@ -88,6 +88,13 @@ tests
 
 - 空值契约遵循 JSpecify 标注：`@NonNull` 方法返回值、参数和集合元素按非空契约使用，不写重复的 `null` 防御；只有 `@Nullable`、外部输入、反序列化边界或持久化读取等不可信来源才做显式空处理。
 
+业务日志与可观测性：
+
+- `ledger`、`wallet`、`transaction` 及清结算/治理实现的关键用例边界必须输出可追溯业务日志，覆盖准入/拒绝、交易或账本状态变化、冻结/解冻、入账/退款/冲正、幂等复用、重试/补偿和对账差错处理；DTO、Entity、Mapper、MapStruct 转换、简单查询和循环明细不打流水账。
+- 业务日志使用项目统一日志框架，优先 `@Slf4j` 和参数化日志；禁止 `System.out`、`printStackTrace`、吞异常或只打印异常 message。异常日志保留 cause，并带上稳定业务标识。
+- 日志字段只保留最小可定位上下文：`tenantId`、业务场景/业务单号、`transactionSn`、`ledgerTransactionSn`、账户或主体脱敏标识、状态、金额币种、规则/版本/幂等摘要和 traceId；不得输出完整 Request/Response、Entity、SQL、`contextVariables`、PAN、CVV、token、密钥、证件号、手机号、外部账号等敏感信息。
+- 日志不替代交易事实、账本事实、审计证据、对账证据或测试断言；涉及资金事实、幂等、补偿、对账和安全边界的日志改动必须随相关切片验证，并在交付说明里列出验证命令。
+
 ## 4. 规格入口
 
 | 路径 | 用途 |

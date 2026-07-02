@@ -76,11 +76,20 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
         FundsInstructionLifecycleResult lifecycleResult = fundsInstructionLifecycleRecorder.beforePosting(instruction,
                 resolvedRoute, routeSnapshot);
         if (lifecycleResult.isCompleted()) {
+            LOGGER.info("资金指令已完成，复用原生命周期事实，instructionType={}, eventType={}, transactionType={}, "
+                            + "businessScene={}, businessSn={}, transactionSn={}",
+                    instruction.getInstructionType(), instruction.getEventType(), instruction.getTransactionType(),
+                    instruction.getBusinessScene(), instruction.getBusinessSn(), lifecycleResult.getTransactionSn());
             publishProjection(instruction, resolvedRoute, routeSnapshot, lifecycleResult, null);
             return lifecycleResult.getTransactionSn();
         }
         if (resolvedRoute.getLegs().isEmpty()) {
             fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, null);
+            logAfterCommit(() -> LOGGER.info("资金指令无账务影响，已标记成功，instructionType={}, eventType={}, "
+                            + "transactionType={}, businessScene={}, businessSn={}, transactionSn={}, amount={}, currency={}",
+                    instruction.getInstructionType(), instruction.getEventType(), instruction.getTransactionType(),
+                    instruction.getBusinessScene(), instruction.getBusinessSn(), lifecycleResult.getTransactionSn(),
+                    instruction.getAmount().getAmount(), instruction.getAmount().getCurrency()));
             publishProjection(instruction, resolvedRoute, routeSnapshot,
                     completedLifecycleResult(lifecycleResult, null), null);
             return lifecycleResult.getTransactionSn();
@@ -90,11 +99,21 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
                     resolvedRoute);
             ledgerTransactionPostingService.post(transaction);
             fundsInstructionLifecycleRecorder.markSucceeded(instruction, lifecycleResult, transaction.getSn());
+            logAfterCommit(() -> LOGGER.info("资金指令执行完成，instructionType={}, eventType={}, transactionType={}, businessScene={}, "
+                            + "businessSn={}, transactionSn={}, ledgerTransactionSn={}, amount={}, currency={}",
+                    instruction.getInstructionType(), instruction.getEventType(), instruction.getTransactionType(),
+                    instruction.getBusinessScene(), instruction.getBusinessSn(), lifecycleResult.getTransactionSn(),
+                    transaction.getSn(), instruction.getAmount().getAmount(), instruction.getAmount().getCurrency()));
             publishProjection(instruction, resolvedRoute, routeSnapshot,
                     completedLifecycleResult(lifecycleResult, transaction.getSn()), transaction);
             return lifecycleResult.getTransactionSn();
         } catch (RuntimeException | Error exception) {
             fundsInstructionLifecycleRecorder.markFailed(instruction, lifecycleResult, exception);
+            LOGGER.warn("资金指令执行失败，已尝试记录失败生命周期事实，instructionType={}, eventType={}, transactionType={}, "
+                            + "businessScene={}, businessSn={}, transactionSn={}",
+                    instruction.getInstructionType(), instruction.getEventType(), instruction.getTransactionType(),
+                    instruction.getBusinessScene(), instruction.getBusinessSn(), lifecycleResult.getTransactionSn(),
+                    exception);
             throw exception;
         }
     }
@@ -136,7 +155,8 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
                 .lifecycleResult(lifecycleResult)
                 .ledgerTransaction(ledgerTransaction)
                 .build();
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()
+                && TransactionSynchronizationManager.isActualTransactionActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 
                 @Override
@@ -147,6 +167,21 @@ public class DefaultRoutedFundsInstructionOrchestrator implements FundsInstructi
             return;
         }
         publishProjectionImmediately(context);
+    }
+
+    private void logAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()
+                || !TransactionSynchronizationManager.isActualTransactionActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private void publishProjectionImmediately(FundsTransactionProjectionPublishContext context) {

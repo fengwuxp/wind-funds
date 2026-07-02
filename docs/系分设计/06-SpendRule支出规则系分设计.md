@@ -871,6 +871,41 @@ SR-HN-002 工程交接卡：
 
 本分册只声明上述证据和缺口，不把初始服务层证据外推为完整规则引擎、生产迁移、运营后台或外部通道规则生产适用性。
 
+### 14.1 规则变更审计与 Runbook 工程门禁
+
+本节是 Spend Controls 生产准入的最小工程门禁，不新增运行时代码、不改变公共契约，也不把现有服务层测试外推为生产上线批准。后续若要编码落地审计表、运营后台、告警或迁移脚本，必须以本节为独立工程边界重新确认 writeScope、schemaDecision、targetTests 和停止条件。
+
+| 项 | 结论 |
+| --- | --- |
+| Task ID | SR-PROD-001-SPEND-CONTROLS-AUDIT-RUNBOOK |
+| 目标 | 让规则变更、准入决策、控制窗口和异常恢复在生产试点前具备可审计、可定位、可回滚和可验收的最小证据链。 |
+| 当前 writeScope | 仅文档和 TDD 锚点；不修改 Java、H2 schema、DDL、Mapper、公共 DTO 或交易 canonical 入参。 |
+| readScope | `SpendRuleDefinitionServiceTests`、`SpendControlAdmissionApplicationServiceTests`、`SpendControlMovementServiceFlowTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、`WalletSpendControlsAcceptanceFlowTests`。 |
+| schemaDecision | 当前不新增表。生产落地审计和告警前，需单独评审是否复用现有审计字段、接入统一操作审计，或新增规则变更审计表。 |
+| verification | 文档切片执行 `git diff --check`；若进入代码或 schema，最小回归为 `just verify-slice SpendRuleDefinitionServiceTests,SpendControlAdmissionApplicationServiceTests,SpendControlMovementServiceFlowTests,WalletSpendControlsAcceptanceFlowTests tests`。 |
+| stopCondition | 需要运营后台、审批流、webhook、生产 DDL / 索引、历史回填、强一致频控拦截、敏感原文存储或多规则明细落库时停止，拆独立工程任务。 |
+
+规则变更审计最小证据：
+
+| 变更对象 | 必须记录 | 禁止 |
+| --- | --- | --- |
+| 规则定义 | tenantId、ruleId、ruleCode、changeType、operator、reason、traceId、auditReferenceSn、变更前后状态摘要。 | 无操作者创建或直接删除生产规则事实。 |
+| 规则版本 | ruleId、ruleVersion、ruleDigest、ruleSpec 摘要、发布人、发布时间、审批或审计引用。 | 覆盖已发布版本正文，或用当前版本改写历史解释。 |
+| 规则挂载 | assignmentSn、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status、变更前后摘要。 | 缺冲突策略上线，或删除历史挂载证据。 |
+| 决策记录 | decisionSn、assignmentSn、ruleId、ruleVersion、decisionResult、rejectReason、decisionDigest、业务引用和外部决策引用。 | 按当前规则重算历史决策，或把多规则明细塞入未确认公共契约。 |
+| 控制额度变动 | movementSn、movementType、controlScopeId、periodId、targetAccountId、amount、currency、movementDigest、原控制流水引用。 | 修改历史控制流水金额，或用账本余额替代控制投影。 |
+
+Runbook 最低信号和处置：
+
+| 信号 | 发现方式 | 止血动作 | 恢复验收 |
+| --- | --- | --- | --- |
+| 规则版本摘要冲突 | 版本发布或幂等重放返回摘要冲突。 | 暂停该规则新挂载，保留冲突请求和 traceId。 | 同 ruleId + version 只能保留一个已发布摘要；冲突请求无资金事实副作用。 |
+| 挂载冲突或缺冲突策略 | 挂载校验失败、准入无法解释有效挂载。 | 停用问题挂载或恢复旧挂载，不覆盖历史版本。 | 指定 scope 在评估时间只能得到可解释挂载集合。 |
+| 准入拒绝异常升高 | 拒绝率、拒绝原因或外部决策拒绝数量超过灰度阈值。 | 暂停灰度、切回旧挂载或转人工复核。 | 拒绝无 route、posting、LedgerEntry 和余额副作用；拒绝原因可查询。 |
+| 控制投影缺证据 | `controlScopeId + periodId` 查询缺 LIMIT 或历史控制流水不闭合。 | 阻断自动授权，要求补调额证据或人工处理。 | 指定控制窗口可以重建 limit、occupied、consumed、available 控制口径。 |
+| 滚动窗口查询慢或超阈值 | evaluator 查询耗时、扫描范围或 H2 / 生产索引评审失败。 | 关闭该滚动窗口规则或限制灰度范围。 | 只读评估不写资金事实；恢复前完成索引、容量和慢查询评审。 |
+| 生产迁移或回填失败 | dry-run、批次校验、摘要校验或回填差异失败。 | 停止批次、保留游标和差异样本，不推进生产启用。 | 回填范围、影响行数、差异报告、回滚或前滚方案可审计。 |
+
 ## 15. 工程进入门禁
 
 进入编码必须按单一工程边界推进，并明确：
@@ -883,6 +918,17 @@ SR-HN-002 工程交接卡：
 | targetTests | 目标测试类、相邻回归和边界测试。 |
 | moneyInvariant | 拒绝无资金事实副作用；规则和预算控制不入账；历史解释不重算。 |
 | verification | 至少执行目标测试、compile、pmd 和 git diff --check；文档-only 切片只需结构检查和 git diff --check。 |
+
+### 15.1 研发计划与验收方式
+
+Spend Rule 后续研发计划按单一工程边界推进，不把本分册中的生产缺口合并成一次性大任务。每个里程碑进入编码前都必须重新确认负责人、写入范围、目标测试和停止条件。
+
+| 里程碑 | 负责人 | 验收方式 |
+| --- | --- | --- |
+| 服务层能力维护 | wallet owner、测试 owner | 目标服务测试和 `just verify-slice` 证明规则定义、挂载、决策、控制流水和投影仍满足无资金事实副作用。 |
+| 生产准入审计与 Runbook | 架构 owner、SRE、安全、运营 | 规则变更审计、告警信号、止血动作、恢复验收、灰度和回滚方案经过生产变更评审。 |
+| 生产迁移或历史回填 | 架构 owner、DBA、SRE、研发 owner | DDL / 索引、dry-run、批次校验、差异报告、回滚或前滚方案和审计证据齐备。 |
+| 外部规则生产适用性 | 产品 owner、法务、合规、通道、财务 | 外部规则来源、版本、生效日期、适用法域、核验日期和确认方齐备；未确认时不得自动放行。 |
 
 ## 16. 参考资料
 

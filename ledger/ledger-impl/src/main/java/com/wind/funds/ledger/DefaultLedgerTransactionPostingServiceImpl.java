@@ -20,6 +20,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -74,6 +76,10 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         Map<FundsAccountId, LedgerBalanceProjectionService> projectionServices = resolveProjectionServices(groups);
         LedgerTransactionPostResult postResult = ledgerTransactionService.postLedgerTransaction(transaction);
         if (!postResult.isNewlyPosted()) {
+            log.info("账本交易已存在，跳过重复入账和余额投影，ledgerTransactionSn={}, fundsTransactionSn={}, "
+                            + "businessScene={}, businessSn={}",
+                    transaction.getSn(), transaction.getFundsTransactionSn(), transaction.getBusinessScene(),
+                    transaction.getBusinessSn());
             return;
         }
         for (Map.Entry<FundsAccountId, List<LedgerEntrySpec>> entry : groups.entrySet()) {
@@ -81,6 +87,26 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
             List<LedgerEntrySpec> entries = entry.getValue();
             projectionServices.get(accountId).project(entries);
         }
+        logAfterCommit(() -> log.info("账本交易入账完成，ledgerTransactionSn={}, fundsTransactionSn={}, eventType={}, "
+                        + "businessScene={}, businessSn={}, amount={}, currency={}, postingPlanCount={}, subjectCount={}",
+                transaction.getSn(), transaction.getFundsTransactionSn(), transaction.getEventType(),
+                transaction.getBusinessScene(), transaction.getBusinessSn(), transaction.getAmount().getAmount(),
+                transaction.getCurrency(), transaction.getPostingPlans().size(), groups.size()));
+    }
+
+    private void logAfterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()
+                || !TransactionSynchronizationManager.isActualTransactionActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
     private void assertTransactionPostable(LedgerTransactionSpec transaction) {
