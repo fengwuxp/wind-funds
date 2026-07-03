@@ -382,7 +382,7 @@ flowchart LR
 
 | 准入项 | 进入编码前要求 | 未满足时处理 |
 | --- | --- | --- |
-| 账户层级策略 | 明确是否新增或调整父账户、子账户、rootAccount、accountPurpose、层级版本、账目 profile、账本初始化、SubjectRef 兼容、H2/DDL、摘要、fixture、route snapshot、`PostingRole` 和回放断言；默认恢复入口为 `B2-ACCOUNT-HIERARCHY-CAD-001`。 | 不允许声明 VCC 预付卡、共享卡或发卡账户生产可用；只能保留设计或 contract-only。 |
+| 账户层级策略 | 明确是否新增或调整父账户、子账户、rootAccount、accountPurpose、层级版本、账目 profile、账本初始化、SubjectRef 兼容、H2/DDL、摘要、fixture、route snapshot、`PostingRole` 和回放断言；默认恢复到“账户层级策略”专项工程边界。 | 不允许声明 VCC 预付卡、共享卡或发卡账户生产可用；只能保留设计或 contract-only。 |
 | 资金责任字段策略 | 明确子账户背后的父账户、资金责任来源如何迁移到 `targetSubjectType + targetSubjectId` 并同步 DTO、DDL/H2、摘要、fixture、route snapshot 和回放断言。 | 未完成目标主体迁移前，不允许声明 VCC 子账户背后的父账户、平台角色或多责任主体生产可用。 |
 | 支付工具授权入口 | 明确 facade 名称、入参、错误类别、幂等键、委派账户主体型授权内核的边界。 | 只能 contract-only，不改授权内核公共请求。 |
 | 敏感字段边界 | 完整 PAN、CVV、CVC、token secret、密钥、完整磁道和完整外部账户号 must-fail 或脱敏阻断。 | 不进入沙箱闭环和生产资金流。 |
