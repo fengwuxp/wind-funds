@@ -537,7 +537,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setRuleSpec("{\"dslCaseId\":\"DSL-SPEND-RULE-DECISION-CONSUME-AUTH-001\"}")
                 .setRuleDigest(SPEND_RULE_DIGEST)
                 .setOperatorId("codex")
-                .setAuditReferenceSn("grant:GSD2-B5-SPEND-RULE-DECISION-CONSUME-001")
+                .setAuditReferenceSn("grant:SPEND-RULE-DECISION-CONSUME")
                 .setDescription("发布支付工具授权准入规则版本");
     }
 

@@ -188,7 +188,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
                 .setRuleSpec("{\"window\":\"DAILY\",\"amount\":10000,\"currency\":\"USD\"}")
                 .setRuleDigest(RULE_DIGEST)
                 .setOperatorId("codex")
-                .setAuditReferenceSn("grant:GSD2-SR-COMPAT-FACADE-DELEGATION-001")
+                .setAuditReferenceSn("grant:SPEND-RULE-COMPAT-FACADE-DELEGATION")
                 .setDescription("发布 Spend Rule 版本");
     }
 

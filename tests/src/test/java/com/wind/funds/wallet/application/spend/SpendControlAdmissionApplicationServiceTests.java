@@ -429,7 +429,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setRuleSpec("{\"dslCaseId\":\"DSL-SPEND-RULE-DECISION-CONSUME-001\"}")
                 .setRuleDigest(SPEND_RULE_DIGEST)
                 .setOperatorId("codex")
-                .setAuditReferenceSn("grant:GSD2-B5-SPEND-RULE-DECISION-CONSUME-001")
+                .setAuditReferenceSn("grant:SPEND-RULE-DECISION-CONSUME")
                 .setDescription("发布支出控制准入消费规则版本");
     }
 

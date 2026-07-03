@@ -337,7 +337,7 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 .setRuleSpec(ruleSpec)
                 .setRuleDigest(ruleDigest)
                 .setOperatorId("codex")
-                .setAuditReferenceSn("grant:GSD2-SR-DEFINITION-VERSION-ASSIGNMENT-SERVICE-SPLIT-001")
+                .setAuditReferenceSn("grant:SPEND-RULE-DEFINITION-VERSION-ASSIGNMENT-SERVICE-SPLIT")
                 .setDescription("发布 Spend Rule 版本");
     }
 
