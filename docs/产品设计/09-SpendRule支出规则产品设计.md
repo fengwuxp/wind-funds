@@ -377,22 +377,22 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 | 灰度与回滚 | 规则变更通过新增版本、停用挂载或恢复旧挂载回滚，不覆盖已发布版本和历史决策；灰度范围、暂停条件和回滚 owner 明确。 | 不允许原地改写已发布规则版本或删除历史决策 / 控制流水。 |
 | 生产迁移 | DDL、索引、历史数据回填和权限模型必须有独立工程边界、dry-run、校验、回滚和审计。 | 迁移未确认前，不声明生产 DDL 或历史数据生产可用。 |
 
-### 12.2 Highnote Spend Controls 对齐后的任务计划
+### 12.2 Highnote Spend Controls 对齐后的能力边界
 
-本计划只承接 Highnote Spend Rules、Velocity Controls 和 Collaborative Authorization 对齐后的差距，不代表已授权实现完整托管式规则平台。当前基线继续定位为“规则事实、决策证据、控制额度流水和只读投影”，后续按单一工程边界逐片推进。
+本节只承接 Highnote Spend Rules、Velocity Controls 和 Collaborative Authorization 对齐后的稳定能力边界，不代表已实现或授权完整托管式规则平台。当前基线继续定位为“规则事实、决策证据、控制额度流水和只读投影”，后续新增能力必须按单一工程边界评审。
 
-| 任务ID | 目标 | Owner | 最小交付 | 验证方式 | 停止条件 |
+| 能力项 | 目标 | Owner | 最小交付 | 验证方式 | 停止条件 |
 | --- | --- | --- | --- | --- | --- |
-| SR-HN-001 | 明确对外接入口径：当前先支持上游已决策的 Spend Rule 证据和控制额度事实，不声明托管式规则引擎。 | 产品 owner、架构 owner。 | 用户接入指南、TDD 入口和系分入口同步说明“上游决策、wallet 固化证据、transaction 消费快照”。 | 文档 diff、现有 Spend Rule 服务层测试清单可反查。 | 发现需要新增公共 API、DTO 字段或 DDL 时停止，转工程边界评审。 |
-| SR-HN-002 | 补最小可执行规则切片，只覆盖单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果。 | 架构 owner、wallet owner、测试 owner。 | 规则执行只作为可选轻量 evaluator，不引入表达式引擎、脚本沙箱或运营后台。 | 新增最小 TDD：超单笔拒绝、周期超额拒绝、次数超限拒绝、MCC / 商户国家 / 卡数据输入能力 / 卡交易处理类型 / 商户标识 / PAN 录入方式 / POS 类别 / CVV 必填 / 邮编校验结果拒绝和拒绝无资金事实副作用。 | 需要多规则复杂冲突、脚本、外部风控、街道地址原文或卡组织正式规则时停止。 |
-| SR-HN-003 | 将 velocity control 收敛为控制窗口模型，不复用账本周期，不新增预算组账本。 | 产品 owner、架构 owner、wallet owner。 | 明确 `windowType`、`periodId`、时区和重置口径，复用 `SpendControlMovement` 和预算控制投影。 | 控制窗口 TDD 证明当前周期和历史周期可查询，跨周期、跨账户、跨 scope 不串账。 | 需要 rolling amount、cooldown 或生产调度重置时停止，拆独立任务。 |
-| SR-HN-004 | 评估协同授权接入边界，只定义本系统消费外部 approve / decline 证据的契约。 | 产品 owner、风控 owner、架构 owner。 | 保持 `SpendControlAdmissionApplicationService` 消费外部决策证据；不内建 webhook 注册、验签、超时和 stand-in。 | 准入测试证明外部拒绝无 route、posting、LedgerEntry，外部通过仍需账户能力和资金责任校验。 | 一旦要做 webhook endpoint、HMAC、超时兜底或模拟工具，转外部接入工程边界。 |
-| SR-HN-005 | 多规则裁决证据升级评审。 | 产品 owner、架构 owner、测试 owner。 | 评估 `evaluatedRules`、`decisionPolicy`、`finalDecision` 是否进入公共契约或仅保留在内部解释 payload。 | 先补契约评审和 TDD Red，不直接改公共 DTO。 | 涉及公共契约破坏性变更、数据迁移或历史决策回填时停止。 |
-| SR-HN-006 | 明确 Highnote 对象到 wind-funds 挂载范围的映射。 | 产品 owner、架构 owner、测试 owner。 | `payment card -> PAYMENT_INSTRUMENT`；`financial account -> FUNDING_ACCOUNT / CREDIT_ACCOUNT`；`authorized user / cardholder / 员工 / 账户层级 -> ACCOUNT_HIERARCHY`；`card product -> BUSINESS_SCENE`。 | `SpendRuleDefinitionServiceTests` 证明多 scope 挂载、查询和解释均无资金事实副作用。 | 需要新增卡产品主数据、授权用户主数据、DDL 或把 scope 作为账本主体时停止。 |
-| SR-HN-007 | 补齐币种控制和本地授权时间窗口控制 evaluator。 | 架构 owner、wallet owner、测试 owner。 | `currencyControl` 使用请求币种做黑白名单判断；`timeWindowControl` 使用调用方已归一化的授权本地时间做允许窗口判断。 | `SpendRuleEvaluationApplicationServiceTests` 覆盖币种拒绝、币种通过、时间窗口拒绝、窗口起点通过和拒绝 / 通过均无资金事实副作用。 | 需要时区换算、节假日、生产调度、复杂组合规则、DDL 或公共契约破坏性变更时停止。 |
-| SR-HN-008 | 补齐滚动窗口次数 velocity evaluator。 | 架构 owner、wallet owner、测试 owner。 | `counterSpec.windowMode=ROLLING` + `windowSizeMinutes` + `limitSpec.countLimit.maxCount`，按请求 `authorizationTime` 锚定窗口，复用既有 `SpendControlMovement` 事实计数；该能力只做只读候选评估，不承诺并发强一致授权拦截。 | `SpendRuleEvaluationApplicationServiceTests` 覆盖窗口内次数超限拒绝、窗口外历史流水不误拒绝，且拒绝 / 通过均无资金事实副作用。 | 需要 rolling amount、cooldown、专门窗口聚合表、生产调度、强一致频控拦截、复杂组合规则、生产 DDL / 索引校验或公共契约破坏性变更时停止。 |
+| 接入口径 | 明确对外接入口径：当前先支持上游已决策的 Spend Rule 证据和控制额度事实，不声明托管式规则引擎。 | 产品 owner、架构 owner。 | 用户接入指南、TDD 入口和系分入口同步说明“上游决策、wallet 固化证据、transaction 消费快照”。 | 文档 diff、现有 Spend Rule 服务层测试清单可反查。 | 发现需要新增公共 API、DTO 字段或 DDL 时停止，转工程边界评审。 |
+| 轻量规则评估 | 补最小可执行规则切片，只覆盖单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果。 | 架构 owner、wallet owner、测试 owner。 | 规则执行只作为可选轻量 evaluator，不引入表达式引擎、脚本沙箱或运营后台。 | 新增最小 TDD：超单笔拒绝、周期超额拒绝、次数超限拒绝、MCC / 商户国家 / 卡数据输入能力 / 卡交易处理类型 / 商户标识 / PAN 录入方式 / POS 类别 / CVV 必填 / 邮编校验结果拒绝和拒绝无资金事实副作用。 | 需要多规则复杂冲突、脚本、外部风控、街道地址原文或卡组织正式规则时停止。 |
+| 控制窗口模型 | 将 velocity control 收敛为控制窗口模型，不复用账本周期，不新增预算组账本。 | 产品 owner、架构 owner、wallet owner。 | 明确 `windowType`、`periodId`、时区和重置口径，复用 `SpendControlMovement` 和预算控制投影。 | 控制窗口 TDD 证明当前周期和历史周期可查询，跨周期、跨账户、跨 scope 不串账。 | 需要 rolling amount、cooldown 或生产调度重置时停止，拆独立任务。 |
+| 外部决策证据 | 评估协同授权接入边界，只定义本系统消费外部 approve / decline 证据的契约。 | 产品 owner、风控 owner、架构 owner。 | 保持 `SpendControlAdmissionApplicationService` 消费外部决策证据；不内建 webhook 注册、验签、超时和 stand-in。 | 准入测试证明外部拒绝无 route、posting、LedgerEntry，外部通过仍需账户能力和资金责任校验。 | 一旦要做 webhook endpoint、HMAC、超时兜底或模拟工具，转外部接入工程边界。 |
+| 多规则裁决证据 | 多规则裁决证据升级评审。 | 产品 owner、架构 owner、测试 owner。 | 评估 `evaluatedRules`、`decisionPolicy`、`finalDecision` 是否进入公共契约或仅保留在内部解释 payload。 | 先补契约评审和 TDD Red，不直接改公共 DTO。 | 涉及公共契约破坏性变更、数据迁移或历史决策回填时停止。 |
+| 挂载范围映射 | 明确 Highnote 对象到 wind-funds 挂载范围的映射。 | 产品 owner、架构 owner、测试 owner。 | `payment card -> PAYMENT_INSTRUMENT`；`financial account -> FUNDING_ACCOUNT / CREDIT_ACCOUNT`；`authorized user / cardholder / 员工 / 账户层级 -> ACCOUNT_HIERARCHY`；`card product -> BUSINESS_SCENE`。 | `SpendRuleDefinitionServiceTests` 证明多 scope 挂载、查询和解释均无资金事实副作用。 | 需要新增卡产品主数据、授权用户主数据、DDL 或把 scope 作为账本主体时停止。 |
+| 币种和本地授权时间窗口 | 补齐币种控制和本地授权时间窗口控制 evaluator。 | 架构 owner、wallet owner、测试 owner。 | `currencyControl` 使用请求币种做黑白名单判断；`timeWindowControl` 使用调用方已归一化的授权本地时间做允许窗口判断。 | `SpendRuleEvaluationApplicationServiceTests` 覆盖币种拒绝、币种通过、时间窗口拒绝、窗口起点通过和拒绝 / 通过均无资金事实副作用。 | 需要时区换算、节假日、生产调度、复杂组合规则、DDL 或公共契约破坏性变更时停止。 |
+| 滚动窗口次数 | 补齐滚动窗口次数 velocity evaluator。 | 架构 owner、wallet owner、测试 owner。 | `counterSpec.windowMode=ROLLING` + `windowSizeMinutes` + `limitSpec.countLimit.maxCount`，按请求 `authorizationTime` 锚定窗口，复用既有 `SpendControlMovement` 事实计数；该能力只做只读候选评估，不承诺并发强一致授权拦截。 | `SpendRuleEvaluationApplicationServiceTests` 覆盖窗口内次数超限拒绝、窗口外历史流水不误拒绝，且拒绝 / 通过均无资金事实副作用。 | 需要 rolling amount、cooldown、专门窗口聚合表、生产调度、强一致频控拦截、复杂组合规则、生产 DDL / 索引校验或公共契约破坏性变更时停止。 |
 
-SR-HN-002 当前推进边界与已落地切片：
+轻量规则评估当前边界与已落地能力：
 
 1. 最小 evaluator 只输出规则评估结论，不写 Spend Rule 决策记录、控制额度变动流水、资金交易、route、posting、LedgerEntry 或账本投影。
 2. `SpendControlAdmissionApplicationService` 继续保持“消费上游决策证据并固化控制事实”的现有职责，不扩展为规则执行入口。
@@ -401,7 +401,7 @@ SR-HN-002 当前推进边界与已落地切片：
 5. `merchantCategoryControl.deniedMccCodes` / `allowedMccCodes`、`merchantCountryControl.deniedCountryCodes` / `allowedCountryCodes`、`cardDataInputCapabilityControl.deniedCardDataInputCapabilities` / `allowedCardDataInputCapabilities`、`cardTransactionProcessingTypeControl.deniedCardTransactionProcessingTypes` / `allowedCardTransactionProcessingTypes`、`merchantIdControl.deniedMerchantIds` / `allowedMerchantIds`、`panEntryModeControl.deniedPanEntryModes` / `allowedPanEntryModes`、`pointOfServiceCategoryControl.deniedPointOfServiceCategories` / `allowedPointOfServiceCategories` 和 `postalCodeVerificationControl.deniedVerificationResults` / `allowedVerificationResults` 缺省时按空集合处理；黑名单命中优先拒绝，白名单非空且未命中时拒绝。CVV 必填规则只接收 `cvvProvided` 布尔事实，AVS 邮编校验只接收 `MATCH` / `NO_MATCH` 等校验结果事实，不接收或保存 CVV、邮编或街道地址原文。
 6. 若发现需要新增数据库字段、规则运营后台、外部风控协议、协同授权 webhook、rolling amount、cooldown、强一致频控拦截、生产 DDL / 索引校验或复杂多规则裁决，应停止当前最小 evaluator，拆成独立工程边界。
 
-当前进度：SR-HN-001 文档口径已同步；SR-HN-002 已落地单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果 evaluator 代码切片；SR-HN-003 已补控制窗口 TDD 锚点，当前以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，证明跨周期、跨账户、跨控制范围不串账，且准入 / 授权公共契约已补齐 `controlScopeId` 目标字段并保留 `budgetGroupSn` 兼容映射；SR-HN-004 已补外部 approve / decline 决策证据准入 TDD 锚点，确认外部拒绝无资金事实副作用，外部通过仍不得绕过支付工具、账户能力和资金责任校验；SR-HN-005 已完成公共契约评审，当前只消费最终决策流水、结果、摘要和拒绝原因，不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段；SR-HN-006 已补 `ACCOUNT_HIERARCHY` 挂载范围和服务层 TDD，明确 Highnote 对象只映射为控制 scope，不成为资金主体或账本主体；SR-HN-007 已补币种控制和本地授权时间窗口 evaluator TDD，明确时间由调用方按业务或规则时区归一化后传入；SR-HN-008 已补滚动窗口次数 evaluator TDD，明确以请求授权时间锚定窗口，只读既有控制流水，不提供并发强一致频控拦截。后续仍不在 SR-HN-002 至 SR-HN-008 范围内扩展规则引擎、时区换算、节假日、rolling amount、cooldown、生产调度、强一致频控拦截、webhook、外部风控协议、多规则明细落库、授权用户主数据或卡产品主数据。
+当前能力：接入口径已同步为“上游决策、wallet 固化证据、transaction 消费快照”；轻量 evaluator 已落地单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果代码切片；控制窗口以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，证明跨周期、跨账户、跨控制范围不串账，且准入 / 授权公共契约已补齐 `controlScopeId` 目标字段并保留 `budgetGroupSn` 兼容映射；外部 approve / decline 决策证据准入已确认外部拒绝无资金事实副作用，外部通过仍不得绕过支付工具、账户能力和资金责任校验；多规则裁决当前只消费最终决策流水、结果、摘要和拒绝原因，不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段；挂载范围已支持 `ACCOUNT_HIERARCHY` 并明确 Highnote 对象只映射为控制 scope，不成为资金主体或账本主体；币种控制和本地授权时间窗口 evaluator 已明确时间由调用方按业务或规则时区归一化后传入；滚动窗口次数 evaluator 以请求授权时间锚定窗口，只读既有控制流水，不提供并发强一致频控拦截。后续仍不扩展规则引擎、时区换算、节假日、rolling amount、cooldown、生产调度、强一致频控拦截、webhook、外部风控协议、多规则明细落库、授权用户主数据或卡产品主数据。
 
 ## 13. 产品到架构和 TDD 交接
 

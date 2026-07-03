@@ -1269,7 +1269,7 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 .setRuleSpec(ruleSpec)
                 .setRuleDigest(ruleDigest)
                 .setOperatorId("codex")
-                .setAuditReferenceSn("grant:SR-HN-002-SPEND-RULE-LIGHTWEIGHT-EVALUATOR")
+                .setAuditReferenceSn("grant:SPEND-RULE-LIGHTWEIGHT-EVALUATOR")
                 .setDescription("发布单笔限额规则版本"));
     }
 
@@ -1371,7 +1371,7 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                 PERIOD_ID,
                 "PERIOD_LIMIT_TEST",
                 "codex",
-                "grant:SR-HN-002-SPEND-RULE-LIGHTWEIGHT-EVALUATOR",
+                "grant:SPEND-RULE-LIGHTWEIGHT-EVALUATOR",
                 "sha256:movement-" + movementSn);
     }
 
