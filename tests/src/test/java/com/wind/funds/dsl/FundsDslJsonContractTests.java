@@ -1027,7 +1027,7 @@ class FundsDslJsonContractTests {
     }
 
     /**
-     * 场景：JSON 样例把预算组写成账本 route leg 节点。
+     * 场景：JSON 样例把预算组写成账本 route leg 节点主体类型。
      * 预期：JSON 契约校验显式失败。
      * 红线：预算组只能作为控制范围和控制投影视图，不能成为账本 route node。
      */
@@ -1069,16 +1069,17 @@ class FundsDslJsonContractTests {
 
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("RouteLeg sourceNode must be FUNDING_ACCOUNT or CREDIT_ACCOUNT");
+                .hasMessageContaining("expectedRoute.legs.sourceNode.subjectType")
+                .hasMessageContaining("FundsSubjectType");
     }
 
     /**
-     * 场景：VCC route participant 只声明预算组类型，缺少稳定主体标识。
+     * 场景：VCC route participant 把预算组声明为主体类型。
      * 预期：JSON 契约校验显式失败。
-     * 红线：预算组可作为迁移期控制参与方快照，但不能缺失可追溯主体 ID。
+     * 红线：预算组只能作为支出控制范围，不能成为 route participant 资金主体。
      */
     @Test
-    void testJsonContractVerifierShouldRejectBudgetGroupRouteParticipantWithoutSubjectId() {
+    void testJsonContractVerifierShouldRejectBudgetGroupRouteParticipantSubjectType() {
         JSONObject document = JSON.parseObject("""
                 {
                   "caseId": "DSL-INVALID-VCC-ROUTE-BUDGET-PARTICIPANT-001",
@@ -1102,7 +1103,8 @@ class FundsDslJsonContractTests {
 
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("expectedRoute.participants.subjectRef.subjectId");
+                .hasMessageContaining("expectedRoute.participants.subjectRef.subjectType")
+                .hasMessageContaining("FundsSubjectType");
     }
 
     /**
@@ -1236,8 +1238,8 @@ class FundsDslJsonContractTests {
                       "fundingAllocations": [{
                         "allocationId": "alloc_vcc_budget_001",
                         "subjectRef": {
-                          "subjectType": "BUDGET_GROUP",
-                          "subjectId": "bg_vcc_001"
+                          "subjectType": "CREDIT_ACCOUNT",
+                          "subjectId": "ca_vcc_001"
                         },
                         "ledgerSubjectCode": "AUTHORIZATION",
                         "amount": { "currency": "USD", "amount": 100 },
@@ -1258,7 +1260,7 @@ class FundsDslJsonContractTests {
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("accountHierarchySnapshot.accountRef.subjectType")
-                .hasMessageContaining("FUNDING_ACCOUNT or CREDIT_ACCOUNT");
+                .hasMessageContaining("FundsSubjectType");
     }
 
     /**

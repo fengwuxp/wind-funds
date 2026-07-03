@@ -103,8 +103,7 @@ class FundsModuleDependencyBoundaryTests {
             "governance/governance-face/src/main/java",
             "governance/governance-impl/src/main/java",
             "tests/src/test/java",
-            "docs",
-            "openspec");
+            "docs");
 
     private static final List<String> FUNDS_JAVA_PACKAGE_SCAN_PATHS = List.of(
             "core/src/main/java",

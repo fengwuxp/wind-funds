@@ -370,8 +370,8 @@ flowchart LR
 
 | 切片 | 目标 | 首批准入问题 | 允许落地点 | 不混入 |
 | --- | --- | --- | --- | --- |
-| A0 契约冻结 | 冻结 VCC 接入 DTO 语义、子账户/父账户语义、幂等键、requestDigest、敏感字段、错误类别和外部引用。 | VCC 输入是否都能映射为安全引用、资金子账户/信用子账户、父账户、支付工具、资金责任、授权或清算动作。 | PRD、DSL、系分、TDD、OpenSpec、接口伪契约。 | 生产代码、DDL、真实资金写入。 |
-| B2-ACCOUNT-HIERARCHY | 资金账户/信用账户父子结构和 VCC 关联子账户建模。 | 是否允许新增或调整父账户、子账户、accountPurpose、账目 profile、账本初始化、H2/DDL 和兼容迁移。 | DSL、系分、TDD、OpenSpec、接口伪契约；代码需独立工程边界授权。 | 卡生命周期、issuer 协议、支付工具交易内核、`VCC_ACCOUNT` 主体类型。 |
+| A0 契约冻结 | 冻结 VCC 接入 DTO 语义、子账户/父账户语义、幂等键、requestDigest、敏感字段、错误类别和外部引用。 | VCC 输入是否都能映射为安全引用、资金子账户/信用子账户、父账户、支付工具、资金责任、授权或清算动作。 | PRD、DSL、系分、TDD、任务基线和接口伪契约。 | 生产代码、DDL、真实资金写入。 |
+| B2-ACCOUNT-HIERARCHY | 资金账户/信用账户父子结构和 VCC 关联子账户建模。 | 是否允许新增或调整父账户、子账户、accountPurpose、账目 profile、账本初始化、H2/DDL 和兼容迁移。 | DSL、系分、TDD、任务基线和接口伪契约；代码需独立工程边界授权。 | 卡生命周期、issuer 协议、支付工具交易内核、`VCC_ACCOUNT` 主体类型。 |
 | B2-PI-CAP | 支付工具能力准入。 | 工具状态、方向、币种、动作能力、绑定版本和敏感字段是否可判定。 | wallet application facade、DTO、契约测试。 | 授权状态机、Spend Rule 表、清结算。 |
 | B2-FR | 资金责任目标主体解析。 | 子账户、父账户和背后资金责任来源是否用 `targetSubjectType + targetSubjectId` 或等价主体引用表达。 | 资金责任关系契约、route snapshot、TDD fixture。 | 字段策略混用、直接交易、清结算、P2 轨道协议。 |
 | B4-AUTH-PI | 支付工具授权入口。 | `authorizeByInstrument` 是否只做 application facade 并委派账户主体型内核。 | 授权准入 facade、委派适配、拒绝无副作用测试。 | 替换授权内核 canonical 请求、完整 VCC 发卡。 |
