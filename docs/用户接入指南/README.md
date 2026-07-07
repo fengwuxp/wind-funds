@@ -46,7 +46,7 @@
 
 | 项 | 必填内容 |
 | --- | --- |
-| 业务动作 | topup、transfer、pay、refund、withdraw、fee、authorize、reversal、settle、settleRefund、freeze、unfreeze、adjust、benefit settle/refund、external confirmed credit。 |
+| 业务动作 | topup、transfer、pay、refund、withdraw、fee、authorize、authorization reversal、settle、settleRefund、freeze、unfreeze、adjust、benefit settle/refund、external confirmed credit。 |
 | 资金主体 | 回答“谁的钱”：成本承担方、资金流出方、资金流入方、授权主体或冻结主体。 |
 | 账户类型 | FundingAccount、CreditAccount、平台账户角色解析结果；BudgetGroup、Spend Rule、PaymentInstrument 只能是控制或引用。 |
 | 金额币种 | 回答“多少钱”：金额必须为正，币种和精度必须能和账户、账本 profile 对齐。 |
@@ -224,7 +224,7 @@ flowchart LR
 | 外部入金只是 accepted、submitted、processing、message sent 或待匹配。 | 不可以。 | 停在上游入金单、在途、挂账、对账或人工复核。 | 外部引用、状态、文件摘要、匹配原因、待处理 owner。 | 不增加 `AVAILABLE`，不生成 `topup`。 |
 | 外部出款已终态成功，且可以关闭内部冻结资金。 | 可以。 | `InstrumentTransactionLifecycleApplicationService.payOutByRail`。 | 原冻结流水、外部出款流水、终态成功状态、rail、收款端引用、金额、币种、业务流水。 | 不把外部 submitted / accepted / processing 当成功。 |
 | 外部出款已提交、受理、处理中或 message sent。 | 不可以。 | 停在上游 payout order、在途、对账或差错链路。 | 出款单、外部状态、回单拉取计划、超时告警、处理 owner。 | 不关闭 `FROZEN`、`SETTLEMENT` 或 `IN_TRANSIT`，不生成 `withdraw`。 |
-| 退汇、return、NOC、reversal、金额不一致或费用不一致。 | 不可以直接进入默认交易入口。 | 进入对账差错、退汇专项或人工处理，明确责任后再生成资金事实。 | 原交易或原出款引用、外部原因、费用、责任方、审批或差错单。 | 不降级成普通 `refund`，不净额静默抵消。 |
+| 退汇、return、NOC、外部 rail reversal、金额不一致或费用不一致。 | 不可以直接进入默认交易入口。 | 进入对账差错、退汇专项或人工处理，明确责任后再生成资金事实。 | 原交易或原出款引用、外部原因、费用、责任方、审批或差错单。 | 不降级成普通 `refund`，不净额静默抵消。 |
 | 涉及跨币种、FX、汇兑损益或错币种到账。 | 默认不可以。 | 先由 FX / treasury 或差错链路确认。 | quoteRef、原币、目标币、汇率、有效期、执行结果、审批引用。 | 不自动换汇，不按期望币种静默入账。 |
 
 接入申请必须能回答四个问题：外部状态是否终态、内部账务主体是谁、金额币种是否可直接入账、失败或退回时由谁负责处理。回答不完整时，只能登记在途、差错或人工复核，不进入资金事实链路。
@@ -258,7 +258,7 @@ flowchart LR
 | 失败无副作用 | 准入失败、余额不足、规则拒绝、外部非终态和路由失败不得留下错误资金事实。 |
 | 账务验收 | 已验证 transaction、route、posting、ledger transaction、ledger entry、余额桶和投影查询。 |
 | 敏感数据 | 不在 request、contextVariables、日志或审计摘要中保存 PAN、CVV、密钥、证件号、手机号或外部账号原文。 |
-| P2 边界 | VCC、全球账户、ACH、收单、FX、退汇、NOC、reversal、多币种对账和通道协议未进入本轮交付承诺。 |
+| P2 边界 | VCC、全球账户、ACH、收单、FX、退汇、NOC、外部 rail reversal、多币种对账和通道协议未进入本轮交付承诺。 |
 
 ### 8.2 发布 Runbook
 

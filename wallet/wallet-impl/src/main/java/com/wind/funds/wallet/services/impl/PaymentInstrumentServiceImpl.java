@@ -106,6 +106,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         assertBindingValidityWindow(binding);
         paymentInstrumentBindingConcurrencyGuard.lockActiveDefaultBindingScope(binding);
         assertNoDuplicateActiveDefaultBinding(binding);
+        paymentInstrumentBindingConcurrencyGuard.lockActivePriorityBindingScope(binding);
         assertNoDuplicateActivePriorityBinding(binding);
         Long bindingId = paymentInstrumentBindingService.createPaymentInstrumentBinding(request);
         appendBindingHistory(null,
@@ -144,6 +145,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         assertBindingValidityWindow(after);
         paymentInstrumentBindingConcurrencyGuard.lockActiveDefaultBindingScope(after);
         assertNoDuplicateActiveDefaultBinding(after);
+        paymentInstrumentBindingConcurrencyGuard.lockActivePriorityBindingScope(after);
         assertNoDuplicateActivePriorityBinding(after);
         paymentInstrumentBindingService.updatePaymentInstrumentBinding(toUpdateRequest(before, after, request));
         appendBindingHistory(before,

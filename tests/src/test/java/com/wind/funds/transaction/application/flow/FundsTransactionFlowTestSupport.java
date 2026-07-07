@@ -94,7 +94,7 @@ import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultLedgerFactQueryService;
+import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
@@ -1331,7 +1331,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             LedgerTransactionServiceImpl.class,
             LedgerBalanceProjectionServiceImpl.class,
             DefaultLedgerTransactionPostingServiceImpl.class,
-            DefaultLedgerFactQueryService.class,
+            DefaultLedgerQueryService.class,
             DefaultFundsInstructionLifecycleSaver.class,
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,

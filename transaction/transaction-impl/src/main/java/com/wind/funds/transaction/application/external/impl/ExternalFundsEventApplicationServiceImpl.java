@@ -7,6 +7,7 @@ import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.transaction.application.ExternalFundsEventApplicationService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
+import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.model.request.ConsumeExternalFundsEventRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -78,7 +79,7 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
                 .setAccountId(request.getTargetAccountId())
                 .setFundsSourceAccountId(FundsAccountId.immutable(EXTERNAL_SOURCE_ACCOUNT_ID,
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(railDecision.transactionChannel())
+                .setChannel(FundsTransactionChannel.valueOf(railDecision.transactionChannelCode()))
                 .setChannelTransactionSn(request.getExternalEventSn())
                 .setChannelId(railDecision.externalRailCode())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
@@ -95,7 +96,7 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
         result.put("externalEventSn", request.getExternalEventSn());
         result.put("externalEventType", request.getExternalEventType());
         result.put("externalRailCode", railDecision.externalRailCode());
-        result.put("transactionChannel", railDecision.transactionChannel().name());
+        result.put("transactionChannel", railDecision.transactionChannelCode());
         putIfPresent(result, "originalTransactionSn", request.getOriginalTransactionSn());
         putIfPresent(result, "reconciliationDifferenceSn", request.getReconciliationDifferenceSn());
         return Map.copyOf(result);

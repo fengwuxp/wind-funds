@@ -639,7 +639,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     /**
      * 场景：两个外部请求并发把同一支付工具、绑定角色和币种创建为当前 ACTIVE 默认绑定。
      * 输入：两个不同绑定 SN、不同主体和不同 requestSn 同时提交，且绑定窗口重叠。
-     * 输出：只有一个默认绑定创建成功，另一个被默认唯一性拒绝；DB guard scope 只生成一行。
+     * 输出：只有一个默认绑定创建成功，另一个被默认唯一性拒绝；默认和优先级 guard scope 各生成一行。
      * 红线：并发下不得同时留下两个当前默认候选，也不得写入账本事实。
      */
     @Test
@@ -676,6 +676,50 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                     .singleElement()
                     .satisfies(result -> assertThat(result.message()).contains("默认支付工具绑定不唯一"));
             assertThat(defaults).singleElement();
+            assertThat(countRows("t_payment_instrument_binding_guard", "instrument_sn", PAYMENT_INSTRUMENT_SN))
+                    .isEqualTo(2);
+            assertLedgerFactsUnchanged(jdbcTemplate, before);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    /**
+     * 场景：两个外部请求并发把同一支付工具、绑定角色和币种创建为当前 ACTIVE 同优先级非默认绑定。
+     * 输入：两个不同绑定 SN、不同主体和不同 requestSn 同时提交，且绑定窗口和 priority 重叠。
+     * 输出：只有一个绑定创建成功，另一个被优先级唯一性拒绝；DB guard scope 只生成一行。
+     * 红线：并发下不得同时留下两个当前同优先级候选，也不得写入账本事实。
+     */
+    @Test
+    void testCreatePaymentInstrumentBindingShouldSerializeConcurrentPriorityCandidates() throws Exception {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<BindingAttemptResult> first = executor.submit(concurrentBindingAttempt(startGate,
+                    createBindingRequest().setDefaultBinding(Boolean.FALSE)));
+            Future<BindingAttemptResult> second = executor.submit(concurrentBindingAttempt(startGate,
+                    createPriorityConflictBindingRequest()));
+
+            startGate.countDown();
+
+            List<BindingAttemptResult> results = List.of(first.get(), second.get());
+            List<PaymentInstrumentBindingDTO> bindings = paymentInstrumentService.queryPaymentInstrumentBindings(
+                    new PaymentInstrumentBindingQuery()
+                            .setTenantId(TENANT_ID)
+                            .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                            .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                            .setCurrency(CurrencyIsoCode.USD)
+                            .setDefaultBinding(Boolean.FALSE)
+                            .setStatus(FundsAccountStatus.ACTIVE),
+                    DefaultPageQueryOptions.defaults(10)).getRecords();
+
+            assertThat(results).filteredOn(BindingAttemptResult::succeeded).hasSize(1);
+            assertThat(results).filteredOn(result -> !result.succeeded())
+                    .singleElement()
+                    .satisfies(result -> assertThat(result.message()).contains("支付工具绑定优先级冲突"));
+            assertThat(bindings).singleElement();
             assertThat(countRows("t_payment_instrument_binding_guard", "instrument_sn", PAYMENT_INSTRUMENT_SN))
                     .isOne();
             assertLedgerFactsUnchanged(jdbcTemplate, before);

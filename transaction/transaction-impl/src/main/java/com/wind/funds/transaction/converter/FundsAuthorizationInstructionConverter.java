@@ -23,7 +23,7 @@ import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
-import com.wind.funds.wallet.service.LedgerFactQueryService;
+import com.wind.funds.wallet.service.LedgerQueryService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,13 +49,13 @@ public class FundsAuthorizationInstructionConverter {
 
     private final FundsInstructionAmountSupport amountSupport;
 
-    private final LedgerFactQueryService ledgerFactQueryService;
+    private final LedgerQueryService ledgerQueryService;
 
     @Autowired
     public FundsAuthorizationInstructionConverter(@NonNull FundsAccountQueryService fundsAccountQueryService,
-                                                  @NonNull LedgerFactQueryService ledgerFactQueryService) {
+                                                  @NonNull LedgerQueryService ledgerQueryService) {
         this.amountSupport = new FundsInstructionAmountSupport(fundsAccountQueryService);
-        this.ledgerFactQueryService = ledgerFactQueryService;
+        this.ledgerQueryService = ledgerQueryService;
     }
 
     public @NonNull FundsInstructionSpec convertToAuthorizeInstruction(
@@ -268,10 +268,10 @@ public class FundsAuthorizationInstructionConverter {
     }
 
     private @NonNull String authorizationLedgerTransactionSn(@NonNull String authorizationTransactionSn) {
-        List<LedgerTransactionFactDTO> records = ledgerFactQueryService.queryLedgerTransactions(
+        List<LedgerTransactionFactDTO> records = ledgerQueryService.queryLedgerTransactions(
                 ThreadContextTenantIdHolder.requireTenantId(),
                 authorizationTransactionSn,
-                FundsTransactionEventType.AUTHORIZE,
+                FundsTransactionEventType.AUTHORIZE.name(),
                 2);
         AssertUtils.isTrue(records.size() == 1, "授权原账本交易不存在或不唯一，authorizationTransactionSn = {}",
                 authorizationTransactionSn);

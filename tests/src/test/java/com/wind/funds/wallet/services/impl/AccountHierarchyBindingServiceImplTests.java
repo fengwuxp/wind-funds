@@ -15,7 +15,13 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -33,7 +39,13 @@ class AccountHierarchyBindingServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String SUSPENDED_BINDING_SN = "account_hierarchy_binding_suspended_service";
 
+    private static final String CONCURRENT_ACTIVE_BINDING_SN = "account_hierarchy_binding_active_concurrent_a";
+
+    private static final String CONCURRENT_ACTIVE_BINDING_SN_2 = "account_hierarchy_binding_active_concurrent_b";
+
     private static final String ACTIVE_ACCOUNT_ID = "child_account_hierarchy_service";
+
+    private static final String CONCURRENT_ACTIVE_ACCOUNT_ID = "child_account_hierarchy_concurrent_service";
 
     private static final String SUSPENDED_ACCOUNT_ID = "suspended_child_account_hierarchy_service";
 
@@ -115,6 +127,40 @@ class AccountHierarchyBindingServiceImplTests extends AbstractFundsServiceTest {
         assertThat(countRows("t_ledger", "subject_id", SUSPENDED_ACCOUNT_ID)).isZero();
     }
 
+    /**
+     * 场景：两个请求并发为同一子账户创建当前 ACTIVE 层级绑定。
+     * 输入：同租户、同子账户、同主体类型，两个不同绑定 SN 同时提交，其中一个省略状态走 DB 默认 ACTIVE。
+     * 输出：只有一个 ACTIVE 绑定创建成功，另一个被当前态唯一性拒绝。
+     * 红线：账户层级快照不得在并发写入后退化为“最新 id 获胜”。
+     */
+    @Test
+    void testCreateAccountHierarchyBindingShouldSerializeConcurrentActiveBindings() throws Exception {
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<BindingAttemptResult> first = executor.submit(concurrentBindingAttempt(startGate,
+                    binding(CONCURRENT_ACTIVE_BINDING_SN,
+                            CONCURRENT_ACTIVE_ACCOUNT_ID,
+                            FundsAccountStatus.ACTIVE)));
+            Future<BindingAttemptResult> second = executor.submit(concurrentBindingAttempt(startGate,
+                    binding(CONCURRENT_ACTIVE_BINDING_SN_2,
+                            CONCURRENT_ACTIVE_ACCOUNT_ID,
+                            null)));
+
+            startGate.countDown();
+
+            List<BindingAttemptResult> results = List.of(first.get(), second.get());
+
+            assertThat(results).filteredOn(BindingAttemptResult::succeeded).hasSize(1);
+            assertThat(results).filteredOn(result -> !result.succeeded())
+                    .singleElement()
+                    .satisfies(result -> assertThat(result.message()).contains("账户层级绑定 ACTIVE 关系已存在"));
+            assertThat(countRows("t_account_hierarchy_binding", "account_id", CONCURRENT_ACTIVE_ACCOUNT_ID)).isOne();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private AccountHierarchyBindingDTO binding(String sn, String accountId, FundsAccountStatus status) {
         return new AccountHierarchyBindingDTO()
                 .setSn(sn)
@@ -137,8 +183,24 @@ class AccountHierarchyBindingServiceImplTests extends AbstractFundsServiceTest {
                 value);
     }
 
+    private Callable<BindingAttemptResult> concurrentBindingAttempt(CountDownLatch startGate,
+                                                                    AccountHierarchyBindingDTO binding) {
+        return () -> {
+            startGate.await();
+            try {
+                accountHierarchyBindingService.createAccountHierarchyBinding(binding);
+                return new BindingAttemptResult(true, null);
+            } catch (RuntimeException ex) {
+                return new BindingAttemptResult(false, ex.getMessage());
+            }
+        };
+    }
+
     @Configuration
     @Import(AccountHierarchyBindingServiceImpl.class)
     static class Config {
+    }
+
+    private record BindingAttemptResult(boolean succeeded, String message) {
     }
 }

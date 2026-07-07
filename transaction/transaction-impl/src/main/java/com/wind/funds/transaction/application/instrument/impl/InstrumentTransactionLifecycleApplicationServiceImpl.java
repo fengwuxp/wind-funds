@@ -7,6 +7,7 @@ import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
+import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
@@ -176,7 +177,8 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         return new FundsTransactionTopupRequest()
                 .setAccountId(snapshot.getTargetAccountId())
                 .setFundsSourceAccountId(request.getFundsSourceAccountId())
-                .setChannel(WalletExternalFundsRailSupport.resolveReceiveChannel(request.getChannelCode()))
+                .setChannel(FundsTransactionChannel.valueOf(
+                        WalletExternalFundsRailSupport.resolveReceiveChannelCode(request.getChannelCode())))
                 .setChannelTransactionSn(request.getChannelTransactionSn())
                 .setChannelId(request.getChannelId())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),

@@ -59,7 +59,7 @@ import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
-import com.wind.funds.wallet.services.impl.DefaultLedgerFactQueryService;
+import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
@@ -478,7 +478,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             DefaultFundsFrozenOrderLifecycleSaver.class,
             DelegatingFundsInstructionLifecycleRecorder.class,
             DefaultFundsTransactionQueryService.class,
-            DefaultLedgerFactQueryService.class,
+            DefaultLedgerQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
             AccountHierarchyBindingServiceImpl.class,

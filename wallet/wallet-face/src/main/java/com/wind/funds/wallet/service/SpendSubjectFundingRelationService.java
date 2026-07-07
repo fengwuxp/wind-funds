@@ -11,9 +11,9 @@ import org.jspecify.annotations.NonNull;
 /**
  * 支出主体资金关系服务。
  *
- * <p>职责：维护信用账户、预算组、支付工具等支出主体到真实 FundingAccount 的资金来源关系。</p>
+ * <p>职责：维护信用账户、预算组、支付工具等支出主体到资金责任目标主体的资金责任解析关系。</p>
  *
- * <p>边界：只维护关系，不直接执行扣款、不计算 Spend Rules、不生成账本分录。</p>
+ * <p>边界：只维护解析关系，不直接执行扣款、不计算 Spend Rules、不生成账本分录。</p>
  *
  * @author Codex
  * @date 2026-05-07
@@ -21,9 +21,9 @@ import org.jspecify.annotations.NonNull;
 public interface SpendSubjectFundingRelationService {
 
     /**
-     * 创建支出主体和真实资金账户关系。
+     * 创建支出主体和资金责任目标主体关系。
      *
-     * <p>能力范围：建立支出主体到 FundingAccount 的资金归属或扣款关系，供 RouteResolver 使用。</p>
+     * <p>能力范围：建立支出主体到资金责任目标主体的责任解析关系，供 RouteResolver 使用。</p>
      *
      * @param request 创建请求
      * @return 关系主键

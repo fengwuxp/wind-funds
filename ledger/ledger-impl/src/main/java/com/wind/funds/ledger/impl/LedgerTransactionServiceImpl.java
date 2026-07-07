@@ -44,6 +44,7 @@ import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -140,7 +141,15 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         if (existingResult != null) {
             return existingResult;
         }
-        ledgerTransactionMapper.insertSelective(entity);
+        try {
+            ledgerTransactionMapper.insertSelective(entity);
+        } catch (DuplicateKeyException exception) {
+            LedgerTransactionPostResult retryResult = resolveExistingLedgerTransaction(entity);
+            if (retryResult != null) {
+                return retryResult;
+            }
+            throw exception;
+        }
         AssertUtils.notNull(entity.getId(), "创建账户账本交易失败");
         for (LedgerPostingPlanSpec plan : transaction.getPostingPlans()) {
             String postingPlanSn = createPostingPlan(entity, plan);

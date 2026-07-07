@@ -37,6 +37,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -44,7 +49,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFa
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
- * 支出主体资金来源关系服务层边界测试。
+ * 支出主体资金责任解析关系服务层边界测试。
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
@@ -198,7 +203,7 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()))
-                .hasMessageContaining("资金账户不可作为资金来源");
+                .hasMessageContaining("资金账户不可作为资金责任目标主体");
 
         assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -211,16 +216,16 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
 
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
                 .setCurrency(CurrencyIsoCode.CNY)))
-                .hasMessageContaining("资金账户币种与资金来源关系币种不一致");
+                .hasMessageContaining("资金账户币种与资金责任解析关系币种不一致");
 
         assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
-     * 场景：运营创建资金来源关系时配置了倒置或空的生效窗口。
-     * 输入：validTo 早于或等于 validFrom 的 ACTIVE 资金来源关系。
-     * 输出：创建被拒绝，不留下资金来源候选。
+     * 场景：运营创建资金责任解析关系时配置了倒置或空的生效窗口。
+     * 输入：validTo 早于或等于 validFrom 的 ACTIVE 资金责任解析关系。
+     * 输出：创建被拒绝，不留下资金责任候选。
      * 红线：无效窗口不得进入 route 候选池，也不得写账或污染关系证据。
      */
     @Test
@@ -232,22 +237,22 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
                 .setValidFrom(now)
                 .setValidTo(now.minusSeconds(1))))
-                .hasMessageContaining("资金来源关系生效时间必须早于失效时间");
+                .hasMessageContaining("资金责任解析关系生效时间必须早于失效时间");
 
         assertThatThrownBy(() -> fundingRelationService.createSpendSubjectFundingRelation(createRelationRequest()
                 .setValidFrom(now)
                 .setValidTo(now)))
-                .hasMessageContaining("资金来源关系生效时间必须早于失效时间");
+                .hasMessageContaining("资金责任解析关系生效时间必须早于失效时间");
 
         assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
-     * 场景：运营创建资金来源关系时把外部账户号或通道密钥放入扩展上下文。
+     * 场景：运营创建资金责任解析关系时把外部账户号或通道密钥放入扩展上下文。
      * 输入：contextVariables 含嵌套 bankAccountNo 字段，或嵌套 secretKey 字段。
-     * 输出：创建被拒绝，不留下资金来源关系，也不改变资金账户账本或账务事实。
-     * 红线：资金来源关系不得成为外部账户号、PAN、CVV 或 token secret 的旁路存储。
+     * 输出：创建被拒绝，不留下资金责任解析关系，也不改变资金账户账本或账务事实。
+     * 红线：资金责任解析关系不得成为外部账户号、PAN、CVV 或 token secret 的旁路存储。
      */
     @Test
     void testCreateSpendSubjectFundingRelationShouldRejectSensitiveContextVariablesWithoutRelation() {
@@ -276,10 +281,10 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     /**
-     * 场景：同一支出主体已经存在一个可用默认资金来源后，再配置第二个默认资金来源。
+     * 场景：同一支出主体已经存在一个可用默认资金责任候选后，再配置第二个默认资金责任候选。
      * 输入：同租户、同支出主体、同币种、同关系类型，两个 ACTIVE 默认关系。
-     * 输出：第二个关系被拒绝，保持原有唯一默认资金来源。
-     * 红线：默认资金来源不唯一时不得为后续 route 留下随机选路候选，也不得写账。
+     * 输出：第二个关系被拒绝，保持原有唯一默认资金责任候选。
+     * 红线：默认资金责任候选不唯一时不得为后续 route 留下随机选路候选，也不得写账。
      */
     @Test
     void testCreateSpendSubjectFundingRelationShouldRejectDuplicateActiveDefaultRelation() {
@@ -293,17 +298,17 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 .setSn(DUPLICATE_DEFAULT_RELATION_SN)
                 .setFundingAccountId(SECOND_FUNDING_ACCOUNT_SN)
                 .setPriority(30)))
-                .hasMessageContaining("默认资金来源关系不唯一");
+                .hasMessageContaining("默认资金责任解析关系不唯一");
 
         assertThat(countRows("t_spend_subject_funding_rel", "sn", DUPLICATE_DEFAULT_RELATION_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
-     * 场景：同一支出主体已经存在一个可用资金来源优先级后，再配置同优先级资金来源。
+     * 场景：同一支出主体已经存在一个可用资金责任候选优先级后，再配置同优先级资金责任候选。
      * 输入：同租户、同支出主体、同币种、同关系类型，两个 ACTIVE 非默认关系使用相同 priority。
-     * 输出：第二个关系被拒绝，保持原有资金来源候选唯一可排序。
-     * 红线：资金来源优先级冲突时不得为后续 route 留下随机选路候选，也不得写账。
+     * 输出：第二个关系被拒绝，保持原有资金责任候选唯一可排序。
+     * 红线：资金责任候选优先级冲突时不得为后续 route 留下随机选路候选，也不得写账。
      */
     @Test
     void testCreateSpendSubjectFundingRelationShouldRejectDuplicateActivePriorityRelation() {
@@ -318,11 +323,58 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 .setSn(PRIORITY_CONFLICT_RELATION_SN)
                 .setFundingAccountId(SECOND_FUNDING_ACCOUNT_SN)
                 .setDefaultRelation(Boolean.FALSE)))
-                .hasMessageContaining("资金来源关系优先级冲突");
+                .hasMessageContaining("资金责任解析关系优先级冲突");
 
         assertThat(countRows("t_spend_subject_funding_rel", "sn", RELATION_SN)).isOne();
         assertThat(countRows("t_spend_subject_funding_rel", "sn", PRIORITY_CONFLICT_RELATION_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：两个运营请求并发为同一支出主体创建当前 ACTIVE 同优先级资金责任候选。
+     * 输入：两个不同关系 SN、不同目标资金账户、同租户 / 支出主体 / 币种 / 关系类型 / priority。
+     * 输出：只有一个候选创建成功，另一个被优先级唯一性拒绝。
+     * 红线：并发下不得同时留下两个当前同优先级候选，避免后续 route 随机选路。
+     */
+    @Test
+    void testCreateSpendSubjectFundingRelationShouldSerializeConcurrentPriorityCandidates() throws Exception {
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
+        fundingAccountService.createFundingAccount(createFundingAccountRequest()
+                .setSn(SECOND_FUNDING_ACCOUNT_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<RelationAttemptResult> first = executor.submit(concurrentRelationAttempt(startGate,
+                    createRelationRequest().setDefaultRelation(Boolean.FALSE)));
+            Future<RelationAttemptResult> second = executor.submit(concurrentRelationAttempt(startGate,
+                    createRelationRequest()
+                            .setSn(PRIORITY_CONFLICT_RELATION_SN)
+                            .setFundingAccountId(SECOND_FUNDING_ACCOUNT_SN)
+                            .setDefaultRelation(Boolean.FALSE)));
+
+            startGate.countDown();
+
+            List<RelationAttemptResult> results = List.of(first.get(), second.get());
+            List<SpendSubjectFundingRelationDTO> records = fundingRelationService.querySpendSubjectFundingRelations(
+                    new SpendSubjectFundingRelationQuery()
+                            .setTenantId(TENANT_ID)
+                            .setSpendSubjectId(SPEND_SUBJECT_ID)
+                            .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                            .setCurrency(CurrencyIsoCode.USD)
+                            .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                            .setStatus(FundsAccountStatus.ACTIVE),
+                    DefaultPageQueryOptions.defaults(10)).getRecords();
+
+            assertThat(results).filteredOn(RelationAttemptResult::succeeded).hasSize(1);
+            assertThat(results).filteredOn(result -> !result.succeeded())
+                    .singleElement()
+                    .satisfies(result -> assertThat(result.message()).contains("资金责任解析关系优先级冲突"));
+            assertThat(records).singleElement();
+            assertLedgerFactsUnchanged(jdbcTemplate, before);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     /**
@@ -407,10 +459,10 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     /**
-     * 场景：同一支出主体下存在过期、当前有效和未来生效的 ACTIVE 非默认资金来源。
+     * 场景：同一支出主体下存在过期、当前有效和未来生效的 ACTIVE 非默认资金责任候选。
      * 输入：三条关系都为 ACTIVE，但 validFrom/validTo 覆盖过去、当前和未来窗口。
-     * 输出：查询当前 ACTIVE 资金来源候选时只返回当前有效记录。
-     * 红线：已过期或未生效的资金来源关系不得进入 route 候选，避免后续交易随机或错误扣款。
+     * 输出：查询当前 ACTIVE 资金责任候选时只返回当前有效记录。
+     * 红线：已过期或未生效的资金责任解析关系不得进入 route 候选，避免后续交易随机或错误扣款。
      */
     @Test
     void testQuerySpendSubjectFundingRelationsShouldExcludeInactiveValidityWindowCandidates() {
@@ -454,9 +506,9 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
     }
 
     /**
-     * 场景：资金来源关系仍为 ACTIVE，但目标资金账户已被风控暂停。
+     * 场景：资金责任解析关系仍为 ACTIVE，但目标资金账户已被风控暂停。
      * 输入：先创建可用资金账户和 ACTIVE 关系，再将资金账户状态改为 SUSPENDED。
-     * 输出：查询当前 ACTIVE 资金来源候选时不返回该关系。
+     * 输出：查询当前 ACTIVE 资金责任候选时不返回该关系。
      * 红线：资金账户不可借记时不得进入 route 候选，也不得因为候选过滤写账或覆盖关系证据。
      */
     @Test
@@ -619,6 +671,20 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
                 .setTargetSubjectId(CREDIT_TARGET_SN);
     }
 
+    private Callable<RelationAttemptResult> concurrentRelationAttempt(
+            CountDownLatch startGate,
+            CreateSpendSubjectFundingRelationRequest request) {
+        return () -> {
+            startGate.await();
+            try {
+                fundingRelationService.createSpendSubjectFundingRelation(request);
+                return new RelationAttemptResult(true, null);
+            } catch (RuntimeException ex) {
+                return new RelationAttemptResult(false, ex.getMessage());
+            }
+        };
+    }
+
     private CreateSpendSubjectFundingRelationRequest createPriorityOrderRelationRequest() {
         return createRelationRequest()
                 .setSn(PRIORITY_ORDER_RELATION_SN)
@@ -665,5 +731,8 @@ class SpendSubjectFundingRelationServiceImplTests extends AbstractFundsServiceTe
             SpendSubjectFundingRelationServiceImpl.class
     })
     static class Config {
+    }
+
+    private record RelationAttemptResult(boolean succeeded, String message) {
     }
 }

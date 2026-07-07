@@ -16,7 +16,7 @@ import com.wind.funds.transaction.model.query.FundsBalanceAdjustmentAuditQuery;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.wallet.model.dto.LedgerEntryFactDTO;
 import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
-import com.wind.funds.wallet.service.LedgerFactQueryService;
+import com.wind.funds.wallet.service.LedgerQueryService;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -48,7 +48,7 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
-    private final LedgerFactQueryService ledgerFactQueryService;
+    private final LedgerQueryService ledgerQueryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -144,13 +144,13 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
     }
 
     private List<LedgerTransactionFactDTO> queryLedgerTransactions(Long tenantId, String transactionSn) {
-        return ledgerFactQueryService.queryLedgerTransactions(tenantId, transactionSn, null, AUDIT_QUERY_PAGE_SIZE);
+        return ledgerQueryService.queryLedgerTransactions(tenantId, transactionSn, null, AUDIT_QUERY_PAGE_SIZE);
     }
 
     private List<LedgerEntryFactDTO> queryLedgerEntries(Long tenantId,
                                                         List<LedgerTransactionFactDTO> ledgerTransactions) {
         return ledgerTransactions.stream()
-                .flatMap(ledgerTransaction -> ledgerFactQueryService.queryLedgerEntries(tenantId,
+                .flatMap(ledgerTransaction -> ledgerQueryService.queryLedgerEntries(tenantId,
                                 ledgerTransaction.getSn(),
                                 AUDIT_QUERY_PAGE_SIZE)
                         .stream())

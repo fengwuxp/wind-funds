@@ -12,7 +12,9 @@ import com.wind.funds.wallet.model.dto.AccountHierarchyBindingDTO;
 import com.wind.funds.wallet.service.AccountHierarchyBindingService;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -29,10 +31,20 @@ public class AccountHierarchyBindingServiceImpl implements AccountHierarchyBindi
     private final AccountHierarchyBindingMapper accountHierarchyBindingMapper;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public @NonNull Long createAccountHierarchyBinding(@NonNull AccountHierarchyBindingDTO binding) {
+        AssertUtils.isFalse(existsActiveAccountHierarchyBinding(binding),
+                "账户层级绑定 ACTIVE 关系已存在，accountType = {}, accountId = {}",
+                binding.getAccountType(),
+                binding.getAccountId());
         AccountHierarchyBinding entity =
                 AccountHierarchyBindingConverter.INSTANCE.convertToAccountHierarchyBinding(binding);
-        accountHierarchyBindingMapper.insertSelective(entity);
+        try {
+            accountHierarchyBindingMapper.insertSelective(entity);
+        } catch (DuplicateKeyException ex) {
+            assertNotActiveDuplicate(binding);
+            throw ex;
+        }
         AssertUtils.notNull(entity.getId(), "创建账户层级绑定失败");
         return entity.getId();
     }
@@ -56,7 +68,7 @@ public class AccountHierarchyBindingServiceImpl implements AccountHierarchyBindi
 
     @Override
     public boolean existsActiveAccountHierarchyBinding(@NonNull AccountHierarchyBindingDTO binding) {
-        if (binding.getStatus() != FundsAccountStatus.ACTIVE) {
+        if (effectiveStatus(binding) != FundsAccountStatus.ACTIVE) {
             return false;
         }
         AccountHierarchyBindingNameRefs ref = AccountHierarchyBindingNameRefs.accountHierarchyBinding;
@@ -67,5 +79,16 @@ public class AccountHierarchyBindingServiceImpl implements AccountHierarchyBindi
                 .and(ref.accountType.eq(binding.getAccountType()))
                 .and(ref.status.eq(FundsAccountStatus.ACTIVE));
         return !accountHierarchyBindingMapper.selectListByQuery(wrapper).isEmpty();
+    }
+
+    private FundsAccountStatus effectiveStatus(AccountHierarchyBindingDTO binding) {
+        return binding.getStatus() == null ? FundsAccountStatus.ACTIVE : binding.getStatus();
+    }
+
+    private void assertNotActiveDuplicate(AccountHierarchyBindingDTO binding) {
+        AssertUtils.isFalse(existsActiveAccountHierarchyBinding(binding),
+                "账户层级绑定 ACTIVE 关系已存在，accountType = {}, accountId = {}",
+                binding.getAccountType(),
+                binding.getAccountId());
     }
 }

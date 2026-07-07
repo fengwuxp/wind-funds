@@ -1,5 +1,14 @@
 package com.wind.funds.wallet.services.impl;
 
+import com.mybatisflex.core.query.QueryCondition;
+import com.mybatisflex.core.query.QueryWrapper;
+import com.wind.common.exception.AssertUtils;
+import com.wind.common.locks.JdkLockFactory;
+import com.wind.common.locks.LockFactory;
+import com.wind.common.locks.WindLock;
+import com.wind.common.query.WindPagination;
+import com.wind.common.query.WindQuery;
+import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.dal.entities.SpendSubjectFundingRel;
 import com.wind.funds.wallet.dal.entities.table.CreditAccountNameRefs;
@@ -15,18 +24,14 @@ import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequ
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
-import com.mybatisflex.core.query.QueryCondition;
-import com.mybatisflex.core.query.QueryWrapper;
-import com.wind.common.exception.AssertUtils;
-import com.wind.common.query.WindPagination;
-import com.wind.common.query.WindQuery;
-import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -41,6 +46,10 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundingRelationService {
 
+    private static final String CREATE_LOCK_PREFIX = "funds:spend-subject-funding-relation:";
+
+    private static final LockFactory LOCK_FACTORY = new JdkLockFactory();
+
     private final SpendSubjectFundingRelMapper spendSubjectFundingRelMapper;
 
     private final FundingAccountService fundingAccountService;
@@ -54,6 +63,7 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
         WalletContextVariablesValidator.assertNoSensitiveContextVariables(request.getContextVariables());
         resolveAndValidateTargetSubject(request);
         assertValidityWindow(request);
+        lockActiveRelationScope(request);
         assertNoDuplicateActiveDefaultRelation(request);
         assertNoDuplicateActivePriorityRelation(request);
         SpendSubjectFundingRel entity =
@@ -140,16 +150,16 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                 "资金责任目标主体不可用，targetSubjectType = {}, targetSubjectId = {}",
                 request.getTargetSubjectType(), request.getTargetSubjectId());
         AssertUtils.equals(creditAccount.getCurrency(), request.getCurrency(),
-                "资金责任目标主体币种与资金来源关系币种不一致，targetSubjectType = {}, targetSubjectId = {}",
+                "资金责任目标主体币种与资金责任解析关系币种不一致，targetSubjectType = {}, targetSubjectId = {}",
                 request.getTargetSubjectType(), request.getTargetSubjectId());
     }
 
     private void assertFundingAccountCanBind(FundingAccountDTO fundingAccount,
                                              CreateSpendSubjectFundingRelationRequest request) {
         AssertUtils.isTrue(fundingAccount.getStatus().canDebit(),
-                "资金账户不可作为资金来源，fundingAccountId = {}", request.getTargetSubjectId());
+                "资金账户不可作为资金责任目标主体，fundingAccountId = {}", request.getTargetSubjectId());
         AssertUtils.equals(fundingAccount.getCurrency(), request.getCurrency(),
-                "资金账户币种与资金来源关系币种不一致，fundingAccountId = {}", request.getTargetSubjectId());
+                "资金账户币种与资金责任解析关系币种不一致，fundingAccountId = {}", request.getTargetSubjectId());
     }
 
     private void assertValidityWindow(CreateSpendSubjectFundingRelationRequest request) {
@@ -157,12 +167,55 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
             return;
         }
         AssertUtils.isTrue(request.getValidFrom().isBefore(request.getValidTo()),
-                "资金来源关系生效时间必须早于失效时间");
+                "资金责任解析关系生效时间必须早于失效时间");
+    }
+
+    private void lockActiveRelationScope(CreateSpendSubjectFundingRelationRequest request) {
+        if (effectiveStatus(request) != FundsAccountStatus.ACTIVE) {
+            return;
+        }
+        AssertUtils.notNull(request.getTenantId(), "资金责任解析关系 tenantId 不能为空");
+        AssertUtils.notNull(request.getSpendSubjectType(), "资金责任解析关系 spendSubjectType 不能为空");
+        AssertUtils.hasText(request.getSpendSubjectId(), "资金责任解析关系 spendSubjectId 不能为空");
+        AssertUtils.notNull(request.getCurrency(), "资金责任解析关系 currency 不能为空");
+        AssertUtils.notNull(request.getRelationType(), "资金责任解析关系 relationType 不能为空");
+        // 本地串行化覆盖当前单应用写入；多节点同时写同一 scope 时再升级为数据库级排他约束。
+        WindLock lock = LOCK_FACTORY.apply(CREATE_LOCK_PREFIX
+                + request.getTenantId()
+                + ":"
+                + request.getSpendSubjectType().name()
+                + ":"
+                + request.getSpendSubjectId()
+                + ":"
+                + request.getCurrency().name()
+                + ":"
+                + request.getRelationType().name());
+        lock.lock();
+        boolean unlockImmediately = true;
+        try {
+            unlockImmediately = !registerTransactionCompletionUnlock(lock);
+        } finally {
+            if (unlockImmediately) {
+                lock.unlock();
+            }
+        }
+    }
+
+    private static boolean registerTransactionCompletionUnlock(WindLock lock) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return false;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                lock.unlock();
+            }
+        });
+        return true;
     }
 
     private void assertNoDuplicateActiveDefaultRelation(CreateSpendSubjectFundingRelationRequest request) {
-        FundsAccountStatus status = request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus();
-        if (!Boolean.TRUE.equals(request.getDefaultRelation()) || status != FundsAccountStatus.ACTIVE) {
+        if (!Boolean.TRUE.equals(request.getDefaultRelation()) || effectiveStatus(request) != FundsAccountStatus.ACTIVE) {
             return;
         }
         SpendSubjectFundingRelNameRefs ref = SpendSubjectFundingRelNameRefs.spendSubjectFundingRel;
@@ -181,15 +234,14 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                         request.getValidFrom(),
                         request.getValidTo()));
         AssertUtils.isFalse(duplicated,
-                "默认资金来源关系不唯一，spendSubjectId = {}, relationType = {}, currency = {}",
+                "默认资金责任解析关系不唯一，spendSubjectId = {}, relationType = {}, currency = {}",
                 request.getSpendSubjectId(),
                 request.getRelationType(),
                 request.getCurrency());
     }
 
     private void assertNoDuplicateActivePriorityRelation(CreateSpendSubjectFundingRelationRequest request) {
-        FundsAccountStatus status = request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus();
-        if (status != FundsAccountStatus.ACTIVE) {
+        if (effectiveStatus(request) != FundsAccountStatus.ACTIVE) {
             return;
         }
         SpendSubjectFundingRelNameRefs ref = SpendSubjectFundingRelNameRefs.spendSubjectFundingRel;
@@ -209,11 +261,15 @@ public class SpendSubjectFundingRelationServiceImpl implements SpendSubjectFundi
                         request.getValidFrom(),
                         request.getValidTo()));
         AssertUtils.isFalse(duplicated,
-                "资金来源关系优先级冲突，spendSubjectId = {}, relationType = {}, currency = {}, priority = {}",
+                "资金责任解析关系优先级冲突，spendSubjectId = {}, relationType = {}, currency = {}, priority = {}",
                 request.getSpendSubjectId(),
                 request.getRelationType(),
                 request.getCurrency(),
                 priority);
+    }
+
+    private FundsAccountStatus effectiveStatus(CreateSpendSubjectFundingRelationRequest request) {
+        return request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus();
     }
 
     private void applyCurrentEffectiveWindow(QueryWrapper wrapper,

@@ -6,10 +6,9 @@ import com.wind.funds.ledger.dto.LedgerTransactionDTO;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.ledger.query.LedgerTransactionQuery;
 import com.wind.funds.ledger.service.LedgerTransactionService;
-import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.model.dto.LedgerEntryFactDTO;
 import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
-import com.wind.funds.wallet.service.LedgerFactQueryService;
+import com.wind.funds.wallet.service.LedgerQueryService;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -19,11 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 /**
- * 默认账本事实只读查询服务。
+ * 默认账本只读查询服务。
  */
 @Service
 @AllArgsConstructor
-public class DefaultLedgerFactQueryService implements LedgerFactQueryService {
+public class DefaultLedgerQueryService implements LedgerQueryService {
 
     private final LedgerTransactionService ledgerTransactionService;
 
@@ -31,13 +30,13 @@ public class DefaultLedgerFactQueryService implements LedgerFactQueryService {
     @Transactional(readOnly = true)
     public @NonNull List<LedgerTransactionFactDTO> queryLedgerTransactions(@NonNull Long tenantId,
                                                                            @NonNull String fundsTransactionSn,
-                                                                           @Nullable FundsTransactionEventType eventType,
+                                                                           @Nullable String eventType,
                                                                            int limit) {
         LedgerTransactionQuery query = new LedgerTransactionQuery()
                 .setTenantId(tenantId)
                 .setFundsTransactionSn(fundsTransactionSn);
         if (eventType != null) {
-            query.setEventType(eventType.name());
+            query.setEventType(eventType);
         }
         return ledgerTransactionService.queryAccountLedgerTransactions(query, DefaultPageQueryOptions.defaults(limit))
                 .getRecords()

@@ -141,9 +141,6 @@ public class LedgerEntryDTO {
     @Schema(description = "结算周期（账期）")
     private String settlementPeriod;
 
-    @Schema(description = "最后结算时间")
-    private LocalDateTime latestSettlementTime;
-
     @Schema(description = "结算完成时间")
     private LocalDateTime settlementCompletedTime;
 
@@ -156,9 +153,6 @@ public class LedgerEntryDTO {
 
     @Schema(description = "对账批次（示例：2026040900015）")
     private String reconciliationBatch;
-
-    @Schema(description = "最后对账时间")
-    private LocalDateTime latestReconciliationTime;
 
     @Schema(description = "对账完成时间")
     private LocalDateTime reconciliationCompletedTime;

@@ -1,6 +1,5 @@
 package com.wind.funds.wallet.application.support;
 
-import com.wind.funds.transaction.enums.FundsTransactionChannel;
 import com.wind.funds.wallet.application.support.WalletExternalFundsRailSupport.ExternalCreditRailDecision;
 import org.junit.jupiter.api.Test;
 
@@ -20,14 +19,14 @@ class WalletExternalFundsRailSupportTests {
      */
     @Test
     void testResolveReceiveChannelShouldNormalizeSupportedRailAliases() {
-        assertThat(WalletExternalFundsRailSupport.resolveReceiveChannel("WIRE_TRANSFER"))
-                .isEqualTo(FundsTransactionChannel.WIRE_TRANSFER);
-        assertThat(WalletExternalFundsRailSupport.resolveReceiveChannel("wire-transfer"))
-                .isEqualTo(FundsTransactionChannel.WIRE_TRANSFER);
-        assertThat(WalletExternalFundsRailSupport.resolveReceiveChannel("bank_rail"))
-                .isEqualTo(FundsTransactionChannel.WIRE_TRANSFER);
-        assertThat(WalletExternalFundsRailSupport.resolveReceiveChannel("ach"))
-                .isEqualTo(FundsTransactionChannel.WIRE_TRANSFER);
+        assertThat(WalletExternalFundsRailSupport.resolveReceiveChannelCode("WIRE_TRANSFER"))
+                .isEqualTo("WIRE_TRANSFER");
+        assertThat(WalletExternalFundsRailSupport.resolveReceiveChannelCode("wire-transfer"))
+                .isEqualTo("WIRE_TRANSFER");
+        assertThat(WalletExternalFundsRailSupport.resolveReceiveChannelCode("bank_rail"))
+                .isEqualTo("WIRE_TRANSFER");
+        assertThat(WalletExternalFundsRailSupport.resolveReceiveChannelCode("ach"))
+                .isEqualTo("WIRE_TRANSFER");
     }
 
     /**
@@ -38,7 +37,7 @@ class WalletExternalFundsRailSupportTests {
      */
     @Test
     void testResolveReceiveChannelShouldRejectUnknownRailAlias() {
-        assertThatThrownBy(() -> WalletExternalFundsRailSupport.resolveReceiveChannel("mystery_rail"))
+        assertThatThrownBy(() -> WalletExternalFundsRailSupport.resolveReceiveChannelCode("mystery_rail"))
                 .hasMessageContaining("收款渠道编码不支持")
                 .hasMessageContaining("mystery_rail")
                 .hasMessageContaining("支持的收款渠道");
@@ -62,9 +61,9 @@ class WalletExternalFundsRailSupportTests {
         assertThat(ach.externalRailCode()).isEqualTo("ACH_RAIL");
         assertThat(bank.externalRailCode()).isEqualTo("BANK_RAIL");
         assertThat(external.externalRailCode()).isEqualTo("EXTERNAL_RAIL");
-        assertThat(ach.transactionChannel()).isEqualTo(FundsTransactionChannel.WIRE_TRANSFER);
-        assertThat(bank.transactionChannel()).isEqualTo(FundsTransactionChannel.WIRE_TRANSFER);
-        assertThat(external.transactionChannel()).isEqualTo(FundsTransactionChannel.WIRE_TRANSFER);
+        assertThat(ach.transactionChannelCode()).isEqualTo("WIRE_TRANSFER");
+        assertThat(bank.transactionChannelCode()).isEqualTo("WIRE_TRANSFER");
+        assertThat(external.transactionChannelCode()).isEqualTo("WIRE_TRANSFER");
     }
 
     /**

@@ -68,12 +68,6 @@ public class LedgerEntryQuery {
     @Schema(description = "结算周期（账期）")
     private String settlementPeriod;
 
-    @Schema(description = "查询到最小最后结算时间")
-    private LocalDateTime latestSettlementTimeMin;
-
-    @Schema(description = "查询到最大最后结算时间")
-    private LocalDateTime latestSettlementTimeMax;
-
     @Schema(description = "查询到最小结算完成时间")
     private LocalDateTime settlementCompletedTimeMin;
 
@@ -85,12 +79,6 @@ public class LedgerEntryQuery {
 
     @Schema(description = "对账批次（示例：2026040900015）")
     private String reconciliationBatch;
-
-    @Schema(description = "查询到最小最后对账时间")
-    private LocalDateTime latestReconciliationTimeMin;
-
-    @Schema(description = "查询到最大最后对账时间")
-    private LocalDateTime latestReconciliationTimeMax;
 
     @Schema(description = "查询到最小对账完成时间")
     private LocalDateTime reconciliationCompletedTimeMin;

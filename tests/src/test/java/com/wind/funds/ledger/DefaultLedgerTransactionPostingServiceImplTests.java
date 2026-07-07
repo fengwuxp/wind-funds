@@ -57,6 +57,11 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -440,6 +445,42 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         assertLedgerFactsUnchanged(jdbcTemplate, afterFirstPost);
     }
 
+    /**
+     * 场景：外部编排并发重放同一账本交易入账请求。
+     * 输入：两个线程使用完全相同 LedgerTransactionSpec 同时 post。
+     * 输出：两个调用都完成；最终只保留一套 ledger transaction、posting plan、ledger entry 和一次余额投影。
+     * 红线：并发重放不得把唯一键冲突冒泡成交易失败，也不得重复入账。
+     */
+    @Test
+    void testPostShouldReadBackExistingLedgerTransactionForConcurrentSameTransaction() throws Exception {
+        seedFundingAccount(SOURCE_SUBJECT_ID);
+        seedFundingAccount(TARGET_SUBJECT_ID);
+        Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
+        Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
+        LedgerTransactionSpec transaction = transaction(
+                LedgerTransactionStatus.POSTED,
+                List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<PostAttemptResult> first = executor.submit(concurrentPostAttempt(startGate, transaction));
+            Future<PostAttemptResult> second = executor.submit(concurrentPostAttempt(startGate, transaction));
+
+            startGate.countDown();
+
+            List<PostAttemptResult> results = List.of(first.get(), second.get());
+            LedgerFactSnapshot after = ledgerFactSnapshot(jdbcTemplate);
+
+            assertThat(results).filteredOn(PostAttemptResult::succeeded).hasSize(2);
+            assertThat(after.transactions()).hasSize(before.transactions().size() + 1);
+            assertThat(after.postingPlans()).hasSize(before.postingPlans().size() + 1);
+            assertThat(after.entries()).hasSize(before.entries().size() + 2);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private LedgerTransactionSpec transaction(LedgerTransactionStatus status,
                                               List<LedgerPostingPlanSpec> postingPlans) {
         return new TestLedgerTransactionSpec(status, postingPlans);
@@ -455,6 +496,19 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         return postingPlan(List.of(
                 creditEntry(SOURCE_SUBJECT_ID, sourceLedgerId, TRANSACTION_AMOUNT),
                 debitEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)));
+    }
+
+    private Callable<PostAttemptResult> concurrentPostAttempt(CountDownLatch startGate,
+                                                              LedgerTransactionSpec transaction) {
+        return () -> {
+            startGate.await();
+            try {
+                postingService.post(transaction);
+                return new PostAttemptResult(true, null);
+            } catch (RuntimeException ex) {
+                return new PostAttemptResult(false, ex.getMessage());
+            }
+        };
     }
 
     private LedgerPostingPlanSpec postingPlan(List<LedgerEntrySpec> entries) {
@@ -939,6 +993,9 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         public Map<String, Object> getContextVariables() {
             return Map.of("ledgerEntrySn", "LE-POSTING-BOUNDARY-001");
         }
+    }
+
+    private record PostAttemptResult(boolean succeeded, String message) {
     }
 
     @Configuration
