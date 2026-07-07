@@ -55,7 +55,9 @@ public interface InstrumentTransactionLifecycleApplicationService {
      * 通过支付工具出款 rail 入口完成准入并委派账户主体型提现或出款内核。
      *
      * <p>典型场景包括全球账户通过 SWIFT、local rail、ACH 等方式向外部收款人打款。
-     * 本服务只承载资金域服务层入口，具体 rail 协议、收款人详情、渠道报文和外部状态机仍属于上层业务或通道域。</p>
+     * 本服务只承载资金域服务层入口，具体 rail 协议、收款人详情、渠道报文和外部状态机仍属于上层业务或通道域。
+     * 调用方必须只在外部出款已达到可关闭内部冻结资金的终态成功，或已有等价业务确认时调用；
+     * 外部 submitted、accepted、processing、message sent 等非终态不得调用本入口。</p>
      *
      * @param request  支付工具出款 rail 请求
      * @param operator 操作者

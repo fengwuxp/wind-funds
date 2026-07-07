@@ -15,7 +15,9 @@ import lombok.experimental.Accessors;
  * 支付工具出款 rail 请求。
  *
  * <p>该请求是 wallet application 层的全球账户出款入口模型，用于承载外部业务语义、支付工具引用、
- * 出款 rail 和收款人引用；不替代 transaction 层账户主体型提现请求。</p>
+ * 出款 rail 和收款人引用；不替代 transaction 层账户主体型提现请求。
+ * 本请求只适用于外部出款已达到可关闭内部冻结资金的终态成功或等价业务确认；
+ * 外部受理、提交或处理中状态只能停在上游出款单、在途或差错链路。</p>
  *
  * @author Codex
  * @date 2026-06-21
@@ -67,6 +69,10 @@ public class PayOutByRailRequest {
     @Schema(description = "外部出款请求或渠道流水号")
     @NotBlank
     private String externalPayoutSn;
+
+    @Schema(description = "外部出款终态状态，只有 SUCCEEDED、PAID、SETTLED、COMPLETED 可关闭内部冻结资金")
+    @NotBlank
+    private String externalPayoutStatus;
 
     @Schema(description = "业务流水号，通常为出款订单号或请求幂等号")
     @NotBlank

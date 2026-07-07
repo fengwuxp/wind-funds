@@ -178,6 +178,26 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
     }
 
     /**
+     * 场景：外部 rail 已受理入金但尚未确认到账。
+     * 输入：ACH_CREDIT_ACCEPTED、目标资金账户和完整业务流水。
+     * 输出：服务层入口在交易内核前拒绝。
+     * 红线：accepted、submitted 或 processing 只表示外部在途，不得提前生成充值交易或增加 AVAILABLE。
+     */
+    @Test
+    void testConsumeAcceptedCreditEventShouldFailFastBeforeFundsFacts() {
+        createCreditConsumeScenario();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        ConsumeExternalFundsEventRequest request = consumeRequest()
+                .setExternalEventType("ACH_CREDIT_ACCEPTED");
+
+        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(request, WindOperator.system()))
+                .hasMessageContaining("外部入金事件未确认到账不得入账");
+
+        assertNoFundsOrLedgerFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：外部入金事件目标是信用账户，但当前只接入资金账户充值内核。
      * 输入：ACH_CREDIT_CONFIRMED、信用账户主体和完整业务流水。
      * 输出：服务层入口在交易内核前拒绝。

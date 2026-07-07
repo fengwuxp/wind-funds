@@ -1,7 +1,6 @@
-# AGENTS.md
+# CLAUDE.md
 
-> 本文件是 `wind-funds` 的常驻项目契约，只保留每次会话都应知道的项目定位、模块边界、资金红线、规格入口、验证命令和 Skill 路由。
-> 本项目启用 Wind 项目编码约规；通用 Java 编码、测试、Review 和 AI Native Loop 细节不在本文件重复展开，按 Skill 路由读取。
+本文件是 `wind-funds` 面向 Claude 的项目入口，独立承载 Claude 运行时需要遵守的项目约束。
 
 ## 1. 项目身份
 
@@ -10,17 +9,15 @@
 - 默认命令入口：根目录 `Justfile`。
 - 默认语言：中文沟通、评审、规划、交付说明和 Git commit message；代码标识符、协议字段、API、命令、错误码、标准 commit type 和英文专有名词按项目既有英文保留。
 
-核心原则：
+核心原则：资金语义独立、契约稳定、核心先行、实现内聚、可验证交付。构建依赖会访问私有 Maven 仓库；验证失败时先区分代码问题和仓库、网络、凭据或本地缓存问题。
 
-- 资金语义独立：支付、账务、账户、路由、清结算、对账等能力在本仓库演进。
-- 契约稳定：跨模块调用优先依赖 `*-face` 和 `core`，不得暴露 Entity、Mapper 或内部实现类。
-- 核心先行：`core` 承载资金 DSL、枚举、值对象和端口契约，不依赖 DAL、Web、消息或具体实现。
-- 实现内聚：`*-impl` 承载 DAL、服务实现、转换器和领域规则，避免规则扩散到测试、工具或外部适配层。
-- 可验证交付：代码变更必须说明编译、相关测试和规约扫描结果；无法执行时说明环境或依赖限制。
+## 2. 先读什么
 
-构建依赖会访问私有 Maven 仓库。验证失败时先区分代码问题和仓库、网络、凭据或本地缓存问题。
+修改代码或设计文档前，先读当前任务相关模块源码和测试。
 
-## 2. 模块边界
+涉及支付资金底座目标态、DSL、API、清结算、对账、归档、TDD 门禁或能力规格时，同步阅读 `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`。涉及接入契约、生产使用说明或能力差距复核时，再读 `docs/用户接入指南`。
+
+## 3. 模块边界
 
 模块职责：`core` 放资金 DSL、核心契约、枚举、值对象和端口；各 `*-face` 放对外契约；各 `*-impl` 放实现、DAL、Mapper、MapStruct 和内部规则；`tests` 放资金域测试、契约测试、架构边界测试和 H2 表结构；`dependencies` 只做依赖聚合 / BOM。
 
@@ -30,15 +27,14 @@
 
 - `*-face` 不依赖 `*-impl`；生产模块不得依赖 `tests`。
 - `wallet-impl` 不依赖 `transaction-face`，不创建资金交易事实。
-- `transaction-impl` 可以依赖 `wallet-face` 消费钱包准入、支付工具、资金责任和支出控制契约；不得依赖 `wallet-impl`、钱包 DAL、Mapper 或钱包内部实现包。
+- `transaction-impl` 可依赖 `wallet-face` 消费钱包准入、支付工具、资金责任和支出控制契约；不得依赖 `wallet-impl`、钱包 DAL、Mapper 或钱包内部实现包。
 - `reconciliation-impl` 和 `governance-impl` 只能通过 `*-face`、core port 或只读证据引用消费主链事实；禁止依赖其他模块 `*-impl`、DAL、Mapper 或反写交易、账本、钱包事实。
-- `route` 只解析资金路径，不直接写交易事实或账本事实。
-- `ledger` 只维护账本事实和账本投影，不反向持有业务交易生命周期状态。
-- 资金域 Java 包名和源码路径统一使用 `com.wind.funds` / `com/wind/funds`；不得恢复历史 Capte funds 包根或旧 Wind integration funds 包根。`com.capte.domain` 是外部领域依赖边界，可按模块依赖约束保留。
+- `route` 只解析资金路径，不直接写交易事实或账本事实；`ledger` 只维护账本事实和账本投影，不反向持有业务交易生命周期状态。
+- 包名和源码路径统一使用 `com.wind.funds` / `com/wind/funds`；不得恢复历史 Capte funds 包根或旧 Wind integration funds 包根。`com.capte.domain` 是外部领域依赖边界，可按模块依赖约束保留。
 
-## 3. Wind 项目约规
+## 4. Wind 项目约规
 
-本项目遵守 Wind 项目编码约规。涉及 face/impl、模型归位、Entity 不外露、基础服务、ServiceImpl、MyBatis Flex、币种枚举、TDD/CR 或代码生成后审查时，先按 `wind-project-coding-conventions` 判断规则，再由 `资深架构师` 闭环源码设计、测试和验证。
+本项目遵守 Wind 项目编码约规。涉及 face/impl、模型归位、Entity 不外露、基础服务、ServiceImpl、MyBatis Flex、币种枚举、TDD/CR 或代码生成后审查时，先按 Wind 规则判断，再闭环源码设计、测试和验证。
 
 项目级 Wind 红线：
 
@@ -50,7 +46,7 @@
 - 空值契约遵循 JSpecify：已声明非空的值不写重复防御式空判断；只有 `@Nullable`、外部输入、反序列化边界或持久化读取等不可信来源才做显式空处理。
 - 业务事件、审计展示和可回放消息优先使用稳定 `eventKey + params`，不得把中文文案或可变翻译作为业务判断依据。
 
-## 4. 资金测试红线
+## 5. 资金测试红线
 
 涉及金额、状态流转、幂等、重放、账务平衡、余额约束、冻结 / 解冻、清结算和对账差错的变更必须补测试。资金变化测试必须同时断言相关主体账本余额桶、posting plan 平衡、ledger transaction 可追溯和幂等行为。
 
@@ -63,23 +59,15 @@
 
 测试 backlog 权威入口：`docs/TDD设计/支付资金底座测试驱动设计.md`。
 
-## 5. 业务日志与审计
+## 6. 业务日志与审计
 
 `ledger`、`wallet`、`transaction` 及清结算 / 治理实现的关键用例边界必须输出可追溯业务日志，覆盖准入 / 拒绝、交易或账本状态变化、冻结 / 解冻、入账 / 退款 / 冲正、幂等复用、重试 / 补偿和对账差错处理。
-
-日志要求：
 
 - 优先使用 `@Slf4j` 和参数化日志；禁止 `System.out`、`printStackTrace`、吞异常或只打印异常 message。
 - 异常日志保留 cause，并带上稳定业务标识。
 - 日志字段只保留最小可定位上下文：`tenantId`、业务场景 / 业务单号、`transactionSn`、`ledgerTransactionSn`、账户或主体脱敏标识、状态、金额币种、规则 / 版本 / 幂等摘要和 traceId。
 - 不得输出完整 Request/Response、Entity、SQL、`contextVariables`、PAN、CVV、token、密钥、证件号、手机号、外部账号等敏感信息。
 - 日志不替代交易事实、账本事实、审计证据、对账证据或测试断言；涉及资金事实、幂等、补偿、对账和安全边界的日志改动必须随相关切片验证。
-
-## 6. 规格入口
-
-权威设计入口：`docs/产品设计/`、`docs/DSL设计/`、`docs/系分设计/`、`docs/TDD设计/`、`docs/用户接入指南/`。测试表结构入口：`tests/src/test/resources/jdbc-schema.sql`。
-
-进入编码前，凡涉及支付资金底座目标态、DSL、API、清结算、对账、归档、TDD 门禁或能力规格，必须同步阅读 `docs/产品设计`、`docs/DSL设计`、`docs/系分设计`、`docs/TDD设计`。涉及接入契约、生产使用说明或能力差距复核时，再同步阅读 `docs/用户接入指南`。
 
 ## 7. 验证命令
 
@@ -99,31 +87,24 @@ just test-boundary
 just test-governance
 ```
 
-提交前优先执行 `just pmd`；阶段收口、完整基线复核或高风险提交前执行 `just verify-cad`。
+提交前优先执行 `just pmd`；阶段收口、完整基线复核或高风险提交前执行 `just verify-cad`。仅修改文档、产品设计、系统分析设计、方案讨论、需求澄清、流程图或说明性材料时，不要求运行编译；至少执行 `git diff --check`。
 
-仅修改文档、产品设计、系统分析设计、方案讨论、需求澄清、流程图或说明性材料时，不要求运行编译；至少执行 `git diff --check`。
+## 8. Claude 工作方式
 
-## 8. Skill 路由
+- 改动要小，并且能直接回到用户请求。
+- 优先删除过时过程产物，而不是新增计划文件。
+- 不主动创建任务账本、进度追踪、临时基线或重复流程文档，除非用户明确要求。
+- 不把 CAD、Goal、Harness、Execution Grant 等内部流程词当作面向用户的完成状态，除非任务明确讨论流程内部。
+- 做代码评审时，先列问题，按严重级别排序，并给出文件和行号。
+- 做实现交付时，说明改了哪些文件、覆盖了哪些测试、执行了哪些验证、是否通过和残余风险。
+- Git commit message 默认用中文；需要时可保留 `feat:`、`fix:`、`test:`、`docs:`、`chore:` 等标准前缀。
 
-| 场景 | 必用 Skill | 产物边界 |
+## 9. Skill 路由
+
+| 场景 | 必用 Skill | 边界 |
 | --- | --- | --- |
-| 端到端角色协作、Goal / Loop / GSD / CAD 编排、owner / 交接物 / 授权 / 验证 / 停止条件 | `ai-native-engineering-workflow` | 只做流程准入、角色协作和交接闭环；不替代产品、架构、代码、测试、Git 授权或上线审批。 |
-| 编码、编码设计、架构设计、系统分析、技术方案、代码评审、重构评估、测试设计、工程治理 | `资深架构师` | 工程边界、模块设计、接口契约、代码修改、测试策略、验证命令、Review 结论和交付说明。 |
-| Wind/Nobe 编码约规判断、face/impl、模型归位、基础服务、Entity 不外露、MyBatis Flex、ServiceImpl 和 TDD/CR 约规 | `wind-project-coding-conventions`，源码执行配合 `资深架构师` | 判断是否偏离 Wind 约规、给最小整改建议；真实源码修改和验证由架构师闭环。 |
-| 产品架构、PRD、业务建模、能力地图、业务流程、状态机、规则矩阵、产品验收，及支付资金产品方案 | `产品架构专家` | 产品目标、角色、对象、流程、状态、规则、权限、指标、异常路径、产品验收和风险清单。 |
+| 端到端角色协作、Goal / Loop / GSD / CAD、owner、交接物、授权、验证、停止条件 | `ai-native-engineering-workflow` | 只做流程准入和交接闭环，不替代产品、架构、代码、测试、Git 授权或上线审批。 |
+| 编码、架构设计、系统分析、技术方案、代码评审、重构评估、测试设计、工程治理 | `资深架构师` | 负责工程边界、接口契约、代码修改、测试策略、验证命令和 Review 结论。 |
+| Wind 约规判断、face/impl、模型归位、Entity 不外露、MyBatis Flex、ServiceImpl、TDD/CR 约规 | `wind-project-coding-conventions`，源码执行配合 `资深架构师` | 只判断规则和最小整改建议；真实源码修改和验证由架构师闭环。 |
+| 产品架构、PRD、业务建模、能力地图、业务流程、状态机、规则矩阵、产品验收、支付资金产品方案 | `产品架构专家` | 输出产品目标、角色、对象、流程、规则、异常路径、验收和风险。 |
 | 结构化 Java Service 脚手架生成 | `java-service-code-generator` | 必须有 DDL / schema / Java 类 / 字段表格；不从纯自然语言生成生产代码。 |
-
-涉及真实资金、监管、跨境、外汇、客户资金、备付金、风控或合规口径时，只输出产品和系统设计分析，不替代法律、税务、会计或合规最终结论。
-
-## 9. 交付说明
-
-完成任务时说明：
-
-- 改了什么。
-- 覆盖了哪些测试清单项；若不适用，说明原因。
-- 执行了哪些验证命令。
-- 验证是否通过。
-- 未能执行或未通过的原因。
-- 残余风险和下一 owner。
-
-Git commit message 默认使用中文；可保留 `feat:`、`fix:`、`test:`、`docs:`、`chore:` 等标准前缀，但 subject 尽可能用中文表达实际变更。

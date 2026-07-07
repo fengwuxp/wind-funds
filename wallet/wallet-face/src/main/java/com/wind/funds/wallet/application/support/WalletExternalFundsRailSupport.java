@@ -24,6 +24,13 @@ public final class WalletExternalFundsRailSupport {
 
     private static final String BANK_RAIL = "BANK_RAIL";
 
+    private static final Set<String> NON_FINAL_CREDIT_EVENT_SUFFIXES = Set.of(
+            "_ACCEPTED",
+            "_SUBMITTED",
+            "_PROCESSING",
+            "_MESSAGE_SENT",
+            "_IN_TRANSIT");
+
     private static final Map<String, FundsTransactionChannel> CHANNEL_ALIASES = Map.ofEntries(
             Map.entry(FundsTransactionChannel.WIRE_TRANSFER.name(), FundsTransactionChannel.WIRE_TRANSFER),
             Map.entry(BANK_RAIL, FundsTransactionChannel.WIRE_TRANSFER),
@@ -81,9 +88,16 @@ public final class WalletExternalFundsRailSupport {
 
     public static @NonNull ExternalCreditRailDecision requireConfirmedCreditRailDecision(
             @NonNull String externalEventType) {
-        ExternalCreditRailDecision result = CONFIRMED_CREDIT_RAIL_DECISIONS.get(normalize(externalEventType));
+        String normalizedType = normalize(externalEventType);
+        AssertUtils.isFalse(isNonFinalCreditEvent(normalizedType), "外部入金事件未确认到账不得入账");
+        ExternalCreditRailDecision result = CONFIRMED_CREDIT_RAIL_DECISIONS.get(normalizedType);
         AssertUtils.notNull(result, "外部资金事件类型暂不支持真实消费");
         return result;
+    }
+
+    private static boolean isNonFinalCreditEvent(String externalEventType) {
+        return externalEventType.contains("_CREDIT_")
+                && NON_FINAL_CREDIT_EVENT_SUFFIXES.stream().anyMatch(externalEventType::endsWith);
     }
 
     private static String normalize(String value) {

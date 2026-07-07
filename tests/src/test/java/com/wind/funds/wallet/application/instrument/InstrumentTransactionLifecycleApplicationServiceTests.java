@@ -165,6 +165,8 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private static final String UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN = "INSTRUMENT_PAYOUT_RAIL_UNSUPPORTED";
 
+    private static final String PROCESSING_PAYOUT_BUSINESS_SN = "INSTRUMENT_PAYOUT_RAIL_PROCESSING";
+
     private static final String PAYOUT_FREEZE_BUSINESS_SN = "INSTRUMENT_PAYOUT_RAIL_FREEZE";
 
     private static final String AUTHORIZE_BUSINESS_SN = "INSTRUMENT_AUTHORIZE_001";
@@ -385,6 +387,28 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .hasMessageContaining("支持的出款 rail");
 
         assertNoFundsOrLedgerFacts(UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：全球账户出款 rail 入口收到外部非终态。
+     * 输入：外部状态为 PROCESSING，其他请求字段齐全。
+     * 输出：服务层入口拒绝，不进入预交易快照和提现内核。
+     * 红线：submitted、accepted 或 processing 不能关闭内部冻结资金。
+     */
+    @Test
+    void testPayOutByRailShouldRejectNonFinalExternalStatusWithoutFundsFacts() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        PayOutByRailRequest request = payoutRequest()
+                .setBusinessSn(PROCESSING_PAYOUT_BUSINESS_SN)
+                .setExternalPayoutStatus("PROCESSING")
+                .setReferenceFreezeSn("freeze_not_used_for_processing");
+
+        assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.payOutByRail(request,
+                WindOperator.system()))
+                .hasMessageContaining("外部出款非终态成功状态不得关闭内部冻结资金");
+
+        assertNoFundsOrLedgerFacts(PROCESSING_PAYOUT_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -630,6 +654,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setRailCode("LOCAL")
                 .setReceiverReference("receiver_endpoint_001")
                 .setExternalPayoutSn("processor_payout_001")
+                .setExternalPayoutStatus("PAID")
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(PAYOUT_BUSINESS_SN)
                 .setExpectedBindingVersion(1)

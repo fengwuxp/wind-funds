@@ -32,7 +32,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 支付工具交易生命周期应用服务实现。
@@ -44,6 +46,12 @@ import java.util.Map;
 @AllArgsConstructor
 public class InstrumentTransactionLifecycleApplicationServiceImpl
         implements InstrumentTransactionLifecycleApplicationService {
+
+    private static final Set<String> FINAL_SUCCESS_PAYOUT_STATUSES = Set.of(
+            "SUCCEEDED",
+            "PAID",
+            "SETTLED",
+            "COMPLETED");
 
     private final AuthorizationAdmissionApplicationService authorizationAdmissionApplicationService;
 
@@ -117,9 +125,20 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         WalletExternalFundsRailSupport.requirePayoutRailCode(request.getRailCode());
         AssertUtils.hasText(request.getReceiverReference(), "出款收款人引用不能为空");
         AssertUtils.hasText(request.getExternalPayoutSn(), "外部出款流水不能为空");
+        AssertUtils.hasText(request.getExternalPayoutStatus(), "外部出款终态状态不能为空");
+        AssertUtils.isTrue(FINAL_SUCCESS_PAYOUT_STATUSES.contains(normalizeExternalPayoutStatus(
+                        request.getExternalPayoutStatus())),
+                "外部出款非终态成功状态不得关闭内部冻结资金");
         AssertUtils.hasText(request.getBusinessScene(), "出款业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "出款业务流水号不能为空");
         AssertUtils.notNull(request.getExpectedBindingVersion(), "支付工具出款绑定版本不能为空");
+    }
+
+    private static String normalizeExternalPayoutStatus(String status) {
+        return status.trim()
+                .replace('-', '_')
+                .replace(' ', '_')
+                .toUpperCase(Locale.ROOT);
     }
 
     private ResolvePaymentInstrumentPreTransactionSnapshotRequest toPreTransactionRequest(
@@ -219,6 +238,7 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         values.put("payoutRailCode", WalletExternalFundsRailSupport.requirePayoutRailCode(request.getRailCode()));
         values.put("receiverReference", request.getReceiverReference());
         values.put("externalPayoutSn", request.getExternalPayoutSn());
+        values.put("externalPayoutStatus", normalizeExternalPayoutStatus(request.getExternalPayoutStatus()));
         values.put("referenceFreezeSn", request.getReferenceFreezeSn());
         values.put("payeeAccountId", payeeAccountId.id());
         values.put("payeeAccountType", payeeAccountId.type());
