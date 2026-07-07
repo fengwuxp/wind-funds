@@ -18,7 +18,7 @@
 
 ## 3. 接入顺序
 
-1. 先确认业务事实已经成立：谁的钱、什么动作、金额、币种、幂等键、来源引用和操作者。
+1. 先确认业务事实已经成立，并能回答账务三问：谁的钱、多少钱、怎么变的；同时准备幂等键、来源引用和操作者。
 2. 先走 `wallet` 建模或准入：账户能力、支付工具能力、资金责任、Spend Rule 决策。
 3. 再走 `transaction` 产生资金事实：直接交易、授权交易、余额控制、让利出资、外部确认入金。
 4. 最后用 `ledger` 和投影查询验收：账本交易、分录、余额桶、幂等和失败无副作用。
@@ -42,16 +42,16 @@
 
 ## 5. 业务事实说明卡
 
-每个接入场景先填这 10 项，填不满就不要拆研发任务。
+每个接入场景先填这 10 项，填不满就不要拆研发任务。前三类信息必须先回答账务三问。
 
 | 项 | 必填内容 |
 | --- | --- |
 | 业务动作 | topup、transfer、pay、refund、withdraw、fee、authorize、reversal、settle、settleRefund、freeze、unfreeze、adjust、benefit settle/refund、external confirmed credit。 |
-| 资金主体 | 成本承担方、资金流出方、资金流入方、授权主体或冻结主体。 |
+| 资金主体 | 回答“谁的钱”：成本承担方、资金流出方、资金流入方、授权主体或冻结主体。 |
 | 账户类型 | FundingAccount、CreditAccount、平台账户角色解析结果；BudgetGroup、Spend Rule、PaymentInstrument 只能是控制或引用。 |
-| 金额币种 | 金额必须为正，币种和精度必须能和账户、账本 profile 对齐。 |
+| 金额币种 | 回答“多少钱”：金额必须为正，币种和精度必须能和账户、账本 profile 对齐。 |
 | 幂等 | 业务流水、请求摘要、重复提交和同键不同摘要处理。 |
-| 来源引用 | 订单、提现单、授权单、外部事件、原交易 SN 或原冻结单 SN。 |
+| 来源引用 | 回答“怎么变的”：订单、提现单、授权单、外部事件、原交易 SN 或原冻结单 SN。 |
 | 操作者 | 使用 `WindOperator`，不要塞进 request 字段。 |
 | 准入快照 | 账户能力、支付工具能力、资金责任、Spend Rule 决策或原 route snapshot。 |
 | 账务验收 | 交易状态、route、posting、ledger transaction、ledger entry、余额桶变化。 |
