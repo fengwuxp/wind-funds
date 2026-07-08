@@ -4,6 +4,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Table;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerReconcileStatus;
@@ -87,6 +88,18 @@ public class LedgerEntry implements Serializable {
      * 对应 t_ledger.id
      */
     private Long ledgerId;
+
+    /**
+     * 账本周期类型快照
+     */
+    @NotNull
+    private AccountBalancePeriodType periodType;
+
+    /**
+     * 账本周期 ID 快照
+     */
+    @NotNull
+    private String periodId;
 
     /**
      * 账务主体 ID

@@ -277,6 +277,11 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
             assertThat(query.getPeriodId()).isEqualTo(periodId);
         });
         assertThat(plan.getEntries())
+                .extracting(LedgerEntrySpec::getPeriodType, LedgerEntrySpec::getPeriodId)
+                .containsExactly(
+                        tuple(periodType, periodId),
+                        tuple(periodType, periodId));
+        assertThat(plan.getEntries())
                 .extracting(LedgerEntrySpec::getSubjectId, LedgerEntrySpec::getLedgerSubjectCode,
                         LedgerEntrySpec::getEntryType)
                 .containsExactly(

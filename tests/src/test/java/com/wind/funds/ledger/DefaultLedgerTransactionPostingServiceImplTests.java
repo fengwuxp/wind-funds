@@ -67,6 +67,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFa
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * 账本交易入账编排服务事实边界测试。
@@ -99,6 +100,8 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     private static final Money TRANSACTION_AMOUNT = Money.immutable(100L, CURRENCY);
 
     private static final LocalDateTime TRANSACTION_TIME = LocalDateTime.of(2026, 6, 4, 10, 0);
+
+    private static final String MONTHLY_PERIOD_ID = "2026-06";
 
     @Autowired
     private LedgerTransactionPostingService postingService;
@@ -446,6 +449,40 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     /**
+     * 场景：周期型账本完成入账。
+     * 输入：MONTHLY/2026-06 的源账户和目标账户账本、同周期账本分录。
+     * 输出：LedgerEntry 持久化 periodType/periodId 周期快照。
+     * 红线：分录事实不能只靠 ledgerId 间接追溯周期，避免对账、归档和重放丢失周期证据。
+     */
+    @Test
+    void testPostShouldPersistLedgerEntryPeriodSnapshot() {
+        seedFundingAccount(SOURCE_SUBJECT_ID);
+        seedFundingAccount(TARGET_SUBJECT_ID);
+        Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID,
+                AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID, 200L);
+        Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID,
+                AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID, 0L);
+        LedgerTransactionSpec transaction = transaction(
+                LedgerTransactionStatus.POSTED,
+                List.of(availableTransferPostingPlan(
+                        sourceLedgerId, targetLedgerId, AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID)));
+
+        postingService.post(transaction);
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                SELECT period_type, period_id
+                  FROM t_ledger_entry
+                 WHERE ledger_transaction_sn = ?
+                 ORDER BY id
+                """, LEDGER_TRANSACTION_SN);
+        assertThat(rows)
+                .extracting(row -> row.get("PERIOD_TYPE"), row -> row.get("PERIOD_ID"))
+                .containsExactly(
+                        tuple(AccountBalancePeriodType.MONTHLY.name(), MONTHLY_PERIOD_ID),
+                        tuple(AccountBalancePeriodType.MONTHLY.name(), MONTHLY_PERIOD_ID));
+    }
+
+    /**
      * 场景：外部编排并发重放同一账本交易入账请求。
      * 输入：两个线程使用完全相同 LedgerTransactionSpec 同时 post。
      * 输出：两个调用都完成；最终只保留一套 ledger transaction、posting plan、ledger entry 和一次余额投影。
@@ -493,9 +530,21 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     private LedgerPostingPlanSpec availableTransferPostingPlan(Long sourceLedgerId, Long targetLedgerId) {
+        return availableTransferPostingPlan(sourceLedgerId, targetLedgerId,
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name());
+    }
+
+    private LedgerPostingPlanSpec availableTransferPostingPlan(Long sourceLedgerId,
+                                                               Long targetLedgerId,
+                                                               AccountBalancePeriodType periodType,
+                                                               String periodId) {
         return postingPlan(List.of(
-                creditEntry(SOURCE_SUBJECT_ID, sourceLedgerId, TRANSACTION_AMOUNT),
-                debitEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)));
+                ledgerEntry(SOURCE_SUBJECT_ID, SUBJECT_TYPE, sourceLedgerId, EntrySide.CREDIT, TRANSACTION_AMOUNT,
+                        LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.ASSET,
+                        null, periodType, periodId),
+                ledgerEntry(TARGET_SUBJECT_ID, SUBJECT_TYPE, targetLedgerId, EntrySide.DEBIT, TRANSACTION_AMOUNT,
+                        LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.ASSET,
+                        null, periodType, periodId)));
     }
 
     private Callable<PostAttemptResult> concurrentPostAttempt(CountDownLatch startGate,
@@ -586,16 +635,9 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                                         EntrySide entrySide,
                                         Money amount,
                                         String ledgerTransactionSn) {
-        return new TestLedgerEntrySpec(
-                subjectId,
-                SUBJECT_TYPE,
-                ledgerId,
-                entrySide,
-                amount,
-                ledgerTransactionSn,
-                LedgerSubjectCode.AVAILABLE,
-                LedgerSubjectCategory.ASSET,
-                null);
+        return ledgerEntry(subjectId, SUBJECT_TYPE, ledgerId, entrySide, amount, ledgerTransactionSn,
+                LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.ASSET, null,
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name());
     }
 
     private LedgerEntrySpec ledgerEntry(String subjectId,
@@ -606,16 +648,9 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                                         LedgerSubjectCode ledgerSubjectCode,
                                         LedgerSubjectCategory ledgerSubjectCategory,
                                         LedgerBalanceConstraintType balanceConstraintType) {
-        return new TestLedgerEntrySpec(
-                subjectId,
-                SUBJECT_TYPE,
-                ledgerId,
-                entrySide,
-                amount,
-                ledgerTransactionSn,
-                ledgerSubjectCode,
-                ledgerSubjectCategory,
-                balanceConstraintType);
+        return ledgerEntry(subjectId, SUBJECT_TYPE, ledgerId, entrySide, amount, ledgerTransactionSn,
+                ledgerSubjectCode, ledgerSubjectCategory, balanceConstraintType,
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name());
     }
 
     private LedgerEntrySpec ledgerEntry(String subjectId,
@@ -627,6 +662,22 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                                         LedgerSubjectCode ledgerSubjectCode,
                                         LedgerSubjectCategory ledgerSubjectCategory,
                                         LedgerBalanceConstraintType balanceConstraintType) {
+        return ledgerEntry(subjectId, subjectType, ledgerId, entrySide, amount, ledgerTransactionSn,
+                ledgerSubjectCode, ledgerSubjectCategory, balanceConstraintType,
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name());
+    }
+
+    private LedgerEntrySpec ledgerEntry(String subjectId,
+                                        String subjectType,
+                                        Long ledgerId,
+                                        EntrySide entrySide,
+                                        Money amount,
+                                        String ledgerTransactionSn,
+                                        LedgerSubjectCode ledgerSubjectCode,
+                                        LedgerSubjectCategory ledgerSubjectCategory,
+                                        LedgerBalanceConstraintType balanceConstraintType,
+                                        AccountBalancePeriodType periodType,
+                                        String periodId) {
         return new TestLedgerEntrySpec(
                 subjectId,
                 subjectType,
@@ -636,7 +687,9 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 ledgerTransactionSn,
                 ledgerSubjectCode,
                 ledgerSubjectCategory,
-                balanceConstraintType);
+                balanceConstraintType,
+                periodType,
+                periodId);
     }
 
     private Long createAvailableLedger(String subjectId) {
@@ -708,6 +761,34 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
     private Long createAvailableLedger(String subjectId, long initialBalance) {
         Long ledgerId = createAvailableLedger(subjectId);
+        if (initialBalance != 0L) {
+            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
+                    .setId(ledgerId)
+                    .setDebitAmountDelta(initialBalance)
+                    .setCreditAmountDelta(0L));
+        }
+        return ledgerId;
+    }
+
+    private Long createAvailableLedger(String subjectId,
+                                       AccountBalancePeriodType periodType,
+                                       String periodId,
+                                       long initialBalance) {
+        Long ledgerId = ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(subjectId)
+                .setSubjectType(SUBJECT_TYPE)
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC.name())
+                .setLedgerProfileVersion(1)
+                .setLedgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.ASSET)
+                .setNormalBalanceSide(EntrySide.DEBIT)
+                .setAllowNegative(Boolean.FALSE)
+                .setCurrency(CURRENCY)
+                .setSettlementPolicy("RT")
+                .setCutOffTime(LocalTime.MIDNIGHT)
+                .setPeriodType(periodType)
+                .setPeriodId(periodId));
         if (initialBalance != 0L) {
             ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
                     .setId(ledgerId)
@@ -901,7 +982,9 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                                        String ledgerTransactionSn,
                                        LedgerSubjectCode ledgerSubjectCode,
                                        LedgerSubjectCategory ledgerSubjectCategory,
-                                       LedgerBalanceConstraintType balanceConstraintType)
+                                       LedgerBalanceConstraintType balanceConstraintType,
+                                       AccountBalancePeriodType periodType,
+                                       String periodId)
             implements LedgerEntrySpec {
 
         @Override
@@ -952,6 +1035,16 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         @Override
         public LedgerBalanceConstraintType getBalanceConstraintType() {
             return balanceConstraintType;
+        }
+
+        @Override
+        public AccountBalancePeriodType getPeriodType() {
+            return periodType;
+        }
+
+        @Override
+        public String getPeriodId() {
+            return periodId;
         }
 
         @Override

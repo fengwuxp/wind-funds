@@ -1,6 +1,7 @@
 package com.wind.funds.ledger.query;
 
 
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -46,6 +47,12 @@ public class LedgerEntryQuery {
 
     @Schema(description = "账本交易流水号")
     private String ledgerTransactionSn;
+
+    @Schema(description = "账本周期类型")
+    private AccountBalancePeriodType periodType;
+
+    @Schema(description = "账本周期 ID")
+    private String periodId;
 
     @Schema(description = "账本分录类型（借贷）")
     private EntrySide entryType;

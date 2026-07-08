@@ -1,5 +1,6 @@
 package com.wind.funds.spec.ledger;
 
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
@@ -53,6 +54,16 @@ public interface LedgerEntrySpec {
     @Nullable
     default Long getLedgerId() {
         return null;
+    }
+
+    @NonNull
+    default AccountBalancePeriodType getPeriodType() {
+        return AccountBalancePeriodType.LIFETIME;
+    }
+
+    @NonNull
+    default String getPeriodId() {
+        return AccountBalancePeriodType.LIFETIME.name();
     }
 
     @NonNull

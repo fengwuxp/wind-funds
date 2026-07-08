@@ -73,6 +73,8 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             LedgerEntry.Fields.tenantId,
             LedgerEntry.Fields.subjectId,
             LedgerEntry.Fields.subjectType,
+            LedgerEntry.Fields.periodType,
+            LedgerEntry.Fields.periodId,
             LedgerEntry.Fields.ledgerSubjectCode,
             LedgerEntry.Fields.ledgerSubjectCategory,
             LedgerEntry.Fields.entrySide,
@@ -448,6 +450,8 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
                 .and(ledgerEntry.ledgerSubjectCode.eq(query.getLedgerSubjectCode()))
                 .and(ledgerEntry.ledgerSubjectCategory.eq(query.getLedgerSubjectCategory()))
                 .and(ledgerEntry.ledgerTransactionSn.eq(query.getLedgerTransactionSn()))
+                .and(ledgerEntry.periodType.eq(query.getPeriodType()))
+                .and(ledgerEntry.periodId.eq(query.getPeriodId()))
                 .and(ledgerEntry.entrySide.eq(query.getEntryType()))
                 .and(ledgerEntry.businessScene.eq(query.getBusinessScene()))
                 .and(ledgerEntry.businessSn.eq(query.getBusinessSn()))

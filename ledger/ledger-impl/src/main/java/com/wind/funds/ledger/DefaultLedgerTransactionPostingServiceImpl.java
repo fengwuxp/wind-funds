@@ -293,6 +293,9 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                 ledger.getNormalBalanceSide());
         AssertUtils.isTrue(ledger.getCurrency() == entry.getCurrency(),
                 "账本分录币种与账本币种不一致，ledgerId = {}", ledger.getId());
+        AssertUtils.isTrue(ledger.getPeriodType() == entry.getPeriodType()
+                        && Objects.equals(ledger.getPeriodId(), entry.getPeriodId()),
+                "账本分录周期与账本周期不一致，ledgerId = {}", ledger.getId());
         AssertUtils.isTrue(entry.getBalanceConstraintType() != LedgerBalanceConstraintType.ALLOW_NEGATIVE
                         || Boolean.TRUE.equals(ledger.getAllowNegative()),
                 "账本 profile 不允许负余额，ledgerId = {}, ledgerSubjectCode = {}",

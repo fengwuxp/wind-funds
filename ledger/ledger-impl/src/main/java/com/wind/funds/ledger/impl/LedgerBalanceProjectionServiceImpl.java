@@ -5,16 +5,13 @@ import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.spring.SpringEventPublishUtils;
-import com.wind.funds.ledger.LedgerBalanceBucket;
 import com.wind.funds.ledger.LedgerBalanceChangedEvent;
 import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.LedgerNormalBalanceGuard;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
-import com.wind.funds.wallet.FundsAccountBalanceView;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.transaction.core.Money;
@@ -59,9 +56,9 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
         // 按照 ledger_id 分组，避免同一科目在不同周期账本间串账。
         Map<Long, List<LedgerEntrySpec>> groups = entries.stream()
                 .collect(Collectors.groupingBy(this::requireLedgerId, LinkedHashMap::new, Collectors.toList()));
-        FundsAccountBalanceView beforeBalance = fundsAccountQueryService.getBalance(accountId);
+        fundsAccountQueryService.getBalance(accountId);
         List<ProjectionCommand> commands = groups.entrySet().stream()
-                .map(entry -> prepareProjectionCommand(accountId, beforeBalance, entry.getKey(), entry.getValue()))
+                .map(entry -> prepareProjectionCommand(entry.getKey(), entry.getValue()))
                 .toList();
         commands.forEach(command -> {
             LedgerDTO ledger = command.ledger();
@@ -75,23 +72,13 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
         });
     }
 
-    private ProjectionCommand prepareProjectionCommand(FundsAccountId accountId,
-                                                       FundsAccountBalanceView beforeBalance,
-                                                       Long ledgerId,
+    private ProjectionCommand prepareProjectionCommand(Long ledgerId,
                                                        List<LedgerEntrySpec> entries) {
         LedgerDTO ledger = ledgerService.getLedgerById(ledgerId);
         AssertUtils.notNull(ledger, "账本不存在，ledgerId = {}", ledgerId);
         assertEntriesMatchLedger(ledger, entries);
-        LedgerSubjectCode ledgerCode = ledger.getLedgerSubjectCode();
         ProjectionDelta delta = computeProjectionDelta(entries, ledger.getNormalBalanceSide());
-        LedgerBalanceBucket beforeBalanceBucket = beforeBalance.getBalanceBucketNullable(ledgerCode);
-        AssertUtils.notNull(beforeBalanceBucket,
-                "资金账户余额桶未初始化，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, ledgerId = {}",
-                accountId.id(),
-                accountId.type(),
-                ledgerCode,
-                ledgerId);
-        Money beforeBalanceAmount = beforeBalanceBucket.balance();
+        Money beforeBalanceAmount = Money.immutable(ledger.getNormalBalance(), ledger.getCurrency());
         assertMustNotBeNegativeBalance(ledger, entries, beforeBalanceAmount, delta);
         return new ProjectionCommand(ledger, entries, beforeBalanceAmount, delta);
     }

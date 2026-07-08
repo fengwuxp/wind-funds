@@ -182,6 +182,8 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         SubjectRef subjectRef = node.getSubjectRef();
         return DefaultLedgerEntrySpec.builder()
                 .ledgerId(ledger.getId())
+                .periodType(ledger.getPeriodType())
+                .periodId(ledger.getPeriodId())
                 .subjectId(subjectRef.getSubjectId())
                 .subjectType(subjectRef.getSubjectType().name())
                 .ledgerSubjectCode(node.getLedgerSubjectCode())
@@ -411,6 +413,10 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
 
         private final Long ledgerId;
 
+        private final AccountBalancePeriodType periodType;
+
+        private final String periodId;
+
         private final String ledgerTransactionSn;
 
         private final EntrySide entryType;
@@ -451,6 +457,8 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                                        LedgerSubjectCode ledgerSubjectCode,
                                        LedgerSubjectCategory ledgerSubjectCategory,
                                        Long ledgerId,
+                                       AccountBalancePeriodType periodType,
+                                       String periodId,
                                        String ledgerTransactionSn,
                                        EntrySide entryType,
                                        LedgerPhaseCode phaseCode,
@@ -473,6 +481,8 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             this.ledgerSubjectCode = ledgerSubjectCode;
             this.ledgerSubjectCategory = ledgerSubjectCategory;
             this.ledgerId = ledgerId;
+            this.periodType = periodType;
+            this.periodId = periodId;
             this.ledgerTransactionSn = ledgerTransactionSn;
             this.entryType = entryType;
             this.phaseCode = phaseCode;

@@ -1,5 +1,6 @@
 package com.wind.funds.ledger.dto;
 
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -63,6 +64,12 @@ public class LedgerEntryDTO {
 
     @Schema(description = "对应 t_ledger.id")
     private Long ledgerId;
+
+    @Schema(description = "账本周期类型快照")
+    private AccountBalancePeriodType periodType;
+
+    @Schema(description = "账本周期 ID 快照")
+    private String periodId;
 
     @Schema(description = "账务主体 ID")
     private String subjectId;

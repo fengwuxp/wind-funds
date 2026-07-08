@@ -71,6 +71,8 @@ public interface LedgerConverter {
     @Mapping(target = "subjectId", expression = "java(data.getSubjectId())")
     @Mapping(target = "subjectType", expression = "java(data.getSubjectType())")
     @Mapping(target = "entrySide", source = "entryType")
+    @Mapping(target = "periodType", expression = "java(data.getPeriodType())")
+    @Mapping(target = "periodId", expression = "java(data.getPeriodId())")
     @Mapping(target = "amount", expression = "java(data.getAmount().getAmount())")
     @Mapping(target = "currency", expression = "java(data.getAmount().getCurrency())")
     @Mapping(target = "originalAmount", expression = "java(data.getOriginalAmount().getAmount())")
@@ -90,6 +92,8 @@ public interface LedgerConverter {
      * @return LedgerEntryDTO 实例
      */
     @Mapping(target = "entryType", source = "entrySide")
+    @Mapping(target = "periodType", source = "periodType")
+    @Mapping(target = "periodId", source = "periodId")
     @Mapping(target = "amount", expression = "java(new Money(data.getAmount(),data.getCurrency()))")
     @Mapping(
             target = "originalAmount",
