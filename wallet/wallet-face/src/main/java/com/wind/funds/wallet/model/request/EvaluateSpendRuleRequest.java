@@ -48,7 +48,8 @@ public class EvaluateSpendRuleRequest implements Serializable {
     @NotNull
     private PaymentInstrumentAction action;
 
-    @Schema(description = "交易金额，最小货币单位")
+    @Schema(description = "调用方已归一后的本次评估金额，最小货币单位；"
+            + "卡授权场景不得让本服务从 requested amount、退款或撤销事实反推授权累计口径")
     @NotNull
     private Long amount;
 

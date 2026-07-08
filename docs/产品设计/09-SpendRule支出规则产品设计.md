@@ -73,8 +73,8 @@ Spend Rule 的产品归属是钱包支出控制域。它围绕支付工具、预
 边界结论：
 
 1. `wallet` 可以调用 `transaction` 账户主体型交易服务完成业务编排。
-2. `transaction` 不直接依赖 `wallet` 的 Spend Rule application service、规则定义表、控制额度变动流水表或预算控制投影模型。
-3. `transaction` 只消费 `spendRuleDecision` 这类已固化快照、route snapshot 或控制额度变动引用，不重新计算规则。
+2. `transaction-impl` 可以通过 `wallet-face` 稳定契约承接交易后控制消费、释放或退款补偿适配；不得依赖 `wallet-impl`、规则定义表、控制额度变动流水表、Mapper 或预算控制投影模型。
+3. `transaction` 只消费 `spendRuleDecision` 这类已固化快照、route snapshot 或控制额度变动引用，不重新计算规则，不管理规则定义、版本、挂载或决策记录。
 4. `ledger` 不识别 Spend Rule 为账本主体，也不从 Spend Rule 或预算控制视图派生账本余额。
 
 ## 3. 背景、问题、目标与非目标
@@ -379,11 +379,12 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 
 ### 12.2 Highnote Spend Controls 对齐后的能力边界
 
-本节只承接 Highnote Spend Rules、Velocity Controls 和 Collaborative Authorization 对齐后的稳定能力边界，不代表已实现或授权完整托管式规则平台。当前基线继续定位为“规则事实、决策证据、控制额度流水和只读投影”，后续新增能力必须按单一工程边界评审。
+本节只承接 Highnote Spend Rules、Velocity Controls 和 Collaborative Authorization 对齐后的稳定能力边界，不代表已实现或授权完整托管式规则平台。Highnote 官方页只作为 2026-07-07 的能力校准来源，不作为本项目事实、合规结论或外部平台兼容承诺。当前基线继续定位为“规则事实、决策证据、控制额度流水和只读投影”，后续新增能力必须按单一工程边界评审。
 
 | 能力项 | 目标 | Owner | 最小交付 | 验证方式 | 停止条件 |
 | --- | --- | --- | --- | --- | --- |
 | 接入口径 | 明确对外接入口径：当前先支持上游已决策的 Spend Rule 证据和控制额度事实，不声明托管式规则引擎。 | 产品 owner、架构 owner。 | 用户接入指南、TDD 入口和系分入口同步说明“上游决策、wallet 固化证据、transaction 消费快照”。 | 文档 diff、现有 Spend Rule 服务层测试清单可反查。 | 发现需要新增公共 API、DTO 字段或 DDL 时停止，转工程边界评审。 |
+| 金额和事件口径 | 防止把外部 requested amount、authorized amount、reversal、refund 或异步规则结果延迟混成同一口径。 | 产品 owner、架构 owner、wallet owner。 | `EvaluateSpendRuleRequest.amount` 只表示调用方已归一后的本次评估金额；控制累计只读取本系统 `SpendControlMovement` 和预算控制投影；外部异步规则结果延迟由上游证据系统承接。 | 接入说明、接口注释和现有 evaluator / 控制流水测试可反查。 | 需要复刻 Highnote 15 秒延迟模型、按外部 requested amount 推导授权金额、按退款 / 撤销事件重算外部平台累计授权口径，或承接 Highnote authorization hold configuration 时停止。 |
 | 轻量规则评估 | 补最小可执行规则切片，只覆盖单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果。 | 架构 owner、wallet owner、测试 owner。 | 规则执行只作为可选轻量 evaluator，不引入表达式引擎、脚本沙箱或运营后台。 | 新增最小 TDD：超单笔拒绝、周期超额拒绝、次数超限拒绝、MCC / 商户国家 / 卡数据输入能力 / 卡交易处理类型 / 商户标识 / PAN 录入方式 / POS 类别 / CVV 必填 / 邮编校验结果拒绝和拒绝无资金事实副作用。 | 需要多规则复杂冲突、脚本、外部风控、街道地址原文或卡组织正式规则时停止。 |
 | 控制窗口模型 | 将 velocity control 收敛为控制窗口模型，不复用账本周期，不新增预算组账本。 | 产品 owner、架构 owner、wallet owner。 | 明确 `windowType`、`periodId`、时区和重置口径，复用 `SpendControlMovement` 和预算控制投影。 | 控制窗口 TDD 证明当前周期和历史周期可查询，跨周期、跨账户、跨 scope 不串账。 | 需要 rolling amount、cooldown 或生产调度重置时停止，拆独立任务。 |
 | 外部决策证据 | 评估协同授权接入边界，只定义本系统消费外部 approve / decline 证据的契约。 | 产品 owner、风控 owner、架构 owner。 | 保持 `SpendControlAdmissionApplicationService` 消费外部决策证据；不内建 webhook 注册、验签、超时和 stand-in。 | 准入测试证明外部拒绝无 route、posting、LedgerEntry，外部通过仍需账户能力和资金责任校验。 | 一旦要做 webhook endpoint、HMAC、超时兜底或模拟工具，转外部接入工程边界。 |
@@ -396,10 +397,11 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 
 1. 最小 evaluator 只输出规则评估结论，不写 Spend Rule 决策记录、控制额度变动流水、资金交易、route、posting、LedgerEntry 或账本投影。
 2. `SpendControlAdmissionApplicationService` 继续保持“消费上游决策证据并固化控制事实”的现有职责，不扩展为规则执行入口。
-3. 当前已新增独立 wallet evaluator 契约，单笔切片输入已发布的 `ruleId`、`ruleVersion`、交易金额、币种、支付工具动作和业务流水，读取已发布 `ruleSpec.limitSpec.amountLimit`，输出 `PASSED` / `REJECTED`、拒绝原因和决策摘要候选。
+3. 当前已新增独立 wallet evaluator 契约，单笔切片输入已发布的 `ruleId`、`ruleVersion`、调用方已归一后的本次评估金额、币种、支付工具动作和业务流水，读取已发布 `ruleSpec.limitSpec.amountLimit`，输出 `PASSED` / `REJECTED`、拒绝原因和决策摘要候选。该金额不由 evaluator 从外部 requested amount、原始网络字段或交易退款 / 撤销事实推导；周期和滚动控制只读本系统控制流水和控制投影。
 4. 当前已落地单笔限额超限拒绝、限额内通过、摘要稳定、周期金额可用额度不足拒绝、周期次数达到上限拒绝、滚动窗口次数达到上限拒绝、窗口外历史流水不误拒绝、MCC 黑白名单拒绝 / 通过、商户国家黑白名单拒绝 / 通过、卡数据输入能力黑白名单拒绝 / 通过、卡交易处理类型黑白名单拒绝 / 通过、商户标识黑白名单拒绝 / 通过、PAN 录入方式黑白名单拒绝 / 通过、POS 类别黑白名单拒绝 / 通过、CVV 必填拒绝 / 通过、AVS 邮编校验结果拒绝 / 通过、币种黑白名单拒绝 / 通过，以及本地授权时间窗口拒绝 / 通过；周期金额通过 `controlScopeId`、`periodId` 和可选 `targetAccountId` 只读复用 `BudgetControlProjectionDTO`，周期次数通过同一控制范围和周期下的既有控制占用 / 消耗流水按原始占用流水去重计数，滚动窗口次数通过 `counterSpec.windowMode=ROLLING`、`windowSizeMinutes`、请求 `authorizationTime` 和既有控制占用 / 消耗流水创建时间按原始占用流水去重计数，MCC 通过 `EvaluateSpendRuleRequest.merchantCategoryCode` 和 `ruleSpec.limitSpec.merchantCategoryControl` 判断，商户国家通过 `EvaluateSpendRuleRequest.merchantCountryCode` 和 `ruleSpec.limitSpec.merchantCountryControl` 判断，卡数据输入能力通过 `EvaluateSpendRuleRequest.cardDataInputCapability` 和 `ruleSpec.limitSpec.cardDataInputCapabilityControl` 判断，卡交易处理类型通过 `EvaluateSpendRuleRequest.cardTransactionProcessingType` 和 `ruleSpec.limitSpec.cardTransactionProcessingTypeControl` 判断，商户标识通过 `EvaluateSpendRuleRequest.merchantId` 和 `ruleSpec.limitSpec.merchantIdControl` 判断，PAN 录入方式通过 `EvaluateSpendRuleRequest.panEntryMode` 和 `ruleSpec.limitSpec.panEntryModeControl` 判断，POS 类别通过 `EvaluateSpendRuleRequest.pointOfServiceCategory` 和 `ruleSpec.limitSpec.pointOfServiceCategoryControl` 判断，CVV 必填通过 `EvaluateSpendRuleRequest.cvvProvided` 和 `ruleSpec.limitSpec.cvvControl.required` 判断，AVS 邮编校验通过 `EvaluateSpendRuleRequest.postalCodeVerificationResult` 和 `ruleSpec.limitSpec.postalCodeVerificationControl` 判断，币种通过 `EvaluateSpendRuleRequest.currency` 和 `ruleSpec.limitSpec.currencyControl` 判断，时间窗口通过 `EvaluateSpendRuleRequest.authorizationTime` 和 `ruleSpec.limitSpec.timeWindowControl.allowedWindows` 判断，均不新增控制流水或资金事实；其中滚动窗口次数只是只读候选评估，不是并发强一致频控拦截。
 5. `merchantCategoryControl.deniedMccCodes` / `allowedMccCodes`、`merchantCountryControl.deniedCountryCodes` / `allowedCountryCodes`、`cardDataInputCapabilityControl.deniedCardDataInputCapabilities` / `allowedCardDataInputCapabilities`、`cardTransactionProcessingTypeControl.deniedCardTransactionProcessingTypes` / `allowedCardTransactionProcessingTypes`、`merchantIdControl.deniedMerchantIds` / `allowedMerchantIds`、`panEntryModeControl.deniedPanEntryModes` / `allowedPanEntryModes`、`pointOfServiceCategoryControl.deniedPointOfServiceCategories` / `allowedPointOfServiceCategories` 和 `postalCodeVerificationControl.deniedVerificationResults` / `allowedVerificationResults` 缺省时按空集合处理；黑名单命中优先拒绝，白名单非空且未命中时拒绝。CVV 必填规则只接收 `cvvProvided` 布尔事实，AVS 邮编校验只接收 `MATCH` / `NO_MATCH` 等校验结果事实，不接收或保存 CVV、邮编或街道地址原文。
-6. 若发现需要新增数据库字段、规则运营后台、外部风控协议、协同授权 webhook、rolling amount、cooldown、强一致频控拦截、生产 DDL / 索引校验或复杂多规则裁决，应停止当前最小 evaluator，拆成独立工程边界。
+6. Highnote 页面中的 maximum amount variance on credit limit、maximum percent variance on credit limit、conditional rule、deposit amount、deposit count、deposit processing network 和 street address 等规则类型当前不进入 wallet evaluator：信用额度浮动类规则由授信 / 风控专项承接，conditional rule 不进入单条 evaluator，外部确认入金由 `transaction` 外部资金事件入口承接，街道地址原文不得进入资金底座，地址类控制只接收外部 AVS / 邮编校验结果事实。
+7. 若发现需要新增数据库字段、规则运营后台、外部风控协议、协同授权 webhook、rolling amount、cooldown、强一致频控拦截、生产 DDL / 索引校验或复杂多规则裁决，应停止当前最小 evaluator，拆成独立工程边界。
 
 当前能力：接入口径已同步为“上游决策、wallet 固化证据、transaction 消费快照”；轻量 evaluator 已落地单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果代码切片；控制窗口以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，证明跨周期、跨账户、跨控制范围不串账，且准入 / 授权公共契约已补齐 `controlScopeId` 目标字段并保留 `budgetGroupSn` 兼容映射；外部 approve / decline 决策证据准入已确认外部拒绝无资金事实副作用，外部通过仍不得绕过支付工具、账户能力和资金责任校验；多规则裁决当前只消费最终决策流水、结果、摘要和拒绝原因，不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段；挂载范围已支持 `ACCOUNT_HIERARCHY` 并明确 Highnote 对象只映射为控制 scope，不成为资金主体或账本主体；币种控制和本地授权时间窗口 evaluator 已明确时间由调用方按业务或规则时区归一化后传入；滚动窗口次数 evaluator 以请求授权时间锚定窗口，只读既有控制流水，不提供并发强一致频控拦截。后续仍不扩展规则引擎、时区换算、节假日、rolling amount、cooldown、生产调度、强一致频控拦截、webhook、外部风控协议、多规则明细落库、授权用户主数据或卡产品主数据。
 

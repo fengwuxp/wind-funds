@@ -40,6 +40,24 @@
 | 让利出资记账 | `FundsBenefitContributionTransactionService` | 平台/商户/合作方已决策让利出资入账和按原交易冲回。 | `FundsBenefitContributionTransactionServiceContractTests`、`FundsBenefitContributionTransactionServiceFlowTests` |
 | 外部确认入金 | `ExternalFundsEventApplicationService` | 已确认外部入金消费为标准充值，目标必须是资金账户。 | `ExternalFundsEventApplicationServiceTests` |
 
+### 4.1 当前生产准出基线
+
+本表是当前接入承诺的最小基线。新增公共契约、扩展业务能力或进入 P2 场景前，必须重新确认写入范围、验证命令和不接入范围。
+
+| 能力域 | 准出结论 | 当前可交付内容 | 生产接入前仍需确认 |
+| --- | --- | --- | --- |
+| `ledger` 账本主链 | 可接入。 | 建账、过账、账本交易、分录查询和余额投影。 | 业务场景必须提供账务主体、账目、币种、幂等和 posting 平衡验收。 |
+| `wallet` 账户和支付工具 | 可接入。 | 资金账户、信用账户、账户能力、支付工具能力、绑定快照和交易前快照。 | 支付工具只做引用和准入快照，不作为账本主体；敏感数据不得进入 request、日志和投影。 |
+| `wallet` 资金责任 | 可接入。 | 按支出主体解析资金账户或信用账户责任主体。 | 多资金责任、错币种、停用账户和冲突优先级必须在准入前失败。 |
+| `wallet` Spend Rule / 预算控制 | 受控试点可用。 | 单条规则只读评估、最终决策固化、周期额度流水、消费/释放/退款补偿和控制投影查询。 | 多规则组合裁决、强一致授权拦截、rolling amount、cooldown、外部协同授权和生产调度由上游或专项承接。 |
+| `transaction` 直接交易 | 可接入。 | 充值、转账、付款、退款、提现、手续费和退费。 | 外部 pending、审批中或通道处理中不得进入交易事实。 |
+| `transaction` 授权交易 | 可接入。 | 授权、撤销、完成和完成后退款，后继动作基于原路径。 | 授权拒绝不得生成 route、posting、ledger entry；清算、争议和强制完成需按专项边界确认。 |
+| `transaction` 余额控制 | 可接入。 | 冻结、解冻、受控余额调整和失败无副作用。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`，不表达扣款、消费或跨主体转移。 |
+| 让利出资记账 | 可接入。 | 上游已决策的平台、商户或合作方让利出资入账，以及按原交易冲回。 | 不计算券、不维护券生命周期、不保存营销归因；非入账权益不进本服务。 |
+| 外部确认入金 | 可接入。 | `confirmed credit -> funding account` 转为标准充值。 | accepted、submitted、processing、message sent、VA 未匹配、错币种和外部账户入账均不得进入本入口。 |
+| 清结算 / 对账 / 归档 / 治理 | 不作为本文生产接入承诺。 | 可只读消费主链事实；已存在局部服务和测试只能作为专项依据。 | 需要独立产品设计、系统设计、TDD、DDL/H2、服务级测试、Runbook 和 owner 确认。 |
+| VCC / 全球账户 / ACH / 收单 / FX / 退汇 | P2 边界设计，不进入默认实现。 | 可复用主链事实和外部引用边界。 | 业务生命周期、外部规则、通道协议、合规、敏感数据和专项回归未确认前，不得声明生产可用。 |
+
 ## 5. 业务事实说明卡
 
 每个接入场景先填这 10 项，填不满就不要拆研发任务。前三类信息必须先回答账务三问。
@@ -138,6 +156,10 @@
 适用条件：需要在交易前固化支出控制决策，或记录交易消费对控制范围的影响。
 
 当前接入口径：接入方先完成规则判断或外部风控判断，`wallet` 只固化 Spend Rule 决策证据、控制额度流水和只读投影；如接入方只需要单条已发布规则的轻量评估，可先调用 `SpendRuleEvaluationApplicationService.evaluate` 覆盖单笔金额、周期金额可用额度、周期次数、滚动窗口次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填、AVS 邮编校验结果、币种黑白名单和本地授权时间窗口判断，再把最终决策证据交给准入服务固化。每个被 `evaluate` 的 `ruleSpec` 只允许一个可执行控制项；金额、MCC、币种、时间窗口等组合裁决需要拆成多条规则由上游合成最终结果。该 evaluator 只提供只读候选评估，不提供并发强一致授权拦截；本文不承诺 Highnote 式托管规则引擎、rolling amount、cooldown、生产调度或协同授权 webhook。
+
+金额和事件口径：`EvaluateSpendRuleRequest.amount` 是调用方已归一后的本次评估金额。卡授权接入方如果区分 requested amount 和 authorized amount，必须先在上游确定进入支出控制的金额口径，再传入 evaluator；wallet 不从外部原始网络字段、退款、撤销或 Highnote 式延迟结果中推导累计授权金额。周期额度、周期次数和滚动窗口次数只读取本系统已有 `SpendControlMovement` 与预算控制投影；交易成功、失败、撤销、过期和退款对控制事实的影响，继续由交易消费控制活动记录。
+
+不承接规则类型：Highnote 文档中的 maximum amount variance on credit limit、maximum percent variance on credit limit、conditional rule、authorization hold configuration、deposit amount、deposit count、deposit processing network 和 street address 当前不进入 wallet Spend Rule evaluator。信用额度浮动类规则由授信 / 风控专项承接；authorization hold configuration 不改变本项目授权占用和释放语义；外部确认入金走 `transaction` 的外部资金事件入口；地址类控制只允许传入 AVS / 邮编校验结果事实，不接收或保存街道地址原文。
 
 外部风控或协同授权的 approve / decline 只作为最终决策证据进入 `SpendControlAdmissionApplicationService.resolve`。`REJECTED` 会在交易内核前停止；`PASSED` 仍然必须继续通过支付工具绑定、账户能力和资金责任校验，不能被接入方理解为资金可用、授权成功或已经完成交易。
 
