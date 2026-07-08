@@ -159,6 +159,8 @@
 
 金额和事件口径：`EvaluateSpendRuleRequest.amount` 是调用方已归一后的本次评估金额。卡授权接入方如果区分 requested amount 和 authorized amount，必须先在上游确定进入支出控制的金额口径，再传入 evaluator；wallet 不从外部原始网络字段、退款、撤销或 Highnote 式延迟结果中推导累计授权金额。周期额度、周期次数和滚动窗口次数只读取本系统已有 `SpendControlMovement` 与预算控制投影；交易成功、失败、撤销、过期和退款对控制事实的影响，继续由交易消费控制活动记录。
 
+Velocity 控制口径：Highnote 的 `PER_TRANSACTION` 在本项目只对应本次评估；`DAILY` / `WEEKLY` / `MONTHLY` / `QUARTERLY` / `YEARLY` 由接入方生成稳定 `periodId` 后查询控制投影；滚动次数只按 `ROLLING + windowSizeMinutes` 做只读候选评估；`NINETY_DAYS`、`COOLDOWN_MINUTE`、`COOLDOWN_HOUR`、rolling amount 和 Highnote 的 velocity control 数量上限当前不是 wallet 硬约束。Highnote velocity balance 查询只对应 `BudgetControlProjectionDTO` 的控制口径，不是资金账户余额或账本余额。
+
 不承接规则类型：Highnote 文档中的 maximum amount variance on credit limit、maximum percent variance on credit limit、conditional rule、authorization hold configuration、deposit amount、deposit count、deposit processing network 和 street address 当前不进入 wallet Spend Rule evaluator。信用额度浮动类规则由授信 / 风控专项承接；authorization hold configuration 不改变本项目授权占用和释放语义；外部确认入金走 `transaction` 的外部资金事件入口；地址类控制只允许传入 AVS / 邮编校验结果事实，不接收或保存街道地址原文。
 
 外部风控或协同授权的 approve / decline 只作为最终决策证据进入 `SpendControlAdmissionApplicationService.resolve`。`REJECTED` 会在交易内核前停止；`PASSED` 仍然必须继续通过支付工具绑定、账户能力和资金责任校验，不能被接入方理解为资金可用、授权成功或已经完成交易。
@@ -194,6 +196,13 @@ AVS 邮编校验结果场景示例：电商卡要求账单邮编校验匹配，�
 | 历史窗口查询 | 当前和历史周期都能用 `controlScopeId + periodId` 查询控制额度；需要按账户隔离时必须带目标账户和币种。 |
 | 告警和 Runbook | 摘要冲突、挂载冲突、拒绝率异常、控制投影缺证据、滚动窗口慢查询和迁移失败都要有发现方式、处理 owner、止血动作和恢复验收。 |
 | 灰度和回滚 | 规则回滚通过新增版本、停用挂载或恢复旧挂载完成；不得覆盖已发布版本、删除历史决策或修改历史控制流水。 |
+
+受控试点角色交接：
+
+- 产品 owner 确认试点只包含单条规则评估、最终决策证据、控制流水、控制投影和交易消费 / 释放 / 退款补偿。
+- 架构 owner 确认接入方只依赖 `wallet-face`、`transaction-face`、`ledger-face` 和 `core`，不依赖 `*-impl`、Entity、Mapper 或内部包。
+- 测试 owner 回挂 evaluator、admission、movement、projection 和 transaction consumption 验证簇；进入发版前补 `just compile`，提交前补 `just pmd`。
+- 发布 owner 确认灰度、回滚、告警、Runbook 和人工接管；确认不完整时停在联调、预发或受控试点。
 
 推荐入口：
 

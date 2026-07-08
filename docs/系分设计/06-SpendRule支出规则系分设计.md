@@ -860,6 +860,13 @@ Highnote Spend Controls 对齐后的后续工程边界以产品分册 09 的能�
 | 验证命令 | 原子实现优先 `just test-one SpendRuleEvaluationApplicationServiceTests tests`；若新增公共契约，再执行 `just compile` 和相关 wallet spend control 回归。 |
 | 停止条件 | 需要破坏公共兼容、改表、改交易 canonical 入参、引入规则引擎或让 transaction 执行 Spend Rule 时停止。 |
 
+Velocity 控制映射边界：
+
+1. Highnote `PER_TRANSACTION` 只映射为本次评估，不生成控制窗口；`DAILY` / `WEEKLY` / `MONTHLY` / `QUARTERLY` / `YEARLY` 由上游生成稳定 `periodId` 后进入 `SpendControlMovement` / `BudgetControlProjection` 查询。
+2. `NINETY_DAYS`、滚动次数和自定义滚动窗口只允许走 `counterSpec.windowMode=ROLLING + windowSizeMinutes` 的只读候选评估；当前不新增窗口聚合表、调度器或强一致频控锁。
+3. `COOLDOWN_MINUTE` / `COOLDOWN_HOUR`、rolling amount、每个 velocity control 三条规则上限和每个挂载对象十个 velocity controls 上限，均不是当前 wallet 运行时硬约束；需要时按独立工程边界补规则挂载容量校验和性能验证。
+4. Highnote velocity balance 查询只映射为预算控制投影查询，读取 `controlScopeId + periodId + currency + 可选 targetAccountId` 下的控制口径；不得返回资金账户余额、账本余额或授权占用余额。
+
 ## 14. 能力状态和生产未覆盖项
 
 | 能力域 | 当前证据 | 生产准入前还需 | 验证入口 |

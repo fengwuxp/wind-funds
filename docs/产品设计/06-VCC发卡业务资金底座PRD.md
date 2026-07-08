@@ -627,12 +627,26 @@ VCC 对账不追求把供应商账单、授权、清算、费用、资金流水�
 | B5-SR-CONTROL | MCC、金额、次数、时间窗、预算不足、规则版本变更。 | Spend Rule 和预算只生成控制事实和投影，不写账本主体。 |
 | B6/B8-PI-VIEW | 同一父账户下多共享卡投影、换绑后退款、预付充值后授权、未确认入金拒绝。 | 子账户账务和父账户汇总可解释，卡和使用人视图从投影生成。 |
 
+#### 13.7.1 Highnote Issue Virtual Cards 承接矩阵
+
+本矩阵把 Highnote “先有 approved account holder，再 issue financial account，再 issue / activate virtual payment card，并处理 PAR/PAN lineage、PIN、physical / tokenized card 后续”的发卡路径落成本项目边界。结论仍是：`wind-funds` 承接资金、钱包、支付工具引用、授权交易、账本、投影和对账证据；不承接完整发卡产品、发卡处理商协议、卡生命周期、PAN/CVC、HSM、PIN 或 token vault。
+
+| Highnote 发卡节点 | `wind-funds` 承接方式 | 首期任务 | 停止条件 |
+| --- | --- | --- | --- |
+| Account holder approved application | 只消费上游已批准的企业、持卡人、业务单和合规结果引用。 | 产品 owner 冻结上游对象引用和幂等键。 | 需要在资金底座实现开户申请、KYC/KYB、持卡人生命周期或审批流。 |
+| Issue financial account | 映射为 VCC 关联资金子账户或信用子账户，并保留父账户、账目 profile、责任来源和审计引用。 | 架构 owner 推进 `B2-ACCOUNT-HIERARCHY` 和 `targetSubjectType + targetSubjectId` 决策。 | 仍只有 `fundingAccountId`，或需要新增 `VCC_ACCOUNT`。 |
+| Issue virtual card / card profile | 虚拟卡、卡产品和 card profile 只进入 `PaymentInstrumentRef`、绑定快照、产品场景和脱敏展示。 | wallet owner 推进 `B2-PI-CAP`，证明卡是工具不是账本主体。 | 需要保存完整 PAN/CVC、卡 profile 规则全集或卡生命周期状态机。 |
+| Payment card lineage / PAR / PAN | PAR、PAN lineage、reissue、close stolen card 属于发卡域；资金底座只保存脱敏工具引用、绑定版本和原 route snapshot。 | 测试 owner 补换绑后退款、撤销、拒付原路径回放验证。 | 需要用当前卡绑定重算历史资金路径。 |
+| Activate card / set PIN | 激活和 PIN 由发卡系统、SDK 或 PCI 边界承接；资金底座最多消费脱敏后的可用状态、PIN 校验结果或卡交易处理类型。 | 安全 owner 校验 request、contextVariables、日志、投影和测试夹具无敏感原文。 | 需要接收、保存或展示 PIN、CVV、完整 PAN、token secret。 |
+| Physical card / digital wallet / embedded device | 只作为外部工具形态和 token reference 进入支付工具引用。 | 产品 owner 明确它们不改变资金主体和账本模型。 | 需要在资金底座实现制卡、绑钱包、设备 token provisioning。 |
+
 ### 13.8 Highnote 参考核验
 
 本节引用 Highnote 公开文档作为产品和系统设计参考，不构成卡组织、发卡行、PCI、法律、税务、会计或合规最终规则。真实生产启用仍需法务、合规、财务、安全、发卡行、处理商和卡组织确认。
 
 | 参考来源 | 版本或发布日期 | 适用法域或适用范围 | 适用主体 | 生效日期 | 核验日期 | 确认方 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| Highnote Issue Virtual Cards，`https://docs.highnote.com/docs/issuing/cards/issue/issue-virtual-cards` | 页面 `dateModified=2026-06-12` | approved account holder、financial account、virtual payment card、PAR/PAN lineage、activation、PIN 和后续实体卡 / tokenized card 设计参考。 | VCC 发卡对象边界、支付工具映射、资金账户映射和 PCI 敏感数据边界参考。 | 不适用，本地设计参考。 | 2026-07-08 | 产品、架构；待发卡合作方、合规、财务和安全确认生产适用性。 | 已核验公开页面，不作为上线规则。 |
 | Highnote Using Ledgers，`https://docs.highnote.com/docs/issuing/accounts/funding/using-ledgers` | 页面 `dateModified=2026-02-15` | financial account、ledger、ledger entry、account balance 设计参考。 | `wind-funds` 资金账户、信用账户、父子账户、账本和投影设计参考。 | 不适用，本地设计参考。 | 2026-06-02 | 产品、架构；待法务/合规/财务/安全确认生产适用性。 | 已核验公开页面，不作为上线规则。 |
 | Highnote On-demand Funding，`https://docs.highnote.com/docs/issuing/accounts/funding/on-demand-funding` | 页面 `dateModified=2026-03-27` | source financial account、zero-balance / pseudo balance / pseudo limit 设计参考。 | 共享卡、预付卡和按需供资设计参考。 | 不适用，本地设计参考。 | 2026-06-02 | 产品、架构；待法务/合规/财务/发卡合作方确认生产适用性。 | 已核验公开页面，不作为上线规则。 |
 | Highnote Spend Rules，`https://docs.highnote.com/docs/issuing/spend-controls/spend-rules` | 页面 `dateModified=2026-05-19` | amount、MCC、merchant、country 等授权控制设计参考。 | Spend Rule 和预算控制设计参考。 | 不适用，本地设计参考。 | 2026-06-02 | 产品、风控、架构；待合规/卡组织/处理商确认生产适用性。 | 已核验公开页面，不作为上线规则。 |
