@@ -204,6 +204,15 @@ AVS 邮编校验结果场景示例：电商卡要求账单邮编校验匹配，�
 - 测试 owner 回挂 evaluator、admission、movement、projection 和 transaction consumption 验证簇；进入发版前补 `just compile`，提交前补 `just pmd`。
 - 发布 owner 确认灰度、回滚、告警、Runbook 和人工接管；确认不完整时停在联调、预发或受控试点。
 
+SC-LOOP-06 准出交接卡：
+
+| 交接项 | 结论 |
+| --- | --- |
+| 试点能力 | 单条规则只读评估、最终决策证据固化、控制流水、控制投影和交易消费 / 释放 / 退款补偿。 |
+| 推荐入口 | `evaluate` -> `resolve` -> `adjustLimit` -> 交易层入口 -> `consume`。 |
+| 生产前证据 | 规则变更审计、最终决策证据、历史窗口查询、告警 / Runbook、灰度 / 回滚。 |
+| 不接入范围 | P2 VCC / 全球账户 / ACH / 收单 / FX、Highnote 托管规则引擎、rolling amount、cooldown、协同授权 webhook、完整生产启用或上线审批。 |
+
 推荐入口：
 
 1. `SpendRuleEvaluationApplicationService.evaluate` 可选只读评估单条已发布规则
