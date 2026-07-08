@@ -570,6 +570,33 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     }
 
     /**
+     * 场景：MCC 命中白名单规则，且请求 MCC 带有前后空白。
+     * 输入：规则只允许 MCC 5812，请求评估 MCC 为 " 5812 "。
+     * 输出：按同一个 MCC 返回通过评估结论。
+     * 红线：输入格式空白不能让白名单命中误拒，也不能新增控制流水、决策记录或资金事实。
+     */
+    @Test
+    void testEvaluateMerchantCategoryAllowListHitShouldTrimRequestMccWithoutFundsSideEffect() {
+        publishMccAllowRuleVersion();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleEvaluationDecisionDTO decision = spendRuleEvaluationApplicationService.evaluate(
+                evaluateRequest()
+                        .setRuleId(MCC_ALLOW_RULE_ID)
+                        .setMerchantCategoryCode(" 5812 "));
+
+        assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getRejectReason()).isNull();
+        assertThat(decision.getDecisionDigest()).startsWith("sha256:");
+        assertThat(decision.getRuleId()).isEqualTo(MCC_ALLOW_RULE_ID);
+        assertThat(decision.getRuleVersion()).isEqualTo(RULE_VERSION);
+        assertNoSpendRuleDecisionRecord(MCC_ALLOW_RULE_ID);
+        assertThat(countSpendControlMovement(MCC_ALLOW_RULE_ID)).isZero();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：商户国家黑名单规则命中拒绝。
      * 输入：规则拒绝国家 CU，请求评估商户国家为 CU。
      * 输出：返回拒绝评估结论。

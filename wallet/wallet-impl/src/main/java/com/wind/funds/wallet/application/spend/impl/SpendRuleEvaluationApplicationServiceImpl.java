@@ -579,11 +579,12 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
     private SpendControlDecisionResult evaluateMerchantCategory(EvaluateSpendRuleRequest request,
                                                                 MerchantCategoryControl control) {
         AssertUtils.hasText(request.getMerchantCategoryCode(), "商户类别规则评估 MCC 不能为空");
-        if (control.deniedMccCodes().contains(request.getMerchantCategoryCode())) {
+        String merchantCategoryCode = request.getMerchantCategoryCode().trim();
+        if (control.deniedMccCodes().contains(merchantCategoryCode)) {
             return SpendControlDecisionResult.REJECTED;
         }
         if (!control.allowedMccCodes().isEmpty()
-                && !control.allowedMccCodes().contains(request.getMerchantCategoryCode())) {
+                && !control.allowedMccCodes().contains(merchantCategoryCode)) {
             return SpendControlDecisionResult.REJECTED;
         }
         return SpendControlDecisionResult.PASSED;
@@ -907,7 +908,7 @@ public class SpendRuleEvaluationApplicationServiceImpl implements SpendRuleEvalu
         digestValues.put("businessScene", request.getBusinessScene());
         digestValues.put("businessSn", request.getBusinessSn());
         digestValues.put("merchantCategoryCode",
-                request.getMerchantCategoryCode() == null ? "" : request.getMerchantCategoryCode());
+                request.getMerchantCategoryCode() == null ? "" : request.getMerchantCategoryCode().trim());
         digestValues.put("merchantId", request.getMerchantId() == null ? "" : request.getMerchantId().trim());
         digestValues.put("merchantCountryCode",
                 request.getMerchantCountryCode() == null ? "" : normalizeUpperCode(request.getMerchantCountryCode()));

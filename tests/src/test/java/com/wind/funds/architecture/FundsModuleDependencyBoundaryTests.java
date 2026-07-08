@@ -137,7 +137,20 @@ class FundsModuleDependencyBoundaryTests {
     private static final List<String> WALLET_APPLICATION_IMPL_SCAN_PATHS = List.of(
             "wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application");
 
+    private static final String TRANSACTION_WALLET_AUTHORIZATION_FACADE_SOURCE =
+            "transaction/transaction-impl/src/main/java/com/wind/funds/transaction/application/instrument/impl/"
+                    + "AuthorizationAdmissionApplicationServiceImpl.java";
+
+    private static final List<String> TRANSACTION_FORBIDDEN_SPEND_CONTROL_ADMISSION_TOKENS = List.of(
+            "com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService");
+
     private static final Map<String, List<String>> TRANSACTION_FORBIDDEN_SPEND_RULE_TOKENS = Map.of(
+            "wallet spend rule evaluation or ownership service", List.of(
+                    "com.wind.funds.wallet.application.spend.SpendRuleEvaluationApplicationService",
+                    "com.wind.funds.wallet.service.SpendRuleDefinitionService",
+                    "com.wind.funds.wallet.service.SpendRuleVersionService",
+                    "com.wind.funds.wallet.service.SpendRuleAssignmentService",
+                    "com.wind.funds.wallet.service.SpendRuleDecisionRecordService"),
             "wallet spend rule entity or mapper", List.of(
                     "com.wind.funds.wallet.dal.entities.SpendRule",
                     "com.wind.funds.wallet.dal.entities.SpendControlMovement",
@@ -341,17 +354,25 @@ class FundsModuleDependencyBoundaryTests {
     /**
      * 场景：Spend Rule 主能力归属于钱包支出控制域，交易模块只通过 wallet-face 契约协作。
      * 预期：transaction 生产源码不得直接依赖 wallet 的 Spend Rule 实体、Mapper 或预算控制投影模型。
-     * 红线：交易内核不能越过 wallet-face 计算、更新或查询当前 Spend Rule。
+     * 红线：除支付工具授权 facade 固化准入证据外，交易内核不能越过 wallet-face 计算、更新或查询当前 Spend Rule。
      */
     @Test
     void testTransactionShouldOnlyConsumeSpendRuleSnapshotsWithoutWalletRuleOwnership() throws Exception {
         List<String> violations = new ArrayList<>();
         for (Path javaFile : transactionJavaSourceFiles()) {
             String content = Files.readString(javaFile);
+            String relativePath = workspaceRoot().relativize(javaFile).toString();
+            for (String forbiddenToken : TRANSACTION_FORBIDDEN_SPEND_CONTROL_ADMISSION_TOKENS) {
+                if (content.contains(forbiddenToken)
+                        && !TRANSACTION_WALLET_AUTHORIZATION_FACADE_SOURCE.equals(relativePath)) {
+                    violations.add(relativePath
+                            + " contains wallet spend control admission token " + forbiddenToken);
+                }
+            }
             for (Map.Entry<String, List<String>> forbiddenEntry : TRANSACTION_FORBIDDEN_SPEND_RULE_TOKENS.entrySet()) {
                 for (String forbiddenToken : forbiddenEntry.getValue()) {
                     if (content.contains(forbiddenToken)) {
-                        violations.add(workspaceRoot().relativize(javaFile)
+                        violations.add(relativePath
                                 + " contains " + forbiddenEntry.getKey() + " token " + forbiddenToken);
                     }
                 }
