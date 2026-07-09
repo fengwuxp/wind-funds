@@ -14,7 +14,10 @@ import lombok.experimental.Accessors;
 import org.jspecify.annotations.NonNull;
 
 /**
- * 钱包交易退款请求
+ * 直接交易退款请求。
+ *
+ * <p>填写 {@code referenceTransactionSn} 时按原交易 route snapshot 回放；未填写时为业务决策型直接退款，
+ * 调用方必须明确给出退款到账账户、出资账户和出资账目。</p>
  *
  * @author wuxp
  * @date 2026-04-21 08:57
@@ -34,15 +37,15 @@ public class FundsTransactionRefundRequest {
     @Schema(description = "本次交易显式手续费规则")
     private FeeSpec feeSpec;
 
-    @Schema(description = "退款出资（原收款方）账户")
+    @Schema(description = "退款出资账户；业务决策型直接退款时由调用方明确给出")
     @NotNull
     private FundsAccountId payerId;
 
-    @Schema(description = "退款出资账户 Ledger编码")
+    @Schema(description = "退款出资账户账目编码；业务决策型直接退款时由调用方明确给出")
     @NonNull
     private LedgerSubjectCode payerLedgerCode = LedgerSubjectCode.SETTLEMENT;
 
-    @Schema(description = "原资金交易流水号；填写后直接退款按原交易 RouteSnapshot 回放")
+    @Schema(description = "原资金交易流水号；填写后按原交易 route snapshot 回放，未填写表示业务决策型直接退款")
     @Size(max = 80)
     private String referenceTransactionSn;
 

@@ -12,6 +12,7 @@ import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResol
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
+import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -21,11 +22,13 @@ import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
+import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
@@ -67,6 +70,8 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
 
     private static final String CREDIT_ACCOUNT_SN = "pre_tx_credit_account";
 
+    private static final String REFUND_ACCOUNT_SN = "pre_tx_refund_account";
+
     private static final String PAYMENT_INSTRUMENT_SN = "pre_tx_payment_card";
 
     private static final String RECEIVE_INSTRUMENT_SN = "pre_tx_receive_card";
@@ -85,6 +90,9 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
 
     @Autowired
     private CreditAccountService creditAccountService;
+
+    @Autowired
+    private FundingAccountService fundingAccountService;
 
     @Autowired
     private PaymentInstrumentService paymentInstrumentService;
@@ -162,24 +170,32 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
     }
 
     /**
-     * 场景：退款动作不能通过预交易快照重新解析当前资金责任。
-     * 输入：支付工具、绑定、资金责任和账户能力均存在，但动作是 REFUND。
-     * 输出：应用层入口直接拒绝。
-     * 红线：退款必须基于原 route snapshot 回放，不能按当前支付工具绑定和账户能力重新选路。
+     * 场景：业务决策型退款需要通过支付工具读取当前资金责任快照。
+     * 输入：支付工具、绑定、资金责任和可收款账户能力均存在，动作是 REFUND。
+     * 输出：返回工具、资金责任和账户能力快照；不创建资金事实。
+     * 红线：预交易快照只提供业务决策输入，原路径退款仍必须由 transaction 层按 route snapshot 回放。
      */
     @Test
-    void testResolvePreTransactionSnapshotShouldRejectRefundWithoutCurrentPathSelectionSideEffect() {
-        creditAccountService.createCreditAccount(createCreditAccountRequest());
+    void testResolvePreTransactionSnapshotShouldAllowBusinessDecidedRefundWithoutFundsSideEffect() {
+        fundingAccountService.createFundingAccount(createRefundAccountRequest());
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
-                PaymentInstrumentFlowDirection.OUTBOUND));
-        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(PAYMENT_INSTRUMENT_SN));
-        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
+                PaymentInstrumentFlowDirection.INBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createRefundBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createRefundFundingRelationRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> snapshotApplicationService.resolvePreTransactionSnapshot(
-                snapshotRequest(PAYMENT_INSTRUMENT_SN).setAction(PaymentInstrumentAction.REFUND)))
-                .hasMessageContaining("退款不能通过支付工具预交易快照重选当前资金路径");
+        PaymentInstrumentPreTransactionSnapshotDTO snapshot =
+                snapshotApplicationService.resolvePreTransactionSnapshot(snapshotRequest(PAYMENT_INSTRUMENT_SN)
+                        .setAction(PaymentInstrumentAction.REFUND)
+                        .setBindingRole(PaymentInstrumentBindingRole.RECEIVE_SUBJECT));
 
+        assertThat(snapshot.getAction()).isEqualTo(PaymentInstrumentAction.REFUND);
+        assertThat(snapshot.getReady()).isTrue();
+        assertThat(snapshot.getTargetAccountId())
+                .isEqualTo(FundsAccountId.immutable(REFUND_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT));
+        assertThat(snapshot.getPaymentInstrumentCapability().getBindingRole())
+                .isEqualTo(PaymentInstrumentBindingRole.RECEIVE_SUBJECT);
+        assertThat(snapshot.getFundsAccountCapability().getCanReceive()).isTrue();
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -225,6 +241,8 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
                 RECEIVE_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", CREDIT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", REFUND_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn = ?", REFUND_ACCOUNT_SN);
     }
 
     private ResolvePaymentInstrumentPreTransactionSnapshotRequest snapshotRequest(String instrumentSn) {
@@ -251,6 +269,18 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
+                .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
+    private CreateFundingAccountRequest createRefundAccountRequest() {
+        return new CreateFundingAccountRequest()
+                .setSn(REFUND_ACCOUNT_SN)
+                .setTenantId(TENANT_ID)
+                .setOwnerId(OWNER_ID)
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setAccountType(FundingAccountType.USER_WALLET.name())
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
                 .setStatus(FundsAccountStatus.ACTIVE);
     }
 
@@ -285,6 +315,21 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
                 .setStatus(FundsAccountStatus.ACTIVE);
     }
 
+    private CreatePaymentInstrumentBindingRequest createRefundBindingRequest() {
+        return new CreatePaymentInstrumentBindingRequest()
+                .setSn(PAYMENT_BINDING_SN)
+                .setRequestSn(PAYMENT_BINDING_SN + "_refund_create")
+                .setTenantId(TENANT_ID)
+                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setBindingRole(PaymentInstrumentBindingRole.RECEIVE_SUBJECT)
+                .setSubjectId(REFUND_ACCOUNT_SN)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setPriority(10)
+                .setDefaultBinding(Boolean.TRUE)
+                .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
         return new CreateSpendSubjectFundingRelationRequest()
                 .setSn(FUNDING_RELATION_SN)
@@ -293,6 +338,21 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
                 .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectId(CREDIT_ACCOUNT_SN)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                .setPriority(10)
+                .setDefaultRelation(Boolean.TRUE)
+                .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
+    private CreateSpendSubjectFundingRelationRequest createRefundFundingRelationRequest() {
+        return new CreateSpendSubjectFundingRelationRequest()
+                .setSn(FUNDING_RELATION_SN)
+                .setTenantId(TENANT_ID)
+                .setSpendSubjectId(REFUND_ACCOUNT_SN)
+                .setSpendSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setTargetSubjectId(REFUND_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
                 .setPriority(10)

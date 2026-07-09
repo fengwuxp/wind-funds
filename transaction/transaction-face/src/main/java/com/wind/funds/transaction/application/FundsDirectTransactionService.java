@@ -47,7 +47,11 @@ public interface FundsDirectTransactionService {
     String pay(FundsTransactionPayRequest request, WindOperator operator);
 
     /**
-     * 账户退款
+     * 账户退款。
+     *
+     * <p>{@link FundsTransactionRefundRequest#getReferenceTransactionSn()} 有值时按原交易 route snapshot 回放；
+     * 为空时表示业务方已完成退款决策，资金底座按请求给定的到账账户、出资账户和出资账目执行直接退款。
+     * 本接口不再额外引入退款模式字段；资金底座只校验内部资金主体、账目、余额、状态、幂等和敏感上下文。</p>
      *
      * @param request  退款请求对象
      * @param operator 操作人
