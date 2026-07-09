@@ -4,16 +4,26 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.operator.WindOperator;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
+import com.wind.funds.ledger.dto.LedgerDTO;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.ledger.query.LedgerQuery;
+import com.wind.funds.ledger.request.CreateLedgerRequest;
+import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
@@ -392,6 +402,77 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
+     * 场景：资金账户授权后账户进入关闭收口态。
+     * 输入：授权占用 60 后，将 AUTHORIZATION 账本挂起；随后尝试新授权并完成原授权。
+     * 输出：新授权被拒绝，原授权完成继续消费 AUTHORIZATION 并进入平台 SETTLEMENT。
+     * 红线：SUSPENDED 账本只允许原链路清算收口，不得承接新的普通授权。
+     */
+    @Test
+    void testSuspendedAuthorizationLedgerShouldRejectNewAuthorizeAndAllowSettleClosingPosting() {
+        FundsAccountId user = fundingAccount("funding_user");
+
+        topup(user, 100L, "AUTH_CLOSING_SETTLE_TOPUP");
+        String authorizationSn = authorize(user, 60L, true, "AUTH_CLOSING_SETTLE_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        Long authorizationLedgerId = findLedger(user, LedgerSubjectCode.AUTHORIZATION)
+                .orElseThrow()
+                .getId();
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(authorizationLedgerId)
+                .setStatus(LedgerStatus.SUSPENDED));
+        LedgerFactSnapshot afterSuspended = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> authorize(user, 10L, true, "AUTH_CLOSING_SETTLE_REJECTED_AUTHORIZE"))
+                .hasMessageContaining("账本状态不允许入账");
+        assertLedgerTransactionFactsUnchanged(afterSuspended);
+        assertFailedFundsTransactionWithoutLedgerFacts("AUTH_CLOSING_SETTLE_REJECTED_AUTHORIZE");
+
+        settleAuthorization(user, 60L, authorizationSn, "AUTH_CLOSING_SETTLE_CAPTURE");
+        BalanceSnapshot afterSettle = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
+        assertOnlyBalanceDeltas(afterAuthorize, afterSettle,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 60L, CURRENCY));
+        assertThat(ledgerService.getLedgerById(authorizationLedgerId).getStatus())
+                .isEqualTo(LedgerStatus.SUSPENDED);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_CLOSING_SETTLE_CAPTURE", 0, 2, 1, 2);
+    }
+
+    /**
+     * 场景：授权交易命中月度账本 bucket 后，全额撤销必须继承原授权路由周期。
+     * 输入：资金账户只预置 AVAILABLE/AUTHORIZATION 的 MONTHLY/2026-06 账本，授权 60 后撤销 60。
+     * 输出：授权和撤销都只改动 MONTHLY/2026-06 bucket，route snapshot 与 LedgerEntry 保留同一周期。
+     * 预期：后继交易不得使用当前默认周期或 LIFETIME bucket 解释旧授权链路。
+     * 红线：旧周期账本是授权事实的一部分，撤销、结算和退款不能静默串到账本新周期。
+     */
+    @Test
+    void testAuthorizationSuccessorShouldInheritOriginalRoutePeriod() {
+        FundsAccountId user = fundingAccount("funding_period_user");
+        AccountBalancePeriodType periodType = AccountBalancePeriodType.MONTHLY;
+        String periodId = "2026-06";
+        ensurePeriodLedger(user, LedgerSubjectCode.AVAILABLE, periodType, periodId, 100L);
+        ensurePeriodLedger(user, LedgerSubjectCode.AUTHORIZATION, periodType, periodId, 0L);
+
+        assertPeriodLedgerBalance(user, LedgerSubjectCode.AVAILABLE, periodType, periodId, 100L);
+        assertPeriodLedgerBalance(user, LedgerSubjectCode.AUTHORIZATION, periodType, periodId, 0L);
+
+        String authorizationSn = authorizeWithLedgerPeriod(user, 60L, "AUTH_PERIOD_AUTHORIZE", periodType, periodId);
+
+        assertPeriodLedgerBalance(user, LedgerSubjectCode.AVAILABLE, periodType, periodId, 40L);
+        assertPeriodLedgerBalance(user, LedgerSubjectCode.AUTHORIZATION, periodType, periodId, 60L);
+        assertRouteSnapshotPeriod(authorizationSn, periodType, periodId);
+        assertLedgerEntriesPeriod("AUTH_PERIOD_AUTHORIZE", periodType, periodId);
+
+        String reversalSn = reverseAuthorization(user, 60L, authorizationSn, "AUTH_PERIOD_REVERSAL");
+
+        assertPeriodLedgerBalance(user, LedgerSubjectCode.AVAILABLE, periodType, periodId, 100L);
+        assertPeriodLedgerBalance(user, LedgerSubjectCode.AUTHORIZATION, periodType, periodId, 0L);
+        assertRouteSnapshotPeriod(reversalSn, periodType, periodId);
+        assertLedgerEntriesPeriod("AUTH_PERIOD_REVERSAL", periodType, periodId);
+    }
+
+    /**
      * 场景：预算组被误作为授权交易账户。
      * 输入：提交预算组授权批准 10。
      * 输出：授权请求被拒绝；预算组控制账本和平台结算账户余额保持请求前状态。
@@ -700,32 +781,51 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
-     * 场景：VCC 共享卡授权已经解析到信用子账户及其父账户层级。
-     * 输入：信用子账户额度 100，授权批准 60。
-     * 输出：授权 route snapshot 的 funding allocation 携带账户层级快照。
+     * 场景：VCC 共享卡授权解析到信用子账户及其父资金账户。
+     * 输入：信用子账户额度 100，父资金账户可用余额 100，授权批准 60。
+     * 输出：信用子账户和父资金账户同时形成授权占用，route snapshot 的 funding allocation 携带账户层级快照。
      * 预期：accountHierarchySnapshot 固化子账户、父账户和根账户。
-     * 红线：父账户只作为归因快照，不得作为本次授权的 LedgerEntry 主体。
+     * 红线：共享卡授权不得只占用信用额度而跳过父资金账户。
      */
     @Test
-    void testSharedCardAuthorizationShouldPersistAccountHierarchySnapshotInRoute() {
+    void testSharedCardAuthorizationShouldHoldCreditAndParentFundingAccountWithHierarchySnapshot() {
         FundsAccountId parentAccount = fundingAccount("vcc_parent_pool");
         FundsAccountId cardAccount = creditAccount("vcc_shared_card_credit");
         ensureFundingAccount(parentAccount);
+        ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
         ensureCreditAccount(cardAccount);
         bindAccountHierarchy(cardAccount,
                 parentAccount,
                 parentAccount,
                 "AUTH_SHARED_CARD_HIERARCHY");
 
+        topup(parentAccount, 100L, "AUTH_SHARED_CARD_PARENT_TOPUP");
         adjustBalance(cardAccount, 100L, true, "AUTH_SHARED_CARD_LIMIT");
 
-        String authorizationSn = authorize(cardAccount, 60L, true, "AUTH_SHARED_CARD_AUTHORIZE");
+        String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L,
+                "AUTH_SHARED_CARD_AUTHORIZE");
+
+        assertBucket(balance(cardAccount), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(cardAccount), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertBucket(balance(parentAccount), LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(balance(parentAccount), LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
 
         assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
                 .as("authorization route snapshot should carry account hierarchy")
                 .hasValueSatisfying(routeSnapshot -> {
                     assertThat(routeSnapshot.getRoutingDecision()).isNotNull();
                     assertThat(routeSnapshot.getRoutingDecision().getFundingAllocations())
+                            .hasSize(2)
+                            .anySatisfy(allocation -> {
+                                assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo(parentAccount.id());
+                                assertThat(allocation.getSubjectRef().getSubjectType().name())
+                                        .isEqualTo(parentAccount.type());
+                                assertThat(allocation.getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AUTHORIZATION);
+                                assertThat(allocation.getAmount()).isEqualTo(Money.immutable(60L, CURRENCY));
+                            })
+                            .filteredOn(allocation -> cardAccount.id()
+                                    .equals(allocation.getSubjectRef().getSubjectId()))
                             .singleElement()
                             .satisfies(allocation -> {
                                 assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo(cardAccount.id());
@@ -749,7 +849,103 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThat(entriesByBusinessSn("AUTH_SHARED_CARD_AUTHORIZE"))
                 .extracting(LedgerEntry::getSubjectId)
                 .contains(cardAccount.id())
-                .doesNotContain(parentAccount.id());
+                .contains(parentAccount.id());
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_SHARED_CARD_AUTHORIZE", 1, 2, 2, 4);
+    }
+
+    /**
+     * 场景：VCC 共享卡授权后收到全额撤销。
+     * 输入：授权时已占用信用子账户和父资金账户各 60，撤销请求只携带信用子账户和原授权流水。
+     * 输出：撤销从原授权事实继承父资金账户并双释放。
+     * 预期：信用子账户和父资金账户 AVAILABLE 均恢复 100，AUTHORIZATION 均归零。
+     * 红线：撤销不得要求上层重复传父资金账户，也不得只释放信用子账户导致父账户授权占用残留。
+     */
+    @Test
+    void testSharedCardAuthorizationReversalShouldInheritParentFundingAccount() {
+        FundsAccountId parentAccount = fundingAccount("vcc_rev_pool");
+        FundsAccountId cardAccount = creditAccount("vcc_rev_card");
+        ensureFundingAccount(parentAccount);
+        ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
+        ensureCreditAccount(cardAccount);
+        bindAccountHierarchy(cardAccount,
+                parentAccount,
+                parentAccount,
+                "AUTH_SHARED_CARD_REVERSAL_HIERARCHY");
+        topup(parentAccount, 100L, "AUTH_SHARED_CARD_REVERSAL_PARENT_TOPUP");
+        adjustBalance(cardAccount, 100L, true, "AUTH_SHARED_CARD_REVERSAL_LIMIT");
+        String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L,
+                "AUTH_SHARED_CARD_REVERSAL_AUTHORIZE");
+
+        reverseAuthorization(cardAccount, 60L, authorizationSn, "AUTH_SHARED_CARD_REVERSAL_CANCEL");
+
+        assertBucket(balance(cardAccount), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance(cardAccount), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(balance(parentAccount), LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(balance(parentAccount), LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertThat(entriesByBusinessSn("AUTH_SHARED_CARD_REVERSAL_CANCEL"))
+                .extracting(LedgerEntry::getSubjectId)
+                .contains(cardAccount.id())
+                .contains(parentAccount.id());
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_SHARED_CARD_REVERSAL_AUTHORIZE", 1, 2, 2, 4);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_SHARED_CARD_REVERSAL_CANCEL", 0, 2, 2, 4);
+    }
+
+    /**
+     * 场景：VCC 共享卡授权后卡账户进入关闭收口态。
+     * 输入：信用子账户和父资金账户授权占用各 60；子账户 AVAILABLE/AUTHORIZATION 账本挂起后撤销原授权。
+     * 输出：新共享卡授权被拒绝，原授权撤销仍释放信用子账户和父资金账户。
+     * 红线：共享卡关闭不能留下父资金账户授权占用，也不能让已挂起卡账本继续承接新消费。
+     */
+    @Test
+    void testSuspendedSharedCardLedgerShouldRejectNewAuthorizeAndAllowReversalClosingPosting() {
+        FundsAccountId parentAccount = fundingAccount("vcc_closing_pool");
+        FundsAccountId cardAccount = creditAccount("vcc_closing_card");
+        ensureFundingAccount(parentAccount);
+        ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
+        ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
+        ensureCreditAccount(cardAccount);
+        bindAccountHierarchy(cardAccount,
+                parentAccount,
+                parentAccount,
+                "AUTH_SHARED_CARD_CLOSING_HIERARCHY");
+        topup(parentAccount, 100L, "AUTH_SHARED_CARD_CLOSING_PARENT_TOPUP");
+        adjustBalance(cardAccount, 100L, true, "AUTH_SHARED_CARD_CLOSING_LIMIT");
+        String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L,
+                "AUTH_SHARED_CARD_CLOSING_AUTHORIZE");
+        BalanceSnapshot afterAuthorize = snapshot(balances(cardAccount, parentAccount));
+        Long cardAvailableLedgerId = findLedger(cardAccount, LedgerSubjectCode.AVAILABLE)
+                .orElseThrow()
+                .getId();
+        Long cardAuthorizationLedgerId = findLedger(cardAccount, LedgerSubjectCode.AUTHORIZATION)
+                .orElseThrow()
+                .getId();
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(cardAvailableLedgerId)
+                .setStatus(LedgerStatus.SUSPENDED));
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(cardAuthorizationLedgerId)
+                .setStatus(LedgerStatus.SUSPENDED));
+        LedgerFactSnapshot afterSuspended = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> authorizeSharedCard(cardAccount, parentAccount, 10L,
+                "AUTH_SHARED_CARD_CLOSING_REJECTED_AUTHORIZE"))
+                .hasMessageContaining("账本状态不允许入账");
+        assertLedgerTransactionFactsUnchanged(afterSuspended);
+        assertFailedFundsTransactionWithoutLedgerFacts("AUTH_SHARED_CARD_CLOSING_REJECTED_AUTHORIZE");
+
+        reverseAuthorization(cardAccount, 60L, authorizationSn, "AUTH_SHARED_CARD_CLOSING_CANCEL");
+        BalanceSnapshot afterReversal = snapshot(balances(cardAccount, parentAccount));
+        assertOnlyBalanceDeltas(afterAuthorize, afterReversal,
+                delta(cardAccount, LedgerSubjectCode.AVAILABLE, 60L, CURRENCY),
+                delta(cardAccount, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY),
+                delta(parentAccount, LedgerSubjectCode.AVAILABLE, 60L, CURRENCY),
+                delta(parentAccount, LedgerSubjectCode.AUTHORIZATION, -60L, CURRENCY));
+        assertThat(ledgerService.getLedgerById(cardAvailableLedgerId).getStatus())
+                .isEqualTo(LedgerStatus.SUSPENDED);
+        assertThat(ledgerService.getLedgerById(cardAuthorizationLedgerId).getStatus())
+                .isEqualTo(LedgerStatus.SUSPENDED);
+        assertFundsAndLedgerFactsForBusinessSn("AUTH_SHARED_CARD_CLOSING_CANCEL", 0, 2, 2, 4);
     }
 
     /**
@@ -2348,6 +2544,105 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         .isNotEqualTo(FundsRouteCodes.AUTHORIZATION_REFUND_REPLAY));
     }
 
+    private void ensurePeriodLedger(FundsAccountId accountId,
+                                    LedgerSubjectCode ledgerSubjectCode,
+                                    AccountBalancePeriodType periodType,
+                                    String periodId,
+                                    long initialBalance) {
+        ensureFundingAccount(accountId);
+        Long ledgerId = ledgerService.createLedger(new CreateLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(accountId.id())
+                .setSubjectType(accountId.type())
+                .setLedgerProfileCode("TEST")
+                .setLedgerProfileVersion(1)
+                .setLedgerSubjectCode(ledgerSubjectCode)
+                .setLedgerSubjectCategory(LedgerSubjectCategory.LIABILITY)
+                .setNormalBalanceSide(EntrySide.CREDIT)
+                .setAllowNegative(Boolean.FALSE)
+                .setCurrency(CURRENCY)
+                .setSettlementPolicy("RT")
+                .setPeriodType(periodType)
+                .setPeriodId(periodId));
+        if (initialBalance != 0L) {
+            ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
+                    .setId(ledgerId)
+                    .setCreditAmountDelta(initialBalance > 0L ? initialBalance : null)
+                    .setDebitAmountDelta(initialBalance < 0L ? -initialBalance : null));
+        }
+    }
+
+    private String authorizeWithLedgerPeriod(FundsAccountId accountId,
+                                             long amount,
+                                             String businessSn,
+                                             AccountBalancePeriodType periodType,
+                                             String periodId) {
+        return authorizationTransactionService.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
+                .setAccountId(accountId)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
+                .setApproved(true)
+                .setLedgerPeriodType(periodType)
+                .setLedgerPeriodId(periodId)
+                .setBusinessScene("AUTHORIZATION")
+                .setBusinessSn(businessSn)
+                .setDescription("authorization with ledger period"), WindOperator.system());
+    }
+
+    private void assertPeriodLedgerBalance(FundsAccountId accountId,
+                                           LedgerSubjectCode ledgerSubjectCode,
+                                           AccountBalancePeriodType periodType,
+                                           String periodId,
+                                           long normalBalance) {
+        assertThat(periodLedger(accountId, ledgerSubjectCode, periodType, periodId).getNormalBalance())
+                .isEqualTo(normalBalance);
+    }
+
+    private LedgerDTO periodLedger(FundsAccountId accountId,
+                                   LedgerSubjectCode ledgerSubjectCode,
+                                   AccountBalancePeriodType periodType,
+                                   String periodId) {
+        List<LedgerDTO> ledgers = ledgerService.queryLedgers(new LedgerQuery()
+                                .setTenantId(TENANT_ID)
+                                .setSubjectId(accountId.id())
+                                .setSubjectType(accountId.type())
+                                .setLedgerSubjectCode(ledgerSubjectCode)
+                                .setCurrency(CURRENCY)
+                                .setPeriodType(periodType)
+                                .setPeriodId(periodId),
+                        DefaultPageQueryOptions.defaults(10))
+                .getRecords()
+                .stream()
+                .toList();
+        assertThat(ledgers)
+                .as("period ledger for accountId %s subject %s period %s/%s",
+                        accountId, ledgerSubjectCode, periodType, periodId)
+                .singleElement();
+        return ledgers.getFirst();
+    }
+
+    private void assertRouteSnapshotPeriod(String transactionSn,
+                                           AccountBalancePeriodType periodType,
+                                           String periodId) {
+        assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn))
+                .hasValueSatisfying(routeSnapshot -> assertThat(routeSnapshot.getLegs())
+                        .isNotEmpty()
+                        .allSatisfy(leg -> {
+                            assertThat(leg.getPeriodType()).isEqualTo(periodType);
+                            assertThat(leg.getPeriodId()).isEqualTo(periodId);
+                        }));
+    }
+
+    private void assertLedgerEntriesPeriod(String businessSn,
+                                           AccountBalancePeriodType periodType,
+                                           String periodId) {
+        assertThat(entriesOf(ledgerTransactionByBusinessSn(businessSn)))
+                .isNotEmpty()
+                .allSatisfy(entry -> {
+                    assertThat(entry.getPeriodType()).isEqualTo(periodType);
+                    assertThat(entry.getPeriodId()).isEqualTo(periodId);
+                });
+    }
+
     private static JSONObject contextVariablesOf(String contextVariables) {
         if (contextVariables == null || contextVariables.isBlank()) {
             return new JSONObject();
@@ -2386,6 +2681,20 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     private String forceSettleAuthorization(FundsAccountId accountId, long amount, String businessSn) {
         return authorizationTransactionService.settle(forceSettleRequest(accountId, amount, businessSn),
                 WindOperator.system());
+    }
+
+    private String authorizeSharedCard(FundsAccountId cardAccount,
+                                       FundsAccountId parentFundingAccount,
+                                       long amount,
+                                       String businessSn) {
+        return authorizationTransactionService.authorize(new FundsAuthorizationTransactionAuthorizeRequest()
+                .setAccountId(cardAccount)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
+                .setApproved(true)
+                .setLinkedFundingAccountId(parentFundingAccount)
+                .setBusinessScene("AUTHORIZATION")
+                .setBusinessSn(businessSn)
+                .setDescription("shared card authorization"), WindOperator.system());
     }
 
     private FundsAuthorizationTransactionSettleRequest forceSettleRequest(FundsAccountId accountId,

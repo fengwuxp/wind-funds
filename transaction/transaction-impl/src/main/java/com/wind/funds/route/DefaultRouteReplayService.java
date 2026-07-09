@@ -30,6 +30,7 @@ import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.spec.transaction.FundsInstructionFieldKeys;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
@@ -135,7 +136,6 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private Map<String, Object> disputeRefundContext(@NonNull FundsInstructionSpec instruction) {
         Map<String, Object> result = new LinkedHashMap<>(instruction.getContextVariables());
-        result.remove(FundsInstructionContextKeys.ACCOUNT_ID);
         result.remove(FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN);
         return result;
     }
@@ -202,7 +202,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
             return;
         }
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.ACCOUNT_ID);
+                FundsInstructionFieldKeys.ACCOUNT_ID);
         AssertUtils.isTrue(snapshotContainsSubject(routeSnapshot, accountId),
                 FREEZE_ORDER_SUBJECT_MISMATCH_MESSAGE + "，referenceSn = {}，accountId = {}，accountType = {}",
                 reference.getReferenceSn(), accountId.id(), accountId.type());

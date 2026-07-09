@@ -86,13 +86,13 @@ public class FundsBalanceControlInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
                 .operator(operationActor(operator))
-                .contextVariables(mergeContext(request.getContextVariables(),
-                        Map.of(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId())))
+                .contextVariables(mergeContext(request.getContextVariables(), Map.of()))
                 .build();
     }
 
@@ -108,6 +108,7 @@ public class FundsBalanceControlInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
                 .reference(reference(FundsInstructionReferenceType.FREEZE_ORDER, request.getReferenceFreezeSn()))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
@@ -115,7 +116,6 @@ public class FundsBalanceControlInstructionConverter {
                 .description(request.getDescription())
                 .operator(operationActor(operator))
                 .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
                         FundsInstructionContextKeys.REFERENCE_FREEZE_SN, request.getReferenceFreezeSn())))
                 .build();
     }
@@ -140,6 +140,7 @@ public class FundsBalanceControlInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -179,7 +180,6 @@ public class FundsBalanceControlInstructionConverter {
 
     private @NonNull Map<String, Object> adjustContext(@NonNull FundsBalanceAdjustRequest request) {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         result.put(FundsInstructionContextKeys.INCREASE, request.getIncrease());
         result.put(FundsInstructionContextKeys.ADJUST_REASON, request.getAdjustReason());
         result.put(FundsInstructionContextKeys.ADJUST_EVIDENCE_REF, request.getAdjustEvidenceRef());

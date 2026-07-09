@@ -5,20 +5,6 @@ package com.wind.funds.transaction.constant;
  */
 public final class FundsInstructionContextKeys {
 
-    public static final String ACCOUNT_ID = "accountId";
-
-    public static final String PAYER_ACCOUNT_ID = "payerAccountId";
-
-    public static final String PAYEE_ACCOUNT_ID = "payeeAccountId";
-
-    public static final String PAYER_ID = "payerId";
-
-    public static final String PAYEE_ID = "payeeId";
-
-    public static final String PAYER_LEDGER_SUBJECT_CODE = "payerLedgerSubjectCode";
-
-    public static final String PAYEE_LEDGER_SUBJECT_CODE = "payeeLedgerSubjectCode";
-
     public static final String APPROVED = "approved";
 
     /**
@@ -64,8 +50,6 @@ public final class FundsInstructionContextKeys {
     public static final String DISPUTE_VOUCHER_REF = "disputeVoucherRef";
 
     public static final String EXTERNAL_DISPUTE_REF = "externalDisputeRef";
-
-    public static final String LINKED_FUNDING_ACCOUNT_ID = "linkedFundingAccountId";
 
     public static final String LINKED_BUDGET_GROUP_ID = "linkedBudgetGroupId";
 

@@ -20,7 +20,9 @@ import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.core.WritableContextVariables;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
+import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
@@ -58,13 +60,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
             "routeLegId", "replayRefLegId", "replayPolicy");
 
     private static final Set<String> DIRECT_REQUEST_CONTEXT_KEYS = Set.of(
-            "accountId",
-            "payerAccountId",
-            "payeeAccountId",
-            "payerId",
-            "payeeId",
-            "payerLedgerSubjectCode",
-            "payeeLedgerSubjectCode",
             "channelCode",
             "externalTransactionId",
             "feeSpec");
@@ -214,6 +209,48 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_INSUFFICIENT_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_INSUFFICIENT_PAY", 2, 2);
         assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_REFUND_INSUFFICIENT_REFUND");
+    }
+
+    /**
+     * 场景：业务关闭收款账户后，收款账本挂起但仍有待收口余额。
+     * 输入：付款方充值 100、付款 70，收款方 SETTLEMENT 账本挂起后尝试普通收款和退款 30。
+     * 输出：普通收款被拒绝，退款作为 closing posting 继续入账。
+     * 红线：SUSPENDED 账本不能承接新交易，但必须允许退款/撤销/清算这类收口事实消减余额。
+     */
+    @Test
+    void testSuspendedPayeeLedgerShouldRejectNormalPayAndAllowRefundClosingPosting() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("closing_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        topup(payer, 100L, "DIRECT_CLOSING_TOPUP");
+        pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_CLOSING_PAY");
+        BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        Long payeeSettlementLedgerId = findLedger(payee, LedgerSubjectCode.SETTLEMENT)
+                .orElseThrow()
+                .getId();
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(payeeSettlementLedgerId)
+                .setStatus(LedgerStatus.SUSPENDED));
+        LedgerFactSnapshot afterSuspended = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 10L,
+                "DIRECT_CLOSING_REJECTED_PAY"))
+                .hasMessageContaining("账本状态不允许入账");
+        assertLedgerTransactionFactsUnchanged(afterSuspended);
+        assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_CLOSING_REJECTED_PAY");
+
+        refund(payer, payee, LedgerSubjectCode.SETTLEMENT, 30L, "DIRECT_CLOSING_REFUND");
+        BalanceSnapshot afterRefund = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(afterPay, afterRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(payer, LedgerSubjectCode.FROZEN, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertThat(ledgerService.getLedgerById(payeeSettlementLedgerId).getStatus())
+                .isEqualTo(LedgerStatus.SUSPENDED);
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_CLOSING_REFUND", 2, 2);
     }
 
     /**

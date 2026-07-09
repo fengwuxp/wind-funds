@@ -276,7 +276,7 @@ class DefaultRouteReplayServiceTests {
 
     /**
      * 场景：含权益退款回放引用带历史权益摘要的原 RouteSnapshot。
-     * 输入：原 RouteSnapshot context 保存原权益快照 ID 和稳定摘要，当前请求携带 accountId 等临时上下文。
+     * 输入：原 RouteSnapshot context 保存原权益快照 ID 和稳定摘要，当前请求携带临时上下文。
      * 输出：回放成功，ResolvedRoute context 继承原权益快照摘要。
      * 预期：回放结果继续使用原路径摘要，也不扩散当前请求上下文。
      * 红线：Route Replay 只读原权益快照摘要，不能按当前营销或退款请求重新生成历史权益事实。
@@ -294,14 +294,14 @@ class DefaultRouteReplayServiceTests {
         ResolvedRouteSpec resolvedRoute = replayService.resolve(replayInstruction(reference,
                 paymentInstrumentRef("CARD-NEW", "new-binding"),
                 null,
-                Map.of(FundsInstructionContextKeys.ACCOUNT_ID, "PAYER-CURRENT", "requestChannel", "mobile")));
+                Map.of("requestChannel", "mobile")));
 
         assertThat(resolvedRoute.getContextVariables())
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_ID, "BS-ORIGINAL-001")
                 .containsEntry(FundsInstructionContextKeys.BENEFIT_SNAPSHOT_STABLE_DIGEST,
                         "sha256:original-benefit-digest");
         assertThat(resolvedRoute.getContextVariables())
-                .doesNotContainKeys(FundsInstructionContextKeys.ACCOUNT_ID, "requestChannel");
+                .doesNotContainKey("requestChannel");
     }
 
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference) {

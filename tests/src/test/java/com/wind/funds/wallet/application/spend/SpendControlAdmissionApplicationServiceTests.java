@@ -18,7 +18,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
@@ -468,7 +468,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setInstrumentType("CARD")
-                .setInstrumentDirection(PaymentInstrumentDirection.PAYMENT)
+                .setFlowDirection(PaymentInstrumentFlowDirection.OUTBOUND)
                 .setInstrumentNo("****2468")
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId("tok_spend_control_2468")

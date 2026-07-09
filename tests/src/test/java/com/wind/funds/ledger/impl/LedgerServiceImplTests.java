@@ -8,9 +8,12 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,7 +95,7 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getDebitAmount()).isZero();
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isZero();
-        assertThat(ledger.getStatus()).isEqualTo("ACTIVE");
+        assertThat(ledger.getStatus()).isEqualTo(LedgerStatus.ACTIVE);
         assertThat(ledger.getSettlementPolicy()).isEqualTo("RT");
         assertThat(ledger.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
         assertThat(ledger.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
@@ -132,7 +135,7 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
         assertThat(ledger.getDebitAmount()).isZero();
         assertThat(ledger.getCreditAmount()).isZero();
         assertThat(ledger.getNormalBalance()).isZero();
-        assertThat(ledger.getStatus()).isEqualTo("ACTIVE");
+        assertThat(ledger.getStatus()).isEqualTo(LedgerStatus.ACTIVE);
         assertThat(ledger.getSettlementPolicy()).isEqualTo("RT");
         assertThat(ledger.getCutOffTime()).isEqualTo(LocalTime.MIDNIGHT);
         assertThat(ledger.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
@@ -158,6 +161,96 @@ class LedgerServiceImplTests extends AbstractFundsServiceTest {
 
         assertThat(countLedgers()).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：账本已经被业务侧挂起后，底层余额更新入口仍被直接调用。
+     * 输入：ACTIVE 账本被业务侧标记为 SUSPENDED 后尝试普通余额更新。
+     * 输出：余额更新被拒绝，账本事实保持不变。
+     * 红线：绕过 posting 的底层余额入口也不得改动不可入账账本。
+     */
+    @Test
+    void testUpdateLedgerBalanceShouldRejectSuspendedLedgerForNormalPosting() {
+        Long ledgerId = ledgerService.createLedger(createLedgerRequest(
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name()));
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(ledgerId)
+                .setStatus(LedgerStatus.SUSPENDED));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
+                .setId(ledgerId)
+                .setDebitAmountDelta(100L)
+                .setCreditAmountDelta(0L)))
+                .hasMessageContaining("账本状态不允许入账");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testUpdateLedgerStatusShouldAllowReactivatingSuspendedLedger() {
+        Long ledgerId = ledgerService.createLedger(createLedgerRequest(
+                AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID));
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(ledgerId)
+                .setStatus(LedgerStatus.SUSPENDED));
+
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(ledgerId)
+                .setStatus(LedgerStatus.ACTIVE));
+
+        assertThat(ledgerService.getLedgerById(ledgerId).getStatus()).isEqualTo(LedgerStatus.ACTIVE);
+    }
+
+    /**
+     * 场景：业务要关闭仍有余额的账户账本。
+     * 输入：ACTIVE 账本存在正常余额，目标状态为 CLOSED。
+     * 输出：状态变更被拒绝，余额和账本事实保持不变。
+     * 红线：close ledger 不是清零动作，余额归零必须来自前置账务事实。
+     */
+    @Test
+    void testUpdateLedgerStatusShouldRejectClosingNonZeroBalanceLedger() {
+        Long ledgerId = ledgerService.createLedger(createLedgerRequest(
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name()));
+        ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
+                .setId(ledgerId)
+                .setDebitAmountDelta(100L)
+                .setCreditAmountDelta(0L));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(ledgerId)
+                .setStatus(LedgerStatus.CLOSED)))
+                .hasMessageContaining("非零余额账本不允许关闭");
+
+        assertThat(ledgerService.getLedgerById(ledgerId).getStatus()).isEqualTo(LedgerStatus.ACTIVE);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：历史借贷发生额已经归平，业务侧关闭单个账本。
+     * 输入：账本 debitAmount 和 creditAmount 均非零，但 normalBalance 为 0。
+     * 输出：账本允许关闭，累计发生额保留。
+     * 红线：close ledger 只校验单账本净余额，不清零历史累计发生额，也不检查主体下其他账本桶。
+     */
+    @Test
+    void testUpdateLedgerStatusShouldCloseZeroNormalBalanceLedgerWithHistoricalAmounts() {
+        Long ledgerId = ledgerService.createLedger(createLedgerRequest(
+                AccountBalancePeriodType.LIFETIME, AccountBalancePeriodType.LIFETIME.name()));
+        ledgerService.updateLedgerBalance(new UpdateLedgerBalanceRequest()
+                .setId(ledgerId)
+                .setDebitAmountDelta(100L)
+                .setCreditAmountDelta(100L));
+
+        ledgerService.updateLedgerStatus(new UpdateLedgerStatusRequest()
+                .setId(ledgerId)
+                .setStatus(LedgerStatus.CLOSED));
+
+        LedgerDTO ledger = ledgerService.getLedgerById(ledgerId);
+        assertThat(ledger.getStatus()).isEqualTo(LedgerStatus.CLOSED);
+        assertThat(ledger.getDebitAmount()).isEqualTo(100L);
+        assertThat(ledger.getCreditAmount()).isEqualTo(100L);
+        assertThat(ledger.getNormalBalance()).isZero();
     }
 
     @BeforeEach

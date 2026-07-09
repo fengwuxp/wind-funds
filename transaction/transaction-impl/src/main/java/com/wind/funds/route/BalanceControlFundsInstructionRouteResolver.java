@@ -23,6 +23,7 @@ import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
+import com.wind.funds.spec.transaction.FundsInstructionFieldKeys;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.wallet.FundsAccountQueryService;
@@ -110,7 +111,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private ResolvedRouteSpec resolveFreeze(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.ACCOUNT_ID);
+                FundsInstructionFieldKeys.ACCOUNT_ID);
         assertEnoughAvailableBalance(accountId, instruction.getAmount());
         List<RouteLegSpec> legs = List.of(RouteSpecSupport.routeLeg(
                 FundsRouteLegIds.FREEZE, 1, RouteLegType.HOLD, instruction)
@@ -144,7 +145,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private ResolvedRouteSpec resolveUnfreeze(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.ACCOUNT_ID);
+                FundsInstructionFieldKeys.ACCOUNT_ID);
         List<RouteLegSpec> legs = List.of(RouteSpecSupport.routeLeg(
                 FundsRouteLegIds.UNFREEZE, 1, RouteLegType.RELEASE, instruction)
                 .sourceNode(RouteSpecSupport.sourceNode(
@@ -161,7 +162,7 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
 
     private ResolvedRouteSpec resolveAdjust(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.ACCOUNT_ID);
+                FundsInstructionFieldKeys.ACCOUNT_ID);
         if (routeSubjectSupport.isFundingAccount(accountId)) {
             return resolveFundingBalanceAdjust(instruction, accountId);
         }

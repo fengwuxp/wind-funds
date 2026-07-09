@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.model.request;
 
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -48,9 +48,9 @@ public class CreatePaymentInstrumentRequest {
     @NotBlank
     private String instrumentType;
 
-    @Schema(description = "工具方向")
+    @Schema(description = "工具资金流向")
     @NotNull
-    private PaymentInstrumentDirection instrumentDirection;
+    private PaymentInstrumentFlowDirection flowDirection;
 
     @Schema(description = "工具展示号或稳定识别号")
     @NotBlank

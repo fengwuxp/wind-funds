@@ -1,6 +1,7 @@
 package com.wind.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.enums.InternationalRegionCode;
@@ -67,6 +68,15 @@ public class FundsAuthorizationTransactionAuthorizeRequest {
 
     @Schema(description = "支付工具引用快照，仅用于 route snapshot 和审计回链，不作为账务主体")
     private PaymentInstrumentRefSpec paymentInstrumentRef;
+
+    @Schema(description = "共享卡等场景下参与授权的真实资金责任账户")
+    private FundsAccountId linkedFundingAccountId;
+
+    @Schema(description = "授权账本周期类型")
+    private AccountBalancePeriodType ledgerPeriodType;
+
+    @Schema(description = "授权账本周期标识")
+    private String ledgerPeriodId;
 
     @Schema(description = "上下文变量")
     private ReadonlyContextVariables contextVariables;

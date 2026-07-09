@@ -5,18 +5,18 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * 支付工具使用方向。
+ * 支付工具资金流向。
  *
  * @author Codex
  * @date 2026-05-07
  */
 @AllArgsConstructor
 @Getter
-public enum PaymentInstrumentDirection implements DescriptiveEnum {
+public enum PaymentInstrumentFlowDirection implements DescriptiveEnum {
 
-    RECEIVE("收款"),
-    PAYMENT("付款"),
-    BOTH("收付款");
+    INBOUND("入向"),
+    OUTBOUND("出向"),
+    BIDIRECTIONAL("双向");
 
     private final String desc;
 }

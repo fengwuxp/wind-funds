@@ -105,14 +105,13 @@ class AuthorizationFundsInstructionRouteResolverTests {
     @Test
     void testExplicitRefundClassificationShouldNotBeOverriddenByExternalReference() {
         FundsInstructionSpec instruction = noAuthRefundInstruction(Map.of(
-                FundsInstructionContextKeys.ACCOUNT_ID, USER_ACCOUNT,
                 FundsInstructionContextKeys.REFUND_MODE, FundsInstructionContextKeys.REFUND_MODE_DISPUTE));
 
         assertThat(resolver.supports(instruction)).isFalse();
     }
 
     private FundsInstructionSpec noAuthRefundInstructionWithoutRefundModeTag() {
-        return noAuthRefundInstruction(Map.of(FundsInstructionContextKeys.ACCOUNT_ID, USER_ACCOUNT));
+        return noAuthRefundInstruction(Map.of());
     }
 
     private FundsInstructionSpec noAuthRefundInstruction(Map<String, Object> contextVariables) {
@@ -122,6 +121,7 @@ class AuthorizationFundsInstructionRouteResolverTests {
                 .eventType(FundsTransactionEventType.AUTH_REFUND)
                 .transactionType(DefaultFundsTransactionType.REFUND)
                 .amount(Money.immutable(40L, CurrencyIsoCode.USD))
+                .accountId(USER_ACCOUNT)
                 .reference(ImmutableFundsInstructionReferenceSpec.builder()
                         .referenceType(FundsInstructionReferenceType.EXTERNAL_TRANSACTION)
                         .externalTransactionId("CHANNEL_CAPTURE_1001")

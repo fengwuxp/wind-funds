@@ -59,7 +59,6 @@ public interface LedgerConverter {
      * @param data Ledger 实例
      * @return LedgerDTO 实例
      */
-    @Mapping(target = "status", source = "status")
     LedgerDTO convertToLedgerDTO(Ledger data);
 
     /**

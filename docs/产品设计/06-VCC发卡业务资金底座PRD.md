@@ -620,7 +620,7 @@ VCC 对账不追求把供应商账单、授权、清算、费用、资金流水�
 
 | 切片 | TDD 种子 | 必须证明 |
 | --- | --- | --- |
-| B2-PI-CAP | VCC 工具注册、状态不可用、方向不匹配、敏感字段阻断。 | 卡只作为工具，不生成卡号账本主体。 |
+| B2-PI-CAP | VCC 工具注册、状态不可用、资金流向不匹配、敏感字段阻断。 | 卡只作为工具，不生成卡号账本主体。 |
 | B2-ACCOUNT-HIERARCHY | 父子账户、accountPurpose、卡对子账户绑定、父账户状态不可用阻断。 | `SubjectRef(FUNDING_ACCOUNT)` / `SubjectRef(CREDIT_ACCOUNT)` 可入账，`VCC_ACCOUNT`、卡号/PAN/token 不可入账。 |
 | B2-FR | 共享卡多绑定、预付资金来源、资金责任不唯一。 | `FundingAllocationDecision` 唯一、可回放、可进入 route snapshot。 |
 | B4-AUTH-PI | `authorizeByInstrument` 批准、拒绝、幂等、同键不同摘要冲突。 | facade 委派账户主体型授权内核；拒绝无账务副作用。 |

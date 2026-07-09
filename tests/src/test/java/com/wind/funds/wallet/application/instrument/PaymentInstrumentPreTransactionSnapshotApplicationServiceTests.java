@@ -17,7 +17,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
@@ -108,7 +108,7 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
     void testResolvePreTransactionSnapshotShouldCombineAdmissionDecisionsWithoutFundsSideEffect() {
         creditAccountService.createCreditAccount(createCreditAccountRequest());
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
-                PaymentInstrumentDirection.PAYMENT));
+                PaymentInstrumentFlowDirection.OUTBOUND));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(PAYMENT_INSTRUMENT_SN));
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
@@ -142,7 +142,7 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
     }
 
     /**
-     * 场景：支付工具方向不支持当前预交易动作。
+     * 场景：支付工具资金流向不支持当前预交易动作。
      * 输入：RECEIVE-only 工具发起授权预交易快照。
      * 输出：准入阶段失败。
      * 红线：预交易快照失败不得写交易、route、posting、LedgerEntry 或余额投影事实。
@@ -150,12 +150,35 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
     @Test
     void testResolvePreTransactionSnapshotShouldRejectInstrumentCapabilityWithoutFundsSideEffect() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(RECEIVE_INSTRUMENT_SN,
-                PaymentInstrumentDirection.RECEIVE));
+                PaymentInstrumentFlowDirection.INBOUND));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> snapshotApplicationService.resolvePreTransactionSnapshot(
                 snapshotRequest(RECEIVE_INSTRUMENT_SN).setAction(PaymentInstrumentAction.AUTHORIZE)))
-                .hasMessageContaining("支付工具方向不支持当前动作");
+                .hasMessageContaining("支付工具资金流向不支持当前动作");
+
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：退款动作不能通过预交易快照重新解析当前资金责任。
+     * 输入：支付工具、绑定、资金责任和账户能力均存在，但动作是 REFUND。
+     * 输出：应用层入口直接拒绝。
+     * 红线：退款必须基于原 route snapshot 回放，不能按当前支付工具绑定和账户能力重新选路。
+     */
+    @Test
+    void testResolvePreTransactionSnapshotShouldRejectRefundWithoutCurrentPathSelectionSideEffect() {
+        creditAccountService.createCreditAccount(createCreditAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.OUTBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(PAYMENT_INSTRUMENT_SN));
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> snapshotApplicationService.resolvePreTransactionSnapshot(
+                snapshotRequest(PAYMENT_INSTRUMENT_SN).setAction(PaymentInstrumentAction.REFUND)))
+                .hasMessageContaining("退款不能通过支付工具预交易快照重选当前资金路径");
 
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -232,14 +255,14 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
     }
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
-                                                                          PaymentInstrumentDirection direction) {
+                                                                          PaymentInstrumentFlowDirection direction) {
         return new CreatePaymentInstrumentRequest()
                 .setSn(instrumentSn)
                 .setTenantId(TENANT_ID)
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setInstrumentType("CARD")
-                .setInstrumentDirection(direction)
+                .setFlowDirection(direction)
                 .setInstrumentNo("****8642")
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId("tok_pre_tx_8642")

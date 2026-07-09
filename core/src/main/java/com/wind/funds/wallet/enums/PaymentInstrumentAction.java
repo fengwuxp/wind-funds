@@ -18,7 +18,7 @@ public enum PaymentInstrumentAction implements DescriptiveEnum {
     PAY("付款"),
     AUTHORIZE("授权"),
     REFUND("退款"),
-    WITHDRAW("提现");
+    WITHDRAW("提现/出款");
 
     private final String desc;
 }

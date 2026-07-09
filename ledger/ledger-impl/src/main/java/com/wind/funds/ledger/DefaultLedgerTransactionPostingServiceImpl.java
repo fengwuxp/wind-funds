@@ -7,6 +7,8 @@ import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
+import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
@@ -14,7 +16,6 @@ import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -24,6 +25,8 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -65,15 +68,11 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         assertAllLedgerBalanceConstraintsSatisfied(transaction, boundLedgers);
 
         // 按照账务主体分组更新余额
-        Map<@NotNull FundsAccountId, List<LedgerEntrySpec>> groups = transaction.getPostingPlans()
+        Map<ProjectionGroupKey, List<LedgerEntrySpec>> groups = groupProjectionEntries(transaction);
+        Map<FundsAccountId, LedgerBalanceProjectionService> projectionServices = resolveProjectionServices(groups.keySet()
                 .stream()
-                .map(LedgerPostingPlanSpec::getEntries)
-                .flatMap(List::stream)
-                .collect(Collectors.groupingBy(entry -> FundsAccountId.immutable(
-                        entry.getSubjectId(),
-                        entry.getSubjectType()
-                )));
-        Map<FundsAccountId, LedgerBalanceProjectionService> projectionServices = resolveProjectionServices(groups);
+                .map(ProjectionGroupKey::accountId)
+                .collect(Collectors.toCollection(LinkedHashSet::new)));
         LedgerTransactionPostResult postResult = ledgerTransactionService.postLedgerTransaction(transaction);
         if (!postResult.isNewlyPosted()) {
             log.info("账本交易已存在，跳过重复入账和余额投影，ledgerTransactionSn={}, fundsTransactionSn={}, "
@@ -82,16 +81,16 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                     transaction.getBusinessSn());
             return;
         }
-        for (Map.Entry<FundsAccountId, List<LedgerEntrySpec>> entry : groups.entrySet()) {
-            FundsAccountId accountId = entry.getKey();
+        for (Map.Entry<ProjectionGroupKey, List<LedgerEntrySpec>> entry : groups.entrySet()) {
+            FundsAccountId accountId = entry.getKey().accountId();
             List<LedgerEntrySpec> entries = entry.getValue();
-            projectionServices.get(accountId).project(entries);
+            projectionServices.get(accountId).project(entries, entry.getKey().postingAccessType());
         }
         logAfterCommit(() -> log.info("账本交易入账完成，ledgerTransactionSn={}, fundsTransactionSn={}, eventType={}, "
                         + "businessScene={}, businessSn={}, amount={}, currency={}, postingPlanCount={}, subjectCount={}",
                 transaction.getSn(), transaction.getFundsTransactionSn(), transaction.getEventType(),
                 transaction.getBusinessScene(), transaction.getBusinessSn(), transaction.getAmount().getAmount(),
-                transaction.getCurrency(), transaction.getPostingPlans().size(), groups.size()));
+                transaction.getCurrency(), transaction.getPostingPlans().size(), projectionServices.size()));
     }
 
     private void logAfterCommit(Runnable action) {
@@ -271,11 +270,12 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         Map<Long, LedgerDTO> ledgers = ledgerService.getLedgerByIds(ledgerIds)
                 .stream()
                 .collect(Collectors.toMap(LedgerDTO::getId, ledger -> ledger));
-        entries.forEach(entry -> {
+        transaction.getPostingPlans().forEach(plan -> plan.getEntries().forEach(entry -> {
             LedgerDTO ledger = ledgers.get(entry.getLedgerId());
             AssertUtils.notNull(ledger, "账户账本不存在，ledgerId = {}", entry.getLedgerId());
+            LedgerStatus.assertPostable(ledger.getId(), ledger.getStatus(), plan.getPostingAccessType());
             assertEntryMatchesLedger(entry, ledger);
-        });
+        }));
         return ledgers;
     }
 
@@ -377,10 +377,25 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
         return normalBalanceSide == EntrySide.DEBIT ? rawDelta : -rawDelta;
     }
 
+    private Map<ProjectionGroupKey, List<LedgerEntrySpec>> groupProjectionEntries(LedgerTransactionSpec transaction) {
+        Map<ProjectionGroupKey, List<LedgerEntrySpec>> result = new LinkedHashMap<>();
+        for (LedgerPostingPlanSpec plan : transaction.getPostingPlans()) {
+            LedgerPostingAccessType postingAccessType = plan.getPostingAccessType();
+            AssertUtils.notNull(postingAccessType,
+                    "账务计划入账准入类型不能为空，planId = {}", plan.getPlanId());
+            for (LedgerEntrySpec entry : plan.getEntries()) {
+                FundsAccountId accountId = FundsAccountId.immutable(entry.getSubjectId(), entry.getSubjectType());
+                ProjectionGroupKey key = new ProjectionGroupKey(accountId, postingAccessType);
+                result.computeIfAbsent(key, ignored -> new ArrayList<>()).add(entry);
+            }
+        }
+        return result;
+    }
+
     private Map<FundsAccountId, LedgerBalanceProjectionService> resolveProjectionServices(
-            Map<@NotNull FundsAccountId, List<LedgerEntrySpec>> groups) {
+            Collection<FundsAccountId> accountIds) {
         Map<FundsAccountId, LedgerBalanceProjectionService> result = new LinkedHashMap<>();
-        for (FundsAccountId accountId : groups.keySet()) {
+        for (FundsAccountId accountId : accountIds) {
             List<LedgerBalanceProjectionService> supported = ledgerBalanceProjectionServices.stream()
                     .filter(delegate -> delegate.supports(accountId))
                     .toList();
@@ -389,6 +404,9 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
             result.put(accountId, supported.getFirst());
         }
         return result;
+    }
+
+    private record ProjectionGroupKey(FundsAccountId accountId, LedgerPostingAccessType postingAccessType) {
     }
 
 }

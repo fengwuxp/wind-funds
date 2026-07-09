@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.dal.entities;
 
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
@@ -80,10 +80,11 @@ public class PaymentInstrument implements Serializable, TenantIsolationObject<Lo
     private String instrumentType;
 
     /**
-     * 工具资金方向。
+     * 工具资金流向。
      */
     @NotNull
-    private PaymentInstrumentDirection instrumentDirection;
+    @Column("instrument_direction")
+    private PaymentInstrumentFlowDirection flowDirection;
 
     /**
      * 工具号码或账号标识。

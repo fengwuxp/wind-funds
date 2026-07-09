@@ -1143,7 +1143,7 @@ VCC 授权接入口径：
 | RECEIVE | 入金识别、收款、VA 到账匹配。 | 缺能力时不生成入金 route；外部回单只能停留在待处理或差错上下文。 |
 | PAY | 主动付款、钱包支付、外部工具扣款。 | 缺能力时付款失败无 route、posting、entry。 |
 | AUTHORIZE | VCC、虚拟卡、共享卡或卡 token 授权。 | 缺能力时只能记录授权拒绝或失败事实，不生成账务路径。 |
-| REFUND | 原路退款、撤销、退费、拒付回放。 | 缺原快照或原工具快照时不得按当前绑定重选路。 |
+| REFUND | 原路退款、撤销、退费、拒付回放。 | 缺原快照或原工具快照时不得按当前绑定重选路；工具准入不按当前 `flowDirection` 把逆向回放强判为付款或收款。 |
 | WITHDRAW | 提现、出款、商户结算出款端点。 | 缺能力时出款门禁失败，不生成出款资金事实。 |
 
 | 用例 | 资金交易结构 | 资金链路重点 | 开发承接 | 测试承接 |
@@ -1152,7 +1152,7 @@ VCC 授权接入口径：
 | 支付工具动作能力匹配 | `DIRECT_TRANSACTION`、`AUTHORIZATION_TRANSACTION` 或出款/入金事实按动作选择能力。 | 工具能力只做准入；账户能力、余额、额度和周期仍由后续链路独立判断。 | application facade 一次性校验工具状态、方向、动作能力、币种、有效期、绑定版本和敏感字段，输出不可变工具准入快照。 | `DSL-PAYMENT-INSTRUMENT-CAPABILITY-001`、`TDD-WALLET-018`、`TDD-ROUTE-012`。 |
 | prepaid virtual card 授权 | `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | 预付卡只进入工具快照；预付余额通过 `SubjectRef(FUNDING_ACCOUNT)` 入账，预付资金来源和父账户约束通过 `FundingAllocationDecision` 与 `AccountHierarchySnapshot` 解析。 | 缺资金子账户、缺父账户快照、缺预付资金来源、缺财务确认引用或资金模式待确认时拒绝或 contract-only。 | `DSL-VCC-HIERARCHY-001`、`DSL-PAYMENT-INSTRUMENT-PREPAID-CARD-001`、`TDD-P2-VCC-004`、`TDD-WALLET-010`。 |
 | shared card 授权 | `AUTHORIZATION_TRANSACTION / AUTHORIZE`。 | 共享卡只表达工具和使用模式；预算组和 Spend Rule 只表达控制上下文；route leg 最终落到信用子账户，并保留父账户约束、资金账户、信用账户或平台账户角色来源。 | 固化使用人、绑定版本、信用子账户、父账户快照、预算组、Spend Rule、资金责任解析关系和规则版本；多责任主体不唯一时失败无副作用。 | `DSL-VCC-HIERARCHY-001`、`DSL-PAYMENT-INSTRUMENT-SHARED-CARD-001`、`TDD-P2-VCC-005`、`TDD-AUTH-008`、`TDD-AUTH-009`。 |
-| 支付工具准入失败 | 不生成资金路径。 | 工具不可用、方向不匹配、动作能力缺失、资金责任不唯一、账户能力不足。 | 失败返回可解释原因或授权拒绝；不生成 route、posting、entry。 | `DSL-PAYMENT-INSTRUMENT-FAIL-001`、`TDD-ROUTE-012`、`TDD-RED-035`。 |
+| 支付工具准入失败 | 不生成资金路径。 | 工具不可用、资金流向不匹配、动作能力缺失、资金责任不唯一、账户能力不足。 | 失败返回可解释原因或授权拒绝；不生成 route、posting、entry。 | `DSL-PAYMENT-INSTRUMENT-FAIL-001`、`TDD-ROUTE-012`、`TDD-RED-035`。 |
 | 工具换绑后原路退款 | `DIRECT_TRANSACTION / REFUND` 或授权链退款。 | 使用原 `RouteSnapshot`、原 `PaymentInstrumentRef` 和原 `RoutingDecision`。 | route replay 不读取当前默认绑定或当前资金责任关系。 | `DSL-PAYMENT-INSTRUMENT-REPLAY-001`、`TDD-ROUTE-013`、`TDD-RED-036`。 |
 | 敏感信息治理 | 所有含工具引用的指令和快照。 | 只保存掩码号、别名或安全 token reference。 | 完整 PAN、CVV、密钥、token secret 和银行账户敏感号不得进入快照、日志、导出或报表。 | `TDD-WALLET-011`、`TDD-RED-034`。 |
 
@@ -1323,7 +1323,7 @@ JSON 用例只表达 DSL 对象和验收预期，不表达 Controller 报文、�
 | `DSL-SETTLEMENT-POLICY-001` | 结算策略表达和解析失败边界。 | `SettlementPolicySpec` 固化周期、cutoff、时区、节假日和结算对象。 | 策略解析成功才生成候选或结算计划；策略快照可追溯。 | 空表达式、未知策略或解析失败被静默按实时结算处理。 |
 | `DSL-P2-EXTERNAL-EVIDENCE-PACK-001` | P2 业务能力包外部适配证据包。 | GatewayInstruction、RouteDecisionSnapshot、ChannelRequest、ChannelResponse、WebhookEvent、ChannelReference、ExternalQueryResult、ExternalFileDigest、ExternalRuleVerification 或等价脱敏摘要。 | 外部动作可被去重、验签、回查、审计、对账和关联 route snapshot；证据包只作为归一资金事实、阻断、等待证据或对账输入。 | 外部 accepted/submitted/processing 直接入账，缺验签/幂等/外部引用/文件摘要/规则核验仍自动推进，保存敏感原文。 |
 | `DSL-VCC-RECON-SOURCE-OBJECT-001` | VCC 对账来源对象承接。 | SupplierBill、AuthorizationEvent、ClearingRecord、FeeRecord、FundingStatement、LedgerEntry、AccountingVoucher、ReconciliationCase、MatchResult、DifferenceItem、AdjustmentAction、AuditTrail 的引用、摘要、归属和匹配键。 | 每类来源解释自己的金额、币种、日期、方向、状态和责任口径，并能汇入同一条 VCC 交易链；差异进入对账差错、阻断、调账、挂账、核销或追偿闭环。 | 把供应商账单或财务凭证做成本模块、对账结果直接改 LedgerEntry、净额静默抵消本金/费用/FX/税费差异、缺审计证据关闭差错。 |
-| `DSL-PAYMENT-INSTRUMENT-ROUTE-001` | 支付工具参与路由。 | `PaymentInstrumentRef`、`BindingHistory`、`FundingAllocationDecision`。 | 工具只做引用和快照；资金责任解析成内部可记账主体。 | 外部账户或卡号入账、工具状态/方向不匹配仍通过。 |
+| `DSL-PAYMENT-INSTRUMENT-ROUTE-001` | 支付工具参与路由。 | `PaymentInstrumentRef`、`BindingHistory`、`FundingAllocationDecision`。 | 工具只做引用和快照；资金责任解析成内部可记账主体。 | 外部账户或卡号入账、工具状态/资金流向不匹配仍通过。 |
 | `DSL-VCC-HIERARCHY-001` | VCC 卡绑定资金/信用子账户并固化父账户约束。 | `SubjectRef(FUNDING_ACCOUNT/CREDIT_ACCOUNT)`、`AccountHierarchySnapshot`、账目 profile、ledger subject、account status、funding source reference。 | VCC 不新增独立主体；卡号、PAN、token 和 Cardholder 仍只做工具或归因维度；父账户汇总默认是投影，不自动写分录。 | 缺子账户仍授权、卡号/PAN/token 入账、缺父账户快照入账、缺账目 profile 入账、状态不可用仍入账。 |
 | `DSL-PAYMENT-INSTRUMENT-PREPAID-CARD-001` | prepaid virtual card 授权和清算。 | `PaymentInstrumentRef`、`SubjectRef(FUNDING_ACCOUNT)`、`AccountHierarchySnapshot`、预付资金来源引用、`FundingAllocationDecision`、财务确认引用。 | 预付卡是工具资金模式，余额责任落到资金子账户；储值券、礼品卡和预付代金券仍按权益 DSL 表达。 | 预付卡号直接入账、预付余额写在工具上、缺确认仍生产入账。 |
 | `DSL-PAYMENT-INSTRUMENT-SHARED-CARD-001` | shared card 授权、可信撤销、完成和退款；过期不入资金交易。 | `PaymentInstrumentRef`、`SubjectRef(CREDIT_ACCOUNT)`、`AccountHierarchySnapshot`、binding snapshot、cardholder/department/project 上下文、BudgetGroup 上下文、Spend Rule 快照和资金责任决策。 | 共享卡是使用模式；每张卡绑定一个信用子账户，多卡共享通过同一父账户约束，后续事件沿原快照回放，不读取当前绑定重选路。 | 共享卡、卡号或持卡人入账、缺信用子账户、缺父账户快照、缺绑定版本、当前换绑影响历史退款，或过期直接生成资金事实。 |

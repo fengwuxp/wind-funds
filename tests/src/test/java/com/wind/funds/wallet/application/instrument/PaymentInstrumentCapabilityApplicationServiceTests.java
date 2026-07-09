@@ -9,7 +9,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.query.PaymentInstrumentBindingHistoryQuery;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
@@ -77,7 +77,7 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
     @Test
     void testResolvePaymentInstrumentCapabilityShouldReturnActiveBindingSnapshotWithoutLedgerSideEffect() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
-                PaymentInstrumentDirection.PAYMENT));
+                PaymentInstrumentFlowDirection.OUTBOUND));
         Long bindingId = paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -94,7 +94,7 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
                     assertThat(result.getOwnerId()).isEqualTo(OWNER_ID);
                     assertThat(result.getOwnerType()).isEqualTo(FundsAccountOwnerType.USER);
                     assertThat(result.getInstrumentType()).isEqualTo(INSTRUMENT_TYPE_CARD);
-                    assertThat(result.getInstrumentDirection()).isEqualTo(PaymentInstrumentDirection.PAYMENT);
+                    assertThat(result.getFlowDirection()).isEqualTo(PaymentInstrumentFlowDirection.OUTBOUND);
                     assertThat(result.getChannelCode()).isEqualTo(CHANNEL_CODE);
                     assertThat(result.getAction()).isEqualTo(PaymentInstrumentAction.AUTHORIZE);
                     assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
@@ -114,22 +114,43 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
     @Test
     void testResolvePaymentInstrumentCapabilityShouldRejectDirectionMismatchWithoutLedgerSideEffect() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(RECEIVE_INSTRUMENT_SN,
-                PaymentInstrumentDirection.RECEIVE));
+                PaymentInstrumentFlowDirection.INBOUND));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> capabilityApplicationService.resolvePaymentInstrumentCapability(resolveRequest()
                 .setInstrumentSn(RECEIVE_INSTRUMENT_SN)
                 .setAction(PaymentInstrumentAction.PAY)))
-                .hasMessageContaining("支付工具方向不支持当前动作");
+                .hasMessageContaining("支付工具资金流向不支持当前动作");
 
         assertThat(countBindingHistoryRows()).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
+    void testResolvePaymentInstrumentCapabilityShouldAllowRefundWithoutCurrentFlowDirectionMatch() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(RECEIVE_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.INBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(RECEIVE_INSTRUMENT_SN,
+                PAYMENT_BINDING_SN + "_refund",
+                PaymentInstrumentBindingRole.RECEIVE_SUBJECT));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        PaymentInstrumentCapabilityDecisionDTO decision =
+                capabilityApplicationService.resolvePaymentInstrumentCapability(resolveRequest()
+                        .setInstrumentSn(RECEIVE_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.RECEIVE_SUBJECT)
+                        .setAction(PaymentInstrumentAction.REFUND));
+
+        assertThat(decision.getInstrumentSn()).isEqualTo(RECEIVE_INSTRUMENT_SN);
+        assertThat(decision.getFlowDirection()).isEqualTo(PaymentInstrumentFlowDirection.INBOUND);
+        assertThat(decision.getAction()).isEqualTo(PaymentInstrumentAction.REFUND);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
     void testResolvePaymentInstrumentCapabilityShouldRejectStaleBindingVersionWithoutLedgerSideEffect() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
-                PaymentInstrumentDirection.PAYMENT));
+                PaymentInstrumentFlowDirection.OUTBOUND));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -184,14 +205,14 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
     }
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
-                                                                          PaymentInstrumentDirection direction) {
+                                                                          PaymentInstrumentFlowDirection direction) {
         return new CreatePaymentInstrumentRequest()
                 .setSn(instrumentSn)
                 .setTenantId(TENANT_ID)
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setInstrumentType(INSTRUMENT_TYPE_CARD)
-                .setInstrumentDirection(direction)
+                .setFlowDirection(direction)
                 .setInstrumentNo(MASKED_INSTRUMENT_NO)
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId(EXTERNAL_INSTRUMENT_ID)
@@ -200,12 +221,19 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
     }
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
+        return createBindingRequest(PAYMENT_INSTRUMENT_SN, PAYMENT_BINDING_SN,
+                PaymentInstrumentBindingRole.PAYMENT_SUBJECT);
+    }
+
+    private CreatePaymentInstrumentBindingRequest createBindingRequest(String instrumentSn,
+                                                                       String bindingSn,
+                                                                       PaymentInstrumentBindingRole bindingRole) {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(PAYMENT_BINDING_SN)
-                .setRequestSn(PAYMENT_BINDING_SN + "_create")
+                .setSn(bindingSn)
+                .setRequestSn(bindingSn + "_create")
                 .setTenantId(TENANT_ID)
-                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
-                .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
+                .setInstrumentSn(instrumentSn)
+                .setBindingRole(bindingRole)
                 .setSubjectId(SUBJECT_ID)
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)

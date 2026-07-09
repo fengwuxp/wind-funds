@@ -33,7 +33,7 @@ import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import lombok.AllArgsConstructor;
@@ -272,7 +272,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 .and(ref.ownerId.eq(query.getOwnerId()))
                 .and(ref.ownerType.eq(query.getOwnerType()))
                 .and(ref.instrumentType.eq(query.getInstrumentType()))
-                .and(ref.instrumentDirection.eq(query.getInstrumentDirection()))
+                .and(ref.flowDirection.eq(query.getFlowDirection()))
                 .and(ref.instrumentNo.eq(query.getInstrumentNo()))
                 .and(ref.channelCode.eq(query.getChannelCode()))
                 .and(ref.externalInstrumentId.eq(query.getExternalInstrumentId()))
@@ -321,8 +321,8 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
         AssertUtils.isTrue(instrument.getCurrency() == request.getCurrency(),
                 "支付工具币种与绑定币种不一致，instrumentSn = {}",
                 request.getInstrumentSn());
-        AssertUtils.isTrue(supportsBindingRole(instrument.getInstrumentDirection(), request.getBindingRole()),
-                "支付工具方向不支持绑定角色，instrumentSn = {}",
+        AssertUtils.isTrue(supportsBindingRole(instrument.getFlowDirection(), request.getBindingRole()),
+                "支付工具资金流向不支持绑定角色，instrumentSn = {}",
                 request.getInstrumentSn());
     }
 
@@ -370,11 +370,11 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
                 "支付工具绑定生效时间必须早于失效时间");
     }
 
-    private boolean supportsBindingRole(PaymentInstrumentDirection direction, PaymentInstrumentBindingRole bindingRole) {
+    private boolean supportsBindingRole(PaymentInstrumentFlowDirection direction, PaymentInstrumentBindingRole bindingRole) {
         if (bindingRole == PaymentInstrumentBindingRole.RECEIVE_SUBJECT) {
-            return direction == PaymentInstrumentDirection.RECEIVE || direction == PaymentInstrumentDirection.BOTH;
+            return direction == PaymentInstrumentFlowDirection.INBOUND || direction == PaymentInstrumentFlowDirection.BIDIRECTIONAL;
         }
-        return direction == PaymentInstrumentDirection.PAYMENT || direction == PaymentInstrumentDirection.BOTH;
+        return direction == PaymentInstrumentFlowDirection.OUTBOUND || direction == PaymentInstrumentFlowDirection.BIDIRECTIONAL;
     }
 
     private void assertNoDuplicateActiveDefaultBinding(PaymentInstrumentBindingDTO binding) {

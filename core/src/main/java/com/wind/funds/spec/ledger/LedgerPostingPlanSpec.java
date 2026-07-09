@@ -2,6 +2,7 @@ package com.wind.funds.spec.ledger;
 
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
@@ -48,6 +49,11 @@ public interface LedgerPostingPlanSpec {
 
     @NonNull
     LedgerPostingIntentType getIntent();
+
+    @NonNull
+    default LedgerPostingAccessType getPostingAccessType() {
+        return LedgerPostingAccessType.fromIntent(getIntent());
+    }
 
     @Nullable
     default LedgerPostingScope getPostingScope() {

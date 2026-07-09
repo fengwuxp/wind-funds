@@ -10,6 +10,8 @@ import com.wind.funds.transaction.application.FundsAuthorizationTransactionServi
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
+import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.instrument.AuthorizationAdmissionApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
 import com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService;
@@ -34,6 +36,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 支付工具授权准入应用服务实现。
@@ -171,8 +174,11 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
             AuthorizeByPaymentInstrumentRequest request,
             PaymentInstrumentPreTransactionSnapshotDTO snapshot,
             @Nullable SpendControlAdmissionDecisionDTO spendControlDecision) {
+        FundsAccountId authorizationAccountId = authorizationAccountId(snapshot);
+        FundsAccountId linkedFundingAccountId = linkedFundingAccountId(authorizationAccountId,
+                snapshot.getTargetAccountId());
         return new FundsAuthorizationTransactionAuthorizeRequest()
-                .setAccountId(snapshot.getTargetAccountId())
+                .setAccountId(authorizationAccountId)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
                         request.getCurrency())))
                 .setBusinessSn(request.getBusinessSn())
@@ -182,6 +188,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
                 .setTransactionCountry(request.getTransactionCountry())
                 .setDeclineReason(request.getDeclineReason())
                 .setPaymentInstrumentRef(paymentInstrumentRef(request, snapshot.getPaymentInstrumentCapability()))
+                .setLinkedFundingAccountId(linkedFundingAccountId)
                 .setContextVariables(admissionContextVariables(snapshot, spendControlDecision))
                 .setDescription(request.getDescription());
     }
@@ -195,6 +202,20 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
             values.put(FundsInstructionContextKeys.SPEND_RULE_DECISION, decision);
         }
         return ReadonlyContextVariables.of(values);
+    }
+
+    private FundsAccountId authorizationAccountId(PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
+        PaymentInstrumentCapabilityDecisionDTO instrument = snapshot.getPaymentInstrumentCapability();
+        return FundsAccountId.immutable(instrument.getSubjectId(), instrument.getSubjectType());
+    }
+
+    private @Nullable FundsAccountId linkedFundingAccountId(FundsAccountId authorizationAccountId,
+                                                            FundsAccountId targetAccountId) {
+        if (Objects.equals(authorizationAccountId, targetAccountId)
+                || !FundsSubjectType.FUNDING_ACCOUNT.name().equals(targetAccountId.type())) {
+            return null;
+        }
+        return targetAccountId;
     }
 
     private @NonNull Map<String, Object> walletAdmissionContext(PaymentInstrumentPreTransactionSnapshotDTO snapshot) {

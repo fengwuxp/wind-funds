@@ -1150,7 +1150,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 FundsSubjectType.FUNDING_ACCOUNT.name());
     }
 
-    private Optional<LedgerDTO> findLedger(FundsAccountId accountId, LedgerSubjectCode subjectCode) {
+    protected Optional<LedgerDTO> findLedger(FundsAccountId accountId, LedgerSubjectCode subjectCode) {
         return findLedgers(accountId).stream()
                 .filter(ledger -> ledger.getLedgerSubjectCode() == subjectCode)
                 .findFirst();

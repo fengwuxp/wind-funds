@@ -1,11 +1,14 @@
 package com.wind.funds.spec.transaction;
 
 import com.wind.funds.operation.FundsOperationActorSpec;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -59,6 +62,56 @@ public interface FundsInstructionSpec {
 
     @Nullable
     ExternalAccountRefSpec getExternalAccountRef();
+
+    @Nullable
+    default FundsAccountId getAccountId() {
+        return null;
+    }
+
+    @Nullable
+    default FundsAccountId getPayerAccountId() {
+        return null;
+    }
+
+    @Nullable
+    default FundsAccountId getPayeeAccountId() {
+        return null;
+    }
+
+    @Nullable
+    default FundsAccountId getPayerId() {
+        return null;
+    }
+
+    @Nullable
+    default FundsAccountId getPayeeId() {
+        return null;
+    }
+
+    @Nullable
+    default LedgerSubjectCode getPayerLedgerSubjectCode() {
+        return null;
+    }
+
+    @Nullable
+    default LedgerSubjectCode getPayeeLedgerSubjectCode() {
+        return null;
+    }
+
+    @Nullable
+    default FundsAccountId getLinkedFundingAccountId() {
+        return null;
+    }
+
+    @Nullable
+    default AccountBalancePeriodType getLedgerPeriodType() {
+        return null;
+    }
+
+    @Nullable
+    default String getLedgerPeriodId() {
+        return null;
+    }
 
     @Nullable
     FundsInstructionReferenceSpec getReference();

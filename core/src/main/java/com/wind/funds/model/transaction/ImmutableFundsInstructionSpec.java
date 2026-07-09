@@ -1,6 +1,8 @@
 package com.wind.funds.model.transaction;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
@@ -10,6 +12,7 @@ import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
@@ -35,6 +38,16 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
                                             BigDecimal exchangeRate,
                                             @Nullable PaymentInstrumentRefSpec instrumentRef,
                                             @Nullable ExternalAccountRefSpec externalAccountRef,
+                                            @Nullable FundsAccountId accountId,
+                                            @Nullable FundsAccountId payerAccountId,
+                                            @Nullable FundsAccountId payeeAccountId,
+                                            @Nullable FundsAccountId payerId,
+                                            @Nullable FundsAccountId payeeId,
+                                            @Nullable LedgerSubjectCode payerLedgerSubjectCode,
+                                            @Nullable LedgerSubjectCode payeeLedgerSubjectCode,
+                                            @Nullable FundsAccountId linkedFundingAccountId,
+                                            @Nullable AccountBalancePeriodType ledgerPeriodType,
+                                            @Nullable String ledgerPeriodId,
                                             @Nullable FundsInstructionReferenceSpec reference,
                                             String businessScene,
                                             String businessSn,
@@ -62,6 +75,15 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
         }
         if (exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("fundsInstruction.exchangeRate must be positive");
+        }
+        if (ledgerPeriodType == null) {
+            AssertUtils.isTrue(ledgerPeriodId == null,
+                    "fundsInstruction.ledgerPeriodType must not be null when ledgerPeriodId is present");
+        } else if (ledgerPeriodType == AccountBalancePeriodType.LIFETIME) {
+            ledgerPeriodId = AccountBalancePeriodType.LIFETIME.name();
+        } else {
+            AssertUtils.hasText(ledgerPeriodId,
+                    "fundsInstruction.ledgerPeriodId must not be blank for non-lifetime ledgerPeriodType");
         }
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
                         || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables),
@@ -139,6 +161,56 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
     @Override
     public @Nullable ExternalAccountRefSpec getExternalAccountRef() {
         return externalAccountRef;
+    }
+
+    @Override
+    public @Nullable FundsAccountId getAccountId() {
+        return accountId;
+    }
+
+    @Override
+    public @Nullable FundsAccountId getPayerAccountId() {
+        return payerAccountId;
+    }
+
+    @Override
+    public @Nullable FundsAccountId getPayeeAccountId() {
+        return payeeAccountId;
+    }
+
+    @Override
+    public @Nullable FundsAccountId getPayerId() {
+        return payerId;
+    }
+
+    @Override
+    public @Nullable FundsAccountId getPayeeId() {
+        return payeeId;
+    }
+
+    @Override
+    public @Nullable LedgerSubjectCode getPayerLedgerSubjectCode() {
+        return payerLedgerSubjectCode;
+    }
+
+    @Override
+    public @Nullable LedgerSubjectCode getPayeeLedgerSubjectCode() {
+        return payeeLedgerSubjectCode;
+    }
+
+    @Override
+    public @Nullable FundsAccountId getLinkedFundingAccountId() {
+        return linkedFundingAccountId;
+    }
+
+    @Override
+    public @Nullable AccountBalancePeriodType getLedgerPeriodType() {
+        return ledgerPeriodType;
+    }
+
+    @Override
+    public @Nullable String getLedgerPeriodId() {
+        return ledgerPeriodId;
     }
 
     @Override

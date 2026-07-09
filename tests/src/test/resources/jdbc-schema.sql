@@ -133,7 +133,7 @@ CREATE TABLE `t_payment_instrument`
     `owner_id`               VARCHAR(30)  NOT NULL COMMENT '工具归属主体 ID',
     `owner_type`             VARCHAR(50)  NOT NULL COMMENT '工具归属主体类型',
     `instrument_type`        VARCHAR(50)  NOT NULL COMMENT '工具类型',
-    `instrument_direction`   VARCHAR(50)  NOT NULL COMMENT '工具方向：RECEIVE/PAYMENT/BOTH',
+    `instrument_direction`   VARCHAR(50)  NOT NULL COMMENT '工具资金流向：INBOUND/OUTBOUND/BIDIRECTIONAL',
     `instrument_no`          VARCHAR(128) NOT NULL COMMENT '工具展示号、掩码号、别名号或稳定识别号',
     `channel_code`           VARCHAR(50)           DEFAULT NULL COMMENT '通道编码',
     `external_instrument_id` VARCHAR(128)          DEFAULT NULL COMMENT '外部工具 ID',

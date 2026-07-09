@@ -53,10 +53,6 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
 
     private static final String FROZEN_ORDER_REQUEST_HASH = "frozenOrderRequestHash";
 
-    private static final String ACCOUNT_ID = "id";
-
-    private static final String ACCOUNT_TYPE = "type";
-
     private static final String HASH_FIELD_CURRENCY = "currency";
 
     private static final String HASH_FIELD_FREEZE_TYPE = "freezeType";
@@ -326,27 +322,14 @@ public class DefaultFundsFrozenOrderLifecycleSaver implements FundsInstructionLi
         if (routeSnapshot != null && !routeSnapshot.getParticipants().isEmpty()) {
             return routeSnapshot.getParticipants().getFirst().getSubjectRef().getSubjectId();
         }
-        Object accountId = instruction.getContextVariables().get(FundsInstructionContextKeys.ACCOUNT_ID);
-        return accountField(accountId, ACCOUNT_ID);
+        return instruction.getAccountId() == null ? null : instruction.getAccountId().id();
     }
 
     private String subjectType(FundsInstructionSpec instruction, RouteSnapshotSpec routeSnapshot) {
         if (routeSnapshot != null && !routeSnapshot.getParticipants().isEmpty()) {
             return routeSnapshot.getParticipants().getFirst().getSubjectRef().getSubjectType().name();
         }
-        Object accountId = instruction.getContextVariables().get(FundsInstructionContextKeys.ACCOUNT_ID);
-        return accountField(accountId, ACCOUNT_TYPE);
-    }
-
-    private String accountField(Object accountId, String fieldName) {
-        if (accountId == null) {
-            return null;
-        }
-        if (accountId instanceof Map<?, ?> values) {
-            Object value = values.get(fieldName);
-            return value == null ? null : value.toString();
-        }
-        return JSON.to(JSONObject.class, accountId).getString(fieldName);
+        return instruction.getAccountId() == null ? null : instruction.getAccountId().type();
     }
 
     private String computeRequestHash(FundsInstructionSpec instruction, @Nullable RouteSnapshotSpec routeSnapshot) {

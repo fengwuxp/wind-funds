@@ -2,6 +2,7 @@ package com.wind.funds.ledger.query;
 
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -62,7 +63,7 @@ public class LedgerQuery {
     private Long creditAmount;
 
     @Schema(description = "账本状态，例如 ACTIVE")
-    private String status;
+    private LedgerStatus status;
 
     @Schema(description = "币种")
     private CurrencyIsoCode currency;

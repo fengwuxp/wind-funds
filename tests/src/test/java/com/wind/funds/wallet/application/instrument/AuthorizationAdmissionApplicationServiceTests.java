@@ -48,10 +48,11 @@ import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabi
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
+import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
@@ -128,6 +129,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsServiceTest {
 
     private static final String CREDIT_ACCOUNT_SN = "auth_admission_credit";
+
+    private static final String PARENT_FUNDING_ACCOUNT_SN = "auth_admission_parent_funding";
 
     private static final String PLATFORM_SETTLEMENT_ACCOUNT_SN = "auth_adm_settle";
 
@@ -219,7 +222,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
         creditAccountService.createCreditAccount(createCreditAccountRequest());
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
-                PaymentInstrumentDirection.PAYMENT));
+                PaymentInstrumentFlowDirection.OUTBOUND));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
@@ -253,6 +256,60 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     }
 
     /**
+     * 场景：共享 VCC 绑定信用账户，但真实资金责任落在父资金账户。
+     * 输入：支付工具绑定信用账户，资金责任解析到父 FundingAccount，两边各有 100 可用余额，授权 60。
+     * 输出：信用账户和父资金账户同时 AVAILABLE 减 60、AUTHORIZATION 增 60，并共享同一授权交易事实。
+     * 红线：共享卡授权不得只占用信用额度而跳过父资金账户，否则父账户最终可能透支。
+     */
+    @Test
+    void testAuthorizeSharedCardShouldHoldCreditAndParentFundingAccount() {
+        FundsAccountId creditAccount = creditAccountId();
+        FundsAccountId parentFundingAccount = parentFundingAccountId();
+        fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
+        fundingAccountService.createFundingAccount(createParentFundingAccountRequest());
+        creditAccountService.createCreditAccount(createCreditAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.OUTBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createParentFundingRelationRequest());
+        adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
+        initializeAvailableBalance(parentFundingAccount, 100L);
+        FundsSubjectBalanceDTO beforeCreditAuthorize = balance(creditAccount);
+        FundsSubjectBalanceDTO beforeParentAuthorize = balance(parentFundingAccount);
+        assertBucket(beforeCreditAuthorize, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(beforeCreditAuthorize, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertBucket(beforeParentAuthorize, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(beforeParentAuthorize, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+
+        String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+                authorizeRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperator.system());
+
+        assertThat(authorizationSn).isNotBlank();
+        FundsSubjectBalanceDTO afterCreditAuthorize = balance(creditAccount);
+        FundsSubjectBalanceDTO afterParentAuthorize = balance(parentFundingAccount);
+        assertBucket(afterCreditAuthorize, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(afterCreditAuthorize, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertBucket(afterParentAuthorize, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(afterParentAuthorize, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertThat(fundsTransactionStatus(AUTHORIZE_BUSINESS_SN)).isEqualTo(FundsTransactionStatus.OPEN.name());
+        assertThat(fundsTransactionDetailStatuses(AUTHORIZE_BUSINESS_SN))
+                .containsExactly(FundsTransactionDetailStatus.SUCCEEDED.name(),
+                        FundsTransactionDetailStatus.SUCCEEDED.name());
+        assertThat(ledgerEntrySubjects(AUTHORIZE_BUSINESS_SN))
+                .containsExactlyInAnyOrder(CREDIT_ACCOUNT_SN, CREDIT_ACCOUNT_SN,
+                        PARENT_FUNDING_ACCOUNT_SN, PARENT_FUNDING_ACCOUNT_SN);
+        assertThat(ledgerEntrySubjectCodes(AUTHORIZE_BUSINESS_SN))
+                .containsExactlyInAnyOrder(LedgerSubjectCode.AVAILABLE.name(),
+                        LedgerSubjectCode.AUTHORIZATION.name(),
+                        LedgerSubjectCode.AVAILABLE.name(),
+                        LedgerSubjectCode.AUTHORIZATION.name());
+        assertThat(postingPlanCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(2);
+        assertThat(ledgerEntryCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(4);
+        assertThat(routeLegCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(2);
+        assertAuthorizationAdmissionContextSnapshot(AUTHORIZE_BUSINESS_SN, parentFundingAccount);
+    }
+
+    /**
      * 场景：支付工具授权入口携带 Spend Rule 决策证据，规则准入通过后进入授权内核。
      * 输入：支付工具、资金责任、账户能力和 Spend Rule 决策均通过。
      * 输出：交易投影解释可以展示规则、版本、挂载、scope、决策流水、结果和决策记录引用。
@@ -264,7 +321,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
         creditAccountService.createCreditAccount(createCreditAccountRequest());
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
-                PaymentInstrumentDirection.PAYMENT));
+                PaymentInstrumentFlowDirection.OUTBOUND));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         prepareSpendRuleDecisionData();
@@ -280,7 +337,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     }
 
     /**
-     * 场景：支付工具方向不支持授权。
+     * 场景：支付工具资金流向不支持授权。
      * 输入：RECEIVE-only 工具发起授权准入。
      * 输出：准入阶段拒绝，业务流水下没有资金交易、账本交易、posting plan 或分录。
      * 红线：工具准入失败不得进入交易内核，不得留下半成功资金事实。
@@ -288,12 +345,12 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     @Test
     void testAuthorizeByInstrumentShouldRejectDirectionMismatchWithoutFundsFacts() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(RECEIVE_INSTRUMENT_SN,
-                PaymentInstrumentDirection.RECEIVE));
+                PaymentInstrumentFlowDirection.INBOUND));
         var before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
                 authorizeRequest(DIRECTION_FAIL_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperator.system()))
-                .hasMessageContaining("支付工具方向不支持当前动作");
+                .hasMessageContaining("支付工具资金流向不支持当前动作");
 
         assertNoFundsOrLedgerFacts(DIRECTION_FAIL_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -330,7 +387,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
         creditAccountService.createCreditAccount(createCreditAccountRequest());
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
-                PaymentInstrumentDirection.PAYMENT));
+                PaymentInstrumentFlowDirection.OUTBOUND));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
@@ -370,7 +427,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
         creditAccountService.createCreditAccount(createCreditAccountRequest());
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
-                PaymentInstrumentDirection.PAYMENT));
+                PaymentInstrumentFlowDirection.OUTBOUND));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         prepareSpendRuleDecisionData();
@@ -434,10 +491,14 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 PAYMENT_INSTRUMENT_SN, RECEIVE_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?)",
                 PAYMENT_INSTRUMENT_SN, RECEIVE_INSTRUMENT_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
-                CREDIT_ACCOUNT_SN, PLATFORM_SETTLEMENT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
+                CREDIT_ACCOUNT_SN,
+                PLATFORM_SETTLEMENT_ACCOUNT_SN,
+                PARENT_FUNDING_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", CREDIT_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn = ?", PLATFORM_SETTLEMENT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)",
+                PLATFORM_SETTLEMENT_ACCOUNT_SN,
+                PARENT_FUNDING_ACCOUNT_SN);
     }
 
     private CreateCreditAccountRequest createCreditAccountRequest() {
@@ -467,15 +528,28 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setStatus(FundsAccountStatus.ACTIVE);
     }
 
+    private CreateFundingAccountRequest createParentFundingAccountRequest() {
+        return new CreateFundingAccountRequest()
+                .setSn(PARENT_FUNDING_ACCOUNT_SN)
+                .setTenantId(TENANT_ID)
+                .setOwnerId(OWNER_ID)
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setAccountType(FundingAccountType.USER_WALLET.name())
+                .setPlatform(Boolean.FALSE)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
+                .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
-                                                                          PaymentInstrumentDirection direction) {
+                                                                          PaymentInstrumentFlowDirection direction) {
         return new CreatePaymentInstrumentRequest()
                 .setSn(instrumentSn)
                 .setTenantId(TENANT_ID)
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setInstrumentType("CARD")
-                .setInstrumentDirection(direction)
+                .setFlowDirection(direction)
                 .setInstrumentNo("****2468")
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId("tok_auth_admission_2468")
@@ -511,6 +585,13 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setPriority(10)
                 .setDefaultRelation(Boolean.TRUE)
                 .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
+    private CreateSpendSubjectFundingRelationRequest createParentFundingRelationRequest() {
+        return createFundingRelationRequest()
+                .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setTargetSubjectId(PARENT_FUNDING_ACCOUNT_SN)
+                .setFundingAccountId(PARENT_FUNDING_ACCOUNT_SN);
     }
 
     private void prepareSpendRuleDecisionData() {
@@ -606,6 +687,10 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         return FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT);
     }
 
+    private FundsAccountId parentFundingAccountId() {
+        return FundsAccountId.immutable(PARENT_FUNDING_ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
     private void adjustBalance(FundsAccountId accountId, long amount, String businessSn) {
         balanceControlService.adjust(new FundsBalanceAdjustRequest()
                 .setAccountId(accountId)
@@ -617,6 +702,17 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setAdjustEvidenceRef("EVIDENCE_" + businessSn)
                 .setApprovalRef("APPROVAL_" + businessSn)
                 .setDescription("authorization admission limit"), WindOperator.system());
+    }
+
+    private void initializeAvailableBalance(FundsAccountId accountId, long amount) {
+        jdbcTemplate.update("""
+                UPDATE t_ledger
+                SET credit_amount = ?
+                WHERE tenant_id = ?
+                  AND subject_id = ?
+                  AND subject_type = ?
+                  AND ledger_subject_code = ?
+                """, amount, TENANT_ID, accountId.id(), accountId.type(), LedgerSubjectCode.AVAILABLE.name());
     }
 
     private FundsSubjectBalanceDTO balance(FundsAccountId accountId) {
@@ -731,6 +827,10 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     }
 
     private void assertAuthorizationAdmissionContextSnapshot(String businessSn) {
+        assertAuthorizationAdmissionContextSnapshot(businessSn, creditAccountId());
+    }
+
+    private void assertAuthorizationAdmissionContextSnapshot(String businessSn, FundsAccountId targetAccountId) {
         JSONObject contextVariables = JSON.parseObject(transactionContextVariablesJson(businessSn));
 
         assertThat(contextVariables).isNotNull().isNotEmpty();
@@ -743,8 +843,8 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(contextVariables.getString("fundingRelationSn")).isEqualTo(FUNDING_RELATION_SN);
         assertThat(contextVariables.getString("fundingRelationType"))
                 .isEqualTo(SpendSubjectFundingRelationType.FUNDING_SOURCE.name());
-        assertThat(contextVariables.getString("targetAccountId")).isEqualTo(CREDIT_ACCOUNT_SN);
-        assertThat(contextVariables.getString("targetAccountType")).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT.name());
+        assertThat(contextVariables.getString("targetAccountId")).isEqualTo(targetAccountId.id());
+        assertThat(contextVariables.getString("targetAccountType")).isEqualTo(targetAccountId.type());
     }
 
     private String transactionContextVariablesJson(String businessSn) {

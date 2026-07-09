@@ -1,5 +1,6 @@
 package com.wind.funds.ledger;
 
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import org.jspecify.annotations.NonNull;
@@ -19,7 +20,17 @@ public interface LedgerBalanceProjectionService {
      *
      * @param entries 账本条目定义
      */
-    void project(@NonNull List<LedgerEntrySpec> entries);
+    default void project(@NonNull List<LedgerEntrySpec> entries) {
+        project(entries, LedgerPostingAccessType.NORMAL);
+    }
+
+    /**
+     * 投影
+     *
+     * @param entries           账本条目定义
+     * @param postingAccessType 入账准入类型
+     */
+    void project(@NonNull List<LedgerEntrySpec> entries, @NonNull LedgerPostingAccessType postingAccessType);
 
     /**
      * 是否支持

@@ -5,6 +5,7 @@ import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
@@ -523,6 +524,11 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
 
         @Override
         public void updateLedgerBalance(UpdateLedgerBalanceRequest request) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void updateLedgerStatus(UpdateLedgerStatusRequest request) {
             throw new UnsupportedOperationException();
         }
 

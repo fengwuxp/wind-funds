@@ -2,6 +2,7 @@ package com.wind.funds.transaction.application.impl;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
+import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
@@ -35,14 +36,17 @@ import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
+import java.util.function.Function;
 
 /**
  * 资金交易命令服务实现。
@@ -154,23 +158,38 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Transactional(rollbackFor = Exception.class)
     public String reversal(FundsAuthorizationTransactionReversalRequest request, WindOperator operator) {
         return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
-                () -> authorizationInstructionConverter.convertToReversalInstruction(request, operator),
+                authorizationTransaction -> {
+                    request.setContextVariables(authorizationSuccessorContext(request.getContextVariables()));
+                    return authorizationInstructionConverter.convertToReversalInstruction(request, operator);
+                },
                 this::assertAuthorizationRemainingAmountSufficient);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String settle(FundsAuthorizationTransactionSettleRequest request, WindOperator operator) {
+        if (request.isForceSettle()) {
+            return execute(authorizationInstructionConverter.convertToSettleInstruction(request, operator));
+        }
         return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
-                () -> authorizationInstructionConverter.convertToSettleInstruction(request, operator),
+                authorizationTransaction -> {
+                    request.setContextVariables(authorizationSuccessorContext(request.getContextVariables()));
+                    return authorizationInstructionConverter.convertToSettleInstruction(request, operator);
+                },
                 this::assertAuthorizationRemainingAmountSufficient);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String settleRefund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator) {
+        if (request.isNoAuthRefund()) {
+            return execute(authorizationInstructionConverter.convertToSettleRefundInstruction(request, operator));
+        }
         return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
-                () -> authorizationInstructionConverter.convertToSettleRefundInstruction(request, operator));
+                authorizationTransaction -> {
+                    request.setContextVariables(authorizationSuccessorContext(request.getContextVariables()));
+                    return authorizationInstructionConverter.convertToSettleRefundInstruction(request, operator);
+                });
     }
 
     private @NonNull String execute(@NonNull FundsInstructionSpec instruction) {
@@ -179,17 +198,17 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
 
     private @NonNull String executeAuthorizationSuccessor(
             String authorizationTransactionSn,
-            Supplier<FundsInstructionSpec> instructionSupplier) {
-        return executeAuthorizationSuccessor(authorizationTransactionSn, instructionSupplier, (transaction, instruction) -> {
+            Function<FundsTransaction, FundsInstructionSpec> instructionFactory) {
+        return executeAuthorizationSuccessor(authorizationTransactionSn, instructionFactory, (transaction, instruction) -> {
         });
     }
 
     private @NonNull String executeAuthorizationSuccessor(
             String authorizationTransactionSn,
-            Supplier<FundsInstructionSpec> instructionSupplier,
+            Function<FundsTransaction, FundsInstructionSpec> instructionFactory,
             BiConsumer<FundsTransaction, FundsInstructionSpec> precondition) {
         if (authorizationTransactionSn == null || authorizationTransactionSn.isBlank()) {
-            return execute(instructionSupplier.get());
+            throw new IllegalArgumentException("authorizationTransactionSn must not be blank");
         }
         WindLock lock = AUTHORIZATION_TRANSACTION_LOCK_FACTORY.apply(authorizationTransactionLockKey(
                 authorizationTransactionSn));
@@ -198,7 +217,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         try {
             unlockImmediately = !registerTransactionCompletionUnlock(lock);
             FundsTransaction authorizationTransaction = lockAuthorizationTransaction(authorizationTransactionSn);
-            FundsInstructionSpec instruction = instructionSupplier.get();
+            FundsInstructionSpec instruction = instructionFactory.apply(authorizationTransaction);
             precondition.accept(authorizationTransaction, instruction);
             return execute(instruction);
         } finally {
@@ -226,6 +245,15 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
             }
         });
         return true;
+    }
+
+    private @Nullable ReadonlyContextVariables authorizationSuccessorContext(
+            @Nullable ReadonlyContextVariables requestContext) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (requestContext != null && requestContext.getContextVariables() != null) {
+            result.putAll(requestContext.getContextVariables());
+        }
+        return result.isEmpty() ? requestContext : ReadonlyContextVariables.of(result);
     }
 
     private FundsTransaction lockAuthorizationTransaction(String authorizationTransactionSn) {

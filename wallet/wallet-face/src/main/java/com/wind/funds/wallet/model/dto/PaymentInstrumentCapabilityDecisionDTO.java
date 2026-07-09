@@ -5,7 +5,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -54,8 +54,8 @@ public class PaymentInstrumentCapabilityDecisionDTO implements Serializable {
     @Schema(description = "支付工具类型")
     private String instrumentType;
 
-    @Schema(description = "支付工具方向")
-    private PaymentInstrumentDirection instrumentDirection;
+    @Schema(description = "支付工具资金流向")
+    private PaymentInstrumentFlowDirection flowDirection;
 
     @Schema(description = "通道编码")
     private String channelCode;

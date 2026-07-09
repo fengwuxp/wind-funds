@@ -74,7 +74,6 @@ public class FundsDirectTransactionInstructionConverter {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
-        extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         extraContext.put(FundsInstructionContextKeys.CHANNEL_CODE, request.getChannel().name());
         extraContext.put(FundsInstructionContextKeys.EXTERNAL_TRANSACTION_ID, request.getChannelTransactionSn());
         putFeeSpec(extraContext, request.getFeeSpec());
@@ -86,6 +85,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
                 .instrumentRef(request.getPaymentInstrumentRef())
                 .externalAccountRef(externalAccountRef(request.getFundsSourceAccountId(), request.getChannel().name(),
                         request.getChannelTransactionSn(), request.getChannelId(), request.getDescription()))
@@ -110,8 +110,6 @@ public class FundsDirectTransactionInstructionConverter {
         assertNotBudgetGroup(request.getPayeeAccountId(), "系统内转账收款账户不能是预算组");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getPayerAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
-        extraContext.put(FundsInstructionContextKeys.PAYER_ACCOUNT_ID, request.getPayerAccountId());
-        extraContext.put(FundsInstructionContextKeys.PAYEE_ACCOUNT_ID, request.getPayeeAccountId());
         putFeeSpec(extraContext, request.getFeeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
@@ -121,6 +119,8 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .payerAccountId(request.getPayerAccountId())
+                .payeeAccountId(request.getPayeeAccountId())
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -143,9 +143,6 @@ public class FundsDirectTransactionInstructionConverter {
         assertNotBudgetGroup(request.getPayeeId(), "直接付款收款主体不能是预算组");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
-        extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
-        extraContext.put(FundsInstructionContextKeys.PAYEE_ID, request.getPayeeId());
-        extraContext.put(FundsInstructionContextKeys.PAYEE_LEDGER_SUBJECT_CODE, request.getPayeeLedgerCode());
         putFeeSpec(extraContext, request.getFeeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
@@ -155,6 +152,9 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
+                .payeeId(request.getPayeeId())
+                .payeeLedgerSubjectCode(request.getPayeeLedgerCode())
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -177,9 +177,6 @@ public class FundsDirectTransactionInstructionConverter {
         assertNotBudgetGroup(request.getPayerId(), "直接退款出资主体不能是预算组");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
-        extraContext.put(FundsInstructionContextKeys.PAYER_ID, request.getPayerId());
-        extraContext.put(FundsInstructionContextKeys.PAYER_LEDGER_SUBJECT_CODE, request.getPayerLedgerCode());
-        extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         putFeeSpec(extraContext, request.getFeeSpec());
         if (request.getChannel() != null) {
             extraContext.put(FundsInstructionContextKeys.CHANNEL_CODE, request.getChannel().name());
@@ -195,6 +192,9 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
+                .payerId(request.getPayerId())
+                .payerLedgerSubjectCode(request.getPayerLedgerCode())
                 .reference(refundReference(request))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
@@ -226,7 +226,6 @@ public class FundsDirectTransactionInstructionConverter {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
-        extraContext.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         extraContext.put(FundsInstructionContextKeys.REFERENCE_FREEZE_SN, request.getReferenceFreezeSn());
         putFeeSpec(extraContext, request.getFeeSpec());
         return ImmutableFundsInstructionSpec.builder()
@@ -237,6 +236,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
                 .instrumentRef(request.getPaymentInstrumentRef())
                 .externalAccountRef(externalAccountRef(request.getPayeeId(), null, null, null,
                         request.getDescription()))
@@ -266,13 +266,13 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
                 .operator(operationActor(operator))
                 .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
                         FundsInstructionContextKeys.FEE_TYPE, request.getFeeType())))
                 .build();
     }
@@ -293,14 +293,14 @@ public class FundsDirectTransactionInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
                 .reference(reference(FundsInstructionReferenceType.FEE, request.getFeeSourceTransactionSn(), null))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
                 .description(request.getDescription())
                 .operator(operationActor(operator))
-                .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId())))
+                .contextVariables(mergeContext(request.getContextVariables(), Map.of()))
                 .build();
     }
 

@@ -226,7 +226,6 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
                                               PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
         PaymentInstrumentCapabilityDecisionDTO instrument = snapshot.getPaymentInstrumentCapability();
         FundsAccountId targetAccountId = snapshot.getTargetAccountId();
-        FundsAccountId payeeAccountId = request.getPayeeAccountId();
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("instrumentSn", snapshot.getInstrumentSn());
         values.put("instrumentAction", PaymentInstrumentAction.WITHDRAW.name());
@@ -242,8 +241,6 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
         values.put("externalPayoutSn", request.getExternalPayoutSn());
         values.put("externalPayoutStatus", normalizeExternalPayoutStatus(request.getExternalPayoutStatus()));
         values.put("referenceFreezeSn", request.getReferenceFreezeSn());
-        values.put("payeeAccountId", payeeAccountId.id());
-        values.put("payeeAccountType", payeeAccountId.type());
         return Map.copyOf(values);
     }
 

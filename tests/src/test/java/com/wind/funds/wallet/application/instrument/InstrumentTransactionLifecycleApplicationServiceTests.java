@@ -56,7 +56,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
@@ -296,7 +296,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
         assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.receiveByInstrument(
                 receiveRequest(DIRECTION_FAIL_BUSINESS_SN, PAYMENT_ONLY_INSTRUMENT_SN), WindOperator.system()))
-                .hasMessageContaining("支付工具方向不支持当前动作");
+                .hasMessageContaining("支付工具资金流向不支持当前动作");
 
         assertNoFundsOrLedgerFacts(DIRECTION_FAIL_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -477,7 +477,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         createTestLedger(cashMappingAccountId(), LedgerSubjectCode.CASH, 10_000L);
         createTestLedger(prepaymentAccountId(), LedgerSubjectCode.PREPAYMENT, 0L);
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(RECEIVE_INSTRUMENT_SN,
-                PaymentInstrumentDirection.RECEIVE));
+                PaymentInstrumentFlowDirection.INBOUND));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(RECEIVE_INSTRUMENT_SN,
                 RECEIVE_BINDING_SN));
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest(FUNDING_RELATION_SN));
@@ -485,7 +485,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private void createPayoutInstrumentScenario() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYOUT_INSTRUMENT_SN,
-                PaymentInstrumentDirection.PAYMENT, PAYOUT_INSTRUMENT_NO));
+                PaymentInstrumentFlowDirection.OUTBOUND, PAYOUT_INSTRUMENT_NO));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(PAYOUT_INSTRUMENT_SN,
                 PAYOUT_BINDING_SN, PaymentInstrumentBindingRole.PAYMENT_SUBJECT));
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest(
@@ -507,7 +507,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private void createPaymentOnlyInstrumentScenario() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_ONLY_INSTRUMENT_SN,
-                PaymentInstrumentDirection.PAYMENT));
+                PaymentInstrumentFlowDirection.OUTBOUND));
     }
 
     private void createPlatformFundingAccount(String accountSn, PlatformFundingAccountRole role) {
@@ -555,12 +555,12 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     }
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
-                                                                          PaymentInstrumentDirection direction) {
+                                                                          PaymentInstrumentFlowDirection direction) {
         return createPaymentInstrumentRequest(instrumentSn, direction, RECEIVE_INSTRUMENT_NO);
     }
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
-                                                                          PaymentInstrumentDirection direction,
+                                                                          PaymentInstrumentFlowDirection direction,
                                                                           String instrumentNo) {
         return new CreatePaymentInstrumentRequest()
                 .setSn(instrumentSn)
@@ -568,7 +568,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setInstrumentType("VA")
-                .setInstrumentDirection(direction)
+                .setFlowDirection(direction)
                 .setInstrumentNo(instrumentNo)
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId(externalInstrumentId(instrumentSn))

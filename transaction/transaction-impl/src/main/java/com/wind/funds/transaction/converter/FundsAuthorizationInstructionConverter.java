@@ -64,7 +64,6 @@ public class FundsAuthorizationInstructionConverter {
         assertNotBudgetGroup(request.getAccountId(), "授权交易账户不能是预算组");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
-        context.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         context.put(FundsInstructionContextKeys.APPROVED, request.getApproved());
         if (request.getDeclineReason() != null) {
             context.put(FundsInstructionContextKeys.DECLINE_REASON, request.getDeclineReason());
@@ -83,6 +82,10 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
+                .linkedFundingAccountId(request.getLinkedFundingAccountId())
+                .ledgerPeriodType(request.getLedgerPeriodType())
+                .ledgerPeriodId(request.getLedgerPeriodId())
                 .instrumentRef(request.getPaymentInstrumentRef())
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
@@ -111,8 +114,8 @@ public class FundsAuthorizationInstructionConverter {
                 .eventTime(eventTime(request.getReversalTime()))
                 .description(request.getDescription())
                 .operator(operationActor(operator))
+                .accountId(request.getAccountId())
                 .contextVariables(mergeContext(request.getContextVariables(), Map.of(
-                        FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId(),
                         FundsInstructionContextKeys.AUTHORIZATION_TRANSACTION_SN,
                         request.getAuthorizationTransactionSn())))
                 .build();
@@ -123,7 +126,6 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
-        context.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         FundsInstructionReferenceSpec reference = null;
         if (request.isForceSettle()) {
             validateForceSettleRequest(request, amount);
@@ -153,6 +155,7 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
                 .reference(reference)
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
@@ -168,7 +171,6 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
-        context.put(FundsInstructionContextKeys.ACCOUNT_ID, request.getAccountId());
         FundsInstructionReferenceSpec reference;
         if (request.isNoAuthRefund()) {
             validateNoAuthRefundRequest(request);
@@ -194,6 +196,7 @@ public class FundsAuthorizationInstructionConverter {
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
                 .exchangeRate(amount.exchangeRate())
+                .accountId(request.getAccountId())
                 .reference(reference)
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())

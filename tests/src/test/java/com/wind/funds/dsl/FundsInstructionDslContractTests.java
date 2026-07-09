@@ -3,12 +3,15 @@ package com.wind.funds.dsl;
 import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionReferenceSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
+import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -50,6 +53,85 @@ class FundsInstructionDslContractTests {
             assertThat(reference.getReferenceType()).isEqualTo(FundsInstructionReferenceType.EXTERNAL_TRANSACTION);
             assertThat(reference.getExternalTransactionId()).isEqualTo("EXT-202605200001");
         });
+    }
+
+    /**
+     * 场景：资金指令携带会影响 route、posting 或账本周期的账户类输入。
+     * 预期：账户、对手方、账目和账本周期必须是 typed DSL 字段，不能藏在 contextVariables。
+     * 红线：contextVariables 只能做证据和解释补充，不能成为第二套资金指令模型。
+     */
+    @Test
+    void testFundsInstructionShouldExposeRouteInputsAsTypedFields() {
+        FundsAccountId accountId = FundsAccountId.immutable("ACC-001", "FUNDING_ACCOUNT");
+        FundsAccountId payerAccountId = FundsAccountId.immutable("PAYER-001", "FUNDING_ACCOUNT");
+        FundsAccountId payeeAccountId = FundsAccountId.immutable("PAYEE-001", "FUNDING_ACCOUNT");
+        FundsAccountId payerId = FundsAccountId.immutable("PAYER-LEDGER-001", "FUNDING_ACCOUNT");
+        FundsAccountId payeeId = FundsAccountId.immutable("PAYEE-LEDGER-001", "FUNDING_ACCOUNT");
+        FundsAccountId linkedFundingAccountId = FundsAccountId.immutable("PARENT-001", "FUNDING_ACCOUNT");
+
+        FundsInstructionSpec instruction = ImmutableFundsInstructionSpec.builder()
+                .tenantId(1L)
+                .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
+                .eventType(FundsTransactionEventType.AUTHORIZE)
+                .transactionType(DefaultFundsTransactionType.PAY)
+                .amount(Money.immutable(100L, CURRENCY))
+                .originalAmount(Money.immutable(100L, CURRENCY))
+                .exchangeRate(BigDecimal.ONE)
+                .accountId(accountId)
+                .payerAccountId(payerAccountId)
+                .payeeAccountId(payeeAccountId)
+                .payerId(payerId)
+                .payeeId(payeeId)
+                .payerLedgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .payeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
+                .linkedFundingAccountId(linkedFundingAccountId)
+                .ledgerPeriodType(AccountBalancePeriodType.MONTHLY)
+                .ledgerPeriodId("2026-06")
+                .reference(externalTransactionReference())
+                .businessScene("FUNDS_INSTRUCTION_DSL")
+                .businessSn("BIZ-FI-ROUTE-INPUT-001")
+                .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
+                .operator(ImmutableFundsOperationActorSpec.builder()
+                        .operatorId(1L)
+                        .operatorType("SYSTEM")
+                        .operatorName("Codex")
+                        .appName("wind-funds-tests")
+                        .contextVariables(Map.of())
+                        .build())
+                .contextVariables(Map.of("evidenceRef", "EV-001"))
+                .build();
+
+        assertThat(instruction.getAccountId()).isEqualTo(accountId);
+        assertThat(instruction.getPayerAccountId()).isEqualTo(payerAccountId);
+        assertThat(instruction.getPayeeAccountId()).isEqualTo(payeeAccountId);
+        assertThat(instruction.getPayerId()).isEqualTo(payerId);
+        assertThat(instruction.getPayeeId()).isEqualTo(payeeId);
+        assertThat(instruction.getPayerLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AVAILABLE);
+        assertThat(instruction.getPayeeLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.SETTLEMENT);
+        assertThat(instruction.getLinkedFundingAccountId()).isEqualTo(linkedFundingAccountId);
+        assertThat(instruction.getLedgerPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
+        assertThat(instruction.getLedgerPeriodId()).isEqualTo("2026-06");
+        assertThat(instruction.getContextVariables()).containsOnly(Map.entry("evidenceRef", "EV-001"));
+    }
+
+    /**
+     * 场景：调用方把影响 route 或账本周期的关键字段塞入扩展上下文。
+     * 预期：资金指令构造阶段显式失败。
+     * 红线：不能用 contextVariables 绕过 typed DSL 字段和资金事实审计。
+     */
+    @Test
+    void testFundsInstructionContextShouldRejectRouteInputFields() {
+        assertThatThrownBy(() -> validInstruction(externalTransactionReference(),
+                Map.of("accountId", FundsAccountId.immutable("ACC-CTX-001", "FUNDING_ACCOUNT"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsInstruction.contextVariables must not contain core instruction field: "
+                        + "accountId");
+
+        assertThatThrownBy(() -> validInstruction(externalTransactionReference(),
+                Map.of("ledgerPeriodType", AccountBalancePeriodType.MONTHLY)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsInstruction.contextVariables must not contain core instruction field: "
+                        + "ledgerPeriodType");
     }
 
     /**

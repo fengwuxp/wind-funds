@@ -6,7 +6,7 @@ import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentCapabilityApplicationService;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentBindingDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentDTO;
@@ -79,8 +79,8 @@ public class PaymentInstrumentCapabilityApplicationServiceImpl
         AssertUtils.isTrue(isCurrentEffective(instrument.getValidFrom(), instrument.getValidTo()),
                 "支付工具不在当前有效期内，instrumentSn = {}",
                 request.getInstrumentSn());
-        AssertUtils.isTrue(supportsAction(instrument.getInstrumentDirection(), request.getAction()),
-                "支付工具方向不支持当前动作，instrumentSn = {}, action = {}",
+        AssertUtils.isTrue(supportsAction(instrument.getFlowDirection(), request.getAction()),
+                "支付工具资金流向不支持当前动作，instrumentSn = {}, action = {}",
                 request.getInstrumentSn(),
                 request.getAction());
     }
@@ -125,11 +125,14 @@ public class PaymentInstrumentCapabilityApplicationServiceImpl
         return (validFrom == null || !validFrom.isAfter(now)) && (validTo == null || validTo.isAfter(now));
     }
 
-    private boolean supportsAction(PaymentInstrumentDirection direction, PaymentInstrumentAction action) {
-        if (action == PaymentInstrumentAction.RECEIVE) {
-            return direction == PaymentInstrumentDirection.RECEIVE || direction == PaymentInstrumentDirection.BOTH;
-        }
-        return direction == PaymentInstrumentDirection.PAYMENT || direction == PaymentInstrumentDirection.BOTH;
+    private boolean supportsAction(PaymentInstrumentFlowDirection direction, PaymentInstrumentAction action) {
+        return switch (action) {
+            case RECEIVE -> direction == PaymentInstrumentFlowDirection.INBOUND
+                    || direction == PaymentInstrumentFlowDirection.BIDIRECTIONAL;
+            case REFUND -> true;
+            default -> direction == PaymentInstrumentFlowDirection.OUTBOUND
+                    || direction == PaymentInstrumentFlowDirection.BIDIRECTIONAL;
+        };
     }
 
     private PaymentInstrumentCapabilityDecisionDTO toDecision(PaymentInstrumentDTO instrument,
@@ -143,7 +146,7 @@ public class PaymentInstrumentCapabilityApplicationServiceImpl
                 .setOwnerId(instrument.getOwnerId())
                 .setOwnerType(instrument.getOwnerType())
                 .setInstrumentType(instrument.getInstrumentType())
-                .setInstrumentDirection(instrument.getInstrumentDirection())
+                .setFlowDirection(instrument.getFlowDirection())
                 .setChannelCode(instrument.getChannelCode())
                 .setAction(request.getAction())
                 .setCurrency(request.getCurrency())

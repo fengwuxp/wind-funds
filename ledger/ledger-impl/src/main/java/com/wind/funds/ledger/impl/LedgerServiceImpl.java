@@ -8,6 +8,7 @@ import com.wind.funds.ledger.mapstruct.LedgerConverter;
 import com.wind.funds.ledger.query.LedgerQuery;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.request.UpdateLedgerBalanceRequest;
+import com.wind.funds.ledger.request.UpdateLedgerStatusRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.query.QueryColumn;
@@ -20,6 +21,8 @@ import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.ledger.LedgerNormalBalanceGuard;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
+import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.spec.ledger.SettlementPolicySpec;
@@ -34,6 +37,7 @@ import java.time.LocalTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 账户账本服务实现类
@@ -60,6 +64,10 @@ public class LedgerServiceImpl implements LedgerService {
     @Override
     public void updateLedgerBalance(@NonNull UpdateLedgerBalanceRequest request) {
         Ledger ledger = findLedger(request.getId());
+        LedgerPostingAccessType postingAccessType = request.getPostingAccessType() == null
+                ? LedgerPostingAccessType.NORMAL
+                : request.getPostingAccessType();
+        LedgerStatus.assertPostable(ledger.getId(), ledger.getStatus(), postingAccessType);
         validateMinimumNormalBalance(ledger, request);
         Ledger entity = UpdateEntity.of(Ledger.class);
         UpdateWrapper<Ledger> updateWrapper = UpdateWrapper.of(entity);
@@ -68,12 +76,33 @@ public class LedgerServiceImpl implements LedgerService {
         setRawDelta(updateWrapper, LedgerNameRefs.ledger.version, 1L);
         QueryWrapper where = QueryWrapper.create()
                 .where(LedgerNameRefs.ledger.id.eq(request.getId()))
-                .and(LedgerNameRefs.ledger.version.eq(ledger.getVersion()));
+                .and(LedgerNameRefs.ledger.version.eq(ledger.getVersion()))
+                .and(LedgerNameRefs.ledger.status.eq(ledger.getStatus()));
         if (request.getMinimumNormalBalance() != null) {
             where.and(normalBalanceAfterDelta(ledger.getNormalBalanceSide(), request)
                     .ge(request.getMinimumNormalBalance()));
         }
         AssertUtils.isTrue(ledgerMapper.updateByQuery(entity, where) > 0, "账本余额更新失败");
+    }
+
+    @Override
+    public void updateLedgerStatus(@NonNull UpdateLedgerStatusRequest request) {
+        Ledger ledger = findLedger(request.getId());
+        LedgerStatus targetStatus = request.getStatus();
+        LedgerStatus.assertTransitionAllowed(ledger.getId(), ledger.getStatus(), targetStatus);
+        if (ledger.getStatus() == targetStatus) {
+            return;
+        }
+        assertCloseableBalance(ledger, targetStatus);
+        Ledger entity = UpdateEntity.of(Ledger.class);
+        UpdateWrapper<Ledger> updateWrapper = UpdateWrapper.of(entity);
+        updateWrapper.set(LedgerNameRefs.ledger.status, targetStatus, true);
+        setRawDelta(updateWrapper, LedgerNameRefs.ledger.version, 1L);
+        AssertUtils.isTrue(ledgerMapper.updateByQuery(entity, QueryWrapper.create()
+                        .where(LedgerNameRefs.ledger.id.eq(request.getId()))
+                        .and(LedgerNameRefs.ledger.version.eq(ledger.getVersion()))
+                        .and(LedgerNameRefs.ledger.status.eq(ledger.getStatus()))) == 1,
+                "账本状态更新失败");
     }
 
     @Override
@@ -141,6 +170,16 @@ public class LedgerServiceImpl implements LedgerService {
         return result;
     }
 
+    private void assertCloseableBalance(Ledger ledger, LedgerStatus targetStatus) {
+        if (targetStatus != LedgerStatus.CLOSED) {
+            return;
+        }
+        AssertUtils.isTrue(Objects.equals(0L, ledger.getNormalBalance()),
+                "非零余额账本不允许关闭，ledgerId = {}, normalBalance = {}",
+                ledger.getId(),
+                ledger.getNormalBalance());
+    }
+
     private void fillCreateDefaults(Ledger entity, CreateLedgerRequest request) {
         AssertUtils.hasText(entity.getSubjectId(), "账务主体 ID 不能为空");
         AssertUtils.hasText(entity.getSubjectType(), "账务主体类型不能为空");
@@ -173,6 +212,9 @@ public class LedgerServiceImpl implements LedgerService {
         }
         if (entity.getCreditAmount() == null) {
             entity.setCreditAmount(0L);
+        }
+        if (entity.getStatus() == null) {
+            entity.setStatus(LedgerStatus.ACTIVE);
         }
         if (entity.getSettlementPolicy() == null) {
             entity.setSettlementPolicy(SettlementPolicySpec.RT.getRaw());

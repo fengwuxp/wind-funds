@@ -21,7 +21,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.PaymentInstrumentDirection;
+import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -156,7 +156,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 new PaymentInstrumentQuery()
                         .setTenantId(TENANT_ID)
                         .setOwnerId(OWNER_ID)
-                        .setInstrumentDirection(PaymentInstrumentDirection.PAYMENT)
+                        .setFlowDirection(PaymentInstrumentFlowDirection.OUTBOUND)
                         .setStatus(FundsAccountStatus.ACTIVE),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
 
@@ -165,7 +165,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThat(instrument.getOwnerId()).isEqualTo(OWNER_ID);
         assertThat(instrument.getOwnerType()).isEqualTo(FundsAccountOwnerType.USER);
         assertThat(instrument.getInstrumentType()).isEqualTo(INSTRUMENT_TYPE_CARD);
-        assertThat(instrument.getInstrumentDirection()).isEqualTo(PaymentInstrumentDirection.PAYMENT);
+        assertThat(instrument.getFlowDirection()).isEqualTo(PaymentInstrumentFlowDirection.OUTBOUND);
         assertThat(instrument.getInstrumentNo()).isEqualTo(MASKED_INSTRUMENT_NO);
         assertThat(instrument.getChannelCode()).isEqualTo(CHANNEL_CODE);
         assertThat(instrument.getExternalInstrumentId()).isEqualTo(EXTERNAL_INSTRUMENT_ID);
@@ -422,12 +422,12 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     void testCreatePaymentInstrumentBindingShouldRejectDirectionMismatchWithoutRouteCandidate() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest()
                 .setSn(RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN)
-                .setInstrumentDirection(PaymentInstrumentDirection.RECEIVE));
+                .setFlowDirection(PaymentInstrumentFlowDirection.INBOUND));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setInstrumentSn(RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN)))
-                .hasMessageContaining("支付工具方向不支持绑定角色");
+                .hasMessageContaining("支付工具资金流向不支持绑定角色");
 
         assertThat(countRows("t_payment_instrument_binding", "instrument_sn", RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN))
                 .isZero();
@@ -1329,7 +1329,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
                 .setInstrumentType(INSTRUMENT_TYPE_CARD)
-                .setInstrumentDirection(PaymentInstrumentDirection.PAYMENT)
+                .setFlowDirection(PaymentInstrumentFlowDirection.OUTBOUND)
                 .setInstrumentNo(MASKED_INSTRUMENT_NO)
                 .setChannelCode(CHANNEL_CODE)
                 .setExternalInstrumentId(EXTERNAL_INSTRUMENT_ID)

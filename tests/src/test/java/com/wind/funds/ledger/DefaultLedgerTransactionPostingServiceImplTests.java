@@ -5,9 +5,11 @@ import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
+import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.ledger.enums.LedgerTransactionStatus;
@@ -357,6 +359,87 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     /**
+     * 场景：分录绑定的账本已经被业务侧挂起。
+     * 输入：源账本 status=SUSPENDED，交易和分录本身借贷平衡，posting access type 默认为 NORMAL。
+     * 输出：入账入口在账务事实落库和余额投影前拒绝请求。
+     * 红线：挂起账本不得继续承接普通新增交易。
+     */
+    @Test
+    void testPostShouldRejectSuspendedLedgerForNormalPostingBeforeFacts() {
+        seedFundingAccount(SOURCE_SUBJECT_ID);
+        seedFundingAccount(TARGET_SUBJECT_ID);
+        Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
+        Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
+        markLedgerStatus(sourceLedgerId, LedgerStatus.SUSPENDED);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> postingService.post(transaction(
+                LedgerTransactionStatus.POSTED,
+                List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)))))
+                .hasMessageContaining("账本状态不允许入账");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：VCC/预付卡业务先关闭卡，再用收口交易处理挂账或余额转出。
+     * 输入：源账本 status=SUSPENDED，posting access type=CLOSING。
+     * 输出：允许入账并完成余额投影。
+     * 红线：SUSPENDED 只能放行显式收口入账，不能把余额关进死账。
+     */
+    @Test
+    void testPostShouldAllowSuspendedLedgerForClosingPosting() {
+        seedFundingAccount(SOURCE_SUBJECT_ID);
+        seedFundingAccount(TARGET_SUBJECT_ID);
+        Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
+        Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
+        markLedgerStatus(sourceLedgerId, LedgerStatus.SUSPENDED);
+
+        postingService.post(transaction(
+                LedgerTransactionStatus.POSTED,
+                List.of(postingPlan(LedgerPostingAccessType.CLOSING, List.of(
+                        ledgerEntry(SOURCE_SUBJECT_ID, SUBJECT_TYPE, sourceLedgerId, EntrySide.CREDIT,
+                                TRANSACTION_AMOUNT, LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE,
+                                LedgerSubjectCategory.ASSET, null),
+                        ledgerEntry(TARGET_SUBJECT_ID, SUBJECT_TYPE, targetLedgerId, EntrySide.DEBIT,
+                                TRANSACTION_AMOUNT, LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE,
+                                LedgerSubjectCategory.ASSET, null))))));
+
+        assertThat(ledgerService.getLedgerById(sourceLedgerId).getNormalBalance()).isEqualTo(100L);
+        assertThat(ledgerService.getLedgerById(sourceLedgerId).getStatus()).isEqualTo(LedgerStatus.SUSPENDED);
+        assertThat(ledgerService.getLedgerById(targetLedgerId).getNormalBalance()).isEqualTo(100L);
+    }
+
+    /**
+     * 场景：账本已经完成关闭后，历史链路又提交收口入账。
+     * 输入：源账本 status=CLOSED，posting access type=CLOSING。
+     * 输出：入账入口在账务事实落库和余额投影前拒绝请求。
+     * 红线：CLOSED 是终态，不能被 closing posting 重新写入。
+     */
+    @Test
+    void testPostShouldRejectClosedLedgerForClosingPostingBeforeFacts() {
+        seedFundingAccount(SOURCE_SUBJECT_ID);
+        seedFundingAccount(TARGET_SUBJECT_ID);
+        Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
+        Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
+        markLedgerStatus(sourceLedgerId, LedgerStatus.CLOSED);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> postingService.post(transaction(
+                LedgerTransactionStatus.POSTED,
+                List.of(postingPlan(LedgerPostingAccessType.CLOSING, List.of(
+                        ledgerEntry(SOURCE_SUBJECT_ID, SUBJECT_TYPE, sourceLedgerId, EntrySide.CREDIT,
+                                TRANSACTION_AMOUNT, LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE,
+                                LedgerSubjectCategory.ASSET, null),
+                        ledgerEntry(TARGET_SUBJECT_ID, SUBJECT_TYPE, targetLedgerId, EntrySide.DEBIT,
+                                TRANSACTION_AMOUNT, LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE,
+                                LedgerSubjectCategory.ASSET, null)))))))
+                .hasMessageContaining("账本状态不允许入账");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：预算组虽然存在控制账本，但被外部 LedgerTransactionSpec 作为账本分录主体提交。
      * 输入：POSTED 交易携带 BUDGET_GROUP 分录，并绑定同主体同科目同币种的账本。
      * 输出：入账入口在事实落库和余额投影前拒绝请求。
@@ -561,9 +644,13 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     private LedgerPostingPlanSpec postingPlan(List<LedgerEntrySpec> entries) {
+        return postingPlan(LedgerPostingAccessType.NORMAL, entries);
+    }
+
+    private LedgerPostingPlanSpec postingPlan(LedgerPostingAccessType accessType, List<LedgerEntrySpec> entries) {
         return new TestLedgerPostingPlanSpec(List.of(new TestLedgerPostingPhaseSpec(
                 LedgerPhaseCode.TRANSFER,
-                entries)));
+                entries)), accessType);
     }
 
     private LedgerEntrySpec debitEntry(String subjectId, Long ledgerId, Money amount) {
@@ -759,6 +846,10 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 ledgerId);
     }
 
+    private void markLedgerStatus(Long ledgerId, LedgerStatus status) {
+        jdbcTemplate.update("UPDATE t_ledger SET status = ? WHERE id = ?", status.name(), ledgerId);
+    }
+
     private Long createAvailableLedger(String subjectId, long initialBalance) {
         Long ledgerId = createAvailableLedger(subjectId);
         if (initialBalance != 0L) {
@@ -922,7 +1013,8 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         }
     }
 
-    private record TestLedgerPostingPlanSpec(List<LedgerPostingPhaseSpec> postingPhases)
+    private record TestLedgerPostingPlanSpec(List<LedgerPostingPhaseSpec> postingPhases,
+                                             LedgerPostingAccessType postingAccessType)
             implements LedgerPostingPlanSpec {
 
         private TestLedgerPostingPlanSpec {
@@ -942,6 +1034,11 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         @Override
         public LedgerPostingIntentType getIntent() {
             return LedgerPostingIntentType.TRANSFER;
+        }
+
+        @Override
+        public LedgerPostingAccessType getPostingAccessType() {
+            return postingAccessType;
         }
 
         @Override

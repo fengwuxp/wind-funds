@@ -8,6 +8,7 @@ import com.wind.funds.wallet.application.account.FundsAccountCapabilityApplicati
 import com.wind.funds.wallet.application.funding.FundingResponsibilityResolutionApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentCapabilityApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
+import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.model.dto.FundingResponsibilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.FundsAccountCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
@@ -33,6 +34,8 @@ import java.util.Objects;
 @AllArgsConstructor
 public class PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl
         implements PaymentInstrumentPreTransactionSnapshotApplicationService {
+
+    private static final String REFUND_REPLAY_REQUIRED_MESSAGE = "退款不能通过支付工具预交易快照重选当前资金路径";
 
     private final PaymentInstrumentCapabilityApplicationService paymentInstrumentCapabilityApplicationService;
 
@@ -60,6 +63,7 @@ public class PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl
                 "支付工具预交易快照 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
         AssertUtils.notNull(request.getAction(), "支付工具动作不能为空");
+        AssertUtils.isTrue(request.getAction() != PaymentInstrumentAction.REFUND, REFUND_REPLAY_REQUIRED_MESSAGE);
         AssertUtils.notNull(request.getAmount(), "交易金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0L, "交易金额必须大于 0");
         AssertUtils.notNull(request.getCurrency(), "币种不能为空");
@@ -128,9 +132,10 @@ public class PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl
     private void assertAccountCapabilitySupportsAction(ResolvePaymentInstrumentPreTransactionSnapshotRequest request,
                                                        FundsAccountCapabilityDecisionDTO accountDecision) {
         boolean allowed = switch (request.getAction()) {
-            case RECEIVE, REFUND -> Boolean.TRUE.equals(accountDecision.getCanReceive());
+            case RECEIVE -> Boolean.TRUE.equals(accountDecision.getCanReceive());
             case PAY, AUTHORIZE -> Boolean.TRUE.equals(accountDecision.getCanPay());
             case WITHDRAW -> Boolean.TRUE.equals(accountDecision.getCanWithdraw());
+            case REFUND -> false;
         };
         AssertUtils.isTrue(allowed,
                 "预交易快照账户能力不支持当前动作，accountId = {}, action = {}",

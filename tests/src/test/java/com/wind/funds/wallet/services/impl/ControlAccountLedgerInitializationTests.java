@@ -25,8 +25,10 @@ import com.wind.funds.wallet.model.dto.BudgetGroupDTO;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
+import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
 import com.wind.funds.wallet.service.BudgetGroupService;
 import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,6 +73,8 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     private static final String MONTHLY_PERIOD_ID = "2026-05";
 
+    private static final String NEXT_MONTHLY_PERIOD_ID = "2026-06";
+
     private static final String CUSTOM_PERIOD_POLICY = "CONTRACT_H1_RULE_V1";
 
     private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
@@ -106,6 +110,9 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     @Autowired
     private LedgerService ledgerService;
+
+    @Autowired
+    private SubjectLedgerInitializer subjectLedgerInitializer;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -181,6 +188,51 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 AccountBalancePeriodType.MONTHLY,
                 MONTHLY_PERIOD_ID));
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testSubjectLedgerInitializerShouldKeepOldPeriodLedgersWhenCreatingNextPeriod() {
+        creditAccountService.createCreditAccount(createCreditAccountRequest()
+                .setSn(NON_LIFETIME_CREDIT_ACCOUNT_SN)
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(MONTHLY_PERIOD_ID));
+        List<LedgerDTO> oldPeriodLedgers = loadLedgers(
+                FundsSubjectType.CREDIT_ACCOUNT,
+                NON_LIFETIME_CREDIT_ACCOUNT_SN,
+                AccountBalancePeriodType.MONTHLY,
+                MONTHLY_PERIOD_ID);
+
+        Map<LedgerSubjectCode, Long> nextPeriodLedgerIds = subjectLedgerInitializer.initializeRequiredLedgers(
+                initializeCreditSubjectLedgerRequest(NEXT_MONTHLY_PERIOD_ID));
+        Map<LedgerSubjectCode, Long> reusedNextPeriodLedgerIds = subjectLedgerInitializer.initializeRequiredLedgers(
+                initializeCreditSubjectLedgerRequest(NEXT_MONTHLY_PERIOD_ID));
+
+        List<LedgerDTO> nextPeriodLedgers = loadLedgers(
+                FundsSubjectType.CREDIT_ACCOUNT,
+                NON_LIFETIME_CREDIT_ACCOUNT_SN,
+                AccountBalancePeriodType.MONTHLY,
+                NEXT_MONTHLY_PERIOD_ID);
+        List<LedgerDTO> allLedgers = loadLedgers(FundsSubjectType.CREDIT_ACCOUNT, NON_LIFETIME_CREDIT_ACCOUNT_SN);
+
+        assertThat(nextPeriodLedgerIds).isEqualTo(reusedNextPeriodLedgerIds);
+        assertThat(nextPeriodLedgerIds).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
+        assertThat(oldPeriodLedgers).hasSize(3);
+        assertThat(nextPeriodLedgers).hasSize(3);
+        assertThat(allLedgers).hasSize(6);
+        assertThat(oldPeriodLedgers).allSatisfy(ledger -> assertControlLedger(
+                ledger,
+                FundsSubjectType.CREDIT_ACCOUNT,
+                NON_LIFETIME_CREDIT_ACCOUNT_SN,
+                LedgerProfileCode.CREDIT_BASIC,
+                AccountBalancePeriodType.MONTHLY,
+                MONTHLY_PERIOD_ID));
+        assertThat(nextPeriodLedgers).allSatisfy(ledger -> assertControlLedger(
+                ledger,
+                FundsSubjectType.CREDIT_ACCOUNT,
+                NON_LIFETIME_CREDIT_ACCOUNT_SN,
+                LedgerProfileCode.CREDIT_BASIC,
+                AccountBalancePeriodType.MONTHLY,
+                NEXT_MONTHLY_PERIOD_ID));
     }
 
     @Test
@@ -381,6 +433,20 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         return loadLedgers(subjectType.name(), subjectId);
     }
 
+    private List<LedgerDTO> loadLedgers(FundsSubjectType subjectType,
+                                        String subjectId,
+                                        AccountBalancePeriodType periodType,
+                                        String periodId) {
+        return ledgerService.queryLedgers(new LedgerQuery()
+                        .setTenantId(TENANT_ID)
+                        .setSubjectId(subjectId)
+                        .setSubjectType(subjectType.name())
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setPeriodType(periodType)
+                        .setPeriodId(periodId),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+    }
+
     private List<LedgerDTO> loadLedgers(String subjectType, String subjectId) {
         return ledgerService.queryLedgers(new LedgerQuery()
                         .setTenantId(TENANT_ID)
@@ -394,6 +460,17 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         Long result = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + tableName + " WHERE " + columnName + " = ?",
                 Long.class, value);
         return result;
+    }
+
+    private InitializeSubjectLedgerRequest initializeCreditSubjectLedgerRequest(String periodId) {
+        return new InitializeSubjectLedgerRequest()
+                .setTenantId(TENANT_ID)
+                .setSubjectId(NON_LIFETIME_CREDIT_ACCOUNT_SN)
+                .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
+                .setPeriodType(AccountBalancePeriodType.MONTHLY)
+                .setPeriodId(periodId);
     }
 
     private void assertControlLedger(LedgerDTO ledger,

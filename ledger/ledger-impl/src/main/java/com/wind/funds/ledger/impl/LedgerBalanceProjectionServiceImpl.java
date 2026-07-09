@@ -10,6 +10,7 @@ import com.wind.funds.ledger.LedgerBalanceProjectionService;
 import com.wind.funds.ledger.LedgerNormalBalanceGuard;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.wallet.FundsAccountId;
@@ -47,10 +48,11 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void project(@NonNull List<LedgerEntrySpec> entries) {
+    public void project(@NonNull List<LedgerEntrySpec> entries, @NonNull LedgerPostingAccessType postingAccessType) {
         if (entries.isEmpty()) {
             return;
         }
+        AssertUtils.notNull(postingAccessType, "账本入账准入类型不能为空");
         assertNoCoreBenefitContextVariables(entries);
         FundsAccountId accountId = requireSingleFundsAccount(entries);
         // 按照 ledger_id 分组，避免同一科目在不同周期账本间串账。
@@ -67,7 +69,8 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
                     .setId(ledger.getId())
                     .setDebitAmountDelta(delta.debitAmountDelta())
                     .setCreditAmountDelta(delta.creditAmountDelta())
-                    .setMinimumNormalBalance(resolveMinimumNormalBalance(ledger, command.entries())));
+                    .setMinimumNormalBalance(resolveMinimumNormalBalance(ledger, command.entries()))
+                    .setPostingAccessType(postingAccessType));
             publishBalanceChangedEvents(accountId, ledger, command.entries(), command.beforeBalanceAmount(), delta);
         });
     }

@@ -27,6 +27,7 @@ import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.spec.transaction.FeeSpec;
+import com.wind.funds.spec.transaction.FundsInstructionFieldKeys;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
@@ -94,7 +95,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     private ResolvedRouteSpec resolveTopup(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.ACCOUNT_ID);
+                FundsInstructionFieldKeys.ACCOUNT_ID);
         FundsAccountId cashMappingAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
                 PlatformFundingAccountRole.CASH_MAPPING);
         FundsAccountId prepaymentAccount = platformAccountRouteSupport.requireAccount(
@@ -134,9 +135,9 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     private ResolvedRouteSpec resolveTransfer(FundsInstructionSpec instruction) {
         FundsAccountId payerAccountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.PAYER_ACCOUNT_ID);
+                FundsInstructionFieldKeys.PAYER_ACCOUNT_ID);
         FundsAccountId payeeAccountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.PAYEE_ACCOUNT_ID);
+                FundsInstructionFieldKeys.PAYEE_ACCOUNT_ID);
         AssertUtils.isFalse(payerAccountId.equals(payeeAccountId), SAME_ACCOUNT_MESSAGE);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(FundsRouteLegIds.TRANSFER, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
@@ -160,11 +161,11 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     private ResolvedRouteSpec resolvePay(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.ACCOUNT_ID);
+                FundsInstructionFieldKeys.ACCOUNT_ID);
         FundsAccountId payeeId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.PAYEE_ID);
+                FundsInstructionFieldKeys.PAYEE_ID);
         LedgerSubjectCode payeeLedgerSubjectCode = FundsInstructionContextReader.requireLedgerSubjectCode(instruction,
-                FundsInstructionContextKeys.PAYEE_LEDGER_SUBJECT_CODE);
+                FundsInstructionFieldKeys.PAYEE_LEDGER_SUBJECT_CODE);
         AssertUtils.isFalse(accountId.equals(payeeId), SAME_PAY_ACCOUNT_MESSAGE);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(FundsRouteLegIds.PAY, 1, RouteLegType.INTERNAL_TRANSFER, instruction)
@@ -187,11 +188,11 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     private ResolvedRouteSpec resolveRefund(FundsInstructionSpec instruction) {
         FundsAccountId payerId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.PAYER_ID);
+                FundsInstructionFieldKeys.PAYER_ID);
         LedgerSubjectCode payerLedgerSubjectCode = FundsInstructionContextReader.requireLedgerSubjectCode(instruction,
-                FundsInstructionContextKeys.PAYER_LEDGER_SUBJECT_CODE);
+                FundsInstructionFieldKeys.PAYER_LEDGER_SUBJECT_CODE);
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.ACCOUNT_ID);
+                FundsInstructionFieldKeys.ACCOUNT_ID);
         AssertUtils.isFalse(accountId.equals(payerId), SAME_REFUND_ACCOUNT_MESSAGE);
         List<RouteLegSpec> legs = new ArrayList<>();
         legs.add(routeLeg(FundsRouteLegIds.REFUND, 1, RouteLegType.RESTORE, instruction)
@@ -212,7 +213,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     private ResolvedRouteSpec resolveWithdraw(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.ACCOUNT_ID);
+                FundsInstructionFieldKeys.ACCOUNT_ID);
         assertWithdrawReferenceMatchesAccount(instruction, accountId);
         FundsAccountId cashMappingAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
                 PlatformFundingAccountRole.CASH_MAPPING);
@@ -341,7 +342,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
 
     private ResolvedRouteSpec resolveFee(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
-                FundsInstructionContextKeys.ACCOUNT_ID);
+                FundsInstructionFieldKeys.ACCOUNT_ID);
         FundsAccountId feeAccount = platformAccountRouteSupport.requireAccount(instruction.getAmount().getCurrency(),
                 PlatformFundingAccountRole.FEE);
         List<RouteLegSpec> legs = List.of(routeLeg(FundsRouteLegIds.FEE, 1, RouteLegType.INTERNAL_TRANSFER, instruction)

@@ -1,5 +1,6 @@
 package com.wind.funds.ledger.request;
 
+import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -33,4 +34,7 @@ public class UpdateLedgerBalanceRequest {
 
     @Schema(description = "本次更新后的最小正常余额，null 表示不额外限制")
     private Long minimumNormalBalance;
+
+    @Schema(description = "入账准入类型，null 表示普通入账")
+    private LedgerPostingAccessType postingAccessType;
 }
