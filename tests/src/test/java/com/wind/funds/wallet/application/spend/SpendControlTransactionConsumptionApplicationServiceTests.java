@@ -328,8 +328,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
         SpendControlMovementDTO activity =
                 spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
-                        confirmedRefundRequest(CONFIRMED_REFUND_ACTIVITY_SN,
-                                "sha256:sctc-business-confirmed-refund"));
+                        confirmedRefundRequest(CONFIRMED_REFUND_ACTIVITY_SN));
 
         assertThat(activity.getMovementSn()).isEqualTo(CONFIRMED_REFUND_ACTIVITY_SN);
         assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.REFUND_COMPENSATED);
@@ -337,6 +336,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activity.getTransactionSn()).isNull();
         assertThat(activity.getAuditReferenceSn()).isEqualTo("audit_sctc_confirmed_refund");
         assertThat(activity.getAmount()).isEqualTo(40L);
+        assertThat(activity.getMovementDigest()).startsWith("sha256:");
 
         BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
                 projectionQuery());
@@ -346,6 +346,69 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
         assertThat(activityCount(CONFIRMED_REFUND_ACTIVITY_SN)).isOne();
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：业务确认型退款补偿同一变动流水被相同不可变业务事实重放。
+     * 输入：同一 movementSn、同一业务事实，变更说明和上下文变量后重放。
+     * 输出：复用已记录的 REFUND_COMPENSATED 控制补偿流水，资金侧生成的 movementDigest 保持一致。
+     * 红线：description/contextVariables 不是不可变业务事实，不得进入控制额度变动摘要。
+     */
+    @Test
+    void testCompensateBusinessConfirmedRefundShouldReplayWithGeneratedMovementDigest() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlMovementService.recordMovement(limitIncreaseRequest());
+        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
+        spendControlMovementService.recordMovement(recordRequest(decision, CONSUME_ACTIVITY_SN,
+                SpendControlMovementType.CONSUMED, "sha256:sctc-consumed")
+                .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(FUNDS_TRANSACTION_SN));
+        SpendControlMovementDTO first =
+                spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
+                        confirmedRefundRequest(CONFIRMED_REFUND_ACTIVITY_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendControlMovementDTO replayed =
+                spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
+                        confirmedRefundRequest(CONFIRMED_REFUND_ACTIVITY_SN)
+                                .setDescription("业务确认型退款补偿重放")
+                                .setContextVariables("{\"traceId\":\"ignored-on-replay\"}"));
+
+        assertThat(replayed.getMovementSn()).isEqualTo(first.getMovementSn());
+        assertThat(replayed.getMovementDigest()).isEqualTo(first.getMovementDigest());
+        assertThat(activityCount(CONFIRMED_REFUND_ACTIVITY_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：业务确认型退款补偿同一变动流水被不同不可变业务事实重放。
+     * 输入：同一 movementSn，变更退款补偿原因码后重放。
+     * 输出：请求被拒绝，不新增控制额度变动。
+     * 红线：reasonCode 属于业务确认事实，必须进入资金侧生成的 movementDigest。
+     */
+    @Test
+    void testCompensateBusinessConfirmedRefundSameMovementSnWithChangedBusinessFactShouldFailWithoutSideEffect() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlMovementService.recordMovement(limitIncreaseRequest());
+        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
+        spendControlMovementService.recordMovement(recordRequest(decision, CONSUME_ACTIVITY_SN,
+                SpendControlMovementType.CONSUMED, "sha256:sctc-consumed")
+                .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(FUNDS_TRANSACTION_SN));
+        spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
+                confirmedRefundRequest(CONFIRMED_REFUND_ACTIVITY_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
+                confirmedRefundRequest(CONFIRMED_REFUND_ACTIVITY_SN).setReasonCode("MANUAL_CONFIRMED_REFUND")))
+                .hasMessageContaining("控制额度变动流水已存在但摘要不一致");
+
+        assertThat(activityCount(CONFIRMED_REFUND_ACTIVITY_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -369,8 +432,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
-                confirmedRefundRequest(OVER_CONFIRMED_REFUND_ACTIVITY_SN,
-                        "sha256:sctc-business-confirmed-refund-over").setAmount(70L)))
+                confirmedRefundRequest(OVER_CONFIRMED_REFUND_ACTIVITY_SN).setAmount(70L)))
                 .hasMessageContaining("业务确认退款补偿金额超过当前周期净消费控制金额");
 
         assertThat(activityCount(OVER_CONFIRMED_REFUND_ACTIVITY_SN)).isZero();
@@ -1211,8 +1273,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setDescription("交易成功后消费 Spend Rule 控制占用");
     }
 
-    private SpendControlBusinessConfirmedRefundCompensationRequest confirmedRefundRequest(String movementSn,
-                                                                                         String movementDigest) {
+    private SpendControlBusinessConfirmedRefundCompensationRequest confirmedRefundRequest(String movementSn) {
         return new SpendControlBusinessConfirmedRefundCompensationRequest()
                 .setTenantId(TENANT_ID)
                 .setMovementSn(movementSn)
@@ -1225,12 +1286,10 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
                 .setControlScopeId(BUDGET_GROUP_SN)
-                .setBudgetGroupSn(BUDGET_GROUP_SN)
                 .setPeriodId(PERIOD_ID)
                 .setReasonCode("BUSINESS_CONFIRMED_REFUND")
                 .setOperatorId("system")
                 .setAuditReferenceSn("audit_sctc_confirmed_refund")
-                .setMovementDigest(movementDigest)
                 .setDescription("业务确认型退款补偿 Spend Rule 控制额度");
     }
 
