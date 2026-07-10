@@ -22,6 +22,7 @@ import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
 import com.wind.funds.wallet.service.LedgerQueryService;
 import org.jspecify.annotations.NonNull;
@@ -45,7 +46,7 @@ public class FundsAuthorizationInstructionConverter {
 
     private static final long TRUSTED_FORCE_SETTLE_LIMIT_AMOUNT = 60L;
 
-    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
 
     private final FundsInstructionAmountSupport amountSupport;
 

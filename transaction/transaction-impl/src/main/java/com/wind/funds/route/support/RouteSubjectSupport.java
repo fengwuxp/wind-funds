@@ -5,6 +5,7 @@ import com.wind.funds.model.route.ImmutableSubjectRef;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.ref.SubjectRef;
@@ -19,7 +20,7 @@ import java.util.Objects;
 @Component
 public class RouteSubjectSupport {
 
-    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
 
     public @NonNull SubjectRef createSubjectRef(@NonNull FundsAccountId accountId) {
         if (isExternalAccountType(accountId.type())) {

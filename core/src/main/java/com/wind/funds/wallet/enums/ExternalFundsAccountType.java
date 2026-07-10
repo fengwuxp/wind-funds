@@ -47,7 +47,7 @@ public enum ExternalFundsAccountType implements DescriptiveEnum {
      */
     MERCHANT(DefaultFundsAccountType.EXTERNAL_MERCHANT, "外部商户账户");
 
-    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
 
     private static final Map<DefaultFundsAccountType, ExternalFundsAccountType> BY_DEFAULT_ACCOUNT_TYPE =
             Arrays.stream(values())

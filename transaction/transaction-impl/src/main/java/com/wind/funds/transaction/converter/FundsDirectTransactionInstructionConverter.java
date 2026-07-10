@@ -31,6 +31,7 @@ import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -50,7 +51,7 @@ public class FundsDirectTransactionInstructionConverter {
 
     private static final String EXTERNAL_TRANSACTION_ID = "externalTransactionId";
 
-    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
 
     private final PlatformFundingAccountService platformFundingAccountService;
 

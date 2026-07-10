@@ -33,7 +33,7 @@ public enum CreditFundsAccountType implements DescriptiveEnum {
                     .collect(Collectors.toUnmodifiableMap(CreditFundsAccountType::getAccountType,
                             Function.identity()));
 
-    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
 
     private final DefaultFundsAccountType accountType;
 

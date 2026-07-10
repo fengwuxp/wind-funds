@@ -47,7 +47,7 @@ public enum FundingAccountType implements DescriptiveEnum {
      */
     PREPAID_CARD(DefaultFundsAccountType.PREPAID_CARD, "预付卡账户");
 
-    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
 
     private static final Map<DefaultFundsAccountType, FundingAccountType> BY_DEFAULT_ACCOUNT_TYPE =
             Arrays.stream(values())

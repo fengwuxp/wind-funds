@@ -22,6 +22,7 @@ import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountQueryService;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,7 +65,7 @@ public class FundsBalanceControlInstructionConverter {
     private static final String SPEND_CONTROL_SCOPE_ADJUST_FORBIDDEN_MESSAGE =
             "支出控制范围额度调整已迁移到预算控制活动，不允许通过资金余额控制入账";
 
-    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
 
     private static final String UNFREEZE_REFERENCE_REQUIRED_MESSAGE = "余额解冻缺少原冻结单引用";
 

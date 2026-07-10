@@ -38,6 +38,7 @@ import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.transaction.core.Money;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -67,7 +68,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private static final String REPLAY_LEG_ID_SEPARATOR = "_";
 
-    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
 
     private static final String REPLAY_REFERENCE_REQUIRED_MESSAGE = "RouteSnapshot 回放事件缺少原路径引用";
 
