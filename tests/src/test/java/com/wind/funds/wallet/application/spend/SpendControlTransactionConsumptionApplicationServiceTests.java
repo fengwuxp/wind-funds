@@ -35,6 +35,7 @@ import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
+import com.wind.funds.wallet.model.request.SpendControlBusinessConfirmedRefundCompensationRequest;
 import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
@@ -205,6 +206,12 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String TENANT_MISMATCH_ACTIVITY_SN = "activity_tenant_mismatch_001";
 
+    private static final String LIMIT_INCREASE_ACTIVITY_SN = "activity_limit_increased_for_confirmed_refund_001";
+
+    private static final String CONFIRMED_REFUND_ACTIVITY_SN = "activity_confirmed_refund_compensated_001";
+
+    private static final String OVER_CONFIRMED_REFUND_ACTIVITY_SN = "activity_confirmed_refund_over_consumed_001";
+
     @Autowired
     private CreditAccountService creditAccountService;
 
@@ -297,6 +304,76 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
         assertThat(activityCount(TENANT_MISMATCH_ACTIVITY_SN)).isZero();
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：VCC 退款找不到原控制流水，但业务侧确认支付工具、周期和金额可以补偿。
+     * 输入：当前周期已有 100 控制额度、60 控制消费，业务确认补偿 40。
+     * 输出：记录 REFUND_COMPENSATED 控制补偿流水，不要求原控制流水或资金交易流水。
+     * 红线：业务确认型控制补偿不得创建资金交易、route、posting、LedgerEntry 或账本余额投影事实。
+     */
+    @Test
+    void testCompensateBusinessConfirmedRefundShouldRecordRefundCompensationWithoutOriginalMovement() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlMovementService.recordMovement(limitIncreaseRequest());
+        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
+        spendControlMovementService.recordMovement(recordRequest(decision, CONSUME_ACTIVITY_SN,
+                SpendControlMovementType.CONSUMED, "sha256:sctc-consumed")
+                .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(FUNDS_TRANSACTION_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendControlMovementDTO activity =
+                spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
+                        confirmedRefundRequest(CONFIRMED_REFUND_ACTIVITY_SN,
+                                "sha256:sctc-business-confirmed-refund"));
+
+        assertThat(activity.getMovementSn()).isEqualTo(CONFIRMED_REFUND_ACTIVITY_SN);
+        assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.REFUND_COMPENSATED);
+        assertThat(activity.getOriginalMovementSn()).isNull();
+        assertThat(activity.getTransactionSn()).isNull();
+        assertThat(activity.getAuditReferenceSn()).isEqualTo("audit_sctc_confirmed_refund");
+        assertThat(activity.getAmount()).isEqualTo(40L);
+
+        BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
+                projectionQuery());
+        assertThat(projection.getLimitAmount()).isEqualTo(100L);
+        assertThat(projection.getConsumedAmount()).isEqualTo(20L);
+        assertThat(projection.getRemainingControlAmount()).isEqualTo(40L);
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
+        assertThat(activityCount(CONFIRMED_REFUND_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：业务确认型退款补偿金额超过当前周期净消费金额。
+     * 输入：当前周期只有 60 控制消费，尝试补偿 70。
+     * 输出：请求被拒绝，不写新的控制补偿流水。
+     * 红线：控制补偿不能把周期净消费打成负数，也不能让可用控制额度超过周期额度。
+     */
+    @Test
+    void testCompensateBusinessConfirmedRefundShouldRejectAmountOverNetConsumed() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlMovementService.recordMovement(limitIncreaseRequest());
+        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
+        spendControlMovementService.recordMovement(recordRequest(decision, CONSUME_ACTIVITY_SN,
+                SpendControlMovementType.CONSUMED, "sha256:sctc-consumed")
+                .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn(FUNDS_TRANSACTION_SN));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
+                confirmedRefundRequest(OVER_CONFIRMED_REFUND_ACTIVITY_SN,
+                        "sha256:sctc-business-confirmed-refund-over").setAmount(70L)))
+                .hasMessageContaining("业务确认退款补偿金额超过当前周期净消费控制金额");
+
+        assertThat(activityCount(OVER_CONFIRMED_REFUND_ACTIVITY_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -1134,6 +1211,50 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setDescription("交易成功后消费 Spend Rule 控制占用");
     }
 
+    private SpendControlBusinessConfirmedRefundCompensationRequest confirmedRefundRequest(String movementSn,
+                                                                                         String movementDigest) {
+        return new SpendControlBusinessConfirmedRefundCompensationRequest()
+                .setTenantId(TENANT_ID)
+                .setMovementSn(movementSn)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn("SPEND_CONTROL_CONFIRMED_REFUND_001")
+                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT))
+                .setAmount(40L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setSpendRuleId(SPEND_RULE_ID)
+                .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setControlScopeId(BUDGET_GROUP_SN)
+                .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setPeriodId(PERIOD_ID)
+                .setReasonCode("BUSINESS_CONFIRMED_REFUND")
+                .setOperatorId("system")
+                .setAuditReferenceSn("audit_sctc_confirmed_refund")
+                .setMovementDigest(movementDigest)
+                .setDescription("业务确认型退款补偿 Spend Rule 控制额度");
+    }
+
+    private RecordSpendControlMovementRequest limitIncreaseRequest() {
+        return new RecordSpendControlMovementRequest()
+                .setTenantId(TENANT_ID)
+                .setMovementSn(LIMIT_INCREASE_ACTIVITY_SN)
+                .setMovementType(SpendControlMovementType.LIMIT_INCREASED)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn("SPEND_CONTROL_LIMIT_INCREASE_001")
+                .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT))
+                .setAmount(100L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setSpendRuleId(SPEND_RULE_ID)
+                .setSpendRuleVersion(SPEND_RULE_VERSION)
+                .setControlScopeId(BUDGET_GROUP_SN)
+                .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setPeriodId(PERIOD_ID)
+                .setReasonCode("INITIALIZE_TEST_LIMIT")
+                .setOperatorId("system")
+                .setAuditReferenceSn("audit_sctc_limit")
+                .setMovementDigest("sha256:sctc-limit-increased");
+    }
+
     private BudgetControlProjectionQuery projectionQuery() {
         return new BudgetControlProjectionQuery()
                 .setTenantId(TENANT_ID)
@@ -1284,9 +1405,10 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                     } catch (InvocationTargetException exception) {
                         throw exception.getCause();
                     }
-                });
+        });
         return new SpendControlTransactionConsumptionApplicationServiceImpl(
                 activityService,
+                paymentInstrumentService,
                 fundsTransactionQueryService);
     }
 

@@ -13,6 +13,7 @@ import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.dal.entities.SpendControlMovement;
 import com.wind.funds.wallet.dal.entities.table.SpendControlMovementNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendControlMovementMapper;
+import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlMovementType;
 import com.wind.funds.wallet.mapstruct.SpendControlMovementConverter;
 import com.wind.funds.wallet.model.dto.BudgetControlProjectionDTO;
@@ -144,20 +145,34 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         assertNoSensitiveContextVariables(request.getContextVariables());
         assertTargetAccountSupported(request);
         if (request.getMovementType().isLimitAdjustmentMovement()) {
-            AssertUtils.hasText(request.getReasonCode(), "预算控制额度调整原因码不能为空");
-            AssertUtils.hasText(request.getOperatorId(), "预算控制额度调整操作者不能为空");
-            AssertUtils.hasText(request.getAuditReferenceSn(), "预算控制额度调整审计引用不能为空");
+            assertAuditFields(request, "预算控制额度调整");
         } else {
             AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
             AssertUtils.notNull(request.getAction(), "支付工具动作不能为空");
-            AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
-            AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
-            SpendRuleDigestValidator.assertSha256Digest(request.getSpendDecisionDigest(), "Spend Rule 决策摘要");
+            if (isBusinessConfirmedRefundCompensation(request)) {
+                assertAuditFields(request, "业务确认退款控制补偿");
+            } else {
+                AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
+                AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
+                SpendRuleDigestValidator.assertSha256Digest(request.getSpendDecisionDigest(), "Spend Rule 决策摘要");
+            }
         }
         if (request.getMovementType().isBudgetProjectionMovement()) {
             AssertUtils.hasText(controlScopeId(request), "预算控制额度变动必须提供控制范围标识");
             AssertUtils.hasText(request.getPeriodId(), "预算控制额度变动必须提供周期标识");
         }
+    }
+
+    private boolean isBusinessConfirmedRefundCompensation(RecordSpendControlMovementRequest request) {
+        return request.getMovementType() == SpendControlMovementType.REFUND_COMPENSATED
+                && request.getAction() == PaymentInstrumentAction.REFUND
+                && !StringUtils.hasText(request.getOriginalMovementSn());
+    }
+
+    private void assertAuditFields(RecordSpendControlMovementRequest request, String actionName) {
+        AssertUtils.hasText(request.getReasonCode(), "{}原因码不能为空", actionName);
+        AssertUtils.hasText(request.getOperatorId(), "{}操作者不能为空", actionName);
+        AssertUtils.hasText(request.getAuditReferenceSn(), "{}审计引用不能为空", actionName);
     }
 
     private void assertTargetAccountSupported(RecordSpendControlMovementRequest request) {
