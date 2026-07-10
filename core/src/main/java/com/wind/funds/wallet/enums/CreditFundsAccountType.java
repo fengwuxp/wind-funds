@@ -33,6 +33,8 @@ public enum CreditFundsAccountType implements DescriptiveEnum {
                     .collect(Collectors.toUnmodifiableMap(CreditFundsAccountType::getAccountType,
                             Function.identity()));
 
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
+
     private final DefaultFundsAccountType accountType;
 
     private final String desc;
@@ -42,6 +44,9 @@ public enum CreditFundsAccountType implements DescriptiveEnum {
     }
 
     public static Optional<CreditFundsAccountType> fromAccountType(@NonNull String accountType) {
+        if (SPEND_CONTROL_SCOPE_ACCOUNT_TYPE.equals(accountType)) {
+            return Optional.empty();
+        }
         return fromAccountType(DefaultFundsAccountType.valueOf(accountType));
     }
 
