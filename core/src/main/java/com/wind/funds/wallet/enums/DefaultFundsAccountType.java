@@ -105,11 +105,6 @@ public enum DefaultFundsAccountType implements DescriptiveEnum {
      */
     CREDIT_CARD(LedgerSubjectCategory.LIABILITY, "信用卡"),
 
-    /**
-     * 支出控制范围（仅控制额度，不直接参与资金）
-     */
-    SPEND_CONTROL_SCOPE(LedgerSubjectCategory.MEMO, "支出控制范围"),
-
     /* ===== 对账 / 清算 ===== */
 
     /**

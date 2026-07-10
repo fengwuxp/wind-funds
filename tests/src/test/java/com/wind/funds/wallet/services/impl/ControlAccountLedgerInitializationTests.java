@@ -17,10 +17,10 @@ import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
-import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.model.dto.SpendControlScopeDTO;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
 import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
@@ -245,7 +245,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         SpendControlScopeDTO controlScope = spendControlScopeService.getSpendControlScope(
                 TENANT_ID,
                 SPEND_CONTROL_SCOPE_SN,
-                DefaultFundsAccountType.SPEND_CONTROL_SCOPE.name());
+                SpendRuleScopeType.SPEND_CONTROL_SCOPE.name());
         List<LedgerDTO> ledgers = loadLedgers(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE, SPEND_CONTROL_SCOPE_SN);
 
         assertThat(spendControlScope.getSn()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
@@ -413,7 +413,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .setTenantId(TENANT_ID)
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
-                .setScopeType(DefaultFundsAccountType.SPEND_CONTROL_SCOPE.name())
+                .setScopeType(SpendRuleScopeType.SPEND_CONTROL_SCOPE.name())
                 .setCurrency(CurrencyIsoCode.USD);
     }
 

@@ -125,6 +125,7 @@ import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -402,7 +403,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setTenantId(TENANT_ID)
                 .setOwnerId("owner_scope")
                 .setOwnerType(FundsAccountOwnerType.USER)
-                .setScopeType(DefaultFundsAccountType.SPEND_CONTROL_SCOPE.name())
+                .setScopeType(SpendRuleScopeType.SPEND_CONTROL_SCOPE.name())
                 .setCurrency(CURRENCY));
     }
 

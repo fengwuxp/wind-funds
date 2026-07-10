@@ -1,9 +1,11 @@
 package com.wind.funds.dsl;
 
 import com.wind.funds.route.enums.FundsSubjectType;
+import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 资金主体类型契约测试。
@@ -22,5 +24,7 @@ class FundsSubjectTypeContractTests {
         assertThat(FundsSubjectType.FUNDING_ACCOUNT.isLedgerPostable()).isTrue();
         assertThat(FundsSubjectType.CREDIT_ACCOUNT.isLedgerPostable()).isTrue();
         assertThat(FundsSubjectType.isLedgerPostableName("SPEND_CONTROL_SCOPE")).isFalse();
+        assertThatThrownBy(() -> DefaultFundsAccountType.valueOf("SPEND_CONTROL_SCOPE"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

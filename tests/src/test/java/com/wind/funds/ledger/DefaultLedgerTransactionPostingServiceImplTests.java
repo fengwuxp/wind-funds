@@ -29,10 +29,10 @@ import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
-import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.FundingAccountType;
+import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
 import com.wind.funds.wallet.service.SpendControlScopeService;
 import com.wind.funds.wallet.services.impl.SpendControlScopeServiceImpl;
@@ -912,7 +912,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 .setSn(spendControlScopeSn)
                 .setOwnerId("owner_" + spendControlScopeSn)
                 .setOwnerType(FundsAccountOwnerType.USER)
-                .setScopeType(DefaultFundsAccountType.SPEND_CONTROL_SCOPE.name())
+                .setScopeType(SpendRuleScopeType.SPEND_CONTROL_SCOPE.name())
                 .setCurrency(CURRENCY)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name())
