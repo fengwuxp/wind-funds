@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.util.StringUtils;
 
 /**
  * 支出控制准入应用服务实现。
@@ -95,10 +94,6 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
         if (request.getSpendDecisionResult() == SpendControlDecisionResult.REJECTED) {
             AssertUtils.hasText(request.getRejectReason(), "Spend Rule 拒绝原因不能为空");
         }
-        if (StringUtils.hasText(request.getControlScopeId()) && StringUtils.hasText(request.getBudgetGroupSn())) {
-            AssertUtils.equals(request.getControlScopeId(), request.getBudgetGroupSn(),
-                    "控制范围标识与预算组历史字段不一致");
-        }
     }
 
     private ResolvePaymentInstrumentPreTransactionSnapshotRequest toSnapshotRequest(
@@ -161,15 +156,11 @@ public class SpendControlAdmissionApplicationServiceImpl implements SpendControl
                 .setSpendDecisionDigest(request.getSpendDecisionDigest())
                 .setSpendDecisionRecordId(decisionRecord.getId())
                 .setControlScopeId(controlScopeId(request))
-                .setBudgetGroupSn(controlScopeId(request))
                 .setRejectReason(request.getRejectReason())
                 .setPreTransactionSnapshot(snapshot);
     }
 
     private String controlScopeId(ResolveSpendControlAdmissionRequest request) {
-        if (StringUtils.hasText(request.getControlScopeId())) {
-            return request.getControlScopeId();
-        }
-        return request.getBudgetGroupSn();
+        return request.getControlScopeId();
     }
 }

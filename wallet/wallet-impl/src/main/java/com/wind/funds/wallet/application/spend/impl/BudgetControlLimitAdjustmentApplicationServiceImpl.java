@@ -18,7 +18,6 @@ import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -92,7 +91,6 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 .setSpendRuleId(request.getSpendRuleId())
                 .setSpendRuleVersion(request.getSpendRuleVersion())
                 .setControlScopeId(controlScopeId(request))
-                .setBudgetGroupSn(controlScopeId(request))
                 .setPeriodId(request.getPeriodId())
                 .setReasonCode(request.getReasonCode())
                 .setOperatorId(operatorId(operator))
@@ -111,7 +109,6 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
         return new BudgetControlProjectionQuery()
                 .setTenantId(request.getTenantId())
                 .setControlScopeId(controlScopeId(request))
-                .setBudgetGroupSn(controlScopeId(request))
                 .setPeriodId(request.getPeriodId())
                 .setCurrency(request.getCurrency())
                 .setSpendRuleId(request.getSpendRuleId())
@@ -152,7 +149,6 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
                 .setBusinessScene(activity.getBusinessScene())
                 .setBusinessSn(activity.getBusinessSn())
                 .setControlScopeId(activity.getControlScopeId())
-                .setBudgetGroupSn(activity.getBudgetGroupSn())
                 .setPeriodId(activity.getPeriodId())
                 .setTargetAccountId(activity.getTargetAccountId())
                 .setAmount(activity.getAmount())
@@ -168,13 +164,6 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
     }
 
     private String controlScopeId(AdjustBudgetControlLimitRequest request) {
-        if (StringUtils.hasText(request.getControlScopeId()) && StringUtils.hasText(request.getBudgetGroupSn())) {
-            AssertUtils.equals(request.getControlScopeId(), request.getBudgetGroupSn(),
-                    "控制范围标识与预算组历史字段不一致");
-        }
-        if (StringUtils.hasText(request.getControlScopeId())) {
-            return request.getControlScopeId();
-        }
-        return request.getBudgetGroupSn();
+        return request.getControlScopeId();
     }
 }

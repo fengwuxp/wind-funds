@@ -1226,7 +1226,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setSpendDecisionSn(SPEND_DECISION_SN)
                 .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
                 .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
-                .setBudgetGroupSn(BUDGET_GROUP_SN);
+                .setControlScopeId(BUDGET_GROUP_SN);
     }
 
     private RecordSpendControlMovementRequest recordRequest(SpendControlAdmissionDecisionDTO decision,
@@ -1249,8 +1249,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setSpendDecisionSn(decision.getSpendDecisionSn())
                 .setSpendDecisionResult(decision.getSpendDecisionResult())
                 .setSpendDecisionDigest(decision.getSpendDecisionDigest())
-                .setControlScopeId(decision.getBudgetGroupSn())
-                .setBudgetGroupSn(decision.getBudgetGroupSn())
+                .setControlScopeId(decision.getControlScopeId())
                 .setPeriodId(PERIOD_ID)
                 .setMovementDigest(movementDigest);
     }
@@ -1306,7 +1305,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
                 .setControlScopeId(BUDGET_GROUP_SN)
-                .setBudgetGroupSn(BUDGET_GROUP_SN)
                 .setPeriodId(PERIOD_ID)
                 .setReasonCode("INITIALIZE_TEST_LIMIT")
                 .setOperatorId("system")
@@ -1318,7 +1316,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         return new BudgetControlProjectionQuery()
                 .setTenantId(TENANT_ID)
                 .setControlScopeId(BUDGET_GROUP_SN)
-                .setBudgetGroupSn(BUDGET_GROUP_SN)
                 .setPeriodId(PERIOD_ID)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)

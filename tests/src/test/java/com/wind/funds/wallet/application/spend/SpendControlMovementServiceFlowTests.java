@@ -274,7 +274,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setControlScopeId(BUDGET_GROUP_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
@@ -312,7 +312,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setControlScopeId(BUDGET_GROUP_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
@@ -354,12 +354,10 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setAmount(80L));
         spendControlMovementService.recordMovement(limitIncreaseRequest("limit_second_scope_july", PERIOD_ID, 500L,
                 "sha256:limit-second-scope-july")
-                .setControlScopeId(SECOND_BUDGET_GROUP_SN)
-                .setBudgetGroupSn(SECOND_BUDGET_GROUP_SN));
+                .setControlScopeId(SECOND_BUDGET_GROUP_SN));
         spendControlMovementService.recordMovement(recordRequest(decision, "activity_reserved_second_scope_july",
                 SpendControlMovementType.RESERVED, "sha256:activity-reserved-second-scope-july")
                 .setControlScopeId(SECOND_BUDGET_GROUP_SN)
-                .setBudgetGroupSn(SECOND_BUDGET_GROUP_SN)
                 .setAmount(200L));
 
         BudgetControlProjectionDTO historicalProjection = spendControlMovementService.getBudgetControlProjection(
@@ -388,7 +386,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                                 FundsSubjectType.CREDIT_ACCOUNT)));
 
         assertThat(historicalProjection.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
-        assertThat(historicalProjection.getBudgetGroupSn()).isEqualTo(BUDGET_GROUP_SN);
         assertThat(historicalProjection.getPeriodId()).isEqualTo(PERIOD_ID);
         assertThat(historicalProjection.getLimitAmount()).isEqualTo(100L);
         assertThat(historicalProjection.getReservedAmount()).isEqualTo(60L);
@@ -437,7 +434,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(activityCount(SECOND_RELEASED_ACTIVITY_SN)).isZero();
         BudgetControlProjectionDTO primaryProjection = spendControlMovementService.getBudgetControlProjection(new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setControlScopeId(BUDGET_GROUP_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
@@ -447,7 +444,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(primaryProjection.getRemainingControlAmount()).isZero();
         BudgetControlProjectionDTO secondProjection = spendControlMovementService.getBudgetControlProjection(new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setControlScopeId(BUDGET_GROUP_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
@@ -494,7 +491,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setBudgetGroupSn(BUDGET_GROUP_SN)
+                        .setControlScopeId(BUDGET_GROUP_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setTargetAccountId(FundsAccountId.immutable(BUDGET_GROUP_SN,
@@ -549,7 +546,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setSpendDecisionSn(SPEND_DECISION_SN)
                 .setSpendDecisionResult(decisionResult)
                 .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
-                .setBudgetGroupSn(BUDGET_GROUP_SN)
+                .setControlScopeId(BUDGET_GROUP_SN)
                 .setRejectReason(rejectReason);
     }
 
@@ -573,8 +570,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setSpendDecisionSn(decision.getSpendDecisionSn())
                 .setSpendDecisionResult(decision.getSpendDecisionResult())
                 .setSpendDecisionDigest(decision.getSpendDecisionDigest())
-                .setControlScopeId(decision.getBudgetGroupSn())
-                .setBudgetGroupSn(decision.getBudgetGroupSn())
+                .setControlScopeId(decision.getControlScopeId())
                 .setPeriodId(PERIOD_ID)
                 .setRejectReason(decision.getRejectReason())
                 .setMovementDigest(movementDigest);
@@ -596,7 +592,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
                 .setControlScopeId(BUDGET_GROUP_SN)
-                .setBudgetGroupSn(BUDGET_GROUP_SN)
                 .setPeriodId(periodId)
                 .setReasonCode("PERIOD_LIMIT_REFRESH")
                 .setOperatorId("period-limit-scheduler")

@@ -1370,7 +1370,7 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                     gmt_create, gmt_modified, movement_sn, tenant_id, movement_type, business_scene, business_sn,
                     original_movement_sn, transaction_sn, instrument_sn, action, target_subject_id,
                     target_subject_type, amount, currency, spend_rule_id, spend_rule_version,
-                    spend_decision_sn, spend_decision_result, spend_decision_digest, budget_group_sn,
+                    spend_decision_sn, spend_decision_result, spend_decision_digest, control_scope_id,
                     period_id, reason_code, operator_id, audit_reference_sn, movement_digest)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,

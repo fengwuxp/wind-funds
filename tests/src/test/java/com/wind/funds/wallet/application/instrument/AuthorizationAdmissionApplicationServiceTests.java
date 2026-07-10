@@ -666,7 +666,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setSpendDecisionSn(SPEND_DECISION_SN)
                 .setSpendDecisionResult(SpendControlDecisionResult.REJECTED)
                 .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
-                .setBudgetGroupSn("budget_auth_admission")
+                .setControlScopeId("budget_auth_admission")
                 .setSpendDecisionRejectReason("超过单卡单日授权限额");
     }
 
@@ -912,8 +912,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .containsEntry("decisionSn", SPEND_PASS_DECISION_SN)
                 .containsEntry("decisionResult", SpendControlDecisionResult.PASSED.name())
                 .containsEntry("decisionDigest", SPEND_PASS_DECISION_DIGEST)
-                .containsEntry("controlScopeId", "budget_auth_admission")
-                .containsEntry("budgetGroupSn", "budget_auth_admission");
+                .containsEntry("controlScopeId", "budget_auth_admission");
         assertThat(spendRuleDecision).containsKey("decisionRecordId");
         assertThat(explanation.payload().toString())
                 .doesNotContain("dslCaseId")

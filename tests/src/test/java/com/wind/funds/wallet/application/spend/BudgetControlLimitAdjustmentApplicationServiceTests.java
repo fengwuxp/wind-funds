@@ -137,7 +137,6 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThat(result.getMovementSn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
         assertThat(result.getMovementType()).isEqualTo(SpendControlMovementType.LIMIT_INCREASED);
         assertThat(result.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
-        assertThat(result.getBudgetGroupSn()).isEqualTo(BUDGET_GROUP_SN);
         assertThat(result.getPeriodId()).isEqualTo(PERIOD_ID);
         assertThat(result.getTargetAccountId()).isEqualTo(targetAccountId());
         assertThat(result.getAmount()).isEqualTo(100L);
@@ -351,7 +350,6 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(businessSn)
                 .setControlScopeId(BUDGET_GROUP_SN)
-                .setBudgetGroupSn(BUDGET_GROUP_SN)
                 .setPeriodId(PERIOD_ID)
                 .setTargetAccountId(targetAccountId())
                 .setAmount(100L)
@@ -382,7 +380,6 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
                 .setSpendDecisionDigest("sha256:budget-limit-reserved-decision")
                 .setControlScopeId(BUDGET_GROUP_SN)
-                .setBudgetGroupSn(BUDGET_GROUP_SN)
                 .setPeriodId(PERIOD_ID)
                 .setMovementDigest("sha256:budget-limit-reserved");
     }
@@ -412,7 +409,6 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         return new BudgetControlProjectionQuery()
                 .setTenantId(TENANT_ID)
                 .setControlScopeId(BUDGET_GROUP_SN)
-                .setBudgetGroupSn(BUDGET_GROUP_SN)
                 .setPeriodId(PERIOD_ID)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)

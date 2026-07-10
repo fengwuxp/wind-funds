@@ -485,7 +485,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | spend_rule_id | varchar(64) | 是 | Spend Rule 标识。 | SR-DAILY-001 |
 | spend_rule_version | varchar(64) | 是 | Spend Rule 版本。 | v1 |
 | spend_decision_sn | varchar(64) | 否 | Spend Rule 决策流水。 | DEC-001 |
-| budget_group_sn | varchar(64) | 否 | 预算组或预算控制范围标识，不表达账务主体。 | BG-001 |
+| control_scope_id | varchar(64) | 否 | 控制范围标识，不表达账务主体。 | BG-001 |
 | period_id | varchar(64) | 否 | 控制周期标识；预算控制投影类流水必填，用于当前周期和历史周期追溯。 | 2026-07 |
 | movement_digest | varchar(128) | 是 | 控制额度变动摘要。 | sha256:activity |
 
@@ -497,11 +497,11 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | idx_spend_control_movement_business | 普通索引 | tenant_id, business_scene, business_sn | 按业务流水查询控制时间线。 |
 | idx_spend_control_movement_original | 普通索引 | tenant_id, original_movement_sn | 按原控制流水查询消费、释放或补偿。 |
 | idx_spend_control_movement_target | 普通索引 | tenant_id, target_subject_type, target_subject_id | 按目标账户查询预算控制投影。 |
-| idx_spend_control_movement_budget | 普通索引 | tenant_id, budget_group_sn, period_id, currency | 按控制范围和周期查询预算控制投影。 |
+| idx_spend_control_movement_scope | 普通索引 | tenant_id, control_scope_id, period_id, currency | 按控制范围和周期查询预算控制投影。 |
 | idx_spend_control_movement_rule | 普通索引 | tenant_id, spend_rule_id, spend_rule_version | 按规则版本查询控制流水。 |
-| idx_spend_control_movement_rolling_count | 普通索引 | tenant_id, budget_group_sn, currency, spend_rule_id, spend_rule_version, target_subject_type, target_subject_id, gmt_create | 支撑滚动窗口次数 evaluator 的窄范围只读查询。 |
+| idx_spend_control_movement_rolling_count | 普通索引 | tenant_id, control_scope_id, currency, spend_rule_id, spend_rule_version, target_subject_type, target_subject_id, gmt_create | 支撑滚动窗口次数 evaluator 的窄范围只读查询。 |
 
-滚动窗口次数 evaluator 需要按 `tenant_id + budget_group_sn + currency + spend_rule_id + spend_rule_version + target_subject_type + target_subject_id + gmt_create` 组合读取控制流水。当前 H2 schema 已补齐目标组合索引，只证明服务层和测试基线具备对应访问路径；生产启用前仍必须同步真实 DDL、执行计划和慢查询风险评审，未完成前不得把该 evaluator 声明为生产强一致频控能力。
+滚动窗口次数 evaluator 需要按 `tenant_id + control_scope_id + currency + spend_rule_id + spend_rule_version + target_subject_type + target_subject_id + gmt_create` 组合读取控制流水。当前 H2 schema 已补齐目标组合索引，只证明服务层和测试基线具备对应访问路径；生产启用前仍必须同步真实 DDL、执行计划和慢查询风险评审，未完成前不得把该 evaluator 声明为生产强一致频控能力。
 
 | 当前 movementType | 目标语义 | 是否参与预算控制投影 | 说明 |
 | --- | --- | --- | --- |
@@ -522,7 +522,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 4. `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`，表示周期或 scope 内还能继续使用的控制额度。
 5. 调减预算控制额度时，新的 `limitAmount` 不得低于 `consumedAmount + remainingControlAmount`。
 6. 查询当前周期额度时使用 `controlScopeId + periodId`；历史周期同理，只替换 `periodId`。
-7. `controlScopeId` 是公共契约目标语义名，当前兼容映射到 `budget_group_sn`；两个字段同时传入时必须一致。
+7. `controlScopeId` 是公共契约、控制流水和投影的统一控制范围标识，落库字段为 `control_scope_id`。
 8. `period_id` 只表达 Spend Rule 控制周期，不创建预算组账本，也不复用 ledger bucket 作为控制事实。
 9. 若未来将 `remainingControlAmount` 改名为 `occupiedControlAmount`，必须单独评估公共 DTO、表字段、测试和调用方兼容。
 10. `SpendControlMovementService#recordMovement` 不接受新的 `ADMISSION_RECORDED` 或 `REJECTED_RECORDED` 写入；历史兼容类型只用于存量解释、查询或迁移前审计。
@@ -650,7 +650,7 @@ flowchart TD
 | decisionSn | 本次规则决策流水。 |
 | decisionResult | PASSED、REJECTED 或 REVIEW 类决策结果。 |
 | decisionDigest | 决策摘要，用于幂等、回放和对账追踪。 |
-| budgetGroupSn | 预算组或预算控制范围引用。 |
+| controlScopeId | 控制范围引用。 |
 
 实现约束：
 

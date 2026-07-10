@@ -255,7 +255,7 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         AssertUtils.isTrue(Objects.equals(existing.getSpendRuleVersion(), request.getSpendRuleVersion()),
                 "控制额度变动流水已存在但 Spend Rule 版本不一致，movementSn = {}",
                 request.getMovementSn());
-        AssertUtils.isTrue(Objects.equals(existing.getBudgetGroupSn(), controlScopeId(request)),
+        AssertUtils.isTrue(Objects.equals(existing.getControlScopeId(), controlScopeId(request)),
                 "控制额度变动流水已存在但控制范围标识不一致，movementSn = {}",
                 request.getMovementSn());
         AssertUtils.isTrue(Objects.equals(existing.getPeriodId(), request.getPeriodId()),
@@ -304,7 +304,6 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 new BudgetControlProjectionQuery()
                         .setTenantId(request.getTenantId())
                         .setControlScopeId(controlScopeId(request))
-                        .setBudgetGroupSn(controlScopeId(request))
                         .setPeriodId(request.getPeriodId())
                         .setCurrency(request.getCurrency())
                         .setSpendRuleId(request.getSpendRuleId())
@@ -339,7 +338,6 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         return queryMovementsByPage(new SpendControlMovementQuery()
                 .setTenantId(query.getTenantId())
                 .setControlScopeId(controlScopeId(query))
-                .setBudgetGroupSn(controlScopeId(query))
                 .setPeriodId(query.getPeriodId())
                 .setCurrency(query.getCurrency())
                 .setSpendRuleId(query.getSpendRuleId())
@@ -374,7 +372,6 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         return new BudgetControlProjectionDTO()
                 .setTenantId(query.getTenantId())
                 .setControlScopeId(controlScopeId)
-                .setBudgetGroupSn(controlScopeId)
                 .setPeriodId(query.getPeriodId())
                 .setCurrency(query.getCurrency())
                 .setSpendRuleId(query.getSpendRuleId())
@@ -405,7 +402,6 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 || StringUtils.hasText(query.getSpendRuleId())
                 || StringUtils.hasText(query.getSpendRuleVersion())
                 || StringUtils.hasText(query.getControlScopeId())
-                || StringUtils.hasText(query.getBudgetGroupSn())
                 || StringUtils.hasText(query.getPeriodId())
                 || query.getGmtCreateMin() != null
                 || query.getGmtCreateMax() != null;
@@ -474,7 +470,7 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 .and(ref.currency.eq(query.getCurrency()))
                 .and(ref.spendRuleId.eq(query.getSpendRuleId()))
                 .and(ref.spendRuleVersion.eq(query.getSpendRuleVersion()))
-                .and(ref.budgetGroupSn.eq(controlScopeId))
+                .and(ref.controlScopeId.eq(controlScopeId))
                 .and(ref.periodId.eq(query.getPeriodId()))
                 .and(ref.gmtCreate.ge(query.getGmtCreateMin()))
                 .and(ref.gmtCreate.le(query.getGmtCreateMax()));
@@ -491,25 +487,15 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
     }
 
     private String controlScopeId(RecordSpendControlMovementRequest request) {
-        return resolveControlScopeId(request.getControlScopeId(), request.getBudgetGroupSn());
+        return request.getControlScopeId();
     }
 
     private String controlScopeId(BudgetControlProjectionQuery query) {
-        return resolveControlScopeId(query.getControlScopeId(), query.getBudgetGroupSn());
+        return query.getControlScopeId();
     }
 
     private String controlScopeId(SpendControlMovementQuery query) {
-        return resolveControlScopeId(query.getControlScopeId(), query.getBudgetGroupSn());
-    }
-
-    private String resolveControlScopeId(String controlScopeId, String budgetGroupSn) {
-        if (StringUtils.hasText(controlScopeId) && StringUtils.hasText(budgetGroupSn)) {
-            AssertUtils.equals(controlScopeId, budgetGroupSn, "控制范围标识与预算组历史字段不一致");
-        }
-        if (StringUtils.hasText(controlScopeId)) {
-            return controlScopeId;
-        }
-        return budgetGroupSn;
+        return query.getControlScopeId();
     }
 
     private FundsSubjectType targetSubjectType(FundsAccountId accountId) {

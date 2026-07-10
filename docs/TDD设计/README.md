@@ -143,7 +143,7 @@ Spend Rule 服务层分层测试口径：
 
 Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`assignmentSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立工程变更边界。
 
-Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界为准。接入口径已同步为“上游决策、wallet 固化证据、transaction 消费快照”；轻量规则评估、控制窗口、外部决策证据、多规则最终裁决摘要、挂载范围语义、币种控制、本地授权时间窗口和滚动窗口次数均已有对应测试与契约锚点，并持续断言不得产生越界资金事实；它只证明只读候选评估和 H2 测试 schema 的目标索引基线，不证明并发强一致频控拦截或真实生产 DDL / 慢查询评审已完成。准入 / 授权公共请求优先使用 `controlScopeId` 表达控制范围，`budgetGroupSn` 仅作为兼容字段参与同值校验和历史映射。
+Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界为准。接入口径已同步为“上游决策、wallet 固化证据、transaction 消费快照”；轻量规则评估、控制窗口、外部决策证据、多规则最终裁决摘要、挂载范围语义、币种控制、本地授权时间窗口和滚动窗口次数均已有对应测试与契约锚点，并持续断言不得产生越界资金事实；它只证明只读候选评估和 H2 测试 schema 的目标索引基线，不证明并发强一致频控拦截或真实生产 DDL / 慢查询评审已完成。准入 / 授权公共请求、控制流水和投影统一使用 `controlScopeId` 表达控制范围。
 
 轻量规则评估最小测试卡：
 

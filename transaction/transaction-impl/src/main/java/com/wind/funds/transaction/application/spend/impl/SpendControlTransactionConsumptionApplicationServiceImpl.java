@@ -199,7 +199,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         return spendControlMovementService.getBudgetControlProjection(new BudgetControlProjectionQuery()
                 .setTenantId(request.getTenantId())
                 .setControlScopeId(controlScopeId)
-                .setBudgetGroupSn(controlScopeId)
                 .setPeriodId(request.getPeriodId())
                 .setCurrency(request.getCurrency())
                 .setSpendRuleId(request.getSpendRuleId())
@@ -526,8 +525,8 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 "关联控制额度变动 Spend Rule 版本不一致，movementSn = {}, originalMovementSn = {}",
                 linkedMovement.getMovementSn(),
                 originalMovement.getMovementSn());
-        AssertUtils.isTrue(Objects.equals(linkedMovement.getBudgetGroupSn(), originalMovement.getBudgetGroupSn()),
-                "关联控制额度变动预算组不一致，movementSn = {}, originalMovementSn = {}",
+        AssertUtils.isTrue(Objects.equals(linkedMovement.getControlScopeId(), originalMovement.getControlScopeId()),
+                "关联控制额度变动控制范围不一致，movementSn = {}, originalMovementSn = {}",
                 linkedMovement.getMovementSn(),
                 originalMovement.getMovementSn());
         AssertUtils.isTrue(Objects.equals(linkedMovement.getPeriodId(), originalMovement.getPeriodId()),
@@ -565,7 +564,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 .setSpendDecisionResult(originalMovement.getSpendDecisionResult())
                 .setSpendDecisionDigest(originalMovement.getSpendDecisionDigest())
                 .setControlScopeId(originalMovement.getControlScopeId())
-                .setBudgetGroupSn(originalMovement.getBudgetGroupSn())
                 .setPeriodId(originalMovement.getPeriodId())
                 .setMovementDigest(request.getMovementDigest())
                 .setDescription(request.getDescription())
@@ -589,7 +587,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                 .setSpendRuleId(request.getSpendRuleId())
                 .setSpendRuleVersion(request.getSpendRuleVersion())
                 .setControlScopeId(controlScopeId)
-                .setBudgetGroupSn(controlScopeId)
                 .setPeriodId(request.getPeriodId())
                 .setReasonCode(request.getReasonCode())
                 .setOperatorId(request.getOperatorId())

@@ -31,7 +31,7 @@
       ],
       "authCode": "AUTH_CODE_202605140001",
       "budgetControlScope": {
-        "budgetGroupSn": "bg_team_90001_usd",
+        "controlScopeId": "bg_team_90001_usd",
         "projectionSource": "SPEND_CONTROL_ACTIVITY"
       }
     }

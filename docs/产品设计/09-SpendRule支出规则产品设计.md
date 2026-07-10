@@ -148,10 +148,10 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | SpendRuleVersion | 不可变规则版本，描述规则规格 JSON、裁决动作和摘要。 | ruleId、ruleVersion、ruleSpec、ruleDigest；ruleSpec 可承载 display、matchSpec、counterSpec、limitSpec、decisionSpec、safetySpec。 | DRAFT、PUBLISHED、EXPIRED、RETIRED。 |
 | SpendRuleAssignment | 规则挂载，描述某一版本应用到哪个 scope、优先级、冲突策略和生效窗口。 | assignmentSn、ruleId、ruleVersion、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status。 | ACTIVE、SUSPENDED、EXPIRED、REMOVED。 |
 | SpendRuleDecisionRecord | 规则决策记录，描述一次请求的规则版本、挂载、范围、结果和原因。 | decisionSn、assignmentSn、ruleId、ruleVersion、scopeType、scopeId、instrumentSn、action、amount、currency、businessScene、businessSn、decisionResult、rejectReason、decisionDigest。 | RECORDED；记录不可改写，只能追加更正或新决策。 |
-| SpendControlMovement | 规则执行后的控制额度变动流水，例如额度调整、预留、消耗、释放或退款补偿。 | movementSn、movementType、targetSubjectRef、amount、currency、spendRuleId、spendRuleVersion、spendDecisionSn、controlScopeId / budgetGroupSn、periodId、movementDigest。 | 作为既有控制事实能力保留，不作为规则定义表。 |
-| BudgetControlProjection | 从控制额度变动流水派生的只读预算控制视图。 | controlScopeId / budgetGroupSn、periodId、reservedAmount、consumedAmount、releasedAmount、remainingControlAmount、availableControlAmount、lastMovementSn。 | 可重建、可重放、不可反写账本余额。 |
+| SpendControlMovement | 规则执行后的控制额度变动流水，例如额度调整、预留、消耗、释放或退款补偿。 | movementSn、movementType、targetSubjectRef、amount、currency、spendRuleId、spendRuleVersion、spendDecisionSn、controlScopeId、periodId、movementDigest。 | 作为既有控制事实能力保留，不作为规则定义表。 |
+| BudgetControlProjection | 从控制额度变动流水派生的只读预算控制视图。 | controlScopeId、periodId、reservedAmount、consumedAmount、releasedAmount、remainingControlAmount、availableControlAmount、lastMovementSn。 | 可重建、可重放、不可反写账本余额。 |
 
-命名和兼容口径：
+命名口径：
 
 1. 产品语义优先使用 `SpendRuleDecisionRecord` 和 `SpendControlMovement`。
 2. 当前代码、表结构和字段已使用 `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendControlMovement`、`RecordSpendControlMovementRequest`、`movementSn`、`movementType`、`movementDigest` 等最终命名。
@@ -160,7 +160,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 5. `remainingControlAmount` 在当前 DTO 中表达“未终局释放的控制占用”，后续如改名为 `occupiedControlAmount` 需单独评估兼容。
 6. `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`；其中 `consumedAmount` 为已消费减退款补偿后的净消耗。
 7. `SpendControlMovementType` 统一承载“是否参与预算控制投影、是否为调额类、是否为释放类、是否为决策记录兼容类型”的分类口径；服务实现不得再各自硬编码一套类型解释。
-8. `controlScopeId` 是预算控制范围的目标语义名，`ResolveSpendControlAdmissionRequest`、`AuthorizeByPaymentInstrumentRequest` 等公共接入口已支持该字段；`budgetGroupSn` 仅作为历史兼容名保留，两者同时出现时必须一致，落库仍映射到 `budget_group_sn`。
+8. `controlScopeId` 是预算控制范围的公共契约和落库字段，`ResolveSpendControlAdmissionRequest`、`AuthorizeByPaymentInstrumentRequest`、控制额度变动流水和预算控制投影统一使用该字段。
 9. `periodId` 是 Spend Rule 控制周期标识，例如 `2026-07`，用于当前周期和历史周期查询；它不是账本周期 bucket，不会生成预算组账本。
 
 命名口径：
@@ -405,7 +405,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 8. Highnote 页面中的 maximum amount variance on credit limit、maximum percent variance on credit limit、conditional rule、deposit amount、deposit count、deposit processing network 和 street address 等规则类型当前不进入 wallet evaluator：信用额度浮动类规则由授信 / 风控专项承接，conditional rule 不进入单条 evaluator，外部确认入金由 `transaction` 外部资金事件入口承接，街道地址原文不得进入资金底座，地址类控制只接收外部 AVS / 邮编校验结果事实。
 9. 若发现需要新增数据库字段、规则运营后台、外部风控协议、协同授权 webhook、rolling amount、cooldown、强一致频控拦截、生产 DDL / 索引校验、挂载容量硬约束或复杂多规则裁决，应停止当前最小 evaluator，拆成独立工程边界。
 
-当前能力：接入口径已同步为“上游决策、wallet 固化证据、transaction 消费快照”；轻量 evaluator 已落地单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果代码切片；控制窗口以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，证明跨周期、跨账户、跨控制范围不串账，且准入 / 授权公共契约已补齐 `controlScopeId` 目标字段并保留 `budgetGroupSn` 兼容映射；外部 approve / decline 决策证据准入已确认外部拒绝无资金事实副作用，外部通过仍不得绕过支付工具、账户能力和资金责任校验；多规则裁决当前只消费最终决策流水、结果、摘要和拒绝原因，不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段；挂载范围已支持 `ACCOUNT_HIERARCHY` 并明确 Highnote 对象只映射为控制 scope，不成为资金主体或账本主体；币种控制和本地授权时间窗口 evaluator 已明确时间由调用方按业务或规则时区归一化后传入；滚动窗口次数 evaluator 以请求授权时间锚定窗口，只读既有控制流水，不提供并发强一致频控拦截。后续仍不扩展规则引擎、时区换算、节假日、rolling amount、cooldown、生产调度、强一致频控拦截、webhook、外部风控协议、多规则明细落库、授权用户主数据或卡产品主数据。
+当前能力：接入口径已同步为“上游决策、wallet 固化证据、transaction 消费快照”；轻量 evaluator 已落地单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果代码切片；控制窗口以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，证明跨周期、跨账户、跨控制范围不串账，且准入 / 授权公共契约、控制流水和投影统一使用 `controlScopeId`；外部 approve / decline 决策证据准入已确认外部拒绝无资金事实副作用，外部通过仍不得绕过支付工具、账户能力和资金责任校验；多规则裁决当前只消费最终决策流水、结果、摘要和拒绝原因，不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段；挂载范围已支持 `ACCOUNT_HIERARCHY` 并明确 Highnote 对象只映射为控制 scope，不成为资金主体或账本主体；币种控制和本地授权时间窗口 evaluator 已明确时间由调用方按业务或规则时区归一化后传入；滚动窗口次数 evaluator 以请求授权时间锚定窗口，只读既有控制流水，不提供并发强一致频控拦截。后续仍不扩展规则引擎、时区换算、节假日、rolling amount、cooldown、生产调度、强一致频控拦截、webhook、外部风控协议、多规则明细落库、授权用户主数据或卡产品主数据。
 
 ## 13. 产品到架构和 TDD 交接
 

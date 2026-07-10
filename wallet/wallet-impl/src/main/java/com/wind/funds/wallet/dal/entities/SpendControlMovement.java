@@ -150,9 +150,9 @@ public class SpendControlMovement implements Serializable, TenantIsolationObject
     private String spendDecisionDigest;
 
     /**
-     * 预算控制范围标识，历史字段名为预算组号，不表达账务主体。
+     * 控制范围标识。
      */
-    private String budgetGroupSn;
+    private String controlScopeId;
 
     /**
      * 控制周期标识，用于周期额度当前查询和历史追溯。

@@ -264,7 +264,6 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(BUSINESS_SN + "_LIMIT")
                 .setControlScopeId(CONTROL_SCOPE_ID)
-                .setBudgetGroupSn(CONTROL_SCOPE_ID)
                 .setPeriodId(PERIOD_ID)
                 .setTargetAccountId(targetAccountId())
                 .setAmount(100L)
@@ -313,7 +312,6 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setSpendDecisionResult(evaluation.getDecisionResult())
                 .setSpendDecisionDigest(evaluation.getDecisionDigest())
                 .setControlScopeId(CONTROL_SCOPE_ID)
-                .setBudgetGroupSn(CONTROL_SCOPE_ID)
                 .setRejectReason(evaluation.getRejectReason());
     }
 
@@ -335,7 +333,6 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setSpendDecisionResult(admission.getSpendDecisionResult())
                 .setSpendDecisionDigest(admission.getSpendDecisionDigest())
                 .setControlScopeId(admission.getControlScopeId())
-                .setBudgetGroupSn(admission.getControlScopeId())
                 .setPeriodId(PERIOD_ID)
                 .setMovementDigest("sha256:wallet-spend-controls-reserved");
     }
@@ -361,7 +358,6 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         return new BudgetControlProjectionQuery()
                 .setTenantId(TENANT_ID)
                 .setControlScopeId(CONTROL_SCOPE_ID)
-                .setBudgetGroupSn(CONTROL_SCOPE_ID)
                 .setPeriodId(periodId)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)
