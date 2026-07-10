@@ -17,21 +17,21 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 预算控制范围。
+ * 支出控制范围。
  *
- * <p>BudgetGroup 是历史兼容名，目标语义为 Spend Rule 可引用的支出控制 scope，不是账务主体。</p>
+ * <p>目标语义为 Spend Rule 可引用的支出控制 scope，不是账务主体。</p>
  *
  * @author Codex
  * @date 2026-05-07
  */
 @Data
-@Table(BudgetGroup.TABLE_NAME)
-public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
+@Table(SpendControlScope.TABLE_NAME)
+public class SpendControlScope implements Serializable, TenantIsolationObject<Long> {
 
     @Serial
     private static final long serialVersionUID = 8450696281937455315L;
 
-    public static final String TABLE_NAME = "t_budget_group";
+    public static final String TABLE_NAME = "t_spend_control_scope";
 
     /**
      * 自增主键。
@@ -50,7 +50,7 @@ public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
     private LocalDateTime gmtModified;
 
     /**
-     * 预算控制范围标识，历史字段名为预算组流水号，不表达账务主体。
+     * 支出控制范围标识，不表达账务主体。
      */
     @NotNull
     private String sn;
@@ -62,22 +62,22 @@ public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
     private Long tenantId;
 
     /**
-     * 预算控制范围归属主体 ID。
+     * 支出控制范围归属主体 ID。
      */
     @NotNull
     private String ownerId;
 
     /**
-     * 预算控制范围归属主体类型。
+     * 支出控制范围归属主体类型。
      */
     @NotNull
     private FundsAccountOwnerType ownerType;
 
     /**
-     * 预算控制范围业务类型。
+     * 支出控制范围业务类型。
      */
     @NotNull
-    private String budgetType;
+    private String scopeType;
 
     /**
      * 控制币种。
@@ -103,13 +103,13 @@ public class BudgetGroup implements Serializable, TenantIsolationObject<Long> {
     private String periodPolicy;
 
     /**
-     * 预算控制范围状态。
+     * 支出控制范围状态。
      */
     @NotNull
     private FundsAccountStatus status;
 
     /**
-     * 预算控制范围说明。
+     * 支出控制范围说明。
      */
     private String description;
 

@@ -34,9 +34,9 @@
       }
     },
     "contextVariables": {
-      "payerId": "fa_merchant_20001_usd",
-      "payerLedgerSubjectCode": "CLEARING",
-      "accountId": "fa_user_10001_usd",
+      "refundPayerContextId": "fa_merchant_20001_usd",
+      "refundPayerLedgerContextCode": "CLEARING",
+      "refundAccountContextId": "fa_user_10001_usd",
       "refundReasonCode": "CUSTOMER_REQUEST"
     }
   },

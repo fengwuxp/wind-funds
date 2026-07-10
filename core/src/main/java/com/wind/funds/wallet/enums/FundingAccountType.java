@@ -47,7 +47,7 @@ public enum FundingAccountType implements DescriptiveEnum {
      */
     PREPAID_CARD(DefaultFundsAccountType.PREPAID_CARD, "预付卡账户");
 
-    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
 
     private static final Map<DefaultFundsAccountType, FundingAccountType> BY_DEFAULT_ACCOUNT_TYPE =
             Arrays.stream(values())
@@ -57,7 +57,7 @@ public enum FundingAccountType implements DescriptiveEnum {
     private static final Set<String> NON_FUNDING_ACCOUNT_TYPE_NAMES = Set.of(
             FundsSubjectType.FUNDING_ACCOUNT.name(),
             FundsSubjectType.CREDIT_ACCOUNT.name(),
-            LEGACY_BUDGET_GROUP_ACCOUNT_TYPE,
+            SPEND_CONTROL_SCOPE_ACCOUNT_TYPE,
             RouteNodeType.SUBJECT.name(),
             RouteNodeType.PAYMENT_INSTRUMENT.name(),
             RouteNodeType.PLATFORM_FUNDING_ACCOUNT.name(),

@@ -66,7 +66,7 @@
 | --- | --- |
 | 业务动作 | topup、transfer、pay、refund、withdraw、fee、authorize、authorization reversal、settle、settleRefund、freeze、unfreeze、adjust、benefit settle/refund、external confirmed credit。 |
 | 资金主体 | 回答“谁的钱”：成本承担方、资金流出方、资金流入方、授权主体或冻结主体。 |
-| 账户类型 | FundingAccount、CreditAccount、平台账户角色解析结果；BudgetGroup、Spend Rule、PaymentInstrument 只能是控制或引用。 |
+| 账户类型 | FundingAccount、CreditAccount、平台账户角色解析结果；SpendControlScope、Spend Rule、PaymentInstrument 只能是控制或引用。 |
 | 金额币种 | 回答“多少钱”：金额必须为正，币种和精度必须能和账户、账本 profile 对齐。 |
 | 幂等 | 业务流水、请求摘要、重复提交和同键不同摘要处理。 |
 | 来源引用 | 回答“怎么变的”：订单、提现单、授权单、外部事件、原交易 SN 或原冻结单 SN。 |
@@ -221,7 +221,7 @@ SC-LOOP-06 准出交接卡：
 4. 交易层入口
 5. `SpendControlTransactionConsumptionApplicationService` 记录消费、释放或退款补偿事实
 
-BudgetGroup 是控制范围，不是账本主体。接入侧使用 `controlScopeId + periodId` 查询额度，并在准入 / 授权请求中传入 `controlScopeId`。
+SpendControlScope 是控制范围，不是账本主体。接入侧使用 `controlScopeId + periodId` 查询额度，并在准入 / 授权请求中传入 `controlScopeId`。
 
 典型周期额度流程：
 
@@ -277,7 +277,7 @@ flowchart LR
 | --- | --- |
 | 业务方直接依赖 `ledger-impl`、`wallet-impl`、`transaction-impl`。 | 破坏模块边界，绕过公共契约。 |
 | 业务方直接写 ledger entry 或改余额投影。 | 破坏账本事实源。 |
-| 把支付工具、外部账户、VA、卡号、BudgetGroup、Spend Rule 当作 ledger subject。 | 它们只是引用或控制范围。 |
+| 把支付工具、外部账户、VA、卡号、SpendControlScope、Spend Rule 当作 ledger subject。 | 它们只是引用或控制范围。 |
 | 把冻结当消费、扣款或提现成功。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`。 |
 | 授权拒绝后继续生成 route、posting 或 ledger entry。 | 拒绝不是资金事实。 |
 | 用 `contextVariables` 承载核心金额、分摊、账户或规则事实。 | 核心事实必须是强字段或稳定引用。 |

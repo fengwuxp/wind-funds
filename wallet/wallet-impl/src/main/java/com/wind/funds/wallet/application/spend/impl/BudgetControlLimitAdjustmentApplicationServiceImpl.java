@@ -61,7 +61,7 @@ public class BudgetControlLimitAdjustmentApplicationServiceImpl
         AssertUtils.hasText(request.getMovementSn(), "预算控制额度调整变动流水号不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
-        AssertUtils.hasText(controlScopeId(request), "预算控制范围标识不能为空");
+        AssertUtils.hasText(controlScopeId(request), "支出控制范围标识不能为空");
         AssertUtils.hasText(request.getPeriodId(), "预算控制周期标识不能为空");
         AssertUtils.notNull(request.getTargetAccountId(), "预算控制额度目标账户不能为空");
         AssertUtils.notNull(request.getAmount(), "调整金额不能为空");

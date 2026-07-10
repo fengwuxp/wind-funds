@@ -15,7 +15,7 @@ import lombok.Getter;
 public enum SpendRuleScopeType implements DescriptiveEnum {
 
     PAYMENT_INSTRUMENT("支付工具"),
-    BUDGET_GROUP("预算组"),
+    SPEND_CONTROL_SCOPE("支出控制范围"),
     FUNDING_ACCOUNT("资金账户"),
     CREDIT_ACCOUNT("信用账户"),
     BUSINESS_SCENE("业务场景"),

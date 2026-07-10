@@ -1,8 +1,8 @@
 package com.wind.funds.wallet.mapstruct;
 
-import com.wind.funds.wallet.dal.entities.BudgetGroup;
-import com.wind.funds.wallet.model.dto.BudgetGroupDTO;
-import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
+import com.wind.funds.wallet.dal.entities.SpendControlScope;
+import com.wind.funds.wallet.model.dto.SpendControlScopeDTO;
+import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import org.mapstruct.AfterMapping;
@@ -12,40 +12,40 @@ import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 
 /**
- * BudgetGroup model converter.
+ * SpendControlScope model converter.
  *
  * @author Codex
  * @date 2026-05-08
  */
 @Mapper(unmappedTargetPolicy = ReportingPolicy.IGNORE)
-public interface BudgetGroupConverter {
+public interface SpendControlScopeConverter {
 
-    BudgetGroupConverter INSTANCE = Mappers.getMapper(BudgetGroupConverter.class);
+    SpendControlScopeConverter INSTANCE = Mappers.getMapper(SpendControlScopeConverter.class);
 
     /**
-     * CreateBudgetGroupRequest convert to BudgetGroup.
+     * CreateSpendControlScopeRequest convert to SpendControlScope.
      *
      * @param request 创建请求
-     * @return BudgetGroup 实例
+     * @return SpendControlScope 实例
      */
-    BudgetGroup convertToBudgetGroup(CreateBudgetGroupRequest request);
+    SpendControlScope convertToSpendControlScope(CreateSpendControlScopeRequest request);
 
     /**
-     * BudgetGroup convert to BudgetGroupDTO.
+     * SpendControlScope convert to SpendControlScopeDTO.
      *
-     * @param data BudgetGroup 实例
-     * @return BudgetGroupDTO 实例
+     * @param data SpendControlScope 实例
+     * @return SpendControlScopeDTO 实例
      */
-    BudgetGroupDTO convertToBudgetGroupDTO(BudgetGroup data);
+    SpendControlScopeDTO convertToSpendControlScopeDTO(SpendControlScope data);
 
     /**
      * Fill create defaults after same-name field mapping.
      *
      * @param request 创建请求
-     * @param entity 预算组实体
+     * @param entity 支出控制范围实体
      */
     @AfterMapping
-    default void fillCreateDefaults(CreateBudgetGroupRequest request, @MappingTarget BudgetGroup entity) {
+    default void fillCreateDefaults(CreateSpendControlScopeRequest request, @MappingTarget SpendControlScope entity) {
         AccountBalancePeriodType periodType = request.getPeriodType() == null
                 ? AccountBalancePeriodType.LIFETIME : request.getPeriodType();
         entity.setPeriodType(periodType);

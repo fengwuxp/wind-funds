@@ -33,7 +33,7 @@
       }
     },
     "contextVariables": {
-      "accountId": "fa_user_10001_usd",
+      "freezeAccountContextId": "fa_user_10001_usd",
       "freezeOrderSn": "FO_202605140001"
     }
   },

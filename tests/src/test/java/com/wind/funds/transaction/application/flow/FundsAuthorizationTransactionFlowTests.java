@@ -473,22 +473,22 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     }
 
     /**
-     * 场景：预算组被误作为授权交易账户。
-     * 输入：提交预算组授权批准 10。
-     * 输出：授权请求被拒绝；预算组控制账本和平台结算账户余额保持请求前状态。
-     * 预期：预算组只能作为预算控制上下文，不得被授权交易包装成资金价值主体。
-     * 红线：预算组不得生成授权 route、posting、ledger entry 或余额投影。
+     * 场景：支出控制范围被误作为授权交易账户。
+     * 输入：提交支出控制范围授权批准 10。
+     * 输出：授权请求被拒绝；支出控制范围控制账本和平台结算账户余额保持请求前状态。
+     * 预期：支出控制范围只能作为预算控制上下文，不得被授权交易包装成资金价值主体。
+     * 红线：支出控制范围不得生成授权 route、posting、ledger entry 或余额投影。
      */
     @Test
-    void testAuthorizeBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
-        FundsAccountId budget = budgetGroup("auth_budget_group");
-        ensureBudgetGroupWithoutLedgers(budget);
+    void testAuthorizeSpendControlScopeShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId budget = spendControlScope("auth_spend_control_scope");
+        ensureSpendControlScopeWithoutLedgers(budget);
 
         BalanceSnapshot beforeAuthorize = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
         LedgerFactSnapshot beforeAuthorizeFacts = ledgerFactSnapshot();
 
-        assertThatThrownBy(() -> authorize(budget, 10L, true, "AUTH_BUDGET_GROUP_AUTHORIZE"))
-                .hasMessageContaining("授权交易账户不能是预算组");
+        assertThatThrownBy(() -> authorize(budget, 10L, true, "AUTH_SPEND_CONTROL_SCOPE_AUTHORIZE"))
+                .hasMessageContaining("授权交易账户不能是支出控制范围");
 
         BalanceSnapshot afterRejectedAuthorize = snapshot(balances(budget, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(beforeAuthorize, afterRejectedAuthorize,
@@ -504,7 +504,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY);
 
         assertPostedTransactions(0);
-        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_BUDGET_GROUP_AUTHORIZE");
+        assertNoFundsOrLedgerFactsForBusinessSn("AUTH_SPEND_CONTROL_SCOPE_AUTHORIZE");
     }
 
     /**

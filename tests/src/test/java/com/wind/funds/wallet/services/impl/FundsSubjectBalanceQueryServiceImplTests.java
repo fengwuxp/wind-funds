@@ -5,9 +5,9 @@ import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.request.CreateLedgerRequest;
 import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
-import com.wind.funds.wallet.dal.entities.BudgetGroup;
+import com.wind.funds.wallet.dal.entities.SpendControlScope;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
-import com.wind.funds.wallet.dal.mapper.BudgetGroupMapper;
+import com.wind.funds.wallet.dal.mapper.SpendControlScopeMapper;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
@@ -53,7 +53,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest {
 
-    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
 
     private static final String UNINITIALIZED_ACCOUNT_SN = "fbal_query_uninit";
 
@@ -79,7 +79,7 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
     private FundingAccountMapper fundingAccountMapper;
 
     @Autowired
-    private BudgetGroupMapper budgetGroupMapper;
+    private SpendControlScopeMapper spendControlScopeMapper;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -362,20 +362,20 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
     }
 
     /**
-     * 场景：历史预算组记录仍存在，但目标态余额查询只接受核心资金账务主体。
-     * 输入：t_budget_group 有预算组元数据，subjectRefs 传入 BUDGET_GROUP。
+     * 场景：历史支出控制范围记录仍存在，但目标态余额查询只接受核心资金账务主体。
+     * 输入：t_spend_control_scope 有支出控制范围元数据，subjectRefs 传入 SPEND_CONTROL_SCOPE。
      * 输出：余额查询按资金主体不存在拒绝，不返回 initialized=false 的余额视图。
-     * 红线：预算组是控制范围，不得通过余额查询继续冒充 ledger 余额主体。
+     * 红线：支出控制范围是控制范围，不得通过余额查询继续冒充 ledger 余额主体。
      */
     @Test
-    void testQueryCurrentBalancesShouldRejectBudgetGroupSubjectEvenWhenBudgetGroupExists() {
-        insertBudgetGroupWithoutLedgers();
+    void testQueryCurrentBalancesShouldRejectSpendControlScopeSubjectEvenWhenSpendControlScopeExists() {
+        insertSpendControlScopeWithoutLedgers();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> balanceQueryService.queryCurrentBalances(new FundsSubjectBalanceQuery()
                 .setTenantId(TENANT_ID)
                 .setSubjectRefs(List.of(FundsAccountId.immutable(UNINITIALIZED_ACCOUNT_SN,
-                        LEGACY_BUDGET_GROUP_ACCOUNT_TYPE)))
+                        SPEND_CONTROL_SCOPE_ACCOUNT_TYPE)))
                 .setCurrency(CURRENCY)))
                 .hasMessageContaining("资金主体不存在");
 
@@ -400,7 +400,7 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)",
                 UNINITIALIZED_ACCOUNT_SN,
                 SECOND_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_budget_group WHERE sn = ?", UNINITIALIZED_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_control_scope WHERE sn = ?", UNINITIALIZED_ACCOUNT_SN);
     }
 
     private FundsSubjectBalanceQuery balanceQuery() {
@@ -438,20 +438,20 @@ class FundsSubjectBalanceQueryServiceImplTests extends AbstractFundsServiceTest 
         createLifetimeLedger(accountSn, LedgerSubjectCode.FROZEN);
     }
 
-    private void insertBudgetGroupWithoutLedgers() {
-        BudgetGroup budgetGroup = new BudgetGroup();
-        budgetGroup.setSn(UNINITIALIZED_ACCOUNT_SN);
-        budgetGroup.setTenantId(TENANT_ID);
-        budgetGroup.setOwnerId(OWNER_ID);
-        budgetGroup.setOwnerType(FundsAccountOwnerType.USER);
-        budgetGroup.setBudgetType(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE);
-        budgetGroup.setCurrency(CurrencyIsoCode.USD);
-        budgetGroup.setPeriodType(AccountBalancePeriodType.LIFETIME);
-        budgetGroup.setPeriodId(AccountBalancePeriodType.LIFETIME.name());
-        budgetGroup.setStatus(FundsAccountStatus.ACTIVE);
-        budgetGroup.setDescription("budget group must not be a balance subject");
-        budgetGroup.setVersion(0);
-        budgetGroupMapper.insertSelective(budgetGroup);
+    private void insertSpendControlScopeWithoutLedgers() {
+        SpendControlScope spendControlScope = new SpendControlScope();
+        spendControlScope.setSn(UNINITIALIZED_ACCOUNT_SN);
+        spendControlScope.setTenantId(TENANT_ID);
+        spendControlScope.setOwnerId(OWNER_ID);
+        spendControlScope.setOwnerType(FundsAccountOwnerType.USER);
+        spendControlScope.setScopeType(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE);
+        spendControlScope.setCurrency(CurrencyIsoCode.USD);
+        spendControlScope.setPeriodType(AccountBalancePeriodType.LIFETIME);
+        spendControlScope.setPeriodId(AccountBalancePeriodType.LIFETIME.name());
+        spendControlScope.setStatus(FundsAccountStatus.ACTIVE);
+        spendControlScope.setDescription("budget group must not be a balance subject");
+        spendControlScope.setVersion(0);
+        spendControlScopeMapper.insertSelective(spendControlScope);
     }
 
     private void createLifetimeLedger(String accountSn, LedgerSubjectCode ledgerSubjectCode) {

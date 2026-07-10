@@ -179,8 +179,8 @@ flowchart TB
 | 产品能力 | 产品侧必须给出的交付材料 | 不应混入 |
 | --- | --- | --- |
 | 直接交易、授权交易、余额控制、交易投影 | 对应 `AC-*`、`RED-*`、资金动作、使用者解释、失败原因、退款/撤销/过期/冻结边界和未覆盖范围。 | 清结算、对账、生产治理模块、VCC/全球账户/收单特殊规则。 |
-| 钱包、账本、账目和余额投影 | 核心资金账务主体、账目 bucket、账本周期、余额桶、可用/冻结/结算锁定展示口径和余额不可直接修改红线。 | 把支付工具、外部账户、业务订单、预算组、Spend Rule 或报表当内部账本主体。 |
-| 支付工具和账户层级 | 支付工具能力、绑定快照、资金责任解析关系、卡到资金子账户或信用子账户的绑定规则、父账户约束和敏感数据边界。 | 因 VCC prepaid/shared 卡产品形态自动创建 `VCC_ACCOUNT`、卡号账户、预算组账本或支付工具余额。 |
+| 钱包、账本、账目和余额投影 | 核心资金账务主体、账目 bucket、账本周期、余额桶、可用/冻结/结算锁定展示口径和余额不可直接修改红线。 | 把支付工具、外部账户、业务订单、支出控制范围、Spend Rule 或报表当内部账本主体。 |
+| 支付工具和账户层级 | 支付工具能力、绑定快照、资金责任解析关系、卡到资金子账户或信用子账户的绑定规则、父账户约束和敏感数据边界。 | 因 VCC prepaid/shared 卡产品形态自动创建 `VCC_ACCOUNT`、卡号账户、支出控制范围账本或支付工具余额。 |
 | 清结算与对账 | 对账批次、差错单、清分、清算、结算、出款、追偿、运营补事实白名单、审批审计、外部规则确认、批次视图重放和 `CLS-GATE-*`。 | 交易主链路特殊规则；未确认外部规则前不得声明生产可出款。 |
 | 资金数据治理 | 02 承接 checkpoint、watermark、余额快照和交易投影重放；03 承接批次视图重放和差异报告；05 承接 `GOV-GATE-*`、指标只读边界和大数据消费边界。 | 用指标快照替代账本余额确认，或让治理任务反写资金事实；04 不再新增独立能力内容。 |
 | VCC、全球账户、ACH、收单 | 业务状态映射、外部引用、规则待确认、敏感数据边界、资金事实映射、P0/P1 回归和不新增平行内核承诺。 | 平行钱包、平行账本、平行清结算、平行对账、平行归档或外部协议全集。 |
@@ -191,12 +191,12 @@ flowchart TB
 
 | 对齐主题 | PRD 口径 | DSL 口径 | 系分口径 | TDD 口径 |
 | --- | --- | --- | --- | --- |
-| 可入账主体 | 默认由资金账户、信用账户和平台角色解析后的平台资金账户承接资金或额度责任；VCC 发卡专项通过资金子账户或信用子账户承接卡账户余额、授权占用、清算、退款、拒付和费用。 | `SubjectRef` / 可入账 `FundsSubjectType` 只承载 `FUNDING_ACCOUNT`、`CREDIT_ACCOUNT` 和平台角色解析后的资金账户；VCC 关联子账户使用资金账户或信用账户类型，不新增 `VCC_ACCOUNT`。 | route participant、posting plan、ledger entry 和余额投影不得直接落到预算组、Spend Rule、支付工具、卡号、PAN、token 或外部账户。 | 红线测试必须覆盖预算组、Spend Rule、支付工具、卡号、外部账户、业务单据和 `VCC_ACCOUNT` 直接入账失败且无账务副作用，并覆盖卡绑定子账户、父子账户约束、账目 profile 和资金责任来源。 |
+| 可入账主体 | 默认由资金账户、信用账户和平台角色解析后的平台资金账户承接资金或额度责任；VCC 发卡专项通过资金子账户或信用子账户承接卡账户余额、授权占用、清算、退款、拒付和费用。 | `SubjectRef` / 可入账 `FundsSubjectType` 只承载 `FUNDING_ACCOUNT`、`CREDIT_ACCOUNT` 和平台角色解析后的资金账户；VCC 关联子账户使用资金账户或信用账户类型，不新增 `VCC_ACCOUNT`。 | route participant、posting plan、ledger entry 和余额投影不得直接落到支出控制范围、Spend Rule、支付工具、卡号、PAN、token 或外部账户。 | 红线测试必须覆盖支出控制范围、Spend Rule、支付工具、卡号、外部账户、业务单据和 `VCC_ACCOUNT` 直接入账失败且无账务副作用，并覆盖卡绑定子账户、父子账户约束、账目 profile 和资金责任来源。 |
 | 支付工具 | VCC、VA、外部电子钱包端点、银行卡和外部账户只暴露工具能力和外部引用；内部余额钱包、信用额度、返利钱包和商户钱包不归入支付工具。 | 外部工具使用 `PaymentInstrumentRef`、`ExternalAccountRef`、binding snapshot 和 route snapshot；内部入口解析为 `SubjectRef`、权益资金事实、历史摘要或资金责任决策。 | `PaymentInstrumentService` 管工具和绑定，route resolver 只消费快照并解析最终责任主体。 | 覆盖工具换绑、原路径回放、敏感信息脱敏、工具不得拥有余额或 ledger entry，以及内部入口不得被误建成 `PaymentInstrument`。 |
-| 预算控制范围和 Spend Rule | 预算控制范围（BudgetGroup）表达预算 scope、owner、展示和审计；Spend Rule 统一表达预算额度、MCC、商户、频控和时间窗口等授权前规则，专项产品口径见 [09-SpendRule支出规则产品设计.md](09-SpendRule支出规则产品设计.md)。 | 使用 BudgetGroup 上下文、Spend Rule 快照、规则决策日志和预算控制投影，不新增账本余额桶。 | `BudgetGroupService` 和 Spend Rule 控制视图只管理控制证据；资金责任解析关系解析到资金账户、信用账户、VCC 关联子账户或平台账户角色。 | 覆盖预算控制范围创建不初始化 ledger、规则拒绝不生成 route/entry、预算控制占用/释放只更新控制证据。 |
-| 资金责任解析关系 | 产品上回答“本次支出最终由哪个内部资金或额度主体承担”，可由工具、卡绑定子账户、主账户、使用主体、预算组、Spend Rule 等上下文参与筛选。 | DSL 保留 `FundingAllocationDecision` 表达最终责任主体、账目、优先级、选择原因和规则版本；兼容名称“资金来源关系”不得扩展为预算资金池。 | `SpendSubjectFundingRelationService` 可保留现有命名，但输出必须是资金账户、信用账户、VCC 关联子账户或平台账户角色解析后的平台资金账户；预算组和 Spend Rule 只作为控制上下文。 | 覆盖缺失、不唯一、错币种、默认关系冲突、预算组或 Spend Rule 被当作资金来源时失败且无账务副作用。 |
-| 交易投影 | 交易投影是统一只读读模型，不归属于支付工具子模块。 | 投影只消费资金事实、route snapshot、ledger entry、工具快照和控制日志，不生成新事实。 | 查询服务可按工具、资金账户、信用账户、预算组和 Spend Rule 建索引，但不得反写交易、账本或余额。 | 覆盖多维查询、投影重放只读、预算/规则视图不生成资金交易记录。 |
-| 资金责任目标字段 | 生产可用性验收前必须在 `funding-account-only` 和 `targetSubjectType + targetSubjectId` 中二选一；前者只声明解析到资金账户，后者可声明信用账户、平台角色责任主体和 VCC 关联资金/信用子账户。 | DSL fixture、Spec 或公共字段变更前必须先选策略；目标主体迁移必须同步摘要、route snapshot 和回放断言，不新增 `VCC_ACCOUNT`。 | 若迁移目标字段，DTO、DDL/H2、Entity、Mapper、service 和审计必须同步。 | TDD 必须覆盖字段策略、缺失/不唯一/错币种/预算组或 Spend Rule 被当最终主体失败；不得在 `fundingAccountId` 仍是唯一字段时声明信用账户、平台角色或 VCC 关联子账户生产可用。 |
+| 支出控制范围和 Spend Rule | 支出控制范围（SpendControlScope）表达预算 scope、owner、展示和审计；Spend Rule 统一表达预算额度、MCC、商户、频控和时间窗口等授权前规则，专项产品口径见 [09-SpendRule支出规则产品设计.md](09-SpendRule支出规则产品设计.md)。 | 使用 SpendControlScope 上下文、Spend Rule 快照、规则决策日志和预算控制投影，不新增账本余额桶。 | `SpendControlScopeService` 和 Spend Rule 控制视图只管理控制证据；资金责任解析关系解析到资金账户、信用账户、VCC 关联子账户或平台账户角色。 | 覆盖支出控制范围创建不初始化 ledger、规则拒绝不生成 route/entry、预算控制占用/释放只更新控制证据。 |
+| 资金责任解析关系 | 产品上回答“本次支出最终由哪个内部资金或额度主体承担”，可由工具、卡绑定子账户、主账户、使用主体、支出控制范围、Spend Rule 等上下文参与筛选。 | DSL 保留 `FundingAllocationDecision` 表达最终责任主体、账目、优先级、选择原因和规则版本；兼容名称“资金来源关系”不得扩展为预算资金池。 | `SpendSubjectFundingRelationService` 可保留现有命名，但输出必须是资金账户、信用账户、VCC 关联子账户或平台账户角色解析后的平台资金账户；支出控制范围和 Spend Rule 只作为控制上下文。 | 覆盖缺失、不唯一、错币种、默认关系冲突、支出控制范围或 Spend Rule 被当作资金来源时失败且无账务副作用。 |
+| 交易投影 | 交易投影是统一只读读模型，不归属于支付工具子模块。 | 投影只消费资金事实、route snapshot、ledger entry、工具快照和控制日志，不生成新事实。 | 查询服务可按工具、资金账户、信用账户、支出控制范围和 Spend Rule 建索引，但不得反写交易、账本或余额。 | 覆盖多维查询、投影重放只读、预算/规则视图不生成资金交易记录。 |
+| 资金责任目标字段 | 生产可用性验收前必须在 `funding-account-only` 和 `targetSubjectType + targetSubjectId` 中二选一；前者只声明解析到资金账户，后者可声明信用账户、平台角色责任主体和 VCC 关联资金/信用子账户。 | DSL fixture、Spec 或公共字段变更前必须先选策略；目标主体迁移必须同步摘要、route snapshot 和回放断言，不新增 `VCC_ACCOUNT`。 | 若迁移目标字段，DTO、DDL/H2、Entity、Mapper、service 和审计必须同步。 | TDD 必须覆盖字段策略、缺失/不唯一/错币种/支出控制范围或 Spend Rule 被当最终主体失败；不得在 `fundingAccountId` 仍是唯一字段时声明信用账户、平台角色或 VCC 关联子账户生产可用。 |
 | 交易投影输入 | 交易投影只读消费交易事实、冻结单、route snapshot、支付工具快照、资金责任决策、Spend Rule 决策/活动、账本摘要、授权拒绝事实、清结算和对账差错。 | `TransactionView` 不生成 `ResolvedRoute`、`PostingPlan`、`LedgerEntry` 或余额事实。 | 系分 02 的交易投影输入矩阵是系统承接入口；B6/B8 只允许只读投影和有范围重放。 | 覆盖多维查询、拒绝事实解释、重放只读和不反写 route/posting/entry/balance；不得把交易投影通过写成生产交付完成。 |
 | 进入实现 | 产品定性只证明语义和验收边界成立。 | DSL caseId 必须能落到稳定字段、不变量和失败边界。 | 系分必须给出服务、状态、表、事务、幂等、审计和安全边界。 | 编码前必须明确工程任务、目标 Red、断言事实和验证命令。 |
 

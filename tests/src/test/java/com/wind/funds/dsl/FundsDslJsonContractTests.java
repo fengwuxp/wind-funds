@@ -1027,12 +1027,12 @@ class FundsDslJsonContractTests {
     }
 
     /**
-     * 场景：JSON 样例把预算组写成账本 route leg 节点主体类型。
+     * 场景：JSON 样例把支出控制范围写成账本 route leg 节点主体类型。
      * 预期：JSON 契约校验显式失败。
-     * 红线：预算组只能作为控制范围和控制投影视图，不能成为账本 route node。
+     * 红线：支出控制范围只能作为控制范围和控制投影视图，不能成为账本 route node。
      */
     @Test
-    void testJsonContractVerifierShouldRejectBudgetGroupRouteLegNode() {
+    void testJsonContractVerifierShouldRejectSpendControlScopeRouteLegNode() {
         JSONObject document = JSON.parseObject("""
                 {
                   "caseId": "DSL-INVALID-BUDGET-GROUP-ROUTE-NODE-001",
@@ -1048,13 +1048,13 @@ class FundsDslJsonContractTests {
                       "legType": "HOLD",
                       "sourceNode": {
                         "nodeRole": "SOURCE",
-                        "subjectType": "BUDGET_GROUP",
+                        "subjectType": "SPEND_CONTROL_SCOPE",
                         "subjectId": "bg_invalid_route_node",
                         "ledgerSubjectCode": "AVAILABLE"
                       },
                       "targetNode": {
                         "nodeRole": "TARGET",
-                        "subjectType": "BUDGET_GROUP",
+                        "subjectType": "SPEND_CONTROL_SCOPE",
                         "subjectId": "bg_invalid_route_node",
                         "ledgerSubjectCode": "AUTHORIZATION"
                       },
@@ -1074,12 +1074,12 @@ class FundsDslJsonContractTests {
     }
 
     /**
-     * 场景：VCC route participant 把预算组声明为主体类型。
+     * 场景：VCC route participant 把支出控制范围声明为主体类型。
      * 预期：JSON 契约校验显式失败。
-     * 红线：预算组只能作为支出控制范围，不能成为 route participant 资金主体。
+     * 红线：支出控制范围只能作为支出控制范围，不能成为 route participant 资金主体。
      */
     @Test
-    void testJsonContractVerifierShouldRejectBudgetGroupRouteParticipantSubjectType() {
+    void testJsonContractVerifierShouldRejectSpendControlScopeRouteParticipantSubjectType() {
         JSONObject document = JSON.parseObject("""
                 {
                   "caseId": "DSL-INVALID-VCC-ROUTE-BUDGET-PARTICIPANT-001",
@@ -1094,7 +1094,7 @@ class FundsDslJsonContractTests {
                     "participants": [{
                       "participantRole": "BUDGET_CONTROLLER",
                       "subjectRef": {
-                        "subjectType": "BUDGET_GROUP"
+                        "subjectType": "SPEND_CONTROL_SCOPE"
                       }
                     }]
                   }
@@ -1217,12 +1217,12 @@ class FundsDslJsonContractTests {
     }
 
     /**
-     * 场景：JSON 样例把预算组写成账户层级中的实际账户。
+     * 场景：JSON 样例把支出控制范围写成账户层级中的实际账户。
      * 预期：JSON 契约校验显式失败。
-     * 红线：预算组是控制范围，不是资金或信用账户，不能进入账户层级作为落账主体。
+     * 红线：支出控制范围是控制范围，不是资金或信用账户，不能进入账户层级作为落账主体。
      */
     @Test
-    void testJsonContractVerifierShouldRejectBudgetGroupAsHierarchyAccountRef() {
+    void testJsonContractVerifierShouldRejectSpendControlScopeAsHierarchyAccountRef() {
         JSONObject document = JSON.parseObject("""
                 {
                   "caseId": "DSL-INVALID-VCC-BUDGET-HIERARCHY-001",
@@ -1244,10 +1244,10 @@ class FundsDslJsonContractTests {
                         "ledgerSubjectCode": "AUTHORIZATION",
                         "amount": { "currency": "USD", "amount": 100 },
                         "priority": 10,
-                        "reason": "INVALID_BUDGET_GROUP_HIERARCHY_ACCOUNT",
+                        "reason": "INVALID_SPEND_CONTROL_SCOPE_HIERARCHY_ACCOUNT",
                         "accountHierarchySnapshot": {
                           "accountRef": {
-                            "subjectType": "BUDGET_GROUP",
+                            "subjectType": "SPEND_CONTROL_SCOPE",
                             "subjectId": "bg_vcc_001"
                           }
                         }

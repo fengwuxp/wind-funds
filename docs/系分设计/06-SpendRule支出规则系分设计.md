@@ -48,7 +48,7 @@
 
 1. 不实现完整规则引擎、规则表达式执行器、运营后台、审批流、事件消费、outbox 或生产迁移。
 2. 不改变直接交易、授权交易、余额控制的账户主体 canonical 入参。
-3. 不让 Spend Rule、预算组、支付工具、卡号、外部账户或业务订单成为账本主体。
+3. 不让 Spend Rule、支出控制范围、支付工具、卡号、外部账户或业务订单成为账本主体。
 
 系统边界：Spend Rule 系统能力落在 wallet application 和 wallet impl 的规则事实、控制事实与只读查询边界；transaction 只消费已固化证据，ledger 只接受资金账户或信用账户等可入账主体。
 
@@ -62,7 +62,7 @@
 | --- | --- | --- | --- | --- |
 | REQ-SR-001 | 规则定义、不可变版本和规则挂载。 | 产品设计 3.4、5、6、8。 | 已确认 | 不能进入规则准入或交易投影解释。 |
 | REQ-SR-002 | 授权前或资金动作前规则决策、拒绝原因和审计证据。 | 产品设计 3.4、6、7、11。 | 已确认 | 默认 fail-fast，不进入交易内核。 |
-| REQ-SR-003 | 控制额度变动流水和预算控制只读投影。 | 产品设计 5、6、11。 | 已确认 | 不得用预算组账本或账本余额临时代替。 |
+| REQ-SR-003 | 控制额度变动流水和预算控制只读投影。 | 产品设计 5、6、11。 | 已确认 | 不得用支出控制范围账本或账本余额临时代替。 |
 | REQ-SR-004 | 历史交易投影只读解释规则证据。 | 产品设计 8.2、9、13。 | 已确认 | 解释不完整时只标记缺证据或转人工，不重算历史。 |
 | QA-SR-001 | 拒绝无资金事实副作用、历史解释不重算、敏感字段不外泄。 | 产品设计 10、11、12。 | 已确认 | 作为编码和测试红线。 |
 | Q-SR-001 | 完整规则引擎、多规则明细、生产迁移、运营后台和外部规则适用性。 | 产品设计 14。 | 待确认 | 只能进入 未完成交付或后续单一工程边界。 |
@@ -78,13 +78,13 @@
 
 1. wallet 服务层能以分层契约管理规则事实、决策事实和控制事实；不是所有对外服务都命名或实现为 application service。
 2. transaction 只读消费已固化 `spendRuleDecision` 和控制额度变动引用，不计算规则。
-3. ledger 对 Spend Rule、预算组、支付工具和控制 scope 保持不可入账主体护栏。
+3. ledger 对 Spend Rule、支出控制范围、支付工具和控制 scope 保持不可入账主体护栏。
 4. 规则拒绝、摘要冲突、挂载非法、证据缺失等失败路径无 route、posting、LedgerEntry、ledger transaction 或余额投影副作用。
 
 非目标：
 
 1. 不实现完整规则表达式解析器、规则执行器、冲突合成器、运营后台、审批流、事件消费、outbox 或生产迁移。
-2. 不改变交易 canonical 入参，不新增支付工具交易内核，不让 Spend Rule 或预算组成为账本主体。
+2. 不改变交易 canonical 入参，不新增支付工具交易内核，不让 Spend Rule 或支出控制范围成为账本主体。
 3. 不替代外部风控、法务、合规、税务、会计、银行、ACH、卡组织或跨境规则专业确认。
 
 ## 3. 概要设计、核心方案和设计结论
@@ -109,7 +109,7 @@
 | REQ-SR-002 | 决策记录和拒绝原因。 | RecordSpendRuleDecisionRecordRequest、决策记录表、准入组合。 | 决策记录不可改写，同流水同摘要幂等，同流水不同摘要拒绝。 | SpendControlAdmissionApplicationServiceTests、AuthorizationAdmissionApplicationServiceTests。 |
 | REQ-SR-003 | 控制额度变动和预算控制投影。 | `SpendControlMovementService`、`SpendControlTransactionConsumptionApplicationService`、BudgetControlProjectionDTO。 | 控制额度变动流水不写账本，预算控制投影按 `controlScopeId + periodId` 可重建。 | SpendControlMovementServiceFlowTests、BudgetControlLimitAdjustmentApplicationServiceTests、SpendControlTransactionConsumptionApplicationServiceTests。 |
 | REQ-SR-004 | 历史交易投影解释。 | TransactionProjectionExplanationSource 和已固化 `spendRuleDecision` 快照。 | 只读解释历史版本、挂载、决策和控制引用，不执行规则 DSL。 | FundsTransactionProjectionExplainApplicationServiceTests。 |
-| QA-SR-001 | 金融红线和敏感信息安全。 | ledger posting 主体护栏、allow-list payload、脱敏摘要、边界测试。 | Spend Rule、预算组、支付工具和控制 scope 不得入账；不输出 ruleSpec、script 或敏感原文。 | LayerBoundaryTests、投影解释测试、pmd / diff 检查。 |
+| QA-SR-001 | 金融红线和敏感信息安全。 | ledger posting 主体护栏、allow-list payload、脱敏摘要、边界测试。 | Spend Rule、支出控制范围、支付工具和控制 scope 不得入账；不输出 ruleSpec、script 或敏感原文。 | LayerBoundaryTests、投影解释测试、pmd / diff 检查。 |
 
 ### 3.3 方案取舍
 
@@ -117,7 +117,7 @@
 | --- | --- | --- | --- |
 | Spend Rule 放在 wallet 支出控制域，transaction 只读消费固化证据。 | 规则、准入、控制视图和支付工具能力在同一产品门面；交易内核保持账户主体 canonical 入参。 | wallet 需要清晰 application facade，避免调用方自行拼资源服务。 | 采用。 |
 | Spend Rule 下沉到 transaction 交易内核。 | 交易上下文能直接拿到规则计算结果。 | 会让交易内核依赖 wallet 规则事实、规则引擎和预算控制表，破坏 canonical 入参和模块边界。 | 放弃。 |
-| Spend Rule 或预算组作为 ledger subject。 | 可直接用账本余额表达预算。 | 会把控制视图伪装成资金事实，破坏账务可信度、清结算和对账。 | 明确禁止。 |
+| Spend Rule 或支出控制范围作为 ledger subject。 | 可直接用账本余额表达预算。 | 会把控制视图伪装成资金事实，破坏账务可信度、清结算和对账。 | 明确禁止。 |
 | 当前切片引入完整规则引擎和 `wind-script`。 | 可执行复杂规则。 | 需要沙箱、安全、版本、回放、幂等、灰度和生产迁移，超出当前服务层闭环。 | 作为后续独立工程边界候选。 |
 
 核心方案：
@@ -127,13 +127,13 @@
 3. 控制额度变动流水和预算控制投影继续作为控制事实和只读视图，不进入 ledger posting。
 4. 交易投影解释只读取历史规则版本、挂载、决策流水和控制额度变动引用。
 
-关键依赖：支付工具预交易快照、资金责任解析、账户能力来源、账户主体型交易内核、ledger posting 主体护栏、预算组非建账和交易投影解释。
+关键依赖：支付工具预交易快照、资金责任解析、账户能力来源、账户主体型交易内核、ledger posting 主体护栏、支出控制范围非建账和交易投影解释。
 
 | 主题 | 系统结论 | 禁止方向 |
 | --- | --- | --- |
 | 模块归属 | Spend Rule 属于 wallet application 支出控制能力，交易内核只消费已固化的规则证据和控制事实。 | 在 transaction 内新增支付工具或 Spend Rule 专用交易内核。 |
 | 事实分层 | 规则定义、版本、挂载、决策记录是规则事实；控制额度变动流水是金额控制过程事实；预算控制投影是只读视图。 | 用 SpendControlMovement / SpendControlMovement 反向替代规则定义，或用预算投影替代账本余额。 |
-| 账务边界 | Spend Rule、预算组、支付工具、卡号、PAN、token 和外部账户都不能成为 route leg、posting 或 LedgerEntry 主体。 | ledger posting 接受 BUDGET_GROUP、SPEND_RULE、PAYMENT_INSTRUMENT 或 cardRef。 |
+| 账务边界 | Spend Rule、支出控制范围、支付工具、卡号、PAN、token 和外部账户都不能成为 route leg、posting 或 LedgerEntry 主体。 | ledger posting 接受 SPEND_CONTROL_SCOPE、SPEND_RULE、PAYMENT_INSTRUMENT 或 cardRef。 |
 | 准入边界 | 规则拒绝必须停在交易内核前，只能写决策记录；不写控制额度变动流水。 | 拒绝后生成 route、posting、LedgerEntry、资金交易扣款、余额投影或 chargeback。 |
 | 历史解释 | 交易投影只能读取历史规则版本、挂载、决策流水和控制额度变动引用。 | 按当前规则定义、当前挂载或当前工具绑定重算历史交易。 |
 
@@ -145,7 +145,7 @@
 | wallet-face | 暴露 Spend Rule application 契约、Request、Query、DTO。 | 暴露 Entity、Mapper、内部实现类或 HTTP/RPC 控制器。 |
 | wallet-impl | 实现规则定义、版本发布、规则挂载、决策记录、控制额度变动流水和预算控制投影。 | 写资金交易事实、route、posting、LedgerEntry、ledger transaction 或账本余额投影。 |
 | transaction-face / transaction-impl | 在授权、付款、退款和投影解释中读取已固化规则证据。 | 计算 Spend Rule、管理规则定义、更新规则挂载或把规则作为 canonical 入参主体。 |
-| ledger-face / ledger-impl | 只接受资金账户、信用账户或平台角色解析后的资金账户作为账本主体。 | 为 Spend Rule 或预算组建账、过账或投影余额。 |
+| ledger-face / ledger-impl | 只接受资金账户、信用账户或平台角色解析后的资金账户作为账本主体。 | 为 Spend Rule 或支出控制范围建账、过账或投影余额。 |
 | reconciliation / governance | 校验规则证据、交易事实、控制额度变动流水和外部证据的引用一致性。 | 用对账或治理任务重算规则并反写交易或账本事实。 |
 | tests | 承载服务层流程、H2 schema、边界测试、失败无副作用和只读投影断言。 | 用内存版业务实现冒充生产闭环。 |
 
@@ -158,7 +158,7 @@ Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费
 | `wallet/wallet-face` | 暴露 Spend Rule 定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制投影契约。 | 直接写交易事实、账本分录或余额投影。 |
 | `wallet/wallet-impl` | 持久化规则事实和控制事实，提供支付工具、账户能力、资金责任和准入证据。 | 依赖 transaction-face/impl，或直接写交易表、route、posting、LedgerEntry。 |
 | `transaction-face / transaction-impl` | 读取 `spendRuleDecision`、route snapshot、控制额度变动引用等已固化证据用于历史解释；`transaction-impl` 可通过 `wallet-face` 契约实现交易后控制消费、释放或退款补偿适配；支付工具授权 facade 可在进入交易内核前调用 wallet-face 准入契约固化决策证据。 | 依赖 `wallet-impl`、wallet DAL / Mapper、规则定义 / 挂载 / 决策记录 Entity，查询预算控制投影模型，或在交易内核内执行 Spend Rule。 |
-| `ledger` | 校验可入账主体并过账资金账户、信用账户或平台资金账户。 | 为 Spend Rule、预算组、支付工具或控制 scope 建账、过账或投影余额。 |
+| `ledger` | 校验可入账主体并过账资金账户、信用账户或平台资金账户。 | 为 Spend Rule、支出控制范围、支付工具或控制 scope 建账、过账或投影余额。 |
 | `core` | 承载必要枚举和 DSL 值对象。 | 引入 DAL、Spring Bean、规则执行器或具体服务实现。 |
 
 工程守卫：
@@ -268,7 +268,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 2. 所有表均由应用层维护逻辑关联，不使用数据库外键或级联删除。
 3. 新增、改名、删除公共字段或迁移物理表必须另起单一工程边界，并补 DDL/H2、兼容发布、回滚和历史数据校验。
 4. 金额字段统一使用最小货币单位；币种字段使用 ISO 货币码；预算控制金额不代表账本余额。
-5. `tenant_id` 当前代码类型为 `bigint(20)` / Long；本文不把资金账户、信用账户、预算组或支付工具既有 sn 统一改名为 code。
+5. `tenant_id` 当前代码类型为 `bigint(20)` / Long；本文不把资金账户、信用账户、支出控制范围或支付工具既有 sn 统一改名为 code。
 
 ### 6.1 规则定义表
 
@@ -397,7 +397,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 
 挂载边界：
 
-1. scopeType 可以是支付工具、预算组、资金账户、信用账户、账户层级、使用主体或业务场景。
+1. scopeType 可以是支付工具、支出控制范围、资金账户、信用账户、账户层级、使用主体或业务场景。
 2. scopeType 只是控制范围，不输出资金责任主体。
 3. 挂载关系不能生成 route、posting、LedgerEntry 或 ledger bucket。
 4. 挂载生效窗口当前代码为必填，生产迁移不得把 null 解释为永久有效。
@@ -460,7 +460,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 
 业务用途：记录额度调增、调减、预留、消耗、释放、过期、撤销和退款补偿等控制额度变动事实。
 
-数据归属：租户级控制事实，目标主体只允许资金账户或信用账户；预算组只作为控制 scope 或展示归属。
+数据归属：租户级控制事实，目标主体只允许资金账户或信用账户；支出控制范围只作为控制 scope 或展示归属。
 
 关键字段：
 
@@ -523,7 +523,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 5. 调减预算控制额度时，新的 `limitAmount` 不得低于 `consumedAmount + remainingControlAmount`。
 6. 查询当前周期额度时使用 `controlScopeId + periodId`；历史周期同理，只替换 `periodId`。
 7. `controlScopeId` 是公共契约、控制流水和投影的统一控制范围标识，落库字段为 `control_scope_id`。
-8. `period_id` 只表达 Spend Rule 控制周期，不创建预算组账本，也不复用 ledger bucket 作为控制事实。
+8. `period_id` 只表达 Spend Rule 控制周期，不创建支出控制范围账本，也不复用 ledger bucket 作为控制事实。
 9. 若未来将 `remainingControlAmount` 改名为 `occupiedControlAmount`，必须单独评估公共 DTO、表字段、测试和调用方兼容。
 10. `SpendControlMovementService#recordMovement` 不接受新的 `ADMISSION_RECORDED` 或 `REJECTED_RECORDED` 写入；历史兼容类型只用于存量解释、查询或迁移前审计。
 11. `SpendControlMovementType` 是控制额度变动的工程分类契约，必须由枚举自身表达 `budgetProjectionMovement`、`limitAdjustmentMovement`、`releaseMovement` 和 `decisionRecordType`；application 实现只能消费这些分类方法，不得在实现类中重复硬编码类型集合。
@@ -743,7 +743,7 @@ Runbook 最低要求：
 | SpendControlTransactionConsumptionApplicationServiceTests | 交易结果消费、失败释放、退款补偿和目标账户隔离不反写资金事实。 |
 | SpendControlMovementTypeContractTests | 枚举分类契约：决策记录兼容类型不参与预算投影，控制额度变动类型统一解释为 SpendControlMovement。 |
 | FundsTransactionProjectionExplainApplicationServiceTests / AuthorizationAdmissionApplicationServiceTests | 历史规则决策快照可被投影只读解释，不输出 ruleSpec 或敏感原文。 |
-| LayerBoundaryTests | wallet 不写交易事实，ledger 不接受 Spend Rule 或预算组主体。 |
+| LayerBoundaryTests | wallet 不写交易事实，ledger 不接受 Spend Rule 或支出控制范围主体。 |
 
 测试类型：
 
@@ -789,7 +789,7 @@ git diff --check
 当前已形成的初始服务层基线：
 
 1. 规则定义、版本发布、规则挂载、挂载查询、挂载解释、决策记录、决策记录只读查询和决策事实解释已有最小 application service、DTO、Entity、Mapper、H2 schema 和目标服务流测试。
-2. 已证明已发布版本不可变、挂载必须携带冲突策略和有效期、支付工具和预算组只作为控制 scope、规则拒绝不生成资金交易或账本副作用。
+2. 已证明已发布版本不可变、挂载必须携带冲突策略和有效期、支付工具和支出控制范围只作为控制 scope、规则拒绝不生成资金交易或账本副作用。
 3. 支出控制准入已消费上层决策证据并通过 `recordDecision` 固化当前单条决策记录，授权准入可以透传 Spend Rule 决策证据。
 4. 控制额度变动流水、预算额度调额、交易成功消耗、失败释放、退款补偿和预算控制投影已有服务层证据，且不反写资金交易或账本事实。
 5. `SpendControlMovementType` 已承载兼容期语义分类，当前服务实现消费枚举分类方法，避免各实现重复硬编码类型集合。

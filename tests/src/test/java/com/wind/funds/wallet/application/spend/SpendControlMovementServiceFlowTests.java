@@ -70,7 +70,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
-    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
 
     private static final String CREDIT_ACCOUNT_SN = "sca_credit_account";
 
@@ -100,9 +100,9 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     private static final String SPEND_DECISION_DIGEST = "sha256:spend-control-activity";
 
-    private static final String BUDGET_GROUP_SN = "budget_spend_control_movement";
+    private static final String SPEND_CONTROL_SCOPE_SN = "budget_spend_control_movement";
 
-    private static final String SECOND_BUDGET_GROUP_SN = "budget_spend_control_movement_second";
+    private static final String SECOND_SPEND_CONTROL_SCOPE_SN = "budget_spend_control_movement_second";
 
     private static final String PERIOD_ID = "2026-07";
 
@@ -257,7 +257,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：预算控制投影从控制额度变动派生。
-     * 输入：同一预算组下先记录占用，再记录释放。
+     * 输入：同一支出控制范围下先记录占用，再记录释放。
      * 输出：投影展示控制占用、释放和剩余控制金额。
      * 红线：投影不是账本余额，不得创建 ledger balance、route 或交易事实。
      */
@@ -274,7 +274,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setControlScopeId(BUDGET_GROUP_SN)
+                        .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
@@ -290,10 +290,10 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：同一预算控制范围和 Spend Rule 下存在多个目标账户控制额度变动。
+     * 场景：同一支出控制范围和 Spend Rule 下存在多个目标账户控制额度变动。
      * 输入：两个信用账户分别记录控制占用。
      * 输出：传入目标账户查询投影时，只返回该账户的控制占用。
-     * 红线：预算组级投影可以汇总，但账户级投影不得把其他账户或其他卡的控制占用混入。
+     * 红线：支出控制范围级投影可以汇总，但账户级投影不得把其他账户或其他卡的控制占用混入。
      */
     @Test
     void testBudgetControlProjectionShouldFilterByTargetAccountWithoutMixingAccounts() {
@@ -312,7 +312,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setControlScopeId(BUDGET_GROUP_SN)
+                        .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
@@ -354,16 +354,16 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setAmount(80L));
         spendControlMovementService.recordMovement(limitIncreaseRequest("limit_second_scope_july", PERIOD_ID, 500L,
                 "sha256:limit-second-scope-july")
-                .setControlScopeId(SECOND_BUDGET_GROUP_SN));
+                .setControlScopeId(SECOND_SPEND_CONTROL_SCOPE_SN));
         spendControlMovementService.recordMovement(recordRequest(decision, "activity_reserved_second_scope_july",
                 SpendControlMovementType.RESERVED, "sha256:activity-reserved-second-scope-july")
-                .setControlScopeId(SECOND_BUDGET_GROUP_SN)
+                .setControlScopeId(SECOND_SPEND_CONTROL_SCOPE_SN)
                 .setAmount(200L));
 
         BudgetControlProjectionDTO historicalProjection = spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setControlScopeId(BUDGET_GROUP_SN)
+                        .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
@@ -371,7 +371,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         BudgetControlProjectionDTO currentProjection = spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setControlScopeId(BUDGET_GROUP_SN)
+                        .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                         .setPeriodId(NEXT_PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
@@ -379,13 +379,13 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         BudgetControlProjectionDTO secondScopeProjection = spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setControlScopeId(SECOND_BUDGET_GROUP_SN)
+                        .setControlScopeId(SECOND_SPEND_CONTROL_SCOPE_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
                                 FundsSubjectType.CREDIT_ACCOUNT)));
 
-        assertThat(historicalProjection.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(historicalProjection.getControlScopeId()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
         assertThat(historicalProjection.getPeriodId()).isEqualTo(PERIOD_ID);
         assertThat(historicalProjection.getLimitAmount()).isEqualTo(100L);
         assertThat(historicalProjection.getReservedAmount()).isEqualTo(60L);
@@ -397,7 +397,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(currentProjection.getReservedAmount()).isEqualTo(80L);
         assertThat(currentProjection.getAvailableControlAmount()).isEqualTo(220L);
         assertThat(currentProjection.getLastMovementSn()).isEqualTo("activity_reserved_august");
-        assertThat(secondScopeProjection.getControlScopeId()).isEqualTo(SECOND_BUDGET_GROUP_SN);
+        assertThat(secondScopeProjection.getControlScopeId()).isEqualTo(SECOND_SPEND_CONTROL_SCOPE_SN);
         assertThat(secondScopeProjection.getLimitAmount()).isEqualTo(500L);
         assertThat(secondScopeProjection.getReservedAmount()).isEqualTo(200L);
         assertThat(secondScopeProjection.getAvailableControlAmount()).isEqualTo(300L);
@@ -406,7 +406,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：同一预算控制范围和 Spend Rule 下其他账户仍有可释放占用。
+     * 场景：同一支出控制范围和 Spend Rule 下其他账户仍有可释放占用。
      * 输入：主账户已释放完毕，第二个信用账户仍有 RESERVED 控制占用，再尝试释放主账户。
      * 输出：主账户释放请求被拒绝，不借用其他账户的剩余额度。
      * 红线：释放类变动的写入上限必须按目标资金账户或信用账户隔离，不得跨账户释放控制占用。
@@ -434,7 +434,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(activityCount(SECOND_RELEASED_ACTIVITY_SN)).isZero();
         BudgetControlProjectionDTO primaryProjection = spendControlMovementService.getBudgetControlProjection(new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setControlScopeId(BUDGET_GROUP_SN)
+                        .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
@@ -444,7 +444,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(primaryProjection.getRemainingControlAmount()).isZero();
         BudgetControlProjectionDTO secondProjection = spendControlMovementService.getBudgetControlProjection(new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setControlScopeId(BUDGET_GROUP_SN)
+                        .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
@@ -458,9 +458,9 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：查询控制额度变动时传入非资金账户或信用账户主体。
-     * 输入：预算组类型的目标主体。
+     * 输入：支出控制范围类型的目标主体。
      * 输出：直接拒绝查询条件。
-     * 红线：预算组不能被误当成控制额度变动的资金目标主体。
+     * 红线：支出控制范围不能被误当成控制额度变动的资金目标主体。
      */
     @Test
     void testQueryMovementsShouldRejectUnsupportedTargetSubjectType() {
@@ -470,8 +470,8 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> spendControlMovementService.queryMovements(
                 new SpendControlMovementQuery()
                         .setTenantId(TENANT_ID)
-                        .setTargetAccountId(FundsAccountId.immutable(BUDGET_GROUP_SN,
-                                LEGACY_BUDGET_GROUP_ACCOUNT_TYPE))))
+                        .setTargetAccountId(FundsAccountId.immutable(SPEND_CONTROL_SCOPE_SN,
+                                SPEND_CONTROL_SCOPE_ACCOUNT_TYPE))))
                 .hasMessageContaining("控制额度变动目标只能是资金账户或信用账户");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -479,9 +479,9 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：查询预算控制投影时传入非资金账户或信用账户主体。
-     * 输入：预算组类型的目标主体。
+     * 输入：支出控制范围类型的目标主体。
      * 输出：直接拒绝查询条件。
-     * 红线：账户级预算控制投影只能按资金账户或信用账户过滤，不能把预算组重新打开成目标主体。
+     * 红线：账户级预算控制投影只能按资金账户或信用账户过滤，不能把支出控制范围重新打开成目标主体。
      */
     @Test
     void testBudgetControlProjectionShouldRejectUnsupportedTargetSubjectType() {
@@ -491,11 +491,11 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> spendControlMovementService.getBudgetControlProjection(
                 new BudgetControlProjectionQuery()
                         .setTenantId(TENANT_ID)
-                        .setControlScopeId(BUDGET_GROUP_SN)
+                        .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                         .setPeriodId(PERIOD_ID)
                         .setCurrency(CurrencyIsoCode.USD)
-                        .setTargetAccountId(FundsAccountId.immutable(BUDGET_GROUP_SN,
-                                LEGACY_BUDGET_GROUP_ACCOUNT_TYPE))))
+                        .setTargetAccountId(FundsAccountId.immutable(SPEND_CONTROL_SCOPE_SN,
+                                SPEND_CONTROL_SCOPE_ACCOUNT_TYPE))))
                 .hasMessageContaining("控制额度变动目标只能是资金账户或信用账户");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -546,7 +546,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setSpendDecisionSn(SPEND_DECISION_SN)
                 .setSpendDecisionResult(decisionResult)
                 .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
-                .setControlScopeId(BUDGET_GROUP_SN)
+                .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                 .setRejectReason(rejectReason);
     }
 
@@ -591,7 +591,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setControlScopeId(BUDGET_GROUP_SN)
+                .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                 .setPeriodId(periodId)
                 .setReasonCode("PERIOD_LIMIT_REFRESH")
                 .setOperatorId("period-limit-scheduler")

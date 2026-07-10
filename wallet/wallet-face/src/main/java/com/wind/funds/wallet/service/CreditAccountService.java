@@ -44,7 +44,7 @@ public interface CreditAccountService {
     /**
      * 根据信用账户号查询。
      *
-     * <p>能力范围：按 FundsAccountId 查询信用账户，不查询真实资金账户或预算组。</p>
+     * <p>能力范围：按 FundsAccountId 查询信用账户，不查询真实资金账户或支出控制范围。</p>
      *
      * @param accountId 信用账户标识
      * @return 信用账户
@@ -54,7 +54,7 @@ public interface CreditAccountService {
     /**
      * 按租户和账户号查询信用账户。
      *
-     * <p>能力范围：用于内部服务解析已知 CreditAccount 主体；不查询资金账户和预算组，不触发额度重算。</p>
+     * <p>能力范围：用于内部服务解析已知 CreditAccount 主体；不查询资金账户和支出控制范围，不触发额度重算。</p>
      *
      * @param tenantId 租户 ID
      * @param accountSn 信用账户号

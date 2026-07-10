@@ -116,7 +116,7 @@ flowchart TD
 
 | 优先级 | 能力域 | 产品验收对象 | DSL 承载 | 系分落点 | TDD 证据 | 阻断信号 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P0 | 钱包账户和支付工具 | 资金账户、信用账户、VCC 关联资金/信用子账户、预算组、Spend Rule、平台资金账户角色解析、支付工具状态、绑定和资金责任解析。 | `SubjectRef`、`PaymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、Spend Rule 快照。 | 02 分册钱包账户、支付工具、账户层级、资金责任解析关系、支出控制对象和 route 准入。 | `TDD-WALLET-*`、`TDD-ROUTE-006`、`TDD-ROUTE-011` 至 `TDD-ROUTE-013`。 | 支付工具、外部账户、卡号、PAN、token、VA、预算组、Spend Rule 或 `VCC_ACCOUNT` 被设计成 ledger subject，或工具换绑导致历史回放漂移。 |
+| P0 | 钱包账户和支付工具 | 资金账户、信用账户、VCC 关联资金/信用子账户、支出控制范围、Spend Rule、平台资金账户角色解析、支付工具状态、绑定和资金责任解析。 | `SubjectRef`、`PaymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、Spend Rule 快照。 | 02 分册钱包账户、支付工具、账户层级、资金责任解析关系、支出控制对象和 route 准入。 | `TDD-WALLET-*`、`TDD-ROUTE-006`、`TDD-ROUTE-011` 至 `TDD-ROUTE-013`。 | 支付工具、外部账户、卡号、PAN、token、VA、支出控制范围、Spend Rule 或 `VCC_ACCOUNT` 被设计成 ledger subject，或工具换绑导致历史回放漂移。 |
 | P0 | 账本账目和余额投影 | posting plan 平衡、ledger entry、账本周期、余额投影和余额日志。 | `PostingPlan`、`LedgerEntry`、`periodType`、`BalanceProjection`。 | 02 分册账务计划、账本写入、余额投影。 | `TDD-LEDGER-*`、`TDD-VIEW-*`、`TDD-RACE-*`。 | 余额从投影或日志修复，周期语义混用，posting 不平衡仍写账。 |
 | P0 | 清结算与对账 | 清分、清算、结算、出款前准入、外部非终态、出款解释状态、对账差错、调账核销和追偿闭环。 | `SettlementPolicySpec`、`DSL-SETTLEMENT-*`、出款准入、出款结果、差错和调账引用。 | 03 分册可清分明细、批次、候选、结算单、出款单、对账批次、差错单和出款处理台。 | `TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-SETTLE-004`、`TDD-SETTLE-005`、`TDD-RECON-*`、`TDD-OPS-*`。 | 清分候选直接入账、缺前置对账仍清算、出款准入未知仍放行、外部受理展示为成功、差错直接改历史分录。 |
 | P0 | 资金数据治理与大数据消费边界 | Manifest、checkpoint、watermark、余额快照、指标项承接、异常流程、人工处理、大数据消费和只读边界。 | `archiveManifest`、`BalanceSnapshotVerifyRef`、治理读取或导出快照引用、指标项输入引用。 | 02 承接余额快照和交易投影重放，03 承接批次视图重放，05 承接治理门禁和指标边界；04 仅作拆分索引。 | `TDD-GOV-*`、`TDD-ARCH-*`、`TDD-METRIC-*`。 | 无范围重放、先推水位后计算、缺差异报告或人工处理闭环、普通指标快照替代账本余额快照，或大数据消费绕过治理读取和脱敏审计。 |
@@ -136,7 +136,7 @@ flowchart TD
 | 06 VCC | `VCC-AC-001`、`VCC-AC-002` | 授权批准只表达卡绑定资金/信用子账户授权占用，授权拒绝无账务副作用。 | 授权交易 DSL、`SubjectRef(FUNDING_ACCOUNT)` / `SubjectRef(CREDIT_ACCOUNT)`、支付工具引用、子账户/父账户快照和 route snapshot；02 系分授权状态机和 VCC 工具边界。 | `TDD-P2-VCC-001`、`TDD-RAIL-001`、`TDD-AUTH-*`。 | 必须先证明卡、token、PAN/CVC 不作为账本主体，VCC 发卡账务只能落到资金子账户或信用子账户，且拒绝不生成 route、posting 或 ledger entry。 |
 | 06 VCC | `VCC-AC-003` 至 `VCC-AC-006` | 撤销、clearing、退款和 chargeback 都基于原授权或原 route 回放。 | `SETTLE`、`AUTH_REFUND`、原路径 replay、争议证据引用；02/03 系分授权回放和对账差错。 | `TDD-P2-VCC-002`、`TDD-P2-VCC-003`、`TDD-RECON-*`。 | clearing、forced post、chargeback 和证据时限未专业确认前，只能作为待确认设计或 contract-only 验证。 |
 | 06 VCC | `VCC-AC-007` | prepaid virtual card 只作为支付工具，预付余额必须落到该卡绑定的资金子账户，预付资金来源必须解析为内部责任来源。 | `PaymentInstrumentRef`、`SubjectRef(FUNDING_ACCOUNT)`、子账户/父账户快照、预付资金来源引用、`FundingAllocationDecision`、财务确认引用；02 系分支付工具、账户层级和资金责任解析关系。 | `TDD-P2-VCC-004`、`TDD-RAIL-001A`、`TDD-WALLET-010`、`TDD-WALLET-015`、`TDD-WALLET-017`、`TDD-WALLET-020`。 | 预付资金模式、合同、财务或合规口径未确认前，不得声明生产入账能力；不得因 prepaid 名称绕过子账户 profile、父账户、资金来源确认或创建卡号账本。 |
-| 06 VCC | `VCC-AC-008`、`VCC-AC-009` | shared card 是使用和绑定模式，授权必须固化使用人、信用子账户、父账户、预算、Spend Rule 和资金责任快照。 | `PaymentInstrumentRef`、`SubjectRef(CREDIT_ACCOUNT)`、binding snapshot、子账户/父账户快照、预算组、Spend Rule、资金责任解析关系、规则版本；02 系分共享卡绑定和授权回放。 | `TDD-P2-VCC-005`、`TDD-P2-VCC-012`、`TDD-AUTH-008`、`TDD-AUTH-009`、`TDD-ROUTE-013`、`TDD-WALLET-016`、`TDD-WALLET-017`、`TDD-WALLET-020`。 | 共享卡、卡号、卡组、预算组、Spend Rule、持卡人或部门不得成为账本主体；后续事件不得按当前绑定重新解释；每张卡绑定一个信用子账户，多卡共享通过同一主账户约束表达。 |
+| 06 VCC | `VCC-AC-008`、`VCC-AC-009` | shared card 是使用和绑定模式，授权必须固化使用人、信用子账户、父账户、预算、Spend Rule 和资金责任快照。 | `PaymentInstrumentRef`、`SubjectRef(CREDIT_ACCOUNT)`、binding snapshot、子账户/父账户快照、支出控制范围、Spend Rule、资金责任解析关系、规则版本；02 系分共享卡绑定和授权回放。 | `TDD-P2-VCC-005`、`TDD-P2-VCC-012`、`TDD-AUTH-008`、`TDD-AUTH-009`、`TDD-ROUTE-013`、`TDD-WALLET-016`、`TDD-WALLET-017`、`TDD-WALLET-020`。 | 共享卡、卡号、卡组、支出控制范围、Spend Rule、持卡人或部门不得成为账本主体；后续事件不得按当前绑定重新解释；每张卡绑定一个信用子账户，多卡共享通过同一主账户约束表达。 |
 | 06 VCC | `VCC-RED-001` | 完整 PAN/CVC 不得进入资金底座。 | 支付工具脱敏快照、审计引用和敏感导出边界；05 系分安全红线。 | `TDD-P2-VCC-RED-001`、`TDD-OPS-003`、`TDD-OPS-006`。 | 任何日志、投影、导出或测试夹具出现完整 PAN/CVC 都必须阻断。 |
 | 07 全球账户 | `GA-AC-001`、`GA-AC-002` | 银行流水或 VA 匹配后才入账；外部 accepted 保持在途。 | 外部账户引用、入金资金动作、`IN_TRANSIT` 展示状态；02/03 系分入金、对账和在途处理。 | `TDD-P2-GA-001`、`TDD-RAIL-008`。 | 银行协议、VA 字段和到账口径未确认前，不得把外部受理展示为到账成功。 |
 | 07 全球账户 | `GA-AC-003` 至 `GA-AC-005` | 出款前置检查、回单终态确认和退汇回补分层处理。 | 出款前准入、外部回单、退汇事实、费用引用；03 系分出款和对账差错。 | `TDD-P2-GA-002`、`TDD-RAIL-009`、`TDD-SETTLE-*`。 | 法域、合作银行、跨境材料和资金归属未确认前，只能阻断、降级、转人工或保留在途。 |
@@ -222,16 +222,16 @@ flowchart TD
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
 | --- | --- | --- | --- | --- |
 | AC-PI-001 | 支付工具引用快照 | 付款、授权、提现、入金或退款使用卡、VA、外部账户、虚拟卡或通道 token。 | route snapshot 保存支付工具引用、外部账户引用和脱敏展示信息。 | 支付工具和外部账户只做引用，不作为 LedgerEntry 主体；完整卡号、CVV、密钥或 token secret 不得入快照、日志或导出。 |
-| AC-PI-002 | 支付工具绑定解析 | 工具绑定到付款主体、收款主体、资金子账户、信用子账户、父账户、预算组、Spend Rule 或真实资金账户。 | 路由解析出最终核心资金账务主体，并固化预算组和 Spend Rule 控制快照。 | 绑定关系只提供候选；最终 route leg 必须落到资金账户（含平台角色解析后的平台资金账户和 VCC 资金子账户）或信用账户（含 VCC 信用子账户），预算组和 Spend Rule 只能作为支出控制上下文。 |
+| AC-PI-002 | 支付工具绑定解析 | 工具绑定到付款主体、收款主体、资金子账户、信用子账户、父账户、支出控制范围、Spend Rule 或真实资金账户。 | 路由解析出最终核心资金账务主体，并固化支出控制范围和 Spend Rule 控制快照。 | 绑定关系只提供候选；最终 route leg 必须落到资金账户（含平台角色解析后的平台资金账户和 VCC 资金子账户）或信用账户（含 VCC 信用子账户），支出控制范围和 Spend Rule 只能作为支出控制上下文。 |
 | AC-PI-003 | 工具资金流向、状态和动作能力校验 | 工具资金流向为收款、付款或双向，状态为未验证、暂停、解绑、过期或可用，动作能力为 RECEIVE、PAY、AUTHORIZE、REFUND 或 WITHDRAW。 | 不符合当前动作时失败或授权拒绝。 | 失败不得生成 route、posting plan 或 LedgerEntry；原因和审计可查询。 |
-| AC-PI-004 | 资金责任决策 | 同一支付工具可关联资金子账户、信用子账户、主账户、真实资金账户、信用账户、预算组、Spend Rule 或兜底资金责任主体。 | routing decision 保存子账户、父账户、资金责任主体、优先级、命中规则、控制快照和原因。 | 多责任主体命中必须有确定优先级；预算组和 Spend Rule 只参与是否允许和如何解释，不得被随机选为入账主体。 |
+| AC-PI-004 | 资金责任决策 | 同一支付工具可关联资金子账户、信用子账户、主账户、真实资金账户、信用账户、支出控制范围、Spend Rule 或兜底资金责任主体。 | routing decision 保存子账户、父账户、资金责任主体、优先级、命中规则、控制快照和原因。 | 多责任主体命中必须有确定优先级；支出控制范围和 Spend Rule 只参与是否允许和如何解释，不得被随机选为入账主体。 |
 | AC-PI-005 | 工具换绑后的原路退款 | 原交易后支付工具绑定关系或默认资金责任关系发生变化。 | 退款、撤销、退费或拒付按原 route snapshot 和原工具快照解释。 | 不按当前绑定重新选路；累计金额和原路径仍可核对。 |
 | AC-PI-006 | 支付工具动作和账户能力匹配 | 工具缺少当前动作能力，或工具解析出的内部资金账户缺少收款、付款或提现能力。 | 工具能力失败时直接拒绝或失败；工具能力通过但账户能力不足时路由失败或进入人工处理。 | 支付工具能力只做工具准入；账户无对应能力时不得继续入账，不能用工具能力绕过账户能力。 |
 | AC-PI-007 | 绑定历史和审计留痕 | 工具绑定、默认标识、优先级、方向、状态或资金责任解析关系发生变更。 | 系统保留当前有效绑定、历史变更记录、前后值、操作者、原因、时间和版本。 | 当前态用于新交易候选；历史审计用于争议、对账、回放和客服证明；不得用覆盖更新抹掉历史证据。 |
-| AC-PI-008 | 钱包入口作为支付方式引用 | 前台选择内部余额钱包、平台钱包、商户钱包、返利钱包、VCC 卡、第三方钱包端点或通道 token 作为支付方式。 | 内部钱包入口解析为 `SubjectRef`、`BenefitSnapshot` 或资金责任决策；VCC 卡解析到 `PaymentInstrumentRef` + 卡绑定资金/信用子账户；第三方钱包端点和通道 token 可进入工具快照；posting 和 LedgerEntry 主体必须是解析后的资金账户（含平台角色解析后的平台资金账户和 VCC 资金子账户）或信用账户（含 VCC 信用子账户）。 | 钱包入口不等于钱包账户域，也不等于 `FundingAccount` 或 `PaymentInstrument`；缺解析结果时失败，不得用钱包标识、工具号、预算组、Spend Rule、PAN 或 token 入账。 |
-| AC-PI-009 | `FundingAccount` 语义不泛化 | 信用账户、预算组、Spend Rule、支付工具或平台账户角色进入路由、授权、余额查询或清结算。 | 信用账户保持独立资金账务主体；预算组和 Spend Rule 保持独立支出控制对象；平台账户角色先解析到平台资金账户；支付工具只做引用。 | `FundingAccount` 只表示真实资金账户或平台责任资金账户；不得把信用额度、预算控制、支出规则或支付工具塞进 `FundingAccount` 统一处理。 |
-| AC-PI-010 | 授权支付工具应用入口 | VCC、共享卡、VA、外部钱包端点、通道 token 或卡 token 发起授权，调用方只持有工具引用和业务上下文；内部钱包或信用额度入口先按业务入口解析。 | 应用层完成工具状态、绑定版本、使用主体、预算组、Spend Rule、资金责任和账户能力校验；批准后委派账户主体型授权内核，拒绝时只返回拒绝事实和原因。 | 支付工具入口不等于账本主体；不得要求外部调用方绕过钱包 / 路由直接选择内部账户，也不得让工具准入失败生成 route、posting 或 LedgerEntry。 |
-| AC-PI-011 | 共享卡和多卡主账户共享账单归因 | 每张共享卡绑定一个信用子账户，多张共享卡通过同一主信用账户或主资金账户共享额度/资金约束。 | 单卡余额、ledger entry 和余额投影落到各自信用子账户；主账户用于额度/资金约束和汇总展示；卡维度账单通过交易投影按 `PaymentInstrumentRef`、绑定版本、子账户、使用主体、预算组、Spend Rule 和资金责任快照过滤生成。 | 多张共享卡不得绑定同一子账户；不得创建卡号余额投影主体；逆向事件不按当前绑定重算历史卡归因。 |
+| AC-PI-008 | 钱包入口作为支付方式引用 | 前台选择内部余额钱包、平台钱包、商户钱包、返利钱包、VCC 卡、第三方钱包端点或通道 token 作为支付方式。 | 内部钱包入口解析为 `SubjectRef`、`BenefitSnapshot` 或资金责任决策；VCC 卡解析到 `PaymentInstrumentRef` + 卡绑定资金/信用子账户；第三方钱包端点和通道 token 可进入工具快照；posting 和 LedgerEntry 主体必须是解析后的资金账户（含平台角色解析后的平台资金账户和 VCC 资金子账户）或信用账户（含 VCC 信用子账户）。 | 钱包入口不等于钱包账户域，也不等于 `FundingAccount` 或 `PaymentInstrument`；缺解析结果时失败，不得用钱包标识、工具号、支出控制范围、Spend Rule、PAN 或 token 入账。 |
+| AC-PI-009 | `FundingAccount` 语义不泛化 | 信用账户、支出控制范围、Spend Rule、支付工具或平台账户角色进入路由、授权、余额查询或清结算。 | 信用账户保持独立资金账务主体；支出控制范围和 Spend Rule 保持独立支出控制对象；平台账户角色先解析到平台资金账户；支付工具只做引用。 | `FundingAccount` 只表示真实资金账户或平台责任资金账户；不得把信用额度、预算控制、支出规则或支付工具塞进 `FundingAccount` 统一处理。 |
+| AC-PI-010 | 授权支付工具应用入口 | VCC、共享卡、VA、外部钱包端点、通道 token 或卡 token 发起授权，调用方只持有工具引用和业务上下文；内部钱包或信用额度入口先按业务入口解析。 | 应用层完成工具状态、绑定版本、使用主体、支出控制范围、Spend Rule、资金责任和账户能力校验；批准后委派账户主体型授权内核，拒绝时只返回拒绝事实和原因。 | 支付工具入口不等于账本主体；不得要求外部调用方绕过钱包 / 路由直接选择内部账户，也不得让工具准入失败生成 route、posting 或 LedgerEntry。 |
+| AC-PI-011 | 共享卡和多卡主账户共享账单归因 | 每张共享卡绑定一个信用子账户，多张共享卡通过同一主信用账户或主资金账户共享额度/资金约束。 | 单卡余额、ledger entry 和余额投影落到各自信用子账户；主账户用于额度/资金约束和汇总展示；卡维度账单通过交易投影按 `PaymentInstrumentRef`、绑定版本、子账户、使用主体、支出控制范围、Spend Rule 和资金责任快照过滤生成。 | 多张共享卡不得绑定同一子账户；不得创建卡号余额投影主体；逆向事件不按当前绑定重算历史卡归因。 |
 | AC-PI-012 | VCC 关联子账户作为发卡账务主体 | VCC 卡、预付卡或共享卡需要解释余额、授权、清算、退款、拒付和费用。 | `SubjectRef(FUNDING_ACCOUNT)` / `SubjectRef(CREDIT_ACCOUNT)`、账目 profile、绑定工具、子账户/父账户快照、资金责任来源、route snapshot 和 ledger entry 可追溯。 | VCC 关联子账户可作为资金账户或信用账户入账；卡号、PAN、token、持卡人和卡片凭证不可入账；缺子账户、缺父账户、缺账目 profile 或状态不可用时失败无账务副作用。 |
 
 ### 5.3 授权、撤销与结算
@@ -245,7 +245,7 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | 验收 ID | 场景 | 输入 | 期望输出 | 核心断言 |
 | --- | --- | --- | --- | --- |
 | AC-AUTH-000 | 授权入口分层 | 授权由外部支付工具、VCC、共享卡、外部钱包端点或通道 token 触发，或由可信内部系统直接传入已解析账户主体。 | 支付工具型入口先解析并固化工具、绑定、规则和资金责任快照；内部钱包、信用额度或权益入口先解析为主体或快照；账户主体型入口直接进入授权内核。 | 三类入口不得混用责任：外层不得写账，内核不得按当前工具绑定重算历史路径；新增支付工具型入口必须由独立工程边界明确契约和验证范围。 |
-| AC-AUTH-001 | 授权成功 | 资金账户、信用账户或 VCC 关联子账户可用余额/额度充足，预算型 Spend Rule 和其他支出规则通过。 | 资金或信用主体 AVAILABLE -> AUTHORIZATION，并保存子账户、父账户和规则快照。 | 授权成功不是最终消费；预算组和 Spend Rule 不作为占用主体。 |
+| AC-AUTH-001 | 授权成功 | 资金账户、信用账户或 VCC 关联子账户可用余额/额度充足，预算型 Spend Rule 和其他支出规则通过。 | 资金或信用主体 AVAILABLE -> AUTHORIZATION，并保存子账户、父账户和规则快照。 | 授权成功不是最终消费；支出控制范围和 Spend Rule 不作为占用主体。 |
 | AC-AUTH-002 | 多主体授权 | 资金、信用和预算控制多个对象共同参与。 | 全部成功或全部失败。 | 不允许部分资金或信用主体入账成功、部分失败；预算控制失败时不得生成账务路径。 |
 | AC-AUTH-003 | 授权拒绝 | 风控、额度或余额不足。 | 记录拒绝原因，不生成账务路径。 | 不生成 route leg 和 LedgerEntry，不计入争议拒付。 |
 | AC-AUTH-004 | 授权撤销释放 | 原授权存在且剩余可释放，外部明确撤销或冲正。 | AUTHORIZATION -> AVAILABLE。 | 基于原快照，超剩余释放失败；不得用系统到期或超时替代可信撤销事实。 |
@@ -256,7 +256,7 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | AC-AUTH-012 | 无授权直接退款 | 无前置授权，但存在可追溯外部引用。 | 使用 settleRefund 的无授权退款模式回补。 | 不补造原授权；以空原授权流水进入 no-auth 语义，保留 `externalReferenceSn`、退款原因、操作者和审计；不得携带或查询内部授权流水；缺外部引用、无原因或无审计不得静默退款。 |
 | AC-AUTH-008 | 发卡扩展：支出规则命中拒绝 | 授权请求命中禁用 MCC、商户、国家、POS、PAN entry mode、CVV/AVS 或金额规则。 | 授权拒绝，返回可解释原因。 | 记录命中规则、规则版本和审计信息；不生成 route、LedgerEntry 或 chargeback。 |
 | AC-AUTH-009 | 发卡扩展：周期限额命中拒绝 | 授权请求超过日、周、月或自定义周期内的金额或次数窗口。 | 授权拒绝，累计窗口不被错误推进。 | 周期窗口口径明确；不得用清算账期、报表周期或归档水位替代支出窗口。 |
-| AC-AUTH-010 | 发卡扩展：支出规则通过后授权占用 | 卡状态、支出规则、风控、预算和资金或信用可用性均通过。 | 进入资金路由并生成资金或信用主体 AVAILABLE -> AUTHORIZATION。 | 支出规则只做前置决策，账务变化仍由 route 和 ledger 负责；预算组和 Spend Rule 只进快照和审计。 |
+| AC-AUTH-010 | 发卡扩展：支出规则通过后授权占用 | 卡状态、支出规则、风控、预算和资金或信用可用性均通过。 | 进入资金路由并生成资金或信用主体 AVAILABLE -> AUTHORIZATION。 | 支出规则只做前置决策，账务变化仍由 route 和 ledger 负责；支出控制范围和 Spend Rule 只进快照和审计。 |
 
 ### 5.4 冻结、解冻、余额调整、额度调整、调账与负余额
 
@@ -272,17 +272,17 @@ AC-AUTH-008 至 AC-AUTH-010 是发卡授权控制扩展用例，只在 VCC、企
 | AC-CTRL-007 | 受控负余额 | 后置费用、争议费、清算差额、追偿或调额导致 AVAILABLE 为负。 | 负余额进入报表、风控、抵扣或追偿。 | 必须有来源、策略、上限、账龄和处理路径。 |
 | AC-CTRL-008 | 负余额后继续交易 | 主体 AVAILABLE 已为负仍继续支付、冻结、授权或出款。 | 失败或进入策略审批。 | 不得把负余额当作可继续消费余额。 |
 | AC-CTRL-013 | 外部余额异常纠偏 | 第三方钱包、VCC 发卡行、发卡处理商或外部余额系统已形成终局事实，导致我侧同主体目标账目需要调整，甚至出现负可用。 | 通过受控余额调整或差错闭环调账生成纠偏事实。 | 必须有外部终局事件、外部余额快照、差错单或审批、凭证、责任方、操作者和重新对账引用；不得把外部异常包装成普通消费透支。 |
-| AC-CTRL-009 | 月度预算窗口隔离 | 预算组存在 MONTHLY/2026-04 和 MONTHLY/2026-05 两个预算型 Spend Rule 窗口。 | 2026-05 的授权前预算控制、预留证据、释放证据或规则调整只影响 2026-05 的控制视图。 | 不得消费、释放或抵扣 2026-04 的预算控制额度，也不得把预算组建成账本 bucket。 |
+| AC-CTRL-009 | 月度预算窗口隔离 | 支出控制范围存在 MONTHLY/2026-04 和 MONTHLY/2026-05 两个预算型 Spend Rule 窗口。 | 2026-05 的授权前预算控制、预留证据、释放证据或规则调整只影响 2026-05 的控制视图。 | 不得消费、释放或抵扣 2026-04 的预算控制额度，也不得把支出控制范围建成账本 bucket。 |
 | AC-CTRL-010 | 默认生命周期账本 | 普通资金账户未显式传周期。 | 使用 LIFETIME/LIFETIME 账本 bucket。 | 不得因缺 periodId 错配到天、月或自定义周期 bucket。 |
-| AC-CTRL-011 | 自定义周期预算 | 企业预算按合同周期 CUSTOM_CYCLE 管理。 | 周期 ID、起止规则、时区、日切、预算 scope 和规则版本可查询。 | 缺周期 ID、规则版本或预算 scope 不得通过预算控制；不得以预算组入账补救。 |
-| AC-CTRL-012 | 业务主体解析为账务主体 | 请求中包含用户、商户、平台角色、信用账户、VCC 关联子账户、预算组、Spend Rule、卡或外部账户引用。 | route snapshot 和 LedgerEntry 只能使用资金账户（含平台角色解析后的平台资金账户和 VCC 资金子账户）或信用账户（含 VCC 信用子账户）作为账务主体；预算组和 Spend Rule 只进控制快照。 | 用户 ID、商户 ID、业务订单、卡号、PAN、token、VA、银行账户、支付工具、通道账户、预算组、Spend Rule 和 `VCC_ACCOUNT` 不得直接作为可记账主体。 |
+| AC-CTRL-011 | 自定义周期预算 | 企业预算按合同周期 CUSTOM_CYCLE 管理。 | 周期 ID、起止规则、时区、日切、预算 scope 和规则版本可查询。 | 缺周期 ID、规则版本或预算 scope 不得通过预算控制；不得以支出控制范围入账补救。 |
+| AC-CTRL-012 | 业务主体解析为账务主体 | 请求中包含用户、商户、平台角色、信用账户、VCC 关联子账户、支出控制范围、Spend Rule、卡或外部账户引用。 | route snapshot 和 LedgerEntry 只能使用资金账户（含平台角色解析后的平台资金账户和 VCC 资金子账户）或信用账户（含 VCC 信用子账户）作为账务主体；支出控制范围和 Spend Rule 只进控制快照。 | 用户 ID、商户 ID、业务订单、卡号、PAN、token、VA、银行账户、支付工具、通道账户、支出控制范围、Spend Rule 和 `VCC_ACCOUNT` 不得直接作为可记账主体。 |
 
 #### 5.4.1 余额调整与差错调账判定表
 
 | 判定场景 | 产品验收 | DSL / 系分承接 | TDD 承接 | 必须失败的边界 |
 | --- | --- | --- | --- | --- |
 | 同主体资金账户目标账目修正，来源为对账差错、运营修正或财务调整，审批、凭证、原因和操作者齐备。 | AC-CTRL-004 | BALANCE_CONTROL / BALANCE_ADJUST；系分 02 的 t_funds_balance_adjust_action。 | TDD-CTRL-009、TDD-CTRL-ERR-005。 | 跨主体、错币种、错周期、无来源、无审批、无凭证、账本未开放负余额能力或缺少本次运行时策略事实。 |
-| 信用账户额度调整或预算规则调整，不表达现金流和跨主体资金转移。 | AC-CTRL-005、AC-CTRL-006 | BALANCE_CONTROL / LIMIT_ADJUST；预算型 Spend Rule 版本和控制视图。 | TDD-CTRL-005 至 TDD-CTRL-008。 | 把 LIMIT 当作普通交易 source/target，或把预算组 / Spend Rule 当作资金池或账本主体。 |
+| 信用账户额度调整或预算规则调整，不表达现金流和跨主体资金转移。 | AC-CTRL-005、AC-CTRL-006 | BALANCE_CONTROL / LIMIT_ADJUST；预算型 Spend Rule 版本和控制视图。 | TDD-CTRL-005 至 TDD-CTRL-008。 | 把 LIMIT 当作普通交易 source/target，或把支出控制范围 / Spend Rule 当作资金池或账本主体。 |
 | 对账差错闭环内需要修正同主体资金账户余额。 | AC-ADJ-001、AC-CTRL-004 | 差错单引用 BALANCE_CONTROL / BALANCE_ADJUST；ApplyExceptionActionRequest.adjustActionSn；重新对账闭环。 | TDD-RECON-001、TDD-RECON-002、TDD-CTRL-009、TDD-CTRL-ERR-005。 | 绕过差错单、审批、凭证、账本交易或重新对账依据直接改余额。 |
 | 外部钱包、VCC 发卡行或发卡处理商余额终局事实与我侧不一致，需要修正同主体目标账目余额。 | AC-CTRL-013、AC-ADJ-001 | BALANCE_CONTROL / BALANCE_ADJUST；DSL-BALANCE-CONTROL-EXTERNAL-DEFICIT-ADJUST-001；系分 02 外部余额异常纠偏。 | TDD-CTRL-012、TDD-CTRL-ERR-007、TDD-RECON-016。 | 上游未终局、无外部余额快照、无差错单或审批、无凭证、跨主体转移损失，或纠偏后绕过运行时负余额策略继续交易。 |
 | 对账差错闭环内需要跨主体补偿、价值转移或明确的资金调账交易。 | AC-ADJ-001 | 批次授权 DIRECT_TRANSACTION / ADJUSTMENT；DSL-SETTLEMENT-RECONCILIATION-ADJUST-001；差错调账账务规则。 | TDD-RECON-001、TDD-RECON-002、TDD-OPS-001。 | 通过余额控制 adjust 表达跨主体价值转移，或直接修改历史分录和投影。 |
@@ -328,7 +328,7 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | AC-REC-009 | 账实一致验收 | 内部账本需要对应外部现金、文件或回单。 | 生成账实匹配结果。 | 内部账务主体、账目和余额桶必须能映射到银行流水、通道文件、托管户流水或外部回单。 |
 | AC-REC-010 | 账账一致验收 | 业务账、支付账、账户账、商户账、总账、明细账需要核对。 | 生成账账匹配结果。 | 同一业务事实在各账的金额、方向、主体、状态一致，汇总等于明细。 |
 | AC-REC-011 | 单账一致验收 | 业务单、支付单、退款单、清分批次、清算批次、结算单、调账单需要核对。 | 生成单账匹配结果。 | 有单无账、有账无单、重复单据均进入差错，不得人工忽略。 |
-| AC-REC-012 | 余额一致验收 | 资金账户（含平台角色解析后的平台资金账户）和信用账户需要按余额桶核对；预算组需要按 Spend Rule 窗口和控制视图核对。 | 输出余额桶公式校验结果和预算控制视图校验结果。 | CLEARING、AVAILABLE、SETTLEMENT、IN_TRANSIT、FROZEN 等桶分别满足期初、本期入出和期末公式；预算视图不得冒充资金余额。 |
+| AC-REC-012 | 余额一致验收 | 资金账户（含平台角色解析后的平台资金账户）和信用账户需要按余额桶核对；支出控制范围需要按 Spend Rule 窗口和控制视图核对。 | 输出余额桶公式校验结果和预算控制视图校验结果。 | CLEARING、AVAILABLE、SETTLEMENT、IN_TRANSIT、FROZEN 等桶分别满足期初、本期入出和期末公式；预算视图不得冒充资金余额。 |
 | AC-REC-013 | 有解释差异放行 | 文件延迟、手续费尾差、汇率尾差、跨日归属等低风险差异。 | 进入有条件放行或暂缓。 | 必须有差异类型、金额、主体、币种、责任方、审批、阈值、账龄、风险承接和到期重查。 |
 | AC-REC-014 | 重大差错阻断 | 错主体、错币种、金额不平、余额公式不成立、重复出款、缺分录或外部失败内部成功。 | 阻断清分、清算、结算、出款或报表发布。 | 不允许带原因放行；必须补事实、冲正、调账、挂账、追偿或核销后重新对账。 |
 | AC-REC-015 | 对账任务生命周期 | 对账任务创建、收数、匹配、差异、阻断、重跑、关闭。 | 每次运行有状态和报告。 | 任务失败、文件延迟、等待超时、重跑和人工关闭都必须保留审计；重跑不得覆盖旧运行记录。 |
@@ -420,7 +420,7 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | AC-REPLAY-002 | 有界批量重放 | 指定租户、视图域、时间窗口或主体范围。 | 重放任务和差异报告。 | 无范围全量在线重放必须失败。 |
 | AC-REPLAY-003 | 归档后跨冷热重放 | 历史交易、交易明细或账目引用跨热区和冷区。 | 重放任务可读取冷热事实并生成投影或差异报告。 | 重放范围不早于允许重放起点，冷区摘要一致，不用汇总金额补造交易明细。 |
 | AC-REPLAY-004 | 清分清算批次视图重放 | 清分批次、清算批次、结算单或对账差错视图异常。 | 重建批次投影视图。 | 只修复只读视图，不触发重新清分、重新清算或重新入账。 |
-| AC-REPLAY-005 | 多维交易投影查询 | 同一资金事实携带支付工具快照、子账户/父账户快照、资金账户 / 信用账户账务主体、预算组和 Spend Rule 控制快照。 | 可按支付工具、子账户、父账户、资金账户、信用账户、预算组和 Spend Rule 生成只读账单、控制时间线或差异报告。 | 查询维度不得成为资金事实源；不得把支付工具、预算组、Spend Rule 或 `VCC_ACCOUNT` 写成 LedgerEntry 主体；重放不得反写交易、路由、账本或余额。 |
+| AC-REPLAY-005 | 多维交易投影查询 | 同一资金事实携带支付工具快照、子账户/父账户快照、资金账户 / 信用账户账务主体、支出控制范围和 Spend Rule 控制快照。 | 可按支付工具、子账户、父账户、资金账户、信用账户、支出控制范围和 Spend Rule 生成只读账单、控制时间线或差异报告。 | 查询维度不得成为资金事实源；不得把支付工具、支出控制范围、Spend Rule 或 `VCC_ACCOUNT` 写成 LedgerEntry 主体；重放不得反写交易、路由、账本或余额。 |
 
 ### 5.8 支付轨道和跨境边界
 
@@ -527,7 +527,7 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | RED-064 | 含权益视图误导使用者 | 用户账单、商户账单、运营时间线、财务对账视图或审计导出把授权占用、冻结、待清算、出款受理、补充事实、证据包状态或专业确认状态展示成已完成资金结果。 |
 | RED-065 | 证据包或导出越过最小必要边界 | 审计证据包、补充材料、导出文件、日志或告警包含完整卡号、CVV、密钥、token secret、证件影像、完整银行账户敏感号、无关聊天记录或超范围个人信息。 |
 | RED-066 | 未核验外部规则被写成生产依据 | 税务、会计、合同、卡组织、银行、通道、KYC/KYB/AML、客户资金、跨境或外汇口径缺规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方或确认状态，仍作为自动入账、退款、清结算、出款、归档或审计放行依据。 |
-| RED-067 | `FundingAccount` 被泛化成万能账户，或预算组 / Spend Rule 被当作账本主体 | 信用账户、VCC 信用子账户、预算组、Spend Rule、支付工具、钱包标识或外部账户被写入普通 `FundingAccount` 口径，或预算组 / Spend Rule 被写成 route leg、LedgerEntry 或清结算主体，导致额度、发卡账务、预算、规则、工具引用和真实资金混账。 |
+| RED-067 | `FundingAccount` 被泛化成万能账户，或支出控制范围 / Spend Rule 被当作账本主体 | 信用账户、VCC 信用子账户、支出控制范围、Spend Rule、支付工具、钱包标识或外部账户被写入普通 `FundingAccount` 口径，或支出控制范围 / Spend Rule 被写成 route leg、LedgerEntry 或清结算主体，导致额度、发卡账务、预算、规则、工具引用和真实资金混账。 |
 
 ## 7. TDD 用例书写模板
 
@@ -586,14 +586,14 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | --- | --- | --- | --- |
 | AC-IN-*、AC-PAY-*、AC-MER-*、AC-FEE-* | DIRECT_TRANSACTION、DSL-DIRECT-PAY-FEE-001、DSL-DIRECT-FUND-IN-FEE-001、DSL-DIRECT-CHAIN-001、DSL-REVERSE-REFUND-FEE-001 | TDD-DIR-*、TDD-DIR-FLOW-*、TDD-DIR-ERR-* | 入金、付款、商户收款、转账、提现、退款、手续费和退费都能说明 route、posting、余额桶、幂等和原路径回放。 |
 | AC-BEN-*、RED-050 至 RED-066 | `FundsBenefitContributionTransactionService`、`DSL-BENEFIT-*`、expectedBenefitContributionTransaction、refund dispositions、fixtureLevel、权益准入证明、伴随权益指令组、补充权益事实、审计证据包、explainableProjection | TDD-BEN-*、TDD-BEN-RED-*、TDD-DIR-*、TDD-AUTH-*、TDD-CLS-*、TDD-RECON-*、TDD-RACE-012、FundsOperationExplainabilityTests、FundsOperationPermissionBoundaryTests | 权益金额组件只承接业务侧已决策结果；商户让利、平台补贴、储值券、不退券、授权占券、部分退款、零实付权益、伴随指令、补充事实、清结算拆分和营销资金差异都可追踪；无资金影响权益不入账，真实入账让利出资不得和本金或手续费净额混记；含权益生产链路必须能长期回放原权益资金事实、历史摘要或受控补充事实，夹具级别、准入决策、审计证据包、解释视图和外部规则确认不能混用。 |
-| AC-ROUTE-*、AC-PI-*、RED-043 至 RED-049、RED-067 | RouteSnapshotSpec、RouteLegSpec、PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、Route Replay DSL、BindingHistory、Spend Rule 快照、DSL-PAYMENT-INSTRUMENT-ROUTE-001、DSL-PAYMENT-INSTRUMENT-FAIL-001、DSL-PAYMENT-INSTRUMENT-REPLAY-001、expectedRouteCreated=false | TDD-ROUTE-*、TDD-WALLET-*、TDD-RACE-009、TDD-RED-001、TDD-RED-003、TDD-RED-029、TDD-RED-034 至 TDD-RED-037、TDD-RED-043 | 路由只解析路径，不写账；外部支付工具、外部账户、预算组和 Spend Rule 只做引用、scope、规则或快照；内部钱包入口只做主体、权益资金事实或历史摘要解析来源；绑定、方向、状态、资金责任、账户能力、`FundingAccount` 语义边界和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
-| VCC-AC-007、VCC-AC-008、VCC-AC-009、AC-PI-*、RED-046 至 RED-049、RED-067 | DSL-VCC-HIERARCHY-001、DSL-PAYMENT-INSTRUMENT-PREPAID-CARD-001、DSL-PAYMENT-INSTRUMENT-SHARED-CARD-001、PaymentInstrumentRefSpec、BindingHistory、AccountHierarchySnapshot、FundingAllocationDecisionSpec、Spend Rule 快照 | TDD-P2-VCC-004 至 TDD-P2-VCC-012、TDD-RAIL-001A、TDD-AUTH-008、TDD-AUTH-009、TDD-WALLET-010、TDD-WALLET-015 至 TDD-WALLET-020、TDD-ROUTE-013 | 预付卡是 VCC 资金子账户模式，不是工具余额账户；共享卡是使用和绑定模式，不是卡号资金账户；每张卡最终都必须解析到资金子账户或信用子账户并固化原路径、父账户、预算组和 Spend Rule 快照；同名混淆、缺子账户、缺父账户、缺绑定版本、多责任主体、缺财务确认、工具换绑、应用 facade 缺失和敏感字段都必须有临界测试；不得恢复 `VCC_ACCOUNT` 或把预算组、Spend Rule 作为 LedgerEntry 主体。 |
+| AC-ROUTE-*、AC-PI-*、RED-043 至 RED-049、RED-067 | RouteSnapshotSpec、RouteLegSpec、PaymentInstrumentRefSpec、ExternalAccountRefSpec、RoutingDecisionSpec、FundingAllocationDecisionSpec、Route Replay DSL、BindingHistory、Spend Rule 快照、DSL-PAYMENT-INSTRUMENT-ROUTE-001、DSL-PAYMENT-INSTRUMENT-FAIL-001、DSL-PAYMENT-INSTRUMENT-REPLAY-001、expectedRouteCreated=false | TDD-ROUTE-*、TDD-WALLET-*、TDD-RACE-009、TDD-RED-001、TDD-RED-003、TDD-RED-029、TDD-RED-034 至 TDD-RED-037、TDD-RED-043 | 路由只解析路径，不写账；外部支付工具、外部账户、支出控制范围和 Spend Rule 只做引用、scope、规则或快照；内部钱包入口只做主体、权益资金事实或历史摘要解析来源；绑定、方向、状态、资金责任、账户能力、`FundingAccount` 语义边界和历史审计可解释；失败不自动换路；普通支付不误入商户清算；工具换绑不改变历史回放路径。 |
+| VCC-AC-007、VCC-AC-008、VCC-AC-009、AC-PI-*、RED-046 至 RED-049、RED-067 | DSL-VCC-HIERARCHY-001、DSL-PAYMENT-INSTRUMENT-PREPAID-CARD-001、DSL-PAYMENT-INSTRUMENT-SHARED-CARD-001、PaymentInstrumentRefSpec、BindingHistory、AccountHierarchySnapshot、FundingAllocationDecisionSpec、Spend Rule 快照 | TDD-P2-VCC-004 至 TDD-P2-VCC-012、TDD-RAIL-001A、TDD-AUTH-008、TDD-AUTH-009、TDD-WALLET-010、TDD-WALLET-015 至 TDD-WALLET-020、TDD-ROUTE-013 | 预付卡是 VCC 资金子账户模式，不是工具余额账户；共享卡是使用和绑定模式，不是卡号资金账户；每张卡最终都必须解析到资金子账户或信用子账户并固化原路径、父账户、支出控制范围和 Spend Rule 快照；同名混淆、缺子账户、缺父账户、缺绑定版本、多责任主体、缺财务确认、工具换绑、应用 facade 缺失和敏感字段都必须有临界测试；不得恢复 `VCC_ACCOUNT` 或把支出控制范围、Spend Rule 作为 LedgerEntry 主体。 |
 | AC-AUTH-*、AC-RAIL-001、AC-RAIL-002 | AUTHORIZATION_TRANSACTION、DSL-AUTH-LIFECYCLE-001、DSL-AUTH-FORCE-CAPTURE-001、DSL-AUTH-REFUND-001 | TDD-AUTH-*、TDD-AUTH-FLOW-*、TDD-AUTH-ERR-*、TDD-AUTH-EXT-*、TDD-ROUTE-005、TDD-ROUTE-009、TDD-RACE-001 至 TDD-RACE-003、TDD-RAIL-001、TDD-RED-003、TDD-RED-005、TDD-RED-008、TDD-RED-016、TDD-RED-017、TDD-RED-017A、TDD-RED-017B、TDD-RED-033、TDD-RED-036 | 授权批准、拒绝、撤销、过期、普通完成、强制完成、完成后退款、无授权退款、拒付原因承接、原路径回放和 VCC 授权归一边界一致；预算只保留规则快照、预留和释放证据；完整支付轨道仍按 AC-RAIL-* 专项确认。 |
 | AC-RAIL-002A 至 AC-RAIL-007、ACH-BOUNDARY-001 至 ACH-BOUNDARY-006 | P2 业务能力包外部轨道边界、ExternalAccountRefSpec、外部规则核验字段、对账差错和调账引用；不新增 ACH DSL 内核对象。 | TDD-RAIL-002 至 TDD-RAIL-007、TDD-RED-030、TDD-RED-034、TDD-P2-GA-*、TDD-P2-ACQ-*、TDD-RECON-*、TDD-OPS-* | ACH 或银行转账必须先由上层业务或通道适配层解释为资金事实；资金底座只承接外部引用、核验状态、在途、return 处理对象、差错、追偿、调账核销、投影和审计；不得实现 ACH 协议、Nacha/ODFI/RDFI 规则、Debit 授权、return code/NOC/reversal 解释或保存完整银行账户敏感信息。 |
-| AC-CTRL-*、RED-013 | BALANCE_CONTROL、DSL-BALANCE-CONTROL-FREEZE-001、DSL-BALANCE-CONTROL-ADJUST-001、DSL-BALANCE-CONTROL-LIMIT-BUDGET-001、DSL-DIRECT-OVERDRAFT-001、账本周期 DSL、SubjectRef / RouteNode 主体解析、预算型 Spend Rule 控制视图 | TDD-CTRL-*、TDD-CTRL-FLOW-*、TDD-CTRL-ERR-*、TDD-LEDGER-008 至 TDD-LEDGER-011、TDD-WALLET-001 至 TDD-WALLET-004、TDD-ROUTE-004、TDD-RACE-004、TDD-RED-006、TDD-RED-011、TDD-RED-012、TDD-RED-015、TDD-RED-033 | 冻结、解冻、资金账户余额调整、信用账户额度调整、预算规则调整和受控负余额不混用；AC-CTRL-009 至 AC-CTRL-011 必须证明账本周期与预算规则窗口各自隔离；AC-CTRL-012 必须证明用户、商户、卡、VA、银行账户、支付工具、预算组、Spend Rule 和业务单据不能直接作为可记账主体；冻结单状态不得表达消费、扣划或付款完成；LIMIT 只能由调额触碰；余额控制不承接跨主体价值转移。 |
+| AC-CTRL-*、RED-013 | BALANCE_CONTROL、DSL-BALANCE-CONTROL-FREEZE-001、DSL-BALANCE-CONTROL-ADJUST-001、DSL-BALANCE-CONTROL-LIMIT-BUDGET-001、DSL-DIRECT-OVERDRAFT-001、账本周期 DSL、SubjectRef / RouteNode 主体解析、预算型 Spend Rule 控制视图 | TDD-CTRL-*、TDD-CTRL-FLOW-*、TDD-CTRL-ERR-*、TDD-LEDGER-008 至 TDD-LEDGER-011、TDD-WALLET-001 至 TDD-WALLET-004、TDD-ROUTE-004、TDD-RACE-004、TDD-RED-006、TDD-RED-011、TDD-RED-012、TDD-RED-015、TDD-RED-033 | 冻结、解冻、资金账户余额调整、信用账户额度调整、预算规则调整和受控负余额不混用；AC-CTRL-009 至 AC-CTRL-011 必须证明账本周期与预算规则窗口各自隔离；AC-CTRL-012 必须证明用户、商户、卡、VA、银行账户、支付工具、支出控制范围、Spend Rule 和业务单据不能直接作为可记账主体；冻结单状态不得表达消费、扣划或付款完成；LIMIT 只能由调额触碰；余额控制不承接跨主体价值转移。 |
 | AC-ADJ-001、RED-010 | BALANCE_CONTROL / BALANCE_ADJUST、批次授权 DIRECT_TRANSACTION / ADJUSTMENT、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、差错调账账务规则 | TDD-RECON-001、TDD-RECON-002、TDD-CTRL-ERR-005、TDD-OPS-001 | 调账必须有差错或调整来源、审批、凭证、账本交易和重新对账依据；不得绕过差错闭环直接改余额，不得直接修改历史分录或投影。 |
 | AC-CLR-*、AC-SET-*、AC-SET-006 至 AC-SET-009、AC-REC-* | DSL-SETTLEMENT-RECONCILIATION-001、DSL-SETTLEMENT-CLEARING-CONFIRM-001、DSL-SETTLEMENT-LOCK-001、DSL-SETTLEMENT-PAYOUT-RESULT-001、DSL-SETTLEMENT-RECONCILIATION-ADJUST-001、DSL-SETTLEMENT-POLICY-001 | TDD-CLS-*、TDD-CLS-FLOW-*、TDD-SETTLE-*、TDD-SETTLE-004、TDD-SETTLE-005、TDD-RECON-*、TDD-RED-020 至 TDD-RED-025、TDD-RED-031、TDD-OPS-* | 清分、清算、结算、出款和对账对象独立；出款前准入、外部非终态、金额不一致和出款解释状态不误导；清分前基础对账、清算前置对账、差错追加事实、账期临界、退款时序和重跑审计闭环可验证。 |
-| AC-VIEW-*、AC-BALLOG-*、AC-REPLAY-005 | Projection DSL、余额日志和交易投影只读边界、Spend Control Activity、规则决策日志、预算控制投影 | TDD-LEDGER-*、TDD-VIEW-*、TDD-REPLAY-*、TDD-RED-010、TDD-RED-013、TDD-RED-014 | 余额投影、余额日志和交易投影都从事实派生；日志失败不回滚事实；投影和日志不得修复余额；支付工具、预算组和 Spend Rule 只能作为查询维度和解释视图，不得成为资金事实源或账本主体。 |
+| AC-VIEW-*、AC-BALLOG-*、AC-REPLAY-005 | Projection DSL、余额日志和交易投影只读边界、Spend Control Activity、规则决策日志、预算控制投影 | TDD-LEDGER-*、TDD-VIEW-*、TDD-REPLAY-*、TDD-RED-010、TDD-RED-013、TDD-RED-014 | 余额投影、余额日志和交易投影都从事实派生；日志失败不回滚事实；投影和日志不得修复余额；支付工具、支出控制范围和 Spend Rule 只能作为查询维度和解释视图，不得成为资金事实源或账本主体。 |
 | AC-ARCH-*、AC-ARCH-008、AC-ARCH-009、AC-REPLAY-* | Replay DSL 中的投影重放边界、归档 Manifest、Checkpoint、Watermark、differenceReport、manualResolutionRef、DSL-GOVERNANCE-ARCHIVE-MANIFEST-001、DSL-GOVERNANCE-BALANCE-SNAPSHOT-001、DSL-GOVERNANCE-PROJECTION-REPLAY-001、DSL-GOVERNANCE-BIG-DATA-ARCHIVE-BOUNDARY-001 | TDD-GOV-*、TDD-ARCH-*、TDD-ARCH-009、TDD-ARCH-010、TDD-REPLAY-*、TDD-METRIC-004、TDD-RACE-008、TDD-RACE-010、TDD-RED-018、TDD-RED-026 至 TDD-RED-028 | 归档只改变冷热位置；统一治理任务不替代资金归档 Manifest、余额水位或交易投影 checkpoint；余额快照按 HOT_ONLY、COLD_MANIFEST、MIXED 覆盖模式校验，只能从账本事实确认；余额重建只从检查点和增量分录出发；交易投影重放有范围、dry-run/apply、异常流程、人工处理和差异报告；大数据消费只能经治理读取、导出快照、Manifest 摘要、脱敏和审计边界承接。 |
 | AC-RPT-* | 指标项来源、口径版本、只读边界、DSL-GOVERNANCE-METRIC-SNAPSHOT-BOUNDARY-001 | TDD-METRIC-*、TDD-RACE-010、TDD-RED-019 | 资金底座只列产品和业务关心的指标项；指标实现由报表指标模块承接，不反写资金事实；普通指标快照不能替代账本余额快照确认，指标水位不能参与余额水位推进、归档 Manifest 或交易投影重放 checkpoint。 |
 | AC-OPS-*、RED-010、RED-011、RED-028 | 审计上下文、差错单、调账事实、运营处理引用 | TDD-RECON-*、TDD-RED-*、系分安全与审计测试 | 后台只推进处理单、审批、凭证和审计，不直接修改历史分录、余额或投影。 |

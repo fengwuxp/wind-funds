@@ -93,7 +93,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
 
     private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_definition_card";
 
-    private static final String BUDGET_GROUP_SN = "spend_rule_definition_budget";
+    private static final String SPEND_CONTROL_SCOPE_SN = "spend_rule_definition_budget";
 
     private static final LocalDateTime EFFECTIVE_FROM = LocalDateTime.now().withNano(0).minusDays(1);
 
@@ -139,10 +139,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：规则版本挂载到支付工具和预算控制范围。
-     * 输入：支付工具 scope 与预算组 scope。
+     * 场景：规则版本挂载到支付工具和支出控制范围。
+     * 输入：支付工具 scope 与支出控制范围 scope。
      * 输出：只产生规则挂载记录。
-     * 红线：挂载对象只是控制范围，不能输出预算组、支付工具或 Spend Rule 作为资金责任主体。
+     * 红线：挂载对象只是控制范围，不能输出支出控制范围、支付工具或 Spend Rule 作为资金责任主体。
      */
     @Test
     void testAssignSpendRuleVersionShouldOnlyRecordControlScopeWithoutFundsSideEffect() {
@@ -152,12 +152,12 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         SpendRuleAssignmentDTO instrumentAssignment = spendRuleDefinitionService.assignVersion(
                 assignmentRequest(ASSIGNMENT_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
         SpendRuleAssignmentDTO budgetAssignment = spendRuleDefinitionService.assignVersion(
-                assignmentRequest(ASSIGNMENT_SN + "_budget", SpendRuleScopeType.BUDGET_GROUP, BUDGET_GROUP_SN));
+                assignmentRequest(ASSIGNMENT_SN + "_budget", SpendRuleScopeType.SPEND_CONTROL_SCOPE, SPEND_CONTROL_SCOPE_SN));
 
         assertThat(instrumentAssignment.getAssignmentSn()).isEqualTo(ASSIGNMENT_SN);
         assertThat(instrumentAssignment.getScopeType()).isEqualTo(SpendRuleScopeType.PAYMENT_INSTRUMENT);
         assertThat(instrumentAssignment.getStatus()).isEqualTo(SpendRuleAssignmentStatus.ACTIVE);
-        assertThat(budgetAssignment.getScopeType()).isEqualTo(SpendRuleScopeType.BUDGET_GROUP);
+        assertThat(budgetAssignment.getScopeType()).isEqualTo(SpendRuleScopeType.SPEND_CONTROL_SCOPE);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }

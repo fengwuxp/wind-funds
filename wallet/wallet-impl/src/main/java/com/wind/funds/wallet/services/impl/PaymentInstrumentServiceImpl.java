@@ -351,7 +351,7 @@ public class PaymentInstrumentServiceImpl implements PaymentInstrumentService {
             return;
         }
         AssertUtils.isFalse(request.getBindingRole() == PaymentInstrumentBindingRole.BUDGET_SUBJECT,
-                "预算控制范围不通过支付工具资金主体绑定维护，请使用 Spend Rule / Spend Control 控制范围，bindingSn = {}",
+                "支出控制范围不通过支付工具资金主体绑定维护，请使用 Spend Rule / Spend Control 控制范围，bindingSn = {}",
                 request.getSn());
     }
 

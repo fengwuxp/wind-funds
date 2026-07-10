@@ -67,7 +67,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private static final String REPLAY_LEG_ID_SEPARATOR = "_";
 
-    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
 
     private static final String REPLAY_REFERENCE_REQUIRED_MESSAGE = "RouteSnapshot 回放事件缺少原路径引用";
 
@@ -232,8 +232,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
             return FundsSubjectType.CREDIT_ACCOUNT;
         }
-        if (Objects.equals(accountId.type(), LEGACY_BUDGET_GROUP_ACCOUNT_TYPE)) {
-            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能用于 RouteSnapshot 回放主体匹配，accountId = "
+        if (Objects.equals(accountId.type(), SPEND_CONTROL_SCOPE_ACCOUNT_TYPE)) {
+            throw new IllegalArgumentException("支出控制范围不是核心资金账务主体，不能用于 RouteSnapshot 回放主体匹配，accountId = "
                     + accountId);
         }
         return FundsSubjectType.FUNDING_ACCOUNT;
@@ -357,7 +357,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         FundsSubjectType subjectType = routeNode.getSubjectRef().getSubjectType();
         AssertUtils.isTrue(subjectType == FundsSubjectType.FUNDING_ACCOUNT
                         || subjectType == FundsSubjectType.CREDIT_ACCOUNT,
-                "预算组不是核心资金账务主体，不能作为 RouteSnapshot 回放参与方");
+                "支出控制范围不是核心资金账务主体，不能作为 RouteSnapshot 回放参与方");
     }
 
     private String replayLegRequiredMessage(ReplayRequestSpec replayRequest) {

@@ -33,9 +33,9 @@ import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.FundingAccountType;
-import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
-import com.wind.funds.wallet.service.BudgetGroupService;
-import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
+import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
+import com.wind.funds.wallet.service.SpendControlScopeService;
+import com.wind.funds.wallet.services.impl.SpendControlScopeServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
@@ -93,9 +93,9 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
     private static final String SUBJECT_TYPE = FundsSubjectType.FUNDING_ACCOUNT.name();
 
-    private static final String BUDGET_GROUP_SUBJECT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_SUBJECT_TYPE = "SPEND_CONTROL_SCOPE";
 
-    private static final String BUDGET_GROUP_SUBJECT_ID = "posting_boundary_budget";
+    private static final String SPEND_CONTROL_SCOPE_SUBJECT_ID = "posting_boundary_budget";
 
     private static final CurrencyIsoCode CURRENCY = CurrencyIsoCode.USD;
 
@@ -115,7 +115,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     private FundingAccountMapper fundingAccountMapper;
 
     @Autowired
-    private BudgetGroupService budgetGroupService;
+    private SpendControlScopeService spendControlScopeService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -440,23 +440,23 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     /**
-     * 场景：预算组虽然存在控制账本，但被外部 LedgerTransactionSpec 作为账本分录主体提交。
-     * 输入：POSTED 交易携带 BUDGET_GROUP 分录，并绑定同主体同科目同币种的账本。
+     * 场景：支出控制范围虽然存在控制账本，但被外部 LedgerTransactionSpec 作为账本分录主体提交。
+     * 输入：POSTED 交易携带 SPEND_CONTROL_SCOPE 分录，并绑定同主体同科目同币种的账本。
      * 输出：入账入口在事实落库和余额投影前拒绝请求。
-     * 红线：预算组只能作为预算控制 scope 和审计上下文，不得成为核心资金账本分录主体。
+     * 红线：支出控制范围只能作为预算控制 scope 和审计上下文，不得成为核心资金账本分录主体。
      */
     @Test
-    void testPostShouldRejectBudgetGroupMoneyValueEntryBeforeLedgerFacts() {
-        seedBudgetGroup(BUDGET_GROUP_SUBJECT_ID);
-        Long budgetLedgerId = createBudgetAvailableAssetLedger(BUDGET_GROUP_SUBJECT_ID);
+    void testPostShouldRejectSpendControlScopeMoneyValueEntryBeforeLedgerFacts() {
+        seedSpendControlScope(SPEND_CONTROL_SCOPE_SUBJECT_ID);
+        Long budgetLedgerId = createBudgetAvailableAssetLedger(SPEND_CONTROL_SCOPE_SUBJECT_ID);
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
                 LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
-                        creditEntry(BUDGET_GROUP_SUBJECT_ID,
-                                BUDGET_GROUP_SUBJECT_TYPE,
+                        creditEntry(SPEND_CONTROL_SCOPE_SUBJECT_ID,
+                                SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
                                 budgetLedgerId,
                                 TRANSACTION_AMOUNT),
                         debitEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)))))))
@@ -466,31 +466,31 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     /**
-     * 场景：预算组作为历史兼容控制对象发起 LIMIT 与 AVAILABLE 之间的额度控制调账。
-     * 输入：BUDGET_GROUP 分录均绑定 CONTROL 类预算控制账本。
+     * 场景：支出控制范围发起 LIMIT 与 AVAILABLE 之间的额度控制调账。
+     * 输入：SPEND_CONTROL_SCOPE 分录均绑定 CONTROL 类预算控制账本。
      * 输出：入账入口在事实落库和余额投影前拒绝请求。
      * 红线：预算额度调整已迁移到 Spend Control Activity 和 Budget Control Projection，
-     * BUDGET_GROUP 不得再作为任何 LedgerEntry 主体。
+     * SPEND_CONTROL_SCOPE 不得再作为任何 LedgerEntry 主体。
      */
     @Test
-    void testPostShouldRejectBudgetGroupControlEntriesBeforeLedgerFacts() {
-        seedBudgetGroup(BUDGET_GROUP_SUBJECT_ID);
-        Long budgetLimitLedgerId = createBudgetControlLedger(BUDGET_GROUP_SUBJECT_ID, LedgerSubjectCode.LIMIT);
-        Long budgetAvailableLedgerId = createBudgetControlLedger(BUDGET_GROUP_SUBJECT_ID,
+    void testPostShouldRejectSpendControlScopeControlEntriesBeforeLedgerFacts() {
+        seedSpendControlScope(SPEND_CONTROL_SCOPE_SUBJECT_ID);
+        Long budgetLimitLedgerId = createBudgetControlLedger(SPEND_CONTROL_SCOPE_SUBJECT_ID, LedgerSubjectCode.LIMIT);
+        Long budgetAvailableLedgerId = createBudgetControlLedger(SPEND_CONTROL_SCOPE_SUBJECT_ID,
                 LedgerSubjectCode.AVAILABLE);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
                 LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
-                        debitEntry(BUDGET_GROUP_SUBJECT_ID,
-                                BUDGET_GROUP_SUBJECT_TYPE,
+                        debitEntry(SPEND_CONTROL_SCOPE_SUBJECT_ID,
+                                SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
                                 budgetLimitLedgerId,
                                 TRANSACTION_AMOUNT,
                                 LedgerSubjectCode.LIMIT,
                                 LedgerSubjectCategory.CONTROL),
-                        creditEntry(BUDGET_GROUP_SUBJECT_ID,
-                                BUDGET_GROUP_SUBJECT_TYPE,
+                        creditEntry(SPEND_CONTROL_SCOPE_SUBJECT_ID,
+                                SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
                                 budgetAvailableLedgerId,
                                 TRANSACTION_AMOUNT,
                                 LedgerSubjectCode.AVAILABLE,
@@ -792,7 +792,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     private Long createBudgetAvailableAssetLedger(String subjectId) {
         return createLedger(
                 subjectId,
-                BUDGET_GROUP_SUBJECT_TYPE,
+                SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
                 LedgerSubjectCode.AVAILABLE,
                 LedgerSubjectCategory.ASSET,
                 Boolean.FALSE,
@@ -802,7 +802,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     private Long createBudgetControlLedger(String subjectId, LedgerSubjectCode subjectCode) {
         return createLedger(
                 subjectId,
-                BUDGET_GROUP_SUBJECT_TYPE,
+                SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
                 subjectCode,
                 LedgerSubjectCategory.CONTROL,
                 Boolean.FALSE,
@@ -906,13 +906,13 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         fundingAccountMapper.insertSelective(account);
     }
 
-    private void seedBudgetGroup(String budgetGroupSn) {
-        budgetGroupService.createBudgetGroup(new CreateBudgetGroupRequest()
+    private void seedSpendControlScope(String spendControlScopeSn) {
+        spendControlScopeService.createSpendControlScope(new CreateSpendControlScopeRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(budgetGroupSn)
-                .setOwnerId("owner_" + budgetGroupSn)
+                .setSn(spendControlScopeSn)
+                .setOwnerId("owner_" + spendControlScopeSn)
                 .setOwnerType(FundsAccountOwnerType.USER)
-                .setBudgetType(DefaultFundsAccountType.BUDGET_GROUP.name())
+                .setScopeType(DefaultFundsAccountType.SPEND_CONTROL_SCOPE.name())
                 .setCurrency(CURRENCY)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setPeriodId(AccountBalancePeriodType.LIFETIME.name())
@@ -929,11 +929,11 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
                 SOURCE_SUBJECT_ID,
                 TARGET_SUBJECT_ID,
                 MISMATCH_LEDGER_SUBJECT_ID,
-                BUDGET_GROUP_SUBJECT_ID);
+                SPEND_CONTROL_SCOPE_SUBJECT_ID);
         jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)",
                 SOURCE_SUBJECT_ID,
                 TARGET_SUBJECT_ID);
-        jdbcTemplate.update("DELETE FROM t_budget_group WHERE sn = ?", BUDGET_GROUP_SUBJECT_ID);
+        jdbcTemplate.update("DELETE FROM t_spend_control_scope WHERE sn = ?", SPEND_CONTROL_SCOPE_SUBJECT_ID);
     }
 
     private record InvalidAmountCase(Money amount, String expectedMessage) {
@@ -1193,7 +1193,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
             DefaultLedgerTransactionPostingServiceImpl.class,
             LedgerTransactionServiceImpl.class,
             LedgerServiceImpl.class,
-            BudgetGroupServiceImpl.class,
+            SpendControlScopeServiceImpl.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
             FundingAccountServiceImpl.class,

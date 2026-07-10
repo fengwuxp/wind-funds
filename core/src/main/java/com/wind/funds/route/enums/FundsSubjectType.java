@@ -8,7 +8,7 @@ import lombok.Getter;
  * 资金主体类型。
  *
  * <p>仅表达可进入 route leg、posting plan、ledger entry 和余额投影的核心账务主体。
- * 预算组属于 Spend Rule / Spend Control 的控制范围对象，不是资金主体。
+ * 支出控制范围属于 Spend Rule / Spend Control 的控制范围对象，不是资金主体。
  */
 @AllArgsConstructor
 @Getter

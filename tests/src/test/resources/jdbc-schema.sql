@@ -91,19 +91,19 @@ CREATE TABLE `t_account_hierarchy_binding`
   DEFAULT CHARSET = utf8mb4 COMMENT = '账户层级绑定表';
 
 -- ----------------------------
--- 预算组表
+-- 支出控制范围表
 -- ----------------------------
-DROP TABLE IF EXISTS `t_budget_group`;
-CREATE TABLE `t_budget_group`
+DROP TABLE IF EXISTS `t_spend_control_scope`;
+CREATE TABLE `t_spend_control_scope`
 (
     `id`                     BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
     `gmt_create`             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `gmt_modified`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
-    `sn`                     VARCHAR(64)  NOT NULL COMMENT '预算组号，全局唯一',
+    `sn`                     VARCHAR(64)  NOT NULL COMMENT '支出控制范围号，全局唯一',
     `tenant_id`              BIGINT(20)   NOT NULL COMMENT '租户 ID',
     `owner_id`               VARCHAR(30)  NOT NULL COMMENT '归属主体 ID',
     `owner_type`             VARCHAR(50)  NOT NULL COMMENT '归属主体类型',
-    `budget_type`            VARCHAR(50)  NOT NULL COMMENT '预算类型',
+    `scope_type`             VARCHAR(50)  NOT NULL COMMENT '控制范围类型',
     `currency`               VARCHAR(10)  NOT NULL COMMENT '币种',
     `period_type`            VARCHAR(20)  NOT NULL DEFAULT 'LIFETIME' COMMENT '周期类型',
     `period_id`              VARCHAR(30)  NOT NULL DEFAULT 'LIFETIME' COMMENT '周期 ID',
@@ -113,11 +113,11 @@ CREATE TABLE `t_budget_group`
     `context_variables`      TEXT                  DEFAULT NULL COMMENT '扩展上下文',
     `version`                INT(11)      NOT NULL DEFAULT 0 COMMENT '乐观锁版本',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_budget_group_sn` (`sn`),
-    KEY `idx_budget_group_owner` (`owner_type`, `owner_id`),
-    KEY `idx_budget_group_status` (`status`)
+    UNIQUE KEY `uk_spend_control_scope_sn` (`sn`),
+    KEY `idx_spend_control_scope_owner` (`owner_type`, `owner_id`),
+    KEY `idx_spend_control_scope_status` (`status`)
 ) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4 COMMENT = '预算组表';
+  DEFAULT CHARSET = utf8mb4 COMMENT = '支出控制范围表';
 
 -- ----------------------------
 -- 支付工具表

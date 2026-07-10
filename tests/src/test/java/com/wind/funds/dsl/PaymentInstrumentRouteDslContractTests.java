@@ -104,9 +104,9 @@ class PaymentInstrumentRouteDslContractTests {
     }
 
     /**
-     * 场景：授权组合场景使用资金账户、共享卡 + 资金账户、共享卡 + 预算组 + 资金账户三种模型。
+     * 场景：授权组合场景使用资金账户、共享卡 + 资金账户、共享卡 + 支出控制范围 + 资金账户三种模型。
      * 预期：RoutingDecision 能分别表达真实资金来源、工具快照和预算额度控制维度。
-     * 红线：共享卡不得替代真实资金账户；预算组不得成为唯一真实资金来源。
+     * 红线：共享卡不得替代真实资金账户；支出控制范围不得成为唯一真实资金来源。
      */
     @Test
     void testRoutingDecisionShouldCoverRequiredFundingSourceModels() {

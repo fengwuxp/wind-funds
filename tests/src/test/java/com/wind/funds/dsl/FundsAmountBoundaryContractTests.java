@@ -98,7 +98,7 @@ class FundsAmountBoundaryContractTests {
     }
 
     /**
-     * 场景：支付工具或预算组命中的资金来源分配进入 route snapshot。
+     * 场景：支付工具或支出控制范围命中的资金来源分配进入 route snapshot。
      * 预期：资金来源分配金额必须为正。
      * 红线：资金来源决策不能用非正金额伪装成候选或跳过累计闭合校验。
      */

@@ -25,9 +25,9 @@
       "actorId": "user_10001"
     },
     "contextVariables": {
-      "accountId": "fa_user_10001_usd",
-      "payeeId": "fa_merchant_20001_usd",
-      "payeeLedgerSubjectCode": "CLEARING",
+      "payerAccountContextId": "fa_user_10001_usd",
+      "payeeContextId": "fa_merchant_20001_usd",
+      "payeeLedgerContextCode": "CLEARING",
       "feeRuleCode": "MERCHANT_STANDARD_001",
       "feeRuleVersion": "2026-05"
     }

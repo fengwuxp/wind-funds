@@ -47,7 +47,7 @@ public class BudgetControlProjectionDTO implements Serializable {
     @Schema(description = "Spend Rule 版本")
     private String spendRuleVersion;
 
-    @Schema(description = "控制额度变动目标资金账户或信用账户标识，空表示预算控制范围级聚合投影")
+    @Schema(description = "控制额度变动目标资金账户或信用账户标识，空表示支出控制范围级聚合投影")
     private FundsAccountId targetAccountId;
 
     @Schema(description = "控制额度调增金额，最小货币单位")

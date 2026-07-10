@@ -25,8 +25,8 @@
       "actorId": "platform-rule-engine"
     },
     "contextVariables": {
-      "payerAccountId": "fa_platform_adjust_usd",
-      "payeeAccountId": "fa_user_10001_usd",
+      "payerAccountContextId": "fa_platform_adjust_usd",
+      "payeeAccountContextId": "fa_user_10001_usd",
       "reasonCode": "SERVICE_COMPENSATION",
       "approvalRef": "APR_202605140001"
     }

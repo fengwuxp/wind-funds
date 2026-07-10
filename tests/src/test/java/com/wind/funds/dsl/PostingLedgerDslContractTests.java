@@ -42,7 +42,7 @@ class PostingLedgerDslContractTests {
 
     private static final LocalDateTime TRANSACTION_TIME = LocalDateTime.of(2026, 5, 20, 10, 0);
 
-    private static final String LEGACY_BUDGET_GROUP_SUBJECT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_SUBJECT_TYPE = "SPEND_CONTROL_SCOPE";
 
     /**
      * 场景：一个 route leg 或控制意图生成一组借贷分录。
@@ -175,29 +175,29 @@ class PostingLedgerDslContractTests {
     }
 
     /**
-     * 场景：预算组兼容主体被误写入 PostingPlan。
+     * 场景：支出控制范围兼容主体被误写入 PostingPlan。
      * 预期：借贷金额相等也不能被视为可入账计划。
-     * 红线：预算控制范围不能绕过交易路由进入账本分录。
+     * 红线：支出控制范围不能绕过交易路由进入账本分录。
      */
     @Test
-    void testPostingPlanShouldRejectBudgetGroupEntrySubject() {
-        LedgerPostingPlanSpec budgetGroupPlan = postingPlan("PLAN-BUDGET-GROUP",
+    void testPostingPlanShouldRejectSpendControlScopeEntrySubject() {
+        LedgerPostingPlanSpec spendControlScopePlan = postingPlan("PLAN-BUDGET-GROUP",
                 entry("BG-CONTROL-DEBIT",
-                        LEGACY_BUDGET_GROUP_SUBJECT_TYPE,
+                        SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
                         LedgerSubjectCode.AVAILABLE,
                         LedgerSubjectCategory.MEMO,
                         "LE-DSL-001",
                         EntrySide.DEBIT,
                         100L),
                 entry("BG-CONTROL-CREDIT",
-                        LEGACY_BUDGET_GROUP_SUBJECT_TYPE,
+                        SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
                         LedgerSubjectCode.AVAILABLE,
                         LedgerSubjectCategory.MEMO,
                         "LE-DSL-001",
                         EntrySide.CREDIT,
                         100L));
 
-        assertThat(budgetGroupPlan.isBalanced()).isFalse();
+        assertThat(spendControlScopePlan.isBalanced()).isFalse();
     }
 
     /**

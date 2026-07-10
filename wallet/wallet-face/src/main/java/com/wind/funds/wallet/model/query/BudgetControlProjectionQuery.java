@@ -49,6 +49,6 @@ public class BudgetControlProjectionQuery implements Serializable {
     @Schema(description = "Spend Rule 版本")
     private String spendRuleVersion;
 
-    @Schema(description = "控制额度变动目标资金账户或信用账户标识，不传时按预算控制范围聚合")
+    @Schema(description = "控制额度变动目标资金账户或信用账户标识，不传时按支出控制范围聚合")
     private FundsAccountId targetAccountId;
 }

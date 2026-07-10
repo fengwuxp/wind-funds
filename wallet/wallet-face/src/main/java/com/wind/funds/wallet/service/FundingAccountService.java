@@ -44,7 +44,7 @@ public interface FundingAccountService {
     /**
      * 根据账户号查询资金账户。
      *
-     * <p>能力范围：按 FundsAccountId 查询真实资金账户，不支持信用账户和预算组。</p>
+     * <p>能力范围：按 FundsAccountId 查询真实资金账户，不支持信用账户和支出控制范围。</p>
      *
      * @param accountId 账户标识
      * @return 资金账户
@@ -54,7 +54,7 @@ public interface FundingAccountService {
     /**
      * 按租户和账户号查询资金账户。
      *
-     * <p>能力范围：用于内部服务解析已知 FundingAccount 主体；不支持信用账户和预算组，不触发账本初始化。</p>
+     * <p>能力范围：用于内部服务解析已知 FundingAccount 主体；不支持信用账户和支出控制范围，不触发账本初始化。</p>
      *
      * @param tenantId 租户 ID
      * @param accountSn 资金账户号

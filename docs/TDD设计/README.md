@@ -213,7 +213,7 @@ Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界�
 
 | 输出项 | 本轮结论 |
 | --- | --- |
-| `deliveryScenario` | 周期额度不复用账本周期、不生成预算组账本；接入方直接用 `controlScopeId + periodId` 查询当前或历史控制窗口。 |
+| `deliveryScenario` | 周期额度不复用账本周期、不生成支出控制范围账本；接入方直接用 `controlScopeId + periodId` 查询当前或历史控制窗口。 |
 | `firstRedSet` | `SPEND-RULE-CONTROL-WINDOW-RED-001`。 |
 | `coreAssertions` | 当前周期和历史周期只需替换 `periodId`；同周期不同 `controlScopeId`、不同目标账户不得串账；投影查询不得写交易、route、posting、LedgerEntry 或账本余额。 |
 | `outOfScope` | 新增 `windowType` 字段、rolling amount、cooldown、生产调度、时区计算器、表达式引擎和 DDL。 |
@@ -223,7 +223,7 @@ Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界�
 
 | redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SPEND-RULE-CONTROL-WINDOW-RED-001 | 当前周期和历史周期额度是否能用周期标识直接查询，且不串入其他周期、账户或控制范围？ | Spend Rule 控制窗口只派生控制投影，不生成账本余额或预算组账本。 | `BudgetControlProjectionQuery(controlScopeId, periodId, currency, targetAccountId)` 返回指定窗口的额度、占用、剩余和可用控制额度。 | 不写资金交易、route、posting、LedgerEntry；不把其他周期、其他账户、其他 `controlScopeId` 的流水混入。 | 2026-07 和 2026-08 分别能返回各自额度；另一个 `controlScopeId` 的同周期流水不影响主控制范围；查询后资金事实不变。 | `SpendControlMovementServiceFlowTests`，已落地。 | `just test-one SpendControlMovementServiceFlowTests tests`。 | 需要 rolling amount、cooldown、时区换算或生产调度刷新。 |
+| SPEND-RULE-CONTROL-WINDOW-RED-001 | 当前周期和历史周期额度是否能用周期标识直接查询，且不串入其他周期、账户或控制范围？ | Spend Rule 控制窗口只派生控制投影，不生成账本余额或支出控制范围账本。 | `BudgetControlProjectionQuery(controlScopeId, periodId, currency, targetAccountId)` 返回指定窗口的额度、占用、剩余和可用控制额度。 | 不写资金交易、route、posting、LedgerEntry；不把其他周期、其他账户、其他 `controlScopeId` 的流水混入。 | 2026-07 和 2026-08 分别能返回各自额度；另一个 `controlScopeId` 的同周期流水不影响主控制范围；查询后资金事实不变。 | `SpendControlMovementServiceFlowTests`，已落地。 | `just test-one SpendControlMovementServiceFlowTests tests`。 | 需要 rolling amount、cooldown、时区换算或生产调度刷新。 |
 
 外部决策证据接入测试卡：
 

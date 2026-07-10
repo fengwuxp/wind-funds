@@ -51,7 +51,7 @@
 
 | 业务 | 统一资金内核支撑可行性 | 交易层通用性 | 端到端产品落地可行性 | 关键判断 |
 | --- | --- | --- | --- |
-| VCC 发卡业务 | 高 | 不完全通用 | 中 | VCC 的钱包、信用账户、预算组、账本、账目、授权占用、清算入账、退款、拒付、费用和对账适合进入统一资金内核；授权交易适配、卡片生命周期、PAN/CVC、发卡处理、卡组织报文和 PCI 边界必须外置或独立包化。 |
+| VCC 发卡业务 | 高 | 不完全通用 | 中 | VCC 的钱包、信用账户、支出控制范围、账本、账目、授权占用、清算入账、退款、拒付、费用和对账适合进入统一资金内核；授权交易适配、卡片生命周期、PAN/CVC、发卡处理、卡组织报文和 PCI 边界必须外置或独立包化。 |
 | 全球账户收付款 | 中高 | 不完全通用 | 中 | 多币种资金账户、账本、账目、在途、费用、结算、对账和投影适合进入统一资金内核；全球账户入金、出金、退汇、银行状态、VA、SWIFT/本地清算网络、FX 执行和跨境合规必须外置或独立包化。 |
 | 收单业务 | 中高 | 不完全通用 | 中 | 商户待结算、清分、清算、结算、出款、退款、拒付、准备金、对账和归档适合统一设计、统一实现；payment attempt、capture、PSP 状态、商户入网、收银台、支付网关、通道协议、tokenization 和 PCI 数据边界必须外置或独立包化。 |
 
@@ -67,7 +67,7 @@
 
 | 业务模式 | 本质定性 | 核心对象 | 资金复杂度 | 外部依赖复杂度 | `wind-funds` 适合承接的部分 |
 | --- | --- | --- | --- | --- | --- |
-| VCC 发卡业务 | 授权控制驱动的卡支付和企业支出管理业务。 | Program、企业客户、Funding Account、Credit Account、Budget Group、Cardholder、Virtual Card、Spend Control、Authorization、Clearing、Dispute。 | 授权成功不等于入账；预算、额度、现金、授权占用、费用、退款和拒付必须分开。 | 发卡银行、发卡处理商、卡组织、HSM、PCI、风控和卡规则。 | 资金账户、信用账户、预算组、授权生命周期、route snapshot、ledger entry、交易投影、对账和归档。 |
+| VCC 发卡业务 | 授权控制驱动的卡支付和企业支出管理业务。 | Program、企业客户、Funding Account、Credit Account、Budget Group、Cardholder、Virtual Card、Spend Control、Authorization、Clearing、Dispute。 | 授权成功不等于入账；预算、额度、现金、授权占用、费用、退款和拒付必须分开。 | 发卡银行、发卡处理商、卡组织、HSM、PCI、风控和卡规则。 | 资金账户、信用账户、支出控制范围、授权生命周期、route snapshot、ledger entry、交易投影、对账和归档。 |
 | 全球账户收付款 | 多法域、多币种、多银行轨道下的账户型收付和资金归集业务。 | 客户、全球账户、VA、本地银行账户、收款指令、付款指令、FX Quote、Nostro/Vostro 引用、银行流水、退汇。 | 币种、汇率、费用、在途、退汇、合规拦截和到账时效复杂。 | 银行、代理行、本地清算网络、SWIFT、本地 PSP、外汇和合规系统。 | 内部资金账户、多币种账本、入金/出金事实、在途、费用、对账差错、余额投影、交易投影。 |
 | 收单业务 | 商户收款、清分、结算、出款和争议处理业务。 | Merchant、Payment Order、Payment Attempt、Capture、Refund、Clearing、Settlement、Payout、Reserve、Dispute、Chargeback。 | 支付成功、清算完成、商户可结算、出款成功、银行到账必须分开。 | PSP、收单行、卡组织、本地支付方式、商户入网、风控、PCI 和争议系统。 | 商户待清算/可结算账户、清分清算、结算出款、准备金、退款/拒付资金影响、对账和归档重放。 |
 
@@ -129,7 +129,7 @@ mindmap
     钱包和账目
       资金账户
       信用账户
-      预算组
+      支出控制范围
       AVAILABLE
       FROZEN
       AUTHORIZATION
@@ -186,7 +186,7 @@ mindmap
 
 | 对象类别 | VCC 发卡业务 | 全球账户收付款 | 收单业务 | 底座统一承接方式 |
 | --- | --- | --- | --- | --- |
-| 业务主体 | 企业客户、持卡人、Program。 | 客户、收款方、付款方、境内外主体。 | 商户、门店、平台、消费者。 | 解析为内部资金账户、信用账户、预算组或平台账户角色。 |
+| 业务主体 | 企业客户、持卡人、Program。 | 客户、收款方、付款方、境内外主体。 | 商户、门店、平台、消费者。 | 解析为内部资金账户、信用账户、支出控制范围或平台账户角色。 |
 | 支付工具 | Virtual Card、token、掩码卡号。 | VA、银行账户、钱包、本地支付工具。 | 卡、APM、钱包、银行转账、本地支付方式。 | 只进入 `instrumentRef`、`externalAccountRef` 或上下文，不能作为账本主体。 |
 | 外部事件 | Authorization、Clearing、Refund、Chargeback。 | Bank Credit、Bank Debit、Payout Status、Return、FX。 | Payment、Capture、Refund、Dispute、Payout、Settlement File。 | 上层归一后进入资金事实；底座不消费未解释原始报文。 |
 | 账务主体 | Funding Account、Credit Account、Budget Group。 | 内部资金账户、币种账户、在途账户、差错账户。 | 商户待清算账户、可结算账户、准备金账户、平台手续费账户。 | 统一使用可记账主体和账目 bucket。 |
@@ -208,7 +208,7 @@ flowchart LR
     Biz["三类业务产品系统"] --> Adapter["业务/通道事件归一层"]
     Adapter --> TxAdapter["场景交易适配\nVCC / 全球账户 / 收单"]
     TxAdapter --> Funds["统一资金内核\n底座资金动作"]
-    Funds --> Account["钱包和账目\n资金账户 / 信用账户 / 预算组"]
+    Funds --> Account["钱包和账目\n资金账户 / 信用账户 / 支出控制范围"]
     Account --> Route["资金路由\nroute snapshot"]
     Route --> Ledger["账本分录\nposting plan / ledger entry"]
     Ledger --> Projection["余额投影 / 交易投影"]
@@ -278,7 +278,7 @@ flowchart LR
 
 | 业务 | 可行能力 | 当前基础 | 主要缺口 | 建议结论 |
 | --- | --- | --- | --- | --- |
-| VCC 发卡业务 | 授权占用、额度/预算/资金账户分录、账目变化、清算入账、退款、拒付承接、投影和对账。 | DSL 已明确 VCC 信息只作为 `instrumentRef`、`merchantInfo` 或上下文；账务主体只能是内部资金账户、信用账户或预算组。 | VCC 交易适配层、Program/Card/Cardholder 生命周期、发卡处理商适配、卡组织清算文件、PAN/CVC/PCI、stand-in/SAF、卡账单和争议证据链。 | 适合作为 VCC 统一资金内核，不适合作为完整发卡处理系统；交易层不完全通用。 |
+| VCC 发卡业务 | 授权占用、额度/预算/资金账户分录、账目变化、清算入账、退款、拒付承接、投影和对账。 | DSL 已明确 VCC 信息只作为 `instrumentRef`、`merchantInfo` 或上下文；账务主体只能是内部资金账户、信用账户或支出控制范围。 | VCC 交易适配层、Program/Card/Cardholder 生命周期、发卡处理商适配、卡组织清算文件、PAN/CVC/PCI、stand-in/SAF、卡账单和争议证据链。 | 适合作为 VCC 统一资金内核，不适合作为完整发卡处理系统；交易层不完全通用。 |
 | 全球账户收付款 | 内部多币种账户、钱包余额、账本、账目、在途、费用、退汇资金影响、结算、对账和余额投影。 | 资金账户、账本、清算结算、对账、出款前置检查和归档重放可复用。 | 全球账户交易适配层、VA/银行账户模型、跨境消息网络、Nostro/Vostro 引用、FX Quote/Rate、合规拦截、退汇原因码和银行文件适配。 | 适合作为内部账户和资金内核；全球银行网络、FX 执行和收付交易语义需外置或独立包化。 |
 | 收单业务 | 商户待清算、清分、清算、结算、出款、退款资金影响、拒付、准备金、对账和归档。 | 已有清结算与对账设计，并已有收单业务专项设计输入。 | 收单交易适配层、Payment Order/Attempt、Capture、PSP 事件、商户入网、PCI、tokenization、风控评分、争议运营和商户结算账单细节。 | 适合作为收单统一资金内核；支付网关、交易层、商户运营和敏感卡数据必须外置或独立包化。 |
 
@@ -377,7 +377,7 @@ scenario transaction capability packs
 | `core` | 可新增或扩展通用引用、枚举、值对象和 DSL 契约，但必须保持业务无关。 |
 | `transaction-face` / `transaction-impl` | 可承接底座资金动作、授权资金动作、幂等和请求摘要；不应被误用为三类业务完全通用交易层。 |
 | `ledger-face` / `ledger-impl` | 可统一承接账本交易、账目、分录、余额投影和账务巡检，不承接业务产品状态。 |
-| `wallet-face` / `wallet-impl` | 可统一承接钱包账户、余额桶、信用账户、预算组和产品门面，不承接卡片、VA、商户入网或网关协议。 |
+| `wallet-face` / `wallet-impl` | 可统一承接钱包账户、余额桶、信用账户、支出控制范围和产品门面，不承接卡片、VA、商户入网或网关协议。 |
 | `tests` | 需要新增三类业务 capability pack 的契约测试、服务流测试、对账/清结算测试和红线测试。 |
 | `docs` / `openspec` | 进入编码前必须把正式批次同步到 PRD、DSL、系分、TDD 和 OpenSpec。 |
 
@@ -483,7 +483,7 @@ scenario transaction capability packs
 | 风险 | 后果 | 控制建议 |
 | --- | --- | --- |
 | 把三类业务混成一个支付模板 | 状态、资金归属、清结算和对账口径混乱。 | 以 capability pack 分别定义业务语义，底座只统一资金事实。 |
-| 把外部账户或卡当账本主体 | 分录无法解释，审计和对账失真。 | 外部对象只作为引用；内部账务主体必须是资金账户、信用账户、预算组或平台账户角色。 |
+| 把外部账户或卡当账本主体 | 分录无法解释，审计和对账失真。 | 外部对象只作为引用；内部账务主体必须是资金账户、信用账户、支出控制范围或平台账户角色。 |
 | 把授权成功当最终消费 | VCC、预授权和收单 capture 资金状态错误。 | 授权、清算、结算、出款、到账分层建模。 |
 | 把外部受理当到账 | 全球出金或收单出款对用户/商户误导。 | `SUBMITTED`、`PROCESSING`、`PAID`、`RETURNED` 分开。 |
 

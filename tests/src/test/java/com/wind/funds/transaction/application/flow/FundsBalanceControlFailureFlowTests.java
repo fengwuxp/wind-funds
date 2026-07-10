@@ -718,22 +718,22 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
-     * 场景：历史调用方继续通过资金余额控制入口调整预算组额度。
-     * 输入：预算组额度调增 300，并给齐调账原因、凭证和审批引用。
+     * 场景：历史调用方继续通过资金余额控制入口调整支出控制范围额度。
+     * 输入：支出控制范围额度调增 300，并给齐调账原因、凭证和审批引用。
      * 输出：旧入口前置拒绝，不生成资金交易、route、posting、LedgerEntry、账本交易或余额投影事实。
      * 预期：预算额度调整必须迁移到预算控制活动和预算控制投影入口。
-     * 红线：预算组不得再通过余额控制写入任何 ledger entry。
+     * 红线：支出控制范围不得再通过余额控制写入任何 ledger entry。
      */
     @Test
     void testBudgetLimitAdjustShouldRejectLegacyBalanceControlEntry() {
-        FundsAccountId budget = budgetGroup("budget_limit_flow");
+        FundsAccountId budget = spendControlScope("budget_limit_flow");
         FundsAccountId funding = fundingAccount("funding_user");
-        ensureBudgetGroupWithoutLedgers(budget);
+        ensureSpendControlScopeWithoutLedgers(budget);
         BalanceSnapshot before = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
         LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> adjustBalance(budget, 300L, true, "BUDGET_LIMIT_ADJUST_INCREASE"))
-                .hasMessageContaining("预算组额度调整已迁移到预算控制活动");
+                .hasMessageContaining("支出控制范围额度调整已迁移到预算控制活动");
 
         BalanceSnapshot afterFailure = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterFailure,
@@ -804,23 +804,23 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
     }
 
     /**
-     * 场景：历史调用方继续通过资金余额控制入口调减预算组额度。
-     * 输入：预算组额度调减 260，并给齐调账原因、凭证和审批引用。
-     * 输出：旧入口前置拒绝，预算组、资金账户和平台账本均无变化。
+     * 场景：历史调用方继续通过资金余额控制入口调减支出控制范围额度。
+     * 输入：支出控制范围额度调减 260，并给齐调账原因、凭证和审批引用。
+     * 输出：旧入口前置拒绝，支出控制范围、资金账户和平台账本均无变化。
      * 预期：预算额度调减下限校验应由预算控制活动入口负责，不再通过 ledger 余额桶表达。
      * 红线：失败路径不得污染真实资金账户、平台 CASH/PREPAYMENT 或留下半成功账务事实。
      */
     @Test
     void testBudgetLimitDecreaseShouldRejectLegacyBalanceControlEntryAndLeaveNoSideEffects() {
-        FundsAccountId budget = budgetGroup("budget_limit_dec_fail");
+        FundsAccountId budget = spendControlScope("budget_limit_dec_fail");
         FundsAccountId funding = fundingAccount("funding_user");
-        ensureBudgetGroupWithoutLedgers(budget);
+        ensureSpendControlScopeWithoutLedgers(budget);
         BalanceSnapshot before = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
         LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> adjustBalance(budget, 260L, false,
                 "BUDGET_LIMIT_DECREASE_FAIL_DECREASE"))
-                .hasMessageContaining("预算组额度调整已迁移到预算控制活动");
+                .hasMessageContaining("支出控制范围额度调整已迁移到预算控制活动");
 
         BalanceSnapshot afterFailure = snapshot(balances(budget, funding, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterFailure,

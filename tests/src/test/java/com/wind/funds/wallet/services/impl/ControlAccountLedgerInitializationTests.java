@@ -21,12 +21,12 @@ import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
-import com.wind.funds.wallet.model.dto.BudgetGroupDTO;
+import com.wind.funds.wallet.model.dto.SpendControlScopeDTO;
 import com.wind.funds.wallet.model.dto.CreditAccountDTO;
-import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
+import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.InitializeSubjectLedgerRequest;
-import com.wind.funds.wallet.service.BudgetGroupService;
+import com.wind.funds.wallet.service.SpendControlScopeService;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.SubjectLedgerInitializer;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -52,7 +52,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerTr
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
- * 信用账户和预算组控制账本初始化服务层测试。
+ * 信用账户和支出控制范围控制账本初始化服务层测试。
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
@@ -65,9 +65,9 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     private static final String NON_LIFETIME_CREDIT_ACCOUNT_SN = "credit_control_monthly";
 
-    private static final String BUDGET_GROUP_SN = "budget_control_basic";
+    private static final String SPEND_CONTROL_SCOPE_SN = "budget_control_basic";
 
-    private static final String CUSTOM_BUDGET_GROUP_SN = "budget_control_custom";
+    private static final String CUSTOM_SPEND_CONTROL_SCOPE_SN = "budget_control_custom";
 
     private static final String CUSTOM_PERIOD_ID = "CONTRACT-2026-H1";
 
@@ -77,7 +77,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
     private static final String CUSTOM_PERIOD_POLICY = "CONTRACT_H1_RULE_V1";
 
-    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
 
     private static final String OWNER_ID = "owner_control_basic";
 
@@ -103,7 +103,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     private CreditAccountService creditAccountService;
 
     @Autowired
-    private BudgetGroupService budgetGroupService;
+    private SpendControlScopeService spendControlScopeService;
 
     @Autowired
     private FundsAccountQueryService fundsAccountQueryService;
@@ -236,83 +236,83 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void testCreateBudgetGroupShouldNotInitializeLifetimeControlLedgersByDefault() {
+    void testCreateSpendControlScopeShouldNotInitializeLifetimeControlLedgersByDefault() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        Long budgetGroupId = budgetGroupService.createBudgetGroup(createBudgetGroupRequest());
+        Long spendControlScopeId = spendControlScopeService.createSpendControlScope(createSpendControlScopeRequest());
 
-        BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
-        BudgetGroupDTO controlScope = budgetGroupService.getBudgetControlScope(
+        SpendControlScopeDTO spendControlScope = spendControlScopeService.getSpendControlScopeById(spendControlScopeId);
+        SpendControlScopeDTO controlScope = spendControlScopeService.getSpendControlScope(
                 TENANT_ID,
-                BUDGET_GROUP_SN,
-                DefaultFundsAccountType.BUDGET_GROUP.name());
-        List<LedgerDTO> ledgers = loadLedgers(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE, BUDGET_GROUP_SN);
+                SPEND_CONTROL_SCOPE_SN,
+                DefaultFundsAccountType.SPEND_CONTROL_SCOPE.name());
+        List<LedgerDTO> ledgers = loadLedgers(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE, SPEND_CONTROL_SCOPE_SN);
 
-        assertThat(budgetGroup.getSn()).isEqualTo(BUDGET_GROUP_SN);
-        assertThat(controlScope.getId()).isEqualTo(budgetGroupId);
-        assertThat(controlScope.getSn()).isEqualTo(BUDGET_GROUP_SN);
-        assertThat(budgetGroup.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
-        assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
-        assertThat(budgetGroup.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
+        assertThat(spendControlScope.getSn()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
+        assertThat(controlScope.getId()).isEqualTo(spendControlScopeId);
+        assertThat(controlScope.getSn()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
+        assertThat(spendControlScope.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(spendControlScope.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
+        assertThat(spendControlScope.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         assertThat(ledgers).isEmpty();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
-    void testCreateBudgetGroupShouldNotInitializeMonthlyControlLedgersWhenSpecified() {
+    void testCreateSpendControlScopeShouldNotInitializeMonthlyControlLedgersWhenSpecified() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        Long budgetGroupId = budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+        Long spendControlScopeId = spendControlScopeService.createSpendControlScope(createSpendControlScopeRequest()
                 .setPeriodType(AccountBalancePeriodType.MONTHLY)
                 .setPeriodId(MONTHLY_PERIOD_ID));
 
-        BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
-        List<LedgerDTO> ledgers = loadLedgers(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE, BUDGET_GROUP_SN);
+        SpendControlScopeDTO spendControlScope = spendControlScopeService.getSpendControlScopeById(spendControlScopeId);
+        List<LedgerDTO> ledgers = loadLedgers(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE, SPEND_CONTROL_SCOPE_SN);
 
-        assertThat(budgetGroup.getSn()).isEqualTo(BUDGET_GROUP_SN);
-        assertThat(budgetGroup.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
-        assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
-        assertThat(budgetGroup.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
+        assertThat(spendControlScope.getSn()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
+        assertThat(spendControlScope.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(spendControlScope.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
+        assertThat(spendControlScope.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
         assertThat(ledgers).isEmpty();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
-    void testCreateBudgetGroupShouldRejectCustomCycleWithoutPeriodId() {
+    void testCreateSpendControlScopeShouldRejectCustomCycleWithoutPeriodId() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(customCycleBudgetGroupRequest()))
+        assertThatThrownBy(() -> spendControlScopeService.createSpendControlScope(customCycleSpendControlScopeRequest()))
                 .hasMessageContaining("非生命周期账本周期 periodId 不能为空");
 
-        assertThat(countRows("t_budget_group", "sn", CUSTOM_BUDGET_GROUP_SN)).isZero();
-        assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
+        assertThat(countRows("t_spend_control_scope", "sn", CUSTOM_SPEND_CONTROL_SCOPE_SN)).isZero();
+        assertThat(countRows("t_ledger", "subject_id", CUSTOM_SPEND_CONTROL_SCOPE_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
      * 场景：企业自定义周期预算缺少周期策略。
      * 输入：periodType = CUSTOM_CYCLE，periodId 已指定，但 periodPolicy 为空。
-     * 输出：创建被拒绝，不留下预算组或控制账本。
+     * 输出：创建被拒绝，不留下支出控制范围或控制账本。
      * 红线：自定义周期缺少规则版本时不得初始化预算账本，避免后续额度跨周期误用。
      */
     @Test
-    void testCreateBudgetGroupShouldRejectCustomCycleWithoutPeriodPolicy() {
+    void testCreateSpendControlScopeShouldRejectCustomCycleWithoutPeriodPolicy() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(customCycleBudgetGroupRequest()
+        assertThatThrownBy(() -> spendControlScopeService.createSpendControlScope(customCycleSpendControlScopeRequest()
                 .setPeriodId(CUSTOM_PERIOD_ID)
                 .setPeriodPolicy(null)))
-                .hasMessageContaining("自定义周期预算组 periodPolicy 不能为空");
+                .hasMessageContaining("自定义周期支出控制范围 periodPolicy 不能为空");
 
-        assertThat(countRows("t_budget_group", "sn", CUSTOM_BUDGET_GROUP_SN)).isZero();
-        assertThat(countRows("t_ledger", "subject_id", CUSTOM_BUDGET_GROUP_SN)).isZero();
+        assertThat(countRows("t_spend_control_scope", "sn", CUSTOM_SPEND_CONTROL_SCOPE_SN)).isZero();
+        assertThat(countRows("t_ledger", "subject_id", CUSTOM_SPEND_CONTROL_SCOPE_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
-     * 场景：运营创建信用账户或预算组时把外部账户号、PAN 或通道密钥放入扩展上下文。
+     * 场景：运营创建信用账户或支出控制范围时把外部账户号、PAN 或通道密钥放入扩展上下文。
      * 输入：contextVariables 含嵌套敏感值、敏感字段名，或坏 JSON 未加引号敏感字段名。
-     * 输出：创建被拒绝，不留下控制账户、预算组、账本或账务事实。
+     * 输出：创建被拒绝，不留下控制账户、支出控制范围、账本或账务事实。
      * 红线：控制类钱包对象不得通过扩展上下文保存敏感支付工具或外部账户原文。
      */
     @Test
@@ -322,7 +322,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()
                 .setContextVariables("{\"processorPayload\":{\"networkReference\":\"GB82WEST12345698765432\"}}")))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
-        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+        assertThatThrownBy(() -> spendControlScopeService.createSpendControlScope(createSpendControlScopeRequest()
                 .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
         assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()
@@ -331,34 +331,34 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> creditAccountService.createCreditAccount(createCreditAccountRequest()
                 .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
-        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+        assertThatThrownBy(() -> spendControlScopeService.createSpendControlScope(createSpendControlScopeRequest()
                 .setContextVariables(UNQUOTED_PAYMENT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
-        assertThatThrownBy(() -> budgetGroupService.createBudgetGroup(createBudgetGroupRequest()
+        assertThatThrownBy(() -> spendControlScopeService.createSpendControlScope(createSpendControlScopeRequest()
                 .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive wallet fields");
 
         assertThat(countRows("t_credit_account", "sn", CREDIT_ACCOUNT_SN)).isZero();
-        assertThat(countRows("t_budget_group", "sn", BUDGET_GROUP_SN)).isZero();
+        assertThat(countRows("t_spend_control_scope", "sn", SPEND_CONTROL_SCOPE_SN)).isZero();
         assertThat(countRows("t_ledger", "subject_id", CREDIT_ACCOUNT_SN)).isZero();
-        assertThat(countRows("t_ledger", "subject_id", BUDGET_GROUP_SN)).isZero();
+        assertThat(countRows("t_ledger", "subject_id", SPEND_CONTROL_SCOPE_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
-    void testCreateBudgetGroupShouldNotInitializeCustomCycleControlLedgers() {
+    void testCreateSpendControlScopeShouldNotInitializeCustomCycleControlLedgers() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        Long budgetGroupId = budgetGroupService.createBudgetGroup(
-                customCycleBudgetGroupRequest().setPeriodId(CUSTOM_PERIOD_ID));
+        Long spendControlScopeId = spendControlScopeService.createSpendControlScope(
+                customCycleSpendControlScopeRequest().setPeriodId(CUSTOM_PERIOD_ID));
 
-        BudgetGroupDTO budgetGroup = budgetGroupService.getBudgetGroupById(budgetGroupId);
-        List<LedgerDTO> ledgers = loadLedgers(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE, CUSTOM_BUDGET_GROUP_SN);
+        SpendControlScopeDTO spendControlScope = spendControlScopeService.getSpendControlScopeById(spendControlScopeId);
+        List<LedgerDTO> ledgers = loadLedgers(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE, CUSTOM_SPEND_CONTROL_SCOPE_SN);
 
-        assertThat(budgetGroup.getSn()).isEqualTo(CUSTOM_BUDGET_GROUP_SN);
-        assertThat(budgetGroup.getPeriodType()).isEqualTo(AccountBalancePeriodType.CUSTOM_CYCLE);
-        assertThat(budgetGroup.getPeriodId()).isEqualTo(CUSTOM_PERIOD_ID);
-        assertThat(budgetGroup.getPeriodPolicy()).isEqualTo(CUSTOM_PERIOD_POLICY);
+        assertThat(spendControlScope.getSn()).isEqualTo(CUSTOM_SPEND_CONTROL_SCOPE_SN);
+        assertThat(spendControlScope.getPeriodType()).isEqualTo(AccountBalancePeriodType.CUSTOM_CYCLE);
+        assertThat(spendControlScope.getPeriodId()).isEqualTo(CUSTOM_PERIOD_ID);
+        assertThat(spendControlScope.getPeriodPolicy()).isEqualTo(CUSTOM_PERIOD_POLICY);
         assertThat(ledgers).isEmpty();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -387,14 +387,14 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?, ?)",
                 CREDIT_ACCOUNT_SN,
                 NON_LIFETIME_CREDIT_ACCOUNT_SN,
-                BUDGET_GROUP_SN,
-                CUSTOM_BUDGET_GROUP_SN);
+                SPEND_CONTROL_SCOPE_SN,
+                CUSTOM_SPEND_CONTROL_SCOPE_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn IN (?, ?)",
                 CREDIT_ACCOUNT_SN,
                 NON_LIFETIME_CREDIT_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_budget_group WHERE sn IN (?, ?)",
-                BUDGET_GROUP_SN,
-                CUSTOM_BUDGET_GROUP_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_control_scope WHERE sn IN (?, ?)",
+                SPEND_CONTROL_SCOPE_SN,
+                CUSTOM_SPEND_CONTROL_SCOPE_SN);
     }
 
     private CreateCreditAccountRequest createCreditAccountRequest() {
@@ -407,19 +407,19 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
                 .setCurrency(CurrencyIsoCode.USD);
     }
 
-    private CreateBudgetGroupRequest createBudgetGroupRequest() {
-        return new CreateBudgetGroupRequest()
-                .setSn(BUDGET_GROUP_SN)
+    private CreateSpendControlScopeRequest createSpendControlScopeRequest() {
+        return new CreateSpendControlScopeRequest()
+                .setSn(SPEND_CONTROL_SCOPE_SN)
                 .setTenantId(TENANT_ID)
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
-                .setBudgetType(DefaultFundsAccountType.BUDGET_GROUP.name())
+                .setScopeType(DefaultFundsAccountType.SPEND_CONTROL_SCOPE.name())
                 .setCurrency(CurrencyIsoCode.USD);
     }
 
-    private CreateBudgetGroupRequest customCycleBudgetGroupRequest() {
-        return createBudgetGroupRequest()
-                .setSn(CUSTOM_BUDGET_GROUP_SN)
+    private CreateSpendControlScopeRequest customCycleSpendControlScopeRequest() {
+        return createSpendControlScopeRequest()
+                .setSn(CUSTOM_SPEND_CONTROL_SCOPE_SN)
                 .setPeriodType(AccountBalancePeriodType.CUSTOM_CYCLE)
                 .setPeriodId(null)
                 .setPeriodPolicy(CUSTOM_PERIOD_POLICY);
@@ -506,7 +506,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
             DefaultSubjectLedgerInitializer.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
-            BudgetGroupServiceImpl.class,
+            SpendControlScopeServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
     })
     static class Config {

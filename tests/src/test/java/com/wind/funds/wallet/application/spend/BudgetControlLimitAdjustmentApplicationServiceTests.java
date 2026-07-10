@@ -79,7 +79,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
     private static final String TENANT_MISMATCH_BUSINESS_SN = "BUDGET_LIMIT_ADJUST_TENANT_MISMATCH";
 
-    private static final String BUDGET_GROUP_SN = "budget_control_limit_scope";
+    private static final String SPEND_CONTROL_SCOPE_SN = "budget_control_limit_scope";
 
     private static final String PERIOD_ID = "2026-07";
 
@@ -121,7 +121,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
     /**
      * 场景：运营调增预算控制额度。
-     * 输入：预算组、Spend Rule、目标信用账户、规则版本、原因、操作者和审批引用完整。
+     * 输入：支出控制范围、Spend Rule、目标信用账户、规则版本、原因、操作者和审批引用完整。
      * 输出：写入额度调增控制额度变动，并从控制额度变动派生预算控制投影。
      * 红线：预算额度调整不创建资金交易、route、posting、LedgerEntry、账本交易或余额投影事实。
      */
@@ -136,7 +136,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
         assertThat(result.getMovementSn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
         assertThat(result.getMovementType()).isEqualTo(SpendControlMovementType.LIMIT_INCREASED);
-        assertThat(result.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(result.getControlScopeId()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
         assertThat(result.getPeriodId()).isEqualTo(PERIOD_ID);
         assertThat(result.getTargetAccountId()).isEqualTo(targetAccountId());
         assertThat(result.getAmount()).isEqualTo(100L);
@@ -146,7 +146,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThat(result.getAuditReferenceSn()).isEqualTo(AUDIT_REFERENCE_SN);
 
         BudgetControlProjectionDTO projection = result.getProjection();
-        assertThat(projection.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(projection.getControlScopeId()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
         assertThat(projection.getPeriodId()).isEqualTo(PERIOD_ID);
         assertThat(projection.getLimitIncreasedAmount()).isEqualTo(100L);
         assertThat(projection.getLimitDecreasedAmount()).isZero();
@@ -167,7 +167,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                     assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.LIMIT_INCREASED);
                     assertThat(activity.getInstrumentSn()).isNull();
                     assertThat(activity.getAction()).isNull();
-                    assertThat(activity.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+                    assertThat(activity.getControlScopeId()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
                     assertThat(activity.getPeriodId()).isEqualTo(PERIOD_ID);
                     assertThat(activity.getReasonCode()).isEqualTo(REASON_CODE);
                     assertThat(activity.getOperatorId()).isEqualTo(OPERATOR_ID);
@@ -349,7 +349,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setMovementSn(movementSn)
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(businessSn)
-                .setControlScopeId(BUDGET_GROUP_SN)
+                .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                 .setPeriodId(PERIOD_ID)
                 .setTargetAccountId(targetAccountId())
                 .setAmount(100L)
@@ -379,7 +379,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 .setSpendDecisionSn("decision_budget_limit_reserved_001")
                 .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
                 .setSpendDecisionDigest("sha256:budget-limit-reserved-decision")
-                .setControlScopeId(BUDGET_GROUP_SN)
+                .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                 .setPeriodId(PERIOD_ID)
                 .setMovementDigest("sha256:budget-limit-reserved");
     }
@@ -408,7 +408,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     private BudgetControlProjectionQuery projectionQuery() {
         return new BudgetControlProjectionQuery()
                 .setTenantId(TENANT_ID)
-                .setControlScopeId(BUDGET_GROUP_SN)
+                .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                 .setPeriodId(PERIOD_ID)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)

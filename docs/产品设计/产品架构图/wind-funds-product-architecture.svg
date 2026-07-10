@@ -68,7 +68,7 @@ text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsof
 <rect x="70" y="568" width="190" height="104" rx="8" ry="8" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.5"/>
 <rect x="82" y="580" width="38" height="24" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/><text x="101" y="597" text-anchor="middle" class="small" fill="#2563eb">P0</text>
 <text x="132" y="596" class="node-title">钱包账户域</text>
-<text x="86" y="620" class="node-text" text-anchor="start"><tspan x="86" dy="0">PaymentInstrument / 绑定</tspan><tspan x="86" dy="17">资金账户 / 信用账户</tspan><tspan x="86" dy="17">预算组 / Spend Rule</tspan></text>
+<text x="86" y="620" class="node-text" text-anchor="start"><tspan x="86" dy="0">PaymentInstrument / 绑定</tspan><tspan x="86" dy="17">资金账户 / 信用账户</tspan><tspan x="86" dy="17">支出控制范围 / Spend Rule</tspan></text>
 </g><g>
 <rect x="300" y="568" width="190" height="104" rx="8" ry="8" fill="#ffffff" stroke="#bbf7d0" stroke-width="1.5"/>
 <rect x="312" y="580" width="38" height="24" rx="12" fill="#f0fdf4" stroke="#bbf7d0"/><text x="331" y="597" text-anchor="middle" class="small" fill="#2563eb">P0</text>

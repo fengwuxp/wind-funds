@@ -1257,21 +1257,21 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
-     * 场景：直接充值把预算组作为入账主体。
-     * 输入：预算组作为 accountId，外部银行账户作为资金来源。
-     * 输出：请求被拒绝；预算组控制账本和平台账户余额不变化。
-     * 预期：预算组只能作为预算控制上下文，不得被充值交易包装成入金价值主体。
-     * 红线：预算组不得生成充值 route、posting、ledger entry 或余额投影。
+     * 场景：直接充值把支出控制范围作为入账主体。
+     * 输入：支出控制范围作为 accountId，外部银行账户作为资金来源。
+     * 输出：请求被拒绝；支出控制范围控制账本和平台账户余额不变化。
+     * 预期：支出控制范围只能作为预算控制上下文，不得被充值交易包装成入金价值主体。
+     * 红线：支出控制范围不得生成充值 route、posting、ledger entry 或余额投影。
      */
     @Test
-    void testTopupToBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
-        FundsAccountId budget = budgetGroup("topup_bg");
-        ensureBudgetGroupWithoutLedgers(budget);
+    void testTopupToSpendControlScopeShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId budget = spendControlScope("topup_bg");
+        ensureSpendControlScopeWithoutLedgers(budget);
         BalanceSnapshot before = snapshot(balances(budget, cashMappingAccount(), prepaymentAccount()));
         LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
 
-        assertThatThrownBy(() -> topup(budget, 10L, "DIRECT_TOPUP_BUDGET_GROUP"))
-                .hasMessageContaining("直接充值入账账户不能是预算组");
+        assertThatThrownBy(() -> topup(budget, 10L, "DIRECT_TOPUP_SPEND_CONTROL_SCOPE"))
+                .hasMessageContaining("直接充值入账账户不能是支出控制范围");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(budget, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterRejectedTopup,
@@ -1287,7 +1287,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(0);
-        assertNoPersistedTransactionFactsForBusinessSn("DIRECT_TOPUP_BUDGET_GROUP");
+        assertNoPersistedTransactionFactsForBusinessSn("DIRECT_TOPUP_SPEND_CONTROL_SCOPE");
     }
 
     /**
@@ -1800,24 +1800,24 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
-     * 场景：系统内转账把预算组作为付款主体。
-     * 输入：预算组向普通资金账户转账 10。
-     * 输出：请求被拒绝；预算组控制账本、收款方和平台账户余额保持请求前状态。
-     * 预期：预算组只能作为预算控制上下文，不得被转账交易包装成资金价值主体。
-     * 红线：预算组不得生成转账 route、posting、ledger entry 或余额投影。
+     * 场景：系统内转账把支出控制范围作为付款主体。
+     * 输入：支出控制范围向普通资金账户转账 10。
+     * 输出：请求被拒绝；支出控制范围控制账本、收款方和平台账户余额保持请求前状态。
+     * 预期：支出控制范围只能作为预算控制上下文，不得被转账交易包装成资金价值主体。
+     * 红线：支出控制范围不得生成转账 route、posting、ledger entry 或余额投影。
      */
     @Test
-    void testTransferFromBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
-        FundsAccountId budget = budgetGroup("transfer_bg");
+    void testTransferFromSpendControlScopeShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId budget = spendControlScope("transfer_bg");
         FundsAccountId payee = fundingAccount("budget_transfer_payee");
-        ensureBudgetGroupWithoutLedgers(budget);
+        ensureSpendControlScopeWithoutLedgers(budget);
         ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
 
         BalanceSnapshot beforeTransfer = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
         LedgerFactSnapshot beforeTransferFacts = ledgerFactSnapshot();
 
-        assertThatThrownBy(() -> transfer(budget, payee, 10L, "DIRECT_TRANSFER_BUDGET_GROUP"))
-                .hasMessageContaining("系统内转账付款账户不能是预算组");
+        assertThatThrownBy(() -> transfer(budget, payee, 10L, "DIRECT_TRANSFER_SPEND_CONTROL_SCOPE"))
+                .hasMessageContaining("系统内转账付款账户不能是支出控制范围");
 
         BalanceSnapshot afterRejectedTransfer = snapshot(balances(budget, payee, cashMappingAccount(),
                 prepaymentAccount()));
@@ -1836,7 +1836,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(0);
-        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_BUDGET_GROUP");
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TRANSFER_SPEND_CONTROL_SCOPE");
     }
 
     /**
@@ -2274,25 +2274,25 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
-     * 场景：预算组被误作为直接付款主体。
-     * 输入：提交预算组向普通收款方付款 10。
-     * 输出：付款请求被拒绝；预算组控制账本、收款方和平台账户余额保持请求前状态。
-     * 预期：预算组只能作为预算控制上下文，不得被直接交易包装成资金价值主体。
-     * 红线：预算组不得生成直接付款 route、posting、ledger entry 或余额投影。
+     * 场景：支出控制范围被误作为直接付款主体。
+     * 输入：提交支出控制范围向普通收款方付款 10。
+     * 输出：付款请求被拒绝；支出控制范围控制账本、收款方和平台账户余额保持请求前状态。
+     * 预期：支出控制范围只能作为预算控制上下文，不得被直接交易包装成资金价值主体。
+     * 红线：支出控制范围不得生成直接付款 route、posting、ledger entry 或余额投影。
      */
     @Test
-    void testPayFromBudgetGroupShouldRejectAndLeaveNoLedgerSideEffects() {
-        FundsAccountId budget = budgetGroup("direct_pay_budget_group");
+    void testPayFromSpendControlScopeShouldRejectAndLeaveNoLedgerSideEffects() {
+        FundsAccountId budget = spendControlScope("direct_pay_spend_control_scope");
         FundsAccountId payee = fundingAccount("budget_pay_payee");
-        ensureBudgetGroupWithoutLedgers(budget);
+        ensureSpendControlScopeWithoutLedgers(budget);
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
 
         BalanceSnapshot beforePay = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
         LedgerFactSnapshot beforePayFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> pay(budget, payee, LedgerSubjectCode.SETTLEMENT, 10L,
-                "DIRECT_PAY_BUDGET_GROUP"))
-                .hasMessageContaining("直接付款账户不能是预算组");
+                "DIRECT_PAY_SPEND_CONTROL_SCOPE"))
+                .hasMessageContaining("直接付款账户不能是支出控制范围");
 
         BalanceSnapshot afterRejectedPay = snapshot(balances(budget, payee, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(beforePay, afterRejectedPay,
@@ -2310,7 +2310,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(prepaymentAccount()), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY);
 
         assertPostedTransactions(0);
-        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_BUDGET_GROUP");
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_PAY_SPEND_CONTROL_SCOPE");
     }
 
     /**

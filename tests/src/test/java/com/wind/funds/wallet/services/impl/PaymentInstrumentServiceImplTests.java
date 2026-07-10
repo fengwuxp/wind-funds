@@ -458,10 +458,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：运营尝试用支付工具绑定维护预算控制范围。
+     * 场景：运营尝试用支付工具绑定维护支出控制范围。
      * 输入：bindingRole = BUDGET_SUBJECT。
      * 输出：创建被拒绝，不留下绑定候选或历史。
-     * 红线：预算组是 Spend Rule / Spend Control 的控制范围对象，不通过支付工具资金主体绑定维护。
+     * 红线：支出控制范围是 Spend Rule / Spend Control 的控制范围对象，不通过支付工具资金主体绑定维护。
      */
     @Test
     void testCreatePaymentInstrumentBindingShouldRejectBudgetSubjectBinding() {
@@ -471,11 +471,11 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setBindingRole(PaymentInstrumentBindingRole.BUDGET_SUBJECT)
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)))
-                .hasMessageContaining("预算控制范围不通过支付工具资金主体绑定维护");
+                .hasMessageContaining("支出控制范围不通过支付工具资金主体绑定维护");
         assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
                 .setBindingRole(PaymentInstrumentBindingRole.BUDGET_SUBJECT)
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)))
-                .hasMessageContaining("预算控制范围不通过支付工具资金主体绑定维护");
+                .hasMessageContaining("支出控制范围不通过支付工具资金主体绑定维护");
 
         assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
         assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();

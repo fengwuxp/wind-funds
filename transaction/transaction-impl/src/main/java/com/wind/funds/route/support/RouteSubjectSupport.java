@@ -19,14 +19,14 @@ import java.util.Objects;
 @Component
 public class RouteSubjectSupport {
 
-    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
 
     public @NonNull SubjectRef createSubjectRef(@NonNull FundsAccountId accountId) {
         if (isExternalAccountType(accountId.type())) {
             throw new IllegalArgumentException("外部账户不能创建账务主体引用，accountId = " + accountId);
         }
-        if (isBudgetGroup(accountId)) {
-            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能创建账务主体引用，accountId = "
+        if (isSpendControlScope(accountId)) {
+            throw new IllegalArgumentException("支出控制范围不是核心资金账务主体，不能创建账务主体引用，accountId = "
                     + accountId);
         }
         return ImmutableSubjectRef.builder()
@@ -40,8 +40,8 @@ public class RouteSubjectSupport {
         if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
             return FundsSubjectType.CREDIT_ACCOUNT;
         }
-        if (isBudgetGroup(accountId)) {
-            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能解析账务主体类型，accountId = "
+        if (isSpendControlScope(accountId)) {
+            throw new IllegalArgumentException("支出控制范围不是核心资金账务主体，不能解析账务主体类型，accountId = "
                     + accountId);
         }
         return FundsSubjectType.FUNDING_ACCOUNT;
@@ -52,8 +52,8 @@ public class RouteSubjectSupport {
         if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
             return RouteParticipantRole.AUTH_HOLDER;
         }
-        if (isBudgetGroup(accountId)) {
-            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能解析路由参与方，accountId = "
+        if (isSpendControlScope(accountId)) {
+            throw new IllegalArgumentException("支出控制范围不是核心资金账务主体，不能解析路由参与方，accountId = "
                     + accountId);
         }
         return sourceSide ? RouteParticipantRole.PAYER : RouteParticipantRole.PAYEE;
@@ -63,8 +63,8 @@ public class RouteSubjectSupport {
         if (Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name())) {
             return LedgerProfileCode.CREDIT_BASIC;
         }
-        if (isBudgetGroup(accountId)) {
-            throw new IllegalArgumentException("预算组不是核心资金账务主体，不能解析账本 Profile，accountId = "
+        if (isSpendControlScope(accountId)) {
+            throw new IllegalArgumentException("支出控制范围不是核心资金账务主体，不能解析账本 Profile，accountId = "
                     + accountId);
         }
         if (isMerchantFundingAccountType(accountId.type())) {
@@ -82,8 +82,8 @@ public class RouteSubjectSupport {
         return Objects.equals(accountId.type(), FundsSubjectType.CREDIT_ACCOUNT.name());
     }
 
-    public boolean isBudgetGroup(@NonNull FundsAccountId accountId) {
-        return Objects.equals(accountId.type(), LEGACY_BUDGET_GROUP_ACCOUNT_TYPE);
+    public boolean isSpendControlScope(@NonNull FundsAccountId accountId) {
+        return Objects.equals(accountId.type(), SPEND_CONTROL_SCOPE_ACCOUNT_TYPE);
     }
 
     private boolean isExternalAccountType(String accountType) {

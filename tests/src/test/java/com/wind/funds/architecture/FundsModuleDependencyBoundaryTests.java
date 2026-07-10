@@ -216,7 +216,7 @@ class FundsModuleDependencyBoundaryTests {
             "wallet account resource service", List.of(
                     "com.wind.funds.wallet.service.FundingAccountService",
                     "com.wind.funds.wallet.service.CreditAccountService",
-                    "com.wind.funds.wallet.service.BudgetGroupService"));
+                    "com.wind.funds.wallet.service.SpendControlScopeService"));
 
     /**
      * 场景：core 承载资金 DSL、枚举、值对象和端口契约。

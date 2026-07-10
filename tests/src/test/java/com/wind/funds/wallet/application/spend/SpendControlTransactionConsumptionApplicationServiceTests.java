@@ -168,7 +168,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String SPEND_DECISION_DIGEST = "sha256:sctc-decision";
 
-    private static final String BUDGET_GROUP_SN = "budget_sctc";
+    private static final String SPEND_CONTROL_SCOPE_SN = "budget_sctc";
 
     private static final String PERIOD_ID = "2026-07";
 
@@ -259,7 +259,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.CONSUMED);
         assertThat(activity.getOriginalMovementSn()).isEqualTo(RESERVED_ACTIVITY_SN);
         assertThat(activity.getTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
-        assertThat(activity.getControlScopeId()).isEqualTo(BUDGET_GROUP_SN);
+        assertThat(activity.getControlScopeId()).isEqualTo(SPEND_CONTROL_SCOPE_SN);
         assertThat(activity.getPeriodId()).isEqualTo(PERIOD_ID);
         assertThat(activity.getAmount()).isEqualTo(60L);
 
@@ -440,10 +440,10 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     /**
-     * 场景：同一预算控制范围和 Spend Rule 下存在多个目标账户，交易成功只消费其中一个账户的控制占用。
+     * 场景：同一支出控制范围和 Spend Rule 下存在多个目标账户，交易成功只消费其中一个账户的控制占用。
      * 输入：两个信用账户分别存在 RESERVED 控制额度变动，其中一个账户发生成功资金交易并记录 CONSUMED。
      * 输出：按目标账户查询预算控制投影时，只解释该账户的占用和消费。
-     * 红线：交易消费服务不得让同预算组下其他账户或其他卡的控制额度变动污染当前账户投影。
+     * 红线：交易消费服务不得让同支出控制范围下其他账户或其他卡的控制额度变动污染当前账户投影。
      */
     @Test
     void testConsumeProjectionShouldFilterTargetAccountWithoutMixingOtherAccountMovements() {
@@ -1226,7 +1226,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setSpendDecisionSn(SPEND_DECISION_SN)
                 .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
                 .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
-                .setControlScopeId(BUDGET_GROUP_SN);
+                .setControlScopeId(SPEND_CONTROL_SCOPE_SN);
     }
 
     private RecordSpendControlMovementRequest recordRequest(SpendControlAdmissionDecisionDTO decision,
@@ -1284,7 +1284,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setControlScopeId(BUDGET_GROUP_SN)
+                .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                 .setPeriodId(PERIOD_ID)
                 .setReasonCode("BUSINESS_CONFIRMED_REFUND")
                 .setOperatorId("system")
@@ -1304,7 +1304,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setControlScopeId(BUDGET_GROUP_SN)
+                .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                 .setPeriodId(PERIOD_ID)
                 .setReasonCode("INITIALIZE_TEST_LIMIT")
                 .setOperatorId("system")
@@ -1315,7 +1315,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private BudgetControlProjectionQuery projectionQuery() {
         return new BudgetControlProjectionQuery()
                 .setTenantId(TENANT_ID)
-                .setControlScopeId(BUDGET_GROUP_SN)
+                .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
                 .setPeriodId(PERIOD_ID)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setSpendRuleId(SPEND_RULE_ID)

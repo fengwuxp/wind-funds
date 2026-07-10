@@ -45,7 +45,7 @@ public class FundsAuthorizationInstructionConverter {
 
     private static final long TRUSTED_FORCE_SETTLE_LIMIT_AMOUNT = 60L;
 
-    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
 
     private final FundsInstructionAmountSupport amountSupport;
 
@@ -61,7 +61,7 @@ public class FundsAuthorizationInstructionConverter {
     public @NonNull FundsInstructionSpec convertToAuthorizeInstruction(
             @NonNull FundsAuthorizationTransactionAuthorizeRequest request,
             @NonNull WindOperator operator) {
-        assertNotBudgetGroup(request.getAccountId(), "授权交易账户不能是预算组");
+        assertNotSpendControlScope(request.getAccountId(), "授权交易账户不能是支出控制范围");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put(FundsInstructionContextKeys.APPROVED, request.getApproved());
@@ -303,8 +303,8 @@ public class FundsAuthorizationInstructionConverter {
         return Map.copyOf(result);
     }
 
-    private void assertNotBudgetGroup(@NonNull FundsAccountId accountId, @NonNull String message) {
-        AssertUtils.isFalse(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE.equals(accountId.type()), message);
+    private void assertNotSpendControlScope(@NonNull FundsAccountId accountId, @NonNull String message) {
+        AssertUtils.isFalse(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE.equals(accountId.type()), message);
     }
 
     private @NonNull FundsOperationActorSpec operationActor(@NonNull WindOperator operator) {

@@ -72,8 +72,8 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
     private static final String ALLOW_NEGATIVE_BALANCE_AGING_REQUIRED_MESSAGE =
             "受控负余额调账缺少账龄起点";
 
-    private static final String BUDGET_GROUP_ADJUST_FORBIDDEN_MESSAGE =
-            "预算组额度调整已迁移到预算控制活动，不允许通过余额控制路由入账";
+    private static final String SPEND_CONTROL_SCOPE_ADJUST_FORBIDDEN_MESSAGE =
+            "支出控制范围额度调整已迁移到预算控制活动，不允许通过余额控制路由入账";
 
     private static final String ALLOW_NEGATIVE_BALANCE_LIMIT_CURRENCY_MESSAGE =
             "受控负余额调账上限币种必须与本次金额币种一致";
@@ -169,8 +169,8 @@ public class BalanceControlFundsInstructionRouteResolver implements RouteResolve
         if (routeSubjectSupport.isCreditAccount(accountId)) {
             return resolveCreditLimitAdjust(instruction, accountId);
         }
-        if (routeSubjectSupport.isBudgetGroup(accountId)) {
-            throw new IllegalArgumentException(BUDGET_GROUP_ADJUST_FORBIDDEN_MESSAGE);
+        if (routeSubjectSupport.isSpendControlScope(accountId)) {
+            throw new IllegalArgumentException(SPEND_CONTROL_SCOPE_ADJUST_FORBIDDEN_MESSAGE);
         }
         throw new IllegalArgumentException(UNSUPPORTED_ADJUST_SUBJECT_TYPE_MESSAGE + accountId.type());
     }

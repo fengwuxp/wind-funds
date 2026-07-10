@@ -84,14 +84,14 @@ import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.request.CreateAccountHierarchyBindingRequest;
-import com.wind.funds.wallet.model.request.CreateBudgetGroupRequest;
+import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.service.AccountHierarchyService;
-import com.wind.funds.wallet.service.BudgetGroupService;
+import com.wind.funds.wallet.service.SpendControlScopeService;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
-import com.wind.funds.wallet.services.impl.BudgetGroupServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendControlScopeServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
@@ -163,7 +163,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     private static final int MAX_LEDGER_BUCKET_SIZE = 50;
 
-    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
 
     private static final List<String> FLOW_TEST_TABLES = List.of(
             "t_ledger_entry",
@@ -175,7 +175,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             "t_account_hierarchy_binding",
             "t_funding_account",
             "t_credit_account",
-            "t_budget_group",
+            "t_spend_control_scope",
             "t_ledger");
 
     @Autowired
@@ -200,7 +200,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected AccountHierarchyService accountHierarchyService;
 
     @Autowired
-    protected BudgetGroupService budgetGroupService;
+    protected SpendControlScopeService spendControlScopeService;
 
     @Autowired
     private LedgerTransactionMapper ledgerTransactionMapper;
@@ -306,16 +306,16 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return fundingAccountMapper.selectCountByQuery(wrapper) > 0;
     }
 
-    private boolean budgetGroupExists(String budgetGroupSn) {
+    private boolean spendControlScopeExists(String spendControlScopeSn) {
         Long count = jdbcTemplate.queryForObject("""
                         SELECT COUNT(*)
-                        FROM t_budget_group
+                        FROM t_spend_control_scope
                         WHERE tenant_id = ?
                           AND sn = ?
                         """,
                 Long.class,
                 TENANT_ID,
-                budgetGroupSn);
+                spendControlScopeSn);
         return count != null && count > 0;
     }
 
@@ -392,22 +392,22 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setCurrency(CURRENCY));
     }
 
-    protected void ensureBudgetGroup(FundsAccountId accountId) {
-        assertThat(accountId.type()).isEqualTo(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE);
-        if (budgetGroupExists(accountId.id())) {
+    protected void ensureSpendControlScope(FundsAccountId accountId) {
+        assertThat(accountId.type()).isEqualTo(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE);
+        if (spendControlScopeExists(accountId.id())) {
             return;
         }
-        budgetGroupService.createBudgetGroup(new CreateBudgetGroupRequest()
+        spendControlScopeService.createSpendControlScope(new CreateSpendControlScopeRequest()
                 .setSn(accountId.id())
                 .setTenantId(TENANT_ID)
-                .setOwnerId("owner_" + accountId.id())
+                .setOwnerId("owner_scope")
                 .setOwnerType(FundsAccountOwnerType.USER)
-                .setBudgetType(DefaultFundsAccountType.BUDGET_GROUP.name())
+                .setScopeType(DefaultFundsAccountType.SPEND_CONTROL_SCOPE.name())
                 .setCurrency(CURRENCY));
     }
 
-    protected void ensureBudgetGroupWithoutLedgers(FundsAccountId accountId) {
-        ensureBudgetGroup(accountId);
+    protected void ensureSpendControlScopeWithoutLedgers(FundsAccountId accountId) {
+        ensureSpendControlScope(accountId);
         assertThat(findLedgers(accountId)).isEmpty();
     }
 
@@ -1125,8 +1125,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         return FundsAccountId.immutable(accountId, FundsSubjectType.CREDIT_ACCOUNT.name());
     }
 
-    protected static FundsAccountId budgetGroup(String accountId) {
-        return FundsAccountId.immutable(accountId, LEGACY_BUDGET_GROUP_ACCOUNT_TYPE);
+    protected static FundsAccountId spendControlScope(String accountId) {
+        return FundsAccountId.immutable(accountId, SPEND_CONTROL_SCOPE_ACCOUNT_TYPE);
     }
 
     protected static FundsAccountId cashMappingAccount() {
@@ -1342,7 +1342,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             AccountHierarchyServiceImpl.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
-            BudgetGroupServiceImpl.class,
+            SpendControlScopeServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             PlatformFundingAccountServiceImpl.class
     })

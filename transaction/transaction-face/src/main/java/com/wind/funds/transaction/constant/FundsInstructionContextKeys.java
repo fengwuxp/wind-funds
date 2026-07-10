@@ -51,7 +51,7 @@ public final class FundsInstructionContextKeys {
 
     public static final String EXTERNAL_DISPUTE_REF = "externalDisputeRef";
 
-    public static final String LINKED_BUDGET_GROUP_ID = "linkedBudgetGroupId";
+    public static final String LINKED_SPEND_CONTROL_SCOPE_ID = "linkedSpendControlScopeId";
 
     public static final String INCREASE = "increase";
 

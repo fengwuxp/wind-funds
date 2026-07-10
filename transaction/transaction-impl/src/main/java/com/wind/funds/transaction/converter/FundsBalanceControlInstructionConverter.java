@@ -61,10 +61,10 @@ public class FundsBalanceControlInstructionConverter {
     private static final String EXTERNAL_BALANCE_ANOMALY_RESPONSIBILITY_REQUIRED_MESSAGE =
             "外部余额异常纠偏缺少责任归属引用";
 
-    private static final String BUDGET_GROUP_ADJUST_FORBIDDEN_MESSAGE =
-            "预算组额度调整已迁移到预算控制活动，不允许通过资金余额控制入账";
+    private static final String SPEND_CONTROL_SCOPE_ADJUST_FORBIDDEN_MESSAGE =
+            "支出控制范围额度调整已迁移到预算控制活动，不允许通过资金余额控制入账";
 
-    private static final String LEGACY_BUDGET_GROUP_ACCOUNT_TYPE = "BUDGET_GROUP";
+    private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = "SPEND_CONTROL_SCOPE";
 
     private static final String UNFREEZE_REFERENCE_REQUIRED_MESSAGE = "余额解冻缺少原冻结单引用";
 
@@ -126,7 +126,7 @@ public class FundsBalanceControlInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToAdjustInstruction(@NonNull FundsBalanceAdjustRequest request,
                                                                     @NonNull WindOperator operator) {
-        assertNotBudgetGroupAdjust(request);
+        assertNotSpendControlScopeAdjust(request);
         requireAdjustAuditContext(request);
         FundsTransactionEventType eventType = isLimitAdjust(request)
                 ? FundsTransactionEventType.LIMIT_ADJUST
@@ -157,9 +157,9 @@ public class FundsBalanceControlInstructionConverter {
         requireExternalBalanceAnomalyContext(request);
     }
 
-    private void assertNotBudgetGroupAdjust(@NonNull FundsBalanceAdjustRequest request) {
-        AssertUtils.isFalse(LEGACY_BUDGET_GROUP_ACCOUNT_TYPE.equals(request.getAccountId().type()),
-                BUDGET_GROUP_ADJUST_FORBIDDEN_MESSAGE);
+    private void assertNotSpendControlScopeAdjust(@NonNull FundsBalanceAdjustRequest request) {
+        AssertUtils.isFalse(SPEND_CONTROL_SCOPE_ACCOUNT_TYPE.equals(request.getAccountId().type()),
+                SPEND_CONTROL_SCOPE_ADJUST_FORBIDDEN_MESSAGE);
     }
 
     private void requireExternalBalanceAnomalyContext(@NonNull FundsBalanceAdjustRequest request) {
