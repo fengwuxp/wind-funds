@@ -52,7 +52,7 @@ import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerTr
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 
 /**
- * 信用账户和支出控制范围控制账本初始化服务层测试。
+ * 信用账户账本初始化、支出控制范围元数据创建服务层测试。
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
@@ -236,7 +236,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void testCreateSpendControlScopeShouldNotInitializeLifetimeControlLedgersByDefault() {
+    void testCreateSpendControlScopeShouldCreateLifetimeMetadataWithoutLedgersByDefault() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Long spendControlScopeId = spendControlScopeService.createSpendControlScope(createSpendControlScopeRequest());
@@ -259,7 +259,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void testCreateSpendControlScopeShouldNotInitializeMonthlyControlLedgersWhenSpecified() {
+    void testCreateSpendControlScopeShouldCreateMonthlyMetadataWithoutLedgersWhenSpecified() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Long spendControlScopeId = spendControlScopeService.createSpendControlScope(createSpendControlScopeRequest()
@@ -292,8 +292,8 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     /**
      * 场景：企业自定义周期预算缺少周期策略。
      * 输入：periodType = CUSTOM_CYCLE，periodId 已指定，但 periodPolicy 为空。
-     * 输出：创建被拒绝，不留下支出控制范围或控制账本。
-     * 红线：自定义周期缺少规则版本时不得初始化预算账本，避免后续额度跨周期误用。
+     * 输出：创建被拒绝，不留下支出控制范围、控制流水或预算投影。
+     * 红线：自定义周期缺少规则版本时不得生成预算控制流水或预算投影，避免后续额度跨周期误用。
      */
     @Test
     void testCreateSpendControlScopeShouldRejectCustomCycleWithoutPeriodPolicy() {
@@ -346,7 +346,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void testCreateSpendControlScopeShouldNotInitializeCustomCycleControlLedgers() {
+    void testCreateSpendControlScopeShouldCreateCustomCycleMetadataWithoutLedgers() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Long spendControlScopeId = spendControlScopeService.createSpendControlScope(

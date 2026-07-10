@@ -475,7 +475,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     /**
      * 场景：支出控制范围被误作为授权交易账户。
      * 输入：提交支出控制范围授权批准 10。
-     * 输出：授权请求被拒绝；支出控制范围控制账本和平台结算账户余额保持请求前状态。
+     * 输出：授权请求被拒绝；不生成支出控制流水或核心余额投影，平台结算账户余额保持请求前状态。
      * 预期：支出控制范围只能作为预算控制上下文，不得被授权交易包装成资金价值主体。
      * 红线：支出控制范围不得生成授权 route、posting、ledger entry 或余额投影。
      */

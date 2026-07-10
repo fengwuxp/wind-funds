@@ -440,8 +440,8 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     /**
-     * 场景：支出控制范围虽然存在控制账本，但被外部 LedgerTransactionSpec 作为账本分录主体提交。
-     * 输入：POSTED 交易携带 SPEND_CONTROL_SCOPE 分录，并绑定同主体同科目同币种的账本。
+     * 场景：外部错误预置支出控制范围账本记录，并把它作为账本分录主体提交。
+     * 输入：POSTED 交易携带 SPEND_CONTROL_SCOPE 分录，并绑定同主体同科目同币种的伪造账本。
      * 输出：入账入口在事实落库和余额投影前拒绝请求。
      * 红线：支出控制范围只能作为预算控制 scope 和审计上下文，不得成为核心资金账本分录主体。
      */
@@ -466,8 +466,8 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     /**
-     * 场景：支出控制范围发起 LIMIT 与 AVAILABLE 之间的额度控制调账。
-     * 输入：SPEND_CONTROL_SCOPE 分录均绑定 CONTROL 类预算控制账本。
+     * 场景：外部错误把支出控制范围包装成 LIMIT 与 AVAILABLE 额度控制调账。
+     * 输入：SPEND_CONTROL_SCOPE 分录均绑定测试预置的 CONTROL 类账本记录。
      * 输出：入账入口在事实落库和余额投影前拒绝请求。
      * 红线：预算额度调整已迁移到 Spend Control Activity 和 Budget Control Projection，
      * SPEND_CONTROL_SCOPE 不得再作为任何 LedgerEntry 主体。
