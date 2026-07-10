@@ -45,4 +45,19 @@ class FundsSubjectTypeContractTests {
         assertThat(DefaultFundsAccountType.isCreditCard("SPEND_CONTROL_SCOPE")).isFalse();
         assertThat(DefaultFundsAccountType.isExternalAccount("SPEND_CONTROL_SCOPE")).isFalse();
     }
+
+    /**
+     * 场景：账户分类入口接收到未知账户类型。
+     * 预期：未知类型继续按非法枚举处理，避免吞掉上游脏数据。
+     * 红线：只有已确认的跨域哨兵值可以降级为空分类结果。
+     */
+    @Test
+    void testUnknownAccountTypeShouldStillFailFast() {
+        assertThatThrownBy(() -> FundingAccountType.fromAccountType("UNKNOWN_ACCOUNT_TYPE"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> CreditFundsAccountType.fromAccountType("UNKNOWN_ACCOUNT_TYPE"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> ExternalFundsAccountType.fromAccountType("UNKNOWN_ACCOUNT_TYPE"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }
