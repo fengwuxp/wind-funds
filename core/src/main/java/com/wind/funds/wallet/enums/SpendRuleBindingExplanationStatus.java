@@ -12,7 +12,7 @@ import lombok.Getter;
  */
 @AllArgsConstructor
 @Getter
-public enum SpendRuleAssignmentExplanationStatus implements DescriptiveEnum {
+public enum SpendRuleBindingExplanationStatus implements DescriptiveEnum {
 
     EFFECTIVE("当前有效"),
     NOT_YET_EFFECTIVE("尚未生效"),

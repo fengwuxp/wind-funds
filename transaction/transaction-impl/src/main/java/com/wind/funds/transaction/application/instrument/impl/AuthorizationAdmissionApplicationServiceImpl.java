@@ -91,7 +91,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
     private boolean hasSpendControlEvidence(AuthorizeByPaymentInstrumentRequest request) {
         return StringUtils.hasText(request.getSpendRuleId())
                 || StringUtils.hasText(request.getSpendRuleVersion())
-                || StringUtils.hasText(request.getSpendRuleAssignmentSn())
+                || StringUtils.hasText(request.getSpendRuleBindingSn())
                 || request.getSpendRuleScopeType() != null
                 || StringUtils.hasText(request.getSpendRuleScopeId())
                 || StringUtils.hasText(request.getSpendDecisionSn())
@@ -158,7 +158,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
                 .setBusinessSn(request.getBusinessSn())
                 .setSpendRuleId(request.getSpendRuleId())
                 .setSpendRuleVersion(request.getSpendRuleVersion())
-                .setSpendRuleAssignmentSn(request.getSpendRuleAssignmentSn())
+                .setSpendRuleBindingSn(request.getSpendRuleBindingSn())
                 .setSpendRuleScopeType(request.getSpendRuleScopeType())
                 .setSpendRuleScopeId(request.getSpendRuleScopeId())
                 .setSpendDecisionSn(request.getSpendDecisionSn())
@@ -240,7 +240,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
         putIfNotNull(values, "decisionRecordId", spendControlDecision.getSpendDecisionRecordId());
         putIfText(values, "ruleId", spendControlDecision.getSpendRuleId());
         putIfText(values, "ruleVersion", spendControlDecision.getSpendRuleVersion());
-        putIfText(values, "assignmentSn", spendControlDecision.getSpendRuleAssignmentSn());
+        putIfText(values, "spendRuleBindingSn", spendControlDecision.getSpendRuleBindingSn());
         if (spendControlDecision.getSpendRuleScopeType() != null) {
             values.put("scopeType", spendControlDecision.getSpendRuleScopeType().name());
         }

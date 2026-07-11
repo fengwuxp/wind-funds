@@ -1,7 +1,7 @@
 package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
-import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class SpendRuleAssignmentDTO implements Serializable {
+public class SpendRuleBindingDTO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 3621330559126513154L;
@@ -43,7 +43,7 @@ public class SpendRuleAssignmentDTO implements Serializable {
     private Long tenantId;
 
     @Schema(description = "规则挂载流水号")
-    private String assignmentSn;
+    private String sn;
 
     @Schema(description = "Spend Rule 标识")
     private String ruleId;
@@ -70,7 +70,7 @@ public class SpendRuleAssignmentDTO implements Serializable {
     private LocalDateTime effectiveTo;
 
     @Schema(description = "挂载状态")
-    private SpendRuleAssignmentStatus status;
+    private SpendRuleBindingStatus status;
 
     @Schema(description = "描述")
     private String description;

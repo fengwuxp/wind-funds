@@ -150,7 +150,7 @@ Highnote 公开发卡文档中的 financial account、ledger、ledger entry、pa
 
 模块归属约束：Spend Rule 的规则定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制视图归属于 `wallet` 支出控制域；`transaction` 只消费已固化 `spendRuleDecision`、控制额度变动引用和 route snapshot 做历史投影解释；`ledger` 只接受可入账账户主体。交易模块不得直接依赖 wallet Spend Rule application service、DAL Entity 或 Mapper 来计算、更新或解释规则。公共类名、表名和字段统一使用 `SpendRuleDecisionRecord`、`SpendControlMovement`、`movementSn`、`movementType` 和 `movementDigest` 等最终交付名。历史兼容变动类型 `ADMISSION_RECORDED`、`REJECTED_RECORDED` 只用于存量解释，不再作为新的控制额度变动 DSL 输入；新的准入 / 拒绝证据必须进入决策记录。`SpendControlMovementType` 作为控制额度变动 DSL 类型分类契约，统一声明预算投影参与性、调额类、释放类和决策记录兼容类。
 
-当前代码映射：Spend Rule DSL v1.1 示例均为 `fixtureLevel=DOC_ONLY`，用于锁定产品和测试契约，不等同于当前 Controller 报文、数据库列或可执行规则引擎。当前服务层把规则版本正文落到 `ruleSpec / ruleDigest`，把规则挂载流水落到 `assignmentSn`，把决策证据落到单条 `SpendRuleDecisionRecord` 记录；`evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 是目标解释契约，未作为独立明细或字段完成落库。后续若把 DOC_ONLY DSL 升级为机器契约，必须新增 fixture、解析器、测试和独立工程边界。
+当前代码映射：Spend Rule DSL v1.1 示例均为 `fixtureLevel=DOC_ONLY`，用于锁定产品和测试契约，不等同于当前 Controller 报文、数据库列或可执行规则引擎。当前服务层把规则版本正文落到 `ruleSpec / ruleDigest`，把规则挂载自身流水落到 `sn`，把决策证据落到单条 `SpendRuleDecisionRecord` 记录；决策证据引用挂载时使用 `spendRuleBindingSn`。`evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 是目标解释契约，未作为独立明细或字段完成落库。后续若把 DOC_ONLY DSL 升级为机器契约，必须新增 fixture、解析器、测试和独立工程边界。
 
 | 设计面 | 对齐口径 | 必须保持 | 工程影响 |
 | --- | --- | --- | --- |
@@ -218,7 +218,7 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
   "safetySpec": {
     "unknownFieldPolicy": "FAIL_CLOSED",
     "sensitiveFieldPolicy": "DIGEST_OR_MASK_ONLY",
-    "historyReplayPolicy": "USE_VERSION_AND_ASSIGNMENT_SNAPSHOT",
+    "historyReplayPolicy": "USE_VERSION_AND_BINDING_SNAPSHOT",
     "digestAlgorithm": "SHA-256"
   },
   "versionDigest": "sha256:version-body"
@@ -240,10 +240,10 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
 
 ```json
 {
-  "dslCaseId": "DSL-SPEND-RULE-ASSIGNMENT-001",
+  "dslCaseId": "DSL-SPEND-RULE-BINDING-001",
   "fixtureLevel": "DOC_ONLY",
-  "specType": "SpendRuleAssignmentSpec",
-  "assignmentSn": "ASG-VCC-001",
+  "specType": "SpendRuleBindingSpec",
+  "sn": "ASG-VCC-001",
   "ruleId": "SR-VCC-DAILY-USD-001",
   "ruleVersion": "v1",
   "scopeRef": {
@@ -256,7 +256,7 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
     "effectiveFrom": "2026-06-22T00:00:00Z",
     "effectiveTo": "2026-07-22T00:00:00Z"
   },
-  "assignmentDigest": "sha256:assignment-body"
+  "bindingDigest": "sha256:binding-body"
 }
 ```
 
@@ -279,7 +279,7 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
   "decisionReasonMessage": "Merchant category is not allowed for this card",
   "evaluatedRules": [
     {
-      "assignmentSn": "ASG-VCC-001",
+      "spendRuleBindingSn": "ASG-VCC-001",
       "ruleId": "SR-VCC-DAILY-USD-001",
       "ruleVersion": "v1",
       "decision": "ALLOW",
@@ -292,7 +292,7 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
       "ruleDigest": "sha256:version-body"
     },
     {
-      "assignmentSn": "ASG-MCC-001",
+      "spendRuleBindingSn": "ASG-MCC-001",
       "ruleId": "SR-MCC-DENY-001",
       "ruleVersion": "v3",
       "decision": "DECLINE",
@@ -320,7 +320,7 @@ Spend Rule DSL v1.1 只作为规则事实和控制证据契约，不作为规则
 2. 多规则冲突必须记录 `decisionPolicy`，不能只保存最后一条命中规则。
 3. 拒绝或待复核时必须能证明无资金事实副作用；文档 DSL 只表达目标断言，真实证明需要服务层测试。
 4. 交易投影解释只能读取历史 `decisionSn`、规则版本、挂载摘要和决策摘要，不按当前规则重算。
-5. 当前代码只持久化单条 rule / assignment / scope 决策记录；多规则 `evaluatedRules` 明细、`decisionPolicy` 和 `finalDecision` 是目标态解释契约，不得在未落库前声明生产完成。
+5. 当前代码只持久化单条 rule / binding / scope 决策记录；多规则 `evaluatedRules` 明细、`decisionPolicy` 和 `finalDecision` 是目标态解释契约，不得在未落库前声明生产完成。
 
 场景覆盖：
 

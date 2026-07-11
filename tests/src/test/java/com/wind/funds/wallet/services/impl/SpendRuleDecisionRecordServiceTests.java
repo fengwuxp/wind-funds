@@ -12,7 +12,7 @@ import com.wind.funds.wallet.model.dto.SpendRuleDecisionExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionRecordDTO;
 import com.wind.funds.wallet.model.query.SpendRuleDecisionExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleDecisionRecordQuery;
-import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
@@ -54,7 +54,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
 
     private static final String RULE_DIGEST = "sha256:spend-rule-decision-record-service";
 
-    private static final String ASSIGNMENT_SN = "spend_rule_decision_record_service_assignment";
+    private static final String BINDING_SN = "spend_rule_decision_record_service_binding";
 
     private static final String DECISION_SN = "spend_rule_decision_record_service_001";
 
@@ -85,7 +85,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
      */
     @Test
     void testRecordDecisionShouldBeAvailableThroughServiceQueryWithoutFundsSideEffect() {
-        prepareRuleVersionAndAssignment();
+        prepareRuleVersionAndBinding();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         SpendRuleDecisionRecordDTO decision =
@@ -109,7 +109,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
         assertThat(explanation.getEvidenceRefs()).contains(
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
-                "spendRuleAssignment:" + ASSIGNMENT_SN,
+                "spendRuleBinding:" + BINDING_SN,
                 "spendRuleDecision:" + DECISION_SN,
                 "paymentInstrument:" + PAYMENT_INSTRUMENT_SN);
         assertNoTransactionFacts(BUSINESS_SN);
@@ -124,7 +124,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
      */
     @Test
     void testRecordDecisionShouldReuseIdempotentDecisionRecordWithoutFundsSideEffect() {
-        prepareRuleVersionAndAssignment();
+        prepareRuleVersionAndBinding();
         SpendRuleDecisionRecordDTO first = spendRuleDecisionRecordService.recordDecision(rejectedDecisionRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -164,10 +164,10 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
         cleanupDecisionRecordServiceTestData();
     }
 
-    private void prepareRuleVersionAndAssignment() {
+    private void prepareRuleVersionAndBinding() {
         spendRuleDefinitionService.createDefinition(createDefinitionRequest());
         spendRuleDefinitionService.publishVersion(publishVersionRequest());
-        spendRuleDefinitionService.assignVersion(assignmentRequest());
+        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest());
     }
 
     private CreateSpendRuleDefinitionRequest createDefinitionRequest() {
@@ -192,10 +192,10 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
                 .setDescription("发布 Spend Rule 版本");
     }
 
-    private AssignSpendRuleVersionRequest assignmentRequest() {
-        return new AssignSpendRuleVersionRequest()
+    private CreateSpendRuleBindingRequest bindingRequest() {
+        return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setAssignmentSn(ASSIGNMENT_SN)
+                .setSn(BINDING_SN)
                 .setRuleId(RULE_ID)
                 .setRuleVersion(RULE_VERSION)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
@@ -213,7 +213,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
                 .setDecisionSn(DECISION_SN)
                 .setRuleId(RULE_ID)
                 .setRuleVersion(RULE_VERSION)
-                .setAssignmentSn(ASSIGNMENT_SN)
+                .setSpendRuleBindingSn(BINDING_SN)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setScopeId(PAYMENT_INSTRUMENT_SN)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
@@ -230,7 +230,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
     private void cleanupDecisionRecordServiceTestData() {
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+        jdbcTemplate.update("DELETE FROM t_spend_rule_binding WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
@@ -271,7 +271,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
     @Import({
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
-            SpendRuleAssignmentServiceImpl.class,
+            SpendRuleBindingServiceImpl.class,
             SpendRuleDecisionRecordServiceImpl.class
     })
     static class Config {

@@ -320,14 +320,14 @@ CREATE TABLE `t_spend_rule_version`
 -- ----------------------------
 -- Spend Rule 挂载表
 -- ----------------------------
-DROP TABLE IF EXISTS `t_spend_rule_assignment`;
-CREATE TABLE `t_spend_rule_assignment`
+DROP TABLE IF EXISTS `t_spend_rule_binding`;
+CREATE TABLE `t_spend_rule_binding`
 (
     `id`              BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
     `gmt_create`      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `gmt_modified`    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     `tenant_id`       BIGINT(20)  NOT NULL COMMENT '租户 ID',
-    `assignment_sn`   VARCHAR(64) NOT NULL COMMENT '规则挂载流水号',
+    `sn`              VARCHAR(64) NOT NULL COMMENT '规则挂载流水号',
     `rule_id`         VARCHAR(64) NOT NULL COMMENT 'Spend Rule 标识',
     `rule_version`    VARCHAR(64) NOT NULL COMMENT 'Spend Rule 版本',
     `scope_type`      VARCHAR(50) NOT NULL COMMENT '挂载范围类型',
@@ -339,10 +339,10 @@ CREATE TABLE `t_spend_rule_assignment`
     `status`          VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
     `description`     VARCHAR(512)         DEFAULT NULL COMMENT '描述',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_spend_rule_assignment_sn` (`tenant_id`, `assignment_sn`),
-    UNIQUE KEY `uk_spend_rule_assignment_scope` (`tenant_id`, `scope_type`, `scope_id`, `rule_id`, `rule_version`),
-    KEY `idx_spend_rule_assignment_rule` (`tenant_id`, `rule_id`, `rule_version`, `status`),
-    KEY `idx_spend_rule_assignment_scope` (`tenant_id`, `scope_type`, `scope_id`, `status`)
+    UNIQUE KEY `uk_spend_rule_binding_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_spend_rule_binding_scope` (`tenant_id`, `scope_type`, `scope_id`, `rule_id`, `rule_version`),
+    KEY `idx_spend_rule_binding_rule` (`tenant_id`, `rule_id`, `rule_version`, `status`),
+    KEY `idx_spend_rule_binding_scope` (`tenant_id`, `scope_type`, `scope_id`, `status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = 'Spend Rule 挂载表';
 
@@ -358,7 +358,7 @@ CREATE TABLE `t_spend_rule_decision_record`
     `decision_sn`     VARCHAR(64) NOT NULL COMMENT '规则决策流水号',
     `rule_id`         VARCHAR(64) NOT NULL COMMENT 'Spend Rule 标识',
     `rule_version`    VARCHAR(64) NOT NULL COMMENT 'Spend Rule 版本',
-    `assignment_sn`   VARCHAR(64)          DEFAULT NULL COMMENT '规则挂载流水号',
+    `spend_rule_binding_sn` VARCHAR(64)    DEFAULT NULL COMMENT '规则挂载流水号',
     `scope_type`      VARCHAR(50) NOT NULL COMMENT '控制范围类型',
     `scope_id`        VARCHAR(64) NOT NULL COMMENT '控制范围标识',
     `instrument_sn`   VARCHAR(64)          DEFAULT NULL COMMENT '支付工具号',
@@ -375,7 +375,7 @@ CREATE TABLE `t_spend_rule_decision_record`
     KEY `idx_spend_rule_decision_record_business` (`tenant_id`, `business_scene`, `business_sn`),
     KEY `idx_spend_rule_decision_record_rule` (`tenant_id`, `rule_id`, `rule_version`),
     KEY `idx_spend_rule_decision_record_scope` (`tenant_id`, `scope_type`, `scope_id`),
-    KEY `idx_spend_rule_decision_record_assignment` (`tenant_id`, `assignment_sn`)
+    KEY `idx_spend_rule_decision_record_binding` (`tenant_id`, `spend_rule_binding_sn`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = 'Spend Rule 决策记录表';
 

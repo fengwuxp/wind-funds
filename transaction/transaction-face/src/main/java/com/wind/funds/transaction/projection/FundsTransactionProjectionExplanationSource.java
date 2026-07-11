@@ -155,7 +155,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String SPEND_RULE_VERSION_FIELD = "ruleVersion";
 
-    private static final String SPEND_RULE_ASSIGNMENT_SN_FIELD = "assignmentSn";
+    private static final String SPEND_RULE_BINDING_SN_FIELD = "spendRuleBindingSn";
 
     private static final String SPEND_RULE_SCOPE_TYPE_FIELD = "scopeType";
 
@@ -173,7 +173,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             SPEND_RULE_DECISION_RECORD_ID_FIELD,
             SPEND_RULE_ID_FIELD,
             SPEND_RULE_VERSION_FIELD,
-            SPEND_RULE_ASSIGNMENT_SN_FIELD,
+            SPEND_RULE_BINDING_SN_FIELD,
             SPEND_RULE_SCOPE_TYPE_FIELD,
             SPEND_RULE_SCOPE_ID_FIELD,
             SPEND_RULE_DECISION_SN_FIELD,
@@ -422,7 +422,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         if (StringUtils.hasText(ruleId) && StringUtils.hasText(ruleVersion)) {
             refs.add("spendRuleVersion:" + ruleId + ":" + ruleVersion);
         }
-        addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_ASSIGNMENT_SN_FIELD, "spendRuleAssignment");
+        addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_BINDING_SN_FIELD, "spendRuleBinding");
         addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_DECISION_SN_FIELD, "spendRuleDecision");
         addSpendRuleDecisionEvidence(refs, decision, SPEND_RULE_DECISION_RECORD_ID_FIELD, "spendRuleDecisionRecord");
     }

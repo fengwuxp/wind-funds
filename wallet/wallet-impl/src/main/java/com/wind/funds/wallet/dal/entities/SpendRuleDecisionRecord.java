@@ -69,7 +69,7 @@ public class SpendRuleDecisionRecord implements Serializable, TenantIsolationObj
     /**
      * 规则挂载流水号。
      */
-    private String assignmentSn;
+    private String spendRuleBindingSn;
 
     /**
      * 控制范围类型。

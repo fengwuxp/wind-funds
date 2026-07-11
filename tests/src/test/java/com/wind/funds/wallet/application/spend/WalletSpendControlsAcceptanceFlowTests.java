@@ -40,7 +40,7 @@ import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleEvaluationDecisionDTO;
 import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
 import com.wind.funds.wallet.model.request.AdjustBudgetControlLimitRequest;
-import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
@@ -66,7 +66,7 @@ import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServic
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendControlMovementServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDecisionRecordServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
@@ -121,7 +121,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
 
     private static final String SPEND_RULE_VERSION = "2026-07-02.1";
 
-    private static final String SPEND_RULE_ASSIGNMENT_SN = "wallet_spend_controls_assignment";
+    private static final String SPEND_RULE_BINDING_SN = "wallet_spend_controls_binding";
 
     private static final String SPEND_RULE_DIGEST = "sha256:wallet-spend-controls-rule";
 
@@ -254,7 +254,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
         spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleDefinitionService.assignVersion(assignSpendRuleVersionRequest());
+        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest());
     }
 
     private AdjustBudgetControlLimitRequest adjustLimitRequest() {
@@ -305,7 +305,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setBusinessSn(BUSINESS_SN)
                 .setSpendRuleId(evaluation.getRuleId())
                 .setSpendRuleVersion(evaluation.getRuleVersion())
-                .setSpendRuleAssignmentSn(SPEND_RULE_ASSIGNMENT_SN)
+                .setSpendRuleBindingSn(SPEND_RULE_BINDING_SN)
                 .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn("decision_wallet_spend_controls_001")
@@ -389,10 +389,10 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setDescription("发布企业钱包员工卡月度授权额度规则版本");
     }
 
-    private AssignSpendRuleVersionRequest assignSpendRuleVersionRequest() {
-        return new AssignSpendRuleVersionRequest()
+    private CreateSpendRuleBindingRequest createSpendRuleBindingRequest() {
+        return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setAssignmentSn(SPEND_RULE_ASSIGNMENT_SN)
+                .setSn(SPEND_RULE_BINDING_SN)
                 .setRuleId(SPEND_RULE_ID)
                 .setRuleVersion(SPEND_RULE_VERSION)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
@@ -497,7 +497,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+        jdbcTemplate.update("DELETE FROM t_spend_rule_binding WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
@@ -532,7 +532,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
             PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
-            SpendRuleAssignmentServiceImpl.class,
+            SpendRuleBindingServiceImpl.class,
             SpendRuleDecisionRecordServiceImpl.class,
             SpendControlAdmissionApplicationServiceImpl.class,
             SpendControlMovementServiceImpl.class,

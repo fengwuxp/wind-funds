@@ -49,7 +49,7 @@ public class RecordSpendRuleDecisionRecordRequest implements Serializable {
     private String ruleVersion;
 
     @Schema(description = "规则挂载流水号")
-    private String assignmentSn;
+    private String spendRuleBindingSn;
 
     @Schema(description = "控制范围类型")
     @NotNull

@@ -61,7 +61,7 @@ import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleType;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
-import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
@@ -90,7 +90,7 @@ import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.PlatformFundingAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDecisionRecordServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
@@ -168,7 +168,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
     private static final LocalDateTime SPEND_RULE_EFFECTIVE_TO = LocalDateTime.now().withNano(0).plusDays(30);
 
-    private static final String SPEND_RULE_ASSIGNMENT_SN = "auth_admission_spend_rule_assignment";
+    private static final String SPEND_RULE_BINDING_SN = "auth_admission_spend_rule_binding";
 
     private static final String SPEND_RULE_DIGEST = "sha256:auth-admission-spend-rule";
 
@@ -455,7 +455,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private void cleanupAuthorizationAdmissionTestData() {
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+        jdbcTemplate.update("DELETE FROM t_spend_rule_binding WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
@@ -597,7 +597,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private void prepareSpendRuleDecisionData() {
         spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
         spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleDefinitionService.assignVersion(assignSpendRuleVersionRequest());
+        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest());
     }
 
     private CreateSpendRuleDefinitionRequest createSpendRuleDefinitionRequest() {
@@ -622,10 +622,10 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setDescription("发布支付工具授权准入规则版本");
     }
 
-    private AssignSpendRuleVersionRequest assignSpendRuleVersionRequest() {
-        return new AssignSpendRuleVersionRequest()
+    private CreateSpendRuleBindingRequest createSpendRuleBindingRequest() {
+        return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setAssignmentSn(SPEND_RULE_ASSIGNMENT_SN)
+                .setSn(SPEND_RULE_BINDING_SN)
                 .setRuleId(SPEND_RULE_ID)
                 .setRuleVersion(SPEND_RULE_VERSION)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
@@ -660,7 +660,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         return authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendRuleAssignmentSn(SPEND_RULE_ASSIGNMENT_SN)
+                .setSpendRuleBindingSn(SPEND_RULE_BINDING_SN)
                 .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_DECISION_SN)
@@ -674,7 +674,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         return authorizeRequest(businessSn, instrumentSn)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendRuleAssignmentSn(SPEND_RULE_ASSIGNMENT_SN)
+                .setSpendRuleBindingSn(SPEND_RULE_BINDING_SN)
                 .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_PASS_DECISION_SN)
@@ -897,7 +897,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(explanation.evidenceRefs())
                 .contains("spendRule:" + SPEND_RULE_ID,
                         "spendRuleVersion:" + SPEND_RULE_ID + ":" + SPEND_RULE_VERSION,
-                        "spendRuleAssignment:" + SPEND_RULE_ASSIGNMENT_SN,
+                        "spendRuleBinding:" + SPEND_RULE_BINDING_SN,
                         "spendRuleDecision:" + SPEND_PASS_DECISION_SN);
         assertThat(explanation.payload()).containsKey("spendRuleDecision");
         @SuppressWarnings("unchecked")
@@ -906,7 +906,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(spendRuleDecision)
                 .containsEntry("ruleId", SPEND_RULE_ID)
                 .containsEntry("ruleVersion", SPEND_RULE_VERSION)
-                .containsEntry("assignmentSn", SPEND_RULE_ASSIGNMENT_SN)
+                .containsEntry("spendRuleBindingSn", SPEND_RULE_BINDING_SN)
                 .containsEntry("scopeType", SpendRuleScopeType.PAYMENT_INSTRUMENT.name())
                 .containsEntry("scopeId", PAYMENT_INSTRUMENT_SN)
                 .containsEntry("decisionSn", SPEND_PASS_DECISION_SN)
@@ -927,7 +927,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                   AND decision_sn = ?
                   AND rule_id = ?
                   AND rule_version = ?
-                  AND assignment_sn = ?
+                  AND spend_rule_binding_sn = ?
                   AND scope_type = ?
                   AND scope_id = ?
                   AND instrument_sn = ?
@@ -936,7 +936,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                   AND decision_result = ?
                   AND decision_digest = ?
                 """, Integer.class, TENANT_ID, SPEND_DECISION_SN, SPEND_RULE_ID, SPEND_RULE_VERSION,
-                SPEND_RULE_ASSIGNMENT_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT.name(), PAYMENT_INSTRUMENT_SN,
+                SPEND_RULE_BINDING_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT.name(), PAYMENT_INSTRUMENT_SN,
                 PAYMENT_INSTRUMENT_SN, BUSINESS_SCENE, SPEND_REJECT_BUSINESS_SN,
                 SpendControlDecisionResult.REJECTED.name(), SPEND_DECISION_DIGEST)).isEqualTo(1);
     }
@@ -1000,7 +1000,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             SpendControlAdmissionApplicationServiceImpl.class,
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
-            SpendRuleAssignmentServiceImpl.class,
+            SpendRuleBindingServiceImpl.class,
             SpendRuleDecisionRecordServiceImpl.class,
             AuthorizationAdmissionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,

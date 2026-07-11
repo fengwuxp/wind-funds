@@ -2,23 +2,23 @@ package com.wind.funds.wallet.services.impl;
 
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
-import com.wind.funds.wallet.enums.SpendRuleAssignmentExplanationStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleType;
 import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
-import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
-import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleBindingExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
-import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
-import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
-import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.query.SpendRuleBindingExplainQuery;
+import com.wind.funds.wallet.model.query.SpendRuleBindingQuery;
+import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
-import com.wind.funds.wallet.service.SpendRuleAssignmentService;
+import com.wind.funds.wallet.service.SpendRuleBindingService;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +67,7 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
 
     private static final String CHANGED_RULE_DIGEST = "sha256:spend-rule-definition-service-changed";
 
-    private static final String ASSIGNMENT_SN = "spend_rule_definition_service_assignment";
+    private static final String BINDING_SN = "spend_rule_definition_service_binding";
 
     private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_definition_service_card";
 
@@ -91,7 +91,7 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
     private SpendRuleDefinitionService spendRuleDefinitionService;
 
     @Autowired
-    private SpendRuleAssignmentService spendRuleAssignmentService;
+    private SpendRuleBindingService spendRuleBindingService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -130,21 +130,21 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
      * 红线：挂载只生成控制事实，不创建决策记录、资金交易或账本事实。
      */
     @Test
-    void testAssignVersionShouldReuseIdempotentAssignmentWithoutFundsSideEffect() {
+    void testCreateSpendRuleBindingShouldReuseIdempotentBindingWithoutFundsSideEffect() {
         publishRuleVersions();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        SpendRuleAssignmentDTO first = spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN,
+        SpendRuleBindingDTO first = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN,
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN));
-        SpendRuleAssignmentDTO replayed = spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN,
+        SpendRuleBindingDTO replayed = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN,
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN));
 
         assertThat(replayed.getId()).isEqualTo(first.getId());
-        assertThat(countAssignments()).isEqualTo(1);
+        assertThat(countBindings()).isEqualTo(1);
         assertNoDecisionRecord();
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -157,46 +157,46 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
      * 红线：挂载读服务只读，不记录决策记录、不创建资金交易或账本事实。
      */
     @Test
-    void testQueryAndExplainAssignmentShouldBeReadOnlyWithoutFundsSideEffect() {
+    void testQueryAndExplainBindingShouldBeReadOnlyWithoutFundsSideEffect() {
         publishRuleVersions();
-        spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN,
+        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN,
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN));
-        spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_future",
+        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_future",
                 FUTURE_RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setEffectiveFrom(LocalDateTime.now().plusDays(1))
                 .setEffectiveTo(LocalDateTime.now().plusDays(2)));
-        spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_expired",
+        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_expired",
                 EXPIRED_RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setEffectiveFrom(LocalDateTime.now().minusDays(3))
                 .setEffectiveTo(LocalDateTime.now().minusDays(2)));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        List<SpendRuleAssignmentDTO> assignments = spendRuleAssignmentService.queryAssignments(
-                new SpendRuleAssignmentQuery()
+        List<SpendRuleBindingDTO> bindings = spendRuleBindingService.querySpendRuleBindings(
+                new SpendRuleBindingQuery()
                         .setTenantId(TENANT_ID)
                         .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                         .setScopeId(PAYMENT_INSTRUMENT_SN)
                         .setEffectiveOnly(Boolean.TRUE));
-        SpendRuleAssignmentExplanationDTO effective = explainAssignment(ASSIGNMENT_SN);
-        SpendRuleAssignmentExplanationDTO future = explainAssignment(ASSIGNMENT_SN + "_future");
-        SpendRuleAssignmentExplanationDTO expired = explainAssignment(ASSIGNMENT_SN + "_expired");
+        SpendRuleBindingExplanationDTO effective = explainSpendRuleBinding(BINDING_SN);
+        SpendRuleBindingExplanationDTO future = explainSpendRuleBinding(BINDING_SN + "_future");
+        SpendRuleBindingExplanationDTO expired = explainSpendRuleBinding(BINDING_SN + "_expired");
 
-        assertThat(assignments).hasSize(1);
-        assertThat(assignments.getFirst().getAssignmentSn()).isEqualTo(ASSIGNMENT_SN);
-        assertThat(effective.getExplanationStatus()).isEqualTo(SpendRuleAssignmentExplanationStatus.EFFECTIVE);
+        assertThat(bindings).hasSize(1);
+        assertThat(bindings.getFirst().getSn()).isEqualTo(BINDING_SN);
+        assertThat(effective.getExplanationStatus()).isEqualTo(SpendRuleBindingExplanationStatus.EFFECTIVE);
         assertThat(future.getExplanationStatus())
-                .isEqualTo(SpendRuleAssignmentExplanationStatus.NOT_YET_EFFECTIVE);
-        assertThat(expired.getExplanationStatus()).isEqualTo(SpendRuleAssignmentExplanationStatus.EXPIRED);
+                .isEqualTo(SpendRuleBindingExplanationStatus.NOT_YET_EFFECTIVE);
+        assertThat(expired.getExplanationStatus()).isEqualTo(SpendRuleBindingExplanationStatus.EXPIRED);
         assertThat(effective.getEvidenceRefs()).contains(
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
-                "spendRuleAssignment:" + ASSIGNMENT_SN);
+                "spendRuleBinding:" + BINDING_SN);
         assertNoDecisionRecord();
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -213,43 +213,43 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
         publishRuleVersions();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_payment_card",
+        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_payment_card",
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN,
                 SpendRuleScopeType.PAYMENT_INSTRUMENT));
-        spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_funding_account",
+        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_funding_account",
                 RULE_VERSION,
                 FUNDING_ACCOUNT_SCOPE_ID,
                 SpendRuleScopeType.FUNDING_ACCOUNT));
-        spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_credit_account",
+        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_credit_account",
                 RULE_VERSION,
                 CREDIT_ACCOUNT_SCOPE_ID,
                 SpendRuleScopeType.CREDIT_ACCOUNT));
-        spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_account_hierarchy",
+        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_account_hierarchy",
                 RULE_VERSION,
                 ACCOUNT_HIERARCHY_SCOPE_ID,
                 SpendRuleScopeType.ACCOUNT_HIERARCHY));
-        spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_card_product",
+        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_card_product",
                 RULE_VERSION,
                 CARD_PRODUCT_SCOPE_ID,
                 SpendRuleScopeType.BUSINESS_SCENE));
 
-        assertThat(queryAssignmentSns(SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN))
-                .containsExactly(ASSIGNMENT_SN + "_payment_card");
-        assertThat(queryAssignmentSns(SpendRuleScopeType.FUNDING_ACCOUNT, FUNDING_ACCOUNT_SCOPE_ID))
-                .containsExactly(ASSIGNMENT_SN + "_funding_account");
-        assertThat(queryAssignmentSns(SpendRuleScopeType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SCOPE_ID))
-                .containsExactly(ASSIGNMENT_SN + "_credit_account");
-        assertThat(queryAssignmentSns(SpendRuleScopeType.ACCOUNT_HIERARCHY, ACCOUNT_HIERARCHY_SCOPE_ID))
-                .containsExactly(ASSIGNMENT_SN + "_account_hierarchy");
-        assertThat(queryAssignmentSns(SpendRuleScopeType.BUSINESS_SCENE, CARD_PRODUCT_SCOPE_ID))
-                .containsExactly(ASSIGNMENT_SN + "_card_product");
-        assertThat(explainAssignment(ASSIGNMENT_SN + "_account_hierarchy").getEvidenceRefs())
+        assertThat(queryBindingSns(SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN))
+                .containsExactly(BINDING_SN + "_payment_card");
+        assertThat(queryBindingSns(SpendRuleScopeType.FUNDING_ACCOUNT, FUNDING_ACCOUNT_SCOPE_ID))
+                .containsExactly(BINDING_SN + "_funding_account");
+        assertThat(queryBindingSns(SpendRuleScopeType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SCOPE_ID))
+                .containsExactly(BINDING_SN + "_credit_account");
+        assertThat(queryBindingSns(SpendRuleScopeType.ACCOUNT_HIERARCHY, ACCOUNT_HIERARCHY_SCOPE_ID))
+                .containsExactly(BINDING_SN + "_account_hierarchy");
+        assertThat(queryBindingSns(SpendRuleScopeType.BUSINESS_SCENE, CARD_PRODUCT_SCOPE_ID))
+                .containsExactly(BINDING_SN + "_card_product");
+        assertThat(explainSpendRuleBinding(BINDING_SN + "_account_hierarchy").getEvidenceRefs())
                 .contains("spendRuleScope:" + SpendRuleScopeType.ACCOUNT_HIERARCHY + ":"
                         + ACCOUNT_HIERARCHY_SCOPE_ID);
         assertNoDecisionRecord();
@@ -269,25 +269,25 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
         spendRuleDefinitionService.publishVersion(publishVersionRequest(RULE_DIGEST, RULE_SPEC));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_missing_version",
+        assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_missing_version",
                 "missing-version",
                 PAYMENT_INSTRUMENT_SN)))
                 .hasMessageContaining("Spend Rule 版本不存在");
-        assertThatThrownBy(() -> spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_no_policy",
+        assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_no_policy",
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setConflictPolicy(null)))
                 .hasMessageContaining("Spend Rule 挂载冲突策略不能为空");
-        assertThatThrownBy(() -> spendRuleDefinitionService.assignVersion(assignmentRequest(
-                ASSIGNMENT_SN + "_invalid_window",
+        assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_SN + "_invalid_window",
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setEffectiveFrom(EFFECTIVE_TO)
                 .setEffectiveTo(EFFECTIVE_FROM)))
                 .hasMessageContaining("Spend Rule 挂载生效结束时间必须晚于开始时间");
-        assertThat(countAssignments()).isZero();
+        assertThat(countBindings()).isZero();
         assertNoDecisionRecord();
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -312,11 +312,11 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 publishVersionRequest(EXPIRED_RULE_DIGEST, RULE_SPEC).setRuleVersion(EXPIRED_RULE_VERSION));
     }
 
-    private SpendRuleAssignmentExplanationDTO explainAssignment(String assignmentSn) {
-        return spendRuleAssignmentService.explainAssignment(
-                new SpendRuleAssignmentExplainQuery()
+    private SpendRuleBindingExplanationDTO explainSpendRuleBinding(String sn) {
+        return spendRuleBindingService.explainSpendRuleBinding(
+                new SpendRuleBindingExplainQuery()
                         .setTenantId(TENANT_ID)
-                        .setAssignmentSn(assignmentSn));
+                        .setSn(sn));
     }
 
     private CreateSpendRuleDefinitionRequest createDefinitionRequest() {
@@ -337,23 +337,23 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 .setRuleSpec(ruleSpec)
                 .setRuleDigest(ruleDigest)
                 .setOperatorId("codex")
-                .setAuditReferenceSn("grant:SPEND-RULE-DEFINITION-VERSION-ASSIGNMENT-SERVICE-SPLIT")
+                .setAuditReferenceSn("grant:SPEND-RULE-DEFINITION-VERSION-BINDING-SERVICE-SPLIT")
                 .setDescription("发布 Spend Rule 版本");
     }
 
-    private AssignSpendRuleVersionRequest assignmentRequest(String assignmentSn,
+    private CreateSpendRuleBindingRequest bindingRequest(String sn,
                                                             String ruleVersion,
                                                             String scopeId) {
-        return assignmentRequest(assignmentSn, ruleVersion, scopeId, SpendRuleScopeType.PAYMENT_INSTRUMENT);
+        return bindingRequest(sn, ruleVersion, scopeId, SpendRuleScopeType.PAYMENT_INSTRUMENT);
     }
 
-    private AssignSpendRuleVersionRequest assignmentRequest(String assignmentSn,
+    private CreateSpendRuleBindingRequest bindingRequest(String sn,
                                                             String ruleVersion,
                                                             String scopeId,
                                                             SpendRuleScopeType scopeType) {
-        return new AssignSpendRuleVersionRequest()
+        return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setAssignmentSn(assignmentSn)
+                .setSn(sn)
                 .setRuleId(RULE_ID)
                 .setRuleVersion(ruleVersion)
                 .setScopeType(scopeType)
@@ -365,21 +365,21 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 .setDescription("挂载 Spend Rule 版本");
     }
 
-    private List<String> queryAssignmentSns(SpendRuleScopeType scopeType, String scopeId) {
-        return spendRuleAssignmentService.queryAssignments(new SpendRuleAssignmentQuery()
+    private List<String> queryBindingSns(SpendRuleScopeType scopeType, String scopeId) {
+        return spendRuleBindingService.querySpendRuleBindings(new SpendRuleBindingQuery()
                         .setTenantId(TENANT_ID)
                         .setScopeType(scopeType)
                         .setScopeId(scopeId)
                         .setEffectiveOnly(Boolean.TRUE))
                 .stream()
-                .map(SpendRuleAssignmentDTO::getAssignmentSn)
+                .map(SpendRuleBindingDTO::getSn)
                 .toList();
     }
 
     private void cleanupSpendRuleDefinitionServiceTestData() {
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+        jdbcTemplate.update("DELETE FROM t_spend_rule_binding WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, RULE_ID);
@@ -387,9 +387,9 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 TENANT_ID, RULE_ID);
     }
 
-    private int countAssignments() {
+    private int countBindings() {
         return jdbcTemplate.queryForObject("""
-                SELECT COUNT(*) FROM t_spend_rule_assignment
+                SELECT COUNT(*) FROM t_spend_rule_binding
                 WHERE tenant_id = ? AND rule_id = ?
                 """, Integer.class, TENANT_ID, RULE_ID);
     }
@@ -428,7 +428,7 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
     @Import({
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
-            SpendRuleAssignmentServiceImpl.class
+            SpendRuleBindingServiceImpl.class
     })
     static class Config {
     }

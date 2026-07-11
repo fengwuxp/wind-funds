@@ -11,13 +11,13 @@ import com.wind.funds.wallet.dal.entities.table.SpendRuleDecisionRecordNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendRuleDecisionRecordMapper;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
-import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionExplanationDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDecisionRecordDTO;
 import com.wind.funds.wallet.model.query.SpendRuleDecisionExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleDecisionRecordQuery;
 import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
-import com.wind.funds.wallet.service.SpendRuleAssignmentService;
+import com.wind.funds.wallet.service.SpendRuleBindingService;
 import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.service.SpendRuleVersionService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
@@ -51,7 +51,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
 
     private final SpendRuleVersionService spendRuleVersionService;
 
-    private final SpendRuleAssignmentService spendRuleAssignmentService;
+    private final SpendRuleBindingService spendRuleBindingService;
 
     private @NonNull Long insertDecisionRecord(
             @NonNull RecordSpendRuleDecisionRecordRequest request) {
@@ -70,7 +70,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         spendRuleVersionService.getPublishedVersion(request.getTenantId(),
                 request.getRuleId(),
                 request.getRuleVersion());
-        assertAssignmentMatchesIfPresent(request);
+        assertBindingMatchesIfPresent(request);
         SpendRuleDecisionRecordDTO existing = findDecisionRecord(request.getTenantId(), request.getDecisionSn());
         if (existing != null) {
             assertSameDecisionRecord(request, existing);
@@ -164,27 +164,27 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         }
     }
 
-    private void assertAssignmentMatchesIfPresent(RecordSpendRuleDecisionRecordRequest request) {
-        if (request.getAssignmentSn() == null) {
+    private void assertBindingMatchesIfPresent(RecordSpendRuleDecisionRecordRequest request) {
+        if (request.getSpendRuleBindingSn() == null) {
             return;
         }
-        SpendRuleAssignmentDTO assignment =
-                spendRuleAssignmentService.getActiveAssignment(request.getTenantId(), request.getAssignmentSn());
-        assertAssignmentEffectiveNow(request, assignment);
-        AssertUtils.isTrue(Objects.equals(assignment.getRuleId(), request.getRuleId())
-                        && Objects.equals(assignment.getRuleVersion(), request.getRuleVersion())
-                        && assignment.getScopeType() == request.getScopeType()
-                        && Objects.equals(assignment.getScopeId(), request.getScopeId()),
+        SpendRuleBindingDTO binding =
+                spendRuleBindingService.getActiveSpendRuleBinding(request.getTenantId(), request.getSpendRuleBindingSn());
+        assertBindingEffectiveNow(request, binding);
+        AssertUtils.isTrue(Objects.equals(binding.getRuleId(), request.getRuleId())
+                        && Objects.equals(binding.getRuleVersion(), request.getRuleVersion())
+                        && binding.getScopeType() == request.getScopeType()
+                        && Objects.equals(binding.getScopeId(), request.getScopeId()),
                 "Spend Rule 决策记录与挂载不一致，decisionSn = {}",
                 request.getDecisionSn());
     }
 
-    private void assertAssignmentEffectiveNow(RecordSpendRuleDecisionRecordRequest request,
-                                              SpendRuleAssignmentDTO assignment) {
+    private void assertBindingEffectiveNow(RecordSpendRuleDecisionRecordRequest request,
+                                              SpendRuleBindingDTO binding) {
         LocalDateTime now = LocalDateTime.now();
-        AssertUtils.isTrue(!now.isBefore(assignment.getEffectiveFrom()) && now.isBefore(assignment.getEffectiveTo()),
-                "Spend Rule 挂载未在当前时间生效，assignmentSn = {}",
-                request.getAssignmentSn());
+        AssertUtils.isTrue(!now.isBefore(binding.getEffectiveFrom()) && now.isBefore(binding.getEffectiveTo()),
+                "Spend Rule 挂载未在当前时间生效，spendRuleBindingSn = {}",
+                request.getSpendRuleBindingSn());
     }
 
     private SpendRuleDecisionRecordDTO readIdempotentDecisionRecordAfterInsertConflict(
@@ -202,7 +202,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
                                        SpendRuleDecisionRecordDTO existing) {
         AssertUtils.isTrue(Objects.equals(existing.getRuleId(), request.getRuleId())
                         && Objects.equals(existing.getRuleVersion(), request.getRuleVersion())
-                        && Objects.equals(existing.getAssignmentSn(), request.getAssignmentSn())
+                        && Objects.equals(existing.getSpendRuleBindingSn(), request.getSpendRuleBindingSn())
                         && existing.getScopeType() == request.getScopeType()
                         && Objects.equals(existing.getScopeId(), request.getScopeId())
                         && Objects.equals(existing.getInstrumentSn(), request.getInstrumentSn())
@@ -240,8 +240,8 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         List<String> refs = new ArrayList<>();
         refs.add("spendRule:" + decision.getRuleId());
         refs.add("spendRuleVersion:" + decision.getRuleId() + "@" + decision.getRuleVersion());
-        if (StringUtils.hasText(decision.getAssignmentSn())) {
-            refs.add("spendRuleAssignment:" + decision.getAssignmentSn());
+        if (StringUtils.hasText(decision.getSpendRuleBindingSn())) {
+            refs.add("spendRuleBinding:" + decision.getSpendRuleBindingSn());
         }
         refs.add("spendRuleScope:" + decision.getScopeType() + ":" + decision.getScopeId());
         refs.add("spendRuleDecision:" + decision.getDecisionSn());
@@ -259,7 +259,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         return StringUtils.hasText(query.getDecisionSn())
                 || StringUtils.hasText(query.getRuleId())
                 || StringUtils.hasText(query.getRuleVersion())
-                || StringUtils.hasText(query.getAssignmentSn())
+                || StringUtils.hasText(query.getSpendRuleBindingSn())
                 || query.getScopeType() != null
                 || StringUtils.hasText(query.getScopeId())
                 || StringUtils.hasText(query.getInstrumentSn())
@@ -287,7 +287,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
                 .and(ref.decisionSn.eq(query.getDecisionSn()))
                 .and(ref.ruleId.eq(query.getRuleId()))
                 .and(ref.ruleVersion.eq(query.getRuleVersion()))
-                .and(ref.assignmentSn.eq(query.getAssignmentSn()))
+                .and(ref.spendRuleBindingSn.eq(query.getSpendRuleBindingSn()))
                 .and(ref.scopeType.eq(query.getScopeType()))
                 .and(ref.scopeId.eq(query.getScopeId()))
                 .and(ref.instrumentSn.eq(query.getInstrumentSn()))
@@ -305,7 +305,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         result.setDecisionSn(request.getDecisionSn());
         result.setRuleId(request.getRuleId());
         result.setRuleVersion(request.getRuleVersion());
-        result.setAssignmentSn(request.getAssignmentSn());
+        result.setSpendRuleBindingSn(request.getSpendRuleBindingSn());
         result.setScopeType(request.getScopeType());
         result.setScopeId(request.getScopeId());
         result.setInstrumentSn(request.getInstrumentSn());
@@ -328,7 +328,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
                 .setDecisionSn(entity.getDecisionSn())
                 .setRuleId(entity.getRuleId())
                 .setRuleVersion(entity.getRuleVersion())
-                .setAssignmentSn(entity.getAssignmentSn())
+                .setSpendRuleBindingSn(entity.getSpendRuleBindingSn())
                 .setScopeType(entity.getScopeType())
                 .setScopeId(entity.getScopeId())
                 .setInstrumentSn(entity.getInstrumentSn())

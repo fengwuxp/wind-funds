@@ -1,9 +1,9 @@
 package com.wind.funds.wallet.service;
 
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
-import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
-import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
 import org.jspecify.annotations.NonNull;
@@ -44,7 +44,7 @@ public interface SpendRuleDefinitionService {
      * @param request 规则挂载请求
      * @return 规则挂载
      */
-    @NonNull SpendRuleAssignmentDTO assignVersion(@NonNull AssignSpendRuleVersionRequest request);
+    @NonNull SpendRuleBindingDTO createSpendRuleBinding(@NonNull CreateSpendRuleBindingRequest request);
 
     /**
      * 根据主键查询 Spend Rule 定义。

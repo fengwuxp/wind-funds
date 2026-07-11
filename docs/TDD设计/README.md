@@ -141,7 +141,7 @@ Spend Rule 服务层分层测试口径：
 4. application service 测试不得要求被测对象直接访问 Mapper / Repository；基础服务测试可以覆盖 Mapper-backed 真实服务行为。
 5. `SpendRuleDecisionRecordServiceTests`、`SpendRuleDefinitionServiceTests` 和 `SpendRuleDefinitionServiceFlowTests` 是当前服务测试资产，分别覆盖决策记录幂等 / 窄查询 / 失败无资金副作用，以及规则定义 / 版本 / 挂载的标准基础服务和服务流行为。
 
-Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、`assignmentSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立工程变更边界。
+Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、挂载自身 `sn`、决策证据引用挂载的 `spendRuleBindingSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立工程变更边界。
 
 Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界为准。接入口径已同步为“上游决策、wallet 固化证据、transaction 消费快照”；轻量规则评估、控制窗口、外部决策证据、多规则最终裁决摘要、挂载范围语义、币种控制、本地授权时间窗口和滚动窗口次数均已有对应测试与契约锚点，并持续断言不得产生越界资金事实；它只证明只读候选评估和 H2 测试 schema 的目标索引基线，不证明并发强一致频控拦截或真实生产 DDL / 慢查询评审已完成。准入 / 授权公共请求、控制流水和投影统一使用 `controlScopeId` 表达控制范围。
 
@@ -293,7 +293,7 @@ Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界�
 
 授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核通过授权后继准入卡承接强制完成、无授权退款、争议裁决资金结果承接和并发竞争；支付工具与 Spend Rule 的生产可用性通过支付工具准入卡承接工具准入、资金责任解析、授权 application facade、Spend Rule 控制和只读投影。支付工具及周边支持队列整体排在账本账目、钱包基础能力和交易内核之后；未形成独立工程边界前，TDD 只能继续做差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 
-资金责任目标字段已统一为并落地 `targetSubjectType + targetSubjectId`，允许资源关系表达资金账户和信用账户目标主体；平台角色责任主体、完整 `FundingAllocationDecision` 摘要、route snapshot、账户层级快照和回放断言仍需后续工程边界。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、`SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleAssignment`、`SpendRuleDecisionRecord` / `SpendRuleDecisionRecord`、`SpendControlMovement` / `SpendControlMovement`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产交付完成。
+资金责任目标字段已统一为并落地 `targetSubjectType + targetSubjectId`，允许资源关系表达资金账户和信用账户目标主体；平台角色责任主体、完整 `FundingAllocationDecision` 摘要、route snapshot、账户层级快照和回放断言仍需后续工程边界。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、`SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleBinding`、`SpendRuleDecisionRecord` / `SpendRuleDecisionRecord`、`SpendControlMovement` / `SpendControlMovement`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产交付完成。
 
 ## 生产验证准入口径
 

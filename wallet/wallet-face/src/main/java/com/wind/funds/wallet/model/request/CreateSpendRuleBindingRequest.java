@@ -26,7 +26,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class AssignSpendRuleVersionRequest implements Serializable {
+public class CreateSpendRuleBindingRequest implements Serializable {
 
     @Serial
     private static final long serialVersionUID = -2079566949699936611L;
@@ -37,7 +37,7 @@ public class AssignSpendRuleVersionRequest implements Serializable {
 
     @Schema(description = "规则挂载流水号，用于幂等和审计追踪")
     @NotBlank
-    private String assignmentSn;
+    private String sn;
 
     @Schema(description = "Spend Rule 标识")
     @NotBlank

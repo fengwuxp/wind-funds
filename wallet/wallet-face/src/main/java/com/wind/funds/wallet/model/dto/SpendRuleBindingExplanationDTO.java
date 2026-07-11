@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.model.dto;
 
-import com.wind.funds.wallet.enums.SpendRuleAssignmentExplanationStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -24,13 +24,13 @@ import java.util.List;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class SpendRuleAssignmentExplanationDTO implements Serializable {
+public class SpendRuleBindingExplanationDTO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = -6744329661650188692L;
 
     @Schema(description = "规则挂载快照")
-    private SpendRuleAssignmentDTO assignment;
+    private SpendRuleBindingDTO binding;
 
     @Schema(description = "评估时间")
     private LocalDateTime evaluatedAt;
@@ -39,7 +39,7 @@ public class SpendRuleAssignmentExplanationDTO implements Serializable {
     private Boolean effective;
 
     @Schema(description = "解释状态")
-    private SpendRuleAssignmentExplanationStatus explanationStatus;
+    private SpendRuleBindingExplanationStatus explanationStatus;
 
     @Schema(description = "解释说明")
     private String explanationMessage;

@@ -76,7 +76,7 @@ public class ResolveSpendControlAdmissionRequest {
     private String spendRuleVersion;
 
     @Schema(description = "Spend Rule 挂载流水号，可为空；为空时只记录规则和控制范围")
-    private String spendRuleAssignmentSn;
+    private String spendRuleBindingSn;
 
     @Schema(description = "Spend Rule 控制范围类型")
     @NotNull

@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class SpendRuleAssignmentExplainQuery implements Serializable {
+public class SpendRuleBindingExplainQuery implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1554872230993303283L;
@@ -35,7 +35,7 @@ public class SpendRuleAssignmentExplainQuery implements Serializable {
 
     @Schema(description = "规则挂载流水号")
     @NotBlank
-    private String assignmentSn;
+    private String sn;
 
     @Schema(description = "解释评估时间，不传使用当前时间")
     private LocalDateTime explainAt;

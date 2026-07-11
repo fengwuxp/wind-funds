@@ -69,7 +69,7 @@ public class AuthorizeByPaymentInstrumentRequest {
     private String spendRuleVersion;
 
     @Schema(description = "Spend Rule 挂载流水号，可为空；为空时只记录规则和控制范围")
-    private String spendRuleAssignmentSn;
+    private String spendRuleBindingSn;
 
     @Schema(description = "Spend Rule 控制范围类型，携带支出控制准入决策证据时必填")
     private SpendRuleScopeType spendRuleScopeType;

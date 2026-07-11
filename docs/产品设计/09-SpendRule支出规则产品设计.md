@@ -146,8 +146,8 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | --- | --- | --- | --- |
 | SpendRuleDefinition | 规则定义，描述规则是什么、归谁管理、用于哪个规则域。 | ruleId、ruleCode、ruleName、ruleType、ruleDomain、ownerType、ownerId、status。 | DRAFT、ACTIVE、SUSPENDED、ARCHIVED。 |
 | SpendRuleVersion | 不可变规则版本，描述规则规格 JSON、裁决动作和摘要。 | ruleId、ruleVersion、ruleSpec、ruleDigest；ruleSpec 可承载 display、matchSpec、counterSpec、limitSpec、decisionSpec、safetySpec。 | DRAFT、PUBLISHED、EXPIRED、RETIRED。 |
-| SpendRuleAssignment | 规则挂载，描述某一版本应用到哪个 scope、优先级、冲突策略和生效窗口。 | assignmentSn、ruleId、ruleVersion、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status。 | ACTIVE、SUSPENDED、EXPIRED、REMOVED。 |
-| SpendRuleDecisionRecord | 规则决策记录，描述一次请求的规则版本、挂载、范围、结果和原因。 | decisionSn、assignmentSn、ruleId、ruleVersion、scopeType、scopeId、instrumentSn、action、amount、currency、businessScene、businessSn、decisionResult、rejectReason、decisionDigest。 | RECORDED；记录不可改写，只能追加更正或新决策。 |
+| SpendRuleBinding | 规则挂载，描述某一版本应用到哪个 scope、优先级、冲突策略和生效窗口。 | sn、ruleId、ruleVersion、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status。 | ACTIVE、SUSPENDED、EXPIRED、REMOVED。 |
+| SpendRuleDecisionRecord | 规则决策记录，描述一次请求的规则版本、挂载、范围、结果和原因。 | decisionSn、spendRuleBindingSn、ruleId、ruleVersion、scopeType、scopeId、instrumentSn、action、amount、currency、businessScene、businessSn、decisionResult、rejectReason、decisionDigest。 | RECORDED；记录不可改写，只能追加更正或新决策。 |
 | SpendControlMovement | 规则执行后的控制额度变动流水，例如额度调整、预留、消耗、释放或退款补偿。 | movementSn、movementType、targetSubjectRef、amount、currency、spendRuleId、spendRuleVersion、spendDecisionSn、controlScopeId、periodId、movementDigest。 | 作为既有控制事实能力保留，不作为规则定义表。 |
 | BudgetControlProjection | 从控制额度变动流水派生的只读预算控制视图。 | controlScopeId、periodId、reservedAmount、consumedAmount、releasedAmount、remainingControlAmount、availableControlAmount、lastMovementSn。 | 可重建、可重放、不可反写账本余额。 |
 
@@ -167,15 +167,15 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 
 1. ruleId 表示系统内稳定标识，用于幂等、引用和回放。
 2. ruleCode 表示业务可读编码，面向运营配置和人工沟通。
-3. `assignmentSn`、`decisionSn`、`movementSn` 是当前服务层稳定流水号，用于幂等、回放和审计；产品沟通中的 assignmentId / movementSn 只作语义别名，不代表当前代码字段。
+3. `sn` 是 Spend Rule 挂载自身流水号；`spendRuleBindingSn` 是其他对象引用挂载时使用的字段；`decisionSn`、`movementSn` 分别是决策和控制流水号。
 4. 资金账户、信用账户、支出控制范围和支付工具的既有 sn 不在本文中统一改名为 code；若后续需要命名迁移，必须单独评估兼容和数据库迁移。
 
 当前代码对齐状态：
 
 | 产品语义 | 当前代码载体 | 已具备的服务层证据 | 不代表 |
 | --- | --- | --- | --- |
-| 规则定义、版本和挂载 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleAssignmentService`。 | 支持创建规则、发布不可变 `ruleSpec / ruleDigest` 版本、挂载 scope、查询和解释挂载；已证明版本摘要冲突、挂载幂等、挂载只读解释和失败无资金副作用。 | 不代表完整规则表达式引擎、运营后台、生产迁移已完成；不再保留规则大 application facade 或旧式领域命名服务作为目标入口。 |
-| 决策记录 | `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendRuleDecisionRecordQuery`、`SpendRuleDecisionExplainQuery`、`SpendRuleDecisionRecordService`。 | 支持按单条 rule / assignment / scope 固化决策结果、拒绝原因和 `decisionDigest`，支持按决策流水、业务流水、规则、挂载、scope、支付工具和决策结果做服务层只读查询，并可输出拒绝原因和证据引用；已证明拒绝、查询和解释无资金事实副作用。 | 不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
+| 规则定义、版本和挂载 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleBindingService`。 | 支持创建规则、发布不可变 `ruleSpec / ruleDigest` 版本、挂载 scope、查询和解释挂载；已证明版本摘要冲突、挂载幂等、挂载只读解释和失败无资金副作用。 | 不代表完整规则表达式引擎、运营后台、生产迁移已完成；不再保留规则大 application facade 或旧式领域命名服务作为目标入口。 |
+| 决策记录 | `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendRuleDecisionRecordQuery`、`SpendRuleDecisionExplainQuery`、`SpendRuleDecisionRecordService`。 | 支持按单条 rule / binding / scope 固化决策结果、拒绝原因和 `decisionDigest`，支持按决策流水、业务流水、规则、挂载、scope、支付工具和决策结果做服务层只读查询，并可输出拒绝原因和证据引用；已证明拒绝、查询和解释无资金事实副作用。 | 不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
 | 控制额度变动流水 | `SpendControlMovement`、`RecordSpendControlMovementRequest`、`SpendControlMovementType`。 | 支持调额、预留、消耗、释放、退款补偿和预算控制投影；周期额度流水携带 `controlScopeId`、`periodId`，且历史准入类 activity 不再允许新写入。 | 不代表控制事实是资金交易、账本交易或账本余额。 |
 | 预算控制投影 | `BudgetControlProjectionDTO`。 | 支持按 `controlScopeId + periodId` 查询当前或历史周期，并按控制流水重建 `limitAmount`、`consumedAmount`、`remainingControlAmount` 和 `availableControlAmount`。 | 不代表支出控制范围、Spend Rule 或控制视图可以作为账务主体。 |
 
@@ -193,11 +193,11 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | 规则定义管理 | 规则名称、类型、规则域、归属方和状态。 | 可被版本化和挂载的规则定义。 | 同一租户内 ruleId 唯一；停用规则不能新挂载。 |
 | 规则版本发布 | 规则规格 JSON、版本摘要、操作者和审计引用。 | 不可变规则版本。 | 发布后不得覆盖正文；新版本不影响历史解释。 |
 | 规则挂载 | scope、ruleId、version、priority、conflictPolicy、有效期。 | 可评估的挂载关系。 | 多规则冲突必须可解释；缺优先级或冲突策略不得生产启用。 |
-| 挂载查询与解释 | tenant、assignmentSn、scope、ruleId、version、评估时间。 | 当前有效挂载列表、挂载可用性状态和证据引用。 | 只读查询；不重新执行规则，不写决策记录，不生成资金交易或账本事实。 |
+| 挂载查询与解释 | tenant、sn、scope、ruleId、version、评估时间。 | 当前有效挂载列表、挂载可用性状态和证据引用。 | 只读查询；不重新执行规则，不写决策记录，不生成资金交易或账本事实。 |
 | 决策记录 | 支付工具快照、账户主体、预算 scope、金额币种、商户、MCC、国家、时间和业务场景。 | 决策流水、结果、拒绝原因、摘要。 | 拒绝停在交易内核前；通过只代表允许继续准入。 |
-| 决策记录查询与解释 | tenant、decisionSn、businessScene、businessSn、ruleId、version、assignmentSn、scope、instrumentSn、decisionResult。 | 决策记录列表、是否准入、拒绝原因和 evidenceRefs。 | 查询必须携带 tenantId 外的窄条件；解释只读读取历史决策，不重算规则、不调整额度、不写资金事实。 |
+| 决策记录查询与解释 | tenant、decisionSn、businessScene、businessSn、ruleId、version、spendRuleBindingSn、scope、instrumentSn、decisionResult。 | 决策记录列表、是否准入、拒绝原因和 evidenceRefs。 | 查询必须携带 tenantId 外的窄条件；解释只读读取历史决策，不重算规则、不调整额度、不写资金事实。 |
 | 控制额度变动流水记录 | 决策结果、控制范围、周期标识、目标账户主体、金额币种、交易结果。 | 预留、消耗、释放、过期、退款补偿或调整流水。 | 不生成资金交易、账本交易、账本分录或余额投影。 |
-| 规则时间线查询 | ruleId、ruleVersion、assignmentSn、decisionSn、业务流水、时间范围。 | 规则变更、挂载变更、决策记录和控制额度变动流水时间线。 | 查询只读，不修复状态，不重新评估历史。 |
+| 规则时间线查询 | ruleId、ruleVersion、spendRuleBindingSn、decisionSn、业务流水、时间范围。 | 规则变更、挂载变更、决策记录和控制额度变动流水时间线。 | 查询只读，不修复状态，不重新评估历史。 |
 | 交易投影解释 | 资金交易、route snapshot、支付工具快照、规则决策记录和控制额度变动流水。 | 用户、商户、运营、风控和客服可理解的规则命中解释。 | 投影不反写 route、posting、LedgerEntry 或 balance。 |
 
 ## 7. 业务流程、主流程和状态机
@@ -256,7 +256,7 @@ Spend Rule DSL v1.1 先锁定规则版本、规则挂载和决策证据三类契
 | decisionSpec | 条件通过、违反、证据缺失时的裁决。 | 通过、拒绝还是待复核，缺证据是否默认放行。 |
 | safetySpec | 未知字段、敏感字段、摘要和历史回放策略。 | 是否保存敏感原文，未来能否按历史证据解释。 |
 
-目标态的决策证据必须能解释多规则裁决：一次请求可以评估多条规则，决策记录需要保留 `evaluatedRules`、`decisionPolicy` 和 `finalDecision`。例如单笔限额通过但 MCC 规则拒绝时，最终裁决应说明采用 `DENY_OVERRIDES` 或等价冲突策略，而不是只保存最后一条命中规则。当前服务层最小交付先固化单条 rule / assignment / scope 的决策结果和摘要；完整多规则明细落库、冲突合成器和规则执行器必须另起工程边界。
+目标态的决策证据必须能解释多规则裁决：一次请求可以评估多条规则，决策记录需要保留 `evaluatedRules`、`decisionPolicy` 和 `finalDecision`。例如单笔限额通过但 MCC 规则拒绝时，最终裁决应说明采用 `DENY_OVERRIDES` 或等价冲突策略，而不是只保存最后一条命中规则。当前服务层最小交付先固化单条 rule / binding / scope 的决策结果和摘要；完整多规则明细落库、冲突合成器和规则执行器必须另起工程边界。
 
 产品验收口径：
 
@@ -414,7 +414,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 | 交接项 | 已确认内容 | 架构 / TDD 承接 |
 | --- | --- | --- |
 | 产品目标 | 统一支出规则语言，保护规则拒绝无资金事实副作用，支持历史解释。 | 系分需落到 wallet application、transaction 只读消费和 ledger 主体护栏。 |
-| 核心对象 | SpendRuleDefinition、SpendRuleVersion、SpendRuleAssignment、SpendRuleDecisionRecord、SpendControlMovement、BudgetControlProjection。 | 以最终交付命名标注，公共类名、表名和字段已完成迁移。 |
+| 核心对象 | SpendRuleDefinition、SpendRuleVersion、SpendRuleBinding、SpendRuleDecisionRecord、SpendControlMovement、BudgetControlProjection。 | 以最终交付命名标注，公共类名、表名和字段已完成迁移。 |
 | 关键流程 | 创建定义、发布版本、挂载、授权前决策、控制额度变动、交易投影解释。 | TDD 必须覆盖正向、拒绝、幂等、摘要冲突、历史解释和 forbidden facts。 |
 | 关键规则 | 规则版本不可变、挂载必须有 scope 和冲突策略、拒绝不入交易、历史解释不重算。 | 系分需给出接口、数据、状态、一致性和测试设计；TDD 需给出目标测试资产。 |
 | 风险和待确认 | 完整规则引擎、运营后台、外部规则、生产迁移、权限模型。 | 只能作为未完成交付或后续单一工程变更边界，不得混入当前服务层闭环。 |

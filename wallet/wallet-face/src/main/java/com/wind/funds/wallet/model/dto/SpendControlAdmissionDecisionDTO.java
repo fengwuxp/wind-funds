@@ -73,7 +73,7 @@ public class SpendControlAdmissionDecisionDTO implements Serializable {
     private String spendRuleVersion;
 
     @Schema(description = "Spend Rule 挂载流水号")
-    private String spendRuleAssignmentSn;
+    private String spendRuleBindingSn;
 
     @Schema(description = "Spend Rule 控制范围类型")
     private SpendRuleScopeType spendRuleScopeType;

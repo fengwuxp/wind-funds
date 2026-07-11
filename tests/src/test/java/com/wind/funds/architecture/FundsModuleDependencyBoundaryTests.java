@@ -159,7 +159,7 @@ class FundsModuleDependencyBoundaryTests {
                     "com.wind.funds.wallet.application.spend.SpendRuleEvaluationApplicationService",
                     "com.wind.funds.wallet.service.SpendRuleDefinitionService",
                     "com.wind.funds.wallet.service.SpendRuleVersionService",
-                    "com.wind.funds.wallet.service.SpendRuleAssignmentService",
+                    "com.wind.funds.wallet.service.SpendRuleBindingService",
                     "com.wind.funds.wallet.service.SpendRuleDecisionRecordService"),
             "wallet spend rule entity or mapper", List.of(
                     "com.wind.funds.wallet.dal.entities.SpendRule",

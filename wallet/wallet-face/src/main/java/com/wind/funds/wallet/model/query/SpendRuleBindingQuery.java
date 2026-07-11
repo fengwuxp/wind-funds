@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.model.query;
 
-import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -25,7 +25,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class SpendRuleAssignmentQuery implements Serializable {
+public class SpendRuleBindingQuery implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 4177807300369381796L;
@@ -35,7 +35,7 @@ public class SpendRuleAssignmentQuery implements Serializable {
     private Long tenantId;
 
     @Schema(description = "规则挂载流水号")
-    private String assignmentSn;
+    private String sn;
 
     @Schema(description = "Spend Rule 标识")
     private String ruleId;
@@ -54,7 +54,7 @@ public class SpendRuleAssignmentQuery implements Serializable {
     private String scopeId;
 
     @Schema(description = "挂载状态")
-    private SpendRuleAssignmentStatus status;
+    private SpendRuleBindingStatus status;
 
     @Schema(description = "是否只查询指定时间点有效的挂载")
     private Boolean effectiveOnly;

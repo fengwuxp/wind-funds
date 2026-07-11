@@ -19,7 +19,7 @@ import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
 import com.wind.funds.wallet.application.spend.impl.SpendRuleEvaluationApplicationServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendControlMovementServiceImpl;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
-import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -1408,7 +1408,7 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
                     TENANT_ID, ruleId);
             jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                     TENANT_ID, ruleId);
-            jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+            jdbcTemplate.update("DELETE FROM t_spend_rule_binding WHERE tenant_id = ? AND rule_id = ?",
                     TENANT_ID, ruleId);
             jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                     TENANT_ID, ruleId);
@@ -1499,7 +1499,7 @@ class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTes
     @Import({
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
-            SpendRuleAssignmentServiceImpl.class,
+            SpendRuleBindingServiceImpl.class,
             SpendControlMovementServiceImpl.class,
             SpendRuleEvaluationApplicationServiceImpl.class
     })

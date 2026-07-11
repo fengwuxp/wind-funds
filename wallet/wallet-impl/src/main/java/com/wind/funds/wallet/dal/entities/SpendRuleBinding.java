@@ -5,7 +5,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
-import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
 import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.integration.core.model.TenantIsolationObject;
 import jakarta.validation.constraints.NotNull;
@@ -22,13 +22,13 @@ import java.time.LocalDateTime;
  * @date 2026-06-22
  */
 @Data
-@Table(SpendRuleAssignment.TABLE_NAME)
-public class SpendRuleAssignment implements Serializable, TenantIsolationObject<Long> {
+@Table(SpendRuleBinding.TABLE_NAME)
+public class SpendRuleBinding implements Serializable, TenantIsolationObject<Long> {
 
     @Serial
     private static final long serialVersionUID = -8956553106315399779L;
 
-    public static final String TABLE_NAME = "t_spend_rule_assignment";
+    public static final String TABLE_NAME = "t_spend_rule_binding";
 
     /**
      * 自增主键。
@@ -56,7 +56,7 @@ public class SpendRuleAssignment implements Serializable, TenantIsolationObject<
      * 规则挂载流水号。
      */
     @NotNull
-    private String assignmentSn;
+    private String sn;
 
     /**
      * Spend Rule 标识。
@@ -110,7 +110,7 @@ public class SpendRuleAssignment implements Serializable, TenantIsolationObject<
      * 挂载状态。
      */
     @NotNull
-    private SpendRuleAssignmentStatus status;
+    private SpendRuleBindingStatus status;
 
     /**
      * 挂载说明。

@@ -5,16 +5,16 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.funds.wallet.dal.entities.SpendRuleDefinition;
 import com.wind.funds.wallet.dal.entities.table.SpendRuleDefinitionNameRefs;
 import com.wind.funds.wallet.dal.mapper.SpendRuleDefinitionMapper;
-import com.wind.funds.wallet.enums.SpendRuleAssignmentStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
 import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
 import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
-import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
-import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
-import com.wind.funds.wallet.service.SpendRuleAssignmentService;
+import com.wind.funds.wallet.service.SpendRuleBindingService;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
 import com.wind.funds.wallet.service.SpendRuleVersionService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
@@ -41,7 +41,7 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
 
     private final SpendRuleVersionService spendRuleVersionService;
 
-    private final SpendRuleAssignmentService spendRuleAssignmentService;
+    private final SpendRuleBindingService spendRuleBindingService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -88,24 +88,24 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull SpendRuleAssignmentDTO assignVersion(
-            @NonNull AssignSpendRuleVersionRequest request) {
-        validateAssignmentRequest(request);
+    public @NonNull SpendRuleBindingDTO createSpendRuleBinding(
+            @NonNull CreateSpendRuleBindingRequest request) {
+        validateBindingRequest(request);
         spendRuleVersionService.getPublishedVersion(request.getTenantId(),
                 request.getRuleId(),
                 request.getRuleVersion());
-        SpendRuleAssignmentDTO existing = spendRuleAssignmentService.findAssignment(
+        SpendRuleBindingDTO existing = spendRuleBindingService.findSpendRuleBinding(
                 request.getTenantId(),
-                request.getAssignmentSn());
+                request.getSn());
         if (existing != null) {
-            assertSameAssignment(request, existing);
+            assertSameBinding(request, existing);
             return existing;
         }
         try {
-            Long assignmentId = spendRuleAssignmentService.createAssignment(request);
-            return spendRuleAssignmentService.getAssignmentById(assignmentId);
+            Long bindingId = spendRuleBindingService.createSpendRuleBinding(request);
+            return spendRuleBindingService.getSpendRuleBindingById(bindingId);
         } catch (DataIntegrityViolationException exception) {
-            return readIdempotentAssignmentAfterInsertConflict(request, exception);
+            return readIdempotentBindingAfterInsertConflict(request, exception);
         }
     }
 
@@ -159,9 +159,9 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
         AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 发布审计引用不能为空");
     }
 
-    private void validateAssignmentRequest(AssignSpendRuleVersionRequest request) {
+    private void validateBindingRequest(CreateSpendRuleBindingRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.hasText(request.getAssignmentSn(), "Spend Rule 挂载流水号不能为空");
+        AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
         AssertUtils.hasText(request.getRuleId(), "Spend Rule 标识不能为空");
         AssertUtils.hasText(request.getRuleVersion(), "Spend Rule 版本不能为空");
         AssertUtils.notNull(request.getScopeType(), "Spend Rule 挂载范围类型不能为空");
@@ -198,16 +198,16 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
         return existing;
     }
 
-    private SpendRuleAssignmentDTO readIdempotentAssignmentAfterInsertConflict(
-            AssignSpendRuleVersionRequest request,
+    private SpendRuleBindingDTO readIdempotentBindingAfterInsertConflict(
+            CreateSpendRuleBindingRequest request,
             DataIntegrityViolationException exception) {
-        SpendRuleAssignmentDTO existing = spendRuleAssignmentService.findAssignment(
+        SpendRuleBindingDTO existing = spendRuleBindingService.findSpendRuleBinding(
                 request.getTenantId(),
-                request.getAssignmentSn());
+                request.getSn());
         if (existing == null) {
             throw exception;
         }
-        assertSameAssignment(request, existing);
+        assertSameBinding(request, existing);
         return existing;
     }
 
@@ -233,9 +233,9 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
                 request.getRuleVersion());
     }
 
-    private void assertSameAssignment(AssignSpendRuleVersionRequest request,
-                                      SpendRuleAssignmentDTO existing) {
-        AssertUtils.isTrue(existing.getStatus() == SpendRuleAssignmentStatus.ACTIVE
+    private void assertSameBinding(CreateSpendRuleBindingRequest request,
+                                      SpendRuleBindingDTO existing) {
+        AssertUtils.isTrue(existing.getStatus() == SpendRuleBindingStatus.ACTIVE
                         && Objects.equals(existing.getRuleId(), request.getRuleId())
                         && Objects.equals(existing.getRuleVersion(), request.getRuleVersion())
                         && existing.getScopeType() == request.getScopeType()
@@ -244,8 +244,8 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
                         && existing.getConflictPolicy() == request.getConflictPolicy()
                         && Objects.equals(existing.getEffectiveFrom(), request.getEffectiveFrom())
                         && Objects.equals(existing.getEffectiveTo(), request.getEffectiveTo()),
-                "Spend Rule 挂载已存在但内容不一致，assignmentSn = {}",
-                request.getAssignmentSn());
+                "Spend Rule 挂载已存在但内容不一致，sn = {}",
+                request.getSn());
     }
 
     private SpendRuleDefinition toEntity(CreateSpendRuleDefinitionRequest request) {

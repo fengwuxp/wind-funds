@@ -1,10 +1,10 @@
 package com.wind.funds.wallet.service;
 
-import com.wind.funds.wallet.model.dto.SpendRuleAssignmentDTO;
-import com.wind.funds.wallet.model.dto.SpendRuleAssignmentExplanationDTO;
-import com.wind.funds.wallet.model.query.SpendRuleAssignmentExplainQuery;
-import com.wind.funds.wallet.model.query.SpendRuleAssignmentQuery;
-import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
+import com.wind.funds.wallet.model.dto.SpendRuleBindingExplanationDTO;
+import com.wind.funds.wallet.model.query.SpendRuleBindingExplainQuery;
+import com.wind.funds.wallet.model.query.SpendRuleBindingQuery;
+import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
@@ -23,7 +23,7 @@ import java.util.List;
  * @author Codex
  * @date 2026-06-23
  */
-public interface SpendRuleAssignmentService {
+public interface SpendRuleBindingService {
 
     /**
      * 创建 Spend Rule 挂载。
@@ -31,7 +31,7 @@ public interface SpendRuleAssignmentService {
      * @param request 挂载请求
      * @return 规则挂载主键
      */
-    @NonNull Long createAssignment(@NonNull AssignSpendRuleVersionRequest request);
+    @NonNull Long createSpendRuleBinding(@NonNull CreateSpendRuleBindingRequest request);
 
     /**
      * 根据主键查询 Spend Rule 挂载。
@@ -39,16 +39,16 @@ public interface SpendRuleAssignmentService {
      * @param id 主键
      * @return 规则挂载
      */
-    @NonNull SpendRuleAssignmentDTO getAssignmentById(@NonNull Long id);
+    @NonNull SpendRuleBindingDTO getSpendRuleBindingById(@NonNull Long id);
 
     /**
      * 按租户和挂载流水查找 Spend Rule 挂载。
      *
      * @param tenantId 租户 ID
-     * @param assignmentSn 规则挂载流水号
+     * @param sn 规则挂载流水号
      * @return 规则挂载，未找到时返回 null
      */
-    @Nullable SpendRuleAssignmentDTO findAssignment(@NonNull Long tenantId, @NonNull String assignmentSn);
+    @Nullable SpendRuleBindingDTO findSpendRuleBinding(@NonNull Long tenantId, @NonNull String sn);
 
     /**
      * 查询 Spend Rule 挂载。
@@ -57,8 +57,8 @@ public interface SpendRuleAssignmentService {
      * @param options 查询选项
      * @return 规则挂载分页结果
      */
-    @NonNull WindPagination<SpendRuleAssignmentDTO> queryAssignments(
-            @NonNull SpendRuleAssignmentQuery query,
+    @NonNull WindPagination<SpendRuleBindingDTO> querySpendRuleBindings(
+            @NonNull SpendRuleBindingQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options);
 
     /**
@@ -67,7 +67,7 @@ public interface SpendRuleAssignmentService {
      * @param query 挂载查询条件
      * @return 挂载列表
      */
-    @NonNull List<SpendRuleAssignmentDTO> queryAssignments(@NonNull SpendRuleAssignmentQuery query);
+    @NonNull List<SpendRuleBindingDTO> querySpendRuleBindings(@NonNull SpendRuleBindingQuery query);
 
     /**
      * 解释指定挂载在某个时间点的可用性。
@@ -75,14 +75,14 @@ public interface SpendRuleAssignmentService {
      * @param query 挂载解释查询条件
      * @return 挂载解释结果
      */
-    @NonNull SpendRuleAssignmentExplanationDTO explainAssignment(@NonNull SpendRuleAssignmentExplainQuery query);
+    @NonNull SpendRuleBindingExplanationDTO explainSpendRuleBinding(@NonNull SpendRuleBindingExplainQuery query);
 
     /**
      * 获取有效状态的 Spend Rule 挂载。
      *
      * @param tenantId 租户 ID
-     * @param assignmentSn 规则挂载流水号
+     * @param sn 规则挂载流水号
      * @return 有效状态规则挂载
      */
-    @NonNull SpendRuleAssignmentDTO getActiveAssignment(@NonNull Long tenantId, @NonNull String assignmentSn);
+    @NonNull SpendRuleBindingDTO getActiveSpendRuleBinding(@NonNull Long tenantId, @NonNull String sn);
 }

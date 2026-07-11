@@ -26,7 +26,7 @@ import com.wind.funds.wallet.enums.SpendRuleScopeType;
 import com.wind.funds.wallet.enums.SpendRuleType;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
-import com.wind.funds.wallet.model.request.AssignSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
@@ -48,7 +48,7 @@ import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendSubjectFundingRelationServiceImpl;
-import com.wind.funds.wallet.services.impl.SpendRuleAssignmentServiceImpl;
+import com.wind.funds.wallet.services.impl.SpendRuleBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDefinitionServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleDecisionRecordServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendRuleVersionServiceImpl;
@@ -103,7 +103,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     private static final String SPEND_RULE_VERSION = "2026-06-19.1";
 
-    private static final String SPEND_RULE_ASSIGNMENT_SN = "spend_control_rule_assignment";
+    private static final String SPEND_RULE_BINDING_SN = "spend_control_rule_binding";
 
     private static final String SPEND_RULE_DIGEST = "sha256:spend-control-rule-version";
 
@@ -164,7 +164,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
         assertThat(decision.getSpendRuleId()).isEqualTo(SPEND_RULE_ID);
         assertThat(decision.getSpendRuleVersion()).isEqualTo(SPEND_RULE_VERSION);
-        assertThat(decision.getSpendRuleAssignmentSn()).isEqualTo(SPEND_RULE_ASSIGNMENT_SN);
+        assertThat(decision.getSpendRuleBindingSn()).isEqualTo(SPEND_RULE_BINDING_SN);
         assertThat(decision.getSpendRuleScopeType()).isEqualTo(SpendRuleScopeType.PAYMENT_INSTRUMENT);
         assertThat(decision.getSpendRuleScopeId()).isEqualTo(PAYMENT_INSTRUMENT_SN);
         assertThat(decision.getSpendDecisionSn()).isEqualTo(SPEND_DECISION_SN);
@@ -369,13 +369,13 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
         spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleDefinitionService.assignVersion(assignSpendRuleVersionRequest());
+        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest());
     }
 
     private void cleanupSpendControlAdmissionTestData() {
         jdbcTemplate.update("DELETE FROM t_spend_rule_decision_record WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_rule_assignment WHERE tenant_id = ? AND rule_id = ?",
+        jdbcTemplate.update("DELETE FROM t_spend_rule_binding WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_version WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
@@ -404,7 +404,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setBusinessSn(BUSINESS_SN)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendRuleAssignmentSn(SPEND_RULE_ASSIGNMENT_SN)
+                .setSpendRuleBindingSn(SPEND_RULE_BINDING_SN)
                 .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_DECISION_SN)
@@ -433,10 +433,10 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setDescription("发布支出控制准入消费规则版本");
     }
 
-    private AssignSpendRuleVersionRequest assignSpendRuleVersionRequest() {
-        return new AssignSpendRuleVersionRequest()
+    private CreateSpendRuleBindingRequest createSpendRuleBindingRequest() {
+        return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setAssignmentSn(SPEND_RULE_ASSIGNMENT_SN)
+                .setSn(SPEND_RULE_BINDING_SN)
                 .setRuleId(SPEND_RULE_ID)
                 .setRuleVersion(SPEND_RULE_VERSION)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
@@ -539,7 +539,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         assertThat(jdbcTemplate.queryForObject("""
                         SELECT COUNT(*) FROM t_spend_rule_decision_record
                         WHERE tenant_id = ? AND decision_sn = ? AND rule_id = ? AND rule_version = ?
-                          AND assignment_sn = ? AND scope_type = ? AND scope_id = ?
+                          AND spend_rule_binding_sn = ? AND scope_type = ? AND scope_id = ?
                           AND instrument_sn = ? AND business_scene = ? AND business_sn = ?
                           AND decision_result = ? AND decision_digest = ?
                 """,
@@ -548,7 +548,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 decisionSn,
                 SPEND_RULE_ID,
                 SPEND_RULE_VERSION,
-                SPEND_RULE_ASSIGNMENT_SN,
+                SPEND_RULE_BINDING_SN,
                 SpendRuleScopeType.PAYMENT_INSTRUMENT.name(),
                 PAYMENT_INSTRUMENT_SN,
                 PAYMENT_INSTRUMENT_SN,
@@ -591,7 +591,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
             PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl.class,
             SpendRuleDefinitionServiceImpl.class,
             SpendRuleVersionServiceImpl.class,
-            SpendRuleAssignmentServiceImpl.class,
+            SpendRuleBindingServiceImpl.class,
             SpendRuleDecisionRecordServiceImpl.class,
             SpendControlAdmissionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class
