@@ -30,11 +30,8 @@ public class SpendRuleDecisionExplanationDTO implements Serializable {
     @Schema(description = "规则决策记录快照")
     private SpendRuleDecisionRecordDTO decision;
 
-    @Schema(description = "决策是否允许进入后续交易")
-    private Boolean admitted;
-
-    @Schema(description = "解释说明")
-    private String explanationMessage;
+    @Schema(description = "决策事实摘要，仅用于排查阅读；业务判断以 decision 和 evidenceRefs 为准")
+    private String decisionSummary;
 
     @Schema(description = "证据引用列表")
     private List<String> evidenceRefs;

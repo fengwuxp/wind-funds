@@ -291,8 +291,8 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                         .setDecisionSn(DECISION_SN));
 
         assertThat(explanation.getDecision().getId()).isEqualTo(recorded.getId());
-        assertThat(explanation.getAdmitted()).isFalse();
-        assertThat(explanation.getExplanationMessage()).contains("拒绝", "超过单卡日限额");
+        assertThat(explanation.getDecision().getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(explanation.getDecisionSummary()).contains("拒绝", "超过单卡日限额");
         assertThat(explanation.getEvidenceRefs()).contains(
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
@@ -370,14 +370,14 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 rejectedDecisionRequest()
                         .setDecisionSn(DECISION_SN + "_future")
                         .setSpendRuleBindingSn(futureBinding.getSn())))
-                .hasMessageContaining("Spend Rule 挂载未在当前时间生效");
+                .hasMessageContaining("Spend Rule 挂载未在生效时间点生效");
         assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest()
                         .setDecisionSn(DECISION_SN + "_expired")
                         .setSpendRuleBindingSn(expiredBinding.getSn())
                         .setScopeId(PAYMENT_INSTRUMENT_SN + "_expired")
                         .setInstrumentSn(PAYMENT_INSTRUMENT_SN + "_expired")))
-                .hasMessageContaining("Spend Rule 挂载未在当前时间生效");
+                .hasMessageContaining("Spend Rule 挂载未在生效时间点生效");
         assertNoSpendRuleDecisionRecord(DECISION_SN + "_future");
         assertNoSpendRuleDecisionRecord(DECISION_SN + "_expired");
         assertNoTransactionFacts(BUSINESS_SN);
@@ -475,6 +475,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
 
         assertThat(effective.getEffective()).isTrue();
         assertThat(effective.getExplanationStatus()).isEqualTo(SpendRuleBindingExplanationStatus.EFFECTIVE);
+        assertThat(effective.getBindingSummary()).isEqualTo("当前有效");
         assertThat(effective.getEvidenceRefs()).contains(
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,

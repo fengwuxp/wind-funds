@@ -193,7 +193,7 @@ Spend Rule 服务层按项目统一基础服务模板收敛，不再拆旧式领
 | --- | --- | --- | --- | --- |
 | SpendRuleDefinitionService | 规则定义创建、不可变版本发布和规则挂载。 | CreateSpendRuleDefinitionRequest、PublishSpendRuleVersionRequest、CreateSpendRuleBindingRequest、tenantId、ruleId。 | definitionId、SpendRuleDefinitionDTO、SpendRuleVersionDTO、SpendRuleBindingDTO。 | 可访问 Mapper；校验定义幂等、版本不可原地覆盖、已发布版本挂载和挂载幂等；不执行规则、不记录决策记录、不生成交易、route、posting、LedgerEntry 或余额投影。 |
 | SpendRuleVersionService | 规则版本基础创建、按版本读取和已发布版本读取。 | PublishSpendRuleVersionRequest、tenantId、ruleId、ruleVersion。 | SpendRuleVersionDTO。 | 基础服务可访问 Mapper；不判断发布业务不变量，不执行规则，不生成交易或账务事实。 |
-| SpendRuleBindingService | 规则挂载创建、读取、条件查询、有效挂载读取和挂载可用性解释。 | CreateSpendRuleBindingRequest、SpendRuleBindingQuery、SpendRuleBindingExplainQuery、tenantId、sn。 | SpendRuleBindingDTO、SpendRuleBindingExplanationDTO。 | 可访问 Mapper；只读解释不重新执行规则、不记录决策记录、不调整控制额度。 |
+| SpendRuleBindingService | 规则挂载创建、生命周期状态更新、读取、条件查询、有效挂载读取和挂载可用性解释。 | CreateSpendRuleBindingRequest、SuspendSpendRuleBindingRequest、ResumeSpendRuleBindingRequest、RetireSpendRuleBindingRequest、SpendRuleBindingQuery、SpendRuleBindingExplainQuery、tenantId、sn。 | SpendRuleBindingDTO、SpendRuleBindingExplanationDTO。 | 可访问 Mapper；生命周期命令只校验并更新状态，不承接操作者、原因、审批引用、变更摘要或审计日志；只读解释不重新执行规则、不记录决策记录、不调整控制额度。 |
 | SpendRuleDecisionRecordService | 决策记录写入、单条读取、窄条件查询和解释。 | RecordSpendRuleDecisionRecordRequest、SpendRuleDecisionRecordQuery、SpendRuleDecisionExplainQuery。 | decisionRecordId、SpendRuleDecisionRecordDTO、SpendRuleDecisionExplanationDTO。 | 可访问 Mapper；校验规则版本、挂载、有效期、支付工具 scope 一致性、幂等摘要冲突和拒绝原因语义；不生成交易、route、posting、LedgerEntry 或余额投影。 |
 | SpendControlAdmissionApplicationService | 消费外部或上层提供的 Spend Rule 决策证据，组合支付工具预交易快照形成准入结论。 | 支付工具快照、规则版本、决策流水、决策摘要、拒绝原因。 | 支出控制准入快照。 | 不持久化规则定义，不写控制额度变动流水，不更新预算投影。 |
 | SpendControlMovementService | 控制额度变动流水写入、单条读取、窄条件查询和预算控制投影重建。 | RecordSpendControlMovementRequest、SpendControlMovementQuery、BudgetControlProjectionQuery。 | movementId、SpendControlMovementDTO、BudgetControlProjectionDTO。 | 可访问 Mapper；校验目标账务主体、变动类型、幂等摘要、释放上限、调额上限、控制范围和控制周期边界；不写资金交易、route、posting、LedgerEntry 或账本余额投影。 |
@@ -216,8 +216,8 @@ Spend Rule 服务层按项目统一基础服务模板收敛，不再拆旧式领
 | SpendRuleDefinitionService | createSpendRuleBinding | CreateSpendRuleBindingRequest | SpendRuleBindingDTO | ruleId + ruleVersion + scopeType + scopeId + auditReferenceSn 幂等；sn 由资金底座内部生成。 | 版本不存在、scope 非法、冲突策略缺失、有效期非法、审计引用缺失。 | 只写规则挂载，不输出资金责任主体。 |
 | SpendRuleBindingService | explainSpendRuleBinding | SpendRuleBindingExplainQuery | SpendRuleBindingExplanationDTO | 只读查询。 | scope 不支持、规则挂载不可用。 | 不计算复杂规则，不写决策记录或控制流水。 |
 | SpendRuleDecisionRecordService | recordDecision | RecordSpendRuleDecisionRecordRequest | SpendRuleDecisionRecordDTO | decisionSn + decisionDigest 幂等；摘要冲突拒绝。 | 决策摘要冲突、规则版本缺失、决策结果非法。 | 只写决策记录；拒绝不生成交易、route、posting 或账本事实。 |
-| SpendRuleDecisionRecordService | queryDecisions | SpendRuleDecisionRecordQuery | List<SpendRuleDecisionRecordDTO> | 只读查询；tenantId 外必须至少提供一个窄条件。 | 缺租户、缺查询条件。 | 不重算规则，不写控制流水，不生成交易、route、posting 或账本事实。 |
-| SpendRuleDecisionRecordService | explainDecision | SpendRuleDecisionExplainQuery | SpendRuleDecisionExplanationDTO | tenantId + decisionSn 精确查询。 | 决策记录不存在。 | 只解释历史决策事实、拒绝原因和证据引用，不反写任何事实。 |
+| SpendRuleDecisionRecordService | queryDecisions | SpendRuleDecisionRecordQuery | List<SpendRuleDecisionRecordDTO> | 只读查询；tenantId 可作为可选过滤条件，但必须至少提供一个业务窄条件。 | 缺查询条件。 | 不重算规则，不写控制流水，不生成交易、route、posting 或账本事实。 |
+| SpendRuleDecisionRecordService | explainDecision | SpendRuleDecisionExplainQuery | SpendRuleDecisionExplanationDTO | tenantId + decisionSn 精确查询；`decisionSummary` 仅由 `decisionResult + rejectReason` 派生，用于排查阅读。 | 决策记录不存在。 | 只解释历史决策事实、拒绝原因和证据引用，不反写任何事实；业务判断以 `decision.decisionResult` 为准。 |
 | SpendControlAdmissionApplicationService | admit | SpendControlAdmissionRequest | SpendControlAdmissionDecisionDTO | admissionSn 或业务请求摘要幂等。 | 缺决策证据、规则拒绝、证据摘要冲突。 | 不写规则定义，不写控制额度变动流水，不进交易内核。 |
 | SpendControlMovementService | recordMovement | RecordSpendControlMovementRequest | SpendControlMovementDTO | movementSn + movementDigest 幂等；摘要冲突拒绝。 | 历史决策兼容类型新写入拒绝、额度调减低于占用拒绝。 | 只写控制额度变动流水，不写资金事实。 |
 | SpendControlTransactionConsumptionApplicationService | consume / release / refund | 交易结果和控制流水引用。 | SpendControlMovementDTO | 基于原控制流水、交易流水和变动摘要幂等。 | 原控制流水缺失、跨业务场景、跨目标账户、金额超限。 | 只追加控制流水，不反写交易或账本。 |
@@ -703,7 +703,7 @@ flowchart TD
 
 1. 规则条件、请求摘要和决策摘要不得保存完整卡号、CVC、明文 token、完整外部账户号或超范围商户敏感原文。
 2. 规则定义、版本发布、挂载变更、决策查询需要租户隔离和权限控制。
-3. 规则发布和挂载建议具备操作者、审批或变更原因；首切片可先保留操作者和审计字段，不做审批流。
+3. 规则发布和挂载变更建议具备操作者、审批或变更原因；这些字段由 web / 运营审计层统一记录，不进入 SpendRuleBinding 生命周期请求，也不覆盖规则挂载主表字段。
 
 审计要求：
 
@@ -711,7 +711,7 @@ flowchart TD
 | --- | --- | --- |
 | 创建规则定义 | tenantId、ruleId、ruleCode、operator、createdAt。 | 说明规则来源和归属。 |
 | 发布版本 | ruleId、version、versionDigest、publishedBy、publishedAt。 | 证明版本不可变。 |
-| 挂载规则 | sn、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo。 | 证明规则适用范围。 |
+| 挂载规则 | sn、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status；操作者、原因和变更摘要由 web / 运营审计层记录。 | 证明规则适用范围和状态变化边界。 |
 | 记录决策 | decisionSn、ruleId、ruleVersion、spendRuleBindingSn、scope、instrument、amount、currency、business、decisionDigest、decisionResult、rejectReason。 | 证明拒绝或放行依据。 |
 
 观测建议：
@@ -890,7 +890,7 @@ Velocity 控制映射边界：
 | 目标 | 让规则变更、准入决策、控制窗口和异常恢复在生产试点前具备可审计、可定位、可回滚和可验收的最小证据链。 |
 | 写入范围 | 仅文档和 TDD 锚点；不修改 Java、H2 schema、DDL、Mapper、公共 DTO 或交易 canonical 入参。 |
 | 只读范围 | `SpendRuleDefinitionServiceTests`、`SpendControlAdmissionApplicationServiceTests`、`SpendControlMovementServiceFlowTests`、`SpendControlTransactionConsumptionApplicationServiceTests`、`WalletSpendControlsAcceptanceFlowTests`。 |
-| 数据结构决策 | 当前不新增表。生产落地审计和告警前，需单独评审是否复用现有审计字段、接入统一操作审计，或新增规则变更审计表。 |
+| 数据结构决策 | 当前不新增表。生产落地审计和告警前，需单独评审接入统一操作审计或新增规则变更审计表；不得把操作者、原因、审批引用或变更摘要补回 SpendRuleBinding 生命周期请求。 |
 | 验证方式 | 文档切片执行 `git diff --check`；若进入代码或 schema，最小回归为 `just verify-slice SpendRuleDefinitionServiceTests,SpendControlAdmissionApplicationServiceTests,SpendControlMovementServiceFlowTests,WalletSpendControlsAcceptanceFlowTests tests`。 |
 | 停止条件 | 需要运营后台、审批流、webhook、生产 DDL / 索引、历史回填、强一致频控拦截、敏感原文存储或多规则明细落库时停止，拆独立工程任务。 |
 
@@ -900,7 +900,7 @@ Velocity 控制映射边界：
 | --- | --- | --- |
 | 规则定义 | tenantId、ruleId、ruleCode、changeType、operator、reason、traceId、auditReferenceSn、变更前后状态摘要。 | 无操作者创建或直接删除生产规则事实。 |
 | 规则版本 | ruleId、ruleVersion、ruleDigest、ruleSpec 摘要、发布人、发布时间、审批或审计引用。 | 覆盖已发布版本正文，或用当前版本改写历史解释。 |
-| 规则挂载 | sn、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status、变更前后摘要。 | 缺冲突策略上线，或删除历史挂载证据。 |
+| 规则挂载 | 资金底座记录 sn、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status；web / 运营审计层记录操作者、原因、审批引用和变更前后摘要。 | 缺冲突策略上线，删除历史挂载证据，或把生命周期审计字段塞回资金底座请求。 |
 | 决策记录 | decisionSn、spendRuleBindingSn、ruleId、ruleVersion、decisionResult、rejectReason、decisionDigest、业务引用和外部决策引用。 | 按当前规则重算历史决策，或把多规则明细塞入未确认公共契约。 |
 | 控制额度变动 | movementSn、movementType、controlScopeId、periodId、targetAccountId、amount、currency、movementDigest、原控制流水引用。 | 修改历史控制流水金额，或用账本余额替代控制投影。 |
 

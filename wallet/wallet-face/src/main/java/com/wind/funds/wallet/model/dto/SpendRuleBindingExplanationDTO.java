@@ -41,8 +41,8 @@ public class SpendRuleBindingExplanationDTO implements Serializable {
     @Schema(description = "解释状态")
     private SpendRuleBindingExplanationStatus explanationStatus;
 
-    @Schema(description = "解释说明")
-    private String explanationMessage;
+    @Schema(description = "挂载事实摘要，仅用于排查阅读；业务判断以 effective、explanationStatus 和 evidenceRefs 为准")
+    private String bindingSummary;
 
     @Schema(description = "证据引用列表")
     private List<String> evidenceRefs;

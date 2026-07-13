@@ -131,8 +131,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         AssertUtils.notNull(decision, "Spend Rule 决策记录不存在，decisionSn = {}", query.getDecisionSn());
         return new SpendRuleDecisionExplanationDTO()
                 .setDecision(decision)
-                .setAdmitted(decision.getDecisionResult() == SpendControlDecisionResult.PASSED)
-                .setExplanationMessage(toDecisionExplanationMessage(decision))
+                .setDecisionSummary(toDecisionSummary(decision))
                 .setEvidenceRefs(toDecisionEvidenceRefs(decision));
     }
 
@@ -170,7 +169,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         }
         SpendRuleBindingDTO binding =
                 spendRuleBindingService.getActiveSpendRuleBinding(request.getTenantId(), request.getSpendRuleBindingSn());
-        assertBindingEffectiveNow(request, binding);
+        assertBindingEffectiveAt(request, binding, LocalDateTime.now());
         AssertUtils.isTrue(Objects.equals(binding.getRuleId(), request.getRuleId())
                         && Objects.equals(binding.getRuleVersion(), request.getRuleVersion())
                         && binding.getScopeType() == request.getScopeType()
@@ -179,11 +178,12 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
                 request.getDecisionSn());
     }
 
-    private void assertBindingEffectiveNow(RecordSpendRuleDecisionRecordRequest request,
-                                              SpendRuleBindingDTO binding) {
-        LocalDateTime now = LocalDateTime.now();
-        AssertUtils.isTrue(!now.isBefore(binding.getEffectiveFrom()) && now.isBefore(binding.getEffectiveTo()),
-                "Spend Rule 挂载未在当前时间生效，spendRuleBindingSn = {}",
+    private void assertBindingEffectiveAt(RecordSpendRuleDecisionRecordRequest request,
+                                          SpendRuleBindingDTO binding,
+                                          LocalDateTime effectiveAt) {
+        AssertUtils.isTrue(!effectiveAt.isBefore(binding.getEffectiveFrom())
+                        && effectiveAt.isBefore(binding.getEffectiveTo()),
+                "Spend Rule 挂载未在生效时间点生效，spendRuleBindingSn = {}",
                 request.getSpendRuleBindingSn());
     }
 
@@ -228,7 +228,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         AssertUtils.hasText(query.getDecisionSn(), "Spend Rule 决策流水号不能为空");
     }
 
-    private String toDecisionExplanationMessage(SpendRuleDecisionRecordDTO decision) {
+    private String toDecisionSummary(SpendRuleDecisionRecordDTO decision) {
         if (decision.getDecisionResult() == SpendControlDecisionResult.REJECTED) {
             return decision.getDecisionResult().getDesc() + "：" + decision.getRejectReason();
         }

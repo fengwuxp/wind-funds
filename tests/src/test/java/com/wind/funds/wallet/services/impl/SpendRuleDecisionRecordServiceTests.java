@@ -19,6 +19,7 @@ import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
 import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
+import jakarta.validation.constraints.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -113,7 +114,8 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
         assertThat(decisionsWithoutTenantId).hasSize(1);
         assertThat(decisionsWithoutTenantId.getFirst().getId()).isEqualTo(decision.getId());
         assertThat(explanation.getDecision().getId()).isEqualTo(decision.getId());
-        assertThat(explanation.getAdmitted()).isFalse();
+        assertThat(explanation.getDecision().getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
+        assertThat(explanation.getDecisionSummary()).contains("拒绝", "超过单卡日限额");
         assertThat(explanation.getEvidenceRefs()).contains(
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
@@ -160,6 +162,18 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
 
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：决策记录查询依赖 MyBatis-Flex 租户隔离，不要求调用方显式传 tenantId。
+     * 输入：公共 Query 模型。
+     * 输出：tenantId 作为可选过滤条件，不带必填校验注解。
+     * 红线：查询模型不得和服务层已支持的无 tenantId 查询契约冲突。
+     */
+    @Test
+    void testDecisionRecordQueryShouldNotRequireTenantId() throws NoSuchFieldException {
+        assertThat(SpendRuleDecisionRecordQuery.class.getDeclaredField("tenantId")
+                .isAnnotationPresent(NotNull.class)).isFalse();
     }
 
     @BeforeEach

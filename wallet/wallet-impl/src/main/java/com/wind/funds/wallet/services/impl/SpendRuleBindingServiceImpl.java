@@ -146,7 +146,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 .setEvaluatedAt(evaluatedAt)
                 .setEffective(status == SpendRuleBindingExplanationStatus.EFFECTIVE)
                 .setExplanationStatus(status)
-                .setExplanationMessage(status.getDesc())
+                .setBindingSummary(status.getDesc())
                 .setEvidenceRefs(toBindingEvidenceRefs(binding));
     }
 
