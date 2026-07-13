@@ -15,7 +15,8 @@ import lombok.Getter;
 public enum SpendRuleBindingStatus implements DescriptiveEnum {
 
     ACTIVE("生效"),
-    DISABLED("停用");
+    SUSPENDED("暂停"),
+    RETIRED("退役");
 
     private final String desc;
 }

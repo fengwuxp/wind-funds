@@ -168,7 +168,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
     private static final LocalDateTime SPEND_RULE_EFFECTIVE_TO = LocalDateTime.now().withNano(0).plusDays(30);
 
-    private static final String SPEND_RULE_BINDING_SN = "auth_admission_spend_rule_binding";
+    private static final String SPEND_RULE_BINDING_AUDIT_REFERENCE_SN = "grant:auth_admission_spend_rule_binding";
 
     private static final String SPEND_RULE_DIGEST = "sha256:auth-admission-spend-rule";
 
@@ -209,6 +209,8 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    private String spendRuleBindingSn;
 
     /**
      * 场景：VCC/卡支付工具入口完成授权准入后，委派账户主体型授权交易内核。
@@ -597,7 +599,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private void prepareSpendRuleDecisionData() {
         spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
         spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest());
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()).getSn();
     }
 
     private CreateSpendRuleDefinitionRequest createSpendRuleDefinitionRequest() {
@@ -625,7 +627,6 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private CreateSpendRuleBindingRequest createSpendRuleBindingRequest() {
         return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(SPEND_RULE_BINDING_SN)
                 .setRuleId(SPEND_RULE_ID)
                 .setRuleVersion(SPEND_RULE_VERSION)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
@@ -634,6 +635,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
                 .setEffectiveFrom(SPEND_RULE_EFFECTIVE_FROM)
                 .setEffectiveTo(SPEND_RULE_EFFECTIVE_TO)
+                .setAuditReferenceSn(SPEND_RULE_BINDING_AUDIT_REFERENCE_SN)
                 .setDescription("挂载到支付工具授权准入 scope");
     }
 
@@ -660,7 +662,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         return authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendRuleBindingSn(SPEND_RULE_BINDING_SN)
+                .setSpendRuleBindingSn(spendRuleBindingSn)
                 .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_DECISION_SN)
@@ -674,7 +676,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         return authorizeRequest(businessSn, instrumentSn)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendRuleBindingSn(SPEND_RULE_BINDING_SN)
+                .setSpendRuleBindingSn(spendRuleBindingSn)
                 .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_PASS_DECISION_SN)
@@ -897,7 +899,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(explanation.evidenceRefs())
                 .contains("spendRule:" + SPEND_RULE_ID,
                         "spendRuleVersion:" + SPEND_RULE_ID + ":" + SPEND_RULE_VERSION,
-                        "spendRuleBinding:" + SPEND_RULE_BINDING_SN,
+                        "spendRuleBinding:" + spendRuleBindingSn,
                         "spendRuleDecision:" + SPEND_PASS_DECISION_SN);
         assertThat(explanation.payload()).containsKey("spendRuleDecision");
         @SuppressWarnings("unchecked")
@@ -906,7 +908,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(spendRuleDecision)
                 .containsEntry("ruleId", SPEND_RULE_ID)
                 .containsEntry("ruleVersion", SPEND_RULE_VERSION)
-                .containsEntry("spendRuleBindingSn", SPEND_RULE_BINDING_SN)
+                .containsEntry("spendRuleBindingSn", spendRuleBindingSn)
                 .containsEntry("scopeType", SpendRuleScopeType.PAYMENT_INSTRUMENT.name())
                 .containsEntry("scopeId", PAYMENT_INSTRUMENT_SN)
                 .containsEntry("decisionSn", SPEND_PASS_DECISION_SN)
@@ -936,7 +938,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                   AND decision_result = ?
                   AND decision_digest = ?
                 """, Integer.class, TENANT_ID, SPEND_DECISION_SN, SPEND_RULE_ID, SPEND_RULE_VERSION,
-                SPEND_RULE_BINDING_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT.name(), PAYMENT_INSTRUMENT_SN,
+                spendRuleBindingSn, SpendRuleScopeType.PAYMENT_INSTRUMENT.name(), PAYMENT_INSTRUMENT_SN,
                 PAYMENT_INSTRUMENT_SN, BUSINESS_SCENE, SPEND_REJECT_BUSINESS_SN,
                 SpendControlDecisionResult.REJECTED.name(), SPEND_DECISION_DIGEST)).isEqualTo(1);
     }

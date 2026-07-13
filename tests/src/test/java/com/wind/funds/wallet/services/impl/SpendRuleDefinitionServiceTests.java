@@ -3,6 +3,7 @@ package com.wind.funds.wallet.services.impl;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.wallet.enums.SpendRuleBindingExplanationStatus;
+import com.wind.funds.wallet.enums.SpendRuleBindingStatus;
 import com.wind.funds.wallet.enums.SpendRuleConflictPolicy;
 import com.wind.funds.wallet.enums.SpendRuleDefinitionStatus;
 import com.wind.funds.wallet.enums.SpendRuleDomain;
@@ -67,7 +68,9 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
 
     private static final String CHANGED_RULE_DIGEST = "sha256:spend-rule-definition-service-changed";
 
-    private static final String BINDING_SN = "spend_rule_definition_service_binding";
+    private static final String BINDING_AUDIT_REFERENCE_PREFIX = "grant:spend_rule_definition_service_binding";
+
+    private static final String BINDING_AUDIT_REFERENCE_SN = "grant:SPEND-RULE-BINDING-SERVICE";
 
     private static final String PAYMENT_INSTRUMENT_SN = "spend_rule_definition_service_card";
 
@@ -125,8 +128,8 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
 
     /**
      * 场景：标准基础服务挂载已发布规则版本。
-     * 输入：同一挂载流水重复进入且内容一致。
-     * 输出：重复请求返回同一条挂载。
+     * 输入：同一业务挂载和审计引用重复进入且内容一致。
+     * 输出：重复请求返回同一条挂载，挂载流水由资金侧内部生成。
      * 红线：挂载只生成控制事实，不创建决策记录、资金交易或账本事实。
      */
     @Test
@@ -134,16 +137,18 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
         publishRuleVersions();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        SpendRuleBindingDTO first = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN,
+        SpendRuleBindingDTO first = spendRuleDefinitionService.createSpendRuleBinding(businessBindingRequest(
                 RULE_VERSION,
-                PAYMENT_INSTRUMENT_SN));
-        SpendRuleBindingDTO replayed = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN,
+                PAYMENT_INSTRUMENT_SN,
+                BINDING_AUDIT_REFERENCE_SN));
+        SpendRuleBindingDTO replayed = spendRuleDefinitionService.createSpendRuleBinding(businessBindingRequest(
                 RULE_VERSION,
-                PAYMENT_INSTRUMENT_SN));
+                PAYMENT_INSTRUMENT_SN,
+                BINDING_AUDIT_REFERENCE_SN));
 
         assertThat(replayed.getId()).isEqualTo(first.getId());
+        assertThat(first.getSn()).isNotBlank();
+        assertThat(first.getAuditReferenceSn()).isEqualTo(BINDING_AUDIT_REFERENCE_SN);
         assertThat(countBindings()).isEqualTo(1);
         assertNoDecisionRecord();
         assertNoTransactionFacts();
@@ -159,18 +164,18 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
     @Test
     void testQueryAndExplainBindingShouldBeReadOnlyWithoutFundsSideEffect() {
         publishRuleVersions();
-        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN,
+        SpendRuleBindingDTO effectiveBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX,
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN));
-        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_future",
+        SpendRuleBindingDTO futureBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX + "_future",
                 FUTURE_RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setEffectiveFrom(LocalDateTime.now().plusDays(1))
                 .setEffectiveTo(LocalDateTime.now().plusDays(2)));
-        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_expired",
+        SpendRuleBindingDTO expiredBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX + "_expired",
                 EXPIRED_RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setEffectiveFrom(LocalDateTime.now().minusDays(3))
@@ -183,12 +188,19 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                         .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                         .setScopeId(PAYMENT_INSTRUMENT_SN)
                         .setEffectiveOnly(Boolean.TRUE));
-        SpendRuleBindingExplanationDTO effective = explainSpendRuleBinding(BINDING_SN);
-        SpendRuleBindingExplanationDTO future = explainSpendRuleBinding(BINDING_SN + "_future");
-        SpendRuleBindingExplanationDTO expired = explainSpendRuleBinding(BINDING_SN + "_expired");
+        List<SpendRuleBindingDTO> bindingsWithoutTenant = spendRuleBindingService.querySpendRuleBindings(
+                new SpendRuleBindingQuery()
+                        .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
+                        .setScopeId(PAYMENT_INSTRUMENT_SN)
+                        .setEffectiveOnly(Boolean.TRUE));
+        SpendRuleBindingExplanationDTO effective = explainSpendRuleBinding(effectiveBinding.getSn());
+        SpendRuleBindingExplanationDTO future = explainSpendRuleBinding(futureBinding.getSn());
+        SpendRuleBindingExplanationDTO expired = explainSpendRuleBinding(expiredBinding.getSn());
 
         assertThat(bindings).hasSize(1);
-        assertThat(bindings.getFirst().getSn()).isEqualTo(BINDING_SN);
+        assertThat(bindingsWithoutTenant).hasSize(1);
+        assertThat(bindings.getFirst().getId()).isEqualTo(effectiveBinding.getId());
+        assertThat(bindingsWithoutTenant.getFirst().getId()).isEqualTo(effectiveBinding.getId());
         assertThat(effective.getExplanationStatus()).isEqualTo(SpendRuleBindingExplanationStatus.EFFECTIVE);
         assertThat(future.getExplanationStatus())
                 .isEqualTo(SpendRuleBindingExplanationStatus.NOT_YET_EFFECTIVE);
@@ -196,7 +208,42 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
         assertThat(effective.getEvidenceRefs()).contains(
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
-                "spendRuleBinding:" + BINDING_SN);
+                "spendRuleBinding:" + effectiveBinding.getSn());
+        assertNoDecisionRecord();
+        assertNoTransactionFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：解释已暂停或已退役的 Spend Rule 挂载。
+     * 输入：挂载状态分别为 SUSPENDED 和 RETIRED。
+     * 输出：解释状态保留具体生命周期语义，不再合并成 DISABLED。
+     * 红线：解释能力只读，不重新执行规则，不记录决策记录，不写交易或账本事实。
+     */
+    @Test
+    void testExplainInactiveBindingShouldKeepConcreteLifecycleStatus() {
+        publishRuleVersions();
+        SpendRuleBindingDTO suspendedBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX + "_suspended",
+                RULE_VERSION,
+                PAYMENT_INSTRUMENT_SN));
+        SpendRuleBindingDTO retiredBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX + "_retired",
+                FUTURE_RULE_VERSION,
+                PAYMENT_INSTRUMENT_SN));
+        jdbcTemplate.update("UPDATE t_spend_rule_binding SET status = ? WHERE tenant_id = ? AND sn = ?",
+                SpendRuleBindingStatus.SUSPENDED.name(), TENANT_ID, suspendedBinding.getSn());
+        jdbcTemplate.update("UPDATE t_spend_rule_binding SET status = ? WHERE tenant_id = ? AND sn = ?",
+                SpendRuleBindingStatus.RETIRED.name(), TENANT_ID, retiredBinding.getSn());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendRuleBindingExplanationDTO suspended = explainSpendRuleBinding(suspendedBinding.getSn());
+        SpendRuleBindingExplanationDTO retired = explainSpendRuleBinding(retiredBinding.getSn());
+
+        assertThat(suspended.getEffective()).isFalse();
+        assertThat(suspended.getExplanationStatus()).isEqualTo(SpendRuleBindingExplanationStatus.SUSPENDED);
+        assertThat(retired.getEffective()).isFalse();
+        assertThat(retired.getExplanationStatus()).isEqualTo(SpendRuleBindingExplanationStatus.RETIRED);
         assertNoDecisionRecord();
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -213,43 +260,43 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
         publishRuleVersions();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_payment_card",
+        SpendRuleBindingDTO paymentCardBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX + "_payment_card",
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN,
                 SpendRuleScopeType.PAYMENT_INSTRUMENT));
-        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_funding_account",
+        SpendRuleBindingDTO fundingAccountBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX + "_funding_account",
                 RULE_VERSION,
                 FUNDING_ACCOUNT_SCOPE_ID,
                 SpendRuleScopeType.FUNDING_ACCOUNT));
-        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_credit_account",
+        SpendRuleBindingDTO creditAccountBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX + "_credit_account",
                 RULE_VERSION,
                 CREDIT_ACCOUNT_SCOPE_ID,
                 SpendRuleScopeType.CREDIT_ACCOUNT));
-        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_account_hierarchy",
+        SpendRuleBindingDTO accountHierarchyBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX + "_account_hierarchy",
                 RULE_VERSION,
                 ACCOUNT_HIERARCHY_SCOPE_ID,
                 SpendRuleScopeType.ACCOUNT_HIERARCHY));
-        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_card_product",
+        SpendRuleBindingDTO cardProductBinding = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
+                BINDING_AUDIT_REFERENCE_PREFIX + "_card_product",
                 RULE_VERSION,
                 CARD_PRODUCT_SCOPE_ID,
                 SpendRuleScopeType.BUSINESS_SCENE));
 
         assertThat(queryBindingSns(SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN))
-                .containsExactly(BINDING_SN + "_payment_card");
+                .containsExactly(paymentCardBinding.getSn());
         assertThat(queryBindingSns(SpendRuleScopeType.FUNDING_ACCOUNT, FUNDING_ACCOUNT_SCOPE_ID))
-                .containsExactly(BINDING_SN + "_funding_account");
+                .containsExactly(fundingAccountBinding.getSn());
         assertThat(queryBindingSns(SpendRuleScopeType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SCOPE_ID))
-                .containsExactly(BINDING_SN + "_credit_account");
+                .containsExactly(creditAccountBinding.getSn());
         assertThat(queryBindingSns(SpendRuleScopeType.ACCOUNT_HIERARCHY, ACCOUNT_HIERARCHY_SCOPE_ID))
-                .containsExactly(BINDING_SN + "_account_hierarchy");
+                .containsExactly(accountHierarchyBinding.getSn());
         assertThat(queryBindingSns(SpendRuleScopeType.BUSINESS_SCENE, CARD_PRODUCT_SCOPE_ID))
-                .containsExactly(BINDING_SN + "_card_product");
-        assertThat(explainSpendRuleBinding(BINDING_SN + "_account_hierarchy").getEvidenceRefs())
+                .containsExactly(cardProductBinding.getSn());
+        assertThat(explainSpendRuleBinding(accountHierarchyBinding.getSn()).getEvidenceRefs())
                 .contains("spendRuleScope:" + SpendRuleScopeType.ACCOUNT_HIERARCHY + ":"
                         + ACCOUNT_HIERARCHY_SCOPE_ID);
         assertNoDecisionRecord();
@@ -270,18 +317,18 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_missing_version",
+                BINDING_AUDIT_REFERENCE_PREFIX + "_missing_version",
                 "missing-version",
                 PAYMENT_INSTRUMENT_SN)))
                 .hasMessageContaining("Spend Rule 版本不存在");
         assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_no_policy",
+                BINDING_AUDIT_REFERENCE_PREFIX + "_no_policy",
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setConflictPolicy(null)))
                 .hasMessageContaining("Spend Rule 挂载冲突策略不能为空");
         assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(bindingRequest(
-                BINDING_SN + "_invalid_window",
+                BINDING_AUDIT_REFERENCE_PREFIX + "_invalid_window",
                 RULE_VERSION,
                 PAYMENT_INSTRUMENT_SN)
                 .setEffectiveFrom(EFFECTIVE_TO)
@@ -341,19 +388,18 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 .setDescription("发布 Spend Rule 版本");
     }
 
-    private CreateSpendRuleBindingRequest bindingRequest(String sn,
+    private CreateSpendRuleBindingRequest bindingRequest(String auditReferenceSn,
                                                             String ruleVersion,
                                                             String scopeId) {
-        return bindingRequest(sn, ruleVersion, scopeId, SpendRuleScopeType.PAYMENT_INSTRUMENT);
+        return bindingRequest(auditReferenceSn, ruleVersion, scopeId, SpendRuleScopeType.PAYMENT_INSTRUMENT);
     }
 
-    private CreateSpendRuleBindingRequest bindingRequest(String sn,
+    private CreateSpendRuleBindingRequest bindingRequest(String auditReferenceSn,
                                                             String ruleVersion,
                                                             String scopeId,
                                                             SpendRuleScopeType scopeType) {
         return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(sn)
                 .setRuleId(RULE_ID)
                 .setRuleVersion(ruleVersion)
                 .setScopeType(scopeType)
@@ -362,6 +408,24 @@ class SpendRuleDefinitionServiceTests extends AbstractFundsServiceTest {
                 .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
                 .setEffectiveFrom(EFFECTIVE_FROM)
                 .setEffectiveTo(EFFECTIVE_TO)
+                .setAuditReferenceSn(auditReferenceSn)
+                .setDescription("挂载 Spend Rule 版本");
+    }
+
+    private CreateSpendRuleBindingRequest businessBindingRequest(String ruleVersion,
+                                                                 String scopeId,
+                                                                 String auditReferenceSn) {
+        return new CreateSpendRuleBindingRequest()
+                .setTenantId(TENANT_ID)
+                .setRuleId(RULE_ID)
+                .setRuleVersion(ruleVersion)
+                .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
+                .setScopeId(scopeId)
+                .setPriority(10)
+                .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
+                .setEffectiveFrom(EFFECTIVE_FROM)
+                .setEffectiveTo(EFFECTIVE_TO)
+                .setAuditReferenceSn(auditReferenceSn)
                 .setDescription("挂载 Spend Rule 版本");
     }
 

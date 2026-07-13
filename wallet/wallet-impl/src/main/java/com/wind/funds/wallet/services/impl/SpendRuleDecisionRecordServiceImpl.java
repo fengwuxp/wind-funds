@@ -219,7 +219,6 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
     }
 
     private void validateDecisionRecordQuery(SpendRuleDecisionRecordQuery query) {
-        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         AssertUtils.isTrue(hasDecisionRecordNarrowCondition(query),
                 "至少提供一个 Spend Rule 决策查询条件");
     }

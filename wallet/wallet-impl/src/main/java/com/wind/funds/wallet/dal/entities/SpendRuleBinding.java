@@ -113,6 +113,12 @@ public class SpendRuleBinding implements Serializable, TenantIsolationObject<Lon
     private SpendRuleBindingStatus status;
 
     /**
+     * 创建挂载的审计引用。
+     */
+    @NotNull
+    private String auditReferenceSn;
+
+    /**
      * 挂载说明。
      */
     private String description;

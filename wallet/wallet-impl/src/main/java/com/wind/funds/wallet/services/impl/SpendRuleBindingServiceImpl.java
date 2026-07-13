@@ -18,6 +18,8 @@ import com.wind.funds.wallet.model.query.SpendRuleBindingQuery;
 import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.service.SpendRuleBindingService;
 import com.wind.mybatis.flex.MybatisQueryHelper;
+import com.wind.sequence.WindSequenceType;
+import com.wind.sequence.time.TemporalSequenceFactory;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -39,6 +41,9 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
 
     private static final int BINDING_QUERY_PAGE_SIZE = 100;
 
+    private static final WindSequenceType SPEND_RULE_BINDING_SEQUENCE_TYPE =
+            WindSequenceType.immutable("SPEND_RULE_BINDING", "SRB", 6);
+
     private final SpendRuleBindingMapper spendRuleBindingMapper;
 
     @Override
@@ -46,8 +51,10 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
             @NonNull CreateSpendRuleBindingRequest request) {
         SpendRuleBinding entity = toEntity(request);
         spendRuleBindingMapper.insertSelective(entity);
-        AssertUtils.notNull(entity.getId(), "挂载 Spend Rule 版本失败，sn = {}",
-                request.getSn());
+        AssertUtils.notNull(entity.getId(), "挂载 Spend Rule 版本失败，ruleId = {}, ruleVersion = {}, auditReferenceSn = {}",
+                request.getRuleId(),
+                request.getRuleVersion(),
+                request.getAuditReferenceSn());
         return entity.getId();
     }
 
@@ -72,7 +79,6 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     public @NonNull WindPagination<SpendRuleBindingDTO> querySpendRuleBindings(
             @NonNull SpendRuleBindingQuery query,
             @NonNull WindQuery<? extends QueryOrderField> options) {
-        validateBindingQuery(query);
         return MybatisQueryHelper.<SpendRuleBinding, SpendRuleBindingDTO>query(toQueryWrapper(query, options))
                 .counter(spendRuleBindingMapper::selectCountByQuery)
                 .resultQueryFunc(spendRuleBindingMapper::selectListByQuery)
@@ -116,10 +122,6 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
         return binding;
     }
 
-    private void validateBindingQuery(SpendRuleBindingQuery query) {
-        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
-    }
-
     private void validateBindingExplainQuery(SpendRuleBindingExplainQuery query) {
         AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(query.getSn(), "Spend Rule 挂载流水号不能为空");
@@ -144,7 +146,8 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 .and(ref.ruleVersion.eq(query.getRuleVersion()))
                 .and(ref.scopeType.eq(query.getScopeType()))
                 .and(ref.scopeId.eq(query.getScopeId()))
-                .and(ref.status.eq(query.getStatus()));
+                .and(ref.status.eq(query.getStatus()))
+                .and(ref.auditReferenceSn.eq(query.getAuditReferenceSn()));
         if (Boolean.TRUE.equals(query.getEffectiveOnly())) {
             LocalDateTime effectiveAt = resolveEvaluationTime(query.getEffectiveAt());
             wrapper.and(ref.status.eq(SpendRuleBindingStatus.ACTIVE))
@@ -164,16 +167,19 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
 
     private SpendRuleBindingExplanationStatus resolveExplanationStatus(SpendRuleBindingDTO binding,
                                                                           LocalDateTime evaluatedAt) {
-        if (binding.getStatus() != SpendRuleBindingStatus.ACTIVE) {
-            return SpendRuleBindingExplanationStatus.DISABLED;
-        }
-        if (evaluatedAt.isBefore(binding.getEffectiveFrom())) {
-            return SpendRuleBindingExplanationStatus.NOT_YET_EFFECTIVE;
-        }
-        if (!evaluatedAt.isBefore(binding.getEffectiveTo())) {
-            return SpendRuleBindingExplanationStatus.EXPIRED;
-        }
-        return SpendRuleBindingExplanationStatus.EFFECTIVE;
+        return switch (binding.getStatus()) {
+            case SUSPENDED -> SpendRuleBindingExplanationStatus.SUSPENDED;
+            case RETIRED -> SpendRuleBindingExplanationStatus.RETIRED;
+            case ACTIVE -> {
+                if (evaluatedAt.isBefore(binding.getEffectiveFrom())) {
+                    yield SpendRuleBindingExplanationStatus.NOT_YET_EFFECTIVE;
+                }
+                if (!evaluatedAt.isBefore(binding.getEffectiveTo())) {
+                    yield SpendRuleBindingExplanationStatus.EXPIRED;
+                }
+                yield SpendRuleBindingExplanationStatus.EFFECTIVE;
+            }
+        };
     }
 
     private List<String> toBindingEvidenceRefs(SpendRuleBindingDTO binding) {
@@ -187,7 +193,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     private SpendRuleBinding toEntity(CreateSpendRuleBindingRequest request) {
         SpendRuleBinding result = new SpendRuleBinding();
         result.setTenantId(request.getTenantId());
-        result.setSn(request.getSn());
+        result.setSn(TemporalSequenceFactory.hourNext(SPEND_RULE_BINDING_SEQUENCE_TYPE));
         result.setRuleId(request.getRuleId());
         result.setRuleVersion(request.getRuleVersion());
         result.setScopeType(request.getScopeType());
@@ -197,6 +203,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
         result.setEffectiveFrom(request.getEffectiveFrom());
         result.setEffectiveTo(request.getEffectiveTo());
         result.setStatus(SpendRuleBindingStatus.ACTIVE);
+        result.setAuditReferenceSn(request.getAuditReferenceSn());
         result.setDescription(request.getDescription());
         return result;
     }
@@ -217,6 +224,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 .setEffectiveFrom(entity.getEffectiveFrom())
                 .setEffectiveTo(entity.getEffectiveTo())
                 .setStatus(entity.getStatus())
+                .setAuditReferenceSn(entity.getAuditReferenceSn())
                 .setDescription(entity.getDescription());
     }
 }

@@ -146,7 +146,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | --- | --- | --- | --- |
 | SpendRuleDefinition | 规则定义，描述规则是什么、归谁管理、用于哪个规则域。 | ruleId、ruleCode、ruleName、ruleType、ruleDomain、ownerType、ownerId、status。 | DRAFT、ACTIVE、SUSPENDED、ARCHIVED。 |
 | SpendRuleVersion | 不可变规则版本，描述规则规格 JSON、裁决动作和摘要。 | ruleId、ruleVersion、ruleSpec、ruleDigest；ruleSpec 可承载 display、matchSpec、counterSpec、limitSpec、decisionSpec、safetySpec。 | DRAFT、PUBLISHED、EXPIRED、RETIRED。 |
-| SpendRuleBinding | 规则挂载，描述某一版本应用到哪个 scope、优先级、冲突策略和生效窗口。 | sn、ruleId、ruleVersion、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、status。 | ACTIVE、SUSPENDED、EXPIRED、REMOVED。 |
+| SpendRuleBinding | 规则挂载，描述某一版本应用到哪个 scope、优先级、冲突策略和生效窗口。 | sn、ruleId、ruleVersion、scopeType、scopeId、priority、conflictPolicy、effectiveFrom、effectiveTo、auditReferenceSn、status。 | ACTIVE、SUSPENDED、RETIRED；EXPIRED 是按生效窗口解释出的只读状态，不作为挂载存储状态。 |
 | SpendRuleDecisionRecord | 规则决策记录，描述一次请求的规则版本、挂载、范围、结果和原因。 | decisionSn、spendRuleBindingSn、ruleId、ruleVersion、scopeType、scopeId、instrumentSn、action、amount、currency、businessScene、businessSn、decisionResult、rejectReason、decisionDigest。 | RECORDED；记录不可改写，只能追加更正或新决策。 |
 | SpendControlMovement | 规则执行后的控制额度变动流水，例如额度调整、预留、消耗、释放或退款补偿。 | movementSn、movementType、targetSubjectRef、amount、currency、spendRuleId、spendRuleVersion、spendDecisionSn、controlScopeId、periodId、movementDigest。 | 作为既有控制事实能力保留，不作为规则定义表。 |
 | BudgetControlProjection | 从控制额度变动流水派生的只读预算控制视图。 | controlScopeId、periodId、reservedAmount、consumedAmount、releasedAmount、remainingControlAmount、availableControlAmount、lastMovementSn。 | 可重建、可重放、不可反写账本余额。 |
@@ -167,7 +167,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 
 1. ruleId 表示系统内稳定标识，用于幂等、引用和回放。
 2. ruleCode 表示业务可读编码，面向运营配置和人工沟通。
-3. `sn` 是 Spend Rule 挂载自身流水号；`spendRuleBindingSn` 是其他对象引用挂载时使用的字段；`decisionSn`、`movementSn` 分别是决策和控制流水号。
+3. `sn` 是 Spend Rule 挂载自身流水号，由资金底座内部生成；创建请求使用 `auditReferenceSn` 承接上层审批或业务事实引用，并与 rule、version、scope 共同构成挂载业务幂等键。`spendRuleBindingSn` 是其他对象引用挂载时使用的字段；`decisionSn`、`movementSn` 分别是决策和控制流水号。
 4. 资金账户、信用账户、支出控制范围和支付工具的既有 sn 不在本文中统一改名为 code；若后续需要命名迁移，必须单独评估兼容和数据库迁移。
 
 当前代码对齐状态：

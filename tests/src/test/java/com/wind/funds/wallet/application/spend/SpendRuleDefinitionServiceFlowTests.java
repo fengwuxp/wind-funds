@@ -83,7 +83,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
 
     private static final String CHANGED_RULE_DIGEST = "sha256:changed-spend-rule-definition-contract";
 
-    private static final String BINDING_SN = "spend_rule_binding_definition_contract_001";
+    private static final String BINDING_AUDIT_REFERENCE_PREFIX = "grant:spend_rule_binding_definition_contract";
 
     private static final String DECISION_SN = "spend_rule_decision_definition_contract_001";
 
@@ -110,6 +110,8 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    private String spendRuleBindingSn;
 
     /**
      * 场景：规则定义创建后发布一个不可变版本。
@@ -150,11 +152,15 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         SpendRuleBindingDTO instrumentBinding = spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX,
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN));
         SpendRuleBindingDTO budgetBinding = spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_budget", SpendRuleScopeType.SPEND_CONTROL_SCOPE, SPEND_CONTROL_SCOPE_SN));
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_budget",
+                        SpendRuleScopeType.SPEND_CONTROL_SCOPE,
+                        SPEND_CONTROL_SCOPE_SN));
 
-        assertThat(instrumentBinding.getSn()).isEqualTo(BINDING_SN);
+        assertThat(instrumentBinding.getSn()).isNotBlank();
         assertThat(instrumentBinding.getScopeType()).isEqualTo(SpendRuleScopeType.PAYMENT_INSTRUMENT);
         assertThat(instrumentBinding.getStatus()).isEqualTo(SpendRuleBindingStatus.ACTIVE);
         assertThat(budgetBinding.getScopeType()).isEqualTo(SpendRuleScopeType.SPEND_CONTROL_SCOPE);
@@ -174,25 +180,25 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_no_policy",
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_no_policy",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setConflictPolicy(null)))
                 .hasMessageContaining("Spend Rule 挂载冲突策略不能为空");
         assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_no_from",
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_no_from",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setEffectiveFrom(null)))
                 .hasMessageContaining("Spend Rule 挂载生效开始时间不能为空");
         assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_no_to",
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_no_to",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setEffectiveTo(null)))
                 .hasMessageContaining("Spend Rule 挂载生效结束时间不能为空");
         assertThatThrownBy(() -> spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_invalid_window",
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_invalid_window",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setEffectiveFrom(EFFECTIVE_TO)
@@ -211,8 +217,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     @Test
     void testRecordRejectedSpendRuleDecisionShouldNotCreateFundsFacts() {
         publishRuleVersion();
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX,
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)).getSn();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         SpendRuleDecisionRecordDTO decision = spendRuleDecisionRecordService.recordDecision(
@@ -234,8 +242,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     @Test
     void testQuerySpendRuleDecisionsShouldFilterByBusinessWithoutFundsSideEffect() {
         publishRuleVersion();
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX,
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)).getSn();
         spendRuleDecisionRecordService.recordDecision(rejectedDecisionRequest());
         spendRuleDecisionRecordService.recordDecision(
                 passedDecisionRequest().setBusinessSn(BUSINESS_SN + "_passed"));
@@ -266,8 +276,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     @Test
     void testExplainSpendRuleDecisionShouldReturnEvidenceRefsWithoutFundsSideEffect() {
         publishRuleVersion();
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX,
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)).getSn();
         SpendRuleDecisionRecordDTO recorded = spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
@@ -284,7 +296,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         assertThat(explanation.getEvidenceRefs()).contains(
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
-                "spendRuleBinding:" + BINDING_SN,
+                "spendRuleBinding:" + spendRuleBindingSn,
                 "spendRuleScope:" + SpendRuleScopeType.PAYMENT_INSTRUMENT + ":" + PAYMENT_INSTRUMENT_SN,
                 "spendRuleDecision:" + DECISION_SN,
                 "spendRuleDecisionRecord:" + recorded.getId(),
@@ -340,14 +352,14 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     @Test
     void testDecisionShouldRejectInactiveBindingWindow() {
         publishRuleVersion();
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_future",
+        SpendRuleBindingDTO futureBinding = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_future",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setEffectiveFrom(LocalDateTime.now().plusDays(1))
                         .setEffectiveTo(LocalDateTime.now().plusDays(2)));
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_expired",
+        SpendRuleBindingDTO expiredBinding = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_expired",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN + "_expired")
                         .setEffectiveFrom(LocalDateTime.now().minusDays(2))
@@ -357,12 +369,12 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest()
                         .setDecisionSn(DECISION_SN + "_future")
-                        .setSpendRuleBindingSn(BINDING_SN + "_future")))
+                        .setSpendRuleBindingSn(futureBinding.getSn())))
                 .hasMessageContaining("Spend Rule 挂载未在当前时间生效");
         assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
                 rejectedDecisionRequest()
                         .setDecisionSn(DECISION_SN + "_expired")
-                        .setSpendRuleBindingSn(BINDING_SN + "_expired")
+                        .setSpendRuleBindingSn(expiredBinding.getSn())
                         .setScopeId(PAYMENT_INSTRUMENT_SN + "_expired")
                         .setInstrumentSn(PAYMENT_INSTRUMENT_SN + "_expired")))
                 .hasMessageContaining("Spend Rule 挂载未在当前时间生效");
@@ -381,13 +393,13 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     @Test
     void testQueryEffectiveBindingsShouldReturnOnlyCurrentScopeBindingsWithoutFundsSideEffect() {
         publishThreeRuleVersions();
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN,
+        SpendRuleBindingDTO effectiveBinding = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX,
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setPriority(20));
         spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_future",
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_future",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setRuleVersion(FUTURE_RULE_VERSION)
@@ -395,7 +407,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                         .setEffectiveFrom(LocalDateTime.now().plusDays(1))
                         .setEffectiveTo(LocalDateTime.now().plusDays(2)));
         spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_expired",
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_expired",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setRuleVersion(EXPIRED_RULE_VERSION)
@@ -412,7 +424,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                         .setEffectiveOnly(Boolean.TRUE));
 
         assertThat(bindings).hasSize(1);
-        assertThat(bindings.getFirst().getSn()).isEqualTo(BINDING_SN);
+        assertThat(bindings.getFirst().getId()).isEqualTo(effectiveBinding.getId());
         assertThat(bindings.getFirst().getConflictPolicy()).isEqualTo(SpendRuleConflictPolicy.DENY_OVERRIDES);
         assertNoSpendRuleDecisionRecord(DECISION_SN);
         assertNoTransactionFacts(BUSINESS_SN);
@@ -428,19 +440,19 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     @Test
     void testExplainBindingShouldDescribeAvailabilityWithoutFundsSideEffect() {
         publishThreeRuleVersions();
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN,
+        SpendRuleBindingDTO effectiveBinding = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX,
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN));
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_future",
+        SpendRuleBindingDTO futureBinding = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_future",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setRuleVersion(FUTURE_RULE_VERSION)
                         .setEffectiveFrom(LocalDateTime.now().plusDays(1))
                         .setEffectiveTo(LocalDateTime.now().plusDays(2)));
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN + "_expired",
+        SpendRuleBindingDTO expiredBinding = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX + "_expired",
                         SpendRuleScopeType.PAYMENT_INSTRUMENT,
                         PAYMENT_INSTRUMENT_SN)
                         .setRuleVersion(EXPIRED_RULE_VERSION)
@@ -451,22 +463,22 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
         SpendRuleBindingExplanationDTO effective = spendRuleBindingService.explainSpendRuleBinding(
                 new SpendRuleBindingExplainQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN));
+                        .setSn(effectiveBinding.getSn()));
         SpendRuleBindingExplanationDTO future = spendRuleBindingService.explainSpendRuleBinding(
                 new SpendRuleBindingExplainQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN + "_future"));
+                        .setSn(futureBinding.getSn()));
         SpendRuleBindingExplanationDTO expired = spendRuleBindingService.explainSpendRuleBinding(
                 new SpendRuleBindingExplainQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN + "_expired"));
+                        .setSn(expiredBinding.getSn()));
 
         assertThat(effective.getEffective()).isTrue();
         assertThat(effective.getExplanationStatus()).isEqualTo(SpendRuleBindingExplanationStatus.EFFECTIVE);
         assertThat(effective.getEvidenceRefs()).contains(
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
-                "spendRuleBinding:" + BINDING_SN);
+                "spendRuleBinding:" + effectiveBinding.getSn());
         assertThat(future.getEffective()).isFalse();
         assertThat(future.getExplanationStatus())
                 .isEqualTo(SpendRuleBindingExplanationStatus.NOT_YET_EFFECTIVE);
@@ -486,8 +498,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     @Test
     void testPaymentInstrumentDecisionShouldRequireMatchedInstrumentReference() {
         publishRuleVersion();
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX,
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)).getSn();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
@@ -509,8 +523,10 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
     @Test
     void testPassedSpendRuleDecisionShouldRejectRejectReason() {
         publishRuleVersion();
-        spendRuleDefinitionService.createSpendRuleBinding(
-                bindingRequest(BINDING_SN, SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN));
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(
+                bindingRequest(BINDING_AUDIT_REFERENCE_PREFIX,
+                        SpendRuleScopeType.PAYMENT_INSTRUMENT,
+                        PAYMENT_INSTRUMENT_SN)).getSn();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
@@ -566,12 +582,11 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 .setDescription("发布 Spend Rule 版本");
     }
 
-    private CreateSpendRuleBindingRequest bindingRequest(String sn,
+    private CreateSpendRuleBindingRequest bindingRequest(String auditReferenceSn,
                                                             SpendRuleScopeType scopeType,
                                                             String scopeId) {
         return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(sn)
                 .setRuleId(RULE_ID)
                 .setRuleVersion(RULE_VERSION)
                 .setScopeType(scopeType)
@@ -580,6 +595,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
                 .setEffectiveFrom(EFFECTIVE_FROM)
                 .setEffectiveTo(EFFECTIVE_TO)
+                .setAuditReferenceSn(auditReferenceSn)
                 .setDescription("挂载 Spend Rule 版本");
     }
 
@@ -589,7 +605,7 @@ class SpendRuleDefinitionServiceFlowTests extends AbstractFundsServiceTest {
                 .setDecisionSn(DECISION_SN)
                 .setRuleId(RULE_ID)
                 .setRuleVersion(RULE_VERSION)
-                .setSpendRuleBindingSn(BINDING_SN)
+                .setSpendRuleBindingSn(spendRuleBindingSn)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setScopeId(PAYMENT_INSTRUMENT_SN)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)

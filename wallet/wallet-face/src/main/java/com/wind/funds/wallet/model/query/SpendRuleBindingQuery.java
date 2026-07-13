@@ -56,6 +56,9 @@ public class SpendRuleBindingQuery implements Serializable {
     @Schema(description = "挂载状态")
     private SpendRuleBindingStatus status;
 
+    @Schema(description = "创建挂载的审计引用")
+    private String auditReferenceSn;
+
     @Schema(description = "是否只查询指定时间点有效的挂载")
     private Boolean effectiveOnly;
 

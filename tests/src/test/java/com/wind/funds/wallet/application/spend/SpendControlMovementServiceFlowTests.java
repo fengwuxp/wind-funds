@@ -248,8 +248,12 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
         List<SpendControlMovementDTO> movements = spendControlMovementService.queryMovements(
                 new SpendControlMovementQuery().setTenantId(TENANT_ID).setMovementSn(RESERVED_ACTIVITY_SN));
+        List<SpendControlMovementDTO> movementsWithoutTenantId = spendControlMovementService.queryMovements(
+                new SpendControlMovementQuery().setMovementSn(RESERVED_ACTIVITY_SN));
         assertThat(movements).hasSize(1);
         assertThat(movements.getFirst().getMovementType()).isEqualTo(SpendControlMovementType.RESERVED);
+        assertThat(movementsWithoutTenantId).hasSize(1);
+        assertThat(movementsWithoutTenantId.getFirst().getMovementType()).isEqualTo(SpendControlMovementType.RESERVED);
         assertThat(activityCount(RESERVED_ACTIVITY_SN)).isOne();
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -279,10 +283,20 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                         .setCurrency(CurrencyIsoCode.USD)
                         .setSpendRuleId(SPEND_RULE_ID)
                         .setSpendRuleVersion(SPEND_RULE_VERSION));
+        BudgetControlProjectionDTO projectionWithoutTenantId = spendControlMovementService.getBudgetControlProjection(
+                new BudgetControlProjectionQuery()
+                        .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
+                        .setPeriodId(PERIOD_ID)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setSpendRuleId(SPEND_RULE_ID)
+                        .setSpendRuleVersion(SPEND_RULE_VERSION));
 
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
         assertThat(projection.getReleasedAmount()).isEqualTo(20L);
         assertThat(projection.getRemainingControlAmount()).isEqualTo(40L);
+        assertThat(projectionWithoutTenantId.getReservedAmount()).isEqualTo(60L);
+        assertThat(projectionWithoutTenantId.getReleasedAmount()).isEqualTo(20L);
+        assertThat(projectionWithoutTenantId.getRemainingControlAmount()).isEqualTo(40L);
         assertThat(projection.getLastMovementSn()).isEqualTo(RELEASED_ACTIVITY_SN);
         assertThat(projection.getLastMovementAt()).isNotNull();
         assertNoTransactionFacts(BUSINESS_SN);

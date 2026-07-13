@@ -11,6 +11,7 @@ import com.wind.funds.wallet.enums.SpendRuleVersionStatus;
 import com.wind.funds.wallet.model.dto.SpendRuleBindingDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleDefinitionDTO;
 import com.wind.funds.wallet.model.dto.SpendRuleVersionDTO;
+import com.wind.funds.wallet.model.query.SpendRuleBindingQuery;
 import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
@@ -94,9 +95,7 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
         spendRuleVersionService.getPublishedVersion(request.getTenantId(),
                 request.getRuleId(),
                 request.getRuleVersion());
-        SpendRuleBindingDTO existing = spendRuleBindingService.findSpendRuleBinding(
-                request.getTenantId(),
-                request.getSn());
+        SpendRuleBindingDTO existing = findBindingByBusinessKey(request);
         if (existing != null) {
             assertSameBinding(request, existing);
             return existing;
@@ -161,7 +160,6 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
 
     private void validateBindingRequest(CreateSpendRuleBindingRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
         AssertUtils.hasText(request.getRuleId(), "Spend Rule 标识不能为空");
         AssertUtils.hasText(request.getRuleVersion(), "Spend Rule 版本不能为空");
         AssertUtils.notNull(request.getScopeType(), "Spend Rule 挂载范围类型不能为空");
@@ -172,6 +170,7 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
         AssertUtils.notNull(request.getEffectiveTo(), "Spend Rule 挂载生效结束时间不能为空");
         AssertUtils.isTrue(request.getEffectiveTo().isAfter(request.getEffectiveFrom()),
                 "Spend Rule 挂载生效结束时间必须晚于开始时间");
+        AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载审计引用不能为空");
     }
 
     private Long readIdempotentDefinitionAfterInsertConflict(
@@ -201,9 +200,7 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
     private SpendRuleBindingDTO readIdempotentBindingAfterInsertConflict(
             CreateSpendRuleBindingRequest request,
             DataIntegrityViolationException exception) {
-        SpendRuleBindingDTO existing = spendRuleBindingService.findSpendRuleBinding(
-                request.getTenantId(),
-                request.getSn());
+        SpendRuleBindingDTO existing = findBindingByBusinessKey(request);
         if (existing == null) {
             throw exception;
         }
@@ -243,9 +240,27 @@ public class SpendRuleDefinitionServiceImpl implements SpendRuleDefinitionServic
                         && Objects.equals(existing.getPriority(), request.getPriority())
                         && existing.getConflictPolicy() == request.getConflictPolicy()
                         && Objects.equals(existing.getEffectiveFrom(), request.getEffectiveFrom())
-                        && Objects.equals(existing.getEffectiveTo(), request.getEffectiveTo()),
-                "Spend Rule 挂载已存在但内容不一致，sn = {}",
-                request.getSn());
+                        && Objects.equals(existing.getEffectiveTo(), request.getEffectiveTo())
+                        && Objects.equals(existing.getAuditReferenceSn(), request.getAuditReferenceSn()),
+                "Spend Rule 挂载已存在但内容不一致，ruleId = {}, ruleVersion = {}, scopeType = {}, scopeId = {}, auditReferenceSn = {}",
+                request.getRuleId(),
+                request.getRuleVersion(),
+                request.getScopeType(),
+                request.getScopeId(),
+                request.getAuditReferenceSn());
+    }
+
+    private SpendRuleBindingDTO findBindingByBusinessKey(CreateSpendRuleBindingRequest request) {
+        return spendRuleBindingService.querySpendRuleBindings(new SpendRuleBindingQuery()
+                        .setTenantId(request.getTenantId())
+                        .setRuleId(request.getRuleId())
+                        .setRuleVersion(request.getRuleVersion())
+                        .setScopeType(request.getScopeType())
+                        .setScopeId(request.getScopeId())
+                        .setAuditReferenceSn(request.getAuditReferenceSn()))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private SpendRuleDefinition toEntity(CreateSpendRuleDefinitionRequest request) {

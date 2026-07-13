@@ -35,10 +35,6 @@ public class CreateSpendRuleBindingRequest implements Serializable {
     @NotNull
     private Long tenantId;
 
-    @Schema(description = "规则挂载流水号，用于幂等和审计追踪")
-    @NotBlank
-    private String sn;
-
     @Schema(description = "Spend Rule 标识")
     @NotBlank
     private String ruleId;
@@ -75,6 +71,10 @@ public class CreateSpendRuleBindingRequest implements Serializable {
     @Schema(description = "挂载生效结束时间")
     @NotNull
     private LocalDateTime effectiveTo;
+
+    @Schema(description = "创建挂载的审计引用，参与业务幂等。必须来自上层业务事实或审批事实，不是外部请求流水号。")
+    @NotBlank
+    private String auditReferenceSn;
 
     @Schema(description = "描述")
     private String description;

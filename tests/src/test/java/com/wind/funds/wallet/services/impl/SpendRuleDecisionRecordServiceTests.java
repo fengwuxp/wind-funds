@@ -54,7 +54,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
 
     private static final String RULE_DIGEST = "sha256:spend-rule-decision-record-service";
 
-    private static final String BINDING_SN = "spend_rule_decision_record_service_binding";
+    private static final String BINDING_AUDIT_REFERENCE_SN = "grant:spend_rule_decision_record_service_binding";
 
     private static final String DECISION_SN = "spend_rule_decision_record_service_001";
 
@@ -77,6 +77,8 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private String spendRuleBindingSn;
+
     /**
      * 场景：准入链直接通过决策记录标准基础服务固化规则决策。
      * 输入：已发布版本、当前有效挂载和一条拒绝决策。
@@ -95,6 +97,10 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
                         .setTenantId(TENANT_ID)
                         .setBusinessScene(BUSINESS_SCENE)
                         .setBusinessSn(BUSINESS_SN));
+        List<SpendRuleDecisionRecordDTO> decisionsWithoutTenantId = spendRuleDecisionRecordService.queryDecisions(
+                new SpendRuleDecisionRecordQuery()
+                        .setBusinessScene(BUSINESS_SCENE)
+                        .setBusinessSn(BUSINESS_SN));
         SpendRuleDecisionExplanationDTO explanation = spendRuleDecisionRecordService.explainDecision(
                 new SpendRuleDecisionExplainQuery()
                         .setTenantId(TENANT_ID)
@@ -104,12 +110,14 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
         assertThat(decision.getDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
         assertThat(decisions).hasSize(1);
         assertThat(decisions.getFirst().getId()).isEqualTo(decision.getId());
+        assertThat(decisionsWithoutTenantId).hasSize(1);
+        assertThat(decisionsWithoutTenantId.getFirst().getId()).isEqualTo(decision.getId());
         assertThat(explanation.getDecision().getId()).isEqualTo(decision.getId());
         assertThat(explanation.getAdmitted()).isFalse();
         assertThat(explanation.getEvidenceRefs()).contains(
                 "spendRule:" + RULE_ID,
                 "spendRuleVersion:" + RULE_ID + "@" + RULE_VERSION,
-                "spendRuleBinding:" + BINDING_SN,
+                "spendRuleBinding:" + spendRuleBindingSn,
                 "spendRuleDecision:" + DECISION_SN,
                 "paymentInstrument:" + PAYMENT_INSTRUMENT_SN);
         assertNoTransactionFacts(BUSINESS_SN);
@@ -167,7 +175,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
     private void prepareRuleVersionAndBinding() {
         spendRuleDefinitionService.createDefinition(createDefinitionRequest());
         spendRuleDefinitionService.publishVersion(publishVersionRequest());
-        spendRuleDefinitionService.createSpendRuleBinding(bindingRequest());
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(bindingRequest()).getSn();
     }
 
     private CreateSpendRuleDefinitionRequest createDefinitionRequest() {
@@ -195,7 +203,6 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
     private CreateSpendRuleBindingRequest bindingRequest() {
         return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(BINDING_SN)
                 .setRuleId(RULE_ID)
                 .setRuleVersion(RULE_VERSION)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
@@ -204,6 +211,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
                 .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
                 .setEffectiveFrom(EFFECTIVE_FROM)
                 .setEffectiveTo(EFFECTIVE_TO)
+                .setAuditReferenceSn(BINDING_AUDIT_REFERENCE_SN)
                 .setDescription("挂载 Spend Rule 版本");
     }
 
@@ -213,7 +221,7 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
                 .setDecisionSn(DECISION_SN)
                 .setRuleId(RULE_ID)
                 .setRuleVersion(RULE_VERSION)
-                .setSpendRuleBindingSn(BINDING_SN)
+                .setSpendRuleBindingSn(spendRuleBindingSn)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setScopeId(PAYMENT_INSTRUMENT_SN)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)

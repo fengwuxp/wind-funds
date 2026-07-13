@@ -121,7 +121,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
 
     private static final String SPEND_RULE_VERSION = "2026-07-02.1";
 
-    private static final String SPEND_RULE_BINDING_SN = "wallet_spend_controls_binding";
+    private static final String SPEND_RULE_BINDING_AUDIT_REFERENCE_SN = "grant:wallet_spend_controls_binding";
 
     private static final String SPEND_RULE_DIGEST = "sha256:wallet-spend-controls-rule";
 
@@ -170,6 +170,8 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    private String spendRuleBindingSn;
 
     /**
      * 场景：企业钱包用 Spend Rule 控制员工卡月度授权额度。
@@ -254,7 +256,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
         spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest());
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()).getSn();
     }
 
     private AdjustBudgetControlLimitRequest adjustLimitRequest() {
@@ -305,7 +307,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setBusinessSn(BUSINESS_SN)
                 .setSpendRuleId(evaluation.getRuleId())
                 .setSpendRuleVersion(evaluation.getRuleVersion())
-                .setSpendRuleBindingSn(SPEND_RULE_BINDING_SN)
+                .setSpendRuleBindingSn(spendRuleBindingSn)
                 .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn("decision_wallet_spend_controls_001")
@@ -392,7 +394,6 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
     private CreateSpendRuleBindingRequest createSpendRuleBindingRequest() {
         return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(SPEND_RULE_BINDING_SN)
                 .setRuleId(SPEND_RULE_ID)
                 .setRuleVersion(SPEND_RULE_VERSION)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
@@ -401,6 +402,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
                 .setEffectiveFrom(LocalDateTime.now().withNano(0).minusDays(1))
                 .setEffectiveTo(LocalDateTime.now().withNano(0).plusDays(30))
+                .setAuditReferenceSn(SPEND_RULE_BINDING_AUDIT_REFERENCE_SN)
                 .setDescription("挂载到企业钱包员工卡");
     }
 

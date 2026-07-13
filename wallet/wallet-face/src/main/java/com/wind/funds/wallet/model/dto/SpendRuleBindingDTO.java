@@ -72,6 +72,9 @@ public class SpendRuleBindingDTO implements Serializable {
     @Schema(description = "挂载状态")
     private SpendRuleBindingStatus status;
 
+    @Schema(description = "创建挂载的审计引用")
+    private String auditReferenceSn;
+
     @Schema(description = "描述")
     private String description;
 }

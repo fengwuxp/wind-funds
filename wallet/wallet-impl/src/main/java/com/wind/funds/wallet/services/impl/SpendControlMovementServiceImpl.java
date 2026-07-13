@@ -317,7 +317,6 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
     }
 
     private void validateQuery(SpendControlMovementQuery query) {
-        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         AssertUtils.isTrue(hasNarrowCondition(query), "控制额度变动流水查询必须至少提供一个过滤条件");
         if (query.getTargetAccountId() != null) {
             targetSubjectType(query.getTargetAccountId());
@@ -325,7 +324,6 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
     }
 
     private void validateProjectionQuery(BudgetControlProjectionQuery query) {
-        AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(controlScopeId(query), "支出控制范围标识不能为空");
         AssertUtils.hasText(query.getPeriodId(), "预算控制周期标识不能为空");
         AssertUtils.notNull(query.getCurrency(), "币种不能为空");

@@ -103,7 +103,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     private static final String SPEND_RULE_VERSION = "2026-06-19.1";
 
-    private static final String SPEND_RULE_BINDING_SN = "spend_control_rule_binding";
+    private static final String SPEND_RULE_BINDING_AUDIT_REFERENCE_SN = "grant:spend_control_rule_binding";
 
     private static final String SPEND_RULE_DIGEST = "sha256:spend-control-rule-version";
 
@@ -137,6 +137,8 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private String spendRuleBindingSn;
+
     /**
      * 场景：支付工具预交易快照通过后，Spend Rule 决策也通过。
      * 输入：支付工具、资金责任和账户能力均可用，并带有规则 ID、版本、决策流水和摘要。
@@ -164,7 +166,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
         assertThat(decision.getSpendRuleId()).isEqualTo(SPEND_RULE_ID);
         assertThat(decision.getSpendRuleVersion()).isEqualTo(SPEND_RULE_VERSION);
-        assertThat(decision.getSpendRuleBindingSn()).isEqualTo(SPEND_RULE_BINDING_SN);
+        assertThat(decision.getSpendRuleBindingSn()).isEqualTo(spendRuleBindingSn);
         assertThat(decision.getSpendRuleScopeType()).isEqualTo(SpendRuleScopeType.PAYMENT_INSTRUMENT);
         assertThat(decision.getSpendRuleScopeId()).isEqualTo(PAYMENT_INSTRUMENT_SN);
         assertThat(decision.getSpendDecisionSn()).isEqualTo(SPEND_DECISION_SN);
@@ -369,7 +371,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
         spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest());
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()).getSn();
     }
 
     private void cleanupSpendControlAdmissionTestData() {
@@ -404,7 +406,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setBusinessSn(BUSINESS_SN)
                 .setSpendRuleId(SPEND_RULE_ID)
                 .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendRuleBindingSn(SPEND_RULE_BINDING_SN)
+                .setSpendRuleBindingSn(spendRuleBindingSn)
                 .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
                 .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_DECISION_SN)
@@ -436,7 +438,6 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     private CreateSpendRuleBindingRequest createSpendRuleBindingRequest() {
         return new CreateSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(SPEND_RULE_BINDING_SN)
                 .setRuleId(SPEND_RULE_ID)
                 .setRuleVersion(SPEND_RULE_VERSION)
                 .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
@@ -445,6 +446,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setConflictPolicy(SpendRuleConflictPolicy.DENY_OVERRIDES)
                 .setEffectiveFrom(SPEND_RULE_EFFECTIVE_FROM)
                 .setEffectiveTo(SPEND_RULE_EFFECTIVE_TO)
+                .setAuditReferenceSn(SPEND_RULE_BINDING_AUDIT_REFERENCE_SN)
                 .setDescription("挂载到支付工具准入 scope");
     }
 
@@ -548,7 +550,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 decisionSn,
                 SPEND_RULE_ID,
                 SPEND_RULE_VERSION,
-                SPEND_RULE_BINDING_SN,
+                spendRuleBindingSn,
                 SpendRuleScopeType.PAYMENT_INSTRUMENT.name(),
                 PAYMENT_INSTRUMENT_SN,
                 PAYMENT_INSTRUMENT_SN,

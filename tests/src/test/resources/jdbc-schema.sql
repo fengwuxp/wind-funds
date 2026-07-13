@@ -337,10 +337,11 @@ CREATE TABLE `t_spend_rule_binding`
     `effective_from`  DATETIME    NOT NULL COMMENT '生效开始时间',
     `effective_to`    DATETIME    NOT NULL COMMENT '生效结束时间',
     `status`          VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
+    `audit_reference_sn` VARCHAR(128) NOT NULL COMMENT '审计引用',
     `description`     VARCHAR(512)         DEFAULT NULL COMMENT '描述',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_spend_rule_binding_sn` (`tenant_id`, `sn`),
-    UNIQUE KEY `uk_spend_rule_binding_scope` (`tenant_id`, `scope_type`, `scope_id`, `rule_id`, `rule_version`),
+    UNIQUE KEY `uk_spend_rule_binding_scope` (`tenant_id`, `scope_type`, `scope_id`, `rule_id`, `rule_version`, `audit_reference_sn`),
     KEY `idx_spend_rule_binding_rule` (`tenant_id`, `rule_id`, `rule_version`, `status`),
     KEY `idx_spend_rule_binding_scope` (`tenant_id`, `scope_type`, `scope_id`, `status`)
 ) ENGINE = InnoDB
