@@ -36,6 +36,4 @@ public class RetireSpendRuleBindingRequest implements Serializable {
     @NotBlank
     private String sn;
 
-    @Schema(description = "描述")
-    private String description;
 }

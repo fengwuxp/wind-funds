@@ -71,9 +71,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
         AssertUtils.isTrue(entity.getStatus() == SpendRuleBindingStatus.ACTIVE,
                 "只有有效的 Spend Rule 挂载可以暂停，sn = {}",
                 request.getSn());
-        updateBindingStatus(entity,
-                SpendRuleBindingStatus.SUSPENDED,
-                request.getDescription());
+        updateBindingStatus(entity, SpendRuleBindingStatus.SUSPENDED);
     }
 
     @Override
@@ -84,9 +82,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
         AssertUtils.isTrue(entity.getStatus() == SpendRuleBindingStatus.SUSPENDED,
                 "只有已暂停的 Spend Rule 挂载可以恢复，sn = {}",
                 request.getSn());
-        updateBindingStatus(entity,
-                SpendRuleBindingStatus.ACTIVE,
-                request.getDescription());
+        updateBindingStatus(entity, SpendRuleBindingStatus.ACTIVE);
     }
 
     @Override
@@ -98,9 +94,7 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                         || entity.getStatus() == SpendRuleBindingStatus.SUSPENDED,
                 "只有有效或已暂停的 Spend Rule 挂载可以退役，sn = {}",
                 request.getSn());
-        updateBindingStatus(entity,
-                SpendRuleBindingStatus.RETIRED,
-                request.getDescription());
+        updateBindingStatus(entity, SpendRuleBindingStatus.RETIRED);
     }
 
     @Override
@@ -194,13 +188,11 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     }
 
     private void updateBindingStatus(SpendRuleBinding binding,
-                                     SpendRuleBindingStatus status,
-                                     String description) {
+                                     SpendRuleBindingStatus status) {
         SpendRuleBindingNameRefs ref = SpendRuleBindingNameRefs.spendRuleBinding;
         SpendRuleBinding entity = UpdateEntity.of(SpendRuleBinding.class);
         UpdateWrapper<SpendRuleBinding> updateWrapper = UpdateWrapper.of(entity);
         updateWrapper.set(ref.status, status, true);
-        updateWrapper.set(ref.description, description, description != null);
         AssertUtils.isTrue(spendRuleBindingMapper.updateByQuery(entity, QueryWrapper.create()
                         .where(ref.tenantId.eq(binding.getTenantId()))
                         .and(ref.sn.eq(binding.getSn()))

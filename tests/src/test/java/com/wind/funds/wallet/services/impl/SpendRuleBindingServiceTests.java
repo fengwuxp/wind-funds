@@ -78,10 +78,13 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
         assertThat(binding.getStatus()).isEqualTo(SpendRuleBindingStatus.ACTIVE);
         assertThat(suspended.getStatus()).isEqualTo(SpendRuleBindingStatus.SUSPENDED);
         assertThat(suspended.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
+        assertThat(suspended.getDescription()).isEqualTo("挂载 Spend Rule 版本");
         assertThat(resumed.getStatus()).isEqualTo(SpendRuleBindingStatus.ACTIVE);
         assertThat(resumed.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
+        assertThat(resumed.getDescription()).isEqualTo("挂载 Spend Rule 版本");
         assertThat(retired.getStatus()).isEqualTo(SpendRuleBindingStatus.RETIRED);
         assertThat(retired.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
+        assertThat(retired.getDescription()).isEqualTo("挂载 Spend Rule 版本");
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -164,22 +167,19 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
     private SuspendSpendRuleBindingRequest suspendRequest(String sn) {
         return new SuspendSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(sn)
-                .setDescription("暂停 Spend Rule 挂载");
+                .setSn(sn);
     }
 
     private ResumeSpendRuleBindingRequest resumeRequest(String sn) {
         return new ResumeSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(sn)
-                .setDescription("恢复 Spend Rule 挂载");
+                .setSn(sn);
     }
 
     private RetireSpendRuleBindingRequest retireRequest(String sn) {
         return new RetireSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
-                .setSn(sn)
-                .setDescription("退役 Spend Rule 挂载");
+                .setSn(sn);
     }
 
     private void cleanupSpendRuleBindingServiceTestData() {
