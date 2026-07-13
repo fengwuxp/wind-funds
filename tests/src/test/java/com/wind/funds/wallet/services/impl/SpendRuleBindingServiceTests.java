@@ -137,10 +137,10 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
     }
 
     /**
-     * 场景：Spend Rule 挂载生命周期命令必须带上业务审计参数。
-     * 输入：缺少原因码、操作者或审计引用的暂停请求。
+     * 场景：Spend Rule 挂载生命周期命令必须带上业务审计引用。
+     * 输入：缺少审计引用的暂停请求。
      * 输出：请求被拒绝。
-     * 红线：资金底座不依赖外部 requestSn，但必须保留可定位的业务审计引用。
+     * 红线：资金底座不依赖外部 requestSn，但必须保留可定位的上层业务事实引用。
      */
     @Test
     void testLifecycleCommandsShouldValidateAuditFields() {
@@ -148,12 +148,6 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
                 createBindingRequest("grant:srb-lifecycle-validation"));
         String bindingSn = spendRuleBindingService.getSpendRuleBindingById(bindingId).getSn();
 
-        assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(
-                suspendRequest(bindingSn, "audit:srb-lifecycle-no-reason").setReasonCode(null)))
-                .hasMessageContaining("Spend Rule 挂载状态变更原因码不能为空");
-        assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(
-                suspendRequest(bindingSn, "audit:srb-lifecycle-no-operator").setOperatorId(null)))
-                .hasMessageContaining("Spend Rule 挂载状态变更操作者不能为空");
         assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(
                 suspendRequest(bindingSn, null)))
                 .hasMessageContaining("Spend Rule 挂载状态变更审计引用不能为空");
@@ -190,8 +184,6 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
         return new SuspendSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(sn)
-                .setReasonCode("BUSINESS_STOP")
-                .setOperatorId("codex")
                 .setAuditReferenceSn(auditReferenceSn)
                 .setDescription("暂停 Spend Rule 挂载");
     }
@@ -200,8 +192,6 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
         return new ResumeSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(sn)
-                .setReasonCode("BUSINESS_RESUME")
-                .setOperatorId("codex")
                 .setAuditReferenceSn(auditReferenceSn)
                 .setDescription("恢复 Spend Rule 挂载");
     }
@@ -210,8 +200,6 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
         return new RetireSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(sn)
-                .setReasonCode("BUSINESS_RETIRE")
-                .setOperatorId("codex")
                 .setAuditReferenceSn(auditReferenceSn)
                 .setDescription("退役 Spend Rule 挂载");
     }

@@ -178,24 +178,18 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     private void validateSuspendRequest(SuspendSpendRuleBindingRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
-        AssertUtils.hasText(request.getReasonCode(), "Spend Rule 挂载状态变更原因码不能为空");
-        AssertUtils.hasText(request.getOperatorId(), "Spend Rule 挂载状态变更操作者不能为空");
         AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载状态变更审计引用不能为空");
     }
 
     private void validateResumeRequest(ResumeSpendRuleBindingRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
-        AssertUtils.hasText(request.getReasonCode(), "Spend Rule 挂载状态变更原因码不能为空");
-        AssertUtils.hasText(request.getOperatorId(), "Spend Rule 挂载状态变更操作者不能为空");
         AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载状态变更审计引用不能为空");
     }
 
     private void validateRetireRequest(RetireSpendRuleBindingRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
-        AssertUtils.hasText(request.getReasonCode(), "Spend Rule 挂载状态变更原因码不能为空");
-        AssertUtils.hasText(request.getOperatorId(), "Spend Rule 挂载状态变更操作者不能为空");
         AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载状态变更审计引用不能为空");
     }
 

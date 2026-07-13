@@ -36,14 +36,6 @@ public class SuspendSpendRuleBindingRequest implements Serializable {
     @NotBlank
     private String sn;
 
-    @Schema(description = "状态变更原因码，由上层业务按审批、运营或风险事实传入")
-    @NotBlank
-    private String reasonCode;
-
-    @Schema(description = "操作者")
-    @NotBlank
-    private String operatorId;
-
     @Schema(description = "状态变更审计引用，来自上层业务事实或审批事实，不是外部请求流水号")
     @NotBlank
     private String auditReferenceSn;
