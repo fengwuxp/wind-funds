@@ -5,6 +5,9 @@ import com.wind.funds.wallet.model.dto.SpendRuleBindingExplanationDTO;
 import com.wind.funds.wallet.model.query.SpendRuleBindingExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleBindingQuery;
 import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
+import com.wind.funds.wallet.model.request.ResumeSpendRuleBindingRequest;
+import com.wind.funds.wallet.model.request.RetireSpendRuleBindingRequest;
+import com.wind.funds.wallet.model.request.SuspendSpendRuleBindingRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
@@ -32,6 +35,33 @@ public interface SpendRuleBindingService {
      * @return 规则挂载主键
      */
     @NonNull Long createSpendRuleBinding(@NonNull CreateSpendRuleBindingRequest request);
+
+    /**
+     * 暂停 Spend Rule 挂载。
+     *
+     * <p>仅允许 ACTIVE -> SUSPENDED。重复暂停或退役后暂停均拒绝。</p>
+     *
+     * @param request 暂停请求
+     */
+    void suspendSpendRuleBinding(@NonNull SuspendSpendRuleBindingRequest request);
+
+    /**
+     * 恢复 Spend Rule 挂载。
+     *
+     * <p>仅允许 SUSPENDED -> ACTIVE。有效状态重复恢复或退役后恢复均拒绝。</p>
+     *
+     * @param request 恢复请求
+     */
+    void resumeSpendRuleBinding(@NonNull ResumeSpendRuleBindingRequest request);
+
+    /**
+     * 退役 Spend Rule 挂载。
+     *
+     * <p>仅允许 ACTIVE/SUSPENDED -> RETIRED。RETIRED 为终态，重复退役拒绝。</p>
+     *
+     * @param request 退役请求
+     */
+    void retireSpendRuleBinding(@NonNull RetireSpendRuleBindingRequest request);
 
     /**
      * 根据主键查询 Spend Rule 挂载。

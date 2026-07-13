@@ -1,6 +1,8 @@
 package com.wind.funds.wallet.services.impl;
 
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.update.UpdateWrapper;
+import com.mybatisflex.core.util.UpdateEntity;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
@@ -16,6 +18,9 @@ import com.wind.funds.wallet.model.dto.SpendRuleBindingExplanationDTO;
 import com.wind.funds.wallet.model.query.SpendRuleBindingExplainQuery;
 import com.wind.funds.wallet.model.query.SpendRuleBindingQuery;
 import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
+import com.wind.funds.wallet.model.request.ResumeSpendRuleBindingRequest;
+import com.wind.funds.wallet.model.request.RetireSpendRuleBindingRequest;
+import com.wind.funds.wallet.model.request.SuspendSpendRuleBindingRequest;
 import com.wind.funds.wallet.service.SpendRuleBindingService;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import com.wind.sequence.WindSequenceType;
@@ -56,6 +61,49 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 request.getRuleVersion(),
                 request.getAuditReferenceSn());
         return entity.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void suspendSpendRuleBinding(@NonNull SuspendSpendRuleBindingRequest request) {
+        validateSuspendRequest(request);
+        SpendRuleBinding entity = getSpendRuleBindingEntity(request.getTenantId(), request.getSn());
+        AssertUtils.isTrue(entity.getStatus() == SpendRuleBindingStatus.ACTIVE,
+                "只有有效的 Spend Rule 挂载可以暂停，sn = {}",
+                request.getSn());
+        updateBindingStatus(entity,
+                SpendRuleBindingStatus.SUSPENDED,
+                request.getAuditReferenceSn(),
+                request.getDescription());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void resumeSpendRuleBinding(@NonNull ResumeSpendRuleBindingRequest request) {
+        validateResumeRequest(request);
+        SpendRuleBinding entity = getSpendRuleBindingEntity(request.getTenantId(), request.getSn());
+        AssertUtils.isTrue(entity.getStatus() == SpendRuleBindingStatus.SUSPENDED,
+                "只有已暂停的 Spend Rule 挂载可以恢复，sn = {}",
+                request.getSn());
+        updateBindingStatus(entity,
+                SpendRuleBindingStatus.ACTIVE,
+                request.getAuditReferenceSn(),
+                request.getDescription());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void retireSpendRuleBinding(@NonNull RetireSpendRuleBindingRequest request) {
+        validateRetireRequest(request);
+        SpendRuleBinding entity = getSpendRuleBindingEntity(request.getTenantId(), request.getSn());
+        AssertUtils.isTrue(entity.getStatus() == SpendRuleBindingStatus.ACTIVE
+                        || entity.getStatus() == SpendRuleBindingStatus.SUSPENDED,
+                "只有有效或已暂停的 Spend Rule 挂载可以退役，sn = {}",
+                request.getSn());
+        updateBindingStatus(entity,
+                SpendRuleBindingStatus.RETIRED,
+                request.getAuditReferenceSn(),
+                request.getDescription());
     }
 
     @Override
@@ -125,6 +173,54 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     private void validateBindingExplainQuery(SpendRuleBindingExplainQuery query) {
         AssertUtils.notNull(query.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(query.getSn(), "Spend Rule 挂载流水号不能为空");
+    }
+
+    private void validateSuspendRequest(SuspendSpendRuleBindingRequest request) {
+        AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
+        AssertUtils.hasText(request.getReasonCode(), "Spend Rule 挂载状态变更原因码不能为空");
+        AssertUtils.hasText(request.getOperatorId(), "Spend Rule 挂载状态变更操作者不能为空");
+        AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载状态变更审计引用不能为空");
+    }
+
+    private void validateResumeRequest(ResumeSpendRuleBindingRequest request) {
+        AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
+        AssertUtils.hasText(request.getReasonCode(), "Spend Rule 挂载状态变更原因码不能为空");
+        AssertUtils.hasText(request.getOperatorId(), "Spend Rule 挂载状态变更操作者不能为空");
+        AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载状态变更审计引用不能为空");
+    }
+
+    private void validateRetireRequest(RetireSpendRuleBindingRequest request) {
+        AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
+        AssertUtils.hasText(request.getReasonCode(), "Spend Rule 挂载状态变更原因码不能为空");
+        AssertUtils.hasText(request.getOperatorId(), "Spend Rule 挂载状态变更操作者不能为空");
+        AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载状态变更审计引用不能为空");
+    }
+
+    private SpendRuleBinding getSpendRuleBindingEntity(Long tenantId, String sn) {
+        SpendRuleBinding entity = findSpendRuleBindingEntity(tenantId, sn);
+        AssertUtils.notNull(entity, "Spend Rule 挂载不存在，sn = {}", sn);
+        return entity;
+    }
+
+    private void updateBindingStatus(SpendRuleBinding binding,
+                                     SpendRuleBindingStatus status,
+                                     String auditReferenceSn,
+                                     String description) {
+        SpendRuleBindingNameRefs ref = SpendRuleBindingNameRefs.spendRuleBinding;
+        SpendRuleBinding entity = UpdateEntity.of(SpendRuleBinding.class);
+        UpdateWrapper<SpendRuleBinding> updateWrapper = UpdateWrapper.of(entity);
+        updateWrapper.set(ref.status, status, true);
+        updateWrapper.set(ref.auditReferenceSn, auditReferenceSn, true);
+        updateWrapper.set(ref.description, description, description != null);
+        AssertUtils.isTrue(spendRuleBindingMapper.updateByQuery(entity, QueryWrapper.create()
+                        .where(ref.tenantId.eq(binding.getTenantId()))
+                        .and(ref.sn.eq(binding.getSn()))
+                        .and(ref.status.eq(binding.getStatus()))) == 1,
+                "Spend Rule 挂载已变更，请重试，sn = {}",
+                binding.getSn());
     }
 
     private SpendRuleBinding findSpendRuleBindingEntity(Long tenantId, String sn) {
