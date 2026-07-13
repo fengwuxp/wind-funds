@@ -68,15 +68,12 @@ class SpendControlMovementTypeContractTests {
     }
 
     /**
-     * 场景：交易失败、过期或撤销后释放已占用控制额度。
-     * 预期：释放、过期和撤销是释放类流水，仍然属于控制额度变动。
+     * 场景：收到可信完成或撤销事实后释放已占用控制额度。
+     * 预期：只有 RELEASED 是释放类流水，超时不落控制流水，撤销来源由业务引用表达。
      */
     @Test
     void testReleaseTypesShouldBeExplicitSubsetOfControlMovements() {
-        EnumSet<SpendControlMovementType> releaseTypes = EnumSet.of(
-                SpendControlMovementType.RELEASED,
-                SpendControlMovementType.EXPIRED,
-                SpendControlMovementType.REVERSED);
+        EnumSet<SpendControlMovementType> releaseTypes = EnumSet.of(SpendControlMovementType.RELEASED);
 
         assertThat(releaseTypes)
                 .allSatisfy(type -> {

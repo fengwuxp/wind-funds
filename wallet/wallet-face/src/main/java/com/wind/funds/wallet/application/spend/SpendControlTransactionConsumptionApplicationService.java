@@ -31,7 +31,7 @@ public interface SpendControlTransactionConsumptionApplicationService {
     @NonNull SpendControlMovementDTO consume(@NonNull SpendControlTransactionConsumptionRequest request);
 
     /**
-     * 记录交易失败、过期或被拒绝后的控制释放活动。
+     * 记录交易失败或被拒绝后的控制释放活动。
      *
      * @param request 交易结果释放控制额度变动流水请求
      * @return 支出控制释放活动

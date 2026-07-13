@@ -197,7 +197,7 @@ Spend Rule 服务层按项目统一基础服务模板收敛，不再拆旧式领
 | SpendRuleDecisionRecordService | 决策记录写入、单条读取、窄条件查询和解释。 | RecordSpendRuleDecisionRecordRequest、SpendRuleDecisionRecordQuery、SpendRuleDecisionExplainQuery。 | decisionRecordId、SpendRuleDecisionRecordDTO、SpendRuleDecisionExplanationDTO。 | 可访问 Mapper；校验规则版本、挂载、有效期、支付工具 scope 一致性、幂等摘要冲突和拒绝原因语义；不生成交易、route、posting、LedgerEntry 或余额投影。 |
 | SpendControlAdmissionApplicationService | 消费外部或上层提供的 Spend Rule 决策证据，组合支付工具预交易快照形成准入结论。 | 支付工具快照、规则版本、决策流水、决策摘要、拒绝原因。 | 支出控制准入快照。 | 不持久化规则定义，不写控制额度变动流水，不更新预算投影。 |
 | SpendControlMovementService | 控制额度变动流水写入、单条读取、窄条件查询和预算控制投影重建。 | RecordSpendControlMovementRequest、SpendControlMovementQuery、BudgetControlProjectionQuery。 | movementId、SpendControlMovementDTO、BudgetControlProjectionDTO。 | 可访问 Mapper；校验目标账务主体、变动类型、幂等摘要、释放上限、调额上限、控制范围和控制周期边界；不写资金交易、route、posting、LedgerEntry 或账本余额投影。 |
-| SpendControlTransactionConsumptionApplicationService | 交易成功、失败、撤销、过期、退款或争议后消费、释放或补偿控制额度变动。 | 原预留流水、资金交易引用、交易结果、退款引用。 | 交易后控制额度变动流水。 | 只桥接交易事实和控制事实，不改交易 canonical 入参。 |
+| SpendControlTransactionConsumptionApplicationService | 交易成功、失败、拒绝、退款或争议后消费、释放或补偿控制额度变动；超时不写控制流水。 | 原预留流水、资金交易引用、交易结果、退款引用。 | 交易后控制额度变动流水。 | 只桥接交易事实和控制事实，不改交易 canonical 入参。 |
 | TransactionProjectionExplanationSource | 读取规则决策和控制额度变动流水，生成交易投影解释。 | 资金交易、route snapshot、规则决策、控制额度变动引用、账本摘要。 | 只读解释 payload 和 evidenceRefs。 | 不重算规则，不反写事实。 |
 
 服务分层规则：
@@ -459,7 +459,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 
 表名：t_spend_control_movement
 
-业务用途：记录额度调增、调减、预留、消耗、释放、过期、撤销和退款补偿等控制额度变动事实。
+业务用途：记录额度调增、调减、预留、消耗、可信释放和退款补偿等控制额度变动事实；超时不写控制流水。
 
 数据归属：租户级控制事实，目标主体只允许资金账户或信用账户；支出控制范围只作为控制 scope 或展示归属。
 
@@ -513,7 +513,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | RESERVED | 控制预留流水 | 是 | 授权或付款前占用控制额度。 |
 | CONSUMED | 控制消耗流水 | 是 | 交易成功后将预留解释为已使用。 |
 | REFUND_COMPENSATED | 退款控制补偿流水 | 是 | 退款事实成功后恢复已使用控制额度。 |
-| RELEASED / EXPIRED / REVERSED | 控制释放流水 | 是 | 交易失败、过期、撤销或反向处理后释放预留控制占用。 |
+| RELEASED | 控制释放流水 | 是 | 收到可信失败、拒绝或其他业务确认释放事实后释放预留控制占用；超时不写控制流水。 |
 
 预算控制投影计算口径：
 
@@ -527,7 +527,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 8. `period_id` 只表达 Spend Rule 控制周期，不创建支出控制范围账本，也不复用 ledger bucket 作为控制事实。
 9. 若未来将 `remainingControlAmount` 改名为 `occupiedControlAmount`，必须单独评估公共 DTO、表字段、测试和调用方兼容。
 10. `SpendControlMovementService#recordMovement` 不接受新的 `ADMISSION_RECORDED` 或 `REJECTED_RECORDED` 写入；历史兼容类型只用于存量解释、查询或迁移前审计。
-11. `SpendControlMovementType` 是控制额度变动的工程分类契约，必须由枚举自身表达 `budgetProjectionMovement`、`limitAdjustmentMovement`、`releaseMovement` 和 `decisionRecordType`；application 实现只能消费这些分类方法，不得在实现类中重复硬编码类型集合。
+11. `SpendControlMovementType` 是控制额度变动的工程分类契约，必须由枚举自身表达 `budgetProjectionMovement`、`limitAdjustmentMovement`、`releaseMovement` 和 `decisionRecordType`；application 实现只能消费这些分类方法，不得在实现类中重复硬编码类型集合；释放类只保留 `RELEASED`。
 
 ## 7. 状态机、主流程和异常流程
 

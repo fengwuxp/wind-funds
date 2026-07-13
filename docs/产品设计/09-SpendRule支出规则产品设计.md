@@ -156,7 +156,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 1. 产品语义优先使用 `SpendRuleDecisionRecord` 和 `SpendControlMovement`。
 2. 当前代码、表结构和字段已使用 `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendControlMovement`、`RecordSpendControlMovementRequest`、`movementSn`、`movementType`、`movementDigest` 等最终命名。
 3. `ADMISSION_RECORDED`、`REJECTED_RECORDED` 是历史兼容控制额度变动类型，本质上更接近决策记录，不参与预算控制投影；新写入必须走 `SpendRuleDecisionRecord` / `recordDecision`，不得继续通过控制额度变动流水入口记录准入或拒绝决策。
-4. `LIMIT_INCREASED`、`LIMIT_DECREASED`、`RESERVED`、`CONSUMED`、`REFUND_COMPENSATED`、`RELEASED`、`EXPIRED`、`REVERSED` 才属于控制额度变动流水。
+4. `LIMIT_INCREASED`、`LIMIT_DECREASED`、`RESERVED`、`CONSUMED`、`REFUND_COMPENSATED`、`RELEASED` 才属于控制额度变动流水；超时不是可信释放事实，不写入控制流水。
 5. `remainingControlAmount` 在当前 DTO 中表达“未终局释放的控制占用”，后续如改名为 `occupiedControlAmount` 需单独评估兼容。
 6. `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`；其中 `consumedAmount` 为已消费减退款补偿后的净消耗。
 7. `SpendControlMovementType` 统一承载“是否参与预算控制投影、是否为调额类、是否为释放类、是否为决策记录兼容类型”的分类口径；服务实现不得再各自硬编码一套类型解释。
