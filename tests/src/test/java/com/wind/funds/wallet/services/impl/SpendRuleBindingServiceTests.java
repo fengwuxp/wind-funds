@@ -58,7 +58,7 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
     /**
      * 场景：Spend Rule 挂载按允许状态机执行暂停、恢复、退役。
      * 输入：ACTIVE 挂载依次执行 suspend、resume、retire。
-     * 输出：状态持久化为 SUSPENDED、ACTIVE、RETIRED，最新审计引用随命令更新。
+     * 输出：状态持久化为 SUSPENDED、ACTIVE、RETIRED，创建审计引用保持不变。
      * 红线：生命周期命令只改变控制事实，不创建交易或账本事实。
      */
     @Test
@@ -68,26 +68,20 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
                 createBindingRequest("grant:srb-lifecycle-allowed"));
         SpendRuleBindingDTO binding = spendRuleBindingService.getSpendRuleBindingById(bindingId);
 
-        spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(
-                binding.getSn(),
-                "audit:srb-lifecycle-suspend"));
+        spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(binding.getSn()));
         SpendRuleBindingDTO suspended = spendRuleBindingService.getSpendRuleBindingById(bindingId);
-        spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(
-                binding.getSn(),
-                "audit:srb-lifecycle-resume"));
+        spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(binding.getSn()));
         SpendRuleBindingDTO resumed = spendRuleBindingService.getSpendRuleBindingById(bindingId);
-        spendRuleBindingService.retireSpendRuleBinding(retireRequest(
-                binding.getSn(),
-                "audit:srb-lifecycle-retire"));
+        spendRuleBindingService.retireSpendRuleBinding(retireRequest(binding.getSn()));
         SpendRuleBindingDTO retired = spendRuleBindingService.getSpendRuleBindingById(bindingId);
 
         assertThat(binding.getStatus()).isEqualTo(SpendRuleBindingStatus.ACTIVE);
         assertThat(suspended.getStatus()).isEqualTo(SpendRuleBindingStatus.SUSPENDED);
-        assertThat(suspended.getAuditReferenceSn()).isEqualTo("audit:srb-lifecycle-suspend");
+        assertThat(suspended.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
         assertThat(resumed.getStatus()).isEqualTo(SpendRuleBindingStatus.ACTIVE);
-        assertThat(resumed.getAuditReferenceSn()).isEqualTo("audit:srb-lifecycle-resume");
+        assertThat(resumed.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
         assertThat(retired.getStatus()).isEqualTo(SpendRuleBindingStatus.RETIRED);
-        assertThat(retired.getAuditReferenceSn()).isEqualTo("audit:srb-lifecycle-retire");
+        assertThat(retired.getAuditReferenceSn()).isEqualTo("grant:srb-lifecycle-allowed");
         assertNoTransactionFacts();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -104,53 +98,40 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
                 createBindingRequest("grant:srb-lifecycle-reject"));
         SpendRuleBindingDTO binding = spendRuleBindingService.getSpendRuleBindingById(bindingId);
 
-        assertThatThrownBy(() -> spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(
-                binding.getSn(),
-                "audit:srb-lifecycle-resume-active")))
+        assertThatThrownBy(() -> spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(binding.getSn())))
                 .hasMessageContaining("只有已暂停的 Spend Rule 挂载可以恢复");
         assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getStatus())
                 .isEqualTo(SpendRuleBindingStatus.ACTIVE);
 
-        spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(
-                binding.getSn(),
-                "audit:srb-lifecycle-suspend-once"));
-        assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(
-                binding.getSn(),
-                "audit:srb-lifecycle-suspend-twice")))
+        spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(binding.getSn()));
+        assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(suspendRequest(binding.getSn())))
                 .hasMessageContaining("只有有效的 Spend Rule 挂载可以暂停");
         assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getStatus())
                 .isEqualTo(SpendRuleBindingStatus.SUSPENDED);
 
-        spendRuleBindingService.retireSpendRuleBinding(retireRequest(
-                binding.getSn(),
-                "audit:srb-lifecycle-retire-once"));
-        assertThatThrownBy(() -> spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(
-                binding.getSn(),
-                "audit:srb-lifecycle-resume-retired")))
+        spendRuleBindingService.retireSpendRuleBinding(retireRequest(binding.getSn()));
+        assertThatThrownBy(() -> spendRuleBindingService.resumeSpendRuleBinding(resumeRequest(binding.getSn())))
                 .hasMessageContaining("只有已暂停的 Spend Rule 挂载可以恢复");
-        assertThatThrownBy(() -> spendRuleBindingService.retireSpendRuleBinding(retireRequest(
-                binding.getSn(),
-                "audit:srb-lifecycle-retire-twice")))
+        assertThatThrownBy(() -> spendRuleBindingService.retireSpendRuleBinding(retireRequest(binding.getSn())))
                 .hasMessageContaining("只有有效或已暂停的 Spend Rule 挂载可以退役");
         assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getStatus())
                 .isEqualTo(SpendRuleBindingStatus.RETIRED);
     }
 
     /**
-     * 场景：Spend Rule 挂载生命周期命令必须带上业务审计引用。
-     * 输入：缺少审计引用的暂停请求。
+     * 场景：Spend Rule 挂载生命周期命令必须带上挂载身份。
+     * 输入：缺少挂载流水号的暂停请求。
      * 输出：请求被拒绝。
-     * 红线：资金底座不依赖外部 requestSn，但必须保留可定位的上层业务事实引用。
+     * 红线：资金底座不依赖外部 requestSn，也不靠审计引用定位生命周期目标。
      */
     @Test
-    void testLifecycleCommandsShouldValidateAuditFields() {
+    void testLifecycleCommandsShouldValidateBindingIdentity() {
         Long bindingId = spendRuleBindingService.createSpendRuleBinding(
                 createBindingRequest("grant:srb-lifecycle-validation"));
-        String bindingSn = spendRuleBindingService.getSpendRuleBindingById(bindingId).getSn();
 
         assertThatThrownBy(() -> spendRuleBindingService.suspendSpendRuleBinding(
-                suspendRequest(bindingSn, null)))
-                .hasMessageContaining("Spend Rule 挂载状态变更审计引用不能为空");
+                suspendRequest(null)))
+                .hasMessageContaining("Spend Rule 挂载流水号不能为空");
         assertThat(spendRuleBindingService.getSpendRuleBindingById(bindingId).getStatus())
                 .isEqualTo(SpendRuleBindingStatus.ACTIVE);
     }
@@ -180,27 +161,24 @@ class SpendRuleBindingServiceTests extends AbstractFundsServiceTest {
                 .setDescription("挂载 Spend Rule 版本");
     }
 
-    private SuspendSpendRuleBindingRequest suspendRequest(String sn, String auditReferenceSn) {
+    private SuspendSpendRuleBindingRequest suspendRequest(String sn) {
         return new SuspendSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(sn)
-                .setAuditReferenceSn(auditReferenceSn)
                 .setDescription("暂停 Spend Rule 挂载");
     }
 
-    private ResumeSpendRuleBindingRequest resumeRequest(String sn, String auditReferenceSn) {
+    private ResumeSpendRuleBindingRequest resumeRequest(String sn) {
         return new ResumeSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(sn)
-                .setAuditReferenceSn(auditReferenceSn)
                 .setDescription("恢复 Spend Rule 挂载");
     }
 
-    private RetireSpendRuleBindingRequest retireRequest(String sn, String auditReferenceSn) {
+    private RetireSpendRuleBindingRequest retireRequest(String sn) {
         return new RetireSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(sn)
-                .setAuditReferenceSn(auditReferenceSn)
                 .setDescription("退役 Spend Rule 挂载");
     }
 

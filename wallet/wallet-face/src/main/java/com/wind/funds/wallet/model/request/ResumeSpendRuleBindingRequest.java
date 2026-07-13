@@ -36,10 +36,6 @@ public class ResumeSpendRuleBindingRequest implements Serializable {
     @NotBlank
     private String sn;
 
-    @Schema(description = "状态变更审计引用，来自上层业务事实或审批事实，不是外部请求流水号")
-    @NotBlank
-    private String auditReferenceSn;
-
     @Schema(description = "描述")
     private String description;
 }

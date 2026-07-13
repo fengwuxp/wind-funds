@@ -73,7 +73,6 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 request.getSn());
         updateBindingStatus(entity,
                 SpendRuleBindingStatus.SUSPENDED,
-                request.getAuditReferenceSn(),
                 request.getDescription());
     }
 
@@ -87,7 +86,6 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 request.getSn());
         updateBindingStatus(entity,
                 SpendRuleBindingStatus.ACTIVE,
-                request.getAuditReferenceSn(),
                 request.getDescription());
     }
 
@@ -102,7 +100,6 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
                 request.getSn());
         updateBindingStatus(entity,
                 SpendRuleBindingStatus.RETIRED,
-                request.getAuditReferenceSn(),
                 request.getDescription());
     }
 
@@ -178,19 +175,16 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
     private void validateSuspendRequest(SuspendSpendRuleBindingRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
-        AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载状态变更审计引用不能为空");
     }
 
     private void validateResumeRequest(ResumeSpendRuleBindingRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
-        AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载状态变更审计引用不能为空");
     }
 
     private void validateRetireRequest(RetireSpendRuleBindingRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(request.getSn(), "Spend Rule 挂载流水号不能为空");
-        AssertUtils.hasText(request.getAuditReferenceSn(), "Spend Rule 挂载状态变更审计引用不能为空");
     }
 
     private SpendRuleBinding getSpendRuleBindingEntity(Long tenantId, String sn) {
@@ -201,13 +195,11 @@ public class SpendRuleBindingServiceImpl implements SpendRuleBindingService {
 
     private void updateBindingStatus(SpendRuleBinding binding,
                                      SpendRuleBindingStatus status,
-                                     String auditReferenceSn,
                                      String description) {
         SpendRuleBindingNameRefs ref = SpendRuleBindingNameRefs.spendRuleBinding;
         SpendRuleBinding entity = UpdateEntity.of(SpendRuleBinding.class);
         UpdateWrapper<SpendRuleBinding> updateWrapper = UpdateWrapper.of(entity);
         updateWrapper.set(ref.status, status, true);
-        updateWrapper.set(ref.auditReferenceSn, auditReferenceSn, true);
         updateWrapper.set(ref.description, description, description != null);
         AssertUtils.isTrue(spendRuleBindingMapper.updateByQuery(entity, QueryWrapper.create()
                         .where(ref.tenantId.eq(binding.getTenantId()))
