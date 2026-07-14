@@ -22,25 +22,25 @@ class AccountHierarchyBindingContractTests {
      * 场景：账户层级绑定收窄为当前关系来源。
      * 输入：账户层级绑定持久化实体和创建请求。
      * 输出：对外契约字段集合。
-     * 预期：不再暴露 validFrom/validTo 有效期窗口和绑定状态。
-     * 红线：账户层级来源不得提前引入未闭环的排期生效、历史窗口或关系状态语义。
+     * 预期：不再暴露 validFrom/validTo 有效期窗口、绑定状态和根账户字段。
+     * 红线：账户层级来源不得提前引入未闭环的排期生效、历史窗口、关系状态或多级树语义。
      */
     @Test
     void testAccountHierarchyBindingContractShouldNotExposeValidityWindow() {
         assertThat(fieldNames(AccountHierarchyBinding.class))
-                .doesNotContain("validFrom", "validTo", "status");
+                .doesNotContain("validFrom", "validTo", "status", "rootAccountId", "rootAccountType");
         assertThat(fieldNames(AccountHierarchyBindingDTO.class))
-                .doesNotContain("validFrom", "validTo", "status");
+                .doesNotContain("validFrom", "validTo", "status", "rootAccountId", "rootAccountType");
         assertThat(fieldNames(CreateAccountHierarchyBindingRequest.class))
-                .doesNotContain("validFrom", "validTo", "status");
+                .doesNotContain("validFrom", "validTo", "status", "rootAccountId", "rootAccountType");
     }
 
     /**
      * 场景：H2 schema 承载账户层级绑定测试表。
      * 输入：测试数据库 schema。
      * 输出：t_account_hierarchy_binding 表结构。
-     * 预期：不再包含 valid_from/valid_to/status 字段。
-     * 红线：测试表结构不得保留已经从契约删除的有效期窗口或关系状态列。
+     * 预期：不再包含 valid_from/valid_to/status/root_account_id/root_account_type 字段。
+     * 红线：测试表结构不得保留已经从契约删除的有效期窗口、关系状态或根账户列。
      */
     @Test
     void testAccountHierarchyBindingSchemaShouldNotExposeValidityWindow() throws IOException {
@@ -49,7 +49,7 @@ class AccountHierarchyBindingContractTests {
                 schema.indexOf("DEFAULT CHARSET = utf8mb4 COMMENT = '账户层级绑定表';"));
 
         assertThat(tableDefinition)
-                .doesNotContain("`valid_from`", "`valid_to`", "`status`");
+                .doesNotContain("`valid_from`", "`valid_to`", "`status`", "`root_account_id`", "`root_account_type`");
     }
 
     private String[] fieldNames(Class<?> type) {

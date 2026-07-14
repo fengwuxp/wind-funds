@@ -74,8 +74,6 @@ CREATE TABLE `t_account_hierarchy_binding`
     `account_type`           VARCHAR(50) NOT NULL COMMENT '子账户主体类型',
     `parent_account_id`      VARCHAR(64) NOT NULL COMMENT '父账户 ID',
     `parent_account_type`    VARCHAR(50) NOT NULL COMMENT '父账户主体类型',
-    `root_account_id`        VARCHAR(64) NOT NULL COMMENT '根账户 ID',
-    `root_account_type`      VARCHAR(50) NOT NULL COMMENT '根账户主体类型',
     `currency`               VARCHAR(10) NOT NULL COMMENT '币种',
     `operator_id`            VARCHAR(64)          DEFAULT NULL COMMENT '操作者',
     `context_variables`      TEXT                 DEFAULT NULL COMMENT '扩展上下文',
@@ -83,8 +81,7 @@ CREATE TABLE `t_account_hierarchy_binding`
     UNIQUE KEY `uk_account_hierarchy_binding_sn` (`sn`),
     UNIQUE KEY `uk_account_hierarchy_binding_account` (`tenant_id`, `account_type`, `account_id`),
     KEY `idx_account_hierarchy_binding_account` (`tenant_id`, `account_type`, `account_id`),
-    KEY `idx_account_hierarchy_binding_parent` (`tenant_id`, `parent_account_type`, `parent_account_id`),
-    KEY `idx_account_hierarchy_binding_root` (`tenant_id`, `root_account_type`, `root_account_id`)
+    KEY `idx_account_hierarchy_binding_parent` (`tenant_id`, `parent_account_type`, `parent_account_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '账户层级绑定表';
 

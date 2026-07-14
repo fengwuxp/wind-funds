@@ -52,9 +52,8 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         WalletContextVariablesValidator.assertNoSensitiveContextVariables(request.getContextVariables());
         ResolvedAccount account = resolveRequiredAccount(request.getTenantId(), request.getAccountId());
         ResolvedAccount parentAccount = resolveRequiredAccount(request.getTenantId(), request.getParentAccountId());
-        ResolvedAccount rootAccount = resolveRequiredAccount(request.getTenantId(), request.getRootAccountId());
-        assertCompatibleBinding(request, account, parentAccount, rootAccount);
-        AccountHierarchyBindingDTO binding = toDTO(request, account, parentAccount, rootAccount);
+        assertCompatibleBinding(request, account, parentAccount);
+        AccountHierarchyBindingDTO binding = toDTO(request, account, parentAccount);
         assertNoDuplicateCurrentBinding(binding);
         return accountHierarchyBindingService.createAccountHierarchyBinding(binding);
     }
@@ -80,8 +79,7 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
 
     private AccountHierarchyBindingDTO toDTO(CreateAccountHierarchyBindingRequest request,
                                              ResolvedAccount account,
-                                             ResolvedAccount parentAccount,
-                                             ResolvedAccount rootAccount) {
+                                             ResolvedAccount parentAccount) {
         AccountHierarchyBindingDTO result = new AccountHierarchyBindingDTO();
         result.setSn(request.getSn());
         result.setTenantId(request.getTenantId());
@@ -89,8 +87,6 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         result.setAccountType(account.accountType());
         result.setParentAccountId(parentAccount.accountId());
         result.setParentAccountType(parentAccount.accountType());
-        result.setRootAccountId(rootAccount.accountId());
-        result.setRootAccountType(rootAccount.accountType());
         result.setCurrency(request.getCurrency());
         result.setOperatorId(createOperatorId(request));
         result.setContextVariables(request.getContextVariables());
@@ -103,10 +99,6 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
                 .parentAccountRef(subjectRef(binding.getTenantId(),
                         binding.getParentAccountId(),
                         binding.getParentAccountType(),
-                        binding.getCurrency()))
-                .rootAccountRef(subjectRef(binding.getTenantId(),
-                        binding.getRootAccountId(),
-                        binding.getRootAccountType(),
                         binding.getCurrency()))
                 .contextVariables(parseContextVariables(binding.getContextVariables()))
                 .build();
@@ -155,16 +147,13 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
 
     private void assertCompatibleBinding(CreateAccountHierarchyBindingRequest request,
                                          ResolvedAccount account,
-                                         ResolvedAccount parentAccount,
-                                         ResolvedAccount rootAccount) {
-        AssertUtils.isTrue(isActive(account) && isActive(parentAccount) && isActive(rootAccount),
+                                         ResolvedAccount parentAccount) {
+        AssertUtils.isTrue(isActive(account) && isActive(parentAccount),
                 "账户层级绑定只支持 ACTIVE 账户");
         AssertUtils.isTrue(account.currency() == request.getCurrency()
-                        && parentAccount.currency() == request.getCurrency()
-                        && rootAccount.currency() == request.getCurrency(),
+                        && parentAccount.currency() == request.getCurrency(),
                 "账户层级绑定账户币种必须一致");
         AssertUtils.isFalse(sameAccount(account, parentAccount), "父账户不能等于子账户");
-        AssertUtils.isFalse(sameAccount(account, rootAccount), "根账户不能等于子账户");
         new ImmutableAccountHierarchySnapshotSpec(subjectRef(request.getTenantId(),
                 account.accountId(),
                 account.accountType(),
@@ -173,10 +162,7 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
                         parentAccount.accountId(),
                         parentAccount.accountType(),
                         parentAccount.currency()),
-                subjectRef(request.getTenantId(),
-                        rootAccount.accountId(),
-                        rootAccount.accountType(),
-                        rootAccount.currency()),
+                null,
                 parseContextVariables(request.getContextVariables()));
     }
 

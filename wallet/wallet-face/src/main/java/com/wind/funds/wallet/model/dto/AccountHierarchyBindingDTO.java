@@ -56,12 +56,6 @@ public class AccountHierarchyBindingDTO implements Serializable {
     @Schema(description = "父账户类型")
     private FundsSubjectType parentAccountType;
 
-    @Schema(description = "根账户 ID")
-    private String rootAccountId;
-
-    @Schema(description = "根账户类型")
-    private FundsSubjectType rootAccountType;
-
     @Schema(description = "层级关系币种")
     private CurrencyIsoCode currency;
 

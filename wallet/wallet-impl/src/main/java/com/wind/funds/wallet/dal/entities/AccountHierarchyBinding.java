@@ -81,18 +81,6 @@ public class AccountHierarchyBinding implements Serializable, TenantIsolationObj
     private FundsSubjectType parentAccountType;
 
     /**
-     * 根账户 ID。
-     */
-    @NotNull
-    private String rootAccountId;
-
-    /**
-     * 根账户类型。
-     */
-    @NotNull
-    private FundsSubjectType rootAccountType;
-
-    /**
      * 层级关系币种。
      */
     @NotNull

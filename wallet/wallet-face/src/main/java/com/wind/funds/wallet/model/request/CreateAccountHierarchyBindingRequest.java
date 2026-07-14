@@ -40,10 +40,6 @@ public class CreateAccountHierarchyBindingRequest {
     @NotNull
     private FundsAccountId parentAccountId;
 
-    @Schema(description = "根账户标识")
-    @NotNull
-    private FundsAccountId rootAccountId;
-
     @Schema(description = "币种")
     @NotNull
     private CurrencyIsoCode currency;

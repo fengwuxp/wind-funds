@@ -414,14 +414,12 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected void bindAccountHierarchy(FundsAccountId accountId,
                                         FundsAccountId parentAccountId,
-                                        FundsAccountId rootAccountId,
                                         String businessSn) {
         accountHierarchyService.createAccountHierarchyBinding(new CreateAccountHierarchyBindingRequest()
                 .setSn("AH_" + businessSn)
                 .setTenantId(TENANT_ID)
                 .setAccountId(accountId)
                 .setParentAccountId(parentAccountId)
-                .setRootAccountId(rootAccountId)
                 .setCurrency(CURRENCY)
                 .setOperatorId("flow-test"));
     }

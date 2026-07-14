@@ -21,7 +21,7 @@ public interface AccountHierarchyService {
     /**
      * 创建账户层级绑定。
      *
-     * <p>能力范围：登记一个子账户到父账户、根账户的当前关系；同一账户只能有一个账户层级来源。</p>
+     * <p>能力范围：登记一个子账户到直接父账户的当前关系；同一账户只能有一个账户层级来源。</p>
      *
      * @param request 创建请求
      * @return 绑定主键

@@ -784,7 +784,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
      * 场景：VCC 共享卡授权解析到信用子账户及其父资金账户。
      * 输入：信用子账户额度 100，父资金账户可用余额 100，授权批准 60。
      * 输出：信用子账户和父资金账户同时形成授权占用，route snapshot 的 funding allocation 携带账户层级快照。
-     * 预期：accountHierarchySnapshot 固化子账户、父账户和根账户。
+     * 预期：accountHierarchySnapshot 固化子账户和直接父账户，根账户留空。
      * 红线：共享卡授权不得只占用信用额度而跳过父资金账户。
      */
     @Test
@@ -796,7 +796,6 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
         ensureCreditAccount(cardAccount);
         bindAccountHierarchy(cardAccount,
-                parentAccount,
                 parentAccount,
                 "AUTH_SHARED_CARD_HIERARCHY");
 
@@ -840,10 +839,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                                         .isNotNull()
                                         .satisfies(parent -> assertThat(parent.getSubjectId())
                                                 .isEqualTo(parentAccount.id()));
-                                assertThat(allocation.getAccountHierarchySnapshot().getRootAccountRef())
-                                        .isNotNull()
-                                        .satisfies(root -> assertThat(root.getSubjectId())
-                                                .isEqualTo(parentAccount.id()));
+                                assertThat(allocation.getAccountHierarchySnapshot().getRootAccountRef()).isNull();
                             });
                 });
         assertThat(entriesByBusinessSn("AUTH_SHARED_CARD_AUTHORIZE"))
@@ -869,7 +865,6 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
         ensureCreditAccount(cardAccount);
         bindAccountHierarchy(cardAccount,
-                parentAccount,
                 parentAccount,
                 "AUTH_SHARED_CARD_REVERSAL_HIERARCHY");
         topup(parentAccount, 100L, "AUTH_SHARED_CARD_REVERSAL_PARENT_TOPUP");
@@ -906,7 +901,6 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
         ensureCreditAccount(cardAccount);
         bindAccountHierarchy(cardAccount,
-                parentAccount,
                 parentAccount,
                 "AUTH_SHARED_CARD_CLOSING_HIERARCHY");
         topup(parentAccount, 100L, "AUTH_SHARED_CARD_CLOSING_PARENT_TOPUP");

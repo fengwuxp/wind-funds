@@ -46,8 +46,6 @@ class AccountHierarchyBindingServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String PARENT_ACCOUNT_ID = "parent_account_hierarchy_service";
 
-    private static final String ROOT_ACCOUNT_ID = "root_account_hierarchy_service";
-
     private static final String OPERATOR_ID = "ops_account_hierarchy_service";
 
     @Autowired
@@ -81,14 +79,12 @@ class AccountHierarchyBindingServiceImplTests extends AbstractFundsServiceTest {
                         AccountHierarchyBindingDTO::getAccountId,
                         AccountHierarchyBindingDTO::getAccountType,
                         AccountHierarchyBindingDTO::getParentAccountId,
-                        AccountHierarchyBindingDTO::getRootAccountId,
                         AccountHierarchyBindingDTO::getCurrency,
                         AccountHierarchyBindingDTO::getOperatorId)
                 .containsExactly(CURRENT_BINDING_SN,
                         CURRENT_ACCOUNT_ID,
                         FundsSubjectType.FUNDING_ACCOUNT,
                         PARENT_ACCOUNT_ID,
-                        ROOT_ACCOUNT_ID,
                         CurrencyIsoCode.USD,
                         OPERATOR_ID);
         assertThat(accountHierarchyBindingService.existsCurrentAccountHierarchyBinding(binding)).isTrue();
@@ -137,8 +133,6 @@ class AccountHierarchyBindingServiceImplTests extends AbstractFundsServiceTest {
                 .setAccountType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setParentAccountId(PARENT_ACCOUNT_ID)
                 .setParentAccountType(FundsSubjectType.FUNDING_ACCOUNT)
-                .setRootAccountId(ROOT_ACCOUNT_ID)
-                .setRootAccountType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CURRENCY)
                 .setOperatorId(OPERATOR_ID)
                 .setContextVariables("{\"scenario\":\"account_hierarchy_service\"}");
