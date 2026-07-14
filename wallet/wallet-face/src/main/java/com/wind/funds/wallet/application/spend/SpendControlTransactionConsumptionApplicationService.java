@@ -8,14 +8,14 @@ import org.jspecify.annotations.NonNull;
 /**
  * 交易结果消费控制额度变动流水应用服务。
  *
- * <p>职责：在资金交易事实已经存在后，把交易成功、失败释放或退款补偿结果翻译为
+ * <p>职责：在资金交易事实已经存在后，把交易成功或退款补偿结果翻译为
  * Spend Rule 控制额度变动事实；业务确认型退款补偿可在没有原控制流水时显式写入控制补偿事实。</p>
  *
  * <p>资金退款和支付工具周期额度回补属于两个抽象层次：资金退款只处理资金事实；
  * 周期额度回补必须由业务侧确认支付工具、周期和金额后显式调用控制补偿入口。</p>
  *
  * <p>边界：本服务不创建或修改资金交易、route snapshot、账本交易、账目分录、余额投影、
- * 支付工具能力方向或交易 canonical 入参；退款和释放语义只作为控制额度变动补偿，不替代资金交易事实。</p>
+ * 支付工具能力方向或交易 canonical 入参；退款补偿语义只作为控制额度变动补偿，不替代资金交易事实。</p>
  *
  * @author Codex
  * @date 2026-06-20
@@ -29,14 +29,6 @@ public interface SpendControlTransactionConsumptionApplicationService {
      * @return 支出控制消耗活动
      */
     @NonNull SpendControlMovementDTO consume(@NonNull SpendControlTransactionConsumptionRequest request);
-
-    /**
-     * 记录交易失败或被拒绝后的控制释放活动。
-     *
-     * @param request 交易结果释放控制额度变动流水请求
-     * @return 支出控制释放活动
-     */
-    @NonNull SpendControlMovementDTO release(@NonNull SpendControlTransactionConsumptionRequest request);
 
     /**
      * 记录退款成功后的控制补偿活动。

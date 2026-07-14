@@ -73,7 +73,7 @@ Spend Rule 的产品归属是钱包支出控制域。它围绕支付工具、预
 边界结论：
 
 1. `wallet` 可以调用 `transaction` 账户主体型交易服务完成业务编排。
-2. `transaction-impl` 可以通过 `wallet-face` 稳定契约承接交易后控制消费、释放或退款补偿适配；不得依赖 `wallet-impl`、规则定义表、控制额度变动流水表、Mapper 或预算控制投影模型。
+2. `transaction-impl` 可以通过 `wallet-face` 稳定契约承接交易后控制消费或退款补偿适配；不得依赖 `wallet-impl`、规则定义表、控制额度变动流水表、Mapper 或预算控制投影模型。
 3. `transaction` 只消费 `spendRuleDecision` 这类已固化快照、route snapshot 或控制额度变动引用，不重新计算规则，不管理规则定义、版本、挂载或决策记录。
 4. `ledger` 不识别 Spend Rule 为账本主体，也不从 Spend Rule 或预算控制视图派生账本余额。
 

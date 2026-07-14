@@ -74,24 +74,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public @NonNull SpendControlMovementDTO release(@NonNull SpendControlTransactionConsumptionRequest request) {
-        validateTransactionControlRequest(request);
-        SpendControlMovementDTO originalMovement = getOriginalReservedMovement(request);
-        FundsTransactionDTO transaction = getExistingFundsTransaction(request);
-        assertReleasableTransaction(request, transaction);
-        AssertUtils.isTrue(transaction.getTransactionType() != DefaultFundsTransactionType.REFUND,
-                "控制释放不能使用退款交易事实，transactionSn = {}", request.getTransactionSn());
-        assertControlMovementMatchesOriginalMovement(request, originalMovement, "控制释放");
-        assertControlMovementMatchesTransaction(request, transaction, "控制释放");
-        assertTransactionBusinessSnMatches(request, transaction);
-        assertEnoughRemainingControlAmount(request, originalMovement, "控制释放金额超过原占用剩余额度");
-        assertTransactionControlAmountNotExceeded(request, transaction, SpendControlMovementType.RELEASED, "控制释放");
-        return spendControlMovementService.recordMovement(
-                toRecordRequest(request, originalMovement, SpendControlMovementType.RELEASED));
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
     public @NonNull SpendControlMovementDTO refund(@NonNull SpendControlTransactionConsumptionRequest request) {
         validateTransactionControlRequest(request);
         SpendControlMovementDTO originalMovement = getOriginalReservedMovement(request);
@@ -249,13 +231,6 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
                                          FundsTransactionDTO transaction) {
         AssertUtils.isTrue(transaction.getStatus() == FundsTransactionStatus.CLOSED,
                 "资金交易必须已关闭，transactionSn = {}", request.getTransactionSn());
-    }
-
-    private void assertReleasableTransaction(SpendControlTransactionConsumptionRequest request,
-                                             FundsTransactionDTO transaction) {
-        AssertUtils.isTrue(transaction.getStatus() == FundsTransactionStatus.FAILED
-                        || transaction.getStatus() == FundsTransactionStatus.REJECTED,
-                "控制释放必须使用失败或拒绝交易事实，transactionSn = {}", request.getTransactionSn());
     }
 
     private void assertControlMovementMatchesOriginalMovement(SpendControlTransactionConsumptionRequest request,

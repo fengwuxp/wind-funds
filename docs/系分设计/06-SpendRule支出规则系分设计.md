@@ -157,7 +157,7 @@ Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费
 | --- | --- | --- |
 | `wallet/wallet-face` | 暴露 Spend Rule 定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制投影契约。 | 直接写交易事实、账本分录或余额投影。 |
 | `wallet/wallet-impl` | 持久化规则事实和控制事实，提供支付工具、账户能力、资金责任和准入证据。 | 依赖 transaction-face/impl，或直接写交易表、route、posting、LedgerEntry。 |
-| `transaction-face / transaction-impl` | 读取 `spendRuleDecision`、route snapshot、控制额度变动引用等已固化证据用于历史解释；`transaction-impl` 可通过 `wallet-face` 契约实现交易后控制消费、释放或退款补偿适配；支付工具授权 facade 可在进入交易内核前调用 wallet-face 准入契约固化决策证据。 | 依赖 `wallet-impl`、wallet DAL / Mapper、规则定义 / 挂载 / 决策记录 Entity，查询预算控制投影模型，或在交易内核内执行 Spend Rule。 |
+| `transaction-face / transaction-impl` | 读取 `spendRuleDecision`、route snapshot、控制额度变动引用等已固化证据用于历史解释；`transaction-impl` 可通过 `wallet-face` 契约实现交易后控制消费或退款补偿适配；支付工具授权 facade 可在进入交易内核前调用 wallet-face 准入契约固化决策证据。 | 依赖 `wallet-impl`、wallet DAL / Mapper、规则定义 / 挂载 / 决策记录 Entity，查询预算控制投影模型，或在交易内核内执行 Spend Rule。 |
 | `ledger` | 校验可入账主体并过账资金账户、信用账户或平台资金账户。 | 为 Spend Rule、支出控制范围、支付工具或控制 scope 建账、过账或投影余额。 |
 | `core` | 承载必要枚举和 DSL 值对象。 | 引入 DAL、Spring Bean、规则执行器或具体服务实现。 |
 
@@ -176,7 +176,7 @@ Spend Rule 服务层按项目统一基础服务模板收敛，不再拆旧式领
 | 服务类型 | Spend Rule 目标服务 | 职责 |
 | --- | --- | --- |
 | 基础服务 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleBindingService`、`SpendRuleDecisionRecordService`、`SpendControlMovementService` | 规则定义、版本、挂载、决策记录、控制额度变动流水和预算控制投影的标准服务能力；允许访问 Mapper / Repository，并在服务内保留必要业务守卫。 |
-| 场景应用服务 | `SpendControlAdmissionApplicationService`、`SpendControlTransactionConsumptionApplicationService`、`InstrumentTransactionLifecycleApplicationService` | 授权前准入、交易后消费 / 释放 / 退款补偿、支付工具生命周期入口等跨对象用例编排和事务边界。 |
+| 场景应用服务 | `SpendControlAdmissionApplicationService`、`SpendControlTransactionConsumptionApplicationService`、`InstrumentTransactionLifecycleApplicationService` | 授权前准入、交易后消费 / 退款补偿、支付工具生命周期入口等跨对象用例编排和事务边界。 |
 
 服务命名规则：
 
@@ -197,13 +197,13 @@ Spend Rule 服务层按项目统一基础服务模板收敛，不再拆旧式领
 | SpendRuleDecisionRecordService | 决策记录写入、单条读取、窄条件查询和解释。 | RecordSpendRuleDecisionRecordRequest、SpendRuleDecisionRecordQuery、SpendRuleDecisionExplainQuery。 | decisionRecordId、SpendRuleDecisionRecordDTO、SpendRuleDecisionExplanationDTO。 | 可访问 Mapper；校验规则版本、挂载、有效期、支付工具 scope 一致性、幂等摘要冲突和拒绝原因语义；不生成交易、route、posting、LedgerEntry 或余额投影。 |
 | SpendControlAdmissionApplicationService | 消费外部或上层提供的 Spend Rule 决策证据，组合支付工具预交易快照形成准入结论。 | 支付工具快照、规则版本、决策流水、决策摘要、拒绝原因。 | 支出控制准入快照。 | 不持久化规则定义，不写控制额度变动流水，不更新预算投影。 |
 | SpendControlMovementService | 控制额度变动流水写入、单条读取、窄条件查询和预算控制投影重建。 | RecordSpendControlMovementRequest、SpendControlMovementQuery、BudgetControlProjectionQuery。 | movementId、SpendControlMovementDTO、BudgetControlProjectionDTO。 | 可访问 Mapper；校验目标账务主体、变动类型、幂等摘要、释放上限、调额上限、控制范围和控制周期边界；不写资金交易、route、posting、LedgerEntry 或账本余额投影。 |
-| SpendControlTransactionConsumptionApplicationService | 交易成功、失败、拒绝、退款或争议后消费、释放或补偿控制额度变动；超时不写控制流水。 | 原预留流水、资金交易引用、交易结果、退款引用。 | 交易后控制额度变动流水。 | 只桥接交易事实和控制事实，不改交易 canonical 入参。 |
+| SpendControlTransactionConsumptionApplicationService | 交易成功、授权完成、退款或争议后消费或补偿控制额度变动；失败或拒绝通过同一资金事务回滚控制预留，不写释放补偿；超时不写控制流水。 | 原预留流水、资金交易引用、交易结果、退款引用。 | 交易后控制额度变动流水。 | 只桥接交易事实和控制事实，不改交易 canonical 入参。 |
 | TransactionProjectionExplanationSource | 读取规则决策和控制额度变动流水，生成交易投影解释。 | 资金交易、route snapshot、规则决策、控制额度变动引用、账本摘要。 | 只读解释 payload 和 evidenceRefs。 | 不重算规则，不反写事实。 |
 
 服务分层规则：
 
 1. 基础服务负责“规则定义、版本、挂载、决策记录、控制流水如何写入、读取、查询、解释和守卫不变量”。
-2. 场景应用服务负责“交易前是否允许继续、交易后如何消费或释放控制额度、支付工具入口如何委派账户主体交易”。
+2. 场景应用服务负责“交易前是否允许继续、交易后如何消费或补偿控制额度、支付工具入口如何委派账户主体交易”。
 3. 基础服务可访问 Mapper / Repository；场景应用服务只编排基础服务和外部能力，不直接写 Mapper。
 4. 失败必须停在交易内核前或只追加控制事实，不能反写交易、route、posting、LedgerEntry 或账本余额投影。
 
@@ -220,7 +220,7 @@ Spend Rule 服务层按项目统一基础服务模板收敛，不再拆旧式领
 | SpendRuleDecisionRecordService | explainDecision | SpendRuleDecisionExplainQuery | SpendRuleDecisionExplanationDTO | tenantId + decisionSn 精确查询；`decisionSummary` 仅由 `decisionResult + rejectReason` 派生，用于排查阅读。 | 决策记录不存在。 | 只解释历史决策事实、拒绝原因和证据引用，不反写任何事实；业务判断以 `decision.decisionResult` 为准。 |
 | SpendControlAdmissionApplicationService | admit | SpendControlAdmissionRequest | SpendControlAdmissionDecisionDTO | admissionSn 或业务请求摘要幂等。 | 缺决策证据、规则拒绝、证据摘要冲突。 | 不写规则定义，不写控制额度变动流水，不进交易内核。 |
 | SpendControlMovementService | recordMovement | RecordSpendControlMovementRequest | SpendControlMovementDTO | movementSn + movementDigest 幂等；摘要冲突拒绝。 | 历史决策兼容类型新写入拒绝、额度调减低于占用拒绝。 | 只写控制额度变动流水，不写资金事实。 |
-| SpendControlTransactionConsumptionApplicationService | consume / release / refund | 交易结果和控制流水引用。 | SpendControlMovementDTO | 基于原控制流水、交易流水和变动摘要幂等。 | 原控制流水缺失、跨业务场景、跨目标账户、金额超限。 | 只追加控制流水，不反写交易或账本。 |
+| SpendControlTransactionConsumptionApplicationService | consume / refund | 交易结果和控制流水引用。 | SpendControlMovementDTO | 基于原控制流水、交易流水和变动摘要幂等。 | 原控制流水缺失、跨业务场景、跨目标账户、金额超限。 | 只追加控制流水，不反写交易或账本。 |
 | TransactionProjectionExplanationSource | explain | 资金交易、route snapshot、规则决策快照和控制引用。 | 解释 payload 和 evidenceRefs。 | 只读。 | 历史证据缺失、敏感字段超 allow-list。 | 不重算规则，不反写任何事实。 |
 
 ### 5.2 DSL v1.1 结构化契约
@@ -513,7 +513,7 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 | RESERVED | 控制预留流水 | 是 | 授权或付款前占用控制额度。 |
 | CONSUMED | 控制消耗流水 | 是 | 交易成功后将预留解释为已使用。 |
 | REFUND_COMPENSATED | 退款控制补偿流水 | 是 | 退款事实成功后恢复已使用控制额度。 |
-| RELEASED | 控制释放流水 | 是 | 收到可信失败、拒绝或其他业务确认释放事实后释放预留控制占用；超时不写控制流水。 |
+| RELEASED | 控制释放流水 | 是 | 收到可信业务释放事实后释放已提交的预留控制占用；交易失败或拒绝由同一资金事务回滚控制预留，不写 `RELEASED` 补偿；超时不写控制流水。 |
 
 预算控制投影计算口径：
 
@@ -741,7 +741,7 @@ Runbook 最低要求：
 | SpendControlAdmissionApplicationServiceTests | 支出控制准入消费决策证据，证明通过、拒绝、缺证据、幂等和摘要冲突边界。 |
 | SpendControlMovementServiceFlowTests | 控制额度变动流水幂等、预算控制投影只读、历史决策兼容类型不再允许新写入。 |
 | BudgetControlLimitAdjustmentApplicationServiceTests | 预算额度调增、调减、投影占用下限和幂等摘要冲突。 |
-| SpendControlTransactionConsumptionApplicationServiceTests | 交易结果消费、失败释放、退款补偿和目标账户隔离不反写资金事实。 |
+| SpendControlTransactionConsumptionApplicationServiceTests | 交易结果消费、退款补偿和目标账户隔离不反写资金事实。 |
 | SpendControlMovementTypeContractTests | 枚举分类契约：决策记录兼容类型不参与预算投影，控制额度变动类型统一解释为 SpendControlMovement。 |
 | FundsTransactionProjectionExplainApplicationServiceTests / AuthorizationAdmissionApplicationServiceTests | 历史规则决策快照可被投影只读解释，不输出 ruleSpec 或敏感原文。 |
 | LayerBoundaryTests | wallet 不写交易事实，ledger 不接受 Spend Rule 或支出控制范围主体。 |
@@ -792,7 +792,7 @@ git diff --check
 1. 规则定义、版本发布、规则挂载、挂载查询、挂载解释、决策记录、决策记录只读查询和决策事实解释已有最小 application service、DTO、Entity、Mapper、H2 schema 和目标服务流测试。
 2. 已证明已发布版本不可变、挂载必须携带冲突策略和有效期、支付工具和支出控制范围只作为控制 scope、规则拒绝不生成资金交易或账本副作用。
 3. 支出控制准入已消费上层决策证据并通过 `recordDecision` 固化当前单条决策记录，授权准入可以透传 Spend Rule 决策证据。
-4. 控制额度变动流水、预算额度调额、交易成功消耗、失败释放、退款补偿和预算控制投影已有服务层证据，且不反写资金交易或账本事实。
+4. 控制额度变动流水、预算额度调额、交易成功消耗、退款补偿和预算控制投影已有服务层证据，且不反写资金交易或账本事实。
 5. `SpendControlMovementType` 已承载兼容期语义分类，当前服务实现消费枚举分类方法，避免各实现重复硬编码类型集合。
 6. 该基线不等于完整规则引擎、生产迁移、运营后台或外部通道规则生产适用性已完成。
 

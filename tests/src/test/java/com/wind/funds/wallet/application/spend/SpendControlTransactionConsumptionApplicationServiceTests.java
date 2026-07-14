@@ -129,12 +129,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String LARGE_CONSUME_ACTIVITY_SN = "activity_large_consumed_001";
 
-    private static final String RELEASE_ACTIVITY_SN = "activity_released_001";
-
-    private static final String SECOND_RELEASE_ACTIVITY_SN = "activity_released_002";
-
-    private static final String CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN = "activity_cross_business_sn_released_001";
-
     private static final String REPLAYED_RELEASE_ACTIVITY_SN = "activity_replayed_released_001";
 
     private static final String REFUND_ACTIVITY_SN = "activity_refund_compensated_001";
@@ -182,11 +176,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String LARGE_CONSUME_TRANSACTION_SN = "funds_transaction_sctc_large_consume_001";
 
-    private static final String FAILED_TRANSACTION_SN = "funds_transaction_sctc_failed_001";
-
-    private static final String CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN =
-            "funds_transaction_sctc_cross_business_sn_failed_001";
-
     private static final String REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_001";
 
     private static final String INCONSISTENT_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_inconsistent_001";
@@ -201,8 +190,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private static final String OVER_REFERENCE_REFUND_TRANSACTION_SN =
             "funds_transaction_sctc_refund_over_reference_001";
-
-    private static final String FAILED_REFUND_TRANSACTION_SN = "funds_transaction_sctc_refund_failed_001";
 
     private static final String TENANT_MISMATCH_ACTIVITY_SN = "activity_tenant_mismatch_001";
 
@@ -632,162 +619,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     /**
-     * 场景：资金交易失败后释放已预留的 Spend Rule 控制额度变动。
-     * 输入：已有 RESERVED 控制额度变动和失败资金交易事实。
-     * 输出：记录 RELEASED 控制额度变动，预算控制投影释放金额增加。
-     * 红线：释放控制额度变动不得创建或修改资金交易、route、posting、LedgerEntry、账本交易或余额投影事实。
-     */
-    @Test
-    void testReleaseReservedControlActivityShouldRecordReleasedWithoutFundsSideEffect() {
-        prepareSpendControlTransactionConsumptionData();
-        SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
-                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
-        insertFundsTransaction(FAILED_TRANSACTION_SN, BUSINESS_SN,
-                DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        SpendControlMovementDTO activity = spendControlTransactionConsumptionApplicationService.release(
-                consumptionRequest(RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FAILED_TRANSACTION_SN,
-                        "sha256:sctc-released").setDescription("交易失败后释放 Spend Rule 控制占用"));
-
-        assertThat(activity.getMovementSn()).isEqualTo(RELEASE_ACTIVITY_SN);
-        assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.RELEASED);
-        assertThat(activity.getOriginalMovementSn()).isEqualTo(RESERVED_ACTIVITY_SN);
-        assertThat(activity.getTransactionSn()).isEqualTo(FAILED_TRANSACTION_SN);
-
-        BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
-                projectionQuery());
-        assertThat(projection.getReservedAmount()).isEqualTo(60L);
-        assertThat(projection.getConsumedAmount()).isZero();
-        assertThat(projection.getReleasedAmount()).isEqualTo(60L);
-        assertThat(projection.getRemainingControlAmount()).isZero();
-        assertThat(projection.getLastMovementSn()).isEqualTo(RELEASE_ACTIVITY_SN);
-
-        assertThat(fundsTransactionCount(FAILED_TRANSACTION_SN)).isOne();
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：调用方把同业务场景但不同业务流水的失败交易事实误用于当前 Spend Rule 控制释放。
-     * 输入：已有 RESERVED 控制额度变动和同业务场景、不同业务流水的 FAILED PAY 资金交易事实。
-     * 输出：请求被拒绝，不写新的释放控制额度变动。
-     * 红线：失败释放只能解释同一业务流水的交易终局，不得跨订单释放控制占用，也不得写 route、posting 或账本事实。
-     */
-    @Test
-    void testReleaseWithDifferentBusinessSnTransactionShouldFailWithoutSideEffect() {
-        prepareSpendControlTransactionConsumptionData();
-        SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
-                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
-        insertFundsTransaction(CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN, OTHER_BUSINESS_SN,
-                DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.release(
-                consumptionRequest(CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
-                        CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN, "sha256:sctc-cross-business-sn-released")))
-                .hasMessageContaining("资金交易业务流水不一致");
-
-        assertThat(activityCount(CROSS_BUSINESS_SN_RELEASE_ACTIVITY_SN)).isZero();
-        assertThat(fundsTransactionCount(CROSS_BUSINESS_SN_FAILED_TRANSACTION_SN)).isOne();
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：上游返回失败的退款交易事实，调用方误用 release 释放原控制占用。
-     * 输入：已有 RESERVED 控制额度变动和失败 REFUND 资金交易事实。
-     * 输出：请求被拒绝，不写新的控制额度变动。
-     * 红线：退款交易只能走退款补偿语义，不得被降级为普通失败释放，也不得写 route、posting 或账本事实。
-     */
-    @Test
-    void testReleaseWithFailedRefundTransactionShouldFailWithoutSideEffect() {
-        prepareSpendControlTransactionConsumptionData();
-        SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
-                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
-        insertFundsTransaction(FAILED_REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_FAILED_001",
-                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD,
-                FUNDS_TRANSACTION_SN);
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.release(
-                consumptionRequest(RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FAILED_REFUND_TRANSACTION_SN,
-                        "sha256:sctc-release-refund-conflict")))
-                .hasMessageContaining("控制释放不能使用退款交易事实");
-
-        assertThat(activityCount(RELEASE_ACTIVITY_SN)).isZero();
-        assertThat(fundsTransactionCount(FAILED_REFUND_TRANSACTION_SN)).isOne();
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：同一原占用变动下，同一失败交易流水被多个释放变动累计解释超过交易金额。
-     * 输入：原占用金额大于失败交易金额，先释放 40，再用同一交易尝试释放 30。
-     * 输出：第二次释放被拒绝，不写新的控制额度变动。
-     * 红线：同一原控制额度变动不能把同一交易流水累计解释成超过资金交易金额的控制释放。
-     */
-    @Test
-    void testReleaseSameTransactionOverTransactionAmountShouldFailWithoutSideEffect() {
-        prepareSpendControlTransactionConsumptionData();
-        SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
-                SpendControlMovementType.RESERVED, "sha256:sctc-reserved").setAmount(100L));
-        insertFundsTransaction(FAILED_TRANSACTION_SN, BUSINESS_SN,
-                DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
-        spendControlTransactionConsumptionApplicationService.release(
-                consumptionRequest(RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FAILED_TRANSACTION_SN,
-                        "sha256:sctc-released").setAmount(40L));
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.release(
-                consumptionRequest(SECOND_RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FAILED_TRANSACTION_SN,
-                        "sha256:sctc-second-released").setAmount(30L)))
-                .hasMessageContaining("控制释放累计金额超过资金交易金额");
-
-        assertThat(activityCount(SECOND_RELEASE_ACTIVITY_SN)).isZero();
-        assertThat(activityCount(RELEASE_ACTIVITY_SN)).isOne();
-        assertThat(fundsTransactionCount(FAILED_TRANSACTION_SN)).isOne();
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：历史脏事实留下了同一原占用下目标账户不一致的派生控制额度变动。
-     * 输入：主账户已有 RESERVED 和 CONSUMED，异账户挂载 REFUND_COMPENSATED 到同一 originalMovementSn 后再尝试释放主账户。
-     * 输出：释放请求被拒绝，不借异账户补偿虚增当前账户可释放额度。
-     * 红线：交易消费链路必须按原占用目标账户解释控制额度变动，不能跨账户复用控制额度，也不得写 route、posting 或账本事实。
-     */
-    @Test
-    void testReleaseWithInconsistentLinkedTargetAccountShouldFailWithoutSideEffect() {
-        prepareSpendControlTransactionConsumptionData();
-        creditAccountService.createCreditAccount(createCreditAccountRequest().setSn(SECOND_CREDIT_ACCOUNT_SN));
-        SpendControlAdmissionDecisionDTO decision = admittedDecision();
-        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
-                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
-        spendControlMovementService.recordMovement(recordRequest(decision, INCONSISTENT_LINKED_ACTIVITY_SN,
-                SpendControlMovementType.REFUND_COMPENSATED, "sha256:sctc-inconsistent-linked")
-                .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
-                .setTransactionSn(REFUND_TRANSACTION_SN)
-                .setTargetAccountId(FundsAccountId.immutable(SECOND_CREDIT_ACCOUNT_SN,
-                        FundsSubjectType.CREDIT_ACCOUNT))
-                .setAmount(60L));
-        insertFundsTransaction(FAILED_TRANSACTION_SN, BUSINESS_SN,
-                DefaultFundsTransactionType.PAY, FundsTransactionStatus.FAILED, 60L, CurrencyIsoCode.USD, null);
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.release(
-                consumptionRequest(RELEASE_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FAILED_TRANSACTION_SN,
-                        "sha256:sctc-release-inconsistent-linked")))
-                .hasMessageContaining("关联控制额度变动目标账户不一致");
-
-        assertThat(activityCount(RELEASE_ACTIVITY_SN)).isZero();
-        assertThat(activityCount(INCONSISTENT_LINKED_ACTIVITY_SN)).isOne();
-        assertThat(fundsTransactionCount(FAILED_TRANSACTION_SN)).isOne();
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：同一控制额度变动流水和摘要被错误地从 release 语义复用到 consume。
+     * 场景：同一控制额度变动流水和摘要被错误地从释放语义复用到 consume。
      * 输入：已存在 RELEASED 控制额度变动，再用同一 movementSn 和 movementDigest 调用 consume。
      * 输出：请求被拒绝，不返回类型不匹配的旧变动。
      * 红线：幂等回放必须保持控制额度变动语义一致，不能只凭摘要复用不同类型、不同交易状态的控制额度变动。
@@ -803,7 +635,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 SpendControlMovementType.RELEASED, "sha256:sctc-replayed-activity")
                 .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
                 .setTransactionSn(FUNDS_TRANSACTION_SN)
-                .setDescription("交易失败后释放 Spend Rule 控制占用"));
+                .setDescription("可信释放事实释放 Spend Rule 控制占用"));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.consume(

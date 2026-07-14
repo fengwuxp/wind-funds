@@ -106,7 +106,7 @@ Spend Rule 测试设计优先引用独立产品分册 09、系分分册 06 和 D
 | `SpendRuleDefinitionServiceFlowTests` | 规则版本不可变、挂载冲突策略和有效期、支付工具范围一致性、挂载查询解释、单条决策记录幂等、决策记录窄查询、决策事实解释和拒绝 / 查询 / 解释无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、批量规则时间线 Query Service、运营后台。 |
 | `SpendRuleDefinitionServiceTests` | 规则定义、版本发布、规则挂载和挂载查询 / 解释已经按目标分层服务执行；覆盖版本同摘要幂等、异摘要拒绝覆盖、挂载幂等、非法挂载拒绝、查询 / 解释只读和无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、运营后台、DDL / 生产迁移。 |
 | `SpendControlAdmissionApplicationServiceTests`、`AuthorizationAdmissionApplicationServiceTests` | 上层决策证据可进入准入快照和授权准入组合；拒绝停在交易内核前且无资金事实；已证明上游多规则最终裁决摘要可被准入服务按最终 `decisionSn/result/digest/rejectReason` 固化。 | 多规则冲突合成器、多规则明细落库、支付工具全场景生产可用、事件消费、控制额度自动占用。 |
-| `SpendControlMovementServiceFlowTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests` | 控制额度变动流水、预算额度调额、交易成功消耗、失败释放、退款补偿、目标账户隔离和投影下限守卫。 | 账本余额、资金交易事实、生产迁移或历史脏数据修复。 |
+| `SpendControlMovementServiceFlowTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests` | 控制额度变动流水、预算额度调额、交易成功消耗、退款补偿、目标账户隔离和投影下限守卫。 | 账本余额、资金交易事实、生产迁移或历史脏数据修复。 |
 | `WalletSpendControlsAcceptanceFlowTests` | 真实接入方视角串起已发布规则、单规则评估、准入决策固化、周期额度初始化、预留、交易成功消费、退款补偿和 `controlScopeId + periodId` 历史窗口查询，并持续证明不写 route、posting、LedgerEntry 或账本余额事实。 | 多规则冲突合成器、协同授权 webhook、rolling amount、cooldown、强一致频控拦截、生产调度、运营后台或完整卡产品平台。 |
 | `SpendControlMovementTypeContractTests` | 兼容期枚举分类集中在枚举本身，历史决策兼容类型不参与预算投影。 | 公共类名、表名、DTO 或历史枚举删除。 |
 | `FundsTransactionProjectionExplainApplicationServiceTests` / `AuthorizationAdmissionApplicationServiceTests` | 已固化 Spend Rule 决策快照可被交易投影只读解释，不输出 `ruleSpec` 或敏感原文。 | 完整规则定义、版本、挂载、决策记录和控制额度变动流水的运营时间线。 |
