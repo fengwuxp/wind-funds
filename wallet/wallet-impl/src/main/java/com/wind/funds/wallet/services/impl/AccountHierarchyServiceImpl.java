@@ -55,7 +55,7 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         ResolvedAccount rootAccount = resolveRequiredAccount(request.getTenantId(), request.getRootAccountId());
         assertCompatibleBinding(request, account, parentAccount, rootAccount);
         AccountHierarchyBindingDTO binding = toDTO(request, account, parentAccount, rootAccount);
-        assertNoDuplicateActiveBinding(binding);
+        assertNoDuplicateCurrentBinding(binding);
         return accountHierarchyBindingService.createAccountHierarchyBinding(binding);
     }
 
@@ -72,7 +72,7 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         if (!isAccountSubject(accountRef.getSubjectType()) || accountRef.getTenantId() == null) {
             return Optional.empty();
         }
-        return accountHierarchyBindingService.findActiveAccountHierarchyBinding(accountRef.getTenantId(),
+        return accountHierarchyBindingService.findCurrentAccountHierarchyBinding(accountRef.getTenantId(),
                         accountRef.getSubjectId(),
                         accountRef.getSubjectType())
                 .map(binding -> toSnapshot(accountRef, binding));
@@ -92,7 +92,6 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
         result.setRootAccountId(rootAccount.accountId());
         result.setRootAccountType(rootAccount.accountType());
         result.setCurrency(request.getCurrency());
-        result.setStatus(request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus());
         result.setOperatorId(createOperatorId(request));
         result.setContextVariables(request.getContextVariables());
         return result;
@@ -181,12 +180,9 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
                 parseContextVariables(request.getContextVariables()));
     }
 
-    private void assertNoDuplicateActiveBinding(AccountHierarchyBindingDTO binding) {
-        if (binding.getStatus() != FundsAccountStatus.ACTIVE) {
-            return;
-        }
-        AssertUtils.isFalse(accountHierarchyBindingService.existsActiveAccountHierarchyBinding(binding),
-                "账户层级绑定 ACTIVE 关系已存在，accountId = {}, accountType = {}",
+    private void assertNoDuplicateCurrentBinding(AccountHierarchyBindingDTO binding) {
+        AssertUtils.isFalse(accountHierarchyBindingService.existsCurrentAccountHierarchyBinding(binding),
+                "账户层级绑定关系已存在，accountId = {}, accountType = {}",
                 binding.getAccountId(),
                 binding.getAccountType());
     }

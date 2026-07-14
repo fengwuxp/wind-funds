@@ -1,7 +1,6 @@
 package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -65,9 +64,6 @@ public class AccountHierarchyBindingDTO implements Serializable {
 
     @Schema(description = "层级关系币种")
     private CurrencyIsoCode currency;
-
-    @Schema(description = "层级绑定状态")
-    private FundsAccountStatus status;
 
     @Schema(description = "操作人 ID")
     private String operatorId;

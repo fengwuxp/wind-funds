@@ -1,7 +1,6 @@
 package com.wind.funds.wallet.model.request;
 
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -48,9 +47,6 @@ public class CreateAccountHierarchyBindingRequest {
     @Schema(description = "币种")
     @NotNull
     private CurrencyIsoCode currency;
-
-    @Schema(description = "状态")
-    private FundsAccountStatus status;
 
     @Schema(description = "操作者")
     private String operatorId;

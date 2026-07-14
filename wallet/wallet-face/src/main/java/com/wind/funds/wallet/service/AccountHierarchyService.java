@@ -21,8 +21,7 @@ public interface AccountHierarchyService {
     /**
      * 创建账户层级绑定。
      *
-     * <p>能力范围：登记一个子账户到父账户、根账户的当前关系；同一账户只能有一个 ACTIVE
-     * 账户层级来源。</p>
+     * <p>能力范围：登记一个子账户到父账户、根账户的当前关系；同一账户只能有一个账户层级来源。</p>
      *
      * @param request 创建请求
      * @return 绑定主键
@@ -32,8 +31,8 @@ public interface AccountHierarchyService {
     /**
      * 查询账户层级快照。
      *
-     * <p>能力范围：只读返回指定事件对应的账户层级快照；当前按 ACTIVE 关系来源解析，
-     * 不按有效期窗口切片；不存在关系时返回空。</p>
+     * <p>能力范围：只读返回指定事件对应的账户层级快照；当前按唯一关系来源解析，不按有效期窗口切片；
+     * 不存在关系时返回空。</p>
      *
      * @param accountRef 账户主体引用
      * @param effectiveAt 事件时间
