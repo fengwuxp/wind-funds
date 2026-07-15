@@ -141,10 +141,6 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
 
     private static final String PAYOUT_BINDING_SN = "pi_lifecycle_payout_binding";
 
-    private static final String FUNDING_RELATION_SN = "instrument_lifecycle_receive_relation";
-
-    private static final String PAYOUT_FUNDING_RELATION_SN = "instrument_lifecycle_payout_relation";
-
     private static final String OWNER_ID = "owner_instrument_lifecycle";
 
     private static final String CHANNEL_CODE = "bank_rail";
@@ -456,8 +452,8 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
                 UNSUPPORTED_CHANNEL_BUSINESS_SN, PAYOUT_BUSINESS_SN, UNSUPPORTED_PAYOUT_RAIL_BUSINESS_SN,
                 PAYOUT_FREEZE_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?)",
-                FUNDING_RELATION_SN, PAYOUT_FUNDING_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
+                TENANT_ID, RECEIVE_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?, ?)",
                 RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN, PAYOUT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn IN (?, ?, ?)",
@@ -480,7 +476,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 PaymentInstrumentFlowDirection.INBOUND));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(RECEIVE_INSTRUMENT_SN,
                 RECEIVE_BINDING_SN));
-        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest(FUNDING_RELATION_SN));
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
     }
 
     private void createPayoutInstrumentScenario() {
@@ -489,7 +485,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(PAYOUT_INSTRUMENT_SN,
                 PAYOUT_BINDING_SN, PaymentInstrumentBindingRole.PAYMENT_SUBJECT));
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest(
-                PAYOUT_FUNDING_RELATION_SN, SpendSubjectFundingRelationType.FUNDING_SOURCE));
+                SpendSubjectFundingRelationType.FUNDING_SOURCE));
     }
 
     private void createReceiveAccount() {
@@ -605,25 +601,20 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setStatus(FundsAccountStatus.ACTIVE);
     }
 
-    private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest(String relationSn) {
-        return createFundingRelationRequest(relationSn, SpendSubjectFundingRelationType.SETTLEMENT_TARGET);
+    private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
+        return createFundingRelationRequest(SpendSubjectFundingRelationType.SETTLEMENT_TARGET);
     }
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest(
-            String relationSn,
             SpendSubjectFundingRelationType relationType) {
         return new CreateSpendSubjectFundingRelationRequest()
-                .setSn(relationSn)
                 .setTenantId(TENANT_ID)
                 .setSpendSubjectId(RECEIVE_ACCOUNT_SN)
                 .setSpendSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setTargetSubjectId(RECEIVE_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setRelationType(relationType)
-                .setPriority(10)
-                .setDefaultRelation(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setRelationType(relationType);
     }
 
     private ReceiveByInstrumentRequest receiveRequest(String businessSn, String instrumentSn) {

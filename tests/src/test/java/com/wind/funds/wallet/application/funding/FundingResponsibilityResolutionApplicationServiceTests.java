@@ -52,10 +52,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFundsServiceTest {
 
-    private static final String FUNDING_RELATION_SN = "app_funding_responsibility";
-
-    private static final String CREDIT_RELATION_SN = "app_credit_responsibility";
-
     private static final String FUNDING_ACCOUNT_SN = "app_funding_target";
 
     private static final String CREDIT_ACCOUNT_SN = "app_credit_target";
@@ -91,17 +87,14 @@ class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFun
         assertThat(decision)
                 .satisfies(result -> {
                     assertThat(result.getRelationId()).isEqualTo(relationId);
-                    assertThat(result.getRelationSn()).isEqualTo(FUNDING_RELATION_SN);
+                    assertThat(result.getRelationSn()).isNotBlank();
                     assertThat(result.getTenantId()).isEqualTo(TENANT_ID);
                     assertThat(result.getSpendSubjectId()).isEqualTo(SPEND_SUBJECT_ID);
                     assertThat(result.getSpendSubjectType()).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT);
-                    assertThat(result.getFundingAccountId()).isEqualTo(FUNDING_ACCOUNT_SN);
                     assertThat(result.getTargetSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT);
                     assertThat(result.getTargetSubjectId()).isEqualTo(FUNDING_ACCOUNT_SN);
                     assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
                     assertThat(result.getRelationType()).isEqualTo(SpendSubjectFundingRelationType.FUNDING_SOURCE);
-                    assertThat(result.getPriority()).isEqualTo(10);
-                    assertThat(result.getDefaultRelation()).isTrue();
                 });
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -118,8 +111,7 @@ class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFun
         assertThat(decision)
                 .satisfies(result -> {
                     assertThat(result.getRelationId()).isEqualTo(relationId);
-                    assertThat(result.getRelationSn()).isEqualTo(CREDIT_RELATION_SN);
-                    assertThat(result.getFundingAccountId()).isNull();
+                    assertThat(result.getRelationSn()).isNotBlank();
                     assertThat(result.getTargetSubjectType()).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT);
                     assertThat(result.getTargetSubjectId()).isEqualTo(CREDIT_ACCOUNT_SN);
                     assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
@@ -133,7 +125,7 @@ class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFun
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> resolutionApplicationService.resolveFundingResponsibility(resolveRequest()))
-                .hasMessageContaining("默认资金责任关系不存在");
+                .hasMessageContaining("资金责任关系不存在");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -160,9 +152,9 @@ class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFun
     }
 
     private void cleanupFundingResponsibilityResolutionTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn IN (?, ?)",
-                FUNDING_RELATION_SN,
-                CREDIT_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
+                TENANT_ID,
+                SPEND_SUBJECT_ID);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?)",
                 FUNDING_ACCOUNT_SN,
                 CREDIT_ACCOUNT_SN);
@@ -207,22 +199,17 @@ class FundingResponsibilityResolutionApplicationServiceTests extends AbstractFun
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
         return new CreateSpendSubjectFundingRelationRequest()
-                .setSn(FUNDING_RELATION_SN)
                 .setTenantId(TENANT_ID)
                 .setSpendSubjectId(SPEND_SUBJECT_ID)
                 .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
-                .setFundingAccountId(FUNDING_ACCOUNT_SN)
+                .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setTargetSubjectId(FUNDING_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
-                .setPriority(10)
-                .setDefaultRelation(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createCreditRelationRequest() {
         return createFundingRelationRequest()
-                .setSn(CREDIT_RELATION_SN)
-                .setFundingAccountId(null)
                 .setTargetSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectId(CREDIT_ACCOUNT_SN);
     }

@@ -87,8 +87,6 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     private static final String PAYMENT_BINDING_SN = "spend_control_payment_binding";
 
-    private static final String FUNDING_RELATION_SN = "spend_control_funding_rel";
-
     private static final String OWNER_ID = "spend_control_owner";
 
     private static final String CHANNEL_CODE = "spend_control_channel";
@@ -244,19 +242,21 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     /**
      * 场景：上游或外部 Spend Rule 决策通过，但 wallet 资金责任基础事实缺失。
-     * 输入：携带 PASSED 决策证据，支付工具绑定和账户存在，但默认资金责任关系不存在。
+     * 输入：携带 PASSED 决策证据，支付工具绑定和账户存在，但资金责任关系不存在。
      * 输出：准入停在预交易快照阶段，不固化 Spend Rule 决策记录。
      * 红线：外部 approve 不代表资金可用，不能绕过支付工具、账户能力和资金责任校验。
      */
     @Test
     void testResolveSpendControlAdmissionShouldRejectExternalApproveWhenFundingResponsibilityMissingWithoutSideEffect() {
         prepareSpendControlAdmissionData();
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
+                TENANT_ID,
+                CREDIT_ACCOUNT_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
                 admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED)))
-                .hasMessageContaining("默认资金责任关系不存在");
+                .hasMessageContaining("资金责任关系不存在");
 
         assertThat(decisionRecordCount()).isZero();
         assertNoTransactionFacts(BUSINESS_SN);
@@ -383,7 +383,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_spend_rule_definition WHERE tenant_id = ? AND rule_id = ?",
                 TENANT_ID, SPEND_RULE_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
+                TENANT_ID,
+                CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn = ?",
                 PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn = ?", PAYMENT_INSTRUMENT_SN);
@@ -495,17 +497,13 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
         return new CreateSpendSubjectFundingRelationRequest()
-                .setSn(FUNDING_RELATION_SN)
                 .setTenantId(TENANT_ID)
                 .setSpendSubjectId(CREDIT_ACCOUNT_SN)
                 .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectId(CREDIT_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
-                .setPriority(10)
-                .setDefaultRelation(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE);
     }
 
     private void assertNoTransactionFacts(String businessSn) {

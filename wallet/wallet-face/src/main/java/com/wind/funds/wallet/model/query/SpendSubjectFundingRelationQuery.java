@@ -2,7 +2,6 @@ package com.wind.funds.wallet.model.query;
 
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -36,9 +35,6 @@ public class SpendSubjectFundingRelationQuery {
     @Schema(description = "支出控制主体类型")
     private FundsSubjectType spendSubjectType;
 
-    @Schema(description = "兼容真实资金账户 ID，仅资金账户目标主体使用")
-    private String fundingAccountId;
-
     @Schema(description = "资金责任目标主体类型")
     private FundsSubjectType targetSubjectType;
 
@@ -50,10 +46,4 @@ public class SpendSubjectFundingRelationQuery {
 
     @Schema(description = "关系类型")
     private SpendSubjectFundingRelationType relationType;
-
-    @Schema(description = "是否默认关系")
-    private Boolean defaultRelation;
-
-    @Schema(description = "状态")
-    private FundsAccountStatus status;
 }

@@ -140,8 +140,6 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
     private static final String PAYMENT_BINDING_SN = "pi_auth_admission_binding";
 
-    private static final String FUNDING_RELATION_SN = "auth_admission_relation";
-
     private static final String OWNER_ID = "owner_auth_admission";
 
     private static final String CHANNEL_CODE = "issuer_processor";
@@ -486,7 +484,9 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_sn IN (?, ?, ?, ?, ?, ?)",
                 AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
                 SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
+                TENANT_ID,
+                CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
                 PAYMENT_INSTRUMENT_SN, RECEIVE_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn IN (?, ?)",
@@ -576,24 +576,19 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
         return new CreateSpendSubjectFundingRelationRequest()
-                .setSn(FUNDING_RELATION_SN)
                 .setTenantId(TENANT_ID)
                 .setSpendSubjectId(CREDIT_ACCOUNT_SN)
                 .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectId(CREDIT_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
-                .setPriority(10)
-                .setDefaultRelation(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createParentFundingRelationRequest() {
         return createFundingRelationRequest()
                 .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
-                .setTargetSubjectId(PARENT_FUNDING_ACCOUNT_SN)
-                .setFundingAccountId(PARENT_FUNDING_ACCOUNT_SN);
+                .setTargetSubjectId(PARENT_FUNDING_ACCOUNT_SN);
     }
 
     private void prepareSpendRuleDecisionData() {
@@ -842,7 +837,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name());
         assertThat(contextVariables.getString("instrumentBindingSn")).isEqualTo(PAYMENT_BINDING_SN);
         assertThat(contextVariables.getInteger("instrumentBindingVersion")).isEqualTo(1);
-        assertThat(contextVariables.getString("fundingRelationSn")).isEqualTo(FUNDING_RELATION_SN);
+        assertThat(contextVariables.getString("fundingRelationSn")).isNotBlank();
         assertThat(contextVariables.getString("fundingRelationType"))
                 .isEqualTo(SpendSubjectFundingRelationType.FUNDING_SOURCE.name());
         assertThat(contextVariables.getString("targetAccountId")).isEqualTo(targetAccountId.id());

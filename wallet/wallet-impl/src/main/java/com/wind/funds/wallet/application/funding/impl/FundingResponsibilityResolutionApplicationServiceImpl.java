@@ -4,7 +4,6 @@ import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.wallet.application.funding.FundingResponsibilityResolutionApplicationService;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.model.dto.FundingResponsibilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
 import com.wind.funds.wallet.model.query.SpendSubjectFundingRelationQuery;
@@ -41,17 +40,15 @@ public class FundingResponsibilityResolutionApplicationServiceImpl
                         .setSpendSubjectId(request.getSpendSubjectId())
                         .setSpendSubjectType(request.getSpendSubjectType())
                         .setCurrency(request.getCurrency())
-                        .setRelationType(request.getRelationType())
-                        .setDefaultRelation(Boolean.TRUE)
-                        .setStatus(FundsAccountStatus.ACTIVE),
+                        .setRelationType(request.getRelationType()),
                 DefaultPageQueryOptions.defaults(2)).getRecords();
         AssertUtils.isFalse(records.isEmpty(),
-                "默认资金责任关系不存在，spendSubjectId = {}, relationType = {}, currency = {}",
+                "资金责任关系不存在，spendSubjectId = {}, relationType = {}, currency = {}",
                 request.getSpendSubjectId(),
                 request.getRelationType(),
                 request.getCurrency());
         AssertUtils.isTrue(records.size() == 1,
-                "默认资金责任关系不唯一，spendSubjectId = {}, relationType = {}, currency = {}",
+                "资金责任关系不唯一，spendSubjectId = {}, relationType = {}, currency = {}",
                 request.getSpendSubjectId(),
                 request.getRelationType(),
                 request.getCurrency());
@@ -75,12 +72,9 @@ public class FundingResponsibilityResolutionApplicationServiceImpl
                 .setTenantId(relation.getTenantId())
                 .setSpendSubjectId(relation.getSpendSubjectId())
                 .setSpendSubjectType(relation.getSpendSubjectType())
-                .setFundingAccountId(relation.getFundingAccountId())
                 .setTargetSubjectType(relation.getTargetSubjectType())
                 .setTargetSubjectId(relation.getTargetSubjectId())
                 .setCurrency(relation.getCurrency())
-                .setRelationType(relation.getRelationType())
-                .setPriority(relation.getPriority())
-                .setDefaultRelation(relation.getDefaultRelation());
+                .setRelationType(relation.getRelationType());
     }
 }

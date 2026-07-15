@@ -3,10 +3,7 @@ package com.wind.funds.wallet.mapstruct;
 import com.wind.funds.wallet.dal.entities.SpendSubjectFundingRel;
 import com.wind.funds.wallet.model.dto.SpendSubjectFundingRelationDTO;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
-import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
-import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
 
@@ -36,18 +33,4 @@ public interface SpendSubjectFundingRelationConverter {
      * @return SpendSubjectFundingRelationDTO 实例
      */
     SpendSubjectFundingRelationDTO convertToSpendSubjectFundingRelationDTO(SpendSubjectFundingRel data);
-
-    /**
-     * Fill create defaults after same-name field mapping.
-     *
-     * @param request 创建请求
-     * @param entity 支出主体资金关系实体
-     */
-    @AfterMapping
-    default void fillCreateDefaults(CreateSpendSubjectFundingRelationRequest request,
-                                    @MappingTarget SpendSubjectFundingRel entity) {
-        entity.setPriority(request.getPriority() == null ? 0 : request.getPriority());
-        entity.setDefaultRelation(Boolean.TRUE.equals(request.getDefaultRelation()));
-        entity.setStatus(request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus());
-    }
 }

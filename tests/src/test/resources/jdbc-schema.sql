@@ -244,25 +244,16 @@ CREATE TABLE `t_spend_subject_funding_rel`
     `tenant_id`           BIGINT(20)  NOT NULL COMMENT '租户 ID',
     `spend_subject_id`    VARCHAR(64) NOT NULL COMMENT '支出控制主体 ID',
     `spend_subject_type`  VARCHAR(50) NOT NULL COMMENT '支出控制主体类型',
-    `funding_account_id`  VARCHAR(64)          DEFAULT NULL COMMENT '兼容真实资金账户 ID，仅资金账户目标主体使用',
     `target_subject_type` VARCHAR(50) NOT NULL COMMENT '资金责任目标主体类型',
     `target_subject_id`   VARCHAR(64) NOT NULL COMMENT '资金责任目标主体 ID',
     `currency`            VARCHAR(10) NOT NULL COMMENT '币种',
     `relation_type`       VARCHAR(50) NOT NULL COMMENT '关系类型',
-    `priority`            INT(11)     NOT NULL DEFAULT 0 COMMENT '路由优先级',
-    `is_default`          TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '是否默认关系',
-    `status`              VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
-    `valid_from`          DATETIME             DEFAULT NULL COMMENT '生效时间',
-    `valid_to`            DATETIME             DEFAULT NULL COMMENT '失效时间',
     `description`         VARCHAR(512)         DEFAULT NULL COMMENT '描述',
-    `context_variables`   TEXT                 DEFAULT NULL COMMENT '扩展上下文',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_spend_subject_funding_rel_sn` (`sn`),
-    UNIQUE KEY `uk_spend_subject_funding_rel_subject` (`tenant_id`, `spend_subject_type`, `spend_subject_id`, `target_subject_type`, `target_subject_id`, `currency`, `relation_type`),
+    UNIQUE KEY `uk_spend_subject_funding_rel_scope` (`tenant_id`, `spend_subject_type`, `spend_subject_id`, `currency`, `relation_type`),
     KEY `idx_spend_subject_funding_rel_spend_subject` (`spend_subject_type`, `spend_subject_id`),
-    KEY `idx_spend_subject_funding_rel_funding` (`funding_account_id`),
-    KEY `idx_spend_subject_funding_rel_target` (`target_subject_type`, `target_subject_id`),
-    KEY `idx_spend_subject_funding_rel_status` (`status`)
+    KEY `idx_spend_subject_funding_rel_target` (`target_subject_type`, `target_subject_id`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '支出主体资金关系表';
 

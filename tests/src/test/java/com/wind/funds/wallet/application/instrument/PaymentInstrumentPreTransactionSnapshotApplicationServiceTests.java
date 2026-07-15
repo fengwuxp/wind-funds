@@ -78,8 +78,6 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
 
     private static final String PAYMENT_BINDING_SN = "pre_tx_payment_binding";
 
-    private static final String FUNDING_RELATION_SN = "pre_tx_funding_rel";
-
     private static final String OWNER_ID = "pre_tx_owner";
 
     private static final String CHANNEL_CODE = "pre_tx_channel";
@@ -137,7 +135,7 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
         assertThat(snapshot.getPaymentInstrumentCapability().getInstrumentSn()).isEqualTo(PAYMENT_INSTRUMENT_SN);
         assertThat(snapshot.getPaymentInstrumentCapability().getBindingSn()).isEqualTo(PAYMENT_BINDING_SN);
         assertThat(snapshot.getPaymentInstrumentCapability().getBindingVersion()).isEqualTo(1);
-        assertThat(snapshot.getFundingResponsibility().getRelationSn()).isEqualTo(FUNDING_RELATION_SN);
+        assertThat(snapshot.getFundingResponsibility().getRelationSn()).isNotBlank();
         assertThat(snapshot.getFundingResponsibility().getTargetSubjectType())
                 .isEqualTo(FundsSubjectType.CREDIT_ACCOUNT);
         assertThat(snapshot.getFundingResponsibility().getTargetSubjectId()).isEqualTo(CREDIT_ACCOUNT_SN);
@@ -229,7 +227,10 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
     }
 
     private void cleanupPaymentInstrumentPreTransactionSnapshotTestData() {
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id IN (?, ?)",
+                TENANT_ID,
+                CREDIT_ACCOUNT_SN,
+                REFUND_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
                 PAYMENT_INSTRUMENT_SN,
                 RECEIVE_INSTRUMENT_SN);
@@ -332,32 +333,24 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
         return new CreateSpendSubjectFundingRelationRequest()
-                .setSn(FUNDING_RELATION_SN)
                 .setTenantId(TENANT_ID)
                 .setSpendSubjectId(CREDIT_ACCOUNT_SN)
                 .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectId(CREDIT_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
-                .setPriority(10)
-                .setDefaultRelation(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createRefundFundingRelationRequest() {
         return new CreateSpendSubjectFundingRelationRequest()
-                .setSn(FUNDING_RELATION_SN)
                 .setTenantId(TENANT_ID)
                 .setSpendSubjectId(REFUND_ACCOUNT_SN)
                 .setSpendSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setTargetSubjectId(REFUND_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
-                .setPriority(10)
-                .setDefaultRelation(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE);
     }
 
     private void assertNoTransactionFacts(String businessSn) {

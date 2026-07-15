@@ -105,8 +105,6 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
 
     private static final String PAYMENT_BINDING_SN = "wallet_spend_controls_binding";
 
-    private static final String FUNDING_RELATION_SN = "wallet_spend_controls_funding_rel";
-
     private static final String OWNER_ID = "wallet_spend_controls_owner";
 
     private static final String CHANNEL_CODE = "wallet_spend_controls_channel";
@@ -451,17 +449,13 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
         return new CreateSpendSubjectFundingRelationRequest()
-                .setSn(FUNDING_RELATION_SN)
                 .setTenantId(TENANT_ID)
                 .setSpendSubjectId(CREDIT_ACCOUNT_SN)
                 .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectId(CREDIT_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
-                .setPriority(10)
-                .setDefaultRelation(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE);
     }
 
     private FundsAccountId targetAccountId() {
@@ -507,7 +501,9 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 TENANT_ID, SPEND_RULE_ID);
         jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE tenant_id = ? AND sn LIKE 'wallet_spend_controls_%'",
                 TENANT_ID);
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
+                TENANT_ID,
+                CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn = ?",
                 PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn = ?", PAYMENT_INSTRUMENT_SN);

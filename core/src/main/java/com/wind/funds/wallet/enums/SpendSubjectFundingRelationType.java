@@ -15,8 +15,7 @@ import lombok.Getter;
 public enum SpendSubjectFundingRelationType implements DescriptiveEnum {
 
     FUNDING_SOURCE("出资资金账户"),
-    SETTLEMENT_TARGET("结算目标账户"),
-    FALLBACK_SOURCE("兜底出资账户");
+    SETTLEMENT_TARGET("结算目标账户");
 
     private final String desc;
 }

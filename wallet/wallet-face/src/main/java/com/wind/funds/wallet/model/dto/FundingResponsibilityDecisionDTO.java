@@ -44,9 +44,6 @@ public class FundingResponsibilityDecisionDTO implements Serializable {
     @Schema(description = "支出控制主体类型")
     private FundsSubjectType spendSubjectType;
 
-    @Schema(description = "兼容真实资金账户 ID，仅资金账户目标主体使用")
-    private String fundingAccountId;
-
     @Schema(description = "资金责任目标主体类型")
     private FundsSubjectType targetSubjectType;
 
@@ -58,10 +55,4 @@ public class FundingResponsibilityDecisionDTO implements Serializable {
 
     @Schema(description = "关系类型")
     private SpendSubjectFundingRelationType relationType;
-
-    @Schema(description = "路由优先级")
-    private Integer priority;
-
-    @Schema(description = "是否默认关系")
-    private Boolean defaultRelation;
 }

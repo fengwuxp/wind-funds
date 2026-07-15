@@ -80,8 +80,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     private static final String PAYMENT_BINDING_SN = "spend_control_movement_binding";
 
-    private static final String FUNDING_RELATION_SN = "spend_control_movement_funding_rel";
-
     private static final String OWNER_ID = "spend_control_movement_owner";
 
     private static final String CHANNEL_CODE = "spend_control_movement_channel";
@@ -658,22 +656,20 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
         return new CreateSpendSubjectFundingRelationRequest()
-                .setSn(FUNDING_RELATION_SN)
                 .setTenantId(TENANT_ID)
                 .setSpendSubjectId(CREDIT_ACCOUNT_SN)
                 .setSpendSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setTargetSubjectId(CREDIT_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
-                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
-                .setPriority(10)
-                .setDefaultRelation(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE);
     }
 
     private void cleanupSpendControlMovementTestData() {
         jdbcTemplate.update("DELETE FROM t_spend_control_movement WHERE business_scene = ?", BUSINESS_SCENE);
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE sn = ?", FUNDING_RELATION_SN);
+        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
+                TENANT_ID,
+                CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn = ?",
                 PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn = ?", PAYMENT_INSTRUMENT_SN);

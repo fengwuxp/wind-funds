@@ -634,7 +634,7 @@ VCC 对账不追求把供应商账单、授权、清算、费用、资金流水�
 | Highnote 发卡节点 | `wind-funds` 承接方式 | 首期任务 | 停止条件 |
 | --- | --- | --- | --- |
 | Account holder approved application | 只消费上游已批准的企业、持卡人、业务单和合规结果引用。 | 产品 owner 冻结上游对象引用和幂等键。 | 需要在资金底座实现开户申请、KYC/KYB、持卡人生命周期或审批流。 |
-| Issue financial account | 映射为 VCC 关联资金子账户或信用子账户，并保留父账户、账目 profile、责任来源和审计引用。 | 架构 owner 推进 `B2-ACCOUNT-HIERARCHY` 和 `targetSubjectType + targetSubjectId` 决策。 | 仍只有 `fundingAccountId`，或需要新增 `VCC_ACCOUNT`。 |
+| Issue financial account | 映射为 VCC 关联资金子账户或信用子账户，并保留父账户、账目 profile、责任来源和审计引用。 | 架构 owner 推进 `B2-ACCOUNT-HIERARCHY` 和 `targetSubjectType + targetSubjectId` 落地验证。 | 目标主体字段缺失，或需要新增 `VCC_ACCOUNT`。 |
 | Issue virtual card / card profile | 虚拟卡、卡产品和 card profile 只进入 `PaymentInstrumentRef`、绑定快照、产品场景和脱敏展示。 | wallet owner 推进 `B2-PI-CAP`，证明卡是工具不是账本主体。 | 需要保存完整 PAN/CVC、卡 profile 规则全集或卡生命周期状态机。 |
 | Payment card lineage / PAR / PAN | PAR、PAN lineage、reissue、close stolen card 属于发卡域；资金底座只保存脱敏工具引用、绑定版本和原 route snapshot。 | 测试 owner 补换绑后退款、撤销、拒付原路径回放验证。 | 需要用当前卡绑定重算历史资金路径。 |
 | Activate card / set PIN | 激活和 PIN 由发卡系统、SDK 或 PCI 边界承接；资金底座最多消费脱敏后的可用状态、PIN 校验结果或卡交易处理类型。 | 安全 owner 校验 request、contextVariables、日志、投影和测试夹具无敏感原文。 | 需要接收、保存或展示 PIN、CVV、完整 PAN、token secret。 |

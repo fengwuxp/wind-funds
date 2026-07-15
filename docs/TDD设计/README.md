@@ -240,7 +240,7 @@ Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界�
 | redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | SPEND-RULE-EXTERNAL-DECISION-RED-001 | 外部 decline 后是否能在交易内核前停止？ | 外部拒绝不得创建任何交易或账本事实。 | 返回 `admitted=false`，固化决策流水、规则版本、摘要和拒绝原因。 | 不写资金交易、route、posting、LedgerEntry 或余额投影。 | 支付工具、账户能力和资金责任均可用；上游结果为 `REJECTED`；断言拒绝原因、决策记录和资金事实不变。 | `SpendControlAdmissionApplicationServiceTests`，已落地。 | `just test-one SpendControlAdmissionApplicationServiceTests tests`。 | 需要新增外部回调协议字段或 webhook。 |
-| SPEND-RULE-EXTERNAL-DECISION-RED-002 | 外部 approve 是否会绕过 wallet 准入链？ | 外部通过只是一条规则证据，不代表资金责任、账户能力或授权交易成功。 | 默认资金责任缺失时准入失败，且不固化决策记录。 | 不写决策记录、资金交易、route、posting、LedgerEntry 或余额投影。 | 携带 `PASSED` 决策证据；支付工具和账户存在但默认资金责任关系缺失；断言失败原因和无副作用。 | `SpendControlAdmissionApplicationServiceTests`，已落地。 | `just test-one SpendControlAdmissionApplicationServiceTests tests`。 | 需要把外部 approve 解释成直接授权成功。 |
+| SPEND-RULE-EXTERNAL-DECISION-RED-002 | 外部 approve 是否会绕过 wallet 准入链？ | 外部通过只是一条规则证据，不代表资金责任、账户能力或授权交易成功。 | 资金责任关系缺失时准入失败，且不固化决策记录。 | 不写决策记录、资金交易、route、posting、LedgerEntry 或余额投影。 | 携带 `PASSED` 决策证据；支付工具和账户存在但资金责任关系缺失；断言失败原因和无副作用。 | `SpendControlAdmissionApplicationServiceTests`，已落地。 | `just test-one SpendControlAdmissionApplicationServiceTests tests`。 | 需要把外部 approve 解释成直接授权成功。 |
 
 多规则裁决证据契约评审卡：
 

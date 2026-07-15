@@ -7,7 +7,6 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -72,11 +71,6 @@ public class SpendSubjectFundingRel implements Serializable, TenantIsolationObje
     private FundsSubjectType spendSubjectType;
 
     /**
-     * 兼容字段：历史资金账户 ID。
-     */
-    private String fundingAccountId;
-
-    /**
      * 目标资金主体类型。
      */
     @NotNull
@@ -101,41 +95,7 @@ public class SpendSubjectFundingRel implements Serializable, TenantIsolationObje
     private SpendSubjectFundingRelationType relationType;
 
     /**
-     * 匹配优先级。
-     */
-    @NotNull
-    private Integer priority;
-
-    /**
-     * 是否默认资金关系。
-     */
-    @NotNull
-    @Column("is_default")
-    private Boolean defaultRelation;
-
-    /**
-     * 资金关系状态。
-     */
-    @NotNull
-    private FundsAccountStatus status;
-
-    /**
-     * 关系生效时间。
-     */
-    private LocalDateTime validFrom;
-
-    /**
-     * 关系失效时间。
-     */
-    private LocalDateTime validTo;
-
-    /**
      * 关系说明。
      */
     private String description;
-
-    /**
-     * 扩展上下文变量。
-     */
-    private String contextVariables;
 }
