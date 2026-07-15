@@ -173,7 +173,7 @@ CREATE TABLE `t_payment_instrument_binding`
     `context_variables`   TEXT                 DEFAULT NULL COMMENT '扩展上下文',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_payment_instrument_binding_sn` (`sn`),
-    UNIQUE KEY `uk_payment_instrument_binding_subject` (`instrument_sn`, `binding_role`, `subject_type`, `subject_id`, `currency`),
+    UNIQUE KEY `uk_payment_instrument_binding_subject` (`tenant_id`, `instrument_sn`, `binding_role`, `subject_type`, `subject_id`, `currency`),
     KEY `idx_payment_instrument_binding_instrument` (`instrument_sn`),
     KEY `idx_payment_instrument_binding_subject` (`subject_type`, `subject_id`),
     KEY `idx_payment_instrument_binding_status` (`status`)
