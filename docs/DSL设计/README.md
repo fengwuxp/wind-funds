@@ -148,7 +148,7 @@ B7 目标态可以描述可清分明细、清分批次、内部清算候选、�
 
 Highnote 公开发卡文档中的 financial account、ledger、ledger entry、payment card 和 financial account activity 分层，可作为本 DSL 的外部参考确认：资金和账本落在账户，卡只是访问工具，账户活动和交易事件承担卡维度归因。wind-funds DSL 因此坚持“账户入账、工具归因、控制留痕、投影查询”：`SubjectRef` 决定可入账主体，`PaymentInstrumentRef` 和 binding snapshot 决定工具归因，Spend Rule / 预算控制只产出控制证据和只读投影输入。
 
-模块归属约束：Spend Rule 的规则定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制视图归属于 `wallet` 支出控制域；`transaction` 只消费已固化 `spendRuleDecision`、控制额度变动引用和 route snapshot 做历史投影解释；`ledger` 只接受可入账账户主体。交易模块不得直接依赖 wallet Spend Rule application service、DAL Entity 或 Mapper 来计算、更新或解释规则。公共类名、表名和字段统一使用 `SpendRuleDecisionRecord`、`SpendControlMovement`、`movementSn`、`movementType` 和 `movementDigest` 等最终交付名。历史兼容变动类型 `ADMISSION_RECORDED`、`REJECTED_RECORDED` 只用于存量解释，不再作为新的控制额度变动 DSL 输入；新的准入 / 拒绝证据必须进入决策记录。`SpendControlMovementType` 作为控制额度变动 DSL 类型分类契约，统一声明预算投影参与性、调额类、释放类和决策记录兼容类。
+模块归属约束：Spend Rule 的规则定义、版本、挂载、决策记录、准入、控制额度变动流水和预算控制视图归属于 `wallet` 支出控制域；`transaction` 只消费已固化 `spendRuleDecision`、控制额度变动引用和 route snapshot 做历史投影解释；`ledger` 只接受可入账账户主体。交易模块不得直接依赖 wallet Spend Rule application service、DAL Entity 或 Mapper 来计算、更新或解释规则。公共类名、表名和字段统一使用 `SpendRuleDecisionRecord`、`SpendControlMovement`、`movementSn`、`movementType` 和 `movementDigest` 等最终交付名。准入 / 拒绝证据只进入决策记录，不属于控制额度变动 DSL。`SpendControlMovementType` 只声明预算投影参与性、调额类和释放类。
 
 当前代码映射：Spend Rule DSL v1.1 示例均为 `fixtureLevel=DOC_ONLY`，用于锁定产品和测试契约，不等同于当前 Controller 报文、数据库列或可执行规则引擎。当前服务层把规则版本正文落到 `ruleSpec / ruleDigest`，把规则挂载自身流水落到 `sn`，把决策证据落到单条 `SpendRuleDecisionRecord` 记录；决策证据引用挂载时使用 `spendRuleBindingSn`。`evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 是目标解释契约，未作为独立明细或字段完成落库。后续若把 DOC_ONLY DSL 升级为机器契约，必须新增 fixture、解析器、测试和独立工程边界。
 

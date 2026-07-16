@@ -941,7 +941,7 @@ Spend Control Movement 是控制事实 DSL，不是资金事实 DSL。它只描�
 | 控制事实 DSL 字段 | 含义 | 禁止 |
 | --- | --- | --- |
 | `movementSn` | 控制额度变动幂等流水。 | 复用资金交易流水替代控制额度变动流水。 |
-| `movementType` | `ADMISSION_RECORDED`、`REJECTED_RECORDED`、`RESERVED`、`CONSUMED`、`RELEASED`、`EXPIRED`、`REVERSED` 等控制动作；`CONSUMED` 表示交易成功后的控制额度消耗，是否写入实现以工程边界和测试证据为准。 | 用控制动作表达真实资金消费、入账、冻结或调账；把交易成功消耗和失败释放混用同一变动类型。 |
+| `movementType` | `LIMIT_INCREASED`、`LIMIT_DECREASED`、`RESERVED`、`CONSUMED`、`REFUND_COMPENSATED`、`RELEASED` 控制额度变动；`RELEASED` 只承接可信业务释放事实。 | 用控制动作表达真实资金消费、入账、冻结或调账；把交易失败、拒绝或超时写成控制释放。 |
 | `targetSubjectRef` | 已解析资金账户、信用账户或平台角色解析后的平台资金账户。 | 支出控制范围、Spend Rule、支付工具、卡号、PAN、token 或外部账户成为目标主体。 |
 | `spendControlScopeRef` / `ruleRef` | 预算控制 scope、规则 ID、规则版本和规则决策证据。 | 规则通过直接生成 route、posting、entry 或余额投影。 |
 | `transactionRef` / `originalMovementRef` | 交易后控制消费、释放或退款释放时回链原资金交易和原控制额度变动。 | 缺原控制额度变动或原交易时补写控制消费事实，或由控制额度变动反向修改交易事实。 |

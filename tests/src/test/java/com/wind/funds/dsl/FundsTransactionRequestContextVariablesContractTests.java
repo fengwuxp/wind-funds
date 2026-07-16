@@ -125,6 +125,20 @@ class FundsTransactionRequestContextVariablesContractTests {
     }
 
     /**
+     * 场景：手续费退回需要沿原费用路径回放金额事实。
+     * 预期：请求统一使用 TransactionAmount，不保留只能表达同币种金额的 amount 字段。
+     */
+    @Test
+    void testFeeRefundShouldUseTransactionAmount() throws NoSuchFieldException {
+        Field transactionAmount = FundsTransactionFeeRefundRequest.class.getDeclaredField("transactionAmount");
+
+        assertThat(transactionAmount.getType()).isEqualTo(TransactionAmount.class);
+        assertThat(Arrays.stream(FundsTransactionFeeRefundRequest.class.getDeclaredFields())
+                .map(Field::getName))
+                .doesNotContain("amount");
+    }
+
+    /**
      * 场景：调用方不传交易请求上下文。
      * 预期：请求对象保留 null，以维持服务层“无额外上下文”的语义。
      */

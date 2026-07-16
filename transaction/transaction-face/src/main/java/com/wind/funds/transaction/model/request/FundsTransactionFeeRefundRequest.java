@@ -2,7 +2,6 @@ package com.wind.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -10,6 +9,9 @@ import lombok.experimental.Accessors;
 
 /**
  * 资金交易手续费退回请求。
+ *
+ * <p>{@link #transactionAmount} 表达本次退回金额及原手续费事实使用的汇率快照，不触发实时询价。
+ * 同币种手续费使用 {@link TransactionAmount#sameCurrency(com.wind.transaction.core.Money)} 构造。</p>
  */
 @Data
 @Accessors(chain = true)
@@ -19,9 +21,9 @@ public class FundsTransactionFeeRefundRequest {
     @NotNull
     private FundsAccountId accountId;
 
-    @Schema(description = "退回手续费金额")
+    @Schema(description = "退回手续费交易金额，跨币种时复用原手续费事实的汇率快照")
     @NotNull
-    private Money amount;
+    private TransactionAmount transactionAmount;
 
     @Schema(description = "原手续费事实所在资金交易流水号")
     @NotNull

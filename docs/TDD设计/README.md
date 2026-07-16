@@ -97,7 +97,7 @@ TDD 设计的准入目标是证明设计已经能转成真实测试资产和验�
 
 TDD 评审口径：TDD 入口必须承接 PRD 目标、DSL 契约和系分落点，并能进入测试资产分析和 Red 排序。进入编码前仍需工程任务明确写入范围、禁止范围、目标测试资产、验证命令和未覆盖范围；未确认时只能产出测试设计、契约草案或 dry-run。
 
-Spend Rule 测试设计优先引用独立产品分册 09、系分分册 06 和 DSL README 的 Spend Rule DSL v1.1：TDD 只把规则定义、不可变版本、挂载 scope、决策记录、控制额度变动流水、预算控制投影和只读解释转成可执行断言，不在交易路由主线或测试夹具中重新发明规则模型。当前代码兼容名 `SpendRuleDecisionRecord`、`SpendControlMovement` 分别对应产品语义 `SpendRuleDecisionRecord`、`SpendControlMovement`；预算控制投影必须证明 `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`，且额度调减不能低于已使用和已占用控制金额之和。新写入测试必须证明 `ADMISSION_RECORDED`、`REJECTED_RECORDED` 不能再通过控制额度变动流水入口记录，准入和拒绝证据应进入 Spend Rule 决策记录。`SpendControlMovementTypeContractTests` 是当前兼容期的最小枚举契约测试资产，必须证明兼容决策类型不参与预算控制投影，控制额度变动类型统一解释为 `SpendControlMovement`，调额类和释放类只作为控制额度变动流水子集；application 实现必须消费枚举分类方法，不得在实现类中重新硬编码类型集合。
+Spend Rule 测试设计优先引用独立产品分册 09、系分分册 06 和 DSL README 的 Spend Rule DSL v1.1：TDD 只把规则定义、不可变版本、挂载 scope、决策记录、控制额度变动流水、预算控制投影和只读解释转成可执行断言，不在交易路由主线或测试夹具中重新发明规则模型。`SpendRuleDecisionRecord` 只承载准入和拒绝决策，`SpendControlMovement` 只承载额度调整、预留、消耗、退款补偿和可信释放；预算控制投影必须证明 `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`，且额度调减不能低于已使用和已占用控制金额之和。`SpendControlMovementTypeContractTests` 必须证明枚举只包含真实控制额度变动类型，调额类和释放类只作为控制额度变动流水子集；application 实现必须消费枚举分类方法，不得在实现类中重新硬编码类型集合。
 
 当前 Spend Rule 服务层测试证据口径：
 
@@ -326,7 +326,7 @@ TDD 设计区分“目标测试资产”和“执行证据”。目标测试资�
 | --- | --- | --- | --- |
 | 基线核验 | 证明测试环境、H2 schema、现有测试资产和验证命令可用。 | `just mvn-version`、目标测试可定位、fixture 可读取、任务范围可解释。 | 不新增生产实现、测试代码或 schema。 |
 | 直接交易 | 证明直接交易成功和失败的资金事实链。 | 交易状态、route snapshot、posting plan、ledger transaction、ledger entry、余额投影、幂等和审计；余额不足、规则不唯一或重复请求无副作用。 | 清结算、对账、归档、P2 业务能力包。 |
-| 授权交易 | 证明授权完成、部分完成、撤销、过期、退款和拒付的状态与金额边界。 | 授权拒绝不生成 route/entry；累计完成不超授权；撤销/过期释放剩余占用；逆向沿原 route snapshot。 | 商户结算单、出款单、外部卡组织完整规则。 |
+| 授权交易 | 证明授权完成、部分完成、可信撤销、过期异常、退款和拒付的状态与金额边界。 | 授权拒绝不生成 route/entry；累计完成不超授权；可信撤销沿原快照释放；过期事件不产生资金释放；逆向沿原 route snapshot。 | 商户结算单、出款单、外部卡组织完整规则。 |
 | 余额控制 | 证明冻结、解冻、调整和失败路径不改变资金语义。 | 冻结只做同主体 `AVAILABLE <-> FROZEN`；解冻不产生跨主体转移；调整必须有审批、原因、审计和幂等；失败不写 entry。 | 对账差错调账和运营补事实白名单，除非独立任务确认。 |
 | DSL 执行化 | 证明交付引用的 caseId 不只是文档样例。 | 每个引用 caseId 有 fixture 级别、路径、目标测试类、核心断言和未覆盖范围；被测试读取后才声明机器契约通过。 | 未纳入任务范围的历史 caseId 全量清理。 |
 | 清结算与对账 | 独立证明对账、差错、清分、清算、结算、出款和追偿闭环。 | `CLS-GATE-*`、`TDD-B7-RED-*`、DDL/H2、服务级 H2 流程、并发重跑、权限审计、外部规则和人工处理。 | 不混入交易主线；不把出款前准入设计当完整生命周期。 |

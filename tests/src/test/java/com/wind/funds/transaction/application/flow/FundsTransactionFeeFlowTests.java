@@ -11,6 +11,7 @@ import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.request.FundsTransactionFeeRefundRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionFeeRequest;
+import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.core.WritableContextVariables;
 import com.wind.funds.ledger.enums.EntrySide;
@@ -272,7 +273,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .getFundsTransactionSn();
         assertThatThrownBy(() -> directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
                 .setAccountId(payer)
-                .setAmount(Money.immutable(5L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(5L, CURRENCY)))
                 .setFeeSourceTransactionSn(feeSourceTransactionSn)
                 .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
                         Map.of("networkReference", "GB82WEST12345698765432"))))
@@ -349,7 +350,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .getFundsTransactionSn();
 
         assertThatThrownBy(() -> directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
-                .setAmount(Money.immutable(5L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(5L, CURRENCY)))
                 .setFeeSourceTransactionSn(feeSourceTransactionSn)
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn("FEE_REFUND_MISSING_ACCOUNT_RETURN")
@@ -421,7 +422,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
                 .setAccountId(externalAccount)
-                .setAmount(Money.immutable(5L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(5L, CURRENCY)))
                 .setFeeSourceTransactionSn(feeSourceTransactionSn)
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn("FEE_REFUND_EXTERNAL_ACCOUNT_RETURN")
@@ -487,7 +488,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
                 .setAccountId(payer)
-                .setAmount(Money.immutable(5L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(5L, CURRENCY)))
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn("FEE_REFUND_MISSING_SOURCE_RETURN")
                 .setDescription("fee refund without source transaction"), WindOperator.system()))
@@ -551,7 +552,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
-                .setAmount(Money.immutable(5L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(5L, CURRENCY)))
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn("FEE_REFUND_MISSING_SOURCE_AND_ACCOUNT_RETURN")
                 .setDescription("fee refund without source transaction and account"), WindOperator.system()))
@@ -1201,7 +1202,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                                         String ruleVersion) {
         return directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
                 .setAccountId(accountId)
-                .setAmount(Money.immutable(amount, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
                 .setFeeSourceTransactionSn(feeSourceTransactionSn)
                 .setContextVariables(WritableContextVariables.of(Map.of("ruleVersion", ruleVersion)))
                 .setBusinessScene("FEE_REFUND")

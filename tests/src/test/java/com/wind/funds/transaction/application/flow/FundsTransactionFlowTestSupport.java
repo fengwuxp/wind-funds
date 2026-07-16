@@ -519,7 +519,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                                String businessSn) {
         return directTransactionService.refundFee(new FundsTransactionFeeRefundRequest()
                 .setAccountId(accountId)
-                .setAmount(amount(amount))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setFeeSourceTransactionSn(feeSourceTransactionSn)
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn(businessSn)

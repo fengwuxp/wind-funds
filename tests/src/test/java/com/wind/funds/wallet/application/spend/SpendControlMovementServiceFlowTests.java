@@ -85,8 +85,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     private static final String BUSINESS_SN = "SPEND_CONTROL_ACTIVITY_001";
 
-    private static final String REJECTED_BUSINESS_SN = "SPEND_CONTROL_ACTIVITY_REJECTED_001";
-
     private static final String SPEND_RULE_ID = "sr_vcc_activity_daily_limit";
 
     private static final String SPEND_RULE_VERSION = "2026-06-20.1";
@@ -102,10 +100,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     private static final String PERIOD_ID = "2026-07";
 
     private static final String NEXT_PERIOD_ID = "2026-08";
-
-    private static final String ADMISSION_ACTIVITY_SN = "activity_admission_recorded_001";
-
-    private static final String REJECTED_ACTIVITY_SN = "activity_rejected_recorded_001";
 
     private static final String RESERVED_ACTIVITY_SN = "activity_reserved_001";
 
@@ -129,50 +123,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
-
-    /**
-     * 场景：准入已记录类型误入控制额度变动流水写入入口。
-     * 输入：准入已通过，但变动类型为 ADMISSION_RECORDED。
-     * 输出：直接拒绝写入。
-     * 红线：Spend Rule 准入决策证据应记录为决策记录，不得继续写入控制额度变动流水。
-     */
-    @Test
-    void testRecordAdmissionDecisionMovementShouldRejectWithoutFundsSideEffect() {
-        prepareSpendControlMovementData();
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
-
-        assertThatThrownBy(() -> spendControlMovementService.recordMovement(
-                recordRequest(decision, ADMISSION_ACTIVITY_SN, SpendControlMovementType.ADMISSION_RECORDED,
-                        "sha256:activity-admission-recorded")))
-                .hasMessageContaining("Spend Rule 准入决策应记录为决策记录");
-
-        assertThat(activityCount(ADMISSION_ACTIVITY_SN)).isZero();
-        assertNoTransactionFacts(BUSINESS_SN);
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：拒绝已记录类型误入控制额度变动流水写入入口。
-     * 输入：准入被拒绝，变动类型为 REJECTED_RECORDED。
-     * 输出：直接拒绝写入。
-     * 红线：拒绝原因属于 Spend Rule 决策记录，不得继续写入控制额度变动流水。
-     */
-    @Test
-    void testRecordRejectedDecisionMovementShouldRejectWithoutFundsSideEffect() {
-        prepareSpendControlMovementData();
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        SpendControlAdmissionDecisionDTO decision = rejectedDecision(REJECTED_BUSINESS_SN);
-
-        assertThatThrownBy(() -> spendControlMovementService.recordMovement(
-                recordRequest(decision, REJECTED_ACTIVITY_SN, SpendControlMovementType.REJECTED_RECORDED,
-                        "sha256:activity-rejected-recorded")))
-                .hasMessageContaining("Spend Rule 准入决策应记录为决策记录");
-
-        assertThat(activityCount(REJECTED_ACTIVITY_SN)).isZero();
-        assertNoTransactionFacts(REJECTED_BUSINESS_SN);
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
 
     /**
      * 场景：同一控制额度变动流水按相同摘要重放。
@@ -576,10 +526,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     private SpendControlAdmissionDecisionDTO admittedDecision(String businessSn) {
         return decision(businessSn, SpendControlDecisionResult.PASSED, null);
-    }
-
-    private SpendControlAdmissionDecisionDTO rejectedDecision(String businessSn) {
-        return decision(businessSn, SpendControlDecisionResult.REJECTED, "超过单卡单日授权限额");
     }
 
     private SpendControlAdmissionDecisionDTO decision(String businessSn,

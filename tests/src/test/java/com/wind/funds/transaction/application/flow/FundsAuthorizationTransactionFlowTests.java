@@ -37,6 +37,8 @@ import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -61,6 +63,73 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 授权交易业务流测试。
  */
 class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSupport {
+
+    @Test
+    void testPartialFxAuthorizationRefundShouldReuseSnapshotRate() {
+        FundsAccountId user = fundingAccount("funding_user");
+        topup(user, 325L, "FX_AUTH_REFUND_TOPUP");
+        String authorizationSn = authorizationTransactionService.authorize(
+                new FundsAuthorizationTransactionAuthorizeRequest()
+                        .setAccountId(user)
+                        .setTransactionAmount(TransactionAmount.converted(
+                                Money.immutable(325L, CurrencyIsoCode.USD),
+                                Money.immutable(1_000L, CurrencyIsoCode.KWD),
+                                new BigDecimal("3.25")))
+                        .setApproved(true)
+                        .setBusinessScene("AUTHORIZATION")
+                        .setBusinessSn("FX_AUTH_REFUND_AUTHORIZE"), WindOperator.system());
+        authorizationTransactionService.settle(new FundsAuthorizationTransactionSettleRequest()
+                .setAccountId(user)
+                .setTransactionAmount(TransactionAmount.converted(
+                        Money.immutable(325L, CurrencyIsoCode.USD),
+                        Money.immutable(1_000L, CurrencyIsoCode.KWD),
+                        new BigDecimal("3.25")))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setBusinessScene("AUTHORIZATION_SETTLE")
+                .setBusinessSn("FX_AUTH_REFUND_SETTLE"), WindOperator.system());
+
+        authorizationTransactionService.settleRefund(new FundsAuthorizationTransactionRefundRequest()
+                .setAccountId(user)
+                .setTransactionAmount(TransactionAmount.converted(
+                        Money.immutable(100L, CurrencyIsoCode.USD),
+                        Money.immutable(308L, CurrencyIsoCode.KWD),
+                        new BigDecimal("3.25")))
+                .setAuthorizationTransactionSn(authorizationSn)
+                .setBusinessScene("AUTHORIZATION_REFUND")
+                .setBusinessSn("FX_AUTH_REFUND_RETURN"), WindOperator.system());
+
+        LedgerTransaction refundTransaction = ledgerTransactionByBusinessSn("FX_AUTH_REFUND_RETURN");
+        assertThat(refundTransaction.getAmount()).isEqualTo(100L);
+        assertThat(refundTransaction.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+        assertThat(refundTransaction.getOriginalAmount()).isEqualTo(308L);
+        assertThat(refundTransaction.getOriginalCurrency()).isEqualTo(CurrencyIsoCode.KWD);
+        assertThat(refundTransaction.getExchangeRate()).isEqualByComparingTo("3.25");
+        assertBucket(balance(user), LedgerSubjectCode.AVAILABLE, 100L, CurrencyIsoCode.USD);
+        assertBucket(balance(user), LedgerSubjectCode.AUTHORIZATION, 0L, CurrencyIsoCode.USD);
+        assertBucket(balance(settlementAccount()), LedgerSubjectCode.SETTLEMENT, 225L, CurrencyIsoCode.USD);
+
+        BalanceSnapshot beforeFailure = snapshot(balances(user, settlementAccount()));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+        assertThatThrownBy(() -> authorizationTransactionService.settleRefund(
+                new FundsAuthorizationTransactionRefundRequest()
+                        .setAccountId(user)
+                        .setTransactionAmount(TransactionAmount.converted(
+                                Money.immutable(50L, CurrencyIsoCode.USD),
+                                Money.immutable(152L, CurrencyIsoCode.KWD),
+                                new BigDecimal("3.30")))
+                        .setAuthorizationTransactionSn(authorizationSn)
+                        .setBusinessScene("AUTHORIZATION_REFUND")
+                        .setBusinessSn("FX_AUTH_REFUND_RATE_CHANGED"), WindOperator.system()))
+                .hasMessageContaining("退款汇率必须与原支付快照汇率一致");
+
+        BalanceSnapshot afterFailure = snapshot(balances(user, settlementAccount()));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(user, LedgerSubjectCode.AVAILABLE, 0L, CurrencyIsoCode.USD),
+                delta(user, LedgerSubjectCode.AUTHORIZATION, 0L, CurrencyIsoCode.USD),
+                delta(settlementAccount(), LedgerSubjectCode.SETTLEMENT, 0L, CurrencyIsoCode.USD));
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("FX_AUTH_REFUND_RATE_CHANGED");
+    }
 
     /**
      * 场景：风控或额度判断拒绝授权。

@@ -506,8 +506,6 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 
 | 当前 movementType | 目标语义 | 是否参与预算控制投影 | 说明 |
 | --- | --- | --- | --- |
-| ADMISSION_RECORDED | 决策记录兼容活动 | 否 | 记录准入已留痕，本质接近 SpendRuleDecisionRecord。 |
-| REJECTED_RECORDED | 决策记录兼容活动 | 否 | 记录拒绝原因，本质接近 SpendRuleDecisionRecord。 |
 | LIMIT_INCREASED | 控制额度调增流水 | 是 | 增加当前周期或 scope 的控制额度。 |
 | LIMIT_DECREASED | 控制额度调减流水 | 是 | 减少当前周期或 scope 的控制额度。 |
 | RESERVED | 控制预留流水 | 是 | 授权或付款前占用控制额度。 |
@@ -526,8 +524,8 @@ Spend Rule DSL v1.1 在系统上拆成三个稳定契约，不把 JSON 直接等
 7. `controlScopeId` 是公共契约、控制流水和投影的统一控制范围标识，落库字段为 `control_scope_id`。
 8. `period_id` 只表达 Spend Rule 控制周期，不创建支出控制范围账本，也不复用 ledger bucket 作为控制事实。
 9. 若未来将 `remainingControlAmount` 改名为 `occupiedControlAmount`，必须单独评估公共 DTO、表字段、测试和调用方兼容。
-10. `SpendControlMovementService#recordMovement` 不接受新的 `ADMISSION_RECORDED` 或 `REJECTED_RECORDED` 写入；历史兼容类型只用于存量解释、查询或迁移前审计。
-11. `SpendControlMovementType` 是控制额度变动的工程分类契约，必须由枚举自身表达 `budgetProjectionMovement`、`limitAdjustmentMovement`、`releaseMovement` 和 `decisionRecordType`；application 实现只能消费这些分类方法，不得在实现类中重复硬编码类型集合；释放类只保留 `RELEASED`。
+10. 准入和拒绝证据只写入 `SpendRuleDecisionRecord`，不进入 `SpendControlMovementService#recordMovement`。
+11. `SpendControlMovementType` 是控制额度变动的工程分类契约，必须由枚举自身表达 `budgetProjectionMovement`、`limitAdjustmentMovement` 和 `releaseMovement`；application 实现只能消费这些分类方法，不得在实现类中重复硬编码类型集合；释放类只保留 `RELEASED`。
 
 ## 7. 状态机、主流程和异常流程
 
@@ -686,7 +684,6 @@ flowchart TD
 | --- | --- | --- |
 | 公共命名 | 当前代码、表结构和 DTO 使用 `SpendRuleDecisionRecord` / `SpendControlMovement` 作为最终交付命名。 | 若未来再次改公共类名、表名或 DTO 字段，必须单独 工程边界，提供兼容发布、调用方清单和回滚。 |
 | DSL v1.1 | 当前 JSON 样例为 `DOC_ONLY`，不等同于 Controller 报文或机器契约。 | 升级为可执行 DSL 前必须新增 fixture、解析器、规则执行器安全评估、测试和回放策略。 |
-| 历史准入 activity | `ADMISSION_RECORDED`、`REJECTED_RECORDED` 仅作存量解释，不允许新写入控制流水。 | 生产迁移需给出存量清查、只读解释、回填或归档策略。 |
 | 表结构和索引 | 本文只描述当前服务层目标结构，不授权生产 DDL。 | 生产迁移必须包含 DDL、H2、数据校验、双版本兼容、灰度开关、回滚 SQL 或禁写策略。 |
 | 灰度和回滚 | 当前范围不配置运行时开关。 | 生产启用需具备按租户、规则域、支付工具类型或业务场景灰度；回滚必须能停止新规则挂载和新决策写入。 |
 

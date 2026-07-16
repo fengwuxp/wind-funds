@@ -131,9 +131,6 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
         AssertUtils.hasText(request.getMovementSn(), "控制额度变动流水号不能为空");
         AssertUtils.notNull(request.getMovementType(), "控制额度变动类型不能为空");
-        AssertUtils.isFalse(request.getMovementType().isDecisionRecordType(),
-                "Spend Rule 准入决策应记录为决策记录，不应写入控制额度变动流水，movementSn = {}",
-                request.getMovementSn());
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
         AssertUtils.notNull(request.getTargetAccountId(), "控制额度变动目标账户不能为空");

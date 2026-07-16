@@ -354,7 +354,7 @@ flowchart LR
 | 支付工具注册 | 创建、激活、暂停、关闭 VCC 卡，并保存 issuer / processor 安全引用。 | 保存 `PaymentInstrumentRef`、脱敏展示、工具状态、方向、币种、能力、绑定版本、子账户引用和父账户引用。 | 把卡、卡 token、持卡人或卡组建成账本主体。 |
 | 资金责任解析 | 按服务计划、托管模式、业务审批、预算策略、预付责任、子账户 profile 和父账户约束提供上下文。 | 用 `FundingAllocationDecision` 解析 VCC 关联子账户背后的父级资金账户、父级信用账户、平台责任账户或 product funding / source account；支出控制范围和 Spend Rule 只作为控制上下文。 | 用卡产品形态反推出账户类型，或把支出控制范围、Spend Rule 写入 ledger subject。 |
 | 授权交易 | 接收授权请求，做来源校验、脱敏、幂等、规则上下文、商户/MCC/地区等场景归一。 | 提供 `authorizeByInstrument` 或等价 application facade，完成工具准入、绑定快照、资金责任解析、账户能力校验，再委派账户主体型授权内核。 | 把 `FundsAuthorizationTransactionService` 的 canonical 请求整体改成支付工具入参，或新增统一支付工具交易内核。 |
-| 清算、退款和争议裁决资金结果 | 归一 clearing、partial clearing、force capture、refund、chargeback、fee 和外部规则确认。 | 按原授权和原 route snapshot 完成 settle、release、expire、refund、差错、费用、追偿、对账和投影；chargeback 过程本身不直接成为交易层主入口。 | 按当前卡绑定重新选路，或让 VCC 表替代资金交易、账本、清结算、对账事实。 |
+| 清算、退款和争议裁决资金结果 | 归一 clearing、partial clearing、force capture、refund、chargeback、fee 和外部规则确认。 | 按原授权和原 route snapshot 完成 settle、可信 reversal / void 释放、refund、差错、费用、追偿、对账和投影；到期只进入异常处理，chargeback 过程本身不直接成为交易层主入口。 | 按当前卡绑定重新选路，或让 VCC 表替代资金交易、账本、清结算、对账事实。 |
 | 卡账单和运营视图 | 提供卡、持卡人、企业、服务计划和 issuer 侧解释字段。 | 通过统一交易投影按子账户、父账户、`PaymentInstrumentRef`、绑定版本、支出控制范围、Spend Rule 和资金责任决策生成只读视图。 | 给卡号、PAN 或 token 建立独立账本、独立余额或独立资金流水事实源。 |
 
 ### 12.2 fincone-issuing 接入 wind-funds 的业务链路
@@ -415,7 +415,7 @@ VCC 场景可以增加面向支付工具的 application facade，用于承接上
 | --- | --- | --- | --- |
 | authorizeByInstrument | 用 VCC 卡、共享卡或预付卡发起授权。 | 支付工具准入、绑定快照、Spend Rule 和预算控制、资金责任解析、账户能力校验后，委派账户主体型授权服务。 | 不把 `FundsAuthorizationTransactionService` 的 canonical 请求整体改成支付工具入参。 |
 | settleInstrumentAuthorization | 对原授权做 clearing、部分 clearing、费用或受控强制完成。 | 基于原授权、原 route snapshot 和原资金责任决策完成 settle。 | 不按当前卡绑定重新选路。 |
-| releaseInstrumentAuthorization | 对 reversal、void、expire 做授权释放。 | 基于原授权释放 AUTHORIZATION。 | 不释放已清算金额，不跨主体转移价值。 |
+| releaseInstrumentAuthorization | 对可信 reversal、void 或清算剩余做授权释放。 | 基于原授权释放 AUTHORIZATION。 | 到期或超时不得调用；不释放已清算金额，不跨主体转移价值。 |
 | refundInstrumentTransaction | 对已清算交易做退款。 | 基于原 route snapshot 回放退款。 | 不把退款按当前卡绑定、当前预算或当前 Spend Rule 重算。 |
 | postPrepaidFunding | 记录预付资金充值、系统钱包转入或外部确认入金。 | 转换为账户主体型直接交易、充值或内部转账。 | 外部未确认入金不得增加可用余额。 |
 | unloadPrepaidFunding | 记录预付资金提现、退回或转出。 | 转换为账户主体型提现、退款或内部转账。 | 发卡侧卡余额变化不等于资金底座可直接扣款，必须有确认事件和幂等引用。 |
@@ -571,7 +571,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | authorization approved | 固化使用人、绑定版本、支出控制范围、Spend Rule、信用子账户、父账户和资金责任决策。 | 固化资金子账户、父账户、预付资金来源和余额责任。 | 批准只占用 AUTHORIZATION，不代表清算入账。 |
 | authorization declined | 记录拒绝原因、规则版本和使用人归因。 | 记录余额不足、资金责任缺失或规则拒绝。 | 拒绝无 route、posting、LedgerEntry。 |
-| reversal / expire | 按原授权释放剩余占用。 | 按原授权释放资金子账户占用。 | 只能同主体 `AUTHORIZATION -> AVAILABLE`，不表达消费或转账。 |
+| trusted reversal / void | 按原授权释放剩余占用。 | 按原授权释放资金子账户占用。 | 只能同主体 `AUTHORIZATION -> AVAILABLE`，不表达消费或转账；到期或超时只进入异常、对账或人工处理。 |
 | clearing / presentment | 按原快照核销授权并生成实际入账。 | 按原资金子账户核销授权并生成消费。 | 无原授权、超额或规则未确认时进入差错。 |
 | refund | 退款归回原子账户，卡侧只生成投影。 | 退款归回原资金子账户。 | 退款必须原路径回放。 |
 | chargeback | 形成独立争议、扣回、费用或追偿。 | 形成子账户上的争议扣回或追偿。 | chargeback 不等同 refund，防重复损失。 |

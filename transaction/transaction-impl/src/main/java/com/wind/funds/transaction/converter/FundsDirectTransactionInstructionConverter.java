@@ -290,7 +290,8 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
                 "手续费退回到账账户不能是外部账户");
         assertNotSpendControlScope(request.getAccountId(), "手续费退回到账账户不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)

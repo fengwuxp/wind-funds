@@ -150,6 +150,46 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 225L, CurrencyIsoCode.USD);
     }
 
+    @Test
+    void testPartialFxRefundWithChangedRateShouldRejectWithoutFundsSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("fx_refund_rate_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 325L, "FX_REFUND_RATE_TOPUP");
+        String payTransactionSn = directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(payer)
+                .setPayeeId(payee)
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.converted(
+                        Money.immutable(325L, CurrencyIsoCode.USD),
+                        Money.immutable(1_000L, CurrencyIsoCode.KWD),
+                        new BigDecimal("3.25")))
+                .setBusinessScene("PAY")
+                .setBusinessSn("FX_REFUND_RATE_PAY"), WindOperator.system());
+        BalanceSnapshot beforeFailure = snapshot(balances(payer, payee));
+        LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.converted(
+                        Money.immutable(100L, CurrencyIsoCode.USD),
+                        Money.immutable(303L, CurrencyIsoCode.KWD),
+                        new BigDecimal("3.30")))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("FX_REFUND_RATE_CHANGED"), WindOperator.system()))
+                .hasMessageContaining("退款汇率必须与原支付快照汇率一致");
+
+        BalanceSnapshot afterFailure = snapshot(balances(payer, payee));
+        assertOnlyBalanceDeltas(beforeFailure, afterFailure,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CurrencyIsoCode.USD),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CurrencyIsoCode.USD));
+        assertLedgerTransactionFactsUnchanged(beforeFailureFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("FX_REFUND_RATE_CHANGED");
+    }
+
     /**
      * 场景：用户充值后向普通收款方付款，随后收款方发起部分退款。
      * 输入：充值 100、付款 70、部分退款 30。

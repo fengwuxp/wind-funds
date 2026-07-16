@@ -12,44 +12,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SpendControlMovementTypeContractTests {
 
     /**
-     * 场景：历史准入和拒绝活动类型仍存在于枚举中。
-     * 预期：它们只解释为决策记录兼容类型，不参与新的控制额度变动流水。
-     * 红线：不得再次把准入或拒绝证据写入预算控制投影。
-     */
-    @Test
-    void testDecisionRecordCompatibilityTypesShouldNotBeControlMovements() {
-        EnumSet<SpendControlMovementType> decisionRecordCompatibilityTypes = EnumSet.of(
-                SpendControlMovementType.ADMISSION_RECORDED,
-                SpendControlMovementType.REJECTED_RECORDED);
-
-        assertThat(decisionRecordCompatibilityTypes)
-                .allSatisfy(type -> {
-                    assertThat(type.getProductSemantic()).isEqualTo("SpendRuleDecisionRecord");
-                    assertThat(type.isDecisionRecordType()).isTrue();
-                    assertThat(type.isBudgetProjectionMovement()).isFalse();
-                    assertThat(type.isControlMovement()).isFalse();
-                    assertThat(type.isLimitAdjustmentMovement()).isFalse();
-                    assertThat(type.isReleaseMovement()).isFalse();
-                });
-    }
-
-    /**
      * 场景：额度调整、预留、消耗、退款补偿和释放类活动进入控制额度变动流水。
-     * 预期：这些类型统一解释为 SpendControlMovement，并参与预算控制投影。
-     * 红线：控制额度变动流水不得退化成规则决策记录。
+     * 预期：枚举只包含真实控制额度变动类型，并全部参与预算控制投影。
+     * 红线：准入和拒绝决策不得作为控制额度变动类型保留。
      */
     @Test
-    void testControlMovementTypesShouldParticipateInBudgetProjection() {
-        EnumSet<SpendControlMovementType> movementTypes = EnumSet.complementOf(EnumSet.of(
-                SpendControlMovementType.ADMISSION_RECORDED,
-                SpendControlMovementType.REJECTED_RECORDED));
+    void testOnlyControlMovementTypesShouldBeDeclared() {
+        EnumSet<SpendControlMovementType> movementTypes = EnumSet.allOf(SpendControlMovementType.class);
 
         assertThat(movementTypes)
+                .containsExactly(
+                        SpendControlMovementType.LIMIT_INCREASED,
+                        SpendControlMovementType.LIMIT_DECREASED,
+                        SpendControlMovementType.RESERVED,
+                        SpendControlMovementType.CONSUMED,
+                        SpendControlMovementType.REFUND_COMPENSATED,
+                        SpendControlMovementType.RELEASED)
                 .allSatisfy(type -> {
-                    assertThat(type.getProductSemantic()).isEqualTo("SpendControlMovement");
                     assertThat(type.isControlMovement()).isTrue();
                     assertThat(type.isBudgetProjectionMovement()).isTrue();
-                    assertThat(type.isDecisionRecordType()).isFalse();
                 });
     }
 

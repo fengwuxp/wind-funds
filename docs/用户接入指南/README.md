@@ -49,7 +49,7 @@
 | `ledger` 账本主链 | 可接入。 | 建账、过账、账本交易、分录查询和余额投影。 | 业务场景必须提供账务主体、账目、币种、幂等和 posting 平衡验收。 |
 | `wallet` 账户和支付工具 | 可接入。 | 资金账户、信用账户、账户能力、支付工具能力、绑定快照和交易前快照。 | 支付工具只做引用和准入快照，不作为账本主体；敏感数据不得进入 request、日志和投影。 |
 | `wallet` 资金责任 | 可接入。 | 按支出主体解析资金账户或信用账户责任主体。 | 多资金责任、错币种、停用账户和冲突优先级必须在准入前失败。 |
-| `wallet` Spend Rule / 预算控制 | 受控试点可用。 | 单条规则只读评估、最终决策固化、周期额度流水、消费/释放/退款补偿和控制投影查询。 | 多规则组合裁决、强一致授权拦截、rolling amount、cooldown、外部协同授权和生产调度由上游或专项承接。 |
+| `wallet` Spend Rule / 预算控制 | 受控试点可用。 | 单条规则只读评估、最终决策固化、周期额度流水、交易消费、退款补偿、可信控制释放和控制投影查询。 | 多规则组合裁决、强一致授权拦截、rolling amount、cooldown、外部协同授权和生产调度由上游或专项承接。 |
 | `transaction` 直接交易 | 可接入。 | 充值、转账、付款、退款、提现、手续费和退费。 | 外部 pending、审批中或通道处理中不得进入交易事实。 |
 | `transaction` 授权交易 | 可接入。 | 授权、撤销、完成和完成后退款，后继动作基于原路径。 | 授权拒绝不得生成 route、posting、ledger entry；清算、争议和强制完成需按专项边界确认。 |
 | `transaction` 余额控制 | 可接入。 | 冻结、解冻、受控余额调整和失败无副作用。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`，不表达扣款、消费或跨主体转移。 |
@@ -158,7 +158,7 @@
 
 当前接入口径：接入方先完成规则判断或外部风控判断，`wallet` 只固化 Spend Rule 决策证据、控制额度流水和只读投影；如接入方只需要单条已发布规则的轻量评估，可先调用 `SpendRuleEvaluationApplicationService.evaluate` 覆盖单笔金额、周期金额可用额度、周期次数、滚动窗口次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填、AVS 邮编校验结果、币种黑白名单和本地授权时间窗口判断，再把最终决策证据交给准入服务固化。每个被 `evaluate` 的 `ruleSpec` 只允许一个可执行控制项；金额、MCC、币种、时间窗口等组合裁决需要拆成多条规则由上游合成最终结果。该 evaluator 只提供只读候选评估，不提供并发强一致授权拦截；本文不承诺 Highnote 式托管规则引擎、rolling amount、cooldown、生产调度或协同授权 webhook。
 
-金额和事件口径：`EvaluateSpendRuleRequest.amount` 是调用方已归一后的本次评估金额。卡授权接入方如果区分 requested amount 和 authorized amount，必须先在上游确定进入支出控制的金额口径，再传入 evaluator；wallet 不从外部原始网络字段、退款、撤销或 Highnote 式延迟结果中推导累计授权金额。周期额度、周期次数和滚动窗口次数只读取本系统已有 `SpendControlMovement` 与预算控制投影；交易成功、失败、撤销、过期和退款对控制事实的影响，继续由交易消费控制活动记录。
+金额和事件口径：`EvaluateSpendRuleRequest.amount` 是调用方已归一后的本次评估金额。卡授权接入方如果区分 requested amount 和 authorized amount，必须先在上游确定进入支出控制的金额口径，再传入 evaluator；wallet 不从外部原始网络字段、退款、撤销或 Highnote 式延迟结果中推导累计授权金额。周期额度、周期次数和滚动窗口次数只读取本系统已有 `SpendControlMovement` 与预算控制投影。交易成功通过交易消费入口记录 `CONSUMED`，退款成功记录 `REFUND_COMPENSATED`；交易失败或拒绝依赖同一资金事务回滚预留，不写释放补偿；到期或超时不写控制流水；可信撤销、清算剩余释放或差错补事实由上层显式调用控制流水服务记录 `RELEASED`。
 
 Velocity 控制口径：Highnote 的 `PER_TRANSACTION` 在本项目只对应本次评估；`DAILY` / `WEEKLY` / `MONTHLY` / `QUARTERLY` / `YEARLY` 由接入方生成稳定 `periodId` 后查询控制投影；滚动次数只按 `ROLLING + windowSizeMinutes` 做只读候选评估；`NINETY_DAYS`、`COOLDOWN_MINUTE`、`COOLDOWN_HOUR`、rolling amount 和 Highnote 的 velocity control 数量上限当前不是 wallet 硬约束。Highnote velocity balance 查询只对应 `BudgetControlProjectionDTO` 的控制口径，不是资金账户余额或账本余额。
 
@@ -200,7 +200,7 @@ AVS 邮编校验结果场景示例：电商卡要求账单邮编校验匹配，�
 
 受控试点角色交接：
 
-- 产品 owner 确认试点只包含单条规则评估、最终决策证据、控制流水、控制投影和交易消费 / 释放 / 退款补偿。
+- 产品 owner 确认试点只包含单条规则评估、最终决策证据、控制流水、控制投影、交易消费和退款补偿；可信控制释放由上层显式提交。
 - 架构 owner 确认接入方只依赖 `wallet-face`、`transaction-face`、`ledger-face` 和 `core`，不依赖 `*-impl`、Entity、Mapper 或内部包。
 - 测试 owner 回挂 evaluator、admission、movement、projection 和 transaction consumption 验证簇；进入发版前补 `just compile`，提交前补 `just pmd`。
 - 发布 owner 确认灰度、回滚、告警、Runbook 和人工接管；确认不完整时停在联调、预发或受控试点。
@@ -209,7 +209,7 @@ SC-LOOP-06 准出交接卡：
 
 | 交接项 | 结论 |
 | --- | --- |
-| 试点能力 | 单条规则只读评估、最终决策证据固化、控制流水、控制投影和交易消费 / 释放 / 退款补偿。 |
+| 试点能力 | 单条规则只读评估、最终决策证据固化、控制流水、控制投影、交易消费和退款补偿；可信控制释放由上层显式提交。 |
 | 推荐入口 | `evaluate` -> `resolve` -> `adjustLimit` -> 交易层入口 -> `consume`。 |
 | 生产前证据 | 规则变更审计、最终决策证据、历史窗口查询、告警 / Runbook、灰度 / 回滚。 |
 | 不接入范围 | P2 VCC / 全球账户 / ACH / 收单 / FX quote 与执行、Highnote 托管规则引擎、rolling amount、cooldown、协同授权 webhook、完整生产启用或上线审批。 |
@@ -220,7 +220,7 @@ SC-LOOP-06 准出交接卡：
 2. `SpendControlAdmissionApplicationService.resolve` 固化最终支出控制决策
 3. `BudgetControlLimitAdjustmentApplicationService.adjustLimit` 记录周期控制额度调增或调减
 4. 交易层入口
-5. `SpendControlTransactionConsumptionApplicationService` 记录消费、释放或退款补偿事实
+5. `SpendControlTransactionConsumptionApplicationService` 记录交易消费或退款补偿事实；可信控制释放直接调用 `SpendControlMovementService`
 
 SpendControlScope 是控制范围，不是账本主体。接入侧使用 `controlScopeId + periodId` 查询额度，并在准入 / 授权请求中传入 `controlScopeId`。
 
