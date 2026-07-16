@@ -484,6 +484,11 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         if (isRefundReplay(replayRequest.getReplayType())) {
             AssertUtils.isTrue(exchangeRate.compareTo(sourceLeg.getExchangeRate()) == 0,
                     "RouteSnapshot 退款汇率必须与原支付快照汇率一致，legId = {}", sourceLeg.getLegId());
+            AssertUtils.isTrue(originalAmount.getAmount() <= sourceLeg.getOriginalAmount().getAmount(),
+                    "RouteSnapshot 退款原币金额不能大于原支付原币金额，legId = {}", sourceLeg.getLegId());
+            AssertUtils.isTrue(amount.getAmount() == sourceLeg.getAmount().getAmount()
+                            || originalAmount.getAmount() < sourceLeg.getOriginalAmount().getAmount(),
+                    "RouteSnapshot 部分退款原币金额必须小于原支付原币金额，legId = {}", sourceLeg.getLegId());
         }
         return ImmutableRouteLegSpec.builder()
                 .legId(legType.name() + REPLAY_LEG_ID_SEPARATOR + sourceLeg.getLegId())

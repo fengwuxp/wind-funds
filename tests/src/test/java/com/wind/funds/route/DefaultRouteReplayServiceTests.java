@@ -308,7 +308,7 @@ class DefaultRouteReplayServiceTests {
     }
 
     @Test
-    void testPartialFxRefundShouldUsePaymentSnapshotRate() {
+    void testPartialFxRefundShouldUsePaymentSnapshotFacts() {
         SubjectRef payer = fundingAccount("PAYER-FX-001");
         SubjectRef payee = fundingAccount("PAYEE-FX-001");
         RouteLegSpec sourceLeg = ImmutableRouteLegSpec.builder()
@@ -368,6 +368,21 @@ class DefaultRouteReplayServiceTests {
                         .contextVariables(Map.of())
                         .build()))
                 .hasMessageContaining("退款汇率必须与原支付快照汇率一致");
+
+        assertThatThrownBy(() -> routeReplayService.replay(snapshot,
+                ImmutableReplayRequestSpec.builder()
+                        .replayType(RouteReplayType.REFUND)
+                        .eventType(FundsTransactionEventType.REFUND)
+                        .businessScene("FX_REFUND")
+                        .businessSn("FX_PARTIAL_REFUND_FULL_ORIGINAL_AMOUNT")
+                        .referenceSnapshotId(snapshot.getSnapshotId())
+                        .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                        .originalAmount(Money.immutable(1_000L, CurrencyIsoCode.KWD))
+                        .exchangeRate(new BigDecimal("3.25"))
+                        .eventTime(LocalDateTime.of(2026, 5, 19, 1, 10))
+                        .contextVariables(Map.of())
+                        .build()))
+                .hasMessageContaining("部分退款原币金额必须小于原支付原币金额");
     }
 
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference) {
