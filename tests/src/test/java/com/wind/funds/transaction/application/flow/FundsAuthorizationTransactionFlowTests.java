@@ -1510,7 +1510,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         authorizationTransactionService.settleRefund(new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(user)
-                .setAmount(Money.immutable(40L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setAuthorizationTransactionSn(authorizationSn)
                 .setDisputeMode("CHARGEBACK")
                 .setDisputeReason("CARDHOLDER_DISPUTE")
@@ -1596,7 +1596,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThatThrownBy(() -> authorizationTransactionService.settleRefund(
                 new FundsAuthorizationTransactionRefundRequest()
                         .setAccountId(user)
-                        .setAmount(Money.immutable(40L, CURRENCY))
+                        .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                         .setAuthorizationTransactionSn(authorizationSn)
                         .setDisputeMode("CHARGEBACK")
                         .setDisputeReason("CARDHOLDER_DISPUTE")
@@ -2714,7 +2714,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                                                                             String businessSn) {
         return new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(accountId)
-                .setAmount(Money.immutable(amount, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(amount, CURRENCY)))
                 .setAuthorizationTransactionSn(authorizationTransactionSn)
                 .setDisputeMode("CHARGEBACK")
                 .setDisputeReason("CARDHOLDER_DISPUTE")

@@ -14,6 +14,7 @@ import com.wind.funds.model.route.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.model.route.ImmutableExternalAccountRefSpec;
 import com.wind.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
+import com.wind.funds.model.route.ImmutableReplayRequestSpec;
 import com.wind.funds.model.route.ImmutableRoutingDecisionSpec;
 import com.wind.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.funds.model.route.ImmutableRouteNodeSpec;
@@ -28,6 +29,7 @@ import com.wind.funds.route.enums.RouteNodeRole;
 import com.wind.funds.route.enums.RouteNodeType;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.enums.RouteReplayPolicy;
+import com.wind.funds.route.enums.RouteReplayType;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.SubjectRef;
@@ -49,6 +51,7 @@ import org.junit.jupiter.api.Test;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -302,6 +305,69 @@ class DefaultRouteReplayServiceTests {
                         "sha256:original-benefit-digest");
         assertThat(resolvedRoute.getContextVariables())
                 .doesNotContainKey("requestChannel");
+    }
+
+    @Test
+    void testPartialFxRefundShouldUsePaymentSnapshotRate() {
+        SubjectRef payer = fundingAccount("PAYER-FX-001");
+        SubjectRef payee = fundingAccount("PAYEE-FX-001");
+        RouteLegSpec sourceLeg = ImmutableRouteLegSpec.builder()
+                .legId("PAY")
+                .sequence(1)
+                .legType(RouteLegType.INTERNAL_TRANSFER)
+                .sourceNode(routeNode(payer, RouteNodeRole.SOURCE))
+                .targetNode(routeNode(payee, RouteNodeRole.TARGET))
+                .amount(Money.immutable(325L, CurrencyIsoCode.USD))
+                .originalAmount(Money.immutable(1_000L, CurrencyIsoCode.KWD))
+                .exchangeRate(new BigDecimal("3.25"))
+                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
+                .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
+                .constraintOverrides(Map.of())
+                .contextVariables(Map.of())
+                .build();
+        RouteSnapshotSpec snapshot = routeSnapshot(null,
+                null,
+                routingDecision("ALLOC-FX", payer, Money.immutable(325L, CurrencyIsoCode.USD)),
+                List.of(participant(RouteParticipantRole.PAYER, payer),
+                        participant(RouteParticipantRole.PAYEE, payee)),
+                List.of(sourceLeg),
+                Map.of());
+
+        ResolvedRouteSpec resolvedRoute = routeReplayService.replay(snapshot,
+                ImmutableReplayRequestSpec.builder()
+                        .replayType(RouteReplayType.REFUND)
+                        .eventType(FundsTransactionEventType.REFUND)
+                        .businessScene("FX_REFUND")
+                        .businessSn("FX_PARTIAL_REFUND_001")
+                        .referenceSnapshotId(snapshot.getSnapshotId())
+                        .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                        .originalAmount(Money.immutable(308L, CurrencyIsoCode.KWD))
+                        .exchangeRate(new BigDecimal("3.25"))
+                        .eventTime(LocalDateTime.of(2026, 5, 19, 1, 0))
+                        .contextVariables(Map.of())
+                        .build());
+
+        assertThat(resolvedRoute.getLegs()).singleElement().satisfies(leg -> {
+            assertThat(leg.getAmount()).isEqualTo(Money.immutable(100L, CurrencyIsoCode.USD));
+            assertThat(leg.getOriginalAmount()).isEqualTo(Money.immutable(308L, CurrencyIsoCode.KWD));
+            assertThat(leg.getExchangeRate()).isEqualByComparingTo("3.25");
+        });
+
+        assertThatThrownBy(() -> routeReplayService.replay(snapshot,
+                ImmutableReplayRequestSpec.builder()
+                        .replayType(RouteReplayType.REFUND)
+                        .eventType(FundsTransactionEventType.REFUND)
+                        .businessScene("FX_REFUND")
+                        .businessSn("FX_PARTIAL_REFUND_CHANGED_RATE")
+                        .referenceSnapshotId(snapshot.getSnapshotId())
+                        .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                        .originalAmount(Money.immutable(303L, CurrencyIsoCode.KWD))
+                        .exchangeRate(new BigDecimal("3.30"))
+                        .eventTime(LocalDateTime.of(2026, 5, 19, 1, 5))
+                        .contextVariables(Map.of())
+                        .build()))
+                .hasMessageContaining("退款汇率必须与原支付快照汇率一致");
     }
 
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference) {

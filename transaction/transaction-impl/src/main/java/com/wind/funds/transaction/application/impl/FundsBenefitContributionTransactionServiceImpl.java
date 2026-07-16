@@ -109,7 +109,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                 .setAccountId(route.costBearerAccountId())
                 .setPayerId(route.benefitReceiverAccountId())
                 .setPayerLedgerCode(route.benefitReceiverLedgerCode())
-                .setAmount(request.getAmount())
+                .setTransactionAmount(TransactionAmount.sameCurrency(request.getAmount()))
                 .setReferenceTransactionSn(request.getReferenceBenefitTransactionSn())
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())

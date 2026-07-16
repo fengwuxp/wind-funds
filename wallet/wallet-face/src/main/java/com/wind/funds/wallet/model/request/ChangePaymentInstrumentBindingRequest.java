@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.model.request;
 
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -39,13 +39,13 @@ public class ChangePaymentInstrumentBindingRequest {
     @Schema(description = "是否默认绑定")
     private Boolean defaultBinding;
 
-    @Schema(description = "状态")
-    private FundsAccountStatus status;
+    @Schema(description = "绑定生命周期状态")
+    private PaymentInstrumentBindingState state;
 
-    @Schema(description = "生效时间")
+    @Schema(description = "绑定候选生效时间")
     private LocalDateTime validFrom;
 
-    @Schema(description = "失效时间")
+    @Schema(description = "绑定候选失效时间")
     private LocalDateTime validTo;
 
     @Schema(description = "描述")
@@ -62,10 +62,6 @@ public class ChangePaymentInstrumentBindingRequest {
     @NotBlank
     private String changeReason;
 
-    @Schema(description = "请求号，用于支付工具绑定变更幂等、回放和对账追踪")
-    @NotBlank
-    private String requestSn;
-
-    @Schema(description = "生效时间")
+    @Schema(description = "本次变更事实生效时间，不支持未来预约")
     private LocalDateTime effectiveAt;
 }

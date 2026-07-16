@@ -61,7 +61,6 @@ import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingConcurrencyGuard;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
@@ -102,8 +101,6 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
     private static final String CREDIT_ACCOUNT_SN = "wallet_spend_controls_credit";
 
     private static final String PAYMENT_INSTRUMENT_SN = "wallet_spend_controls_card";
-
-    private static final String PAYMENT_BINDING_SN = "wallet_spend_controls_binding";
 
     private static final String OWNER_ID = "wallet_spend_controls_owner";
 
@@ -434,8 +431,6 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(PAYMENT_BINDING_SN)
-                .setRequestSn(PAYMENT_BINDING_SN + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                 .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
@@ -443,8 +438,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setDefaultBinding(Boolean.TRUE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
@@ -519,7 +513,6 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
             DefaultSubjectLedgerInitializer.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
-            PaymentInstrumentBindingConcurrencyGuard.class,
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
             PaymentInstrumentBindingHistoryServiceImpl.class,

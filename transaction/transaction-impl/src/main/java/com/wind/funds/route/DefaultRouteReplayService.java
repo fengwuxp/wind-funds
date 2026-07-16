@@ -46,6 +46,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -469,6 +470,21 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                                         Map<String, LedgerBalanceConstraintType> constraints,
                                         @Nullable String description) {
         Money amount = resolveReplayAmount(sourceLeg, replayRequest);
+        Money originalAmount = replayRequest.getOriginalAmount();
+        BigDecimal exchangeRate = replayRequest.getExchangeRate();
+        AssertUtils.isTrue((originalAmount == null) == (exchangeRate == null),
+                "RouteSnapshot 回放原币金额和汇率必须同时提供");
+        if (originalAmount == null) {
+            originalAmount = sourceLeg.getOriginalAmount();
+            exchangeRate = sourceLeg.getExchangeRate();
+        } else {
+            AssertUtils.isTrue(originalAmount.getCurrency() == sourceLeg.getOriginalAmount().getCurrency(),
+                    "RouteSnapshot 回放原币币种必须与原 RouteLeg 一致，legId = {}", sourceLeg.getLegId());
+        }
+        if (isRefundReplay(replayRequest.getReplayType())) {
+            AssertUtils.isTrue(exchangeRate.compareTo(sourceLeg.getExchangeRate()) == 0,
+                    "RouteSnapshot 退款汇率必须与原支付快照汇率一致，legId = {}", sourceLeg.getLegId());
+        }
         return ImmutableRouteLegSpec.builder()
                 .legId(legType.name() + REPLAY_LEG_ID_SEPARATOR + sourceLeg.getLegId())
                 .sequence(sequence)
@@ -476,8 +492,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .sourceNode(sourceNode)
                 .targetNode(targetNode)
                 .amount(amount)
-                .originalAmount(sourceLeg.getOriginalAmount())
-                .exchangeRate(sourceLeg.getExchangeRate())
+                .originalAmount(originalAmount)
+                .exchangeRate(exchangeRate)
                 .balanceEffectType(balanceEffectType)
                 .phaseCode(phaseCode)
                 .periodType(sourceLeg.getPeriodType())
@@ -488,6 +504,12 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .description(description == null ? sourceLeg.getDescription() : description)
                 .contextVariables(sourceLeg.getContextVariables())
                 .build();
+    }
+
+    private boolean isRefundReplay(RouteReplayType replayType) {
+        return replayType == RouteReplayType.REFUND
+                || replayType == RouteReplayType.AUTHORIZATION_REFUND
+                || replayType == RouteReplayType.FEE_REFUND;
     }
 
     private Money resolveReplayAmount(RouteLegSpec sourceLeg, ReplayRequestSpec replayRequest) {

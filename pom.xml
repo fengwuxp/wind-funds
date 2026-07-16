@@ -22,6 +22,7 @@
 
     <modules>
         <module>core</module>
+        <module>fx/fx-impl</module>
         <module>ledger/ledger-face</module>
         <module>ledger/ledger-impl</module>
         <module>transaction/transaction-face</module>
@@ -58,6 +59,11 @@
             <dependency>
                 <groupId>com.wind.funds</groupId>
                 <artifactId>capte-funds-core</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
+                <artifactId>capte-funds-fx-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

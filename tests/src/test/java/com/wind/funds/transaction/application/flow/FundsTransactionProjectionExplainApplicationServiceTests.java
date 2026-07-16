@@ -7,6 +7,7 @@ import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
+import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainApplicationService;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplainQuery;
 import com.wind.funds.transaction.projection.FundsTransactionProjectionExplanation;
@@ -154,7 +155,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
         settleAuthorization(user, 60L, authorizationSn, "PROJECTION_EXPLAIN_DISPUTE_CAPTURE");
         String refundSn = authorizationTransactionService.settleRefund(new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(user)
-                .setAmount(Money.immutable(40L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setAuthorizationTransactionSn(authorizationSn)
                 .setDisputeMode("CHARGEBACK")
                 .setDisputeReason("CARDHOLDER_DISPUTE")

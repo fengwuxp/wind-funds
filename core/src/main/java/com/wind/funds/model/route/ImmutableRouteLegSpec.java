@@ -1,5 +1,6 @@
 package com.wind.funds.model.route;
 
+import com.wind.funds.fx.FxAppliedRate;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
@@ -56,6 +57,15 @@ public record ImmutableRouteLegSpec(String legId,
         if (exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("routeLeg.exchangeRate must be positive");
         }
+        if (amount.getCurrency() == originalAmount.getCurrency()) {
+            if (amount.getAmount() != originalAmount.getAmount()) {
+                throw new IllegalArgumentException("routeLeg.originalAmount must equal amount for same currency");
+            }
+            if (exchangeRate.compareTo(BigDecimal.ONE) != 0) {
+                throw new IllegalArgumentException("routeLeg.exchangeRate must be 1 for same currency");
+            }
+        }
+        FxAppliedRate.validateSupportedPrecision(exchangeRate);
         if (periodType != null && periodType != AccountBalancePeriodType.LIFETIME
                 && !StringUtils.hasText(periodId)) {
             throw new IllegalArgumentException("routeLeg.periodId is required for non-lifetime period");

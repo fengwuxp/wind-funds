@@ -48,8 +48,7 @@ public class RecordPaymentInstrumentBindingHistoryRequest {
     @Schema(description = "变更前快照")
     private String beforeSnapshot;
 
-    @Schema(description = "变更后快照")
-    @NotBlank
+    @Schema(description = "变更后快照，解绑时为空")
     private String afterSnapshot;
 
     @Schema(description = "操作者")
@@ -60,11 +59,8 @@ public class RecordPaymentInstrumentBindingHistoryRequest {
     @NotBlank
     private String changeReason;
 
-    @Schema(description = "生效时间")
+    @Schema(description = "变更事实生效时间")
     private LocalDateTime effectiveAt;
-
-    @Schema(description = "请求号")
-    private String requestSn;
 
     @Schema(description = "扩展上下文")
     private String contextVariables;

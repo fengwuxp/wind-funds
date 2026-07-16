@@ -21,6 +21,11 @@
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
+                <artifactId>capte-funds-fx-impl</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.wind.funds</groupId>
                 <artifactId>capte-funds-ledger-face</artifactId>
                 <version>${project.version}</version>
             </dependency>

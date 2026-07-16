@@ -23,13 +23,14 @@
 
 ## 2. 模块边界
 
-模块职责：`core` 放资金 DSL、核心契约、枚举、值对象和端口；各 `*-face` 放对外契约；各 `*-impl` 放实现、DAL、Mapper、MapStruct 和内部规则；`tests` 放资金域测试、契约测试、架构边界测试和 H2 表结构；`dependencies` 只做依赖聚合 / BOM。
+模块职责：`core` 放资金 DSL、核心契约、枚举、值对象和端口；`fx-impl` 放汇率快照选择和金额换算默认实现；各 `*-face` 放对外契约；各 `*-impl` 放实现、DAL、Mapper、MapStruct 和内部规则；`tests` 放资金域测试、契约测试、架构边界测试和 H2 表结构；`dependencies` 只做依赖聚合 / BOM。
 
-强制依赖方向：`*-face -> core / capte-domain-core`；`transaction-impl -> transaction-face / wallet-face / core / infrastructure`；`wallet-impl -> wallet-face / ledger-face / core / infrastructure`；`ledger-impl -> ledger-face / core / infrastructure`；`reconciliation-impl -> reconciliation-face / transaction-face / ledger-face / core / infrastructure`；`governance-impl -> governance-face / transaction-face / ledger-face / reconciliation-face / core / infrastructure`；`tests -> impl / face / core`。
+强制依赖方向：`*-face -> core / capte-domain-core`；`fx-impl -> core`；`transaction-impl -> transaction-face / wallet-face / core / infrastructure`；`wallet-impl -> wallet-face / ledger-face / core / infrastructure`；`ledger-impl -> ledger-face / core / infrastructure`；`reconciliation-impl -> reconciliation-face / transaction-face / ledger-face / core / infrastructure`；`governance-impl -> governance-face / transaction-face / ledger-face / reconciliation-face / core / infrastructure`；`tests -> impl / face / core`。
 
 模块红线：
 
 - `*-face` 不依赖 `*-impl`；生产模块不得依赖 `tests`。
+- `fx-impl` 只提供显式汇率价格选择和金额换算，不创建报价、换汇执行、资金交易或账本事实。
 - `wallet-impl` 不依赖 `transaction-face`，不创建资金交易事实。
 - `transaction-impl` 可以依赖 `wallet-face` 消费钱包准入、支付工具、资金责任和支出控制契约；不得依赖 `wallet-impl`、钱包 DAL、Mapper 或钱包内部实现包。
 - `reconciliation-impl` 和 `governance-impl` 只能通过 `*-face`、core port 或只读证据引用消费主链事实；禁止依赖其他模块 `*-impl`、DAL、Mapper 或反写交易、账本、钱包事实。

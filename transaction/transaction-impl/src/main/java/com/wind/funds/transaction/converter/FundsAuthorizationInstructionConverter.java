@@ -63,7 +63,8 @@ public class FundsAuthorizationInstructionConverter {
             @NonNull FundsAuthorizationTransactionAuthorizeRequest request,
             @NonNull WindOperator operator) {
         assertNotSpendControlScope(request.getAccountId(), "授权交易账户不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put(FundsInstructionContextKeys.APPROVED, request.getApproved());
         if (request.getDeclineReason() != null) {
@@ -100,7 +101,8 @@ public class FundsAuthorizationInstructionConverter {
     public @NonNull FundsInstructionSpec convertToReversalInstruction(
             @NonNull FundsAuthorizationTransactionReversalRequest request,
             @NonNull WindOperator operator) {
-        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
@@ -125,7 +127,8 @@ public class FundsAuthorizationInstructionConverter {
     public @NonNull FundsInstructionSpec convertToSettleInstruction(
             @NonNull FundsAuthorizationTransactionSettleRequest request,
             @NonNull WindOperator operator) {
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         FundsInstructionReferenceSpec reference = null;
         if (request.isForceSettle()) {
@@ -170,7 +173,8 @@ public class FundsAuthorizationInstructionConverter {
     public @NonNull FundsInstructionSpec convertToSettleRefundInstruction(
             @NonNull FundsAuthorizationTransactionRefundRequest request,
             @NonNull WindOperator operator) {
-        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         FundsInstructionReferenceSpec reference;
         if (request.isNoAuthRefund()) {

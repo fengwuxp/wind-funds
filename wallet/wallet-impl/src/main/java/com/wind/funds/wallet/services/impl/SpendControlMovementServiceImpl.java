@@ -69,6 +69,7 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         }
         validateRecordRequest(request);
         assertReleaseAmountNotOverReserved(request);
+        assertRefundCompensationAmountAllowed(request);
         try {
             Long id = insertSpendControlMovement(request);
             return getSpendControlMovementById(id);
@@ -314,6 +315,32 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 request.getMovementSn(),
                 remainingControlAmount,
                 request.getAmount());
+    }
+
+    private void assertRefundCompensationAmountAllowed(RecordSpendControlMovementRequest request) {
+        if (request.getMovementType() != SpendControlMovementType.REFUND_COMPENSATED) {
+            return;
+        }
+        BudgetControlProjectionDTO projection = getBudgetControlProjection(new BudgetControlProjectionQuery()
+                .setTenantId(request.getTenantId())
+                .setControlScopeId(controlScopeId(request))
+                .setPeriodId(request.getPeriodId())
+                .setCurrency(request.getCurrency())
+                .setSpendRuleId(request.getSpendRuleId())
+                .setSpendRuleVersion(request.getSpendRuleVersion())
+                .setTargetAccountId(request.getTargetAccountId()));
+        AssertUtils.isTrue(projection.getConsumedAmount() >= request.getAmount(),
+                "退款控制补偿金额超过当前周期净消费控制金额，movementSn = {}, consumedAmount = {}, amount = {}",
+                request.getMovementSn(),
+                projection.getConsumedAmount(),
+                request.getAmount());
+        long availableAfterCompensation = Math.addExact(projection.getAvailableControlAmount(), request.getAmount());
+        AssertUtils.isTrue(availableAfterCompensation <= projection.getLimitAmount(),
+                "退款控制补偿后可用控制额度不能超过周期控制额度，movementSn = {}, limitAmount = {}, "
+                        + "availableAfterCompensation = {}",
+                request.getMovementSn(),
+                projection.getLimitAmount(),
+                availableAfterCompensation);
     }
 
     private void validateQuery(SpendControlMovementQuery query) {

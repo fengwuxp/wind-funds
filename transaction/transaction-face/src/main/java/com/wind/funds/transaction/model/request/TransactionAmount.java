@@ -1,11 +1,12 @@
 package com.wind.funds.transaction.model.request;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.funds.fx.FxAmountConversionResult;
+import com.wind.funds.fx.FxAppliedRate;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -34,20 +35,16 @@ public class TransactionAmount {
     @NonNull
     private final BigDecimal exchangeRate;
 
-    @Schema(description = "汇率或报价引用 ID")
-    @Nullable
-    private final String rateId;
-
     private TransactionAmount(@NonNull Money amount,
                               @NonNull Money originalAmount,
-                              @NonNull BigDecimal exchangeRate,
-                              @Nullable String rateId) {
+                              @NonNull BigDecimal exchangeRate) {
         AssertUtils.notNull(amount, "transactionAmount.amount must not be null");
         AssertUtils.notNull(originalAmount, "transactionAmount.originalAmount must not be null");
         AssertUtils.notNull(exchangeRate, "transactionAmount.exchangeRate must not be null");
         AssertUtils.isTrue(amount.getAmount() > 0, "transactionAmount.amount must be greater than 0");
         AssertUtils.isTrue(originalAmount.getAmount() > 0, "transactionAmount.originalAmount must be greater than 0");
         AssertUtils.isTrue(exchangeRate.compareTo(BigDecimal.ZERO) > 0, "transactionAmount.exchangeRate must be greater than 0");
+        FxAppliedRate.validateSupportedPrecision(exchangeRate);
         if (amount.getCurrency() == originalAmount.getCurrency()) {
             AssertUtils.isTrue(amount.getAmount() == originalAmount.getAmount(),
                     "transactionAmount.originalAmount must equal amount for same currency");
@@ -57,7 +54,6 @@ public class TransactionAmount {
         this.amount = amount;
         this.originalAmount = originalAmount;
         this.exchangeRate = exchangeRate;
-        this.rateId = rateId;
     }
 
     /**
@@ -67,7 +63,7 @@ public class TransactionAmount {
      * @return 交易金额
      */
     public static TransactionAmount sameCurrency(@NonNull Money amount) {
-        return new TransactionAmount(amount, amount, BigDecimal.ONE, null);
+        return new TransactionAmount(amount, amount, BigDecimal.ONE);
     }
 
     /**
@@ -96,23 +92,19 @@ public class TransactionAmount {
     public static TransactionAmount converted(@NonNull Money amount,
                                               @NonNull Money originalAmount,
                                               @NonNull BigDecimal exchangeRate) {
-        return converted(amount, originalAmount, exchangeRate, null);
+        return new TransactionAmount(amount, originalAmount, exchangeRate);
     }
 
     /**
-     * 构造跨币种交易金额。
+     * 根据外汇金额换算结果构造交易金额。
      *
-     * @param amount         本次交易主金额
-     * @param originalAmount 业务原币金额
-     * @param exchangeRate   originalAmount -> amount 的汇率
-     * @param rateId         汇率或报价引用 ID
+     * @param result 外汇金额换算结果
      * @return 交易金额
      */
-    public static TransactionAmount converted(@NonNull Money amount,
-                                              @NonNull Money originalAmount,
-                                              @NonNull BigDecimal exchangeRate,
-                                              @Nullable String rateId) {
-        return new TransactionAmount(amount, originalAmount, exchangeRate, rateId);
+    public static TransactionAmount converted(@NonNull FxAmountConversionResult result) {
+        AssertUtils.notNull(result, "fxAmountConversionResult must not be null");
+        FxAppliedRate appliedRate = result.appliedRate();
+        return converted(result.targetAmount(), result.sourceAmount(), appliedRate.rate());
     }
 
     private static BigDecimal calculateExchangeRate(@NonNull Money amount,

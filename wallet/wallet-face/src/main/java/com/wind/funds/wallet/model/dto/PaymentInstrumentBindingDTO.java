@@ -2,7 +2,7 @@ package com.wind.funds.wallet.model.dto;
 
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -67,8 +67,8 @@ public class PaymentInstrumentBindingDTO implements Serializable {
     @Schema(description = "是否默认绑定")
     private Boolean defaultBinding;
 
-    @Schema(description = "状态")
-    private FundsAccountStatus status;
+    @Schema(description = "绑定生命周期状态")
+    private PaymentInstrumentBindingState state;
 
     @Schema(description = "绑定版本")
     private Integer version;

@@ -64,6 +64,92 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
             "externalTransactionId",
             "feeSpec");
 
+    @Test
+    void testConvertedTopupShouldPropagateOriginalAmountAndExchangeRateToLedgerFacts() {
+        FundsAccountId account = fundingAccount("funding_user");
+        String businessSn = "DIRECT_CONVERTED_TOPUP";
+        Money amount = Money.immutable(325L, CurrencyIsoCode.USD);
+        Money originalAmount = Money.immutable(1_000L, CurrencyIsoCode.KWD);
+        BigDecimal exchangeRate = new BigDecimal("3.25");
+
+        directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_converted_topup",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_CONVERTED_TOPUP_CHANNEL")
+                .setTransactionAmount(TransactionAmount.converted(amount, originalAmount, exchangeRate))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn(businessSn)
+                .setDescription("converted topup"), WindOperator.system());
+
+        assertThat(routeSnapshot(businessSn).getLegs()).isNotEmpty().allSatisfy(leg -> {
+            assertThat(leg.getAmount()).isEqualTo(amount);
+            assertThat(leg.getOriginalAmount()).isEqualTo(originalAmount);
+            assertThat(leg.getExchangeRate()).isEqualByComparingTo(exchangeRate);
+        });
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn(businessSn);
+        assertThat(ledgerTransaction.getAmount()).isEqualTo(amount.getAmount());
+        assertThat(ledgerTransaction.getCurrency()).isEqualTo(amount.getCurrency());
+        assertThat(ledgerTransaction.getOriginalAmount()).isEqualTo(originalAmount.getAmount());
+        assertThat(ledgerTransaction.getOriginalCurrency()).isEqualTo(originalAmount.getCurrency());
+        assertThat(ledgerTransaction.getExchangeRate()).isEqualByComparingTo(exchangeRate);
+        assertThat(entriesOf(ledgerTransaction)).isNotEmpty().allSatisfy(entry -> {
+            assertThat(entry.getAmount()).isEqualTo(amount.getAmount());
+            assertThat(entry.getCurrency()).isEqualTo(amount.getCurrency());
+            assertThat(entry.getOriginalAmount()).isEqualTo(originalAmount.getAmount());
+            assertThat(entry.getOriginalCurrency()).isEqualTo(originalAmount.getCurrency());
+            assertThat(entry.getExchangeRate()).isEqualByComparingTo(exchangeRate);
+        });
+        assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, amount.getAmount(), amount.getCurrency());
+    }
+
+    @Test
+    void testPartialFxRefundShouldPropagateCurrentAmountFactsToLedger() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("fx_refund_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 325L, "FX_PARTIAL_REFUND_TOPUP");
+        String payTransactionSn = directTransactionService.pay(new FundsTransactionPayRequest()
+                .setAccountId(payer)
+                .setPayeeId(payee)
+                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.converted(
+                        Money.immutable(325L, CurrencyIsoCode.USD),
+                        Money.immutable(1_000L, CurrencyIsoCode.KWD),
+                        new BigDecimal("3.25")))
+                .setBusinessScene("PAY")
+                .setBusinessSn("FX_PARTIAL_REFUND_PAY"), WindOperator.system());
+
+        directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setPayerId(payee)
+                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.converted(
+                        Money.immutable(100L, CurrencyIsoCode.USD),
+                        Money.immutable(308L, CurrencyIsoCode.KWD),
+                        new BigDecimal("3.25")))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("FX_PARTIAL_REFUND"), WindOperator.system());
+
+        LedgerTransaction refundTransaction = ledgerTransactionByBusinessSn("FX_PARTIAL_REFUND");
+        assertThat(refundTransaction.getAmount()).isEqualTo(100L);
+        assertThat(refundTransaction.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+        assertThat(refundTransaction.getOriginalAmount()).isEqualTo(308L);
+        assertThat(refundTransaction.getOriginalCurrency()).isEqualTo(CurrencyIsoCode.KWD);
+        assertThat(refundTransaction.getExchangeRate()).isEqualByComparingTo("3.25");
+        assertThat(entriesOf(refundTransaction)).allSatisfy(entry -> {
+            assertThat(entry.getAmount()).isEqualTo(100L);
+            assertThat(entry.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
+            assertThat(entry.getOriginalAmount()).isEqualTo(308L);
+            assertThat(entry.getOriginalCurrency()).isEqualTo(CurrencyIsoCode.KWD);
+            assertThat(entry.getExchangeRate()).isEqualByComparingTo("3.25");
+        });
+        assertBucket(balance(payer), LedgerSubjectCode.AVAILABLE, 100L, CurrencyIsoCode.USD);
+        assertBucket(balance(payee), LedgerSubjectCode.SETTLEMENT, 225L, CurrencyIsoCode.USD);
+    }
+
     /**
      * 场景：用户充值后向普通收款方付款，随后收款方发起部分退款。
      * 输入：充值 100、付款 70、部分退款 30。
@@ -290,7 +376,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setReferenceTransactionSn("FUNDS_TRANSACTION_NOT_EXISTS")
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_REFUND")
@@ -364,7 +450,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_REFUND")
@@ -429,7 +515,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_REFERENCE_REFUND")
@@ -458,7 +544,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(50L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(50L, CURRENCY)))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_REFERENCE_EXCEED_REFUND")
@@ -533,7 +619,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_REPLAY_BINDING_REFUND")
@@ -598,7 +684,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
                         Map.of("networkReference", "GB82WEST12345698765432"))))
                 .setBusinessScene("REFUND")
@@ -670,7 +756,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_ACCOUNT")
                 .setDescription("refund without account"), WindOperator.system()))
@@ -743,7 +829,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(externalAccount)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_EXTERNAL_ACCOUNT")
                 .setDescription("refund to external account"), WindOperator.system()))
@@ -816,7 +902,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(externalPayer)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_EXTERNAL_PAYER")
                 .setDescription("refund from external payer"), WindOperator.system()))
@@ -886,7 +972,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_PAYER")
                 .setDescription("refund without payer"), WindOperator.system()))
@@ -3118,7 +3204,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
                 .setDescription("idempotent refund"), WindOperator.system());
@@ -3137,7 +3223,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
                 .setDescription("idempotent refund"), WindOperator.system());
@@ -3157,7 +3243,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(31L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(31L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
                 .setDescription("idempotent refund"), WindOperator.system()))
@@ -3229,7 +3315,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT")
@@ -3249,7 +3335,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT")
@@ -3271,7 +3357,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setPayerId(payee)
                 .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
-                .setAmount(Money.immutable(30L, CURRENCY))
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT")

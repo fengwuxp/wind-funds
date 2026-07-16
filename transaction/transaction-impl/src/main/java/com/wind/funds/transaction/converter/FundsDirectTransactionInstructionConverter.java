@@ -72,7 +72,8 @@ public class FundsDirectTransactionInstructionConverter {
         assertNotSpendControlScope(request.getAccountId(), "直接充值入账账户不能是支出控制范围");
         AssertUtils.notNull(request.getChannel(), "直接充值资金通道不能为空");
         AssertUtils.notNull(request.getChannelTransactionSn(), "直接充值通道交易流水不能为空");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.CHANNEL_CODE, request.getChannel().name());
@@ -109,7 +110,8 @@ public class FundsDirectTransactionInstructionConverter {
                 "系统内转账收款账户不能是外部账户");
         assertNotSpendControlScope(request.getPayerAccountId(), "系统内转账付款账户不能是支出控制范围");
         assertNotSpendControlScope(request.getPayeeAccountId(), "系统内转账收款账户不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getPayerAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getPayerAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         putFeeSpec(extraContext, request.getFeeSpec());
         return ImmutableFundsInstructionSpec.builder()
@@ -142,7 +144,8 @@ public class FundsDirectTransactionInstructionConverter {
                 "直接付款收款主体不能是外部账户");
         assertNotSpendControlScope(request.getAccountId(), "直接付款账户不能是支出控制范围");
         assertNotSpendControlScope(request.getPayeeId(), "直接付款收款主体不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         putFeeSpec(extraContext, request.getFeeSpec());
         return ImmutableFundsInstructionSpec.builder()
@@ -176,7 +179,8 @@ public class FundsDirectTransactionInstructionConverter {
         AssertUtils.notNull(request.getPayerLedgerCode(), "直接退款出资账目不能为空");
         assertNotSpendControlScope(request.getAccountId(), "直接退款到账账户不能是支出控制范围");
         assertNotSpendControlScope(request.getPayerId(), "直接退款出资主体不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
         putFeeSpec(extraContext, request.getFeeSpec());
         if (request.getChannel() != null) {
@@ -224,7 +228,8 @@ public class FundsDirectTransactionInstructionConverter {
                 "提现账户不能是外部账户");
         AssertUtils.hasText(request.getReferenceFreezeSn(), "提现冻结流水号不能为空");
         assertNotSpendControlScope(request.getAccountId(), "提现账户不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
+        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
+                request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.REFERENCE_FREEZE_SN, request.getReferenceFreezeSn());

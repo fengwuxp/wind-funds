@@ -77,6 +77,12 @@ class FundsAmountBoundaryContractTests {
         assertThatThrownBy(() -> fundsInstruction(100L, Money.immutable(100L, CURRENCY), new BigDecimal("-1")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("fundsInstruction.exchangeRate must be positive");
+        assertThatThrownBy(() -> fundsInstruction(100L, Money.immutable(99L, CURRENCY), BigDecimal.ONE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsInstruction.originalAmount must equal amount for same currency");
+        assertThatThrownBy(() -> fundsInstruction(100L, Money.immutable(100L, CURRENCY), new BigDecimal("2")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("fundsInstruction.exchangeRate must be 1 for same currency");
     }
 
     /**
@@ -95,6 +101,13 @@ class FundsAmountBoundaryContractTests {
         assertThatThrownBy(() -> routeLeg(100L, AccountBalancePeriodType.DAYS, " "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("routeLeg.periodId is required for non-lifetime period");
+        assertThatThrownBy(() -> routeLegWithAmountFacts(100L, Money.immutable(99L, CURRENCY), BigDecimal.ONE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("routeLeg.originalAmount must equal amount for same currency");
+        assertThatThrownBy(() -> routeLegWithAmountFacts(100L, Money.immutable(100L, CURRENCY),
+                new BigDecimal("2")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("routeLeg.exchangeRate must be 1 for same currency");
     }
 
     /**
@@ -297,6 +310,25 @@ class FundsAmountBoundaryContractTests {
                                            AccountBalancePeriodType periodType,
                                            String periodId) {
         return routeLeg("LEG-AMOUNT-001", amount, periodType, periodId);
+    }
+
+    private ImmutableRouteLegSpec routeLegWithAmountFacts(long amount,
+                                                          Money originalAmount,
+                                                          BigDecimal exchangeRate) {
+        return ImmutableRouteLegSpec.builder()
+                .legId("LEG-AMOUNT-FX")
+                .sequence(1)
+                .legType(RouteLegType.CONSUME)
+                .sourceNode(routeNode("FA-SOURCE-001", RouteNodeRole.SOURCE))
+                .targetNode(routeNode("FA-TARGET-001", RouteNodeRole.TARGET))
+                .amount(Money.immutable(amount, CURRENCY))
+                .originalAmount(originalAmount)
+                .exchangeRate(exchangeRate)
+                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
+                .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .constraintOverrides(Map.of())
+                .contextVariables(Map.of())
+                .build();
     }
 
     private ImmutableRouteLegSpec routeLeg(String legId,

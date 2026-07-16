@@ -507,7 +507,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setAccountId(accountId)
                 .setPayerId(payerId)
                 .setPayerLedgerCode(payerLedgerCode)
-                .setAmount(amount(amount))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn(businessSn)
                 .setDescription("refund"), WindOperator.system());
@@ -623,7 +623,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                                                 String businessSn) {
         return authorizationTransactionService.settleRefund(new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(accountId)
-                .setAmount(amount(amount))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setAuthorizationTransactionSn(authorizationTransactionSn)
                 .setBusinessScene("AUTHORIZATION_REFUND")
                 .setBusinessSn(businessSn)
@@ -642,7 +642,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                                                                              String businessSn) {
         return new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(accountId)
-                .setAmount(amount(amount))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setExternalReferenceSn("processor_capture_202606030001")
                 .setRefundReason("external capture refunded without internal authorization")
                 .setBusinessScene("AUTHORIZATION_NO_AUTH_REFUND")
@@ -656,7 +656,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                                           String businessSn) {
         return authorizationTransactionService.reversal(new FundsAuthorizationTransactionReversalRequest()
                 .setAccountId(accountId)
-                .setAmount(amount(amount))
+                .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setAuthorizationTransactionSn(authorizationTransactionSn)
                 .setBusinessScene("AUTHORIZATION_REVERSAL")
                 .setBusinessSn(businessSn)

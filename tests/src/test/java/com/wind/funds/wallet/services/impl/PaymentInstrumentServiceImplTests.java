@@ -14,6 +14,7 @@ import com.wind.funds.wallet.model.query.PaymentInstrumentQuery;
 import com.wind.funds.wallet.model.request.ChangePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.UnbindPaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.route.enums.FundsSubjectType;
@@ -21,6 +22,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingChangeType;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.AfterEach;
@@ -38,11 +40,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -71,16 +68,6 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private static final String RECEIVE_ONLY_PAYMENT_INSTRUMENT_SN = "pi_service_receive_card";
 
-    private static final String BINDING_SN = "pi_binding_service_candidate";
-
-    private static final String DUPLICATE_DEFAULT_BINDING_SN = "pi_binding_service_default_duplicate";
-
-    private static final String PRIORITY_CONFLICT_BINDING_SN = "pi_binding_service_priority_conflict";
-
-    private static final String PRIORITY_ORDER_BINDING_SN = "pi_binding_service_priority_order";
-
-    private static final String CONCURRENT_DEFAULT_BINDING_SN = "pi_binding_service_default_concurrent";
-
     private static final String OWNER_ID = "owner_pi_service";
 
     private static final String FUNDING_ACCOUNT_ID = "funding_pi_binding_target";
@@ -93,26 +80,6 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     private static final String THIRD_FUNDING_ACCOUNT_ID = "funding_pi_binding_third";
 
     private static final String OPERATOR_ID = "ops_pi_service";
-
-    private static final String CREATE_BINDING_REQUEST_SN = "req_pi_binding_create";
-
-    private static final String CHANGE_BINDING_REQUEST_SN = "req_pi_binding_change";
-
-    private static final String LONG_SUBJECT_BINDING_SN = "pi_binding_service_long_subject";
-
-    private static final String LONG_SUBJECT_BINDING_REQUEST_SN = "req_pi_binding_long_subject";
-
-    private static final String DUPLICATE_DEFAULT_CREATE_REQUEST_SN = "req_pi_binding_duplicate_default_create";
-
-    private static final String DUPLICATE_DEFAULT_CHANGE_REQUEST_SN = "req_pi_binding_duplicate_default_change";
-
-    private static final String PRIORITY_CONFLICT_CREATE_REQUEST_SN = "req_pi_binding_priority_conflict_create";
-
-    private static final String PRIORITY_CONFLICT_CHANGE_REQUEST_SN = "req_pi_binding_priority_conflict_change";
-
-    private static final String PRIORITY_ORDER_CREATE_REQUEST_SN = "req_pi_binding_priority_order_create";
-
-    private static final String CONCURRENT_DEFAULT_CREATE_REQUEST_SN = "req_pi_binding_default_concurrent_create";
 
     private static final String INSTRUMENT_TYPE_CARD = "CARD";
 
@@ -321,14 +288,14 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                         .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
                         .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                         .setDefaultBinding(Boolean.TRUE)
-                        .setStatus(FundsAccountStatus.ACTIVE),
+                        .setState(PaymentInstrumentBindingState.ACTIVE),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
 
         assertThat(bindingId).isPositive();
         assertThat(records).hasSize(1);
         assertThat(records.getFirst())
                 .satisfies(binding -> {
-                    assertThat(binding.getSn()).isEqualTo(BINDING_SN);
+                    assertThat(binding.getSn()).startsWith("PIB");
                     assertThat(binding.getInstrumentSn()).isEqualTo(PAYMENT_INSTRUMENT_SN);
                     assertThat(binding.getBindingRole()).isEqualTo(PaymentInstrumentBindingRole.FUNDING_SUBJECT);
                     assertThat(binding.getSubjectId()).isEqualTo(FUNDING_ACCOUNT_ID);
@@ -336,10 +303,10 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                     assertThat(binding.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
                     assertThat(binding.getPriority()).isEqualTo(10);
                     assertThat(binding.getDefaultBinding()).isTrue();
-                    assertThat(binding.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+                    assertThat(binding.getState()).isEqualTo(PaymentInstrumentBindingState.ACTIVE);
                     assertThat(binding.getVersion()).isEqualTo(1);
                 });
-        assertThat(countRows("t_ledger", "subject_id", BINDING_SN)).isZero();
+        assertThat(countRows("t_ledger", "subject_id", records.getFirst().getSn())).isZero();
         assertThat(countRows("t_ledger", "subject_id", PAYMENT_INSTRUMENT_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -350,14 +317,13 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
-                .setSn(LONG_SUBJECT_BINDING_SN)
-                .setSubjectId(LONG_FUNDING_ACCOUNT_ID)
-                .setRequestSn(LONG_SUBJECT_BINDING_REQUEST_SN));
+                .setSubjectId(LONG_FUNDING_ACCOUNT_ID));
 
         List<PaymentInstrumentBindingDTO> records = paymentInstrumentService.queryPaymentInstrumentBindings(
                 new PaymentInstrumentBindingQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(LONG_SUBJECT_BINDING_SN)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
                         .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                         .setSubjectId(LONG_FUNDING_ACCOUNT_ID),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
@@ -367,36 +333,51 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     @Test
-    void testCreatePaymentInstrumentBindingShouldReturnExistingWhenRequestSnReplayed() {
+    void testCreatePaymentInstrumentBindingShouldGenerateSnAndReplayByBusinessKey() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Long firstBindingId = paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         Long replayedBindingId = paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
 
+        List<PaymentInstrumentBindingDTO> records = paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                        .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                        .setSubjectId(FUNDING_ACCOUNT_ID)
+                        .setCurrency(CurrencyIsoCode.USD),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
         assertThat(replayedBindingId).isEqualTo(firstBindingId);
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isOne();
-        assertThat(countRows("t_payment_instrument_binding_history", "request_sn", CREATE_BINDING_REQUEST_SN)).isOne();
+        assertThat(records).singleElement().satisfies(binding -> {
+            assertThat(binding.getSn()).startsWith("PIB");
+            assertThat(binding.getState()).isEqualTo(PaymentInstrumentBindingState.ACTIVE);
+        });
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", records.getFirst().getSn()))
+                .isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
-    /**
-     * 场景：运营创建支付工具绑定时缺少幂等流水。
-     * 输入：requestSn 为空的绑定创建请求。
-     * 输出：创建被拒绝，不留下绑定当前态或历史证据。
-     * 红线：支付工具绑定创建必须可幂等、可回放、可对账追踪，缺流水时不得写入任何资金事实。
-     */
     @Test
-    void testCreatePaymentInstrumentBindingShouldRejectMissingRequestSnWithoutBindingMutation() {
+    void testCreatePaymentInstrumentBindingShouldRejectBusinessKeyReplayWithDifferentState() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest()
-                .setRequestSn("   ")))
-                .hasMessageContaining("支付工具绑定创建 requestSn 不能为空");
+        assertThatThrownBy(() -> paymentInstrumentService.createPaymentInstrumentBinding(
+                createBindingRequest().setState(PaymentInstrumentBindingState.SUSPENDED)))
+                .hasMessageContaining("支付工具绑定已存在但内容不一致");
 
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertThat(paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                        .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                        .setSubjectId(FUNDING_ACCOUNT_ID)
+                        .setCurrency(CurrencyIsoCode.USD),
+                DefaultPageQueryOptions.defaults(10)).getRecords()).hasSize(1);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -452,8 +433,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)))
                 .hasMessageContaining("信用控制主体绑定必须指向信用账户");
 
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -477,8 +458,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)))
                 .hasMessageContaining("支出控制范围不通过支付工具资金主体绑定维护");
 
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -491,8 +472,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setCurrency(CurrencyIsoCode.CNY)))
                 .hasMessageContaining("支付工具币种与绑定币种不一致");
 
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -520,8 +501,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
 
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -547,8 +528,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setValidTo(now)))
                 .hasMessageContaining("支付工具绑定生效时间必须早于失效时间");
 
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isZero();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
+        assertThat(countRows("t_payment_instrument_binding_history", "instrument_sn", PAYMENT_INSTRUMENT_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -575,17 +556,15 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                         .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setDefaultBinding(Boolean.TRUE)
-                        .setStatus(FundsAccountStatus.ACTIVE),
+                        .setState(PaymentInstrumentBindingState.ACTIVE),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
         assertThat(defaults)
                 .singleElement()
                 .satisfies(binding -> {
-                    assertThat(binding.getSn()).isEqualTo(BINDING_SN);
+                    assertThat(binding.getSn()).isEqualTo(bindingSn(FUNDING_ACCOUNT_ID));
                     assertThat(binding.getSubjectId()).isEqualTo(FUNDING_ACCOUNT_ID);
                 });
-        assertThat(countRows("t_payment_instrument_binding", "sn", DUPLICATE_DEFAULT_BINDING_SN)).isZero();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", DUPLICATE_DEFAULT_BINDING_SN))
-                .isZero();
+        assertThat(findBindings(SECOND_FUNDING_ACCOUNT_ID)).isEmpty();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -617,115 +596,23 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                         .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
                         .setCurrency(CurrencyIsoCode.USD)
                         .setDefaultBinding(Boolean.TRUE)
-                        .setStatus(FundsAccountStatus.ACTIVE),
+                        .setState(PaymentInstrumentBindingState.ACTIVE),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
         PaymentInstrumentBindingDTO futureBinding = paymentInstrumentService.queryPaymentInstrumentBindings(
                 new PaymentInstrumentBindingQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(DUPLICATE_DEFAULT_BINDING_SN),
+                        .setSn(bindingSn(SECOND_FUNDING_ACCOUNT_ID)),
                 DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
 
         assertThat(futureBindingId).isPositive();
         assertThat(currentDefaults)
                 .extracting(PaymentInstrumentBindingDTO::getSn)
-                .containsExactly(BINDING_SN);
+                .containsExactly(bindingSn(FUNDING_ACCOUNT_ID));
         assertThat(futureBinding.getDefaultBinding()).isTrue();
         assertThat(futureBinding.getValidFrom()).isAfter(now);
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", DUPLICATE_DEFAULT_BINDING_SN))
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", futureBinding.getSn()))
                 .isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：两个外部请求并发把同一支付工具、绑定角色和币种创建为当前 ACTIVE 默认绑定。
-     * 输入：两个不同绑定 SN、不同主体和不同 requestSn 同时提交，且绑定窗口重叠。
-     * 输出：只有一个默认绑定创建成功，另一个被默认唯一性拒绝；默认和优先级 guard scope 各生成一行。
-     * 红线：并发下不得同时留下两个当前默认候选，也不得写入账本事实。
-     */
-    @Test
-    void testCreatePaymentInstrumentBindingShouldSerializeConcurrentDefaultCandidates() throws Exception {
-        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        CountDownLatch startGate = new CountDownLatch(1);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
-            Future<BindingAttemptResult> first = executor.submit(concurrentBindingAttempt(startGate,
-                    createBindingRequest()));
-            Future<BindingAttemptResult> second = executor.submit(concurrentBindingAttempt(startGate,
-                    createSecondBindingRequest()
-                            .setSn(CONCURRENT_DEFAULT_BINDING_SN)
-                            .setSubjectId(THIRD_FUNDING_ACCOUNT_ID)
-                            .setRequestSn(CONCURRENT_DEFAULT_CREATE_REQUEST_SN)
-                            .setDefaultBinding(Boolean.TRUE)));
-
-            startGate.countDown();
-
-            List<BindingAttemptResult> results = List.of(first.get(), second.get());
-            List<PaymentInstrumentBindingDTO> defaults = paymentInstrumentService.queryPaymentInstrumentBindings(
-                    new PaymentInstrumentBindingQuery()
-                            .setTenantId(TENANT_ID)
-                            .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
-                            .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
-                            .setCurrency(CurrencyIsoCode.USD)
-                            .setDefaultBinding(Boolean.TRUE)
-                            .setStatus(FundsAccountStatus.ACTIVE),
-                    DefaultPageQueryOptions.defaults(10)).getRecords();
-
-            assertThat(results).filteredOn(BindingAttemptResult::succeeded).hasSize(1);
-            assertThat(results).filteredOn(result -> !result.succeeded())
-                    .singleElement()
-                    .satisfies(result -> assertThat(result.message()).contains("默认支付工具绑定不唯一"));
-            assertThat(defaults).singleElement();
-            assertThat(countRows("t_payment_instrument_binding_guard", "instrument_sn", PAYMENT_INSTRUMENT_SN))
-                    .isEqualTo(2);
-            assertLedgerFactsUnchanged(jdbcTemplate, before);
-        } finally {
-            executor.shutdownNow();
-        }
-    }
-
-    /**
-     * 场景：两个外部请求并发把同一支付工具、绑定角色和币种创建为当前 ACTIVE 同优先级非默认绑定。
-     * 输入：两个不同绑定 SN、不同主体和不同 requestSn 同时提交，且绑定窗口和 priority 重叠。
-     * 输出：只有一个绑定创建成功，另一个被优先级唯一性拒绝；DB guard scope 只生成一行。
-     * 红线：并发下不得同时留下两个当前同优先级候选，也不得写入账本事实。
-     */
-    @Test
-    void testCreatePaymentInstrumentBindingShouldSerializeConcurrentPriorityCandidates() throws Exception {
-        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        CountDownLatch startGate = new CountDownLatch(1);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
-            Future<BindingAttemptResult> first = executor.submit(concurrentBindingAttempt(startGate,
-                    createBindingRequest().setDefaultBinding(Boolean.FALSE)));
-            Future<BindingAttemptResult> second = executor.submit(concurrentBindingAttempt(startGate,
-                    createPriorityConflictBindingRequest()));
-
-            startGate.countDown();
-
-            List<BindingAttemptResult> results = List.of(first.get(), second.get());
-            List<PaymentInstrumentBindingDTO> bindings = paymentInstrumentService.queryPaymentInstrumentBindings(
-                    new PaymentInstrumentBindingQuery()
-                            .setTenantId(TENANT_ID)
-                            .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
-                            .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
-                            .setCurrency(CurrencyIsoCode.USD)
-                            .setDefaultBinding(Boolean.FALSE)
-                            .setStatus(FundsAccountStatus.ACTIVE),
-                    DefaultPageQueryOptions.defaults(10)).getRecords();
-
-            assertThat(results).filteredOn(BindingAttemptResult::succeeded).hasSize(1);
-            assertThat(results).filteredOn(result -> !result.succeeded())
-                    .singleElement()
-                    .satisfies(result -> assertThat(result.message()).contains("支付工具绑定优先级冲突"));
-            assertThat(bindings).singleElement();
-            assertThat(countRows("t_payment_instrument_binding_guard", "instrument_sn", PAYMENT_INSTRUMENT_SN))
-                    .isOne();
-            assertLedgerFactsUnchanged(jdbcTemplate, before);
-        } finally {
-            executor.shutdownNow();
-        }
     }
 
     /**
@@ -744,24 +631,23 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(DUPLICATE_DEFAULT_BINDING_SN)
+                        .setBindingSn(bindingSn(SECOND_FUNDING_ACCOUNT_ID))
                         .setTenantId(TENANT_ID)
                         .setDefaultBinding(Boolean.TRUE)
-                        .setStatus(FundsAccountStatus.ACTIVE)
+                        .setState(PaymentInstrumentBindingState.ACTIVE)
                         .setOperatorId(OPERATOR_ID)
-                        .setChangeReason("promote duplicate default")
-                        .setRequestSn(DUPLICATE_DEFAULT_CHANGE_REQUEST_SN)))
+                        .setChangeReason("promote duplicate default")))
                 .hasMessageContaining("默认支付工具绑定不唯一");
 
         PaymentInstrumentBindingDTO secondBinding = paymentInstrumentService.queryPaymentInstrumentBindings(
                 new PaymentInstrumentBindingQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(DUPLICATE_DEFAULT_BINDING_SN),
+                        .setSn(bindingSn(SECOND_FUNDING_ACCOUNT_ID)),
                 DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
         assertThat(secondBinding.getDefaultBinding()).isFalse();
-        assertThat(secondBinding.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(secondBinding.getState()).isEqualTo(PaymentInstrumentBindingState.ACTIVE);
         assertThat(secondBinding.getVersion()).isEqualTo(1);
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", DUPLICATE_DEFAULT_BINDING_SN))
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", secondBinding.getSn()))
                 .isEqualTo(1);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -783,10 +669,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 createPriorityConflictBindingRequest()))
                 .hasMessageContaining("支付工具绑定优先级冲突");
 
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isOne();
-        assertThat(countRows("t_payment_instrument_binding", "sn", PRIORITY_CONFLICT_BINDING_SN)).isZero();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", PRIORITY_CONFLICT_BINDING_SN))
-                .isZero();
+        assertThat(findBindings(FUNDING_ACCOUNT_ID)).hasSize(1);
+        assertThat(findBindings(SECOND_FUNDING_ACCOUNT_ID)).isEmpty();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -807,23 +691,22 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(PRIORITY_CONFLICT_BINDING_SN)
+                        .setBindingSn(bindingSn(SECOND_FUNDING_ACCOUNT_ID))
                         .setTenantId(TENANT_ID)
                         .setPriority(10)
                         .setOperatorId(OPERATOR_ID)
-                        .setChangeReason("raise priority")
-                        .setRequestSn(PRIORITY_CONFLICT_CHANGE_REQUEST_SN)))
+                        .setChangeReason("raise priority")))
                 .hasMessageContaining("支付工具绑定优先级冲突");
 
         PaymentInstrumentBindingDTO secondBinding = paymentInstrumentService.queryPaymentInstrumentBindings(
                 new PaymentInstrumentBindingQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(PRIORITY_CONFLICT_BINDING_SN),
+                        .setSn(bindingSn(SECOND_FUNDING_ACCOUNT_ID)),
                 DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
         assertThat(secondBinding.getPriority()).isEqualTo(20);
-        assertThat(secondBinding.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(secondBinding.getState()).isEqualTo(PaymentInstrumentBindingState.ACTIVE);
         assertThat(secondBinding.getVersion()).isEqualTo(1);
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", PRIORITY_CONFLICT_BINDING_SN))
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", secondBinding.getSn()))
                 .isEqualTo(1);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -850,12 +733,12 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                         .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                         .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
                         .setCurrency(CurrencyIsoCode.USD)
-                        .setStatus(FundsAccountStatus.ACTIVE),
+                        .setState(PaymentInstrumentBindingState.ACTIVE),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
 
         assertThat(records)
                 .extracting(PaymentInstrumentBindingDTO::getSn)
-                .containsExactly(PRIORITY_ORDER_BINDING_SN, BINDING_SN);
+                .containsExactly(bindingSn(SECOND_FUNDING_ACCOUNT_ID), bindingSn(FUNDING_ACCOUNT_ID));
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -891,12 +774,12 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                         .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                         .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
                         .setCurrency(CurrencyIsoCode.USD)
-                        .setStatus(FundsAccountStatus.ACTIVE),
+                        .setState(PaymentInstrumentBindingState.ACTIVE),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
 
         assertThat(records)
                 .extracting(PaymentInstrumentBindingDTO::getSn)
-                .containsExactly(PRIORITY_ORDER_BINDING_SN);
+                .containsExactly(bindingSn(SECOND_FUNDING_ACCOUNT_ID));
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -921,12 +804,13 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                         .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                         .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
                         .setCurrency(CurrencyIsoCode.USD)
-                        .setStatus(FundsAccountStatus.ACTIVE),
+                        .setState(PaymentInstrumentBindingState.ACTIVE),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
 
         assertThat(records).isEmpty();
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isOne();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
+        String bindingSn = bindingSn(FUNDING_ACCOUNT_ID);
+        assertThat(countRows("t_payment_instrument_binding", "sn", bindingSn)).isOne();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", bindingSn)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -951,11 +835,11 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                         .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                         .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
                         .setCurrency(CurrencyIsoCode.USD)
-                        .setStatus(FundsAccountStatus.ACTIVE),
+                        .setState(PaymentInstrumentBindingState.ACTIVE),
                 DefaultPageQueryOptions.defaults(10)).getRecords();
 
         assertThat(records).isEmpty();
-        assertThat(countRows("t_payment_instrument_binding", "sn", BINDING_SN)).isOne();
+        assertThat(countRows("t_payment_instrument_binding", "sn", bindingSn(FUNDING_ACCOUNT_ID))).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -969,70 +853,36 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     void testChangePaymentInstrumentBindingShouldRejectMissingAuditContextWithoutHistoryMutation() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        String bindingSn = bindingSn(FUNDING_ACCOUNT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
+                        .setBindingSn(bindingSn)
                         .setTenantId(TENANT_ID)
                         .setPriority(20)
                         .setOperatorId("   ")
-                        .setChangeReason("risk review")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
+                        .setChangeReason("risk review")))
                 .hasMessageContaining("支付工具绑定变更 operatorId 不能为空");
 
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
+                        .setBindingSn(bindingSn)
                         .setTenantId(TENANT_ID)
                         .setPriority(20)
                         .setOperatorId(OPERATOR_ID)
-                        .setChangeReason("   ")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
+                        .setChangeReason("   ")))
                 .hasMessageContaining("支付工具绑定变更 changeReason 不能为空");
 
         PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
                 new PaymentInstrumentBindingQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN),
+                        .setSn(bindingSn),
                 DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
         assertThat(binding.getPriority()).isEqualTo(10);
-        assertThat(binding.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(binding.getState()).isEqualTo(PaymentInstrumentBindingState.ACTIVE);
         assertThat(binding.getVersion()).isEqualTo(1);
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：运营变更支付工具绑定时缺少幂等流水。
-     * 输入：已存在 ACTIVE 绑定，变更请求 requestSn 为空。
-     * 输出：变更被拒绝，绑定当前态和历史证据保持不变。
-     * 红线：支付工具绑定变更必须可幂等、可回放、可对账追踪，缺流水时不得改写候选池。
-     */
-    @Test
-    void testChangePaymentInstrumentBindingShouldRejectMissingRequestSnWithoutHistoryMutation() {
-        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
-        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
-                new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
-                        .setTenantId(TENANT_ID)
-                        .setPriority(20)
-                        .setOperatorId(OPERATOR_ID)
-                        .setChangeReason("risk review")
-                        .setRequestSn("   ")))
-                .hasMessageContaining("支付工具绑定变更 requestSn 不能为空");
-
-        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
-                new PaymentInstrumentBindingQuery()
-                        .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN),
-                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
-        assertThat(binding.getPriority()).isEqualTo(10);
-        assertThat(binding.getVersion()).isEqualTo(1);
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", bindingSn)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -1046,40 +896,39 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     void testChangePaymentInstrumentBindingShouldRejectInvalidValidityWindowWithoutHistoryMutation() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        String bindingSn = bindingSn(FUNDING_ACCOUNT_ID);
         LocalDateTime now = LocalDateTime.now().withNano(0);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
+                        .setBindingSn(bindingSn)
                         .setTenantId(TENANT_ID)
                         .setValidFrom(now)
                         .setValidTo(now.minusSeconds(1))
                         .setOperatorId(OPERATOR_ID)
-                        .setChangeReason("invalid window")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
+                        .setChangeReason("invalid window")))
                 .hasMessageContaining("支付工具绑定生效时间必须早于失效时间");
 
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
+                        .setBindingSn(bindingSn)
                         .setTenantId(TENANT_ID)
                         .setValidFrom(now)
                         .setValidTo(now)
                         .setOperatorId(OPERATOR_ID)
-                        .setChangeReason("invalid window")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
+                        .setChangeReason("invalid window")))
                 .hasMessageContaining("支付工具绑定生效时间必须早于失效时间");
 
         PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
                 new PaymentInstrumentBindingQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN),
+                        .setSn(bindingSn),
                 DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
         assertThat(binding.getVersion()).isEqualTo(1);
         assertThat(binding.getValidFrom()).isNull();
         assertThat(binding.getValidTo()).isNull();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", bindingSn)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -1093,58 +942,55 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     void testChangePaymentInstrumentBindingShouldRejectSensitiveContextVariablesWithoutHistoryMutation() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        String bindingSn = bindingSn(FUNDING_ACCOUNT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
+                        .setBindingSn(bindingSn)
                         .setTenantId(TENANT_ID)
                         .setPriority(20)
                         .setOperatorId(OPERATOR_ID)
                         .setChangeReason("risk review")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)
                         .setContextVariables("{\"processorPayload\":{\"secretKey\":\"secret-value\"}}")))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
+                        .setBindingSn(bindingSn)
                         .setTenantId(TENANT_ID)
                         .setPriority(20)
                         .setOperatorId(OPERATOR_ID)
                         .setChangeReason("risk review")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)
                         .setContextVariables(RAW_PAN_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
+                        .setBindingSn(bindingSn)
                         .setTenantId(TENANT_ID)
                         .setPriority(20)
                         .setOperatorId(OPERATOR_ID)
                         .setChangeReason("risk review")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)
                         .setContextVariables(RAW_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
         assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
+                        .setBindingSn(bindingSn)
                         .setTenantId(TENANT_ID)
                         .setPriority(20)
                         .setOperatorId(OPERATOR_ID)
                         .setChangeReason("risk review")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)
                         .setContextVariables(UNQUOTED_EXTERNAL_ACCOUNT_CONTEXT_VARIABLES)))
                 .hasMessageContaining("contextVariables must not contain sensitive payment instrument fields");
 
         PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
                 new PaymentInstrumentBindingQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN),
+                        .setSn(bindingSn),
                 DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
         assertThat(binding.getPriority()).isEqualTo(10);
         assertThat(binding.getVersion()).isEqualTo(1);
         assertThat(binding.getContextVariables()).isNull();
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isOne();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", bindingSn)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -1152,29 +998,30 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     void testChangePaymentInstrumentBindingShouldAppendHistoryWithoutOverwritingEvidence() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        String bindingSn = bindingSn(FUNDING_ACCOUNT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Long changedBindingId = paymentInstrumentService.changePaymentInstrumentBinding(
                 new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
+                        .setBindingSn(bindingSn)
                         .setTenantId(TENANT_ID)
                         .setPriority(20)
                         .setDefaultBinding(Boolean.FALSE)
-                        .setStatus(FundsAccountStatus.SUSPENDED)
+                        .setState(PaymentInstrumentBindingState.SUSPENDED)
                         .setOperatorId(OPERATOR_ID)
                         .setChangeReason("risk review")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)
+                        .setDescription("temporarily suspended")
                         .setContextVariables("{\"ticket\":\"PI-007\"}"));
 
         PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
                 new PaymentInstrumentBindingQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN),
+                        .setSn(bindingSn),
                 DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
         List<PaymentInstrumentBindingHistoryDTO> histories = new ArrayList<>(paymentInstrumentService
                 .queryPaymentInstrumentBindingHistories(new PaymentInstrumentBindingHistoryQuery()
                                 .setTenantId(TENANT_ID)
-                                .setBindingSn(BINDING_SN),
+                                .setBindingSn(bindingSn),
                         DefaultPageQueryOptions.defaults(10))
                 .getRecords());
         histories.sort(Comparator.comparing(PaymentInstrumentBindingHistoryDTO::getVersion));
@@ -1182,7 +1029,7 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
         assertThat(changedBindingId).isEqualTo(binding.getId());
         assertThat(binding.getPriority()).isEqualTo(20);
         assertThat(binding.getDefaultBinding()).isFalse();
-        assertThat(binding.getStatus()).isEqualTo(FundsAccountStatus.SUSPENDED);
+        assertThat(binding.getState()).isEqualTo(PaymentInstrumentBindingState.SUSPENDED);
         assertThat(binding.getVersion()).isEqualTo(2);
         assertThat(histories)
                 .extracting(PaymentInstrumentBindingHistoryDTO::getChangeType)
@@ -1196,7 +1043,6 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                     assertThat(snapshotOf(history.getAfterSnapshot())).containsEntry("priority", 10);
                     assertThat(history.getOperatorId()).isEqualTo(OPERATOR_ID);
                     assertThat(history.getChangeReason()).isEqualTo("bind funding account");
-                    assertThat(history.getRequestSn()).isEqualTo(CREATE_BINDING_REQUEST_SN);
                 });
         assertThat(histories.get(1))
                 .satisfies(history -> {
@@ -1206,80 +1052,120 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                     assertThat(snapshotOf(history.getAfterSnapshot()))
                             .containsEntry("priority", 20)
                             .containsEntry("defaultBinding", false)
-                            .containsEntry("status", "SUSPENDED")
+                            .containsEntry("state", "SUSPENDED")
+                            .containsEntry("description", "temporarily suspended")
+                            .containsEntry("contextVariables", "{\"ticket\":\"PI-007\"}")
                             .containsEntry("version", 2);
                     assertThat(history.getOperatorId()).isEqualTo(OPERATOR_ID);
                     assertThat(history.getChangeReason()).isEqualTo("risk review");
-                    assertThat(history.getRequestSn()).isEqualTo(CHANGE_BINDING_REQUEST_SN);
                 });
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isEqualTo(2);
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", bindingSn)).isEqualTo(2);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
-    void testChangePaymentInstrumentBindingShouldReturnExistingWhenRequestSnReplayed() {
+    void testChangePaymentInstrumentBindingShouldIgnoreRepeatedTargetState() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
-        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        Long bindingId = paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        PaymentInstrumentBindingDTO created = binding(FUNDING_ACCOUNT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
         ChangePaymentInstrumentBindingRequest request = new ChangePaymentInstrumentBindingRequest()
-                .setBindingSn(BINDING_SN)
+                .setBindingSn(created.getSn())
                 .setTenantId(TENANT_ID)
-                .setPriority(20)
-                .setDefaultBinding(Boolean.FALSE)
-                .setStatus(FundsAccountStatus.SUSPENDED)
+                .setState(PaymentInstrumentBindingState.SUSPENDED)
                 .setOperatorId(OPERATOR_ID)
-                .setChangeReason("risk review")
-                .setRequestSn(CHANGE_BINDING_REQUEST_SN)
-                .setContextVariables("{\"ticket\":\"PI-007\"}");
-        Long firstChangedBindingId = paymentInstrumentService.changePaymentInstrumentBinding(request);
-        Long replayedChangedBindingId = paymentInstrumentService.changePaymentInstrumentBinding(request);
+                .setChangeReason("risk review");
 
-        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
-                new PaymentInstrumentBindingQuery()
-                        .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN),
-                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
-        assertThat(replayedChangedBindingId).isEqualTo(firstChangedBindingId);
+        Long firstChangedBindingId = paymentInstrumentService.changePaymentInstrumentBinding(request);
+        Long replayedBindingId = paymentInstrumentService.changePaymentInstrumentBinding(request);
+
+        PaymentInstrumentBindingDTO binding = binding(FUNDING_ACCOUNT_ID);
+        assertThat(firstChangedBindingId).isEqualTo(bindingId);
+        assertThat(replayedBindingId).isEqualTo(bindingId);
+        assertThat(binding.getState()).isEqualTo(PaymentInstrumentBindingState.SUSPENDED);
         assertThat(binding.getVersion()).isEqualTo(2);
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isEqualTo(2);
-        assertThat(countRows("t_payment_instrument_binding_history", "request_sn", CHANGE_BINDING_REQUEST_SN)).isOne();
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", created.getSn())).isEqualTo(2);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     @Test
-    void testChangePaymentInstrumentBindingShouldRejectRequestSnReplayFieldDrift() {
+    void testUnbindPaymentInstrumentBindingShouldDeleteCurrentStateAndKeepHistory() {
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
-        paymentInstrumentService.changePaymentInstrumentBinding(new ChangePaymentInstrumentBindingRequest()
-                .setBindingSn(BINDING_SN)
-                .setTenantId(TENANT_ID)
-                .setPriority(20)
-                .setDefaultBinding(Boolean.FALSE)
-                .setStatus(FundsAccountStatus.SUSPENDED)
-                .setOperatorId(OPERATOR_ID)
-                .setChangeReason("risk review")
-                .setRequestSn(CHANGE_BINDING_REQUEST_SN));
+        PaymentInstrumentBindingDTO created = binding(FUNDING_ACCOUNT_ID);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        LocalDateTime effectiveAt = LocalDateTime.now().minusMinutes(1).withNano(0);
+        UnbindPaymentInstrumentBindingRequest request = new UnbindPaymentInstrumentBindingRequest()
+                .setTenantId(TENANT_ID)
+                .setBindingSn(created.getSn())
+                .setOperatorId(OPERATOR_ID)
+                .setChangeReason("account detached")
+                .setEffectiveAt(effectiveAt);
 
-        assertThatThrownBy(() -> paymentInstrumentService.changePaymentInstrumentBinding(
-                new ChangePaymentInstrumentBindingRequest()
-                        .setBindingSn(BINDING_SN)
-                        .setTenantId(TENANT_ID)
-                        .setPriority(30)
-                        .setOperatorId(OPERATOR_ID)
-                        .setChangeReason("risk review")
-                        .setRequestSn(CHANGE_BINDING_REQUEST_SN)))
-                .hasMessageContaining("支付工具绑定请求流水号重放字段不一致");
+        paymentInstrumentService.unbindPaymentInstrumentBinding(request);
+        paymentInstrumentService.unbindPaymentInstrumentBinding(request);
 
-        PaymentInstrumentBindingDTO binding = paymentInstrumentService.queryPaymentInstrumentBindings(
+        assertThat(paymentInstrumentService.queryPaymentInstrumentBindings(
                 new PaymentInstrumentBindingQuery()
                         .setTenantId(TENANT_ID)
-                        .setSn(BINDING_SN),
-                DefaultPageQueryOptions.defaults(10)).getRecords().getFirst();
-        assertThat(binding.getPriority()).isEqualTo(20);
-        assertThat(binding.getVersion()).isEqualTo(2);
-        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", BINDING_SN)).isEqualTo(2);
+                        .setSn(created.getSn()),
+                DefaultPageQueryOptions.defaults(10)).getRecords()).isEmpty();
+        List<PaymentInstrumentBindingHistoryDTO> histories =
+                paymentInstrumentService.queryPaymentInstrumentBindingHistories(
+                        new PaymentInstrumentBindingHistoryQuery()
+                                .setTenantId(TENANT_ID)
+                                .setBindingSn(created.getSn()),
+                        DefaultPageQueryOptions.defaults(10)).getRecords();
+        assertThat(histories).hasSize(2);
+        assertThat(histories).anySatisfy(history -> {
+            assertThat(history.getChangeType()).isEqualTo(PaymentInstrumentBindingChangeType.UNBIND);
+            assertThat(history.getVersion()).isEqualTo(2);
+            assertThat(history.getBeforeSnapshot()).isNotBlank();
+            assertThat(history.getAfterSnapshot()).isNull();
+            assertThat(history.getOperatorId()).isEqualTo(OPERATOR_ID);
+            assertThat(history.getChangeReason()).isEqualTo("account detached");
+            assertThat(history.getEffectiveAt()).isEqualTo(effectiveAt);
+        });
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testUnbindPaymentInstrumentBindingShouldRejectMissingBindingSnWithoutMutation() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        PaymentInstrumentBindingDTO created = binding(FUNDING_ACCOUNT_ID);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.unbindPaymentInstrumentBinding(
+                new UnbindPaymentInstrumentBindingRequest()
+                        .setTenantId(TENANT_ID)
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("account detached")))
+                .hasMessageContaining("支付工具绑定号不能为空");
+
+        assertThat(binding(FUNDING_ACCOUNT_ID).getId()).isEqualTo(created.getId());
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", created.getSn())).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    @Test
+    void testUnbindPaymentInstrumentBindingShouldRejectFutureEffectiveAtWithoutMutation() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        PaymentInstrumentBindingDTO created = binding(FUNDING_ACCOUNT_ID);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentService.unbindPaymentInstrumentBinding(
+                new UnbindPaymentInstrumentBindingRequest()
+                        .setTenantId(TENANT_ID)
+                        .setBindingSn(created.getSn())
+                        .setOperatorId(OPERATOR_ID)
+                        .setChangeReason("scheduled detach")
+                        .setEffectiveAt(LocalDateTime.now().plusDays(1))))
+                .hasMessageContaining("支付工具绑定变更 effectiveAt 不能晚于当前时间");
+
+        assertThat(binding(FUNDING_ACCOUNT_ID).getId()).isEqualTo(created.getId());
+        assertThat(countRows("t_payment_instrument_binding_history", "binding_sn", created.getSn())).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -1294,21 +1180,9 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     }
 
     private void cleanupPaymentInstrumentTestData() {
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE binding_sn IN (?, ?, ?, ?, ?, ?)",
-                BINDING_SN,
-                LONG_SUBJECT_BINDING_SN,
-                DUPLICATE_DEFAULT_BINDING_SN,
-                CONCURRENT_DEFAULT_BINDING_SN,
-                PRIORITY_CONFLICT_BINDING_SN,
-                PRIORITY_ORDER_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE sn IN (?, ?, ?, ?, ?, ?)",
-                BINDING_SN,
-                LONG_SUBJECT_BINDING_SN,
-                DUPLICATE_DEFAULT_BINDING_SN,
-                CONCURRENT_DEFAULT_BINDING_SN,
-                PRIORITY_CONFLICT_BINDING_SN,
-                PRIORITY_ORDER_BINDING_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_guard WHERE instrument_sn IN (?)",
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn = ?",
+                PAYMENT_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn = ?",
                 PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 PAYMENT_INSTRUMENT_SN,
@@ -1338,7 +1212,6 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(BINDING_SN)
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                 .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
@@ -1348,47 +1221,49 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
                 .setPriority(10)
                 .setDefaultBinding(Boolean.TRUE)
                 .setOperatorId(OPERATOR_ID)
-                .setChangeReason("bind funding account")
-                .setRequestSn(CREATE_BINDING_REQUEST_SN);
+                .setChangeReason("bind funding account");
     }
 
     private CreatePaymentInstrumentBindingRequest createSecondBindingRequest() {
         return createBindingRequest()
-                .setSn(DUPLICATE_DEFAULT_BINDING_SN)
                 .setSubjectId(SECOND_FUNDING_ACCOUNT_ID)
-                .setPriority(20)
-                .setRequestSn(DUPLICATE_DEFAULT_CREATE_REQUEST_SN);
+                .setPriority(20);
     }
 
     private CreatePaymentInstrumentBindingRequest createPriorityConflictBindingRequest() {
         return createBindingRequest()
-                .setSn(PRIORITY_CONFLICT_BINDING_SN)
                 .setSubjectId(SECOND_FUNDING_ACCOUNT_ID)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.FALSE)
-                .setRequestSn(PRIORITY_CONFLICT_CREATE_REQUEST_SN);
+                .setDefaultBinding(Boolean.FALSE);
     }
 
     private CreatePaymentInstrumentBindingRequest createPriorityOrderBindingRequest() {
         return createBindingRequest()
-                .setSn(PRIORITY_ORDER_BINDING_SN)
                 .setSubjectId(SECOND_FUNDING_ACCOUNT_ID)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.FALSE)
-                .setRequestSn(PRIORITY_ORDER_CREATE_REQUEST_SN);
+                .setDefaultBinding(Boolean.FALSE);
     }
 
-    private Callable<BindingAttemptResult> concurrentBindingAttempt(CountDownLatch startGate,
-                                                                    CreatePaymentInstrumentBindingRequest request) {
-        return () -> {
-            startGate.await();
-            try {
-                paymentInstrumentService.createPaymentInstrumentBinding(request);
-                return new BindingAttemptResult(true, null);
-            } catch (RuntimeException ex) {
-                return new BindingAttemptResult(false, ex.getMessage());
-            }
-        };
+    private List<PaymentInstrumentBindingDTO> findBindings(String subjectId) {
+        return paymentInstrumentService.queryPaymentInstrumentBindings(
+                new PaymentInstrumentBindingQuery()
+                        .setTenantId(TENANT_ID)
+                        .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                        .setBindingRole(PaymentInstrumentBindingRole.FUNDING_SUBJECT)
+                        .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                        .setSubjectId(subjectId)
+                        .setCurrency(CurrencyIsoCode.USD),
+                DefaultPageQueryOptions.defaults(10)).getRecords();
+    }
+
+    private PaymentInstrumentBindingDTO binding(String subjectId) {
+        List<PaymentInstrumentBindingDTO> bindings = findBindings(subjectId);
+        assertThat(bindings).singleElement();
+        return bindings.getFirst();
+    }
+
+    private String bindingSn(String subjectId) {
+        return binding(subjectId).getSn();
     }
 
     private void assertPaymentInstrumentToStringDoesNotExposeSensitiveIdentifiers(Object value) {
@@ -1414,12 +1289,8 @@ class PaymentInstrumentServiceImplTests extends AbstractFundsServiceTest {
     @Import({
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
-            PaymentInstrumentBindingHistoryServiceImpl.class,
-            PaymentInstrumentBindingConcurrencyGuard.class
+            PaymentInstrumentBindingHistoryServiceImpl.class
     })
     static class Config {
-    }
-
-    private record BindingAttemptResult(boolean succeeded, String message) {
     }
 }

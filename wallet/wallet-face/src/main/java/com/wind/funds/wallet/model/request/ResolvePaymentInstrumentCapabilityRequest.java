@@ -41,10 +41,9 @@ public class ResolvePaymentInstrumentCapabilityRequest {
     @NotNull
     private CurrencyIsoCode currency;
 
-    @Schema(description = "期望绑定角色")
-    @NotNull
+    @Schema(description = "期望绑定角色；不需要解析绑定快照时可不传")
     private PaymentInstrumentBindingRole bindingRole;
 
-    @Schema(description = "期望绑定版本，用于防止换绑后继续使用旧快照")
+    @Schema(description = "期望绑定版本，用于防止换绑后继续使用旧快照；传入时必须同时指定绑定角色")
     private Integer expectedBindingVersion;
 }

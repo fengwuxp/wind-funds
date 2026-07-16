@@ -67,6 +67,17 @@ public interface PaymentInstrumentBindingService {
     @NonNull Long updatePaymentInstrumentBinding(@NonNull UpdatePaymentInstrumentBindingRequest request);
 
     /**
+     * 按期望版本删除支付工具绑定当前态。
+     *
+     * @param tenantId 租户 ID
+     * @param bindingSn 绑定号
+     * @param expectedVersion 期望版本
+     */
+    void deletePaymentInstrumentBinding(@NonNull Long tenantId,
+                                        @NonNull String bindingSn,
+                                        @NonNull Integer expectedVersion);
+
+    /**
      * 判断是否存在同工具、同角色、同币种的重叠 ACTIVE 默认绑定。
      *
      * @param binding 待校验绑定

@@ -55,8 +55,9 @@
 | `transaction` 余额控制 | 可接入。 | 冻结、解冻、受控余额调整和失败无副作用。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`，不表达扣款、消费或跨主体转移。 |
 | 让利出资记账 | 可接入。 | 上游已决策的平台、商户或合作方让利出资入账，以及按原交易冲回。 | 不计算券、不维护券生命周期、不保存营销归因；非入账权益不进本服务。 |
 | 外部确认入金 | 可接入。 | `confirmed credit -> funding account` 转为标准充值。 | accepted、submitted、processing、message sent、VA 未匹配、错币种和外部账户入账均不得进入本入口。 |
+| FX 来源价格与金额换算 | 可接入。 | `FxRateProvider` 是由接入方实现并注入的汇率来源端口，提供含 `snapshotId`、`observedAt` 和 `MID/BID/ASK` 的来源快照；跨币种换算可显式传入最终 `FxAppliedRate`，也可指定 `FxPriceType` 由换算服务查询来源快照并选价。 | wind-funds 不提供默认汇率来源实现；`FxAppliedRate` 与 `FxPriceType` 互斥且不默认选价。客户加点、quote、费用、有效期、锁汇、历史行情、换汇执行、合规和资金入账仍由上层业务或专项承接。 |
 | 清结算 / 对账 / 归档 / 治理 | 不作为本文生产接入承诺。 | 可只读消费主链事实；已存在局部服务和测试只能作为专项依据。 | 需要独立产品设计、系统设计、TDD、DDL/H2、服务级测试、Runbook 和 owner 确认。 |
-| VCC / 全球账户 / ACH / 收单 / FX / 退汇 | P2 边界设计，不进入默认实现。 | 可复用主链事实和外部引用边界。 | 业务生命周期、外部规则、通道协议、合规、敏感数据和专项回归未确认前，不得声明生产可用。 |
+| VCC / 全球账户 / ACH / 收单 / FX quote 与执行 / 退汇 | P2 边界设计，不进入默认实现。 | 可复用主链事实、外部引用边界和显式 FX 金额计算。 | 业务生命周期、外部规则、通道协议、合规、敏感数据和专项回归未确认前，不得声明生产可用。 |
 
 ## 5. 业务事实说明卡
 
@@ -211,7 +212,7 @@ SC-LOOP-06 准出交接卡：
 | 试点能力 | 单条规则只读评估、最终决策证据固化、控制流水、控制投影和交易消费 / 释放 / 退款补偿。 |
 | 推荐入口 | `evaluate` -> `resolve` -> `adjustLimit` -> 交易层入口 -> `consume`。 |
 | 生产前证据 | 规则变更审计、最终决策证据、历史窗口查询、告警 / Runbook、灰度 / 回滚。 |
-| 不接入范围 | P2 VCC / 全球账户 / ACH / 收单 / FX、Highnote 托管规则引擎、rolling amount、cooldown、协同授权 webhook、完整生产启用或上线审批。 |
+| 不接入范围 | P2 VCC / 全球账户 / ACH / 收单 / FX quote 与执行、Highnote 托管规则引擎、rolling amount、cooldown、协同授权 webhook、完整生产启用或上线审批。 |
 
 推荐入口：
 
@@ -258,6 +259,10 @@ flowchart LR
 
 全球账户、跨境收付款、ACH/银行转账和本地清算网络只作为上层业务能力包接入资金底座。接入方必须先完成产品生命周期、外部协议、合规材料、FX 决策、通道状态和对账来源解释，再把已经成立的资金事实交给 `wallet`、`transaction` 和 `ledger`。
 
+`FxRateProvider` 是由接入方实现并注入的汇率来源端口，wind-funds 不提供默认实现，也不关心具体汇率来源及其接入方式。`FxRateProvider#getRateSnapshot` 只提供当前可用的来源价格快照。`FxRateSnapshot` 使用必填 `snapshotId` 标识 Wind 归一化快照，使用 `observedAt` 表达来源价格观测时间，并保留汇率提供方视角的 `MID/BID/ASK`；它不表达 provider、报价有效期、业务加点或换汇执行。接入方负责选择来源价格、完成客户定价或业务加点，并保存来源快照与最终决策的关联。
+
+`FxAmountConversionService` 支持两种互斥模式：上层已完成客户加点或报价时显式传入最终 `FxAppliedRate`，服务不再查询 provider；只需按来源价格换算时指定 `FxPriceType.MID/BID/ASK`，服务调用 `FxRateProvider` 获取当前快照，选择对应价格并以 `snapshotId` 形成 `FxAppliedRate.rateId`。请求必须包含源金额和目标币种；跨币种必须提供 `FxAppliedRate` 或 `FxPriceType`，同币种两者都不需要并按 `rate=1` 处理。舍入模式默认 `HALF_UP` 且允许上层覆盖，以 `CurrencyIsoCode.getPrecision()` 为唯一币种精度来源，服务只在目标币种精度舍入一次。`TransactionAmount.converted(FxAmountConversionResult)` 可直接承接目标金额、原币金额和最终汇率；`rateId` 只保留在换算结果的 `FxAppliedRate` 中。应用汇率最多支持 10 位整数和 8 位小数，超出账本 `DECIMAL(18,8)` 无损保存范围时在进入交易前失败。`UNKNOWN` 不能作为源币种、目标币种或汇率事实币种；源金额、目标金额或目标币种舍入结果非正，以及金额超出系统上限时均明确失败，不会静默截断、溢出或变成负数。有关联原支付路径的退款、授权退款和费用退款必须通过 `TransactionAmount` 显式传入本次退款目标金额、对应原币金额和原支付快照汇率；部分退款不能复制原交易整笔原币金额，汇率与原支付 route leg 快照不一致时失败，也不能重新查询当前 provider。找不到原支付路径但经上层业务确认允许承接的退款，由上层提供完整、已确认的本次资金事实，不伪造原路由。授权撤销、清算、历史重算和对账同样只消费已确认的金额与汇率事实；`FxAppliedRate` 不能替代 quote、有效期、费用、审批、换汇执行结果或资金入账事实。
+
 | 外部事实或状态 | 能否进入资金底座 | 推荐入口 | 必须带上的证据 | 不能做 |
 | --- | --- | --- | --- | --- |
 | 外部已确认入金，且目标是内部资金账户。 | 可以。 | `ExternalFundsEventApplicationService.consume` 或 `InstrumentTransactionLifecycleApplicationService.receiveByInstrument`。 | 外部事件流水、confirmed credit 类型、目标资金账户、金额、币种、业务流水、外部 rail / provider 引用。 | 不把 VA、银行账户或外部账户建成 ledger subject。 |
@@ -298,7 +303,7 @@ flowchart LR
 | 失败无副作用 | 准入失败、余额不足、规则拒绝、外部非终态和路由失败不得留下错误资金事实。 |
 | 账务验收 | 已验证 transaction、route、posting、ledger transaction、ledger entry、余额桶和投影查询。 |
 | 敏感数据 | 不在 request、contextVariables、日志或审计摘要中保存 PAN、CVV、密钥、证件号、手机号或外部账号原文。 |
-| P2 边界 | VCC、全球账户、ACH、收单、FX、退汇、NOC、外部 rail reversal、多币种对账和通道协议未进入本轮交付承诺。 |
+| P2 边界 | VCC、全球账户、ACH、收单、FX quote 与执行、退汇、NOC、外部 rail reversal、多币种对账和通道协议未进入本轮交付承诺；已提供的 FX 来源价格与金额换算不改变该边界。 |
 
 ### 8.2 发布 Runbook
 
@@ -319,6 +324,7 @@ flowchart LR
 | ledger 接入说明或账本事实 | `just verify-slice DefaultLedgerPostingAssemblerTests,LedgerServiceImplTests,LedgerTransactionServiceImplTests,LedgerBalanceProjectionServiceImplTests tests` |
 | wallet 接入说明 | `just verify-slice FundsAccountCapabilityApplicationServiceTests,PaymentInstrumentCapabilityApplicationServiceTests,FundingResponsibilityResolutionApplicationServiceTests,SpendControlAdmissionApplicationServiceTests tests` |
 | transaction 接入说明 | `just verify-slice FundsDirectTransactionFlowTests,FundsAuthorizationTransactionFlowTests,FundsTransactionFeeFlowTests,FundsBalanceControlFailureFlowTests tests` |
+| FX 来源价格和金额换算 | `just test-fx` |
 | 让利或外部入金说明 | `just verify-slice FundsBenefitContributionTransactionServiceContractTests,FundsBenefitContributionTransactionServiceFlowTests,ExternalFundsEventApplicationServiceTests tests` |
 | 模块边界 | `just test-boundary` |
 | 收口 | `just verify-cad` |

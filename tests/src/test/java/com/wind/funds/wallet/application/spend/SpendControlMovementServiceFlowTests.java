@@ -35,7 +35,6 @@ import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingConcurrencyGuard;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
@@ -77,8 +76,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     private static final String SECOND_CREDIT_ACCOUNT_SN = "sca_second_credit_account";
 
     private static final String PAYMENT_INSTRUMENT_SN = "spend_control_movement_card";
-
-    private static final String PAYMENT_BINDING_SN = "spend_control_movement_binding";
 
     private static final String OWNER_ID = "spend_control_movement_owner";
 
@@ -418,6 +415,53 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：业务确认型退款补偿绕过交易编排，直接进入控制额度变动写入入口。
+     * 输入：当前周期净消费 60，尝试补偿 70。
+     * 输出：拒绝写入控制补偿流水。
+     * 红线：控制流水写入边界必须保证退款补偿不会把周期净消费打成负数。
+     */
+    @Test
+    void testRecordBusinessConfirmedRefundShouldRejectAmountOverNetConsumed() {
+        prepareSpendControlMovementData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
+        spendControlMovementService.recordMovement(limitIncreaseRequest(
+                "activity_limit_increased_for_refund_guard",
+                PERIOD_ID,
+                100L,
+                "sha256:activity-limit-increased-for-refund-guard"));
+        spendControlMovementService.recordMovement(recordRequest(decision,
+                RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED,
+                "sha256:activity-reserved-for-refund-guard"));
+        spendControlMovementService.recordMovement(recordRequest(decision,
+                "activity_consumed_for_refund_guard",
+                SpendControlMovementType.CONSUMED,
+                "sha256:activity-consumed-for-refund-guard")
+                .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
+                .setTransactionSn("transaction_consumed_for_refund_guard"));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        RecordSpendControlMovementRequest refundRequest = recordRequest(decision,
+                "activity_refund_over_consumed_guard",
+                SpendControlMovementType.REFUND_COMPENSATED,
+                "sha256:activity-refund-over-consumed-guard")
+                .setAction(PaymentInstrumentAction.REFUND)
+                .setAmount(70L)
+                .setSpendDecisionSn(null)
+                .setSpendDecisionResult(null)
+                .setSpendDecisionDigest(null)
+                .setReasonCode("BUSINESS_CONFIRMED_REFUND")
+                .setOperatorId("refund-confirmation-service")
+                .setAuditReferenceSn("audit:refund-over-consumed-guard");
+
+        assertThatThrownBy(() -> spendControlMovementService.recordMovement(refundRequest))
+                .hasMessageContaining("退款控制补偿金额超过当前周期净消费控制金额");
+
+        assertThat(activityCount(refundRequest.getMovementSn())).isZero();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一支出控制范围和 Spend Rule 下其他账户仍有可释放占用。
      * 输入：主账户已释放完毕，第二个信用账户仍有 RESERVED 控制占用，再尝试释放主账户。
      * 输出：主账户释放请求被拒绝，不借用其他账户的剩余额度。
@@ -641,8 +685,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(PAYMENT_BINDING_SN)
-                .setRequestSn(PAYMENT_BINDING_SN + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                 .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
@@ -650,8 +692,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setDefaultBinding(Boolean.TRUE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
@@ -715,7 +756,6 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
             DefaultSubjectLedgerInitializer.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
-            PaymentInstrumentBindingConcurrencyGuard.class,
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
             PaymentInstrumentBindingHistoryServiceImpl.class,

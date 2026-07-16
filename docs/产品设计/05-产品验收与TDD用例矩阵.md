@@ -438,6 +438,7 @@ AC-SET-006 至 AC-SET-009 是产品验收口径。出款前准入设计只能作
 | AC-RAIL-009 | 全球付款退汇 | 原付款被退回。 | 生成退汇事实、费用和责任处理。 | 退汇不是退款。 |
 | AC-FX-001 | 错币种到账 | 期望 USD，实际 EUR。 | 挂账、驳回或生成错币种差错。 | 不自动按 USD 入账。 |
 | AC-FX-002 | 业务换汇调整 | 有外部或业务 FX 决策快照。 | 记录原币、目标币、汇率、费用和审批。 | 底座不声明执行结售汇。 |
+| AC-FX-003 | 来源价格与金额换算 | 接入方实现并注入 `FxRateProvider`，按币种对提供含 `snapshotId`、`observedAt` 和 `MID/BID/ASK` 的来源价格快照；跨币种换算可显式传入上层最终 `FxAppliedRate`，也可指定 `FxPriceType` 由 `FxAmountConversionService` 查询来源快照并选价。 | 返回目标金额和本次实际应用汇率；来源价格模式以 `snapshotId` 作为 `FxAppliedRate.rateId`；结果可直接构造只承载目标金额、原币金额和最终汇率的 `TransactionAmount`；同币种按 `1` 返回；未知币种、快照币种对错误、目标金额舍入为零或超出系统上限时明确失败。 | wind-funds 不提供默认汇率来源实现；`FxAppliedRate` 与 `FxPriceType` 互斥且不默认选价，默认 `HALF_UP` 且允许上层覆盖，以 `CurrencyIsoCode.getPrecision()` 为唯一精度来源并只按目标币种精度舍入一次；客户加点和报价由上层形成最终 `FxAppliedRate`；不得把 `UNKNOWN` 当作真实币种，不得静默截断或溢出；不创建 quote、费用、锁汇、换汇执行、资金交易或账本事实。 |
 
 ### 5.9 运营后台、权限和报表指标
 

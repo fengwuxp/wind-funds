@@ -5,7 +5,6 @@ import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.spec.transaction.FeeSpec;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -30,9 +29,9 @@ public class FundsTransactionRefundRequest {
     @NotNull
     private FundsAccountId accountId;
 
-    @Schema(description = "退款金额")
+    @Schema(description = "退款交易金额")
     @NotNull
-    private Money amount;
+    private TransactionAmount transactionAmount;
 
     @Schema(description = "本次交易显式手续费规则")
     private FeeSpec feeSpec;

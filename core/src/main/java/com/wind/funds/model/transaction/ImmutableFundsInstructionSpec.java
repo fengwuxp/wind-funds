@@ -2,6 +2,7 @@ package com.wind.funds.model.transaction;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
+import com.wind.funds.fx.FxAppliedRate;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.operation.FundsOperationActorSpec;
 import com.wind.funds.route.ref.ExternalAccountRefSpec;
@@ -76,6 +77,16 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
         if (exchangeRate.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("fundsInstruction.exchangeRate must be positive");
         }
+        if (amount.getCurrency() == originalAmount.getCurrency()) {
+            if (amount.getAmount() != originalAmount.getAmount()) {
+                throw new IllegalArgumentException(
+                        "fundsInstruction.originalAmount must equal amount for same currency");
+            }
+            if (exchangeRate.compareTo(BigDecimal.ONE) != 0) {
+                throw new IllegalArgumentException("fundsInstruction.exchangeRate must be 1 for same currency");
+            }
+        }
+        FxAppliedRate.validateSupportedPrecision(exchangeRate);
         if (ledgerPeriodType == null) {
             AssertUtils.isTrue(ledgerPeriodId == null,
                     "fundsInstruction.ledgerPeriodType must not be null when ledgerPeriodId is present");

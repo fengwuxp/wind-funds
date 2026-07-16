@@ -85,7 +85,6 @@ import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingConcurrencyGuard;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
@@ -137,8 +136,6 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private static final String PAYMENT_INSTRUMENT_SN = "pi_auth_admission_card";
 
     private static final String RECEIVE_INSTRUMENT_SN = "pi_auth_admission_receive";
-
-    private static final String PAYMENT_BINDING_SN = "pi_auth_admission_binding";
 
     private static final String OWNER_ID = "owner_auth_admission";
 
@@ -561,8 +558,6 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(PAYMENT_BINDING_SN)
-                .setRequestSn(PAYMENT_BINDING_SN + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                 .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
@@ -570,8 +565,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setDefaultBinding(Boolean.TRUE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
@@ -813,7 +807,8 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
         JSONObject bindingSnapshot = paymentInstrumentRef.getJSONObject("bindingSnapshot");
         assertThat(bindingSnapshot).isNotNull().isNotEmpty();
-        assertThat(bindingSnapshot.getString("bindingSn")).isEqualTo(PAYMENT_BINDING_SN);
+        String bindingSn = bindingSnapshot.getString("bindingSn");
+        assertThat(bindingSn).isNotBlank();
         assertThat(bindingSnapshot.getInteger("bindingVersion")).isEqualTo(1);
         assertThat(bindingSnapshot.getString("bindingRole"))
                 .isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name());
@@ -829,13 +824,17 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
     private void assertAuthorizationAdmissionContextSnapshot(String businessSn, FundsAccountId targetAccountId) {
         JSONObject contextVariables = JSON.parseObject(transactionContextVariablesJson(businessSn));
+        String bindingSn = JSON.parseObject(routeSnapshotJson(businessSn))
+                .getJSONObject("paymentInstrumentRef")
+                .getJSONObject("bindingSnapshot")
+                .getString("bindingSn");
 
         assertThat(contextVariables).isNotNull().isNotEmpty();
         assertThat(contextVariables.getString("instrumentSn")).isEqualTo(PAYMENT_INSTRUMENT_SN);
         assertThat(contextVariables.getString("instrumentAction")).isEqualTo("AUTHORIZE");
         assertThat(contextVariables.getString("instrumentBindingRole"))
                 .isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name());
-        assertThat(contextVariables.getString("instrumentBindingSn")).isEqualTo(PAYMENT_BINDING_SN);
+        assertThat(contextVariables.getString("instrumentBindingSn")).isEqualTo(bindingSn);
         assertThat(contextVariables.getInteger("instrumentBindingVersion")).isEqualTo(1);
         assertThat(contextVariables.getString("fundingRelationSn")).isNotBlank();
         assertThat(contextVariables.getString("fundingRelationType"))
@@ -858,8 +857,10 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                         .build());
 
         assertThat(explanation.evidenceRefs())
-                .contains("paymentInstrument:" + PAYMENT_INSTRUMENT_SN,
-                        "paymentInstrumentBinding:" + PAYMENT_BINDING_SN + ":v1");
+                .contains("paymentInstrument:" + PAYMENT_INSTRUMENT_SN)
+                .anySatisfy(evidenceRef -> assertThat(evidenceRef)
+                        .startsWith("paymentInstrumentBinding:PIB")
+                        .endsWith(":v1"));
         assertThat(explanation.payload()).containsKey("paymentInstrumentRef");
         @SuppressWarnings("unchecked")
         Map<String, Object> paymentInstrumentRef = (Map<String, Object>) explanation.payload()
@@ -876,13 +877,13 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         @SuppressWarnings("unchecked")
         Map<String, Object> bindingSnapshot = (Map<String, Object>) paymentInstrumentRef.get("bindingSnapshot");
         assertThat(bindingSnapshot)
-                .containsEntry("bindingSn", PAYMENT_BINDING_SN)
                 .containsEntry("bindingVersion", 1)
                 .containsEntry("bindingRole", PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name())
                 .containsEntry("subjectType", FundsSubjectType.CREDIT_ACCOUNT.name())
                 .containsEntry("subjectId", CREDIT_ACCOUNT_SN)
                 .containsEntry("admissionAction", "AUTHORIZE")
                 .containsEntry("admissionDecision", "APPROVED");
+        assertThat(bindingSnapshot.get("bindingSn")).asString().startsWith("PIB");
     }
 
     private void assertAuthorizationProjectionSpendRuleExplanation(String authorizationSn) {
@@ -986,7 +987,6 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
-            PaymentInstrumentBindingConcurrencyGuard.class,
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
             PaymentInstrumentBindingHistoryServiceImpl.class,

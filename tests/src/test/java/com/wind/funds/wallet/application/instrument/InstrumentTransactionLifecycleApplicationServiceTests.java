@@ -82,7 +82,6 @@ import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingConcurrencyGuard;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
@@ -136,10 +135,6 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     private static final String PAYOUT_INSTRUMENT_SN = "pi_lifecycle_payout";
 
     private static final String PAYOUT_INSTRUMENT_NO = "VA-PAYOUT-1357";
-
-    private static final String RECEIVE_BINDING_SN = "pi_lifecycle_receive_binding";
-
-    private static final String PAYOUT_BINDING_SN = "pi_lifecycle_payout_binding";
 
     private static final String OWNER_ID = "owner_instrument_lifecycle";
 
@@ -474,8 +469,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         createTestLedger(prepaymentAccountId(), LedgerSubjectCode.PREPAYMENT, 0L);
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(RECEIVE_INSTRUMENT_SN,
                 PaymentInstrumentFlowDirection.INBOUND));
-        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(RECEIVE_INSTRUMENT_SN,
-                RECEIVE_BINDING_SN));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(RECEIVE_INSTRUMENT_SN));
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
     }
 
@@ -483,7 +477,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYOUT_INSTRUMENT_SN,
                 PaymentInstrumentFlowDirection.OUTBOUND, PAYOUT_INSTRUMENT_NO));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(PAYOUT_INSTRUMENT_SN,
-                PAYOUT_BINDING_SN, PaymentInstrumentBindingRole.PAYMENT_SUBJECT));
+                PaymentInstrumentBindingRole.PAYMENT_SUBJECT));
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest(
                 SpendSubjectFundingRelationType.FUNDING_SOURCE));
     }
@@ -579,17 +573,13 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         return instrumentSn + "_external";
     }
 
-    private CreatePaymentInstrumentBindingRequest createBindingRequest(String instrumentSn,
-                                                                       String bindingSn) {
-        return createBindingRequest(instrumentSn, bindingSn, PaymentInstrumentBindingRole.RECEIVE_SUBJECT);
+    private CreatePaymentInstrumentBindingRequest createBindingRequest(String instrumentSn) {
+        return createBindingRequest(instrumentSn, PaymentInstrumentBindingRole.RECEIVE_SUBJECT);
     }
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest(String instrumentSn,
-                                                                       String bindingSn,
                                                                        PaymentInstrumentBindingRole bindingRole) {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(bindingSn)
-                .setRequestSn(bindingSn + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(instrumentSn)
                 .setBindingRole(bindingRole)
@@ -597,8 +587,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setDefaultBinding(Boolean.TRUE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
@@ -778,7 +767,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         assertThat(paymentInstrumentRef.toString()).doesNotContain("va_lifecycle_2468");
         JSONObject bindingSnapshot = paymentInstrumentRef.getJSONObject("bindingSnapshot");
         assertThat(bindingSnapshot).isNotNull().isNotEmpty();
-        assertThat(bindingSnapshot.getString("bindingSn")).isEqualTo(RECEIVE_BINDING_SN);
+        assertThat(bindingSnapshot.getString("bindingSn")).startsWith("PIB");
         assertThat(bindingSnapshot.getInteger("bindingVersion")).isEqualTo(1);
         assertThat(bindingSnapshot.getString("bindingRole"))
                 .isEqualTo(PaymentInstrumentBindingRole.RECEIVE_SUBJECT.name());
@@ -832,7 +821,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         assertThat(paymentInstrumentRef.getString("status")).isEqualTo(FundsAccountStatus.ACTIVE.name());
         JSONObject bindingSnapshot = paymentInstrumentRef.getJSONObject("bindingSnapshot");
         assertThat(bindingSnapshot).isNotNull().isNotEmpty();
-        assertThat(bindingSnapshot.getString("bindingSn")).isEqualTo(PAYOUT_BINDING_SN);
+        assertThat(bindingSnapshot.getString("bindingSn")).startsWith("PIB");
         assertThat(bindingSnapshot.getInteger("bindingVersion")).isEqualTo(1);
         assertThat(bindingSnapshot.getString("bindingRole"))
                 .isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT.name());
@@ -900,7 +889,6 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
-            PaymentInstrumentBindingConcurrencyGuard.class,
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
             PaymentInstrumentBindingHistoryServiceImpl.class,

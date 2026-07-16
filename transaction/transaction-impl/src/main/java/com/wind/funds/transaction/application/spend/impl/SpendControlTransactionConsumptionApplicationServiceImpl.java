@@ -2,26 +2,21 @@ package com.wind.funds.transaction.application.spend.impl;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.common.exception.AssertUtils;
-import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
-import com.wind.funds.wallet.enums.PaymentInstrumentAction;
+import com.wind.funds.wallet.application.instrument.PaymentInstrumentCapabilityApplicationService;
 import com.wind.funds.wallet.application.spend.SpendControlTransactionConsumptionApplicationService;
+import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlMovementType;
-import com.wind.funds.wallet.model.dto.BudgetControlProjectionDTO;
-import com.wind.funds.wallet.model.dto.PaymentInstrumentDTO;
 import com.wind.funds.wallet.model.dto.SpendControlMovementDTO;
-import com.wind.funds.wallet.model.query.BudgetControlProjectionQuery;
-import com.wind.funds.wallet.model.query.PaymentInstrumentQuery;
 import com.wind.funds.wallet.model.query.SpendControlMovementQuery;
 import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
+import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentCapabilityRequest;
 import com.wind.funds.wallet.model.request.SpendControlBusinessConfirmedRefundCompensationRequest;
 import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
-import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import lombok.AllArgsConstructor;
@@ -29,7 +24,6 @@ import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,7 +44,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     private final SpendControlMovementService spendControlMovementService;
 
-    private final PaymentInstrumentService paymentInstrumentService;
+    private final PaymentInstrumentCapabilityApplicationService paymentInstrumentCapabilityApplicationService;
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
@@ -104,9 +98,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         if (hasRecordedMovement(request)) {
             return spendControlMovementService.recordMovement(recordRequest);
         }
-        assertPaymentInstrumentActive(request);
-        BudgetControlProjectionDTO projection = getBudgetControlProjection(request);
-        assertBusinessConfirmedRefundAmountAllowed(request, projection);
+        assertPaymentInstrumentAvailable(request);
         return spendControlMovementService.recordMovement(recordRequest);
     }
 
@@ -147,62 +139,19 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         AssertUtils.hasText(request.getAuditReferenceSn(), "业务确认退款控制补偿审计引用不能为空");
     }
 
-    private void assertPaymentInstrumentActive(SpendControlBusinessConfirmedRefundCompensationRequest request) {
-        List<PaymentInstrumentDTO> instruments = paymentInstrumentService.queryPaymentInstruments(
-                new PaymentInstrumentQuery()
+    private void assertPaymentInstrumentAvailable(SpendControlBusinessConfirmedRefundCompensationRequest request) {
+        paymentInstrumentCapabilityApplicationService.resolvePaymentInstrumentCapability(
+                new ResolvePaymentInstrumentCapabilityRequest()
                         .setTenantId(request.getTenantId())
-                        .setSn(request.getInstrumentSn()),
-                DefaultPageQueryOptions.defaults(2)).getRecords();
-        AssertUtils.isFalse(instruments.isEmpty(), "支付工具不存在，instrumentSn = {}", request.getInstrumentSn());
-        AssertUtils.isTrue(instruments.size() == 1, "支付工具不唯一，instrumentSn = {}", request.getInstrumentSn());
-        PaymentInstrumentDTO instrument = instruments.getFirst();
-        AssertUtils.isTrue(instrument.getStatus() == FundsAccountStatus.ACTIVE,
-                "支付工具状态不可用，instrumentSn = {}", request.getInstrumentSn());
-        AssertUtils.isTrue(instrument.getCurrency() == request.getCurrency(),
-                "支付工具币种与请求币种不一致，instrumentSn = {}", request.getInstrumentSn());
-        AssertUtils.isTrue(isCurrentEffective(instrument.getValidFrom(), instrument.getValidTo()),
-                "支付工具不在当前有效期内，instrumentSn = {}", request.getInstrumentSn());
+                        .setInstrumentSn(request.getInstrumentSn())
+                        .setAction(PaymentInstrumentAction.REFUND)
+                        .setCurrency(request.getCurrency()));
     }
 
     private boolean hasRecordedMovement(SpendControlBusinessConfirmedRefundCompensationRequest request) {
         return !spendControlMovementService.queryMovements(new SpendControlMovementQuery()
                 .setTenantId(request.getTenantId())
                 .setMovementSn(request.getMovementSn())).isEmpty();
-    }
-
-    private boolean isCurrentEffective(LocalDateTime validFrom, LocalDateTime validTo) {
-        LocalDateTime now = LocalDateTime.now();
-        return (validFrom == null || !validFrom.isAfter(now)) && (validTo == null || validTo.isAfter(now));
-    }
-
-    private BudgetControlProjectionDTO getBudgetControlProjection(
-            SpendControlBusinessConfirmedRefundCompensationRequest request) {
-        String controlScopeId = controlScopeId(request);
-        return spendControlMovementService.getBudgetControlProjection(new BudgetControlProjectionQuery()
-                .setTenantId(request.getTenantId())
-                .setControlScopeId(controlScopeId)
-                .setPeriodId(request.getPeriodId())
-                .setCurrency(request.getCurrency())
-                .setSpendRuleId(request.getSpendRuleId())
-                .setSpendRuleVersion(request.getSpendRuleVersion())
-                .setTargetAccountId(request.getTargetAccountId()));
-    }
-
-    private void assertBusinessConfirmedRefundAmountAllowed(
-            SpendControlBusinessConfirmedRefundCompensationRequest request,
-            BudgetControlProjectionDTO projection) {
-        AssertUtils.isTrue(projection.getConsumedAmount() >= request.getAmount(),
-                "业务确认退款补偿金额超过当前周期净消费控制金额，movementSn = {}, consumedAmount = {}, amount = {}",
-                request.getMovementSn(),
-                projection.getConsumedAmount(),
-                request.getAmount());
-        long availableAfterCompensation = projection.getAvailableControlAmount() + request.getAmount();
-        AssertUtils.isTrue(availableAfterCompensation <= projection.getLimitAmount(),
-                "业务确认退款补偿后可用控制额度不能超过周期控制额度，movementSn = {}, limitAmount = {}, "
-                        + "availableAfterCompensation = {}",
-                request.getMovementSn(),
-                projection.getLimitAmount(),
-                availableAfterCompensation);
     }
 
     private SpendControlMovementDTO getOriginalReservedMovement(SpendControlTransactionConsumptionRequest request) {

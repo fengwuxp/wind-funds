@@ -7,6 +7,7 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
+import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionMode;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
@@ -15,7 +16,8 @@ import com.wind.funds.transaction.services.impl.DefaultFundsTransactionQueryServ
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.FundsAccountCapabilityApplicationService;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
-import com.wind.funds.transaction.application.spend.impl.SpendControlTransactionConsumptionApplicationServiceImpl;
+import com.wind.funds.wallet.application.instrument.PaymentInstrumentCapabilityApplicationService;
+import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -46,7 +48,6 @@ import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingConcurrencyGuard;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
@@ -94,8 +95,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     private static final String SECOND_CREDIT_ACCOUNT_SN = "sctc_second_credit_account";
 
     private static final String PAYMENT_INSTRUMENT_SN = "sctc_card";
-
-    private static final String PAYMENT_BINDING_SN = "sctc_binding";
 
     private static final String OWNER_ID = "sctc_owner";
 
@@ -214,6 +213,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     @Autowired
     private FundsAccountCapabilityApplicationService fundsAccountCapabilityApplicationService;
+
+    @Autowired
+    private PaymentInstrumentCapabilityApplicationService paymentInstrumentCapabilityApplicationService;
 
     @Autowired
     private FundsTransactionQueryService fundsTransactionQueryService;
@@ -418,7 +420,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
         assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
                 confirmedRefundRequest(OVER_CONFIRMED_REFUND_ACTIVITY_SN).setAmount(70L)))
-                .hasMessageContaining("业务确认退款补偿金额超过当前周期净消费控制金额");
+                .hasMessageContaining("退款控制补偿金额超过当前周期净消费控制金额");
 
         assertThat(activityCount(OVER_CONFIRMED_REFUND_ACTIVITY_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -1189,8 +1191,6 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(PAYMENT_BINDING_SN)
-                .setRequestSn(PAYMENT_BINDING_SN + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                 .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
@@ -1198,8 +1198,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setDefaultBinding(Boolean.TRUE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
@@ -1290,7 +1289,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         });
         return new SpendControlTransactionConsumptionApplicationServiceImpl(
                 activityService,
-                paymentInstrumentService,
+                paymentInstrumentCapabilityApplicationService,
                 fundsTransactionQueryService);
     }
 
@@ -1326,12 +1325,12 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
             DefaultSubjectLedgerInitializer.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
-            PaymentInstrumentBindingConcurrencyGuard.class,
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
             PaymentInstrumentBindingHistoryServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,
             FundsAccountCapabilityApplicationServiceImpl.class,
+            PaymentInstrumentCapabilityApplicationServiceImpl.class,
             SpendControlMovementServiceImpl.class,
             SpendControlTransactionConsumptionApplicationServiceImpl.class,
             DefaultFundsTransactionQueryService.class,

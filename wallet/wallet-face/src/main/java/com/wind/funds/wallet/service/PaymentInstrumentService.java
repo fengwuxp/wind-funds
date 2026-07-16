@@ -9,6 +9,7 @@ import com.wind.funds.wallet.model.query.PaymentInstrumentQuery;
 import com.wind.funds.wallet.model.request.ChangePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
+import com.wind.funds.wallet.model.request.UnbindPaymentInstrumentBindingRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
@@ -39,7 +40,8 @@ public interface PaymentInstrumentService {
     /**
      * 创建支付工具和资金主体绑定。
      *
-     * <p>能力范围：建立工具到可支出或可收款主体的关系快照，用于后续 Route 解析。</p>
+     * <p>能力范围：建立工具到可支出或可收款主体的关系快照，用于后续 Route 解析。绑定号由服务内部生成，
+     * 当前态存续期间按工具、绑定角色、主体和币种组成的业务联合键幂等；解绑后再次创建视为新绑定。</p>
      *
      * @param request 创建请求
      * @return 绑定主键
@@ -49,12 +51,22 @@ public interface PaymentInstrumentService {
     /**
      * 变更支付工具绑定当前态。
      *
-     * <p>能力范围：只更新当前候选关系，并追加绑定历史；不得覆盖历史证据。</p>
+     * <p>能力范围：只更新当前候选关系，并追加绑定历史；不得覆盖历史证据。目标内容与当前态一致时直接返回
+     * 当前绑定主键，不增加版本或历史。</p>
      *
      * @param request 变更请求
      * @return 当前绑定主键
      */
     @NonNull Long changePaymentInstrumentBinding(@NonNull ChangePaymentInstrumentBindingRequest request);
+
+    /**
+     * 解除支付工具绑定。
+     *
+     * <p>能力范围：删除当前绑定关系并追加不可变解绑历史；重复解绑不重复写历史。</p>
+     *
+     * @param request 解绑请求
+     */
+    void unbindPaymentInstrumentBinding(@NonNull UnbindPaymentInstrumentBindingRequest request);
 
     /**
      * 根据主键查询支付工具。

@@ -2,12 +2,12 @@ package com.wind.funds.wallet.dal.entities;
 
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -105,10 +105,10 @@ public class PaymentInstrumentBinding implements Serializable, TenantIsolationOb
     private Boolean defaultBinding;
 
     /**
-     * 绑定状态。
+     * 绑定生命周期状态。
      */
     @NotNull
-    private FundsAccountStatus status;
+    private PaymentInstrumentBindingState state;
 
     /**
      * 绑定版本号。

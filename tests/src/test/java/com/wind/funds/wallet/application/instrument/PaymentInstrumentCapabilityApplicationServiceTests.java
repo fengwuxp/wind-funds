@@ -16,7 +16,6 @@ import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentCapabilityRequest;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
-import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingConcurrencyGuard;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
@@ -50,8 +49,6 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
     private static final String PAYMENT_INSTRUMENT_SN = "pi_capability_card";
 
     private static final String RECEIVE_INSTRUMENT_SN = "pi_capability_receive";
-
-    private static final String PAYMENT_BINDING_SN = "pi_capability_binding";
 
     private static final String OWNER_ID = "owner_pi_capability";
 
@@ -100,7 +97,7 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
                     assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
                     assertThat(result.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
                     assertThat(result.getBindingId()).isEqualTo(bindingId);
-                    assertThat(result.getBindingSn()).isEqualTo(PAYMENT_BINDING_SN);
+                    assertThat(result.getBindingSn()).startsWith("PIB");
                     assertThat(result.getBindingRole()).isEqualTo(PaymentInstrumentBindingRole.PAYMENT_SUBJECT);
                     assertThat(result.getSubjectId()).isEqualTo(SUBJECT_ID);
                     assertThat(result.getSubjectType()).isEqualTo(FundsSubjectType.FUNDING_ACCOUNT);
@@ -131,7 +128,6 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(RECEIVE_INSTRUMENT_SN,
                 PaymentInstrumentFlowDirection.INBOUND));
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(RECEIVE_INSTRUMENT_SN,
-                PAYMENT_BINDING_SN + "_refund",
                 PaymentInstrumentBindingRole.RECEIVE_SUBJECT));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
@@ -144,6 +140,34 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
         assertThat(decision.getInstrumentSn()).isEqualTo(RECEIVE_INSTRUMENT_SN);
         assertThat(decision.getFlowDirection()).isEqualTo(PaymentInstrumentFlowDirection.INBOUND);
         assertThat(decision.getAction()).isEqualTo(PaymentInstrumentAction.REFUND);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：业务已确认退款，只需要确认支付工具当前可用于退款，不解析账户绑定。
+     * 输入：有效支付工具和不带 bindingRole 的 REFUND 能力请求。
+     * 输出：返回支付工具能力，绑定快照字段为空。
+     * 红线：支付工具可用性校验不得被不存在或已解绑的账户绑定阻断。
+     */
+    @Test
+    void testResolvePaymentInstrumentCapabilityShouldAllowInstrumentOnlyResolutionWithoutBindingRole() {
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(RECEIVE_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.INBOUND));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        PaymentInstrumentCapabilityDecisionDTO decision =
+                capabilityApplicationService.resolvePaymentInstrumentCapability(resolveRequest()
+                        .setInstrumentSn(RECEIVE_INSTRUMENT_SN)
+                        .setBindingRole(null)
+                        .setAction(PaymentInstrumentAction.REFUND));
+
+        assertThat(decision.getInstrumentSn()).isEqualTo(RECEIVE_INSTRUMENT_SN);
+        assertThat(decision.getAction()).isEqualTo(PaymentInstrumentAction.REFUND);
+        assertThat(decision.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
+        assertThat(decision.getBindingId()).isNull();
+        assertThat(decision.getBindingSn()).isNull();
+        assertThat(decision.getBindingRole()).isNull();
+        assertThat(countBindingHistoryRows()).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -221,16 +245,13 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
     }
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest() {
-        return createBindingRequest(PAYMENT_INSTRUMENT_SN, PAYMENT_BINDING_SN,
+        return createBindingRequest(PAYMENT_INSTRUMENT_SN,
                 PaymentInstrumentBindingRole.PAYMENT_SUBJECT);
     }
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest(String instrumentSn,
-                                                                       String bindingSn,
                                                                        PaymentInstrumentBindingRole bindingRole) {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(bindingSn)
-                .setRequestSn(bindingSn + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(instrumentSn)
                 .setBindingRole(bindingRole)
@@ -238,8 +259,7 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setDefaultBinding(Boolean.TRUE);
     }
 
     private long countBindingHistoryRows() {
@@ -252,7 +272,6 @@ class PaymentInstrumentCapabilityApplicationServiceTests extends AbstractFundsSe
 
     @Configuration
     @Import({
-            PaymentInstrumentBindingConcurrencyGuard.class,
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
             PaymentInstrumentBindingHistoryServiceImpl.class,

@@ -165,7 +165,7 @@ CREATE TABLE `t_payment_instrument_binding`
     `currency`            VARCHAR(10) NOT NULL COMMENT '币种',
     `priority`            INT(11)     NOT NULL DEFAULT 0 COMMENT '路由优先级',
     `is_default`          TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '是否默认绑定',
-    `status`              VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
+    `state`               VARCHAR(50) NOT NULL DEFAULT 'ACTIVE' COMMENT '绑定生命周期状态',
     `version`             INT(11)     NOT NULL DEFAULT 1 COMMENT '绑定版本',
     `valid_from`          DATETIME             DEFAULT NULL COMMENT '生效时间',
     `valid_to`            DATETIME             DEFAULT NULL COMMENT '失效时间',
@@ -176,29 +176,9 @@ CREATE TABLE `t_payment_instrument_binding`
     UNIQUE KEY `uk_payment_instrument_binding_subject` (`tenant_id`, `instrument_sn`, `binding_role`, `subject_type`, `subject_id`, `currency`),
     KEY `idx_payment_instrument_binding_instrument` (`instrument_sn`),
     KEY `idx_payment_instrument_binding_subject` (`subject_type`, `subject_id`),
-    KEY `idx_payment_instrument_binding_status` (`status`)
+    KEY `idx_payment_instrument_binding_state` (`state`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '支付工具绑定表';
-
--- ----------------------------
--- 支付工具绑定并发保护表
--- ----------------------------
-DROP TABLE IF EXISTS `t_payment_instrument_binding_guard`;
-CREATE TABLE `t_payment_instrument_binding_guard`
-(
-    `id`             BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
-    `gmt_create`     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `gmt_modified`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
-    `tenant_id`      BIGINT(20)  NOT NULL COMMENT '租户 ID',
-    `instrument_sn`  VARCHAR(64) NOT NULL COMMENT '工具号',
-    `binding_role`   VARCHAR(50) NOT NULL COMMENT '绑定角色',
-    `currency`       VARCHAR(10) NOT NULL COMMENT '币种',
-    `guard_type`     VARCHAR(50) NOT NULL COMMENT '保护类型',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_payment_instrument_binding_guard_scope`
-        (`tenant_id`, `instrument_sn`, `binding_role`, `currency`, `guard_type`)
-) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4 COMMENT = '支付工具绑定并发保护表';
 
 -- ----------------------------
 -- 支付工具绑定历史表
@@ -216,16 +196,14 @@ CREATE TABLE `t_payment_instrument_binding_history`
     `change_type`         VARCHAR(50)  NOT NULL COMMENT '变更类型',
     `version`             INT(11)      NOT NULL COMMENT '绑定版本',
     `before_snapshot`     TEXT                  DEFAULT NULL COMMENT '变更前快照',
-    `after_snapshot`      TEXT         NOT NULL COMMENT '变更后快照',
+    `after_snapshot`      TEXT                  DEFAULT NULL COMMENT '变更后快照，解绑时为空',
     `operator_id`         VARCHAR(64)  NOT NULL COMMENT '操作者',
     `change_reason`       VARCHAR(256) NOT NULL COMMENT '变更原因',
-    `effective_at`        DATETIME              DEFAULT NULL COMMENT '生效时间',
-    `request_sn`          VARCHAR(64)           DEFAULT NULL COMMENT '请求号',
+    `effective_at`        DATETIME              DEFAULT NULL COMMENT '变更事实生效时间',
     `context_variables`   TEXT                  DEFAULT NULL COMMENT '扩展上下文',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_payment_instrument_binding_history_sn` (`sn`),
     UNIQUE KEY `uk_payment_instrument_binding_history_version` (`binding_sn`, `version`),
-    UNIQUE KEY `uk_payment_instrument_binding_history_request` (`tenant_id`, `request_sn`),
     KEY `idx_payment_instrument_binding_history_binding` (`binding_sn`),
     KEY `idx_payment_instrument_binding_history_instrument` (`instrument_sn`)
 ) ENGINE = InnoDB

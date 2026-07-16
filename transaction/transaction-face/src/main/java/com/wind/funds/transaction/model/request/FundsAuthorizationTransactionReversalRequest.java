@@ -2,7 +2,6 @@ package com.wind.funds.transaction.model.request;
 
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -29,10 +28,10 @@ public class FundsAuthorizationTransactionReversalRequest {
     @NonNull
     private FundsAccountId accountId;
 
-    @Schema(description = "撤销金额（应和账户的币种一致）")
+    @Schema(description = "撤销交易金额，主金额应和账户币种一致")
     @NotNull
     @NonNull
-    private Money amount;
+    private TransactionAmount transactionAmount;
 
     @Schema(description = "业务场景")
     @NotNull

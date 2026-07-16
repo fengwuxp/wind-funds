@@ -27,6 +27,7 @@ class FundsModuleDependencyBoundaryTests {
 
     private static final List<String> PRODUCTION_MODULE_POMS = List.of(
             "core/pom.xml",
+            "fx/fx-impl/pom.xml",
             "ledger/ledger-face/pom.xml",
             "ledger/ledger-impl/pom.xml",
             "transaction/transaction-face/pom.xml",
@@ -48,6 +49,7 @@ class FundsModuleDependencyBoundaryTests {
     private static final List<String> FACE_ALLOWED_FUNDS_ARTIFACTS = List.of("capte-funds-core");
 
     private static final List<String> CORE_FORBIDDEN_ARTIFACTS = List.of(
+            "capte-funds-fx-impl",
             "capte-funds-ledger-face",
             "capte-funds-ledger-impl",
             "capte-funds-transaction-face",
@@ -72,6 +74,17 @@ class FundsModuleDependencyBoundaryTests {
             "@Service");
 
     private static final Map<String, List<String>> MODULE_FORBIDDEN_ARTIFACTS = Map.of(
+            "fx/fx-impl/pom.xml", List.of(
+                    "capte-funds-ledger-face",
+                    "capte-funds-ledger-impl",
+                    "capte-funds-transaction-face",
+                    "capte-funds-transaction-impl",
+                    "capte-funds-wallet-face",
+                    "capte-funds-wallet-impl",
+                    "capte-funds-reconciliation-face",
+                    "capte-funds-reconciliation-impl",
+                    "capte-funds-governance-face",
+                    "capte-funds-governance-impl"),
             "ledger/ledger-impl/pom.xml", List.of(
                     "capte-funds-wallet-face",
                     "capte-funds-wallet-impl",
@@ -89,6 +102,7 @@ class FundsModuleDependencyBoundaryTests {
                     "com/wind/funds/transaction",
                     "com/wind/funds/wallet"),
             "transaction/transaction-impl/src/main/java", List.of(
+                    "com/wind/funds/fx",
                     "com/wind/funds/ledger",
                     "com/wind/funds/wallet/application",
                     "com/wind/funds/wallet/dal",
@@ -102,6 +116,7 @@ class FundsModuleDependencyBoundaryTests {
     private static final List<String> PACKAGE_GUARD_SCAN_PATHS = List.of(
             "AGENTS.md",
             "core/src/main/java",
+            "fx/fx-impl/src/main/java",
             "ledger/ledger-face/src/main/java",
             "ledger/ledger-impl/src/main/java",
             "transaction/transaction-face/src/main/java",
@@ -117,6 +132,7 @@ class FundsModuleDependencyBoundaryTests {
 
     private static final List<String> FUNDS_JAVA_PACKAGE_SCAN_PATHS = List.of(
             "core/src/main/java",
+            "fx/fx-impl/src/main/java",
             "ledger/ledger-face/src/main/java",
             "ledger/ledger-impl/src/main/java",
             "transaction/transaction-face/src/main/java",

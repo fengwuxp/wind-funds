@@ -16,7 +16,9 @@ public enum PaymentInstrumentBindingChangeType implements DescriptiveEnum {
 
     CREATE("创建绑定"),
 
-    UPDATE("更新绑定");
+    UPDATE("更新绑定"),
+
+    UNBIND("解除绑定");
 
     private final String desc;
 }

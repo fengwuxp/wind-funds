@@ -88,7 +88,6 @@ public class PaymentInstrumentBindingHistory implements Serializable, TenantIsol
     /**
      * 变更后快照。
      */
-    @NotNull
     private String afterSnapshot;
 
     /**
@@ -107,11 +106,6 @@ public class PaymentInstrumentBindingHistory implements Serializable, TenantIsol
      * 变更生效时间。
      */
     private LocalDateTime effectiveAt;
-
-    /**
-     * 幂等请求流水号。
-     */
-    private String requestSn;
 
     /**
      * 扩展上下文变量。

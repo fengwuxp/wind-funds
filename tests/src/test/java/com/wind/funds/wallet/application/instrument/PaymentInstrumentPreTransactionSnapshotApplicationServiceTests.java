@@ -36,7 +36,6 @@ import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultSubjectLedgerInitializer;
 import com.wind.funds.wallet.services.impl.FundingAccountServiceImpl;
-import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingConcurrencyGuard;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingHistoryServiceImpl;
 import com.wind.funds.wallet.services.impl.PaymentInstrumentBindingServiceImpl;
@@ -75,8 +74,6 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
     private static final String PAYMENT_INSTRUMENT_SN = "pre_tx_payment_card";
 
     private static final String RECEIVE_INSTRUMENT_SN = "pre_tx_receive_card";
-
-    private static final String PAYMENT_BINDING_SN = "pre_tx_payment_binding";
 
     private static final String OWNER_ID = "pre_tx_owner";
 
@@ -133,7 +130,7 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
         assertThat(snapshot.getTargetAccountId())
                 .isEqualTo(FundsAccountId.immutable(CREDIT_ACCOUNT_SN, FundsSubjectType.CREDIT_ACCOUNT));
         assertThat(snapshot.getPaymentInstrumentCapability().getInstrumentSn()).isEqualTo(PAYMENT_INSTRUMENT_SN);
-        assertThat(snapshot.getPaymentInstrumentCapability().getBindingSn()).isEqualTo(PAYMENT_BINDING_SN);
+        assertThat(snapshot.getPaymentInstrumentCapability().getBindingSn()).startsWith("PIB");
         assertThat(snapshot.getPaymentInstrumentCapability().getBindingVersion()).isEqualTo(1);
         assertThat(snapshot.getFundingResponsibility().getRelationSn()).isNotBlank();
         assertThat(snapshot.getFundingResponsibility().getTargetSubjectType())
@@ -303,8 +300,6 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
 
     private CreatePaymentInstrumentBindingRequest createBindingRequest(String instrumentSn) {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(PAYMENT_BINDING_SN)
-                .setRequestSn(PAYMENT_BINDING_SN + "_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(instrumentSn)
                 .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
@@ -312,14 +307,11 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
                 .setSubjectType(FundsSubjectType.CREDIT_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setDefaultBinding(Boolean.TRUE);
     }
 
     private CreatePaymentInstrumentBindingRequest createRefundBindingRequest() {
         return new CreatePaymentInstrumentBindingRequest()
-                .setSn(PAYMENT_BINDING_SN)
-                .setRequestSn(PAYMENT_BINDING_SN + "_refund_create")
                 .setTenantId(TENANT_ID)
                 .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
                 .setBindingRole(PaymentInstrumentBindingRole.RECEIVE_SUBJECT)
@@ -327,8 +319,7 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
                 .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPriority(10)
-                .setDefaultBinding(Boolean.TRUE)
-                .setStatus(FundsAccountStatus.ACTIVE);
+                .setDefaultBinding(Boolean.TRUE);
     }
 
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
@@ -382,7 +373,6 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
             DefaultSubjectLedgerInitializer.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
-            PaymentInstrumentBindingConcurrencyGuard.class,
             PaymentInstrumentServiceImpl.class,
             PaymentInstrumentBindingServiceImpl.class,
             PaymentInstrumentBindingHistoryServiceImpl.class,

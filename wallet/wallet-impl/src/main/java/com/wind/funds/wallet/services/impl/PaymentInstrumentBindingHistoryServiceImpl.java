@@ -67,7 +67,7 @@ public class PaymentInstrumentBindingHistoryServiceImpl implements PaymentInstru
                 .and(ref.instrumentSn.eq(query.getInstrumentSn()))
                 .and(ref.changeType.eq(query.getChangeType()))
                 .and(ref.version.eq(query.getVersion()))
-                .and(ref.requestSn.eq(query.getRequestSn()));
+                .orderBy(ref.version.desc());
         return MybatisQueryHelper.<PaymentInstrumentBindingHistory, PaymentInstrumentBindingHistoryDTO>query(wrapper)
                 .counter(paymentInstrumentBindingHistoryMapper::selectCountByQuery)
                 .resultQueryFunc(paymentInstrumentBindingHistoryMapper::selectListByQuery)
@@ -88,7 +88,6 @@ public class PaymentInstrumentBindingHistoryServiceImpl implements PaymentInstru
         result.setOperatorId(request.getOperatorId());
         result.setChangeReason(request.getChangeReason());
         result.setEffectiveAt(request.getEffectiveAt() == null ? LocalDateTime.now() : request.getEffectiveAt());
-        result.setRequestSn(request.getRequestSn());
         result.setContextVariables(request.getContextVariables());
         return result;
     }

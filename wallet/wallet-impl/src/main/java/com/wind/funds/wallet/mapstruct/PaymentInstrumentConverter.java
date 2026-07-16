@@ -9,6 +9,7 @@ import com.wind.funds.wallet.model.dto.PaymentInstrumentDTO;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingTarget;
@@ -88,7 +89,7 @@ public interface PaymentInstrumentConverter {
                                     @MappingTarget PaymentInstrumentBinding entity) {
         entity.setPriority(request.getPriority() == null ? 0 : request.getPriority());
         entity.setDefaultBinding(Boolean.TRUE.equals(request.getDefaultBinding()));
-        entity.setStatus(request.getStatus() == null ? FundsAccountStatus.ACTIVE : request.getStatus());
+        entity.setState(request.getState() == null ? PaymentInstrumentBindingState.ACTIVE : request.getState());
         entity.setVersion(1);
     }
 }

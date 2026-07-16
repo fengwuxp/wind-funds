@@ -39,6 +39,4 @@ public class PaymentInstrumentBindingHistoryQuery {
     @Schema(description = "绑定版本")
     private Integer version;
 
-    @Schema(description = "请求号")
-    private String requestSn;
 }

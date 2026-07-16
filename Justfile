@@ -93,6 +93,10 @@ test-module module='tests':
 test-core tests='FundsInstructionDslContractTests,RouteDslContractTests,FundsDslJsonContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,SettlementPolicySpecTests,FundsAmountBoundaryContractTests':
     @just _run-test-classes "{{tests}}" tests
 
+# FX source-price selection and amount-conversion tests.
+test-fx tests='DefaultFxAmountConversionServiceImplTests':
+    @just _run-test-classes "{{tests}}" tests
+
 # Ledger assembly, transaction, posting, and projection tests.
 test-ledger tests='DefaultLedgerPostingAssemblerTests,LedgerBalanceProjectionServiceImplTests,LedgerServiceImplTests,LedgerTransactionServiceImplTests':
     @just _run-test-classes "{{tests}}" tests
@@ -125,7 +129,7 @@ test-reconciliation tests='PayoutPreflightServiceTests,ReconciliationDifferenceA
 verify-fast: mvn-version compile test-boundary test-governance test-reconciliation
 
 # Full CAD verification for the rebuilt payment funds test baseline.
-verify-cad: mvn-version clean-compile test-core test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance test-reconciliation pmd verify-classfiles verify-codegen
+verify-cad: mvn-version clean-compile test-core test-fx test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance test-reconciliation pmd verify-classfiles verify-codegen
 
 # Install reactor snapshots locally when Maven plugin resolution needs local artifacts.
 install-snapshots:

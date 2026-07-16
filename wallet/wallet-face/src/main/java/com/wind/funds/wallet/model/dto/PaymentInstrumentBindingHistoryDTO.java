@@ -67,11 +67,8 @@ public class PaymentInstrumentBindingHistoryDTO implements Serializable {
     @Schema(description = "变更原因")
     private String changeReason;
 
-    @Schema(description = "生效时间")
+    @Schema(description = "变更事实生效时间")
     private LocalDateTime effectiveAt;
-
-    @Schema(description = "请求号")
-    private String requestSn;
 
     @Schema(description = "扩展上下文")
     private String contextVariables;

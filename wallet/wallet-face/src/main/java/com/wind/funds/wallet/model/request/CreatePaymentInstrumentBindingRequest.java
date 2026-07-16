@@ -2,7 +2,7 @@ package com.wind.funds.wallet.model.request;
 
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.FundsAccountStatus;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -27,10 +27,6 @@ import java.time.LocalDateTime;
 @ToString
 @Accessors(chain = true)
 public class CreatePaymentInstrumentBindingRequest {
-
-    @Schema(description = "绑定号")
-    @NotBlank
-    private String sn;
 
     @Schema(description = "租户 ID")
     @NotNull
@@ -62,8 +58,8 @@ public class CreatePaymentInstrumentBindingRequest {
     @Schema(description = "是否默认绑定")
     private Boolean defaultBinding;
 
-    @Schema(description = "状态")
-    private FundsAccountStatus status;
+    @Schema(description = "绑定生命周期状态")
+    private PaymentInstrumentBindingState state;
 
     @Schema(description = "操作者")
     private String operatorId;
@@ -71,14 +67,10 @@ public class CreatePaymentInstrumentBindingRequest {
     @Schema(description = "变更原因")
     private String changeReason;
 
-    @Schema(description = "请求号，用于支付工具绑定创建幂等、回放和对账追踪")
-    @NotBlank
-    private String requestSn;
-
-    @Schema(description = "生效时间")
+    @Schema(description = "绑定候选生效时间")
     private LocalDateTime validFrom;
 
-    @Schema(description = "失效时间")
+    @Schema(description = "绑定候选失效时间")
     private LocalDateTime validTo;
 
     @Schema(description = "描述")

@@ -69,13 +69,13 @@ public class PaymentInstrumentCapabilityDecisionDTO implements Serializable {
     @Schema(description = "支付工具状态")
     private FundsAccountStatus status;
 
-    @Schema(description = "绑定主键")
+    @Schema(description = "绑定主键；请求未指定绑定角色时为空")
     private Long bindingId;
 
-    @Schema(description = "绑定号")
+    @Schema(description = "绑定号；请求未指定绑定角色时为空")
     private String bindingSn;
 
-    @Schema(description = "绑定角色")
+    @Schema(description = "绑定角色；请求未指定绑定角色时为空")
     private PaymentInstrumentBindingRole bindingRole;
 
     @Schema(description = "内部主体 ID")
