@@ -573,6 +573,15 @@ flowchart TD
 3. 规则投影解释缺失历史证据时，只能标记解释不完整或转人工处理，不能按当前规则重算。
 4. 外部风控、银行、卡组织、合规或财务确认缺失时，准入结果默认 REVIEW 或拒绝，不能自动放行。
 
+### 7.4 运行时场景与状态工程规则
+
+| 运行时场景 | 业务入口 | 状态与工程规则 | 守卫条件 | 失败处理 |
+| --- | --- | --- | --- | --- |
+| 规则配置 | 创建定义、发布版本、挂载规则。 | 已发布版本不可变；挂载按生效时间、状态、优先级和冲突策略解释。 | 定义可用、版本摘要一致、scope 合法、冲突策略和生效时间完整。 | 快速失败，不覆盖既有版本，不生成交易或账本事实。 |
+| 交易准入 | wallet application 在交易内核前消费或固化决策。 | ALLOW 才能继续；DECLINE/REVIEW 停在交易内核前，决策证据不可改写。 | 决策来源、规则版本、scope、movementDigest 和上下文摘要一致。 | 返回可审计原因，断言无 route、posting、LedgerEntry 和余额变化。 |
+| 控制额度变动 | 交易成功后记录预占、消耗、释放或退款补偿。 | 控制事实与资金事实分层；周期投影从控制流水重建。 | 原交易/控制流水引用、周期、scope、金额和 movementDigest 完整。 | 记录失败进入补偿或人工处理，不回滚已经成功的资金事实。 |
+| 历史解释 | 查询交易投影和规则时间线。 | 只读历史规则、决策和控制事实，不按当前规则重算。 | 历史证据引用存在且调用方有权查看脱敏摘要。 | 标记证据缺失或转人工，不推断结果、不反写事实。 |
+
 ## 8. 一致性、事务与失败无副作用
 
 | 场景 | 事务边界 | 失败处理 | 无副作用证明 |
@@ -781,6 +790,15 @@ git diff --check
 | AC-SR-003 | 授权前规则拒绝。 | 可代码化 | AuthorizationAdmissionApplicationServiceTests | 拒绝后出现 route、posting、LedgerEntry 或余额变化。 | forbidden facts 为 0。 | transaction owner、ledger owner。 |
 | AC-SR-005 | 历史投影解释。 | 可代码化 / 可观测化 | FundsTransactionProjectionExplainApplicationServiceTests | 修改当前规则后历史解释变化，或输出 ruleSpec / 敏感原文。 | 只读解释历史快照且敏感字段不外泄。 | transaction owner、审计 owner。 |
 | QA-SR-004 | 生产观测、告警和 Runbook。 | 可观测化 / 可评审化 | 生产启用专项工程边界 | 摘要冲突、写入失败和解释缺证据没有指标或处置路径。 | 指标、告警、Runbook 和 owner 已确认。 | SRE、安全、运营。 |
+
+### 12.2 规则落地表
+
+| 规则 ID | 业务表达 | 工程承接 | 验证证据 |
+| --- | --- | --- | --- |
+| SR-R-001 | Spend Rule 只做非现金支出控制，不成为资金账户、信用账户或账本主体。 | wallet rule/control services、transaction 只读证据消费、ledger 主体护栏。 | scope 不可入账边界测试和无 LedgerEntry 断言。 |
+| SR-R-002 | 已发布规则版本和已记录决策不可原地修改。 | version digest 唯一约束、decision digest 幂等约束。 | 同标识不同摘要 must-fail、历史记录不变断言。 |
+| SR-R-003 | 规则拒绝或复核停在交易内核前。 | wallet admission facade、decision record、transaction canonical entry。 | `AuthorizationAdmissionApplicationServiceTests` 和 forbidden facts 断言。 |
+| SR-R-004 | 周期控制余额由控制流水和周期投影实现，与 FundingAccount/CreditAccount 资金账本分层。 | spend control movement、budget projection、period initializer。 | 跨周期拒绝、周期切换、历史周期查询和资金余额不受控制投影反写测试。 |
 
 ## 13. 当前实现基线和 未完成交付
 
