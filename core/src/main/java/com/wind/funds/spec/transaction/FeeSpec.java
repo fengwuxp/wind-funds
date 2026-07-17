@@ -10,7 +10,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 /**
- * 资金交易手续费规范
+ * 资金交易手续费规范。
+ *
+ * <p>同时配置固定手续费和费率时，最终手续费为两者之和。
+ * 最低、最高金额只约束费率计算部分，再与固定手续费累加。</p>
  *
  * @author wuxp
  * @date 2026-04-17 11:22

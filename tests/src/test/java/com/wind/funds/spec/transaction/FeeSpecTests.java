@@ -53,6 +53,60 @@ class FeeSpecTests {
     }
 
     /**
+     * 场景：同时配置固定手续费和费率手续费。
+     * 输入：交易金额 10000，固定手续费 30，费率 2.9%。
+     * 预期：固定部分 30 与费率部分 290 累加，最终手续费为 320 个最小货币单位。
+     */
+    @Test
+    void testCalculateCombinedFixedAndRateFee() {
+        FeeSpec feeSpec = FeeSpec.builder()
+                .feeType("COMBINED_FEE")
+                .fixedFee(30)
+                .feeRate(new BigDecimal("0.029"))
+                .build();
+
+        Money fee = feeSpec.calculateFee(Money.immutable(10_000L, CurrencyIsoCode.CNY));
+
+        assertThat(fee).isEqualTo(Money.immutable(320L, CurrencyIsoCode.CNY));
+    }
+
+    /**
+     * 场景：组合手续费的费率部分低于最低费率手续费。
+     * 预期：先将费率部分提高到最低值 20，再加上固定手续费 30，最终为 50。
+     */
+    @Test
+    void testCalculateCombinedFeeShouldApplyMinimumToRatePart() {
+        FeeSpec feeSpec = FeeSpec.builder()
+                .feeType("COMBINED_FEE")
+                .fixedFee(30)
+                .feeRate(new BigDecimal("0.001"))
+                .minAmountWithRate(20)
+                .build();
+
+        Money fee = feeSpec.calculateFee(Money.immutable(1_000L, CurrencyIsoCode.CNY));
+
+        assertThat(fee).isEqualTo(Money.immutable(50L, CurrencyIsoCode.CNY));
+    }
+
+    /**
+     * 场景：组合手续费的费率部分高于最高费率手续费。
+     * 预期：先将费率部分限制为最高值 50，再加上固定手续费 30，最终为 80。
+     */
+    @Test
+    void testCalculateCombinedFeeShouldApplyMaximumToRatePart() {
+        FeeSpec feeSpec = FeeSpec.builder()
+                .feeType("COMBINED_FEE")
+                .fixedFee(30)
+                .feeRate(new BigDecimal("0.1"))
+                .maxAmountWithRate(50)
+                .build();
+
+        Money fee = feeSpec.calculateFee(Money.immutable(1_000L, CurrencyIsoCode.CNY));
+
+        assertThat(fee).isEqualTo(Money.immutable(80L, CurrencyIsoCode.CNY));
+    }
+
+    /**
      * 场景：固定手续费配置为负数。
      * 预期：手续费规范拒绝非法金额，不把负数传入后续资金路径。
      */
