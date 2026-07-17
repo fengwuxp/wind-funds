@@ -121,9 +121,6 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         assertThat(account.getSn()).isEqualTo(ACCOUNT_SN);
         assertThat(account.getStatus()).isEqualTo(FundsAccountStatus.ACTIVE);
         assertThat(account.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.FUNDING_BASIC);
-        assertThat(account.getLedgerIds())
-                .containsOnlyKeys(LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN,
-                        LedgerSubjectCode.AUTHORIZATION);
         assertThat(ledgers).hasSize(3);
         assertThat(ledgers).extracting(LedgerDTO::getLedgerSubjectCode)
                 .containsExactlyInAnyOrder(LedgerSubjectCode.AVAILABLE, LedgerSubjectCode.FROZEN,
@@ -221,15 +218,17 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
 
     @Test
     void testInitializeRequiredLedgersShouldReuseExistingLedgers() {
-        Long accountId = fundingAccountService.createFundingAccount(createFundingAccountRequest());
-        FundingAccountDTO account = fundingAccountService.getFundingAccountById(accountId);
+        fundingAccountService.createFundingAccount(createFundingAccountRequest());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         Map<LedgerSubjectCode, Long> reusedLedgerIds =
                 subjectLedgerInitializer.initializeRequiredLedgers(initializeSubjectLedgerRequest());
+        List<LedgerDTO> ledgers = loadLedgers();
 
-        assertThat(reusedLedgerIds).containsExactlyInAnyOrderEntriesOf(account.getLedgerIds());
-        assertThat(loadLedgers()).hasSize(3);
+        assertThat(reusedLedgerIds).containsOnlyKeys(EXPECTED_ALLOW_NEGATIVE_RULES.keySet());
+        assertThat(reusedLedgerIds.values()).containsExactlyInAnyOrderElementsOf(
+                ledgers.stream().map(LedgerDTO::getId).toList());
+        assertThat(ledgers).hasSize(3);
         Integer ledgerCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_ledger WHERE subject_id = ?",
                 Integer.class,
@@ -272,14 +271,13 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
     /**
      * 场景：同一真实资金账户同一账目同时存在 LIFETIME 与 MONTHLY 两个余额 bucket。
      * 输入：资金账户默认 LIFETIME 基础账本，额外存在 AVAILABLE / MONTHLY / 2026-05。
-     * 输出：账户基础查询和账户余额视图仍返回默认 LIFETIME 周期账本，不因同账目多周期重复 key 失败。
-     * 红线：账户默认视图不得把多周期账本随机折叠；跨周期余额必须走显式周期查询。
+     * 输出：账户元数据查询不受多周期账本影响，余额视图只返回默认 LIFETIME 周期。
+     * 红线：跨周期余额必须走显式周期查询。
      */
     @Test
-    void testFundingAccountDefaultViewsShouldKeepLifetimeLedgersWhenMonthlyBucketCoexists() {
+    void testFundingAccountDefaultBalanceShouldKeepLifetimeLedgersWhenMonthlyBucketCoexists() {
         Long accountId = fundingAccountService.createFundingAccount(createFundingAccountRequest());
-        FundingAccountDTO lifetimeAccount = fundingAccountService.getFundingAccountById(accountId);
-        Long monthlyAvailableLedgerId = createMonthlyAvailableLedger();
+        createMonthlyAvailableLedger();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         FundingAccountDTO account = fundingAccountService.getFundingAccountById(accountId);
@@ -288,8 +286,8 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         FundsAccountBalanceView balanceView = fundsAccountQueryService.getBalance(
                 FundsAccountId.immutable(ACCOUNT_SN, FundsSubjectType.FUNDING_ACCOUNT));
 
-        assertThat(account.getLedgerIds()).containsExactlyInAnyOrderEntriesOf(lifetimeAccount.getLedgerIds());
-        assertThat(accountView.getAccountLedgerIds()).containsExactlyInAnyOrderEntriesOf(lifetimeAccount.getLedgerIds());
+        assertThat(account.getSn()).isEqualTo(ACCOUNT_SN);
+        assertThat(account.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.FUNDING_BASIC);
         assertThat(accountView.getCapabilities())
                 .containsExactlyInAnyOrder(FundsAccountCapability.RECEIVE,
                         FundsAccountCapability.PAY,
@@ -305,8 +303,6 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
         assertThat(balanceView.getBalanceBuckets().values())
                 .extracting(LedgerBalanceBucket::periodId)
                 .containsOnly(AccountBalancePeriodType.LIFETIME.name());
-        assertThat(account.getLedgerIds()).doesNotContainValue(monthlyAvailableLedgerId);
-        assertThat(accountView.getAccountLedgerIds()).doesNotContainValue(monthlyAvailableLedgerId);
         assertThat(loadLedgers()).hasSize(4);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -326,7 +322,6 @@ class FundingAccountServiceImplTests extends AbstractFundsServiceTest {
                 .owner(FundsAccountOwner.of(OWNER_ID, FundsAccountOwnerType.USER))
                 .status(FundsAccountStatus.ACTIVE)
                 .currency(CurrencyIsoCode.USD)
-                .accountLedgerIds(Map.of())
                 .version(1)
                 .build();
 

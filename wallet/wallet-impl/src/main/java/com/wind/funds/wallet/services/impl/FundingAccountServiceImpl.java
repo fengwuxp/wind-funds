@@ -1,8 +1,5 @@
 package com.wind.funds.wallet.services.impl;
 
-import com.wind.funds.ledger.dto.LedgerDTO;
-import com.wind.funds.ledger.query.LedgerQuery;
-import com.wind.funds.ledger.service.LedgerService;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
@@ -18,20 +15,13 @@ import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
-import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.common.query.supports.QueryOrderField;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.mybatis.flex.MybatisQueryHelper;
-import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * 真实资金账户服务实现。
@@ -46,8 +36,6 @@ public class FundingAccountServiceImpl implements FundingAccountService {
     private final FundingAccountMapper fundingAccountMapper;
 
     private final SubjectLedgerInitializer subjectLedgerInitializer;
-
-    private final LedgerService ledgerService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -70,7 +58,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
     public @NonNull FundingAccountDTO getFundingAccountById(@NonNull Long id) {
         FundingAccount result = fundingAccountMapper.selectOneById(id);
         AssertUtils.notNull(result, "资金账户不存在，id = {}", id);
-        return toDTO(result);
+        return FundingAccountConverter.INSTANCE.convertToFundingAccountDTO(result);
     }
 
     @Override
@@ -82,7 +70,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
                 .and(ref.accountType.eq(accountId.type()));
         FundingAccount result = fundingAccountMapper.selectOneByQuery(wrapper);
         AssertUtils.notNull(result, "资金账户不存在，accountId = {}", accountId);
-        return toDTO(result);
+        return FundingAccountConverter.INSTANCE.convertToFundingAccountDTO(result);
     }
 
     @Override
@@ -94,7 +82,7 @@ public class FundingAccountServiceImpl implements FundingAccountService {
                 .and(ref.sn.eq(accountSn));
         FundingAccount result = fundingAccountMapper.selectOneByQuery(wrapper);
         AssertUtils.notNull(result, "资金账户不存在，tenantId = {}, accountSn = {}", tenantId, accountSn);
-        return toDTO(result);
+        return FundingAccountConverter.INSTANCE.convertToFundingAccountDTO(result);
     }
 
     @Override
@@ -116,25 +104,8 @@ public class FundingAccountServiceImpl implements FundingAccountService {
         return MybatisQueryHelper.<FundingAccount, FundingAccountDTO>query(wrapper)
                 .counter(fundingAccountMapper::selectCountByQuery)
                 .resultQueryFunc(fundingAccountMapper::selectListByQuery)
-                .converter(this::toDTO)
+                .converter(FundingAccountConverter.INSTANCE::convertToFundingAccountDTO)
                 .query(options);
-    }
-
-    private FundingAccountDTO toDTO(FundingAccount entity) {
-        FundingAccountDTO result = FundingAccountConverter.INSTANCE.convertToFundingAccountDTO(entity);
-        return result.setLedgerIds(loadLedgerIds(entity.getTenantId(), entity.getSn(), entity.getCurrency().name()));
-    }
-
-    private Map<LedgerSubjectCode, Long> loadLedgerIds(Long tenantId, String subjectId, String currency) {
-        return ledgerService.queryLedgers(new LedgerQuery()
-                        .setTenantId(tenantId)
-                        .setSubjectId(subjectId)
-                        .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT.name())
-                        .setCurrency(CurrencyIsoCode.valueOf(currency))
-                        .setPeriodType(AccountBalancePeriodType.LIFETIME)
-                        .setPeriodId(AccountBalancePeriodType.LIFETIME.name()),
-                DefaultPageQueryOptions.defaults(50)).getRecords().stream()
-                .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, LedgerDTO::getId));
     }
 
     private void validatePlatformRole(CreateFundingAccountRequest request) {

@@ -4,7 +4,6 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -16,7 +15,6 @@ import lombok.experimental.Accessors;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.Map;
 
 /**
  * 信用账户 DTO。
@@ -85,6 +83,4 @@ public class CreditAccountDTO implements Serializable {
     @Schema(description = "乐观锁版本")
     private Integer version;
 
-    @Schema(description = "账本科目到 ledger id 的映射")
-    private Map<LedgerSubjectCode, Long> ledgerIds;
 }

@@ -8,7 +8,6 @@ import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
@@ -38,7 +37,6 @@ public interface CreditAccountConverter {
      * @param data CreditAccount 实例
      * @return CreditAccountDTO 实例
      */
-    @Mapping(target = "ledgerIds", ignore = true)
     CreditAccountDTO convertToCreditAccountDTO(CreditAccount data);
 
     /**

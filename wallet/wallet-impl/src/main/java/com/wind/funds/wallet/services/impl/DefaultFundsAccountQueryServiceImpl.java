@@ -82,7 +82,6 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
                 .currency(subject.currency())
                 .capabilities(capabilityResolution.capabilities())
                 .capabilitySource(capabilityResolution.source())
-                .accountLedgerIds(loadLedgerIds(subject))
                 .version(subject.version())
                 .build();
     }
@@ -197,7 +196,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     @Nullable
     private FundingAccountDTO querySingleFundingAccount(FundingAccountQuery query) {
         List<FundingAccountDTO> records = fundingAccountService
-                .queryFundingAccounts(query, DefaultPageQueryOptions.defaults(MAX_ACCOUNT_MATCH_SIZE))
+                .queryFundingAccounts(query, DefaultPageQueryOptions.result(MAX_ACCOUNT_MATCH_SIZE))
                 .getRecords();
         return records.isEmpty() ? null : records.getFirst();
     }
@@ -205,14 +204,9 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     @Nullable
     private CreditAccountDTO querySingleCreditAccount(CreditAccountQuery query) {
         List<CreditAccountDTO> records = creditAccountService
-                .queryCreditAccounts(query, DefaultPageQueryOptions.defaults(MAX_ACCOUNT_MATCH_SIZE))
+                .queryCreditAccounts(query, DefaultPageQueryOptions.result(MAX_ACCOUNT_MATCH_SIZE))
                 .getRecords();
         return records.isEmpty() ? null : records.getFirst();
-    }
-
-    private Map<LedgerSubjectCode, Long> loadLedgerIds(ResolvedFundsSubject subject) {
-        return loadLedgers(subject).stream()
-                .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, LedgerDTO::getId));
     }
 
     private FundsSubjectBalanceDTO queryCurrentBalance(FundsSubjectBalanceQuery query,
@@ -306,7 +300,7 @@ public class DefaultFundsAccountQueryServiceImpl implements FundsAccountQuerySer
     }
 
     private List<LedgerDTO> queryLedgers(LedgerQuery query) {
-        return ledgerService.queryLedgers(query, DefaultPageQueryOptions.defaults(MAX_LEDGER_BUCKET_SIZE))
+        return ledgerService.queryLedgers(query, DefaultPageQueryOptions.result(MAX_LEDGER_BUCKET_SIZE))
                 .getRecords()
                 .stream()
                 .toList();

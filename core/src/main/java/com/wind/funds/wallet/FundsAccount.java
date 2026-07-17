@@ -1,17 +1,12 @@
 package com.wind.funds.wallet;
 
 import com.wind.common.WindConstants;
-import com.wind.common.exception.AssertUtils;
 import com.wind.integration.core.model.TenantIsolationObject;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -61,42 +56,6 @@ public interface FundsAccount extends TenantIsolationObject<Long> {
      */
     @NonNull
     FundsAccountStatus getStatus();
-
-    /**
-     * 账户余额ID
-     *
-     * @return {
-     *  key  账本会计编码
-     *  value 账本 id
-     * }
-     */
-    @NonNull
-    Map<LedgerSubjectCode, Long> getAccountLedgerIds();
-
-    /**
-     * 获取账户余额ID
-     *
-     * @param accountCode 账户标识
-     * @return 账户余额ID
-     */
-    @NonNull
-    default Long getLedgerId(@NonNull LedgerSubjectCode accountCode) {
-        Long result = getAccountLedgerIds().get(accountCode);
-        AssertUtils.notNull(result, "{} ledger balance id not found", accountCode);
-        return result;
-    }
-
-    /**
-     * 获取账户余额ID
-     *
-     * @param accountCodes 账户标识
-     * @return 账户余额ID
-     */
-    @NonNull
-    default List<Long> getLedgerIds(@NonNull List<LedgerSubjectCode> accountCodes) {
-        Map<LedgerSubjectCode, Long> accountLedgerIds = getAccountLedgerIds();
-        return accountCodes.stream().map(accountLedgerIds::get).filter(Objects::nonNull).toList();
-    }
 
     /**
      * 账户能力

@@ -133,12 +133,13 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(account.getPeriodType()).isEqualTo(AccountBalancePeriodType.LIFETIME);
         assertThat(account.getPeriodId()).isEqualTo(AccountBalancePeriodType.LIFETIME.name());
         assertThat(account.getLedgerProfileCode()).isEqualTo(LedgerProfileCode.CREDIT_BASIC);
-        assertThat(account.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(accountView.getCapabilities()).containsExactly(FundsAccountCapability.PAY);
         assertThat(accountView.canPay()).isTrue();
         assertThat(accountView.canReceive()).isFalse();
         assertThat(accountView.canWithdraw()).isFalse();
         assertThat(ledgers).hasSize(3);
+        assertThat(ledgers).extracting(LedgerDTO::getLedgerSubjectCode)
+                .containsExactlyInAnyOrderElementsOf(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
                 ledger,
                 FundsSubjectType.CREDIT_ACCOUNT,
@@ -178,8 +179,9 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(account.getSn()).isEqualTo(NON_LIFETIME_CREDIT_ACCOUNT_SN);
         assertThat(account.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
         assertThat(account.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
-        assertThat(account.getLedgerIds()).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(ledgers).hasSize(3);
+        assertThat(ledgers).extracting(LedgerDTO::getLedgerSubjectCode)
+                .containsExactlyInAnyOrderElementsOf(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
                 ledger,
                 FundsSubjectType.CREDIT_ACCOUNT,

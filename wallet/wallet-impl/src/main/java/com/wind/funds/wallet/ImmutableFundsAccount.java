@@ -2,14 +2,12 @@ package com.wind.funds.wallet;
 
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
-import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -38,8 +36,6 @@ public class ImmutableFundsAccount implements FundsAccount {
     private final Set<FundsAccountCapability> capabilities;
 
     private final String capabilitySource;
-
-    private final Map<LedgerSubjectCode, Long> accountLedgerIds;
 
     private final Integer version;
 

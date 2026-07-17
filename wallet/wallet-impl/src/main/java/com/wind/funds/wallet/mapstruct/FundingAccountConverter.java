@@ -8,7 +8,6 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.ReportingPolicy;
 import org.mapstruct.factory.Mappers;
@@ -38,7 +37,6 @@ public interface FundingAccountConverter {
      * @param data FundingAccount 实例
      * @return FundingAccountDTO 实例
      */
-    @Mapping(target = "ledgerIds", ignore = true)
     FundingAccountDTO convertToFundingAccountDTO(FundingAccount data);
 
     /**
