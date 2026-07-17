@@ -5,7 +5,6 @@ import com.wind.funds.route.support.RouteParticipantFactory;
 import com.wind.funds.route.support.RouteSpecSupport;
 import com.wind.funds.route.support.RouteSubjectSupport;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
-import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.transaction.support.FundsInstructionContextReader;
 import com.wind.funds.transaction.support.FundsRouteCodes;
@@ -26,7 +25,6 @@ import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.spec.transaction.FeeSpec;
 import com.wind.funds.spec.transaction.FundsInstructionFieldKeys;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
@@ -126,11 +124,10 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 PlatformFundingAccountRole.PREPAYMENT, instruction.getAmount(), instruction.getDescription()));
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, false), accountId,
                 instruction.getAmount(), instruction.getDescription()));
-        FundsAccountId feeAccount = appendFeeLeg(participants, legs, accountId, instruction, legs.size());
         return route(instruction, FundsRouteCodes.TOPUP_STANDARD, participants, legs,
                 instruction.getExternalAccountRef(),
                 platformAccountRouteSupport.createExternalFundMovementSnapshot(cashMappingAccount, prepaymentAccount,
-                        feeAccount));
+                        null));
     }
 
     private ResolvedRouteSpec resolveTransfer(FundsInstructionSpec instruction) {
@@ -154,9 +151,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 payerAccountId, instruction.getAmount(), instruction.getDescription()));
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(payeeAccountId, false),
                 payeeAccountId, instruction.getAmount(), instruction.getDescription()));
-        FundsAccountId feeAccount = appendFeeLeg(participants, legs, payerAccountId, instruction, legs.size());
-        return route(instruction, FundsRouteCodes.INTERNAL_TRANSFER_STANDARD, participants, legs,
-                platformAccountRouteSupport.createFeeSnapshot(feeAccount));
+        return route(instruction, FundsRouteCodes.INTERNAL_TRANSFER_STANDARD, participants, legs, null);
     }
 
     private ResolvedRouteSpec resolvePay(FundsInstructionSpec instruction) {
@@ -181,9 +176,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 instruction.getAmount(), instruction.getDescription()));
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(payeeId, false), payeeId,
                 instruction.getAmount(), instruction.getDescription()));
-        FundsAccountId feeAccount = appendFeeLeg(participants, legs, accountId, instruction, legs.size());
-        return route(instruction, FundsRouteCodes.DIRECT_PAY_STANDARD, participants, legs,
-                platformAccountRouteSupport.createFeeSnapshot(feeAccount));
+        return route(instruction, FundsRouteCodes.DIRECT_PAY_STANDARD, participants, legs, null);
     }
 
     private ResolvedRouteSpec resolveRefund(FundsInstructionSpec instruction) {
@@ -206,9 +199,7 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 instruction.getAmount(), instruction.getDescription()));
         participants.add(subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, false), accountId,
                 instruction.getAmount(), instruction.getDescription()));
-        FundsAccountId feeAccount = appendFeeLeg(participants, legs, accountId, instruction, legs.size());
-        return route(instruction, FundsRouteCodes.DIRECT_REFUND_STANDARD, participants, legs,
-                platformAccountRouteSupport.createFeeSnapshot(feeAccount));
+        return route(instruction, FundsRouteCodes.DIRECT_REFUND_STANDARD, participants, legs, null);
     }
 
     private ResolvedRouteSpec resolveWithdraw(FundsInstructionSpec instruction) {
@@ -246,11 +237,10 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 PlatformFundingAccountRole.PREPAYMENT, instruction.getAmount(), instruction.getDescription()));
         participants.add(platformParticipant(RouteParticipantRole.PLATFORM_FUNDING_ACCOUNT, cashMappingAccount,
                 PlatformFundingAccountRole.CASH_MAPPING, instruction.getAmount(), instruction.getDescription()));
-        FundsAccountId feeAccount = appendFeeLeg(participants, legs, accountId, instruction, legs.size());
         return route(instruction, FundsRouteCodes.WITHDRAW_STANDARD, participants, legs,
                 instruction.getExternalAccountRef(),
                 platformAccountRouteSupport.createExternalFundMovementSnapshot(cashMappingAccount, prepaymentAccount,
-                        feeAccount));
+                        null));
     }
 
     private void assertWithdrawReferenceMatchesAccount(FundsInstructionSpec instruction, FundsAccountId accountId) {
@@ -363,33 +353,6 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 platformAccountRouteSupport.createFeeSnapshot(feeAccount));
     }
 
-    private FundsAccountId appendFeeLeg(List<RouteParticipantSpec> participants,
-                                        List<RouteLegSpec> legs,
-                                        FundsAccountId payerAccountId,
-                                        FundsInstructionSpec instruction,
-                                        int currentSize) {
-        Money feeAmount = calculateFee(instruction, instruction.getAmount());
-        if (feeAmount.getAmount() <= 0L) {
-            return null;
-        }
-        FundsAccountId feeAccount = platformAccountRouteSupport.requireAccount(feeAmount.getCurrency(),
-                PlatformFundingAccountRole.FEE);
-        legs.add(routeLeg(FundsRouteLegIds.FEE, currentSize + 1, RouteLegType.INTERNAL_TRANSFER,
-                feeAmount, instruction.getDescription())
-                .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(payerAccountId),
-                        LedgerSubjectCode.AVAILABLE))
-                .targetNode(targetNode(platformAccountRouteSupport.createSubjectRef(feeAccount),
-                        platformAccountRouteSupport.resolveLedgerSubjectCode(PlatformFundingAccountRole.FEE)))
-                .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.FEE)
-                .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
-                .constraintOverrides(mustNotBeNegative(payerAccountId, LedgerSubjectCode.AVAILABLE))
-                .build());
-        participants.add(platformParticipant(RouteParticipantRole.FEE_RECEIVER, feeAccount,
-                PlatformFundingAccountRole.FEE, feeAmount, instruction.getDescription()));
-        return feeAccount;
-    }
-
     private ResolvedRouteSpec route(FundsInstructionSpec instruction,
                                     String routeCode,
                                     List<RouteParticipantSpec> participants,
@@ -426,12 +389,6 @@ public class TransferFundsInstructionRouteResolver implements RouteResolver, Ord
                 .build();
         RouteSpecSupport.validateResolvedRoute(result);
         return result;
-    }
-
-    private Money calculateFee(FundsInstructionSpec instruction, Money transactionAmount) {
-        FeeSpec fee = FundsInstructionContextReader.getValue(instruction, FundsInstructionContextKeys.FEE_SPEC,
-                FeeSpec.class);
-        return fee == null ? Money.immutable(0L, transactionAmount.getCurrency()) : fee.calculateFee(transactionAmount);
     }
 
     private RouteParticipantSpec subjectParticipant(RouteParticipantRole role,

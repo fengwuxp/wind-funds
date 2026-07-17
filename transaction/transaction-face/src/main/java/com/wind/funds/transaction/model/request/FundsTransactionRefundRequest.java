@@ -10,13 +10,13 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.experimental.Accessors;
-import org.jspecify.annotations.NonNull;
 
 /**
  * 直接交易退款请求。
  *
- * <p>填写 {@code referenceTransactionSn} 时按原交易 route snapshot 回放；未填写时为业务决策型直接退款，
- * 调用方必须明确给出退款到账账户、出资账户和出资账目。</p>
+ * <p>填写 {@code referenceTransactionSn} 时，原交易 route snapshot 是唯一退款路由事实源，
+ * 不得再填写 {@code accountId}、{@code payerId} 或 {@code payerLedgerSubjectCode}；未填写原交易流水时为
+ * 业务确认型直接退款，调用方必须明确给出退款到账账户、出资账户和出资账目。</p>
  *
  * @author wuxp
  * @date 2026-04-21 08:57
@@ -26,23 +26,21 @@ import org.jspecify.annotations.NonNull;
 public class FundsTransactionRefundRequest {
 
     @Schema(description = "退款到账账户")
-    @NotNull
     private FundsAccountId accountId;
 
     @Schema(description = "退款交易金额")
     @NotNull
     private TransactionAmount transactionAmount;
 
-    @Schema(description = "本次交易显式手续费规则")
-    private FeeSpec feeSpec;
+    @Schema(description = "本次交易新增收费规则；手续费从退款路径中唯一真实资金受益 FundingAccount 的 AVAILABLE 扣取，"
+            + "不得从 CreditAccount 额度扣取，与退款本金原子入账")
+    private FeeSpec feeChargeSpec;
 
     @Schema(description = "退款出资账户；业务决策型直接退款时由调用方明确给出")
-    @NotNull
     private FundsAccountId payerId;
 
     @Schema(description = "退款出资账户账目编码；业务决策型直接退款时由调用方明确给出")
-    @NonNull
-    private LedgerSubjectCode payerLedgerCode = LedgerSubjectCode.SETTLEMENT;
+    private LedgerSubjectCode payerLedgerSubjectCode;
 
     @Schema(description = "原资金交易流水号；填写后按原交易 route snapshot 回放，未填写表示业务决策型直接退款")
     @Size(max = 80)

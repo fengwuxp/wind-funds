@@ -31,8 +31,8 @@ public class FundsTransactionTransferRequest {
     @NotNull
     private TransactionAmount transactionAmount;
 
-    @Schema(description = "本次交易显式手续费规则")
-    private FeeSpec feeSpec;
+    @Schema(description = "本次交易新增收费规则；手续费从 payerAccountId 对应 FundingAccount 的 AVAILABLE 扣取，与转账本金原子入账")
+    private FeeSpec feeChargeSpec;
 
     @Schema(description = "业务流水号，转账凭证，例如：账户转账单流水号、内部调拨单流水号")
     @NotNull

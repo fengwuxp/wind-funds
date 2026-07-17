@@ -25,6 +25,11 @@ final class FundsInstructionAmountSupport {
                                                    @NonNull FundsAccountId targetAccountId) {
         AssertUtils.notNull(transactionAmount, "transactionAmount must not be null");
         validateCurrency(transactionAmount.getAmount(), targetAccountId, "transactionAmount.amount");
+        return fromTransactionAmount(transactionAmount);
+    }
+
+    @NonNull ConvertedAmount fromTransactionAmount(@NonNull TransactionAmount transactionAmount) {
+        AssertUtils.notNull(transactionAmount, "transactionAmount must not be null");
         return new ConvertedAmount(transactionAmount.getAmount(), transactionAmount.getOriginalAmount(),
                 transactionAmount.getExchangeRate());
     }

@@ -27,6 +27,8 @@ import com.wind.funds.route.BalanceControlFundsInstructionRouteResolver;
 import com.wind.funds.route.CompositeRouteResolver;
 import com.wind.funds.route.DefaultRouteReplayService;
 import com.wind.funds.route.DefaultRouteSnapshotFactory;
+import com.wind.funds.route.RefundRouteAdmission;
+import com.wind.funds.route.RouteFeeChargeAppender;
 import com.wind.funds.route.TransferFundsInstructionRouteResolver;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
 import com.wind.funds.route.support.RouteParticipantFactory;
@@ -379,6 +381,16 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .isOne();
     }
 
+    protected void updateAccountStatus(FundsAccountId accountId, FundsAccountStatus status) {
+        String tableName = accountId.type().equals(FundsSubjectType.CREDIT_ACCOUNT.name())
+                ? "t_credit_account" : "t_funding_account";
+        int updated = jdbcTemplate.update("UPDATE " + tableName + " SET status = ? WHERE tenant_id = ? AND sn = ?",
+                status.name(), TENANT_ID, accountId.id());
+        assertThat(updated)
+                .as("account status updated for accountId %s", accountId)
+                .isOne();
+    }
+
     protected void ensureCreditAccount(FundsAccountId accountId) {
         assertThat(accountId.type()).isEqualTo(FundsSubjectType.CREDIT_ACCOUNT.name());
         if (!findLedgers(accountId).isEmpty()) {
@@ -465,13 +477,13 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected String pay(FundsAccountId accountId,
                          FundsAccountId payeeId,
-                         LedgerSubjectCode payeeLedgerCode,
+                         LedgerSubjectCode payeeLedgerSubjectCode,
                          long amount,
                          String businessSn) {
         return directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(accountId)
                 .setPayeeId(payeeId)
-                .setPayeeLedgerCode(payeeLedgerCode)
+                .setPayeeLedgerSubjectCode(payeeLedgerSubjectCode)
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("PAY")
                 .setBusinessSn(businessSn)
@@ -480,16 +492,16 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected void payWithFixedFee(FundsAccountId accountId,
                                    FundsAccountId payeeId,
-                                   LedgerSubjectCode payeeLedgerCode,
+                                   LedgerSubjectCode payeeLedgerSubjectCode,
                                    long amount,
                                    long feeAmount,
                                    String businessSn) {
         directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(accountId)
                 .setPayeeId(payeeId)
-                .setPayeeLedgerCode(payeeLedgerCode)
+                .setPayeeLedgerSubjectCode(payeeLedgerSubjectCode)
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
-                .setFeeSpec(FeeSpec.builder()
+                .setFeeChargeSpec(FeeSpec.builder()
                         .feeType(DefaultFeeType.FEE.getCode())
                         .fixedFee(Math.toIntExact(feeAmount))
                         .build())
@@ -500,13 +512,13 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
 
     protected void refund(FundsAccountId accountId,
                           FundsAccountId payerId,
-                          LedgerSubjectCode payerLedgerCode,
+                          LedgerSubjectCode payerLedgerSubjectCode,
                           long amount,
                           String businessSn) {
         directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(accountId)
                 .setPayerId(payerId)
-                .setPayerLedgerCode(payerLedgerCode)
+                .setPayerLedgerSubjectCode(payerLedgerSubjectCode)
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn(businessSn)
@@ -559,7 +571,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                         DefaultFundsAccountType.EXTERNAL_BANK))
                 .setReferenceFreezeSn(referenceFreezeSn)
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
-                .setFeeSpec(FeeSpec.builder()
+                .setFeeChargeSpec(FeeSpec.builder()
                         .feeType(DefaultFeeType.FEE.getCode())
                         .fixedFee(Math.toIntExact(feeAmount))
                         .build())
@@ -1315,6 +1327,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             RouteSubjectSupport.class,
             PlatformAccountRouteSupport.class,
             DefaultRouteReplayService.class,
+            RefundRouteAdmission.class,
+            RouteFeeChargeAppender.class,
             TransferFundsInstructionRouteResolver.class,
             BalanceControlFundsInstructionRouteResolver.class,
             AuthorizationFundsInstructionRouteResolver.class,

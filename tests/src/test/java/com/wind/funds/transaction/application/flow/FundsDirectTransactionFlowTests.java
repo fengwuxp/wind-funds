@@ -28,11 +28,13 @@ import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.spec.transaction.FeeSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
+import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import java.math.BigDecimal;
@@ -62,7 +64,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     private static final Set<String> DIRECT_REQUEST_CONTEXT_KEYS = Set.of(
             "channelCode",
             "externalTransactionId",
-            "feeSpec");
+            "feeChargeSpec");
 
     @Test
     void testConvertedTopupShouldPropagateOriginalAmountAndExchangeRateToLedgerFacts() {
@@ -104,6 +106,169 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertBucket(balance(account), LedgerSubjectCode.AVAILABLE, amount.getAmount(), amount.getCurrency());
     }
 
+    /**
+     * 场景：外部入金确认后，业务要求在同一笔充值中收取手续费。
+     * 输入：充值 100，并携带固定手续费 5。
+     * 输出：充值账户 AVAILABLE 净增加 95，平台 CASH 减少 100，平台 FEE 增加 5。
+     * 预期：手续费从充值到账 FundingAccount 的 AVAILABLE 扣取，并与充值本金原子入账。
+     * 红线：不得从外部账户、平台 PREPAYMENT 或其他未受益账户扣取充值手续费。
+     */
+    @Test
+    void testTopupWithFeeChargeSpecShouldChargeCreditedFundingAccountAvailable() {
+        FundsAccountId account = fundingAccount("topup_fee_user");
+        ensureLedger(account, LedgerSubjectCode.AVAILABLE);
+        BalanceSnapshot before = snapshot(balances(account, feeAccount(), cashMappingAccount(), prepaymentAccount()));
+
+        directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_topup_fee_source",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_TOPUP_FEE_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(100L, CURRENCY)))
+                .setFeeChargeSpec(FeeSpec.builder()
+                        .feeType("TOPUP_PROCESSING_FEE")
+                        .fixedFee(5)
+                        .build())
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_TOPUP_FEE")
+                .setDescription("topup with processing fee"), WindOperator.system());
+
+        BalanceSnapshot after = snapshot(balances(account, feeAccount(), cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, after,
+                delta(account, LedgerSubjectCode.AVAILABLE, 95L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, -100L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertThat(postingPlansOf(ledgerTransactionByBusinessSn("DIRECT_TOPUP_FEE")).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsExactlyInAnyOrder(
+                        LedgerPhaseCode.FUND_IN.name(),
+                        LedgerPhaseCode.SETTLEMENT.name(),
+                        LedgerPhaseCode.FEE.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_TOPUP_FEE", 4, 6);
+    }
+
+    /**
+     * 场景：充值本金足以入账，但到账账户不足以承担本次新增手续费。
+     * 输入：充值 100，同时收取固定手续费 105。
+     * 输出：充值本金腿和费用腿整体失败，到账账户、平台 CASH/PREPAYMENT/FEE 均不变化。
+     * 预期：主交易与费用腿共享本地事务，不能先完成充值再留下手续费欠款。
+     * 红线：费用失败不得形成部分成功、负余额或孤立账务事实。
+     */
+    @Test
+    void testTopupWithFeeChargeSpecExceedingCreditedAmountShouldRollbackAllLedgerEffects() {
+        FundsAccountId account = fundingAccount("topup_fee_insufficient");
+        ensureLedger(account, LedgerSubjectCode.AVAILABLE);
+        BalanceSnapshot before = snapshot(balances(account, feeAccount(), cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_topup_fee_insufficient",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_TOPUP_FEE_INSUFFICIENT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(100L, CURRENCY)))
+                .setFeeChargeSpec(FeeSpec.builder()
+                        .feeType("TOPUP_PROCESSING_FEE")
+                        .fixedFee(105)
+                        .build())
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_TOPUP_FEE_INSUFFICIENT")
+                .setDescription("topup with excessive processing fee"), WindOperator.system()))
+                .hasMessageContaining("账本余额不足");
+
+        BalanceSnapshot after = snapshot(balances(account, feeAccount(), cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, after,
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertFailedFundsTransactionWithoutLedgerFacts("DIRECT_TOPUP_FEE_INSUFFICIENT");
+    }
+
+    /**
+     * 场景：调用方试图通过自由上下文注入随交易手续费规则。
+     * 输入：feeChargeSpec 一等字段为空，但 contextVariables 含同名保留键。
+     * 输出：请求在指令转换前被拒绝，账户和账务事实均不变化。
+     * 预期：手续费只能由显式请求字段触发，扩展上下文不能改变资金行为。
+     * 红线：不得允许同名上下文绕过公共契约并产生隐式扣费。
+     */
+    @Test
+    void testTopupWithFeeChargeSpecInContextVariablesShouldRejectWithoutSideEffects() {
+        FundsAccountId account = fundingAccount("topup_fee_context");
+        ensureLedger(account, LedgerSubjectCode.AVAILABLE);
+        BalanceSnapshot before = snapshot(balances(account, feeAccount(), cashMappingAccount(), prepaymentAccount()));
+        LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
+                .setAccountId(account)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_topup_fee_context",
+                        DefaultFundsAccountType.EXTERNAL_BANK))
+                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannelTransactionSn("DIRECT_TOPUP_FEE_CONTEXT_CHANNEL")
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(100L, CURRENCY)))
+                .setContextVariables(WritableContextVariables.of(Map.of("feeChargeSpec", FeeSpec.builder()
+                        .feeType("TOPUP_PROCESSING_FEE")
+                        .fixedFee(5)
+                        .build())))
+                .setBusinessScene("TOPUP")
+                .setBusinessSn("DIRECT_TOPUP_FEE_CONTEXT")
+                .setDescription("topup with fee rule in context"), WindOperator.system()))
+                .hasMessageContaining("contextVariables must not contain reserved funds transaction fields");
+
+        BalanceSnapshot after = snapshot(balances(account, feeAccount(), cashMappingAccount(), prepaymentAccount()));
+        assertOnlyBalanceDeltas(before, after,
+                delta(account, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY),
+                delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_TOPUP_FEE_CONTEXT");
+    }
+
+    /**
+     * 场景：内部账户转账时，业务要求在同一笔转账中向付款方收取手续费。
+     * 输入：付款方充值 100，向收款方转账 30，并携带固定手续费 5。
+     * 输出：付款方 AVAILABLE 减少 35，收款方 AVAILABLE 增加 30，平台 FEE 增加 5。
+     * 预期：手续费从 payerAccountId 对应 FundingAccount 的 AVAILABLE 扣取，并与转账本金原子入账。
+     * 红线：不得从收款方、CreditAccount 额度或其他未明确资金责任账户扣费。
+     */
+    @Test
+    void testTransferWithFeeChargeSpecShouldChargePayerFundingAccountAvailable() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("transfer_fee_payee");
+        ensureLedger(payee, LedgerSubjectCode.AVAILABLE);
+        topup(payer, 100L, "DIRECT_TRANSFER_FEE_TOPUP");
+        BalanceSnapshot before = snapshot(balances(payer, payee, feeAccount()));
+
+        directTransactionService.transfer(new FundsTransactionTransferRequest()
+                .setPayerAccountId(payer)
+                .setPayeeAccountId(payee)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setFeeChargeSpec(FeeSpec.builder()
+                        .feeType("TRANSFER_PROCESSING_FEE")
+                        .fixedFee(5)
+                        .build())
+                .setBusinessScene("TRANSFER")
+                .setBusinessSn("DIRECT_TRANSFER_FEE")
+                .setDescription("transfer with processing fee"), WindOperator.system());
+
+        BalanceSnapshot after = snapshot(balances(payer, payee, feeAccount()));
+        assertOnlyBalanceDeltas(before, after,
+                delta(payer, LedgerSubjectCode.AVAILABLE, -35L, CURRENCY),
+                delta(payee, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY));
+        assertThat(postingPlansOf(ledgerTransactionByBusinessSn("DIRECT_TRANSFER_FEE")).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerPhaseCode.TRANSFER.name(), LedgerPhaseCode.FEE.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_TRANSFER_FEE", 3, 4);
+    }
+
     @Test
     void testPartialFxRefundShouldPropagateCurrentAmountFactsToLedger() {
         FundsAccountId payer = fundingAccount("funding_user");
@@ -113,7 +278,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         String payTransactionSn = directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(payee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.converted(
                         Money.immutable(325L, CurrencyIsoCode.USD),
                         Money.immutable(1_000L, CurrencyIsoCode.KWD),
@@ -122,9 +287,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessSn("FX_PARTIAL_REFUND_PAY"), WindOperator.system());
 
         directTransactionService.refund(new FundsTransactionRefundRequest()
-                .setAccountId(payer)
-                .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.converted(
                         Money.immutable(100L, CurrencyIsoCode.USD),
                         Money.immutable(308L, CurrencyIsoCode.KWD),
@@ -159,7 +321,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         String payTransactionSn = directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(payee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.converted(
                         Money.immutable(325L, CurrencyIsoCode.USD),
                         Money.immutable(1_000L, CurrencyIsoCode.KWD),
@@ -170,9 +332,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
-                .setAccountId(payer)
-                .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.converted(
                         Money.immutable(100L, CurrencyIsoCode.USD),
                         Money.immutable(303L, CurrencyIsoCode.KWD),
@@ -380,6 +539,83 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
+     * 场景：原付款账户已关闭，但旧交易随后收到关联退款。
+     * 输入：付款 70 后把原付款账户状态改为 CLOSED，再按原 RouteSnapshot 退款 30。
+     * 输出：退款被拒绝，原付款方、原收款方和平台账户余额保持不变。
+     * 预期：关闭账户不自动重开，也不由资金底座静默改路到其他账户。
+     * 红线：账户关闭不能被退款 closing posting 绕过；合法退款应由上层指定新的有效承接账户。
+     */
+    @Test
+    void testReferencedRefundToClosedAccountShouldRejectWithoutLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("closed_refund_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "DIRECT_CLOSED_REFUND_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
+                "DIRECT_CLOSED_REFUND_PAY");
+        updateAccountStatus(payer, FundsAccountStatus.CLOSED);
+        BalanceSnapshot beforeRefund = snapshot(balances(payer, payee, feeAccount()));
+        LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_CLOSED_REFUND_REFUND")
+                .setDescription("referenced refund to closed account"), WindOperator.system()))
+                .hasMessageContaining("关闭账户不允许承接退款");
+
+        BalanceSnapshot afterRefund = snapshot(balances(payer, payee, feeAccount()));
+        assertOnlyBalanceDeltas(beforeRefund, afterRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_CLOSED_REFUND_REFUND");
+    }
+
+    /**
+     * 场景：冻结账户仍可承接既有退款，但本次退款同时要求从该账户收取新手续费。
+     * 输入：付款完成后冻结原付款账户，再发起关联退款 30 并收取手续费 5。
+     * 输出：整笔退款被拒绝，退款本金和手续费均不入账。
+     * 预期：退款入账义务不等于允许账户出账；手续费扣款必须满足 ACTIVE 借记准入。
+     * 红线：不得借退款流程绕过冻结或挂起账户的出账控制。
+     */
+    @Test
+    void testReferencedRefundWithFeeChargeSpecToFrozenAccountShouldRejectWithoutSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_frozen_fee_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "DIRECT_REFUND_FROZEN_FEE_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
+                "DIRECT_REFUND_FROZEN_FEE_PAY");
+        updateAccountStatus(payer, FundsAccountStatus.FROZEN);
+        BalanceSnapshot beforeRefund = snapshot(balances(payer, payee, feeAccount()));
+        LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setFeeChargeSpec(FeeSpec.builder()
+                        .feeType("REFUND_PROCESSING_FEE")
+                        .fixedFee(5)
+                        .build())
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_FROZEN_FEE_REFUND")
+                .setDescription("referenced refund with fee to frozen account"), WindOperator.system()))
+                .hasMessageContaining("账户状态不允许扣取随交易手续费");
+
+        BalanceSnapshot afterRefund = snapshot(balances(payer, payee, feeAccount()));
+        assertOnlyBalanceDeltas(beforeRefund, afterRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
+        assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_FROZEN_FEE_REFUND");
+    }
+
+    /**
      * 场景：直接退款指定了不存在的原支付交易流水。
      * 输入：付款方充值 100、向收款方付款 70，随后按缺失的原交易流水退款 30。
      * 输出：退款在 RouteSnapshot 回放阶段失败；付款方、收款方和平台账户余额保持付款后的状态。
@@ -413,9 +649,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         LedgerFactSnapshot afterPayFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
-                .setAccountId(payer)
-                .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setReferenceTransactionSn("FUNDS_TRANSACTION_NOT_EXISTS")
                 .setBusinessScene("REFUND")
@@ -487,9 +720,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         LedgerFactSnapshot afterCorruptedReferenceFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
-                .setAccountId(payer)
-                .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
@@ -516,6 +746,42 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertPostedTransactions(2);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_REFUND");
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
+    }
+
+    /**
+     * 场景：关联退款同时传入原交易引用和新的退款到账账户。
+     * 输入：原付款完成后，退款请求同时携带 referenceTransactionSn 与 accountId。
+     * 输出：请求在指令转换阶段被拒绝，原交易余额、累计退款和账务事实均不变化。
+     * 预期：关联退款只允许原 route snapshot 决定路径，不能混入第二套路由来源。
+     * 红线：不得优先使用请求账户，也不得在原快照与请求账户之间静默择一。
+     */
+    @Test
+    void testReferencedRefundWithExplicitAccountShouldRejectWithoutSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_conflict_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+        topup(payer, 100L, "DIRECT_REFUND_CONFLICT_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
+                "DIRECT_REFUND_CONFLICT_PAY");
+        BalanceSnapshot beforeRefund = snapshot(balances(payer, payee));
+        LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(payer)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_CONFLICT_REFUND")
+                .setDescription("referenced refund with explicit account"), WindOperator.system()))
+                .hasMessageContaining("关联退款不得重复传入退款到账账户");
+
+        BalanceSnapshot afterRefund = snapshot(balances(payer, payee));
+        assertOnlyBalanceDeltas(beforeRefund, afterRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
+        assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isZero();
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_CONFLICT_REFUND");
     }
 
     /**
@@ -552,9 +818,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String refundTransactionSn = directTransactionService.refund(new FundsTransactionRefundRequest()
-                .setAccountId(payer)
-                .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
@@ -581,9 +844,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         LedgerFactSnapshot afterFirstRefundFacts = ledgerFactSnapshot();
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
-                .setAccountId(payer)
-                .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(50L, CURRENCY)))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
@@ -602,6 +862,92 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertLedgerTransactionFactsUnchanged(afterFirstRefundFacts);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_REFERENCE_EXCEED_REFUND");
         assertThat(fundsTransaction(payTransactionSn).getRefundedAmount()).isEqualTo(30L);
+    }
+
+    /**
+     * 场景：关联原支付的退款已由上层确认同时收取退款处理费。
+     * 输入：付款 70 后按原 RouteSnapshot 退款 30，并传入固定手续费 5；请求不重复传入退款路由字段。
+     * 输出：原付款方 AVAILABLE 回补 30 后扣费 5，原收款方 SETTLEMENT 减少 30，平台 FEE 增加 5。
+     * 预期：退款本金腿和新增手续费腿在同一账本交易中原子入账。
+     * 红线：关联退款不得忽略收费规则，也不得按当前请求重新选择退款路径。
+     */
+    @Test
+    void testReferencedRefundWithFeeChargeSpecShouldChargeUniqueFundingBeneficiaryAtomically() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId payee = fundingAccount("refund_fee_payee");
+        ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
+
+        topup(payer, 100L, "DIRECT_REFUND_FEE_TOPUP");
+        String payTransactionSn = pay(payer, payee, LedgerSubjectCode.SETTLEMENT, 70L,
+                "DIRECT_REFUND_FEE_PAY");
+        BalanceSnapshot beforeRefund = snapshot(balances(payer, payee, feeAccount()));
+
+        directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setFeeChargeSpec(FeeSpec.builder()
+                        .feeType("REFUND_PROCESSING_FEE")
+                        .fixedFee(5)
+                        .build())
+                .setReferenceTransactionSn(payTransactionSn)
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_FEE_REFUND")
+                .setDescription("referenced refund with processing fee"), WindOperator.system());
+
+        BalanceSnapshot afterRefund = snapshot(balances(payer, payee, feeAccount()));
+        assertOnlyBalanceDeltas(beforeRefund, afterRefund,
+                delta(payer, LedgerSubjectCode.AVAILABLE, 25L, CURRENCY),
+                delta(payee, LedgerSubjectCode.SETTLEMENT, -30L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 5L, CURRENCY));
+        LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("DIRECT_REFUND_FEE_REFUND");
+        assertThat(fundsTransaction(ledgerTransaction.getFundsTransactionSn()).getFeeAmount()).isEqualTo(5L);
+        assertThat(fundsTransaction(payTransactionSn).getFeeAmount()).isZero();
+        assertThat(postingPlansOf(ledgerTransaction).stream()
+                .map(LedgerPostingPlan::getPhaseCode)
+                .toList())
+                .containsExactlyInAnyOrder(LedgerPhaseCode.REFUND.name(), LedgerPhaseCode.FEE.name());
+        assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_FEE_REFUND", 3, 4);
+    }
+
+    /**
+     * 场景：业务确认型退款只回补 CreditAccount 控制额度，同时要求自动收取退款处理费。
+     * 输入：退款目标为 CreditAccount，退款请求携带固定手续费规则。
+     * 输出：请求被拒绝，信用额度、退款出资账目和平台费用账目均不变化。
+     * 预期：随交易手续费只能从唯一真实资金受益 FundingAccount 的 AVAILABLE 扣取。
+     * 红线：不得把 CreditAccount.AVAILABLE 信用额度转换为平台手续费收入。
+     */
+    @Test
+    void testRefundWithFeeChargeSpecAndCreditOnlyBeneficiaryShouldRejectWithoutLedgerSideEffects() {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId refundPayer = fundingAccount("refund_credit_fee_payer");
+        FundsAccountId creditAccount = creditAccount("refund_credit_fee_target");
+        ensureLedger(refundPayer, LedgerSubjectCode.SETTLEMENT);
+        ensureCreditAccount(creditAccount);
+        topup(payer, 100L, "DIRECT_REFUND_CREDIT_FEE_TOPUP");
+        pay(payer, refundPayer, LedgerSubjectCode.SETTLEMENT, 70L, "DIRECT_REFUND_CREDIT_FEE_PAY");
+        BalanceSnapshot beforeRefund = snapshot(balances(refundPayer, creditAccount, feeAccount()));
+        LedgerFactSnapshot beforeRefundFacts = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(creditAccount)
+                .setPayerId(refundPayer)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setFeeChargeSpec(FeeSpec.builder()
+                        .feeType("REFUND_PROCESSING_FEE")
+                        .fixedFee(5)
+                        .build())
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_CREDIT_FEE_REFUND")
+                .setDescription("credit-only refund with processing fee"), WindOperator.system()))
+                .hasMessageContaining("随交易手续费扣款账户必须是唯一真实资金账户");
+
+        BalanceSnapshot afterRefund = snapshot(balances(refundPayer, creditAccount, feeAccount()));
+        assertOnlyBalanceDeltas(beforeRefund, afterRefund,
+                delta(refundPayer, LedgerSubjectCode.SETTLEMENT, 0L, CURRENCY),
+                delta(creditAccount, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                delta(feeAccount(), LedgerSubjectCode.FEE, 0L, CURRENCY));
+        assertLedgerTransactionFactsUnchanged(beforeRefundFacts);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_CREDIT_FEE_REFUND");
     }
 
     /**
@@ -656,9 +1002,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
 
         String refundTransactionSn = directTransactionService.refund(new FundsTransactionRefundRequest()
-                .setAccountId(payer)
-                .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
@@ -723,7 +1066,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
                         Map.of("networkReference", "GB82WEST12345698765432"))))
@@ -795,7 +1138,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_ACCOUNT")
@@ -828,6 +1171,32 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_ACCOUNT_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_ACCOUNT_PAY", 2, 2);
         assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_ACCOUNT");
+    }
+
+    /**
+     * 场景：业务确认型直接退款没有给出退款出资账目。
+     * 输入：到账账户和出资账户均有效，但不传 payerLedgerSubjectCode。
+     * 输出：请求在路由前被拒绝，不生成资金交易或账务事实。
+     * 预期：无原交易快照可回放时，调用方必须完整确认退款资金来源。
+     * 红线：不得默认使用 SETTLEMENT、AVAILABLE 或任何其他账目。
+     */
+    @Test
+    void testBusinessConfirmedRefundWithoutPayerLedgerSubjectCodeShouldRejectWithoutSideEffects() {
+        FundsAccountId beneficiary = fundingAccount("refund_missing_ledger_beneficiary");
+        FundsAccountId payer = fundingAccount("refund_missing_ledger_payer");
+        LedgerFactSnapshot before = ledgerFactSnapshot();
+
+        assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
+                .setAccountId(beneficiary)
+                .setPayerId(payer)
+                .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
+                .setBusinessScene("REFUND")
+                .setBusinessSn("DIRECT_REFUND_MISSING_PAYER_LEDGER")
+                .setDescription("business-confirmed refund without payer ledger"), WindOperator.system()))
+                .hasMessageContaining("业务确认型直接退款出资账目不能为空");
+
+        assertLedgerTransactionFactsUnchanged(before);
+        assertNoFundsOrLedgerFactsForBusinessSn("DIRECT_REFUND_MISSING_PAYER_LEDGER");
     }
 
     /**
@@ -868,7 +1237,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(externalAccount)
                 .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_EXTERNAL_ACCOUNT")
@@ -941,7 +1310,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(externalPayer)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_EXTERNAL_PAYER")
@@ -1011,7 +1380,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_PAYER")
@@ -2095,7 +2464,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(payee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CurrencyIsoCode.CNY)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_CURRENCY_PAY")
@@ -2153,7 +2522,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(payee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
                         Map.of("secretKey", "secret-value"))))
@@ -2164,7 +2533,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(payee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
                         Map.of("networkReference", "GB82WEST12345698765432"))))
@@ -2221,7 +2590,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_MISSING_PAYEE")
@@ -2328,7 +2697,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(externalPayee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_EXTERNAL_PAYEE")
@@ -2377,7 +2746,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(externalPayer)
                 .setPayeeId(payee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_EXTERNAL_PAYER")
@@ -2847,7 +3216,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         String firstPaySn = directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(payee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("PAY")
@@ -2867,7 +3236,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         String retryPaySn = directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(payee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("PAY")
@@ -2889,7 +3258,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
                 .setPayeeId(payee)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
                 .setBusinessScene("PAY")
@@ -3243,7 +3612,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         String firstRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
@@ -3262,7 +3631,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         String retryRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
@@ -3282,7 +3651,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(31L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
@@ -3354,7 +3723,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         String firstRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("REFUND")
@@ -3374,7 +3743,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         String retryRefundSn = directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("REFUND")
@@ -3396,7 +3765,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setAccountId(payer)
                 .setPayerId(payee)
-                .setPayerLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayerLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
                 .setBusinessScene("REFUND")
@@ -3657,7 +4026,9 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(detail.getBusinessScene()).isEqualTo(transaction.getBusinessScene());
                     assertThat(detail.getBusinessSn()).isEqualTo(transaction.getBusinessSn());
                     assertThat(detail.getTransactionType()).isEqualTo(transaction.getTransactionType());
-                    assertThat(detail.getAmount()).isEqualTo(transaction.getAmount());
+                    if (detail.getParticipantRole() != RouteParticipantRole.FEE_RECEIVER) {
+                        assertThat(detail.getAmount()).isEqualTo(transaction.getAmount());
+                    }
                     assertThat(detail.getCurrency()).isEqualTo(transaction.getCurrency());
                     assertThat(detail.getGmtCreate()).isNotNull();
                     assertThat(detail.getGmtModified()).isAfterOrEqualTo(detail.getGmtCreate());
@@ -3952,7 +4323,9 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .allSatisfy(detail -> {
                     assertThat(detail.getTransactionType()).isEqualTo(transaction.getTransactionType());
                     assertThat(detail.getEventType().name()).isEqualTo(ledgerTransaction.getEventType());
-                    assertThat(detail.getAmount()).isEqualTo(transaction.getAmount());
+                    if (detail.getParticipantRole() != RouteParticipantRole.FEE_RECEIVER) {
+                        assertThat(detail.getAmount()).isEqualTo(transaction.getAmount());
+                    }
                     assertThat(detail.getCurrency()).isEqualTo(transaction.getCurrency());
                 });
         assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transaction.getSn()))

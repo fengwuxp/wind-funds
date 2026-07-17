@@ -134,7 +134,7 @@ public final class FundsInstructionContextKeys {
 
     public static final String FEE_TYPE = "feeType";
 
-    public static final String FEE_SPEC = "feeSpec";
+    public static final String FEE_CHARGE_SPEC = "feeChargeSpec";
 
     public static final String REPLAY_CONSUMED_LEG_IDS = "replayConsumedLegIds";
 

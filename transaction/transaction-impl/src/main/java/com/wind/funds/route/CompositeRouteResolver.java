@@ -24,6 +24,10 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
 
     private final List<RouteResolver> delegates;
 
+    private final RefundRouteAdmission refundRouteAdmission;
+
+    private final RouteFeeChargeAppender routeFeeChargeAppender;
+
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return true;
@@ -47,7 +51,9 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
         log.debug("resolved route by resolver, resolver = {}, instructionType = {}, eventType = {}, transactionType = {}, businessSn = {}",
                 delegate.getClass().getSimpleName(), instruction.getInstructionType(), instruction.getEventType(),
                 instruction.getTransactionType(), instruction.getBusinessSn());
-        return delegate.resolve(instruction);
+        ResolvedRouteSpec result = delegate.resolve(instruction);
+        refundRouteAdmission.validate(instruction, result);
+        return routeFeeChargeAppender.append(instruction, result);
     }
 
     private int orderOf(RouteResolver routeResolver) {

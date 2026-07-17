@@ -1,12 +1,20 @@
 package com.wind.funds.route;
 
 import com.wind.funds.route.spec.ResolvedRouteSpec;
+import com.wind.funds.route.support.PlatformAccountRouteSupport;
+import com.wind.funds.route.support.RouteParticipantFactory;
 import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
 import com.wind.funds.model.transaction.ImmutableFundsInstructionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.wallet.FundsAccount;
+import com.wind.funds.wallet.FundsAccountBalanceView;
+import com.wind.funds.wallet.FundsAccountId;
+import com.wind.funds.wallet.FundsAccountQueryService;
+import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
+import com.wind.funds.wallet.service.PlatformFundingAccountService;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.Test;
@@ -33,7 +41,7 @@ class CompositeRouteResolverTests {
     @Test
     void testSupportsShouldNotInvokeDelegateResolver() {
         RecordingRouteResolver delegate = new RecordingRouteResolver();
-        CompositeRouteResolver resolver = new CompositeRouteResolver(List.of(delegate));
+        CompositeRouteResolver resolver = resolver(List.of(delegate));
 
         assertThat(resolver.supports(directInstruction())).isTrue();
         assertThat(delegate.supportsCalls).isZero();
@@ -50,7 +58,7 @@ class CompositeRouteResolverTests {
     @Test
     void testResolveWithoutCandidateShouldNotInvokeDelegateResolve() {
         RecordingRouteResolver delegate = new RecordingRouteResolver(false);
-        CompositeRouteResolver resolver = new CompositeRouteResolver(List.of(delegate));
+        CompositeRouteResolver resolver = resolver(List.of(delegate));
 
         assertThatThrownBy(() -> resolver.resolve(directInstruction()))
                 .hasMessageContaining("未找到匹配的 RouteResolver");
@@ -69,7 +77,7 @@ class CompositeRouteResolverTests {
     void testResolveWithMultipleCandidatesShouldNotInvokeDelegateResolve() {
         RecordingRouteResolver first = new RecordingRouteResolver(true);
         RecordingRouteResolver second = new RecordingRouteResolver(true);
-        CompositeRouteResolver resolver = new CompositeRouteResolver(List.of(first, second));
+        CompositeRouteResolver resolver = resolver(List.of(first, second));
 
         assertThatThrownBy(() -> resolver.resolve(directInstruction()))
                 .hasMessageContaining("RouteResolver 命中不唯一");
@@ -96,6 +104,54 @@ class CompositeRouteResolverTests {
                         .build())
                 .contextVariables(Map.of())
                 .build();
+    }
+
+    private CompositeRouteResolver resolver(List<RouteResolver> delegates) {
+        FundsAccountQueryService accountQueryService = unexpectedAccountQueryService();
+        return new CompositeRouteResolver(
+                delegates,
+                new RefundRouteAdmission(accountQueryService),
+                new RouteFeeChargeAppender(
+                        new RouteParticipantFactory(),
+                        new PlatformAccountRouteSupport(unexpectedPlatformAccountService()),
+                        accountQueryService));
+    }
+
+    private FundsAccountQueryService unexpectedAccountQueryService() {
+        return new FundsAccountQueryService() {
+
+            @Override
+            public FundsAccount getAccount(FundsAccountId accountId) {
+                throw new AssertionError("route post-processing must not query accounts in resolver selection tests");
+            }
+
+            @Override
+            public FundsAccountBalanceView getBalance(FundsAccountId accountId) {
+                throw new AssertionError("route post-processing must not query balances in resolver selection tests");
+            }
+
+            @Override
+            public boolean supports(FundsAccountId accountId) {
+                throw new AssertionError("route post-processing must not query account support in resolver selection tests");
+            }
+        };
+    }
+
+    private PlatformFundingAccountService unexpectedPlatformAccountService() {
+        return new PlatformFundingAccountService() {
+
+            @Override
+            public FundsAccountId requireAccountId(CurrencyIsoCode currency, PlatformFundingAccountRole role) {
+                throw new AssertionError("route post-processing must not resolve platform accounts in resolver selection tests");
+            }
+
+            @Override
+            public FundsAccountId requireAccountId(Long tenantId,
+                                                   CurrencyIsoCode currency,
+                                                   PlatformFundingAccountRole role) {
+                throw new AssertionError("route post-processing must not resolve platform accounts in resolver selection tests");
+            }
+        };
     }
 
     private static final class RecordingRouteResolver implements RouteResolver {

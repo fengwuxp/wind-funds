@@ -41,4 +41,15 @@ public enum FundsAccountStatus implements DescriptiveEnum {
     public boolean canCredit() {
         return this == ACTIVE || this == FROZEN;
     }
+
+    /**
+     * 是否允许承接退款类收口入账。
+     *
+     * <p>冻结或挂起不消灭既有退款义务；关闭账户不得被退款自动重开。</p>
+     *
+     * @return 是否允许承接退款
+     */
+    public boolean canAcceptRefund() {
+        return this != CLOSED;
+    }
 }

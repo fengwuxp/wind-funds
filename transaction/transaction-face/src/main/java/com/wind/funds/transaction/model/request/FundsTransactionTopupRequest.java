@@ -46,8 +46,8 @@ public class FundsTransactionTopupRequest {
     @NotNull
     private TransactionAmount transactionAmount;
 
-    @Schema(description = "本次交易显式手续费规则")
-    private FeeSpec feeSpec;
+    @Schema(description = "本次交易新增收费规则；手续费从充值到账 FundingAccount 的 AVAILABLE 扣取，与充值本金原子入账")
+    private FeeSpec feeChargeSpec;
 
     @Schema(description = "触发本次充值的支付工具引用快照，仅用于路由追溯和投影解释，不作为账务主体")
     private PaymentInstrumentRefSpec paymentInstrumentRef;

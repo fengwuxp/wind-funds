@@ -29,16 +29,16 @@ public class FundsTransactionPayRequest {
     @NonNull
     private TransactionAmount transactionAmount;
 
-    @Schema(description = "本次交易显式手续费规则")
-    private FeeSpec feeSpec;
+    @Schema(description = "本次交易新增收费规则；手续费从实际资金付款 FundingAccount 的 AVAILABLE 扣取，与付款本金原子入账")
+    private FeeSpec feeChargeSpec;
 
     @Schema(description = "收款账户")
     @NonNull
     private FundsAccountId payeeId;
 
-    @Schema(description = "收款账户Ledger编码")
+    @Schema(description = "收款账户账目编码，由调用方按已确认支付事实显式给出")
     @NonNull
-    private LedgerSubjectCode payeeLedgerCode = LedgerSubjectCode.SETTLEMENT;
+    private LedgerSubjectCode payeeLedgerSubjectCode;
 
     @Schema(description = "业务流水号，付款凭证，例如：业务订单交易流水号")
     @NonNull

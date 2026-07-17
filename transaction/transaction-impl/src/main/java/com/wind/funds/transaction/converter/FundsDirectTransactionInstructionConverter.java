@@ -78,7 +78,7 @@ public class FundsDirectTransactionInstructionConverter {
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.CHANNEL_CODE, request.getChannel().name());
         extraContext.put(FundsInstructionContextKeys.EXTERNAL_TRANSACTION_ID, request.getChannelTransactionSn());
-        putFeeSpec(extraContext, request.getFeeSpec());
+        putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -113,7 +113,7 @@ public class FundsDirectTransactionInstructionConverter {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
                 request.getPayerAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
-        putFeeSpec(extraContext, request.getFeeSpec());
+        putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -137,7 +137,7 @@ public class FundsDirectTransactionInstructionConverter {
                                                                  @NonNull WindOperator operator) {
         AssertUtils.notNull(request.getAccountId(), "直接付款账户不能为空");
         AssertUtils.notNull(request.getPayeeId(), "直接付款收款主体不能为空");
-        AssertUtils.notNull(request.getPayeeLedgerCode(), "直接付款收款账目不能为空");
+        AssertUtils.notNull(request.getPayeeLedgerSubjectCode(), "直接付款收款账目不能为空");
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
                 "直接付款账户不能是外部账户");
         AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getPayeeId()),
@@ -147,7 +147,7 @@ public class FundsDirectTransactionInstructionConverter {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
                 request.getAccountId());
         Map<String, Object> extraContext = new LinkedHashMap<>();
-        putFeeSpec(extraContext, request.getFeeSpec());
+        putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -158,7 +158,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .exchangeRate(amount.exchangeRate())
                 .accountId(request.getAccountId())
                 .payeeId(request.getPayeeId())
-                .payeeLedgerSubjectCode(request.getPayeeLedgerCode())
+                .payeeLedgerSubjectCode(request.getPayeeLedgerSubjectCode())
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
                 .eventTime(LocalDateTime.now())
@@ -170,19 +170,12 @@ public class FundsDirectTransactionInstructionConverter {
 
     public @NonNull FundsInstructionSpec convertToRefundInstruction(@NonNull FundsTransactionRefundRequest request,
                                                                     @NonNull WindOperator operator) {
-        AssertUtils.notNull(request.getAccountId(), "直接退款到账账户不能为空");
-        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
-                "直接退款到账账户不能是外部账户");
-        AssertUtils.notNull(request.getPayerId(), "直接退款出资主体不能为空");
-        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getPayerId()),
-                "直接退款出资主体不能是外部账户");
-        AssertUtils.notNull(request.getPayerLedgerCode(), "直接退款出资账目不能为空");
-        assertNotSpendControlScope(request.getAccountId(), "直接退款到账账户不能是支出控制范围");
-        assertNotSpendControlScope(request.getPayerId(), "直接退款出资主体不能是支出控制范围");
-        ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
-                request.getAccountId());
+        boolean referencedRefund = StringUtils.hasText(request.getReferenceTransactionSn());
+        ConvertedAmount amount = referencedRefund
+                ? referencedRefundAmount(request)
+                : businessConfirmedRefundAmount(request);
         Map<String, Object> extraContext = new LinkedHashMap<>();
-        putFeeSpec(extraContext, request.getFeeSpec());
+        putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
         if (request.getChannel() != null) {
             extraContext.put(FundsInstructionContextKeys.CHANNEL_CODE, request.getChannel().name());
         }
@@ -199,7 +192,7 @@ public class FundsDirectTransactionInstructionConverter {
                 .exchangeRate(amount.exchangeRate())
                 .accountId(request.getAccountId())
                 .payerId(request.getPayerId())
-                .payerLedgerSubjectCode(request.getPayerLedgerCode())
+                .payerLedgerSubjectCode(request.getPayerLedgerSubjectCode())
                 .reference(refundReference(request))
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
@@ -208,6 +201,26 @@ public class FundsDirectTransactionInstructionConverter {
                 .operator(operationActor(operator))
                 .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
+    }
+
+    private @NonNull ConvertedAmount referencedRefundAmount(@NonNull FundsTransactionRefundRequest request) {
+        AssertUtils.isNull(request.getAccountId(), "关联退款不得重复传入退款到账账户");
+        AssertUtils.isNull(request.getPayerId(), "关联退款不得重复传入退款出资账户");
+        AssertUtils.isNull(request.getPayerLedgerSubjectCode(), "关联退款不得重复传入退款出资账目");
+        return amountSupport.fromTransactionAmount(request.getTransactionAmount());
+    }
+
+    private @NonNull ConvertedAmount businessConfirmedRefundAmount(@NonNull FundsTransactionRefundRequest request) {
+        AssertUtils.notNull(request.getAccountId(), "业务确认型直接退款到账账户不能为空");
+        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getAccountId()),
+                "业务确认型直接退款到账账户不能是外部账户");
+        AssertUtils.notNull(request.getPayerId(), "业务确认型直接退款出资主体不能为空");
+        AssertUtils.isFalse(DefaultFundsAccountType.isExternalAccount(request.getPayerId()),
+                "业务确认型直接退款出资主体不能是外部账户");
+        AssertUtils.notNull(request.getPayerLedgerSubjectCode(), "业务确认型直接退款出资账目不能为空");
+        assertNotSpendControlScope(request.getAccountId(), "业务确认型直接退款到账账户不能是支出控制范围");
+        assertNotSpendControlScope(request.getPayerId(), "业务确认型直接退款出资主体不能是支出控制范围");
+        return amountSupport.fromTransactionAmount(request.getTransactionAmount(), request.getAccountId());
     }
 
     private @Nullable FundsInstructionReferenceSpec refundReference(@NonNull FundsTransactionRefundRequest request) {
@@ -233,7 +246,7 @@ public class FundsDirectTransactionInstructionConverter {
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
         Map<String, Object> extraContext = new LinkedHashMap<>();
         extraContext.put(FundsInstructionContextKeys.REFERENCE_FREEZE_SN, request.getReferenceFreezeSn());
-        putFeeSpec(extraContext, request.getFeeSpec());
+        putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
@@ -349,6 +362,7 @@ public class FundsDirectTransactionInstructionConverter {
     private @NonNull Map<String, Object> mergeContext(@Nullable ReadonlyContextVariables contextVariables,
                                                       @NonNull Map<String, Object> extraContext) {
         FundsInstructionContextValidator.assertNoSensitiveContextVariables(contextVariables);
+        FundsInstructionContextValidator.assertNoReservedContextVariables(contextVariables);
         Map<String, Object> result = new LinkedHashMap<>();
         if (contextVariables != null && contextVariables.getContextVariables() != null) {
             result.putAll(contextVariables.getContextVariables());
@@ -357,9 +371,9 @@ public class FundsDirectTransactionInstructionConverter {
         return Map.copyOf(result);
     }
 
-    private void putFeeSpec(@NonNull Map<String, Object> context, @Nullable FeeSpec feeSpec) {
-        if (feeSpec != null) {
-            context.put(FundsInstructionContextKeys.FEE_SPEC, feeSpec);
+    private void putFeeChargeSpec(@NonNull Map<String, Object> context, @Nullable FeeSpec feeChargeSpec) {
+        if (feeChargeSpec != null) {
+            context.put(FundsInstructionContextKeys.FEE_CHARGE_SPEC, feeChargeSpec);
         }
     }
 

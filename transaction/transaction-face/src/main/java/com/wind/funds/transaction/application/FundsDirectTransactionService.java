@@ -50,8 +50,12 @@ public interface FundsDirectTransactionService {
      * 账户退款。
      *
      * <p>{@link FundsTransactionRefundRequest#getReferenceTransactionSn()} 有值时按原交易 route snapshot 回放；
-     * 为空时表示业务方已完成退款决策，资金底座按请求给定的到账账户、出资账户和出资账目执行直接退款。
+     * 此时原快照是唯一资金路径来源，请求不得再传到账账户、出资账户或出资账目。该字段为空时表示业务方已完成退款决策，
+     * 资金底座按请求显式给定的到账账户、出资账户和出资账目执行直接退款，不补默认账目。
      * 本接口不再额外引入退款模式字段；资金底座只校验内部资金主体、账目、余额、状态、幂等和敏感上下文。</p>
+     *
+     * <p>请求携带 {@link FundsTransactionRefundRequest#getFeeChargeSpec()} 时，表示业务方确认本次退款同时新增收费；
+     * 手续费只能从退款路径中唯一真实资金受益 FundingAccount 的 AVAILABLE 扣取，不从 CreditAccount 额度扣取。</p>
      *
      * @param request  退款请求对象
      * @param operator 操作人

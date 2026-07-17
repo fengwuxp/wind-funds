@@ -6,10 +6,7 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.route.enums.RouteLegType;
 import com.wind.funds.route.ref.SubjectRef;
-import com.wind.funds.route.spec.RouteLegSpec;
-import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.application.FundsBenefitContributionTransactionService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.enums.FundsBenefitFundingNature;
@@ -18,7 +15,6 @@ import com.wind.funds.transaction.model.request.FundsBenefitContributionSettleRe
 import com.wind.funds.transaction.model.request.FundsTransactionPayRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
-import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.wallet.FundsAccountId;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -29,7 +25,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -77,8 +72,6 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     private final FundsDirectTransactionService directTransactionService;
 
-    private final FundsTransactionQueryService fundsTransactionQueryService;
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String settle(@NonNull FundsBenefitContributionSettleRequest request,
@@ -90,7 +83,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         return directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(costBearer)
                 .setPayeeId(receiver)
-                .setPayeeLedgerCode(LedgerSubjectCode.SETTLEMENT)
+                .setPayeeLedgerSubjectCode(LedgerSubjectCode.SETTLEMENT)
                 .setTransactionAmount(TransactionAmount.sameCurrency(request.getAmount()))
                 .setBusinessScene(request.getBusinessScene())
                 .setBusinessSn(request.getBusinessSn())
@@ -104,11 +97,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                                   @NonNull WindOperator operator) {
         assertRefundRequest(request);
         assertLightweightContext(request.getContextVariables());
-        OriginalBenefitRoute route = originalBenefitRoute(request.getReferenceBenefitTransactionSn());
         return directTransactionService.refund(new FundsTransactionRefundRequest()
-                .setAccountId(route.costBearerAccountId())
-                .setPayerId(route.benefitReceiverAccountId())
-                .setPayerLedgerCode(route.benefitReceiverLedgerCode())
                 .setTransactionAmount(TransactionAmount.sameCurrency(request.getAmount()))
                 .setReferenceTransactionSn(request.getReferenceBenefitTransactionSn())
                 .setBusinessScene(request.getBusinessScene())
@@ -144,23 +133,6 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
         AssertUtils.hasText(request.getBusinessScene(), "权益让利退款业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "权益让利退款业务流水不能为空");
         AssertUtils.hasText(request.getOriginalOrderSn(), "权益让利退款原始订单号不能为空");
-    }
-
-    private OriginalBenefitRoute originalBenefitRoute(@NonNull String referenceBenefitTransactionSn) {
-        RouteSnapshotSpec snapshot = fundsTransactionQueryService.findRouteSnapshotByTransactionSn(referenceBenefitTransactionSn)
-                .orElseThrow(() -> new IllegalArgumentException("原让利出资记账交易 RouteSnapshot 不存在，transactionSn = "
-                        + referenceBenefitTransactionSn));
-        Optional<RouteLegSpec> sourceLeg = snapshot.getLegs()
-                .stream()
-                .filter(leg -> leg.getLegType() == RouteLegType.INTERNAL_TRANSFER)
-                .findFirst();
-        AssertUtils.isTrue(sourceLeg.isPresent(), "原让利出资记账交易缺少可回放的资金路径，transactionSn = {}",
-                referenceBenefitTransactionSn);
-        RouteLegSpec leg = sourceLeg.get();
-        return new OriginalBenefitRoute(
-                toAccountId(leg.getSourceNode().getSubjectRef(), "原权益让利承担方"),
-                toAccountId(leg.getTargetNode().getSubjectRef(), "原权益让利承接账务主体"),
-                leg.getTargetNode().getLedgerSubjectCode());
     }
 
     private FundsAccountId toAccountId(@NonNull SubjectRef subjectRef, @NonNull String roleName) {
@@ -225,8 +197,4 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
                 .replace("-", "");
     }
 
-    private record OriginalBenefitRoute(FundsAccountId costBearerAccountId,
-                                        FundsAccountId benefitReceiverAccountId,
-                                        LedgerSubjectCode benefitReceiverLedgerCode) {
-    }
 }

@@ -153,8 +153,10 @@ DSL 主文档只记录目标契约、字段边界和验收红线。若后续扩�
 
 | 引用字段 | DSL 语义 | 使用边界 |
 | --- | --- | --- |
-| `referenceTransactionSn` | 内部原资金交易引用，转换为 `FundsInstructionReferenceSpec(ORIGINAL_TRANSACTION)`。 | 用于读取原交易 route snapshot 并按原 leg 回放；缺原事实、缺快照、错币种或累计超额必须失败且无 route、posting、LedgerEntry、余额投影副作用。 |
+| `referenceTransactionSn` | 内部原资金交易引用，转换为 `FundsInstructionReferenceSpec(ORIGINAL_TRANSACTION)`。 | 用于读取原交易 route snapshot 并按原 leg 回放；有值时 `accountId`、`payerId`、`payerLedgerSubjectCode` 必须为空，原快照是唯一路径来源；缺原事实、缺快照、错币种或累计超额必须失败且无 route、posting、LedgerEntry、余额投影副作用。 |
 | `channelTransactionSn` | 外部通道、退款流水或外部账务引用，转换为 `EXTERNAL_TRANSACTION` 或保留为外部引用。 | 只能用于外部事实追溯和对账，不得替代内部原交易引用驱动原路径回放。 |
+
+未提供 `referenceTransactionSn` 时表示业务确认型直接退款，`accountId`、`payerId`、`payerLedgerSubjectCode` 必须完整提供；DSL 不提供默认出资账目，也不替上层判断无原路径退款是否安全。
 
 后续如新增 `authorizeByInstrument` 或其他支付工具型 application facade，DSL 契约必须证明“应用入口先解析、内核按主体”的转换关系：内部入口解析为 `SubjectRef` 或权益让利资金交易事实，外部工具解析为 `PaymentInstrumentRef` 或 `ExternalAccountRef`；工具校验、入口解析或规则决策失败时不生成 route；批准或放行时 `PaymentInstrumentRef`、`FundingAllocationDecision` 或权益资金交易摘要按需进入 route snapshot；后续撤销、完成、退款和拒付只回放原 route snapshot，不读取当前绑定重新选路。
 
@@ -1007,12 +1009,14 @@ Spend Control Movement 是控制事实 DSL，不是资金事实 DSL。它只描�
 | --- | --- | --- | --- | --- |
 | 充值成功 | `DIRECT_TRANSACTION / FUND_IN`。 | 外部入金结果 -> 用户资金账户 `AVAILABLE`。 | 处理外部入金结果、幂等键、外部引用和账户初始化校验。 | 余额增加；重复通知不重复入账；外部账户不入账。 |
 | 付款成功 | `DIRECT_TRANSACTION / PAY`。 | 付款方 `AVAILABLE` -> 收款方指定目标账目；商户订单收款才进入商户 `CLEARING`。 | 支持普通支付 route、商户订单收款 route、平台账户角色解析和业务场景识别。 | 付款方减少；普通收款方按产品命令增加指定目标账目；商户订单款进入 `CLEARING`；posting 独立平衡。 |
-| 充值成功 + 入金手续费收取 | `FUND_IN` 后接入金费用 `FEE_CHARGE`。 | 入金先进入用户 `AVAILABLE`；手续费再从用户 `AVAILABLE` 到平台 `FEE`。 | 支持入金结果和费用收取拆为两个事实，费用必须有 `FeeSpec` 和原入金引用。 | 入金失败不收手续费；重复入金通知不重复收费；费用不混入充值本金。 |
-| 充值成功 + 付款并收手续费 | `FUND_IN` 后接本金 `PAY` + 费用 `FEE_CHARGE`。 | 入金进入用户 `AVAILABLE`；付款本金和手续费拆为独立 leg。 | 支持充值后付款、`FeeSpec` 驱动费用 leg、费用账户快照。 | 入金余额增加；付款本金和费用分别扣减；重复入金不重复记账。 |
+| 充值成功 + 入金手续费收取 | 同一 `TOPUP` 资金交易包含 `FUND_IN`、充值结算和 `FEE` 独立 leg。 | 入金进入到账 FundingAccount `AVAILABLE`；手续费从该账户 `AVAILABLE` 到平台 `FEE`。 | `feeChargeSpec` 字段类型保持 `FeeSpec`，驱动同一 route 中的费用 leg 和费用账户快照。 | 主交易与费用原子成功或失败；入金失败不收手续费；费用不混入充值本金。 |
+| 充值成功 + 付款并收手续费 | `TOPUP` 后接同一 `PAY` 资金交易内的本金 leg + `FEE` leg。 | 付款本金和手续费分别从实际资金付款 FundingAccount `AVAILABLE` 扣取。 | `feeChargeSpec` 驱动费用 leg，主路径必须能解析唯一真实资金付款账户。 | 本金和费用分别扣减并原子入账；不得从 CreditAccount 额度扣费。 |
 | 充值 -> 付款 -> 退款 -> 手续费退回 | `FUND_IN` + `PAY` + `REFUND` + `FEE_REFUND`。 | 退款基于付款原路径，退费基于费用原路径。 | 支持本金退款和费用退回分开引用、分开累计、分开上限。 | 普通退款不默认退费；退款不超过已付本金；退费不超过已收手续费。 |
 | A 转给 B | `DIRECT_TRANSACTION / TRANSFER`。 | A `AVAILABLE` -> B `AVAILABLE` 或目标业务桶。 | 支持跨主体内部转账、双方主体解析和幂等。 | A 减少、B 增加；币种一致；双方分录可追溯。 |
-| 提现成功 + 手续费收取 | `FREEZE` 后接 `FUND_OUT` + `FEE_CHARGE`。 | 提现申请先冻结提现本金及按规则预留的手续费；外部出款成功后引用并关闭冻结来源，手续费作为独立费用 leg 入平台 `FEE`。 | 支持提现冻结单、出款确认结果、`FeeSpec` 和费用账户快照；手续费来源桶必须由规则明确。 | 申请阶段只冻结不出款；成功后本金和手续费分别入账；手续费不混入提现本金；重复回调不重复转出或收费。 |
-| 提现撤销或被拒绝 | `FREEZE` 后接 `UNFREEZE`。 | 提现已冻结但未确认出款；用户撤销、风控拒绝或通道拒绝时释放冻结，本金和费用预留回到用户 `AVAILABLE`。 | 支持引用原提现冻结单、撤销/拒绝原因、解冻幂等和剩余冻结校验；不得生成 `FUND_OUT`。 | 撤销/拒绝不扣本金、不默认收费；重复撤销/拒绝不重复解冻；没有冻结单或超额解冻失败。 |
+| A 转给 B 并收手续费 | 同一 `TRANSFER` 资金交易包含本金 leg + `FEE` leg。 | 本金从 A `AVAILABLE` 到 B，手续费从 A `AVAILABLE` 到平台 `FEE`。 | `feeChargeSpec` 驱动费用 leg，扣费账户固定为 `payerAccountId` 对应 FundingAccount。 | A 同时承担本金和费用；B 不承担费用；两条 leg 原子入账。 |
+| 退款并新增处理费 | 同一 `REFUND` 资金交易包含退款本金 replay leg + `FEE` leg。 | 本金按原路径或业务确认路径退款；手续费从退款路径中唯一真实资金受益 FundingAccount `AVAILABLE` 扣取。 | 支持关联退款与业务确认型退款；费用不改变本金路径；退款交易聚合单独记录本次 `feeAmount`。 | 不从 CreditAccount 额度扣费；没有唯一真实资金受益账户或账户不是 `ACTIVE` 时整体失败；`contextVariables` 不得注入收费规则；普通退款不自动退历史手续费。 |
+| 提现成功 + 手续费收取 | `FREEZE` 后接同一 `WITHDRAW` 资金交易内的 `FUND_OUT` + `FEE` leg。 | 提现本金从 FundingAccount `FROZEN` 扣取；手续费从同一账户 `AVAILABLE` 扣取并进入平台 `FEE`。 | 支持提现冻结单、出款确认结果、`feeChargeSpec` 和费用账户快照。 | 申请阶段只冻结本金；成功后本金和手续费分别入账且原子提交；手续费不足时不得只完成本金。 |
+| 提现撤销或被拒绝 | `FREEZE` 后接 `UNFREEZE`。 | 提现已冻结但未确认出款；用户撤销、风控拒绝或通道拒绝时，只把已冻结本金释放回用户 `AVAILABLE`。 | 支持引用原提现冻结单、撤销/拒绝原因、解冻幂等和剩余冻结校验；不得生成 `FUND_OUT` 或手续费腿。 | 撤销/拒绝不扣本金、不收费；重复撤销/拒绝不重复解冻；没有冻结单或超额解冻失败。 |
 | A 充值 -> 转给 B -> B 付款 -> B 提现 | `FUND_IN` + `TRANSFER` + `PAY` + `FREEZE` + `FUND_OUT`。 | A 入金后转给 B；B 付款进入商户清算桶；B 提现先冻结资金，外部出款成功后再确认转出并关闭冻结来源。 | 支持多主体组合链路、跨主体转账、付款、提现冻结和出款结果入账。 | 每一步断言 A、B、商户、平台余额桶；提现申请阶段只冻结；出款成功后冻结来源关闭，撤销或拒绝走解冻路径。 |
 | 资金账户允许受控透支付款 | `DIRECT_TRANSACTION / PAY`，允许 `AVAILABLE` 受控为负。 | 付款方 `AVAILABLE` 可在账本负余额能力闸门允许、且本次交易携带运行时策略、来源、上限、账龄和风险状态时受控为负。 | 支持运行时负余额策略、风险标记、追偿或补足路径。 | 账本未开放负余额能力或本次缺少运行时策略时失败；有策略透支成功但生成风险治理口径。 |
 | 资金账户禁止透支付款 | `DIRECT_TRANSACTION / PAY` 校验失败。 | `AVAILABLE` 不足且账本未开放负余额能力或本次缺少运行时策略事实。 | 余额约束前置校验，失败不生成 route、posting、entry。 | 余额不足失败；失败不改余额；错误原因可解释。 |

@@ -439,7 +439,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             case REVERSAL -> applyReversedSummary(transaction, amount);
             case SETTLE -> applySettledSummary(transaction, primaryDetail, amount);
             case TOPUP, TRANSFER, PAY, WITHDRAW, FEE_CHARGE -> applyPostedSummary(transaction, primaryDetail, details);
-            case AUTH_REFUND, REFUND -> applyRefundedSummary(transaction, amount);
+            case AUTH_REFUND, REFUND -> applyRefundedSummary(transaction, amount, resolveFeeAmount(details));
             case FEE_REFUND -> applyFeeRefundedSummary(transaction, amount);
             case FREEZE, UNFREEZE, BALANCE_ADJUST, LIMIT_ADJUST ->
                     transaction.setStatus(resolveBalanceControlStatus(primaryDetail));
@@ -457,7 +457,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
             return;
         }
         FundsTransaction referencedTransaction = findTransactionBySn(reference.getReferenceSn());
-        applySucceededSummary(referencedTransaction, details);
+        applyRefundedSummary(referencedTransaction, resolvePrimaryAmount(details), 0L);
         AssertUtils.isTrue(fundsTransactionMapper.update(referencedTransaction) == 1,
                 "更新引用资金交易聚合状态失败，sn = {}", referencedTransaction.getSn());
     }
@@ -538,8 +538,9 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 .sum();
     }
 
-    private void applyRefundedSummary(FundsTransaction transaction, long amount) {
+    private void applyRefundedSummary(FundsTransaction transaction, long amount, long feeAmount) {
         transaction.setRefundedAmount(transaction.getRefundedAmount() + amount);
+        transaction.setFeeAmount(transaction.getFeeAmount() + feeAmount);
         if (transaction.getTransactionType() == DefaultFundsTransactionType.REFUND
                 && transaction.getSettledAmount() == 0) {
             transaction.setStatus(FundsTransactionStatus.CLOSED);
