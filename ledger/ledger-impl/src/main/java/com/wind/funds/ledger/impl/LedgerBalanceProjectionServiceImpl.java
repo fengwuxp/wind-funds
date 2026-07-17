@@ -58,7 +58,8 @@ public class LedgerBalanceProjectionServiceImpl implements LedgerBalanceProjecti
         // 按照 ledger_id 分组，避免同一科目在不同周期账本间串账。
         Map<Long, List<LedgerEntrySpec>> groups = entries.stream()
                 .collect(Collectors.groupingBy(this::requireLedgerId, LinkedHashMap::new, Collectors.toList()));
-        fundsAccountQueryService.getBalance(accountId);
+        // 仅校验账务主体存在；余额约束由下方账本读取和原子更新保证。
+        fundsAccountQueryService.getAccount(accountId);
         List<ProjectionCommand> commands = groups.entrySet().stream()
                 .map(entry -> prepareProjectionCommand(entry.getKey(), entry.getValue()))
                 .toList();

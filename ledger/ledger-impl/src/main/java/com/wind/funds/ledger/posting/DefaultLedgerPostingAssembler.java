@@ -19,6 +19,7 @@ import com.wind.funds.ledger.enums.LedgerSettlementStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.model.FundsContextVariables;
+import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
@@ -31,6 +32,7 @@ import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
+import com.wind.transaction.core.enums.CurrencyIsoCode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -42,9 +44,12 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 默认 Route -> Posting 翻译器。
@@ -112,8 +117,9 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
     private List<LedgerPostingPlanSpec> assemblePlans(String ledgerTransactionSn,
                                                       ResolvedRouteSpec resolvedRoute) {
         List<LedgerPostingPlanSpec> result = new ArrayList<>();
+        Map<LedgerBucketGroupKey, Map<LedgerSubjectCode, LedgerDTO>> ledgerSnapshots = new HashMap<>();
         for (RouteLegSpec leg : resolvedRoute.getLegs()) {
-            LedgerPostingPlanSpec plan = assembleLeg(ledgerTransactionSn, resolvedRoute, leg);
+            LedgerPostingPlanSpec plan = assembleLeg(ledgerTransactionSn, resolvedRoute, leg, ledgerSnapshots);
             AssertUtils.isTrue(plan.isBalanced(),
                     "RouteLeg 生成的账务计划不平衡，legId = {}", leg.getLegId());
             result.add(plan);
@@ -123,16 +129,17 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
 
     private LedgerPostingPlanSpec assembleLeg(String ledgerTransactionSn,
                                               ResolvedRouteSpec resolvedRoute,
-                                              RouteLegSpec leg) {
+                                              RouteLegSpec leg,
+                                              Map<LedgerBucketGroupKey, Map<LedgerSubjectCode, LedgerDTO>> ledgerSnapshots) {
         LedgerPostingIntentType intent = resolveIntent(resolvedRoute);
         LedgerPostingScope postingScope = resolvePostingScope(intent, leg.getPhaseCode());
         List<LedgerEntrySpec> entries = List.of(
                 toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getSourceNode(),
                         resolveSourceDirection(resolvedRoute, leg),
-                        intent, postingScope),
+                        intent, postingScope, ledgerSnapshots),
                 toEntry(ledgerTransactionSn, resolvedRoute, leg, leg.getTargetNode(),
                         resolveTargetDirection(resolvedRoute, leg),
-                        intent, postingScope)
+                        intent, postingScope, ledgerSnapshots)
         );
         LedgerPostingPhaseSpec phase = LedgerTransactionSpecFactory.postingPhase(leg.getPhaseCode(), entries);
         return DefaultLedgerPostingPlanSpec.builder()
@@ -176,8 +183,9 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                                     RouteNodeSpec node,
                                     MovementDirection direction,
                                     LedgerPostingIntentType intent,
-                                    LedgerPostingScope postingScope) {
-        LedgerDTO ledger = requireLedger(resolvedRoute, leg, node);
+                                    LedgerPostingScope postingScope,
+                                    Map<LedgerBucketGroupKey, Map<LedgerSubjectCode, LedgerDTO>> ledgerSnapshots) {
+        LedgerDTO ledger = requireLedger(resolvedRoute, leg, node, ledgerSnapshots);
         EntrySide entrySide = resolveEntrySide(ledger.getNormalBalanceSide(), direction);
         SubjectRef subjectRef = node.getSubjectRef();
         return DefaultLedgerEntrySpec.builder()
@@ -210,25 +218,42 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
 
     private LedgerDTO requireLedger(ResolvedRouteSpec resolvedRoute,
                                     RouteLegSpec leg,
-                                    RouteNodeSpec node) {
+                                    RouteNodeSpec node,
+                                    Map<LedgerBucketGroupKey, Map<LedgerSubjectCode, LedgerDTO>> ledgerSnapshots) {
         SubjectRef subjectRef = node.getSubjectRef();
-        LedgerQuery query = new LedgerQuery()
-                .setTenantId(resolvedRoute.getTenantId())
-                .setSubjectId(subjectRef.getSubjectId())
-                .setSubjectType(subjectRef.getSubjectType().name())
-                .setLedgerSubjectCode(node.getLedgerSubjectCode())
-                .setCurrency(leg.getAmount().getCurrency())
-                .setPeriodType(leg.getPeriodType())
-                .setPeriodId(resolvePeriodId(leg));
-        List<LedgerDTO> records = ledgerService.queryLedgers(query, DefaultPageQueryOptions.defaults(2)).getRecords();
-        AssertUtils.isTrue(records.size() == 1,
-                "账本不存在或不唯一，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}",
-                subjectRef.getSubjectId(), subjectRef.getSubjectType(), node.getLedgerSubjectCode());
-        LedgerDTO ledger = records.getFirst();
+        LedgerBucketGroupKey key = new LedgerBucketGroupKey(
+                resolvedRoute.getTenantId(),
+                subjectRef.getSubjectId(),
+                subjectRef.getSubjectType(),
+                leg.getAmount().getCurrency(),
+                leg.getPeriodType(),
+                resolvePeriodId(leg));
+        Map<LedgerSubjectCode, LedgerDTO> ledgers = ledgerSnapshots.computeIfAbsent(key, this::loadLedgers);
+        LedgerDTO ledger = ledgers.get(node.getLedgerSubjectCode());
+        AssertUtils.notNull(ledger,
+                "账本不存在或不唯一，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}, periodType = {}, periodId = {}",
+                subjectRef.getSubjectId(),
+                subjectRef.getSubjectType(),
+                node.getLedgerSubjectCode(),
+                key.periodType(),
+                key.periodId());
         AssertUtils.equals(ledger.getCurrency(), leg.getAmount().getCurrency(),
                 "账本币种与路径金额币种不一致，subjectId = {}, subjectType = {}, ledgerSubjectCode = {}",
                 subjectRef.getSubjectId(), subjectRef.getSubjectType(), node.getLedgerSubjectCode());
         return ledger;
+    }
+
+    private Map<LedgerSubjectCode, LedgerDTO> loadLedgers(LedgerBucketGroupKey key) {
+        List<LedgerDTO> records = ledgerService.queryLedgers(new LedgerQuery()
+                        .setTenantId(key.tenantId())
+                        .setSubjectId(key.subjectId())
+                        .setSubjectType(key.subjectType().name())
+                        .setCurrency(key.currency())
+                        .setPeriodType(key.periodType())
+                        .setPeriodId(key.periodId()),
+                DefaultPageQueryOptions.result(LedgerSubjectCode.values().length)).getRecords();
+        return records.stream()
+                .collect(Collectors.toMap(LedgerDTO::getLedgerSubjectCode, Function.identity()));
     }
 
     private String resolvePeriodId(RouteLegSpec leg) {
@@ -240,6 +265,14 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         String periodId = leg.getPeriodId();
         AssertUtils.hasText(periodId, "非生命周期账本周期 periodId 不能为空");
         return periodId;
+    }
+
+    private record LedgerBucketGroupKey(Long tenantId,
+                                        String subjectId,
+                                        FundsSubjectType subjectType,
+                                        CurrencyIsoCode currency,
+                                        AccountBalancePeriodType periodType,
+                                        String periodId) {
     }
 
     private EntrySide resolveEntrySide(EntrySide normalBalanceSide, MovementDirection direction) {

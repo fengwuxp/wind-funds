@@ -151,6 +151,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .containsExactly(
                         tuple(LedgerSubjectCode.LIMIT, EntrySide.DEBIT),
                         tuple(LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT));
+        assertThat(ledgerService.queries).hasSize(1);
     }
 
     @Test
@@ -165,6 +166,7 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                 .containsExactly(
                         tuple(LedgerSubjectCode.AVAILABLE, EntrySide.DEBIT),
                         tuple(LedgerSubjectCode.LIMIT, EntrySide.CREDIT));
+        assertThat(ledgerService.queries).hasSize(1);
     }
 
     /**
@@ -551,10 +553,27 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
         public WindPagination<LedgerDTO> queryLedgers(LedgerQuery query,
                                                       WindQuery<? extends QueryOrderField> options) {
             queries.add(query);
-            return Pagination.of(List.of(ledger(query)), 1, options.getQuerySize(), QueryType.QUERY_BOTH, 1L);
+            List<LedgerDTO> records = ledgerSubjectCodes(query).stream()
+                    .map(subjectCode -> ledger(query, subjectCode))
+                    .toList();
+            return Pagination.of(records, 1, options.getQuerySize(), QueryType.QUERY_BOTH, records.size());
         }
 
-        private LedgerDTO ledger(LedgerQuery query) {
+        private List<LedgerSubjectCode> ledgerSubjectCodes(LedgerQuery query) {
+            if (query.getLedgerSubjectCode() != null) {
+                return List.of(query.getLedgerSubjectCode());
+            }
+            if (FundsSubjectType.CREDIT_ACCOUNT.name().equals(query.getSubjectType())) {
+                return List.of(LedgerSubjectCode.LIMIT,
+                        LedgerSubjectCode.AVAILABLE,
+                        LedgerSubjectCode.AUTHORIZATION);
+            }
+            return List.of(LedgerSubjectCode.AVAILABLE,
+                    LedgerSubjectCode.FROZEN,
+                    LedgerSubjectCode.AUTHORIZATION);
+        }
+
+        private LedgerDTO ledger(LedgerQuery query, LedgerSubjectCode subjectCode) {
             return new LedgerDTO()
                     .setId(ledgerId++)
                     .setGmtCreate(EVENT_TIME)
@@ -564,9 +583,9 @@ class DefaultLedgerPostingAssemblerTests extends AbstractFundsServiceTest {
                     .setSubjectType(query.getSubjectType())
                     .setLedgerProfileCode("POSTING_PERIOD")
                     .setLedgerProfileVersion(1)
-                    .setLedgerSubjectCode(query.getLedgerSubjectCode())
-                    .setLedgerSubjectCategory(resolveSubjectCategory(query.getLedgerSubjectCode()))
-                    .setNormalBalanceSide(resolveNormalSide(query.getLedgerSubjectCode()))
+                    .setLedgerSubjectCode(subjectCode)
+                    .setLedgerSubjectCategory(resolveSubjectCategory(subjectCode))
+                    .setNormalBalanceSide(resolveNormalSide(subjectCode))
                     .setAllowNegative(Boolean.FALSE)
                     .setDebitAmount(0L)
                     .setCreditAmount(0L)
