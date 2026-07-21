@@ -13,6 +13,7 @@ import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabi
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
 import com.wind.funds.wallet.enums.CreditFundsAccountType;
+import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountCapability;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -29,15 +30,19 @@ import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
 import com.wind.funds.wallet.model.request.CreateSpendRuleBindingRequest;
 import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
+import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
+import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
+import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerProfileServiceImpl;
@@ -84,6 +89,8 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
 
     private static final String PAYMENT_INSTRUMENT_SN = "spend_control_payment_card";
 
+    private static final String PARENT_FUNDING_ACCOUNT_SN = "spend_control_parent_funding";
+
     private static final String OWNER_ID = "spend_control_owner";
 
     private static final String CHANNEL_CODE = "spend_control_channel";
@@ -118,6 +125,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     private CreditAccountService creditAccountService;
 
     @Autowired
+    private FundingAccountService fundingAccountService;
+
+    @Autowired
     private PaymentInstrumentService paymentInstrumentService;
 
     @Autowired
@@ -130,9 +140,231 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     private SpendControlAdmissionApplicationService spendControlAdmissionApplicationService;
 
     @Autowired
+    private SpendRuleDecisionRecordService spendRuleDecisionRecordService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private String spendRuleBindingSn;
+
+    /**
+     * 场景：wallet 找到唯一有效的支付工具规则挂载，上游只提供可回读的决策引用。
+     * 输入：可信上游已固化 PASSED 决策记录，准入请求只携带 decisionSn，不重复携带裸结果和摘要。
+     * 输出：wallet 回读并核对决策记录后放行，返回记录中的规则、挂载和结果证据。
+     * 红线：decisionRef 是证据引用，不得退化为调用方自报 PASSED 的通行证。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldVerifyPersistedDecisionReference() {
+        prepareSpendControlAdmissionData();
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendControlAdmissionDecisionDTO decision =
+                spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                        admissionByDecisionRef(SPEND_DECISION_SN));
+
+        assertThat(decision.getAdmitted()).isTrue();
+        assertThat(decision.getSpendRuleId()).isEqualTo(SPEND_RULE_ID);
+        assertThat(decision.getSpendRuleBindingSn()).isEqualTo(spendRuleBindingSn);
+        assertThat(decision.getSpendDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        assertThat(decision.getSpendDecisionRecordId()).isNotNull();
+        assertThat(decisionRecordCount()).isEqualTo(1);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：支付工具存在有效规则挂载，但调用方省略决策引用。
+     * 输入：wallet 可解析出唯一 binding，准入请求不携带 decisionSn。
+     * 输出：准入 fail-closed。
+     * 红线：存在适用规则时不能把字段省略解释为默认通过。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectMissingDecisionReferenceForApplicableBinding() {
+        prepareSpendControlAdmissionData();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionByDecisionRef(null)))
+                .hasMessageContaining("适用 Spend Rule 挂载要求 decisionRef");
+
+        assertThat(decisionRecordCount()).isZero();
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方只提交裸 PASSED、sha256 摘要和一个无法回读的 decisionSn。
+     * 输入：wallet 可解析出唯一 binding，但决策记录表中不存在该引用。
+     * 输出：准入 fail-closed，不替调用方新建决策记录。
+     * 红线：格式正确的摘要不证明决策真实，wallet 不得把裸结果固化后直接放行。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectUnverifiableBarePassedDecision() {
+        prepareSpendControlAdmissionData();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED)))
+                .hasMessageContaining("Spend Rule 决策引用不存在");
+
+        assertThat(decisionRecordCount()).isZero();
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：wallet 在当前可确定的 scope 上没有找到任何有效规则挂载。
+     * 输入：支付工具、账户能力和资金责任均可用，且请求不携带规则决策字段。
+     * 输出：返回 admitted=true 的显式 NO_APPLICABLE_RULE 结果，不创建虚假决策记录。
+     * 红线：无规则不是省略结果，也不得伪造 ruleId、bindingSn 或 sha256 摘要。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldReturnExplicitNoApplicableRule() {
+        preparePaymentInstrumentAdmissionData();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendControlAdmissionDecisionDTO decision =
+                spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                        admissionByDecisionRef(null));
+
+        assertThat(decision.getAdmitted()).isTrue();
+        assertThat(decision.getSpendDecisionResult().name()).isEqualTo("NO_APPLICABLE_RULE");
+        assertThat(decision.getSpendDecisionRecordId()).isNull();
+        assertThat(decision.getSpendRuleId()).isNull();
+        assertThat(decision.getSpendRuleBindingSn()).isNull();
+        assertThat(decisionRecordCount()).isZero();
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：共享卡绑定 CreditAccount，真实资金责任解析到父 FundingAccount，规则挂在信用账户上。
+     * 输入：唯一有效规则 scope 为 CREDIT_ACCOUNT，决策引用与该挂载一致。
+     * 输出：wallet 命中绑定支付主体规则并验真放行，同时保留父 FundingAccount 资金责任快照。
+     * 红线：资金责任目标变化不得让绑定信用账户上的周期额度或消费规则失效。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldMatchBoundCreditAccountRule() {
+        prepareSharedCardAdmissionData();
+        spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
+        spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()
+                .setScopeType(SpendRuleScopeType.CREDIT_ACCOUNT)
+                .setScopeId(CREDIT_ACCOUNT_SN)
+                .setAuditReferenceSn("grant:spend_control_credit_account_binding")).getSn();
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null,
+                SpendRuleScopeType.CREDIT_ACCOUNT, CREDIT_ACCOUNT_SN);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        SpendControlAdmissionDecisionDTO decision = spendControlAdmissionApplicationService
+                .resolveSpendControlAdmission(admissionByDecisionRef(SPEND_DECISION_SN));
+
+        assertThat(decision.getAdmitted()).isTrue();
+        assertThat(decision.getSpendRuleScopeType()).isEqualTo(SpendRuleScopeType.CREDIT_ACCOUNT);
+        assertThat(decision.getSpendRuleScopeId()).isEqualTo(CREDIT_ACCOUNT_SN);
+        assertThat(decision.getTargetAccountId()).isEqualTo(FundsAccountId.immutable(PARENT_FUNDING_ACCOUNT_SN,
+                FundsSubjectType.FUNDING_ACCOUNT));
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一次授权命中支付工具和业务场景两个有效规则挂载。
+     * 输入：当前公共证据仍只能引用单条 binding。
+     * 输出：准入 fail-closed，要求先升级多规则裁决证据契约。
+     * 红线：wallet 不得擅自选第一条、忽略另一条或伪造冲突合成结果。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectMultipleApplicableBindings() {
+        prepareSpendControlAdmissionData();
+        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()
+                .setScopeType(SpendRuleScopeType.BUSINESS_SCENE)
+                .setScopeId(BUSINESS_SCENE)
+                .setAuditReferenceSn("grant:spend_control_business_scene_binding"));
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionByDecisionRef(SPEND_DECISION_SN)))
+                .hasMessageContaining("不支持多个适用 Spend Rule 挂载");
+
+        assertThat(decisionRecordCount()).isEqualTo(1);
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：租户存在有效 SPEND_CONTROL_SCOPE 挂载，但请求未携带可信 controlScopeId。
+     * 输入：支付工具挂载决策可验真，同时另有控制范围挂载，调用方省略 controlScopeId。
+     * 输出：准入 fail-closed，不把未解析控制范围当成无适用规则。
+     * 红线：调用方省略 scope 不能绕过 wallet 已存在的有效控制策略。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectUnresolvedSpendControlScopeBinding() {
+        prepareSpendControlAdmissionData();
+        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()
+                .setScopeType(SpendRuleScopeType.SPEND_CONTROL_SCOPE)
+                .setScopeId("budget_scope_unresolved")
+                .setAuditReferenceSn("grant:unresolved_spend_control_scope"));
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionByDecisionRef(SPEND_DECISION_SN)))
+                .hasMessageContaining("SPEND_CONTROL_SCOPE 挂载无法从可信上下文解析");
+
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：租户存在有效 SPEND_CONTROL_SCOPE 挂载，但请求伪造另一个非空 controlScopeId。
+     * 输入：有效挂载属于 budget_scope_expected，调用方却声明 budget_scope_forged。
+     * 输出：准入 fail-closed，不把错传 scope 解释为无适用规则。
+     * 红线：非空 scope 也必须命中真实有效挂载，不能靠伪造 ID 绕过控制策略。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectMismatchedSpendControlScopeBinding() {
+        prepareSpendControlAdmissionData();
+        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()
+                .setScopeType(SpendRuleScopeType.SPEND_CONTROL_SCOPE)
+                .setScopeId("budget_scope_expected")
+                .setAuditReferenceSn("grant:expected_spend_control_scope"));
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionByDecisionRef(SPEND_DECISION_SN).setControlScopeId("budget_scope_forged")))
+                .hasMessageContaining("SPEND_CONTROL_SCOPE 挂载无法从可信上下文解析");
+
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：租户已配置 ACCOUNT_HIERARCHY 挂载，但当前准入契约没有可信层级标识。
+     * 输入：支付工具挂载决策可验真，同时存在账户层级挂载。
+     * 输出：准入 fail-closed，不忽略未解析的账户层级策略。
+     * 红线：支持配置但不能解析的 scope 不得静默降级为无适用规则。
+     */
+    @Test
+    void testResolveSpendControlAdmissionShouldRejectUnresolvedAccountHierarchyBinding() {
+        prepareSpendControlAdmissionData();
+        spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()
+                .setScopeType(SpendRuleScopeType.ACCOUNT_HIERARCHY)
+                .setScopeId("employee_scope_unresolved")
+                .setAuditReferenceSn("grant:unresolved_account_hierarchy"));
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
+                admissionByDecisionRef(SPEND_DECISION_SN)))
+                .hasMessageContaining("ACCOUNT_HIERARCHY 挂载无法从可信上下文解析");
+
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
 
     /**
      * 场景：支付工具预交易快照通过后，Spend Rule 决策也通过。
@@ -143,11 +375,12 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     @Test
     void testResolveSpendControlAdmissionShouldPassWithDecisionEvidenceWithoutFundsSideEffect() {
         prepareSpendControlAdmissionData();
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         SpendControlAdmissionDecisionDTO decision =
                 spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                        admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED));
+                        admissionByDecisionRef(SPEND_DECISION_SN));
 
         assertThat(decision.getTenantId()).isEqualTo(TENANT_ID);
         assertThat(decision.getBusinessScene()).isEqualTo(BUSINESS_SCENE);
@@ -185,13 +418,15 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     @Test
     void testResolveSpendControlAdmissionShouldRejectWithDecisionEvidenceWithoutFundsSideEffect() {
         prepareSpendControlAdmissionData();
+        recordDecision(SPEND_DECISION_SN,
+                SPEND_DECISION_DIGEST,
+                SpendControlDecisionResult.REJECTED,
+                "超过单卡单日授权限额");
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         SpendControlAdmissionDecisionDTO decision =
                 spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                        admissionRequest()
-                                .setSpendDecisionResult(SpendControlDecisionResult.REJECTED)
-                                .setRejectReason("超过单卡单日授权限额"));
+                        admissionByDecisionRef(SPEND_DECISION_SN));
 
         assertThat(decision.getAdmitted()).isFalse();
         assertThat(decision.getSpendDecisionResult()).isEqualTo(SpendControlDecisionResult.REJECTED);
@@ -206,24 +441,24 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     }
 
     /**
-     * 场景：上游已完成多条 Spend Rule 的冲突裁决，本服务只消费最终裁决证据。
-     * 输入：单笔限额通过、MCC 黑名单拒绝后，上游按 DENY_OVERRIDES 给出最终拒绝流水和摘要。
-     * 输出：准入固化最终决策流水、结果、摘要和拒绝原因，不要求传入每条 evaluatedRules 明细。
-     * 红线：wallet 不重算多规则、不展开明细落库，不创建交易、route、posting、LedgerEntry 或账本余额事实。
+     * 场景：上游决策记录携带 opaque 摘要，wallet 只按 decisionRef 回读已固化结果。
+     * 输入：单个适用挂载对应一条最终拒绝流水和摘要。
+     * 输出：准入返回决策流水、结果、摘要和拒绝原因，不解释摘要内部结构。
+     * 红线：本用例不证明多 binding 已完整评估；多 binding 仍由 fail-closed 用例约束。
      */
     @Test
-    void testResolveSpendControlAdmissionShouldConsumeUpstreamMultiRuleFinalDecisionDigest() {
+    void testResolveSpendControlAdmissionShouldReadOpaqueDecisionDigest() {
         prepareSpendControlAdmissionData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         String finalRejectReason = "MCC 黑名单命中，DENY_OVERRIDES 最终拒绝";
+        recordDecision(MULTI_RULE_FINAL_DECISION_SN,
+                MULTI_RULE_FINAL_DECISION_DIGEST,
+                SpendControlDecisionResult.REJECTED,
+                finalRejectReason);
 
         SpendControlAdmissionDecisionDTO decision =
                 spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                        admissionRequest()
-                                .setSpendDecisionSn(MULTI_RULE_FINAL_DECISION_SN)
-                                .setSpendDecisionDigest(MULTI_RULE_FINAL_DECISION_DIGEST)
-                                .setSpendDecisionResult(SpendControlDecisionResult.REJECTED)
-                                .setRejectReason(finalRejectReason));
+                        admissionByDecisionRef(MULTI_RULE_FINAL_DECISION_SN));
 
         assertThat(decision.getAdmitted()).isFalse();
         assertThat(decision.getSpendDecisionSn()).isEqualTo(MULTI_RULE_FINAL_DECISION_SN);
@@ -240,43 +475,44 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     /**
      * 场景：上游或外部 Spend Rule 决策通过，但 wallet 资金责任基础事实缺失。
      * 输入：携带 PASSED 决策证据，支付工具绑定和账户存在，但资金责任关系不存在。
-     * 输出：准入停在预交易快照阶段，不固化 Spend Rule 决策记录。
+     * 输出：准入停在预交易快照阶段，既有 Spend Rule 决策记录不被改写。
      * 红线：外部 approve 不代表资金可用，不能绕过支付工具、账户能力和资金责任校验。
      */
     @Test
     void testResolveSpendControlAdmissionShouldRejectExternalApproveWhenFundingResponsibilityMissingWithoutSideEffect() {
         prepareSpendControlAdmissionData();
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
         jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
                 TENANT_ID,
                 CREDIT_ACCOUNT_SN);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED)))
+                admissionByDecisionRef(SPEND_DECISION_SN)))
                 .hasMessageContaining("资金责任关系不存在");
 
-        assertThat(decisionRecordCount()).isZero();
+        assertThat(decisionRecordCount()).isEqualTo(1);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
-     * 场景：调用方缺少 Spend Rule 决策证据。
-     * 输入：没有规则版本。
+     * 场景：decisionRef 指向的决策事实与当前交易金额不一致。
+     * 输入：已固化金额 60 的 PASSED 决策，请求尝试授权 61。
      * 输出：准入阶段失败。
-     * 红线：证据不完整不得创建交易、route、posting、LedgerEntry 或余额投影事实。
+     * 红线：决策引用不得跨交易上下文复用。
      */
     @Test
-    void testResolveSpendControlAdmissionShouldRejectMissingDecisionEvidenceWithoutFundsSideEffect() {
+    void testResolveSpendControlAdmissionShouldRejectDecisionReferenceContextMismatchWithoutFundsSideEffect() {
         prepareSpendControlAdmissionData();
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                admissionRequest()
-                        .setSpendRuleVersion(null)
-                        .setSpendDecisionResult(SpendControlDecisionResult.PASSED)))
-                .hasMessageContaining("Spend Rule 版本不能为空");
+                admissionByDecisionRef(SPEND_DECISION_SN).setAmount(61L)))
+                .hasMessageContaining("与当前交易上下文不一致");
 
+        assertThat(decisionRecordCount()).isEqualTo(1);
         assertNoTransactionFacts(BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -312,14 +548,15 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     @Test
     void testResolveSpendControlAdmissionShouldReuseSameDecisionRecordForIdempotentDecisionEvidence() {
         prepareSpendControlAdmissionData();
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         SpendControlAdmissionDecisionDTO firstDecision =
                 spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                        admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED));
+                        admissionByDecisionRef(SPEND_DECISION_SN));
         SpendControlAdmissionDecisionDTO replayedDecision =
                 spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                        admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED));
+                        admissionByDecisionRef(SPEND_DECISION_SN));
 
         assertThat(replayedDecision.getSpendDecisionRecordId()).isEqualTo(firstDecision.getSpendDecisionRecordId());
         assertThat(decisionRecordCount()).isEqualTo(1);
@@ -328,23 +565,21 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     }
 
     /**
-     * 场景：同一 Spend Rule 决策流水被不同决策摘要复用。
-     * 输入：第一次通过，第二次使用相同决策流水但摘要不同。
+     * 场景：调用方回显摘要与 decisionRef 指向的已固化摘要不一致。
+     * 输入：已固化 PASSED 决策，准入请求携带相同 decisionRef 但回显另一个摘要。
      * 输出：准入阶段拒绝。
-     * 红线：摘要冲突不得创建交易事实或账本事实。
+     * 红线：调用方字段不得覆盖或伪造 wallet 已固化决策事实。
      */
     @Test
-    void testResolveSpendControlAdmissionShouldRejectDecisionDigestConflictWithoutFundsSideEffect() {
+    void testResolveSpendControlAdmissionShouldRejectDecisionDigestEchoMismatchWithoutFundsSideEffect() {
         prepareSpendControlAdmissionData();
-        spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                admissionRequest().setSpendDecisionResult(SpendControlDecisionResult.PASSED));
+        recordDecision(SPEND_DECISION_SN, SPEND_DECISION_DIGEST, SpendControlDecisionResult.PASSED, null);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> spendControlAdmissionApplicationService.resolveSpendControlAdmission(
-                admissionRequest()
-                        .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
+                admissionByDecisionRef(SPEND_DECISION_SN)
                         .setSpendDecisionDigest("sha256:changed-spend-control-admission")))
-                .hasMessageContaining("Spend Rule 决策流水已存在但内容不一致");
+                .hasMessageContaining("摘要回显与决策引用不一致");
 
         assertThat(decisionRecordCount()).isEqualTo(1);
         assertNoTransactionFacts(BUSINESS_SN);
@@ -362,13 +597,27 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
     }
 
     private void prepareSpendControlAdmissionData() {
+        preparePaymentInstrumentAdmissionData();
+        spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
+        spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
+        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()).getSn();
+    }
+
+    private void preparePaymentInstrumentAdmissionData() {
         creditAccountService.createCreditAccount(createCreditAccountRequest());
         paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
-        spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
-        spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
-        spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()).getSn();
+    }
+
+    private void prepareSharedCardAdmissionData() {
+        creditAccountService.createCreditAccount(createCreditAccountRequest());
+        fundingAccountService.createFundingAccount(createParentFundingAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest());
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest()
+                .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setTargetSubjectId(PARENT_FUNDING_ACCOUNT_SN));
     }
 
     private void cleanupSpendControlAdmissionTestData() {
@@ -388,7 +637,9 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn = ?", PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn = ?", PAYMENT_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", CREDIT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", PARENT_FUNDING_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", CREDIT_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn = ?", PARENT_FUNDING_ACCOUNT_SN);
     }
 
     private ResolveSpendControlAdmissionRequest admissionRequest() {
@@ -410,6 +661,54 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_DECISION_SN)
                 .setSpendDecisionDigest(SPEND_DECISION_DIGEST);
+    }
+
+    private ResolveSpendControlAdmissionRequest admissionByDecisionRef(String decisionSn) {
+        return new ResolveSpendControlAdmissionRequest()
+                .setTenantId(TENANT_ID)
+                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setAction(PaymentInstrumentAction.AUTHORIZE)
+                .setAmount(60L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setBindingRole(PaymentInstrumentBindingRole.PAYMENT_SUBJECT)
+                .setExpectedBindingVersion(1)
+                .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(BUSINESS_SN)
+                .setSpendDecisionSn(decisionSn);
+    }
+
+    private void recordDecision(String decisionSn,
+                                String decisionDigest,
+                                SpendControlDecisionResult decisionResult,
+                                String rejectReason) {
+        recordDecision(decisionSn, decisionDigest, decisionResult, rejectReason,
+                SpendRuleScopeType.PAYMENT_INSTRUMENT, PAYMENT_INSTRUMENT_SN);
+    }
+
+    private void recordDecision(String decisionSn,
+                                String decisionDigest,
+                                SpendControlDecisionResult decisionResult,
+                                String rejectReason,
+                                SpendRuleScopeType scopeType,
+                                String scopeId) {
+        spendRuleDecisionRecordService.recordDecision(new RecordSpendRuleDecisionRecordRequest()
+                .setTenantId(TENANT_ID)
+                .setDecisionSn(decisionSn)
+                .setRuleId(SPEND_RULE_ID)
+                .setRuleVersion(SPEND_RULE_VERSION)
+                .setSpendRuleBindingSn(spendRuleBindingSn)
+                .setScopeType(scopeType)
+                .setScopeId(scopeId)
+                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setAction(PaymentInstrumentAction.AUTHORIZE)
+                .setAmount(60L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(BUSINESS_SN)
+                .setDecisionResult(decisionResult)
+                .setRejectReason(rejectReason)
+                .setDecisionDigest(decisionDigest));
     }
 
     private CreateSpendRuleDefinitionRequest createSpendRuleDefinitionRequest() {
@@ -459,6 +758,19 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
                 .setCurrency(CurrencyIsoCode.USD)
                 .setPeriodType(AccountBalancePeriodType.LIFETIME)
                 .setLedgerProfileCode(LedgerProfileCode.CREDIT_BASIC)
+                .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
+    private CreateFundingAccountRequest createParentFundingAccountRequest() {
+        return new CreateFundingAccountRequest()
+                .setSn(PARENT_FUNDING_ACCOUNT_SN)
+                .setTenantId(TENANT_ID)
+                .setOwnerId(OWNER_ID)
+                .setOwnerType(FundsAccountOwnerType.USER)
+                .setAccountType(FundingAccountType.USER_WALLET.name())
+                .setPlatform(Boolean.FALSE)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
                 .setStatus(FundsAccountStatus.ACTIVE);
     }
 

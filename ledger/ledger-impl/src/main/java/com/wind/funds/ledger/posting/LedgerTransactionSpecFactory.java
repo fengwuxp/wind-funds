@@ -6,7 +6,6 @@ import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.model.FundsContextVariables;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.spec.ledger.LedgerPostingPhaseSpec;
@@ -66,7 +65,6 @@ public final class LedgerTransactionSpecFactory {
                 .fundsTransactionSn(fundsTransactionSn)
                 .eventType(instruction.getEventType())
                 .transactionType(instruction.getTransactionType())
-                .status(LedgerTransactionStatus.POSTED)
                 .amount(instruction.getAmount())
                 .originalAmount(instruction.getOriginalAmount())
                 .exchangeRate(instruction.getExchangeRate())
@@ -148,10 +146,6 @@ public final class LedgerTransactionSpecFactory {
         @Schema(description = "交易类型")
         private final DefaultFundsTransactionType transactionType;
 
-        @Schema(description = "交易状态")
-        @NotNull
-        private final LedgerTransactionStatus status;
-
         @Schema(description = "交易金额，单位：分")
         @NotNull
         private final Money amount;
@@ -192,7 +186,6 @@ public final class LedgerTransactionSpecFactory {
                                             String fundsTransactionSn,
                                             FundsTransactionEventType eventType,
                                             DefaultFundsTransactionType transactionType,
-                                            LedgerTransactionStatus status,
                                             Money amount,
                                             Money originalAmount,
                                             BigDecimal exchangeRate,
@@ -209,7 +202,6 @@ public final class LedgerTransactionSpecFactory {
             this.fundsTransactionSn = fundsTransactionSn;
             this.eventType = eventType;
             this.transactionType = transactionType;
-            this.status = status;
             this.amount = amount;
             this.originalAmount = originalAmount;
             this.exchangeRate = exchangeRate;

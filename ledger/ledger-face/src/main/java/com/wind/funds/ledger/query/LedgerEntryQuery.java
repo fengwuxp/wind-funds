@@ -69,30 +69,6 @@ public class LedgerEntryQuery {
     @Schema(description = "原始金额币种")
     private String originalCurrency;
 
-    @Schema(description = "结算状态")
-    private String settlementStatus;
-
-    @Schema(description = "结算周期（账期）")
-    private String settlementPeriod;
-
-    @Schema(description = "查询到最小结算完成时间")
-    private LocalDateTime settlementCompletedTimeMin;
-
-    @Schema(description = "查询到最大结算完成时间")
-    private LocalDateTime settlementCompletedTimeMax;
-
-    @Schema(description = "对账状态")
-    private String reconcileStatus;
-
-    @Schema(description = "对账批次（示例：2026040900015）")
-    private String reconciliationBatch;
-
-    @Schema(description = "查询到最小对账完成时间")
-    private LocalDateTime reconciliationCompletedTimeMin;
-
-    @Schema(description = "查询到最大对账完成时间")
-    private LocalDateTime reconciliationCompletedTimeMax;
-
     @Schema(description = "查询到最小 gmtCreate")
     private LocalDateTime gmtCreateMin;
 

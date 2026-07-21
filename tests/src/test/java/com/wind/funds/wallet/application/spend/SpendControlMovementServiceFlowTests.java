@@ -53,6 +53,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.Stream;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -139,12 +144,100 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                 SpendControlMovementType.RESERVED, "sha256:activity-reserved");
 
         SpendControlMovementDTO first = spendControlMovementService.recordMovement(request);
+        int versionAfterFirstMovement = creditAccountVersion();
         SpendControlMovementDTO replayed = spendControlMovementService.recordMovement(request);
 
         assertThat(replayed.getId()).isEqualTo(first.getId());
         assertThat(replayed.getMovementDigest()).isEqualTo(first.getMovementDigest());
+        assertThat(creditAccountVersion()).isEqualTo(versionAfterFirstMovement);
         assertThat(activityCount(RESERVED_ACTIVITY_SN)).isOne();
         assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：同一账户和控制周期并发提交不同控制占用流水。
+     * 输入：周期额度 100，两笔不同 movementSn 各占用 60。
+     * 输出：只允许一笔成功，另一笔因可用控制额度不足失败。
+     * 红线：不同幂等键的并发请求也不得穿透控制额度聚合约束。
+     */
+    @Test
+    void testConcurrentReservationsShouldNotExceedAvailableControlAmount() throws Exception {
+        prepareSpendControlMovementData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
+        spendControlMovementService.recordMovement(limitIncreaseRequest(
+                "activity_limit_for_concurrent_reservation",
+                PERIOD_ID,
+                100L,
+                "sha256:activity-limit-for-concurrent-reservation"));
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Throwable> first = executor.submit(() -> recordConcurrentReservation(
+                    decision,
+                    "activity_concurrent_reserved_001",
+                    "sha256:activity-concurrent-reserved-001",
+                    ready,
+                    start));
+            Future<Throwable> second = executor.submit(() -> recordConcurrentReservation(
+                    decision,
+                    "activity_concurrent_reserved_002",
+                    "sha256:activity-concurrent-reserved-002",
+                    ready,
+                    start));
+            ready.await();
+            start.countDown();
+
+            List<Throwable> failures = Stream.of(first.get(), second.get())
+                    .filter(java.util.Objects::nonNull)
+                    .toList();
+            assertThat(failures).singleElement()
+                    .satisfies(failure -> assertThat(failure.getMessage())
+                            .containsAnyOf("控制占用金额超过可用控制额度", "控制额度变动目标账户并发冲突"));
+        } finally {
+            executor.shutdownNow();
+        }
+
+        BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
+                new BudgetControlProjectionQuery()
+                        .setTenantId(TENANT_ID)
+                        .setControlScopeId(SPEND_CONTROL_SCOPE_SN)
+                        .setPeriodId(PERIOD_ID)
+                        .setCurrency(CurrencyIsoCode.USD)
+                        .setSpendRuleId(SPEND_RULE_ID)
+                        .setSpendRuleVersion(SPEND_RULE_VERSION)
+                        .setTargetAccountId(FundsAccountId.immutable(CREDIT_ACCOUNT_SN,
+                                FundsSubjectType.CREDIT_ACCOUNT)));
+        assertThat(projection.getReservedAmount()).isEqualTo(60L);
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
+    }
+
+    /**
+     * 场景：未配置周期额度时已存在控制占用，随后首次初始化有限额度。
+     * 输入：先占用 60，再尝试把周期额度初始化为 50。
+     * 输出：拒绝额度初始化，不生成额度变动流水。
+     * 红线：从未配置额度切换为有限额度时，不得使可用控制额度变为负数。
+     */
+    @Test
+    void testFirstLimitIncreaseShouldNotBeLowerThanExistingCommittedControlAmount() {
+        prepareSpendControlMovementData();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        SpendControlAdmissionDecisionDTO decision = admittedDecision(BUSINESS_SN);
+        spendControlMovementService.recordMovement(recordRequest(decision,
+                RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED,
+                "sha256:activity-reserved-before-limit"));
+
+        RecordSpendControlMovementRequest request = limitIncreaseRequest(
+                "activity_limit_below_existing_reservation",
+                PERIOD_ID,
+                50L,
+                "sha256:activity-limit-below-existing-reservation");
+        assertThatThrownBy(() -> spendControlMovementService.recordMovement(request))
+                .hasMessageContaining("预算控制额度不能低于已使用或已占用控制金额");
+
+        assertThat(activityCount(request.getMovementSn())).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -526,6 +619,32 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
     private SpendControlAdmissionDecisionDTO admittedDecision(String businessSn) {
         return decision(businessSn, SpendControlDecisionResult.PASSED, null);
+    }
+
+    private Throwable recordConcurrentReservation(SpendControlAdmissionDecisionDTO decision,
+                                                  String movementSn,
+                                                  String movementDigest,
+                                                  CountDownLatch ready,
+                                                  CountDownLatch start) {
+        ready.countDown();
+        try {
+            start.await();
+            spendControlMovementService.recordMovement(recordRequest(decision,
+                    movementSn,
+                    SpendControlMovementType.RESERVED,
+                    movementDigest));
+            return null;
+        } catch (Throwable throwable) {
+            return throwable;
+        }
+    }
+
+    private int creditAccountVersion() {
+        return jdbcTemplate.queryForObject(
+                "SELECT version FROM t_credit_account WHERE tenant_id = ? AND sn = ?",
+                Integer.class,
+                TENANT_ID,
+                CREDIT_ACCOUNT_SN);
     }
 
     private SpendControlAdmissionDecisionDTO decision(String businessSn,

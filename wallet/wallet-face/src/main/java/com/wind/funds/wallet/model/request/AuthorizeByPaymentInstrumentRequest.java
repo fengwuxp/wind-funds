@@ -62,34 +62,34 @@ public class AuthorizeByPaymentInstrumentRequest {
     @Schema(description = "期望支付工具绑定版本，用于防止换绑后继续使用旧快照")
     private Integer expectedBindingVersion;
 
-    @Schema(description = "Spend Rule 标识，携带支出控制准入决策证据时必填")
+    @Schema(description = "Spend Rule 标识，可选回显字段，不作为授权准入依据")
     private String spendRuleId;
 
-    @Schema(description = "Spend Rule 版本，携带支出控制准入决策证据时必填")
+    @Schema(description = "Spend Rule 版本，可选回显字段，不作为授权准入依据")
     private String spendRuleVersion;
 
-    @Schema(description = "Spend Rule 挂载流水号，可为空；为空时只记录规则和控制范围")
+    @Schema(description = "Spend Rule 挂载流水号，可选回显字段；适用挂载由 wallet 解析")
     private String spendRuleBindingSn;
 
-    @Schema(description = "Spend Rule 控制范围类型，携带支出控制准入决策证据时必填")
+    @Schema(description = "Spend Rule 控制范围类型，可选回显字段；适用范围由 wallet 解析")
     private SpendRuleScopeType spendRuleScopeType;
 
-    @Schema(description = "Spend Rule 控制范围标识，携带支出控制准入决策证据时必填")
+    @Schema(description = "Spend Rule 控制范围标识，可选回显字段；适用范围由 wallet 解析")
     private String spendRuleScopeId;
 
-    @Schema(description = "Spend Rule 决策流水号，携带支出控制准入决策证据时必填")
+    @Schema(description = "Spend Rule 决策引用；存在适用挂载时必须可被 wallet 回读并验真")
     private String spendDecisionSn;
 
-    @Schema(description = "Spend Rule 决策结果，携带支出控制准入决策证据时必填")
+    @Schema(description = "Spend Rule 决策结果，可选回显字段，不作为授权准入依据")
     private SpendControlDecisionResult spendDecisionResult;
 
-    @Schema(description = "Spend Rule 最终决策摘要，用于幂等、回放和对账追踪")
+    @Schema(description = "Spend Rule 最终决策摘要，可选回显字段，不作为授权准入依据")
     private String spendDecisionDigest;
 
     @Schema(description = "控制范围标识，可为空")
     private String controlScopeId;
 
-    @Schema(description = "Spend Rule 决策拒绝原因，仅 spendDecisionResult=REJECTED 时必填")
+    @Schema(description = "Spend Rule 决策拒绝原因，可选回显字段，不作为授权准入依据")
     private String spendDecisionRejectReason;
 
     @Schema(description = "交易授权时间")

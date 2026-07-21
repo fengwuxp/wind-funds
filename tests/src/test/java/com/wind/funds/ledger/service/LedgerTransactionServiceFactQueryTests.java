@@ -7,6 +7,9 @@ import com.wind.funds.ledger.LedgerTransactionPostingService;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.dto.LedgerEntryDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionDTO;
+import com.wind.funds.ledger.dal.entities.LedgerEntry;
+import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
+import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
@@ -16,7 +19,6 @@ import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
@@ -30,6 +32,7 @@ import com.wind.funds.spec.ledger.LedgerPostingPhaseSpec;
 import com.wind.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
@@ -54,6 +57,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -135,6 +139,127 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：账本交易作为成功过账后形成的不可变账务事实。
+     * 输入：账本交易 DSL、基础服务、持久化实体和 H2 表结构。
+     * 输出：不暴露生命周期状态、更新或删除能力，不持久化恒为 true 的平衡标记，保留借贷控制总额。
+     * 红线：业务处理中、失败、结算或冲正状态不得反向污染不可变账本交易事实。
+     */
+    @Test
+    void testLedgerTransactionFactShouldExposeNoLifecycleMutationOrRedundantBalancedFlag() throws Exception {
+        assertThat(LedgerTransactionSpec.class.getMethods())
+                .extracting(Method::getName)
+                .doesNotContain("getStatus");
+        assertThat(LedgerTransactionService.class.getMethods())
+                .extracting(Method::getName)
+                .doesNotContain(
+                        "postLedgerTransaction",
+                        "updateLedgerTransaction",
+                        "deleteLedgerTransactionById",
+                        "deleteLedgerTransactionByIds");
+        assertThat(LedgerTransaction.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName)
+                .contains("debitAmount", "creditAmount")
+                .doesNotContain("status", "balanced");
+        assertThat(LedgerPostingPlan.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName)
+                .contains("debitAmount", "creditAmount")
+                .doesNotContain("balanced");
+        assertThat(tableColumns("T_LEDGER_TRANSACTION"))
+                .contains("DEBIT_AMOUNT", "CREDIT_AMOUNT")
+                .doesNotContain("STATUS", "IS_BALANCED");
+        assertThat(tableColumns("T_LEDGER_POSTING_PLAN"))
+                .contains("DEBIT_AMOUNT", "CREDIT_AMOUNT")
+                .doesNotContain("IS_BALANCED");
+
+        Field digestFields = LedgerTransactionServiceImpl.class
+                .getDeclaredField("LEDGER_TRANSACTION_SHA256_FIELDS");
+        digestFields.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        List<String> transactionDigestFields = (List<String>) digestFields.get(null);
+        assertThat(transactionDigestFields)
+                .contains(LedgerTransaction.Fields.fundsTransactionSn)
+                .doesNotHaveDuplicates();
+
+        assertThat(LedgerTransactionDTO.class.getDeclaredField("eventType").getType())
+                .isEqualTo(FundsTransactionEventType.class);
+        assertThat(LedgerTransactionDTO.class.getDeclaredFields())
+                .extracting(Field::getName)
+                .contains(
+                        "instructionType",
+                        "transactionType",
+                        "debitAmount",
+                        "creditAmount",
+                        "sha256");
+    }
+
+    /**
+     * 场景：对账清算域以稳定分录号引用不可变 LedgerEntry，并独立保存批次、匹配和差错事实。
+     * 输入：LedgerEntry 持久化事实、公开 DTO、查询契约和 H2 表结构。
+     * 输出：账本分录不承载后发生的清算或对账生命周期字段。
+     * 红线：对账或清算结果不得反写 LedgerEntry，也不得由账本层提前生成虚假批次和状态。
+     */
+    @Test
+    void testLedgerEntryFactShouldNotOwnSettlementOrReconciliationLifecycle() {
+        List<String> lifecycleFields = List.of(
+                "settlementStatus",
+                "settlementPeriod",
+                "settlementCompletedTime",
+                "reconcileStatus",
+                "reconcileRemark",
+                "reconciliationBatch",
+                "reconciliationCompletedTime");
+
+        assertThat(LedgerEntry.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName)
+                .doesNotContainAnyElementsOf(lifecycleFields);
+        assertThat(LedgerEntryDTO.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName)
+                .doesNotContainAnyElementsOf(lifecycleFields);
+        assertThat(LedgerEntryQuery.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName)
+                .doesNotContainAnyElementsOf(lifecycleFields);
+        assertThat(tableColumns("T_LEDGER_ENTRY"))
+                .doesNotContain(
+                        "SETTLEMENT_STATUS",
+                        "SETTLEMENT_PERIOD",
+                        "SETTLEMENT_COMPLETED_TIME",
+                        "RECONCILE_STATUS",
+                        "RECONCILE_REMARK",
+                        "RECONCILIATION_BATCH",
+                        "RECONCILIATION_COMPLETED_TIME");
+    }
+
+    /**
+     * 场景：对账、报表和回放按稳定分录识别明细、父级控制和父子划拨口径。
+     * 输入：LedgerEntry 持久化事实、公开 DTO、H2 表结构和分录摘要字段集。
+     * 输出：postingRole 被固化，摘要覆盖分录身份及其账本、交易和计划引用。
+     * 红线：记账角色或父事实引用被改写时，分录摘要不得保持不变。
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void testLedgerEntryFactShouldPersistPostingRoleAndDigestStableReferences() throws Exception {
+        java.lang.reflect.Field digestFields = LedgerTransactionServiceImpl.class
+                .getDeclaredField("LEDGER_ENTRY_SHA256_FIELDS");
+        digestFields.setAccessible(true);
+
+        assertThat(LedgerEntry.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName)
+                .contains("postingRole");
+        assertThat(LedgerEntryDTO.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName)
+                .contains("postingRole");
+        assertThat(tableColumns("T_LEDGER_ENTRY")).contains("POSTING_ROLE");
+        assertThat((List<String>) digestFields.get(null)).contains(
+                "sn",
+                "ledgerTransactionSn",
+                "postingPlanSn",
+                "fundsTransactionSn",
+                "ledgerId",
+                "postingRole",
+                "balanceConstraintType");
+    }
+
+    /**
      * 场景：交易侧、清结算或对账侧需要读取一笔已落账的账务事实。
      * 输入：source / target 两个资金账户、标准 posting gateway 和一笔借贷平衡的账本交易。
      * 输出：基础服务可按稳定 sn 读到账本交易和分录，异租户 get 查询抛异常；余额读取继续走 LedgerService。
@@ -173,10 +298,16 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                         DefaultPageQueryOptions.defaults(10))
                 .getRecords();
 
-        assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
         assertThat(transaction.getSn()).isEqualTo(LEDGER_TRANSACTION_SN);
+        assertThat(transaction.getEventType()).isEqualTo(FundsTransactionEventType.TRANSFER);
+        assertThat(transaction.getInstructionType()).isEqualTo(FundsInstructionType.DIRECT_TRANSACTION);
+        assertThat(transaction.getTransactionType()).isEqualTo(DefaultFundsTransactionType.TRANSFER);
+        assertThat(transaction.getDebitAmount()).isEqualTo(TRANSACTION_AMOUNT);
+        assertThat(transaction.getCreditAmount()).isEqualTo(TRANSACTION_AMOUNT);
+        assertThat(transaction.getSha256()).isNotBlank();
         assertThat(entries).hasSize(2);
         assertThat(firstEntry.getLedgerTransactionSn()).isEqualTo(LEDGER_TRANSACTION_SN);
+        assertThat(firstEntry.getPostingRole()).isEqualTo(LedgerPostingRole.DETAIL);
         assertThat(foreignTenantEntries).isEmpty();
         assertThatThrownBy(() -> ledgerTransactionService.getLedgerTransactionBySn(
                 TENANT_ID + 1, LEDGER_TRANSACTION_SN))
@@ -265,6 +396,13 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
                 TARGET_SUBJECT_ID);
     }
 
+    private List<String> tableColumns(String tableName) {
+        return jdbcTemplate.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?",
+                String.class,
+                tableName);
+    }
+
     private record TestLedgerTransactionSpec(List<LedgerPostingPlanSpec> postingPlans)
             implements LedgerTransactionSpec {
 
@@ -283,13 +421,13 @@ class LedgerTransactionServiceFactQueryTests extends AbstractFundsServiceTest {
         }
 
         @Override
-        public FundsTransactionEventType getEventType() {
-            return FundsTransactionEventType.TRANSFER;
+        public FundsInstructionType getInstructionType() {
+            return FundsInstructionType.DIRECT_TRANSACTION;
         }
 
         @Override
-        public LedgerTransactionStatus getStatus() {
-            return LedgerTransactionStatus.POSTED;
+        public FundsTransactionEventType getEventType() {
+            return FundsTransactionEventType.TRANSFER;
         }
 
         @Override

@@ -97,7 +97,7 @@ TDD 设计的准入目标是证明设计已经能转成真实测试资产和验�
 
 TDD 评审口径：TDD 入口必须承接 PRD 目标、DSL 契约和系分落点，并能进入测试资产分析和 Red 排序。进入编码前仍需工程任务明确写入范围、禁止范围、目标测试资产、验证命令和未覆盖范围；未确认时只能产出测试设计、契约草案或 dry-run。
 
-Spend Rule 测试设计优先引用独立产品分册 09、系分分册 06 和 DSL README 的 Spend Rule DSL v1.1：TDD 只把规则定义、不可变版本、挂载 scope、决策记录、控制额度变动流水、预算控制投影和只读解释转成可执行断言，不在交易路由主线或测试夹具中重新发明规则模型。`SpendRuleDecisionRecord` 只承载准入和拒绝决策，`SpendControlMovement` 只承载额度调整、预留、消耗、退款补偿和可信释放；预算控制投影必须证明 `availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`，且额度调减不能低于已使用和已占用控制金额之和。`SpendControlMovementTypeContractTests` 必须证明枚举只包含真实控制额度变动类型，调额类和释放类只作为控制额度变动流水子集；application 实现必须消费枚举分类方法，不得在实现类中重新硬编码类型集合。
+Spend Rule 测试设计优先引用独立产品分册 09、系分分册 06 和 DSL README 的 Spend Rule DSL v1.1：TDD 只把规则定义、不可变版本、挂载 scope、决策记录、控制额度变动流水、预算控制投影和只读解释转成可执行断言，不在交易路由主线或测试夹具中重新发明规则模型。`SpendRuleDecisionRecord` 只承载准入和拒绝决策，`SpendControlMovement` 只承载额度调整、预留、消耗、退款补偿和可信释放；预算控制投影必须证明 `consumedAmount = grossConsumedAmount - refundCompensatedAmount`、`remainingControlAmount = reservedAmount - grossConsumedAmount - releasedAmount`、`availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`，退款只降低净消费而不恢复已消费 reservation，且首次调增或后续调减后的额度均不能低于已使用和已占用控制金额之和。相同 `movementSn` 的并发重放必须先由 `tenantId + movementSn` 唯一键裁决，失败方通过 current read 回读胜者事实，不得重复累计投影或额外递增账户版本；不同 `movementSn` 的并发变动必须先写候选流水，再按包含候选流水的 after-state 校验聚合不变量并通过账户版本 CAS 裁决，校验或 CAS 失败时删除候选流水并快速失败。`SpendControlMovementTypeContractTests` 必须证明枚举只包含真实控制额度变动类型，调额类和释放类只作为控制额度变动流水子集；application 实现必须消费枚举分类方法，不得在实现类中重新硬编码类型集合。
 
 当前 Spend Rule 服务层测试证据口径：
 

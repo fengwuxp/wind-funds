@@ -55,9 +55,9 @@ public enum LedgerPostingIntentType implements DescriptiveEnum {
     AUTHORIZATION_REVERSAL("授权撤销"),
 
     /**
-     * 授权结算（最终扣款）
+     * 授权完成（消费成立）
      */
-    AUTHORIZATION_SETTLEMENT("授权结算"),
+    AUTHORIZATION_COMPLETION("授权完成"),
 
     // =========================
     // 3. 清结算类

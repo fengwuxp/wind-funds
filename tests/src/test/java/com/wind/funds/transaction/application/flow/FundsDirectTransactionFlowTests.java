@@ -4248,8 +4248,6 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(entry.getGmtModified()).isAfterOrEqualTo(entry.getGmtCreate());
                     assertThat(entry.getTransactionTime()).isEqualTo(ledgerTransaction.getTransactionTime());
                     assertThat(entry.getSha256()).isNotBlank();
-                    assertThat(entry.getSettlementStatus()).isNotNull();
-                    assertThat(entry.getReconcileStatus()).isNotNull();
                 });
     }
 

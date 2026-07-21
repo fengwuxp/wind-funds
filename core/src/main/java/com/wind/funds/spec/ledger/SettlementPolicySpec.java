@@ -4,7 +4,6 @@ import com.wind.common.WindConstants;
 import com.wind.common.exception.AssertUtils;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.springframework.util.Assert;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -296,7 +295,9 @@ public final class SettlementPolicySpec {
      * 解析结算策略
      */
     public static SettlementPolicySpec parse(String expression) {
-        Assert.hasText(expression, REQUIRED_EXPRESSION_MESSAGE);
+        if (expression == null || expression.isBlank()) {
+            throw new IllegalArgumentException(REQUIRED_EXPRESSION_MESSAGE);
+        }
         String rawExpression = expression.trim();
         String normalized = rawExpression.toUpperCase(Locale.ROOT);
 
@@ -441,7 +442,9 @@ public final class SettlementPolicySpec {
             throw new IllegalArgumentException("Custom cycle must start with C@: " + expr);
         }
         String body = expr.substring(EXPRESSION_PREFIX_LENGTH);
-        Assert.hasText(body, "Custom cycle or range id must not be empty: " + expr);
+        if (body.isBlank()) {
+            throw new IllegalArgumentException("Custom cycle or range id must not be empty: " + expr);
+        }
         if (!body.matches(REGEX_CUSTOM_CYCLE)) {
             return new SettlementPolicySpec(SettlementMode.CUSTOM_RANGE, ZERO_INTERVAL, null, null, expr, body);
         }
@@ -523,7 +526,9 @@ public final class SettlementPolicySpec {
      * @param holidayCalendar 默认节假日日历，返回 true 表示该日期不参与交易日计数
      */
     public static void configureDefaultHolidayCalendar(SettlementHolidayCalendar holidayCalendar) {
-        Assert.notNull(holidayCalendar, REQUIRED_HOLIDAY_CALENDAR_MESSAGE);
+        if (holidayCalendar == null) {
+            throw new IllegalArgumentException(REQUIRED_HOLIDAY_CALENDAR_MESSAGE);
+        }
         DEFAULT_HOLIDAY_CALENDAR.set(holidayCalendar);
     }
 
@@ -552,7 +557,9 @@ public final class SettlementPolicySpec {
      * @return 下一次候选结算时间
      */
     public LocalDateTime nextSettlementTime(LocalDateTime now, SettlementHolidayCalendar holidayCalendar) {
-        Assert.notNull(holidayCalendar, REQUIRED_HOLIDAY_CALENDAR_MESSAGE);
+        if (holidayCalendar == null) {
+            throw new IllegalArgumentException(REQUIRED_HOLIDAY_CALENDAR_MESSAGE);
+        }
         return switch (settlementMode) {
             case REALTIME -> now;
             case DELAY_DAYS -> nextBusinessDayDelay(now, interval, holidayCalendar);

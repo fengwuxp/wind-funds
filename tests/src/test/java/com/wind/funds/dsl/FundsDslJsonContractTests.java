@@ -139,7 +139,7 @@ class FundsDslJsonContractTests {
     /**
      * 场景：样例作者把生命周期事件误写入交易类型。
      * 预期：JSON 契约校验显式失败。
-     * 红线：transactionType 不承载 AUTHORIZE、SETTLE、REVERSAL 等生命周期事件。
+     * 红线：transactionType 不承载 AUTHORIZE、COMPLETE、REVERSAL 等生命周期事件。
      */
     @Test
     void testJsonContractVerifierShouldRejectEventAsTransactionType() {
@@ -753,12 +753,6 @@ class FundsDslJsonContractTests {
                             "currency": "USD",
                             "ledgerProfileCode": "FUNDING_BASIC"
                           },
-                          "rootAccountRef": {
-                            "subjectType": "FUNDING_ACCOUNT",
-                            "subjectId": "fa_vcc_parent_001",
-                            "currency": "USD",
-                            "ledgerProfileCode": "FUNDING_BASIC"
-                          },
                           "contextVariables": { "accountPurpose": "VCC_SHARED_CARD" }
                         }
                       }]
@@ -1349,11 +1343,6 @@ class FundsDslJsonContractTests {
                             "subjectType": "FUNDING_ACCOUNT",
                             "subjectId": "fa_vcc_parent_currency_001",
                             "currency": "EUR"
-                          },
-                          "rootAccountRef": {
-                            "subjectType": "FUNDING_ACCOUNT",
-                            "subjectId": "fa_vcc_parent_currency_001",
-                            "currency": "EUR"
                           }
                         }
                       }]
@@ -1407,11 +1396,6 @@ class FundsDslJsonContractTests {
                             "subjectType": "FUNDING_ACCOUNT",
                             "subjectId": "fa_vcc_parent_amount_currency_001",
                             "currency": "EUR"
-                          },
-                          "rootAccountRef": {
-                            "subjectType": "FUNDING_ACCOUNT",
-                            "subjectId": "fa_vcc_parent_amount_currency_001",
-                            "currency": "EUR"
                           }
                         }
                       }]
@@ -1426,9 +1410,9 @@ class FundsDslJsonContractTests {
     }
 
     /**
-     * 场景：JSON 样例把 VCC 卡绑定信用子账户同时写成 parent/root。
+     * 场景：JSON 样例把 VCC 卡绑定信用子账户同时写成 parent。
      * 预期：JSON 契约校验显式失败。
-     * 红线：父账户和根账户不能指回实际落账账户本身，否则多级账户汇总和回放归因会出现自循环。
+     * 红线：直接父账户不能指回实际落账账户本身，否则账户汇总和回放归因会出现自循环。
      */
     @Test
     void testJsonContractVerifierShouldRejectSelfReferencedHierarchyRelation() {
@@ -1465,11 +1449,6 @@ class FundsDslJsonContractTests {
                             "subjectType": "CREDIT_ACCOUNT",
                             "subjectId": "ca_vcc_card_self_001",
                             "currency": "USD"
-                          },
-                          "rootAccountRef": {
-                            "subjectType": "CREDIT_ACCOUNT",
-                            "subjectId": "ca_vcc_card_self_001",
-                            "currency": "USD"
                           }
                         }
                       }]
@@ -1481,64 +1460,6 @@ class FundsDslJsonContractTests {
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("parentAccountRef must not reference accountRef itself");
-    }
-
-    /**
-     * 场景：JSON 样例中的 VCC 子账户没有租户，父账户和根账户分别写入不同租户。
-     * 预期：JSON 契约校验显式失败。
-     * 红线：父账户和根账户必须属于同一责任边界，不能因子账户字段缺省而绕过父根冲突。
-     */
-    @Test
-    void testJsonContractVerifierShouldRejectInconsistentParentAndRootRelation() {
-        JSONObject document = JSON.parseObject("""
-                {
-                  "caseId": "DSL-INVALID-VCC-HIERARCHY-ROOT-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_root_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_card_root_001"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "priority": 10,
-                        "reason": "INVALID_PARENT_ROOT_RELATION",
-                        "accountHierarchySnapshot": {
-                          "accountRef": {
-                            "subjectType": "CREDIT_ACCOUNT",
-                            "subjectId": "ca_vcc_card_root_001"
-                          },
-                          "parentAccountRef": {
-                            "subjectType": "FUNDING_ACCOUNT",
-                            "subjectId": "fa_vcc_parent_root_001",
-                            "tenantId": 1,
-                            "currency": "USD"
-                          },
-                          "rootAccountRef": {
-                            "subjectType": "FUNDING_ACCOUNT",
-                            "subjectId": "fa_vcc_root_root_001",
-                            "tenantId": 2,
-                            "currency": "USD"
-                          }
-                        }
-                      }]
-                    }
-                  }
-                }
-                """);
-
-        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("rootAccountRef.tenantId must match parentAccountRef.tenantId");
     }
 
     private Path transactionLayerDslDir() {

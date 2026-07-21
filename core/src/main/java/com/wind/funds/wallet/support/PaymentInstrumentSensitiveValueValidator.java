@@ -3,7 +3,6 @@ package com.wind.funds.wallet.support;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONException;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Array;
 import java.util.Locale;
@@ -61,7 +60,7 @@ public final class PaymentInstrumentSensitiveValueValidator {
      * @return true 表示输入为 12 到 19 位数字，可带空格或短横线分隔
      */
     public static boolean isRawSensitiveInstrumentNo(@Nullable String instrumentNo) {
-        if (!StringUtils.hasText(instrumentNo)) {
+        if (instrumentNo == null || instrumentNo.isBlank()) {
             return false;
         }
         String compactInstrumentNo = instrumentNo.replace(" ", "").replace("-", "");
@@ -85,7 +84,7 @@ public final class PaymentInstrumentSensitiveValueValidator {
      * @return true 表示上下文字段名形似 CVV、token secret 或密钥，或字段值形似原始 PAN
      */
     public static boolean containsSensitiveContextVariables(@Nullable String contextVariables) {
-        if (!StringUtils.hasText(contextVariables)) {
+        if (contextVariables == null || contextVariables.isBlank()) {
             return false;
         }
         try {
@@ -137,7 +136,7 @@ public final class PaymentInstrumentSensitiveValueValidator {
     }
 
     private static boolean isSensitiveBindingSnapshotField(@Nullable String fieldName) {
-        if (!StringUtils.hasText(fieldName)) {
+        if (fieldName == null || fieldName.isBlank()) {
             return false;
         }
         String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");
@@ -170,7 +169,7 @@ public final class PaymentInstrumentSensitiveValueValidator {
     }
 
     private static boolean isRawPanValue(String value) {
-        if (!StringUtils.hasText(value)) {
+        if (value == null || value.isBlank()) {
             return false;
         }
         String compactValue = value.replace(" ", "").replace("-", "");

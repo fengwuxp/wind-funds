@@ -29,6 +29,9 @@ public interface SpendRuleDecisionRecordService {
     /**
      * 记录 Spend Rule 决策记录。
      *
+     * <p>该写入口只供受信任的规则或业务决策方调用。记录成功只形成可回读证据，
+     * 不等于授权放行；wallet 准入仍会独立解析适用挂载并核对交易上下文。</p>
+     *
      * @param request 决策记录请求
      * @return 决策记录
      */

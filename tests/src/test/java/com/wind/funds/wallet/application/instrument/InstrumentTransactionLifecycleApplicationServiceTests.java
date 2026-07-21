@@ -21,6 +21,8 @@ import com.wind.funds.route.BalanceControlFundsInstructionRouteResolver;
 import com.wind.funds.route.CompositeRouteResolver;
 import com.wind.funds.route.DefaultRouteReplayService;
 import com.wind.funds.route.DefaultRouteSnapshotFactory;
+import com.wind.funds.route.RefundRouteAdmission;
+import com.wind.funds.route.RouteFeeChargeAppender;
 import com.wind.funds.route.TransferFundsInstructionRouteResolver;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
@@ -869,6 +871,8 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
             BalanceControlFundsInstructionRouteResolver.class,
             AuthorizationFundsInstructionRouteResolver.class,
             CompositeRouteResolver.class,
+            RefundRouteAdmission.class,
+            RouteFeeChargeAppender.class,
             DefaultRouteSnapshotFactory.class,
             DefaultLedgerPostingAssembler.class,
             DefaultRoutedFundsInstructionOrchestrator.class,

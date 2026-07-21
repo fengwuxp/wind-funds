@@ -90,13 +90,15 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
     private static final Map<LedgerSubjectCode, EntrySide> EXPECTED_NORMAL_SIDES = Map.of(
             LedgerSubjectCode.LIMIT, EntrySide.DEBIT,
             LedgerSubjectCode.AVAILABLE, EntrySide.CREDIT,
-            LedgerSubjectCode.AUTHORIZATION, EntrySide.CREDIT
+            LedgerSubjectCode.AUTHORIZATION, EntrySide.CREDIT,
+            LedgerSubjectCode.OUTSTANDING, EntrySide.CREDIT
     );
 
     private static final Map<LedgerSubjectCode, Boolean> EXPECTED_NEGATIVE_RULES = Map.of(
             LedgerSubjectCode.LIMIT, Boolean.FALSE,
             LedgerSubjectCode.AVAILABLE, Boolean.TRUE,
-            LedgerSubjectCode.AUTHORIZATION, Boolean.FALSE
+            LedgerSubjectCode.AUTHORIZATION, Boolean.FALSE,
+            LedgerSubjectCode.OUTSTANDING, Boolean.FALSE
     );
 
     @Autowired
@@ -137,7 +139,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(accountView.canPay()).isTrue();
         assertThat(accountView.canReceive()).isFalse();
         assertThat(accountView.canWithdraw()).isFalse();
-        assertThat(ledgers).hasSize(3);
+        assertThat(ledgers).hasSize(4);
         assertThat(ledgers).extracting(LedgerDTO::getLedgerSubjectCode)
                 .containsExactlyInAnyOrderElementsOf(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
@@ -179,7 +181,7 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
         assertThat(account.getSn()).isEqualTo(NON_LIFETIME_CREDIT_ACCOUNT_SN);
         assertThat(account.getPeriodType()).isEqualTo(AccountBalancePeriodType.MONTHLY);
         assertThat(account.getPeriodId()).isEqualTo(MONTHLY_PERIOD_ID);
-        assertThat(ledgers).hasSize(3);
+        assertThat(ledgers).hasSize(4);
         assertThat(ledgers).extracting(LedgerDTO::getLedgerSubjectCode)
                 .containsExactlyInAnyOrderElementsOf(EXPECTED_NORMAL_SIDES.keySet());
         assertThat(ledgers).allSatisfy(ledger -> assertControlLedger(
@@ -218,9 +220,9 @@ class ControlAccountLedgerInitializationTests extends AbstractFundsServiceTest {
 
         assertThat(nextPeriodLedgerIds).isEqualTo(reusedNextPeriodLedgerIds);
         assertThat(nextPeriodLedgerIds).containsOnlyKeys(EXPECTED_NORMAL_SIDES.keySet());
-        assertThat(oldPeriodLedgers).hasSize(3);
-        assertThat(nextPeriodLedgers).hasSize(3);
-        assertThat(allLedgers).hasSize(6);
+        assertThat(oldPeriodLedgers).hasSize(4);
+        assertThat(nextPeriodLedgers).hasSize(4);
+        assertThat(allLedgers).hasSize(8);
         assertThat(oldPeriodLedgers).allSatisfy(ledger -> assertControlLedger(
                 ledger,
                 FundsSubjectType.CREDIT_ACCOUNT,

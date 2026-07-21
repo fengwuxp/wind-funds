@@ -67,41 +67,34 @@ public class ResolveSpendControlAdmissionRequest {
     @NotBlank
     private String businessSn;
 
-    @Schema(description = "Spend Rule 标识")
-    @NotBlank
+    @Schema(description = "Spend Rule 标识，可选回显字段；wallet 以 decisionSn 回读结果为准")
     private String spendRuleId;
 
-    @Schema(description = "Spend Rule 版本")
-    @NotBlank
+    @Schema(description = "Spend Rule 版本，可选回显字段；wallet 以 decisionSn 回读结果为准")
     private String spendRuleVersion;
 
-    @Schema(description = "Spend Rule 挂载流水号，可为空；为空时只记录规则和控制范围")
+    @Schema(description = "Spend Rule 挂载流水号，可选回显字段；适用挂载由 wallet 解析")
     private String spendRuleBindingSn;
 
-    @Schema(description = "Spend Rule 控制范围类型")
-    @NotNull
+    @Schema(description = "Spend Rule 控制范围类型，可选回显字段；适用范围由 wallet 解析")
     private SpendRuleScopeType spendRuleScopeType;
 
-    @Schema(description = "Spend Rule 控制范围标识")
-    @NotBlank
+    @Schema(description = "Spend Rule 控制范围标识，可选回显字段；适用范围由 wallet 解析")
     private String spendRuleScopeId;
 
-    @Schema(description = "Spend Rule 决策流水号")
-    @NotBlank
+    @Schema(description = "Spend Rule 决策引用；存在适用挂载时必填，wallet 必须可回读并验真")
     private String spendDecisionSn;
 
-    @Schema(description = "Spend Rule 决策结果")
-    @NotNull
+    @Schema(description = "Spend Rule 决策结果，可选回显字段，不作为准入依据")
     private SpendControlDecisionResult spendDecisionResult;
 
-    @Schema(description = "Spend Rule 最终决策摘要，用于幂等、回放和对账追踪；"
-            + "可代表上游多规则裁决证据摘要，当前公共契约不展开 evaluatedRules、decisionPolicy 或 finalDecision 明细")
-    @NotBlank
+    @Schema(description = "Spend Rule 最终决策摘要，可选回显字段，不作为准入依据；"
+            + "wallet 以 decisionSn 回读的已固化摘要为准")
     private String spendDecisionDigest;
 
     @Schema(description = "控制范围标识，可为空")
     private String controlScopeId;
 
-    @Schema(description = "拒绝原因，仅 Spend Rule 决策拒绝时必填")
+    @Schema(description = "拒绝原因，可选回显字段，不作为准入依据")
     private String rejectReason;
 }

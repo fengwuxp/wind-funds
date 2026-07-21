@@ -13,7 +13,7 @@ public enum RouteReplayType implements DescriptiveEnum {
 
     RELEASE_HOLD("释放占用"),
 
-    AUTHORIZATION_SETTLEMENT("授权结算"),
+    AUTHORIZATION_COMPLETION("授权完成"),
 
     AUTHORIZATION_REFUND("授权退款"),
 

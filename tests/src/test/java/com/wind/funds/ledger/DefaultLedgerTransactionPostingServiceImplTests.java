@@ -12,7 +12,6 @@ import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.ledger.enums.LedgerStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.ledger.impl.LedgerBalanceProjectionServiceImpl;
 import com.wind.funds.ledger.impl.LedgerServiceImpl;
 import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
@@ -131,24 +130,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     }
 
     /**
-     * 场景：外部 LedgerTransactionSpec 实现传入非 POSTED 的账本交易。
-     * 输入：交易状态为 PENDING，账务计划和分录看似完整。
-     * 输出：入账入口在调用 LedgerTransactionService 和余额投影前拒绝请求，账本事实保持不变。
-     * 红线：未入账状态不得生成 ledger transaction、posting plan、entry 或余额投影副作用。
-     */
-    @Test
-    void testPostShouldRejectNonPostedTransactionBeforeLedgerFacts() {
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.PENDING,
-                List.of(validPostingPlan(null)))))
-                .hasMessageContaining("账本交易状态不允许入账");
-
-        assertLedgerFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
      * 场景：账务计划没有任何分录。
      * 输入：POSTED 交易携带空 entries 的 posting plan。
      * 输出：入账入口在事实落库和余额投影前拒绝请求。
@@ -159,7 +140,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of())))))
                 .hasMessageContaining("账务计划 entries 不能为空");
 
@@ -182,7 +162,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
             LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
             assertThatThrownBy(() -> postingService.post(transaction(
-                    LedgerTransactionStatus.POSTED,
                     List.of(postingPlan(List.of(
                             debitEntry(SOURCE_SUBJECT_ID, null, invalidCase.amount()),
                             creditEntry(TARGET_SUBJECT_ID, null, TRANSACTION_AMOUNT)))))))
@@ -203,7 +182,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
                         debitEntry(SOURCE_SUBJECT_ID, null, TRANSACTION_AMOUNT, "LT-OTHER-001"),
                         creditEntry(TARGET_SUBJECT_ID, null, TRANSACTION_AMOUNT)))))))
@@ -223,7 +201,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(validPostingPlan(null)))))
                 .hasMessageContaining("账本分录 ledgerId 不能为空");
 
@@ -242,7 +219,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
                         debitEntry(SOURCE_SUBJECT_ID, mismatchLedgerId, TRANSACTION_AMOUNT),
                         creditEntry(TARGET_SUBJECT_ID, mismatchLedgerId, TRANSACTION_AMOUNT)))))))
@@ -270,7 +246,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
                         debitEntry(SOURCE_SUBJECT_ID, sourceLedgerId, TRANSACTION_AMOUNT),
                         creditEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)))))))
@@ -298,7 +273,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
                         debitEntry(SOURCE_SUBJECT_ID, sourceLedgerId, TRANSACTION_AMOUNT),
                         creditEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)))))))
@@ -320,7 +294,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
                         ledgerEntry(
                                 SOURCE_SUBJECT_ID,
@@ -351,7 +324,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)))))
                 .hasMessageContaining("账本科目类别与正常余额方向不一致");
 
@@ -374,7 +346,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)))))
                 .hasMessageContaining("账本状态不允许入账");
 
@@ -396,7 +367,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         markLedgerStatus(sourceLedgerId, LedgerStatus.SUSPENDED);
 
         postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(LedgerPostingAccessType.CLOSING, List.of(
                         ledgerEntry(SOURCE_SUBJECT_ID, SUBJECT_TYPE, sourceLedgerId, EntrySide.CREDIT,
                                 TRANSACTION_AMOUNT, LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE,
@@ -426,7 +396,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(LedgerPostingAccessType.CLOSING, List.of(
                         ledgerEntry(SOURCE_SUBJECT_ID, SUBJECT_TYPE, sourceLedgerId, EntrySide.CREDIT,
                                 TRANSACTION_AMOUNT, LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE,
@@ -453,7 +422,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
                         creditEntry(SPEND_CONTROL_SCOPE_SUBJECT_ID,
                                 SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
@@ -481,7 +449,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> postingService.post(transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(postingPlan(List.of(
                         debitEntry(SPEND_CONTROL_SCOPE_SUBJECT_ID,
                                 SPEND_CONTROL_SCOPE_SUBJECT_TYPE,
@@ -515,7 +482,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
         LedgerTransactionSpec transaction = transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)));
 
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
@@ -528,6 +494,34 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
 
         postingService.post(transaction);
 
+        assertLedgerFactsUnchanged(jdbcTemplate, afterFirstPost);
+    }
+
+    /**
+     * 场景：同一账本交易流水被重复提交，但 posting plan 的余额约束发生变化。
+     * 输入：交易头和借贷路径完全相同，第二次提交将源分录改为必须非负。
+     * 输出：幂等摘要冲突并拒绝复用原账本交易，既有账务事实和余额保持不变。
+     * 红线：账本幂等不能只比较交易头，不能把不同 posting plan 当作同一笔成功交易。
+     */
+    @Test
+    void testPostShouldRejectSameTransactionSnWithDifferentPostingFacts() {
+        seedFundingAccount(SOURCE_SUBJECT_ID);
+        seedFundingAccount(TARGET_SUBJECT_ID);
+        Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
+        Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
+        LedgerTransactionSpec original = transaction(
+                List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)));
+        LedgerTransactionSpec conflicting = transaction(List.of(postingPlan(List.of(
+                ledgerEntry(SOURCE_SUBJECT_ID, sourceLedgerId, EntrySide.CREDIT, TRANSACTION_AMOUNT,
+                        LEDGER_TRANSACTION_SN, LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.ASSET,
+                        LedgerBalanceConstraintType.MUST_NOT_BE_NEGATIVE),
+                debitEntry(TARGET_SUBJECT_ID, targetLedgerId, TRANSACTION_AMOUNT)))));
+
+        postingService.post(original);
+        LedgerFactSnapshot afterFirstPost = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> postingService.post(conflicting))
+                .hasMessageContaining("账本交易已存在但摘要不一致");
         assertLedgerFactsUnchanged(jdbcTemplate, afterFirstPost);
     }
 
@@ -546,7 +540,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID,
                 AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID, 0L);
         LedgerTransactionSpec transaction = transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(availableTransferPostingPlan(
                         sourceLedgerId, targetLedgerId, AccountBalancePeriodType.MONTHLY, MONTHLY_PERIOD_ID)));
 
@@ -578,7 +571,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         Long sourceLedgerId = createAvailableLedger(SOURCE_SUBJECT_ID, 200L);
         Long targetLedgerId = createAvailableLedger(TARGET_SUBJECT_ID, 0L);
         LedgerTransactionSpec transaction = transaction(
-                LedgerTransactionStatus.POSTED,
                 List.of(availableTransferPostingPlan(sourceLedgerId, targetLedgerId)));
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         CountDownLatch startGate = new CountDownLatch(1);
@@ -601,9 +593,8 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         }
     }
 
-    private LedgerTransactionSpec transaction(LedgerTransactionStatus status,
-                                              List<LedgerPostingPlanSpec> postingPlans) {
-        return new TestLedgerTransactionSpec(status, postingPlans);
+    private LedgerTransactionSpec transaction(List<LedgerPostingPlanSpec> postingPlans) {
+        return new TestLedgerTransactionSpec(postingPlans);
     }
 
     private LedgerPostingPlanSpec validPostingPlan(Long ledgerId) {
@@ -939,8 +930,7 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
     private record InvalidAmountCase(Money amount, String expectedMessage) {
     }
 
-    private record TestLedgerTransactionSpec(LedgerTransactionStatus status,
-                                             List<LedgerPostingPlanSpec> postingPlans)
+    private record TestLedgerTransactionSpec(List<LedgerPostingPlanSpec> postingPlans)
             implements LedgerTransactionSpec {
 
         private TestLedgerTransactionSpec {
@@ -960,11 +950,6 @@ class DefaultLedgerTransactionPostingServiceImplTests extends AbstractFundsServi
         @Override
         public FundsTransactionEventType getEventType() {
             return FundsTransactionEventType.TRANSFER;
-        }
-
-        @Override
-        public LedgerTransactionStatus getStatus() {
-            return status;
         }
 
         @Override

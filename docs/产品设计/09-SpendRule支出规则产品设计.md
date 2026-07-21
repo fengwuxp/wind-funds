@@ -64,7 +64,7 @@ Spend Rule 的产品归属是钱包支出控制域。它围绕支付工具、预
 | 能力 | 产品归属 | 说明 |
 | --- | --- | --- |
 | 规则定义、版本发布和规则挂载 | wallet | 管理支出控制规则事实，回答规则是什么、哪个版本、作用到哪个控制 scope。 |
-| 规则准入和决策记录 | wallet | 在交易内核前判断是否允许继续，并固化决策流水、结果、摘要和拒绝原因。 |
+| 规则准入和决策记录 | wallet | 可信规则或业务决策方先固化决策记录；准入服务在交易内核前自行解析适用挂载，并按决策引用回读、验真后判断是否允许继续。 |
 | 控制额度变动流水和预算控制视图 | wallet | 记录额度调整、预留、消耗、释放、退款补偿等控制事实，派生预算控制只读视图。 |
 | 账户主体交易、授权、退款和余额控制 | transaction | 只接受账户主体 canonical 入参，执行资金交易和交易事实生命周期。 |
 | 历史交易投影解释 | transaction | 只读取当时已固化的 Spend Rule 决策快照和控制引用，生成只读解释。 |
@@ -175,7 +175,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | 产品语义 | 当前代码载体 | 已具备的服务层证据 | 不代表 |
 | --- | --- | --- | --- |
 | 规则定义、版本和挂载 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleBindingService`。 | 支持创建规则、发布不可变 `ruleSpec / ruleDigest` 版本、挂载 scope、查询和解释挂载；已证明版本摘要冲突、挂载幂等、挂载只读解释和失败无资金副作用。 | 不代表完整规则表达式引擎、运营后台、生产迁移已完成；不再保留规则大 application facade 或旧式领域命名服务作为目标入口。 |
-| 决策记录 | `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendRuleDecisionRecordQuery`、`SpendRuleDecisionExplainQuery`、`SpendRuleDecisionRecordService`。 | 支持按单条 rule / binding / scope 固化决策结果、拒绝原因和 `decisionDigest`，支持按决策流水、业务流水、规则、挂载、scope、支付工具和决策结果做服务层只读查询，并可输出拒绝原因和证据引用；已证明拒绝、查询和解释无资金事实副作用。 | 不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
+| 决策记录 | `SpendRuleDecisionRecord`、`RecordSpendRuleDecisionRecordRequest`、`SpendRuleDecisionRecordQuery`、`SpendRuleDecisionExplainQuery`、`SpendRuleDecisionRecordService`。 | 可信规则或业务决策方可按单条 rule / binding / scope 固化 `PASSED` 或 `REJECTED` 决策结果、拒绝原因和 `decisionDigest`；支持按决策流水、业务流水、规则、挂载、scope、支付工具和决策结果做服务层只读查询，并可输出拒绝原因和证据引用。 | `recordDecision` 不是开放给普通交易调用方的放行入口；不接受 `NO_APPLICABLE_RULE`，也不代表 `evaluatedRules`、`decisionPolicy`、完整多规则裁决明细、批量运营时间线或规则引擎已落库。 |
 | 控制额度变动流水 | `SpendControlMovement`、`RecordSpendControlMovementRequest`、`SpendControlMovementType`。 | 支持调额、预留、消耗、释放、退款补偿和预算控制投影；周期额度流水携带 `controlScopeId`、`periodId`，且历史准入类 activity 不再允许新写入。 | 不代表控制事实是资金交易、账本交易或账本余额。 |
 | 预算控制投影 | `BudgetControlProjectionDTO`。 | 支持按 `controlScopeId + periodId` 查询当前或历史周期，并按控制流水重建 `limitAmount`、`consumedAmount`、`remainingControlAmount` 和 `availableControlAmount`。 | 不代表支出控制范围、Spend Rule 或控制视图可以作为账务主体。 |
 
@@ -184,7 +184,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 1. 产品文档只定义 Spend Rule 的业务对象、能力、流程、验收和风险，不强制工程服务必须全部命名为 application service。
 2. 规则定义、版本、挂载、决策记录、控制额度变动流水和预算控制投影是产品能力对象；工程上按标准基础服务和场景 application service 承接。
 3. 当前规则定义、版本、挂载、挂载查询 / 解释以及决策记录写入 / 查询 / 解释已收敛到标准基础服务；后续新增能力优先落到对应基础服务，不再新增规则大 application facade 或旧式领域命名服务。
-4. 支出控制准入由钱包侧提供支付工具、资金责任、账户能力和 Spend Rule 证据；交易结果消费和支付工具交易生命周期入口由交易层实现组合并写入资金交易事实。
+4. 支出控制准入由钱包侧解析支付工具、资金责任、账户能力和当前有效 Spend Rule 挂载，并按 `decisionSn` 回读已固化决策；交易结果消费和支付工具交易生命周期入口由交易层实现组合并写入资金交易事实。
 
 ## 6. 能力地图
 
@@ -195,6 +195,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 | 规则挂载 | scope、ruleId、version、priority、conflictPolicy、有效期。 | 可评估的挂载关系。 | 多规则冲突必须可解释；缺优先级或冲突策略不得生产启用。 |
 | 挂载查询与解释 | tenant、sn、scope、ruleId、version、评估时间。 | 当前有效挂载列表、挂载可用性状态、`bindingSummary` 和证据引用。 | 只读查询；`bindingSummary` 仅用于排查阅读，不作为业务判断字段；不重新执行规则，不写决策记录，不生成资金交易或账本事实。 |
 | 决策记录 | 支付工具快照、账户主体、预算 scope、金额币种、商户、MCC、国家、时间和业务场景。 | 决策流水、结果、拒绝原因、摘要。 | 拒绝停在交易内核前；通过只代表允许继续准入。 |
+| 支出控制准入验真 | 当前支付工具、资金责任、账户能力、业务场景、控制 scope 和 `decisionSn`。 | 已验真的 `PASSED` / `REJECTED`，或无适用挂载时的 `NO_APPLICABLE_RULE`。 | wallet 自行解析当前有效挂载；裸结果或裸摘要不放行；多个适用挂载在单决策契约下 fail-closed。 |
 | 决策记录查询与解释 | tenant、decisionSn、businessScene、businessSn、ruleId、version、spendRuleBindingSn、scope、instrumentSn、decisionResult。 | 决策记录列表、历史决策结果、拒绝原因、`decisionSummary` 和 evidenceRefs。 | 查询必须携带 tenantId 外的窄条件；`decisionSummary` 仅用于排查阅读，业务判断以 `decisionResult` 和证据引用为准；解释只读读取历史决策，不重算规则、不调整额度、不写资金事实。 |
 | 控制额度变动流水记录 | 决策结果、控制范围、周期标识、目标账户主体、金额币种、交易结果。 | 预留、消耗、释放、过期、退款补偿或调整流水。 | 不生成资金交易、账本交易、账本分录或余额投影。 |
 | 规则时间线查询 | ruleId、ruleVersion、spendRuleBindingSn、decisionSn、业务流水、时间范围。 | 规则变更、挂载变更、决策记录和控制额度变动流水时间线。 | 查询只读，不修复状态，不重新评估历史。 |
@@ -206,23 +207,29 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 flowchart TD
     A["创建规则定义"] --> B["发布不可变规则版本"]
     B --> C["挂载到支付工具 / 预算 scope / 账户 / 场景"]
-    C --> D["业务发起授权或资金动作"]
-    D --> E["读取工具、账户、预算、商户和规则上下文"]
-    E --> F{"规则是否允许"}
-    F -- "拒绝或待复核" --> G["记录决策记录\nSpendRuleDecisionRecord"]
-    G --> H["返回拒绝原因\n无资金事实副作用"]
-    F -- "允许" --> I["记录通过决策\n必要时写控制额度变动流水"]
-    I --> J["继续账户主体型交易内核"]
-    J --> K["交易投影读取规则证据\n生成只读解释"]
+    C --> D["可信决策方裁决并记录\nSpendRuleDecisionRecord"]
+    D --> E["业务携带 decisionSn 发起授权或资金动作"]
+    E --> F["wallet 读取工具、账户和当前有效挂载"]
+    F --> G{"适用挂载数量"}
+    G -- "0" --> H["显式 NO_APPLICABLE_RULE\n不创建决策记录"]
+    G -- "1" --> I["按 decisionSn 回读并核对\nbinding 与交易上下文"]
+    G -- ">1" --> J["单决策契约无法完整表达\n默认拒绝"]
+    I -- "REJECTED / 不一致 / 缺证据" --> K["返回拒绝原因\n无资金事实副作用"]
+    I -- "PASSED 且验真通过" --> L["继续账户主体型交易内核"]
+    H --> L
+    L --> M["交易投影读取规则证据或无规则快照\n生成只读解释"]
 ```
 
 流程规则：
 
-1. 规则定义先于规则版本，规则版本先于规则挂载，规则挂载先于准入决策。
-2. 规则评估失败、证据不完整、版本过期、挂载停用或冲突策略不明时，默认不放行。
-3. 决策通过后仍要继续做支付工具能力、账户能力、资金责任、余额或额度校验；规则通过不代表最终授权成功。
-4. 决策拒绝时，不生成资金交易、route、posting plan、LedgerEntry、ledger transaction、账本余额投影或清结算对象。
-5. 后续退款、撤销、过期、争议、对账或投影解释，必须按原决策证据和原 route snapshot 回放。
+1. 规则定义先于规则版本，规则版本先于规则挂载；可信规则或业务决策方负责规则裁决并通过 `SpendRuleDecisionRecordService.recordDecision` 固化 `PASSED` / `REJECTED` 证据。
+2. wallet 准入按当前支付工具、已解析资金责任、业务场景和 `controlScopeId` 自行查询有效挂载，不采用调用方声明的 rule / binding 作为适用性依据。
+3. 无适用挂载时必须返回显式 `NO_APPLICABLE_RULE`，且不伪造规则、挂载、摘要或决策记录；存在一个适用挂载时必须按 `decisionSn` 回读并核对挂载及当前交易上下文。
+4. 调用方省略 `decisionSn`、只传裸 `PASSED + sha256`、回读记录不存在或上下文不一致时默认不放行；调用方携带的 rule、binding、结果和摘要只可作为可选诊断回显，不是授权依据。
+5. 当前单决策记录契约遇到多个适用挂载时 fail-closed，不按优先级擅自选第一条；需要 `evaluatedRules`、`decisionPolicy`、`finalDecision` 后才能承接多规则合成证据。
+6. 决策通过后仍要继续做支付工具能力、账户能力、资金责任、余额或额度校验；规则通过不代表最终授权成功。
+7. 决策拒绝或验真失败时，不生成资金交易、route、posting plan、LedgerEntry、ledger transaction、账本余额投影或清结算对象。
+8. 后续退款、撤销、过期、争议、对账或投影解释，必须按原决策证据和原 route snapshot 回放。
 
 异常流程和人工兜底：
 
@@ -289,7 +296,7 @@ Spend Rule DSL v1.1 先锁定规则版本、规则挂载和决策证据三类契
 | 对象 | 与 Spend Rule 的关系 | 边界 |
 | --- | --- | --- |
 | 资金账户 | 规则通过后可能成为最终入账或扣款主体。 | 资金账户余额由账本分录和余额投影证明，不由规则直接修改。 |
-| 信用账户 | 规则通过后可能形成授权占用或额度责任。 | 信用账户 LIMIT、AVAILABLE、AUTHORIZATION 仍由账户和交易链路控制。 |
+| 信用账户 | 规则通过后可能形成授权占用或额度责任。 | 信用账户 LIMIT、AVAILABLE、AUTHORIZATION、OUTSTANDING 仍由账户和交易链路控制。 |
 | 支付工具 | 规则可挂载到工具或读取工具快照。 | 工具不是资金主体；工具换绑不影响历史规则解释。 |
 | 支出控制范围 | 作为预算 scope、owner、展示维度和控制归属。 | 不初始化账本，不拥有账本余额，不生成 LedgerEntry。 |
 | 资金责任解析 | 可读取规则上下文帮助选择最终责任主体。 | Spend Rule 不能作为资金责任目标主体。 |
@@ -371,7 +378,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 | 准入项 | 必须具备的证据 | 不满足时处理 |
 | --- | --- | --- |
 | 规则变更审计 | 创建规则、发布版本、挂载 scope、停用 / 恢复挂载、控制额度调整都能在 web / 运营审计层追踪操作者、原因、审批或审计引用、traceId、变更前后摘要、影响 scope 和生效窗口；资金底座生命周期命令只负责状态机更新。 | 只允许服务层或灰度验证，不开放运营入口和自动生产放行。 |
-| 决策证据留存 | 每次准入必须能追踪最终决策流水、规则版本、挂载、请求摘要、拒绝原因和上游外部决策引用；多规则明细仍由上游证据系统保留。 | 决策证据缺失时 fail-fast，不进入交易内核。 |
+| 决策证据留存 | 有适用挂载时，可信决策方必须先固化最终决策流水、规则版本、挂载、请求摘要、拒绝原因和上游外部决策引用，wallet 再按 `decisionSn` 回读验真；无适用挂载时保留显式 `NO_APPLICABLE_RULE` 准入快照。 | 有适用挂载但决策引用缺失、不可回读或上下文不一致时 fail-fast，不进入交易内核。 |
 | 控制窗口可追溯 | 当前和历史额度窗口通过 `controlScopeId + periodId` 查询，必要时再加目标账户和币种；历史窗口不得按当前规则或当前挂载重算。 | 缺历史窗口证据时只展示缺证据或进入人工处理，不补造控制流水。 |
 | 告警与 Runbook | 至少有摘要冲突、幂等冲突、准入拒绝异常升高、投影查询缺证据、滚动窗口查询慢或超阈值、生产迁移失败的发现方式、处理 owner 和恢复验收。 | 只能作为内部受控能力，不进入外部生产接入。 |
 | 灰度与回滚 | 规则变更通过新增版本、停用挂载或恢复旧挂载回滚，不覆盖已发布版本和历史决策；灰度范围、暂停条件和回滚 owner 明确。 | 不允许原地改写已发布规则版本或删除历史决策 / 控制流水。 |
@@ -383,11 +390,11 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 
 | 能力项 | 目标 | Owner | 最小交付 | 验证方式 | 停止条件 |
 | --- | --- | --- | --- | --- | --- |
-| 接入口径 | 明确对外接入口径：当前先支持上游已决策的 Spend Rule 证据和控制额度事实，不声明托管式规则引擎。 | 产品 owner、架构 owner。 | 用户接入指南、TDD 入口和系分入口同步说明“上游决策、wallet 固化证据、transaction 消费快照”。 | 文档 diff、现有 Spend Rule 服务层测试清单可反查。 | 发现需要新增公共 API、DTO 字段或 DDL 时停止，转工程边界评审。 |
+| 接入口径 | 明确对外接入口径：上游可信决策方负责裁决并固化 Spend Rule 决策记录，wallet 负责解析适用挂载、回读验真和形成准入快照。 | 产品 owner、架构 owner。 | 用户接入指南、TDD 入口和系分入口同步说明“上游裁决并固化、wallet 解析并验真、transaction 消费快照”；无规则显式返回，裸证据不放行。 | 文档 diff、现有 Spend Rule 服务层测试清单可反查。 | 发现需要新增多规则公共契约、DTO 字段或 DDL 时停止，转工程边界评审。 |
 | 金额和事件口径 | 防止把外部 requested amount、authorized amount、reversal、refund 或异步规则结果延迟混成同一口径。 | 产品 owner、架构 owner、wallet owner。 | `EvaluateSpendRuleRequest.amount` 只表示调用方已归一后的本次评估金额；控制累计只读取本系统 `SpendControlMovement` 和预算控制投影；外部异步规则结果延迟由上游证据系统承接。 | 接入说明、接口注释和现有 evaluator / 控制流水测试可反查。 | 需要复刻 Highnote 15 秒延迟模型、按外部 requested amount 推导授权金额、按退款 / 撤销事件重算外部平台累计授权口径，或承接 Highnote authorization hold configuration 时停止。 |
 | 轻量规则评估 | 补最小可执行规则切片，只覆盖单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果。 | 架构 owner、wallet owner、测试 owner。 | 规则执行只作为可选轻量 evaluator，不引入表达式引擎、脚本沙箱或运营后台。 | 新增最小 TDD：超单笔拒绝、周期超额拒绝、次数超限拒绝、MCC / 商户国家 / 卡数据输入能力 / 卡交易处理类型 / 商户标识 / PAN 录入方式 / POS 类别 / CVV 必填 / 邮编校验结果拒绝和拒绝无资金事实副作用。 | 需要多规则复杂冲突、脚本、外部风控、街道地址原文或卡组织正式规则时停止。 |
 | 控制窗口模型 | 将 velocity control 收敛为控制窗口模型，不复用账本周期，不新增支出控制范围账本。 | 产品 owner、架构 owner、wallet owner。 | 明确 `windowType`、`periodId`、时区和重置口径，复用 `SpendControlMovement` 和预算控制投影。 | 控制窗口 TDD 证明当前周期和历史周期可查询，跨周期、跨账户、跨 scope 不串账。 | 需要 rolling amount、cooldown 或生产调度重置时停止，拆独立任务。 |
-| 外部决策证据 | 评估协同授权接入边界，只定义本系统消费外部 approve / decline 证据的契约。 | 产品 owner、风控 owner、架构 owner。 | 保持 `SpendControlAdmissionApplicationService` 消费外部决策证据；不内建 webhook 注册、验签、超时和 stand-in。 | 准入测试证明外部拒绝无 route、posting、LedgerEntry，外部通过仍需账户能力和资金责任校验。 | 一旦要做 webhook endpoint、HMAC、超时兜底或模拟工具，转外部接入工程边界。 |
+| 外部决策证据 | 评估协同授权接入边界，只定义可信决策写入与 wallet 回读验真的契约。 | 产品 owner、风控 owner、架构 owner。 | 外部 approve / decline 先由可信适配方写为决策记录，准入只接受可回读的 `decisionSn`；不内建 webhook 注册、验签、超时和 stand-in。 | 准入测试证明裸结果 / 摘要不放行、外部拒绝无 route / posting / LedgerEntry、外部通过仍需账户能力和资金责任校验。 | 一旦要做 webhook endpoint、HMAC、超时兜底或模拟工具，转外部接入工程边界。 |
 | 多规则裁决证据 | 多规则裁决证据升级评审。 | 产品 owner、架构 owner、测试 owner。 | 评估 `evaluatedRules`、`decisionPolicy`、`finalDecision` 是否进入公共契约或仅保留在内部解释 payload。 | 先补契约评审和 TDD Red，不直接改公共 DTO。 | 涉及公共契约破坏性变更、数据迁移或历史决策回填时停止。 |
 | 挂载范围映射 | 明确 Highnote 对象到 wind-funds 挂载范围的映射。 | 产品 owner、架构 owner、测试 owner。 | `payment card -> PAYMENT_INSTRUMENT`；`financial account -> FUNDING_ACCOUNT / CREDIT_ACCOUNT`；`authorized user / cardholder / 员工 / 账户层级 -> ACCOUNT_HIERARCHY`；`card product -> BUSINESS_SCENE`。 | `SpendRuleDefinitionServiceTests` 证明多 scope 挂载、查询和解释均无资金事实副作用。 | 需要新增卡产品主数据、授权用户主数据、DDL 或把 scope 作为账本主体时停止。 |
 | 币种和本地授权时间窗口 | 补齐币种控制和本地授权时间窗口控制 evaluator。 | 架构 owner、wallet owner、测试 owner。 | `currencyControl` 使用请求币种做黑白名单判断；`timeWindowControl` 使用调用方已归一化的授权本地时间做允许窗口判断。 | `SpendRuleEvaluationApplicationServiceTests` 覆盖币种拒绝、币种通过、时间窗口拒绝、窗口起点通过和拒绝 / 通过均无资金事实副作用。 | 需要时区换算、节假日、生产调度、复杂组合规则、DDL 或公共契约破坏性变更时停止。 |
@@ -396,7 +403,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 轻量规则评估当前边界与已落地能力：
 
 1. 最小 evaluator 只输出规则评估结论，不写 Spend Rule 决策记录、控制额度变动流水、资金交易、route、posting、LedgerEntry 或账本投影。
-2. `SpendControlAdmissionApplicationService` 继续保持“消费上游决策证据并固化控制事实”的现有职责，不扩展为规则执行入口。
+2. `SpendRuleDecisionRecordService.recordDecision` 只供可信规则或业务决策方固化 `PASSED` / `REJECTED`；`SpendControlAdmissionApplicationService` 不写决策记录、不执行规则，只解析当前有效挂载并按 `decisionSn` 回读验真。
 3. 当前已新增独立 wallet evaluator 契约，单笔切片输入已发布的 `ruleId`、`ruleVersion`、调用方已归一后的本次评估金额、币种、支付工具动作和业务流水，读取已发布 `ruleSpec.limitSpec.amountLimit`，输出 `PASSED` / `REJECTED`、拒绝原因和决策摘要候选。该金额不由 evaluator 从外部 requested amount、原始网络字段或交易退款 / 撤销事实推导；周期和滚动控制只读本系统控制流水和控制投影。
 4. 当前已落地单笔限额超限拒绝、限额内通过、摘要稳定、周期金额可用额度不足拒绝、周期次数达到上限拒绝、滚动窗口次数达到上限拒绝、窗口外历史流水不误拒绝、MCC 黑白名单拒绝 / 通过、商户国家黑白名单拒绝 / 通过、卡数据输入能力黑白名单拒绝 / 通过、卡交易处理类型黑白名单拒绝 / 通过、商户标识黑白名单拒绝 / 通过、PAN 录入方式黑白名单拒绝 / 通过、POS 类别黑白名单拒绝 / 通过、CVV 必填拒绝 / 通过、AVS 邮编校验结果拒绝 / 通过、币种黑白名单拒绝 / 通过，以及本地授权时间窗口拒绝 / 通过；周期金额通过 `controlScopeId`、`periodId` 和可选 `targetAccountId` 只读复用 `BudgetControlProjectionDTO`，周期次数通过同一控制范围和周期下的既有控制占用 / 消耗流水按原始占用流水去重计数，滚动窗口次数通过 `counterSpec.windowMode=ROLLING`、`windowSizeMinutes`、请求 `authorizationTime` 和既有控制占用 / 消耗流水创建时间按原始占用流水去重计数，MCC 通过 `EvaluateSpendRuleRequest.merchantCategoryCode` 和 `ruleSpec.limitSpec.merchantCategoryControl` 判断，商户国家通过 `EvaluateSpendRuleRequest.merchantCountryCode` 和 `ruleSpec.limitSpec.merchantCountryControl` 判断，卡数据输入能力通过 `EvaluateSpendRuleRequest.cardDataInputCapability` 和 `ruleSpec.limitSpec.cardDataInputCapabilityControl` 判断，卡交易处理类型通过 `EvaluateSpendRuleRequest.cardTransactionProcessingType` 和 `ruleSpec.limitSpec.cardTransactionProcessingTypeControl` 判断，商户标识通过 `EvaluateSpendRuleRequest.merchantId` 和 `ruleSpec.limitSpec.merchantIdControl` 判断，PAN 录入方式通过 `EvaluateSpendRuleRequest.panEntryMode` 和 `ruleSpec.limitSpec.panEntryModeControl` 判断，POS 类别通过 `EvaluateSpendRuleRequest.pointOfServiceCategory` 和 `ruleSpec.limitSpec.pointOfServiceCategoryControl` 判断，CVV 必填通过 `EvaluateSpendRuleRequest.cvvProvided` 和 `ruleSpec.limitSpec.cvvControl.required` 判断，AVS 邮编校验通过 `EvaluateSpendRuleRequest.postalCodeVerificationResult` 和 `ruleSpec.limitSpec.postalCodeVerificationControl` 判断，币种通过 `EvaluateSpendRuleRequest.currency` 和 `ruleSpec.limitSpec.currencyControl` 判断，时间窗口通过 `EvaluateSpendRuleRequest.authorizationTime` 和 `ruleSpec.limitSpec.timeWindowControl.allowedWindows` 判断，均不新增控制流水或资金事实；其中滚动窗口次数只是只读候选评估，不是并发强一致频控拦截。
 5. `merchantCategoryControl.deniedMccCodes` / `allowedMccCodes`、`merchantCountryControl.deniedCountryCodes` / `allowedCountryCodes`、`cardDataInputCapabilityControl.deniedCardDataInputCapabilities` / `allowedCardDataInputCapabilities`、`cardTransactionProcessingTypeControl.deniedCardTransactionProcessingTypes` / `allowedCardTransactionProcessingTypes`、`merchantIdControl.deniedMerchantIds` / `allowedMerchantIds`、`panEntryModeControl.deniedPanEntryModes` / `allowedPanEntryModes`、`pointOfServiceCategoryControl.deniedPointOfServiceCategories` / `allowedPointOfServiceCategories` 和 `postalCodeVerificationControl.deniedVerificationResults` / `allowedVerificationResults` 缺省时按空集合处理；黑名单命中优先拒绝，白名单非空且未命中时拒绝。CVV 必填规则只接收 `cvvProvided` 布尔事实，AVS 邮编校验只接收 `MATCH` / `NO_MATCH` 等校验结果事实，不接收或保存 CVV、邮编或街道地址原文。
@@ -405,7 +412,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 8. Highnote 页面中的 maximum amount variance on credit limit、maximum percent variance on credit limit、conditional rule、deposit amount、deposit count、deposit processing network 和 street address 等规则类型当前不进入 wallet evaluator：信用额度浮动类规则由授信 / 风控专项承接，conditional rule 不进入单条 evaluator，外部确认入金由 `transaction` 外部资金事件入口承接，街道地址原文不得进入资金底座，地址类控制只接收外部 AVS / 邮编校验结果事实。
 9. 若发现需要新增数据库字段、规则运营后台、外部风控协议、协同授权 webhook、rolling amount、cooldown、强一致频控拦截、生产 DDL / 索引校验、挂载容量硬约束或复杂多规则裁决，应停止当前最小 evaluator，拆成独立工程边界。
 
-当前能力：接入口径已同步为“上游决策、wallet 固化证据、transaction 消费快照”；轻量 evaluator 已落地单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果代码切片；控制窗口以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，证明跨周期、跨账户、跨控制范围不串账，且准入 / 授权公共契约、控制流水和投影统一使用 `controlScopeId`；外部 approve / decline 决策证据准入已确认外部拒绝无资金事实副作用，外部通过仍不得绕过支付工具、账户能力和资金责任校验；多规则裁决当前只消费最终决策流水、结果、摘要和拒绝原因，不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段；挂载范围已支持 `ACCOUNT_HIERARCHY` 并明确 Highnote 对象只映射为控制 scope，不成为资金主体或账本主体；币种控制和本地授权时间窗口 evaluator 已明确时间由调用方按业务或规则时区归一化后传入；滚动窗口次数 evaluator 以请求授权时间锚定窗口，只读既有控制流水，不提供并发强一致频控拦截。后续仍不扩展规则引擎、时区换算、节假日、rolling amount、cooldown、生产调度、强一致频控拦截、webhook、外部风控协议、多规则明细落库、授权用户主数据或卡产品主数据。
+当前能力：接入口径已同步为“上游可信决策方裁决并固化、wallet 解析 binding 并回读验真、transaction 消费准入快照”；轻量 evaluator 已落地单笔限额、周期金额、周期次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填和 AVS 邮编校验结果代码切片；控制窗口以 `controlScopeId + periodId` 直接定位当前或历史控制窗口，且准入 / 授权公共契约、控制流水和投影统一使用 `controlScopeId`；外部 approve / decline 先由可信适配方写入决策记录，wallet 已证明裸结果 / 摘要不放行、外部拒绝无资金事实副作用、外部通过仍不得绕过支付工具、账户能力和资金责任校验；多个适用 binding 当前 fail-closed，尚未新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段；挂载管理支持 `ACCOUNT_HIERARCHY`，但当前准入契约没有可信层级标识，不能自行解析该 scope；币种控制和本地授权时间窗口 evaluator 已明确时间由调用方按业务或规则时区归一化后传入；滚动窗口次数 evaluator 以请求授权时间锚定窗口，只读既有控制流水，不提供并发强一致频控拦截。`controlScopeId` 仍来自请求，生产调用方若可省略该字段就可能规避 `SPEND_CONTROL_SCOPE` 挂载，因此必须由可信 facade 强制提供或后续改为 wallet 从内部关系派生；该门禁未关闭前不得声明所有 scope 已实现完全自治解析。
 
 ## 13. 产品到架构和 TDD 交接
 

@@ -7,7 +7,6 @@ import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.util.Map;
 import java.util.Objects;
@@ -19,17 +18,13 @@ import java.util.Objects;
 @FieldNameConstants
 public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
                                                     @Nullable SubjectRef parentAccountRef,
-                                                    @Nullable SubjectRef rootAccountRef,
                                                     Map<String, Object> contextVariables)
         implements AccountHierarchySnapshotSpec {
 
     public ImmutableAccountHierarchySnapshotSpec {
         requireAccountSubject(accountRef, "account hierarchy");
         requireOptionalAccountSubject(parentAccountRef, "parent account");
-        requireOptionalAccountSubject(rootAccountRef, "root account");
         requireCompatibleRelation(accountRef, parentAccountRef, "parent account");
-        requireCompatibleRelation(accountRef, rootAccountRef, "root account");
-        requireCompatibleRelation(parentAccountRef, rootAccountRef);
         contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "accountHierarchySnapshot");
     }
 
@@ -44,11 +39,6 @@ public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
     }
 
     @Override
-    public @Nullable SubjectRef getRootAccountRef() {
-        return rootAccountRef;
-    }
-
-    @Override
     public @NonNull Map<String, Object> getContextVariables() {
         return contextVariables;
     }
@@ -60,7 +50,9 @@ public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
     }
 
     private static void requireAccountSubject(@Nullable SubjectRef subjectRef, String label) {
-        if (subjectRef == null || !StringUtils.hasText(subjectRef.getSubjectId())) {
+        if (subjectRef == null
+                || subjectRef.getSubjectId() == null
+                || subjectRef.getSubjectId().isBlank()) {
             throw new IllegalArgumentException(label + " subject is required");
         }
         if (subjectRef.getSubjectType() != FundsSubjectType.FUNDING_ACCOUNT
@@ -83,19 +75,6 @@ public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
         }
         if (!compatible(accountRef.getCurrency(), relationRef.getCurrency())) {
             throw new IllegalArgumentException(label + " currency must match account currency");
-        }
-    }
-
-    private static void requireCompatibleRelation(@Nullable SubjectRef parentAccountRef,
-                                                  @Nullable SubjectRef rootAccountRef) {
-        if (parentAccountRef == null || rootAccountRef == null) {
-            return;
-        }
-        if (!compatible(parentAccountRef.getTenantId(), rootAccountRef.getTenantId())) {
-            throw new IllegalArgumentException("root account tenant must match parent account tenant");
-        }
-        if (!compatible(parentAccountRef.getCurrency(), rootAccountRef.getCurrency())) {
-            throw new IllegalArgumentException("root account currency must match parent account currency");
         }
     }
 

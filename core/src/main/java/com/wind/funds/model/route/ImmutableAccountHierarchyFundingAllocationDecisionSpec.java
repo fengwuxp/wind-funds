@@ -9,7 +9,6 @@ import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.util.Objects;
 
@@ -38,7 +37,7 @@ public record ImmutableAccountHierarchyFundingAllocationDecisionSpec(String allo
             throw new IllegalArgumentException("funding allocation amount must be positive");
         }
         FundingAllocationDecisionValidator.requireSubjectAmountCurrency(subjectRef, amount);
-        if (!StringUtils.hasText(reason)) {
+        if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("funding allocation reason is required");
         }
         validateAccountHierarchySnapshot(subjectRef, accountHierarchySnapshot);

@@ -78,7 +78,7 @@ class RouteSnapshotJsonSupportTests {
      * 场景：VCC 共享卡经支付工具路由后，实际资金责任落到子信用账户。
      * 输入：RouteSnapshot routingDecision 的 funding allocation 携带账户层级快照。
      * 输出：JSON 往返后的 RouteSnapshot。
-     * 预期：子账户、父账户和根账户不丢失。
+     * 预期：子账户和直接父账户不丢失。
      * 红线：交易事实快照必须能支撑共享卡按卡、按子账户、按主账户追溯，且不得保存完整卡号。
      */
     @Test
@@ -101,8 +101,6 @@ class RouteSnapshotJsonSupportTests {
                 .doesNotContainKey("description");
         assertThat(serializedHierarchy.getJSONObject("parentAccountRef"))
                 .doesNotContainKey("description");
-        assertThat(serializedHierarchy.getJSONObject("rootAccountRef"))
-                .doesNotContainKey("description");
         assertThat(parsed.getRoutingDecision().getFundingAllocations()).singleElement()
                 .satisfies(allocation -> {
                     assertThat(allocation.getSubjectRef().getSubjectType())
@@ -113,9 +111,6 @@ class RouteSnapshotJsonSupportTests {
                     assertThat(hierarchySnapshot.getAccountRef().getSubjectId()).isEqualTo("VCC-CREDIT-SUB-001");
                     assertThat(hierarchySnapshot.getParentAccountRef()).isNotNull();
                     assertThat(hierarchySnapshot.getParentAccountRef().getSubjectId())
-                            .isEqualTo("VCC-CREDIT-MAIN-001");
-                    assertThat(hierarchySnapshot.getRootAccountRef()).isNotNull();
-                    assertThat(hierarchySnapshot.getRootAccountRef().getSubjectId())
                             .isEqualTo("VCC-CREDIT-MAIN-001");
                     assertThat(hierarchySnapshot.getContextVariables())
                             .containsEntry("instrumentId", "VCC-CARD-001")
@@ -161,7 +156,6 @@ class RouteSnapshotJsonSupportTests {
         AccountHierarchySnapshotSpec hierarchySnapshot = ImmutableAccountHierarchySnapshotSpec.builder()
                 .accountRef(childCreditAccount)
                 .parentAccountRef(subject("VCC-CREDIT-MAIN-001", FundsSubjectType.CREDIT_ACCOUNT))
-                .rootAccountRef(subject("VCC-CREDIT-MAIN-001", FundsSubjectType.CREDIT_ACCOUNT))
                 .contextVariables(Map.of(
                         "instrumentId", "VCC-CARD-001",
                         "instrumentType", "VCC_SHARED_CARD"))

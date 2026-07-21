@@ -8,7 +8,6 @@ import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 /**
  * 不可变资金来源决策明细实现。
@@ -31,7 +30,7 @@ public record ImmutableFundingAllocationDecisionSpec(String allocationId,
             throw new IllegalArgumentException("funding allocation amount must be positive");
         }
         FundingAllocationDecisionValidator.requireSubjectAmountCurrency(subjectRef, amount);
-        if (!StringUtils.hasText(reason)) {
+        if (reason == null || reason.isBlank()) {
             throw new IllegalArgumentException("funding allocation reason is required");
         }
     }

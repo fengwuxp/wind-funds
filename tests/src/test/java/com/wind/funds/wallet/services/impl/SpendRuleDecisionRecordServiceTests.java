@@ -147,6 +147,46 @@ class SpendRuleDecisionRecordServiceTests extends AbstractFundsServiceTest {
     }
 
     /**
+     * 场景：调用方尝试把无适用规则结果伪装成持久化规则决策。
+     * 输入：有效规则和挂载，但 decisionResult=NO_APPLICABLE_RULE。
+     * 输出：决策记录写入口拒绝，不创建记录。
+     * 红线：NO_APPLICABLE_RULE 只能由 wallet 基于当前 binding 查询显式形成，不能由上游自报。
+     */
+    @Test
+    void testRecordDecisionShouldRejectCallerProvidedNoApplicableRule() {
+        prepareRuleVersionAndBinding();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(rejectedDecisionRequest()
+                .setDecisionResult(SpendControlDecisionResult.NO_APPLICABLE_RULE)
+                .setRejectReason(null)))
+                .hasMessageContaining("只允许 PASSED 或 REJECTED");
+
+        assertThat(countDecisionRecords()).isZero();
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：决策写入请求租户与当前线程租户不一致。
+     * 输入：线程租户为 1，请求 tenantId 为 2。
+     * 输出：写入口在读取规则或 binding 前拒绝，不创建决策记录。
+     * 红线：trusted writer 的部署鉴权不能替代 wallet 服务层租户一致性校验。
+     */
+    @Test
+    void testRecordDecisionShouldRejectTenantMismatch() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendRuleDecisionRecordService.recordDecision(
+                rejectedDecisionRequest().setTenantId(TENANT_ID + 1)))
+                .hasMessageContaining("Spend Rule 决策写入 tenantId 与当前租户不一致");
+
+        assertThat(countDecisionRecords()).isZero();
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：调用方误用标准基础服务做租户级决策记录扫描。
      * 输入：只传 tenantId。
      * 输出：查询被拒绝。

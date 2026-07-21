@@ -32,7 +32,7 @@ public enum LedgerPostingAccessType implements DescriptiveEnum {
         }
         return switch (intent) {
             case AUTHORIZATION_REVERSAL,
-                    AUTHORIZATION_SETTLEMENT,
+                    AUTHORIZATION_COMPLETION,
                     SETTLEMENT,
                     REFUND,
                     REVERSAL,

@@ -34,6 +34,7 @@ import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
+import com.wind.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
@@ -59,6 +60,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * RouteSnapshot 回放解析边界测试。
@@ -385,6 +387,150 @@ class DefaultRouteReplayServiceTests {
                 .hasMessageContaining("部分退款原币金额必须小于原支付原币金额");
     }
 
+    @Test
+    void testPartialAuthorizationCompletionShouldScaleRoutingDecisionAllocations() {
+        SubjectRef payer = fundingAccount("PAYER-PARTIAL-001");
+        SubjectRef secondaryFundingAccount = fundingAccount("PAYER-PARTIAL-002");
+        SubjectRef parentFundingAccount = fundingAccount("PAYER-PARTIAL-PARENT");
+        AccountHierarchySnapshotSpec hierarchySnapshot = accountHierarchySnapshot(secondaryFundingAccount,
+                parentFundingAccount);
+        RouteLegSpec authorizationLeg = ImmutableRouteLegSpec.builder()
+                .legId("AUTHORIZATION_PARTIAL")
+                .sequence(1)
+                .legType(RouteLegType.HOLD)
+                .sourceNode(routeNode(payer, RouteNodeRole.SOURCE, LedgerSubjectCode.AVAILABLE))
+                .targetNode(routeNode(payer, RouteNodeRole.TARGET, LedgerSubjectCode.AUTHORIZATION))
+                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
+                .balanceEffectType(LedgerBalanceEffectType.HOLD)
+                .phaseCode(LedgerPhaseCode.AUTHORIZATION)
+                .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
+                .constraintOverrides(Map.of())
+                .contextVariables(Map.of())
+                .build();
+        RoutingDecisionSpec routingDecision = ImmutableRoutingDecisionSpec.builder()
+                .policyCode("PARTIAL_COMPLETION_POLICY")
+                .matchedRules(List.of("PRIMARY_THEN_SECONDARY"))
+                .selectedProcessor("ORIGINAL_PROCESSOR")
+                .selectedCashFundingAccount(payer.getSubjectId())
+                .selectedPlatformAccount("SETTLEMENT-001")
+                .fundingAllocations(List.of(
+                        ImmutableFundingAllocationDecisionSpec.builder()
+                                .allocationId("ALLOC_PRIMARY")
+                                .subjectRef(payer)
+                                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                                .amount(Money.immutable(40L, CurrencyIsoCode.USD))
+                                .priority(1)
+                                .reason("primary funding allocation")
+                                .build(),
+                        ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
+                                .allocationId("ALLOC_SECONDARY")
+                                .subjectRef(secondaryFundingAccount)
+                                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                                .amount(Money.immutable(60L, CurrencyIsoCode.USD))
+                                .accountHierarchySnapshot(hierarchySnapshot)
+                                .priority(2)
+                                .reason("secondary funding allocation")
+                                .build()))
+                .decisionReason("original split funding decision")
+                .contextVariables(Map.of("decisionVersion", 3))
+                .build();
+        RouteSnapshotSpec snapshot = routeSnapshot(null,
+                null,
+                routingDecision,
+                List.of(participant(RouteParticipantRole.PAYER, payer)),
+                List.of(authorizationLeg),
+                Map.of());
+
+        ResolvedRouteSpec resolvedRoute = routeReplayService.replay(snapshot,
+                ImmutableReplayRequestSpec.builder()
+                        .replayType(RouteReplayType.AUTHORIZATION_COMPLETION)
+                        .eventType(FundsTransactionEventType.COMPLETE)
+                        .businessScene("AUTHORIZATION_COMPLETE")
+                        .businessSn("AUTHORIZATION_PARTIAL_COMPLETE_001")
+                        .referenceSnapshotId(snapshot.getSnapshotId())
+                        .amount(Money.immutable(60L, CurrencyIsoCode.USD))
+                        .originalAmount(Money.immutable(60L, CurrencyIsoCode.USD))
+                        .exchangeRate(BigDecimal.ONE)
+                        .eventTime(LocalDateTime.of(2026, 5, 19, 2, 0))
+                        .contextVariables(Map.of())
+                        .build());
+
+        assertThat(resolvedRoute.getLegs()).singleElement()
+                .extracting(RouteLegSpec::getAmount)
+                .isEqualTo(Money.immutable(60L, CurrencyIsoCode.USD));
+        RoutingDecisionSpec replayDecision = resolvedRoute.getRoutingDecision();
+        assertThat(replayDecision).isNotNull();
+        assertThat(replayDecision.getFundingAllocations())
+                .extracting(allocation -> allocation.getAmount().getAmount())
+                .containsExactly(24L, 36L);
+        assertThat(replayDecision.getFundingAllocations().stream()
+                .mapToLong(allocation -> allocation.getAmount().getAmount())
+                .sum()).isEqualTo(60L);
+        assertThat(replayDecision.getPolicyCode()).isEqualTo("PARTIAL_COMPLETION_POLICY");
+        assertThat(replayDecision.getMatchedRules()).containsExactly("PRIMARY_THEN_SECONDARY");
+        assertThat(replayDecision.getSelectedProcessor()).isEqualTo("ORIGINAL_PROCESSOR");
+        assertThat(replayDecision.getSelectedCashFundingAccount()).isEqualTo(payer.getSubjectId());
+        assertThat(replayDecision.getSelectedPlatformAccount()).isEqualTo("SETTLEMENT-001");
+        assertThat(replayDecision.getDecisionReason()).isEqualTo("original split funding decision");
+        assertThat(replayDecision.getContextVariables()).containsEntry("decisionVersion", 3);
+        assertThat(replayDecision.getFundingAllocations().get(1).getAccountHierarchySnapshot())
+                .isSameAs(hierarchySnapshot);
+    }
+
+    @Test
+    void testSelectiveAuthorizationCompletionWithMultipleAllocationsShouldFailClosed() {
+        SubjectRef primaryAccount = fundingAccount("PAYER-SELECTIVE-001");
+        SubjectRef secondaryAccount = fundingAccount("PAYER-SELECTIVE-002");
+        RouteLegSpec primaryLeg = authorizationHoldLeg("AUTHORIZATION_PRIMARY", primaryAccount, 50L);
+        RouteLegSpec secondaryLeg = authorizationHoldLeg("AUTHORIZATION_SECONDARY", secondaryAccount, 50L);
+        RoutingDecisionSpec routingDecision = splitRoutingDecision(List.of(
+                fundingAllocation("ALLOC_PRIMARY", primaryAccount, 50L, 1),
+                fundingAllocation("ALLOC_SECONDARY", secondaryAccount, 50L, 2)));
+        RouteSnapshotSpec snapshot = routeSnapshot(null,
+                null,
+                routingDecision,
+                List.of(participant(RouteParticipantRole.PAYER, primaryAccount),
+                        participant(RouteParticipantRole.REAL_FUNDING_SOURCE, secondaryAccount)),
+                List.of(primaryLeg, secondaryLeg),
+                Map.of());
+
+        assertThatThrownBy(() -> routeReplayService.replay(snapshot,
+                partialCompletionRequest(snapshot, 50L, List.of(primaryLeg.getLegId()),
+                        "AUTHORIZATION_SELECTIVE_COMPLETE_001")))
+                .hasMessageContaining("部分选择 RouteLeg 时不能重建多资金分配决策");
+    }
+
+    @Test
+    void testPartialAuthorizationCompletionShouldDistributeIndivisibleRemainderCumulatively() {
+        SubjectRef firstAccount = fundingAccount("PAYER-INDIVISIBLE-001");
+        SubjectRef secondAccount = fundingAccount("PAYER-INDIVISIBLE-002");
+        SubjectRef thirdAccount = fundingAccount("PAYER-INDIVISIBLE-003");
+        RouteLegSpec authorizationLeg = authorizationHoldLeg("AUTHORIZATION_INDIVISIBLE", firstAccount, 3L);
+        RoutingDecisionSpec routingDecision = splitRoutingDecision(List.of(
+                fundingAllocation("ALLOC_FIRST", firstAccount, 1L, 1),
+                fundingAllocation("ALLOC_SECOND", secondAccount, 1L, 2),
+                fundingAllocation("ALLOC_THIRD", thirdAccount, 1L, 3)));
+        RouteSnapshotSpec snapshot = routeSnapshot(null,
+                null,
+                routingDecision,
+                List.of(participant(RouteParticipantRole.PAYER, firstAccount)),
+                List.of(authorizationLeg),
+                Map.of());
+
+        ResolvedRouteSpec resolvedRoute = routeReplayService.replay(snapshot,
+                partialCompletionRequest(snapshot, 2L, List.of(), "AUTHORIZATION_INDIVISIBLE_COMPLETE_001"));
+
+        assertThat(resolvedRoute.getRoutingDecision().getFundingAllocations())
+                .extracting(allocation -> allocation.getAllocationId(),
+                        allocation -> allocation.getAmount().getAmount())
+                .containsExactly(tuple("ALLOC_SECOND", 1L), tuple("ALLOC_THIRD", 1L));
+        assertThat(resolvedRoute.getRoutingDecision().getFundingAllocations())
+                .allSatisfy(allocation -> assertThat(allocation.getAmount().getAmount()).isLessThanOrEqualTo(1L));
+        assertThat(resolvedRoute.getRoutingDecision().getFundingAllocations().stream()
+                .mapToLong(allocation -> allocation.getAmount().getAmount())
+                .sum()).isEqualTo(2L);
+    }
+
     private FundsInstructionSpec replayInstruction(FundsInstructionReferenceSpec reference) {
         return replayInstruction(reference, null);
     }
@@ -447,17 +593,41 @@ class DefaultRouteReplayServiceTests {
     }
 
     private ImmutableRouteLegSpec authorizationHoldLeg(SubjectRef payer) {
+        return authorizationHoldLeg("AUTHORIZATION_1", payer, 80L);
+    }
+
+    private ImmutableRouteLegSpec authorizationHoldLeg(String legId, SubjectRef payer, long amount) {
         return ImmutableRouteLegSpec.builder()
-                .legId("AUTHORIZATION_1")
+                .legId(legId)
                 .sequence(1)
                 .legType(RouteLegType.HOLD)
                 .sourceNode(routeNode(payer, RouteNodeRole.SOURCE, LedgerSubjectCode.AVAILABLE))
                 .targetNode(routeNode(payer, RouteNodeRole.TARGET, LedgerSubjectCode.AUTHORIZATION))
-                .amount(Money.immutable(80L, CurrencyIsoCode.USD))
+                .amount(Money.immutable(amount, CurrencyIsoCode.USD))
                 .balanceEffectType(LedgerBalanceEffectType.HOLD)
                 .phaseCode(LedgerPhaseCode.AUTHORIZATION)
                 .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
                 .constraintOverrides(Map.of())
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private ImmutableReplayRequestSpec partialCompletionRequest(RouteSnapshotSpec snapshot,
+                                                                long amount,
+                                                                List<String> replayLegIds,
+                                                                String businessSn) {
+        Money replayAmount = Money.immutable(amount, CurrencyIsoCode.USD);
+        return ImmutableReplayRequestSpec.builder()
+                .replayType(RouteReplayType.AUTHORIZATION_COMPLETION)
+                .eventType(FundsTransactionEventType.COMPLETE)
+                .businessScene("AUTHORIZATION_COMPLETE")
+                .businessSn(businessSn)
+                .referenceSnapshotId(snapshot.getSnapshotId())
+                .amount(replayAmount)
+                .originalAmount(replayAmount)
+                .exchangeRate(BigDecimal.ONE)
+                .replayLegIds(replayLegIds)
+                .eventTime(LocalDateTime.of(2026, 5, 19, 2, 30))
                 .contextVariables(Map.of())
                 .build();
     }
@@ -605,7 +775,6 @@ class DefaultRouteReplayServiceTests {
         return ImmutableAccountHierarchySnapshotSpec.builder()
                 .accountRef(accountRef)
                 .parentAccountRef(parentAccountRef)
-                .rootAccountRef(parentAccountRef)
                 .contextVariables(Map.of("cardBindingVersion", 1, "cardFundingMode", "SHARED"))
                 .build();
     }
@@ -657,6 +826,30 @@ class DefaultRouteReplayServiceTests {
                         .build()))
                 .decisionReason("original route snapshot")
                 .contextVariables(Map.of("snapshot", allocationId))
+                .build();
+    }
+
+    private RoutingDecisionSpec splitRoutingDecision(List<FundingAllocationDecisionSpec> allocations) {
+        return ImmutableRoutingDecisionSpec.builder()
+                .policyCode("SPLIT_FUNDING_POLICY")
+                .matchedRules(List.of("SPLIT_FUNDING"))
+                .fundingAllocations(allocations)
+                .decisionReason("split funding decision")
+                .contextVariables(Map.of())
+                .build();
+    }
+
+    private FundingAllocationDecisionSpec fundingAllocation(String allocationId,
+                                                             SubjectRef account,
+                                                             long amount,
+                                                             int priority) {
+        return ImmutableFundingAllocationDecisionSpec.builder()
+                .allocationId(allocationId)
+                .subjectRef(account)
+                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
+                .amount(Money.immutable(amount, CurrencyIsoCode.USD))
+                .priority(priority)
+                .reason("split funding allocation")
                 .build();
     }
 

@@ -162,7 +162,6 @@ public class AccountHierarchyServiceImpl implements AccountHierarchyService, Acc
                         parentAccount.accountId(),
                         parentAccount.accountType(),
                         parentAccount.currency()),
-                null,
                 parseContextVariables(request.getContextVariables()));
     }
 

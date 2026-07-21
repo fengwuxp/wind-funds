@@ -90,7 +90,7 @@ public interface FundsTransactionConverter {
     private void initSummaryAmounts(FundsTransaction entity) {
         entity.setAuthorizedAmount(0L);
         entity.setReversedAmount(0L);
-        entity.setSettledAmount(0L);
+        entity.setCompletedAmount(0L);
         entity.setRefundedAmount(0L);
         entity.setDeclinedAmount(0L);
         entity.setFeeAmount(0L);

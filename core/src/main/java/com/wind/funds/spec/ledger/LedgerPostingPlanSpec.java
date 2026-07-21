@@ -11,7 +11,6 @@ import com.wind.transaction.core.Money;
 import jakarta.validation.constraints.NotNull;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.beans.Transient;
 import java.util.List;
@@ -122,10 +121,10 @@ public interface LedgerPostingPlanSpec {
     }
 
     private static boolean isPostableEntry(@NonNull LedgerEntrySpec entry) {
-        return StringUtils.hasText(entry.getSubjectId())
-                && StringUtils.hasText(entry.getSubjectType())
+        return entry.getSubjectId() != null && !entry.getSubjectId().isBlank()
+                && entry.getSubjectType() != null && !entry.getSubjectType().isBlank()
                 && FundsSubjectType.isLedgerPostableName(entry.getSubjectType())
-                && StringUtils.hasText(entry.getLedgerTransactionSn())
+                && entry.getLedgerTransactionSn() != null && !entry.getLedgerTransactionSn().isBlank()
                 && entry.getPostingRole() != LedgerPostingRole.AGGREGATE_VIEW
                 && isPositiveEntryAmount(entry);
     }

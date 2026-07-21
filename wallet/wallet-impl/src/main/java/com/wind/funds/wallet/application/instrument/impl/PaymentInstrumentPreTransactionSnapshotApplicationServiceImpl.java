@@ -48,7 +48,13 @@ public class PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl
         PaymentInstrumentCapabilityDecisionDTO instrumentDecision = resolvePaymentInstrument(request);
         FundingResponsibilityDecisionDTO fundingDecision = resolveFundingResponsibility(request, instrumentDecision);
         assertBindingMatchesFundingSubject(instrumentDecision, fundingDecision);
+        FundsAccountId boundAccountId = resolveBoundAccountId(instrumentDecision);
         FundsAccountId targetAccountId = resolveTargetAccountId(fundingDecision);
+        if (!boundAccountId.equals(targetAccountId)) {
+            FundsAccountCapabilityDecisionDTO boundAccountDecision =
+                    resolveFundsAccountCapability(request, boundAccountId);
+            assertAccountCapabilitySupportsAction(request, boundAccountDecision);
+        }
         FundsAccountCapabilityDecisionDTO accountDecision = resolveFundsAccountCapability(request, targetAccountId);
         assertAccountCapabilitySupportsAction(request, accountDecision);
         return toSnapshot(request, instrumentDecision, fundingDecision, targetAccountId, accountDecision);
@@ -113,6 +119,16 @@ public class PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl
                 "预交易快照资金责任目标只能是资金账户或信用账户，targetSubjectType = {}",
                 fundingDecision.getTargetSubjectType());
         return FundsAccountId.immutable(fundingDecision.getTargetSubjectId(), fundingDecision.getTargetSubjectType());
+    }
+
+    private FundsAccountId resolveBoundAccountId(PaymentInstrumentCapabilityDecisionDTO instrumentDecision) {
+        AssertUtils.notNull(instrumentDecision.getSubjectType(), "支付工具绑定主体类型不能为空");
+        AssertUtils.hasText(instrumentDecision.getSubjectId(), "支付工具绑定主体 ID 不能为空");
+        AssertUtils.isTrue(instrumentDecision.getSubjectType() == FundsSubjectType.FUNDING_ACCOUNT
+                        || instrumentDecision.getSubjectType() == FundsSubjectType.CREDIT_ACCOUNT,
+                "支付工具绑定主体只能是资金账户或信用账户，subjectType = {}",
+                instrumentDecision.getSubjectType());
+        return FundsAccountId.immutable(instrumentDecision.getSubjectId(), instrumentDecision.getSubjectType());
     }
 
     private FundsAccountCapabilityDecisionDTO resolveFundsAccountCapability(

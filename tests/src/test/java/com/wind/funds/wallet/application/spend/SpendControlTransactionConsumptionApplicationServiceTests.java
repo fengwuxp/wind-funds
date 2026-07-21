@@ -296,7 +296,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
     /**
      * 场景：VCC 退款找不到原控制流水，但业务侧确认支付工具、周期和金额可以补偿。
-     * 输入：当前周期已有 100 控制额度、60 控制消费，业务确认补偿 40。
+     * 输入：当前周期已有 100 控制额度、100 控制占用、60 控制消费，业务确认补偿 20。
      * 输出：记录 REFUND_COMPENSATED 控制补偿流水，不要求原控制流水或资金交易流水。
      * 红线：业务确认型控制补偿不得创建资金交易、route、posting、LedgerEntry 或账本余额投影事实。
      */
@@ -306,7 +306,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         SpendControlAdmissionDecisionDTO decision = admittedDecision();
         spendControlMovementService.recordMovement(limitIncreaseRequest());
         spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
-                SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
+                SpendControlMovementType.RESERVED, "sha256:sctc-reserved").setAmount(100L));
         spendControlMovementService.recordMovement(recordRequest(decision, CONSUME_ACTIVITY_SN,
                 SpendControlMovementType.CONSUMED, "sha256:sctc-consumed")
                 .setOriginalMovementSn(RESERVED_ACTIVITY_SN)
@@ -315,22 +315,24 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
         SpendControlMovementDTO activity =
                 spendControlTransactionConsumptionApplicationService.compensateBusinessConfirmedRefund(
-                        confirmedRefundRequest(CONFIRMED_REFUND_ACTIVITY_SN));
+                        confirmedRefundRequest(CONFIRMED_REFUND_ACTIVITY_SN).setAmount(20L));
 
         assertThat(activity.getMovementSn()).isEqualTo(CONFIRMED_REFUND_ACTIVITY_SN);
         assertThat(activity.getMovementType()).isEqualTo(SpendControlMovementType.REFUND_COMPENSATED);
         assertThat(activity.getOriginalMovementSn()).isNull();
         assertThat(activity.getTransactionSn()).isNull();
         assertThat(activity.getAuditReferenceSn()).isEqualTo("audit_sctc_confirmed_refund");
-        assertThat(activity.getAmount()).isEqualTo(40L);
+        assertThat(activity.getAmount()).isEqualTo(20L);
         assertThat(activity.getMovementDigest()).startsWith("sha256:");
 
         BudgetControlProjectionDTO projection = spendControlMovementService.getBudgetControlProjection(
                 projectionQuery());
         assertThat(projection.getLimitAmount()).isEqualTo(100L);
-        assertThat(projection.getConsumedAmount()).isEqualTo(20L);
+        assertThat(projection.getReservedAmount()).isEqualTo(100L);
+        assertThat(queryActivity(CONSUME_ACTIVITY_SN).getAmount()).isEqualTo(60L);
+        assertThat(projection.getConsumedAmount()).isEqualTo(40L);
         assertThat(projection.getRemainingControlAmount()).isEqualTo(40L);
-        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(20L);
         assertThat(activityCount(CONFIRMED_REFUND_ACTIVITY_SN)).isOne();
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isZero();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -554,9 +556,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     /**
-     * 场景：两个线程并发消费同一控制额度变动流水且摘要相同。
+     * 场景：三个线程并发消费同一控制额度变动流水且摘要相同。
      * 输入：已有 RESERVED 控制额度变动和已存在的成功资金交易事实。
-     * 输出：只有一条 CONSUMED 控制额度变动，两个调用都回到同一变动事实。
+     * 输出：只有一条 CONSUMED 控制额度变动，三个调用都回到同一变动事实。
      * 红线：并发唯一键冲突必须按幂等回读处理，不得抛出数据库异常或生成重复资金、route、posting、账本事实。
      */
     @Test
@@ -567,8 +569,9 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
                 SpendControlMovementType.RESERVED, "sha256:sctc-reserved"));
         insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 60L, CurrencyIsoCode.USD);
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        SpendControlTransactionConsumptionApplicationService concurrentService = concurrentConsumptionService(2);
-        ExecutorService executor = Executors.newFixedThreadPool(2);
+        int versionBeforeConsumption = creditAccountVersion();
+        SpendControlTransactionConsumptionApplicationService concurrentService = concurrentConsumptionService(3);
+        ExecutorService executor = Executors.newFixedThreadPool(3);
         try {
             Callable<SpendControlMovementDTO> command = () -> withTenant(() -> concurrentService.consume(
                     consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
@@ -576,12 +579,16 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
 
             Future<SpendControlMovementDTO> first = executor.submit(command);
             Future<SpendControlMovementDTO> second = executor.submit(command);
+            Future<SpendControlMovementDTO> third = executor.submit(command);
 
             SpendControlMovementDTO firstActivity = first.get(10, TimeUnit.SECONDS);
             SpendControlMovementDTO secondActivity = second.get(10, TimeUnit.SECONDS);
+            SpendControlMovementDTO thirdActivity = third.get(10, TimeUnit.SECONDS);
             assertThat(firstActivity.getId()).isEqualTo(secondActivity.getId());
+            assertThat(firstActivity.getId()).isEqualTo(thirdActivity.getId());
             assertThat(firstActivity.getMovementType()).isEqualTo(SpendControlMovementType.CONSUMED);
             assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
+            assertThat(creditAccountVersion()).isEqualTo(versionBeforeConsumption + 1);
             assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
             assertLedgerFactsUnchanged(jdbcTemplate, before);
         } finally {
@@ -654,7 +661,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     /**
      * 场景：退款交易成功后对已消费 Spend Rule 控制额度变动做补偿。
      * 输入：已有 RESERVED、CONSUMED 控制额度变动和成功退款资金交易事实。
-     * 输出：记录 REFUND_COMPENSATED 控制额度变动，并按净消费更新预算控制投影。
+     * 输出：记录 REFUND_COMPENSATED 控制额度变动，减少净消费但不恢复已消费的控制占用。
      * 红线：退款补偿只消费既有退款事实，不新增交易、route、posting 或支付工具 REFUND 方向。
      */
     @Test
@@ -688,7 +695,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
         assertThat(projection.getConsumedAmount()).isEqualTo(20L);
         assertThat(projection.getReleasedAmount()).isZero();
-        assertThat(projection.getRemainingControlAmount()).isEqualTo(40L);
+        assertThat(projection.getRemainingControlAmount()).isZero();
         assertThat(projection.getLastMovementSn()).isEqualTo(REFUND_ACTIVITY_SN);
 
         assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
@@ -998,6 +1005,44 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     /**
+     * 场景：退款补偿后再次消费同一原控制占用。
+     * 输入：原占用 100，已消费 60、退款补偿 20，再尝试消费 50。
+     * 输出：第二次消费按总消费后的剩余占用 40 拒绝，不把退款补偿当作恢复控制占用。
+     * 红线：退款只减少净消费，不得重新打开已消费的 authorization reservation。
+     */
+    @Test
+    void testConsumeAfterRefundShouldUseGrossConsumedAmountForRemainingReservation() {
+        prepareSpendControlTransactionConsumptionData();
+        SpendControlAdmissionDecisionDTO decision = admittedDecision();
+        spendControlMovementService.recordMovement(recordRequest(decision, RESERVED_ACTIVITY_SN,
+                SpendControlMovementType.RESERVED, "sha256:sctc-reserved").setAmount(100L));
+        insertSucceededFundsTransaction(FUNDS_TRANSACTION_SN, BUSINESS_SN, 110L, CurrencyIsoCode.USD);
+        spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN, FUNDS_TRANSACTION_SN,
+                        "sha256:sctc-consumed").setAmount(60L));
+        insertFundsTransaction(REFUND_TRANSACTION_SN, "SPEND_CONTROL_TRANSACTION_REFUND_001",
+                DefaultFundsTransactionType.REFUND, FundsTransactionStatus.CLOSED, 20L, CurrencyIsoCode.USD,
+                FUNDS_TRANSACTION_SN);
+        spendControlTransactionConsumptionApplicationService.refund(
+                consumptionRequest(REFUND_ACTIVITY_SN, RESERVED_ACTIVITY_SN, REFUND_TRANSACTION_SN,
+                        "sha256:sctc-refund-compensated").setAmount(20L));
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> spendControlTransactionConsumptionApplicationService.consume(
+                consumptionRequest(SECOND_CONSUME_ACTIVITY_SN, RESERVED_ACTIVITY_SN,
+                        FUNDS_TRANSACTION_SN, "sha256:sctc-post-refund-consumed")
+                        .setAmount(50L)))
+                .hasMessageContaining("控制消费金额超过原占用剩余额度")
+                .hasMessageContaining("remainingControlAmount = 40");
+
+        assertThat(activityCount(SECOND_CONSUME_ACTIVITY_SN)).isZero();
+        assertThat(activityCount(CONSUME_ACTIVITY_SN)).isOne();
+        assertThat(activityCount(REFUND_ACTIVITY_SN)).isOne();
+        assertThat(fundsTransactionCount(FUNDS_TRANSACTION_SN)).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：同一控制额度变动流水被不同摘要重放。
      * 输入：已存在 CONSUMED 控制额度变动，再用同一流水和不同摘要重试。
      * 输出：请求被拒绝，不新增控制额度变动。
@@ -1242,7 +1287,7 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         jdbcTemplate.update("""
                         INSERT INTO t_funds_transaction (
                             sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
-                            reference_transaction_sn, status, amount, currency, authorized_amount, reversed_amount, settled_amount,
+                            reference_transaction_sn, status, amount, currency, authorized_amount, reversed_amount, completed_amount,
                             refunded_amount, declined_amount, fee_amount, version
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0, 0, 0, 0)
                         """,
@@ -1269,6 +1314,14 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
         return jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM t_funds_transaction WHERE tenant_id = ? AND sn = ?",
                 Integer.class, TENANT_ID, transactionSn);
+    }
+
+    private int creditAccountVersion() {
+        return jdbcTemplate.queryForObject(
+                "SELECT version FROM t_credit_account WHERE tenant_id = ? AND sn = ?",
+                Integer.class,
+                TENANT_ID,
+                CREDIT_ACCOUNT_SN);
     }
 
     private SpendControlTransactionConsumptionApplicationService concurrentConsumptionService(int concurrentInserts) {

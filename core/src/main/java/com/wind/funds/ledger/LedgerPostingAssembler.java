@@ -4,7 +4,6 @@ import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.spec.ledger.LedgerTransactionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import org.jspecify.annotations.NonNull;
-import org.springframework.core.Ordered;
 
 /**
  * Route 到 Posting DSL 的翻译器。
@@ -23,7 +22,7 @@ import org.springframework.core.Ordered;
  *   <li>不执行账本写入和余额投影</li>
  * </ul>
  */
-public interface LedgerPostingAssembler<R extends ResolvedRouteSpec> extends Ordered {
+public interface LedgerPostingAssembler<R extends ResolvedRouteSpec> {
 
     /**
      * 生成账本交易。
@@ -51,8 +50,4 @@ public interface LedgerPostingAssembler<R extends ResolvedRouteSpec> extends Ord
      */
     boolean supports(@NonNull ResolvedRouteSpec resolvedRoute);
 
-    @Override
-    default int getOrder() {
-        return 0;
-    }
 }

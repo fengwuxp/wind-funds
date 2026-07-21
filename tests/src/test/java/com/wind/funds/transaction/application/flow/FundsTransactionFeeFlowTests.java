@@ -1,5 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
+import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
@@ -18,7 +19,6 @@ import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
@@ -30,7 +30,15 @@ import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertBucket;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertOnlyBalanceDeltas;
@@ -950,7 +958,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> refundFee(payer, 5L, "FUNDS_TRANSACTION_NOT_EXISTS",
                 "FEE_REFUND_UNKNOWN_SOURCE_RETURN"))
-                .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照");
+                .hasMessageContaining("手续费原费用交易不存在");
 
         BalanceSnapshot afterFailure = snapshot(balances(payer, payee, feeAccount(), cashMappingAccount(),
                 prepaymentAccount()));
@@ -1183,6 +1191,67 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         assertNoFundsOrLedgerFactsForBusinessSn("FEE_REFUND_EXCEED_SECOND_RETURN");
     }
 
+    /**
+     * 场景：同一原费用事实在并发窗口内收到两笔全额退费。
+     * 输入：原手续费 5，平台手续费账户另有足额余额，两个不同业务流水同时退费 5。
+     * 输出：只有一笔退费成功，另一笔按累计退费上限失败且不留下资金或账务事实。
+     * 红线：不同 businessSn 不能绕过同一 feeSourceTransactionSn 的累计金额约束。
+     */
+    @Test
+    void testConcurrentFeeRefundsForSameSourceShouldAllowOnlyOneWinner() throws Exception {
+        FundsAccountId payer = fundingAccount("funding_user");
+        FundsAccountId reservePayer = fundingAccount("fee_refund_reserve");
+        ensureLedger(reservePayer, LedgerSubjectCode.AVAILABLE);
+        topup(payer, 20L, "FEE_REFUND_CONCURRENT_TOPUP");
+        fee(payer, 5L, "FEE_REFUND_CONCURRENT_SOURCE");
+        topup(reservePayer, 40L, "FEE_REFUND_CONCURRENT_RESERVE_TOPUP");
+        fee(reservePayer, 20L, "FEE_REFUND_CONCURRENT_RESERVE_FEE");
+        String feeSourceTransactionSn = ledgerTransactionByBusinessSn("FEE_REFUND_CONCURRENT_SOURCE")
+                .getFundsTransactionSn();
+        BalanceSnapshot beforeRace = snapshot(balances(payer, reservePayer, feeAccount(), cashMappingAccount(),
+                prepaymentAccount()));
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<FeeRefundRaceOutcome> first = executor.submit(() -> raceFeeRefund(ready, start, payer,
+                    feeSourceTransactionSn, "FEE_REFUND_CONCURRENT_FIRST"));
+            Future<FeeRefundRaceOutcome> second = executor.submit(() -> raceFeeRefund(ready, start, payer,
+                    feeSourceTransactionSn, "FEE_REFUND_CONCURRENT_SECOND"));
+            assertThat(ready.await(5, TimeUnit.SECONDS)).as("fee refund race commands are ready").isTrue();
+            start.countDown();
+
+            List<FeeRefundRaceOutcome> outcomes = List.of(awaitFeeRefundOutcome(first),
+                    awaitFeeRefundOutcome(second));
+            List<FeeRefundRaceOutcome> successes = outcomes.stream()
+                    .filter(FeeRefundRaceOutcome::succeeded)
+                    .toList();
+            List<FeeRefundRaceOutcome> failures = outcomes.stream()
+                    .filter(outcome -> !outcome.succeeded())
+                    .toList();
+            assertThat(successes).as("fee refund race outcomes: %s", outcomes).hasSize(1);
+            assertThat(failures).as("fee refund race outcomes: %s", outcomes).hasSize(1);
+            FeeRefundRaceOutcome winner = successes.getFirst();
+            FeeRefundRaceOutcome loser = failures.getFirst();
+            assertThat(loser.failure())
+                    .hasMessageContaining("回放累计金额不能大于原 RouteLeg 金额");
+
+            BalanceSnapshot afterRace = snapshot(balances(payer, reservePayer, feeAccount(), cashMappingAccount(),
+                    prepaymentAccount()));
+            assertOnlyBalanceDeltas(beforeRace, afterRace,
+                    delta(payer, LedgerSubjectCode.AVAILABLE, 5L, CURRENCY),
+                    delta(reservePayer, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
+                    delta(feeAccount(), LedgerSubjectCode.FEE, -5L, CURRENCY),
+                    delta(cashMappingAccount(), LedgerSubjectCode.CASH, 0L, CURRENCY),
+                    delta(prepaymentAccount(), LedgerSubjectCode.PREPAYMENT, 0L, CURRENCY));
+            assertFeeRefundFactsWithFundsTransaction(winner.businessSn(), feeSourceTransactionSn);
+            assertNoFundsOrLedgerFactsForBusinessSn(loser.businessSn());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private void assertRouteSnapshotUnchanged(String businessSn, RouteSnapshotSpec expectedRouteSnapshot) {
         assertThat(routeSnapshot(businessSn))
                 .as("fee route snapshot must not be rewritten for idempotent businessSn %s", businessSn)
@@ -1193,6 +1262,38 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
         return fundsTransactionQueryService.findRouteSnapshotByTransactionSn(transactionSn)
                 .orElseThrow(() -> new AssertionError("missing route snapshot for businessSn " + businessSn));
+    }
+
+    private FeeRefundRaceOutcome raceFeeRefund(CountDownLatch ready,
+                                               CountDownLatch start,
+                                               FundsAccountId accountId,
+                                               String feeSourceTransactionSn,
+                                               String businessSn) {
+        try {
+            ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
+            ready.countDown();
+            awaitRaceStart(start);
+            return FeeRefundRaceOutcome.success(businessSn,
+                    refundFee(accountId, 5L, feeSourceTransactionSn, businessSn));
+        } catch (Throwable failure) {
+            return FeeRefundRaceOutcome.failure(businessSn, failure);
+        } finally {
+            ThreadContextTenantIdHolder.remove();
+        }
+    }
+
+    private static void awaitRaceStart(CountDownLatch start) {
+        try {
+            assertThat(start.await(5, TimeUnit.SECONDS)).as("fee refund race start signal received").isTrue();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(exception);
+        }
+    }
+
+    private static FeeRefundRaceOutcome awaitFeeRefundOutcome(Future<FeeRefundRaceOutcome> future)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        return future.get(10, TimeUnit.SECONDS);
     }
 
     private String refundFeeWithContext(FundsAccountId accountId,
@@ -1261,7 +1362,6 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                     var postingPlanSns = postingPlans.stream()
                             .map(LedgerPostingPlan::getSn)
                             .toList();
-                    assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
                     assertThat(transaction.getFundsTransactionSn()).isEqualTo(transactionSn);
                     assertThat(transaction.getEventType())
                             .isEqualTo(FundsTransactionEventType.FEE_REFUND.name());
@@ -1361,6 +1461,20 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
             return new FeeRefundRouteNodeKey(routeLeg.getTargetNode().getSubjectRef().getSubjectId(),
                     routeLeg.getTargetNode().getSubjectRef().getSubjectType().name(),
                     routeLeg.getTargetNode().getLedgerSubjectCode(), EntrySide.CREDIT);
+        }
+    }
+
+    private record FeeRefundRaceOutcome(String businessSn,
+                                        boolean succeeded,
+                                        String transactionSn,
+                                        Throwable failure) {
+
+        private static FeeRefundRaceOutcome success(String businessSn, String transactionSn) {
+            return new FeeRefundRaceOutcome(businessSn, true, transactionSn, null);
+        }
+
+        private static FeeRefundRaceOutcome failure(String businessSn, Throwable failure) {
+            return new FeeRefundRaceOutcome(businessSn, false, null, failure);
         }
     }
 }

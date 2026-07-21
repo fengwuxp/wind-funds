@@ -1,5 +1,7 @@
 package com.wind.funds.transaction.application.instrument.impl;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
@@ -8,8 +10,13 @@ import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsTransactionMode;
+import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
+import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.instrument.AuthorizationAdmissionApplicationService;
@@ -17,7 +24,6 @@ import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransact
 import com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
-import com.wind.funds.wallet.enums.SpendControlDecisionResult;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentCapabilityDecisionDTO;
 import com.wind.funds.wallet.model.dto.PaymentInstrumentPreTransactionSnapshotDTO;
@@ -25,7 +31,6 @@ import com.wind.funds.wallet.model.dto.SpendControlAdmissionDecisionDTO;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactionSnapshotRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
-import com.wind.funds.wallet.support.SpendRuleDigestValidator;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -37,6 +42,7 @@ import org.springframework.util.StringUtils;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * 支付工具授权准入应用服务实现。
@@ -54,6 +60,8 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
 
     private final FundsAuthorizationTransactionService authorizationTransactionService;
 
+    private final FundsTransactionQueryService fundsTransactionQueryService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
@@ -63,10 +71,93 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
 
     private String authorize(AuthorizeByPaymentInstrumentRequest request, WindOperator operator) {
         validateRequest(request);
+        String establishedAuthorizationSn = findEstablishedAuthorizationReplay(request);
+        if (establishedAuthorizationSn != null) {
+            return establishedAuthorizationSn;
+        }
         AuthorizationAdmissionDecision admissionDecision = resolveAdmissionDecision(request);
         return authorizationTransactionService.authorize(convertToAuthorizeRequest(request,
                 admissionDecision.snapshot(),
                 admissionDecision.spendControlDecision()), operator);
+    }
+
+    private @Nullable String findEstablishedAuthorizationReplay(AuthorizeByPaymentInstrumentRequest request) {
+        Optional<FundsTransactionDTO> existing = fundsTransactionQueryService.findFundsTransactionByBusiness(
+                request.getTenantId(), request.getBusinessScene(), request.getBusinessSn());
+        if (existing.isEmpty() || !isEstablished(existing.get().getStatus())) {
+            return null;
+        }
+        FundsTransactionDTO transaction = existing.get();
+        JSONObject context = JSON.parseObject(transaction.getContextVariables());
+        if (context == null || !StringUtils.hasText(context.getString("instrumentSn"))) {
+            return null;
+        }
+        assertEstablishedAuthorizationMatches(request, transaction, context);
+        return transaction.getSn();
+    }
+
+    private boolean isEstablished(FundsTransactionStatus status) {
+        return status == FundsTransactionStatus.OPEN
+                || status == FundsTransactionStatus.CLOSED
+                || status == FundsTransactionStatus.REJECTED;
+    }
+
+    private void assertEstablishedAuthorizationMatches(AuthorizeByPaymentInstrumentRequest request,
+                                                        FundsTransactionDTO transaction,
+                                                        JSONObject context) {
+        AssertUtils.isTrue(transaction.getTransactionMode() == FundsTransactionMode.AUTHORIZATION
+                        && transaction.getTransactionType() == DefaultFundsTransactionType.PAY
+                        && Objects.equals(transaction.getAmount(), request.getAmount())
+                        && transaction.getCurrency() == request.getCurrency()
+                        && Objects.equals(context.getString("instrumentSn"), request.getInstrumentSn())
+                        && (request.getExpectedBindingVersion() == null
+                        || Objects.equals(context.getInteger("instrumentBindingVersion"),
+                        request.getExpectedBindingVersion()))
+                        && Objects.equals(context.getBoolean(FundsInstructionContextKeys.APPROVED), request.getApproved())
+                        && Objects.equals(context.getString(FundsInstructionContextKeys.DECLINE_REASON),
+                        request.getDeclineReason())
+                        && Objects.equals(context.getString(FundsInstructionContextKeys.TRANSACTION_COUNTRY),
+                        enumName(request.getTransactionCountry())),
+                "已成立授权请求参数不一致，transactionSn = {}，businessSn = {}",
+                transaction.getSn(), request.getBusinessSn());
+        assertEstablishedSpendDecisionMatches(request,
+                context.getJSONObject(FundsInstructionContextKeys.SPEND_RULE_DECISION),
+                transaction.getSn());
+    }
+
+    private void assertEstablishedSpendDecisionMatches(AuthorizeByPaymentInstrumentRequest request,
+                                                       @Nullable JSONObject decision,
+                                                       String transactionSn) {
+        if (decision == null) {
+            AssertUtils.isTrue(!hasSpendControlEvidence(request)
+                            && (Boolean.FALSE.equals(request.getApproved())
+                            || !StringUtils.hasText(request.getControlScopeId())),
+                    "已成立授权 Spend Rule 证据不一致，transactionSn = {}", transactionSn);
+            return;
+        }
+        AssertUtils.isTrue(Objects.equals(decision.getString("controlScopeId"), request.getControlScopeId())
+                        && matchesOptionalText(request.getSpendRuleId(), decision.getString("ruleId"))
+                        && matchesOptionalText(request.getSpendRuleVersion(), decision.getString("ruleVersion"))
+                        && matchesOptionalText(request.getSpendRuleBindingSn(), decision.getString("spendRuleBindingSn"))
+                        && matchesOptionalEnum(request.getSpendRuleScopeType(), decision.getString("scopeType"))
+                        && matchesOptionalText(request.getSpendRuleScopeId(), decision.getString("scopeId"))
+                        && Objects.equals(request.getSpendDecisionSn(), decision.getString("decisionSn"))
+                        && matchesOptionalEnum(request.getSpendDecisionResult(), decision.getString("decisionResult"))
+                        && matchesOptionalText(request.getSpendDecisionDigest(), decision.getString("decisionDigest"))
+                        && !StringUtils.hasText(request.getSpendDecisionRejectReason()),
+                "已成立授权 Spend Rule 证据不一致，transactionSn = {}", transactionSn);
+    }
+
+    private boolean matchesOptionalText(@Nullable String provided, @Nullable String persisted) {
+        return !StringUtils.hasText(provided) || Objects.equals(provided, persisted);
+    }
+
+    private boolean matchesOptionalEnum(@Nullable Enum<?> provided, @Nullable String persisted) {
+        return provided == null || Objects.equals(provided.name(), persisted);
+    }
+
+    private @Nullable String enumName(@Nullable Enum<?> value) {
+        return value == null ? null : value.name();
     }
 
     private void validateRequest(AuthorizeByPaymentInstrumentRequest request) {
@@ -83,12 +174,12 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
         if (Boolean.FALSE.equals(request.getApproved())) {
             AssertUtils.hasText(request.getDeclineReason(), "授权拒绝原因不能为空");
         }
-        if (hasSpendControlEvidence(request)) {
-            assertCompleteSpendControlEvidence(request);
-        }
+        AssertUtils.isTrue(!hasUnreferencedSpendControlPayload(request),
+                "裸 Spend Rule 结果或摘要不能用于授权准入，必须提供可回读的 decisionRef");
     }
 
     private boolean hasSpendControlEvidence(AuthorizeByPaymentInstrumentRequest request) {
+        // controlScopeId selects binding candidates; it is not decision evidence by itself.
         return StringUtils.hasText(request.getSpendRuleId())
                 || StringUtils.hasText(request.getSpendRuleVersion())
                 || StringUtils.hasText(request.getSpendRuleBindingSn())
@@ -97,25 +188,15 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
                 || StringUtils.hasText(request.getSpendDecisionSn())
                 || request.getSpendDecisionResult() != null
                 || StringUtils.hasText(request.getSpendDecisionDigest())
-                || StringUtils.hasText(request.getControlScopeId())
                 || StringUtils.hasText(request.getSpendDecisionRejectReason());
     }
 
-    private void assertCompleteSpendControlEvidence(AuthorizeByPaymentInstrumentRequest request) {
-        AssertUtils.hasText(request.getSpendRuleId(), "Spend Rule 标识不能为空");
-        AssertUtils.hasText(request.getSpendRuleVersion(), "Spend Rule 版本不能为空");
-        AssertUtils.notNull(request.getSpendRuleScopeType(), "Spend Rule 控制范围类型不能为空");
-        AssertUtils.hasText(request.getSpendRuleScopeId(), "Spend Rule 控制范围标识不能为空");
-        AssertUtils.hasText(request.getSpendDecisionSn(), "Spend Rule 决策流水号不能为空");
-        AssertUtils.notNull(request.getSpendDecisionResult(), "Spend Rule 决策结果不能为空");
-        SpendRuleDigestValidator.assertSha256Digest(request.getSpendDecisionDigest(), "Spend Rule 决策摘要");
-        if (request.getSpendDecisionResult() == SpendControlDecisionResult.REJECTED) {
-            AssertUtils.hasText(request.getSpendDecisionRejectReason(), "Spend Rule 拒绝原因不能为空");
-        }
+    private boolean hasUnreferencedSpendControlPayload(AuthorizeByPaymentInstrumentRequest request) {
+        return hasSpendControlEvidence(request) && !StringUtils.hasText(request.getSpendDecisionSn());
     }
 
     private AuthorizationAdmissionDecision resolveAdmissionDecision(AuthorizeByPaymentInstrumentRequest request) {
-        if (hasSpendControlEvidence(request)) {
+        if (Boolean.TRUE.equals(request.getApproved()) || hasSpendControlEvidence(request)) {
             SpendControlAdmissionDecisionDTO decision =
                     spendControlAdmissionApplicationService.resolveSpendControlAdmission(toSpendControlRequest(request));
             AssertUtils.isTrue(Boolean.TRUE.equals(decision.getAdmitted()),
@@ -210,6 +291,7 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
     private @Nullable FundsAccountId linkedFundingAccountId(FundsAccountId authorizationAccountId,
                                                             FundsAccountId targetAccountId) {
         if (Objects.equals(authorizationAccountId, targetAccountId)
+                || !FundsSubjectType.CREDIT_ACCOUNT.name().equals(authorizationAccountId.type())
                 || !FundsSubjectType.FUNDING_ACCOUNT.name().equals(targetAccountId.type())) {
             return null;
         }

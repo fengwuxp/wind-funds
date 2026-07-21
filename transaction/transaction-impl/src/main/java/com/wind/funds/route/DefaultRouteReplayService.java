@@ -1,10 +1,13 @@
 package com.wind.funds.route;
 
 import com.wind.funds.model.route.ImmutableReplayRequestSpec;
+import com.wind.funds.model.route.ImmutableAccountHierarchyFundingAllocationDecisionSpec;
+import com.wind.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
+import com.wind.funds.model.route.ImmutableRoutingDecisionSpec;
 import com.wind.funds.route.support.RouteSpecSupport;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.support.FundsRouteCodes;
@@ -24,12 +27,14 @@ import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.enums.RouteReplayType;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
+import com.wind.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.funds.route.spec.ReplayRequestSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.route.spec.RoutingDecisionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionFieldKeys;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
@@ -47,6 +52,7 @@ import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -59,7 +65,7 @@ import java.util.Set;
 /**
  * 默认 RouteSnapshot 回放解析器。
  *
- * <p>职责：基于已保存的 RouteSnapshot 派生撤销、结算、退款、拒付等后续路径。
+ * <p>职责：基于已保存的 RouteSnapshot 派生撤销、完成、退款、拒付等后续路径。
  * 回放只复用原路径中的主体、平台账户和节点，不重新执行路由选择。</p>
  */
 @Component
@@ -79,6 +85,9 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
 
     private static final String FREEZE_ORDER_SUBJECT_MISMATCH_MESSAGE =
             "冻结单引用主体与请求账户不一致";
+
+    private static final String AUTHORIZATION_SUBJECT_MISMATCH_MESSAGE =
+            "授权引用主体与请求账户不一致";
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
@@ -162,7 +171,9 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .transactionType(resolveTransactionType(snapshot, replayRequest))
                 .participants(resolveParticipants(snapshot, replayLegs))
                 .legs(replayLegs)
-                .routingDecision(snapshot.getRoutingDecision())
+                .routingDecision(replayRoutingDecision(snapshot.getRoutingDecision(),
+                        replayLegs,
+                        isSelectiveReplay(snapshot, sourceLegs, replayRequest)))
                 .paymentInstrumentRef(snapshot.getPaymentInstrumentRef())
                 .externalAccountRef(snapshot.getExternalAccountRef())
                 .platformAccounts(snapshot.getPlatformAccounts())
@@ -172,6 +183,128 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .build();
         RouteSpecSupport.validateResolvedRoute(result);
         return result;
+    }
+
+    private @Nullable RoutingDecisionSpec replayRoutingDecision(@Nullable RoutingDecisionSpec source,
+                                                                List<RouteLegSpec> replayLegs,
+                                                                boolean selectiveReplay) {
+        if (source == null) {
+            return null;
+        }
+        List<FundingAllocationDecisionSpec> allocations = source.getFundingAllocations();
+        AssertUtils.isFalse(selectiveReplay && allocations.size() > 1,
+                "部分选择 RouteLeg 时不能重建多资金分配决策");
+        Money firstAmount = allocations.getFirst().getAmount();
+        AssertUtils.isTrue(allocations.stream()
+                        .allMatch(allocation -> allocation.getAmount().getCurrency() == firstAmount.getCurrency()),
+                "RouteSnapshot 回放暂不支持跨币种 funding allocation");
+        long sourceAmount = sumAllocationAmount(allocations);
+        long replayAmount = sumReplayConsumeAmount(replayLegs, firstAmount);
+        if (replayAmount == 0L || replayAmount == sourceAmount) {
+            return source;
+        }
+        AssertUtils.isTrue(replayAmount < sourceAmount,
+                "RouteSnapshot 回放 routingDecision 金额不能大于原资金分配金额");
+        List<FundingAllocationDecisionSpec> replayAllocations = scaleAllocations(allocations,
+                sourceAmount,
+                replayAmount);
+        return ImmutableRoutingDecisionSpec.builder()
+                .policyCode(source.getPolicyCode())
+                .matchedRules(source.getMatchedRules())
+                .selectedProcessor(source.getSelectedProcessor())
+                .selectedCashFundingAccount(source.getSelectedCashFundingAccount())
+                .selectedPlatformAccount(source.getSelectedPlatformAccount())
+                .fundingAllocations(replayAllocations)
+                .decisionReason(source.getDecisionReason())
+                .contextVariables(source.getContextVariables())
+                .build();
+    }
+
+    private boolean isSelectiveReplay(RouteSnapshotSpec snapshot,
+                                      List<RouteLegSpec> sourceLegs,
+                                      ReplayRequestSpec replayRequest) {
+        if (replayRequest.getReplayLegIds().isEmpty()) {
+            return false;
+        }
+        long replayableLegCount = snapshot.getLegs().stream()
+                .filter(leg -> leg.getReplayPolicy() != RouteReplayPolicy.NON_REPLAYABLE)
+                .filter(leg -> shouldReplayLeg(leg, replayRequest))
+                .count();
+        return sourceLegs.size() < replayableLegCount;
+    }
+
+    private long sumAllocationAmount(List<FundingAllocationDecisionSpec> allocations) {
+        long result = 0L;
+        for (FundingAllocationDecisionSpec allocation : allocations) {
+            result = Math.addExact(result, allocation.getAmount().getAmount());
+        }
+        return result;
+    }
+
+    private long sumReplayConsumeAmount(List<RouteLegSpec> replayLegs, Money allocationAmount) {
+        long result = 0L;
+        for (RouteLegSpec leg : replayLegs) {
+            if (leg.getBalanceEffectType() != LedgerBalanceEffectType.CONSUME
+                    && leg.getBalanceEffectType() != LedgerBalanceEffectType.HOLD) {
+                continue;
+            }
+            if (leg.getAmount().getCurrency() == allocationAmount.getCurrency()
+                    && leg.getSourceNode().getSubjectRef().getSubjectType().isLedgerPostable()) {
+                result = Math.addExact(result, leg.getAmount().getAmount());
+            }
+        }
+        return result;
+    }
+
+    private List<FundingAllocationDecisionSpec> scaleAllocations(
+            List<FundingAllocationDecisionSpec> allocations,
+            long sourceAmount,
+            long replayAmount) {
+        List<FundingAllocationDecisionSpec> result = new ArrayList<>(allocations.size());
+        long sourceCumulativeAmount = 0L;
+        long replayCumulativeAmount = 0L;
+        for (int index = 0; index < allocations.size(); index++) {
+            FundingAllocationDecisionSpec allocation = allocations.get(index);
+            sourceCumulativeAmount = Math.addExact(sourceCumulativeAmount,
+                    allocation.getAmount().getAmount());
+            long targetCumulativeAmount = index == allocations.size() - 1
+                    ? replayAmount
+                    : BigInteger.valueOf(sourceCumulativeAmount)
+                    .multiply(BigInteger.valueOf(replayAmount))
+                    .divide(BigInteger.valueOf(sourceAmount))
+                    .longValueExact();
+            long scaledAmount = targetCumulativeAmount - replayCumulativeAmount;
+            AssertUtils.isTrue(scaledAmount <= allocation.getAmount().getAmount(),
+                    "RouteSnapshot 回放 allocation 金额不能大于原资金分配金额");
+            if (scaledAmount > 0L) {
+                result.add(replayAllocation(allocation, scaledAmount));
+            }
+            replayCumulativeAmount = targetCumulativeAmount;
+        }
+        return List.copyOf(result);
+    }
+
+    private FundingAllocationDecisionSpec replayAllocation(FundingAllocationDecisionSpec source, long amount) {
+        Money replayAmount = Money.immutable(amount, source.getAmount().getCurrency());
+        if (source.getAccountHierarchySnapshot() != null) {
+            return ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
+                    .allocationId(source.getAllocationId())
+                    .subjectRef(source.getSubjectRef())
+                    .ledgerSubjectCode(source.getLedgerSubjectCode())
+                    .amount(replayAmount)
+                    .accountHierarchySnapshot(source.getAccountHierarchySnapshot())
+                    .priority(source.getPriority())
+                    .reason(source.getReason())
+                    .build();
+        }
+        return ImmutableFundingAllocationDecisionSpec.builder()
+                .allocationId(source.getAllocationId())
+                .subjectRef(source.getSubjectRef())
+                .ledgerSubjectCode(source.getLedgerSubjectCode())
+                .amount(replayAmount)
+                .priority(source.getPriority())
+                .reason(source.getReason())
+                .build();
     }
 
     private RouteSnapshotSpec requireReplaySnapshot(FundsInstructionSpec instruction) {
@@ -185,6 +318,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 reference.getReferenceSn());
         RouteSnapshotSpec result = routeSnapshot.get();
         assertFreezeOrderSubjectMatchesInstruction(instruction, reference, result);
+        assertAuthorizationSubjectMatchesInstruction(instruction, reference, result);
         assertReplayOnceNotConsumed(instruction, reference, result);
         return result;
     }
@@ -207,6 +341,26 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 FundsInstructionFieldKeys.ACCOUNT_ID);
         AssertUtils.isTrue(snapshotContainsSubject(routeSnapshot, accountId),
                 FREEZE_ORDER_SUBJECT_MISMATCH_MESSAGE + "，referenceSn = {}，accountId = {}，accountType = {}",
+                reference.getReferenceSn(), accountId.id(), accountId.type());
+    }
+
+    private void assertAuthorizationSubjectMatchesInstruction(FundsInstructionSpec instruction,
+                                                               FundsInstructionReferenceSpec reference,
+                                                               RouteSnapshotSpec routeSnapshot) {
+        if (reference.getReferenceType() != FundsInstructionReferenceType.AUTHORIZATION) {
+            return;
+        }
+        FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
+                FundsInstructionFieldKeys.ACCOUNT_ID);
+        Optional<SubjectRef> originalSubject = routeSnapshot.getLegs().stream()
+                .filter(leg -> leg.getPhaseCode() == LedgerPhaseCode.AUTHORIZATION)
+                .map(leg -> leg.getSourceNode().getSubjectRef())
+                .findFirst();
+        AssertUtils.isTrue(originalSubject.isPresent(), REPLAY_LEG_REQUIRED_MESSAGE);
+        AssertUtils.isTrue(originalSubject.get().getSubjectId().equals(accountId.id())
+                        && originalSubject.get().getSubjectType().name().equals(accountId.type()),
+                AUTHORIZATION_SUBJECT_MISMATCH_MESSAGE
+                        + "，referenceSn = {}，accountId = {}，accountType = {}",
                 reference.getReferenceSn(), accountId.id(), accountId.type());
     }
 
@@ -320,7 +474,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     private RouteReplayType resolveReplayType(FundsTransactionEventType eventType) {
         return switch (eventType) {
             case REVERSAL -> RouteReplayType.RELEASE_HOLD;
-            case SETTLE -> RouteReplayType.AUTHORIZATION_SETTLEMENT;
+            case COMPLETE -> RouteReplayType.AUTHORIZATION_COMPLETION;
             case AUTH_REFUND -> RouteReplayType.AUTHORIZATION_REFUND;
             case REFUND -> RouteReplayType.REFUND;
             case FEE_REFUND -> RouteReplayType.FEE_REFUND;
@@ -386,7 +540,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                     LedgerPhaseCode.REVERSAL);
             case UNFREEZE -> buildReleaseLeg(sourceLeg, replayRequest, sequence, RouteLegType.RELEASE,
                     LedgerPhaseCode.UNFREEZE);
-            case AUTHORIZATION_SETTLEMENT -> buildAuthorizationSettlementLeg(snapshot, sourceLeg, replayRequest, sequence);
+            case AUTHORIZATION_COMPLETION -> buildAuthorizationCompletionLeg(snapshot, sourceLeg, replayRequest, sequence);
             case AUTHORIZATION_REFUND, REFUND, FEE_REFUND -> buildRefundLeg(snapshot, sourceLeg, replayRequest,
                     sequence, RouteLegType.RESTORE, LedgerPhaseCode.REFUND);
         };
@@ -406,7 +560,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 replayRequest.getDescription());
     }
 
-    private RouteLegSpec buildAuthorizationSettlementLeg(RouteSnapshotSpec snapshot,
+    private RouteLegSpec buildAuthorizationCompletionLeg(RouteSnapshotSpec snapshot,
                                                          RouteLegSpec sourceLeg,
                                                          ReplayRequestSpec replayRequest,
                                                          int sequence) {
@@ -414,7 +568,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 sourceLeg.getTargetNode().getLedgerSubjectCode());
         RouteNodeSpec targetNode = resolveCaptureTargetNode(snapshot, sourceLeg);
         return buildReplayLeg(sourceLeg, replayRequest, sequence, RouteLegType.CONSUME, sourceNode, targetNode,
-                LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.SETTLEMENT, mustNotBeNegative(sourceNode),
+                LedgerBalanceEffectType.CONSUME, LedgerPhaseCode.COMPLETION, mustNotBeNegative(sourceNode),
                 replayRequest.getDescription());
     }
 
@@ -443,6 +597,9 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     }
 
     private RouteNodeSpec resolveCaptureTargetNode(RouteSnapshotSpec snapshot, RouteLegSpec sourceLeg) {
+        if (sourceLeg.getSourceNode().getSubjectRef().getSubjectType() == FundsSubjectType.CREDIT_ACCOUNT) {
+            return copyNode(sourceLeg.getSourceNode(), RouteNodeRole.TARGET, LedgerSubjectCode.OUTSTANDING);
+        }
         SubjectRef settlementAccount = resolveSettlementAccount(snapshot.getPlatformAccounts());
         if (settlementAccount != null) {
             return ImmutableRouteNodeSpec.builder()
@@ -661,7 +818,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     private String resolveRouteCode(ReplayRequestSpec replayRequest) {
         return switch (replayRequest.getReplayType()) {
             case RELEASE_HOLD -> FundsRouteCodes.AUTHORIZATION_REVERSAL_REPLAY;
-            case AUTHORIZATION_SETTLEMENT -> FundsRouteCodes.AUTHORIZATION_SETTLE_REPLAY;
+            case AUTHORIZATION_COMPLETION -> FundsRouteCodes.AUTHORIZATION_COMPLETE_REPLAY;
             case AUTHORIZATION_REFUND -> FundsRouteCodes.AUTHORIZATION_REFUND_REPLAY;
             case REFUND, FEE_REFUND -> FundsRouteCodes.DIRECT_REFUND_REPLAY;
             case UNFREEZE -> FundsRouteCodes.BALANCE_UNFREEZE_REPLAY;
@@ -680,7 +837,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
         }
         return switch (replayRequest.getReplayType()) {
             case RELEASE_HOLD -> FundsTransactionEventType.REVERSAL;
-            case AUTHORIZATION_SETTLEMENT -> FundsTransactionEventType.SETTLE;
+            case AUTHORIZATION_COMPLETION -> FundsTransactionEventType.COMPLETE;
             case AUTHORIZATION_REFUND -> FundsTransactionEventType.AUTH_REFUND;
             case REFUND -> FundsTransactionEventType.REFUND;
             case FEE_REFUND -> FundsTransactionEventType.FEE_REFUND;

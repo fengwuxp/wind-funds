@@ -560,7 +560,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
         }
 
         private long remainingAmount() {
-            return originalReservedAmount - netConsumedAmount() - releasedAmount;
+            return originalReservedAmount - grossConsumedAmount - releasedAmount;
         }
     }
 }

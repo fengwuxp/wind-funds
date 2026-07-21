@@ -6,6 +6,7 @@ import com.wind.funds.ledger.dto.LedgerTransactionDTO;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.ledger.query.LedgerTransactionQuery;
 import com.wind.funds.ledger.service.LedgerTransactionService;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.model.dto.LedgerEntryFactDTO;
 import com.wind.funds.wallet.model.dto.LedgerTransactionFactDTO;
 import com.wind.funds.wallet.service.LedgerQueryService;
@@ -36,7 +37,7 @@ public class DefaultLedgerQueryService implements LedgerQueryService {
                 .setTenantId(tenantId)
                 .setFundsTransactionSn(fundsTransactionSn);
         if (eventType != null) {
-            query.setEventType(eventType);
+            query.setEventType(FundsTransactionEventType.valueOf(eventType));
         }
         return ledgerTransactionService.queryAccountLedgerTransactions(query, DefaultPageQueryOptions.defaults(limit))
                 .getRecords()
@@ -65,7 +66,7 @@ public class DefaultLedgerQueryService implements LedgerQueryService {
                 .setSn(source.getSn())
                 .setTenantId(source.getTenantId())
                 .setFundsTransactionSn(source.getFundsTransactionSn())
-                .setEventType(source.getEventType());
+                .setEventType(source.getEventType().name());
     }
 
     private LedgerEntryFactDTO toEntryFact(LedgerEntryDTO source) {

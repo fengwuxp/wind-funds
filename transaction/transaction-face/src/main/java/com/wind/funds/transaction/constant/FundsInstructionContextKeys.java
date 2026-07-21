@@ -18,17 +18,17 @@ public final class FundsInstructionContextKeys {
 
     public static final String AUTHORIZATION_TRANSACTION_SN = "authorizationTransactionSn";
 
-    public static final String SETTLE_MODE = "settleMode";
+    public static final String COMPLETION_MODE = "completionMode";
 
-    public static final String FORCE_SETTLE_POLICY_CODE = "forceSettlePolicyCode";
+    public static final String FORCE_COMPLETION_POLICY_CODE = "forceCompletionPolicyCode";
 
-    public static final String FORCE_SETTLE_LIMIT_AMOUNT = "forceSettleLimitAmount";
+    public static final String FORCE_COMPLETION_LIMIT_AMOUNT = "forceCompletionLimitAmount";
 
-    public static final String FORCE_SETTLE_REASON = "forceSettleReason";
+    public static final String FORCE_COMPLETION_REASON = "forceCompletionReason";
 
     public static final String EXTERNAL_ORIGINAL_FACT_REF = "externalOriginalFactRef";
 
-    public static final String FORCE_SETTLE_VOUCHER_REF = "forceSettleVoucherRef";
+    public static final String FORCE_COMPLETION_VOUCHER_REF = "forceCompletionVoucherRef";
 
     /**
      * 退款内部归类标签，仅用于资金指令、路由和资金事实上下文，不作为请求字段暴露。

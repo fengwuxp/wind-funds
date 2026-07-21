@@ -9,7 +9,6 @@ import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.util.Map;
 
@@ -29,11 +28,11 @@ public record ImmutableFundsInstructionReferenceSpec(FundsInstructionReferenceTy
 
     public ImmutableFundsInstructionReferenceSpec {
         AssertUtils.notNull(referenceType, "fundsInstruction.referenceType must not be null");
-        if (!StringUtils.hasText(referenceSn)
-                && !StringUtils.hasText(referenceBusinessSn)
-                && !StringUtils.hasText(referenceLedgerTransactionSn)
-                && !StringUtils.hasText(externalTransactionId)
-                && !StringUtils.hasText(authCode)) {
+        if ((referenceSn == null || referenceSn.isBlank())
+                && (referenceBusinessSn == null || referenceBusinessSn.isBlank())
+                && (referenceLedgerTransactionSn == null || referenceLedgerTransactionSn.isBlank())
+                && (externalTransactionId == null || externalTransactionId.isBlank())
+                && (authCode == null || authCode.isBlank())) {
             throw new IllegalArgumentException("fundsInstruction.reference identifier is required");
         }
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)

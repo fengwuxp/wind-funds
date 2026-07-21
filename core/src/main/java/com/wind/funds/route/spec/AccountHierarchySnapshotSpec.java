@@ -32,16 +32,6 @@ public interface AccountHierarchySnapshotSpec {
     }
 
     /**
-     * 根账户，适用于多级账户汇总、责任归因和账单聚合。
-     *
-     * @return 根账户
-     */
-    @Nullable
-    default SubjectRef getRootAccountRef() {
-        return null;
-    }
-
-    /**
      * 层级快照扩展上下文，不承载卡号、外部账户原文或通道密钥等敏感信息。
      *
      * @return 扩展上下文

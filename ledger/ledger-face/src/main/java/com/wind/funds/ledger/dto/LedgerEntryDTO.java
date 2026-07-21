@@ -5,12 +5,11 @@ import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
+import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.enums.LedgerReconcileStatus;
-import com.wind.funds.ledger.enums.LedgerSettlementStatus;
 import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -93,6 +92,10 @@ public class LedgerEntryDTO {
     @NotNull
     private EntrySide entryType;
 
+    @Schema(description = "多级账户记账角色")
+    @NotNull
+    private LedgerPostingRole postingRole;
+
     @Schema(description = "本分录余额约束")
     private LedgerBalanceConstraintType balanceConstraintType;
 
@@ -140,29 +143,6 @@ public class LedgerEntryDTO {
     @Schema(description = "sha256，防止数据篡改")
     @NotNull
     private String sha256;
-
-    @Schema(description = "结算状态")
-    @NotNull
-    private LedgerSettlementStatus settlementStatus;
-
-    @Schema(description = "结算周期（账期）")
-    private String settlementPeriod;
-
-    @Schema(description = "结算完成时间")
-    private LocalDateTime settlementCompletedTime;
-
-    @Schema(description = "对账状态")
-    @NotNull
-    private LedgerReconcileStatus reconcileStatus;
-
-    @Schema(description = "对账备注")
-    private String reconcileRemark;
-
-    @Schema(description = "对账批次（示例：2026040900015）")
-    private String reconciliationBatch;
-
-    @Schema(description = "对账完成时间")
-    private LocalDateTime reconciliationCompletedTime;
 
     public LedgerEntryDTO setContextVariables(Map<String, Object> contextVariables) {
         this.contextVariables = FundsBenefitSpecValidators.immutableInstructionContext(

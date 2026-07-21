@@ -7,8 +7,7 @@ import com.mybatisflex.annotation.Table;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.EntrySide;
-import com.wind.funds.ledger.enums.LedgerReconcileStatus;
-import com.wind.funds.ledger.enums.LedgerSettlementStatus;
+import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
@@ -134,6 +133,12 @@ public class LedgerEntry implements Serializable {
     private EntrySide entrySide;
 
     /**
+     * 多级账户记账角色
+     */
+    @NotNull
+    private LedgerPostingRole postingRole;
+
+    /**
      * 本分录余额约束
      */
     private String balanceConstraintType;
@@ -221,41 +226,4 @@ public class LedgerEntry implements Serializable {
      */
     @NotNull
     private String sha256;
-
-    /**
-     * 结算状态
-     */
-    @NotNull
-    private LedgerSettlementStatus settlementStatus;
-
-    /**
-     * 结算周期（账期）
-     */
-    private String settlementPeriod;
-
-    /**
-     * 结算完成时间
-     */
-    private LocalDateTime settlementCompletedTime;
-
-    /**
-     * 对账状态
-     */
-    @NotNull
-    private LedgerReconcileStatus reconcileStatus;
-
-    /**
-     * 对账备注
-     */
-    private String reconcileRemark;
-
-    /**
-     * 对账批次（示例：2026040900015）
-     */
-    private String reconciliationBatch;
-
-    /**
-     * 对账完成时间
-     */
-    private LocalDateTime reconciliationCompletedTime;
 }

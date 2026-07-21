@@ -71,7 +71,8 @@ public class DefaultLedgerProfileServiceImpl implements LedgerProfileService {
                 profile(LedgerProfileCode.CREDIT_BASIC, FundsSubjectType.CREDIT_ACCOUNT, List.of(
                         item(LedgerSubjectCode.LIMIT, LedgerSubjectCategory.CONTROL, EntrySide.DEBIT, false),
                         item(LedgerSubjectCode.AVAILABLE, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, true),
-                        item(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, false)
+                        item(LedgerSubjectCode.AUTHORIZATION, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, false),
+                        item(LedgerSubjectCode.OUTSTANDING, LedgerSubjectCategory.CONTROL, EntrySide.CREDIT, false)
                 )),
                 LedgerProfileCode.FUNDING_PLATFORM,
                 profile(LedgerProfileCode.FUNDING_PLATFORM, FundsSubjectType.FUNDING_ACCOUNT, List.of(

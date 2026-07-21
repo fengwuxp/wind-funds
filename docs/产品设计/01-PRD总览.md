@@ -138,12 +138,12 @@ PRD 只定义目标产品能力、验收边界和资金红线。局部代码、�
 
 ### 1.3 PRD 合并与分册策略
 
-产品设计目录采用“主线 PRD + 业务补充分册”的结构，而不是把所有业务细节都并入 01-05。原因是三类业务的交易层语义并不完全通用：VCC 有授权、clearing、chargeback 过程和卡账单语义；全球账户有外部受理、在途、退汇、FX 引用和多币种对账语义；收单有 payment attempt、capture、refund、dispute、准备金和商户结算语义。这些业务语义应通过场景交易 capability pack 接入资金底座，不应反向改变钱包、账本、账目、清结算、对账和归档的统一内核。
+产品设计目录采用“资金主线 PRD + 场景资金边界/补充分册”的结构，而不是把所有业务细节都并入 01-05。VCC 的 Program、Card、issuer 事件、chargeback 案件和卡账单是 Fincone 发卡业务语义；全球账户有外部受理、在途、退汇、FX 引用和多币种对账语义；收单有 payment attempt、capture、refund、dispute、准备金和商户结算语义。上层业务必须先将业务状态归一为明确资金动作，再调用 wind-funds；这些业务语义不应反向改变钱包、账本、账目、清结算、对账和归档的统一内核。
 
 | 文档组 | 设计定位 | 合并口径 |
 | --- | --- | --- |
 | 01-05 主线 PRD | 支付资金底座的权威产品主线。 | 承载产品定位、统一能力地图、职责边界、交易/钱包/账本/投影、清结算、对账、归档、验收和生产门禁。 |
-| 06 VCC 发卡业务分册 | VCC 场景资金语义补充。 | 保留 Program、Card、Cardholder、授权控制、卡组织清算和争议案件语义；把授权不等于入账、卡不入账、敏感数据最小化和原路径回放抽象回 01-05。 |
+| 06 VCC 场景资金能力边界 | VCC 业务接入 wind-funds 的契约边界。 | 只保留支付工具、资金/信用子账户、父账户约束、资金责任、授权、清算、退款、原路径回放和账务验收；Program、Card、Cardholder、issuer 事件、VCC 主状态、争议案件和卡账单回归 Fincone。 |
 | 07 全球账户收付款分册 | 全球账户场景资金语义补充。 | 保留 VA、外部银行流水、在途、退汇、FX 引用和跨境材料语义；把外部受理不等于到账、外部账户不入账、错币种阻断和费用拆分抽象回 01-05。 |
 | 08 收单业务分册 | 收单场景资金语义补充。 | 保留 payment attempt、capture、refund、dispute、准备金和商户结算语义；把支付成功不等于可结算、先清账再结算、refund 与 chargeback 分离和 PCI 边界抽象回 01-05。 |
 
@@ -242,13 +242,13 @@ Capte 业务会覆盖 VCC 发卡、全球收付款、收单、平台内部交易
 | 业务主体 | 用户、商户、企业、部门、平台角色或外部机构等业务上的权利义务归属方。 | 业务主体不一定能直接记账；进入账本前必须解析成资金账户（含平台角色解析后的平台资金账户和 VCC 资金子账户）或信用账户（含 VCC 信用子账户）；支出控制范围和 Spend Rule 只提供支出控制上下文。 |
 | 资金账务主体 / 核心记账主体 | 账务层可以作为分录主体、余额投影主体和账本 bucket 归属方的对象。 | 本 PRD 默认核心资金账务主体是资金账户（含平台角色解析后的平台资金账户）和信用账户；VCC 发卡专项中，VCC 关联子账户作为资金账户或信用账户的子账户承接发卡账务。业务订单、用户、商户经营主体、部门、支出控制范围、卡号、PAN、token、VA、银行账户、支付工具和通道账户不能直接入账。 |
 | 资金账户 / FundingAccount | wind-funds 内部可记账资金账户或平台责任资金账户，也是最常见的账务主体。 | 可以承载现金、商户待清算、平台待付、手续费、在途或预收待付等内部责任余额；外部银行账户、托管户、备付金户、通道账户和卡组织账户不是 `FundingAccount`，只能作为外部账户引用、流水、回单和对账证据；`FundingAccount` 不是所有钱包账户的统一父类。 |
-| 信用账户 | 承载授信额度和授权占用的控制账户，也是可记账主体。 | 不是现金账户；额度不是钱；可记录 LIMIT、AVAILABLE、AUTHORIZATION 等额度账目，已消费进入交易视图和报表，不新增账务 CONSUMED。 |
-| VCC 关联子账户 / 外部 Card Account | 发卡业务中用于解释卡余额、授权占用、清算、退款、拒付和卡账单的内部子账户映射。 | `wind-funds` 不新增 VCC Account / Card Account 独立账务主体；外部文档、发卡合作方或行业资料若称 Card Account / Financial Account / VCC Account，进入资金底座后一律映射为 `FundingAccount` 子账户或 `CreditAccount` 子账户。每张 VCC 卡绑定一个子账户；多卡共享时共享同一主账户额度或资金约束，不绑定同一子账户。 |
+| 信用账户 | 承载授信额度、授权占用和已用额度的控制账户，也是可记账主体。 | 不是现金账户；额度不是钱；可记录 LIMIT、AVAILABLE、AUTHORIZATION、OUTSTANDING 等控制账目。VCC 授权完成将信用占用转入 OUTSTANDING，父 FundingAccount 仅承担一次真实资金责任；不新增含义重复的完成金额账目。 |
+| VCC 关联子账户 / 外部 Card Account | VCC 场景中用于承接余额、授权占用、清算、退款和已确认争议资金结果的内部子账户。 | `wind-funds` 不新增 VCC Account / Card Account 独立账务主体；外部文档、发卡合作方或行业资料若称 Card Account / Financial Account / VCC Account，进入资金底座后必须解析为 `FundingAccount` 子账户或 `CreditAccount` 子账户。单卡账单、使用人视图和 VCC 状态由 Fincone 组合资金事实与发卡事实生成。 |
 | 支出控制范围 / SpendControlScope | 部门、项目、卡组、成本中心或共享卡场景下的可命名、可归属、可查询支出控制 scope；统一使用 `SpendControlScope` 命名。 | 不是资金池，也不是核心资金账务主体；预算总额、可用预算、预留和释放应作为 Spend Rule 的预算型规则、控制视图和审计证据表达，不参与真实资金流、清结算和现金账务闭环。 |
 | Spend Rule / Spend Controls | 发卡、VCC、企业卡、员工卡或预算支出场景中，授权发生前用于判断某次支出是否允许的规则能力，例如预算额度、单笔金额、MCC、商户、国家、入卡方式、CVV/AVS、次数和周期窗口。 | 它决定“能不能进入授权占用”，不是资金底座核心主链路、不是账本、不是路由、不是清结算；支出控制范围是规则作用域或管理对象，不能替代 Spend Rule；未启用发卡或预算支出控制时，普通资金交易和授权交易不依赖该能力。 |
 | VCC 卡 / 虚拟卡 / 卡 token | 发卡业务中的支付工具、访问凭证和路由输入。 | 只进入支付工具引用、绑定快照、授权上下文和 route snapshot；真正入账主体是该卡绑定的资金子账户或信用子账户。卡号、PAN、token 和卡片凭证不得作为 LedgerEntry 主体。 |
 | 预付卡 | 如果属于卡组织或发卡体系下的 prepaid virtual card，则是 VCC 资金子账户模式和卡产品形态。 | 预付余额应落在该卡绑定的资金子账户上；卡本体仍是支付工具。若是储值券、礼品卡或预付代金券，则按权益和预收待付语义处理，不默认归入 VCC。 |
-| 共享卡 | VCC、企业卡或员工卡中的使用和绑定模式。 | 每张共享卡绑定一个信用子账户；多张共享卡共享时共享的是同一个主账户额度或资金约束，不是同一个子账户。单卡账单、使用人账单和预算视图通过 `PaymentInstrumentRef`、绑定版本、子账户、支出控制范围和 Spend Rule 投影生成。 |
+| 共享卡 | VCC、企业卡或员工卡中的使用和绑定模式。 | 每张共享卡绑定一个信用子账户；多张共享卡共享时共享同一主账户额度或资金约束，不共用同一子账户。wind-funds 固化 `PaymentInstrumentRef`、绑定版本、子账户、支出控制范围和 Spend Rule 证据；Fincone 据此生成单卡账单、使用人视图和 VCC 业务视图。 |
 | 账本 | 某主体、币种和账本 Profile 下的账务事实容器。 | 缺账本不得自动入账；账本不是钱包、业务订单或报表。 |
 | 账本周期 | 同一主体、币种、账目下按生命周期、天、小时、周、月、季、年或自定义周期切分的账本 bucket。 | 不是清结算账期、报表周期或归档水位；非 LIFETIME 周期必须有明确 periodId 和周期策略，不能跨周期串账。 |
 | 账目 | 账本里的余额桶或科目，例如 AVAILABLE、FROZEN、AUTHORIZATION。 | 账目不是账户主体；它表达账户内某类余额状态。 |
@@ -433,7 +433,7 @@ mindmap
         授权资金链
         清算入账
         退款和拒付
-        卡账单解释
+        资金对账引用
       全球账户收付款
         入金
         出金
@@ -486,7 +486,7 @@ mindmap
 | 钱包账户域 | 账户、工具、资金责任解析和余额查询的上位能力域。 | `wallet-face`、`wallet-impl`、`FundingAccountService`、`CreditAccountService`、`SpendControlScopeService`、`PaymentInstrumentService`、`SpendSubjectFundingRelationService`、`FundsSubjectBalanceQueryService`。 | 否。 | 能力域不是单表；不能被 `FundingAccount` 替代。 |
 | 资金账户 / FundingAccount | 真实资金或平台责任余额账户。 | `FundingAccount`、`FundingAccountService`、`FundingAccountType`、`PlatformFundingAccountRole`。 | 是。 | 只表达真实资金账户；不得承载信用、预算、支付工具或钱包标识。 |
 | 信用账户 | 额度、可用额度和授权占用控制账户。 | `CreditAccount`、`CreditAccountService`。 | 是。 | 额度不是现金；不得压入 `FundingAccount`。 |
-| VCC 关联子账户 | 发卡业务中承接单卡余额、授权占用、清算、退款、拒付和卡账单解释的资金子账户或信用子账户。 | `SubjectRef(FUNDING_ACCOUNT)` / `SubjectRef(CREDIT_ACCOUNT)`、账户层级能力、VCC capability pack、支付工具绑定和资金责任解析；新增或调整父子账户字段、表和服务契约必须进入独立工程边界。 | 是，作为资金账户或信用账户的子账户。 | 不新增 `VCC_ACCOUNT`；每张 VCC 卡绑定一个子账户，卡号、PAN、token、持卡人和卡片凭证仍是支付工具或访问凭证，不得入账。 |
+| VCC 关联子账户 | VCC 场景中承接余额、授权占用、清算、退款和已确认争议资金结果的资金子账户或信用子账户。 | `SubjectRef(FUNDING_ACCOUNT)` / `SubjectRef(CREDIT_ACCOUNT)`、账户层级能力、支付工具绑定和资金责任解析；新增或调整父子账户字段、表和服务契约必须进入独立工程边界。 | 是，作为资金账户或信用账户的子账户。 | 不新增 `VCC_ACCOUNT`；卡号、PAN、token、持卡人和卡片凭证仍是支付工具或访问凭证，不得入账；卡账单由 Fincone 组合生成。 |
 | 支出控制范围 | 预算归属范围、支出控制对象和预算视图。 | `SpendControlScope`、`SpendControlScopeService`；预算型 Spend Rule。 | 否。 | 预算不是资金池，也不是核心资金账务主体；不得压入 `FundingAccount` 或作为 LedgerEntry 主体。 |
 | 支付工具 | 支付、收款或识别入口中的外部工具、外部端点、卡、VA、外部钱包端点或通道 token。 | `PaymentInstrument`、`PaymentInstrumentBinding`、`PaymentInstrumentRefSpec`。 | 否。 | 只做路由输入、绑定和快照；不得作为 LedgerEntry 主体；内部余额钱包、信用额度账户、返利钱包和商户账户本身不强制包装成支付工具。 |
 | Spend Rule / Spend Controls | 授权前支出控制规则，覆盖预算额度、MCC、商户、国家、金额、次数和窗口。 | 发卡授权控制扩展、预算型规则、规则版本和审计。 | 否。 | 只决定是否允许继续授权，不直接写 route、posting、LedgerEntry 或清结算。 |
@@ -510,7 +510,7 @@ mindmap
 | 权益金额组件 | P1 | `AC-BEN-001` 至 `AC-BEN-019`、`RED-050` 至 `RED-066` | `FundsBenefitContributionTransactionService`、权益让利资金交易请求、原事实引用、02/03 系分；`TDD-BEN-*`、`TDD-BEN-RED-*`。 | 权益准入证明、原权益资金交易事实源、闭合角色、伴随指令、补充事实、审计证据包、解释视图和外部规则核验状态必须可追溯。 | 不得在资金底座重算券、重算当前营销规则、静默补平权益差异，或用请求样例替代生产可回放事实。 |
 | 清分、清算、结算、出款和对账 | P0 | `AC-CLR-*`、`AC-SET-*`、`AC-REC-*`、`AC-ADJ-*`、`RED-030` 至 `RED-039` | `DSL-SETTLEMENT-*`、03 系分；`TDD-CLS-*`、`TDD-SETTLE-*`、`TDD-RECON-*`、`TDD-B7-RED-*`。 | 对账任务、匹配结果、差错单、清分明细、清算批次、结算单、出款单、追偿单、审批审计和职责分离必须成体系。 | 不得把清分候选直接入账；不得把外部 accepted/submitted/processing 展示为到账；不得直接改历史分录或绕过重新对账关闭差错。 |
 | 资金数据治理、余额快照、交易重放和指标边界 | P0/P1 | `AC-ARCH-*`、`AC-REPLAY-*`、`AC-RPT-*`、`RED-016` 至 `RED-019`、`RED-034`、`RED-040` 至 `RED-042` | `DSL-GOVERNANCE-*`、04 系分；`TDD-GOV-*`、`TDD-ARCH-*`、`TDD-REPLAY-*`、`TDD-METRIC-*`、`TDD-B8-RED-*`。 | Manifest、checkpoint、watermark、coverage mode、differenceReport、manualResolutionRef、冷热读取、脱敏和审计必须可验证。 | 不得缺 Manifest 推进水位；不得用普通指标快照替代余额确认；不得让治理任务反写资金事实或让数仓绕过治理读取冷事实。 |
-| VCC、全球账户和收单业务能力包 | P2 | `VCC-AC-*`、`GA-AC-*`、`ACQ-AC-*` 及对应 `*-RED-*` | 06/07/08 分册、P2 业务能力包 DSL 准入卡、业务系分补充；`TDD-P2-*` 和 P0/P1 回归。 | 业务分册、场景 pack、归一资金动作、外部引用脱敏字段、P0/P1 回归范围、外部规则核验状态和业务专项验收必须完整。 | 不得新增平行钱包、平行账本、平行清结算、平行对账或平行归档链路；不得把卡、VA、PSP、银行账户或通道对象当账本主体。 |
+| VCC、全球账户和收单场景资金能力 | P2 | `VCC-AC-*`、`GA-AC-*`、`ACQ-AC-*` 及对应 `*-RED-*` | 06 VCC 场景资金能力边界、07/08 场景分册、P2 准入卡；`TDD-P2-*` 和 P0/P1 回归。 | wind-funds 只交付归一资金动作、支付工具与外部引用脱敏快照、资金责任、账本、对账证据和 P0/P1 回归；VCC 业务模型、issuer 事件、卡交易主状态与卡账单由 Fincone 发卡业务承接。 | 不得新增平行钱包、平行账本、平行清结算、平行对账或平行归档链路；不得把卡、VA、PSP、银行账户或通道对象当账本主体。 |
 | ACH 和银行转账支撑边界 | P2 | `ACH-BOUNDARY-001` 至 `ACH-BOUNDARY-006`、`AC-RAIL-002A` 至 `AC-RAIL-007` | ACH 边界文档、DSL P2 业务能力包准入卡、TDD `TDD-RAIL-002` 至 `TDD-RAIL-007`、`TDD-RED-030`、`TDD-RED-034`。 | 上层业务归属、上层解释后的归一资金事实、return/NOC/reversal 责任方、submitted/accepted/processing 展示隔离、externalAccountRef/token/摘要白名单、外部规则核验状态和敏感数据最小化必须明确。 | 不得新增 ACH 内核模块、ACH 产品 PRD、ACH 通道能力、ACH 交易主状态机；不得解释 Nacha/ODFI/RDFI 规则、Debit 授权或 return code；不得保存完整银行账户敏感信息。 |
 
 ### 6.1.3 支付业务评审速查
@@ -536,7 +536,7 @@ mindmap
 
 | 业务分册 | 可吸收到 01-05 的共性能力 | 保留在业务分册的专属能力 | 不能下沉到资金内核的内容 |
 | --- | --- | --- | --- |
-| VCC 发卡 | 授权不等于入账、拒绝无账务副作用、卡号/PAN/token 不作为账本主体、卡绑定资金/信用子账户、原路径回放、敏感数据最小化、clearing 和 dispute 可对账。 | Program、Card、Cardholder、账户层级/父子账户配置、授权控制规则、卡组织 clearing、forced post、chargeback 证据和企业卡账单解释。 | PAN/CVC、HSM、token vault、卡组织原始报文、发卡处理商协议、完整企业卡产品生命周期。 |
+| VCC 场景 | 授权不等于入账、拒绝无账务副作用、卡号/PAN/token 不作为账本主体、卡绑定资金/信用子账户、原路径回放、敏感数据最小化以及资金对账引用。 | Fincone 承接 Program、Card、Cardholder、issuer 事件、VCC 主状态、发卡授权控制、卡组织 clearing、forced post、chargeback 案件与证据、卡账单；wind-funds 只承接归一后的资金动作。 | PAN/CVC、HSM、token vault、卡组织原始报文、发卡处理商协议和完整 VCC 产品生命周期。 |
 | 全球账户收付款 | 外部受理不等于到账、外部账户不入账、在途和可用分离、错币种阻断、费用拆分、出款回单终态确认。 | VA 匹配、银行流水、出金前置检查、退汇、FX quote、跨境材料和多币种客户账单解释。 | 银行核心、开户系统、SWIFT/本地清算网络原始协议、FX 执行、跨境合规最终判断。 |
 | 收单业务 | 支付成功不等于可结算、先清账再结算、refund 与 chargeback 分离、出款受理不等于到账、PCI 数据不入资金底座。 | Payment Attempt、Capture、Void、Dispute、准备金、商户结算单、拒付追偿和收单商户账单解释。 | 商户入网、收银台、支付方式展示、PSP 原始协议、通道路由策略、tokenization 服务。 |
 
@@ -634,7 +634,7 @@ flowchart LR
 ```mermaid
 flowchart TB
     subgraph BIZ["业务场景层"]
-        VCC["06 VCC 发卡\n授权 / clearing / 拒付 / 卡账单"]
+        VCC["06 VCC 场景资金边界\n工具 / 资金责任 / 授权 / 清算 / 退款"]
         GA["07 全球账户收付款\n入金 / 出金 / 在途 / 退汇 / FX"]
         ACQ["08 收单\npayment attempt / capture / refund / dispute"]
     end
@@ -728,7 +728,7 @@ flowchart TB
 | P1 | 资金路由 | 参与方解析、平台账户角色解析、route snapshot、posting plan、逆向回放。 | 路由只解析资金路径，不直接写交易事实、账本分录或余额。 |
 | P1 | 交易投影 | 用户账单、商户账单、运营时间线、财务核对视图、指标项输入和有界重放。 | 交易投影是只读读模型，不写交易、路由、账本或余额事实，不承接正式报表计算和会计确认。 |
 | P1 | 报表数据面 | 指标项、业务问题、使用者、推荐事实来源和只读边界。 | 指标只读消费事实和投影，不反写资金事实；具体实现由报表指标模块承接。 |
-| P2 | VCC 发卡业务支持 | 资金/信用子账户、授权资金链、清算入账、退款、拒付、卡账单解释和发卡授权控制扩展。 | 只作为业务补充分册和场景 pack，Program、Card、PAN/CVC、HSM 和处理商协议不进入资金内核；卡凭证不入账，VCC 发卡账务落到该卡绑定的资金子账户或信用子账户。 |
+| P2 | VCC 场景资金支持 | 支付工具与资金/信用子账户快照、授权资金链、清算入账、本金退款、业务已确认的争议资金结果和资金对账引用。 | wind-funds 不是发卡业务系统；Program、Card、issuer/Webhook、VCC 事件与主状态、卡账单、PAN/CVC、HSM 和处理商协议由 Fincone 承接。卡凭证不入账，VCC 场景账务落到绑定的资金子账户或信用子账户。 |
 | P2 | 全球账户收付款支持 | 入金、出金、在途、退汇、费用、FX 引用和多币种对账。 | 只承接适配后的资金动作；VA、银行账户、SWIFT、本地清算网络和 FX 执行由外部系统负责。 |
 | P2 | 收单业务支持 | payment attempt、capture、refund、dispute、商户清结算、准备金和商户账单。 | 只承接适配后的资金动作和商户资金运营闭环；商户入网、收银台、PSP 协议和 PCI token vault 不进入资金内核。 |
 

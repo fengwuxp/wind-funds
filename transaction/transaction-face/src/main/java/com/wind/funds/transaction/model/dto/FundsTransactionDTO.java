@@ -76,8 +76,8 @@ public class FundsTransactionDTO implements Serializable {
     @Schema(description = "累计撤销金额")
     private Long reversedAmount;
 
-    @Schema(description = "累计结算或完成金额")
-    private Long settledAmount;
+    @Schema(description = "累计完成金额")
+    private Long completedAmount;
 
     @Schema(description = "累计退款金额")
     private Long refundedAmount;

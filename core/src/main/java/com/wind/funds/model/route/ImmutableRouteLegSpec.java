@@ -15,7 +15,6 @@ import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -67,7 +66,7 @@ public record ImmutableRouteLegSpec(String legId,
         }
         FxAppliedRate.validateSupportedPrecision(exchangeRate);
         if (periodType != null && periodType != AccountBalancePeriodType.LIFETIME
-                && !StringUtils.hasText(periodId)) {
+                && (periodId == null || periodId.isBlank())) {
             throw new IllegalArgumentException("routeLeg.periodId is required for non-lifetime period");
         }
         constraintOverrides = Map.copyOf(constraintOverrides == null ? Map.of() : constraintOverrides);

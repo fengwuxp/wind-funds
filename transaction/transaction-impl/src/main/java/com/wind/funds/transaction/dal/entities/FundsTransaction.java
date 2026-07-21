@@ -119,10 +119,10 @@ public class FundsTransaction implements Serializable, TenantIsolationObject<Lon
     private Long reversedAmount;
 
     /**
-     * 已结算金额，单位：分。
+     * 已完成金额，单位：分。
      */
     @NotNull
-    private Long settledAmount;
+    private Long completedAmount;
 
     /**
      * 已退款金额，单位：分。

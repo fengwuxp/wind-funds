@@ -1,7 +1,7 @@
 # AGENTS.md
 
 > 本文件是 `wind-funds` 的常驻项目契约，只保留每次会话都应知道的项目定位、模块边界、资金红线、规格入口、验证命令和 Skill 路由。
-> 本项目启用 Wind 项目编码约规；通用 Java 编码、测试、Review 和 AI Native Loop 细节不在本文件重复展开，按 Skill 路由读取。
+> 本项目启用 Wind 项目编码约规；通用 Java 编码、测试、Review 和跨阶段协作细节不在本文件重复展开，按 Skill 路由读取。
 
 ## 1. 项目身份
 
@@ -40,7 +40,7 @@
 
 ## 3. Wind 项目约规
 
-本项目遵守 Wind 项目编码约规。涉及 face/impl、模型归位、Entity 不外露、基础服务、ServiceImpl、MyBatis Flex、币种枚举、TDD/CR 或代码生成后审查时，先按 `wind-project-coding-conventions` 判断规则，再由 `资深架构师` 闭环源码设计、测试和验证。
+本项目遵守 Wind 项目编码约规。涉及 face/impl、模型归位、Entity 不外露、基础服务、ServiceImpl、MyBatis Flex、币种枚举、TDD/CR 或代码生成后审查时，先按 `wind-coding-conventions` 判断规则，再由 `senior-software-architect` 闭环源码设计、测试和验证。
 
 项目级 Wind 红线：
 
@@ -60,7 +60,7 @@
 - Mock / Fake / Recording 只用于外部系统、不可控环境或明确端口边界。
 - 业务组合测试每一步都断言余额变化，不能只断言最终余额。
 - 冻结 / 解冻只做同主体 `AVAILABLE <-> FROZEN` 控制，不表达消费、扣划或跨主体价值转移。
-- 授权拒绝不得生成 route、posting、LedgerEntry，不得写入 `declinedAmount`，不得被当作 chargeback 事件。
+- 授权拒绝不得生成账务 RouteLeg、posting、LedgerEntry，不得写入 `declinedAmount`，不得被当作 chargeback 事件；允许保存不含 legs、不可回放的 RouteSnapshot 作为拒绝解释证据。
 - 清结算、对账、归档和报表测试必须证明来源事实、批次、规则版本、审计、重跑幂等和只读投影边界。
 
 测试 backlog 权威入口：`docs/TDD设计/支付资金底座测试驱动设计.md`。
@@ -109,10 +109,10 @@ just test-governance
 
 | 场景 | 必用 Skill | 产物边界 |
 | --- | --- | --- |
-| 端到端角色协作、Goal / Loop / GSD / CAD 编排、owner / 交接物 / 授权 / 验证 / 停止条件 | `ai-native-engineering-workflow` | 只做流程准入、角色协作和交接闭环；不替代产品、架构、代码、测试、Git 授权或上线审批。 |
-| 编码、编码设计、架构设计、系统分析、技术方案、代码评审、重构评估、测试设计、工程治理 | `资深架构师` | 工程边界、模块设计、接口契约、代码修改、测试策略、验证命令、Review 结论和交付说明。 |
-| Wind/Nobe 编码约规判断、face/impl、模型归位、基础服务、Entity 不外露、MyBatis Flex、ServiceImpl 和 TDD/CR 约规 | `wind-project-coding-conventions`，源码执行配合 `资深架构师` | 判断是否偏离 Wind 约规、给最小整改建议；真实源码修改和验证由架构师闭环。 |
-| 产品架构、PRD、业务建模、能力地图、业务流程、状态机、规则矩阵、产品验收，及支付资金产品方案 | `产品架构专家` | 产品目标、角色、对象、流程、状态、规则、权限、指标、异常路径、产品验收和风险清单。 |
+| 跨专业、跨阶段或跨轮持续推进，或需统一 Goal / Loop / Worker / Checker、授权、验证和知识回流 | `wise-agent` | 统一目标、边界、能力选择、执行和交付闭环；简单单领域任务直接使用对应 Skill，不做多余编排，不替代人类 Owner、Git 授权或上线审批。 |
+| 编码、编码设计、架构设计、系统分析、技术方案、代码评审、重构评估、测试设计、工程治理 | `senior-software-architect` | 工程边界、模块设计、接口契约、代码修改、测试策略、验证命令、Review 结论和交付说明。 |
+| Wind/Nobe 编码约规判断、face/impl、模型归位、基础服务、Entity 不外露、MyBatis Flex、ServiceImpl 和 TDD/CR 约规 | `wind-coding-conventions`，源码执行配合 `senior-software-architect` | 判断是否偏离 Wind 约规、给最小整改建议；真实源码修改和验证由架构师闭环。 |
+| 产品架构、PRD、业务建模、能力地图、业务流程、状态机、规则矩阵、产品验收，及支付资金产品方案 | `product-architecture-expert` | 产品目标、角色、对象、流程、状态、规则、权限、指标、异常路径、产品验收和风险清单。 |
 | 结构化 Java Service 脚手架生成 | `java-service-code-generator` | 必须有 DDL / schema / Java 类 / 字段表格；不从纯自然语言生成生产代码。 |
 
 涉及真实资金、监管、跨境、外汇、客户资金、备付金、风控或合规口径时，只输出产品和系统设计分析，不替代法律、税务、会计或合规最终结论。

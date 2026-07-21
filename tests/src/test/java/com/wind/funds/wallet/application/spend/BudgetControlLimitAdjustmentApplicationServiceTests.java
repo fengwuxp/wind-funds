@@ -274,7 +274,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     /**
      * 场景：预算控制额度投影同时存在额度、占用、消耗和退款补偿。
      * 输入：预算额度 100，先预占 60，再消费 60，随后退款补偿 40。
-     * 输出：投影展示净消费 20、未终局控制占用 40、可用控制额度 40。
+     * 输出：投影展示净消费 20、未终局控制占用 0、可用控制额度 80。
      * 红线：预算控制投影只解释 Spend Rule 控制额度，不生成资金交易、route、posting、LedgerEntry 或账本余额投影。
      */
     @Test
@@ -294,8 +294,8 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
         assertThat(projection.getConsumedAmount()).isEqualTo(20L);
         assertThat(projection.getReleasedAmount()).isZero();
-        assertThat(projection.getRemainingControlAmount()).isEqualTo(40L);
-        assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
+        assertThat(projection.getRemainingControlAmount()).isZero();
+        assertThat(projection.getAvailableControlAmount()).isEqualTo(80L);
         assertNoTransactionFacts(CONSUMED_BUSINESS_SN);
         assertNoTransactionFacts(REFUND_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, beforeQuery);

@@ -1,7 +1,6 @@
 package com.wind.funds.model;
 
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -63,7 +62,7 @@ public final class FundsContextVariables {
     }
 
     private static String requireContextKey(@Nullable Object key) {
-        if (key instanceof String text && StringUtils.hasText(text)) {
+        if (key instanceof String text && !text.isBlank()) {
             return text;
         }
         throw new IllegalArgumentException("contextVariables key must be text");

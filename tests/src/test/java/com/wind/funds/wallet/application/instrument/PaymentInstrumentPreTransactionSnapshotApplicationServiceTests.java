@@ -71,6 +71,8 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
 
     private static final String REFUND_ACCOUNT_SN = "pre_tx_refund_account";
 
+    private static final String PARENT_FUNDING_ACCOUNT_SN = "pre_tx_parent_funding";
+
     private static final String PAYMENT_INSTRUMENT_SN = "pre_tx_payment_card";
 
     private static final String RECEIVE_INSTRUMENT_SN = "pre_tx_receive_card";
@@ -196,6 +198,32 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
     }
 
     /**
+     * 场景：共享卡绑定的信用账户不可支付，但父资金责任账户仍为 ACTIVE。
+     * 输入：支付工具绑定 SUSPENDED CreditAccount，资金责任解析到可支付的父 FundingAccount。
+     * 输出：预交易准入按绑定支付主体失败，不返回 ready 快照。
+     * 红线：父资金账户可用不能绕过共享卡自身信用账户的状态和额度能力控制。
+     */
+    @Test
+    void testResolvePreTransactionSnapshotShouldRejectUnavailableBoundCreditAccount() {
+        creditAccountService.createCreditAccount(createCreditAccountRequest()
+                .setStatus(FundsAccountStatus.SUSPENDED));
+        fundingAccountService.createFundingAccount(createParentFundingAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.OUTBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(PAYMENT_INSTRUMENT_SN));
+        fundingRelationService.createSpendSubjectFundingRelation(createParentFundingRelationRequest());
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> snapshotApplicationService.resolvePreTransactionSnapshot(
+                snapshotRequest(PAYMENT_INSTRUMENT_SN).setAction(PaymentInstrumentAction.AUTHORIZE)))
+                .hasMessageContaining("预交易快照账户能力不支持当前动作")
+                .hasMessageContaining(CREDIT_ACCOUNT_SN);
+
+        assertNoTransactionFacts(BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
      * 场景：预交易快照请求租户与当前线程租户不一致。
      * 输入：当前线程租户为 1，请求 tenantId 为 2。
      * 输出：应用层入口直接拒绝。
@@ -240,7 +268,9 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", CREDIT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", REFUND_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn = ?", REFUND_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id = ?", PARENT_FUNDING_ACCOUNT_SN);
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)", REFUND_ACCOUNT_SN,
+                PARENT_FUNDING_ACCOUNT_SN);
     }
 
     private ResolvePaymentInstrumentPreTransactionSnapshotRequest snapshotRequest(String instrumentSn) {
@@ -280,6 +310,10 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
                 .setCurrency(CurrencyIsoCode.USD)
                 .setLedgerProfileCode(LedgerProfileCode.FUNDING_BASIC)
                 .setStatus(FundsAccountStatus.ACTIVE);
+    }
+
+    private CreateFundingAccountRequest createParentFundingAccountRequest() {
+        return createRefundAccountRequest().setSn(PARENT_FUNDING_ACCOUNT_SN);
     }
 
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
@@ -342,6 +376,12 @@ class PaymentInstrumentPreTransactionSnapshotApplicationServiceTests extends Abs
                 .setTargetSubjectId(REFUND_ACCOUNT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE);
+    }
+
+    private CreateSpendSubjectFundingRelationRequest createParentFundingRelationRequest() {
+        return createFundingRelationRequest()
+                .setTargetSubjectType(FundsSubjectType.FUNDING_ACCOUNT)
+                .setTargetSubjectId(PARENT_FUNDING_ACCOUNT_SN);
     }
 
     private void assertNoTransactionFacts(String businessSn) {

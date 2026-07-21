@@ -400,7 +400,6 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
         assertThat(ledgerTransaction.getBusinessSn()).isEqualTo("PROJECTION_FAILURE_PAY");
         assertThat(ledgerTransaction.getDebitAmount()).isEqualTo(40L);
         assertThat(ledgerTransaction.getCreditAmount()).isEqualTo(40L);
-        assertThat(ledgerTransaction.getBalanced()).isTrue();
         assertThat(postingPlans).singleElement().satisfies(plan -> {
             assertThat(plan.getFundsTransactionSn()).isEqualTo(transactionSn);
             assertThat(plan.getLedgerTransactionSn()).isEqualTo(ledgerTransaction.getSn());
@@ -413,7 +412,6 @@ class DefaultRoutedFundsInstructionOrchestratorProjectionTests extends FundsTran
             assertThat(plan.getCurrency()).isEqualTo(CURRENCY);
             assertThat(plan.getDebitAmount()).isEqualTo(40L);
             assertThat(plan.getCreditAmount()).isEqualTo(40L);
-            assertThat(plan.getBalanced()).isTrue();
         });
         String postingPlanSn = postingPlans.getFirst().getSn();
         assertThat(entries).hasSize(2).allSatisfy(entry -> {

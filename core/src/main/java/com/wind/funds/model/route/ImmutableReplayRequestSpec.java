@@ -9,7 +9,6 @@ import lombok.Builder;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -65,7 +64,7 @@ public final class ImmutableReplayRequestSpec implements ReplayRequestSpec {
                                        @Nullable String description,
                                        @Nullable FundsOperationActorSpec operator,
                                        @Nullable Map<String, Object> contextVariables) {
-        if (!StringUtils.hasText(referenceSnapshotId)) {
+        if (referenceSnapshotId == null || referenceSnapshotId.isBlank()) {
             throw new IllegalArgumentException("referenceSnapshotId is required for route replay");
         }
         if (replayType == null) {

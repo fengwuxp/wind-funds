@@ -2,13 +2,31 @@ package com.wind.funds.transaction.application.impl;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.domain.core.operator.WindOperator;
+import com.mybatisflex.core.query.QueryWrapper;
+import com.wind.common.exception.AssertUtils;
+import com.wind.common.locks.JdkLockFactory;
+import com.wind.common.locks.LockFactory;
+import com.wind.common.locks.WindLock;
 import com.wind.core.ReadonlyContextVariables;
+import com.wind.funds.spec.transaction.FundsInstructionSpec;
+import com.wind.funds.transaction.FundsInstructionOrchestrator;
+import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
+import com.wind.funds.transaction.application.FundsBalanceControlService;
+import com.wind.funds.transaction.application.FundsDirectTransactionService;
+import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
+import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
+import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
+import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
+import com.wind.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
+import com.wind.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
+import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
@@ -19,19 +37,7 @@ import com.wind.funds.transaction.model.request.FundsTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTransferRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionWithdrawRequest;
-import com.wind.funds.transaction.application.FundsAuthorizationTransactionService;
-import com.wind.funds.transaction.application.FundsBalanceControlService;
-import com.wind.funds.transaction.application.FundsDirectTransactionService;
-import com.wind.funds.transaction.converter.FundsAuthorizationInstructionConverter;
-import com.wind.funds.transaction.converter.FundsBalanceControlInstructionConverter;
-import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionConverter;
-import com.wind.common.exception.AssertUtils;
-import com.wind.common.locks.JdkLockFactory;
-import com.wind.common.locks.LockFactory;
-import com.wind.common.locks.WindLock;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
-import com.wind.funds.spec.transaction.FundsInstructionSpec;
-import com.wind.funds.transaction.FundsInstructionOrchestrator;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -43,9 +49,9 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -59,9 +65,9 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         FundsBalanceControlService,
         FundsAuthorizationTransactionService {
 
-    private static final String AUTHORIZATION_TRANSACTION_LOCK_PREFIX = "funds:authorization-transaction:";
+    private static final String REFERENCED_TRANSACTION_LOCK_PREFIX = "funds:referenced-transaction:";
 
-    private static final LockFactory AUTHORIZATION_TRANSACTION_LOCK_FACTORY = new JdkLockFactory();
+    private static final LockFactory REFERENCED_TRANSACTION_LOCK_FACTORY = new JdkLockFactory();
 
     private final FundsDirectTransactionInstructionConverter directTransactionInstructionConverter;
 
@@ -72,6 +78,8 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     private final FundsInstructionOrchestrator<FundsInstructionSpec> fundsInstructionOrchestrator;
 
     private final FundsTransactionMapper fundsTransactionMapper;
+
+    private final FundsTransactionDetailMapper fundsTransactionDetailMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -125,9 +133,11 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     @Override
     @Transactional(rollbackFor = Exception.class)
     public String refundFee(FundsTransactionFeeRefundRequest request, WindOperator operator) {
-        AssertUtils.notNull(request.getFeeSourceTransactionSn(), "手续费退回原费用交易流水不能为空");
+        AssertUtils.hasText(request.getFeeSourceTransactionSn(), "手续费退回原费用交易流水不能为空");
         AssertUtils.notNull(request.getAccountId(), "手续费退回到账账户不能为空");
-        return execute(directTransactionInstructionConverter.convertToFeeRefundInstruction(request, operator));
+        return executeWithLockedReferenceTransaction(request.getFeeSourceTransactionSn(), "手续费原费用交易",
+                sourceTransaction -> execute(directTransactionInstructionConverter
+                        .convertToFeeRefundInstruction(request, operator)));
     }
 
     @Override
@@ -161,34 +171,32 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
                 authorizationTransaction -> {
                     request.setContextVariables(authorizationSuccessorContext(request.getContextVariables()));
                     return authorizationInstructionConverter.convertToReversalInstruction(request, operator);
-                },
-                this::assertAuthorizationRemainingAmountSufficient);
+                });
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String settle(FundsAuthorizationTransactionSettleRequest request, WindOperator operator) {
-        if (request.isForceSettle()) {
-            return execute(authorizationInstructionConverter.convertToSettleInstruction(request, operator));
+    public String complete(FundsAuthorizationTransactionCompleteRequest request, WindOperator operator) {
+        if (request.isForceCompletion()) {
+            return execute(authorizationInstructionConverter.convertToCompleteInstruction(request, operator));
         }
         return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
                 authorizationTransaction -> {
                     request.setContextVariables(authorizationSuccessorContext(request.getContextVariables()));
-                    return authorizationInstructionConverter.convertToSettleInstruction(request, operator);
-                },
-                this::assertAuthorizationRemainingAmountSufficient);
+                    return authorizationInstructionConverter.convertToCompleteInstruction(request, operator);
+                });
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String settleRefund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator) {
+    public String refund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator) {
         if (request.isNoAuthRefund()) {
-            return execute(authorizationInstructionConverter.convertToSettleRefundInstruction(request, operator));
+            return execute(authorizationInstructionConverter.convertToRefundInstruction(request, operator));
         }
         return executeAuthorizationSuccessor(request.getAuthorizationTransactionSn(),
                 authorizationTransaction -> {
                     request.setContextVariables(authorizationSuccessorContext(request.getContextVariables()));
-                    return authorizationInstructionConverter.convertToSettleRefundInstruction(request, operator);
+                    return authorizationInstructionConverter.convertToRefundInstruction(request, operator);
                 });
     }
 
@@ -199,27 +207,29 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     private @NonNull String executeAuthorizationSuccessor(
             String authorizationTransactionSn,
             Function<FundsTransaction, FundsInstructionSpec> instructionFactory) {
-        return executeAuthorizationSuccessor(authorizationTransactionSn, instructionFactory, (transaction, instruction) -> {
-        });
-    }
-
-    private @NonNull String executeAuthorizationSuccessor(
-            String authorizationTransactionSn,
-            Function<FundsTransaction, FundsInstructionSpec> instructionFactory,
-            BiConsumer<FundsTransaction, FundsInstructionSpec> precondition) {
         if (authorizationTransactionSn == null || authorizationTransactionSn.isBlank()) {
             throw new IllegalArgumentException("authorizationTransactionSn must not be blank");
         }
-        WindLock lock = AUTHORIZATION_TRANSACTION_LOCK_FACTORY.apply(authorizationTransactionLockKey(
-                authorizationTransactionSn));
+        return executeWithLockedReferenceTransaction(authorizationTransactionSn, "授权交易",
+                authorizationTransaction -> {
+                    FundsInstructionSpec instruction = instructionFactory.apply(authorizationTransaction);
+                    assertAuthorizationRemainingAmountSufficient(authorizationTransaction, instruction);
+                    return execute(instruction);
+                });
+    }
+
+    private @NonNull String executeWithLockedReferenceTransaction(
+            String referenceTransactionSn,
+            String referenceName,
+            Function<FundsTransaction, String> command) {
+        WindLock lock = REFERENCED_TRANSACTION_LOCK_FACTORY.apply(referencedTransactionLockKey(
+                referenceTransactionSn));
         lock.lock();
         boolean unlockImmediately = true;
         try {
             unlockImmediately = !registerTransactionCompletionUnlock(lock);
-            FundsTransaction authorizationTransaction = lockAuthorizationTransaction(authorizationTransactionSn);
-            FundsInstructionSpec instruction = instructionFactory.apply(authorizationTransaction);
-            precondition.accept(authorizationTransaction, instruction);
-            return execute(instruction);
+            FundsTransaction referenceTransaction = lockReferencedTransaction(referenceTransactionSn, referenceName);
+            return command.apply(referenceTransaction);
         } finally {
             if (unlockImmediately) {
                 lock.unlock();
@@ -227,11 +237,11 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         }
     }
 
-    private static String authorizationTransactionLockKey(String authorizationTransactionSn) {
-        return AUTHORIZATION_TRANSACTION_LOCK_PREFIX
+    private static String referencedTransactionLockKey(String referenceTransactionSn) {
+        return REFERENCED_TRANSACTION_LOCK_PREFIX
                 + ThreadContextTenantIdHolder.requireTenantId()
                 + ":"
-                + authorizationTransactionSn;
+                + referenceTransactionSn;
     }
 
     private static boolean registerTransactionCompletionUnlock(WindLock lock) {
@@ -256,22 +266,43 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         return result.isEmpty() ? requestContext : ReadonlyContextVariables.of(result);
     }
 
-    private FundsTransaction lockAuthorizationTransaction(String authorizationTransactionSn) {
+    private FundsTransaction lockReferencedTransaction(String referenceTransactionSn, String referenceName) {
         Long tenantId = ThreadContextTenantIdHolder.requireTenantId();
-        FundsTransaction authorizationTransaction = fundsTransactionMapper.selectBySnForUpdate(tenantId,
-                authorizationTransactionSn);
-        AssertUtils.notNull(authorizationTransaction,
-                "授权交易不存在，authorizationTransactionSn = {}", authorizationTransactionSn);
-        return authorizationTransaction;
+        FundsTransaction referenceTransaction = fundsTransactionMapper.selectBySnForUpdate(tenantId,
+                referenceTransactionSn);
+        AssertUtils.notNull(referenceTransaction,
+                "{}不存在，transactionSn = {}", referenceName, referenceTransactionSn);
+        return referenceTransaction;
     }
 
     private void assertAuthorizationRemainingAmountSufficient(FundsTransaction transaction,
                                                               FundsInstructionSpec instruction) {
+        if (instruction.getEventType() != FundsTransactionEventType.COMPLETE
+                && instruction.getEventType() != FundsTransactionEventType.REVERSAL) {
+            return;
+        }
+        if (isSucceededAuthorizationSuccessor(transaction.getSn(), instruction)) {
+            return;
+        }
         long amount = instruction.getAmount().getAmount();
-        long remainingAmount = transaction.getAuthorizedAmount() - transaction.getSettledAmount()
+        long remainingAmount = transaction.getAuthorizedAmount() - transaction.getCompletedAmount()
                 - transaction.getReversedAmount();
         AssertUtils.isTrue(amount <= remainingAmount,
-                "资金交易剩余授权可释放金额不足，sn = {}，remainingAmount = {}，amount = {}",
+                "资金交易剩余授权金额不足，sn = {}，remainingAmount = {}，amount = {}",
                 transaction.getSn(), remainingAmount, amount);
     }
+
+    private boolean isSucceededAuthorizationSuccessor(String transactionSn, FundsInstructionSpec instruction) {
+        FundsTransactionDetailNameRefs ref = FundsTransactionDetailNameRefs.fundsTransactionDetail;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(instruction.getTenantId()))
+                .and(ref.transactionSn.eq(transactionSn))
+                .and(ref.businessScene.eq(instruction.getBusinessScene()))
+                .and(ref.businessSn.eq(instruction.getBusinessSn()))
+                .and(ref.eventType.eq(instruction.getEventType()));
+        List<FundsTransactionDetail> details = fundsTransactionDetailMapper.selectListByQuery(wrapper);
+        return !details.isEmpty()
+                && details.stream().allMatch(detail -> detail.getStatus() == FundsTransactionDetailStatus.SUCCEEDED);
+    }
+
 }

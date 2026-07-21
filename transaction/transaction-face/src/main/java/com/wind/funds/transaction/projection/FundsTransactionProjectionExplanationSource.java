@@ -2,9 +2,13 @@ package com.wind.funds.transaction.projection;
 
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
+import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.enums.FundsTransactionMode;
+import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.transaction.core.Money;
 import lombok.Builder;
 import org.jspecify.annotations.NonNull;
@@ -125,6 +129,10 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
 
     private static final String PAYMENT_INSTRUMENT_REF_CONTEXT_KEY = "paymentInstrumentRef";
 
+    private static final String EXTERNAL_ACCOUNT_REF_CONTEXT_KEY = "externalAccountRef";
+
+    private static final String TRANSACTION_SUMMARY_CONTEXT_KEY = "transactionSummary";
+
     private static final String INSTRUMENT_ID_FIELD = "instrumentId";
 
     private static final String INSTRUMENT_TYPE_FIELD = "instrumentType";
@@ -148,6 +156,32 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
     private static final String BINDING_VERSION_FIELD = "bindingVersion";
 
     private static final String DESCRIPTION_FIELD = "description";
+
+    private static final String EXTERNAL_ACCOUNT_ID_FIELD = "externalAccountId";
+
+    private static final String EXTERNAL_ACCOUNT_TYPE_FIELD = "externalAccountType";
+
+    private static final String PROVIDER_CODE_FIELD = "providerCode";
+
+    private static final String CHANNEL_CODE_FIELD = "channelCode";
+
+    private static final String COUNTRY_CODE_FIELD = "countryCode";
+
+    private static final String AMOUNT_FIELD = "amount";
+
+    private static final String AUTHORIZED_AMOUNT_FIELD = "authorizedAmount";
+
+    private static final String COMPLETED_AMOUNT_FIELD = "completedAmount";
+
+    private static final String REVERSED_AMOUNT_FIELD = "reversedAmount";
+
+    private static final String REFUNDED_AMOUNT_FIELD = "refundedAmount";
+
+    private static final String DECLINED_AMOUNT_FIELD = "declinedAmount";
+
+    private static final String FEE_AMOUNT_FIELD = "feeAmount";
+
+    private static final String REMAINING_AUTHORIZATION_AMOUNT_FIELD = "remainingAuthorizationAmount";
 
     private static final String SPEND_RULE_DECISION_RECORD_ID_FIELD = "decisionRecordId";
 
@@ -197,6 +231,26 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
      * @return 交易投影解释摘要
      */
     public @NonNull FundsTransactionProjectionExplanation explanation() {
+        return buildExplanation(null);
+    }
+
+    /**
+     * 结合交易聚合累计量生成当前态解释摘要。
+     *
+     * <p>该入口用于单笔查询。事件发布仍调用 {@link #explanation()}，保持事件事实与当前聚合态分离。</p>
+     *
+     * @param transaction 交易聚合事实
+     * @return 当前态交易投影解释摘要
+     */
+    public @NonNull FundsTransactionProjectionExplanation explanation(@NonNull FundsTransactionDTO transaction) {
+        AssertUtils.notNull(transaction, "交易投影当前态解释的交易聚合不能为空");
+        return buildExplanation(transaction);
+    }
+
+    private @NonNull FundsTransactionProjectionExplanation buildExplanation(
+            @Nullable FundsTransactionDTO transaction) {
+        boolean outstandingAuthorization = hasOutstandingAuthorization(transaction);
+        boolean partiallyRefundedAuthorization = hasPartiallyRefundedAuthorization(transaction);
         return FundsTransactionProjectionExplanation.builder()
                 .businessScene(businessScene)
                 .businessSn(businessSn)
@@ -204,16 +258,22 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
                 .routeSnapshotId(routeSnapshot.getSnapshotId())
                 .routeCode(routeSnapshot.getRouteCode())
                 .ledgerTransactionSn(ledgerTransactionSn)
-                .factStatus(resolveFactStatus())
-                .displayStatus(resolveDisplayStatus())
-                .operationStatus(resolveOperationStatus())
-                .statusMeaning(resolveStatusMeaning())
+                .factStatus(outstandingAuthorization ? FACT_STATUS_HELD : resolveFactStatus())
+                .displayStatus(outstandingAuthorization
+                        ? DISPLAY_STATUS_AUTHORIZED_HOLD
+                        : partiallyRefundedAuthorization ? DISPLAY_STATUS_SUCCEEDED : resolveDisplayStatus())
+                .operationStatus(outstandingAuthorization
+                        ? OPERATION_STATUS_WAITING_CAPTURE_OR_RELEASE : resolveOperationStatus())
+                .statusMeaning(outstandingAuthorization
+                        ? STATUS_MEANING_AUTHORIZATION_HELD_NOT_CAPTURED
+                        : partiallyRefundedAuthorization ? STATUS_MEANING_FUNDS_POSTED : resolveStatusMeaning())
                 .amountSource(resolveAmountSource())
                 .failureReason(resolveFailureReason())
-                .unavailableReason(resolveUnavailableReason())
-                .nextAction(resolveNextAction())
+                .unavailableReason(outstandingAuthorization
+                        ? UNAVAILABLE_AUTHORIZATION_HOLD_NOT_FINAL_CONSUMPTION : resolveUnavailableReason())
+                .nextAction(outstandingAuthorization ? NEXT_ACTION_WAIT_FOR_CAPTURE_OR_RELEASE : resolveNextAction())
                 .evidenceRefs(evidenceRefs())
-                .explanationContext(resolveExplanationContext())
+                .explanationContext(resolveExplanationContext(transaction))
                 .externalRuleVerificationStatus(NOT_APPLICABLE)
                 .build();
     }
@@ -375,6 +435,7 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             refs.add("ledgerTransaction:" + ledgerTransactionSn);
         }
         addPaymentInstrumentEvidence(refs);
+        addExternalAccountEvidence(refs);
         addSpendRuleDecisionEvidence(refs);
         addContextEvidence(refs, FundsInstructionContextKeys.EXTERNAL_DISPUTE_REF, "externalDisputeRef");
         addContextEvidence(refs, FundsInstructionContextKeys.DISPUTE_VOUCHER_REF, "disputeVoucherRef");
@@ -409,6 +470,13 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         refs.add("paymentInstrumentBinding:" + bindingSn + versionSuffix);
     }
 
+    private void addExternalAccountEvidence(@NonNull List<String> refs) {
+        ExternalAccountRefSpec externalAccountRef = routeSnapshot.getExternalAccountRef();
+        if (externalAccountRef != null && StringUtils.hasText(externalAccountRef.getExternalAccountId())) {
+            refs.add("externalAccount:" + externalAccountRef.getExternalAccountId());
+        }
+    }
+
     private void addSpendRuleDecisionEvidence(@NonNull List<String> refs) {
         Map<String, Object> decision = spendRuleDecisionContext();
         if (decision.isEmpty()) {
@@ -437,10 +505,12 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
         }
     }
 
-    private @NonNull Map<String, Object> resolveExplanationContext() {
+    private @NonNull Map<String, Object> resolveExplanationContext(@Nullable FundsTransactionDTO transaction) {
         Map<String, Object> result = new LinkedHashMap<>();
         putPaymentInstrumentRef(result);
+        putExternalAccountRef(result);
         putSpendRuleDecision(result);
+        putTransactionSummary(result, transaction);
         if (isDisputeRefund()) {
             putContextValue(result, FundsInstructionContextKeys.REFUND_MODE);
             putContextValue(result, FundsInstructionContextKeys.DISPUTE_MODE);
@@ -453,6 +523,83 @@ public record FundsTransactionProjectionExplanationSource(@NonNull String busine
             putContextValue(result, FundsInstructionContextKeys.REFUND_REASON);
         }
         return Map.copyOf(result);
+    }
+
+    private void putExternalAccountRef(@NonNull Map<String, Object> values) {
+        ExternalAccountRefSpec externalAccountRef = routeSnapshot.getExternalAccountRef();
+        if (externalAccountRef == null) {
+            return;
+        }
+        Map<String, Object> refValues = new LinkedHashMap<>();
+        putIfText(refValues, EXTERNAL_ACCOUNT_ID_FIELD, externalAccountRef.getExternalAccountId());
+        putIfText(refValues, EXTERNAL_ACCOUNT_TYPE_FIELD, externalAccountRef.getExternalAccountType());
+        putIfText(refValues, PROVIDER_CODE_FIELD, externalAccountRef.getProviderCode());
+        putIfText(refValues, CHANNEL_CODE_FIELD, externalAccountRef.getChannelCode());
+        putIfText(refValues, CURRENCY_FIELD, externalAccountRef.getCurrency());
+        putIfText(refValues, COUNTRY_CODE_FIELD, externalAccountRef.getCountryCode());
+        Object externalTransactionId = externalAccountRef.getContextVariables()
+                .get(FundsInstructionContextKeys.EXTERNAL_TRANSACTION_ID);
+        if (externalTransactionId != null) {
+            putIfText(refValues, FundsInstructionContextKeys.EXTERNAL_TRANSACTION_ID,
+                    externalTransactionId.toString());
+        }
+        values.put(EXTERNAL_ACCOUNT_REF_CONTEXT_KEY, Map.copyOf(refValues));
+    }
+
+    private void putTransactionSummary(@NonNull Map<String, Object> values,
+                                       @Nullable FundsTransactionDTO transaction) {
+        if (transaction == null) {
+            return;
+        }
+        Map<String, Object> summary = new LinkedHashMap<>();
+        if (transaction.getStatus() != null) {
+            summary.put(STATUS_FIELD, transaction.getStatus().name());
+        }
+        putIfNotNull(summary, AMOUNT_FIELD, transaction.getAmount());
+        if (transaction.getCurrency() != null) {
+            summary.put(CURRENCY_FIELD, transaction.getCurrency().name());
+        }
+        putIfNotNull(summary, AUTHORIZED_AMOUNT_FIELD, transaction.getAuthorizedAmount());
+        putIfNotNull(summary, COMPLETED_AMOUNT_FIELD, transaction.getCompletedAmount());
+        putIfNotNull(summary, REVERSED_AMOUNT_FIELD, transaction.getReversedAmount());
+        putIfNotNull(summary, REFUNDED_AMOUNT_FIELD, transaction.getRefundedAmount());
+        putIfNotNull(summary, DECLINED_AMOUNT_FIELD, transaction.getDeclinedAmount());
+        putIfNotNull(summary, FEE_AMOUNT_FIELD, transaction.getFeeAmount());
+        if (transaction.getTransactionMode() == FundsTransactionMode.AUTHORIZATION) {
+            summary.put(REMAINING_AUTHORIZATION_AMOUNT_FIELD, remainingAuthorizationAmount(transaction));
+        }
+        values.put(TRANSACTION_SUMMARY_CONTEXT_KEY, Map.copyOf(summary));
+    }
+
+    private boolean hasOutstandingAuthorization(@Nullable FundsTransactionDTO transaction) {
+        return transaction != null
+                && transaction.getTransactionMode() == FundsTransactionMode.AUTHORIZATION
+                && transaction.getStatus() == FundsTransactionStatus.OPEN
+                && remainingAuthorizationAmount(transaction) > 0;
+    }
+
+    private boolean hasPartiallyRefundedAuthorization(@Nullable FundsTransactionDTO transaction) {
+        if (transaction == null
+                || transaction.getTransactionMode() != FundsTransactionMode.AUTHORIZATION
+                || !isRefundEvent()
+                || isDisputeRefund()
+                || isNoAuthRefund()) {
+            return false;
+        }
+        long completedAmount = amountOrZero(transaction.getCompletedAmount());
+        long refundedAmount = amountOrZero(transaction.getRefundedAmount());
+        return refundedAmount > 0 && refundedAmount < completedAmount;
+    }
+
+    private long remainingAuthorizationAmount(@NonNull FundsTransactionDTO transaction) {
+        long remainingAmount = amountOrZero(transaction.getAuthorizedAmount())
+                - amountOrZero(transaction.getCompletedAmount())
+                - amountOrZero(transaction.getReversedAmount());
+        return Math.max(remainingAmount, 0L);
+    }
+
+    private long amountOrZero(@Nullable Long value) {
+        return value == null ? 0L : value;
     }
 
     private void putPaymentInstrumentRef(@NonNull Map<String, Object> values) {

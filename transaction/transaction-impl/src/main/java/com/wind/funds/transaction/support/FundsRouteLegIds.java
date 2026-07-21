@@ -33,11 +33,11 @@ public final class FundsRouteLegIds {
 
     public static final String REVERSAL_PREFIX = "REVERSAL_";
 
-    public static final String AUTHORIZATION_SETTLEMENT_PREFIX = "AUTHORIZATION_SETTLEMENT_";
+    public static final String AUTHORIZATION_COMPLETION_PREFIX = "AUTHORIZATION_COMPLETION_";
 
-    public static final String FORCE_SETTLEMENT_PREFIX = "FORCE_SETTLEMENT_";
+    public static final String FORCE_COMPLETION_PREFIX = "FORCE_COMPLETION_";
 
-    public static final String SETTLE_REFUND_PREFIX = "SETTLE_REFUND_";
+    public static final String AUTHORIZATION_REFUND_PREFIX = "AUTHORIZATION_REFUND_";
 
     private FundsRouteLegIds() {
     }

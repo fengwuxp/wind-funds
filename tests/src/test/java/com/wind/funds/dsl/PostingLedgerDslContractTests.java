@@ -6,12 +6,7 @@ import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
-import com.wind.funds.model.route.ImmutableAccountHierarchySnapshotSpec;
-import com.wind.funds.model.route.ImmutableSubjectRef;
 import com.wind.funds.route.enums.FundsSubjectType;
-import com.wind.funds.route.ref.SubjectRef;
-import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.spec.ledger.LedgerPostingPhaseSpec;
 import com.wind.funds.spec.ledger.LedgerPostingPlanSpec;
@@ -117,35 +112,15 @@ class PostingLedgerDslContractTests {
     }
 
     /**
-     * 场景：VCC 子账户、多级账户或父账户汇总需要在账目事实上保留当次层级快照。
-     * 预期：真实入账分录默认为 DETAIL，并可携带不可变账户层级快照。
-     * 红线：账目分录不能只保存 subjectId，丢失当次父子账户关系和责任归因上下文。
+     * 场景：账户层级由资金交易的 RouteSnapshot 负责冻结和回放。
+     * 预期：LedgerEntry 只保存账务事实，不重复暴露账户层级快照或不可解析的快照引用。
+     * 红线：不能把路由决策证据复制进分录契约，形成两个可能漂移的历史事实源。
      */
     @Test
-    void testLedgerEntryShouldCarryPostingRoleAndAccountHierarchySnapshot() {
-        SubjectRef cardAccount = accountSubject("CA-VCC-CARD-001");
-        SubjectRef parentAccount = accountSubject("CA-VCC-PARENT-001");
-        AccountHierarchySnapshotSpec hierarchySnapshot = ImmutableAccountHierarchySnapshotSpec.builder()
-                .accountRef(cardAccount)
-                .parentAccountRef(parentAccount)
-                .rootAccountRef(parentAccount)
-                .contextVariables(Map.of("bindingVersion", 3))
-                .build();
-
-        LedgerEntrySpec detailEntry = entry("CA-VCC-CARD-001",
-                FundsSubjectType.CREDIT_ACCOUNT.name(),
-                LedgerSubjectCode.AVAILABLE,
-                LedgerSubjectCategory.ASSET,
-                "LE-DSL-HIERARCHY-001",
-                EntrySide.DEBIT,
-                Money.immutable(100L, CurrencyIsoCode.USD),
-                LedgerPostingRole.DETAIL,
-                hierarchySnapshot);
-
-        assertThat(detailEntry.getPostingRole()).isEqualTo(LedgerPostingRole.DETAIL);
-        assertThat(detailEntry.getAccountHierarchySnapshot()).isSameAs(hierarchySnapshot);
-        assertThat(detailEntry.getAccountHierarchySnapshot().getAccountRef()).isSameAs(cardAccount);
-        assertThat(detailEntry.getAccountHierarchySnapshot().getParentAccountRef()).isSameAs(parentAccount);
+    void testLedgerEntryShouldNotOwnRouteHierarchySnapshot() {
+        assertThat(LedgerEntrySpec.class.getMethods())
+                .extracting(Method::getName)
+                .doesNotContain("getAccountHierarchySnapshot", "getHierarchySnapshotRef");
     }
 
     /**
@@ -273,7 +248,6 @@ class PostingLedgerDslContractTests {
                 .fundsTransactionSn("FUNDS-TX-CONTEXT-001")
                 .eventType(FundsTransactionEventType.TRANSFER)
                 .transactionType(DefaultFundsTransactionType.TRANSFER)
-                .status(LedgerTransactionStatus.POSTED)
                 .amount(Money.immutable(100L, CurrencyIsoCode.USD))
                 .originalAmount(Money.immutable(100L, CurrencyIsoCode.USD))
                 .exchangeRate(BigDecimal.ONE)
@@ -314,8 +288,7 @@ class PostingLedgerDslContractTests {
                 "LE-DSL-001",
                 side,
                 Money.immutable(amount, CurrencyIsoCode.USD),
-                postingRole,
-                null);
+                postingRole);
     }
 
     private LedgerEntrySpec entry(EntrySide side, long amount, CurrencyIsoCode currency) {
@@ -358,8 +331,7 @@ class PostingLedgerDslContractTests {
                 ledgerTransactionSn,
                 side,
                 amount,
-                LedgerPostingRole.DETAIL,
-                null);
+                LedgerPostingRole.DETAIL);
     }
 
     private LedgerEntrySpec entry(String subjectId,
@@ -369,8 +341,7 @@ class PostingLedgerDslContractTests {
                                   String ledgerTransactionSn,
                                   EntrySide side,
                                   Money amount,
-                                  LedgerPostingRole postingRole,
-                                  AccountHierarchySnapshotSpec hierarchySnapshot) {
+                                  LedgerPostingRole postingRole) {
         return new TestLedgerEntrySpec(subjectId,
                 subjectType,
                 ledgerSubjectCode,
@@ -378,22 +349,11 @@ class PostingLedgerDslContractTests {
                 ledgerTransactionSn,
                 side,
                 amount,
-                postingRole,
-                hierarchySnapshot);
+                postingRole);
     }
 
     private LedgerTransactionSpec ledgerTransaction(List<LedgerPostingPlanSpec> postingPlans) {
         return new TestLedgerTransactionSpec(postingPlans);
-    }
-
-    private SubjectRef accountSubject(String subjectId) {
-        return ImmutableSubjectRef.builder()
-                .tenantId(1L)
-                .subjectId(subjectId)
-                .subjectType(FundsSubjectType.CREDIT_ACCOUNT)
-                .currency(CurrencyIsoCode.USD.name())
-                .ledgerProfileCode("DEFAULT")
-                .build();
     }
 
     private boolean isDefaultMethod(Method method) {
@@ -456,8 +416,7 @@ class PostingLedgerDslContractTests {
                                        String ledgerTransactionSn,
                                        EntrySide entryType,
                                        Money amount,
-                                       LedgerPostingRole postingRole,
-                                       AccountHierarchySnapshotSpec accountHierarchySnapshot) implements LedgerEntrySpec {
+                                       LedgerPostingRole postingRole) implements LedgerEntrySpec {
 
         @Override
         public String getSubjectId() {
@@ -530,11 +489,6 @@ class PostingLedgerDslContractTests {
         }
 
         @Override
-        public AccountHierarchySnapshotSpec getAccountHierarchySnapshot() {
-            return accountHierarchySnapshot;
-        }
-
-        @Override
         public Map<String, Object> getContextVariables() {
             return Map.of();
         }
@@ -560,11 +514,6 @@ class PostingLedgerDslContractTests {
         @Override
         public FundsTransactionEventType getEventType() {
             return FundsTransactionEventType.TRANSFER;
-        }
-
-        @Override
-        public LedgerTransactionStatus getStatus() {
-            return LedgerTransactionStatus.POSTED;
         }
 
         @Override

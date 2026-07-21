@@ -1,5 +1,6 @@
 package com.wind.funds.wallet.services.impl;
 
+import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
@@ -137,6 +138,8 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
 
     private void validateDecisionRecordRequest(RecordSpendRuleDecisionRecordRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
+        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+                "Spend Rule 决策写入 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getDecisionSn(), "Spend Rule 决策流水号不能为空");
         AssertUtils.hasText(request.getRuleId(), "Spend Rule 标识不能为空");
         AssertUtils.hasText(request.getRuleVersion(), "Spend Rule 版本不能为空");
@@ -149,6 +152,10 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "业务流水号不能为空");
         AssertUtils.notNull(request.getDecisionResult(), "Spend Rule 决策结果不能为空");
+        AssertUtils.isTrue(request.getDecisionResult() == SpendControlDecisionResult.PASSED
+                        || request.getDecisionResult() == SpendControlDecisionResult.REJECTED,
+                "Spend Rule 决策记录只允许 PASSED 或 REJECTED，decisionResult = {}",
+                request.getDecisionResult());
         SpendRuleDigestValidator.assertSha256Digest(request.getDecisionDigest(), "Spend Rule 决策摘要");
         if (request.getDecisionResult() == SpendControlDecisionResult.REJECTED) {
             AssertUtils.hasText(request.getRejectReason(), "Spend Rule 拒绝原因不能为空");

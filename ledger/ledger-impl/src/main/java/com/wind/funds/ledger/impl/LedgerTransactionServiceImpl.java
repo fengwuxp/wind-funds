@@ -15,10 +15,8 @@ import com.wind.funds.ledger.dto.LedgerTransactionPostResult;
 import com.wind.funds.ledger.mapstruct.LedgerConverter;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.ledger.query.LedgerTransactionQuery;
-import com.wind.funds.ledger.request.UpdateLedgerTransactionRequest;
 import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.mybatisflex.core.query.QueryWrapper;
-import com.wind.common.WindDateFormater;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
@@ -28,14 +26,13 @@ import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
-import com.wind.funds.ledger.enums.LedgerReconcileStatus;
-import com.wind.funds.ledger.enums.LedgerSettlementStatus;
 import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
 import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.spec.ledger.LedgerPostingPhaseSpec;
 import com.wind.funds.spec.ledger.LedgerPostingPlanSpec;
 import com.wind.funds.spec.ledger.LedgerTransactionSpec;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.support.PaymentInstrumentSensitiveValueValidator;
 import com.wind.mybatis.flex.MybatisQueryHelper;
 import com.wind.sequence.WindSequenceType;
@@ -49,10 +46,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -70,7 +67,12 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             "LEDGER_ENTRY", "LGE", 6);
 
     private static final List<String> LEDGER_ENTRY_SHA256_FIELDS = List.of(
+            LedgerEntry.Fields.sn,
             LedgerEntry.Fields.tenantId,
+            LedgerEntry.Fields.ledgerTransactionSn,
+            LedgerEntry.Fields.postingPlanSn,
+            LedgerEntry.Fields.fundsTransactionSn,
+            LedgerEntry.Fields.ledgerId,
             LedgerEntry.Fields.subjectId,
             LedgerEntry.Fields.subjectType,
             LedgerEntry.Fields.periodType,
@@ -78,6 +80,8 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             LedgerEntry.Fields.ledgerSubjectCode,
             LedgerEntry.Fields.ledgerSubjectCategory,
             LedgerEntry.Fields.entrySide,
+            LedgerEntry.Fields.postingRole,
+            LedgerEntry.Fields.balanceConstraintType,
             LedgerEntry.Fields.intent,
             LedgerEntry.Fields.postingScope,
             LedgerEntry.Fields.balanceEffectType,
@@ -109,6 +113,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             LedgerTransaction.Fields.tenantId,
             LedgerTransaction.Fields.instructionType,
             LedgerTransaction.Fields.eventType,
+            LedgerTransaction.Fields.fundsTransactionSn,
             LedgerTransaction.Fields.transactionType,
             LedgerTransaction.Fields.businessScene,
             LedgerTransaction.Fields.businessSn,
@@ -129,16 +134,14 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
 
     private final LedgerEntryMapper ledgerEntryMapper;
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull LedgerTransactionPostResult postLedgerTransaction(@NonNull LedgerTransactionSpec transaction) {
         assertNoSensitiveContextVariables(transaction);
         LedgerTransaction entity = LedgerConverter.INSTANCE.convertToLedgerTransaction(transaction);
         entity.setDebitAmount(transaction.getTotalDebitAmount().getAmount());
         entity.setCreditAmount(transaction.getTotalCreditAmount().getAmount());
-        entity.setBalanced(transaction.isBalanced());
         entity.setContextVariables(JSON.toJSONString(transaction.getContextVariables()));
-        entity.setSha256(WindObjectDigestUtils.sha256WithNames(entity, LEDGER_TRANSACTION_SHA256_FIELDS));
+        entity.setSha256(resolveLedgerTransactionSha256(entity, transaction));
         LedgerTransactionPostResult existingResult = resolveExistingLedgerTransaction(entity);
         if (existingResult != null) {
             return existingResult;
@@ -162,6 +165,82 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             }
         }
         return toPostResult(entity.getId(), true);
+    }
+
+    private String resolveLedgerTransactionSha256(LedgerTransaction entity, LedgerTransactionSpec transaction) {
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("transaction",
+                WindObjectDigestUtils.sha256WithNames(entity, LEDGER_TRANSACTION_SHA256_FIELDS));
+        facts.put("postingPlans", transaction.getPostingPlans()
+                .stream()
+                .map(this::postingPlanDigestFacts)
+                .toList());
+        return FundsStableHashSupport.sha256Json(facts);
+    }
+
+    private Map<String, Object> postingPlanDigestFacts(LedgerPostingPlanSpec plan) {
+        String phaseCode = resolvePhaseCode(plan);
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("sn", plan.getPlanId());
+        facts.put("ledgerTransactionSn", plan.getLedgerTransactionSn());
+        facts.put("routeLegId", plan.getRouteLegId());
+        facts.put("intent", plan.getIntent().name());
+        facts.put("postingScope", resolvePostingScope(plan, phaseCode).name());
+        facts.put("balanceEffectType", resolveBalanceEffectType(plan, phaseCode).name());
+        facts.put("phaseCode", phaseCode);
+        facts.put("amount", plan.getAmount().getAmount());
+        facts.put("currency", plan.getAmount().getCurrency());
+        facts.put("debitAmount", plan.getTotalDebitAmount().getAmount());
+        facts.put("creditAmount", plan.getTotalCreditAmount().getAmount());
+        facts.put("postingPhases", plan.getPostingPhases()
+                .stream()
+                .map(phase -> postingPhaseDigestFacts(plan, phase))
+                .toList());
+        return facts;
+    }
+
+    private Map<String, Object> postingPhaseDigestFacts(LedgerPostingPlanSpec plan, LedgerPostingPhaseSpec phase) {
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("phaseCode", phase.getPhaseCode().name());
+        facts.put("entries", phase.getEntries()
+                .stream()
+                .map(entry -> ledgerEntryDigestFacts(plan, phase, entry))
+                .toList());
+        return facts;
+    }
+
+    private Map<String, Object> ledgerEntryDigestFacts(LedgerPostingPlanSpec plan,
+                                                       LedgerPostingPhaseSpec phase,
+                                                       LedgerEntrySpec entry) {
+        String phaseCode = phase.getPhaseCode().name();
+        Map<String, Object> facts = new TreeMap<>();
+        facts.put("ledgerTransactionSn", entry.getLedgerTransactionSn());
+        facts.put("ledgerId", entry.getLedgerId());
+        facts.put("periodType", entry.getPeriodType().name());
+        facts.put("periodId", entry.getPeriodId());
+        facts.put("subjectId", entry.getSubjectId());
+        facts.put("subjectType", entry.getSubjectType());
+        facts.put("ledgerSubjectCode", entry.getLedgerSubjectCode().name());
+        facts.put("ledgerSubjectCategory", entry.getLedgerSubjectCategory().name());
+        facts.put("entrySide", entry.getEntrySide().name());
+        facts.put("postingRole", entry.getPostingRole().name());
+        facts.put("balanceConstraintType", defaultIfNull(
+                entry.getBalanceConstraintType(), LedgerBalanceConstraintType.PROFILE_DEFAULT).name());
+        facts.put("intent", defaultIfNull(entry.getIntent(), plan.getIntent()).name());
+        facts.put("postingScope", defaultIfNull(
+                entry.getPostingScope(), resolvePostingScope(plan, phaseCode)).name());
+        facts.put("balanceEffectType", defaultIfNull(
+                entry.getBalanceEffectType(), resolveBalanceEffectType(plan, phaseCode)).name());
+        facts.put("phaseCode", defaultIfNull(entry.getPhaseCode(), phase.getPhaseCode()).name());
+        facts.put("businessScene", entry.getBusinessScene());
+        facts.put("businessSn", entry.getBusinessSn());
+        facts.put("amount", entry.getAmount().getAmount());
+        facts.put("currency", entry.getAmount().getCurrency());
+        facts.put("originalAmount", entry.getOriginalAmount().getAmount());
+        facts.put("originalCurrency", entry.getOriginalAmount().getCurrency());
+        facts.put("exchangeRate", entry.getExchangeRate());
+        facts.put("transactionTime", entry.getTransactionTime());
+        return facts;
     }
 
     private LedgerTransactionPostResult resolveExistingLedgerTransaction(LedgerTransaction entity) {
@@ -200,7 +279,6 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         entity.setCurrency(amount.getCurrency());
         entity.setDebitAmount(plan.getTotalDebitAmount().getAmount());
         entity.setCreditAmount(plan.getTotalCreditAmount().getAmount());
-        entity.setBalanced(plan.isBalanced());
         entity.setDescription(defaultIfBlank(plan.getDescription(), transaction.getDescription()));
         entity.setContextVariables(JSON.toJSONString(plan.getContextVariables()));
         entity.setSha256(WindObjectDigestUtils.sha256WithNames(entity, LEDGER_POSTING_PLAN_SHA256_FIELDS));
@@ -229,6 +307,9 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         ledgerEntry.setLedgerTransactionSn(transaction.getSn());
         ledgerEntry.setPostingPlanSn(postingPlanSn);
         ledgerEntry.setFundsTransactionSn(transaction.getFundsTransactionSn());
+        AssertUtils.notNull(entry.getPostingRole(), "账本分录记账角色不能为空，ledgerTransactionSn = {}",
+                transaction.getSn());
+        ledgerEntry.setPostingRole(entry.getPostingRole());
         ledgerEntry.setIntent(defaultIfNull(entry.getIntent(), plan.getIntent()).name());
         ledgerEntry.setPostingScope(defaultIfNull(
                 entry.getPostingScope(), resolvePostingScope(plan, phase.getPhaseCode().name())).name());
@@ -238,14 +319,6 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
                 entry.getBalanceConstraintType(), LedgerBalanceConstraintType.PROFILE_DEFAULT).name());
         ledgerEntry.setPhaseCode(defaultIfNull(entry.getPhaseCode(), phase.getPhaseCode()).name());
         ledgerEntry.setSha256(WindObjectDigestUtils.sha256WithNames(ledgerEntry, LEDGER_ENTRY_SHA256_FIELDS));
-        if (ledgerEntry.getSettlementStatus() == null) {
-            ledgerEntry.setSettlementStatus(LedgerSettlementStatus.SETTLED);
-        }
-        if (ledgerEntry.getSettlementStatus() == LedgerSettlementStatus.SETTLED) {
-            ledgerEntry.setSettlementCompletedTime(LocalDateTime.now());
-        }
-        ledgerEntry.setReconcileStatus(LedgerReconcileStatus.PENDING);
-        ledgerEntry.setReconciliationBatch(currentReconciliationBatch());
         ledgerEntryMapper.insertSelective(ledgerEntry);
         AssertUtils.notNull(ledgerEntry.getId(), "创建账户账本条目失败");
     }
@@ -277,27 +350,6 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
 
 
     @Override
-    public void updateLedgerTransaction(@NonNull UpdateLedgerTransactionRequest request) {
-        LedgerTransaction entity = findAccountLedgerTransaction(request.getId());
-        entity.setStatus(request.getStatus());
-        entity.setDescription(request.getDescription());
-        if (request.getContextVariable() != null) {
-            assertNoSensitiveContextVariables(request.getContextVariable(), "ledgerTransaction.contextVariables");
-            assertNoCoreBenefitContextVariables(request.getContextVariable(), "ledgerTransaction");
-            entity.setContextVariables(JSON.toJSONString(request.getContextVariable()));
-        }
-        AssertUtils.isTrue(ledgerTransactionMapper.update(entity) == 1, "更新账户账本交易信息失败");
-    }
-
-
-    @Override
-    public void deleteLedgerTransactionByIds(@NonNull Long... ids) {
-        AssertUtils.notEmpty(ids, "argument ids must not empty");
-        int total = ledgerTransactionMapper.deleteBatchByIds(List.of(ids));
-        AssertUtils.isTrue(total == ids.length, "删除账户账本交易失败");
-    }
-
-    @Override
     @NonNull
     public LedgerTransactionDTO getLedgerTransactionById(@NonNull Long id) {
         return LedgerConverter.INSTANCE.convertToAccountLedgerTransactionDTO(findAccountLedgerTransaction(id));
@@ -327,8 +379,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
                 .where(ledgerTransaction.sn.eq(query.getSn()))
                 .and(ledgerTransaction.tenantId.eq(query.getTenantId()))
                 .and(ledgerTransaction.fundsTransactionSn.eq(query.getFundsTransactionSn()))
-                .and(ledgerTransaction.eventType.eq(query.getEventType()))
-                .and(ledgerTransaction.status.eq(query.getStatus()))
+                .and(ledgerTransaction.eventType.eq(enumName(query.getEventType())))
                 .and(ledgerTransaction.currency.eq(query.getCurrency()))
                 .and(ledgerTransaction.businessSn.eq(query.getBusinessSn()))
                 .and(ledgerTransaction.businessScene.eq(query.getBusinessScene()))
@@ -364,7 +415,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             case ADJUSTMENT -> LedgerPostingScope.ADJUSTMENT;
             case HOLD -> resolveHoldPostingScope(phaseCode);
             case AUTHORIZATION, AUTHORIZATION_REVERSAL -> LedgerPostingScope.CONTROL_HOLD;
-            case AUTHORIZATION_SETTLEMENT -> LedgerPostingScope.CONTROL_CONSUME;
+            case AUTHORIZATION_COMPLETION -> LedgerPostingScope.CONTROL_CONSUME;
             default -> LedgerPostingScope.BETWEEN_SUBJECTS;
         };
     }
@@ -389,7 +440,7 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
             case ADJUSTMENT -> LedgerBalanceEffectType.INCREASE;
             case HOLD -> resolveHoldBalanceEffectType(phaseCode);
             case AUTHORIZATION -> LedgerBalanceEffectType.HOLD;
-            case AUTHORIZATION_SETTLEMENT -> LedgerBalanceEffectType.CONSUME;
+            case AUTHORIZATION_COMPLETION -> LedgerBalanceEffectType.CONSUME;
             case REFUND -> LedgerBalanceEffectType.RESTORE;
             default -> LedgerBalanceEffectType.CONSUME;
         };
@@ -409,12 +460,12 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
         return value == null ? defaultValue : value;
     }
 
-    private String defaultIfBlank(String value, String defaultValue) {
-        return StringUtils.hasText(value) ? value : defaultValue;
+    private String enumName(Enum<?> value) {
+        return value == null ? null : value.name();
     }
 
-    private String currentReconciliationBatch() {
-        return WindDateFormater.YYYY_MM_DD_HH.format(LocalDateTime.now());
+    private String defaultIfBlank(String value, String defaultValue) {
+        return StringUtils.hasText(value) ? value : defaultValue;
     }
 
     @Override
@@ -457,14 +508,6 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
                 .and(ledgerEntry.businessSn.eq(query.getBusinessSn()))
                 .and(ledgerEntry.currency.eq(query.getCurrency()))
                 .and(ledgerEntry.originalCurrency.eq(query.getOriginalCurrency()))
-                .and(ledgerEntry.settlementStatus.eq(query.getSettlementStatus()))
-                .and(ledgerEntry.settlementPeriod.eq(query.getSettlementPeriod()))
-                .and(ledgerEntry.settlementCompletedTime.ge(query.getSettlementCompletedTimeMin()))
-                .and(ledgerEntry.settlementCompletedTime.le(query.getSettlementCompletedTimeMax()))
-                .and(ledgerEntry.reconcileStatus.eq(query.getReconcileStatus()))
-                .and(ledgerEntry.reconciliationBatch.eq(query.getReconciliationBatch()))
-                .and(ledgerEntry.reconciliationCompletedTime.ge(query.getReconciliationCompletedTimeMin()))
-                .and(ledgerEntry.reconciliationCompletedTime.le(query.getReconciliationCompletedTimeMax()))
                 .and(ledgerEntry.gmtCreate.ge(query.getGmtCreateMin()))
                 .and(ledgerEntry.gmtCreate.le(query.getGmtCreateMax()))
                 .and(ledgerEntry.gmtModified.ge(query.getGmtModifiedMin()))

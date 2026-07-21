@@ -2,9 +2,9 @@ package com.wind.funds.transaction.application;
 
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -17,9 +17,9 @@ import org.jspecify.annotations.NullMarked;
  *               ↓
  *       ┌───────┴────────┐
  *       ↓                ↓
- * Reversal（撤销）     Settlement（结算）
- * （释放冻结）            ↓
- *                      Capture（扣款）
+ * Reversal（撤销）     Completion（完成）
+ * （释放授权）            ↓
+ *                      Consume（消费成立）
  *                           ↓
  *               ↓
  *          Refund（退款 / 争议裁决资金结果）
@@ -50,21 +50,21 @@ public interface FundsAuthorizationTransactionService {
     String reversal(FundsAuthorizationTransactionReversalRequest request, WindOperator operator);
 
     /**
-     * 交易完成（结算）
+     * 授权交易完成
      *
      * @param request  交易授权完成请求
      * @param operator 操作者
      * @return 交易流水号
      */
-    String settle(FundsAuthorizationTransactionSettleRequest request, WindOperator operator);
+    String complete(FundsAuthorizationTransactionCompleteRequest request, WindOperator operator);
 
     /**
-     * 交易完成撤销（退款）
+     * 已完成交易退款
      *
-     * @param request  交易完成撤销请求
+     * @param request  授权链退款请求
      * @param operator 操作者
      * @return 交易流水号
      */
-    String settleRefund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator);
+    String refund(FundsAuthorizationTransactionRefundRequest request, WindOperator operator);
 
 }

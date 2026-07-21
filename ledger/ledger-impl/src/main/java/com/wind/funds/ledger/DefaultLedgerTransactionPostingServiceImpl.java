@@ -3,13 +3,12 @@ package com.wind.funds.ledger;
 import com.wind.funds.ledger.dto.LedgerDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionPostResult;
 import com.wind.funds.ledger.service.LedgerService;
-import com.wind.funds.ledger.service.LedgerTransactionService;
+import com.wind.funds.ledger.impl.LedgerTransactionServiceImpl;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerPostingAccessType;
 import com.wind.funds.ledger.enums.LedgerStatus;
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
@@ -46,7 +45,7 @@ import java.util.stream.Collectors;
 @Component
 public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransactionPostingService {
 
-    private final LedgerTransactionService ledgerTransactionService;
+    private final LedgerTransactionServiceImpl ledgerTransactionService;
 
     private final LedgerService ledgerService;
 
@@ -129,10 +128,6 @@ public class DefaultLedgerTransactionPostingServiceImpl implements LedgerTransac
                 "账本交易汇率必须大于 0，ledgerTransactionSn = {}, exchangeRate = {}",
                 transaction.getSn(),
                 transaction.getExchangeRate());
-        AssertUtils.isTrue(transaction.getStatus() == LedgerTransactionStatus.POSTED,
-                "账本交易状态不允许入账，ledgerTransactionSn = {}, status = {}",
-                transaction.getSn(),
-                transaction.getStatus());
         AssertUtils.notEmpty(transaction.getPostingPlans(),
                 "账本交易 postingPlans 不能为空，ledgerTransactionSn = {}", transaction.getSn());
     }

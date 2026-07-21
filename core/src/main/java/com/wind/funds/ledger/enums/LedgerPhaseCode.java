@@ -38,6 +38,11 @@ public enum LedgerPhaseCode implements DescriptiveEnum {
     FUND_OUT("外部出金"),
 
     /**
+     * 授权交易完成
+     */
+    COMPLETION("授权完成"),
+
+    /**
      * 清算/结算
      */
     SETTLEMENT("资金结算"),

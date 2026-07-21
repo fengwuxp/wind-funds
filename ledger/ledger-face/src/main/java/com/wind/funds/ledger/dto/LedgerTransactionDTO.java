@@ -1,7 +1,9 @@
 package com.wind.funds.ledger.dto;
 
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.model.transaction.FundsBenefitSpecValidators;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsInstructionType;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -55,11 +57,13 @@ public class LedgerTransactionDTO {
 
     @Schema(description = "事件类型")
     @NotNull
-    private String eventType;
+    private FundsTransactionEventType eventType;
 
-    @Schema(description = "交易状态")
-    @NotNull
-    private LedgerTransactionStatus status;
+    @Schema(description = "资金指令类型")
+    private FundsInstructionType instructionType;
+
+    @Schema(description = "资金交易类型")
+    private DefaultFundsTransactionType transactionType;
 
     @Schema(description = "交易金额，单位：分")
     @NotNull
@@ -72,6 +76,14 @@ public class LedgerTransactionDTO {
     @Schema(description = "汇率")
     @NotNull
     private BigDecimal exchangeRate;
+
+    @Schema(description = "借方合计")
+    @NotNull
+    private Money debitAmount;
+
+    @Schema(description = "贷方合计")
+    @NotNull
+    private Money creditAmount;
 
     @Schema(description = "业务单号")
     @Size(min = 10, max = 80)
@@ -93,6 +105,10 @@ public class LedgerTransactionDTO {
 
     @Schema(description = "上下文变量")
     private Map<String, Object> contextVariables;
+
+    @Schema(description = "账本交易事实摘要")
+    @NotNull
+    private String sha256;
 
     private List<LedgerEntryDTO> entries;
 

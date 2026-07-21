@@ -5,9 +5,9 @@ import com.capte.domain.core.operator.WindOperator;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.model.operation.ImmutableFundsOperationActorSpec;
@@ -42,9 +42,9 @@ import java.util.Map;
 @Component
 public class FundsAuthorizationInstructionConverter {
 
-    private static final String TRUSTED_FORCE_SETTLE_POLICY_CODE = "B4_FORCE_SETTLE_OPS";
+    private static final String TRUSTED_FORCE_COMPLETION_POLICY_CODE = "B4_FORCE_COMPLETION_OPS";
 
-    private static final long TRUSTED_FORCE_SETTLE_LIMIT_AMOUNT = 60L;
+    private static final long TRUSTED_FORCE_COMPLETION_LIMIT_AMOUNT = 60L;
 
     private static final String SPEND_CONTROL_SCOPE_ACCOUNT_TYPE = SpendRuleScopeType.SPEND_CONTROL_SCOPE.name();
 
@@ -124,26 +124,26 @@ public class FundsAuthorizationInstructionConverter {
                 .build();
     }
 
-    public @NonNull FundsInstructionSpec convertToSettleInstruction(
-            @NonNull FundsAuthorizationTransactionSettleRequest request,
+    public @NonNull FundsInstructionSpec convertToCompleteInstruction(
+            @NonNull FundsAuthorizationTransactionCompleteRequest request,
             @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
                 request.getAccountId());
         Map<String, Object> context = new LinkedHashMap<>();
         FundsInstructionReferenceSpec reference = null;
-        if (request.isForceSettle()) {
-            validateForceSettleRequest(request, amount);
-            context.put(FundsInstructionContextKeys.SETTLE_MODE,
-                    FundsAuthorizationTransactionSettleRequest.SETTLE_MODE_FORCE);
-            context.put(FundsInstructionContextKeys.FORCE_SETTLE_POLICY_CODE,
-                    request.getForceSettlePolicyCode());
-            context.put(FundsInstructionContextKeys.FORCE_SETTLE_LIMIT_AMOUNT,
-                    request.getForceSettleLimitAmount());
-            context.put(FundsInstructionContextKeys.FORCE_SETTLE_REASON, request.getForceSettleReason());
+        if (request.isForceCompletion()) {
+            validateForceCompletionRequest(request, amount);
+            context.put(FundsInstructionContextKeys.COMPLETION_MODE,
+                    FundsAuthorizationTransactionCompleteRequest.COMPLETION_MODE_FORCE);
+            context.put(FundsInstructionContextKeys.FORCE_COMPLETION_POLICY_CODE,
+                    request.getForceCompletionPolicyCode());
+            context.put(FundsInstructionContextKeys.FORCE_COMPLETION_LIMIT_AMOUNT,
+                    request.getForceCompletionLimitAmount());
+            context.put(FundsInstructionContextKeys.FORCE_COMPLETION_REASON, request.getForceCompletionReason());
             context.put(FundsInstructionContextKeys.EXTERNAL_ORIGINAL_FACT_REF,
                     request.getExternalOriginalFactRef());
-            context.put(FundsInstructionContextKeys.FORCE_SETTLE_VOUCHER_REF,
-                    request.getForceSettleVoucherRef());
+            context.put(FundsInstructionContextKeys.FORCE_COMPLETION_VOUCHER_REF,
+                    request.getForceCompletionVoucherRef());
         } else {
             AssertUtils.hasText(request.getAuthorizationTransactionSn(),
                     "authorizationTransactionSn must not be blank");
@@ -154,7 +154,7 @@ public class FundsAuthorizationInstructionConverter {
         return ImmutableFundsInstructionSpec.builder()
                 .tenantId(ThreadContextTenantIdHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
-                .eventType(FundsTransactionEventType.SETTLE)
+                .eventType(FundsTransactionEventType.COMPLETE)
                 .transactionType(DefaultFundsTransactionType.PAY)
                 .amount(amount.amount())
                 .originalAmount(amount.originalAmount())
@@ -163,14 +163,14 @@ public class FundsAuthorizationInstructionConverter {
                 .reference(reference)
                 .businessScene(request.getBusinessScene())
                 .businessSn(request.getBusinessSn())
-                .eventTime(eventTime(request.getSettleTime()))
+                .eventTime(eventTime(request.getCompletedTime()))
                 .description(request.getDescription())
                 .operator(operationActor(operator))
                 .contextVariables(mergeContext(request.getContextVariables(), context))
                 .build();
     }
 
-    public @NonNull FundsInstructionSpec convertToSettleRefundInstruction(
+    public @NonNull FundsInstructionSpec convertToRefundInstruction(
             @NonNull FundsAuthorizationTransactionRefundRequest request,
             @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
@@ -216,23 +216,23 @@ public class FundsAuthorizationInstructionConverter {
         return eventTime == null ? LocalDateTime.now() : eventTime;
     }
 
-    private void validateForceSettleRequest(@NonNull FundsAuthorizationTransactionSettleRequest request,
-                                            @NonNull ConvertedAmount amount) {
+    private void validateForceCompletionRequest(@NonNull FundsAuthorizationTransactionCompleteRequest request,
+                                                @NonNull ConvertedAmount amount) {
         AssertUtils.isFalse(StringUtils.hasText(request.getAuthorizationTransactionSn()),
-                "force settle must not carry authorizationTransactionSn");
-        AssertUtils.hasText(request.getForceSettlePolicyCode(), "forceSettlePolicyCode must not be blank");
-        AssertUtils.isTrue(TRUSTED_FORCE_SETTLE_POLICY_CODE.equals(request.getForceSettlePolicyCode()),
-                "forceSettlePolicyCode must be trusted");
-        AssertUtils.notNull(request.getForceSettleLimitAmount(), "forceSettleLimitAmount must not be null");
-        AssertUtils.isTrue(request.getForceSettleLimitAmount() > 0,
-                "forceSettleLimitAmount must be greater than 0");
-        AssertUtils.isTrue(request.getForceSettleLimitAmount() == TRUSTED_FORCE_SETTLE_LIMIT_AMOUNT,
-                "forceSettleLimitAmount must match trusted policy limit");
-        AssertUtils.isTrue(amount.amount().getAmount() <= request.getForceSettleLimitAmount(),
-                "forceSettleLimitAmount must be greater than or equal to transaction amount");
-        AssertUtils.hasText(request.getForceSettleReason(), "forceSettleReason must not be blank");
+                "force completion must not carry authorizationTransactionSn");
+        AssertUtils.hasText(request.getForceCompletionPolicyCode(), "forceCompletionPolicyCode must not be blank");
+        AssertUtils.isTrue(TRUSTED_FORCE_COMPLETION_POLICY_CODE.equals(request.getForceCompletionPolicyCode()),
+                "forceCompletionPolicyCode must be trusted");
+        AssertUtils.notNull(request.getForceCompletionLimitAmount(), "forceCompletionLimitAmount must not be null");
+        AssertUtils.isTrue(request.getForceCompletionLimitAmount() > 0,
+                "forceCompletionLimitAmount must be greater than 0");
+        AssertUtils.isTrue(request.getForceCompletionLimitAmount() == TRUSTED_FORCE_COMPLETION_LIMIT_AMOUNT,
+                "forceCompletionLimitAmount must match trusted policy limit");
+        AssertUtils.isTrue(amount.amount().getAmount() <= request.getForceCompletionLimitAmount(),
+                "forceCompletionLimitAmount must be greater than or equal to transaction amount");
+        AssertUtils.hasText(request.getForceCompletionReason(), "forceCompletionReason must not be blank");
         AssertUtils.hasText(request.getExternalOriginalFactRef(), "externalOriginalFactRef must not be blank");
-        AssertUtils.hasText(request.getForceSettleVoucherRef(), "forceSettleVoucherRef must not be blank");
+        AssertUtils.hasText(request.getForceCompletionVoucherRef(), "forceCompletionVoucherRef must not be blank");
     }
 
     private void validateNoAuthRefundRequest(@NonNull FundsAuthorizationTransactionRefundRequest request) {

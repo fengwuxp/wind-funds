@@ -10,7 +10,6 @@ import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
@@ -99,16 +98,6 @@ public interface LedgerEntrySpec {
 
     @NonNull
     LedgerPostingRole getPostingRole();
-
-    @Nullable
-    default AccountHierarchySnapshotSpec getAccountHierarchySnapshot() {
-        return null;
-    }
-
-    @Nullable
-    default String getHierarchySnapshotRef() {
-        return null;
-    }
 
     @Nullable
     default LedgerBalanceEffectType getBalanceEffectType() {

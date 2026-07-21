@@ -2,8 +2,6 @@ package com.wind.funds.ledger.impl;
 
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.dto.LedgerTransactionPostResult;
-import com.wind.funds.ledger.request.UpdateLedgerTransactionRequest;
-import com.wind.funds.ledger.service.LedgerTransactionService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.funds.ledger.enums.EntrySide;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -11,7 +9,6 @@ import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.spec.ledger.LedgerPostingPhaseSpec;
@@ -66,7 +63,7 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
             Map.of("benefitDecisionTrace", List.of(Map.of("currentMarketingRule", "latest-rule")));
 
     @Autowired
-    private LedgerTransactionService ledgerTransactionService;
+    private LedgerTransactionServiceImpl ledgerTransactionService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -241,77 +238,6 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
         assertThatThrownBy(() -> ledgerTransactionService.postLedgerTransaction(transaction))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ledgerEntry.contextVariables must not contain core benefit field");
-
-        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：已入账账本交易通过更新接口补充交易上下文，更新请求携带敏感字段。
-     * 输入：UpdateLedgerTransactionRequest.contextVariable 含 secretKey。
-     * 输出：账本交易更新被拒绝，已入账 transaction、posting plan、entry 三类账务事实保持不变。
-     * 红线：账务事实更新入口不得成为敏感上下文写入旁路。
-     */
-    @Test
-    void testUpdateLedgerTransactionShouldRejectSensitiveContextWithoutMutatingFacts() {
-        LedgerTransactionPostResult postResult = ledgerTransactionService.postLedgerTransaction(ledgerTransaction(
-                Map.of("traceId", "TRACE-LEDGER-CONTEXT-001"),
-                Map.of("routeTraceId", "ROUTE-TRACE-001"),
-                Map.of("entryTraceId", "ENTRY-TRACE-001")));
-        assertThat(postResult.isNewlyPosted()).isTrue();
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> ledgerTransactionService.updateLedgerTransaction(new UpdateLedgerTransactionRequest()
-                .setId(postResult.getLedgerTransactionId())
-                .setContextVariable(Map.of("secretKey", "secret-value"))))
-                .hasMessageContaining("ledgerTransaction.contextVariables must not contain sensitive fields");
-
-        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：已入账账本交易通过更新接口补充交易上下文，更新请求携带外部账户原文字段。
-     * 输入：UpdateLedgerTransactionRequest.contextVariable 含 externalAccount.bankAccountNo。
-     * 输出：账本交易更新被拒绝，已入账 transaction、posting plan、entry 三类账务事实保持不变。
-     * 红线：账务事实更新入口不得成为外部账户号写入旁路。
-     */
-    @Test
-    void testUpdateLedgerTransactionShouldRejectExternalAccountContextWithoutMutatingFacts() {
-        LedgerTransactionPostResult postResult = ledgerTransactionService.postLedgerTransaction(ledgerTransaction(
-                Map.of("traceId", "TRACE-LEDGER-CONTEXT-002"),
-                Map.of("routeTraceId", "ROUTE-TRACE-002"),
-                Map.of("entryTraceId", "ENTRY-TRACE-002")));
-        assertThat(postResult.isNewlyPosted()).isTrue();
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> ledgerTransactionService.updateLedgerTransaction(new UpdateLedgerTransactionRequest()
-                .setId(postResult.getLedgerTransactionId())
-                .setContextVariable(Map.of("externalAccount", Map.of("bankAccountNo", "123456789012")))))
-                .hasMessageContaining("ledgerTransaction.contextVariables must not contain sensitive fields");
-
-        assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
-    }
-
-    /**
-     * 场景：已入账账本交易通过更新接口补充交易上下文，更新请求携带权益金额和资金责任。
-     * 输入：UpdateLedgerTransactionRequest.contextVariable 含 amount、fundingNature。
-     * 输出：更新请求构造即被拒绝，已入账 transaction、posting plan、entry 三类账务事实保持不变。
-     * 红线：账务事实更新入口不得成为权益核心事实写入旁路。
-     */
-    @Test
-    void testUpdateLedgerTransactionShouldRejectCoreBenefitContextWithoutMutatingFacts() {
-        LedgerTransactionPostResult postResult = ledgerTransactionService.postLedgerTransaction(ledgerTransaction(
-                Map.of("traceId", "TRACE-LEDGER-CONTEXT-003"),
-                Map.of("routeTraceId", "ROUTE-TRACE-003"),
-                Map.of("entryTraceId", "ENTRY-TRACE-003")));
-        assertThat(postResult.isNewlyPosted()).isTrue();
-        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-
-        assertThatThrownBy(() -> ledgerTransactionService.updateLedgerTransaction(new UpdateLedgerTransactionRequest()
-                .setId(postResult.getLedgerTransactionId())
-                .setContextVariable(CORE_BENEFIT_CONTEXT_VARIABLES)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(
-                        "updateLedgerTransactionRequest.contextVariables must not contain core benefit field");
 
         assertLedgerTransactionFactsUnchanged(jdbcTemplate, before);
     }
@@ -514,11 +440,6 @@ class LedgerTransactionServiceImplTests extends AbstractFundsServiceTest {
         @Override
         public FundsTransactionEventType getEventType() {
             return FundsTransactionEventType.TRANSFER;
-        }
-
-        @Override
-        public LedgerTransactionStatus getStatus() {
-            return LedgerTransactionStatus.POSTED;
         }
 
         @Override

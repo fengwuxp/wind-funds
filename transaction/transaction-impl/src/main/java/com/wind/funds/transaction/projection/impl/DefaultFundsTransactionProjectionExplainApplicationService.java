@@ -66,7 +66,7 @@ public class DefaultFundsTransactionProjectionExplainApplicationService
                 .contextVariables(parseContextVariables(primaryDetail.getContextVariables()))
                 .failureReasonOverride(resolveFailureReason(primaryDetail))
                 .build()
-                .explanation();
+                .explanation(transaction);
     }
 
     private void assertRouteSnapshotMatchesTransaction(FundsTransactionDTO transaction,

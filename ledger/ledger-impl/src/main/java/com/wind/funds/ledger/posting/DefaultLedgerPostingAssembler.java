@@ -15,7 +15,6 @@ import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingRole;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
-import com.wind.funds.ledger.enums.LedgerSettlementStatus;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.model.FundsContextVariables;
@@ -38,6 +37,7 @@ import lombok.Builder;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -70,7 +70,7 @@ import java.util.stream.Collectors;
  */
 @Component
 @AllArgsConstructor
-public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<ResolvedRouteSpec> {
+public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<ResolvedRouteSpec>, Ordered {
 
     private static final String KEY_SEPARATOR = ":";
 
@@ -204,7 +204,6 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                 .businessScene(resolvedRoute.getBusinessScene())
                 .businessSn(resolvedRoute.getBusinessSn())
                 .transactionTime(resolvedRoute.getResolvedAt())
-                .settlementStatus(LedgerSettlementStatus.SETTLED)
                 .description(leg.getDescription())
                 .balanceConstraintType(resolveBalanceConstraintType(leg, node))
                 .intent(intent)
@@ -315,7 +314,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
         return switch (eventType) {
             case AUTHORIZE -> LedgerPostingIntentType.AUTHORIZATION;
             case REVERSAL -> LedgerPostingIntentType.AUTHORIZATION_REVERSAL;
-            case SETTLE -> LedgerPostingIntentType.AUTHORIZATION_SETTLEMENT;
+            case COMPLETE -> LedgerPostingIntentType.AUTHORIZATION_COMPLETION;
             case AUTH_REFUND, REFUND -> LedgerPostingIntentType.REFUND;
             case FEE_REFUND -> LedgerPostingIntentType.FEE_REFUND;
             case FREEZE -> LedgerPostingIntentType.HOLD;
@@ -344,7 +343,7 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             case ADJUSTMENT -> LedgerPostingScope.ADJUSTMENT;
             case HOLD -> resolveHoldPostingScope(phaseCode);
             case AUTHORIZATION, AUTHORIZATION_REVERSAL -> LedgerPostingScope.CONTROL_HOLD;
-            case AUTHORIZATION_SETTLEMENT -> LedgerPostingScope.CONTROL_CONSUME;
+            case AUTHORIZATION_COMPLETION -> LedgerPostingScope.CONTROL_CONSUME;
             default -> LedgerPostingScope.BETWEEN_SUBJECTS;
         };
     }
@@ -478,8 +477,6 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
 
         private final LocalDateTime transactionTime;
 
-        private final LedgerSettlementStatus settlementStatus;
-
         private final String description;
 
         private final Map<String, Object> contextVariables;
@@ -506,7 +503,6 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
                                        Money originalAmount,
                                        BigDecimal exchangeRate,
                                        LocalDateTime transactionTime,
-                                       LedgerSettlementStatus settlementStatus,
                                        @Nullable String description,
                                        Map<String, Object> contextVariables) {
             this.subjectId = subjectId;
@@ -530,7 +526,6 @@ public class DefaultLedgerPostingAssembler implements LedgerPostingAssembler<Res
             this.originalAmount = originalAmount;
             this.exchangeRate = exchangeRate;
             this.transactionTime = transactionTime;
-            this.settlementStatus = settlementStatus;
             this.description = description;
             this.contextVariables = Map.copyOf(contextVariables == null ? Map.of() : contextVariables);
         }

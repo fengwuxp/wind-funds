@@ -5,7 +5,6 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
 import com.wind.integration.core.model.TenantIsolationObject;
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -87,12 +86,6 @@ public class LedgerTransaction implements Serializable, TenantIsolationObject<Lo
     private String transactionType;
 
     /**
-     * 交易状态
-     */
-    @NotNull
-    private LedgerTransactionStatus status;
-
-    /**
      * 交易金额，单位：分
      */
     @NotNull
@@ -128,12 +121,6 @@ public class LedgerTransaction implements Serializable, TenantIsolationObject<Lo
      * 贷方合计，单位：分
      */
     private Long creditAmount;
-
-    /**
-     * 是否借贷平衡
-     */
-    @Column("is_balanced")
-    private Boolean balanced;
 
     /**
      * 业务单号

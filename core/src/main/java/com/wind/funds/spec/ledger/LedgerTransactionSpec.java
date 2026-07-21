@@ -1,6 +1,5 @@
 package com.wind.funds.spec.ledger;
 
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -47,9 +46,6 @@ public interface LedgerTransactionSpec {
 
     @NonNull
     FundsTransactionEventType getEventType();
-
-    @NonNull
-    LedgerTransactionStatus getStatus();
 
     @NonNull
     Money getAmount();

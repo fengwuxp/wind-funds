@@ -20,7 +20,7 @@ public enum FundsTransactionMode implements DescriptiveEnum {
     DIRECT("直接交易"),
 
     /**
-     * 授权、撤销、结算、退款生命周期交易。
+     * 授权、完成、撤销和退款生命周期交易。
      */
     AUTHORIZATION("授权交易"),
 

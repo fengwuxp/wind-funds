@@ -38,7 +38,7 @@ DSL 设计归属为产品到系分之间的领域承载层，不是产品 PRD，
 2. 系分设计时，重点看 DSL 对象结构、不变量、流程边界、异常路径和开发承接矩阵。
 3. 测试设计时，重点看场景覆盖、JSON 契约样例、TDD 输入输出、余额断言和评审清单。
 4. 业务沟通时，重点用本文统一“单、账、钱、余额、状态、链路”的共同语言。
-5. 授权链路统一使用“授权完成”承接产品侧“授权结算”，事件使用 `AUTHORIZATION_TRANSACTION / SETTLE`；不要把它和商户清结算的 `SETTLEMENT` 账目混用。
+5. 授权链路统一使用“授权完成”承接产品侧“授权完成”，事件使用 `AUTHORIZATION_TRANSACTION / COMPLETE`；不要把它和商户清结算的 `SETTLEMENT` 账目混用。
 
 ## 核心决策
 
@@ -77,7 +77,7 @@ DSL 设计的准入目标是证明产品语义可以被稳定承载，并能继�
 | 资金安全 | 主体、账户、账目、金额、币种、账本周期、route snapshot、posting plan 和 LedgerEntry 语义完整。 | 外部账户、支付工具、用户 ID、商户 ID 或订单号被设计成可记账主体。 |
 | 金融红线 | 规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方、确认状态、敏感信息脱敏和证据引用能在 DSL 中留痕或显式标为待确认。 | DSL 示例保存完整 PAN、CVV、密钥、token secret 或把外部规则写成无版本结论。 |
 | 易用性 | DSL 字段能支持用户账单、商户账单、运营时间线、拒绝原因和审计解释。 | DSL 只能入账，不能解释为什么拒绝、为什么选路、逆向处理为什么回放原路径。 |
-| 可理解性 | 枚举、事件、状态和 JSON 示例与产品术语映射一致。 | 授权完成与商户结算、`SETTLE` 事件与 `SETTLEMENT` 账目混用。 |
+| 可理解性 | 枚举、事件、状态和 JSON 示例与产品术语映射一致。 | 授权完成与商户结算、`COMPLETE` 事件与 `SETTLEMENT` 账目混用。 |
 | 可开发性 | DSL 对象、不变量、失败边界和公共字段足够稳定，不要求实现时临时补核心字段。 | 公共契约字段未定、枚举含义未定或必填语义未定。 |
 | 可测试性 | 每个 DSL 样例能映射到 TDD 契约测试、余额断言、红线失败、异常人工处理闭环或明确不适用原因。 | JSON 示例只是展示材料，不能驱动测试；治理差异只写日志，没有可断言的阻断原因、影响范围、责任归属和处理动作。 |
 
@@ -122,11 +122,14 @@ ScenarioFundsOperationContext
 | VCC 预付卡充值 | `PaymentInstrumentRef`、绑定资金子账户、外部入金引用、业务流水。 | 资金账户入账、账本分录和余额投影。 | 充值订单、processor event、外部入金流水。 | 卡号余额、VCC 账本主体、调额即入账。 |
 | VCC 预付卡提现 | 卡工具引用、资金子账户、提现目标、外部出款引用。 | 提现、在途、费用、清结算和对账。 | payout、rail、fee、quote 或退汇引用。 | 外部 accepted 即成功。 |
 | VCC 共享卡授权 | 卡工具引用、信用子账户、父账户快照、Spend Rule 决策证据。 | 账户主体型授权、冻结、退款和撤销。 | merchant、MCC、规则版本、控制额度变动引用。 | 替换 canonical 授权入参、共享卡号账本。 |
+| VCC 退款与额外 credit | 业务侧已验真的 `refundRef`、原交易引用、原清算币种本金，以及分别确认的补偿或正向 FX credit 资金事实。 | 本金单独转换为 `refund`；额外 credit 在责任主体、出入账户、账目、币种、规则和审批完整后转换为独立 canonical 直接交易。 | VCC 退款事件、金额分解、责任方、审批、汇率快照和每个资金交易引用。 | 把 `totalCreditAmount` 作为本金提交、把额外 credit 写入 `refundedAmount`、要求资金 DSL 推断责任或提供复合“超额退款”指令。 |
 | VA 收款 | VA 引用、statement line、绑定资金账户。 | 资金账户入账或对账差异。 | 银行流水、PSP 通知、付款方摘要。 | VA 内部余额。 |
 | 全球账户付款 | payout 指令、账户主体、rail、费用、quote。 | 出款、费用、在途、退汇和对账。 | SWIFT/local rail、quote、外部状态。 | 在 funds DSL 中实现 rail 协议。 |
 | ACH 或银行转账事件 | 外部事件、原交易引用、内部账户主体。 | 入账、扣账、退款、撤销、调账或差异单。 | ACH return、NOC、reversal、银行事件流水。 | Nacha/银行文件协议和外部账户敏感明文。 |
 
 DSL 的稳定不变量是：支付工具和外部 rail 只作为 `ScenarioFundsOperationContext`、`PaymentInstrumentRef`、`ExternalEventRef`、绑定快照和审计字段进入资金链路；资金交易、账本交易和账目分录仍必须落到资金账户、信用账户或平台角色解析后的平台资金账户。支出控制范围、Spend Rule、支付工具、VA、VCC 卡号和外部账户不得成为 `SubjectRef` 的可入账主体。
+
+VCC 业务侧持有退款事件、组件拆分、责任与审批、调用顺序、部分成功恢复和主状态；资金 DSL 只表达单个已经成立的资金动作。多个组件共享 `refundRef` 只表示业务关联，不形成批量指令、共享事务或对 `refund` 本金上限的例外。
 
 `authorizeByInstrument` 是 application facade 的入口命名，不改变 `FundsAuthorizationTransactionService.authorize` 的 DSL 内核语义。授权 DSL 内核继续表达已解析账户主体的资金占用、route、posting、ledger 和投影事实。
 

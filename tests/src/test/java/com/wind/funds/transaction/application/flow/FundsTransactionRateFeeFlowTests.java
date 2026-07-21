@@ -60,10 +60,8 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .map(LedgerPostingPlan::getPhaseCode)
                 .toList())
                 .containsExactlyInAnyOrder(LedgerPhaseCode.SETTLEMENT.name(), LedgerPhaseCode.FEE.name());
-        assertThat(ledgerTransaction.getBalanced()).isTrue();
         assertThat(ledgerTransaction.getDebitAmount()).isEqualTo(ledgerTransaction.getCreditAmount());
         assertThat(postingPlansOf(ledgerTransaction)).allSatisfy(postingPlan -> {
-            assertThat(postingPlan.getBalanced()).isTrue();
             assertThat(postingPlan.getDebitAmount()).isEqualTo(postingPlan.getCreditAmount());
         });
         assertThat(entriesOf(ledgerTransaction)).hasSize(4);

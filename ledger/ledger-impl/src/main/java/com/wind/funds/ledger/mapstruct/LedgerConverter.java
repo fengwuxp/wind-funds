@@ -16,6 +16,9 @@ import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.spec.ledger.LedgerEntrySpec;
 import com.wind.funds.spec.ledger.LedgerTransactionSpec;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsInstructionType;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.Money;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -70,6 +73,7 @@ public interface LedgerConverter {
     @Mapping(target = "subjectId", expression = "java(data.getSubjectId())")
     @Mapping(target = "subjectType", expression = "java(data.getSubjectType())")
     @Mapping(target = "entrySide", source = "entryType")
+    @Mapping(target = "postingRole", source = "postingRole")
     @Mapping(target = "periodType", expression = "java(data.getPeriodType())")
     @Mapping(target = "periodId", expression = "java(data.getPeriodId())")
     @Mapping(target = "amount", expression = "java(data.getAmount().getAmount())")
@@ -91,6 +95,7 @@ public interface LedgerConverter {
      * @return LedgerEntryDTO 实例
      */
     @Mapping(target = "entryType", source = "entrySide")
+    @Mapping(target = "postingRole", source = "postingRole")
     @Mapping(target = "periodType", source = "periodType")
     @Mapping(target = "periodId", source = "periodId")
     @Mapping(target = "amount", expression = "java(new Money(data.getAmount(),data.getCurrency()))")
@@ -143,6 +148,14 @@ public interface LedgerConverter {
             target = "originalAmount",
             expression = "java(new Money(data.getOriginalAmount(), data.getOriginalCurrency()))"
     )
+    @Mapping(target = "eventType", expression = "java(toFundsTransactionEventType(data.getEventType()))")
+    @Mapping(target = "instructionType", expression = "java(toFundsInstructionType(data.getInstructionType()))")
+    @Mapping(
+            target = "transactionType",
+            expression = "java(toDefaultFundsTransactionType(data.getTransactionType()))"
+    )
+    @Mapping(target = "debitAmount", expression = "java(new Money(data.getDebitAmount(), data.getCurrency()))")
+    @Mapping(target = "creditAmount", expression = "java(new Money(data.getCreditAmount(), data.getCurrency()))")
     @Mapping(target = "contextVariables", expression = "java(JSON.parseObject(data.getContextVariables()))")
     LedgerTransactionDTO convertToAccountLedgerTransactionDTO(LedgerTransaction data);
 
@@ -204,5 +217,17 @@ public interface LedgerConverter {
      */
     default LedgerPhaseCode toLedgerPhaseCode(String value) {
         return StringUtils.hasText(value) ? LedgerPhaseCode.valueOf(value) : null;
+    }
+
+    default FundsTransactionEventType toFundsTransactionEventType(String value) {
+        return StringUtils.hasText(value) ? FundsTransactionEventType.valueOf(value) : null;
+    }
+
+    default FundsInstructionType toFundsInstructionType(String value) {
+        return StringUtils.hasText(value) ? FundsInstructionType.valueOf(value) : null;
+    }
+
+    default DefaultFundsTransactionType toDefaultFundsTransactionType(String value) {
+        return StringUtils.hasText(value) ? DefaultFundsTransactionType.valueOf(value) : null;
     }
 }

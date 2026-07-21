@@ -258,8 +258,6 @@ final class RouteSnapshotJsonSupport {
                 subjectSummary(snapshot.getAccountRef()));
         values.put(ImmutableAccountHierarchySnapshotSpec.Fields.parentAccountRef,
                 subjectSummary(snapshot.getParentAccountRef()));
-        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.rootAccountRef,
-                subjectSummary(snapshot.getRootAccountRef()));
         values.put(ImmutableAccountHierarchySnapshotSpec.Fields.contextVariables,
                 sortedMap(snapshot.getContextVariables()));
         return values;
@@ -544,8 +542,6 @@ final class RouteSnapshotJsonSupport {
                         ImmutableAccountHierarchySnapshotSpec.Fields.accountRef)))
                 .parentAccountRef(parseSubjectRef(value.getJSONObject(
                         ImmutableAccountHierarchySnapshotSpec.Fields.parentAccountRef)))
-                .rootAccountRef(parseSubjectRef(value.getJSONObject(
-                        ImmutableAccountHierarchySnapshotSpec.Fields.rootAccountRef)))
                 .contextVariables(parseObjectMap(value.getJSONObject(
                         ImmutableAccountHierarchySnapshotSpec.Fields.contextVariables)))
                 .build();

@@ -17,5 +17,9 @@
             <groupId>com.wind.funds</groupId>
             <artifactId>capte-funds-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
     </dependencies>
 </project>

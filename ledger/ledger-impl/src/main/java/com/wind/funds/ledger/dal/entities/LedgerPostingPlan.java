@@ -127,13 +127,6 @@ public class LedgerPostingPlan implements Serializable, TenantIsolationObject<Lo
     private Long creditAmount;
 
     /**
-     * 是否借贷平衡
-     */
-    @NotNull
-    @Column("is_balanced")
-    private Boolean balanced;
-
-    /**
      * 描述
      */
     private String description;

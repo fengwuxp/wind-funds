@@ -62,9 +62,9 @@ import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
@@ -114,7 +114,6 @@ import com.wind.funds.ledger.enums.LedgerPostingIntentType;
 import com.wind.funds.ledger.enums.LedgerPostingScope;
 import com.wind.funds.ledger.enums.LedgerSubjectCategory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
@@ -616,24 +615,24 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setDescription("authorization declined"), WindOperator.system());
     }
 
-    protected String settleAuthorization(FundsAccountId accountId,
+    protected String completeAuthorization(FundsAccountId accountId,
                                          long amount,
                                          String authorizationTransactionSn,
                                          String businessSn) {
-        return authorizationTransactionService.settle(new FundsAuthorizationTransactionSettleRequest()
+        return authorizationTransactionService.complete(new FundsAuthorizationTransactionCompleteRequest()
                 .setAccountId(accountId)
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setAuthorizationTransactionSn(authorizationTransactionSn)
-                .setBusinessScene("AUTHORIZATION_SETTLE")
+                .setBusinessScene("AUTHORIZATION_COMPLETE")
                 .setBusinessSn(businessSn)
-                .setDescription("authorization settle"), WindOperator.system());
+                .setDescription("authorization complete"), WindOperator.system());
     }
 
-    protected String refundSettledAuthorization(FundsAccountId accountId,
+    protected String refundCompletedAuthorization(FundsAccountId accountId,
                                                 long amount,
                                                 String authorizationTransactionSn,
                                                 String businessSn) {
-        return authorizationTransactionService.settleRefund(new FundsAuthorizationTransactionRefundRequest()
+        return authorizationTransactionService.refund(new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(accountId)
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setAuthorizationTransactionSn(authorizationTransactionSn)
@@ -645,7 +644,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected String refundWithoutAuthorization(FundsAccountId accountId,
                                                 long amount,
                                                 String businessSn) {
-        return authorizationTransactionService.settleRefund(noAuthRefundRequest(accountId, amount,
+        return authorizationTransactionService.refund(noAuthRefundRequest(accountId, amount,
                 businessSn), WindOperator.system());
     }
 
@@ -885,7 +884,6 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                     List<String> postingPlanSns = postingPlans.stream()
                             .map(LedgerPostingPlan::getSn)
                             .toList();
-                    assertThat(ledgerTransaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
                     if (!fundsTransactions.isEmpty()) {
                         assertThat(ledgerTransaction.getFundsTransactionSn())
                                 .as("ledger transaction must point to funds transaction for businessSn %s",
@@ -1201,10 +1199,8 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         assertThat(transaction.getTransactionType()).isNotBlank();
         assertThat(transaction.getBusinessScene()).isNotBlank();
         assertThat(transaction.getBusinessSn()).isNotBlank();
-        assertThat(transaction.getStatus()).isEqualTo(LedgerTransactionStatus.POSTED);
         assertThat(transaction.getAmount()).isPositive();
         assertThat(transaction.getOriginalAmount()).isPositive();
-        assertThat(transaction.getBalanced()).isTrue();
         assertThat(transaction.getDebitAmount()).isEqualTo(transaction.getCreditAmount());
         assertThat(transaction.getSha256()).isNotBlank();
         List<LedgerPostingPlan> postingPlans = postingPlansOf(transaction);
@@ -1240,7 +1236,6 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
         assertKnownEnumName(LedgerBalanceEffectType.class, postingPlan.getBalanceEffectType(),
                 "posting plan balance effect");
         assertKnownEnumName(LedgerPhaseCode.class, postingPlan.getPhaseCode(), "posting plan phase");
-        assertThat(postingPlan.getBalanced()).isTrue();
         assertThat(postingPlan.getDebitAmount()).isEqualTo(postingPlan.getCreditAmount());
         assertThat(postingPlan.getSha256()).isNotBlank();
         assertThat(planEntries).as("posting entries for plan %s", postingPlan.getSn()).isNotEmpty();

@@ -3,9 +3,9 @@ package com.wind.funds.dsl;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.transaction.model.request.CreateFundsFrozenOrderRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionReversalRequest;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceAdjustRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceFreezeRequest;
 import com.wind.funds.transaction.model.request.FundsBalanceUnfreezeRequest;
@@ -43,7 +43,7 @@ class FundsTransactionRequestContextVariablesContractTests {
             FundsAuthorizationTransactionAuthorizeRequest.class,
             FundsAuthorizationTransactionRefundRequest.class,
             FundsAuthorizationTransactionReversalRequest.class,
-            FundsAuthorizationTransactionSettleRequest.class,
+            FundsAuthorizationTransactionCompleteRequest.class,
             FundsBalanceAdjustRequest.class,
             FundsBalanceFreezeRequest.class,
             FundsBalanceUnfreezeRequest.class,
@@ -90,10 +90,10 @@ class FundsTransactionRequestContextVariablesContractTests {
                     FundsAuthorizationTransactionAuthorizeRequest::new,
                     FundsAuthorizationTransactionAuthorizeRequest::setContextVariables,
                     FundsAuthorizationTransactionAuthorizeRequest::getContextVariables),
-            new RequestContextCase<>(FundsAuthorizationTransactionSettleRequest.class,
-                    FundsAuthorizationTransactionSettleRequest::new,
-                    FundsAuthorizationTransactionSettleRequest::setContextVariables,
-                    FundsAuthorizationTransactionSettleRequest::getContextVariables),
+            new RequestContextCase<>(FundsAuthorizationTransactionCompleteRequest.class,
+                    FundsAuthorizationTransactionCompleteRequest::new,
+                    FundsAuthorizationTransactionCompleteRequest::setContextVariables,
+                    FundsAuthorizationTransactionCompleteRequest::getContextVariables),
             new RequestContextCase<>(FundsAuthorizationTransactionReversalRequest.class,
                     FundsAuthorizationTransactionReversalRequest::new,
                     FundsAuthorizationTransactionReversalRequest::setContextVariables,

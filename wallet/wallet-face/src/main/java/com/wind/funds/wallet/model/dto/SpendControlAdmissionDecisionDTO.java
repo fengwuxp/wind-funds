@@ -90,7 +90,7 @@ public class SpendControlAdmissionDecisionDTO implements Serializable {
     @Schema(description = "Spend Rule 最终决策摘要，用于幂等、回放和对账追踪")
     private String spendDecisionDigest;
 
-    @Schema(description = "已固化的 Spend Rule 决策记录主键")
+    @Schema(description = "已固化的 Spend Rule 决策记录主键；NO_APPLICABLE_RULE 时为空")
     private Long spendDecisionRecordId;
 
     @Schema(description = "控制范围标识")

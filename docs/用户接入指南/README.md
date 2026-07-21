@@ -29,7 +29,7 @@
 
 | 能力 | 公共入口 | 已验证场景 | 主要测试 |
 | --- | --- | --- | --- |
-| 账本基础 | `LedgerService`、`LedgerTransactionService` | 建账、过账、按 SN 查询交易/分录、余额投影。 | `LedgerServiceImplTests`、`LedgerTransactionServiceImplTests`、`DefaultLedgerPostingAssemblerTests`、`LedgerBalanceProjectionServiceImplTests` |
+| 账本基础 | `LedgerService`、`LedgerTransactionPostingService`、`LedgerTransactionService` | 建账；通过 posting gateway 过账；通过 query service 按 SN 查询交易/分录；查询余额投影。 | `LedgerServiceImplTests`、`DefaultLedgerTransactionPostingServiceImplTests`、`LedgerTransactionServiceFactQueryTests`、`DefaultLedgerPostingAssemblerTests`、`LedgerBalanceProjectionServiceImplTests` |
 | 账户和余额查询 | `FundsAccountCapabilityApplicationService`、`FundsSubjectBalanceQueryService` | 账户能力准入、余额查询、账本 profile 初始化。 | `FundsAccountCapabilityApplicationServiceTests`、`FundsSubjectBalanceQueryServiceImplTests`、`LedgerProfileContractTests`、`ControlAccountLedgerInitializationTests` |
 | 支付工具 | `PaymentInstrumentCapabilityApplicationService`、`PaymentInstrumentPreTransactionSnapshotApplicationService` | 支付工具能力、绑定快照、交易前快照。 | `PaymentInstrumentCapabilityApplicationServiceTests`、`PaymentInstrumentPreTransactionSnapshotApplicationServiceTests`、`PaymentInstrumentServiceImplTests` |
 | 资金责任 | `FundingResponsibilityResolutionApplicationService` | 按关系解析当前资金责任主体。 | `FundingResponsibilityResolutionApplicationServiceTests`、`SpendSubjectFundingRelationServiceImplTests` |
@@ -51,7 +51,7 @@
 | `wallet` 资金责任 | 可接入。 | 按支出主体解析资金账户或信用账户责任主体。 | 多资金责任、错币种、停用账户和冲突优先级必须在准入前失败。 |
 | `wallet` Spend Rule / 预算控制 | 受控试点可用。 | 单条规则只读评估、最终决策固化、周期额度流水、交易消费、退款补偿、可信控制释放和控制投影查询。 | 多规则组合裁决、强一致授权拦截、rolling amount、cooldown、外部协同授权和生产调度由上游或专项承接。 |
 | `transaction` 直接交易 | 可接入。 | 充值、转账、付款、退款、提现、手续费和退费。 | 外部 pending、审批中或通道处理中不得进入交易事实。 |
-| `transaction` 授权交易 | 可接入。 | 授权、撤销、完成和完成后退款，后继动作基于原路径。 | 授权拒绝不得生成 route、posting、ledger entry；清算、争议和强制完成需按专项边界确认。 |
+| `transaction` 授权交易 | 可接入。 | 授权、撤销、完成和完成后本金退款，后继动作基于原路径。 | `refund` 只承接不超过已完成金额的本金；商家补偿、退货运费、FX credit 和 VCC 组件编排不属于该入口。授权拒绝不得生成 route、posting、ledger entry；清算、争议和强制完成需按专项边界确认。 |
 | `transaction` 余额控制 | 可接入。 | 冻结、解冻、受控余额调整和失败无副作用。 | 冻结只表达同主体 `AVAILABLE <-> FROZEN`，不表达扣款、消费或跨主体转移。 |
 | 让利出资记账 | 可接入。 | 上游已决策的平台、商户或合作方让利出资入账，以及按原交易冲回。 | 不计算券、不维护券生命周期、不保存营销归因；非入账权益不进本服务。 |
 | 外部确认入金 | 可接入。 | `confirmed credit -> funding account` 转为标准充值。 | accepted、submitted、processing、message sent、VA 未匹配、错币种和外部账户入账均不得进入本入口。 |
@@ -65,7 +65,7 @@
 
 | 项 | 必填内容 |
 | --- | --- |
-| 业务动作 | topup、transfer、pay、refund、withdraw、fee、authorize、authorization reversal、settle、settleRefund、freeze、unfreeze、adjust、benefit settle/refund、external confirmed credit。 |
+| 业务动作 | topup、transfer、pay、refund、withdraw、fee、authorize、authorization reversal、complete、authorization refund、freeze、unfreeze、adjust、benefit settle/refund、external confirmed credit。 |
 | 资金主体 | 回答“谁的钱”：成本承担方、资金流出方、资金流入方、授权主体或冻结主体。 |
 | 账户类型 | FundingAccount、CreditAccount、平台账户角色解析结果；SpendControlScope、Spend Rule、PaymentInstrument 只能是控制或引用。 |
 | 金额币种 | 回答“多少钱”：金额必须为正，币种和精度必须能和账户、账本 profile 对齐。 |
@@ -118,10 +118,18 @@
 | --- | --- | --- |
 | 授权 | `authorize` | 授权拒绝不得生成 route、posting 或 ledger entry。 |
 | 撤销 | `reversal` | 释放原授权占用。 |
-| 完成 | `settle` | 基于原授权路径完成，不按当前绑定重新选路。 |
-| 完成后退款 | `settleRefund` | 引用原完成事实。 |
+| 完成 | `complete` | 基于原授权路径完成，不按当前绑定重新选路。 |
+| 完成后退款 | `refund` | 引用原完成事实。 |
 
 验证锚点：`FundsAuthorizationTransactionFlowTests`。
+
+#### 6.3.1 本金退款与额外 credit
+
+当前公共契约没有“超额退款”入口。`refund` 只接收原清算币种本金，累计不得超过原交易 `completedAmount`；`totalCreditAmount`、商家补偿、退货运费和 FX credit 不得作为该方法的退款金额，也不得写入 `refundedAmount`。
+
+VCC 或其他业务接入方负责外部事件验真、金额拆分、责任方、出资账户、到账账户、账目、币种、汇率快照、审批、上限、组件顺序、部分成功恢复和业务主状态。`wind-funds` 只执行已经成立的单个资金事实：本金使用 `refund`；额外 credit 只有在上述事实完整且对应 P2 专项完成生产确认后，才能选择适用的 canonical 直接交易入口独立提交。每个组件使用独立幂等键并携带同一 `refundRef`，但不共享跨调用事务。
+
+禁止使用 `FundsBalanceControlService.adjust` 绕过该边界，也禁止把总 credit 拆成多次 `refund` 突破本金累计上限。清算本金 100、补偿 10 时，向 `refund` 提交 110 必须失败；业务侧应提交本金 100，并在额外 credit 专项准出后另行提交已确认的 10。
 
 ### 6.4 冻结、解冻和调整
 
@@ -154,9 +162,13 @@
 
 ### 6.6 Spend Rule 和预算控制
 
-适用条件：需要在交易前固化支出控制决策，或记录交易消费对控制范围的影响。
+适用条件：需要在交易前记录并验真支出控制决策，或记录交易消费对控制范围的影响。
 
-当前接入口径：接入方先完成规则判断或外部风控判断，`wallet` 只固化 Spend Rule 决策证据、控制额度流水和只读投影；如接入方只需要单条已发布规则的轻量评估，可先调用 `SpendRuleEvaluationApplicationService.evaluate` 覆盖单笔金额、周期金额可用额度、周期次数、滚动窗口次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填、AVS 邮编校验结果、币种黑白名单和本地授权时间窗口判断，再把最终决策证据交给准入服务固化。每个被 `evaluate` 的 `ruleSpec` 只允许一个可执行控制项；金额、MCC、币种、时间窗口等组合裁决需要拆成多条规则由上游合成最终结果。该 evaluator 只提供只读候选评估，不提供并发强一致授权拦截；本文不承诺 Highnote 式托管规则引擎、rolling amount、cooldown、生产调度或协同授权 webhook。
+当前接入口径：可信规则或业务决策方先完成规则判断，并通过 `SpendRuleDecisionRecordService.recordDecision` 固化 `PASSED` / `REJECTED` 决策；`wallet` 准入自行解析当前有效 Spend Rule 挂载，再按 `decisionSn` 回读和验真决策记录。普通交易接入方不得把 `recordDecision` 当作授权入口，也不能只传裸 `PASSED + sha256`。如只需要单条已发布规则的轻量评估，可先调用 `SpendRuleEvaluationApplicationService.evaluate` 覆盖单笔金额、周期金额可用额度、周期次数、滚动窗口次数、MCC 黑白名单、商户国家黑白名单、卡数据输入能力黑白名单、卡交易处理类型黑白名单、商户标识黑白名单、PAN 录入方式黑白名单、POS 类别黑白名单、CVV 必填、AVS 邮编校验结果、币种黑白名单和本地授权时间窗口判断，再由可信决策方把最终结果写为决策记录。每个被 `evaluate` 的 `ruleSpec` 只允许一个可执行控制项；该 evaluator 只提供只读候选评估，不提供并发强一致授权拦截。
+
+准入只从可信上下文解析 `PAYMENT_INSTRUMENT`、已解析的 `FUNDING_ACCOUNT` / `CREDIT_ACCOUNT`、`BUSINESS_SCENE` 和请求中的 `controlScopeId` 对应挂载。没有适用且没有无法解析的有效挂载时返回显式 `NO_APPLICABLE_RULE`，不创建伪规则、binding、摘要或决策记录；只有一个适用挂载时必须提供可回读的 `decisionSn`，并核对 binding、支付工具、动作、金额、币种和业务流水；多个适用挂载时，当前单决策证据契约无法完整表达，默认拒绝。存在有效 `SPEND_CONTROL_SCOPE` 挂载但请求未携带匹配的 `controlScopeId`，或租户下存在当前无法解析的有效 `ACCOUNT_HIERARCHY` 挂载时，wallet 明确 fail-closed，不能降级为 `NO_APPLICABLE_RULE`。`controlScopeId` 目前仍由请求提供，生产 facade 必须从可信业务关系补齐并禁止调用方伪造或省略；`ACCOUNT_HIERARCHY` 参与生产准入前必须先补充可信层级标识来源并评审公共契约。
+
+已成立授权按 `tenantId + businessScene + businessSn` 回读原交易，并以原交易上下文核对金额、币种、支付工具、授权结果和 Spend Rule 决策证据。完全相同的请求即使当前 binding 已暂停也返回原交易号，不重新生成资金或账务事实；关键参数或决策引用变化时拒绝。该规则只用于已经成立的授权事实，不允许失败中的请求绕过当前准入。
 
 金额和事件口径：`EvaluateSpendRuleRequest.amount` 是调用方已归一后的本次评估金额。卡授权接入方如果区分 requested amount 和 authorized amount，必须先在上游确定进入支出控制的金额口径，再传入 evaluator；wallet 不从外部原始网络字段、退款、撤销或 Highnote 式延迟结果中推导累计授权金额。周期额度、周期次数和滚动窗口次数只读取本系统已有 `SpendControlMovement` 与预算控制投影。交易成功通过交易消费入口记录 `CONSUMED`，退款成功记录 `REFUND_COMPENSATED`；交易失败或拒绝依赖同一资金事务回滚预留，不写释放补偿；到期或超时不写控制流水；可信撤销、清算剩余释放或差错补事实由上层显式调用控制流水服务记录 `RELEASED`。
 
@@ -164,9 +176,9 @@ Velocity 控制口径：Highnote 的 `PER_TRANSACTION` 在本项目只对应本�
 
 不承接规则类型：Highnote 文档中的 maximum amount variance on credit limit、maximum percent variance on credit limit、conditional rule、authorization hold configuration、deposit amount、deposit count、deposit processing network 和 street address 当前不进入 wallet Spend Rule evaluator。信用额度浮动类规则由授信 / 风控专项承接；authorization hold configuration 不改变本项目授权占用和释放语义；外部确认入金走 `transaction` 的外部资金事件入口；地址类控制只允许传入 AVS / 邮编校验结果事实，不接收或保存街道地址原文。
 
-外部风控或协同授权的 approve / decline 只作为最终决策证据进入 `SpendControlAdmissionApplicationService.resolve`。`REJECTED` 会在交易内核前停止；`PASSED` 仍然必须继续通过支付工具绑定、账户能力和资金责任校验，不能被接入方理解为资金可用、授权成功或已经完成交易。
+外部风控或协同授权的 approve / decline 必须先由可信适配方写入可回读的决策记录，再以 `decisionSn` 进入 `SpendControlAdmissionApplicationService.resolveSpendControlAdmission`。`REJECTED` 会在交易内核前停止；`PASSED` 只有在 binding 和当前交易上下文验真通过后才能继续支付工具绑定、账户能力和资金责任校验，不能被理解为资金可用、授权成功或已经完成交易。
 
-多规则裁决由上游负责合成。接入方如果同时评估单笔限额、MCC、商户标识、国家地区、卡数据输入能力、卡交易处理类型、PAN 录入方式、POS 类别、CVV 必填、AVS 邮编校验结果、币种、时间窗口、滚动窗口次数和外部风控，只把最终 `decisionSn`、`decisionResult`、`decisionDigest` 和 `rejectReason` 传入 wallet；`evaluatedRules`、`decisionPolicy`、`finalDecision` 等明细当前不进入公共契约，保留在上游证据系统中。
+多规则裁决仍由上游负责合成并保留 `evaluatedRules`、`decisionPolicy`、`finalDecision` 等明细，但当前 wallet 的单决策记录契约不能证明多个同时适用 binding 已被完整评估，因此不会仅凭上游最终 `decisionSn` 选取其中一条 binding 放行。生产接入应确保当前准入上下文只有一个适用 binding；需要多规则同时生效时，先完成多规则证据公共契约和持久化设计。
 
 规则挂载范围按本系统稳定对象表达，不直接暴露外部产品名：Highnote payment card 映射 `SpendRuleScopeType.PAYMENT_INSTRUMENT`，`scopeId` 使用支付工具流水；financial account 映射 `FUNDING_ACCOUNT` 或 `CREDIT_ACCOUNT`，`scopeId` 使用资金账户或信用账户流水；authorized user、cardholder、员工或账户层级映射 `ACCOUNT_HIERARCHY`，`scopeId` 使用企业员工、持卡人或账户层级的系统内稳定引用；card product 可按产品侧稳定场景映射 `BUSINESS_SCENE`。这些范围只用于规则挂载、查询和解释，不是资金主体、资金责任主体或账本主体。
 
@@ -193,7 +205,7 @@ AVS 邮编校验结果场景示例：电商卡要求账单邮编校验匹配，�
 | 检查项 | 接入方需要准备 |
 | --- | --- |
 | 规则变更审计 | 规则创建、版本发布、挂载变更、停用 / 恢复、额度调整的操作者、原因、审批或审计引用、traceId、变更前后摘要和影响 scope。 |
-| 最终决策证据 | 最终 `decisionSn`、`decisionResult`、`decisionDigest`、拒绝原因、上游外部决策引用和业务流水；多规则明细由上游证据系统保存。 |
+| 最终决策证据 | 有适用 binding 时，可信决策方已持久化最终 `decisionSn`、`decisionResult`、`decisionDigest`、拒绝原因、上游外部决策引用和业务流水，且 wallet 可按引用回读验真；无适用规则时保留 `NO_APPLICABLE_RULE` 准入快照。 |
 | 历史窗口查询 | 当前和历史周期都能用 `controlScopeId + periodId` 查询控制额度；需要按账户隔离时必须带目标账户和币种。 |
 | 告警和 Runbook | 摘要冲突、挂载冲突、拒绝率异常、控制投影缺证据、滚动窗口慢查询和迁移失败都要有发现方式、处理 owner、止血动作和恢复验收。 |
 | 灰度和回滚 | 规则回滚通过新增版本、停用挂载或恢复旧挂载完成；不得覆盖已发布版本、删除历史决策或修改历史控制流水。 |
@@ -209,18 +221,19 @@ SC-LOOP-06 准出交接卡：
 
 | 交接项 | 结论 |
 | --- | --- |
-| 试点能力 | 单条规则只读评估、最终决策证据固化、控制流水、控制投影、交易消费和退款补偿；可信控制释放由上层显式提交。 |
-| 推荐入口 | `evaluate` -> `resolve` -> `adjustLimit` -> 交易层入口 -> `consume`。 |
+| 试点能力 | 单条规则只读评估、可信决策写入、wallet binding 解析与 decisionRef 回读验真、控制流水、控制投影、交易消费和退款补偿；可信控制释放由上层显式提交。 |
+| 推荐入口 | `evaluate` -> `recordDecision` -> `resolveSpendControlAdmission` -> `adjustLimit` -> 交易层入口 -> `consume`。 |
 | 生产前证据 | 规则变更审计、最终决策证据、历史窗口查询、告警 / Runbook、灰度 / 回滚。 |
 | 不接入范围 | P2 VCC / 全球账户 / ACH / 收单 / FX quote 与执行、Highnote 托管规则引擎、rolling amount、cooldown、协同授权 webhook、完整生产启用或上线审批。 |
 
 推荐入口：
 
 1. `SpendRuleEvaluationApplicationService.evaluate` 可选只读评估单条已发布规则
-2. `SpendControlAdmissionApplicationService.resolve` 固化最终支出控制决策
-3. `BudgetControlLimitAdjustmentApplicationService.adjustLimit` 记录周期控制额度调增或调减
-4. 交易层入口
-5. `SpendControlTransactionConsumptionApplicationService` 记录交易消费或退款补偿事实；可信控制释放直接调用 `SpendControlMovementService`
+2. 可信规则或业务决策方调用 `SpendRuleDecisionRecordService.recordDecision` 固化 `PASSED` / `REJECTED`
+3. 普通交易调用方只把 `decisionSn` 作为决策引用交给 `SpendControlAdmissionApplicationService.resolveSpendControlAdmission`；rule、binding、结果和摘要字段即使提供也只用于一致性诊断
+4. `BudgetControlLimitAdjustmentApplicationService.adjustLimit` 记录周期控制额度调增或调减
+5. 交易层入口
+6. `SpendControlTransactionConsumptionApplicationService` 记录交易消费或退款补偿事实；可信控制释放直接调用 `SpendControlMovementService`
 
 SpendControlScope 是控制范围，不是账本主体。接入侧使用 `controlScopeId + periodId` 查询额度，并在准入 / 授权请求中传入 `controlScopeId`。
 
@@ -251,7 +264,7 @@ flowchart LR
 | 记录出资 | `FundsBenefitContributionTransactionService.settle` |
 | 冲回出资 | `FundsBenefitContributionTransactionService.refund` |
 
-多方出资就多次调用 `settle`，不要批量 API，也不要把多个出资方合并到一个营销账户。
+多方出资就多次调用 `complete`，不要批量 API，也不要把多个出资方合并到一个营销账户。
 
 验证锚点：`FundsBenefitContributionTransactionServiceContractTests`、`FundsBenefitContributionTransactionServiceFlowTests`。
 

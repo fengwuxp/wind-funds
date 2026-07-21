@@ -1,6 +1,6 @@
 package com.wind.funds.ledger.query;
 
-import com.wind.funds.ledger.enums.LedgerTransactionStatus;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -34,10 +34,7 @@ public class LedgerTransactionQuery {
     private String fundsTransactionSn;
 
     @Schema(description = "事件类型")
-    private String eventType;
-
-    @Schema(description = "交易状态")
-    private LedgerTransactionStatus status;
+    private FundsTransactionEventType eventType;
 
     @Schema(description = "交易币种")
     private CurrencyIsoCode currency;

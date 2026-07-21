@@ -141,7 +141,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
     }
 
     /**
-     * 场景：已完成授权发生外部争议，资金结果通过 settleRefund 承接。
+     * 场景：已完成授权发生外部争议，资金结果通过 refund 承接。
      * 输入：授权 60、完成 60、争议退款 40，并携带 dispute 审计字段。
      * 输出：解释摘要必须展示 DISPUTE_REFUND 语义，并暴露外部争议引用。
      * 预期：争议退款可与普通退款、无授权退款区分。
@@ -152,8 +152,8 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
         FundsAccountId user = fundingAccount("funding_user");
         topup(user, 100L, "PROJECTION_EXPLAIN_DISPUTE_TOPUP");
         String authorizationSn = authorize(user, 60L, true, "PROJECTION_EXPLAIN_DISPUTE_AUTHORIZE");
-        settleAuthorization(user, 60L, authorizationSn, "PROJECTION_EXPLAIN_DISPUTE_CAPTURE");
-        String refundSn = authorizationTransactionService.settleRefund(new FundsAuthorizationTransactionRefundRequest()
+        completeAuthorization(user, 60L, authorizationSn, "PROJECTION_EXPLAIN_DISPUTE_CAPTURE");
+        String refundSn = authorizationTransactionService.refund(new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(user)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setAuthorizationTransactionSn(authorizationSn)

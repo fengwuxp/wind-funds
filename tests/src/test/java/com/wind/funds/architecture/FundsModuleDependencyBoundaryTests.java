@@ -63,15 +63,11 @@ class FundsModuleDependencyBoundaryTests {
             "capte-funds-tests",
             "catep-infrastructure-dal");
 
-    private static final List<String> CORE_FORBIDDEN_RUNTIME_SPRING_COMPONENT_TOKENS = List.of(
-            "import org.springframework.context.annotation.Primary;",
-            "import org.springframework.stereotype.Component;",
-            "import org.springframework.stereotype.Repository;",
-            "import org.springframework.stereotype.Service;",
-            "@Primary",
-            "@Component",
-            "@Repository",
-            "@Service");
+    private static final String CORE_FORBIDDEN_SPRING_DEPENDENCY_GROUP_TOKEN =
+            "<groupId>org.springframework";
+
+    private static final List<String> CORE_FORBIDDEN_SPRING_IMPORT_TOKENS = List.of(
+            "import org.springframework.");
 
     private static final Map<String, List<String>> MODULE_FORBIDDEN_ARTIFACTS = Map.of(
             "fx/fx-impl/pom.xml", List.of(
@@ -206,10 +202,7 @@ class FundsModuleDependencyBoundaryTests {
     private static final List<String> LEDGER_DANGEROUS_FACE_CALL_TOKENS = List.of(
             ".updateLedgerBalance(",
             ".deleteLedgerById(",
-            ".deleteLedgerByIds(",
-            ".updateLedgerTransaction(",
-            ".deleteLedgerTransactionById(",
-            ".deleteLedgerTransactionByIds(");
+            ".deleteLedgerByIds(");
 
     private static final List<String> NON_WALLET_PRODUCTION_SOURCE_SCAN_PATHS = List.of(
             "ledger/ledger-face/src/main/java",
@@ -247,15 +240,19 @@ class FundsModuleDependencyBoundaryTests {
 
     /**
      * 场景：core 承载资金 DSL、枚举、值对象和端口契约。
-     * 预期：core 源码不声明 Spring 运行时组件或装配优先级。
-     * 红线：核心契约不能把具体容器装配职责上推到 core。
+     * 预期：core POM 不声明 Spring 依赖，源码不依赖 Spring 运行时类型。
+     * 红线：核心契约、值对象和校验规则不能依赖具体容器或框架工具。
      */
     @Test
-    void testCoreShouldNotDeclareRuntimeSpringComponents() throws Exception {
+    void testCoreShouldNotDependOnSpringRuntime() throws Exception {
         List<String> violations = new ArrayList<>();
+        String corePom = Files.readString(workspaceRoot().resolve("core/pom.xml"));
+        if (corePom.contains(CORE_FORBIDDEN_SPRING_DEPENDENCY_GROUP_TOKEN)) {
+            violations.add("core/pom.xml declares a Spring dependency group");
+        }
         for (Path javaFile : javaSourceFiles(List.of("core/src/main/java"))) {
             String content = Files.readString(javaFile);
-            for (String forbiddenToken : CORE_FORBIDDEN_RUNTIME_SPRING_COMPONENT_TOKENS) {
+            for (String forbiddenToken : CORE_FORBIDDEN_SPRING_IMPORT_TOKENS) {
                 if (content.contains(forbiddenToken)) {
                     violations.add(workspaceRoot().relativize(javaFile)
                             + " contains runtime Spring component token " + forbiddenToken);
@@ -264,7 +261,7 @@ class FundsModuleDependencyBoundaryTests {
         }
 
         assertThat(violations)
-                .as("core must keep Spring runtime component ownership outside core")
+                .as("core must keep Spring runtime dependencies outside core")
                 .isEmpty();
     }
 

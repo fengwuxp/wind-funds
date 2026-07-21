@@ -5,7 +5,6 @@ import com.alibaba.fastjson2.JSONException;
 import com.wind.funds.model.FundsContextVariables;
 import com.wind.funds.spec.transaction.FundsInstructionFieldKeys;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Array;
 import java.util.Locale;
@@ -79,7 +78,7 @@ public final class FundsBenefitSpecValidators {
     }
 
     public static void rejectInstructionContextVariables(@Nullable String contextVariables, String owner) {
-        if (!StringUtils.hasText(contextVariables)) {
+        if (contextVariables == null || contextVariables.isBlank()) {
             return;
         }
         try {
@@ -153,7 +152,7 @@ public final class FundsBenefitSpecValidators {
     }
 
     private static boolean isReservedContextKey(String fieldName, Set<String> reservedKeys) {
-        if (!StringUtils.hasText(fieldName)) {
+        if (fieldName == null || fieldName.isBlank()) {
             return false;
         }
         String normalized = fieldName.toLowerCase(Locale.ROOT).replaceAll(NON_FIELD_NAME_CHARACTER_PATTERN, "");

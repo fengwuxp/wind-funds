@@ -8,7 +8,7 @@ import com.wind.funds.route.support.RouteSpecSupport;
 import com.wind.funds.route.support.RouteSubjectSupport;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.support.FundsInstructionContextReader;
 import com.wind.funds.transaction.support.FundsRouteCodes;
 import com.wind.funds.transaction.support.FundsRouteLegIds;
@@ -93,7 +93,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return instruction.getInstructionType() == FundsInstructionType.AUTHORIZATION_TRANSACTION
                 && (instruction.getEventType() == FundsTransactionEventType.AUTHORIZE
-                || (instruction.getEventType() == FundsTransactionEventType.SETTLE && isForceSettle(instruction))
+                || (instruction.getEventType() == FundsTransactionEventType.COMPLETE && isForceCompletion(instruction))
                 || (instruction.getEventType() == FundsTransactionEventType.AUTH_REFUND
                 && isNoAuthRefund(instruction)));
     }
@@ -103,9 +103,9 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         return switch (instruction.getEventType()) {
             case AUTHORIZE -> resolveAuthorize(instruction);
             case REVERSAL -> resolveReversal(instruction);
-            case SETTLE -> isForceSettle(instruction) ? resolveForceSettle(instruction) : resolveSettle(instruction);
+            case COMPLETE -> isForceCompletion(instruction) ? resolveForceCompletion(instruction) : resolveComplete(instruction);
             case AUTH_REFUND -> isNoAuthRefund(instruction) ? resolveNoAuthRefund(instruction)
-                    : resolveSettleRefund(instruction);
+                    : resolveRefund(instruction);
             default -> throw new IllegalArgumentException(UNSUPPORTED_EVENT_TYPE_MESSAGE
                     + instruction.getEventType());
         };
@@ -143,7 +143,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         return route(instruction, FundsRouteCodes.AUTHORIZATION_REVERSAL_STANDARD, participants, legs);
     }
 
-    private ResolvedRouteSpec resolveSettle(FundsInstructionSpec instruction) {
+    private ResolvedRouteSpec resolveComplete(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionFieldKeys.ACCOUNT_ID);
         List<FundsAccountId> authorizationSubjects = resolveAuthorizationSubjects(instruction, accountId);
@@ -157,10 +157,10 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         participants.add(platformParticipant(RouteParticipantRole.PAYEE, settlementAccount, instruction));
         List<RouteLegSpec> legs = captureLegs(authorizationSubjects, settlementAccount, instruction);
         PlatformAccountsSnapshotSpec snapshot = platformAccountRouteSupport.createSettlementSnapshot(settlementAccount);
-        return route(instruction, FundsRouteCodes.AUTHORIZATION_SETTLE_STANDARD, participants, legs, snapshot);
+        return route(instruction, FundsRouteCodes.AUTHORIZATION_COMPLETE_STANDARD, participants, legs, snapshot);
     }
 
-    private ResolvedRouteSpec resolveForceSettle(FundsInstructionSpec instruction) {
+    private ResolvedRouteSpec resolveForceCompletion(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionFieldKeys.ACCOUNT_ID);
         FundsAccountId settlementAccount = platformAccountRouteSupport.requireAccount(
@@ -169,12 +169,12 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 subjectParticipant(routeSubjectSupport.resolveParticipantRole(accountId, true), accountId,
                         instruction),
                 platformParticipant(RouteParticipantRole.PAYEE, settlementAccount, instruction));
-        List<RouteLegSpec> legs = forceSettleLegs(accountId, settlementAccount, instruction);
+        List<RouteLegSpec> legs = forceCompletionLegs(accountId, settlementAccount, instruction);
         PlatformAccountsSnapshotSpec snapshot = platformAccountRouteSupport.createSettlementSnapshot(settlementAccount);
-        return route(instruction, FundsRouteCodes.AUTHORIZATION_FORCE_SETTLE_STANDARD, participants, legs, snapshot);
+        return route(instruction, FundsRouteCodes.AUTHORIZATION_FORCE_COMPLETION_STANDARD, participants, legs, snapshot);
     }
 
-    private ResolvedRouteSpec resolveSettleRefund(FundsInstructionSpec instruction) {
+    private ResolvedRouteSpec resolveRefund(FundsInstructionSpec instruction) {
         FundsAccountId accountId = FundsInstructionContextReader.requireFundsAccountId(instruction,
                 FundsInstructionFieldKeys.ACCOUNT_ID);
         List<FundsAccountId> authorizationSubjects = resolveAuthorizationSubjects(instruction, accountId);
@@ -188,7 +188,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         }
         List<RouteLegSpec> legs = refundLegs(authorizationSubjects, settlementAccount, instruction);
         PlatformAccountsSnapshotSpec snapshot = platformAccountRouteSupport.createSettlementSnapshot(settlementAccount);
-        return route(instruction, FundsRouteCodes.AUTHORIZATION_SETTLE_REFUND_STANDARD, participants, legs, snapshot);
+        return route(instruction, FundsRouteCodes.AUTHORIZATION_REFUND_STANDARD, participants, legs, snapshot);
     }
 
     private ResolvedRouteSpec resolveNoAuthRefund(FundsInstructionSpec instruction) {
@@ -273,14 +273,14 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 PlatformFundingAccountRole.SETTLEMENT);
         RoutePeriod period = routePeriod(instruction);
         for (FundsAccountId subject : authorizationSubjects) {
-            result.add(routeLeg(FundsRouteLegIds.AUTHORIZATION_SETTLEMENT_PREFIX + sequence, sequence,
+            result.add(routeLeg(FundsRouteLegIds.AUTHORIZATION_COMPLETION_PREFIX + sequence, sequence,
                     RouteLegType.CONSUME,
                     instruction)
                     .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(subject),
                             LedgerSubjectCode.AUTHORIZATION))
                     .targetNode(targetNode(settlementSubject, settlementLedgerSubjectCode))
                     .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                    .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                    .phaseCode(LedgerPhaseCode.COMPLETION)
                     .periodType(period.periodType())
                     .periodId(period.periodId())
                     .replayPolicy(RouteReplayPolicy.PARTIAL_ALLOWED)
@@ -291,19 +291,19 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
         return result;
     }
 
-    private List<RouteLegSpec> forceSettleLegs(FundsAccountId accountId,
+    private List<RouteLegSpec> forceCompletionLegs(FundsAccountId accountId,
                                                FundsAccountId settlementAccount,
                                                FundsInstructionSpec instruction) {
         SubjectRef settlementSubject = platformAccountRouteSupport.createSubjectRef(settlementAccount);
         LedgerSubjectCode settlementLedgerSubjectCode = platformAccountRouteSupport.resolveLedgerSubjectCode(
                 PlatformFundingAccountRole.SETTLEMENT);
-        RouteLegSpec leg = routeLeg(FundsRouteLegIds.FORCE_SETTLEMENT_PREFIX + 1, 1, RouteLegType.CONSUME,
+        RouteLegSpec leg = routeLeg(FundsRouteLegIds.FORCE_COMPLETION_PREFIX + 1, 1, RouteLegType.CONSUME,
                 instruction)
                 .sourceNode(sourceNode(routeSubjectSupport.createSubjectRef(accountId),
                         LedgerSubjectCode.AVAILABLE))
                 .targetNode(targetNode(settlementSubject, settlementLedgerSubjectCode))
                 .balanceEffectType(LedgerBalanceEffectType.CONSUME)
-                .phaseCode(LedgerPhaseCode.SETTLEMENT)
+                .phaseCode(LedgerPhaseCode.COMPLETION)
                 .replayPolicy(RouteReplayPolicy.NON_REPLAYABLE)
                 .constraintOverrides(mustNotBeNegative(accountId, LedgerSubjectCode.AVAILABLE))
                 .build();
@@ -320,7 +320,7 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 PlatformFundingAccountRole.SETTLEMENT);
         RoutePeriod period = routePeriod(instruction);
         for (FundsAccountId subject : authorizationSubjects) {
-            result.add(routeLeg(FundsRouteLegIds.SETTLE_REFUND_PREFIX + sequence, sequence, RouteLegType.RESTORE,
+            result.add(routeLeg(FundsRouteLegIds.AUTHORIZATION_REFUND_PREFIX + sequence, sequence, RouteLegType.RESTORE,
                     instruction)
                     .sourceNode(sourceNode(settlementSubject, settlementLedgerSubjectCode))
                     .targetNode(targetNode(routeSubjectSupport.createSubjectRef(subject), LedgerSubjectCode.AVAILABLE))
@@ -477,10 +477,10 @@ public class AuthorizationFundsInstructionRouteResolver implements RouteResolver
                 instruction.getAmount(), instruction.getDescription(), Map.of());
     }
 
-    private boolean isForceSettle(FundsInstructionSpec instruction) {
-        String settleMode = FundsInstructionContextReader.getValue(instruction,
-                FundsInstructionContextKeys.SETTLE_MODE, String.class);
-        return FundsAuthorizationTransactionSettleRequest.SETTLE_MODE_FORCE.equalsIgnoreCase(settleMode);
+    private boolean isForceCompletion(FundsInstructionSpec instruction) {
+        String completionMode = FundsInstructionContextReader.getValue(instruction,
+                FundsInstructionContextKeys.COMPLETION_MODE, String.class);
+        return FundsAuthorizationTransactionCompleteRequest.COMPLETION_MODE_FORCE.equalsIgnoreCase(completionMode);
     }
 
     private boolean isNoAuthRefund(FundsInstructionSpec instruction) {

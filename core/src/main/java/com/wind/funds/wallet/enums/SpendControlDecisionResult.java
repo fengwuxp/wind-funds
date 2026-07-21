@@ -15,7 +15,8 @@ import lombok.Getter;
 public enum SpendControlDecisionResult implements DescriptiveEnum {
 
     PASSED("通过"),
-    REJECTED("拒绝");
+    REJECTED("拒绝"),
+    NO_APPLICABLE_RULE("无适用规则");
 
     private final String desc;
 }

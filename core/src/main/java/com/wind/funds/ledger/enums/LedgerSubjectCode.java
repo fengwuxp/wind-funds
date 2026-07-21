@@ -52,9 +52,16 @@ public enum LedgerSubjectCode implements DescriptiveEnum {
     CLEARING("清算中余额"),
 
     /**
-     * 结算归集余额。
+     * 已用信用额度。
+     *
+     * <p>仅用于信用账户承接授权完成后的额度责任，不表示现金或外部结算状态。</p>
      */
-    SETTLEMENT("结算归集"),
+    OUTSTANDING("已用信用额度"),
+
+    /**
+     * 已进入内部结算责任的金额。
+     */
+    SETTLEMENT("结算余额"),
 
     /**
      * 手续费归集。

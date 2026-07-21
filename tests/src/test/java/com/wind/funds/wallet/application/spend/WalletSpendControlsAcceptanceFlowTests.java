@@ -49,12 +49,14 @@ import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequ
 import com.wind.funds.wallet.model.request.EvaluateSpendRuleRequest;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
 import com.wind.funds.wallet.model.request.RecordSpendControlMovementRequest;
+import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
 import com.wind.funds.wallet.model.request.ResolveSpendControlAdmissionRequest;
 import com.wind.funds.wallet.model.request.SpendControlTransactionConsumptionRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendControlMovementService;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
+import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
@@ -120,6 +122,8 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
 
     private static final String SPEND_RULE_DIGEST = "sha256:wallet-spend-controls-rule";
 
+    private static final String SPEND_DECISION_SN = "decision_wallet_spend_controls_001";
+
     private static final String CONTROL_SCOPE_ID = "wallet_spend_controls_scope";
 
     private static final String PERIOD_ID = "2026-07";
@@ -155,6 +159,9 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
     private SpendControlAdmissionApplicationService spendControlAdmissionApplicationService;
 
     @Autowired
+    private SpendRuleDecisionRecordService spendRuleDecisionRecordService;
+
+    @Autowired
     private BudgetControlLimitAdjustmentApplicationService budgetControlLimitAdjustmentApplicationService;
 
     @Autowired
@@ -186,6 +193,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         SpendRuleEvaluationDecisionDTO evaluation = spendRuleEvaluationApplicationService.evaluate(
                 evaluateRequest(60L));
         assertThat(evaluation.getDecisionResult()).isEqualTo(SpendControlDecisionResult.PASSED);
+        recordDecision(evaluation);
 
         SpendControlAdmissionDecisionDTO admission = spendControlAdmissionApplicationService
                 .resolveSpendControlAdmission(admissionRequest(evaluation));
@@ -224,8 +232,8 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         assertThat(afterRefund.getLimitAmount()).isEqualTo(100L);
         assertThat(afterRefund.getReservedAmount()).isEqualTo(60L);
         assertThat(afterRefund.getConsumedAmount()).isEqualTo(40L);
-        assertThat(afterRefund.getRemainingControlAmount()).isEqualTo(20L);
-        assertThat(afterRefund.getAvailableControlAmount()).isEqualTo(40L);
+        assertThat(afterRefund.getRemainingControlAmount()).isZero();
+        assertThat(afterRefund.getAvailableControlAmount()).isEqualTo(60L);
 
         BudgetControlProjectionDTO emptyHistoricalPeriod = spendControlMovementService.getBudgetControlProjection(
                 projectionQuery("2026-06"));
@@ -300,16 +308,28 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
                 .setRelationType(SpendSubjectFundingRelationType.FUNDING_SOURCE)
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(BUSINESS_SN)
-                .setSpendRuleId(evaluation.getRuleId())
-                .setSpendRuleVersion(evaluation.getRuleVersion())
+                .setSpendDecisionSn(SPEND_DECISION_SN)
+                .setControlScopeId(CONTROL_SCOPE_ID);
+    }
+
+    private void recordDecision(SpendRuleEvaluationDecisionDTO evaluation) {
+        spendRuleDecisionRecordService.recordDecision(new RecordSpendRuleDecisionRecordRequest()
+                .setTenantId(TENANT_ID)
+                .setDecisionSn(SPEND_DECISION_SN)
+                .setRuleId(evaluation.getRuleId())
+                .setRuleVersion(evaluation.getRuleVersion())
                 .setSpendRuleBindingSn(spendRuleBindingSn)
-                .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
-                .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
-                .setSpendDecisionSn("decision_wallet_spend_controls_001")
-                .setSpendDecisionResult(evaluation.getDecisionResult())
-                .setSpendDecisionDigest(evaluation.getDecisionDigest())
-                .setControlScopeId(CONTROL_SCOPE_ID)
-                .setRejectReason(evaluation.getRejectReason());
+                .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
+                .setScopeId(PAYMENT_INSTRUMENT_SN)
+                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setAction(PaymentInstrumentAction.AUTHORIZE)
+                .setAmount(evaluation.getAmount())
+                .setCurrency(evaluation.getCurrency())
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(BUSINESS_SN)
+                .setDecisionResult(evaluation.getDecisionResult())
+                .setRejectReason(evaluation.getRejectReason())
+                .setDecisionDigest(evaluation.getDecisionDigest()));
     }
 
     private RecordSpendControlMovementRequest reserveRequest(SpendControlAdmissionDecisionDTO admission) {
@@ -465,7 +485,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         jdbcTemplate.update("""
                         INSERT INTO t_funds_transaction (
                             sn, tenant_id, transaction_mode, transaction_type, business_scene, business_sn,
-                            reference_transaction_sn, status, amount, currency, authorized_amount, reversed_amount, settled_amount,
+                            reference_transaction_sn, status, amount, currency, authorized_amount, reversed_amount, completed_amount,
                             refunded_amount, declined_amount, fee_amount, version
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0, 0, 0, 0)
                         """,

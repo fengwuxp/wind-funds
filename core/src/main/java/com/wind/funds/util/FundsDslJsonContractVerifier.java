@@ -27,7 +27,6 @@ import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.springframework.util.StringUtils;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -70,7 +69,7 @@ public final class FundsDslJsonContractVerifier {
         if (fixtureLevel == null) {
             return;
         }
-        if (!(fixtureLevel instanceof String value) || !StringUtils.hasText(value)) {
+        if (!(fixtureLevel instanceof String value) || value.isBlank()) {
             throw new IllegalArgumentException("fixtureLevel is required");
         }
         if (!FIXTURE_LEVELS.contains(value)) {
@@ -196,7 +195,7 @@ public final class FundsDslJsonContractVerifier {
                     path + ".subjectRef"), path + ".subjectRef");
             verifyEnum(LedgerSubjectCode.class, allocation, "ledgerSubjectCode", path + ".ledgerSubjectCode");
             Money amount = verifyMoney(allocation, "amount", path + ".amount");
-            if (StringUtils.hasText(subjectRef.currency())
+            if (subjectRef.currency() != null && !subjectRef.currency().isBlank()
                     && !subjectRef.currency().equals(amount.getCurrency().name())) {
                 throw new IllegalArgumentException(path
                         + ".amount: funding allocation amount currency must match subjectRef currency");
@@ -223,15 +222,10 @@ public final class FundsDslJsonContractVerifier {
         }
         JsonSubjectRef accountRef = parseAccountHierarchySubjectRef(
                 asNullableMap(snapshot.get("accountRef"), path + ".accountRef"), path + ".accountRef");
-        JsonSubjectRef parentAccountRef = parseOptionalAccountHierarchySubjectRef(snapshot,
+        parseOptionalAccountHierarchySubjectRef(snapshot,
                 "parentAccountRef",
                 accountRef,
                 path);
-        JsonSubjectRef rootAccountRef = parseOptionalAccountHierarchySubjectRef(snapshot,
-                "rootAccountRef",
-                accountRef,
-                path);
-        verifyParentAndRootAccountRef(parentAccountRef, rootAccountRef, path);
         verifyRouteContext(asNullableMap(snapshot.get("contextVariables"), path + ".contextVariables"),
                 path + ".contextVariables");
         if (!sameSubject(accountRef, allocationSubjectRef)) {
@@ -262,22 +256,6 @@ public final class FundsDslJsonContractVerifier {
             throw new IllegalArgumentException(path + "." + fieldName + ".currency must match account currency");
         }
         return relationRef;
-    }
-
-    private static void verifyParentAndRootAccountRef(@Nullable JsonSubjectRef parentAccountRef,
-                                                      @Nullable JsonSubjectRef rootAccountRef,
-                                                      String path) {
-        if (parentAccountRef == null || rootAccountRef == null) {
-            return;
-        }
-        if (!compatible(parentAccountRef.tenantId(), rootAccountRef.tenantId())) {
-            throw new IllegalArgumentException(path
-                    + ".rootAccountRef.tenantId must match parentAccountRef.tenantId");
-        }
-        if (!compatible(parentAccountRef.currency(), rootAccountRef.currency())) {
-            throw new IllegalArgumentException(path
-                    + ".rootAccountRef.currency must match parentAccountRef.currency");
-        }
     }
 
     private static JsonSubjectRef parseAccountHierarchySubjectRef(@Nullable Map<String, ?> subjectRef, String path) {
@@ -478,7 +456,7 @@ public final class FundsDslJsonContractVerifier {
 
     private static @NonNull Money parseMoney(@NonNull Map<String, ?> values, boolean positive) {
         Object rawCurrency = values.get(Money.Fields.currency);
-        if (!(rawCurrency instanceof String currency) || !StringUtils.hasText(currency)) {
+        if (!(rawCurrency instanceof String currency) || currency.isBlank()) {
             throw new IllegalArgumentException("money.currency is required");
         }
         if (!values.containsKey(Money.Fields.amount)) {
@@ -526,7 +504,7 @@ public final class FundsDslJsonContractVerifier {
         if (rawValue == null && !required) {
             return null;
         }
-        if (!(rawValue instanceof String value) || !StringUtils.hasText(value)) {
+        if (!(rawValue instanceof String value) || value.isBlank()) {
             throw new IllegalArgumentException(path + " is required");
         }
         return enumValue(enumType, value, path);
@@ -546,7 +524,7 @@ public final class FundsDslJsonContractVerifier {
 
     private static String requireText(Map<String, ?> owner, String fieldName, String path) {
         Object value = owner.get(fieldName);
-        if (!(value instanceof String text) || !StringUtils.hasText(text)) {
+        if (!(value instanceof String text) || text.isBlank()) {
             throw new IllegalArgumentException(path + " is required");
         }
         return text;
@@ -637,7 +615,7 @@ public final class FundsDslJsonContractVerifier {
         }
         List<String> texts = new ArrayList<>(values.size());
         for (Object value : values) {
-            if (!(value instanceof String text) || !StringUtils.hasText(text)) {
+            if (!(value instanceof String text) || text.isBlank()) {
                 throw new IllegalArgumentException(path + " must contain text values");
             }
             texts.add(text);

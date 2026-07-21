@@ -2,14 +2,11 @@ package com.wind.funds.ledger.service;
 
 import com.wind.funds.ledger.dto.LedgerEntryDTO;
 import com.wind.funds.ledger.dto.LedgerTransactionDTO;
-import com.wind.funds.ledger.dto.LedgerTransactionPostResult;
 import com.wind.funds.ledger.query.LedgerEntryQuery;
 import com.wind.funds.ledger.query.LedgerTransactionQuery;
-import com.wind.funds.ledger.request.UpdateLedgerTransactionRequest;
 import com.wind.common.query.WindPagination;
 import com.wind.common.query.WindQuery;
 import com.wind.common.query.supports.QueryOrderField;
-import com.wind.funds.spec.ledger.LedgerTransactionSpec;
 import org.jspecify.annotations.NonNull;
 
 /**
@@ -19,38 +16,6 @@ import org.jspecify.annotations.NonNull;
  * @since 2026-04-14
  */
 public interface LedgerTransactionService {
-
-    /**
-     * 入账账户账本交易。
-     *
-     * @param transaction 入账请求对象
-     * @return 账户账本交易入账结果
-     */
-    @NonNull
-    LedgerTransactionPostResult postLedgerTransaction(@NonNull LedgerTransactionSpec transaction);
-
-    /**
-     * 更新 账户账本交易
-     *
-     * @param request 更新请求对象
-     */
-    void updateLedgerTransaction(@NonNull UpdateLedgerTransactionRequest request);
-
-    /**
-     * 删除账户账本交易
-     *
-     * @param id 账户账本交易 id
-     */
-    default void deleteLedgerTransactionById(@NonNull Long id) {
-        deleteLedgerTransactionByIds(id);
-    }
-
-    /**
-     * 批量删除账户账本交易
-     *
-     * @param ids 账户账本交易 id
-     */
-    void deleteLedgerTransactionByIds(@NonNull Long... ids);
 
     /**
      * 根据 id 查询账户账本交易

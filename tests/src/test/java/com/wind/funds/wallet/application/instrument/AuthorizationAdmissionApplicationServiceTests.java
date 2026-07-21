@@ -16,6 +16,8 @@ import com.wind.funds.route.AuthorizationFundsInstructionRouteResolver;
 import com.wind.funds.route.BalanceControlFundsInstructionRouteResolver;
 import com.wind.funds.route.CompositeRouteResolver;
 import com.wind.funds.route.DefaultRouteSnapshotFactory;
+import com.wind.funds.route.RefundRouteAdmission;
+import com.wind.funds.route.RouteFeeChargeAppender;
 import com.wind.funds.route.TransferFundsInstructionRouteResolver;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
@@ -52,6 +54,7 @@ import com.wind.funds.wallet.enums.FundingAccountType;
 import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
+import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendControlDecisionResult;
@@ -71,11 +74,15 @@ import com.wind.funds.wallet.model.request.CreateSpendRuleDefinitionRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.model.request.PublishSpendRuleVersionRequest;
+import com.wind.funds.wallet.model.request.RecordSpendRuleDecisionRecordRequest;
+import com.wind.funds.wallet.model.request.SuspendSpendRuleBindingRequest;
 import com.wind.funds.wallet.service.CreditAccountService;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
 import com.wind.funds.wallet.service.PaymentInstrumentService;
 import com.wind.funds.wallet.service.SpendRuleDefinitionService;
+import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
+import com.wind.funds.wallet.service.SpendRuleBindingService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
 import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
 import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
@@ -130,6 +137,8 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private static final String CREDIT_ACCOUNT_SN = "auth_admission_credit";
 
     private static final String PARENT_FUNDING_ACCOUNT_SN = "auth_admission_parent_funding";
+
+    private static final String PREPAID_FUNDING_ACCOUNT_SN = "auth_admission_prepaid_funding";
 
     private static final String PLATFORM_SETTLEMENT_ACCOUNT_SN = "auth_adm_settle";
 
@@ -191,6 +200,12 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private SpendRuleDefinitionService spendRuleDefinitionService;
 
     @Autowired
+    private SpendRuleDecisionRecordService spendRuleDecisionRecordService;
+
+    @Autowired
+    private SpendRuleBindingService spendRuleBindingService;
+
+    @Autowired
     private FundsBalanceControlService balanceControlService;
 
     @Autowired
@@ -228,7 +243,9 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertBucket(beforeAuthorize, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
 
         String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
-                authorizeRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperator.system());
+                authorizeRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
+                        .setControlScopeId("budget_without_applicable_rule"),
+                WindOperator.system());
 
         assertThat(authorizationSn).isNotBlank();
         FundsSubjectBalanceDTO afterAuthorize = balance(creditAccount);
@@ -249,6 +266,10 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(routeLegCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
         assertAuthorizationInstrumentSnapshot(AUTHORIZE_BUSINESS_SN);
         assertAuthorizationAdmissionContextSnapshot(AUTHORIZE_BUSINESS_SN);
+        assertThat(JSON.parseObject(transactionContextVariablesJson(AUTHORIZE_BUSINESS_SN))
+                .getJSONObject("spendRuleDecision")
+                .getString("controlScopeId"))
+                .isEqualTo("budget_without_applicable_rule");
         assertAuthorizationProjectionInstrumentExplanation(authorizationSn);
     }
 
@@ -304,6 +325,46 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertThat(ledgerEntryCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(4);
         assertThat(routeLegCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(2);
         assertAuthorizationAdmissionContextSnapshot(AUTHORIZE_BUSINESS_SN, parentFundingAccount);
+        assertAuthorizationProjectionInstrumentExplanation(authorizationSn);
+    }
+
+    /**
+     * 场景：预付 VCC 绑定资金子账户，资金责任关系保留父资金账户来源。
+     * 输入：支付工具绑定预付资金子账户，资金责任解析到父 FundingAccount，两边各有 100 可用余额，授权 60。
+     * 输出：只占用预付资金子账户，父资金账户余额不变，授权路由只有一个资金主体。
+     * 红线：预付资金子账户本身承担真实资金，父账户不得被自动追加成第二个授权占用主体。
+     */
+    @Test
+    void testAuthorizePrepaidCardShouldOnlyHoldBoundFundingAccount() {
+        FundsAccountId prepaidFundingAccount = FundsAccountId.immutable(PREPAID_FUNDING_ACCOUNT_SN,
+                FundsSubjectType.FUNDING_ACCOUNT);
+        FundsAccountId parentFundingAccount = parentFundingAccountId();
+        fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
+        fundingAccountService.createFundingAccount(createParentFundingAccountRequest());
+        fundingAccountService.createFundingAccount(createPrepaidFundingAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.OUTBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createPrepaidBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createPrepaidFundingRelationRequest());
+        initializeAvailableBalance(prepaidFundingAccount, 100L);
+        initializeAvailableBalance(parentFundingAccount, 100L);
+
+        String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+                authorizeRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperator.system());
+
+        assertThat(authorizationSn).isNotBlank();
+        FundsSubjectBalanceDTO prepaidBalance = balance(prepaidFundingAccount);
+        FundsSubjectBalanceDTO parentBalance = balance(parentFundingAccount);
+        assertBucket(prepaidBalance, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY);
+        assertBucket(prepaidBalance, LedgerSubjectCode.AUTHORIZATION, 60L, CURRENCY);
+        assertBucket(parentBalance, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
+        assertBucket(parentBalance, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
+        assertThat(ledgerEntrySubjects(AUTHORIZE_BUSINESS_SN))
+                .containsOnly(PREPAID_FUNDING_ACCOUNT_SN);
+        assertThat(postingPlanCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
+        assertThat(ledgerEntryCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(2);
+        assertThat(routeLegCount(AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
+        assertAuthorizationAdmissionContextSnapshot(AUTHORIZE_BUSINESS_SN, parentFundingAccount);
     }
 
     /**
@@ -322,6 +383,11 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         prepareSpendRuleDecisionData();
+        recordAuthorizationDecision(SPEND_PASS_DECISION_SN,
+                AUTHORIZE_BUSINESS_SN,
+                SpendControlDecisionResult.PASSED,
+                null,
+                SPEND_PASS_DECISION_DIGEST);
         adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
 
         String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
@@ -331,6 +397,115 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         var beforeExplainFacts = ledgerFactSnapshot(jdbcTemplate);
         assertAuthorizationProjectionSpendRuleExplanation(authorizationSn);
         assertLedgerFactsUnchanged(jdbcTemplate, beforeExplainFacts);
+    }
+
+    /**
+     * 场景：已成功授权后，原 Spend Rule 挂载被暂停，调用方重放完全相同的业务请求。
+     * 输入：首次授权已固化准入和资金事实，随后暂停原规则挂载，再提交相同 businessSn 和 decisionSn。
+     * 输出：返回原授权交易号，不重新按当前挂载拒绝，也不重复生成资金或账务事实。
+     * 红线：当前规则状态变化不得破坏已经成立的资金请求幂等重放。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldReplayEstablishedAuthorizationAfterBindingSuspended() {
+        FundsAccountId creditAccount = preparePassedAuthorizationData();
+        AuthorizeByPaymentInstrumentRequest request =
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN);
+        String firstAuthorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+                request, WindOperator.system());
+        spendRuleBindingService.suspendSpendRuleBinding(new SuspendSpendRuleBindingRequest()
+                .setTenantId(TENANT_ID)
+                .setSn(spendRuleBindingSn));
+        FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
+        var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
+
+        String replayedAuthorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+                request, WindOperator.system());
+
+        assertThat(replayedAuthorizationSn).isEqualTo(firstAuthorizationSn);
+        assertThat(balance(creditAccount)).isEqualTo(balanceAfterFirstAuthorization);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstAuthorization);
+        assertThat(countRows("t_funds_transaction", AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
+    }
+
+    /**
+     * 场景：已成功授权且原 Spend Rule 挂载已暂停，调用方用同一业务流水篡改金额重试。
+     * 输入：沿用原 businessSn 和 decisionSn，但把授权金额从 60 改为 61。
+     * 输出：幂等身份校验拒绝，原交易、余额和账务事实保持不变。
+     * 红线：跳过当前挂载重算只适用于完全相同的已成立请求，不能把业务键变成参数绕过入口。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldRejectChangedReplayAfterBindingSuspended() {
+        FundsAccountId creditAccount = preparePassedAuthorizationData();
+        AuthorizeByPaymentInstrumentRequest request =
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN);
+        authorizationAdmissionApplicationService.authorizeByInstrument(request, WindOperator.system());
+        spendRuleBindingService.suspendSpendRuleBinding(new SuspendSpendRuleBindingRequest()
+                .setTenantId(TENANT_ID)
+                .setSn(spendRuleBindingSn));
+        FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
+        var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+                request.setAmount(61L), WindOperator.system()))
+                .hasMessageContaining("已成立授权请求参数不一致");
+
+        assertThat(balance(creditAccount)).isEqualTo(balanceAfterFirstAuthorization);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstAuthorization);
+        assertThat(countRows("t_funds_transaction", AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
+    }
+
+    /**
+     * 场景：已成功授权且原 Spend Rule 挂载已暂停，调用方重放时省略原 decisionRef。
+     * 输入：沿用原业务流水、金额和支付工具，但删除首次授权使用的 decisionSn。
+     * 输出：幂等身份校验拒绝，原交易、余额和账务事实保持不变。
+     * 红线：已成立授权的规则证据必须精确重放，不能把可回读引用降级为可选字段。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldRejectReplayWithoutEstablishedDecisionReference() {
+        FundsAccountId creditAccount = preparePassedAuthorizationData();
+        AuthorizeByPaymentInstrumentRequest request =
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN);
+        authorizationAdmissionApplicationService.authorizeByInstrument(request, WindOperator.system());
+        spendRuleBindingService.suspendSpendRuleBinding(new SuspendSpendRuleBindingRequest()
+                .setTenantId(TENANT_ID)
+                .setSn(spendRuleBindingSn));
+        FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
+        var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+                request.setSpendDecisionSn(null), WindOperator.system()))
+                .hasMessageContaining("已成立授权 Spend Rule 证据不一致");
+
+        assertThat(balance(creditAccount)).isEqualTo(balanceAfterFirstAuthorization);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstAuthorization);
+        assertThat(countRows("t_funds_transaction", AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
+    }
+
+    /**
+     * 场景：已成功授权且原 Spend Rule 挂载已暂停，调用方用错误的期望工具绑定版本重放。
+     * 输入：沿用原业务流水和决策引用，但把 expectedBindingVersion 从空改为 2。
+     * 输出：幂等身份校验拒绝，原交易、余额和账务事实保持不变。
+     * 红线：early replay 不能绕过支付工具绑定版本的乐观并发守卫。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldRejectReplayWithMismatchedExpectedBindingVersion() {
+        FundsAccountId creditAccount = preparePassedAuthorizationData();
+        AuthorizeByPaymentInstrumentRequest request =
+                authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN);
+        authorizationAdmissionApplicationService.authorizeByInstrument(request, WindOperator.system());
+        spendRuleBindingService.suspendSpendRuleBinding(new SuspendSpendRuleBindingRequest()
+                .setTenantId(TENANT_ID)
+                .setSn(spendRuleBindingSn));
+        FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
+        var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+                request.setExpectedBindingVersion(2), WindOperator.system()))
+                .hasMessageContaining("已成立授权请求参数不一致");
+
+        assertThat(balance(creditAccount)).isEqualTo(balanceAfterFirstAuthorization);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstAuthorization);
+        assertThat(countRows("t_funds_transaction", AUTHORIZE_BUSINESS_SN)).isEqualTo(1);
     }
 
     /**
@@ -414,6 +589,39 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     }
 
     /**
+     * 场景：上游拒绝授权时仍携带仅适用于批准路径的 controlScopeId，并完全相同地重放请求。
+     * 输入：首次 approved=false 已固化 REJECTED 交易，随后以相同 businessSn、拒绝原因和 controlScopeId 重试。
+     * 输出：返回原授权交易号，交易事实只保留一份，余额和账务事实不变。
+     * 红线：批准路径忽略的规则 scope 不能破坏已经成立的拒绝结果幂等性。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldReplayDeclinedAuthorizationWithIgnoredControlScope() {
+        FundsAccountId creditAccount = creditAccountId();
+        fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
+        creditAccountService.createCreditAccount(createCreditAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.OUTBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
+        adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
+        AuthorizeByPaymentInstrumentRequest request = authorizeDeclineRequest(
+                DECLINE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN).setControlScopeId("ignored_decline_scope");
+
+        String firstAuthorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+                request, WindOperator.system());
+        FundsSubjectBalanceDTO balanceAfterFirstDecline = balance(creditAccount);
+        var factsAfterFirstDecline = ledgerFactSnapshot(jdbcTemplate);
+
+        String replayedAuthorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+                request, WindOperator.system());
+
+        assertThat(replayedAuthorizationSn).isEqualTo(firstAuthorizationSn);
+        assertThat(balance(creditAccount)).isEqualTo(balanceAfterFirstDecline);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstDecline);
+        assertThat(countRows("t_funds_transaction", DECLINE_BUSINESS_SN)).isEqualTo(1);
+    }
+
+    /**
      * 场景：支付工具授权入口携带 Spend Rule 决策证据，且规则决策拒绝。
      * 输入：支付工具、资金责任和账户能力均可用，但 Spend Rule 决策结果为 REJECTED。
      * 输出：授权准入阶段拒绝，不创建资金交易、route、posting plan、账本交易或分录。
@@ -428,6 +636,11 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
         fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
         prepareSpendRuleDecisionData();
+        recordAuthorizationDecision(SPEND_DECISION_SN,
+                SPEND_REJECT_BUSINESS_SN,
+                SpendControlDecisionResult.REJECTED,
+                "超过单卡单日授权限额",
+                SPEND_DECISION_DIGEST);
         var before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
@@ -435,6 +648,51 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .hasMessageContaining("Spend Rule 准入未通过");
 
         assertSpendRuleDecisionRecord();
+        assertNoFundsOrLedgerFacts(SPEND_REJECT_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：wallet 可解析出有效 Spend Rule 挂载，但授权请求没有 decisionRef。
+     * 输入：支付工具、资金责任和账户能力可用，规则挂载有效，授权候选结果为通过。
+     * 输出：授权准入 fail-closed，不创建任何资金或账务事实。
+     * 红线：存在适用规则时，省略规则字段不能被解释为默认通过。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldRejectMissingDecisionReferenceForApplicableBinding() {
+        creditAccountService.createCreditAccount(createCreditAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.OUTBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
+        prepareSpendRuleDecisionData();
+        var before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+                authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperator.system()))
+                .hasMessageContaining("适用 Spend Rule 挂载要求 decisionRef");
+
+        assertNoFundsOrLedgerFacts(SPEND_REJECT_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：授权请求只携带裸 PASSED 和格式化摘要，没有可回读 decisionRef。
+     * 输入：调用方自报 PASSED 与 sha256 摘要。
+     * 输出：授权入口直接拒绝，不创建任何资金或账务事实。
+     * 红线：摘要格式合法不代表决策可信，裸结果不得获得授权能力。
+     */
+    @Test
+    void testAuthorizeByInstrumentShouldRejectBarePassedDecisionWithoutReference() {
+        var before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+                authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
+                        .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
+                        .setSpendDecisionDigest(SPEND_PASS_DECISION_DIGEST),
+                WindOperator.system()))
+                .hasMessageContaining("必须提供可回读的 decisionRef");
+
         assertNoFundsOrLedgerFacts(SPEND_REJECT_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -481,23 +739,26 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_sn IN (?, ?, ?, ?, ?, ?)",
                 AUTHORIZE_BUSINESS_SN, BALANCE_ADJUST_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, DECLINE_BUSINESS_SN,
                 SPEND_REJECT_BUSINESS_SN, TENANT_MISMATCH_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
-                TENANT_ID,
-                CREDIT_ACCOUNT_SN);
+        jdbcTemplate.update("""
+                DELETE FROM t_spend_subject_funding_rel
+                WHERE tenant_id = ? AND spend_subject_id IN (?, ?)
+                """, TENANT_ID, CREDIT_ACCOUNT_SN, PREPAID_FUNDING_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
                 PAYMENT_INSTRUMENT_SN, RECEIVE_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn IN (?, ?)",
                 PAYMENT_INSTRUMENT_SN, RECEIVE_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?)",
                 PAYMENT_INSTRUMENT_SN, RECEIVE_INSTRUMENT_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
+        jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?, ?)",
                 CREDIT_ACCOUNT_SN,
+                PREPAID_FUNDING_ACCOUNT_SN,
                 PLATFORM_SETTLEMENT_ACCOUNT_SN,
                 PARENT_FUNDING_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_credit_account WHERE sn = ?", CREDIT_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?)",
+        jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?)",
                 PLATFORM_SETTLEMENT_ACCOUNT_SN,
-                PARENT_FUNDING_ACCOUNT_SN);
+                PARENT_FUNDING_ACCOUNT_SN,
+                PREPAID_FUNDING_ACCOUNT_SN);
     }
 
     private CreateCreditAccountRequest createCreditAccountRequest() {
@@ -540,6 +801,12 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setStatus(FundsAccountStatus.ACTIVE);
     }
 
+    private CreateFundingAccountRequest createPrepaidFundingAccountRequest() {
+        return createParentFundingAccountRequest()
+                .setSn(PREPAID_FUNDING_ACCOUNT_SN)
+                .setAccountType(FundingAccountType.PREPAID_CARD.name());
+    }
+
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
                                                                           PaymentInstrumentFlowDirection direction) {
         return new CreatePaymentInstrumentRequest()
@@ -568,6 +835,12 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setDefaultBinding(Boolean.TRUE);
     }
 
+    private CreatePaymentInstrumentBindingRequest createPrepaidBindingRequest() {
+        return createBindingRequest()
+                .setSubjectId(PREPAID_FUNDING_ACCOUNT_SN)
+                .setSubjectType(FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
     private CreateSpendSubjectFundingRelationRequest createFundingRelationRequest() {
         return new CreateSpendSubjectFundingRelationRequest()
                 .setTenantId(TENANT_ID)
@@ -585,10 +858,34 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .setTargetSubjectId(PARENT_FUNDING_ACCOUNT_SN);
     }
 
+    private CreateSpendSubjectFundingRelationRequest createPrepaidFundingRelationRequest() {
+        return createParentFundingRelationRequest()
+                .setSpendSubjectId(PREPAID_FUNDING_ACCOUNT_SN)
+                .setSpendSubjectType(FundsSubjectType.FUNDING_ACCOUNT);
+    }
+
     private void prepareSpendRuleDecisionData() {
         spendRuleDefinitionService.createDefinition(createSpendRuleDefinitionRequest());
         spendRuleDefinitionService.publishVersion(publishSpendRuleVersionRequest());
         spendRuleBindingSn = spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()).getSn();
+    }
+
+    private FundsAccountId preparePassedAuthorizationData() {
+        FundsAccountId creditAccount = creditAccountId();
+        fundingAccountService.createFundingAccount(createPlatformSettlementAccountRequest());
+        creditAccountService.createCreditAccount(createCreditAccountRequest());
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(PAYMENT_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.OUTBOUND));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest());
+        fundingRelationService.createSpendSubjectFundingRelation(createFundingRelationRequest());
+        prepareSpendRuleDecisionData();
+        recordAuthorizationDecision(SPEND_PASS_DECISION_SN,
+                AUTHORIZE_BUSINESS_SN,
+                SpendControlDecisionResult.PASSED,
+                null,
+                SPEND_PASS_DECISION_DIGEST);
+        adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
+        return creditAccount;
     }
 
     private CreateSpendRuleDefinitionRequest createSpendRuleDefinitionRequest() {
@@ -649,29 +946,38 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
     private AuthorizeByPaymentInstrumentRequest authorizeSpendRejectedRequest() {
         return authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
-                .setSpendRuleId(SPEND_RULE_ID)
-                .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendRuleBindingSn(spendRuleBindingSn)
-                .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
-                .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_DECISION_SN)
-                .setSpendDecisionResult(SpendControlDecisionResult.REJECTED)
-                .setSpendDecisionDigest(SPEND_DECISION_DIGEST)
-                .setControlScopeId("budget_auth_admission")
-                .setSpendDecisionRejectReason("超过单卡单日授权限额");
+                .setControlScopeId("budget_auth_admission");
     }
 
     private AuthorizeByPaymentInstrumentRequest authorizeSpendPassedRequest(String businessSn, String instrumentSn) {
         return authorizeRequest(businessSn, instrumentSn)
-                .setSpendRuleId(SPEND_RULE_ID)
-                .setSpendRuleVersion(SPEND_RULE_VERSION)
-                .setSpendRuleBindingSn(spendRuleBindingSn)
-                .setSpendRuleScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
-                .setSpendRuleScopeId(PAYMENT_INSTRUMENT_SN)
                 .setSpendDecisionSn(SPEND_PASS_DECISION_SN)
-                .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
-                .setSpendDecisionDigest(SPEND_PASS_DECISION_DIGEST)
                 .setControlScopeId("budget_auth_admission");
+    }
+
+    private void recordAuthorizationDecision(String decisionSn,
+                                             String businessSn,
+                                             SpendControlDecisionResult decisionResult,
+                                             String rejectReason,
+                                             String decisionDigest) {
+        spendRuleDecisionRecordService.recordDecision(new RecordSpendRuleDecisionRecordRequest()
+                .setTenantId(TENANT_ID)
+                .setDecisionSn(decisionSn)
+                .setRuleId(SPEND_RULE_ID)
+                .setRuleVersion(SPEND_RULE_VERSION)
+                .setSpendRuleBindingSn(spendRuleBindingSn)
+                .setScopeType(SpendRuleScopeType.PAYMENT_INSTRUMENT)
+                .setScopeId(PAYMENT_INSTRUMENT_SN)
+                .setInstrumentSn(PAYMENT_INSTRUMENT_SN)
+                .setAction(PaymentInstrumentAction.AUTHORIZE)
+                .setAmount(60L)
+                .setCurrency(CurrencyIsoCode.USD)
+                .setBusinessScene(BUSINESS_SCENE)
+                .setBusinessSn(businessSn)
+                .setDecisionResult(decisionResult)
+                .setRejectReason(rejectReason)
+                .setDecisionDigest(decisionDigest));
     }
 
     private FundsAccountId creditAccountId() {
@@ -738,13 +1044,13 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
 
     private List<Long> fundsTransactionAmounts(String businessSn) {
         return jdbcTemplate.queryForObject("""
-                SELECT authorized_amount, reversed_amount, settled_amount, declined_amount
+                SELECT authorized_amount, reversed_amount, completed_amount, declined_amount
                 FROM t_funds_transaction
                 WHERE business_scene = ? AND business_sn = ?
                 """, (rs, rowNum) -> List.of(
                 rs.getLong("authorized_amount"),
                 rs.getLong("reversed_amount"),
-                rs.getLong("settled_amount"),
+                rs.getLong("completed_amount"),
                 rs.getLong("declined_amount")), BUSINESS_SCENE, businessSn);
     }
 
@@ -841,6 +1147,11 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 .isEqualTo(SpendSubjectFundingRelationType.FUNDING_SOURCE.name());
         assertThat(contextVariables.getString("targetAccountId")).isEqualTo(targetAccountId.id());
         assertThat(contextVariables.getString("targetAccountType")).isEqualTo(targetAccountId.type());
+        JSONObject spendRuleDecision = contextVariables.getJSONObject("spendRuleDecision");
+        assertThat(spendRuleDecision).isNotNull();
+        assertThat(spendRuleDecision.getString("decisionResult"))
+                .isEqualTo(SpendControlDecisionResult.NO_APPLICABLE_RULE.name());
+        assertThat(spendRuleDecision).doesNotContainKeys("decisionRecordId", "ruleId", "decisionSn", "decisionDigest");
     }
 
     private String transactionContextVariablesJson(String businessSn) {
@@ -856,6 +1167,10 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                         .fundsTransactionSn(authorizationSn)
                         .build());
 
+        assertThat(explanation.factStatus()).isEqualTo("HELD");
+        assertThat(explanation.displayStatus()).isEqualTo("AUTHORIZED_HOLD");
+        assertThat(explanation.operationStatus()).isEqualTo("WAITING_CAPTURE_OR_RELEASE");
+        assertThat(explanation.nextAction()).isEqualTo("WAIT_FOR_CAPTURE_OR_RELEASE");
         assertThat(explanation.evidenceRefs())
                 .contains("paymentInstrument:" + PAYMENT_INSTRUMENT_SN)
                 .anySatisfy(evidenceRef -> assertThat(evidenceRef)
@@ -966,6 +1281,8 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             BalanceControlFundsInstructionRouteResolver.class,
             AuthorizationFundsInstructionRouteResolver.class,
             CompositeRouteResolver.class,
+            RefundRouteAdmission.class,
+            RouteFeeChargeAppender.class,
             DefaultRouteSnapshotFactory.class,
             DefaultLedgerPostingAssembler.class,
             DefaultRoutedFundsInstructionOrchestrator.class,

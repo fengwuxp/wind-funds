@@ -24,7 +24,8 @@ public interface CreditAccountService {
     /**
      * 创建信用账户并显式初始化 ledger。
      *
-     * <p>能力范围：创建 CreditAccount 主体，并按 CREDIT_BASIC profile 初始化 LIMIT、AVAILABLE、AUTHORIZATION 等 ledger。</p>
+     * <p>能力范围：创建 CreditAccount 主体，并按 CREDIT_BASIC profile 初始化 LIMIT、AVAILABLE、AUTHORIZATION、
+     * SETTLEMENT 等额度控制 ledger。</p>
      *
      * @param request 创建请求
      * @return 信用账户主键

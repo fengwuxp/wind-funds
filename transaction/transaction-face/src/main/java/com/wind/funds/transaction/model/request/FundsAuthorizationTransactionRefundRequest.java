@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 @Schema(description = "钱包授权交易退款")
 public class FundsAuthorizationTransactionRefundRequest {
 
-    @Schema(description = "账户 id")
+    @Schema(description = "普通授权链退款必须为原授权主账户；无授权退款时为实际到账账户")
     @NotNull
     private FundsAccountId accountId;
 

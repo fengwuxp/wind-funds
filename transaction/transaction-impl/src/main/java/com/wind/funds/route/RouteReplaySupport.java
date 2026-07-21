@@ -31,7 +31,7 @@ final class RouteReplaySupport {
 
     private static boolean isReplayEvent(FundsTransactionEventType eventType) {
         return switch (eventType) {
-            case REVERSAL, SETTLE, AUTH_REFUND, REFUND, FEE_REFUND, UNFREEZE -> true;
+            case REVERSAL, COMPLETE, AUTH_REFUND, REFUND, FEE_REFUND, UNFREEZE -> true;
             default -> false;
         };
     }

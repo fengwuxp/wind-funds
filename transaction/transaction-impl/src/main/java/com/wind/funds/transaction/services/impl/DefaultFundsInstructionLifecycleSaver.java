@@ -16,7 +16,7 @@ import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.mapstruct.FundsTransactionConverter;
 import com.wind.funds.transaction.model.FundsTransactionParticipant;
 import com.wind.funds.transaction.model.dto.FundsInstructionLifecycleResult;
-import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionSettleRequest;
+import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.services.FundsInstructionLifecycleRecorder;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -38,6 +38,7 @@ import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.wallet.FundsAccountId;
 import com.wind.sequence.WindSequenceType;
 import com.wind.sequence.time.TemporalSequenceFactory;
 import com.wind.transaction.core.Money;
@@ -81,6 +82,10 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
     private static final String HASH_FIELD_PARTICIPANT = "participant";
 
     private static final String HASH_FIELD_CONTEXT_VARIABLES = "contextVariables";
+
+    private static final String ACCOUNT_ID_FIELD_ID = "id";
+
+    private static final String ACCOUNT_ID_FIELD_TYPE = "type";
 
     private static final String MONEY_FIELD_AMOUNT = "amount";
 
@@ -437,7 +442,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 transaction.setStatus(FundsTransactionStatus.OPEN);
             }
             case REVERSAL -> applyReversedSummary(transaction, amount);
-            case SETTLE -> applySettledSummary(transaction, primaryDetail, amount);
+            case COMPLETE -> applyCompletedSummary(transaction, primaryDetail, amount);
             case TOPUP, TRANSFER, PAY, WITHDRAW, FEE_CHARGE -> applyPostedSummary(transaction, primaryDetail, details);
             case AUTH_REFUND, REFUND -> applyRefundedSummary(transaction, amount, resolveFeeAmount(details));
             case FEE_REFUND -> applyFeeRefundedSummary(transaction, amount);
@@ -473,8 +478,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         long amount = instruction.getAmount().getAmount();
         switch (eventType) {
             case AUTH_REFUND, REFUND -> {
-                if (shouldAssertSettledReversibleAmount(transaction)) {
-                    assertSettledReversibleAmountSufficient(transaction, amount);
+                if (shouldAssertCompletedReversibleAmount(transaction)) {
+                    assertCompletedReversibleAmountSufficient(transaction, amount);
                 }
             }
             default -> {
@@ -487,8 +492,8 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         long amount = resolvePrimaryAmount(details);
         switch (primaryDetail.getEventType()) {
             case AUTH_REFUND, REFUND -> {
-                if (shouldAssertSettledReversibleAmount(transaction)) {
-                    assertSettledReversibleAmountSufficient(transaction, amount);
+                if (shouldAssertCompletedReversibleAmount(transaction)) {
+                    assertCompletedReversibleAmountSufficient(transaction, amount);
                 }
             }
             default -> {
@@ -510,11 +515,11 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                 : FundsTransactionStatus.OPEN);
     }
 
-    private void applySettledSummary(FundsTransaction transaction,
+    private void applyCompletedSummary(FundsTransaction transaction,
                                      FundsTransactionDetail detail,
                                      long amount) {
-        transaction.setSettledAmount(transaction.getSettledAmount() + amount);
-        transaction.setStatus(isForceSettle(detail) || isAuthorizationClosed(transaction) ? FundsTransactionStatus.CLOSED
+        transaction.setCompletedAmount(transaction.getCompletedAmount() + amount);
+        transaction.setStatus(isForceCompletion(detail) || isAuthorizationClosed(transaction) ? FundsTransactionStatus.CLOSED
                 : FundsTransactionStatus.OPEN);
     }
 
@@ -525,7 +530,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (detail.getTransactionType() == DefaultFundsTransactionType.FEE) {
             transaction.setFeeAmount(transaction.getFeeAmount() + amount);
         } else {
-            transaction.setSettledAmount(transaction.getSettledAmount() + amount);
+            transaction.setCompletedAmount(transaction.getCompletedAmount() + amount);
             transaction.setFeeAmount(transaction.getFeeAmount() + resolveFeeAmount(details));
         }
         transaction.setStatus(FundsTransactionStatus.CLOSED);
@@ -542,35 +547,35 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         transaction.setRefundedAmount(transaction.getRefundedAmount() + amount);
         transaction.setFeeAmount(transaction.getFeeAmount() + feeAmount);
         if (transaction.getTransactionType() == DefaultFundsTransactionType.REFUND
-                && transaction.getSettledAmount() == 0) {
+                && transaction.getCompletedAmount() == 0) {
             transaction.setStatus(FundsTransactionStatus.CLOSED);
             return;
         }
-        transaction.setStatus(resolveSettledReversibleStatus(transaction));
+        transaction.setStatus(resolveCompletedReversibleStatus(transaction));
     }
 
     private void applyFeeRefundedSummary(FundsTransaction transaction, long amount) {
         transaction.setRefundedAmount(transaction.getRefundedAmount() + amount);
-        transaction.setStatus(transaction.getSettledAmount() > 0
-                && transaction.getRefundedAmount() >= transaction.getSettledAmount()
+        transaction.setStatus(transaction.getCompletedAmount() > 0
+                && transaction.getRefundedAmount() >= transaction.getCompletedAmount()
                 ? FundsTransactionStatus.CLOSED : FundsTransactionStatus.OPEN);
     }
 
-    private void assertSettledReversibleAmountSufficient(FundsTransaction transaction, long amount) {
-        long remainingAmount = transaction.getSettledAmount() - transaction.getRefundedAmount()
+    private void assertCompletedReversibleAmountSufficient(FundsTransaction transaction, long amount) {
+        long remainingAmount = transaction.getCompletedAmount() - transaction.getRefundedAmount()
                 - transaction.getDeclinedAmount();
         AssertUtils.isTrue(amount <= remainingAmount,
-                "资金交易已结算可回退金额不足，sn = {}，remainingAmount = {}，amount = {}",
+                "资金交易已完成可退金额不足，sn = {}，remainingAmount = {}，amount = {}",
                 transaction.getSn(), remainingAmount, amount);
     }
 
-    private boolean shouldAssertSettledReversibleAmount(FundsTransaction transaction) {
+    private boolean shouldAssertCompletedReversibleAmount(FundsTransaction transaction) {
         return transaction.getTransactionType() != DefaultFundsTransactionType.REFUND;
     }
 
-    private FundsTransactionStatus resolveSettledReversibleStatus(FundsTransaction transaction) {
-        return transaction.getSettledAmount() > 0
-                && transaction.getRefundedAmount() + transaction.getDeclinedAmount() >= transaction.getSettledAmount()
+    private FundsTransactionStatus resolveCompletedReversibleStatus(FundsTransaction transaction) {
+        return transaction.getCompletedAmount() > 0
+                && transaction.getRefundedAmount() + transaction.getDeclinedAmount() >= transaction.getCompletedAmount()
                 ? FundsTransactionStatus.CLOSED : FundsTransactionStatus.OPEN;
     }
 
@@ -578,7 +583,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         if (transaction.getAuthorizedAmount() <= 0) {
             return false;
         }
-        return transaction.getReversedAmount() + transaction.getSettledAmount() >= transaction.getAuthorizedAmount();
+        return transaction.getReversedAmount() + transaction.getCompletedAmount() >= transaction.getAuthorizedAmount();
     }
 
     private FundsTransactionStatus resolveBalanceControlStatus(FundsTransactionDetail detail) {
@@ -611,13 +616,13 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         return values.getBoolean(FundsInstructionContextKeys.APPROVED);
     }
 
-    private boolean isForceSettle(FundsTransactionDetail detail) {
+    private boolean isForceCompletion(FundsTransactionDetail detail) {
         if (!StringUtils.hasText(detail.getContextVariables())) {
             return false;
         }
         JSONObject values = JSON.parseObject(detail.getContextVariables());
-        return FundsAuthorizationTransactionSettleRequest.SETTLE_MODE_FORCE.equalsIgnoreCase(
-                values.getString(FundsInstructionContextKeys.SETTLE_MODE));
+        return FundsAuthorizationTransactionCompleteRequest.COMPLETION_MODE_FORCE.equalsIgnoreCase(
+                values.getString(FundsInstructionContextKeys.COMPLETION_MODE));
     }
 
     private boolean isStableTransactionStatus(FundsTransactionStatus status) {
@@ -638,7 +643,7 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         return switch (instruction.getEventType()) {
             case AUTHORIZE, FREEZE -> FundsEffectType.HOLD;
             case REVERSAL, UNFREEZE -> FundsEffectType.RELEASE;
-            case SETTLE, WITHDRAW -> FundsEffectType.CONSUME;
+            case COMPLETE, WITHDRAW -> FundsEffectType.CONSUME;
             case AUTH_REFUND, REFUND, FEE_REFUND -> FundsEffectType.RETURN;
             case BALANCE_ADJUST, LIMIT_ADJUST -> FundsEffectType.ADJUST;
             case TOPUP, TRANSFER, PAY, FEE_CHARGE -> resolvePostedFundsEffectType(instruction);
@@ -685,12 +690,23 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
         values.put(ImmutableFundsInstructionSpec.Fields.exchangeRate, instruction.getExchangeRate());
         values.put(ImmutableFundsInstructionSpec.Fields.businessScene, instruction.getBusinessScene());
         values.put(ImmutableFundsInstructionSpec.Fields.businessSn, instruction.getBusinessSn());
+        values.put(ImmutableFundsInstructionSpec.Fields.accountId, accountIdSummary(instruction.getAccountId()));
         values.put(ImmutableFundsInstructionSpec.Fields.reference, referenceSummary(instruction.getReference()));
         values.put(HASH_FIELD_CONTEXT_VARIABLES,
                 FundsStableHashSupport.stableHashMap(instruction.getContextVariables()));
         values.put(HASH_FIELD_ROUTE, routeRequestHashSummary(routeSnapshot));
         values.put(HASH_FIELD_PARTICIPANT, participantSummary(participant));
         return FundsStableHashSupport.sha256Json(values);
+    }
+
+    private Map<String, Object> accountIdSummary(@Nullable FundsAccountId accountId) {
+        Map<String, Object> values = new TreeMap<>();
+        if (accountId == null) {
+            return values;
+        }
+        values.put(ACCOUNT_ID_FIELD_ID, accountId.id());
+        values.put(ACCOUNT_ID_FIELD_TYPE, accountId.type());
+        return values;
     }
 
     private Map<String, Object> routeRequestHashSummary(RouteSnapshotSpec routeSnapshot) {

@@ -12,6 +12,8 @@ import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.dal.entities.SpendControlMovement;
 import com.wind.funds.wallet.dal.entities.table.SpendControlMovementNameRefs;
+import com.wind.funds.wallet.dal.mapper.CreditAccountMapper;
+import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.dal.mapper.SpendControlMovementMapper;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.SpendControlMovementType;
@@ -49,6 +51,10 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
 
     private final SpendControlMovementMapper spendControlMovementMapper;
 
+    private final FundingAccountMapper fundingAccountMapper;
+
+    private final CreditAccountMapper creditAccountMapper;
+
     private final FundsAccountQueryService fundsAccountQueryService;
 
     private @NonNull Long insertSpendControlMovement(@NonNull RecordSpendControlMovementRequest request) {
@@ -68,14 +74,14 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
             return existing;
         }
         validateRecordRequest(request);
-        assertReleaseAmountNotOverReserved(request);
-        assertRefundCompensationAmountAllowed(request);
+        Long id;
         try {
-            Long id = insertSpendControlMovement(request);
-            return getSpendControlMovementById(id);
+            id = insertSpendControlMovement(request);
         } catch (DataIntegrityViolationException exception) {
             return readIdempotentMovementAfterInsertConflict(request, exception);
         }
+        guardInsertedMovement(request, id);
+        return getSpendControlMovementById(id);
     }
 
     @Override
@@ -189,12 +195,14 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
     private SpendControlMovementDTO readIdempotentMovementAfterInsertConflict(
             RecordSpendControlMovementRequest request,
             DataIntegrityViolationException exception) {
-        SpendControlMovementDTO existing = findSpendControlMovement(request.getTenantId(), request.getMovementSn());
+        SpendControlMovement existing = spendControlMovementMapper.selectByMovementSnWithSharedLock(
+                request.getTenantId(), request.getMovementSn());
         if (existing == null) {
             throw exception;
         }
-        assertSameMovement(request, existing);
-        return existing;
+        SpendControlMovementDTO result = toDTO(existing);
+        assertSameMovement(request, result);
+        return result;
     }
 
     private void assertSameMovement(RecordSpendControlMovementRequest request, SpendControlMovementDTO existing) {
@@ -294,50 +302,134 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 request.getMovementSn());
     }
 
-    private void assertReleaseAmountNotOverReserved(RecordSpendControlMovementRequest request) {
-        if (!request.getMovementType().isReleaseMovement()) {
-            return;
+    private void guardInsertedMovement(RecordSpendControlMovementRequest request, Long id) {
+        FundsSubjectType targetSubjectType = targetSubjectType(request.getTargetAccountId());
+        try {
+            Integer version = selectTargetAccountVersion(request, targetSubjectType);
+            AssertUtils.notNull(version,
+                    "控制额度变动目标账户不存在，accountId = {}，tenantId = {}",
+                    request.getTargetAccountId(),
+                    request.getTenantId());
+            assertMovementAmountAllowed(request);
+            AssertUtils.isTrue(incrementTargetAccountVersion(request, targetSubjectType, version) == 1,
+                    "控制额度变动目标账户并发冲突，请重试，accountId = {}",
+                    request.getTargetAccountId());
+        } catch (RuntimeException exception) {
+            try {
+                deleteInsertedMovement(id);
+            } catch (RuntimeException cleanupException) {
+                exception.addSuppressed(cleanupException);
+            }
+            throw exception;
         }
-        long remainingControlAmount = remainingControlAmount(queryBudgetProjectionMovements(
-                new BudgetControlProjectionQuery()
-                        .setTenantId(request.getTenantId())
-                        .setControlScopeId(controlScopeId(request))
-                        .setPeriodId(request.getPeriodId())
-                        .setCurrency(request.getCurrency())
-                        .setSpendRuleId(request.getSpendRuleId())
-                        .setSpendRuleVersion(request.getSpendRuleVersion())
-                        .setTargetAccountId(request.getTargetAccountId())));
-        AssertUtils.isTrue(remainingControlAmount >= request.getAmount(),
-                "控制释放金额超过可释放占用金额，movementSn = {}, remainingControlAmount = {}, amount = {}",
-                request.getMovementSn(),
-                remainingControlAmount,
-                request.getAmount());
     }
 
-    private void assertRefundCompensationAmountAllowed(RecordSpendControlMovementRequest request) {
-        if (request.getMovementType() != SpendControlMovementType.REFUND_COMPENSATED) {
-            return;
-        }
-        BudgetControlProjectionDTO projection = getBudgetControlProjection(new BudgetControlProjectionQuery()
+    private void deleteInsertedMovement(Long id) {
+        AssertUtils.isTrue(spendControlMovementMapper.deleteById(id) == 1,
+                "删除未通过控制约束的额度变动流水失败，id = {}",
+                id);
+    }
+
+    private Integer selectTargetAccountVersion(RecordSpendControlMovementRequest request,
+                                               FundsSubjectType targetSubjectType) {
+        return switch (targetSubjectType) {
+            case FUNDING_ACCOUNT -> fundingAccountMapper.selectVersionBySn(
+                    request.getTenantId(), request.getTargetAccountId().id());
+            case CREDIT_ACCOUNT -> creditAccountMapper.selectVersionBySn(
+                    request.getTenantId(), request.getTargetAccountId().id());
+            default -> null;
+        };
+    }
+
+    private int incrementTargetAccountVersion(RecordSpendControlMovementRequest request,
+                                              FundsSubjectType targetSubjectType,
+                                              Integer expectedVersion) {
+        return switch (targetSubjectType) {
+            case FUNDING_ACCOUNT -> fundingAccountMapper.incrementVersionIfMatch(
+                    request.getTenantId(), request.getTargetAccountId().id(), expectedVersion);
+            case CREDIT_ACCOUNT -> creditAccountMapper.incrementVersionIfMatch(
+                    request.getTenantId(), request.getTargetAccountId().id(), expectedVersion);
+            default -> 0;
+        };
+    }
+
+    private void assertMovementAmountAllowed(RecordSpendControlMovementRequest request) {
+        BudgetControlProjectionQuery query = new BudgetControlProjectionQuery()
                 .setTenantId(request.getTenantId())
                 .setControlScopeId(controlScopeId(request))
                 .setPeriodId(request.getPeriodId())
                 .setCurrency(request.getCurrency())
                 .setSpendRuleId(request.getSpendRuleId())
                 .setSpendRuleVersion(request.getSpendRuleVersion())
-                .setTargetAccountId(request.getTargetAccountId()));
-        AssertUtils.isTrue(projection.getConsumedAmount() >= request.getAmount(),
+                .setTargetAccountId(request.getTargetAccountId());
+        List<SpendControlMovementDTO> movements = queryBudgetProjectionMovements(query);
+        BudgetControlProjectionDTO projection = toProjection(query, movements);
+        switch (request.getMovementType()) {
+            case LIMIT_INCREASED, LIMIT_DECREASED -> assertLimitAmountAllowed(request, projection);
+            case RESERVED -> assertReservationAmountAllowed(request, projection, movements);
+            case CONSUMED -> assertConsumptionAmountAllowed(request, projection);
+            case REFUND_COMPENSATED -> assertRefundCompensationAmountAllowed(request, projection);
+            case RELEASED -> assertReleaseAmountAllowed(request, projection);
+        }
+    }
+
+    private void assertLimitAmountAllowed(RecordSpendControlMovementRequest request,
+                                          BudgetControlProjectionDTO projection) {
+        long committedControlAmount = projection.getConsumedAmount() + projection.getRemainingControlAmount();
+        AssertUtils.isTrue(projection.getLimitAmount() >= committedControlAmount,
+                "预算控制额度不能低于已使用或已占用控制金额，movementSn = {}, "
+                        + "limitAmount = {}, committedControlAmount = {}",
+                request.getMovementSn(),
+                projection.getLimitAmount(),
+                committedControlAmount);
+    }
+
+    private void assertReservationAmountAllowed(RecordSpendControlMovementRequest request,
+                                                BudgetControlProjectionDTO projection,
+                                                List<SpendControlMovementDTO> movements) {
+        boolean configuredLimit = movements.stream()
+                .anyMatch(movement -> movement.getMovementType().isLimitAdjustmentMovement());
+        if (!configuredLimit) {
+            return;
+        }
+        AssertUtils.isTrue(projection.getAvailableControlAmount() >= 0L,
+                "控制占用金额超过可用控制额度，movementSn = {}, availableControlAmount = {}, amount = {}",
+                request.getMovementSn(),
+                projection.getAvailableControlAmount(),
+                request.getAmount());
+    }
+
+    private void assertConsumptionAmountAllowed(RecordSpendControlMovementRequest request,
+                                                BudgetControlProjectionDTO projection) {
+        AssertUtils.isTrue(projection.getRemainingControlAmount() >= 0L,
+                "控制消费金额超过剩余占用金额，movementSn = {}, remainingControlAmount = {}, amount = {}",
+                request.getMovementSn(),
+                projection.getRemainingControlAmount(),
+                request.getAmount());
+    }
+
+    private void assertReleaseAmountAllowed(RecordSpendControlMovementRequest request,
+                                            BudgetControlProjectionDTO projection) {
+        AssertUtils.isTrue(projection.getRemainingControlAmount() >= 0L,
+                "控制释放金额超过可释放占用金额，movementSn = {}, remainingControlAmount = {}, amount = {}",
+                request.getMovementSn(),
+                projection.getRemainingControlAmount(),
+                request.getAmount());
+    }
+
+    private void assertRefundCompensationAmountAllowed(RecordSpendControlMovementRequest request,
+                                                       BudgetControlProjectionDTO projection) {
+        AssertUtils.isTrue(projection.getConsumedAmount() >= 0L,
                 "退款控制补偿金额超过当前周期净消费控制金额，movementSn = {}, consumedAmount = {}, amount = {}",
                 request.getMovementSn(),
                 projection.getConsumedAmount(),
                 request.getAmount());
-        long availableAfterCompensation = Math.addExact(projection.getAvailableControlAmount(), request.getAmount());
-        AssertUtils.isTrue(availableAfterCompensation <= projection.getLimitAmount(),
+        AssertUtils.isTrue(projection.getAvailableControlAmount() <= projection.getLimitAmount(),
                 "退款控制补偿后可用控制额度不能超过周期控制额度，movementSn = {}, limitAmount = {}, "
                         + "availableAfterCompensation = {}",
                 request.getMovementSn(),
                 projection.getLimitAmount(),
-                availableAfterCompensation);
+                projection.getAvailableControlAmount());
     }
 
     private void validateQuery(SpendControlMovementQuery query) {
@@ -387,7 +479,7 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
         long reservedAmount = sumByType(budgetMovements, SpendControlMovementType.RESERVED);
         long consumedAmount = consumedAmount(budgetMovements);
         long releasedAmount = releasedAmount(budgetMovements);
-        long remainingControlAmount = reservedAmount - consumedAmount - releasedAmount;
+        long remainingControlAmount = reservedAmount - grossConsumedAmount(budgetMovements) - releasedAmount;
         long availableControlAmount = limitAmount - consumedAmount - remainingControlAmount;
         SpendControlMovementDTO lastActivity = budgetMovements.isEmpty() ? null : budgetMovements.getLast();
         String controlScopeId = controlScopeId(query);
@@ -435,17 +527,14 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 .toList();
     }
 
-    private long remainingControlAmount(List<SpendControlMovementDTO> movements) {
-        List<SpendControlMovementDTO> budgetMovements = budgetProjectionMovements(movements);
-        return sumByType(budgetMovements, SpendControlMovementType.RESERVED)
-                - consumedAmount(budgetMovements)
-                - releasedAmount(budgetMovements);
-    }
-
     private long consumedAmount(List<SpendControlMovementDTO> movements) {
-        long grossConsumedAmount = sumByType(movements, SpendControlMovementType.CONSUMED);
+        long grossConsumedAmount = grossConsumedAmount(movements);
         long refundCompensatedAmount = sumByType(movements, SpendControlMovementType.REFUND_COMPENSATED);
         return grossConsumedAmount - refundCompensatedAmount;
+    }
+
+    private long grossConsumedAmount(List<SpendControlMovementDTO> movements) {
+        return sumByType(movements, SpendControlMovementType.CONSUMED);
     }
 
     private long releasedAmount(List<SpendControlMovementDTO> movements) {

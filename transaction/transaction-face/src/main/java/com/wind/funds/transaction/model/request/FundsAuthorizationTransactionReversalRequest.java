@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class FundsAuthorizationTransactionReversalRequest {
 
-    @Schema(description = "账户 id")
+    @Schema(description = "原授权主账户，必须与原授权 RouteSnapshot 一致")
     @NotNull
     @NonNull
     private FundsAccountId accountId;

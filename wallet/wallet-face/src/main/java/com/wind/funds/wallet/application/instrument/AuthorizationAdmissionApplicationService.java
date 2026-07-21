@@ -28,7 +28,8 @@ public interface AuthorizationAdmissionApplicationService {
      * WindOperator)} 接入，本方法供生命周期 facade 或仍直接消费授权准入专项能力的内部协作方调用。</p>
      *
      * <p>准入顺序：支付工具动作能力与绑定快照、资金责任关系、账户主体能力与状态。
-     * 任一准入失败时必须在进入交易内核前中止，不生成 route、posting、LedgerEntry 或交易事实。</p>
+     * 任一准入失败时必须在进入交易内核前中止，不生成 route、posting、LedgerEntry 或交易事实。
+     * 已成立授权的相同业务请求按原交易准入快照幂等返回，不按当前挂载重算；关键请求或决策证据变化时拒绝。</p>
      *
      * @param request  支付工具授权请求
      * @param operator 操作者
