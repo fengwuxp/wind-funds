@@ -705,6 +705,8 @@ CREATE TABLE `t_clearing_splittable_detail`
     `status`                          VARCHAR(50)  NOT NULL COMMENT 'SPLIT_READY/EXCLUDED',
     `exclusion_reason`                VARCHAR(64)           DEFAULT NULL COMMENT '稳定排除原因',
     `reconciliation_decision_status` VARCHAR(50)  NOT NULL COMMENT '清分前对账门禁结论',
+    `reconciliation_run_result_sn`    VARCHAR(64)  NOT NULL COMMENT '清分前对账运行结果流水号',
+    `reconciliation_result_digest`    VARCHAR(64)           DEFAULT NULL COMMENT '清分前对账运行结果 SHA-256；结果缺失并阻断时为空',
     `reconciliation_evidence_refs`    TEXT         NOT NULL COMMENT '清分前对账证据引用 JSON',
     `source_digest`                   VARCHAR(64)  NOT NULL COMMENT '来源事实与规则快照 SHA-256',
     `created_by`                      VARCHAR(64)  NOT NULL COMMENT '创建人',
@@ -716,6 +718,70 @@ CREATE TABLE `t_clearing_splittable_detail`
     KEY `idx_clearing_splittable_detail_status` (`tenant_id`, `status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '可清分明细准入事实表';
+
+-- ----------------------------
+-- 对账运行结果表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_reconciliation_run_result`;
+CREATE TABLE `t_reconciliation_run_result`
+(
+    `id`                       BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `sn`                       VARCHAR(64)  NOT NULL COMMENT '对账运行结果流水号',
+    `tenant_id`                BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `reconciliation_batch_sn`  VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
+    `gate_object_type`         VARCHAR(50)  NOT NULL COMMENT '准入对象类型',
+    `gate_object_sn`           VARCHAR(64)  NOT NULL COMMENT '准入对象流水号',
+    `status`                   VARCHAR(50)  NOT NULL COMMENT 'BALANCED/DIFFERENCE_FOUND/WAITING_DATA/FAILED',
+    `rule_version`             VARCHAR(64)  NOT NULL COMMENT '匹配或对账规则版本',
+    `internal_source_digest`   VARCHAR(64)  NOT NULL COMMENT '归一化内部事实集合 SHA-256',
+    `external_source_digest`   VARCHAR(64)  NOT NULL COMMENT '归一化外部来源事实集合 SHA-256',
+    `source_digest`            VARCHAR(64)  NOT NULL COMMENT '内部与外部来源摘要的组合 SHA-256',
+    `result_digest`            VARCHAR(64)  NOT NULL COMMENT '对账运行结果 SHA-256',
+    `total_count`              INT(11)      NOT NULL COMMENT '参与运行的记录总数',
+    `matched_count`            INT(11)      NOT NULL COMMENT '成功匹配记录数',
+    `difference_count`         INT(11)      NOT NULL COMMENT '差错记录数',
+    `evidence_refs`            TEXT         NOT NULL COMMENT '来源文件、报表或匹配报告证据引用 JSON',
+    `created_by`               VARCHAR(64)  NOT NULL COMMENT '记录人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_run_result_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_reconciliation_run_result_business` (`tenant_id`, `reconciliation_batch_sn`, `gate_object_type`, `gate_object_sn`),
+    KEY `idx_reconciliation_run_result_gate` (`tenant_id`, `gate_object_type`, `gate_object_sn`, `status`),
+    KEY `idx_reconciliation_run_result_digest` (`tenant_id`, `result_digest`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '对账运行结果表';
+
+-- ----------------------------
+-- 对账匹配结果明细表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_reconciliation_match_result`;
+CREATE TABLE `t_reconciliation_match_result`
+(
+    `id`                            BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `sn`                            VARCHAR(64)  NOT NULL COMMENT '匹配结果流水号',
+    `tenant_id`                     BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `reconciliation_run_result_sn`  VARCHAR(64)  NOT NULL COMMENT '对账运行结果流水号',
+    `reconciliation_batch_sn`       VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
+    `internal_source_ref`           VARCHAR(128)          DEFAULT NULL COMMENT '内部事实稳定引用',
+    `external_source_ref`           VARCHAR(128)          DEFAULT NULL COMMENT '外部来源事实稳定引用',
+    `source_quality`                VARCHAR(50)  NOT NULL COMMENT '来源质量',
+    `match_strength`                VARCHAR(50)  NOT NULL COMMENT '匹配强度',
+    `difference_type`               VARCHAR(50)           DEFAULT NULL COMMENT '差错类型',
+    `severity`                      VARCHAR(50)           DEFAULT NULL COMMENT '差错严重等级',
+    `currency`                      VARCHAR(10)           DEFAULT NULL COMMENT '差异币种',
+    `difference_amount`             BIGINT(20)            DEFAULT NULL COMMENT '差异金额，最小货币单位',
+    `evidence_ref`                  VARCHAR(256) NOT NULL COMMENT '匹配结论证据引用',
+    `match_identity_digest`         VARCHAR(64)  NOT NULL COMMENT '内部与外部来源对身份 SHA-256',
+    `match_digest`                  VARCHAR(64)  NOT NULL COMMENT '匹配结果 SHA-256',
+    `created_by`                    VARCHAR(64)  NOT NULL COMMENT '记录人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_match_result_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_reconciliation_match_result_identity` (`tenant_id`, `reconciliation_run_result_sn`, `match_identity_digest`),
+    KEY `idx_reconciliation_match_result_digest` (`tenant_id`, `reconciliation_run_result_sn`, `match_digest`),
+    KEY `idx_reconciliation_match_result_batch` (`tenant_id`, `reconciliation_batch_sn`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '对账匹配结果明细表';
 
 -- ----------------------------
 -- 对账差错表

@@ -58,6 +58,12 @@ public class PayoutPreflightResultDTO implements Serializable {
     @Schema(description = "外部规则核验状态")
     private ExternalRuleVerificationStatus externalRuleVerificationStatus;
 
+    @Schema(description = "本次准入消费的对账运行结果流水号")
+    private String reconciliationRunResultSn;
+
+    @Schema(description = "对账运行结果 SHA-256")
+    private String reconciliationResultDigest;
+
     @Schema(description = "检查时间")
     private LocalDateTime checkedAt;
 

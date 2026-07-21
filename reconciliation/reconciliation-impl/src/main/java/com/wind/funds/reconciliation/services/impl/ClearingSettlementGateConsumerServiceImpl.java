@@ -41,6 +41,8 @@ public class ClearingSettlementGateConsumerServiceImpl implements ClearingSettle
                 .setDecisionStatus(decision.getDecisionStatus())
                 .setGateObjectType(decision.getGateObjectType())
                 .setGateObjectSn(decision.getGateObjectSn())
+                .setReconciliationRunResultSn(decision.getReconciliationRunResultSn())
+                .setReconciliationResultDigest(decision.getReconciliationResultDigest())
                 .setBlockingDifferences(decision.getBlockingDifferences())
                 .setEvidenceRefs(decision.getEvidenceRefs())
                 .setExplanation(decision.getExplanation())
@@ -56,6 +58,7 @@ public class ClearingSettlementGateConsumerServiceImpl implements ClearingSettle
         AssertUtils.isTrue(isClearingOrSettlement(request.getGateObjectType()),
                 "清算结算对账准入消费对象类型仅支持 CLEARING 或 SETTLEMENT");
         AssertUtils.hasText(request.getGateObjectSn(), "清算结算对账准入消费对象流水号不能为空");
+        AssertUtils.hasText(request.getReconciliationRunResultSn(), "清算结算对账运行结果流水号不能为空");
         AssertUtils.notNull(request.getCurrency(), "清算结算对账准入币种不能为空");
         AssertUtils.notNull(request.getAmount(), "清算结算对账准入金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0, "清算结算对账准入金额必须大于 0");
@@ -71,6 +74,7 @@ public class ClearingSettlementGateConsumerServiceImpl implements ClearingSettle
         return new CheckReconciliationGateRequest()
                 .setTenantId(request.getTenantId())
                 .setGateObjectType(request.getGateObjectType())
-                .setGateObjectSn(request.getGateObjectSn());
+                .setGateObjectSn(request.getGateObjectSn())
+                .setReconciliationRunResultSn(request.getReconciliationRunResultSn());
     }
 }

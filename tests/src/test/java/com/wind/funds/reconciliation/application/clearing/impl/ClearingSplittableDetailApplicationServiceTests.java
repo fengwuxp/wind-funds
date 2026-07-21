@@ -17,6 +17,8 @@ import com.wind.funds.reconciliation.application.clearing.impl.ClearingSplittabl
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.gate.impl.ReconciliationGateApplicationServiceImpl;
+import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
+import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ClearingSplittableDetailStatus;
 import com.wind.funds.reconciliation.enums.ClearingSplittableExclusionReason;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
@@ -28,6 +30,8 @@ import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ClearingSplittableDetailDTO;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
 import com.wind.funds.reconciliation.model.request.IdentifyClearingSplittableDetailRequest;
+import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
+import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsEffectType;
@@ -48,6 +52,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -89,17 +95,25 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
     private ReconciliationDifferenceApplicationService reconciliationDifferenceApplicationService;
 
     @Autowired
+    private ReconciliationRunResultApplicationService reconciliationRunResultApplicationService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    private String reconciliationRunResultSn;
 
     @BeforeEach
     void prepareSourceFacts() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
+        jdbcTemplate.update("DELETE FROM t_reconciliation_match_result");
+        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result");
         jdbcTemplate.update("DELETE FROM t_clearing_splittable_detail");
         deleteSourceFacts();
         insertSourceFacts(FundsTransactionStatus.CLOSED, FundsTransactionDetailStatus.SUCCEEDED,
                 LedgerSubjectCode.CLEARING,
                 "{\"routeCode\":\"DIRECT_PAY_STANDARD\",\"routeVersion\":\"v1\",\"legs\":[{\"legId\":\"merchant-clearing\"}]}",
                 0L, 0L);
+        reconciliationRunResultSn = recordBalancedRunResult();
     }
 
     /**
@@ -126,9 +140,28 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getCurrency()).isEqualTo(CurrencyIsoCode.USD);
         assertThat(result.getPrincipalAmount()).isEqualTo(AMOUNT);
         assertThat(result.getReconciliationDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getReconciliationRunResultSn()).isEqualTo(reconciliationRunResultSn);
+        assertThat(result.getReconciliationResultDigest()).hasSize(64);
+        assertThat(result.getReconciliationEvidenceRefs()).containsExactly("report:merchant-clearing-recon-run-001");
         assertThat(result.getSourceDigest()).hasSize(64);
         assertThat(detailCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：来源资金和账本事实完整，但没有可读取的正向对账运行结果。
+     * 结果：稳定排除，不能用“没有登记差错”替代清分前对账。
+     */
+    @Test
+    void testIdentifyShouldExcludeWhenReconciliationRunResultIsMissing() {
+        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result WHERE sn = ?", reconciliationRunResultSn);
+
+        ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
+                minimumRequest(), WindOperator.system());
+
+        assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
+        assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED);
+        assertThat(result.getReconciliationDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
     }
 
     /**
@@ -188,7 +221,8 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED);
         assertThat(result.getReconciliationDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
-        assertThat(result.getReconciliationEvidenceRefs()).containsExactly("merchant-clearing-recon-evidence-001");
+        assertThat(result.getReconciliationEvidenceRefs()).containsExactly("report:merchant-clearing-recon-run-001",
+                "merchant-clearing-recon-evidence-001");
         assertThat(detailCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -317,9 +351,29 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                 .setFundsTransactionSn(FUNDS_TRANSACTION_SN)
                 .setFundsTransactionDetailSn(FUNDS_TRANSACTION_DETAIL_SN)
                 .setLedgerEntrySn(LEDGER_ENTRY_SN)
+                .setReconciliationRunResultSn(reconciliationRunResultSn)
                 .setClearingPeriod("2026-07-21")
                 .setRuleCode("MERCHANT_DAILY_SPLIT")
                 .setRuleVersion("1");
+    }
+
+    private String recordBalancedRunResult() {
+        return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn("clearing_recon_batch_balanced_001")
+                .setGateObjectType(ReconciliationGateObjectType.CLEARING)
+                .setGateObjectSn(FUNDS_TRANSACTION_DETAIL_SN)
+                .setRuleVersion("recon-rule-1")
+                .setInternalSourceDigest("a".repeat(64))
+                .setExternalSourceDigest("b".repeat(64))
+                .setMatchResults(List.of(new ReconciliationMatchResultItem()
+                        .setInternalSourceRef("internal:" + FUNDS_TRANSACTION_DETAIL_SN)
+                        .setExternalSourceRef("external:" + FUNDS_TRANSACTION_DETAIL_SN)
+                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
+                        .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
+                        .setEvidenceRef("report:merchant-clearing-recon-run-001#line-1")))
+                .setEvidenceRefs(List.of("report:merchant-clearing-recon-run-001")),
+                WindOperator.system()).getSn();
     }
 
     private CreateReconciliationDifferenceRequest blockingDifferenceRequest() {
@@ -430,6 +484,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
             LedgerTransactionServiceImpl.class,
             ClearingSplittableDetailApplicationServiceImpl.class,
             ReconciliationDifferenceApplicationServiceImpl.class,
+            ReconciliationRunResultApplicationServiceImpl.class,
             ReconciliationGateApplicationServiceImpl.class
     })
     static class Config {

@@ -84,6 +84,8 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
                 .setDisplayStatus(resolveDisplayStatus(passed))
                 .setOperationStatus(resolveOperationStatus(passed))
                 .setExternalRuleVerificationStatus(resolveExternalRuleVerificationStatus(request))
+                .setReconciliationRunResultSn(reconciliationGateDecision.getReconciliationRunResultSn())
+                .setReconciliationResultDigest(reconciliationGateDecision.getReconciliationResultDigest())
                 .setCheckedAt(checkedAt)
                 .setCheckedBy(String.valueOf(operator.getOperatorId()))
                 .setExpiresAt(checkedAt.plusMinutes(PREFLIGHT_RESULT_EXPIRE_MINUTES))
@@ -91,12 +93,14 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
     }
 
     private void validateRequest(CheckPayoutPreflightRequest request) {
+        AssertUtils.notNull(request, "出款前准入检查请求不能为空");
         AssertUtils.notNull(request.getTenantId(), "出款前准入检查租户 ID 不能为空");
         AssertUtils.hasText(request.getSettlementSn(), "出款前准入检查结算单号不能为空");
         AssertUtils.notNull(request.getCurrency(), "出款前准入检查币种不能为空");
         AssertUtils.notNull(request.getAmount(), "出款前准入检查金额不能为空");
         AssertUtils.isTrue(request.getAmount() > 0, "出款前准入检查金额必须大于 0");
         AssertUtils.hasText(request.getIdempotencyKey(), "出款前准入检查幂等键不能为空");
+        AssertUtils.hasText(request.getReconciliationRunResultSn(), "出款前对账运行结果流水号不能为空");
     }
 
     private void addBlockingReasonIfMissing(List<PayoutPreflightBlockingReasonDTO> blockingReasons,
@@ -145,7 +149,8 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
         return reconciliationGateApplicationService.checkGate(new CheckReconciliationGateRequest()
                 .setTenantId(request.getTenantId())
                 .setGateObjectType(ReconciliationGateObjectType.PAYOUT)
-                .setGateObjectSn(payoutGateObjectSn(request)), operator);
+                .setGateObjectSn(payoutGateObjectSn(request))
+                .setReconciliationRunResultSn(request.getReconciliationRunResultSn()), operator);
     }
 
     private String payoutGateObjectSn(CheckPayoutPreflightRequest request) {

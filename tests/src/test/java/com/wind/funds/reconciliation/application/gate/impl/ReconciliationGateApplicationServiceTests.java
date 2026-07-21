@@ -5,6 +5,8 @@ import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
+import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
+import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
@@ -19,6 +21,8 @@ import com.wind.funds.reconciliation.model.request.CheckReconciliationGateReques
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
 import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceAdjustmentRequest;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
+import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
+import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +34,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -56,6 +62,8 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
 
     private static final String RERUN_SN = "recon_gate_rerun_001";
 
+    private static final String RERUN_BATCH_SN = "recon_gate_batch_001_rerun_001";
+
     @Autowired
     private ReconciliationDifferenceApplicationService reconciliationDifferenceApplicationService;
 
@@ -63,12 +71,25 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     private ReconciliationGateApplicationService reconciliationGateApplicationService;
 
     @Autowired
+    private ReconciliationRunResultApplicationService reconciliationRunResultApplicationService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
-    void cleanReconciliationDifference() {
+    void prepareReconciliationEvidence() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
+        jdbcTemplate.update("DELETE FROM t_reconciliation_match_result");
+        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result");
+        clearingRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.CLEARING,
+                "clearing-candidate-001", RERUN_BATCH_SN, "report:clearing-recon-run-001");
+        settlementRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.SETTLEMENT,
+                "settlement-order-001", "recon-settlement-batch-001", "report:settlement-recon-run-001");
     }
+
+    private String clearingRunResultSn;
+
+    private String settlementRunResultSn;
 
     /**
      * 场景：清算候选生成前存在命中 CLEARING 阻断范围的重大差错。
@@ -96,16 +117,17 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(blockingDifference.getResponsiblePartyRef()).isEqualTo("processor:issuer-ledger");
         assertThat(blockingDifference.getEvidenceRef()).isEqualTo("processor-gate-file-digest-001");
         assertThat(blockingDifference.getBlockingReason()).contains("未闭环");
-        assertThat(result.getEvidenceRefs()).containsExactly("processor-gate-file-digest-001");
+        assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-recon-run-001",
+                "processor-gate-file-digest-001");
         assertThat(result.getExplanation()).contains("阻断");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
-     * 场景：清算候选生成前没有命中阻断范围的差错。
-     * 输入：空差错表和清算准入检查请求。
-     * 输出：准入通过，不返回阻断差错或证据引用。
-     * 红线：空差错准入仍只读检查，不得生成任何资金或账本事实。
+     * 场景：清算候选生成前已有明确 BALANCED 运行结果且没有命中差错。
+     * 输入：正向运行结果、空差错表和清算准入检查请求。
+     * 输出：准入通过，并返回本次运行的正向证据。
+     * 红线：不得把“差错表为空”单独解释成对账通过。
      */
     @Test
     void testCheckGateShouldPassWhenNoScopedDifferenceExists() {
@@ -116,10 +138,63 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getReconciliationRunResultSn()).isEqualTo(clearingRunResultSn);
         assertThat(result.getBlockingDifferences()).isEmpty();
-        assertThat(result.getEvidenceRefs()).isEmpty();
+        assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-recon-run-001");
         assertThat(result.getExplanation()).contains("准入通过");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方没有可读取的对账运行结果。
+     * 结果：准入失败关闭，不能用空差错表替代正向对账证据。
+     */
+    @Test
+    void testCheckGateShouldBlockWhenRunResultDoesNotExist() {
+        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result WHERE sn = ?", clearingRunResultSn);
+
+        ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
+                clearingGateRequest(), WindOperator.system());
+
+        assertThat(result.isPassed()).isFalse();
+        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getBlockingDifferences()).isEmpty();
+        assertThat(result.getEvidenceRefs()).isEmpty();
+        assertThat(result.getExplanation()).contains("运行结果不存在");
+    }
+
+    /**
+     * 场景：完成态逐笔匹配结果包含差异。
+     * 结果：即使尚未登记差错单也必须阻断，直到新批次形成 BALANCED 结果。
+     */
+    @Test
+    void testCheckGateShouldBlockWhenRunResultIsNotBalanced() {
+        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result WHERE sn = ?", clearingRunResultSn);
+        clearingRunResultSn = recordDifferenceRunResult(ReconciliationGateObjectType.CLEARING,
+                "clearing-candidate-001", "recon-difference-batch-001",
+                "report:clearing-recon-difference-001");
+
+        ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
+                clearingGateRequest(), WindOperator.system());
+
+        assertThat(result.isPassed()).isFalse();
+        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-recon-difference-001");
+        assertThat(result.getExplanation()).contains("DIFFERENCE_FOUND");
+    }
+
+    /**
+     * 场景：调用方把结算对象的正向结果用于清算对象。
+     * 结果：对象不匹配时失败关闭，不能复用其他对象的正向证据。
+     */
+    @Test
+    void testCheckGateShouldBlockWhenRunResultObjectDoesNotMatch() {
+        ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
+                clearingGateRequest().setReconciliationRunResultSn(settlementRunResultSn), WindOperator.system());
+
+        assertThat(result.isPassed()).isFalse();
+        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getExplanation()).contains("准入对象不匹配");
     }
 
     /**
@@ -140,7 +215,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
         assertThat(result.getGateObjectType()).isEqualTo(ReconciliationGateObjectType.SETTLEMENT);
         assertThat(result.getBlockingDifferences()).isEmpty();
-        assertThat(result.getEvidenceRefs()).isEmpty();
+        assertThat(result.getEvidenceRefs()).containsExactly("report:settlement-recon-run-001");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -180,7 +255,8 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         ReconciliationGateBlockingDifferenceDTO blockingDifference = result.getBlockingDifferences().getFirst();
         assertThat(blockingDifference.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
         assertThat(blockingDifference.getBlockingObjectSn()).isEqualTo("clearing-candidate-001");
-        assertThat(result.getEvidenceRefs()).containsExactly("processor-gate-file-digest-001");
+        assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-recon-run-001",
+                "processor-gate-file-digest-001");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -232,8 +308,13 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
 
         ReconciliationGateDecisionDTO settlementResult = reconciliationGateApplicationService.checkGate(
                 settlementGateRequest(), WindOperator.system());
+        String otherClearingRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.CLEARING,
+                "settlement-order-001", "recon-clearing-other-batch-001", "report:clearing-other-run-001");
         ReconciliationGateDecisionDTO clearingResult = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest().setGateObjectSn("settlement-order-001"), WindOperator.system());
+                clearingGateRequest()
+                        .setGateObjectSn("settlement-order-001")
+                        .setReconciliationRunResultSn(otherClearingRunResultSn),
+                WindOperator.system());
 
         assertThat(settlementResult.isPassed()).isFalse();
         assertThat(settlementResult.getBlockingDifferences())
@@ -256,6 +337,20 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
 
         assertThatThrownBy(() -> reconciliationGateApplicationService.checkGate(clearingGateRequest(), null))
                 .hasMessageContaining("对账差错准入检查操作人不能为空");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：调用方未提供对账准入请求。
+     * 结果：快速失败，不读取差错或运行结果，不形成任何资金事实。
+     */
+    @Test
+    void testCheckGateShouldRejectNullRequest() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> reconciliationGateApplicationService.checkGate(null, WindOperator.system()))
+                .hasMessageContaining("对账准入检查请求不能为空");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -312,7 +407,8 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.CONDITIONALLY_PASSED);
         assertThat(result.getBlockingDifferences()).isEmpty();
         assertThat(result.getEvidenceRefs())
-                .containsExactly("processor-gate-file-digest-001", "adjustment-evidence-gate-001",
+                .containsExactly("report:clearing-recon-run-001", "processor-gate-file-digest-001",
+                        "adjustment-evidence-gate-001",
                         "rerun-report-gate-001");
         assertThat(result.getExplanation()).contains("重新对账已对平");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -350,14 +446,16 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         return new CheckReconciliationGateRequest()
                 .setTenantId(TENANT_ID)
                 .setGateObjectType(ReconciliationGateObjectType.CLEARING)
-                .setGateObjectSn("clearing-candidate-001");
+                .setGateObjectSn("clearing-candidate-001")
+                .setReconciliationRunResultSn(clearingRunResultSn);
     }
 
     private CheckReconciliationGateRequest settlementGateRequest() {
         return new CheckReconciliationGateRequest()
                 .setTenantId(TENANT_ID)
                 .setGateObjectType(ReconciliationGateObjectType.SETTLEMENT)
-                .setGateObjectSn("settlement-order-001");
+                .setGateObjectSn("settlement-order-001")
+                .setReconciliationRunResultSn(settlementRunResultSn);
     }
 
     private CreateReconciliationDifferenceRequest minimumCreateRequest() {
@@ -398,7 +496,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 .setTenantId(TENANT_ID)
                 .setDifferenceSn(DIFFERENCE_SN)
                 .setRerunSn(RERUN_SN)
-                .setRerunBatchSn("recon_gate_batch_001_rerun_001")
+                .setRerunBatchSn(RERUN_BATCH_SN)
                 .setRuleVersion("recon-rule-v1")
                 .setBalanced(true)
                 .setEvidenceRef("rerun-report-gate-001")
@@ -406,9 +504,56 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 .setDescription("调账后重新对账通过");
     }
 
+    private String recordBalancedRunResult(ReconciliationGateObjectType gateObjectType,
+                                           String gateObjectSn,
+                                           String reconciliationBatchSn,
+                                           String evidenceRef) {
+        return recordRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, evidenceRef,
+                new ReconciliationMatchResultItem()
+                        .setInternalSourceRef("internal:" + gateObjectSn)
+                        .setExternalSourceRef("external:" + gateObjectSn)
+                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
+                        .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
+                        .setEvidenceRef(evidenceRef + "#line-1"));
+    }
+
+    private String recordDifferenceRunResult(ReconciliationGateObjectType gateObjectType,
+                                             String gateObjectSn,
+                                             String reconciliationBatchSn,
+                                             String evidenceRef) {
+        return recordRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, evidenceRef,
+                new ReconciliationMatchResultItem()
+                        .setInternalSourceRef("internal:" + gateObjectSn)
+                        .setExternalSourceRef("external:" + gateObjectSn)
+                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
+                        .setMatchStrength(ReconciliationMatchStrength.UNMATCHED)
+                        .setDifferenceType(ReconciliationDifferenceType.STATUS_MISMATCH)
+                        .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
+                        .setDifferenceAmount(0L)
+                        .setEvidenceRef(evidenceRef + "#line-1"));
+    }
+
+    private String recordRunResult(ReconciliationGateObjectType gateObjectType,
+                                   String gateObjectSn,
+                                   String reconciliationBatchSn,
+                                   String evidenceRef,
+                                   ReconciliationMatchResultItem matchResult) {
+        return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(reconciliationBatchSn)
+                .setGateObjectType(gateObjectType)
+                .setGateObjectSn(gateObjectSn)
+                .setRuleVersion("recon-rule-v1")
+                .setInternalSourceDigest("a".repeat(64))
+                .setExternalSourceDigest("b".repeat(64))
+                .setMatchResults(List.of(matchResult))
+                .setEvidenceRefs(List.of(evidenceRef)), WindOperator.system()).getSn();
+    }
+
     @Configuration
     @Import({
             ReconciliationDifferenceApplicationServiceImpl.class,
+            ReconciliationRunResultApplicationServiceImpl.class,
             ReconciliationGateApplicationServiceImpl.class
     })
     static class Config {

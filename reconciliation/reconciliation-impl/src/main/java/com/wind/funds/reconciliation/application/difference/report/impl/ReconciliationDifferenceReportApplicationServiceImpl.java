@@ -70,10 +70,13 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
         if (difference.getBlockingObjectType() == null || !StringUtils.hasText(difference.getBlockingObjectSn())) {
             return null;
         }
+        AssertUtils.hasText(request.getReconciliationRunResultSn(),
+                "查询对账差异报告 gate 决策时，对账运行结果流水号不能为空");
         return reconciliationGateApplicationService.checkGate(new CheckReconciliationGateRequest()
                 .setTenantId(request.getTenantId())
                 .setGateObjectType(difference.getBlockingObjectType())
-                .setGateObjectSn(difference.getBlockingObjectSn()), operator);
+                .setGateObjectSn(difference.getBlockingObjectSn())
+                .setReconciliationRunResultSn(request.getReconciliationRunResultSn()), operator);
     }
 
     private ReconciliationDifferenceReportDTO toReportDTO(GetReconciliationDifferenceReportRequest request,

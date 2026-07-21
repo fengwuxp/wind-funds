@@ -55,6 +55,12 @@ public class ClearingSettlementGateResultDTO implements Serializable {
     @Schema(description = "准入消费对象流水号")
     private String gateObjectSn;
 
+    @Schema(description = "本次准入消费的对账运行结果流水号")
+    private String reconciliationRunResultSn;
+
+    @Schema(description = "对账运行结果 SHA-256")
+    private String reconciliationResultDigest;
+
     /**
      * 阻断差错列表。
      */

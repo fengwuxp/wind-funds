@@ -1,12 +1,16 @@
 package com.wind.funds.reconciliation.application.gate.impl;
 
+import com.alibaba.fastjson2.JSON;
 import com.capte.domain.core.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationDifference;
+import com.wind.funds.reconciliation.dal.entities.ReconciliationRunResult;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceMapper;
+import com.wind.funds.reconciliation.dal.mapper.ReconciliationRunResultMapper;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateBlockingDifferenceDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
@@ -20,6 +24,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -32,16 +37,32 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
 
     private final ReconciliationDifferenceMapper reconciliationDifferenceMapper;
 
+    private final ReconciliationRunResultMapper reconciliationRunResultMapper;
+
     @Override
     @Transactional(readOnly = true)
     public ReconciliationGateDecisionDTO checkGate(CheckReconciliationGateRequest request, WindOperator operator) {
         validateRequest(request);
         AssertUtils.notNull(operator, "对账差错准入检查操作人不能为空");
+        ReconciliationRunResult runResult = reconciliationRunResultMapper.selectBySn(
+                request.getTenantId(), request.getReconciliationRunResultSn());
+        if (runResult == null) {
+            return blockedForRunResult(request, operator, null, List.of(), "对账运行结果不存在，准入必须阻断");
+        }
+        List<String> runEvidenceRefs = parseEvidenceRefs(runResult.getEvidenceRefs());
+        if (!matchesGateObject(runResult, request)) {
+            return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
+                    "对账运行结果与准入对象不匹配，准入必须阻断");
+        }
+        if (runResult.getStatus() != ReconciliationRunResultStatus.BALANCED) {
+            return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
+                    "对账运行结果状态为 " + runResult.getStatus() + "，只有 BALANCED 可以进入后续准入");
+        }
         List<ReconciliationDifference> scopedDifferences = reconciliationDifferenceMapper.selectByGateObject(
                 request.getTenantId(), request.getGateObjectType().name(), request.getGateObjectType().name(),
                 request.getGateObjectSn());
         List<ReconciliationDifference> blockingDifferences = scopedDifferences.stream()
-                .filter(this::shouldBlock)
+                .filter(difference -> shouldBlock(difference, runResult))
                 .toList();
         ReconciliationGateDecisionStatus decisionStatus = resolveDecisionStatus(scopedDifferences,
                 blockingDifferences);
@@ -50,22 +71,37 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
                 .setDecisionStatus(decisionStatus)
                 .setGateObjectType(request.getGateObjectType())
                 .setGateObjectSn(request.getGateObjectSn())
+                .setReconciliationRunResultSn(runResult.getSn())
+                .setReconciliationBatchSn(runResult.getReconciliationBatchSn())
+                .setReconciliationRunResultStatus(runResult.getStatus())
+                .setReconciliationResultDigest(runResult.getResultDigest())
                 .setBlockingDifferences(toBlockingDifferenceDTOs(blockingDifferences))
-                .setEvidenceRefs(evidenceRefs(scopedDifferences))
+                .setEvidenceRefs(evidenceRefs(runEvidenceRefs, scopedDifferences))
                 .setExplanation(resolveExplanation(decisionStatus, scopedDifferences, blockingDifferences))
                 .setCheckedAt(LocalDateTime.now())
                 .setCheckedBy(operatorId(operator));
     }
 
     private void validateRequest(CheckReconciliationGateRequest request) {
+        AssertUtils.notNull(request, "对账准入检查请求不能为空");
         AssertUtils.notNull(request.getTenantId(), "对账差错准入检查租户 ID 不能为空");
         AssertUtils.notNull(request.getGateObjectType(), "对账差错准入消费对象类型不能为空");
         AssertUtils.hasText(request.getGateObjectSn(), "对账差错准入消费对象流水号不能为空");
+        AssertUtils.hasText(request.getReconciliationRunResultSn(), "对账运行结果流水号不能为空");
     }
 
-    private boolean shouldBlock(ReconciliationDifference difference) {
-        return difference.getStatus() != ReconciliationDifferenceStatus.RESOLVED
-                || !Boolean.TRUE.equals(difference.getLastRerunBalanced());
+    private boolean matchesGateObject(ReconciliationRunResult runResult, CheckReconciliationGateRequest request) {
+        return runResult.getGateObjectType() == request.getGateObjectType()
+                && Objects.equals(runResult.getGateObjectSn(), request.getGateObjectSn());
+    }
+
+    private boolean shouldBlock(ReconciliationDifference difference, ReconciliationRunResult runResult) {
+        if (difference.getStatus() != ReconciliationDifferenceStatus.RESOLVED
+                || !Boolean.TRUE.equals(difference.getLastRerunBalanced())) {
+            return true;
+        }
+        return !Objects.equals(difference.getLastRerunBatchSn(), runResult.getReconciliationBatchSn())
+                || !Objects.equals(difference.getLastRerunRuleVersion(), runResult.getRuleVersion());
     }
 
     private ReconciliationGateDecisionStatus resolveDecisionStatus(List<ReconciliationDifference> scopedDifferences,
@@ -117,14 +153,40 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
         return "对账差错状态未满足准入放行条件";
     }
 
-    private List<String> evidenceRefs(List<ReconciliationDifference> scopedDifferences) {
-        Set<String> result = new LinkedHashSet<>();
+    private List<String> evidenceRefs(List<String> runEvidenceRefs,
+                                      List<ReconciliationDifference> scopedDifferences) {
+        Set<String> result = new LinkedHashSet<>(runEvidenceRefs);
         for (ReconciliationDifference difference : scopedDifferences) {
             addText(result, difference.getEvidenceRef());
             addText(result, difference.getAdjustmentEvidenceRef());
             addText(result, difference.getLastRerunEvidenceRef());
         }
         return List.copyOf(result);
+    }
+
+    private List<String> parseEvidenceRefs(String value) {
+        return StringUtils.hasText(value) ? List.copyOf(JSON.parseArray(value, String.class)) : List.of();
+    }
+
+    private ReconciliationGateDecisionDTO blockedForRunResult(CheckReconciliationGateRequest request,
+                                                               WindOperator operator,
+                                                               @Nullable ReconciliationRunResult runResult,
+                                                               List<String> evidenceRefs,
+                                                               String explanation) {
+        return new ReconciliationGateDecisionDTO()
+                .setPassed(false)
+                .setDecisionStatus(ReconciliationGateDecisionStatus.BLOCKED)
+                .setGateObjectType(request.getGateObjectType())
+                .setGateObjectSn(request.getGateObjectSn())
+                .setReconciliationRunResultSn(request.getReconciliationRunResultSn())
+                .setReconciliationBatchSn(runResult == null ? null : runResult.getReconciliationBatchSn())
+                .setReconciliationRunResultStatus(runResult == null ? null : runResult.getStatus())
+                .setReconciliationResultDigest(runResult == null ? null : runResult.getResultDigest())
+                .setBlockingDifferences(List.of())
+                .setEvidenceRefs(evidenceRefs)
+                .setExplanation(explanation)
+                .setCheckedAt(LocalDateTime.now())
+                .setCheckedBy(operatorId(operator));
     }
 
     private void addText(Set<String> result, @Nullable String value) {

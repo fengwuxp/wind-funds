@@ -2,6 +2,7 @@ package com.wind.funds.reconciliation.model.dto;
 
 import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
+import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -42,6 +43,18 @@ public class ReconciliationGateDecisionDTO implements Serializable {
 
     @Schema(description = "准入消费对象流水号")
     private String gateObjectSn;
+
+    @Schema(description = "本次准入消费的对账运行结果流水号")
+    private String reconciliationRunResultSn;
+
+    @Schema(description = "对账批次流水号")
+    private String reconciliationBatchSn;
+
+    @Schema(description = "对账运行结果状态")
+    private ReconciliationRunResultStatus reconciliationRunResultStatus;
+
+    @Schema(description = "对账运行结果 SHA-256")
+    private String reconciliationResultDigest;
 
     @Schema(description = "阻断差错列表")
     private List<ReconciliationGateBlockingDifferenceDTO> blockingDifferences;

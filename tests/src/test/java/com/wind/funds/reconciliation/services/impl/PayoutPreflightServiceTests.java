@@ -5,6 +5,8 @@ import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.gate.impl.ReconciliationGateApplicationServiceImpl;
+import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
+import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ExternalRuleVerificationStatus;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingLevel;
 import com.wind.funds.reconciliation.enums.PayoutPreflightBlockingReasonCode;
@@ -14,6 +16,7 @@ import com.wind.funds.reconciliation.enums.PayoutPreflightOperationStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceType;
+import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ExternalRuleVerificationEvidenceDTO;
@@ -23,6 +26,8 @@ import com.wind.funds.reconciliation.model.request.CheckPayoutPreflightRequest;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
 import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceAdjustmentRequest;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
+import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
+import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.reconciliation.service.PayoutOrderService;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -37,10 +42,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 出款前准入门禁服务层流程测试。
@@ -68,6 +75,8 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
 
     private static final String RERUN_SN = "recon_payout_gate_rerun_001";
 
+    private static final String RERUN_BATCH_SN = "recon_payout_gate_batch_001_rerun_001";
+
     @Autowired
     private PayoutOrderService payoutOrderService;
 
@@ -75,11 +84,38 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     private ReconciliationDifferenceApplicationService reconciliationDifferenceApplicationService;
 
     @Autowired
+    private ReconciliationRunResultApplicationService reconciliationRunResultApplicationService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private String payoutRunResultSn;
+
+    private String preCreateRunResultSn;
+
     @BeforeEach
-    void cleanReconciliationDifference() {
+    void prepareReconciliationEvidence() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
+        jdbcTemplate.update("DELETE FROM t_reconciliation_match_result");
+        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result");
+        payoutRunResultSn = recordBalancedRunResult(PAYOUT_SN, RERUN_BATCH_SN,
+                "report:payout-recon-run-001");
+        preCreateRunResultSn = recordBalancedRunResult(SETTLEMENT_SN, "recon_payout_precreate_batch_001",
+                "report:payout-precreate-recon-run-001");
+    }
+
+    /**
+     * 场景：调用方未提供出款前准入请求。
+     * 结果：快速失败，不读取对账证据，不生成任何出款或账本事实。
+     */
+    @Test
+    void testCheckPayoutPreflightShouldRejectNullRequest() {
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> payoutOrderService.checkPayoutPreflight(null, WindOperator.system()))
+                .hasMessageContaining("出款前准入检查请求不能为空");
+
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -136,8 +172,10 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.getDisplayStatus()).isEqualTo(PayoutPreflightDisplayStatus.READY_TO_SUBMIT);
         assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.SUBMITTABLE);
         assertThat(result.getExternalRuleVerificationStatus()).isEqualTo(ExternalRuleVerificationStatus.VERIFIED);
+        assertThat(result.getReconciliationRunResultSn()).isEqualTo(payoutRunResultSn);
+        assertThat(result.getReconciliationResultDigest()).hasSize(64);
         assertThat(result.getEvidenceRefs())
-                .containsExactly("rule-evidence-001", "approval-001");
+                .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001");
         assertThat(result.getCheckedAt()).isNotNull();
         assertThat(result.getExpiresAt()).isAfter(result.getCheckedAt());
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -154,7 +192,10 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
-                readyPayoutPreflightRequest().setPayoutSn(null), WindOperator.system());
+                readyPayoutPreflightRequest()
+                        .setPayoutSn(null)
+                        .setReconciliationRunResultSn(preCreateRunResultSn),
+                WindOperator.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
@@ -214,9 +255,10 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         PayoutPreflightBlockingReasonDTO blockingReason = result.getBlockingReasons().getFirst();
         assertThat(blockingReason.getGuardName()).isEqualTo("reconciliationGate");
         assertThat(blockingReason.getMessage()).contains("对账差错");
-        assertThat(blockingReason.getEvidenceRef()).isEqualTo("processor-payout-file-digest-001");
+        assertThat(blockingReason.getEvidenceRef()).isEqualTo("report:payout-recon-run-001");
         assertThat(result.getEvidenceRefs())
-                .containsExactly("rule-evidence-001", "approval-001", "processor-payout-file-digest-001");
+                .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001",
+                        "processor-payout-file-digest-001");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -242,7 +284,8 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
         assertThat(result.getOperationStatus()).isEqualTo(PayoutPreflightOperationStatus.SUBMITTABLE);
         assertThat(result.getEvidenceRefs())
-                .containsExactly("rule-evidence-001", "approval-001", "processor-payout-file-digest-001",
+                .containsExactly("rule-evidence-001", "approval-001", "report:payout-recon-run-001",
+                        "processor-payout-file-digest-001",
                         "adjustment-evidence-payout-001", "rerun-report-payout-001");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -254,6 +297,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 .setPayoutSn(PAYOUT_SN)
                 .setCurrency(CurrencyIsoCode.USD)
                 .setAmount(10_00L)
+                .setReconciliationRunResultSn(payoutRunResultSn)
                 .setIdempotencyKey(IDEMPOTENCY_KEY);
     }
 
@@ -317,7 +361,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 .setTenantId(TENANT_ID)
                 .setDifferenceSn(DIFFERENCE_SN)
                 .setRerunSn(RERUN_SN)
-                .setRerunBatchSn("recon_payout_gate_batch_001_rerun_001")
+                .setRerunBatchSn(RERUN_BATCH_SN)
                 .setRuleVersion("recon-rule-v1")
                 .setBalanced(true)
                 .setEvidenceRef("rerun-report-payout-001")
@@ -325,10 +369,31 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 .setDescription("调账后重新对账通过");
     }
 
+    private String recordBalancedRunResult(String gateObjectSn,
+                                           String reconciliationBatchSn,
+                                           String evidenceRef) {
+        return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(reconciliationBatchSn)
+                .setGateObjectType(ReconciliationGateObjectType.PAYOUT)
+                .setGateObjectSn(gateObjectSn)
+                .setRuleVersion("recon-rule-v1")
+                .setInternalSourceDigest("a".repeat(64))
+                .setExternalSourceDigest("b".repeat(64))
+                .setMatchResults(List.of(new ReconciliationMatchResultItem()
+                        .setInternalSourceRef("internal:" + gateObjectSn)
+                        .setExternalSourceRef("external:" + gateObjectSn)
+                        .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
+                        .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
+                        .setEvidenceRef(evidenceRef + "#line-1")))
+                .setEvidenceRefs(List.of(evidenceRef)), WindOperator.system()).getSn();
+    }
+
     @Configuration
     @Import({
             PayoutOrderServiceImpl.class,
             ReconciliationDifferenceApplicationServiceImpl.class,
+            ReconciliationRunResultApplicationServiceImpl.class,
             ReconciliationGateApplicationServiceImpl.class
     })
     static class Config {

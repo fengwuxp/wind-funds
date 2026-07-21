@@ -53,6 +53,13 @@ public class CheckClearingSettlementGateRequest implements Serializable {
     private String gateObjectSn;
 
     /**
+     * 本次准入必须消费的对账运行结果流水号。
+     */
+    @Schema(description = "本次准入必须消费的对账运行结果流水号")
+    @NotBlank
+    private String reconciliationRunResultSn;
+
+    /**
      * 准入对象币种，用于调用方审计和后续扩展校验。
      */
     @Schema(description = "准入对象币种")
