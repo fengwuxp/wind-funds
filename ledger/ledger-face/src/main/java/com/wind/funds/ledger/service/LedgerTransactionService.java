@@ -72,6 +72,20 @@ public interface LedgerTransactionService {
     LedgerEntryDTO getLedgerEntryBySn(@NonNull Long tenantId, @NonNull String sn);
 
     /**
+     * 判断记账计划是否属于指定账本交易。
+     *
+     * <p>用于清分、对账等只读消费方验证分录来源链，不暴露 LedgerPostingPlan Entity。</p>
+     *
+     * @param tenantId           租户 ID
+     * @param postingPlanSn      记账计划流水号
+     * @param ledgerTransactionSn 账本交易流水号
+     * @return true 表示记账计划存在且属于指定账本交易
+     */
+    boolean existsPostingPlan(@NonNull Long tenantId,
+                              @NonNull String postingPlanSn,
+                              @NonNull String ledgerTransactionSn);
+
+    /**
      * 分页查询 账户账本条目
      *
      * @param query   查询条件

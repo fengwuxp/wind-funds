@@ -679,6 +679,45 @@ CREATE TABLE `t_ledger_entry`
   DEFAULT CHARSET = utf8mb4 COMMENT = '账户账本条目表';
 
 -- ----------------------------
+-- 可清分明细准入事实表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_clearing_splittable_detail`;
+CREATE TABLE `t_clearing_splittable_detail`
+(
+    `id`                              BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`                      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`                    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                              VARCHAR(64)  NOT NULL COMMENT '可清分明细流水号',
+    `tenant_id`                       BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `funds_transaction_sn`            VARCHAR(64)  NOT NULL COMMENT '来源资金交易流水号',
+    `funds_transaction_detail_sn`     VARCHAR(64)  NOT NULL COMMENT '来源资金交易明细流水号',
+    `ledger_transaction_sn`           VARCHAR(64)  NOT NULL COMMENT '来源账本交易流水号',
+    `posting_plan_sn`                 VARCHAR(64)  NOT NULL COMMENT '来源记账计划流水号',
+    `ledger_entry_sn`                 VARCHAR(64)  NOT NULL COMMENT '来源账本分录流水号',
+    `subject_type`                    VARCHAR(50)  NOT NULL COMMENT '账务主体类型',
+    `subject_id`                      VARCHAR(64)  NOT NULL COMMENT '账务主体 ID',
+    `currency`                        VARCHAR(10)  NOT NULL COMMENT '币种',
+    `principal_amount`                BIGINT(20)   NOT NULL COMMENT '本金金额，最小货币单位',
+    `refund_amount`                   BIGINT(20)   NOT NULL DEFAULT 0 COMMENT '清分前已退款金额',
+    `clearing_period`                 VARCHAR(30)  NOT NULL COMMENT '已解析清分周期',
+    `rule_code`                       VARCHAR(64)  NOT NULL COMMENT '清分规则编码',
+    `rule_version`                    VARCHAR(64)  NOT NULL COMMENT '清分规则版本',
+    `status`                          VARCHAR(50)  NOT NULL COMMENT 'SPLIT_READY/EXCLUDED',
+    `exclusion_reason`                VARCHAR(64)           DEFAULT NULL COMMENT '稳定排除原因',
+    `reconciliation_decision_status` VARCHAR(50)  NOT NULL COMMENT '清分前对账门禁结论',
+    `reconciliation_evidence_refs`    TEXT         NOT NULL COMMENT '清分前对账证据引用 JSON',
+    `source_digest`                   VARCHAR(64)  NOT NULL COMMENT '来源事实与规则快照 SHA-256',
+    `created_by`                      VARCHAR(64)  NOT NULL COMMENT '创建人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_clearing_splittable_detail_sn` (`sn`),
+    UNIQUE KEY `uk_clearing_splittable_detail_entry` (`tenant_id`, `ledger_entry_sn`),
+    KEY `idx_clearing_splittable_detail_source` (`tenant_id`, `funds_transaction_sn`, `funds_transaction_detail_sn`),
+    KEY `idx_clearing_splittable_detail_subject` (`tenant_id`, `subject_type`, `subject_id`, `clearing_period`),
+    KEY `idx_clearing_splittable_detail_status` (`tenant_id`, `status`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '可清分明细准入事实表';
+
+-- ----------------------------
 -- 对账差错表
 -- ----------------------------
 DROP TABLE IF EXISTS `t_reconciliation_difference`;

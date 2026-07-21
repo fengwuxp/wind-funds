@@ -5,6 +5,7 @@ import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.dal.entities.table.LedgerEntryNameRefs;
+import com.wind.funds.ledger.dal.entities.table.LedgerPostingPlanNameRefs;
 import com.wind.funds.ledger.dal.entities.table.LedgerTransactionNameRefs;
 import com.wind.funds.ledger.dal.mapper.LedgerEntryMapper;
 import com.wind.funds.ledger.dal.mapper.LedgerPostingPlanMapper;
@@ -485,6 +486,21 @@ public class LedgerTransactionServiceImpl implements LedgerTransactionService {
                 .and(ref.sn.eq(sn)));
         AssertUtils.notNull(result, "账户账本条目不存在，tenantId = {}, sn = {}", tenantId, sn);
         return LedgerConverter.INSTANCE.convertToLedgerEntryDTO(result);
+    }
+
+    @Override
+    public boolean existsPostingPlan(@NonNull Long tenantId,
+                                     @NonNull String postingPlanSn,
+                                     @NonNull String ledgerTransactionSn) {
+        AssertUtils.notNull(tenantId, "记账计划查询 tenantId 不能为空");
+        AssertUtils.hasText(postingPlanSn, "记账计划流水号不能为空");
+        AssertUtils.hasText(ledgerTransactionSn, "账本交易流水号不能为空");
+        LedgerPostingPlanNameRefs ref = LedgerPostingPlanNameRefs.ledgerPostingPlan;
+        return ledgerPostingPlanMapper.selectCountByQuery(QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.sn.eq(postingPlanSn))
+                .and(ref.ledgerTransactionSn.eq(ledgerTransactionSn))) == 1;
     }
 
     @Override
