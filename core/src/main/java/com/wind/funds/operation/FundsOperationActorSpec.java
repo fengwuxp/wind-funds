@@ -17,7 +17,7 @@ public interface FundsOperationActorSpec {
     String OPERATOR_TYPE_RISK_CONTROL = "RISK_CONTROL";
 
     @NonNull
-    Long getOperatorId();
+    String getOperatorId();
 
     @NonNull
     String getOperatorType();

@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.clearing.impl;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
@@ -126,7 +126,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.SPLIT_READY);
         assertThat(result.getExclusionReason()).isNull();
@@ -157,7 +157,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         jdbcTemplate.update("DELETE FROM t_reconciliation_run_result WHERE sn = ?", reconciliationRunResultSn);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED);
@@ -174,9 +174,9 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO first = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
         ClearingSplittableDetailDTO replay = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(replay.getSn()).isEqualTo(first.getSn());
         assertThat(replay.getSourceDigest()).isEqualTo(first.getSourceDigest());
@@ -196,7 +196,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.SOURCE_FACT_INCOMPLETE);
@@ -212,11 +212,11 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
     @Test
     void testIdentifyShouldExcludeWhenPreSplitReconciliationIsBlocked() {
         reconciliationDifferenceApplicationService.createDifference(blockingDifferenceRequest(),
-                WindOperator.system());
+                WindOperatorFactory.system());
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.RECONCILIATION_BLOCKED);
@@ -238,7 +238,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                 FundsTransactionStatus.OPEN.name(), FUNDS_TRANSACTION_SN);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.SPLIT_READY);
         assertThat(result.getExclusionReason()).isNull();
@@ -254,7 +254,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                 FundsTransactionStatus.FAILED.name(), FUNDS_TRANSACTION_SN);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason())
@@ -271,7 +271,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                 LedgerSubjectCode.AVAILABLE.name(), LEDGER_ENTRY_SN);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason())
@@ -288,7 +288,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                 "{\"routeCode\":\"DIRECT_PAY_STANDARD\"}", FUNDS_TRANSACTION_SN);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.SOURCE_FACT_INCOMPLETE);
@@ -305,7 +305,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.SOURCE_FACT_INCOMPLETE);
@@ -323,7 +323,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ClearingSplittableDetailDTO result = clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ClearingSplittableDetailStatus.EXCLUDED);
         assertThat(result.getExclusionReason()).isEqualTo(ClearingSplittableExclusionReason.REFUND_EXISTS);
@@ -337,10 +337,10 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testIdentifyShouldRejectChangedRuleForSameLedgerEntry() {
-        clearingSplittableDetailApplicationService.identifySplittableDetail(minimumRequest(), WindOperator.system());
+        clearingSplittableDetailApplicationService.identifySplittableDetail(minimumRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> clearingSplittableDetailApplicationService.identifySplittableDetail(
-                minimumRequest().setRuleVersion("2"), WindOperator.system()))
+                minimumRequest().setRuleVersion("2"), WindOperatorFactory.system()))
                 .hasMessageContaining("来源事实或规则已变化");
         assertThat(detailCount()).isOne();
     }
@@ -373,7 +373,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
                         .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
                         .setEvidenceRef("report:merchant-clearing-recon-run-001#line-1")))
                 .setEvidenceRefs(List.of("report:merchant-clearing-recon-run-001")),
-                WindOperator.system()).getSn();
+                WindOperatorFactory.system()).getSn();
     }
 
     private CreateReconciliationDifferenceRequest blockingDifferenceRequest() {

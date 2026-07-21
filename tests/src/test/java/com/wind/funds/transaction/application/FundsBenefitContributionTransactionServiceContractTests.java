@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperator;
 import com.wind.funds.transaction.model.request.FundsBenefitContributionRefundRequest;
 import com.wind.funds.transaction.model.request.FundsBenefitContributionSettleRequest;
 import org.junit.jupiter.api.Test;

@@ -12,27 +12,22 @@
     </parent>
 
     <groupId>com.wind.funds</groupId>
-    <artifactId>capte-funds</artifactId>
+    <artifactId>wind-funds</artifactId>
     <packaging>pom</packaging>
     <version>${revision}</version>
 
     <properties>
-        <revision>1.0.1-jdk21-SNAPSHOT</revision>
+        <revision>1.0.0-jdk21-SNAPSHOT</revision>
     </properties>
 
     <modules>
         <module>core</module>
-        <module>fx/fx-impl</module>
-        <module>ledger/ledger-face</module>
-        <module>ledger/ledger-impl</module>
-        <module>transaction/transaction-face</module>
-        <module>reconciliation/reconciliation-face</module>
-        <module>governance/governance-face</module>
-        <module>transaction/transaction-impl</module>
-        <module>wallet/wallet-face</module>
-        <module>wallet/wallet-impl</module>
-        <module>reconciliation/reconciliation-impl</module>
-        <module>governance/governance-impl</module>
+        <module>fx</module>
+        <module>ledger</module>
+        <module>wallet</module>
+        <module>transaction</module>
+        <module>reconciliation</module>
+        <module>governance</module>
         <module>tests</module>
         <module>dependencies</module>
     </modules>
@@ -40,91 +35,83 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>com.capte.third.sdk</groupId>
-                <artifactId>capte-third-sdk-dependencies</artifactId>
-                <version>1.0.1-SNAPSHOT</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
                 <groupId>com.capte.domain</groupId>
                 <artifactId>capte-domain-core</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
-                <groupId>com.capte.domain</groupId>
-                <artifactId>catep-infrastructure-dal</artifactId>
+                <groupId>com.wind.funds</groupId>
+                <artifactId>wind-funds-core</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-core</artifactId>
+                <artifactId>wind-funds-fx-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-fx-impl</artifactId>
+                <artifactId>wind-funds-ledger-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-ledger-face</artifactId>
+                <artifactId>wind-funds-ledger-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-ledger-impl</artifactId>
+                <artifactId>wind-funds-transaction-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-transaction-face</artifactId>
+                <artifactId>wind-funds-transaction-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-transaction-impl</artifactId>
+                <artifactId>wind-funds-reconciliation-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-reconciliation-face</artifactId>
+                <artifactId>wind-funds-reconciliation-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-reconciliation-impl</artifactId>
+                <artifactId>wind-funds-governance-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-governance-face</artifactId>
+                <artifactId>wind-funds-governance-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-governance-impl</artifactId>
+                <artifactId>wind-funds-wallet-face</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-wallet-face</artifactId>
+                <artifactId>wind-funds-wallet-impl</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
                 <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-wallet-impl</artifactId>
-                <version>${revision}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.wind.funds</groupId>
-                <artifactId>capte-funds-tests</artifactId>
+                <artifactId>wind-funds-tests</artifactId>
                 <version>${revision}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>wind-operator</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

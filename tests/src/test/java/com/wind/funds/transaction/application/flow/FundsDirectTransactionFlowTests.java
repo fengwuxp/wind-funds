@@ -2,7 +2,8 @@ package com.wind.funds.transaction.application.flow;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.OperationActorType;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
@@ -83,7 +84,11 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.converted(amount, originalAmount, exchangeRate))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn(businessSn)
-                .setDescription("converted topup"), WindOperator.system());
+                .setDescription("converted topup"), WindOperatorFactory.create(
+                        "tenant-api-client-001",
+                        "Tenant API client",
+                        "wind-funds-tests",
+                        OperationActorType.TENANT_API_CLIENT));
 
         assertThat(routeSnapshot(businessSn).getLegs()).isNotEmpty().allSatisfy(leg -> {
             assertThat(leg.getAmount()).isEqualTo(amount);
@@ -132,7 +137,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         .build())
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_FEE")
-                .setDescription("topup with processing fee"), WindOperator.system());
+                .setDescription("topup with processing fee"), WindOperatorFactory.system());
 
         BalanceSnapshot after = snapshot(balances(account, feeAccount(), cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, after,
@@ -177,7 +182,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         .build())
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_FEE_INSUFFICIENT")
-                .setDescription("topup with excessive processing fee"), WindOperator.system()))
+                .setDescription("topup with excessive processing fee"), WindOperatorFactory.system()))
                 .hasMessageContaining("账本余额不足");
 
         BalanceSnapshot after = snapshot(balances(account, feeAccount(), cashMappingAccount(), prepaymentAccount()));
@@ -217,7 +222,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         .build())))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_FEE_CONTEXT")
-                .setDescription("topup with fee rule in context"), WindOperator.system()))
+                .setDescription("topup with fee rule in context"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain reserved funds transaction fields");
 
         BalanceSnapshot after = snapshot(balances(account, feeAccount(), cashMappingAccount(), prepaymentAccount()));
@@ -255,7 +260,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         .build())
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_TRANSFER_FEE")
-                .setDescription("transfer with processing fee"), WindOperator.system());
+                .setDescription("transfer with processing fee"), WindOperatorFactory.system());
 
         BalanceSnapshot after = snapshot(balances(payer, payee, feeAccount()));
         assertOnlyBalanceDeltas(before, after,
@@ -284,7 +289,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         Money.immutable(1_000L, CurrencyIsoCode.KWD),
                         new BigDecimal("3.25")))
                 .setBusinessScene("PAY")
-                .setBusinessSn("FX_PARTIAL_REFUND_PAY"), WindOperator.system());
+                .setBusinessSn("FX_PARTIAL_REFUND_PAY"), WindOperatorFactory.system());
 
         directTransactionService.refund(new FundsTransactionRefundRequest()
                 .setTransactionAmount(TransactionAmount.converted(
@@ -293,7 +298,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         new BigDecimal("3.25")))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
-                .setBusinessSn("FX_PARTIAL_REFUND"), WindOperator.system());
+                .setBusinessSn("FX_PARTIAL_REFUND"), WindOperatorFactory.system());
 
         LedgerTransaction refundTransaction = ledgerTransactionByBusinessSn("FX_PARTIAL_REFUND");
         assertThat(refundTransaction.getAmount()).isEqualTo(100L);
@@ -327,7 +332,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         Money.immutable(1_000L, CurrencyIsoCode.KWD),
                         new BigDecimal("3.25")))
                 .setBusinessScene("PAY")
-                .setBusinessSn("FX_REFUND_RATE_PAY"), WindOperator.system());
+                .setBusinessSn("FX_REFUND_RATE_PAY"), WindOperatorFactory.system());
         BalanceSnapshot beforeFailure = snapshot(balances(payer, payee));
         LedgerFactSnapshot beforeFailureFacts = ledgerFactSnapshot();
 
@@ -338,7 +343,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         new BigDecimal("3.30")))
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
-                .setBusinessSn("FX_REFUND_RATE_CHANGED"), WindOperator.system()))
+                .setBusinessSn("FX_REFUND_RATE_CHANGED"), WindOperatorFactory.system()))
                 .hasMessageContaining("退款汇率必须与原支付快照汇率一致");
 
         BalanceSnapshot afterFailure = snapshot(balances(payer, payee));
@@ -562,7 +567,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_CLOSED_REFUND_REFUND")
-                .setDescription("referenced refund to closed account"), WindOperator.system()))
+                .setDescription("referenced refund to closed account"), WindOperatorFactory.system()))
                 .hasMessageContaining("关闭账户不允许承接退款");
 
         BalanceSnapshot afterRefund = snapshot(balances(payer, payee, feeAccount()));
@@ -602,7 +607,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_FROZEN_FEE_REFUND")
-                .setDescription("referenced refund with fee to frozen account"), WindOperator.system()))
+                .setDescription("referenced refund with fee to frozen account"), WindOperatorFactory.system()))
                 .hasMessageContaining("账户状态不允许扣取随交易手续费");
 
         BalanceSnapshot afterRefund = snapshot(balances(payer, payee, feeAccount()));
@@ -653,7 +658,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setReferenceTransactionSn("FUNDS_TRANSACTION_NOT_EXISTS")
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_REFERENCE_REFUND")
-                .setDescription("refund with missing original transaction"), WindOperator.system()))
+                .setDescription("refund with missing original transaction"), WindOperatorFactory.system()))
                 .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照");
 
         BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -724,7 +729,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_ROUTE_SNAPSHOT_REFUND")
-                .setDescription("refund with missing original route snapshot"), WindOperator.system()))
+                .setDescription("refund with missing original route snapshot"), WindOperatorFactory.system()))
                 .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照");
 
         BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -772,7 +777,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_CONFLICT_REFUND")
-                .setDescription("referenced refund with explicit account"), WindOperator.system()))
+                .setDescription("referenced refund with explicit account"), WindOperatorFactory.system()))
                 .hasMessageContaining("关联退款不得重复传入退款到账账户");
 
         BalanceSnapshot afterRefund = snapshot(balances(payer, payee));
@@ -822,7 +827,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_REFERENCE_REFUND")
-                .setDescription("refund with original transaction reference"), WindOperator.system());
+                .setDescription("refund with original transaction reference"), WindOperatorFactory.system());
         BalanceSnapshot afterRefund = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterPay, afterRefund,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
@@ -848,7 +853,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_REFERENCE_EXCEED_REFUND")
-                .setDescription("refund exceeds original transaction remaining amount"), WindOperator.system()))
+                .setDescription("refund exceeds original transaction remaining amount"), WindOperatorFactory.system()))
                 .hasMessageContaining("回放累计金额不能大于原 RouteLeg 金额");
 
         BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -891,7 +896,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setReferenceTransactionSn(payTransactionSn)
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_FEE_REFUND")
-                .setDescription("referenced refund with processing fee"), WindOperator.system());
+                .setDescription("referenced refund with processing fee"), WindOperatorFactory.system());
 
         BalanceSnapshot afterRefund = snapshot(balances(payer, payee, feeAccount()));
         assertOnlyBalanceDeltas(beforeRefund, afterRefund,
@@ -938,7 +943,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         .build())
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_CREDIT_FEE_REFUND")
-                .setDescription("credit-only refund with processing fee"), WindOperator.system()))
+                .setDescription("credit-only refund with processing fee"), WindOperatorFactory.system()))
                 .hasMessageContaining("随交易手续费扣款账户必须是唯一真实资金账户");
 
         BalanceSnapshot afterRefund = snapshot(balances(refundPayer, creditAccount, feeAccount()));
@@ -1008,7 +1013,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setBusinessSn("DIRECT_REFUND_REPLAY_BINDING_REFUND")
                 .setContextVariables(WritableContextVariables.of(Map.of(
                         "businessContextVersion", "CURRENT-BINDING-RULE-V2")))
-                .setDescription("refund with changed current binding context"), WindOperator.system());
+                .setDescription("refund with changed current binding context"), WindOperatorFactory.system());
         BalanceSnapshot afterRefund = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterPay, afterRefund,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 30L, CURRENCY),
@@ -1072,7 +1077,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         Map.of("networkReference", "GB82WEST12345698765432"))))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_SENSITIVE_CONTEXT_IBAN_VALUE")
-                .setDescription("refund with sensitive IBAN value"), WindOperator.system()))
+                .setDescription("refund with sensitive IBAN value"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -1142,7 +1147,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_ACCOUNT")
-                .setDescription("refund without account"), WindOperator.system()))
+                .setDescription("refund without account"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接退款到账账户不能为空");
 
         BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -1192,7 +1197,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_PAYER_LEDGER")
-                .setDescription("business-confirmed refund without payer ledger"), WindOperator.system()))
+                .setDescription("business-confirmed refund without payer ledger"), WindOperatorFactory.system()))
                 .hasMessageContaining("业务确认型直接退款出资账目不能为空");
 
         assertLedgerTransactionFactsUnchanged(before);
@@ -1241,7 +1246,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_EXTERNAL_ACCOUNT")
-                .setDescription("refund to external account"), WindOperator.system()))
+                .setDescription("refund to external account"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接退款到账账户不能是外部账户");
 
         BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -1314,7 +1319,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_EXTERNAL_PAYER")
-                .setDescription("refund from external payer"), WindOperator.system()))
+                .setDescription("refund from external payer"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接退款出资主体不能是外部账户");
 
         BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -1384,7 +1389,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_REFUND_MISSING_PAYER")
-                .setDescription("refund without payer"), WindOperator.system()))
+                .setDescription("refund without payer"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接退款出资主体不能为空");
 
         BalanceSnapshot afterRejectedRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -1477,7 +1482,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_TRANSFER_MISSING_ACCOUNTS")
-                .setDescription("transfer without accounts"), WindOperator.system()))
+                .setDescription("transfer without accounts"), WindOperatorFactory.system()))
                 .hasMessageContaining("系统内转账付款账户不能为空");
 
         BalanceSnapshot afterRejectedTransfer = snapshot(balances(cashMappingAccount(), prepaymentAccount()));
@@ -1643,7 +1648,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_TRANSFER_EXTERNAL_PAYEE")
-                .setDescription("transfer to external payee"), WindOperator.system()))
+                .setDescription("transfer to external payee"), WindOperatorFactory.system()))
                 .hasMessageContaining("系统内转账收款账户不能是外部账户");
 
         BalanceSnapshot afterRejectedTransfer = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
@@ -1691,7 +1696,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_TRANSFER_EXTERNAL_PAYER")
-                .setDescription("transfer from external payer"), WindOperator.system()))
+                .setDescription("transfer from external payer"), WindOperatorFactory.system()))
                 .hasMessageContaining("系统内转账付款账户不能是外部账户");
 
         BalanceSnapshot afterRejectedTransfer = snapshot(balances(payee, cashMappingAccount(), prepaymentAccount()));
@@ -1732,7 +1737,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_EXTERNAL_ACCOUNT")
-                .setDescription("topup to external account"), WindOperator.system()))
+                .setDescription("topup to external account"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接充值入账账户不能是外部账户");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(externalAccount, cashMappingAccount(),
@@ -1809,7 +1814,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_INTERNAL_SOURCE")
-                .setDescription("topup from internal source"), WindOperator.system()))
+                .setDescription("topup from internal source"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接充值资金来源账户必须是外部账户");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(account, internalSource, cashMappingAccount(),
@@ -1864,7 +1869,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CurrencyIsoCode.CNY)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_TRANSFER_CURRENCY")
-                .setDescription("transfer with different currency"), WindOperator.system()))
+                .setDescription("transfer with different currency"), WindOperatorFactory.system()))
                 .hasMessageContaining("transactionAmount.amount currency must equal account currency");
 
         BalanceSnapshot afterRejectedTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -1914,7 +1919,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CurrencyIsoCode.CNY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_CURRENCY")
-                .setDescription("topup with different currency"), WindOperator.system()))
+                .setDescription("topup with different currency"), WindOperatorFactory.system()))
                 .hasMessageContaining("transactionAmount.amount currency must equal account currency");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -1954,7 +1959,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_MISSING_ACCOUNT")
-                .setDescription("topup without account"), WindOperator.system()))
+                .setDescription("topup without account"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接充值入账账户不能为空");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(cashMappingAccount(), prepaymentAccount()));
@@ -1988,7 +1993,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_MISSING_ACCOUNT_AND_SOURCE")
-                .setDescription("topup without account and funds source"), WindOperator.system()))
+                .setDescription("topup without account and funds source"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接充值入账账户不能为空");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(cashMappingAccount(), prepaymentAccount()));
@@ -2024,7 +2029,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_MISSING_SOURCE")
-                .setDescription("topup without funds source"), WindOperator.system()))
+                .setDescription("topup without funds source"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接充值资金来源账户不能为空");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -2065,7 +2070,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_MISSING_CHANNEL")
-                .setDescription("topup without channel"), WindOperator.system()))
+                .setDescription("topup without channel"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接充值资金通道不能为空");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -2106,7 +2111,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_MISSING_CHANNEL_SN")
-                .setDescription("topup without channel transaction sn"), WindOperator.system()))
+                .setDescription("topup without channel transaction sn"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接充值通道交易流水不能为空");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -2148,7 +2153,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_RAW_EXTERNAL_ACCOUNT")
-                .setDescription("topup with raw external account id"), WindOperator.system()))
+                .setDescription("topup with raw external account id"), WindOperatorFactory.system()))
                 .hasMessageContaining("externalAccountNo must be masked or token reference");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -2195,7 +2200,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         Map.of("networkReference", "GB82WEST12345698765432"))))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_SENSITIVE_CONTEXT_IBAN_VALUE")
-                .setDescription("topup with sensitive IBAN value"), WindOperator.system()))
+                .setDescription("topup with sensitive IBAN value"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedTopup = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -2226,7 +2231,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         Map.of("networkReference", "GB82WEST12345698765432"))))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_TRANSFER_SENSITIVE_CONTEXT_IBAN_VALUE")
-                .setDescription("transfer with sensitive IBAN value"), WindOperator.system()))
+                .setDescription("transfer with sensitive IBAN value"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -2468,7 +2473,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CurrencyIsoCode.CNY)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_CURRENCY_PAY")
-                .setDescription("pay with different currency"), WindOperator.system()))
+                .setDescription("pay with different currency"), WindOperatorFactory.system()))
                 .hasMessageContaining("transactionAmount.amount currency must equal account currency");
 
         BalanceSnapshot afterRejectedPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -2528,7 +2533,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         Map.of("secretKey", "secret-value"))))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT")
-                .setDescription("pay with sensitive context"), WindOperator.system()))
+                .setDescription("pay with sensitive context"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
         assertThatThrownBy(() -> directTransactionService.pay(new FundsTransactionPayRequest()
                 .setAccountId(payer)
@@ -2539,7 +2544,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                         Map.of("networkReference", "GB82WEST12345698765432"))))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_SENSITIVE_CONTEXT_IBAN_VALUE")
-                .setDescription("pay with sensitive IBAN value"), WindOperator.system()))
+                .setDescription("pay with sensitive IBAN value"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -2594,7 +2599,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_MISSING_PAYEE")
-                .setDescription("pay without payee"), WindOperator.system()))
+                .setDescription("pay without payee"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接付款收款主体不能为空");
 
         BalanceSnapshot afterRejectedPay = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
@@ -2701,7 +2706,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_EXTERNAL_PAYEE")
-                .setDescription("pay to external payee"), WindOperator.system()))
+                .setDescription("pay to external payee"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接付款收款主体不能是外部账户");
 
         BalanceSnapshot afterRejectedPay = snapshot(balances(payer, cashMappingAccount(), prepaymentAccount()));
@@ -2750,7 +2755,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_PAY_EXTERNAL_PAYER")
-                .setDescription("pay from external payer"), WindOperator.system()))
+                .setDescription("pay from external payer"), WindOperatorFactory.system()))
                 .hasMessageContaining("直接付款账户不能是外部账户");
 
         BalanceSnapshot afterRejectedPay = snapshot(balances(payee, cashMappingAccount(), prepaymentAccount()));
@@ -2829,7 +2834,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_ONLY")
-                .setDescription("idempotent topup"), WindOperator.system());
+                .setDescription("idempotent topup"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterFirstTopup,
                 delta(account, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
@@ -2848,7 +2853,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_ONLY")
-                .setDescription("idempotent topup"), WindOperator.system());
+                .setDescription("idempotent topup"), WindOperatorFactory.system());
 
         assertThat(retryTopupSn).isEqualTo(firstTopupSn);
         BalanceSnapshot afterRetryTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -2868,7 +2873,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(41L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_ONLY")
-                .setDescription("idempotent topup"), WindOperator.system()))
+                .setDescription("idempotent topup"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -2916,7 +2921,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_EVENT")
-                .setDescription("idempotent topup event"), WindOperator.system());
+                .setDescription("idempotent topup event"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstTopup = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterFirstTopup,
                 delta(payer, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
@@ -2933,7 +2938,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_EVENT")
-                .setDescription("idempotent event mismatch transfer"), WindOperator.system()))
+                .setDescription("idempotent event mismatch transfer"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
@@ -2984,7 +2989,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("traceId", "TRACE-1")))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_TRACE")
-                .setDescription("idempotent topup with trace"), WindOperator.system());
+                .setDescription("idempotent topup with trace"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterFirstTopup,
                 delta(account, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
@@ -3004,7 +3009,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("traceId", "TRACE-2")))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_TRACE")
-                .setDescription("idempotent topup with trace"), WindOperator.system());
+                .setDescription("idempotent topup with trace"), WindOperatorFactory.system());
 
         assertThat(retryTopupSn).isEqualTo(firstTopupSn);
         BalanceSnapshot afterRetryTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -3046,7 +3051,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT")
-                .setDescription("idempotent topup with business context"), WindOperator.system());
+                .setDescription("idempotent topup with business context"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(before, afterFirstTopup,
                 delta(account, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
@@ -3066,7 +3071,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT")
-                .setDescription("idempotent topup with business context"), WindOperator.system());
+                .setDescription("idempotent topup with business context"), WindOperatorFactory.system());
 
         assertThat(retryTopupSn).isEqualTo(firstTopupSn);
         BalanceSnapshot afterRetryTopup = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -3088,7 +3093,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT")
-                .setDescription("idempotent topup with business context"), WindOperator.system()))
+                .setDescription("idempotent topup with business context"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(account, cashMappingAccount(), prepaymentAccount()));
@@ -3221,7 +3226,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_IDEMPOTENT_PAY_CONTEXT")
-                .setDescription("idempotent pay with business context"), WindOperator.system());
+                .setDescription("idempotent pay with business context"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstPay = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterFirstPay,
@@ -3241,7 +3246,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_IDEMPOTENT_PAY_CONTEXT")
-                .setDescription("idempotent pay with business context"), WindOperator.system());
+                .setDescription("idempotent pay with business context"), WindOperatorFactory.system());
 
         assertThat(retryPaySn).isEqualTo(firstPaySn);
         BalanceSnapshot afterRetryPay = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -3263,7 +3268,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
                 .setBusinessScene("PAY")
                 .setBusinessSn("DIRECT_IDEMPOTENT_PAY_CONTEXT")
-                .setDescription("idempotent pay with business context"), WindOperator.system()))
+                .setDescription("idempotent pay with business context"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -3416,7 +3421,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER")
-                .setDescription("idempotent transfer"), WindOperator.system());
+                .setDescription("idempotent transfer"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterFirstTransfer,
@@ -3434,7 +3439,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER")
-                .setDescription("idempotent transfer"), WindOperator.system());
+                .setDescription("idempotent transfer"), WindOperatorFactory.system());
 
         assertThat(retryTransferSn).isEqualTo(firstTransferSn);
         BalanceSnapshot afterRetryTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -3453,7 +3458,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(41L, CURRENCY)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER")
-                .setDescription("idempotent transfer"), WindOperator.system()))
+                .setDescription("idempotent transfer"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -3514,7 +3519,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT")
-                .setDescription("idempotent transfer with business context"), WindOperator.system());
+                .setDescription("idempotent transfer with business context"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterFirstTransfer,
@@ -3533,7 +3538,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT")
-                .setDescription("idempotent transfer with business context"), WindOperator.system());
+                .setDescription("idempotent transfer with business context"), WindOperatorFactory.system());
 
         assertThat(retryTransferSn).isEqualTo(firstTransferSn);
         BalanceSnapshot afterRetryTransfer = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -3554,7 +3559,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn("DIRECT_IDEMPOTENT_TRANSFER_CONTEXT")
-                .setDescription("idempotent transfer with business context"), WindOperator.system()))
+                .setDescription("idempotent transfer with business context"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -3616,7 +3621,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
-                .setDescription("idempotent refund"), WindOperator.system());
+                .setDescription("idempotent refund"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstRefund = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
         assertOnlyBalanceDeltas(afterPay, afterFirstRefund,
@@ -3635,7 +3640,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(30L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
-                .setDescription("idempotent refund"), WindOperator.system());
+                .setDescription("idempotent refund"), WindOperatorFactory.system());
 
         assertThat(retryRefundSn).isEqualTo(firstRefundSn);
         BalanceSnapshot afterRetryRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -3655,7 +3660,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(31L, CURRENCY)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND")
-                .setDescription("idempotent refund"), WindOperator.system()))
+                .setDescription("idempotent refund"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -3728,7 +3733,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT")
-                .setDescription("idempotent refund with business context"), WindOperator.system());
+                .setDescription("idempotent refund with business context"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstRefund = snapshot(balances(payer, payee, cashMappingAccount(),
                 prepaymentAccount()));
         assertOnlyBalanceDeltas(afterPay, afterFirstRefund,
@@ -3748,7 +3753,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT")
-                .setDescription("idempotent refund with business context"), WindOperator.system());
+                .setDescription("idempotent refund with business context"), WindOperatorFactory.system());
 
         assertThat(retryRefundSn).isEqualTo(firstRefundSn);
         BalanceSnapshot afterRetryRefund = snapshot(balances(payer, payee, cashMappingAccount(),
@@ -3770,7 +3775,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
                 .setBusinessScene("REFUND")
                 .setBusinessSn("DIRECT_IDEMPOTENT_REFUND_CONTEXT")
-                .setDescription("idempotent refund with business context"), WindOperator.system()))
+                .setDescription("idempotent refund with business context"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, payee, cashMappingAccount(),

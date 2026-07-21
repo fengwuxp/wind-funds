@@ -2,7 +2,7 @@ package com.wind.funds.transaction.application.flow;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
@@ -445,7 +445,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setAdjustReason("flow test balance adjust")
                 .setAdjustEvidenceRef("EVIDENCE_" + businessSn)
                 .setApprovalRef("APPROVAL_" + businessSn)
-                .setDescription("balance adjust"), WindOperator.system());
+                .setDescription("balance adjust"), WindOperatorFactory.system());
     }
 
     protected void topup(FundsAccountId accountId, long amount, String businessSn) {
@@ -458,7 +458,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn(businessSn)
-                .setDescription("topup"), WindOperator.system());
+                .setDescription("topup"), WindOperatorFactory.system());
     }
 
     protected void transfer(FundsAccountId payerAccountId,
@@ -471,7 +471,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("TRANSFER")
                 .setBusinessSn(businessSn)
-                .setDescription("transfer"), WindOperator.system());
+                .setDescription("transfer"), WindOperatorFactory.system());
     }
 
     protected String pay(FundsAccountId accountId,
@@ -486,7 +486,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("PAY")
                 .setBusinessSn(businessSn)
-                .setDescription("pay"), WindOperator.system());
+                .setDescription("pay"), WindOperatorFactory.system());
     }
 
     protected void payWithFixedFee(FundsAccountId accountId,
@@ -506,7 +506,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                         .build())
                 .setBusinessScene("PAY")
                 .setBusinessSn(businessSn)
-                .setDescription("pay with fee"), WindOperator.system());
+                .setDescription("pay with fee"), WindOperatorFactory.system());
     }
 
     protected void refund(FundsAccountId accountId,
@@ -521,7 +521,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("REFUND")
                 .setBusinessSn(businessSn)
-                .setDescription("refund"), WindOperator.system());
+                .setDescription("refund"), WindOperatorFactory.system());
     }
 
     protected String refundFee(FundsAccountId accountId,
@@ -534,7 +534,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setFeeSourceTransactionSn(feeSourceTransactionSn)
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn(businessSn)
-                .setDescription("fee refund"), WindOperator.system());
+                .setDescription("fee refund"), WindOperatorFactory.system());
     }
 
     protected void fee(FundsAccountId accountId, long amount, String businessSn) {
@@ -544,7 +544,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setFeeType(DefaultFeeType.FEE.getCode())
                 .setBusinessScene("FEE")
                 .setBusinessSn(businessSn)
-                .setDescription("fee"), WindOperator.system());
+                .setDescription("fee"), WindOperatorFactory.system());
     }
 
     protected void withdraw(FundsAccountId accountId, long amount, String referenceFreezeSn, String businessSn) {
@@ -556,7 +556,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn(businessSn)
-                .setDescription("withdraw"), WindOperator.system());
+                .setDescription("withdraw"), WindOperatorFactory.system());
     }
 
     protected void withdrawWithFixedFee(FundsAccountId accountId,
@@ -576,7 +576,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                         .build())
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn(businessSn)
-                .setDescription("withdraw with fee"), WindOperator.system());
+                .setDescription("withdraw with fee"), WindOperatorFactory.system());
     }
 
     protected String freeze(FundsAccountId accountId, long amount, String businessSn) {
@@ -585,7 +585,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setAmount(amount(amount))
                 .setBusinessScene("FREEZE")
                 .setBusinessSn(businessSn)
-                .setDescription("freeze"), WindOperator.system());
+                .setDescription("freeze"), WindOperatorFactory.system());
     }
 
     protected String authorize(FundsAccountId accountId,
@@ -598,7 +598,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setApproved(approved)
                 .setBusinessScene("AUTHORIZATION")
                 .setBusinessSn(businessSn)
-                .setDescription("authorization"), WindOperator.system());
+                .setDescription("authorization"), WindOperatorFactory.system());
     }
 
     protected String declineAuthorization(FundsAccountId accountId,
@@ -612,7 +612,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setDeclineReason(declineReason)
                 .setBusinessScene("AUTHORIZATION")
                 .setBusinessSn(businessSn)
-                .setDescription("authorization declined"), WindOperator.system());
+                .setDescription("authorization declined"), WindOperatorFactory.system());
     }
 
     protected String completeAuthorization(FundsAccountId accountId,
@@ -625,7 +625,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setAuthorizationTransactionSn(authorizationTransactionSn)
                 .setBusinessScene("AUTHORIZATION_COMPLETE")
                 .setBusinessSn(businessSn)
-                .setDescription("authorization complete"), WindOperator.system());
+                .setDescription("authorization complete"), WindOperatorFactory.system());
     }
 
     protected String refundCompletedAuthorization(FundsAccountId accountId,
@@ -638,14 +638,14 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setAuthorizationTransactionSn(authorizationTransactionSn)
                 .setBusinessScene("AUTHORIZATION_REFUND")
                 .setBusinessSn(businessSn)
-                .setDescription("authorization refund"), WindOperator.system());
+                .setDescription("authorization refund"), WindOperatorFactory.system());
     }
 
     protected String refundWithoutAuthorization(FundsAccountId accountId,
                                                 long amount,
                                                 String businessSn) {
         return authorizationTransactionService.refund(noAuthRefundRequest(accountId, amount,
-                businessSn), WindOperator.system());
+                businessSn), WindOperatorFactory.system());
     }
 
     protected FundsAuthorizationTransactionRefundRequest noAuthRefundRequest(FundsAccountId accountId,
@@ -671,7 +671,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setAuthorizationTransactionSn(authorizationTransactionSn)
                 .setBusinessScene("AUTHORIZATION_REVERSAL")
                 .setBusinessSn(businessSn)
-                .setDescription("authorization reversal"), WindOperator.system());
+                .setDescription("authorization reversal"), WindOperatorFactory.system());
     }
 
     protected void unfreeze(FundsAccountId accountId, long amount, String referenceFreezeSn, String businessSn) {
@@ -681,7 +681,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setReferenceFreezeSn(referenceFreezeSn)
                 .setBusinessScene("UNFREEZE")
                 .setBusinessSn(businessSn)
-                .setDescription("unfreeze"), WindOperator.system());
+                .setDescription("unfreeze"), WindOperatorFactory.system());
     }
 
     protected List<FundsSubjectBalanceDTO> balances(FundsAccountId... accountIds) {

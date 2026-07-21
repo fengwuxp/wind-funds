@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
@@ -48,7 +48,7 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .build();
         String transactionSn = directTransactionService.pay(
                 payRequest(payer, payee, 5_000L, feeChargeSpec, "PAY_WITH_RATE_FEE"),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         BalanceSnapshot after = snapshot(balances(payer, payee, feeAccount()));
         assertOnlyBalanceDeltas(before, after,
@@ -68,7 +68,7 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
 
         String retryTransactionSn = directTransactionService.pay(
                 payRequest(payer, payee, 5_000L, feeChargeSpec, "PAY_WITH_RATE_FEE"),
-                WindOperator.system());
+                WindOperatorFactory.system());
         BalanceSnapshot afterRetry = snapshot(balances(payer, payee, feeAccount()));
         assertThat(retryTransactionSn).isEqualTo(transactionSn);
         assertOnlyBalanceDeltas(after, afterRetry,
@@ -95,7 +95,7 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> directTransactionService.pay(
                 payRequest(payer, payee, 10L, FeeSpec.builder().build(), "PAY_WITH_EMPTY_FEE"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("手续费计算结果必须大于 0");
 
         BalanceSnapshot after = snapshot(balances(payer, payee, feeAccount()));
@@ -127,7 +127,7 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> directTransactionService.pay(
                 payRequest(payer, payee, 1L, feeChargeSpec, "PAY_WITH_ROUNDED_ZERO_FEE"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("手续费计算结果必须大于 0");
 
         BalanceSnapshot after = snapshot(balances(payer, payee, feeAccount()));
@@ -159,7 +159,7 @@ class FundsTransactionRateFeeFlowTests extends FundsTransactionFlowTestSupport {
 
         directTransactionService.pay(
                 payRequest(payer, payee, 1L, feeChargeSpec, "PAY_WITH_MIN_RATE_FEE"),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         BalanceSnapshot after = snapshot(balances(payer, payee, feeAccount()));
         assertOnlyBalanceDeltas(before, after,

@@ -5,51 +5,66 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.funds</groupId>
-        <artifactId>capte-funds</artifactId>
+        <artifactId>wind-funds</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>capte-funds-tests</artifactId>
+    <artifactId>wind-funds-tests</artifactId>
 
     <dependencies>
         <dependency>
-            <groupId>com.wind.funds</groupId>
-            <artifactId>capte-funds-core</artifactId>
+            <groupId>com.capte.domain</groupId>
+            <artifactId>capte-domain-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>capte-funds-fx-impl</artifactId>
+            <artifactId>wind-funds-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>capte-funds-ledger-impl</artifactId>
+            <artifactId>wind-funds-fx-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>capte-funds-transaction-impl</artifactId>
+            <artifactId>wind-funds-ledger-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>capte-funds-reconciliation-impl</artifactId>
+            <artifactId>wind-funds-transaction-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>capte-funds-governance-impl</artifactId>
+            <artifactId>wind-funds-reconciliation-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.funds</groupId>
-            <artifactId>capte-funds-wallet-impl</artifactId>
+            <artifactId>wind-funds-governance-impl</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.funds</groupId>
+            <artifactId>wind-funds-wallet-impl</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.wind.integration</groupId>
             <artifactId>wind-infra-commons</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.wind.integration</groupId>
+            <artifactId>mybatis-flex-extends</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.mybatis-flex</groupId>
+            <artifactId>mybatis-flex-spring-boot4-starter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

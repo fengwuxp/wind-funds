@@ -2,7 +2,7 @@ package com.wind.funds.transaction.application.external;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
@@ -137,7 +137,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         FundsSubjectBalanceDTO before = balance(targetAccountId());
         assertBucket(before, LedgerSubjectCode.AVAILABLE, 0L, CurrencyIsoCode.USD);
 
-        String transactionSn = externalFundsEventApplicationService.consume(consumeRequest(), WindOperator.system());
+        String transactionSn = externalFundsEventApplicationService.consume(consumeRequest(), WindOperatorFactory.system());
 
         assertThat(transactionSn).isNotBlank();
         FundsSubjectBalanceDTO after = balance(targetAccountId());
@@ -170,7 +170,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         ConsumeExternalFundsEventRequest request = consumeRequest()
                 .setExternalEventType("BANK_DEBIT_CONFIRMED");
 
-        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(request, WindOperator.system()))
+        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(request, WindOperatorFactory.system()))
                 .hasMessageContaining("外部资金事件类型暂不支持真实消费");
 
         assertNoFundsOrLedgerFacts();
@@ -190,7 +190,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         ConsumeExternalFundsEventRequest request = consumeRequest()
                 .setExternalEventType("ACH_CREDIT_ACCEPTED");
 
-        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(request, WindOperator.system()))
+        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(request, WindOperatorFactory.system()))
                 .hasMessageContaining("外部入金事件未确认到账不得入账");
 
         assertNoFundsOrLedgerFacts();
@@ -210,7 +210,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                 .setTargetAccountId(FundsAccountId.immutable("external_event_credit_acc",
                         FundsSubjectType.CREDIT_ACCOUNT));
 
-        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(request, WindOperator.system()))
+        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(request, WindOperatorFactory.system()))
                 .hasMessageContaining("外部资金入金事件目标账户必须是资金账户");
 
         assertNoFundsOrLedgerFacts();

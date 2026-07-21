@@ -92,7 +92,7 @@ class FundsInstructionDslContractTests {
                 .businessSn("BIZ-FI-ROUTE-INPUT-001")
                 .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
                 .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId(1L)
+                        .operatorId("1")
                         .operatorType("SYSTEM")
                         .operatorName("Codex")
                         .appName("wind-funds-tests")
@@ -257,7 +257,7 @@ class FundsInstructionDslContractTests {
     @Test
     void testOperationActorShouldRejectSensitiveContextVariables() {
         assertThatThrownBy(() -> ImmutableFundsOperationActorSpec.builder()
-                .operatorId(1L)
+                .operatorId("1")
                 .operatorType("SYSTEM")
                 .operatorName("Codex")
                 .appName("wind-funds-tests")
@@ -266,7 +266,7 @@ class FundsInstructionDslContractTests {
                 .hasMessageContaining("fundsOperationActor.contextVariables must not contain sensitive fields");
 
         assertThatThrownBy(() -> ImmutableFundsOperationActorSpec.builder()
-                .operatorId(1L)
+                .operatorId("1")
                 .operatorType("SYSTEM")
                 .operatorName("Codex")
                 .appName("wind-funds-tests")
@@ -283,7 +283,7 @@ class FundsInstructionDslContractTests {
     @Test
     void testOperationActorContextShouldRejectCoreBenefitFactsButAllowSummaryRefs() {
         assertThatThrownBy(() -> ImmutableFundsOperationActorSpec.builder()
-                .operatorId(1L)
+                .operatorId("1")
                 .operatorType("SYSTEM")
                 .operatorName("Codex")
                 .appName("wind-funds-tests")
@@ -295,7 +295,7 @@ class FundsInstructionDslContractTests {
                 .hasMessageContaining("fundsOperationActor.contextVariables must not contain core benefit field");
 
         assertThatThrownBy(() -> ImmutableFundsOperationActorSpec.builder()
-                .operatorId(1L)
+                .operatorId("1")
                 .operatorType("SYSTEM")
                 .operatorName("Codex")
                 .appName("wind-funds-tests")
@@ -307,7 +307,7 @@ class FundsInstructionDslContractTests {
                         + "currentMarketingRule");
 
         ImmutableFundsOperationActorSpec actor = ImmutableFundsOperationActorSpec.builder()
-                .operatorId(1L)
+                .operatorId("1")
                 .operatorType("SYSTEM")
                 .operatorName("Codex")
                 .appName("wind-funds-tests")
@@ -348,7 +348,7 @@ class FundsInstructionDslContractTests {
                 .businessSn("BIZ-FI-SENSITIVE-001")
                 .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
                 .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId(1L)
+                        .operatorId("1")
                         .operatorType("SYSTEM")
                         .operatorName("Codex")
                         .appName("wind-funds-tests")
@@ -371,7 +371,7 @@ class FundsInstructionDslContractTests {
                 .businessSn("BIZ-FI-SENSITIVE-002")
                 .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
                 .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId(1L)
+                        .operatorId("1")
                         .operatorType("SYSTEM")
                         .operatorName("Codex")
                         .appName("wind-funds-tests")
@@ -488,7 +488,7 @@ class FundsInstructionDslContractTests {
         Map<String, Object> auditPayload = new HashMap<>();
         auditPayload.put("requestId", "REQ-202605270001");
         ImmutableFundsOperationActorSpec actor = ImmutableFundsOperationActorSpec.builder()
-                .operatorId(1L)
+                .operatorId("1")
                 .operatorType("SYSTEM")
                 .operatorName("Codex")
                 .appName("wind-funds-tests")
@@ -523,7 +523,7 @@ class FundsInstructionDslContractTests {
                 .businessSn("BIZ-FI-001")
                 .eventTime(LocalDateTime.of(2026, 5, 20, 10, 0))
                 .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId(1L)
+                        .operatorId("1")
                         .operatorType("SYSTEM")
                         .operatorName("Codex")
                         .appName("wind-funds-tests")

@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
@@ -226,7 +226,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                         Map.of("networkReference", "GB82WEST12345698765432"))))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_SENSITIVE_CONTEXT_IBAN_VALUE")
-                .setDescription("withdraw with sensitive IBAN value"), WindOperator.system()))
+                .setDescription("withdraw with sensitive IBAN value"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -293,7 +293,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_MISSING_ACCOUNT_CONFIRM")
-                .setDescription("withdraw without account"), WindOperator.system()))
+                .setDescription("withdraw without account"), WindOperatorFactory.system()))
                 .hasMessageContaining("提现账户不能为空");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -358,7 +358,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_MISSING_ACCOUNT_AND_PAYEE_CONFIRM")
-                .setDescription("withdraw without account and payee"), WindOperator.system()))
+                .setDescription("withdraw without account and payee"), WindOperatorFactory.system()))
                 .hasMessageContaining("提现账户不能为空");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -426,7 +426,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_MISSING_FREEZE_REF_CONFIRM")
-                .setDescription("withdraw without reference freeze sn"), WindOperator.system()))
+                .setDescription("withdraw without reference freeze sn"), WindOperatorFactory.system()))
                 .hasMessageContaining("提现冻结流水号不能为空");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -491,7 +491,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_MISSING_FREEZE_REF_AND_PAYEE_CONFIRM")
-                .setDescription("withdraw without reference freeze sn and payee"), WindOperator.system()))
+                .setDescription("withdraw without reference freeze sn and payee"), WindOperatorFactory.system()))
                 .hasMessageContaining("提现冻结流水号不能为空");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -558,7 +558,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_MISSING_PAYEE_CONFIRM")
-                .setDescription("withdraw without payee"), WindOperator.system()))
+                .setDescription("withdraw without payee"), WindOperatorFactory.system()))
                 .hasMessageContaining("提现外部收款方不能为空");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -626,7 +626,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CurrencyIsoCode.CNY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_CURRENCY_CONFIRM")
-                .setDescription("withdraw with different currency"), WindOperator.system()))
+                .setDescription("withdraw with different currency"), WindOperatorFactory.system()))
                 .hasMessageContaining("transactionAmount.amount currency must equal account currency");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -864,7 +864,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_INTERNAL_PAYEE_CONFIRM")
-                .setDescription("withdraw to internal account"), WindOperator.system()))
+                .setDescription("withdraw to internal account"), WindOperatorFactory.system()))
                 .hasMessageContaining("提现外部收款方必须是外部账户");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, internalPayee, cashMappingAccount(),
@@ -944,7 +944,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_EXTERNAL_ACCOUNT_CONFIRM")
-                .setDescription("withdraw from external account"), WindOperator.system()))
+                .setDescription("withdraw from external account"), WindOperatorFactory.system()))
                 .hasMessageContaining("提现账户不能是外部账户");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, externalAccount, cashMappingAccount(),
@@ -1015,7 +1015,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_RAW_EXTERNAL_ACCOUNT_CONFIRM")
-                .setDescription("withdraw to raw external account id"), WindOperator.system()))
+                .setDescription("withdraw to raw external account id"), WindOperatorFactory.system()))
                 .hasMessageContaining("externalAccountNo must be masked or token reference");
 
         BalanceSnapshot afterRejectedWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -1082,7 +1082,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM")
-                .setDescription("idempotent withdraw"), WindOperator.system());
+                .setDescription("idempotent withdraw"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterFreeze, afterFirstWithdraw,
                 delta(user, LedgerSubjectCode.AVAILABLE, 0L, CURRENCY),
@@ -1099,7 +1099,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(60L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM")
-                .setDescription("idempotent withdraw"), WindOperator.system());
+                .setDescription("idempotent withdraw"), WindOperatorFactory.system());
 
         assertThat(retryWithdrawSn).isEqualTo(firstWithdrawSn);
         BalanceSnapshot afterRetryWithdraw = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -1117,7 +1117,7 @@ class FundsWithdrawalSuccessFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(61L, CURRENCY)))
                 .setBusinessScene("WITHDRAW")
                 .setBusinessSn("WITHDRAW_IDEMPOTENT_CONFIRM")
-                .setDescription("idempotent withdraw"), WindOperator.system()))
+                .setDescription("idempotent withdraw"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));

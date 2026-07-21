@@ -98,7 +98,7 @@ class CompositeRouteResolverTests {
                 .businessSn("ROUTE_SUPPORTS_NO_SIDE_EFFECT")
                 .eventTime(LocalDateTime.of(2026, 5, 19, 0, 0))
                 .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId(1L)
+                        .operatorId("1")
                         .operatorType("SYSTEM")
                         .appName("wind-funds-tests")
                         .build())

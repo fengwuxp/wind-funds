@@ -2,7 +2,7 @@ package com.wind.funds.transaction.application.flow;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
@@ -77,7 +77,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                                 new BigDecimal("3.25")))
                         .setApproved(true)
                         .setBusinessScene("AUTHORIZATION")
-                        .setBusinessSn("FX_AUTH_REFUND_AUTHORIZE"), WindOperator.system());
+                        .setBusinessSn("FX_AUTH_REFUND_AUTHORIZE"), WindOperatorFactory.system());
         authorizationTransactionService.complete(new FundsAuthorizationTransactionCompleteRequest()
                 .setAccountId(user)
                 .setTransactionAmount(TransactionAmount.converted(
@@ -86,7 +86,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         new BigDecimal("3.25")))
                 .setAuthorizationTransactionSn(authorizationSn)
                 .setBusinessScene("AUTHORIZATION_COMPLETE")
-                .setBusinessSn("FX_AUTH_REFUND_COMPLETE"), WindOperator.system());
+                .setBusinessSn("FX_AUTH_REFUND_COMPLETE"), WindOperatorFactory.system());
 
         authorizationTransactionService.refund(new FundsAuthorizationTransactionRefundRequest()
                 .setAccountId(user)
@@ -96,7 +96,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         new BigDecimal("3.25")))
                 .setAuthorizationTransactionSn(authorizationSn)
                 .setBusinessScene("AUTHORIZATION_REFUND")
-                .setBusinessSn("FX_AUTH_REFUND_RETURN"), WindOperator.system());
+                .setBusinessSn("FX_AUTH_REFUND_RETURN"), WindOperatorFactory.system());
 
         LedgerTransaction refundTransaction = ledgerTransactionByBusinessSn("FX_AUTH_REFUND_RETURN");
         assertThat(refundTransaction.getAmount()).isEqualTo(100L);
@@ -119,7 +119,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                                 new BigDecimal("3.30")))
                         .setAuthorizationTransactionSn(authorizationSn)
                         .setBusinessScene("AUTHORIZATION_REFUND")
-                        .setBusinessSn("FX_AUTH_REFUND_RATE_CHANGED"), WindOperator.system()))
+                        .setBusinessSn("FX_AUTH_REFUND_RATE_CHANGED"), WindOperatorFactory.system()))
                 .hasMessageContaining("退款汇率必须与原支付快照汇率一致");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, settlementAccount()));
@@ -340,7 +340,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                                 Map.of("cardSecurityCode", "123"))))
                         .setBusinessScene("AUTHORIZATION")
                         .setBusinessSn("AUTH_SENSITIVE_CONTEXT_AUTHORIZE")
-                        .setDescription("authorization with sensitive context"), WindOperator.system()))
+                        .setDescription("authorization with sensitive context"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
         assertThatThrownBy(() -> authorizationTransactionService.authorize(
                 new FundsAuthorizationTransactionAuthorizeRequest()
@@ -351,7 +351,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                                 Map.of("networkReference", "4242424242424242"))))
                         .setBusinessScene("AUTHORIZATION")
                         .setBusinessSn("AUTH_SENSITIVE_CONTEXT_PAN_VALUE")
-                        .setDescription("authorization with sensitive PAN value"), WindOperator.system()))
+                        .setDescription("authorization with sensitive PAN value"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
         assertThatThrownBy(() -> authorizationTransactionService.authorize(
                 new FundsAuthorizationTransactionAuthorizeRequest()
@@ -362,7 +362,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                                 Map.of("networkReference", "GB82WEST12345698765432"))))
                         .setBusinessScene("AUTHORIZATION")
                         .setBusinessSn("AUTH_SENSITIVE_CONTEXT_IBAN_VALUE")
-                        .setDescription("authorization with sensitive IBAN value"), WindOperator.system()))
+                        .setDescription("authorization with sensitive IBAN value"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedAuthorize = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
@@ -1402,35 +1402,35 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertThatThrownBy(() -> authorizationTransactionService.complete(forceCompletionRequest(user, 60L,
                 "AUTH_FORCE_COMPLETION_MISSING_POLICY")
-                .setForceCompletionPolicyCode(null), WindOperator.system()))
+                .setForceCompletionPolicyCode(null), WindOperatorFactory.system()))
                 .hasMessageContaining("forceCompletionPolicyCode");
         assertThatThrownBy(() -> authorizationTransactionService.complete(forceCompletionRequest(user, 60L,
                 "AUTH_FORCE_COMPLETION_UNKNOWN_POLICY")
-                .setForceCompletionPolicyCode("UNKNOWN_FORCE_COMPLETION_POLICY"), WindOperator.system()))
+                .setForceCompletionPolicyCode("UNKNOWN_FORCE_COMPLETION_POLICY"), WindOperatorFactory.system()))
                 .hasMessageContaining("forceCompletionPolicyCode");
         assertThatThrownBy(() -> authorizationTransactionService.complete(forceCompletionRequest(user, 60L,
                 "AUTH_FORCE_COMPLETION_EXCEED_LIMIT")
-                .setForceCompletionLimitAmount(50L), WindOperator.system()))
+                .setForceCompletionLimitAmount(50L), WindOperatorFactory.system()))
                 .hasMessageContaining("forceCompletionLimitAmount");
         assertThatThrownBy(() -> authorizationTransactionService.complete(forceCompletionRequest(user, 60L,
                 "AUTH_FORCE_COMPLETION_LIMIT_MISMATCH")
-                .setForceCompletionLimitAmount(99L), WindOperator.system()))
+                .setForceCompletionLimitAmount(99L), WindOperatorFactory.system()))
                 .hasMessageContaining("forceCompletionLimitAmount");
         assertThatThrownBy(() -> authorizationTransactionService.complete(forceCompletionRequest(user, 60L,
                 "AUTH_FORCE_COMPLETION_WITH_AUTH_SN")
-                .setAuthorizationTransactionSn("FT_SHOULD_NOT_BE_ACCEPTED"), WindOperator.system()))
+                .setAuthorizationTransactionSn("FT_SHOULD_NOT_BE_ACCEPTED"), WindOperatorFactory.system()))
                 .hasMessageContaining("authorizationTransactionSn");
         assertThatThrownBy(() -> authorizationTransactionService.complete(forceCompletionRequest(user, 60L,
                 "AUTH_FORCE_COMPLETION_MISSING_REASON")
-                .setForceCompletionReason("   "), WindOperator.system()))
+                .setForceCompletionReason("   "), WindOperatorFactory.system()))
                 .hasMessageContaining("forceCompletionReason");
         assertThatThrownBy(() -> authorizationTransactionService.complete(forceCompletionRequest(user, 60L,
                 "AUTH_FORCE_COMPLETION_MISSING_EXTERNAL_FACT")
-                .setExternalOriginalFactRef("   "), WindOperator.system()))
+                .setExternalOriginalFactRef("   "), WindOperatorFactory.system()))
                 .hasMessageContaining("externalOriginalFactRef");
         assertThatThrownBy(() -> authorizationTransactionService.complete(forceCompletionRequest(user, 60L,
                 "AUTH_FORCE_COMPLETION_MISSING_VOUCHER")
-                .setForceCompletionVoucherRef("   "), WindOperator.system()))
+                .setForceCompletionVoucherRef("   "), WindOperatorFactory.system()))
                 .hasMessageContaining("forceCompletionVoucherRef");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
@@ -1629,7 +1629,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         BalanceSnapshot beforeRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
 
         String refundSn = authorizationTransactionService.refund(noAuthRefundRequest(user, 40L,
-                "AUTH_NO_AUTH_REFUND_INFER_RETURN"), WindOperator.system());
+                "AUTH_NO_AUTH_REFUND_INFER_RETURN"), WindOperatorFactory.system());
 
         BalanceSnapshot afterRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(beforeRefund, afterRefund,
@@ -1666,16 +1666,16 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertThatThrownBy(() -> authorizationTransactionService.refund(noAuthRefundRequest(user, 40L,
                 "AUTH_NO_AUTH_REFUND_MISSING_EXTERNAL_REFERENCE")
-                .setExternalReferenceSn("   "), WindOperator.system()))
+                .setExternalReferenceSn("   "), WindOperatorFactory.system()))
                 .hasMessageContaining("externalReferenceSn");
 
         assertThatThrownBy(() -> authorizationTransactionService.refund(noAuthRefundRequest(user, 40L,
-                "AUTH_NO_AUTH_REFUND_MISSING_REASON").setRefundReason("   "), WindOperator.system()))
+                "AUTH_NO_AUTH_REFUND_MISSING_REASON").setRefundReason("   "), WindOperatorFactory.system()))
                 .hasMessageContaining("refundReason");
 
         assertThatThrownBy(() -> authorizationTransactionService.refund(noAuthRefundRequest(user, 40L,
                 "AUTH_NO_AUTH_REFUND_WITH_AUTH_SN")
-                .setAuthorizationTransactionSn("FT202606030000000001"), WindOperator.system()))
+                .setAuthorizationTransactionSn("FT202606030000000001"), WindOperatorFactory.system()))
                 .hasMessageContaining("授权交易不存在");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
@@ -1713,7 +1713,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setDisputeMode("CHARGEBACK")
                 .setDisputeReason("CARDHOLDER_DISPUTE")
                 .setDisputeVoucherRef("DISPUTE_EVIDENCE_NO_AUTH")
-                .setExternalDisputeRef("DISPUTE_CASE_NO_AUTH"), WindOperator.system()))
+                .setExternalDisputeRef("DISPUTE_CASE_NO_AUTH"), WindOperatorFactory.system()))
                 .hasMessageContaining("dispute");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
@@ -1776,7 +1776,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setBusinessSn("AUTH_DISPUTE_REFUND_RETURN")
                 .setDescription("authorization dispute refund")
                 .setContextVariables(WritableContextVariables.of(Map.of(
-                        "caseOwner", "ops-team-a"))), WindOperator.system());
+                        "caseOwner", "ops-team-a"))), WindOperatorFactory.system());
         BalanceSnapshot afterDisputeRefund = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
         assertOnlyBalanceDeltas(afterComplete, afterDisputeRefund,
                 delta(user, LedgerSubjectCode.AVAILABLE, 40L, CURRENCY),
@@ -1862,7 +1862,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                         .setBusinessSn("AUTH_DISPUTE_REFUND_RETURN")
                         .setDescription("authorization dispute refund")
                         .setContextVariables(WritableContextVariables.of(Map.of(
-                                "caseOwner", "ops-team-a"))), WindOperator.system()))
+                                "caseOwner", "ops-team-a"))), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
         BalanceSnapshot afterIdempotencyConflict = snapshot(balances(user, cashMappingAccount(),
                 settlementAccount()));
@@ -1897,22 +1897,22 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertThatThrownBy(() -> authorizationTransactionService.refund(disputeRefundRequest(user, 40L,
                 authorizationSn, "AUTH_DISPUTE_REFUND_MISSING_MODE")
-                .setDisputeMode("   "), WindOperator.system()))
+                .setDisputeMode("   "), WindOperatorFactory.system()))
                 .hasMessageContaining("disputeMode");
 
         assertThatThrownBy(() -> authorizationTransactionService.refund(disputeRefundRequest(user, 40L,
                 authorizationSn, "AUTH_DISPUTE_REFUND_MISSING_REASON")
-                .setDisputeReason("   "), WindOperator.system()))
+                .setDisputeReason("   "), WindOperatorFactory.system()))
                 .hasMessageContaining("disputeReason");
 
         assertThatThrownBy(() -> authorizationTransactionService.refund(disputeRefundRequest(user, 40L,
                 authorizationSn, "AUTH_DISPUTE_REFUND_MISSING_VOUCHER")
-                .setDisputeVoucherRef("   "), WindOperator.system()))
+                .setDisputeVoucherRef("   "), WindOperatorFactory.system()))
                 .hasMessageContaining("disputeVoucherRef");
 
         assertThatThrownBy(() -> authorizationTransactionService.refund(disputeRefundRequest(user, 40L,
                 authorizationSn, "AUTH_DISPUTE_REFUND_MISSING_EXTERNAL_REF")
-                .setExternalDisputeRef(null), WindOperator.system()))
+                .setExternalDisputeRef(null), WindOperatorFactory.system()))
                 .hasMessageContaining("externalDisputeRef");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), settlementAccount()));
@@ -2119,7 +2119,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
         assertThatThrownBy(() -> authorizationTransactionService.refund(
                 disputeRefundRequest(user, 60L, authorizationSn, "AUTH_DISPUTE_REFUND_EXCEED_RETURN"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易已完成可退金额不足");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, reserveUser, cashMappingAccount(), settlementAccount()));
@@ -2897,7 +2897,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setLedgerPeriodId(periodId)
                 .setBusinessScene("AUTHORIZATION")
                 .setBusinessSn(businessSn)
-                .setDescription("authorization with ledger period"), WindOperator.system());
+                .setDescription("authorization with ledger period"), WindOperatorFactory.system());
     }
 
     private void assertPeriodLedgerBalance(FundsAccountId accountId,
@@ -2992,7 +2992,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
 
     private String forceCompletionAuthorization(FundsAccountId accountId, long amount, String businessSn) {
         return authorizationTransactionService.complete(forceCompletionRequest(accountId, amount, businessSn),
-                WindOperator.system());
+                WindOperatorFactory.system());
     }
 
     private String authorizeSharedCard(FundsAccountId cardAccount,
@@ -3006,7 +3006,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                 .setLinkedFundingAccountId(parentFundingAccount)
                 .setBusinessScene("AUTHORIZATION")
                 .setBusinessSn(businessSn)
-                .setDescription("shared card authorization"), WindOperator.system());
+                .setDescription("shared card authorization"), WindOperatorFactory.system());
     }
 
     private FundsAuthorizationTransactionCompleteRequest forceCompletionRequest(FundsAccountId accountId,

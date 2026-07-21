@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
@@ -165,7 +165,7 @@ class FundsTransactionProjectionExplainApplicationServiceTests extends FundsTran
                 .setBusinessSn("PROJECTION_EXPLAIN_DISPUTE_RETURN")
                 .setDescription("authorization dispute refund")
                 .setContextVariables(WritableContextVariables.of(Map.of(
-                        "caseOwner", "ops-team-a"))), WindOperator.system());
+                        "caseOwner", "ops-team-a"))), WindOperatorFactory.system());
         LedgerTransaction ledgerTransaction = ledgerTransactionByBusinessSn("PROJECTION_EXPLAIN_DISPUTE_RETURN");
         LedgerFactSnapshot beforeExplainFacts = ledgerFactSnapshot();
 

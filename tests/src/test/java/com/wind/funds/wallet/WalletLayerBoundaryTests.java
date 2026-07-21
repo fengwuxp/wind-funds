@@ -22,28 +22,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WalletLayerBoundaryTests {
 
     private static final List<String> FACE_FORBIDDEN_ARTIFACTS = List.of(
-            "capte-funds-ledger-face",
-            "capte-funds-ledger-impl",
-            "capte-funds-transaction-face",
-            "capte-funds-transaction-impl",
-            "capte-funds-wallet-impl");
+            "wind-funds-ledger-face",
+            "wind-funds-ledger-impl",
+            "wind-funds-transaction-face",
+            "wind-funds-transaction-impl",
+            "wind-funds-wallet-impl");
 
     private static final List<String> IMPL_FORBIDDEN_ARTIFACTS = List.of(
-            "capte-funds-ledger-impl",
-            "capte-funds-transaction-face",
-            "capte-funds-transaction-impl");
+            "wind-funds-ledger-impl",
+            "wind-funds-transaction-face",
+            "wind-funds-transaction-impl");
 
     /**
      * 场景：wallet-face 对外表达产品契约。
-     * 预期：face 只依赖 core/capte-domain-core，不感知交易、账务和钱包实现模块。
+     * 预期：face 本地只声明 core，项目级 Wind Operator 依赖由根 POM 统一继承。
      * 红线：对外契约不能泄漏交易事实、账务实现事实或内部实现类型。
      */
     @Test
     void testWalletFaceShouldOnlyExposeCoreContracts() throws Exception {
         List<String> dependencyArtifactIds = dependencyArtifactIds(
-                workspaceRoot().resolve("wallet/wallet-face/pom.xml"));
+                workspaceRoot().resolve("wallet/face/pom.xml"));
 
-        assertThat(dependencyArtifactIds).containsExactlyInAnyOrder("capte-funds-core", "capte-domain-core");
+        assertThat(dependencyArtifactIds).containsExactly("wind-funds-core");
         assertThat(dependencyArtifactIds).doesNotContain(FACE_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
     }
 
@@ -55,11 +55,11 @@ class WalletLayerBoundaryTests {
     @Test
     void testWalletImplShouldUseFaceContractsWithoutImplDependencies() throws Exception {
         List<String> dependencyArtifactIds = dependencyArtifactIds(
-                workspaceRoot().resolve("wallet/wallet-impl/pom.xml"));
+                workspaceRoot().resolve("wallet/impl/pom.xml"));
 
         assertThat(dependencyArtifactIds)
-                .contains("capte-funds-wallet-face",
-                        "capte-funds-ledger-face");
+                .contains("wind-funds-wallet-face",
+                        "wind-funds-ledger-face");
         assertThat(dependencyArtifactIds).doesNotContain(IMPL_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
     }
 

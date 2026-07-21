@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.difference.report.impl;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
@@ -88,10 +88,10 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     @Test
     void testGetReportShouldExplainObjectLevelBlockingDifferenceWithoutLedgerFactsMutation() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
 
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
-                reportRequest(), WindOperator.system());
+                reportRequest(), WindOperatorFactory.system());
 
         assertThat(result.getTenantId()).isEqualTo(TENANT_ID);
         assertThat(result.getDifferenceSn()).isEqualTo(DIFFERENCE_SN);
@@ -120,14 +120,14 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     @Test
     void testGetReportShouldRespectGateAndEvidenceViewSwitches() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
 
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
                 reportRequest()
                         .setIncludeGateDecision(false)
                         .setReconciliationRunResultSn(null)
                         .setIncludeEvidenceRefs(false),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         assertThat(result.getDifferenceSn()).isEqualTo(DIFFERENCE_SN);
         assertThat(result.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.CLEARING);
@@ -146,10 +146,10 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
      */
     @Test
     void testGetReportShouldRequireExplicitRunResultWhenIncludingObjectGateDecision() {
-        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceReportApplicationService.getReport(
-                reportRequest().setReconciliationRunResultSn(null), WindOperator.system()))
+                reportRequest().setReconciliationRunResultSn(null), WindOperatorFactory.system()))
                 .hasMessageContaining("对账运行结果流水号不能为空");
     }
 
@@ -162,7 +162,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     @Test
     void testGetReportShouldExposeIncompleteActionEvidenceWithoutRepairingDifference() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
                 SET adjustment_sn = ?
@@ -171,7 +171,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
                 """, "legacy-adjustment-with-missing-evidence", TENANT_ID, DIFFERENCE_SN);
 
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
-                reportRequest(), WindOperator.system());
+                reportRequest(), WindOperatorFactory.system());
 
         assertThat(result.getAdjustmentSn()).isEqualTo("legacy-adjustment-with-missing-evidence");
         assertThat(result.getActionType()).isNull();
@@ -192,7 +192,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     @Test
     void testGetReportShouldExposeMissingRerunResultWithoutRepairingDifference() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
         jdbcTemplate.update("""
                 UPDATE t_reconciliation_difference
                 SET status = ?
@@ -201,7 +201,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
                 """, ReconciliationDifferenceStatus.RESOLVED.name(), TENANT_ID, DIFFERENCE_SN);
 
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
-                reportRequest(), WindOperator.system());
+                reportRequest(), WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RESOLVED);
         assertThat(result.getLastRerunSn()).isNull();
@@ -220,10 +220,10 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest()
                 .setBlockingObjectType(null)
-                .setBlockingObjectSn(null), WindOperator.system());
+                .setBlockingObjectSn(null), WindOperatorFactory.system());
 
         ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
-                reportRequest(), WindOperator.system());
+                reportRequest(), WindOperatorFactory.system());
 
         assertThat(result.getBlockingScope()).isEqualTo("CLEARING");
         assertThat(result.getBlockingObjectType()).isNull();
@@ -235,7 +235,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
 
     private GetReconciliationDifferenceReportRequest reportRequest() {
         String runResultSn = reconciliationRunResultApplicationService.recordRunResult(
-                balancedRunResultRequest(), WindOperator.system()).getSn();
+                balancedRunResultRequest(), WindOperatorFactory.system()).getSn();
         return new GetReconciliationDifferenceReportRequest()
                 .setTenantId(TENANT_ID)
                 .setDifferenceSn(DIFFERENCE_SN)

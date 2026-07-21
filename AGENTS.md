@@ -25,6 +25,8 @@
 
 模块职责：`core` 放资金 DSL、核心契约、枚举、值对象和端口；`fx-impl` 放汇率快照选择和金额换算默认实现；各 `*-face` 放对外契约；各 `*-impl` 放实现、DAL、Mapper、MapStruct 和内部规则；`tests` 放资金域测试、契约测试、架构边界测试和 H2 表结构；`dependencies` 只做依赖聚合 / BOM。
 
+目录组织：根 POM 只声明 `core`、业务能力聚合模块、`tests` 和 `dependencies`；`fx`、`ledger`、`wallet`、`transaction`、`reconciliation`、`governance` 各自由本目录聚合 POM 管理 `face` / `impl` 叶子模块。聚合 POM 不承载 Java 源码或业务依赖，叶子模块 artifactId 继续使用完整的 `wind-funds-<capability>-<layer>` 名称。
+
 强制依赖方向：`*-face -> core / capte-domain-core`；`fx-impl -> core`；`transaction-impl -> transaction-face / wallet-face / core / infrastructure`；`wallet-impl -> wallet-face / ledger-face / core / infrastructure`；`ledger-impl -> ledger-face / core / infrastructure`；`reconciliation-impl -> reconciliation-face / transaction-face / ledger-face / core / infrastructure`；`governance-impl -> governance-face / transaction-face / ledger-face / reconciliation-face / core / infrastructure`；`tests -> impl / face / core`。
 
 模块红线：

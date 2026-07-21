@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.application.spend;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -189,7 +189,7 @@ class WalletSpendControlsAcceptanceFlowTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         BudgetControlLimitAdjustmentResultDTO limit = budgetControlLimitAdjustmentApplicationService.adjustLimit(
-                adjustLimitRequest(), WindOperator.system());
+                adjustLimitRequest(), WindOperatorFactory.system());
         assertThat(limit.getProjection().getAvailableControlAmount()).isEqualTo(100L);
 
         SpendRuleEvaluationDecisionDTO evaluation = spendRuleEvaluationApplicationService.evaluate(

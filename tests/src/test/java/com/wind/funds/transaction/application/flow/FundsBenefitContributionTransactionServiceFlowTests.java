@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
@@ -56,7 +56,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         var afterTopup = snapshot(balances(costBearer, receiver));
 
         String settleTransactionSn = benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 30L,
-                "BENEFIT_SETTLE_001"), WindOperator.system());
+                "BENEFIT_SETTLE_001"), WindOperatorFactory.system());
 
         assertThat(settleTransactionSn).isNotBlank();
         var afterSettle = snapshot(balances(costBearer, receiver));
@@ -77,7 +77,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setBusinessScene("BENEFIT_REFUND")
                 .setBusinessSn("BENEFIT_REFUND_001")
                 .setOriginalOrderSn("ORDER_001")
-                .setRefundReason("partial order refund"), WindOperator.system());
+                .setRefundReason("partial order refund"), WindOperatorFactory.system());
 
         assertThat(refundTransactionSn).isNotBlank();
         var afterRefund = snapshot(balances(costBearer, receiver));
@@ -98,7 +98,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setBusinessScene("BENEFIT_CANCEL")
                 .setBusinessSn("BENEFIT_CANCEL_REFUND_001")
                 .setOriginalOrderSn("ORDER_001")
-                .setRefundReason("benefit cancellation correction"), WindOperator.system());
+                .setRefundReason("benefit cancellation correction"), WindOperatorFactory.system());
 
         assertThat(cancelRefundTransactionSn).isNotBlank();
         var afterCancelRefund = snapshot(balances(costBearer, receiver));
@@ -131,7 +131,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
 
         assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
                 "BENEFIT_REBATE_001").setFundingNature(FundsBenefitFundingNature.USER_BENEFIT_BALANCE),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("不支持返利、佣金、分润、储值负债释放或无资金转移解释事实");
 
         var after = snapshot(balances(costBearer, receiver));
@@ -159,7 +159,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
 
         String transactionSn = benefitContributionTransactionService.settle(settleRequest(merchantCostBearer, userBenefit, 25L,
                 "BENEFIT_MERCHANT_BORNE_001").setFundingNature(FundsBenefitFundingNature.MERCHANT_BORNE),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         assertThat(transactionSn).isNotBlank();
         var afterSettle = snapshot(balances(merchantCostBearer, userBenefit));
@@ -190,7 +190,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
 
         String businessSn = "BENEFIT_IDEMPOTENT_SETTLE_001";
         String transactionSn = benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 30L,
-                businessSn), WindOperator.system());
+                businessSn), WindOperatorFactory.system());
         var afterSettle = snapshot(balances(costBearer, receiver));
         assertOnlyBalanceDeltas(afterTopup, afterSettle,
                 delta(costBearer, LedgerSubjectCode.AVAILABLE, -30L, CURRENCY),
@@ -199,7 +199,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         LedgerFactSnapshot afterSettleFacts = ledgerFactSnapshot();
 
         String retryTransactionSn = benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 30L,
-                businessSn), WindOperator.system());
+                businessSn), WindOperatorFactory.system());
 
         assertThat(retryTransactionSn).isEqualTo(transactionSn);
         var afterRetry = snapshot(balances(costBearer, receiver));
@@ -209,7 +209,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertLedgerTransactionFactsUnchanged(afterSettleFacts);
 
         assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 31L,
-                businessSn), WindOperator.system()))
+                businessSn), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         var afterConflict = snapshot(balances(costBearer, receiver));
@@ -251,15 +251,15 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         String platformToMerchantSn = benefitContributionTransactionService.settle(
                 settleRequest(platformMarketing, merchantSettlement, 40L, "BENEFIT_MATRIX_PLATFORM_MERCHANT_001")
                         .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS),
-                WindOperator.system());
+                WindOperatorFactory.system());
         String platformToUserSn = benefitContributionTransactionService.settle(
                 settleRequest(platformMarketing, userSubsidy, 15L, "BENEFIT_MATRIX_PLATFORM_USER_001")
                         .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS),
-                WindOperator.system());
+                WindOperatorFactory.system());
         String partnerToOrderSn = benefitContributionTransactionService.settle(
                 settleRequest(partnerCostBearer, orderBenefitPool, 8L, "BENEFIT_MATRIX_PARTNER_ORDER_001")
                         .setFundingNature(FundsBenefitFundingNature.PARTNER_FUNDED),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         assertThat(platformToMerchantSn).isNotBlank();
         assertThat(platformToUserSn).isNotBlank();
@@ -302,11 +302,11 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         String platformTransactionSn = benefitContributionTransactionService.settle(
                 settleRequest(platformCostBearer, receiver, 20L, "BENEFIT_MULTI_PLATFORM_SETTLE_001")
                         .setFundingNature(FundsBenefitFundingNature.PLATFORM_OWN_FUNDS),
-                WindOperator.system());
+                WindOperatorFactory.system());
         String merchantTransactionSn = benefitContributionTransactionService.settle(
                 settleRequest(merchantCostBearer, receiver, 10L, "BENEFIT_MULTI_MERCHANT_SETTLE_001")
                         .setFundingNature(FundsBenefitFundingNature.MERCHANT_BORNE),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         var afterSettle = snapshot(balances(platformCostBearer, merchantCostBearer, receiver));
         assertOnlyBalanceDeltas(afterTopup, afterSettle,
@@ -324,7 +324,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setBusinessScene("BENEFIT_REFUND")
                 .setBusinessSn("BENEFIT_MULTI_PLATFORM_REFUND_001")
                 .setOriginalOrderSn("ORDER_001")
-                .setRefundReason("partial order refund"), WindOperator.system());
+                .setRefundReason("partial order refund"), WindOperatorFactory.system());
         benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
                 .setTenantId(TENANT_ID)
                 .setReferenceBenefitTransactionSn(merchantTransactionSn)
@@ -333,7 +333,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setBusinessScene("BENEFIT_REFUND")
                 .setBusinessSn("BENEFIT_MULTI_MERCHANT_REFUND_001")
                 .setOriginalOrderSn("ORDER_001")
-                .setRefundReason("partial order refund"), WindOperator.system());
+                .setRefundReason("partial order refund"), WindOperatorFactory.system());
 
         var afterRefund = snapshot(balances(platformCostBearer, merchantCostBearer, receiver));
         assertOnlyBalanceDeltas(afterSettle, afterRefund,
@@ -366,7 +366,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setBusinessScene("BENEFIT_REFUND")
                 .setBusinessSn("BENEFIT_MISSING_ORIGINAL_REFUND_001")
                 .setOriginalOrderSn("ORDER_001")
-                .setRefundReason("missing original benefit contribution"), WindOperator.system()))
+                .setRefundReason("missing original benefit contribution"), WindOperatorFactory.system()))
                 .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照")
                 .hasMessageContaining("BENEFIT_TXN_MISSING_ORIGINAL_001");
 
@@ -393,7 +393,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
 
         assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
                 "BENEFIT_NO_TRANSFER_001").setFundingNature(FundsBenefitFundingNature.NO_FUNDS_TRANSFER),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("无资金转移解释事实");
 
         var after = snapshot(balances(costBearer, receiver));
@@ -420,7 +420,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         assertThatThrownBy(() -> benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
                 "BENEFIT_CONTEXT_CORE_FIELD_001")
                 .setContextVariables(ReadonlyContextVariables.of(Map.of("ledgerEffect", "POSTING_REQUIRED"))),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
                 .hasMessageContaining("ledgerEffect");
 
@@ -445,7 +445,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
         ensureLedger(receiver, LedgerSubjectCode.SETTLEMENT);
         topup(costBearer, 100L, "BENEFIT_REFUND_CONTEXT_TOPUP");
         String settleTransactionSn = benefitContributionTransactionService.settle(settleRequest(costBearer, receiver, 20L,
-                "BENEFIT_REFUND_CONTEXT_SETTLE_001"), WindOperator.system());
+                "BENEFIT_REFUND_CONTEXT_SETTLE_001"), WindOperatorFactory.system());
         var beforeRefund = snapshot(balances(costBearer, receiver));
 
         assertThatThrownBy(() -> benefitContributionTransactionService.refund(new FundsBenefitContributionRefundRequest()
@@ -458,7 +458,7 @@ class FundsBenefitContributionTransactionServiceFlowTests extends FundsTransacti
                 .setOriginalOrderSn("ORDER_001")
                 .setRefundReason("partial order refund")
                 .setContextVariables(ReadonlyContextVariables.of(Map.of("rule_id", "RULE_001"))),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("扩展上下文不得承载核心金额、分摊或规则事实")
                 .hasMessageContaining("rule_id");
 

@@ -593,14 +593,14 @@ DSL 契约统一使用 `instrumentSn` 和 `instrumentDisplayNo`：前者作为�
 目标包结构：
 
 ```text
-transaction/transaction-face/src/main/java/com/wind/funds/transaction/application/
+transaction/face/src/main/java/com/wind/funds/transaction/application/
   FundsBenefitContributionTransactionService.java
 
-transaction/transaction-face/src/main/java/com/wind/funds/transaction/model/request/
+transaction/face/src/main/java/com/wind/funds/transaction/model/request/
   FundsBenefitContributionSettleRequest.java
   FundsBenefitContributionRefundRequest.java
 
-transaction/transaction-face/src/main/java/com/wind/funds/transaction/enums/
+transaction/face/src/main/java/com/wind/funds/transaction/enums/
   FundsBenefitFundingNature.java
 ```
 

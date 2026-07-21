@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.difference.impl;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
@@ -75,9 +75,9 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ReconciliationDifferenceDTO result = reconciliationDifferenceApplicationService.createDifference(
-                minimumCreateRequest(), WindOperator.system());
+                minimumCreateRequest(), WindOperatorFactory.system());
         ReconciliationDifferenceDTO replay = reconciliationDifferenceApplicationService.createDifference(
-                minimumCreateRequest(), WindOperator.system());
+                minimumCreateRequest(), WindOperatorFactory.system());
 
         assertThat(result.getDifferenceSn()).isEqualTo(DIFFERENCE_SN);
         assertThat(result.getReconciliationBatchSn()).isEqualTo(RECONCILIATION_BATCH_SN);
@@ -88,7 +88,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.BLOCKED);
         assertThat(result.getBlockingScope()).isEqualTo("CLEARING,PAYOUT");
         assertThat(result.getRerunCount()).isZero();
-        assertThat(result.getCreatedBy()).isEqualTo(String.valueOf(WindOperator.system().getOperatorId()));
+        assertThat(result.getCreatedBy()).isEqualTo(WindOperatorFactory.system().getOperatorAsText());
         assertThat(replay.getId()).isEqualTo(result.getId());
         assertThat(countDifferenceRows(DIFFERENCE_SN)).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -109,9 +109,9 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .setBlockingObjectType(ReconciliationGateObjectType.SETTLEMENT)
                 .setBlockingObjectSn("settlement-order-001");
         ReconciliationDifferenceDTO result = reconciliationDifferenceApplicationService.createDifference(
-                request, WindOperator.system());
+                request, WindOperatorFactory.system());
         ReconciliationDifferenceDTO replay = reconciliationDifferenceApplicationService.createDifference(
-                request, WindOperator.system());
+                request, WindOperatorFactory.system());
 
         assertThat(result.getBlockingScope()).isEqualTo("SETTLEMENT");
         assertThat(result.getBlockingObjectType()).isEqualTo(ReconciliationGateObjectType.SETTLEMENT);
@@ -134,12 +134,12 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
                 minimumCreateRequest()
                         .setBlockingObjectType(ReconciliationGateObjectType.CLEARING),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("创建对账差错阻断对象类型和流水号必须同时填写或同时为空");
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
                 minimumCreateRequest()
                         .setBlockingObjectSn("clearing-candidate-001"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("创建对账差错阻断对象类型和流水号必须同时填写或同时为空");
 
         assertThat(countDifferenceRows(DIFFERENCE_SN)).isZero();
@@ -155,16 +155,16 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     @Test
     void testAdjustmentLinkAndRerunShouldBeIdempotentAndCloseAfterBalancedRerun() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
 
         ReconciliationDifferenceDTO linked = reconciliationDifferenceApplicationService.linkAdjustmentResult(
-                minimumAdjustmentRequest(), WindOperator.system());
+                minimumAdjustmentRequest(), WindOperatorFactory.system());
         ReconciliationDifferenceDTO linkedReplay = reconciliationDifferenceApplicationService.linkAdjustmentResult(
-                minimumAdjustmentRequest(), WindOperator.system());
+                minimumAdjustmentRequest(), WindOperatorFactory.system());
         ReconciliationDifferenceDTO closed = reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest(), WindOperator.system());
+                minimumRerunRequest(), WindOperatorFactory.system());
         ReconciliationDifferenceDTO closedReplay = reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest(), WindOperator.system());
+                minimumRerunRequest(), WindOperatorFactory.system());
 
         assertThat(linked.getStatus()).isEqualTo(ReconciliationDifferenceStatus.ADJUSTING);
         assertThat(linked.getActionType()).isEqualTo(ReconciliationDifferenceActionType.ADJUST);
@@ -188,10 +188,10 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testAdjustmentLinkShouldRejectMissingWhitelistActionContext() {
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
-                adjustmentRequestWithoutWhitelistActionContext(), WindOperator.system()))
+                adjustmentRequestWithoutWhitelistActionContext(), WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错处理动作类型不能为空");
     }
 
@@ -204,16 +204,16 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     @Test
     void testCreateDifferenceShouldRejectIdempotentConflict() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
-                minimumCreateRequest().setDifferenceAmount(51L), WindOperator.system()))
+                minimumCreateRequest().setDifferenceAmount(51L), WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错幂等请求差异金额不一致");
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
                 minimumCreateRequest()
                         .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
                         .setBlockingObjectSn("clearing-candidate-001"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错幂等请求阻断对象类型不一致");
 
         assertThat(countDifferenceRows(DIFFERENCE_SN)).isOne();
@@ -229,13 +229,13 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     @Test
     void testRerunShouldRejectClosingDifferenceWithoutAdjustmentLink() {
         reconciliationDifferenceApplicationService.createDifference(
-                minimumCreateRequest().setDifferenceSn("recon_diff_mvp_002"), WindOperator.system());
+                minimumCreateRequest().setDifferenceSn("recon_diff_mvp_002"), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
                 minimumRerunRequest()
                         .setDifferenceSn("recon_diff_mvp_002")
                         .setRerunSn("recon_rerun_002"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("差错关闭必须先关联处理动作或调账结果");
     }
 
@@ -247,12 +247,12 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testRerunShouldRejectIdempotentConflict() {
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.recordRerunResult(minimumRerunRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.recordRerunResult(minimumRerunRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest().setResultDigest("sha256:changed-rerun-digest"), WindOperator.system()))
+                minimumRerunRequest().setResultDigest("sha256:changed-rerun-digest"), WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错重跑幂等请求结果摘要不一致");
     }
 
@@ -264,20 +264,20 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testAdjustmentLinkShouldRejectWhitelistContextConflict() {
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
                 minimumAdjustmentRequest().setIdempotencyKey("idem-recon-adjust-changed"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错处理幂等请求幂等键不一致");
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
                 minimumAdjustmentRequest().setOriginalFactRef("external-balance-anomaly:changed"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错处理幂等请求原始事实引用不一致");
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
                 minimumAdjustmentRequest().setActionType(ReconciliationDifferenceActionType.REVERSE),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错处理幂等请求动作类型不一致");
     }
 
@@ -289,16 +289,16 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
      */
     @Test
     void testResolvedDifferenceShouldRejectNewRerunResult() {
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.recordRerunResult(minimumRerunRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.recordRerunResult(minimumRerunRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
                 minimumRerunRequest()
                         .setRerunSn("recon_rerun_after_closed_001")
                         .setBalanced(false)
                         .setResultDigest("sha256:recon-rerun-after-closed-unbalanced"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错已关闭");
     }
 

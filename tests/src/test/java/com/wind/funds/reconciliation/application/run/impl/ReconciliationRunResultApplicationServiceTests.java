@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.run.impl;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
@@ -69,9 +69,9 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ReconciliationRunResultDTO first = reconciliationRunResultApplicationService.recordRunResult(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
         ReconciliationRunResultDTO replay = reconciliationRunResultApplicationService.recordRunResult(
-                minimumRequest(), WindOperator.system());
+                minimumRequest(), WindOperatorFactory.system());
 
         assertThat(first.getSn()).isNotBlank();
         assertThat(first.getResultDigest()).hasSize(64);
@@ -96,12 +96,12 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
      */
     @Test
     void testRecordShouldRejectChangedFactForSameBusinessKey() {
-        reconciliationRunResultApplicationService.recordRunResult(minimumRequest(), WindOperator.system());
+        reconciliationRunResultApplicationService.recordRunResult(minimumRequest(), WindOperatorFactory.system());
 
         RecordReconciliationRunResultRequest changed = minimumRequest();
         changed.getMatchResults().getFirst().setExternalSourceRef("external:clearing:002");
         assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
-                changed, WindOperator.system()))
+                changed, WindOperatorFactory.system()))
                 .hasMessageContaining("对账运行结果事实不一致");
 
         assertThat(runResultCount()).isOne();
@@ -126,7 +126,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                         .setEvidenceRef("report:clearing-recon-run-001#line-1")));
 
         ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperator.system());
+                request, WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ReconciliationRunResultStatus.DIFFERENCE_FOUND);
         assertThat(result.getTotalCount()).isOne();
@@ -145,7 +145,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
         request.getMatchResults().getFirst().setExternalSourceRef(null);
 
         assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperator.system()))
+                request, WindOperatorFactory.system()))
                 .hasMessageContaining("自动对平必须同时存在内部和外部来源引用");
 
         assertThat(runResultCount()).isZero();
@@ -168,7 +168,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                         .setEvidenceRef("report:clearing-recon-run-001#line-orphan")));
 
         ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperator.system());
+                request, WindOperatorFactory.system());
 
         assertThat(result.getStatus()).isEqualTo(ReconciliationRunResultStatus.DIFFERENCE_FOUND);
         assertThat(jdbcTemplate.queryForObject("""
@@ -191,7 +191,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                         exactMatchResult("001", "report:clearing-recon-run-001#line-2")));
 
         assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperator.system()))
+                request, WindOperatorFactory.system()))
                 .hasMessageContaining("不能重复使用同一内部和外部来源对");
 
         assertThat(runResultCount()).isZero();
@@ -214,9 +214,9 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                 .setEvidenceRefs(List.of("report:run-a", "report:run-b"));
 
         ReconciliationRunResultDTO first = reconciliationRunResultApplicationService.recordRunResult(
-                firstRequest, WindOperator.system());
+                firstRequest, WindOperatorFactory.system());
         ReconciliationRunResultDTO replay = reconciliationRunResultApplicationService.recordRunResult(
-                replayRequest, WindOperator.system());
+                replayRequest, WindOperatorFactory.system());
 
         assertThat(replay.getSn()).isEqualTo(first.getSn());
         assertThat(replay.getResultDigest()).isEqualTo(first.getResultDigest());
@@ -236,7 +236,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
                         exactMatchResult("002", "x".repeat(300))));
 
         assertThatThrownBy(() -> reconciliationRunResultApplicationService.recordRunResult(
-                request, WindOperator.system()));
+                request, WindOperatorFactory.system()));
 
         assertThat(runResultCount()).isZero();
         assertThat(matchResultCount()).isZero();
@@ -293,7 +293,7 @@ class ReconciliationRunResultApplicationServiceTests extends AbstractFundsServic
             startGate.await();
             try {
                 ReconciliationRunResultDTO result = reconciliationRunResultApplicationService.recordRunResult(
-                        minimumRequest(), WindOperator.system());
+                        minimumRequest(), WindOperatorFactory.system());
                 return new RunResultAttempt(true, result.getSn(), null);
             } catch (RuntimeException exception) {
                 return new RunResultAttempt(false, null, exception.getMessage());

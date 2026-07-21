@@ -5,11 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>com.wind.funds</groupId>
-        <artifactId>capte-funds</artifactId>
+        <artifactId>wind-funds</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>capte-funds-core</artifactId>
+    <artifactId>wind-funds-core</artifactId>
 
     <dependencies>
         <dependency>

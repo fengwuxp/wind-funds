@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.application.gate.impl;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
@@ -100,10 +100,10 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     @Test
     void testCheckGateShouldBlockClearingWhenScopedDifferenceIsUnresolved() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -134,7 +134,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
@@ -154,7 +154,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         jdbcTemplate.update("DELETE FROM t_reconciliation_run_result WHERE sn = ?", clearingRunResultSn);
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -175,7 +175,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 "report:clearing-recon-difference-001");
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -190,7 +190,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     @Test
     void testCheckGateShouldBlockWhenRunResultObjectDoesNotMatch() {
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest().setReconciliationRunResultSn(settlementRunResultSn), WindOperator.system());
+                clearingGateRequest().setReconciliationRunResultSn(settlementRunResultSn), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -206,10 +206,10 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     @Test
     void testCheckGateShouldPassWhenDifferenceScopeDoesNotMatch() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                settlementGateRequest(), WindOperator.system());
+                settlementGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
@@ -233,7 +233,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                         .setBlockingScope("CLEARING")
                         .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
                         .setBlockingObjectSn("clearing-candidate-001"),
-                WindOperator.system());
+                WindOperatorFactory.system());
         reconciliationDifferenceApplicationService.createDifference(
                 minimumCreateRequest()
                         .setDifferenceSn("recon_gate_diff_002")
@@ -242,10 +242,10 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                         .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
                         .setBlockingObjectSn("clearing-candidate-other")
                         .setEvidenceRef("processor-gate-file-digest-002"),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -274,10 +274,10 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                         .setBlockingScope("SETTLEMENT")
                         .setBlockingObjectType(ReconciliationGateObjectType.SETTLEMENT)
                         .setBlockingObjectSn("settlement-order-001"),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                settlementGateRequest(), WindOperator.system());
+                settlementGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -304,17 +304,17 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                         .setBlockingScope("CLEARING,SETTLEMENT")
                         .setBlockingObjectType(ReconciliationGateObjectType.SETTLEMENT)
                         .setBlockingObjectSn("settlement-order-001"),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         ReconciliationGateDecisionDTO settlementResult = reconciliationGateApplicationService.checkGate(
-                settlementGateRequest(), WindOperator.system());
+                settlementGateRequest(), WindOperatorFactory.system());
         String otherClearingRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.CLEARING,
                 "settlement-order-001", "recon-clearing-other-batch-001", "report:clearing-other-run-001");
         ReconciliationGateDecisionDTO clearingResult = reconciliationGateApplicationService.checkGate(
                 clearingGateRequest()
                         .setGateObjectSn("settlement-order-001")
                         .setReconciliationRunResultSn(otherClearingRunResultSn),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         assertThat(settlementResult.isPassed()).isFalse();
         assertThat(settlementResult.getBlockingDifferences())
@@ -349,7 +349,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     void testCheckGateShouldRejectNullRequest() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> reconciliationGateApplicationService.checkGate(null, WindOperator.system()))
+        assertThatThrownBy(() -> reconciliationGateApplicationService.checkGate(null, WindOperatorFactory.system()))
                 .hasMessageContaining("对账准入检查请求不能为空");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -364,16 +364,16 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     @Test
     void testCheckGateShouldKeepBlockedWhenAdjustmentLinkedButRerunUnbalanced() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
         reconciliationDifferenceApplicationService.recordRerunResult(
                 minimumRerunRequest()
                         .setBalanced(false)
                         .setResultDigest("sha256:gate-rerun-unbalanced"),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -396,12 +396,12 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     @Test
     void testCheckGateShouldConditionallyPassWhenScopedDifferenceResolvedByBalancedRerun() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.recordRerunResult(minimumRerunRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.recordRerunResult(minimumRerunRequest(), WindOperatorFactory.system());
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.CONDITIONALLY_PASSED);
@@ -423,16 +423,16 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     @Test
     void testCheckGateShouldNotReleaseWhenAdjustmentContextDriftIsRejected() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
                 minimumAdjustmentRequest().setOriginalFactRef("external-balance-anomaly:changed"),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错处理幂等请求原始事实引用不一致");
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -547,7 +547,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                 .setInternalSourceDigest("a".repeat(64))
                 .setExternalSourceDigest("b".repeat(64))
                 .setMatchResults(List.of(matchResult))
-                .setEvidenceRefs(List.of(evidenceRef)), WindOperator.system()).getSn();
+                .setEvidenceRefs(List.of(evidenceRef)), WindOperatorFactory.system()).getSn();
     }
 
     @Configuration

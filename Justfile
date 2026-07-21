@@ -44,10 +44,10 @@ verify-codegen:
     #!/usr/bin/env zsh
     set -euo pipefail
     required=(
-        ledger/ledger-impl/target/classes/com/wind/funds/ledger/dal/entities/table/LedgerNameRefs.class
-        transaction/transaction-impl/target/classes/com/wind/funds/transaction/dal/entities/table/FundsTransactionNameRefs.class
-        wallet/wallet-impl/target/classes/com/wind/funds/wallet/dal/entities/table/PaymentInstrumentBindingNameRefs.class
-        wallet/wallet-impl/target/classes/com/wind/funds/wallet/mapstruct/AccountHierarchyBindingConverterImpl.class
+        ledger/impl/target/classes/com/wind/funds/ledger/dal/entities/table/LedgerNameRefs.class
+        transaction/impl/target/classes/com/wind/funds/transaction/dal/entities/table/FundsTransactionNameRefs.class
+        wallet/impl/target/classes/com/wind/funds/wallet/dal/entities/table/PaymentInstrumentBindingNameRefs.class
+        wallet/impl/target/classes/com/wind/funds/wallet/mapstruct/AccountHierarchyBindingConverterImpl.class
     )
     missing=()
     for file in "${required[@]}"; do

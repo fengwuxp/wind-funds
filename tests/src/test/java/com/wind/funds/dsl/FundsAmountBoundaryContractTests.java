@@ -493,15 +493,15 @@ class FundsAmountBoundaryContractTests {
     }
 
     private FundsOperationActorSpec systemOperator() {
-        return new TestFundsOperationActorSpec(0L, "SYSTEM", "wind-funds-tests");
+        return new TestFundsOperationActorSpec("0", "SYSTEM", "wind-funds-tests");
     }
 
-    private record TestFundsOperationActorSpec(Long operatorId,
+    private record TestFundsOperationActorSpec(String operatorId,
                                                String operatorType,
                                                String appName) implements FundsOperationActorSpec {
 
         @Override
-        public Long getOperatorId() {
+        public String getOperatorId() {
             return operatorId;
         }
 

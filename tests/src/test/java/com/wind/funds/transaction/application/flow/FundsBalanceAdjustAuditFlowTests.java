@@ -2,7 +2,7 @@ package com.wind.funds.transaction.application.flow;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.spec.SourceObjectType;
@@ -63,7 +63,7 @@ class FundsBalanceAdjustAuditFlowTests extends FundsTransactionFlowTestSupport {
                 delta(adjustmentAccount, LedgerSubjectCode.ADJUSTMENT, 0L, CURRENCY));
 
         String businessSn = "BALANCE_ADJUST_EXTERNAL_ANOMALY";
-        balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user, businessSn), WindOperator.system());
+        balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user, businessSn), WindOperatorFactory.system());
 
         BalanceSnapshot afterAdjust = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(), adjustmentAccount));
         assertOnlyBalanceDeltas(afterTopup, afterAdjust,
@@ -97,19 +97,19 @@ class FundsBalanceAdjustAuditFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user,
                 "BALANCE_ADJUST_EXTERNAL_MISSING_FINAL_EVENT")
-                .setExternalFinalEventRef(null), WindOperator.system()))
+                .setExternalFinalEventRef(null), WindOperatorFactory.system()))
                 .hasMessageContaining("外部余额异常纠偏缺少外部终局事件引用");
         assertThatThrownBy(() -> balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user,
                 "BALANCE_ADJUST_EXTERNAL_MISSING_SNAPSHOT")
-                .setExternalBalanceSnapshotRef(null), WindOperator.system()))
+                .setExternalBalanceSnapshotRef(null), WindOperatorFactory.system()))
                 .hasMessageContaining("外部余额异常纠偏缺少外部余额快照引用");
         assertThatThrownBy(() -> balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user,
                 "BALANCE_ADJUST_EXTERNAL_MISSING_RECON")
-                .setReconciliationExceptionRef(null), WindOperator.system()))
+                .setReconciliationExceptionRef(null), WindOperatorFactory.system()))
                 .hasMessageContaining("外部余额异常纠偏缺少对账差错引用");
         assertThatThrownBy(() -> balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user,
                 "BALANCE_ADJUST_EXTERNAL_MISSING_RESPONSIBILITY")
-                .setResponsibilityRef(null), WindOperator.system()))
+                .setResponsibilityRef(null), WindOperatorFactory.system()))
                 .hasMessageContaining("外部余额异常纠偏缺少责任归属引用");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -143,7 +143,7 @@ class FundsBalanceAdjustAuditFlowTests extends FundsTransactionFlowTestSupport {
 
         String businessScene = "EXTERNAL_BALANCE_ANOMALY";
         String businessSn = "BALANCE_ADJUST_EXTERNAL_AUDIT_QUERY";
-        balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user, businessSn), WindOperator.system());
+        balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user, businessSn), WindOperatorFactory.system());
         String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
         BalanceSnapshot beforeAuditBalance = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(),
                 adjustmentAccount));
@@ -241,7 +241,7 @@ class FundsBalanceAdjustAuditFlowTests extends FundsTransactionFlowTestSupport {
 
         String businessScene = "EXTERNAL_BALANCE_ANOMALY";
         String businessSn = "BALANCE_ADJUST_INCOMPLETE_LEDGER";
-        balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user, businessSn), WindOperator.system());
+        balanceControlService.adjust(externalBalanceAnomalyAdjustRequest(user, businessSn), WindOperatorFactory.system());
         String transactionSn = fundsTransactionsByBusinessSn(businessSn).getFirst().getSn();
         clearLedgerFactsForFundsTransaction(transactionSn);
         BalanceSnapshot beforeAuditBalance = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(),

@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.services.impl;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
@@ -112,7 +112,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     void testCheckPayoutPreflightShouldRejectNullRequest() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> payoutOrderService.checkPayoutPreflight(null, WindOperator.system()))
+        assertThatThrownBy(() -> payoutOrderService.checkPayoutPreflight(null, WindOperatorFactory.system()))
                 .hasMessageContaining("出款前准入检查请求不能为空");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -129,7 +129,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
-                minimumPayoutPreflightRequest(), WindOperator.system());
+                minimumPayoutPreflightRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.BLOCKED);
@@ -147,7 +147,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                         PayoutPreflightBlockingReasonCode.EXTERNAL_RULE_UNVERIFIED,
                         PayoutPreflightBlockingReasonCode.APPROVAL_REQUIRED);
         assertThat(result.getCheckedAt()).isNotNull();
-        assertThat(result.getCheckedBy()).isEqualTo(String.valueOf(WindOperator.system().getOperatorId()));
+        assertThat(result.getCheckedBy()).isEqualTo(WindOperatorFactory.system().getOperatorAsText());
         assertThat(result.getExpiresAt()).isAfter(result.getCheckedAt());
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -163,7 +163,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
-                readyPayoutPreflightRequest(), WindOperator.system());
+                readyPayoutPreflightRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.PASSED);
@@ -195,7 +195,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                 readyPayoutPreflightRequest()
                         .setPayoutSn(null)
                         .setReconciliationRunResultSn(preCreateRunResultSn),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getFactStatus()).isEqualTo(PayoutPreflightFactStatus.PREFLIGHT_PASSED);
@@ -219,7 +219,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                         .setExternalRuleVerificationEvidence(new ExternalRuleVerificationEvidenceDTO()
                                 .setEvidenceRef("rule-evidence-incomplete")
                                 .setStatus(ExternalRuleVerificationStatus.VERIFIED)),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getExternalRuleVerificationStatus())
@@ -239,10 +239,10 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     @Test
     void testCheckPayoutPreflightShouldBlockWhenPayoutReconciliationGateBlocked() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(payoutDifferenceRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(payoutDifferenceRequest(), WindOperatorFactory.system());
 
         PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
-                readyPayoutPreflightRequest(), WindOperator.system());
+                readyPayoutPreflightRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.BLOCKED);
@@ -271,12 +271,12 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
     @Test
     void testCheckPayoutPreflightShouldPassWhenPayoutReconciliationGateConditionallyPassed() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(payoutDifferenceRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.linkAdjustmentResult(payoutAdjustmentRequest(), WindOperator.system());
-        reconciliationDifferenceApplicationService.recordRerunResult(payoutRerunRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(payoutDifferenceRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(payoutAdjustmentRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.recordRerunResult(payoutRerunRequest(), WindOperatorFactory.system());
 
         PayoutPreflightResultDTO result = payoutOrderService.checkPayoutPreflight(
-                readyPayoutPreflightRequest(), WindOperator.system());
+                readyPayoutPreflightRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getBlockingLevel()).isEqualTo(PayoutPreflightBlockingLevel.PASSED);
@@ -386,7 +386,7 @@ class PayoutPreflightServiceTests extends AbstractFundsServiceTest {
                         .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
                         .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
                         .setEvidenceRef(evidenceRef + "#line-1")))
-                .setEvidenceRefs(List.of(evidenceRef)), WindOperator.system()).getSn();
+                .setEvidenceRefs(List.of(evidenceRef)), WindOperatorFactory.system()).getSn();
     }
 
     @Configuration

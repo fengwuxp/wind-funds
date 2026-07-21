@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.application.spend;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -91,7 +91,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
     private static final String OWNER_ID = "budget_limit_adjust_owner";
 
-    private static final String OPERATOR_ID = String.valueOf(WindOperator.system().getOperatorId());
+    private static final String OPERATOR_ID = WindOperatorFactory.system().getOperatorAsText();
 
     private static final String REASON_CODE = "BUDGET_RULE_LIMIT_CHANGE";
 
@@ -134,7 +134,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
 
         BudgetControlLimitAdjustmentResultDTO result = budgetControlLimitAdjustmentApplicationService.adjustLimit(
                 adjustRequest(LIMIT_INCREASE_ACTIVITY_SN, INCREASE_BUSINESS_SN, true,
-                        "sha256:budget-limit-increase"), WindOperator.system());
+                        "sha256:budget-limit-increase"), WindOperatorFactory.system());
 
         assertThat(result.getMovementSn()).isEqualTo(LIMIT_INCREASE_ACTIVITY_SN);
         assertThat(result.getMovementType()).isEqualTo(SpendControlMovementType.LIMIT_INCREASED);
@@ -193,9 +193,9 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
                 true, "sha256:budget-limit-replay");
 
         BudgetControlLimitAdjustmentResultDTO first = budgetControlLimitAdjustmentApplicationService.adjustLimit(
-                request, WindOperator.system());
+                request, WindOperatorFactory.system());
         BudgetControlLimitAdjustmentResultDTO replayed = budgetControlLimitAdjustmentApplicationService.adjustLimit(
-                request, WindOperator.system());
+                request, WindOperatorFactory.system());
 
         assertThat(replayed.getMovementId()).isEqualTo(first.getMovementId());
         assertThat(replayed.getMovementDigest()).isEqualTo(first.getMovementDigest());
@@ -216,11 +216,11 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         prepareBudgetControlLimitAdjustmentData();
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_REPLAY_ACTIVITY_SN,
-                REPLAY_BUSINESS_SN, true, "sha256:budget-limit-replay"), WindOperator.system());
+                REPLAY_BUSINESS_SN, true, "sha256:budget-limit-replay"), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
                 adjustRequest(LIMIT_REPLAY_ACTIVITY_SN, REPLAY_BUSINESS_SN, true,
-                        "sha256:budget-limit-replay-conflict"), WindOperator.system()))
+                        "sha256:budget-limit-replay-conflict"), WindOperatorFactory.system()))
                 .hasMessageContaining("控制额度变动流水已存在但摘要不一致");
 
         assertThat(activityCount(LIMIT_REPLAY_ACTIVITY_SN)).isOne();
@@ -241,7 +241,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
                 adjustRequest("budget_limit_tenant_mismatch_001", TENANT_MISMATCH_BUSINESS_SN, true,
                         "sha256:budget-limit-tenant-mismatch").setTenantId(TENANT_ID + 1),
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("预算控制额度调整 tenantId 与当前租户不一致");
 
         assertThat(activityCount("budget_limit_tenant_mismatch_001")).isZero();
@@ -259,13 +259,13 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     void testDecreaseLimitShouldRejectWhenAdjustedLimitBelowOccupiedControlAmount() {
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
-                INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"), WindOperator.system());
+                INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"), WindOperatorFactory.system());
         spendControlMovementService.recordMovement(reservedRequest());
         LedgerFactSnapshot beforeReject = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
                 adjustRequest(LIMIT_DECREASE_ACTIVITY_SN, DECREASE_BUSINESS_SN, false,
-                        "sha256:budget-limit-decrease").setAmount(50L), WindOperator.system()))
+                        "sha256:budget-limit-decrease").setAmount(50L), WindOperatorFactory.system()))
                 .hasMessageContaining("预算控制额度调减不能低于已使用或已占用控制金额");
 
         assertThat(activityCount(LIMIT_DECREASE_ACTIVITY_SN)).isZero();
@@ -283,7 +283,7 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     void testProjectionShouldDeductNetConsumedAndOccupiedAmountFromAvailableControlLimit() {
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
-                INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"), WindOperator.system());
+                INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"), WindOperatorFactory.system());
         spendControlMovementService.recordMovement(reservedRequest());
         spendControlMovementService.recordMovement(consumedRequest());
         spendControlMovementService.recordMovement(refundCompensatedRequest());
@@ -313,14 +313,14 @@ class BudgetControlLimitAdjustmentApplicationServiceTests extends AbstractFundsS
     void testDecreaseLimitShouldRejectWhenAdjustedLimitBelowConsumedAndOccupiedControlAmount() {
         prepareBudgetControlLimitAdjustmentData();
         budgetControlLimitAdjustmentApplicationService.adjustLimit(adjustRequest(LIMIT_INCREASE_ACTIVITY_SN,
-                INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"), WindOperator.system());
+                INCREASE_BUSINESS_SN, true, "sha256:budget-limit-increase"), WindOperatorFactory.system());
         spendControlMovementService.recordMovement(reservedRequest());
         spendControlMovementService.recordMovement(consumedRequest());
         LedgerFactSnapshot beforeReject = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> budgetControlLimitAdjustmentApplicationService.adjustLimit(
                 adjustRequest(LIMIT_DECREASE_ACTIVITY_SN, DECREASE_BUSINESS_SN, false,
-                        "sha256:budget-limit-decrease").setAmount(50L), WindOperator.system()))
+                        "sha256:budget-limit-decrease").setAmount(50L), WindOperatorFactory.system()))
                 .hasMessageContaining("预算控制额度调减不能低于已使用或已占用控制金额");
 
         assertThat(activityCount(LIMIT_DECREASE_ACTIVITY_SN)).isZero();

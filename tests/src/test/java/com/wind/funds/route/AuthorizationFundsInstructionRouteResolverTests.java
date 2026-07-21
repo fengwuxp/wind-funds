@@ -131,7 +131,7 @@ class AuthorizationFundsInstructionRouteResolverTests {
                 .businessSn("NO_AUTH_REFUND_BY_EXTERNAL_REFERENCE")
                 .eventTime(LocalDateTime.of(2026, 6, 4, 0, 0))
                 .operator(ImmutableFundsOperationActorSpec.builder()
-                        .operatorId(1L)
+                        .operatorId("1")
                         .operatorType("SYSTEM")
                         .appName("wind-funds-tests")
                         .contextVariables(Map.of())

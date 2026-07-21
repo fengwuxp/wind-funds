@@ -1,20 +1,22 @@
 package com.wind.funds;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
-import com.capte.infrastructure.dal.mybatisflex.MybatisFlexQueryBehaviorFuncs;
 import com.mybatisflex.core.audit.AuditManager;
 import com.mybatisflex.core.query.QueryColumnBehavior;
 import com.mybatisflex.spring.FlexTransactionManager;
 import com.mybatisflex.spring.boot.ConfigurationCustomizer;
 import com.mybatisflex.spring.boot.v4.MybatisFlexAutoConfiguration;
 import com.zaxxer.hikari.HikariDataSource;
+import com.wind.common.exception.AssertUtils;
 import com.wind.common.locks.JdkLockFactory;
 import com.wind.common.locks.LockFactory;
 import com.wind.common.spring.SpringEventPublishUtils;
 import com.wind.common.spring.SpringApplicationContextUtils;
 import com.wind.integration.infrastructure.locks.LockTemplate;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.mybatis.convert.LocaleTypeHandler;
 import com.wind.mybatis.encrypt.AbstractEncryptBaseTypeHandler;
+import com.wind.security.core.WindSecurityAccessOperations;
 import com.wind.server.i18n.WindMessageSourceProperties;
 import com.wind.tools.h2.H2FunctionInitializer;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -50,9 +52,12 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ObjectUtils;
 
 import javax.sql.DataSource;
+import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.Locale;
 import java.util.Set;
 
@@ -71,6 +76,10 @@ import java.util.Set;
 @EnableAspectJAutoProxy(proxyTargetClass = true)
 @Transactional(rollbackFor = Exception.class)
 public abstract class AbstractFundsServiceTest {
+
+    private static final int QUERY_IN_MAX_SIZE = 5120;
+
+    private static final String QUERY_IN_SIZE_ERROR_MESSAGE = "database query in op size range in >=1 && <5120";
 
     protected static final Long TENANT_ID = 1L;
 
@@ -100,7 +109,8 @@ public abstract class AbstractFundsServiceTest {
             JdbcTemplateAutoConfiguration.class,
             DataSourceInitializationAutoConfiguration.class,
             H2InitializationAutoConfiguration.class,
-            MybatisFlexAutoConfiguration.class
+            MybatisFlexAutoConfiguration.class,
+            WindOperatorFactory.class
     })
     public static class TestCoreInfrastructureConfig {
 
@@ -142,6 +152,21 @@ public abstract class AbstractFundsServiceTest {
         @Bean
         public CacheManager cacheManager() {
             return new CaffeineCacheManager();
+        }
+
+        @Bean
+        public WindSecurityAccessOperations windSecurityAccessOperations() {
+            return new WindSecurityAccessOperations() {
+                @Override
+                public boolean hasAnyAuthority(String... authorities) {
+                    return false;
+                }
+
+                @Override
+                public boolean hasAnyRole(String... roles) {
+                    return false;
+                }
+            };
         }
 
         @Bean
@@ -230,7 +255,7 @@ public abstract class AbstractFundsServiceTest {
                     return encryptedText;
                 }
             });
-            QueryColumnBehavior.setIgnoreFunction(MybatisFlexQueryBehaviorFuncs::ignoreFunction);
+            QueryColumnBehavior.setIgnoreFunction(AbstractFundsServiceTest::shouldIgnoreQueryValue);
         }
 
         @Bean
@@ -238,6 +263,28 @@ public abstract class AbstractFundsServiceTest {
             return configuration -> configuration.getTypeHandlerRegistry()
                     .register(Locale.class, LocaleTypeHandler.class);
         }
+    }
+
+    static boolean shouldIgnoreQueryValue(Object value) {
+        if (ObjectUtils.isEmpty(value)) {
+            return true;
+        }
+        if (value instanceof Collection<?> elements) {
+            AssertUtils.isTrue(elements.size() < QUERY_IN_MAX_SIZE, QUERY_IN_SIZE_ERROR_MESSAGE);
+        }
+        if (value.getClass().isArray()) {
+            int length = Array.getLength(value);
+            if (length == 1) {
+                return shouldIgnoreQueryValue(Array.get(value, 0));
+            }
+            AssertUtils.isTrue(length < QUERY_IN_MAX_SIZE, QUERY_IN_SIZE_ERROR_MESSAGE);
+            for (int index = 0; index < length; index++) {
+                if (Array.get(value, index) == null) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     protected static void setTestApplicationEventPublisher(ApplicationEventPublisher publisher) {

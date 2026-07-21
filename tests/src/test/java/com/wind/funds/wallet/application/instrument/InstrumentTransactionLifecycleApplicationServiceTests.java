@@ -2,7 +2,8 @@ package com.wind.funds.wallet.application.instrument;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.DefaultLedgerTransactionPostingServiceImpl;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
@@ -207,7 +208,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         AuthorizeByPaymentInstrumentRequest request = authorizeRequest();
 
         String authorizationSn = instrumentTransactionLifecycleApplicationService.authorizeByInstrument(request,
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         assertThat(authorizationSn).isEqualTo(DELEGATED_AUTHORIZATION_SN);
         assertThat(authorizationAdmissionApplicationService.getInvocationCount()).isOne();
@@ -228,7 +229,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         assertBucket(beforeReceive, LedgerSubjectCode.AVAILABLE, 0L, CurrencyIsoCode.USD);
 
         String transactionSn = instrumentTransactionLifecycleApplicationService.receiveByInstrument(
-                receiveRequest(RECEIVE_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperator.system());
+                receiveRequest(RECEIVE_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperatorFactory.system());
 
         assertThat(transactionSn).isNotBlank();
         FundsSubjectBalanceDTO afterReceive = balance(receiveAccount);
@@ -266,7 +267,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setChannelCode("mystery_rail");
 
         assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.receiveByInstrument(request,
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("收款渠道编码不支持")
                 .hasMessageContaining("mystery_rail")
                 .hasMessageContaining("支持的收款渠道");
@@ -288,7 +289,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.receiveByInstrument(
-                receiveRequest(DIRECTION_FAIL_BUSINESS_SN, PAYMENT_ONLY_INSTRUMENT_SN), WindOperator.system()))
+                receiveRequest(DIRECTION_FAIL_BUSINESS_SN, PAYMENT_ONLY_INSTRUMENT_SN), WindOperatorFactory.system()))
                 .hasMessageContaining("支付工具资金流向不支持当前动作");
 
         assertNoFundsOrLedgerFacts(DIRECTION_FAIL_BUSINESS_SN);
@@ -310,7 +311,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setExpectedBindingVersion(null);
 
         assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.receiveByInstrument(request,
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("支付工具收款绑定版本不能为空");
 
         assertNoFundsOrLedgerFacts(MISSING_BINDING_VERSION_BUSINESS_SN);
@@ -327,7 +328,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
     void testPayOutByRailShouldResolveTargetAccountAndDelegateWithdrawKernel() {
         createReceiveScenario();
         instrumentTransactionLifecycleApplicationService.receiveByInstrument(
-                receiveRequest(RECEIVE_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperator.system());
+                receiveRequest(RECEIVE_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperatorFactory.system());
         createPayoutInstrumentScenario();
         FundsAccountId receiveAccount = receiveAccountId();
         String freezeSn = freezeForPayout(receiveAccount);
@@ -336,7 +337,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
         assertBucket(afterFreeze, LedgerSubjectCode.FROZEN, 70L, CurrencyIsoCode.USD);
 
         String transactionSn = instrumentTransactionLifecycleApplicationService.payOutByRail(
-                payoutRequest().setReferenceFreezeSn(freezeSn), WindOperator.system());
+                payoutRequest().setReferenceFreezeSn(freezeSn), WindOperatorFactory.system());
 
         assertThat(transactionSn).isNotBlank();
         FundsSubjectBalanceDTO afterPayout = balance(receiveAccount);
@@ -374,7 +375,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setReferenceFreezeSn("freeze_not_used_for_unknown_rail");
 
         assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.payOutByRail(request,
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("出款 rail 编码不支持")
                 .hasMessageContaining("mystery_rail")
                 .hasMessageContaining("支持的出款 rail");
@@ -398,7 +399,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setReferenceFreezeSn("freeze_not_used_for_processing");
 
         assertThatThrownBy(() -> instrumentTransactionLifecycleApplicationService.payOutByRail(request,
-                WindOperator.system()))
+                WindOperatorFactory.system()))
                 .hasMessageContaining("外部出款非终态成功状态不得关闭内部冻结资金");
 
         assertNoFundsOrLedgerFacts(PROCESSING_PAYOUT_BUSINESS_SN);
@@ -649,7 +650,7 @@ class InstrumentTransactionLifecycleApplicationServiceTests extends AbstractFund
                 .setAmount(Money.immutable(70L, CurrencyIsoCode.USD))
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(PAYOUT_FREEZE_BUSINESS_SN)
-                .setDescription("instrument payout freeze"), WindOperator.system());
+                .setDescription("instrument payout freeze"), WindOperatorFactory.system());
     }
 
     private AuthorizeByPaymentInstrumentRequest authorizeRequest() {

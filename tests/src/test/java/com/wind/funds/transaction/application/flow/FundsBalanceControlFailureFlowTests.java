@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.wind.funds.support.FundsBalanceAssertionSupport.BalanceSnapshot;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
@@ -93,7 +93,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setAmount(Money.immutable(10L, CurrencyIsoCode.CNY))
                 .setBusinessScene("FREEZE")
                 .setBusinessSn("BALANCE_FREEZE_CURRENCY_FREEZE")
-                .setDescription("freeze with different currency"), WindOperator.system()))
+                .setDescription("freeze with different currency"), WindOperatorFactory.system()))
                 .hasMessageContaining("amount currency must equal account currency");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -137,7 +137,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setAmount(Money.immutable(0L, CURRENCY))
                 .setBusinessScene("FREEZE")
                 .setBusinessSn("BALANCE_FREEZE_ZERO_FREEZE")
-                .setDescription("freeze with zero amount"), WindOperator.system()))
+                .setDescription("freeze with zero amount"), WindOperatorFactory.system()))
                 .hasMessageContaining("fundsInstruction.amount must be positive");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -244,7 +244,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setReferenceFreezeSn(freezeSn)
                 .setBusinessScene("UNFREEZE")
                 .setBusinessSn("BALANCE_UNFREEZE_CURRENCY_RELEASE")
-                .setDescription("unfreeze with different currency"), WindOperator.system()))
+                .setDescription("unfreeze with different currency"), WindOperatorFactory.system()))
                 .hasMessageContaining("amount currency must equal account currency");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -300,7 +300,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setAmount(Money.immutable(10L, CURRENCY))
                 .setBusinessScene("UNFREEZE")
                 .setBusinessSn("BALANCE_UNFREEZE_MISSING_REF_RELEASE")
-                .setDescription("unfreeze without reference freeze sn"), WindOperator.system()))
+                .setDescription("unfreeze without reference freeze sn"), WindOperatorFactory.system()))
                 .hasMessageContaining("余额解冻缺少原冻结单引用");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -357,7 +357,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setReferenceFreezeSn("FREEZE_ORDER_NOT_EXISTS")
                 .setBusinessScene("UNFREEZE")
                 .setBusinessSn("BALANCE_UNFREEZE_UNKNOWN_REF_RELEASE")
-                .setDescription("unfreeze with unknown reference freeze sn"), WindOperator.system()))
+                .setDescription("unfreeze with unknown reference freeze sn"), WindOperatorFactory.system()))
                 .hasMessageContaining("RouteSnapshot 回放事件未找到原路径快照");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -421,7 +421,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setReferenceFreezeSn(freezeSn)
                 .setBusinessScene("UNFREEZE")
                 .setBusinessSn("BALANCE_UNFREEZE_ACCOUNT_RELEASE")
-                .setDescription("unfreeze with different account reference"), WindOperator.system()))
+                .setDescription("unfreeze with different account reference"), WindOperatorFactory.system()))
                 .hasMessageContaining("冻结单引用主体与请求账户不一致");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, anotherUser, cashMappingAccount(), prepaymentAccount()));
@@ -482,7 +482,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setReferenceFreezeSn(freezeSn)
                 .setBusinessScene("UNFREEZE")
                 .setBusinessSn("BALANCE_UNFREEZE_ZERO_RELEASE")
-                .setDescription("unfreeze with zero amount"), WindOperator.system()))
+                .setDescription("unfreeze with zero amount"), WindOperatorFactory.system()))
                 .hasMessageContaining("fundsInstruction.amount must be positive");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -603,7 +603,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setAdjustReason("customer service balance adjust")
                 .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_ZERO")
                 .setApprovalRef("APPROVAL_BALANCE_ADJUST_ZERO")
-                .setDescription("balance adjust with zero amount"), WindOperator.system()))
+                .setDescription("balance adjust with zero amount"), WindOperatorFactory.system()))
                 .hasMessageContaining("fundsInstruction.amount must be positive");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -650,7 +650,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setAdjustReason("customer service balance adjust")
                 .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_CURRENCY")
                 .setApprovalRef("APPROVAL_BALANCE_ADJUST_CURRENCY")
-                .setDescription("balance adjust with different currency"), WindOperator.system()))
+                .setDescription("balance adjust with different currency"), WindOperatorFactory.system()))
                 .hasMessageContaining("amount currency must equal account currency");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -870,7 +870,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setAdjustReason("customer service balance decrease adjust")
                 .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_DECREASE_FAIL")
                 .setApprovalRef("APPROVAL_BALANCE_ADJUST_DECREASE_FAIL")
-                .setDescription("balance decrease adjust exceeds available"), WindOperator.system()))
+                .setDescription("balance decrease adjust exceeds available"), WindOperatorFactory.system()))
                 .hasMessageContaining("账本余额不足");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount(), adjustmentAccount));
@@ -903,16 +903,16 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
         LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
-                "BALANCE_ADJUST_AUDIT_MISSING_REASON"), WindOperator.system()))
+                "BALANCE_ADJUST_AUDIT_MISSING_REASON"), WindOperatorFactory.system()))
                 .hasMessageContaining("余额调账缺少调账原因");
         assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
                 "BALANCE_ADJUST_AUDIT_MISSING_EVIDENCE")
-                .setAdjustReason("customer service balance adjust"), WindOperator.system()))
+                .setAdjustReason("customer service balance adjust"), WindOperatorFactory.system()))
                 .hasMessageContaining("余额调账缺少调账凭证");
         assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
                 "BALANCE_ADJUST_AUDIT_MISSING_APPROVAL")
                 .setAdjustReason("customer service balance adjust")
-                .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_001"), WindOperator.system()))
+                .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_001"), WindOperatorFactory.system()))
                 .hasMessageContaining("余额调账缺少审批引用");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));
@@ -949,7 +949,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_SENSITIVE_CONTEXT")
                 .setApprovalRef("APPROVAL_BALANCE_ADJUST_SENSITIVE_CONTEXT")
                 .setContextVariables(WritableContextVariables.of(Map.of("externalAccount",
-                        Map.of("bankAccountNo", "123456789012")))), WindOperator.system()))
+                        Map.of("bankAccountNo", "123456789012")))), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
         assertThatThrownBy(() -> balanceControlService.adjust(balanceAdjustRequest(user,
                 "BALANCE_ADJUST_SENSITIVE_CONTEXT_IBAN_VALUE")
@@ -957,7 +957,7 @@ class FundsBalanceControlFailureFlowTests extends FundsTransactionFlowTestSuppor
                 .setAdjustEvidenceRef("EVIDENCE_BALANCE_ADJUST_SENSITIVE_CONTEXT_IBAN_VALUE")
                 .setApprovalRef("APPROVAL_BALANCE_ADJUST_SENSITIVE_CONTEXT_IBAN_VALUE")
                 .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
-                        Map.of("networkReference", "GB82WEST12345698765432")))), WindOperator.system()))
+                        Map.of("networkReference", "GB82WEST12345698765432")))), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterFailure = snapshot(balances(user, cashMappingAccount(), prepaymentAccount()));

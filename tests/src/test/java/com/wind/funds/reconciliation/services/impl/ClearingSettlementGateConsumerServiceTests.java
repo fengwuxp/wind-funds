@@ -1,6 +1,6 @@
 package com.wind.funds.reconciliation.services.impl;
 
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
@@ -103,10 +103,10 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
     @Test
     void testCheckClearingGateShouldBlockWhenObjectLevelDifferenceUnresolvedWithoutLedgerFactsMutation() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
 
         ClearingSettlementGateResultDTO result = clearingSettlementGateConsumerService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -122,7 +122,7 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
         assertThat(result.getExplanation()).contains("阻断");
         assertThat(result.getOperationStatus()).isEqualTo("BLOCKED");
         assertThat(result.getCheckedAt()).isNotNull();
-        assertThat(result.getCheckedBy()).isEqualTo(String.valueOf(WindOperator.system().getOperatorId()));
+        assertThat(result.getCheckedBy()).isEqualTo(WindOperatorFactory.system().getOperatorAsText());
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -136,10 +136,10 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
     void testCheckSettlementGateShouldBlockWhenObjectLevelDifferenceUnresolvedWithoutLedgerFactsMutation() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         reconciliationDifferenceApplicationService.createDifference(settlementDifferenceRequest(),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         ClearingSettlementGateResultDTO result = clearingSettlementGateConsumerService.checkGate(
-                settlementGateRequest(), WindOperator.system());
+                settlementGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
@@ -163,10 +163,10 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
         reconciliationDifferenceApplicationService.createDifference(
                 clearingDifferenceRequest()
                         .setBlockingObjectSn("clearing-candidate-other"),
-                WindOperator.system());
+                WindOperatorFactory.system());
 
         ClearingSettlementGateResultDTO result = clearingSettlementGateConsumerService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
@@ -185,13 +185,13 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
     @Test
     void testCheckClearingGateShouldConditionallyPassWhenDifferenceResolvedByBalancedRerun() {
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
-        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperator.system());
+        reconciliationDifferenceApplicationService.createDifference(clearingDifferenceRequest(), WindOperatorFactory.system());
         reconciliationDifferenceApplicationService.linkAdjustmentResult(clearingAdjustmentRequest(),
-                WindOperator.system());
-        reconciliationDifferenceApplicationService.recordRerunResult(clearingRerunRequest(), WindOperator.system());
+                WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.recordRerunResult(clearingRerunRequest(), WindOperatorFactory.system());
 
         ClearingSettlementGateResultDTO result = clearingSettlementGateConsumerService.checkGate(
-                clearingGateRequest(), WindOperator.system());
+                clearingGateRequest(), WindOperatorFactory.system());
 
         assertThat(result.isPassed()).isTrue();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.CONDITIONALLY_PASSED);
@@ -214,12 +214,12 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
 
         assertThatThrownBy(() -> clearingSettlementGateConsumerService.checkGate(
-                clearingGateRequest().setGateObjectType(ReconciliationGateObjectType.PAYOUT), WindOperator.system()))
+                clearingGateRequest().setGateObjectType(ReconciliationGateObjectType.PAYOUT), WindOperatorFactory.system()))
                 .hasMessageContaining("清算结算对账准入消费对象类型仅支持 CLEARING 或 SETTLEMENT");
         assertThatThrownBy(() -> clearingSettlementGateConsumerService.checkGate(
-                clearingGateRequest().setGateObjectSn(" "), WindOperator.system()))
+                clearingGateRequest().setGateObjectSn(" "), WindOperatorFactory.system()))
                 .hasMessageContaining("清算结算对账准入消费对象流水号不能为空");
-        assertThatThrownBy(() -> clearingSettlementGateConsumerService.checkGate(null, WindOperator.system()))
+        assertThatThrownBy(() -> clearingSettlementGateConsumerService.checkGate(null, WindOperatorFactory.system()))
                 .hasMessageContaining("清算结算对账准入检查请求不能为空");
 
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -320,7 +320,7 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
                         .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
                         .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
                         .setEvidenceRef(evidenceRef + "#line-1")))
-                .setEvidenceRefs(List.of(evidenceRef)), WindOperator.system()).getSn();
+                .setEvidenceRefs(List.of(evidenceRef)), WindOperatorFactory.system()).getSn();
     }
 
     @Configuration

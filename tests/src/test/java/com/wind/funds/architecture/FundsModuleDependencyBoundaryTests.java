@@ -2,6 +2,7 @@ package com.wind.funds.architecture;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.util.StringUtils;
+import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
@@ -27,41 +28,77 @@ class FundsModuleDependencyBoundaryTests {
 
     private static final List<String> PRODUCTION_MODULE_POMS = List.of(
             "core/pom.xml",
-            "fx/fx-impl/pom.xml",
-            "ledger/ledger-face/pom.xml",
-            "ledger/ledger-impl/pom.xml",
-            "transaction/transaction-face/pom.xml",
-            "transaction/transaction-impl/pom.xml",
-            "wallet/wallet-face/pom.xml",
-            "wallet/wallet-impl/pom.xml",
-            "reconciliation/reconciliation-face/pom.xml",
-            "reconciliation/reconciliation-impl/pom.xml",
-            "governance/governance-face/pom.xml",
-            "governance/governance-impl/pom.xml");
+            "fx/impl/pom.xml",
+            "ledger/face/pom.xml",
+            "ledger/impl/pom.xml",
+            "transaction/face/pom.xml",
+            "transaction/impl/pom.xml",
+            "wallet/face/pom.xml",
+            "wallet/impl/pom.xml",
+            "reconciliation/face/pom.xml",
+            "reconciliation/impl/pom.xml",
+            "governance/face/pom.xml",
+            "governance/impl/pom.xml");
+
+    private static final List<String> PROJECT_POMS = Stream.concat(
+            Stream.of(
+                    "pom.xml",
+                    "fx/pom.xml",
+                    "ledger/pom.xml",
+                    "wallet/pom.xml",
+                    "transaction/pom.xml",
+                    "reconciliation/pom.xml",
+                    "governance/pom.xml",
+                    "tests/pom.xml",
+                    "dependencies/pom.xml"),
+            PRODUCTION_MODULE_POMS.stream()).toList();
+
+    private static final List<String> ROOT_MODULES = List.of(
+            "core",
+            "fx",
+            "ledger",
+            "wallet",
+            "transaction",
+            "reconciliation",
+            "governance",
+            "tests",
+            "dependencies");
+
+    private static final Map<String, List<String>> CAPABILITY_AGGREGATE_MODULES = Map.of(
+            "fx/pom.xml", List.of("impl"),
+            "ledger/pom.xml", List.of("face", "impl"),
+            "wallet/pom.xml", List.of("face", "impl"),
+            "transaction/pom.xml", List.of("face", "impl"),
+            "reconciliation/pom.xml", List.of("face", "impl"),
+            "governance/pom.xml", List.of("face", "impl"));
+
+    private static final String LEGACY_FUNDS_ARTIFACT_PREFIX = String.join("-", "capte", "funds");
 
     private static final List<String> FACE_MODULE_POMS = List.of(
-            "ledger/ledger-face/pom.xml",
-            "transaction/transaction-face/pom.xml",
-            "wallet/wallet-face/pom.xml",
-            "reconciliation/reconciliation-face/pom.xml",
-            "governance/governance-face/pom.xml");
+            "ledger/face/pom.xml",
+            "transaction/face/pom.xml",
+            "wallet/face/pom.xml",
+            "reconciliation/face/pom.xml",
+            "governance/face/pom.xml");
 
-    private static final List<String> FACE_ALLOWED_FUNDS_ARTIFACTS = List.of("capte-funds-core");
+    private static final List<String> FACE_ALLOWED_FUNDS_ARTIFACTS = List.of("wind-funds-core");
+
+    private static final String CAPTE_DAL_INFRASTRUCTURE_ARTIFACT = "catep-infrastructure-dal";
 
     private static final List<String> CORE_FORBIDDEN_ARTIFACTS = List.of(
-            "capte-funds-fx-impl",
-            "capte-funds-ledger-face",
-            "capte-funds-ledger-impl",
-            "capte-funds-transaction-face",
-            "capte-funds-transaction-impl",
-            "capte-funds-wallet-face",
-            "capte-funds-wallet-impl",
-            "capte-funds-reconciliation-face",
-            "capte-funds-reconciliation-impl",
-            "capte-funds-governance-face",
-            "capte-funds-governance-impl",
-            "capte-funds-tests",
-            "catep-infrastructure-dal");
+            "wind-funds-fx-impl",
+            "wind-funds-ledger-face",
+            "wind-funds-ledger-impl",
+            "wind-funds-transaction-face",
+            "wind-funds-transaction-impl",
+            "wind-funds-wallet-face",
+            "wind-funds-wallet-impl",
+            "wind-funds-reconciliation-face",
+            "wind-funds-reconciliation-impl",
+            "wind-funds-governance-face",
+            "wind-funds-governance-impl",
+            "wind-funds-tests",
+            CAPTE_DAL_INFRASTRUCTURE_ARTIFACT);
 
     private static final String CORE_FORBIDDEN_SPRING_DEPENDENCY_GROUP_TOKEN =
             "<groupId>org.springframework";
@@ -70,40 +107,40 @@ class FundsModuleDependencyBoundaryTests {
             "import org.springframework.");
 
     private static final Map<String, List<String>> MODULE_FORBIDDEN_ARTIFACTS = Map.of(
-            "fx/fx-impl/pom.xml", List.of(
-                    "capte-funds-ledger-face",
-                    "capte-funds-ledger-impl",
-                    "capte-funds-transaction-face",
-                    "capte-funds-transaction-impl",
-                    "capte-funds-wallet-face",
-                    "capte-funds-wallet-impl",
-                    "capte-funds-reconciliation-face",
-                    "capte-funds-reconciliation-impl",
-                    "capte-funds-governance-face",
-                    "capte-funds-governance-impl"),
-            "ledger/ledger-impl/pom.xml", List.of(
-                    "capte-funds-wallet-face",
-                    "capte-funds-wallet-impl",
-                    "capte-funds-transaction-face",
-                    "capte-funds-transaction-impl"),
-            "transaction/transaction-impl/pom.xml", List.of(
-                    "capte-funds-ledger-face",
-                    "capte-funds-ledger-impl"),
-            "wallet/wallet-impl/pom.xml", List.of(
-                    "capte-funds-transaction-face",
-                    "capte-funds-transaction-impl"));
+            "fx/impl/pom.xml", List.of(
+                    "wind-funds-ledger-face",
+                    "wind-funds-ledger-impl",
+                    "wind-funds-transaction-face",
+                    "wind-funds-transaction-impl",
+                    "wind-funds-wallet-face",
+                    "wind-funds-wallet-impl",
+                    "wind-funds-reconciliation-face",
+                    "wind-funds-reconciliation-impl",
+                    "wind-funds-governance-face",
+                    "wind-funds-governance-impl"),
+            "ledger/impl/pom.xml", List.of(
+                    "wind-funds-wallet-face",
+                    "wind-funds-wallet-impl",
+                    "wind-funds-transaction-face",
+                    "wind-funds-transaction-impl"),
+            "transaction/impl/pom.xml", List.of(
+                    "wind-funds-ledger-face",
+                    "wind-funds-ledger-impl"),
+            "wallet/impl/pom.xml", List.of(
+                    "wind-funds-transaction-face",
+                    "wind-funds-transaction-impl"));
 
     private static final Map<String, List<String>> MODULE_FORBIDDEN_SOURCE_PACKAGE_PATHS = Map.of(
-            "ledger/ledger-impl/src/main/java", List.of(
+            "ledger/impl/src/main/java", List.of(
                     "com/wind/funds/transaction",
                     "com/wind/funds/wallet"),
-            "transaction/transaction-impl/src/main/java", List.of(
+            "transaction/impl/src/main/java", List.of(
                     "com/wind/funds/fx",
                     "com/wind/funds/ledger",
                     "com/wind/funds/wallet/application",
                     "com/wind/funds/wallet/dal",
                     "com/wind/funds/wallet/mapstruct"),
-            "wallet/wallet-impl/src/main/java", List.of(
+            "wallet/impl/src/main/java", List.of(
                     "com/wind/funds/transaction/converter",
                     "com/wind/funds/transaction/dal",
                     "com/wind/funds/transaction/ledger",
@@ -112,33 +149,33 @@ class FundsModuleDependencyBoundaryTests {
     private static final List<String> PACKAGE_GUARD_SCAN_PATHS = List.of(
             "AGENTS.md",
             "core/src/main/java",
-            "fx/fx-impl/src/main/java",
-            "ledger/ledger-face/src/main/java",
-            "ledger/ledger-impl/src/main/java",
-            "transaction/transaction-face/src/main/java",
-            "transaction/transaction-impl/src/main/java",
-            "wallet/wallet-face/src/main/java",
-            "wallet/wallet-impl/src/main/java",
-            "reconciliation/reconciliation-face/src/main/java",
-            "reconciliation/reconciliation-impl/src/main/java",
-            "governance/governance-face/src/main/java",
-            "governance/governance-impl/src/main/java",
+            "fx/impl/src/main/java",
+            "ledger/face/src/main/java",
+            "ledger/impl/src/main/java",
+            "transaction/face/src/main/java",
+            "transaction/impl/src/main/java",
+            "wallet/face/src/main/java",
+            "wallet/impl/src/main/java",
+            "reconciliation/face/src/main/java",
+            "reconciliation/impl/src/main/java",
+            "governance/face/src/main/java",
+            "governance/impl/src/main/java",
             "tests/src/test/java",
             "docs");
 
     private static final List<String> FUNDS_JAVA_PACKAGE_SCAN_PATHS = List.of(
             "core/src/main/java",
-            "fx/fx-impl/src/main/java",
-            "ledger/ledger-face/src/main/java",
-            "ledger/ledger-impl/src/main/java",
-            "transaction/transaction-face/src/main/java",
-            "transaction/transaction-impl/src/main/java",
-            "wallet/wallet-face/src/main/java",
-            "wallet/wallet-impl/src/main/java",
-            "reconciliation/reconciliation-face/src/main/java",
-            "reconciliation/reconciliation-impl/src/main/java",
-            "governance/governance-face/src/main/java",
-            "governance/governance-impl/src/main/java",
+            "fx/impl/src/main/java",
+            "ledger/face/src/main/java",
+            "ledger/impl/src/main/java",
+            "transaction/face/src/main/java",
+            "transaction/impl/src/main/java",
+            "wallet/face/src/main/java",
+            "wallet/impl/src/main/java",
+            "reconciliation/face/src/main/java",
+            "reconciliation/impl/src/main/java",
+            "governance/face/src/main/java",
+            "governance/impl/src/main/java",
             "tests/src/test/java");
 
     private static final List<String> LEGACY_FUNDS_PACKAGE_TOKENS = List.of(
@@ -150,17 +187,17 @@ class FundsModuleDependencyBoundaryTests {
     private static final Pattern PACKAGE_DECLARATION = Pattern.compile("(?m)^package\\s+([^;]+);");
 
     private static final List<String> TRANSACTION_SOURCE_SCAN_PATHS = List.of(
-            "transaction/transaction-face/src/main/java",
-            "transaction/transaction-impl/src/main/java");
+            "transaction/face/src/main/java",
+            "transaction/impl/src/main/java");
 
     private static final List<String> TRANSACTION_IMPL_WALLET_APPLICATION_IMPL_SCAN_PATHS = List.of(
-            "transaction/transaction-impl/src/main/java/com/wind/funds/wallet/application");
+            "transaction/impl/src/main/java/com/wind/funds/wallet/application");
 
     private static final List<String> WALLET_APPLICATION_IMPL_SCAN_PATHS = List.of(
-            "wallet/wallet-impl/src/main/java/com/wind/funds/wallet/application");
+            "wallet/impl/src/main/java/com/wind/funds/wallet/application");
 
     private static final String TRANSACTION_WALLET_AUTHORIZATION_FACADE_SOURCE =
-            "transaction/transaction-impl/src/main/java/com/wind/funds/transaction/application/instrument/impl/"
+            "transaction/impl/src/main/java/com/wind/funds/transaction/application/instrument/impl/"
                     + "AuthorizationAdmissionApplicationServiceImpl.java";
 
     private static final List<String> TRANSACTION_FORBIDDEN_SPEND_CONTROL_ADMISSION_TOKENS = List.of(
@@ -190,14 +227,14 @@ class FundsModuleDependencyBoundaryTests {
             "com.wind.funds.transaction.converter.");
 
     private static final List<String> LEDGER_DANGEROUS_CALL_SCAN_PATHS = List.of(
-            "transaction/transaction-face/src/main/java",
-            "transaction/transaction-impl/src/main/java",
-            "wallet/wallet-face/src/main/java",
-            "wallet/wallet-impl/src/main/java",
-            "reconciliation/reconciliation-face/src/main/java",
-            "reconciliation/reconciliation-impl/src/main/java",
-            "governance/governance-face/src/main/java",
-            "governance/governance-impl/src/main/java");
+            "transaction/face/src/main/java",
+            "transaction/impl/src/main/java",
+            "wallet/face/src/main/java",
+            "wallet/impl/src/main/java",
+            "reconciliation/face/src/main/java",
+            "reconciliation/impl/src/main/java",
+            "governance/face/src/main/java",
+            "governance/impl/src/main/java");
 
     private static final List<String> LEDGER_DANGEROUS_FACE_CALL_TOKENS = List.of(
             ".updateLedgerBalance(",
@@ -205,14 +242,14 @@ class FundsModuleDependencyBoundaryTests {
             ".deleteLedgerByIds(");
 
     private static final List<String> NON_WALLET_PRODUCTION_SOURCE_SCAN_PATHS = List.of(
-            "ledger/ledger-face/src/main/java",
-            "ledger/ledger-impl/src/main/java",
-            "transaction/transaction-face/src/main/java",
-            "transaction/transaction-impl/src/main/java",
-            "reconciliation/reconciliation-face/src/main/java",
-            "reconciliation/reconciliation-impl/src/main/java",
-            "governance/governance-face/src/main/java",
-            "governance/governance-impl/src/main/java");
+            "ledger/face/src/main/java",
+            "ledger/impl/src/main/java",
+            "transaction/face/src/main/java",
+            "transaction/impl/src/main/java",
+            "reconciliation/face/src/main/java",
+            "reconciliation/impl/src/main/java",
+            "governance/face/src/main/java",
+            "governance/impl/src/main/java");
 
     private static final Map<String, List<String>> WALLET_RESOURCE_SERVICE_BYPASS_TOKENS = Map.of(
             "payment instrument resource service", List.of(
@@ -236,6 +273,44 @@ class FundsModuleDependencyBoundaryTests {
     void testCoreShouldNotDependOnOuterModules() throws Exception {
         assertThat(dependencyArtifactIds(workspaceRoot().resolve("core/pom.xml")))
                 .doesNotContain(CORE_FORBIDDEN_ARTIFACTS.toArray(String[]::new));
+    }
+
+    /**
+     * 场景：资金项目 Maven 坐标已经统一到 Wind 命名空间。
+     * 预期：父项目、模块和模块间依赖均不再使用历史 Capte funds artifactId。
+     * 红线：不得通过新增模块或依赖恢复历史 artifactId 前缀。
+     */
+    @Test
+    void testProjectArtifactIdsShouldUseWindPrefix() throws Exception {
+        List<String> violations = new ArrayList<>();
+        for (String pomPath : PROJECT_POMS) {
+            for (String artifactId : artifactIds(workspaceRoot().resolve(pomPath))) {
+                if (artifactId.equals(LEGACY_FUNDS_ARTIFACT_PREFIX)
+                        || artifactId.startsWith(LEGACY_FUNDS_ARTIFACT_PREFIX + "-")) {
+                    violations.add(pomPath + " contains " + artifactId);
+                }
+            }
+        }
+
+        assertThat(violations)
+                .as("project artifactIds must use the wind-funds prefix")
+                .isEmpty();
+    }
+
+    /**
+     * 场景：资金项目按业务能力组织 Maven 模块。
+     * 预期：根 POM 只声明稳定能力模块，各能力聚合 POM 自行管理 face/impl 子模块。
+     * 红线：根 POM 不直接枚举两级实现路径，避免业务能力内部结构泄漏到项目根。
+     */
+    @Test
+    void testRootShouldDelegateSubmodulesToCapabilityAggregators() throws Exception {
+        assertThat(modulePaths(workspaceRoot().resolve("pom.xml")))
+                .containsExactlyElementsOf(ROOT_MODULES);
+        for (Map.Entry<String, List<String>> entry : CAPABILITY_AGGREGATE_MODULES.entrySet()) {
+            assertThat(modulePaths(workspaceRoot().resolve(entry.getKey())))
+                    .as("capability aggregator %s should own its submodules", entry.getKey())
+                    .containsExactlyElementsOf(entry.getValue());
+        }
     }
 
     /**
@@ -275,7 +350,7 @@ class FundsModuleDependencyBoundaryTests {
         List<String> violations = new ArrayList<>();
         for (String pomPath : FACE_MODULE_POMS) {
             for (String artifactId : dependencyArtifactIds(workspaceRoot().resolve(pomPath))) {
-                if (artifactId.startsWith("capte-funds-") && !FACE_ALLOWED_FUNDS_ARTIFACTS.contains(artifactId)) {
+                if (artifactId.startsWith("wind-funds-") && !FACE_ALLOWED_FUNDS_ARTIFACTS.contains(artifactId)) {
                     violations.add(pomPath + " depends on " + artifactId);
                 }
             }
@@ -295,14 +370,30 @@ class FundsModuleDependencyBoundaryTests {
     void testProductionModulesShouldNotDependOnTestsModule() throws Exception {
         List<String> violations = new ArrayList<>();
         for (String pomPath : PRODUCTION_MODULE_POMS) {
-            if (dependencyArtifactIds(workspaceRoot().resolve(pomPath)).contains("capte-funds-tests")) {
-                violations.add(pomPath + " depends on capte-funds-tests");
+            if (dependencyArtifactIds(workspaceRoot().resolve(pomPath)).contains("wind-funds-tests")) {
+                violations.add(pomPath + " depends on wind-funds-tests");
             }
         }
 
         assertThat(violations)
                 .as("production modules must not depend on tests module")
                 .isEmpty();
+    }
+
+    /**
+     * 场景：资金实现模块直接声明实际使用的 MyBatis Flex 能力。
+     * 预期：根 POM 和生产模块不依赖 Capte DAL 聚合基础设施。
+     * 红线：资金模块不得通过聚合依赖间接引入 KMS、OSS、数据库驱动等无关能力。
+     */
+    @Test
+    void testProductionModulesShouldNotDependOnCapteDalInfrastructure() throws Exception {
+        assertThat(dependencyArtifactIds(workspaceRoot().resolve("pom.xml")))
+                .doesNotContain(CAPTE_DAL_INFRASTRUCTURE_ARTIFACT);
+        for (String pomPath : PRODUCTION_MODULE_POMS) {
+            assertThat(dependencyArtifactIds(workspaceRoot().resolve(pomPath)))
+                    .as("production module %s should not depend on Capte DAL infrastructure", pomPath)
+                    .doesNotContain(CAPTE_DAL_INFRASTRUCTURE_ARTIFACT);
+        }
     }
 
     /**
@@ -482,13 +573,13 @@ class FundsModuleDependencyBoundaryTests {
     void testExternalFundsEventContractShouldBelongToTransactionFace() {
         Path root = workspaceRoot();
 
-        assertThat(root.resolve("transaction/transaction-face/src/main/java/com/wind/funds/transaction/application/"
+        assertThat(root.resolve("transaction/face/src/main/java/com/wind/funds/transaction/application/"
                 + "ExternalFundsEventApplicationService.java")).exists();
-        assertThat(root.resolve("transaction/transaction-face/src/main/java/com/wind/funds/transaction/model/request/"
+        assertThat(root.resolve("transaction/face/src/main/java/com/wind/funds/transaction/model/request/"
                 + "ConsumeExternalFundsEventRequest.java")).exists();
-        assertThat(root.resolve("wallet/wallet-face/src/main/java/com/wind/funds/wallet/application/external/"
+        assertThat(root.resolve("wallet/face/src/main/java/com/wind/funds/wallet/application/external/"
                 + "ExternalFundsEventApplicationService.java")).doesNotExist();
-        assertThat(root.resolve("wallet/wallet-face/src/main/java/com/wind/funds/wallet/model/request/"
+        assertThat(root.resolve("wallet/face/src/main/java/com/wind/funds/wallet/model/request/"
                 + "ConsumeExternalFundsEventRequest.java")).doesNotExist();
     }
 
@@ -542,16 +633,7 @@ class FundsModuleDependencyBoundaryTests {
 
     private List<String> dependencyArtifactIds(Path pomPath)
             throws ParserConfigurationException, IOException, SAXException {
-        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-        factory.setExpandEntityReferences(false);
-        factory.setXIncludeAware(false);
-
-        NodeList dependencyNodes = factory.newDocumentBuilder()
-                .parse(pomPath.toFile())
-                .getElementsByTagName("dependency");
+        NodeList dependencyNodes = parsePom(pomPath).getElementsByTagName("dependency");
         List<String> artifactIds = new ArrayList<>(dependencyNodes.getLength());
         for (int i = 0; i < dependencyNodes.getLength(); i++) {
             NodeList children = dependencyNodes.item(i).getChildNodes();
@@ -562,6 +644,37 @@ class FundsModuleDependencyBoundaryTests {
             }
         }
         return artifactIds;
+    }
+
+    private List<String> artifactIds(Path pomPath)
+            throws ParserConfigurationException, IOException, SAXException {
+        NodeList artifactIdNodes = parsePom(pomPath).getElementsByTagName("artifactId");
+        List<String> artifactIds = new ArrayList<>(artifactIdNodes.getLength());
+        for (int i = 0; i < artifactIdNodes.getLength(); i++) {
+            artifactIds.add(artifactIdNodes.item(i).getTextContent().trim());
+        }
+        return artifactIds;
+    }
+
+    private List<String> modulePaths(Path pomPath)
+            throws ParserConfigurationException, IOException, SAXException {
+        NodeList moduleNodes = parsePom(pomPath).getElementsByTagName("module");
+        List<String> modulePaths = new ArrayList<>(moduleNodes.getLength());
+        for (int i = 0; i < moduleNodes.getLength(); i++) {
+            modulePaths.add(moduleNodes.item(i).getTextContent().trim());
+        }
+        return modulePaths;
+    }
+
+    private Document parsePom(Path pomPath)
+            throws ParserConfigurationException, IOException, SAXException {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        factory.setExpandEntityReferences(false);
+        factory.setXIncludeAware(false);
+        return factory.newDocumentBuilder().parse(pomPath.toFile());
     }
 
     private List<Path> packageGuardTextFiles() throws IOException {

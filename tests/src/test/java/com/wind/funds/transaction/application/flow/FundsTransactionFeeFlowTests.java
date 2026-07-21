@@ -1,7 +1,7 @@
 package com.wind.funds.transaction.application.flow;
 
 import com.capte.domain.core.context.ThreadContextTenantIdHolder;
-import com.capte.domain.core.operator.WindOperator;
+import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
 import com.wind.funds.ledger.dal.entities.LedgerTransaction;
@@ -107,7 +107,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setFeeType(DefaultFeeType.FEE.getCode())
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_MISSING_ACCOUNT_CHARGE")
-                .setDescription("fee without account"), WindOperator.system()))
+                .setDescription("fee without account"), WindOperatorFactory.system()))
                 .hasMessageContaining("手续费支出账户不能为空");
 
         BalanceSnapshot afterFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
@@ -150,7 +150,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setFeeType(DefaultFeeType.FEE.getCode())
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_EXTERNAL_ACCOUNT_CHARGE")
-                .setDescription("fee from external account"), WindOperator.system()))
+                .setDescription("fee from external account"), WindOperatorFactory.system()))
                 .hasMessageContaining("手续费支出账户不能是外部账户");
 
         BalanceSnapshot afterFailure = snapshot(balances(externalAccount, feeAccount(), cashMappingAccount(),
@@ -199,7 +199,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setAmount(Money.immutable(5L, CURRENCY))
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_MISSING_TYPE_CHARGE")
-                .setDescription("fee without type"), WindOperator.system()))
+                .setDescription("fee without type"), WindOperatorFactory.system()))
                 .hasMessageContaining("手续费类型不能为空");
 
         BalanceSnapshot afterFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
@@ -244,7 +244,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                         Map.of("networkReference", "GB82WEST12345698765432"))))
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_SENSITIVE_CONTEXT_IBAN_VALUE")
-                .setDescription("fee with sensitive IBAN value"), WindOperator.system()))
+                .setDescription("fee with sensitive IBAN value"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedFee = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
@@ -287,7 +287,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                         Map.of("networkReference", "GB82WEST12345698765432"))))
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn("FEE_REFUND_SENSITIVE_CONTEXT_IBAN_VALUE")
-                .setDescription("fee refund with sensitive IBAN value"), WindOperator.system()))
+                .setDescription("fee refund with sensitive IBAN value"), WindOperatorFactory.system()))
                 .hasMessageContaining("contextVariables must not contain sensitive funds transaction fields");
 
         BalanceSnapshot afterRejectedFeeRefund = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
@@ -362,7 +362,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setFeeSourceTransactionSn(feeSourceTransactionSn)
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn("FEE_REFUND_MISSING_ACCOUNT_RETURN")
-                .setDescription("fee refund without account"), WindOperator.system()))
+                .setDescription("fee refund without account"), WindOperatorFactory.system()))
                 .hasMessageContaining("手续费退回到账账户不能为空");
 
         BalanceSnapshot afterFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
@@ -434,7 +434,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setFeeSourceTransactionSn(feeSourceTransactionSn)
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn("FEE_REFUND_EXTERNAL_ACCOUNT_RETURN")
-                .setDescription("fee refund to external account"), WindOperator.system()))
+                .setDescription("fee refund to external account"), WindOperatorFactory.system()))
                 .hasMessageContaining("手续费退回到账账户不能是外部账户");
 
         BalanceSnapshot afterFailure = snapshot(balances(payer, externalAccount, feeAccount(), cashMappingAccount(),
@@ -499,7 +499,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(5L, CURRENCY)))
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn("FEE_REFUND_MISSING_SOURCE_RETURN")
-                .setDescription("fee refund without source transaction"), WindOperator.system()))
+                .setDescription("fee refund without source transaction"), WindOperatorFactory.system()))
                 .hasMessageContaining("手续费退回原费用交易流水不能为空");
 
         BalanceSnapshot afterFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
@@ -563,7 +563,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(5L, CURRENCY)))
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn("FEE_REFUND_MISSING_SOURCE_AND_ACCOUNT_RETURN")
-                .setDescription("fee refund without source transaction and account"), WindOperator.system()))
+                .setDescription("fee refund without source transaction and account"), WindOperatorFactory.system()))
                 .hasMessageContaining("手续费退回原费用交易流水不能为空");
 
         BalanceSnapshot afterFailure = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
@@ -618,7 +618,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setFeeType(DefaultFeeType.FEE.getCode())
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_IDEMPOTENT_CHARGE")
-                .setDescription("idempotent fee"), WindOperator.system());
+                .setDescription("idempotent fee"), WindOperatorFactory.system());
         BalanceSnapshot afterFirstFee = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
                 prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterFirstFee,
@@ -636,7 +636,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setFeeType(DefaultFeeType.FEE.getCode())
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_IDEMPOTENT_CHARGE")
-                .setDescription("idempotent fee"), WindOperator.system());
+                .setDescription("idempotent fee"), WindOperatorFactory.system());
 
         assertThat(retryFeeSn).isEqualTo(firstFeeSn);
         BalanceSnapshot afterRetryFee = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
@@ -656,7 +656,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setFeeType(DefaultFeeType.FEE.getCode())
                 .setBusinessScene("FEE")
                 .setBusinessSn("FEE_IDEMPOTENT_CHARGE")
-                .setDescription("idempotent fee"), WindOperator.system()))
+                .setDescription("idempotent fee"), WindOperatorFactory.system()))
                 .hasMessageContaining("资金交易明细请求参数不一致");
 
         BalanceSnapshot afterConflict = snapshot(balances(payer, feeAccount(), cashMappingAccount(),
@@ -1308,7 +1308,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                 .setContextVariables(WritableContextVariables.of(Map.of("ruleVersion", ruleVersion)))
                 .setBusinessScene("FEE_REFUND")
                 .setBusinessSn(businessSn)
-                .setDescription("idempotent fee refund"), WindOperator.system());
+                .setDescription("idempotent fee refund"), WindOperatorFactory.system());
     }
 
     private void assertFeeRefundFactsWithFundsTransaction(String businessSn, String sourceTransactionSn) {

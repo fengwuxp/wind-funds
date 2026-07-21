@@ -15,7 +15,7 @@ import java.util.Map;
  * 不可变资金操作参与者快照。
  */
 @Builder
-public record ImmutableFundsOperationActorSpec(Long operatorId,
+public record ImmutableFundsOperationActorSpec(String operatorId,
                                                String operatorType,
                                                @Nullable String operatorName,
                                                String appName,
@@ -23,7 +23,7 @@ public record ImmutableFundsOperationActorSpec(Long operatorId,
         implements FundsOperationActorSpec {
 
     public ImmutableFundsOperationActorSpec {
-        AssertUtils.notNull(operatorId, "fundsOperationActor.operatorId must not be null");
+        AssertUtils.hasText(operatorId, "fundsOperationActor.operatorId must not be blank");
         AssertUtils.hasText(operatorType, "fundsOperationActor.operatorType must not be blank");
         AssertUtils.hasText(appName, "fundsOperationActor.appName must not be blank");
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
@@ -34,7 +34,7 @@ public record ImmutableFundsOperationActorSpec(Long operatorId,
     }
 
     @Override
-    public @NonNull Long getOperatorId() {
+    public @NonNull String getOperatorId() {
         return operatorId;
     }
 
