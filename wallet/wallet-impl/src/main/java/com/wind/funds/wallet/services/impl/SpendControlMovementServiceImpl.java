@@ -74,13 +74,29 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
             return existing;
         }
         validateRecordRequest(request);
+        FundsSubjectType targetSubjectType = targetSubjectType(request.getTargetAccountId());
+        Integer version = lockTargetAccountVersion(request, targetSubjectType);
+        AssertUtils.notNull(version,
+                "控制额度变动目标账户不存在，accountId = {}，tenantId = {}",
+                request.getTargetAccountId(),
+                request.getTenantId());
+        SpendControlMovement concurrentExisting = spendControlMovementMapper.selectByMovementSnWithSharedLock(
+                request.getTenantId(), request.getMovementSn());
+        if (concurrentExisting != null) {
+            SpendControlMovementDTO result = toDTO(concurrentExisting);
+            assertSameMovement(request, result);
+            return result;
+        }
         Long id;
         try {
             id = insertSpendControlMovement(request);
         } catch (DataIntegrityViolationException exception) {
             return readIdempotentMovementAfterInsertConflict(request, exception);
         }
-        guardInsertedMovement(request, id);
+        assertMovementAmountAllowed(request);
+        AssertUtils.isTrue(incrementTargetAccountVersion(request, targetSubjectType, version) == 1,
+                "控制额度变动目标账户并发冲突，请重试，accountId = {}",
+                request.getTargetAccountId());
         return getSpendControlMovementById(id);
     }
 
@@ -302,40 +318,13 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 request.getMovementSn());
     }
 
-    private void guardInsertedMovement(RecordSpendControlMovementRequest request, Long id) {
-        FundsSubjectType targetSubjectType = targetSubjectType(request.getTargetAccountId());
-        try {
-            Integer version = selectTargetAccountVersion(request, targetSubjectType);
-            AssertUtils.notNull(version,
-                    "控制额度变动目标账户不存在，accountId = {}，tenantId = {}",
-                    request.getTargetAccountId(),
-                    request.getTenantId());
-            assertMovementAmountAllowed(request);
-            AssertUtils.isTrue(incrementTargetAccountVersion(request, targetSubjectType, version) == 1,
-                    "控制额度变动目标账户并发冲突，请重试，accountId = {}",
-                    request.getTargetAccountId());
-        } catch (RuntimeException exception) {
-            try {
-                deleteInsertedMovement(id);
-            } catch (RuntimeException cleanupException) {
-                exception.addSuppressed(cleanupException);
-            }
-            throw exception;
-        }
-    }
-
-    private void deleteInsertedMovement(Long id) {
-        AssertUtils.isTrue(spendControlMovementMapper.deleteById(id) == 1,
-                "删除未通过控制约束的额度变动流水失败，id = {}",
-                id);
-    }
-
-    private Integer selectTargetAccountVersion(RecordSpendControlMovementRequest request,
-                                               FundsSubjectType targetSubjectType) {
+    private Integer lockTargetAccountVersion(RecordSpendControlMovementRequest request,
+                                             FundsSubjectType targetSubjectType) {
+        // ponytail: account-row serialization is intentionally coarse; split by control scope only after contention is measured.
         return switch (targetSubjectType) {
-            case FUNDING_ACCOUNT -> fundingAccountMapper.selectVersionBySn(
+            case FUNDING_ACCOUNT -> fundingAccountMapper.selectVersionBySnForUpdate(
                     request.getTenantId(), request.getTargetAccountId().id());
-            case CREDIT_ACCOUNT -> creditAccountMapper.selectVersionBySn(
+            case CREDIT_ACCOUNT -> creditAccountMapper.selectVersionBySnForUpdate(
                     request.getTenantId(), request.getTargetAccountId().id());
             default -> null;
         };
@@ -362,7 +351,18 @@ public class SpendControlMovementServiceImpl implements SpendControlMovementServ
                 .setSpendRuleId(request.getSpendRuleId())
                 .setSpendRuleVersion(request.getSpendRuleVersion())
                 .setTargetAccountId(request.getTargetAccountId());
-        List<SpendControlMovementDTO> movements = queryBudgetProjectionMovements(query);
+        List<SpendControlMovementDTO> movements = spendControlMovementMapper
+                .selectBudgetProjectionMovementsWithSharedLock(
+                        request.getTenantId(), request.getCurrency(), request.getSpendRuleId(),
+                        request.getSpendRuleVersion(), controlScopeId(request), request.getPeriodId(),
+                        request.getTargetAccountId().id(), targetSubjectType(request.getTargetAccountId()),
+                        CONTROL_MOVEMENT_QUERY_PAGE_SIZE + 1)
+                .stream()
+                .map(this::toDTO)
+                .toList();
+        AssertUtils.isTrue(movements.size() <= CONTROL_MOVEMENT_QUERY_PAGE_SIZE,
+                "控制额度变动流水查询超过单次读取上限，tenantId = {}, total = {}",
+                request.getTenantId(), movements.size());
         BudgetControlProjectionDTO projection = toProjection(query, movements);
         switch (request.getMovementType()) {
             case LIMIT_INCREASED, LIMIT_DECREASED -> assertLimitAmountAllowed(request, projection);

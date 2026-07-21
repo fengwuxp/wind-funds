@@ -4,6 +4,7 @@ import com.capte.domain.core.context.ThreadContextTenantIdHolder;
 import com.capte.infrastructure.dal.mybatisflex.MybatisFlexQueryBehaviorFuncs;
 import com.mybatisflex.core.audit.AuditManager;
 import com.mybatisflex.core.query.QueryColumnBehavior;
+import com.mybatisflex.spring.FlexTransactionManager;
 import com.mybatisflex.spring.boot.ConfigurationCustomizer;
 import com.mybatisflex.spring.boot.v4.MybatisFlexAutoConfiguration;
 import com.zaxxer.hikari.HikariDataSource;
@@ -34,18 +35,19 @@ import org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration
 import org.springframework.boot.sql.autoconfigure.init.SqlInitializationProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.encrypt.TextEncryptor;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -149,7 +151,12 @@ public abstract class AbstractFundsServiceTest {
         }
 
         @Bean
-        public DataSourceTransactionManager transactionManager(DataSource dataSource) {
+        public PlatformTransactionManager transactionManager(
+                DataSource dataSource,
+                @Value("${wind.funds.test.flex-transaction-manager-enabled:false}") boolean flexTransactionManagerEnabled) {
+            if (flexTransactionManagerEnabled) {
+                return new FlexTransactionManager();
+            }
             return new DataSourceTransactionManager(dataSource);
         }
 
@@ -183,9 +190,12 @@ public abstract class AbstractFundsServiceTest {
         public DataSource dataSource(DataSourceProperties properties,
                                      @Value("${spring.datasource.url}") String url) {
             properties.setType(HikariDataSource.class);
-            properties.setUrl(keepAliveH2MemoryDatabase(url));
+            String dataSourceUrl = keepAliveH2MemoryDatabase(url);
+            properties.setUrl(dataSourceUrl);
             DataSource result = properties.initializeDataSourceBuilder().build();
-            H2FunctionInitializer.initialize(result);
+            if (dataSourceUrl.startsWith(H2_MEMORY_URL_PREFIX)) {
+                H2FunctionInitializer.initialize(result);
+            }
             return result;
         }
 

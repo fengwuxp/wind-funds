@@ -32,6 +32,7 @@ public interface FundingAccountMapper extends BaseMapper<FundingAccount> {
             FROM t_funding_account
             WHERE tenant_id = #{tenantId}
               AND sn = #{sn}
+            FOR UPDATE
             """)
-    Integer selectVersionBySn(@Param("tenantId") Long tenantId, @Param("sn") String sn);
+    Integer selectVersionBySnForUpdate(@Param("tenantId") Long tenantId, @Param("sn") String sn);
 }

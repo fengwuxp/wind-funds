@@ -48,6 +48,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,6 +72,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
         SpendControlMovementServiceFlowTests.Config.class
 })
+@TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
 
@@ -211,6 +213,7 @@ class SpendControlMovementServiceFlowTests extends AbstractFundsServiceTest {
                                 FundsSubjectType.CREDIT_ACCOUNT)));
         assertThat(projection.getReservedAmount()).isEqualTo(60L);
         assertThat(projection.getAvailableControlAmount()).isEqualTo(40L);
+        assertThat(creditAccountVersion()).isEqualTo(2);
     }
 
     /**

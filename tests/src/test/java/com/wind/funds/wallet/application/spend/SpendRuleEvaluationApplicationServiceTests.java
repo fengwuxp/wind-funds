@@ -31,6 +31,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +50,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
         SpendRuleEvaluationApplicationServiceTests.Config.class
 })
+@TestPropertySource(properties = "wind.funds.test.flex-transaction-manager-enabled=true")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class SpendRuleEvaluationApplicationServiceTests extends AbstractFundsServiceTest {
 
