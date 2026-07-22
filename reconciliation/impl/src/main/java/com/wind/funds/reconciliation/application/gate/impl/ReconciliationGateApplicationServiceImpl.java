@@ -45,7 +45,7 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
     private final ReconciliationBatchMapper reconciliationBatchMapper;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(rollbackFor = Exception.class)
     public ReconciliationGateDecisionDTO checkGate(CheckReconciliationGateRequest request, WindOperator operator) {
         validateRequest(request);
         AssertUtils.notNull(operator, "对账差错准入检查操作人不能为空");
@@ -59,14 +59,14 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
             return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
                     "对账运行结果与准入对象不匹配，准入必须阻断");
         }
-        ReconciliationBatch batch = reconciliationBatchMapper.selectBySn(
+        ReconciliationBatch batch = reconciliationBatchMapper.selectBySnForUpdate(
                 request.getTenantId(), runResult.getReconciliationBatchSn());
         if (!isCompletedBatchBoundToRunResult(batch, runResult)) {
             return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
                     "对账批次未完成或与运行结果绑定不一致，准入必须阻断");
         }
-        if (reconciliationBatchMapper.countByPreviousBatchSn(
-                request.getTenantId(), runResult.getReconciliationBatchSn()) > 0) {
+        if (reconciliationBatchMapper.selectByPreviousBatchSnForUpdate(
+                request.getTenantId(), runResult.getReconciliationBatchSn()) != null) {
             return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
                     "对账运行结果已被重跑批次替代，旧结论仅可追溯、不得继续用于准入");
         }

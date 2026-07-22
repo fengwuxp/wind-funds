@@ -37,9 +37,9 @@ public interface ReconciliationDifferenceApplicationService {
                                                      WindOperator operator);
 
     /**
-     * 记录差错处理后的重新对账结果。
+     * 将差错处理结果绑定到已固化的重新对账运行结果。
      *
-     * @param request  重跑结果请求
+     * @param request  差错与运行结果绑定请求；对平结论和证据由服务读取持久化事实派生
      * @param operator 操作人，用于审计关闭人或重跑登记人
      * @return 对账差错结果
      */

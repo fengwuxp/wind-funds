@@ -3,6 +3,8 @@ package com.wind.funds.reconciliation.application.difference.impl;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
+import com.wind.funds.reconciliation.application.run.ReconciliationRunResultApplicationService;
+import com.wind.funds.reconciliation.application.run.impl.ReconciliationRunResultApplicationServiceImpl;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceActionType;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceSeverity;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
@@ -13,7 +15,9 @@ import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ReconciliationDifferenceDTO;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
 import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceAdjustmentRequest;
+import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
+import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +29,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
 import static com.wind.funds.support.FundsBalanceAssertionSupport.ledgerFactSnapshot;
@@ -51,10 +57,13 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
 
     private static final String FUNDS_TRANSACTION_SN = "funds_tx_adjust_recon_001";
 
-    private static final String RERUN_SN = "recon_rerun_001";
+    private static final String RERUN_BATCH_SN = "recon_batch_mvp_001_rerun_001";
 
     @Autowired
     private ReconciliationDifferenceApplicationService reconciliationDifferenceApplicationService;
+
+    @Autowired
+    private ReconciliationRunResultApplicationService reconciliationRunResultApplicationService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -62,6 +71,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     @BeforeEach
     void cleanReconciliationDifference() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
+        com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
     }
 
     /**
@@ -161,10 +171,11 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 minimumAdjustmentRequest(), WindOperatorFactory.system());
         ReconciliationDifferenceDTO linkedReplay = reconciliationDifferenceApplicationService.linkAdjustmentResult(
                 minimumAdjustmentRequest(), WindOperatorFactory.system());
+        String runResultSn = recordRunResult(true, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
         ReconciliationDifferenceDTO closed = reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest(), WindOperatorFactory.system());
+                minimumRerunRequest(runResultSn), WindOperatorFactory.system());
         ReconciliationDifferenceDTO closedReplay = reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest(), WindOperatorFactory.system());
+                minimumRerunRequest(runResultSn), WindOperatorFactory.system());
 
         assertThat(linked.getStatus()).isEqualTo(ReconciliationDifferenceStatus.ADJUSTING);
         assertThat(linked.getActionType()).isEqualTo(ReconciliationDifferenceActionType.ADJUST);
@@ -174,7 +185,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertThat(linked.getAdjustmentTransactionSn()).isEqualTo(FUNDS_TRANSACTION_SN);
         assertThat(linkedReplay.getId()).isEqualTo(linked.getId());
         assertThat(closed.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RESOLVED);
-        assertThat(closed.getLastRerunSn()).isEqualTo(RERUN_SN);
+        assertThat(closed.getLastRerunSn()).isEqualTo(runResultSn);
         assertThat(closed.getRerunCount()).isOne();
         assertThat(closedReplay.getRerunCount()).isOne();
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -230,30 +241,132 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     void testRerunShouldRejectClosingDifferenceWithoutAdjustmentLink() {
         reconciliationDifferenceApplicationService.createDifference(
                 minimumCreateRequest().setDifferenceSn("recon_diff_mvp_002"), WindOperatorFactory.system());
+        String runResultSn = recordRunResult(true, "recon_batch_mvp_001_rerun_002", RECONCILIATION_BATCH_SN);
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest()
-                        .setDifferenceSn("recon_diff_mvp_002")
-                        .setRerunSn("recon_rerun_002"),
+                minimumRerunRequest(runResultSn).setDifferenceSn("recon_diff_mvp_002"),
                 WindOperatorFactory.system()))
                 .hasMessageContaining("差错关闭必须先关联处理动作或调账结果");
     }
 
     /**
-     * 场景：同一重跑流水号被重复提交，但重跑摘要发生变化。
-     * 输入：已回链处理动作的差错、同一 rerunSn 和不同 resultDigest。
-     * 输出：拒绝覆盖既有重跑结果。
-     * 红线：重新对账结果是审计事实，不允许同流水号静默覆盖。
+     * 场景：调用方自报对账已通过，但没有任何已持久化的重跑运行结果。
+     * 输入：已回链处理动作的差错，以及指向不存在运行结果的流水号。
+     * 输出：拒绝关闭差错，状态保持处理中。
+     * 红线：差错关闭必须依赖真实完成态对账运行结果，不能相信调用方自报结论。
      */
     @Test
-    void testRerunShouldRejectIdempotentConflict() {
+    void testRerunShouldRejectCallerDeclaredResultWithoutPersistedRunResult() {
         reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
         reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
-        reconciliationDifferenceApplicationService.recordRerunResult(minimumRerunRequest(), WindOperatorFactory.system());
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest().setResultDigest("sha256:changed-rerun-digest"), WindOperatorFactory.system()))
-                .hasMessageContaining("对账差错重跑幂等请求结果摘要不一致");
+                minimumRerunRequest("missing-run-result"), WindOperatorFactory.system()))
+                .hasMessageContaining("对账运行结果不存在");
+
+        ReconciliationDifferenceDTO unchanged = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest(), WindOperatorFactory.system());
+        assertThat(unchanged.getStatus()).isEqualTo(ReconciliationDifferenceStatus.ADJUSTING);
+        assertThat(unchanged.getLastRerunSn()).isNull();
+    }
+
+    /**
+     * 场景：调用方使用与当前差错批次无血缘关系的运行结果。
+     * 输入：已回链处理动作的差错，以及从其他批次派生的已完成运行结果。
+     * 输出：拒绝记录重跑结果。
+     * 红线：重新对账结果必须从当前差错批次可达，不能串用其他链路的结果。
+     */
+    @Test
+    void testRerunShouldRejectRunResultOutsideCurrentLineage() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
+        String runResultSn = recordRunResult(true, RERUN_BATCH_SN, "unrelated_reconciliation_batch");
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(runResultSn), WindOperatorFactory.system()))
+                .hasMessageContaining("血缘");
+    }
+
+    /**
+     * 场景：重跑运行结果已经存在后继批次。
+     * 输入：已回链处理动作的差错、当前重跑结果和引用该结果批次的后继批次。
+     * 输出：拒绝使用已被替代的运行结果关闭差错。
+     * 红线：差错处理只能消费当前血缘末端结果，不能回退信任旧结论。
+     */
+    @Test
+    void testRerunShouldRejectSupersededRunResult() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
+        String runResultSn = recordRunResult(true, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
+        com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
+                jdbcTemplate, TENANT_ID, "recon_batch_mvp_001_rerun_002", ReconciliationGateObjectType.CLEARING,
+                "reconciliation-difference-001", "recon-rule-v2", "report:rerun-002",
+                "internal:rerun-002", "external:rerun-002", RERUN_BATCH_SN);
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(runResultSn), WindOperatorFactory.system()))
+                .hasMessageContaining("已被后续批次替代");
+    }
+
+    /**
+     * 场景：第一轮重跑未对平且尚未回写差错，随后已完成第二轮并对平。
+     * 结果：允许差错直接绑定从当前锚点可达的唯一末端结果，不因漏回写中间结果而卡死。
+     */
+    @Test
+    void testRerunShouldBindLatestDescendantWhenIntermediateResultWasNotRecorded() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
+        recordRunResult(false, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
+        String latestBatchSn = "recon_batch_mvp_001_rerun_002";
+        String latestRunResultSn = recordRunResult(true, latestBatchSn, RERUN_BATCH_SN);
+
+        ReconciliationDifferenceDTO result = reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(latestRunResultSn), WindOperatorFactory.system());
+
+        assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RESOLVED);
+        assertThat(result.getLastRerunSn()).isEqualTo(latestRunResultSn);
+        assertThat(result.getLastRerunBatchSn()).isEqualTo(latestBatchSn);
+        assertThat(result.getRerunCount()).isEqualTo(2);
+    }
+
+    /**
+     * 场景：持久化运行结果的准入对象被错误地改成与完成批次不同的对象。
+     * 结果：即使差错本身没有对象级命中键，也拒绝把该运行结果作为重跑证据。
+     */
+    @Test
+    void testRerunShouldRejectBatchAndRunResultObjectMismatch() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
+        String runResultSn = recordRunResult(true, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
+        jdbcTemplate.update("""
+                        UPDATE t_reconciliation_run_result
+                        SET gate_object_sn = ?
+                        WHERE tenant_id = ?
+                          AND sn = ?
+                        """, "tampered-clearing-candidate", TENANT_ID, runResultSn);
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(runResultSn), WindOperatorFactory.system()))
+                .hasMessageContaining("运行结果与批次准入对象不一致");
+    }
+
+    /**
+     * 场景：对象级差错引用了其他清算对象的重跑结果。
+     * 输入：精确阻断对象与运行结果准入对象不一致。
+     * 输出：拒绝记录重跑结果。
+     * 红线：对象级差错不能串用同类型其他对象的正向证据。
+     */
+    @Test
+    void testRerunShouldRejectRunResultForOtherBlockingObject() {
+        reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest()
+                .setBlockingObjectType(ReconciliationGateObjectType.CLEARING)
+                .setBlockingObjectSn("clearing-candidate-expected"), WindOperatorFactory.system());
+        reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
+        String runResultSn = recordRunResult(true, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(runResultSn), WindOperatorFactory.system()))
+                .hasMessageContaining("阻断对象不一致");
     }
 
     /**
@@ -283,7 +396,7 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
 
     /**
      * 场景：差错已经重新对账通过并关闭后，又收到新的未对平重跑结果。
-     * 输入：已关闭差错、新 rerunSn 和 balanced=false。
+     * 输入：已关闭差错和新的未对平持久化运行结果。
      * 输出：拒绝追加新重跑结果，状态不得从已关闭退回处理中。
      * 红线：已关闭差错不能被后续运行静默重开，需走新的差错单或人工治理流程。
      */
@@ -291,13 +404,13 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     void testResolvedDifferenceShouldRejectNewRerunResult() {
         reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
         reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
-        reconciliationDifferenceApplicationService.recordRerunResult(minimumRerunRequest(), WindOperatorFactory.system());
+        String firstRunResultSn = recordRunResult(true, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
+        reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(firstRunResultSn), WindOperatorFactory.system());
+        String nextRunResultSn = recordRunResult(false, "recon_batch_mvp_001_rerun_002", RERUN_BATCH_SN);
 
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest()
-                        .setRerunSn("recon_rerun_after_closed_001")
-                        .setBalanced(false)
-                        .setResultDigest("sha256:recon-rerun-after-closed-unbalanced"),
+                minimumRerunRequest(nextRunResultSn),
                 WindOperatorFactory.system()))
                 .hasMessageContaining("对账差错已关闭");
     }
@@ -346,17 +459,36 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 .setReason("已由余额控制调账纠偏，等待重新对账");
     }
 
-    private RecordReconciliationDifferenceRerunRequest minimumRerunRequest() {
+    private RecordReconciliationDifferenceRerunRequest minimumRerunRequest(String reconciliationRunResultSn) {
         return new RecordReconciliationDifferenceRerunRequest()
                 .setTenantId(TENANT_ID)
                 .setDifferenceSn(DIFFERENCE_SN)
-                .setRerunSn(RERUN_SN)
-                .setRerunBatchSn("recon_batch_mvp_001_rerun_001")
-                .setRuleVersion("recon-rule-v1")
-                .setBalanced(true)
-                .setEvidenceRef("rerun-report-001")
-                .setResultDigest("sha256:recon-rerun-balanced-001")
-                .setDescription("调账后重新对账通过");
+                .setReconciliationRunResultSn(reconciliationRunResultSn);
+    }
+
+    private String recordRunResult(boolean balanced, String batchSn, String previousBatchSn) {
+        String referenceSourceRef = "internal:" + batchSn;
+        String comparisonSourceRef = "external:" + batchSn;
+        ReconciliationMatchResultItem matchResult = new ReconciliationMatchResultItem()
+                .setReferenceSourceRef(referenceSourceRef)
+                .setComparisonSourceRef(comparisonSourceRef)
+                .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
+                .setMatchStrength(balanced ? ReconciliationMatchStrength.EXACT_MATCH
+                        : ReconciliationMatchStrength.UNMATCHED)
+                .setEvidenceRef("report:" + batchSn + "#line-1");
+        if (!balanced) {
+            matchResult.setDifferenceType(ReconciliationDifferenceType.STATUS_MISMATCH)
+                    .setSeverity(ReconciliationDifferenceSeverity.S1_MAJOR)
+                    .setDifferenceAmount(0L);
+        }
+        com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
+                jdbcTemplate, TENANT_ID, batchSn, ReconciliationGateObjectType.CLEARING,
+                "reconciliation-difference-001", "recon-rule-v1", "report:" + batchSn,
+                referenceSourceRef, comparisonSourceRef, previousBatchSn);
+        return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(batchSn)
+                .setMatchResults(List.of(matchResult)), WindOperatorFactory.system()).getSn();
     }
 
     private Integer countDifferenceRows(String differenceSn) {
@@ -369,7 +501,10 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
     }
 
     @Configuration
-    @Import(ReconciliationDifferenceApplicationServiceImpl.class)
+    @Import({
+            ReconciliationDifferenceApplicationServiceImpl.class,
+            ReconciliationRunResultApplicationServiceImpl.class
+    })
     static class Config {
     }
 }

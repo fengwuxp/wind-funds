@@ -60,19 +60,28 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
     public ReconciliationBatchDTO createBatch(CreateReconciliationBatchRequest request, WindOperator operator) {
         validateCreateRequest(request, operator);
         ReconciliationBatch candidate = toBatch(request, operator);
-        validatePreviousBatch(candidate);
         ReconciliationBatch existing = reconciliationBatchMapper.selectByDigest(
                 candidate.getTenantId(), candidate.getBatchDigest());
         if (existing != null) {
             return toBatchDTO(existing);
         }
+        ReconciliationBatch existingRerun = validatePreviousBatchAndSelectRerun(candidate);
+        if (existingRerun != null) {
+            AssertUtils.isTrue(Objects.equals(existingRerun.getBatchDigest(), candidate.getBatchDigest()),
+                    "同一上一批次只允许创建一个直接重跑批次，previousBatchSn = {}",
+                    candidate.getPreviousBatchSn());
+            return toBatchDTO(existingRerun);
+        }
         try {
             reconciliationBatchMapper.insertSelective(candidate);
         } catch (DuplicateKeyException exception) {
-            ReconciliationBatch winner = reconciliationBatchMapper.selectByDigest(
+            ReconciliationBatch winner = reconciliationBatchMapper.selectByDigestForUpdate(
                     candidate.getTenantId(), candidate.getBatchDigest());
-            AssertUtils.notNull(winner, "对账批次唯一键冲突后未找到幂等结果");
-            return toBatchDTO(winner);
+            if (winner != null) {
+                return toBatchDTO(winner);
+            }
+            assertPreviousBatchHasNoRerun(candidate);
+            throw exception;
         }
         AssertUtils.notNull(candidate.getId(), "创建对账批次失败");
         ReconciliationBatch saved = reconciliationBatchMapper.selectBySn(candidate.getTenantId(), candidate.getSn());
@@ -188,11 +197,11 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         return FundsStableHashSupport.sha256Json(facts);
     }
 
-    private void validatePreviousBatch(ReconciliationBatch candidate) {
+    private ReconciliationBatch validatePreviousBatchAndSelectRerun(ReconciliationBatch candidate) {
         if (!StringUtils.hasText(candidate.getPreviousBatchSn())) {
-            return;
+            return null;
         }
-        ReconciliationBatch previous = reconciliationBatchMapper.selectBySn(
+        ReconciliationBatch previous = reconciliationBatchMapper.selectBySnForUpdate(
                 candidate.getTenantId(), candidate.getPreviousBatchSn());
         AssertUtils.notNull(previous, "上一对账批次不存在，previousBatchSn = {}", candidate.getPreviousBatchSn());
         AssertUtils.isTrue(previous.getStatus() == ReconciliationBatchStatus.COMPLETED,
@@ -205,6 +214,18 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
                         && Objects.equals(previous.getWindowEnd(), candidate.getWindowEnd())
                         && Objects.equals(previous.getTimezoneId(), candidate.getTimezoneId()),
                 "重跑批次对账窗口必须与上一批次一致，previousBatchSn = {}", previous.getSn());
+        return reconciliationBatchMapper.selectByPreviousBatchSnForUpdate(
+                candidate.getTenantId(), candidate.getPreviousBatchSn());
+    }
+
+    private void assertPreviousBatchHasNoRerun(ReconciliationBatch candidate) {
+        if (!StringUtils.hasText(candidate.getPreviousBatchSn())) {
+            return;
+        }
+        AssertUtils.isTrue(reconciliationBatchMapper.selectByPreviousBatchSnForUpdate(
+                        candidate.getTenantId(), candidate.getPreviousBatchSn()) == null,
+                "同一上一批次只允许创建一个直接重跑批次，previousBatchSn = {}",
+                candidate.getPreviousBatchSn());
     }
 
     private ReconciliationSourceSnapshot toSourceSnapshot(RecordReconciliationSourceSnapshotRequest request,

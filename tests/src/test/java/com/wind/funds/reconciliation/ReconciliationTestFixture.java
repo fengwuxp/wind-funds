@@ -6,6 +6,7 @@ import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
 import com.wind.funds.reconciliation.support.ReconciliationDigestSupport;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
@@ -28,14 +29,29 @@ public final class ReconciliationTestFixture {
                                          String evidenceRef,
                                          String referenceSourceRef,
                                          String comparisonSourceRef) {
+        prepareReadyBatch(jdbcTemplate, tenantId, batchSn, gateObjectType, gateObjectSn, ruleVersion,
+                evidenceRef, referenceSourceRef, comparisonSourceRef, null);
+    }
+
+    public static void prepareReadyBatch(JdbcTemplate jdbcTemplate,
+                                         Long tenantId,
+                                         String batchSn,
+                                         ReconciliationGateObjectType gateObjectType,
+                                         String gateObjectSn,
+                                         String ruleVersion,
+                                         String evidenceRef,
+                                         String referenceSourceRef,
+                                         String comparisonSourceRef,
+                                         @Nullable String previousBatchSn) {
         String batchDigest = FundsStableHashSupport.sha256Json(Map.of("batchSn", batchSn));
         jdbcTemplate.update("""
                 INSERT INTO t_reconciliation_batch
                     (sn, tenant_id, gate_object_type, gate_object_sn, rule_version,
-                     window_start, window_end, timezone_id, status, batch_digest, created_by)
+                     window_start, window_end, timezone_id, previous_batch_sn, status, batch_digest, created_by)
                 VALUES (?, ?, ?, ?, ?, '2026-07-21 00:00:00', '2026-07-22 00:00:00',
-                        'Asia/Shanghai', 'DATA_READY', ?, 'SYSTEM')
-                """, batchSn, tenantId, gateObjectType.name(), gateObjectSn, ruleVersion, batchDigest);
+                        'Asia/Shanghai', ?, 'DATA_READY', ?, 'SYSTEM')
+                """, batchSn, tenantId, gateObjectType.name(), gateObjectSn, ruleVersion,
+                previousBatchSn, batchDigest);
         prepareSourceSnapshot(jdbcTemplate, tenantId, batchSn, ReconciliationSourceRole.REFERENCE,
                 ReconciliationSourceType.TRANSACTION, referenceSourceRef, evidenceRef);
         prepareSourceSnapshot(jdbcTemplate, tenantId, batchSn, ReconciliationSourceRole.COMPARISON,

@@ -41,7 +41,7 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
     private final ReconciliationGateApplicationService reconciliationGateApplicationService;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(rollbackFor = Exception.class)
     public ReconciliationDifferenceReportDTO getReport(GetReconciliationDifferenceReportRequest request,
                                                        WindOperator operator) {
         validateRequest(request, operator);

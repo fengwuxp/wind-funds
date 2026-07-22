@@ -744,8 +744,9 @@ CREATE TABLE `t_reconciliation_batch`
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_reconciliation_batch_sn` (`tenant_id`, `sn`),
     UNIQUE KEY `uk_reconciliation_batch_digest` (`tenant_id`, `batch_digest`),
+    UNIQUE KEY `uk_reconciliation_batch_previous` (`tenant_id`, `previous_batch_sn`),
     KEY `idx_reconciliation_batch_gate` (`tenant_id`, `gate_object_type`, `gate_object_sn`, `status`),
-    KEY `idx_reconciliation_batch_previous` (`tenant_id`, `previous_batch_sn`)
+    KEY `idx_reconciliation_batch_status` (`tenant_id`, `status`)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT = '对账批次表';
 
@@ -892,11 +893,11 @@ CREATE TABLE `t_reconciliation_difference`
     `adjustment_approval_ref`   VARCHAR(128)         DEFAULT NULL COMMENT '调账审批引用',
     `adjustment_evidence_ref`   VARCHAR(128)         DEFAULT NULL COMMENT '调账证据引用',
     `adjustment_reason`         VARCHAR(512)         DEFAULT NULL COMMENT '处理原因',
-    `last_rerun_sn`             VARCHAR(64)          DEFAULT NULL COMMENT '最后一次重跑流水号',
+    `last_rerun_sn`             VARCHAR(64)          DEFAULT NULL COMMENT '最后一次重跑对账运行结果流水号',
     `last_rerun_batch_sn`       VARCHAR(64)          DEFAULT NULL COMMENT '最后一次重跑批次流水号',
     `last_rerun_rule_version`   VARCHAR(64)          DEFAULT NULL COMMENT '最后一次重跑规则版本',
     `last_rerun_balanced`       TINYINT(1)           DEFAULT NULL COMMENT '最后一次重跑是否对平',
-    `last_rerun_evidence_ref`   VARCHAR(128)         DEFAULT NULL COMMENT '最后一次重跑证据引用',
+    `last_rerun_evidence_ref`   VARCHAR(128)         DEFAULT NULL COMMENT '最后一次重跑运行结果证据引用',
     `last_rerun_result_digest`  VARCHAR(128)         DEFAULT NULL COMMENT '最后一次重跑结果摘要',
     `rerun_count`               INT(11)     NOT NULL DEFAULT 0 COMMENT '重跑次数',
     `created_by`                VARCHAR(64)          DEFAULT NULL COMMENT '创建人',

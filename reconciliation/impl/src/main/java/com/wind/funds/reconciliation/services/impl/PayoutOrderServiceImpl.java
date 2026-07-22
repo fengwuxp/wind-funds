@@ -52,7 +52,7 @@ public class PayoutOrderServiceImpl implements PayoutOrderService {
     private final ReconciliationGateApplicationService reconciliationGateApplicationService;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(rollbackFor = Exception.class)
     public PayoutPreflightResultDTO checkPayoutPreflight(CheckPayoutPreflightRequest request, WindOperator operator) {
         validateRequest(request);
         AssertUtils.notNull(operator, "出款前准入检查操作人不能为空");

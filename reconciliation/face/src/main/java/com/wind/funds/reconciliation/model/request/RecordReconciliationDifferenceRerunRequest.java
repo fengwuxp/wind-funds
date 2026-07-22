@@ -15,9 +15,10 @@ import java.io.Serializable;
 /**
  * 对账差错重跑结果请求。
  *
- * <p>职责：登记差错处理后的重新对账结果，并保留重跑报告摘要。</p>
+ * <p>职责：将差错处理结果绑定到已经固化的重新对账运行结果。</p>
  *
- * <p>边界：重跑结果不能覆盖旧差错、旧审批或旧处理动作；关闭差错前必须已有处理动作回链。</p>
+ * <p>边界：调用方只提交运行结果引用，是否对平、批次、规则版本、摘要和证据均由服务读取真实运行结果派生；
+ * 重跑结果不能覆盖旧差错、旧审批或旧处理动作，关闭差错前必须已有处理动作回链。</p>
  */
 @Data
 @NoArgsConstructor
@@ -37,30 +38,7 @@ public class RecordReconciliationDifferenceRerunRequest implements Serializable 
     @NotBlank
     private String differenceSn;
 
-    @Schema(description = "重跑流水号，用于幂等")
+    @Schema(description = "已固化的重新对账运行结果流水号")
     @NotBlank
-    private String rerunSn;
-
-    @Schema(description = "重跑批次流水号")
-    @NotBlank
-    private String rerunBatchSn;
-
-    @Schema(description = "重跑使用的规则版本")
-    @NotBlank
-    private String ruleVersion;
-
-    @Schema(description = "重跑后是否对平")
-    @NotNull
-    private Boolean balanced;
-
-    @Schema(description = "重跑证据或报告引用")
-    @NotBlank
-    private String evidenceRef;
-
-    @Schema(description = "重跑结果摘要")
-    @NotBlank
-    private String resultDigest;
-
-    @Schema(description = "描述")
-    private String description;
+    private String reconciliationRunResultSn;
 }

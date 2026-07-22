@@ -25,6 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -225,6 +231,98 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                 .hasMessageContaining("准入对象必须与上一批次一致");
     }
 
+    /**
+     * 场景：同一已完成批次已经创建一个重跑批次后，再次创建不同规则版本的同级重跑。
+     * 结果：拒绝形成分叉，重跑血缘保持单链。
+     */
+    @Test
+    void testCreateRerunShouldRejectSiblingBatchForSamePreviousBatch() {
+        ReconciliationBatchDTO previous = createBatch("recon-rule-v1");
+        jdbcTemplate.update("UPDATE t_reconciliation_batch SET status = 'COMPLETED' WHERE sn = ?", previous.getSn());
+        reconciliationBatchApplicationService.createBatch(
+                minimumCreateRequest("recon-rule-v2").setPreviousBatchSn(previous.getSn()),
+                WindOperatorFactory.system());
+
+        assertThatThrownBy(() -> reconciliationBatchApplicationService.createBatch(
+                minimumCreateRequest("recon-rule-v3").setPreviousBatchSn(previous.getSn()),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("只允许创建一个直接重跑批次");
+
+        assertThat(batchCount()).isEqualTo(2);
+    }
+
+    /**
+     * 场景：两个线程并发创建完全相同的重跑批次。
+     * 结果：上一批次行锁内复查摘要，两个调用都复用同一批次事实。
+     */
+    @Test
+    void testCreateRerunShouldReuseWinnerForConcurrentSameFacts() throws Exception {
+        ReconciliationBatchDTO previous = createCompletedBatch();
+        CreateReconciliationBatchRequest request = minimumCreateRequest("recon-rule-v2")
+                .setPreviousBatchSn(previous.getSn());
+
+        List<BatchCreateAttempt> results = concurrentlyCreate(request, request);
+
+        assertThat(results).allMatch(BatchCreateAttempt::succeeded);
+        assertThat(results).extracting(BatchCreateAttempt::sn).containsOnly(results.getFirst().sn());
+        assertThat(batchCount()).isEqualTo(2);
+    }
+
+    /**
+     * 场景：两个线程并发为同一上一批次创建不同事实的重跑批次。
+     * 结果：只允许一个请求成功，另一请求被线性血缘约束拒绝。
+     */
+    @Test
+    void testCreateRerunShouldAllowOnlyOneConcurrentDifferentFacts() throws Exception {
+        ReconciliationBatchDTO previous = createCompletedBatch();
+
+        List<BatchCreateAttempt> results = concurrentlyCreate(
+                minimumCreateRequest("recon-rule-v2").setPreviousBatchSn(previous.getSn()),
+                minimumCreateRequest("recon-rule-v3").setPreviousBatchSn(previous.getSn()));
+
+        assertThat(results).filteredOn(BatchCreateAttempt::succeeded).hasSize(1);
+        assertThat(results).filteredOn(result -> !result.succeeded()).singleElement()
+                .extracting(BatchCreateAttempt::message)
+                .asString()
+                .contains("只允许创建一个直接重跑批次");
+        assertThat(batchCount()).isEqualTo(2);
+    }
+
+    private ReconciliationBatchDTO createCompletedBatch() {
+        ReconciliationBatchDTO result = createBatch("recon-rule-v1");
+        jdbcTemplate.update("UPDATE t_reconciliation_batch SET status = 'COMPLETED' WHERE sn = ?", result.getSn());
+        return result;
+    }
+
+    private List<BatchCreateAttempt> concurrentlyCreate(CreateReconciliationBatchRequest firstRequest,
+                                                        CreateReconciliationBatchRequest secondRequest)
+            throws Exception {
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<BatchCreateAttempt> first = executor.submit(concurrentCreateAttempt(startGate, firstRequest));
+            Future<BatchCreateAttempt> second = executor.submit(concurrentCreateAttempt(startGate, secondRequest));
+            startGate.countDown();
+            return List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private Callable<BatchCreateAttempt> concurrentCreateAttempt(CountDownLatch startGate,
+                                                                 CreateReconciliationBatchRequest request) {
+        return () -> {
+            startGate.await();
+            try {
+                ReconciliationBatchDTO result = reconciliationBatchApplicationService.createBatch(
+                        request, WindOperatorFactory.system());
+                return new BatchCreateAttempt(true, result.getSn(), null);
+            } catch (RuntimeException exception) {
+                return new BatchCreateAttempt(false, null, exception.getMessage());
+            }
+        };
+    }
+
     private ReconciliationBatchDTO createBatch(String ruleVersion) {
         return reconciliationBatchApplicationService.createBatch(
                 minimumCreateRequest(ruleVersion), WindOperatorFactory.system());
@@ -276,5 +374,8 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
     @Configuration
     @Import(ReconciliationBatchApplicationServiceImpl.class)
     static class Config {
+    }
+
+    private record BatchCreateAttempt(boolean succeeded, String sn, String message) {
     }
 }

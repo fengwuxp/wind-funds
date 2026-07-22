@@ -191,7 +191,7 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
     private String adjustmentReason;
 
     /**
-     * 最后一次重跑流水号。
+     * 最后一次重跑对账运行结果流水号。
      */
     private String lastRerunSn;
 
@@ -211,7 +211,7 @@ public class ReconciliationDifference implements Serializable, TenantIsolationOb
     private Boolean lastRerunBalanced;
 
     /**
-     * 最后一次重跑证据引用。
+     * 最后一次重跑运行结果证据引用，使用 ReconciliationRunResult.sn。
      */
     private String lastRerunEvidenceRef;
 

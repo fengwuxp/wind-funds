@@ -3,9 +3,15 @@ package com.wind.funds.reconciliation.application.difference.impl;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
+import com.wind.funds.reconciliation.dal.entities.ReconciliationBatch;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationDifference;
+import com.wind.funds.reconciliation.dal.entities.ReconciliationRunResult;
+import com.wind.funds.reconciliation.dal.mapper.ReconciliationBatchMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceMapper;
+import com.wind.funds.reconciliation.dal.mapper.ReconciliationRunResultMapper;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
 import com.wind.funds.reconciliation.model.dto.ReconciliationDifferenceDTO;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
 import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceAdjustmentRequest;
@@ -17,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * 对账差错应用服务实现。
@@ -26,6 +35,10 @@ import java.time.LocalDateTime;
 public class ReconciliationDifferenceApplicationServiceImpl implements ReconciliationDifferenceApplicationService {
 
     private final ReconciliationDifferenceMapper reconciliationDifferenceMapper;
+
+    private final ReconciliationBatchMapper reconciliationBatchMapper;
+
+    private final ReconciliationRunResultMapper reconciliationRunResultMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -78,23 +91,28 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
         validateRerunRequest(request);
         ReconciliationDifference entity = selectRequiredDifferenceForUpdate(request.getTenantId(),
                 request.getDifferenceSn());
-        if (request.getRerunSn().equals(entity.getLastRerunSn())) {
-            assertSameRerunRequest(entity, request);
+        ReconciliationRunResult runResult = selectRequiredRunResult(request);
+        ReconciliationBatch batch = selectRequiredCompletedBatch(request.getTenantId(), runResult);
+        if (request.getReconciliationRunResultSn().equals(entity.getLastRerunSn())) {
+            assertSameRerunResult(entity, runResult);
             return toDTO(entity);
         }
         AssertUtils.isTrue(entity.getStatus() != ReconciliationDifferenceStatus.RESOLVED,
                 "对账差错已关闭，不允许追加新的重跑结果，differenceSn = {}", request.getDifferenceSn());
-        if (Boolean.TRUE.equals(request.getBalanced())) {
+        int rerunIncrement = assertCurrentRerunLineage(entity, batch);
+        assertSameBlockingObject(entity, runResult);
+        boolean balanced = runResult.getStatus() == ReconciliationRunResultStatus.BALANCED;
+        if (balanced) {
             AssertUtils.hasText(entity.getAdjustmentSn(), "差错关闭必须先关联处理动作或调账结果");
         }
-        entity.setLastRerunSn(request.getRerunSn());
-        entity.setLastRerunBatchSn(request.getRerunBatchSn());
-        entity.setLastRerunRuleVersion(request.getRuleVersion());
-        entity.setLastRerunBalanced(request.getBalanced());
-        entity.setLastRerunEvidenceRef(request.getEvidenceRef());
-        entity.setLastRerunResultDigest(request.getResultDigest());
-        entity.setRerunCount(entity.getRerunCount() + 1);
-        if (Boolean.TRUE.equals(request.getBalanced())) {
+        entity.setLastRerunSn(runResult.getSn());
+        entity.setLastRerunBatchSn(runResult.getReconciliationBatchSn());
+        entity.setLastRerunRuleVersion(runResult.getRuleVersion());
+        entity.setLastRerunBalanced(balanced);
+        entity.setLastRerunEvidenceRef(runResult.getSn());
+        entity.setLastRerunResultDigest(runResult.getResultDigest());
+        entity.setRerunCount(entity.getRerunCount() + rerunIncrement);
+        if (balanced) {
             entity.setStatus(ReconciliationDifferenceStatus.RESOLVED);
             entity.setResolvedBy(operatorId(operator));
             entity.setResolvedTime(LocalDateTime.now());
@@ -210,12 +228,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
     private void validateRerunRequest(RecordReconciliationDifferenceRerunRequest request) {
         AssertUtils.notNull(request.getTenantId(), "对账差错重跑租户 ID 不能为空");
         AssertUtils.hasText(request.getDifferenceSn(), "对账差错重跑差错流水号不能为空");
-        AssertUtils.hasText(request.getRerunSn(), "对账差错重跑流水号不能为空");
-        AssertUtils.hasText(request.getRerunBatchSn(), "对账差错重跑批次号不能为空");
-        AssertUtils.hasText(request.getRuleVersion(), "对账差错重跑规则版本不能为空");
-        AssertUtils.notNull(request.getBalanced(), "对账差错重跑结果不能为空");
-        AssertUtils.hasText(request.getEvidenceRef(), "对账差错重跑证据引用不能为空");
-        AssertUtils.hasText(request.getResultDigest(), "对账差错重跑结果摘要不能为空");
+        AssertUtils.hasText(request.getReconciliationRunResultSn(), "对账差错重跑运行结果流水号不能为空");
     }
 
     private void assertSameCreateRequest(ReconciliationDifference existing,
@@ -270,18 +283,77 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                 "对账差错处理幂等请求原因不一致，differenceSn = {}", request.getDifferenceSn());
     }
 
-    private void assertSameRerunRequest(ReconciliationDifference existing,
-                                        RecordReconciliationDifferenceRerunRequest request) {
-        AssertUtils.isTrue(existing.getLastRerunBatchSn().equals(request.getRerunBatchSn()),
-                "对账差错重跑幂等请求批次号不一致，differenceSn = {}", request.getDifferenceSn());
-        AssertUtils.isTrue(existing.getLastRerunRuleVersion().equals(request.getRuleVersion()),
-                "对账差错重跑幂等请求规则版本不一致，differenceSn = {}", request.getDifferenceSn());
-        AssertUtils.isTrue(existing.getLastRerunBalanced().equals(request.getBalanced()),
-                "对账差错重跑幂等请求对平结果不一致，differenceSn = {}", request.getDifferenceSn());
-        AssertUtils.isTrue(existing.getLastRerunEvidenceRef().equals(request.getEvidenceRef()),
-                "对账差错重跑幂等请求证据引用不一致，differenceSn = {}", request.getDifferenceSn());
-        AssertUtils.isTrue(existing.getLastRerunResultDigest().equals(request.getResultDigest()),
-                "对账差错重跑幂等请求结果摘要不一致，differenceSn = {}", request.getDifferenceSn());
+    private ReconciliationRunResult selectRequiredRunResult(RecordReconciliationDifferenceRerunRequest request) {
+        ReconciliationRunResult result = reconciliationRunResultMapper.selectBySn(
+                request.getTenantId(), request.getReconciliationRunResultSn());
+        AssertUtils.notNull(result, "对账运行结果不存在，reconciliationRunResultSn = {}",
+                request.getReconciliationRunResultSn());
+        return result;
+    }
+
+    private ReconciliationBatch selectRequiredCompletedBatch(Long tenantId, ReconciliationRunResult runResult) {
+        ReconciliationBatch result = reconciliationBatchMapper.selectBySnForUpdate(
+                tenantId, runResult.getReconciliationBatchSn());
+        AssertUtils.notNull(result, "对账运行结果关联批次不存在，reconciliationBatchSn = {}",
+                runResult.getReconciliationBatchSn());
+        AssertUtils.isTrue(result.getStatus() == ReconciliationBatchStatus.COMPLETED
+                        && Objects.equals(result.getRunResultSn(), runResult.getSn()),
+                "对账运行结果与完成批次绑定不一致，reconciliationBatchSn = {}", result.getSn());
+        AssertUtils.isTrue(Objects.equals(result.getRuleVersion(), runResult.getRuleVersion()),
+                "对账运行结果与批次规则版本不一致，reconciliationBatchSn = {}", result.getSn());
+        AssertUtils.isTrue(result.getGateObjectType() == runResult.getGateObjectType()
+                        && Objects.equals(result.getGateObjectSn(), runResult.getGateObjectSn()),
+                "对账运行结果与批次准入对象不一致，reconciliationBatchSn = {}", result.getSn());
+        return result;
+    }
+
+    private int assertCurrentRerunLineage(ReconciliationDifference difference, ReconciliationBatch batch) {
+        String currentBatchSn = StringUtils.hasText(difference.getLastRerunBatchSn())
+                ? difference.getLastRerunBatchSn()
+                : difference.getReconciliationBatchSn();
+        AssertUtils.isTrue(!Objects.equals(batch.getSn(), currentBatchSn),
+                "对账差错重跑结果必须来自当前批次的后继血缘，differenceSn = {}, currentBatchSn = {}",
+                difference.getDifferenceSn(), currentBatchSn);
+        ReconciliationBatch current = batch;
+        Set<String> visitedBatchSns = new HashSet<>();
+        int rerunCount = 1;
+        while (!Objects.equals(current.getPreviousBatchSn(), currentBatchSn)) {
+            AssertUtils.isTrue(visitedBatchSns.add(current.getSn()),
+                    "对账批次重跑血缘存在循环，reconciliationBatchSn = {}", batch.getSn());
+            AssertUtils.hasText(current.getPreviousBatchSn(),
+                    "对账差错重跑批次不在当前批次血缘，differenceSn = {}, currentBatchSn = {}",
+                    difference.getDifferenceSn(), currentBatchSn);
+            current = reconciliationBatchMapper.selectBySn(
+                    difference.getTenantId(), current.getPreviousBatchSn());
+            AssertUtils.notNull(current,
+                    "对账差错重跑批次血缘引用不存在，differenceSn = {}, reconciliationBatchSn = {}",
+                    difference.getDifferenceSn(), batch.getSn());
+            rerunCount++;
+        }
+        AssertUtils.isTrue(reconciliationBatchMapper.selectByPreviousBatchSnForUpdate(
+                        difference.getTenantId(), batch.getSn()) == null,
+                "对账差错重跑批次已被后续批次替代，differenceSn = {}, rerunBatchSn = {}",
+                difference.getDifferenceSn(), batch.getSn());
+        return rerunCount;
+    }
+
+    private void assertSameBlockingObject(ReconciliationDifference difference, ReconciliationRunResult runResult) {
+        if (difference.getBlockingObjectType() == null) {
+            return;
+        }
+        AssertUtils.isTrue(difference.getBlockingObjectType() == runResult.getGateObjectType()
+                        && Objects.equals(difference.getBlockingObjectSn(), runResult.getGateObjectSn()),
+                "对账差错与重跑运行结果阻断对象不一致，differenceSn = {}", difference.getDifferenceSn());
+    }
+
+    private void assertSameRerunResult(ReconciliationDifference existing, ReconciliationRunResult runResult) {
+        boolean balanced = runResult.getStatus() == ReconciliationRunResultStatus.BALANCED;
+        AssertUtils.isTrue(Objects.equals(existing.getLastRerunBatchSn(), runResult.getReconciliationBatchSn())
+                        && Objects.equals(existing.getLastRerunRuleVersion(), runResult.getRuleVersion())
+                        && Objects.equals(existing.getLastRerunBalanced(), balanced)
+                        && Objects.equals(existing.getLastRerunEvidenceRef(), runResult.getSn())
+                        && Objects.equals(existing.getLastRerunResultDigest(), runResult.getResultDigest()),
+                "对账差错重跑快照与运行结果不一致，differenceSn = {}", existing.getDifferenceSn());
     }
 
     private boolean sameNullable(@Nullable String left, @Nullable String right) {

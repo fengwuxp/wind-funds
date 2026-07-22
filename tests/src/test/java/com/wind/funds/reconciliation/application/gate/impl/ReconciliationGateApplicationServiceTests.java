@@ -64,8 +64,6 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
 
     private static final String ADJUSTMENT_SN = "balance_adjust_gate_001";
 
-    private static final String RERUN_SN = "recon_gate_rerun_001";
-
     private static final String RERUN_BATCH_SN = "recon_gate_batch_001_rerun_001";
 
     @Autowired
@@ -88,7 +86,8 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
         com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
         clearingRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.CLEARING,
-                "clearing-candidate-001", RERUN_BATCH_SN, "report:clearing-recon-run-001");
+                "clearing-candidate-001", RERUN_BATCH_SN, RECONCILIATION_BATCH_SN,
+                "report:clearing-recon-run-001");
         settlementRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.SETTLEMENT,
                 "settlement-order-001", "recon-settlement-batch-001", "report:settlement-recon-run-001");
     }
@@ -396,11 +395,16 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         reconciliationDifferenceApplicationService.createDifference(minimumCreateRequest(), WindOperatorFactory.system());
         reconciliationDifferenceApplicationService.linkAdjustmentResult(minimumAdjustmentRequest(), WindOperatorFactory.system());
+        com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
+        clearingRunResultSn = recordDifferenceRunResult(ReconciliationGateObjectType.CLEARING,
+                "clearing-candidate-001", RERUN_BATCH_SN, RECONCILIATION_BATCH_SN,
+                "report:clearing-recon-unbalanced-001");
+        String unbalancedRunResultSn = clearingRunResultSn;
         reconciliationDifferenceApplicationService.recordRerunResult(
-                minimumRerunRequest()
-                        .setBalanced(false)
-                        .setResultDigest("sha256:gate-rerun-unbalanced"),
-                WindOperatorFactory.system());
+                minimumRerunRequest(), WindOperatorFactory.system());
+        clearingRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.CLEARING,
+                "clearing-candidate-001", "recon_gate_batch_001_rerun_002", RERUN_BATCH_SN,
+                "report:clearing-recon-after-unbalanced-001");
 
         ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
                 clearingGateRequest(), WindOperatorFactory.system());
@@ -411,7 +415,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(blockingDifference.getStatus()).isEqualTo(ReconciliationDifferenceStatus.RECONCILING);
         assertThat(blockingDifference.getActionType()).isEqualTo(ReconciliationDifferenceActionType.ADJUST);
         assertThat(blockingDifference.getAdjustmentSn()).isEqualTo(ADJUSTMENT_SN);
-        assertThat(blockingDifference.getLastRerunSn()).isEqualTo(RERUN_SN);
+        assertThat(blockingDifference.getLastRerunSn()).isEqualTo(unbalancedRunResultSn);
         assertThat(blockingDifference.getLastRerunBalanced()).isFalse();
         assertThat(blockingDifference.getBlockingReason()).contains("重新对账未对平");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
@@ -439,7 +443,7 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(result.getEvidenceRefs())
                 .containsExactly("report:clearing-recon-run-001", "processor-gate-file-digest-001",
                         "adjustment-evidence-gate-001",
-                        "rerun-report-gate-001");
+                        clearingRunResultSn);
         assertThat(result.getExplanation()).contains("重新对账已对平");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
@@ -525,20 +529,22 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         return new RecordReconciliationDifferenceRerunRequest()
                 .setTenantId(TENANT_ID)
                 .setDifferenceSn(DIFFERENCE_SN)
-                .setRerunSn(RERUN_SN)
-                .setRerunBatchSn(RERUN_BATCH_SN)
-                .setRuleVersion("recon-rule-v1")
-                .setBalanced(true)
-                .setEvidenceRef("rerun-report-gate-001")
-                .setResultDigest("sha256:gate-rerun-balanced-001")
-                .setDescription("调账后重新对账通过");
+                .setReconciliationRunResultSn(clearingRunResultSn);
     }
 
     private String recordBalancedRunResult(ReconciliationGateObjectType gateObjectType,
                                            String gateObjectSn,
                                            String reconciliationBatchSn,
                                            String evidenceRef) {
-        return recordRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, evidenceRef,
+        return recordBalancedRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, null, evidenceRef);
+    }
+
+    private String recordBalancedRunResult(ReconciliationGateObjectType gateObjectType,
+                                           String gateObjectSn,
+                                           String reconciliationBatchSn,
+                                           String previousBatchSn,
+                                           String evidenceRef) {
+        return recordRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, previousBatchSn, evidenceRef,
                 new ReconciliationMatchResultItem()
                         .setReferenceSourceRef("internal:" + gateObjectSn)
                         .setComparisonSourceRef("external:" + gateObjectSn)
@@ -551,7 +557,15 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                                              String gateObjectSn,
                                              String reconciliationBatchSn,
                                              String evidenceRef) {
-        return recordRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, evidenceRef,
+        return recordDifferenceRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, null, evidenceRef);
+    }
+
+    private String recordDifferenceRunResult(ReconciliationGateObjectType gateObjectType,
+                                             String gateObjectSn,
+                                             String reconciliationBatchSn,
+                                             String previousBatchSn,
+                                             String evidenceRef) {
+        return recordRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, previousBatchSn, evidenceRef,
                 new ReconciliationMatchResultItem()
                         .setReferenceSourceRef("internal:" + gateObjectSn)
                         .setComparisonSourceRef("external:" + gateObjectSn)
@@ -566,12 +580,13 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     private String recordRunResult(ReconciliationGateObjectType gateObjectType,
                                    String gateObjectSn,
                                    String reconciliationBatchSn,
+                                   String previousBatchSn,
                                    String evidenceRef,
                                    ReconciliationMatchResultItem matchResult) {
         com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
                 jdbcTemplate, TENANT_ID, reconciliationBatchSn, gateObjectType, gateObjectSn,
                 "recon-rule-v1", evidenceRef, matchResult.getReferenceSourceRef(),
-                matchResult.getComparisonSourceRef());
+                matchResult.getComparisonSourceRef(), previousBatchSn);
         return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
                 .setReconciliationBatchSn(reconciliationBatchSn)

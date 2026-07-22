@@ -29,7 +29,7 @@ public class ClearingSettlementGateConsumerServiceImpl implements ClearingSettle
     private final ReconciliationGateApplicationService reconciliationGateApplicationService;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(rollbackFor = Exception.class)
     public ClearingSettlementGateResultDTO checkGate(CheckClearingSettlementGateRequest request,
                                                      WindOperator operator) {
         validateRequest(request);

@@ -40,13 +40,24 @@ public interface ReconciliationBatchMapper extends BaseMapper<ReconciliationBatc
                                        @Param("batchDigest") String batchDigest);
 
     @Select("""
-            SELECT COUNT(*)
+            SELECT *
+            FROM t_reconciliation_batch
+            WHERE tenant_id = #{tenantId}
+              AND batch_digest = #{batchDigest}
+            FOR UPDATE
+            """)
+    ReconciliationBatch selectByDigestForUpdate(@Param("tenantId") Long tenantId,
+                                                @Param("batchDigest") String batchDigest);
+
+    @Select("""
+            SELECT *
             FROM t_reconciliation_batch
             WHERE tenant_id = #{tenantId}
               AND previous_batch_sn = #{previousBatchSn}
+            FOR UPDATE
             """)
-    int countByPreviousBatchSn(@Param("tenantId") Long tenantId,
-                               @Param("previousBatchSn") String previousBatchSn);
+    ReconciliationBatch selectByPreviousBatchSnForUpdate(@Param("tenantId") Long tenantId,
+                                                         @Param("previousBatchSn") String previousBatchSn);
 
     @Update("""
             UPDATE t_reconciliation_batch

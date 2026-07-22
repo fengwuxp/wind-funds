@@ -68,13 +68,13 @@ public class ReconciliationGateBlockingDifferenceDTO implements Serializable {
     @Schema(description = "关联资金交易流水号")
     private String adjustmentTransactionSn;
 
-    @Schema(description = "最后一次重跑流水号")
+    @Schema(description = "最后一次重跑对账运行结果流水号")
     private String lastRerunSn;
 
     @Schema(description = "最后一次重跑是否对平")
     private Boolean lastRerunBalanced;
 
-    @Schema(description = "最后一次重跑证据引用")
+    @Schema(description = "最后一次重跑运行结果证据引用，使用 ReconciliationRunResult.sn")
     private String lastRerunEvidenceRef;
 
     @Schema(description = "阻断原因")
