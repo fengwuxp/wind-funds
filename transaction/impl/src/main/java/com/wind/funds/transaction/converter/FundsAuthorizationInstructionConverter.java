@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.converter;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
@@ -77,7 +77,7 @@ public class FundsAuthorizationInstructionConverter {
             context.put(FundsInstructionContextKeys.TRANSACTION_COUNTRY, request.getTransactionCountry());
         }
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(FundsTransactionEventType.AUTHORIZE)
                 .transactionType(DefaultFundsTransactionType.PAY)
@@ -104,7 +104,7 @@ public class FundsAuthorizationInstructionConverter {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
                 request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(FundsTransactionEventType.REVERSAL)
                 .transactionType(DefaultFundsTransactionType.PAY)
@@ -152,7 +152,7 @@ public class FundsAuthorizationInstructionConverter {
                     request.getAuthorizationTransactionSn());
         }
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(FundsTransactionEventType.COMPLETE)
                 .transactionType(DefaultFundsTransactionType.PAY)
@@ -194,7 +194,7 @@ public class FundsAuthorizationInstructionConverter {
             putDisputeRefundContext(request, context);
         }
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.AUTHORIZATION_TRANSACTION)
                 .eventType(FundsTransactionEventType.AUTH_REFUND)
                 .transactionType(DefaultFundsTransactionType.REFUND)
@@ -277,7 +277,7 @@ public class FundsAuthorizationInstructionConverter {
 
     private @NonNull String authorizationLedgerTransactionSn(@NonNull String authorizationTransactionSn) {
         List<LedgerTransactionFactDTO> records = ledgerQueryService.queryLedgerTransactions(
-                ThreadContextTenantIdHolder.requireTenantId(),
+                TenantContextHolder.requireTenantId(),
                 authorizationTransactionSn,
                 FundsTransactionEventType.AUTHORIZE.name(),
                 2);

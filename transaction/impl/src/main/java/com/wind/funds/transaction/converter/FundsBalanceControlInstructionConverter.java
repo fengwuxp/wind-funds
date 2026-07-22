@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.converter;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.converter.FundsInstructionAmountSupport.ConvertedAmount;
@@ -80,7 +80,7 @@ public class FundsBalanceControlInstructionConverter {
                                                                     @NonNull WindOperator operator) {
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)
                 .eventType(FundsTransactionEventType.FREEZE)
                 .transactionType(DefaultFundsTransactionType.ADJUSTMENT)
@@ -102,7 +102,7 @@ public class FundsBalanceControlInstructionConverter {
         requireUnfreezeReference(request);
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)
                 .eventType(FundsTransactionEventType.UNFREEZE)
                 .transactionType(DefaultFundsTransactionType.ADJUSTMENT)
@@ -134,7 +134,7 @@ public class FundsBalanceControlInstructionConverter {
                 : FundsTransactionEventType.BALANCE_ADJUST;
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.BALANCE_CONTROL)
                 .eventType(eventType)
                 .transactionType(DefaultFundsTransactionType.ADJUSTMENT)

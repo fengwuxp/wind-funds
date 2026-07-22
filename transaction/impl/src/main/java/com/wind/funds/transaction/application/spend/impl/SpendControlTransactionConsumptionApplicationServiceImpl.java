@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.spend.impl;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
@@ -104,7 +104,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     private void validateTransactionControlRequest(SpendControlTransactionConsumptionRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "控制额度变动 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getMovementSn(), "控制额度变动流水号不能为空");
         AssertUtils.hasText(request.getOriginalMovementSn(), "原控制额度变动流水号不能为空");
@@ -120,7 +120,7 @@ public class SpendControlTransactionConsumptionApplicationServiceImpl
 
     private void validateBusinessConfirmedRefundRequest(SpendControlBusinessConfirmedRefundCompensationRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "控制额度变动 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getMovementSn(), "控制额度变动流水号不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "业务场景不能为空");

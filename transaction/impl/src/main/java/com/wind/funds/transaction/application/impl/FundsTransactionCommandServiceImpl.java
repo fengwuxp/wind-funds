@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.impl;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
@@ -239,7 +239,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
 
     private static String referencedTransactionLockKey(String referenceTransactionSn) {
         return REFERENCED_TRANSACTION_LOCK_PREFIX
-                + ThreadContextTenantIdHolder.requireTenantId()
+                + TenantContextHolder.requireTenantId()
                 + ":"
                 + referenceTransactionSn;
     }
@@ -267,7 +267,7 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
     }
 
     private FundsTransaction lockReferencedTransaction(String referenceTransactionSn, String referenceName) {
-        Long tenantId = ThreadContextTenantIdHolder.requireTenantId();
+        Long tenantId = TenantContextHolder.requireTenantId();
         FundsTransaction referenceTransaction = fundsTransactionMapper.selectBySnForUpdate(tenantId,
                 referenceTransactionSn);
         AssertUtils.notNull(referenceTransaction,

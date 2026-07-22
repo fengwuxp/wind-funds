@@ -1,6 +1,6 @@
 package com.wind.funds;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.mybatisflex.core.audit.AuditManager;
 import com.mybatisflex.core.query.QueryColumnBehavior;
 import com.mybatisflex.spring.FlexTransactionManager;
@@ -87,12 +87,12 @@ public abstract class AbstractFundsServiceTest {
 
     @BeforeEach
     void setUpFundsServiceTestContext() {
-        ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
+        TenantContextHolder.setTenantId(TENANT_ID);
     }
 
     @AfterEach
     void tearDownFundsServiceTestContext() {
-        ThreadContextTenantIdHolder.remove();
+        TenantContextHolder.clear();
     }
 
     @Configuration
@@ -124,7 +124,7 @@ public abstract class AbstractFundsServiceTest {
 
         @PostConstruct
         public void init() {
-            ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
+            TenantContextHolder.setTenantId(TENANT_ID);
             new SpringApplicationContextUtils().setApplicationContext(applicationContext);
             SpringApplicationContextUtils.markStarted();
             setTestApplicationEventPublisher(event -> {
@@ -136,7 +136,7 @@ public abstract class AbstractFundsServiceTest {
 
         @PreDestroy
         public void stop() {
-            ThreadContextTenantIdHolder.remove();
+            TenantContextHolder.clear();
         }
 
         @Bean

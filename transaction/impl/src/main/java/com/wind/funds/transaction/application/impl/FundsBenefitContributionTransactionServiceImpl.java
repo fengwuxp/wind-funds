@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.impl;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
@@ -108,7 +108,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     private void assertSettleRequest(@NonNull FundsBenefitContributionSettleRequest request) {
         AssertUtils.notNull(request.getTenantId(), "权益让利 tenantId 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "权益让利 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getBusinessScene(), "权益让利业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "权益让利业务流水不能为空");
@@ -125,7 +125,7 @@ public class FundsBenefitContributionTransactionServiceImpl implements FundsBene
 
     private void assertRefundRequest(@NonNull FundsBenefitContributionRefundRequest request) {
         AssertUtils.notNull(request.getTenantId(), "权益让利退款 tenantId 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "权益让利退款 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getReferenceBenefitTransactionSn(), "原让利出资记账交易流水不能为空");
         AssertUtils.notNull(request.getAmount(), "权益让利退款金额不能为空");

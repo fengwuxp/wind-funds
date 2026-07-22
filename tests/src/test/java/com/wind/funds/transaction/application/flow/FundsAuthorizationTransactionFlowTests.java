@@ -3,7 +3,7 @@ package com.wind.funds.transaction.application.flow;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.wind.integration.operator.WindOperatorFactory;
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
@@ -2779,14 +2779,14 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
                                     FundsTransactionEventType eventType,
                                     RaceCommand command) {
         try {
-            ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
+            TenantContextHolder.setTenantId(TENANT_ID);
             ready.countDown();
             awaitLatch(start);
             return RaceOutcome.success(businessSn, eventType, command.execute());
         } catch (Throwable failure) {
             return RaceOutcome.failure(businessSn, eventType, failure);
         } finally {
-            ThreadContextTenantIdHolder.remove();
+            TenantContextHolder.clear();
         }
     }
 

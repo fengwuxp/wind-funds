@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.application.account.impl;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.wallet.FundsAccount;
 import com.wind.funds.wallet.FundsAccountQueryService;
@@ -45,7 +45,7 @@ public class FundsAccountCapabilityApplicationServiceImpl implements FundsAccoun
 
     private void validateRequest(ResolveFundsAccountCapabilityRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "资金账户能力准入 tenantId 与当前租户不一致");
         AssertUtils.notNull(request.getAccountId(), "资金账户标识不能为空");
         AssertUtils.notNull(request.getCurrency(), "币种不能为空");

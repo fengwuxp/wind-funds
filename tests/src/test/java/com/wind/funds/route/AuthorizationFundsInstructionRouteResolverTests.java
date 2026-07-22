@@ -1,6 +1,6 @@
 package com.wind.funds.route;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
@@ -52,7 +52,7 @@ class AuthorizationFundsInstructionRouteResolverTests {
 
     @BeforeEach
     void setUp() {
-        ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
+        TenantContextHolder.setTenantId(TENANT_ID);
         PlatformFundingAccountService platformFundingAccountService = new FixedPlatformFundingAccountService();
         resolver = new AuthorizationFundsInstructionRouteResolver(
                 new RouteParticipantFactory(),
@@ -62,7 +62,7 @@ class AuthorizationFundsInstructionRouteResolverTests {
 
     @AfterEach
     void tearDown() {
-        ThreadContextTenantIdHolder.remove();
+        TenantContextHolder.clear();
     }
 
     /**

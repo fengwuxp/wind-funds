@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.flow;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.ledger.dal.entities.LedgerEntry;
 import com.wind.funds.ledger.dal.entities.LedgerPostingPlan;
@@ -1270,7 +1270,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                                                String feeSourceTransactionSn,
                                                String businessSn) {
         try {
-            ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
+            TenantContextHolder.setTenantId(TENANT_ID);
             ready.countDown();
             awaitRaceStart(start);
             return FeeRefundRaceOutcome.success(businessSn,
@@ -1278,7 +1278,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
         } catch (Throwable failure) {
             return FeeRefundRaceOutcome.failure(businessSn, failure);
         } finally {
-            ThreadContextTenantIdHolder.remove();
+            TenantContextHolder.clear();
         }
     }
 

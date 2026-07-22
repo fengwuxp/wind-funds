@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.external.impl;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
@@ -53,7 +53,7 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
 
     private void validateConsumeRequest(ConsumeExternalFundsEventRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "外部资金事件 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getExternalEventSn(), "外部资金事件流水不能为空");
         AssertUtils.hasText(request.getExternalEventType(), "外部资金事件类型不能为空");

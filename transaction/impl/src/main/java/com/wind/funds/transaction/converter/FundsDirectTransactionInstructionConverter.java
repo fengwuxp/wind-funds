@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.converter;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.wallet.service.PlatformFundingAccountService;
@@ -80,7 +80,7 @@ public class FundsDirectTransactionInstructionConverter {
         extraContext.put(FundsInstructionContextKeys.EXTERNAL_TRANSACTION_ID, request.getChannelTransactionSn());
         putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TOPUP)
                 .transactionType(DefaultFundsTransactionType.TOPUP)
@@ -115,7 +115,7 @@ public class FundsDirectTransactionInstructionConverter {
         Map<String, Object> extraContext = new LinkedHashMap<>();
         putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.TRANSFER)
                 .transactionType(DefaultFundsTransactionType.TRANSFER)
@@ -149,7 +149,7 @@ public class FundsDirectTransactionInstructionConverter {
         Map<String, Object> extraContext = new LinkedHashMap<>();
         putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.PAY)
                 .transactionType(DefaultFundsTransactionType.PAY)
@@ -183,7 +183,7 @@ public class FundsDirectTransactionInstructionConverter {
             extraContext.put(FundsInstructionContextKeys.EXTERNAL_TRANSACTION_ID, request.getChannelTransactionSn());
         }
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.REFUND)
                 .transactionType(DefaultFundsTransactionType.REFUND)
@@ -248,7 +248,7 @@ public class FundsDirectTransactionInstructionConverter {
         extraContext.put(FundsInstructionContextKeys.REFERENCE_FREEZE_SN, request.getReferenceFreezeSn());
         putFeeChargeSpec(extraContext, request.getFeeChargeSpec());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.WITHDRAW)
                 .transactionType(DefaultFundsTransactionType.WITHDRAW)
@@ -278,7 +278,7 @@ public class FundsDirectTransactionInstructionConverter {
         assertNotSpendControlScope(request.getAccountId(), "手续费支出账户不能是支出控制范围");
         ConvertedAmount amount = amountSupport.sameCurrency(request.getAmount(), request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.FEE_CHARGE)
                 .transactionType(DefaultFundsTransactionType.FEE)
@@ -306,7 +306,7 @@ public class FundsDirectTransactionInstructionConverter {
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
                 request.getAccountId());
         return ImmutableFundsInstructionSpec.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .instructionType(FundsInstructionType.DIRECT_TRANSACTION)
                 .eventType(FundsTransactionEventType.FEE_REFUND)
                 .transactionType(DefaultFundsTransactionType.REFUND)

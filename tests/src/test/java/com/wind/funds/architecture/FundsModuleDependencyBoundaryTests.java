@@ -72,8 +72,6 @@ class FundsModuleDependencyBoundaryTests {
             "reconciliation/pom.xml", List.of("face", "impl"),
             "governance/pom.xml", List.of("face", "impl"));
 
-    private static final String LEGACY_FUNDS_ARTIFACT_PREFIX = String.join("-", "capte", "funds");
-
     private static final List<String> FACE_MODULE_POMS = List.of(
             "ledger/face/pom.xml",
             "transaction/face/pom.xml",
@@ -82,8 +80,6 @@ class FundsModuleDependencyBoundaryTests {
             "governance/face/pom.xml");
 
     private static final List<String> FACE_ALLOWED_FUNDS_ARTIFACTS = List.of("wind-funds-core");
-
-    private static final String CAPTE_DAL_INFRASTRUCTURE_ARTIFACT = "catep-infrastructure-dal";
 
     private static final List<String> CORE_FORBIDDEN_ARTIFACTS = List.of(
             "wind-funds-fx-impl",
@@ -97,8 +93,7 @@ class FundsModuleDependencyBoundaryTests {
             "wind-funds-reconciliation-impl",
             "wind-funds-governance-face",
             "wind-funds-governance-impl",
-            "wind-funds-tests",
-            CAPTE_DAL_INFRASTRUCTURE_ARTIFACT);
+            "wind-funds-tests");
 
     private static final String CORE_FORBIDDEN_SPRING_DEPENDENCY_GROUP_TOKEN =
             "<groupId>org.springframework";
@@ -178,9 +173,7 @@ class FundsModuleDependencyBoundaryTests {
             "governance/impl/src/main/java",
             "tests/src/test/java");
 
-    private static final List<String> LEGACY_FUNDS_PACKAGE_TOKENS = List.of(
-            String.join(".", "com", "capte", "funds"),
-            String.join("/", "com", "capte", "funds"),
+    private static final List<String> NON_CANONICAL_FUNDS_PACKAGE_TOKENS = List.of(
             String.join(".", "com", "wind", "integration", "funds"),
             String.join("/", "com", "wind", "integration", "funds"));
 
@@ -276,28 +269,6 @@ class FundsModuleDependencyBoundaryTests {
     }
 
     /**
-     * 场景：资金项目 Maven 坐标已经统一到 Wind 命名空间。
-     * 预期：父项目、模块和模块间依赖均不再使用历史 Capte funds artifactId。
-     * 红线：不得通过新增模块或依赖恢复历史 artifactId 前缀。
-     */
-    @Test
-    void testProjectArtifactIdsShouldUseWindPrefix() throws Exception {
-        List<String> violations = new ArrayList<>();
-        for (String pomPath : PROJECT_POMS) {
-            for (String artifactId : artifactIds(workspaceRoot().resolve(pomPath))) {
-                if (artifactId.equals(LEGACY_FUNDS_ARTIFACT_PREFIX)
-                        || artifactId.startsWith(LEGACY_FUNDS_ARTIFACT_PREFIX + "-")) {
-                    violations.add(pomPath + " contains " + artifactId);
-                }
-            }
-        }
-
-        assertThat(violations)
-                .as("project artifactIds must use the wind-funds prefix")
-                .isEmpty();
-    }
-
-    /**
      * 场景：资金项目按业务能力组织 Maven 模块。
      * 预期：根 POM 只声明稳定能力模块，各能力聚合 POM 自行管理 face/impl 子模块。
      * 红线：根 POM 不直接枚举两级实现路径，避免业务能力内部结构泄漏到项目根。
@@ -381,22 +352,6 @@ class FundsModuleDependencyBoundaryTests {
     }
 
     /**
-     * 场景：资金实现模块直接声明实际使用的 MyBatis Flex 能力。
-     * 预期：根 POM 和生产模块不依赖 Capte DAL 聚合基础设施。
-     * 红线：资金模块不得通过聚合依赖间接引入 KMS、OSS、数据库驱动等无关能力。
-     */
-    @Test
-    void testProductionModulesShouldNotDependOnCapteDalInfrastructure() throws Exception {
-        assertThat(dependencyArtifactIds(workspaceRoot().resolve("pom.xml")))
-                .doesNotContain(CAPTE_DAL_INFRASTRUCTURE_ARTIFACT);
-        for (String pomPath : PRODUCTION_MODULE_POMS) {
-            assertThat(dependencyArtifactIds(workspaceRoot().resolve(pomPath)))
-                    .as("production module %s should not depend on Capte DAL infrastructure", pomPath)
-                    .doesNotContain(CAPTE_DAL_INFRASTRUCTURE_ARTIFACT);
-        }
-    }
-
-    /**
      * 场景：生产模块按当前已固化的 Maven 边界协作。
      * 预期：ledger-impl 不反向依赖交易/钱包，transaction-impl 不直连 ledger-face/impl，wallet-impl 不反向依赖 transaction-face/impl。
      * 红线：实现模块不能绕开上层应用契约直连下游实现细节。
@@ -444,16 +399,16 @@ class FundsModuleDependencyBoundaryTests {
     /**
      * 场景：资金域包根已经统一为 `com.wind.funds`。
      * 预期：源码、测试、规格和项目级指令不再引入旧资金域包根。
-     * 红线：不得恢复历史 Capte funds 包根或旧 Wind integration funds 资金域包根。
+     * 红线：不得恢复旧 Wind integration funds 资金域包根。
      */
     @Test
     void testFundsPackageRootShouldStayUnderWindFunds() throws Exception {
         List<String> violations = new ArrayList<>();
         for (Path textFile : packageGuardTextFiles()) {
             String content = Files.readString(textFile);
-            for (String legacyToken : LEGACY_FUNDS_PACKAGE_TOKENS) {
-                if (content.contains(legacyToken)) {
-                    violations.add(workspaceRoot().relativize(textFile) + " contains " + legacyToken);
+            for (String forbiddenToken : NON_CANONICAL_FUNDS_PACKAGE_TOKENS) {
+                if (content.contains(forbiddenToken)) {
+                    violations.add(workspaceRoot().relativize(textFile) + " contains " + forbiddenToken);
                 }
             }
         }

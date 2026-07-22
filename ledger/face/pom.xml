@@ -17,10 +17,6 @@
             <groupId>com.wind.funds</groupId>
             <artifactId>wind-funds-core</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.capte.domain</groupId>
-            <artifactId>capte-domain-core</artifactId>
-        </dependency>
     </dependencies>
 
 </project>

@@ -1,6 +1,6 @@
 package com.wind.funds.route.support;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.funds.model.route.ImmutableSubjectRef;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
 import com.wind.funds.wallet.FundsAccountId;
@@ -31,7 +31,7 @@ public class RouteSubjectSupport {
                     + accountId);
         }
         return ImmutableSubjectRef.builder()
-                .tenantId(ThreadContextTenantIdHolder.requireTenantId())
+                .tenantId(TenantContextHolder.requireTenantId())
                 .subjectId(accountId.id())
                 .subjectType(resolveSubjectType(accountId))
                 .build();

@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.application.spend;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.funds.AbstractFundsServiceTest;
 import com.wind.funds.ledger.enums.AccountBalancePeriodType;
 import com.wind.funds.ledger.enums.LedgerProfileCode;
@@ -1349,11 +1349,11 @@ class SpendControlTransactionConsumptionApplicationServiceTests extends Abstract
     }
 
     private <T> T withTenant(Callable<T> command) throws Exception {
-        ThreadContextTenantIdHolder.setTenantId(TENANT_ID);
+        TenantContextHolder.setTenantId(TENANT_ID);
         try {
             return command.call();
         } finally {
-            ThreadContextTenantIdHolder.remove();
+            TenantContextHolder.clear();
         }
     }
 

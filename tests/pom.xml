@@ -13,11 +13,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.capte.domain</groupId>
-            <artifactId>capte-domain-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>com.wind.funds</groupId>
             <artifactId>wind-funds-core</artifactId>
             <scope>test</scope>

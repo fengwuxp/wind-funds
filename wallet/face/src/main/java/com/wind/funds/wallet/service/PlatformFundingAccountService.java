@@ -20,7 +20,7 @@ public interface PlatformFundingAccountService {
     /**
      * 按当前线程租户查询平台资金账户，未初始化时抛出异常。
      *
-     * <p>能力范围：从 ThreadContextTenantIdHolder 获取租户，并解析对应平台账户。</p>
+     * <p>能力范围：从 TenantContextHolder 获取租户，并解析对应平台账户。</p>
      *
      * @param currency 币种
      * @param role 平台账户角色

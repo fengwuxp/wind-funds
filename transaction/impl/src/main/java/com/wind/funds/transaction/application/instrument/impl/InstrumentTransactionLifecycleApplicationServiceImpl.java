@@ -1,6 +1,6 @@
 package com.wind.funds.transaction.application.instrument.impl;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
@@ -93,7 +93,7 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
 
     private void validateReceiveRequest(ReceiveByInstrumentRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "支付工具收款 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
         AssertUtils.notNull(request.getAmount(), "收款金额不能为空");
@@ -111,7 +111,7 @@ public class InstrumentTransactionLifecycleApplicationServiceImpl
 
     private void validatePayOutByRailRequest(PayOutByRailRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "支付工具出款 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
         AssertUtils.notNull(request.getPayoutSourceAccountId(), "出款资金来源账户不能为空");

@@ -33,7 +33,7 @@
   <rect x="80" y="130" width="1340" height="160" class="group purple"/>
   <text x="105" y="164" class="section">资金语义内核</text>
   <rect x="500" y="188" width="500" height="62" class="box purple"/>
-  <text x="750" y="214" text-anchor="middle" class="label">core / capte-domain-core</text>
+  <text x="750" y="214" text-anchor="middle" class="label">core / wind-operator</text>
   <text x="750" y="236" text-anchor="middle" class="sub">DSL、枚举、值对象、Spec、Port；禁止依赖 DAL、Web、MQ、impl、tests</text>
 
   <rect x="80" y="330" width="1340" height="150" class="group"/>

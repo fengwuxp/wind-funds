@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.application.instrument.impl;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentCapabilityApplicationService;
@@ -50,7 +50,7 @@ public class PaymentInstrumentCapabilityApplicationServiceImpl
 
     private void validateRequest(ResolvePaymentInstrumentCapabilityRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "支付工具能力准入 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getInstrumentSn(), "支付工具号不能为空");
         AssertUtils.notNull(request.getAction(), "支付工具动作不能为空");

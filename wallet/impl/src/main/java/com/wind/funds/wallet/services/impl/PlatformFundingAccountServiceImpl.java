@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.services.impl;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.query.supports.DefaultPageQueryOptions;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
@@ -33,7 +33,7 @@ public class PlatformFundingAccountServiceImpl implements PlatformFundingAccount
     @Override
     public @NonNull FundsAccountId requireAccountId(@NonNull CurrencyIsoCode currency,
                                                     @NonNull PlatformFundingAccountRole role) {
-        return requireAccountId(ThreadContextTenantIdHolder.requireTenantId(), currency, role);
+        return requireAccountId(TenantContextHolder.requireTenantId(), currency, role);
     }
 
     @Override

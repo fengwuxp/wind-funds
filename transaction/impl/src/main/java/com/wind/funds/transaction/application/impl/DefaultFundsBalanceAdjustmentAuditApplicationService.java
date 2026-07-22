@@ -2,7 +2,7 @@ package com.wind.funds.transaction.application.impl;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.application.FundsBalanceAdjustmentAuditApplicationService;
@@ -134,7 +134,7 @@ public class DefaultFundsBalanceAdjustmentAuditApplicationService
 
     private void assertTenant(Long tenantId) {
         AssertUtils.notNull(tenantId, "余额调账审计 tenantId 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), tenantId,
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), tenantId,
                 "余额调账审计 tenantId 与当前租户不一致");
     }
 

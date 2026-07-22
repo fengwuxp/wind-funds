@@ -27,7 +27,7 @@
 
 目录组织：根 POM 只声明 `core`、业务能力聚合模块、`tests` 和 `dependencies`；`fx`、`ledger`、`wallet`、`transaction`、`reconciliation`、`governance` 各自由本目录聚合 POM 管理 `face` / `impl` 叶子模块。聚合 POM 不承载 Java 源码或业务依赖，叶子模块 artifactId 继续使用完整的 `wind-funds-<capability>-<layer>` 名称。
 
-强制依赖方向：`*-face -> core / capte-domain-core`；`fx-impl -> core`；`transaction-impl -> transaction-face / wallet-face / core / infrastructure`；`wallet-impl -> wallet-face / ledger-face / core / infrastructure`；`ledger-impl -> ledger-face / core / infrastructure`；`reconciliation-impl -> reconciliation-face / transaction-face / ledger-face / core / infrastructure`；`governance-impl -> governance-face / transaction-face / ledger-face / reconciliation-face / core / infrastructure`；`tests -> impl / face / core`。
+强制依赖方向：`*-face -> core / wind-operator`；`fx-impl -> core`；`transaction-impl -> transaction-face / wallet-face / core / infrastructure`；`wallet-impl -> wallet-face / ledger-face / core / infrastructure`；`ledger-impl -> ledger-face / core / infrastructure`；`reconciliation-impl -> reconciliation-face / transaction-face / ledger-face / core / infrastructure`；`governance-impl -> governance-face / transaction-face / ledger-face / reconciliation-face / core / infrastructure`；`tests -> impl / face / core`。
 
 模块红线：
 
@@ -38,7 +38,7 @@
 - `reconciliation-impl` 和 `governance-impl` 只能通过 `*-face`、core port 或只读证据引用消费主链事实；禁止依赖其他模块 `*-impl`、DAL、Mapper 或反写交易、账本、钱包事实。
 - `route` 只解析资金路径，不直接写交易事实或账本事实。
 - `ledger` 只维护账本事实和账本投影，不反向持有业务交易生命周期状态。
-- 资金域 Java 包名和源码路径统一使用 `com.wind.funds` / `com/wind/funds`；不得恢复历史 Capte funds 包根或旧 Wind integration funds 包根。`com.capte.domain` 是外部领域依赖边界，可按模块依赖约束保留。
+- 资金域 Java 包名和源码路径统一使用 `com.wind.funds` / `com/wind/funds`；不得引入其他资金域包根。
 
 ## 3. Wind 项目约规
 

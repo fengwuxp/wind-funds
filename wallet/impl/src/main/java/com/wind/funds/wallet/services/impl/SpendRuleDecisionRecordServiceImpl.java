@@ -1,6 +1,6 @@
 package com.wind.funds.wallet.services.impl;
 
-import com.capte.domain.core.context.ThreadContextTenantIdHolder;
+import com.wind.integration.core.context.TenantContextHolder;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.wind.common.exception.AssertUtils;
 import com.wind.common.query.WindPagination;
@@ -138,7 +138,7 @@ public class SpendRuleDecisionRecordServiceImpl implements SpendRuleDecisionReco
 
     private void validateDecisionRecordRequest(RecordSpendRuleDecisionRecordRequest request) {
         AssertUtils.notNull(request.getTenantId(), "租户 ID 不能为空");
-        AssertUtils.equals(ThreadContextTenantIdHolder.requireTenantId(), request.getTenantId(),
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "Spend Rule 决策写入 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getDecisionSn(), "Spend Rule 决策流水号不能为空");
         AssertUtils.hasText(request.getRuleId(), "Spend Rule 标识不能为空");
