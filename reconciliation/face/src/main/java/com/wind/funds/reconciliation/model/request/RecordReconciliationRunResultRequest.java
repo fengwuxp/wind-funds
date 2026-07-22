@@ -1,9 +1,7 @@
 package com.wind.funds.reconciliation.model.request;
 
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -18,8 +16,8 @@ import java.util.List;
 /**
  * 记录对账运行结果请求。
  *
- * <p>受控的内部对账调用方提供已完成归一和匹配的逐笔结果；资金底座生成稳定流水号、状态、计数与摘要并追加保存。
- * 本请求不证明来源内容和覆盖范围本身可信，不能向普通业务调用方开放。</p>
+ * <p>匹配调用方只提交批次引用和逐笔匹配结论。准入对象、规则版本、来源摘要与来源证据由服务从已冻结批次读取，
+ * 调用方不能自报或覆盖这些正向事实。</p>
  */
 @Data
 @NoArgsConstructor
@@ -39,31 +37,7 @@ public class RecordReconciliationRunResultRequest implements Serializable {
     @NotBlank
     private String reconciliationBatchSn;
 
-    @Schema(description = "本次结果适用的准入对象类型")
-    @NotNull
-    private ReconciliationGateObjectType gateObjectType;
-
-    @Schema(description = "本次结果适用的准入对象流水号")
-    @NotBlank
-    private String gateObjectSn;
-
-    @Schema(description = "匹配或对账规则版本")
-    @NotBlank
-    private String ruleVersion;
-
-    @Schema(description = "归一化内部事实集合 SHA-256")
-    @NotBlank
-    private String internalSourceDigest;
-
-    @Schema(description = "归一化外部来源事实集合 SHA-256")
-    @NotBlank
-    private String externalSourceDigest;
-
     @Schema(description = "逐笔匹配结果")
-    @NotEmpty
+    @NotNull
     private List<ReconciliationMatchResultItem> matchResults;
-
-    @Schema(description = "来源文件、报表或匹配报告的稳定证据引用")
-    @NotEmpty
-    private List<String> evidenceRefs;
 }

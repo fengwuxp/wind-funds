@@ -720,6 +720,81 @@ CREATE TABLE `t_clearing_splittable_detail`
   DEFAULT CHARSET = utf8mb4 COMMENT = '可清分明细准入事实表';
 
 -- ----------------------------
+-- 对账批次表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_reconciliation_batch`;
+CREATE TABLE `t_reconciliation_batch`
+(
+    `id`                   BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `gmt_modified`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `sn`                   VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
+    `tenant_id`            BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `gate_object_type`     VARCHAR(50)  NOT NULL COMMENT '准入对象类型',
+    `gate_object_sn`       VARCHAR(64)  NOT NULL COMMENT '准入对象流水号',
+    `rule_version`         VARCHAR(64)  NOT NULL COMMENT '匹配或对账规则版本',
+    `window_start`         DATETIME     NOT NULL COMMENT '对账窗口开始时间，含',
+    `window_end`           DATETIME     NOT NULL COMMENT '对账窗口结束时间，不含',
+    `timezone_id`          VARCHAR(64)  NOT NULL COMMENT '对账窗口时区 ID',
+    `previous_batch_sn`    VARCHAR(64)           DEFAULT NULL COMMENT '重跑引用的上一批次流水号',
+    `status`               VARCHAR(50)  NOT NULL COMMENT 'CREATED/DATA_COLLECTING/DATA_READY/COMPLETED',
+    `run_result_sn`        VARCHAR(64)           DEFAULT NULL COMMENT '完成态运行结果流水号',
+    `batch_digest`         VARCHAR(64)  NOT NULL COMMENT '对账范围与重跑关系 SHA-256',
+    `created_by`           VARCHAR(64)  NOT NULL COMMENT '创建人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_batch_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_reconciliation_batch_digest` (`tenant_id`, `batch_digest`),
+    KEY `idx_reconciliation_batch_gate` (`tenant_id`, `gate_object_type`, `gate_object_sn`, `status`),
+    KEY `idx_reconciliation_batch_previous` (`tenant_id`, `previous_batch_sn`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '对账批次表';
+
+-- ----------------------------
+-- 对账来源快照表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_reconciliation_source_snapshot`;
+CREATE TABLE `t_reconciliation_source_snapshot`
+(
+    `id`                       BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`               DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `sn`                       VARCHAR(64)  NOT NULL COMMENT '来源快照流水号',
+    `tenant_id`                BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `reconciliation_batch_sn`  VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
+    `source_role`              VARCHAR(50)  NOT NULL COMMENT 'REFERENCE/COMPARISON',
+    `source_type`              VARCHAR(50)  NOT NULL COMMENT '来源事实类型',
+    `source_digest`            VARCHAR(64)  NOT NULL COMMENT '来源成员集合 SHA-256',
+    `record_count`             INT(11)      NOT NULL COMMENT '来源成员数',
+    `evidence_refs`            TEXT         NOT NULL COMMENT '来源文件或报表稳定证据引用 JSON',
+    `created_by`               VARCHAR(64)  NOT NULL COMMENT '记录人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_source_snapshot_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_reconciliation_source_snapshot_role` (`tenant_id`, `reconciliation_batch_sn`, `source_role`),
+    KEY `idx_reconciliation_source_snapshot_digest` (`tenant_id`, `source_digest`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '对账来源快照表';
+
+-- ----------------------------
+-- 对账来源成员表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_reconciliation_source_item`;
+CREATE TABLE `t_reconciliation_source_item`
+(
+    `id`                  BIGINT(20)   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    `gmt_create`          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `sn`                  VARCHAR(64)  NOT NULL COMMENT '来源成员流水号',
+    `tenant_id`           BIGINT(20)   NOT NULL COMMENT '租户 ID',
+    `source_snapshot_sn`  VARCHAR(64)  NOT NULL COMMENT '来源快照流水号',
+    `source_item_ref`     VARCHAR(128) NOT NULL COMMENT '不可变来源事实稳定引用',
+    `item_digest`         VARCHAR(64)  NOT NULL COMMENT '来源成员身份 SHA-256',
+    `created_by`          VARCHAR(64)  NOT NULL COMMENT '记录人',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_reconciliation_source_item_sn` (`tenant_id`, `sn`),
+    UNIQUE KEY `uk_reconciliation_source_item_ref` (`tenant_id`, `source_snapshot_sn`, `source_item_ref`),
+    KEY `idx_reconciliation_source_item_digest` (`tenant_id`, `source_snapshot_sn`, `item_digest`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT = '对账来源成员表';
+
+-- ----------------------------
 -- 对账运行结果表
 -- ----------------------------
 DROP TABLE IF EXISTS `t_reconciliation_run_result`;
@@ -732,11 +807,11 @@ CREATE TABLE `t_reconciliation_run_result`
     `reconciliation_batch_sn`  VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
     `gate_object_type`         VARCHAR(50)  NOT NULL COMMENT '准入对象类型',
     `gate_object_sn`           VARCHAR(64)  NOT NULL COMMENT '准入对象流水号',
-    `status`                   VARCHAR(50)  NOT NULL COMMENT 'BALANCED/DIFFERENCE_FOUND/WAITING_DATA/FAILED',
+    `status`                   VARCHAR(50)  NOT NULL COMMENT 'BALANCED/DIFFERENCE_FOUND',
     `rule_version`             VARCHAR(64)  NOT NULL COMMENT '匹配或对账规则版本',
-    `internal_source_digest`   VARCHAR(64)  NOT NULL COMMENT '归一化内部事实集合 SHA-256',
-    `external_source_digest`   VARCHAR(64)  NOT NULL COMMENT '归一化外部来源事实集合 SHA-256',
-    `source_digest`            VARCHAR(64)  NOT NULL COMMENT '内部与外部来源摘要的组合 SHA-256',
+    `reference_source_digest`  VARCHAR(64)  NOT NULL COMMENT '基准侧来源成员集合 SHA-256',
+    `comparison_source_digest` VARCHAR(64)  NOT NULL COMMENT '核对侧来源成员集合 SHA-256',
+    `source_digest`            VARCHAR(64)  NOT NULL COMMENT '基准侧与核对侧来源摘要的组合 SHA-256',
     `result_digest`            VARCHAR(64)  NOT NULL COMMENT '对账运行结果 SHA-256',
     `total_count`              INT(11)      NOT NULL COMMENT '参与运行的记录总数',
     `matched_count`            INT(11)      NOT NULL COMMENT '成功匹配记录数',
@@ -745,7 +820,7 @@ CREATE TABLE `t_reconciliation_run_result`
     `created_by`               VARCHAR(64)  NOT NULL COMMENT '记录人',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_reconciliation_run_result_sn` (`tenant_id`, `sn`),
-    UNIQUE KEY `uk_reconciliation_run_result_business` (`tenant_id`, `reconciliation_batch_sn`, `gate_object_type`, `gate_object_sn`),
+    UNIQUE KEY `uk_reconciliation_run_result_business` (`tenant_id`, `reconciliation_batch_sn`),
     KEY `idx_reconciliation_run_result_gate` (`tenant_id`, `gate_object_type`, `gate_object_sn`, `status`),
     KEY `idx_reconciliation_run_result_digest` (`tenant_id`, `result_digest`)
 ) ENGINE = InnoDB
@@ -763,8 +838,8 @@ CREATE TABLE `t_reconciliation_match_result`
     `tenant_id`                     BIGINT(20)   NOT NULL COMMENT '租户 ID',
     `reconciliation_run_result_sn`  VARCHAR(64)  NOT NULL COMMENT '对账运行结果流水号',
     `reconciliation_batch_sn`       VARCHAR(64)  NOT NULL COMMENT '对账批次流水号',
-    `internal_source_ref`           VARCHAR(128)          DEFAULT NULL COMMENT '内部事实稳定引用',
-    `external_source_ref`           VARCHAR(128)          DEFAULT NULL COMMENT '外部来源事实稳定引用',
+    `reference_source_ref`          VARCHAR(128)          DEFAULT NULL COMMENT '基准侧事实稳定引用',
+    `comparison_source_ref`         VARCHAR(128)          DEFAULT NULL COMMENT '核对侧事实稳定引用',
     `source_quality`                VARCHAR(50)  NOT NULL COMMENT '来源质量',
     `match_strength`                VARCHAR(50)  NOT NULL COMMENT '匹配强度',
     `difference_type`               VARCHAR(50)           DEFAULT NULL COMMENT '差错类型',
@@ -772,7 +847,7 @@ CREATE TABLE `t_reconciliation_match_result`
     `currency`                      VARCHAR(10)           DEFAULT NULL COMMENT '差异币种',
     `difference_amount`             BIGINT(20)            DEFAULT NULL COMMENT '差异金额，最小货币单位',
     `evidence_ref`                  VARCHAR(256) NOT NULL COMMENT '匹配结论证据引用',
-    `match_identity_digest`         VARCHAR(64)  NOT NULL COMMENT '内部与外部来源对身份 SHA-256',
+    `match_identity_digest`         VARCHAR(64)  NOT NULL COMMENT '基准侧与核对侧来源对身份 SHA-256',
     `match_digest`                  VARCHAR(64)  NOT NULL COMMENT '匹配结果 SHA-256',
     `created_by`                    VARCHAR(64)  NOT NULL COMMENT '记录人',
     PRIMARY KEY (`id`),

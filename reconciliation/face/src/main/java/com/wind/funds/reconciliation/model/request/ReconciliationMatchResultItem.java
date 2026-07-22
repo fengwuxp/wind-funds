@@ -21,7 +21,7 @@ import java.io.Serializable;
 /**
  * 对账匹配结果项。
  *
- * <p>一项表示一次内部事实与外部来源事实的匹配结论；缺失类差异允许其中一侧引用为空。</p>
+ * <p>一项表示一次基准侧事实与核对侧事实的匹配结论；缺失类差异允许其中一侧引用为空。</p>
  */
 @Data
 @NoArgsConstructor
@@ -33,11 +33,11 @@ public class ReconciliationMatchResultItem implements Serializable {
     @Serial
     private static final long serialVersionUID = 2754849563169512824L;
 
-    @Schema(description = "内部事实稳定引用；INTERNAL_MISSING 时为空")
-    private String internalSourceRef;
+    @Schema(description = "基准侧事实稳定引用；REFERENCE_MISSING 时为空")
+    private String referenceSourceRef;
 
-    @Schema(description = "外部来源事实稳定引用；EXTERNAL_MISSING 时为空")
-    private String externalSourceRef;
+    @Schema(description = "核对侧事实稳定引用；COMPARISON_MISSING 时为空")
+    private String comparisonSourceRef;
 
     @Schema(description = "来源质量")
     @NotNull

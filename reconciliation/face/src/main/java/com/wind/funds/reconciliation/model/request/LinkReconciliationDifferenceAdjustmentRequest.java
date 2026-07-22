@@ -38,7 +38,7 @@ public class LinkReconciliationDifferenceAdjustmentRequest implements Serializab
     @NotBlank
     private String differenceSn;
 
-    @Schema(description = "差错处理动作类型，必须来自补事实、冲正、调账、挂账、追偿或核销白名单")
+    @Schema(description = "上层业务已确认的差错处理动作类型")
     @NotNull
     private ReconciliationDifferenceActionType actionType;
 

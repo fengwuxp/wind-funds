@@ -15,15 +15,5 @@ public enum ReconciliationRunResultStatus {
     /**
      * 已完成匹配并发现差错。
      */
-    DIFFERENCE_FOUND,
-
-    /**
-     * 来源数据尚未完整，不能形成最终结论。
-     */
-    WAITING_DATA,
-
-    /**
-     * 本次运行失败，不能形成正向结论。
-     */
-    FAILED
+    DIFFERENCE_FOUND
 }

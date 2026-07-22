@@ -2,6 +2,8 @@ package com.wind.funds.reconciliation.application.gate.impl;
 
 import com.wind.integration.operator.WindOperatorFactory;
 import com.wind.funds.AbstractFundsServiceTest;
+import com.wind.funds.reconciliation.application.batch.ReconciliationBatchApplicationService;
+import com.wind.funds.reconciliation.application.batch.impl.ReconciliationBatchApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.difference.ReconciliationDifferenceApplicationService;
 import com.wind.funds.reconciliation.application.difference.impl.ReconciliationDifferenceApplicationServiceImpl;
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
@@ -18,6 +20,7 @@ import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateBlockingDifferenceDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
+import com.wind.funds.reconciliation.model.request.CreateReconciliationBatchRequest;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
 import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceAdjustmentRequest;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
@@ -35,6 +38,7 @@ import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static com.wind.funds.support.FundsBalanceAssertionSupport.assertLedgerFactsUnchanged;
@@ -74,13 +78,15 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     private ReconciliationRunResultApplicationService reconciliationRunResultApplicationService;
 
     @Autowired
+    private ReconciliationBatchApplicationService reconciliationBatchApplicationService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void prepareReconciliationEvidence() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
-        jdbcTemplate.update("DELETE FROM t_reconciliation_match_result");
-        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result");
+        com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
         clearingRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.CLEARING,
                 "clearing-candidate-001", RERUN_BATCH_SN, "report:clearing-recon-run-001");
         settlementRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.SETTLEMENT,
@@ -143,6 +149,30 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(result.getEvidenceRefs()).containsExactly("report:clearing-recon-run-001");
         assertThat(result.getExplanation()).contains("准入通过");
         assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：已对平批次被新的重跑批次引用，但调用方仍尝试消费旧运行结果。
+     * 结果：旧结果立即失去门禁资格，即使新批次尚未完成也不得回退信任旧结论。
+     */
+    @Test
+    void testCheckGateShouldBlockRunResultSupersededByRerunBatch() {
+        reconciliationBatchApplicationService.createBatch(new CreateReconciliationBatchRequest()
+                .setTenantId(TENANT_ID)
+                .setGateObjectType(ReconciliationGateObjectType.CLEARING)
+                .setGateObjectSn("clearing-candidate-001")
+                .setRuleVersion("recon-rule-v2")
+                .setWindowStart(LocalDateTime.of(2026, 7, 21, 0, 0))
+                .setWindowEnd(LocalDateTime.of(2026, 7, 22, 0, 0))
+                .setTimezoneId("Asia/Shanghai")
+                .setPreviousBatchSn(RERUN_BATCH_SN), WindOperatorFactory.system());
+
+        ReconciliationGateDecisionDTO result = reconciliationGateApplicationService.checkGate(
+                clearingGateRequest(), WindOperatorFactory.system());
+
+        assertThat(result.isPassed()).isFalse();
+        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
+        assertThat(result.getExplanation()).contains("已被重跑批次替代");
     }
 
     /**
@@ -510,8 +540,8 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                                            String evidenceRef) {
         return recordRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, evidenceRef,
                 new ReconciliationMatchResultItem()
-                        .setInternalSourceRef("internal:" + gateObjectSn)
-                        .setExternalSourceRef("external:" + gateObjectSn)
+                        .setReferenceSourceRef("internal:" + gateObjectSn)
+                        .setComparisonSourceRef("external:" + gateObjectSn)
                         .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
                         .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
                         .setEvidenceRef(evidenceRef + "#line-1"));
@@ -523,8 +553,8 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                                              String evidenceRef) {
         return recordRunResult(gateObjectType, gateObjectSn, reconciliationBatchSn, evidenceRef,
                 new ReconciliationMatchResultItem()
-                        .setInternalSourceRef("internal:" + gateObjectSn)
-                        .setExternalSourceRef("external:" + gateObjectSn)
+                        .setReferenceSourceRef("internal:" + gateObjectSn)
+                        .setComparisonSourceRef("external:" + gateObjectSn)
                         .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
                         .setMatchStrength(ReconciliationMatchStrength.UNMATCHED)
                         .setDifferenceType(ReconciliationDifferenceType.STATUS_MISMATCH)
@@ -538,20 +568,19 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
                                    String reconciliationBatchSn,
                                    String evidenceRef,
                                    ReconciliationMatchResultItem matchResult) {
+        com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
+                jdbcTemplate, TENANT_ID, reconciliationBatchSn, gateObjectType, gateObjectSn,
+                "recon-rule-v1", evidenceRef, matchResult.getReferenceSourceRef(),
+                matchResult.getComparisonSourceRef());
         return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
                 .setReconciliationBatchSn(reconciliationBatchSn)
-                .setGateObjectType(gateObjectType)
-                .setGateObjectSn(gateObjectSn)
-                .setRuleVersion("recon-rule-v1")
-                .setInternalSourceDigest("a".repeat(64))
-                .setExternalSourceDigest("b".repeat(64))
-                .setMatchResults(List.of(matchResult))
-                .setEvidenceRefs(List.of(evidenceRef)), WindOperatorFactory.system()).getSn();
+                .setMatchResults(List.of(matchResult)), WindOperatorFactory.system()).getSn();
     }
 
     @Configuration
     @Import({
+            ReconciliationBatchApplicationServiceImpl.class,
             ReconciliationDifferenceApplicationServiceImpl.class,
             ReconciliationRunResultApplicationServiceImpl.class,
             ReconciliationGateApplicationServiceImpl.class

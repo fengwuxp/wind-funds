@@ -50,13 +50,13 @@ public class ReconciliationRunResultDTO implements Serializable {
     @Schema(description = "匹配或对账规则版本")
     private String ruleVersion;
 
-    @Schema(description = "归一化内部事实集合 SHA-256")
-    private String internalSourceDigest;
+    @Schema(description = "基准侧来源成员集合 SHA-256")
+    private String referenceSourceDigest;
 
-    @Schema(description = "归一化外部来源事实集合 SHA-256")
-    private String externalSourceDigest;
+    @Schema(description = "核对侧来源成员集合 SHA-256")
+    private String comparisonSourceDigest;
 
-    @Schema(description = "由内部与外部来源摘要生成的组合 SHA-256")
+    @Schema(description = "由基准侧与核对侧来源摘要生成的组合 SHA-256")
     private String sourceDigest;
 
     @Schema(description = "对账运行结果 SHA-256，由资金底座生成")

@@ -4,8 +4,8 @@ import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
-import com.wind.funds.reconciliation.enums.ReconciliationGateObjectType;
-import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
+import com.wind.funds.reconciliation.enums.ReconciliationSourceRole;
+import com.wind.funds.reconciliation.enums.ReconciliationSourceType;
 import com.wind.integration.core.model.TenantIsolationObject;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -16,17 +16,17 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 对账运行结果。
+ * 对账来源快照。
  */
 @Data
-@Table(ReconciliationRunResult.TABLE_NAME)
+@Table(ReconciliationSourceSnapshot.TABLE_NAME)
 @FieldNameConstants
-public class ReconciliationRunResult implements Serializable, TenantIsolationObject<Long> {
+public class ReconciliationSourceSnapshot implements Serializable, TenantIsolationObject<Long> {
 
     @Serial
-    private static final long serialVersionUID = -6890953651804099698L;
+    private static final long serialVersionUID = 2547403002610205634L;
 
-    public static final String TABLE_NAME = "t_reconciliation_run_result";
+    public static final String TABLE_NAME = "t_reconciliation_source_snapshot";
 
     @Id(keyType = KeyType.Auto)
     private Long id;
@@ -43,37 +43,16 @@ public class ReconciliationRunResult implements Serializable, TenantIsolationObj
     private String reconciliationBatchSn;
 
     @NotNull
-    private ReconciliationGateObjectType gateObjectType;
+    private ReconciliationSourceRole sourceRole;
 
     @NotNull
-    private String gateObjectSn;
-
-    @NotNull
-    private ReconciliationRunResultStatus status;
-
-    @NotNull
-    private String ruleVersion;
-
-    @NotNull
-    private String referenceSourceDigest;
-
-    @NotNull
-    private String comparisonSourceDigest;
+    private ReconciliationSourceType sourceType;
 
     @NotNull
     private String sourceDigest;
 
     @NotNull
-    private String resultDigest;
-
-    @NotNull
-    private Integer totalCount;
-
-    @NotNull
-    private Integer matchedCount;
-
-    @NotNull
-    private Integer differenceCount;
+    private Integer recordCount;
 
     @NotNull
     private String evidenceRefs;

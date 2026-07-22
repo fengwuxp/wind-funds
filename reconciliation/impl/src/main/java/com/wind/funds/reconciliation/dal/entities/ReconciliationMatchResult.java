@@ -48,9 +48,9 @@ public class ReconciliationMatchResult implements Serializable, TenantIsolationO
     @NotNull
     private String reconciliationBatchSn;
 
-    private String internalSourceRef;
+    private String referenceSourceRef;
 
-    private String externalSourceRef;
+    private String comparisonSourceRef;
 
     @NotNull
     private ReconciliationSourceQuality sourceQuality;

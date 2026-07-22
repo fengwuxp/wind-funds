@@ -105,8 +105,7 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
     @BeforeEach
     void prepareSourceFacts() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
-        jdbcTemplate.update("DELETE FROM t_reconciliation_match_result");
-        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result");
+        com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
         jdbcTemplate.update("DELETE FROM t_clearing_splittable_detail");
         deleteSourceFacts();
         insertSourceFacts(FundsTransactionStatus.CLOSED, FundsTransactionDetailStatus.SUCCEEDED,
@@ -358,21 +357,22 @@ class ClearingSplittableDetailApplicationServiceTests extends AbstractFundsServi
     }
 
     private String recordBalancedRunResult() {
+        String batchSn = "clearing_recon_batch_balanced_001";
+        String referenceSourceRef = "internal:" + FUNDS_TRANSACTION_DETAIL_SN;
+        String comparisonSourceRef = "external:" + FUNDS_TRANSACTION_DETAIL_SN;
+        com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
+                jdbcTemplate, TENANT_ID, batchSn, ReconciliationGateObjectType.CLEARING,
+                FUNDS_TRANSACTION_DETAIL_SN, "recon-rule-1", "report:merchant-clearing-recon-run-001",
+                referenceSourceRef, comparisonSourceRef);
         return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
-                .setReconciliationBatchSn("clearing_recon_batch_balanced_001")
-                .setGateObjectType(ReconciliationGateObjectType.CLEARING)
-                .setGateObjectSn(FUNDS_TRANSACTION_DETAIL_SN)
-                .setRuleVersion("recon-rule-1")
-                .setInternalSourceDigest("a".repeat(64))
-                .setExternalSourceDigest("b".repeat(64))
+                .setReconciliationBatchSn(batchSn)
                 .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setInternalSourceRef("internal:" + FUNDS_TRANSACTION_DETAIL_SN)
-                        .setExternalSourceRef("external:" + FUNDS_TRANSACTION_DETAIL_SN)
+                        .setReferenceSourceRef(referenceSourceRef)
+                        .setComparisonSourceRef(comparisonSourceRef)
                         .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
                         .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                        .setEvidenceRef("report:merchant-clearing-recon-run-001#line-1")))
-                .setEvidenceRefs(List.of("report:merchant-clearing-recon-run-001")),
+                        .setEvidenceRef("report:merchant-clearing-recon-run-001#line-1"))),
                 WindOperatorFactory.system()).getSn();
     }
 

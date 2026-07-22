@@ -122,7 +122,7 @@ test-governance tests='FundsProjectionReplayServiceTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Reconciliation, difference lifecycle, gate consumption, and payout preflight tests.
-test-reconciliation tests='ClearingSplittableDetailApplicationServiceTests,ClearingSettlementGateConsumerServiceTests,PayoutPreflightServiceTests,ReconciliationDifferenceApplicationServiceTests,ReconciliationGateApplicationServiceTests,ReconciliationDifferenceReportApplicationServiceTests,ReconciliationRunResultApplicationServiceTests':
+test-reconciliation tests='ClearingSplittableDetailApplicationServiceTests,ClearingSettlementGateConsumerServiceTests,PayoutPreflightServiceTests,ReconciliationBatchApplicationServiceTests,ReconciliationDifferenceApplicationServiceTests,ReconciliationGateApplicationServiceTests,ReconciliationDifferenceReportApplicationServiceTests,ReconciliationRunResultApplicationServiceTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Fast CAD verification for non-business tooling or test-asset changes.

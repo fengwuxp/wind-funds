@@ -19,8 +19,6 @@ public interface ReconciliationRunResultConverter {
     ReconciliationRunResultConverter INSTANCE = Mappers.getMapper(ReconciliationRunResultConverter.class);
 
     @Mapping(target = "createdTime", source = "gmtCreate")
-    @Mapping(target = "internalSourceDigest", source = "internalSourceDigest")
-    @Mapping(target = "externalSourceDigest", source = "externalSourceDigest")
     @Mapping(target = "evidenceRefs", expression = "java(parseEvidenceRefs(source.getEvidenceRefs()))")
     ReconciliationRunResultDTO toDTO(ReconciliationRunResult source);
 

@@ -24,14 +24,14 @@ public enum ReconciliationDifferenceType implements DescriptiveEnum {
     STATUS_MISMATCH("状态不一致"),
 
     /**
-     * 内部事实缺失。
+     * 基准侧事实缺失。
      */
-    INTERNAL_MISSING("内部事实缺失"),
+    REFERENCE_MISSING("基准侧事实缺失"),
 
     /**
-     * 外部来源缺失。
+     * 核对侧事实缺失。
      */
-    EXTERNAL_MISSING("外部来源缺失"),
+    COMPARISON_MISSING("核对侧事实缺失"),
 
     /**
      * 重复来源或重复匹配。

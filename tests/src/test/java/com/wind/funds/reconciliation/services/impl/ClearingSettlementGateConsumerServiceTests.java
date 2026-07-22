@@ -86,8 +86,7 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
     @BeforeEach
     void prepareReconciliationEvidence() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
-        jdbcTemplate.update("DELETE FROM t_reconciliation_match_result");
-        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result");
+        com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
         clearingRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.CLEARING,
                 CLEARING_OBJECT_SN, RERUN_BATCH_SN, "report:clearing-gate-run-001");
         settlementRunResultSn = recordBalancedRunResult(ReconciliationGateObjectType.SETTLEMENT,
@@ -306,21 +305,20 @@ class ClearingSettlementGateConsumerServiceTests extends AbstractFundsServiceTes
                                            String gateObjectSn,
                                            String reconciliationBatchSn,
                                            String evidenceRef) {
+        String referenceSourceRef = "internal:" + gateObjectSn;
+        String comparisonSourceRef = "external:" + gateObjectSn;
+        com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
+                jdbcTemplate, TENANT_ID, reconciliationBatchSn, gateObjectType, gateObjectSn,
+                "recon-rule-v1", evidenceRef, referenceSourceRef, comparisonSourceRef);
         return reconciliationRunResultApplicationService.recordRunResult(new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
                 .setReconciliationBatchSn(reconciliationBatchSn)
-                .setGateObjectType(gateObjectType)
-                .setGateObjectSn(gateObjectSn)
-                .setRuleVersion("recon-rule-v1")
-                .setInternalSourceDigest("a".repeat(64))
-                .setExternalSourceDigest("b".repeat(64))
                 .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setInternalSourceRef("internal:" + gateObjectSn)
-                        .setExternalSourceRef("external:" + gateObjectSn)
+                        .setReferenceSourceRef(referenceSourceRef)
+                        .setComparisonSourceRef(comparisonSourceRef)
                         .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
                         .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                        .setEvidenceRef(evidenceRef + "#line-1")))
-                .setEvidenceRefs(List.of(evidenceRef)), WindOperatorFactory.system()).getSn();
+                        .setEvidenceRef(evidenceRef + "#line-1"))), WindOperatorFactory.system()).getSn();
     }
 
     @Configuration

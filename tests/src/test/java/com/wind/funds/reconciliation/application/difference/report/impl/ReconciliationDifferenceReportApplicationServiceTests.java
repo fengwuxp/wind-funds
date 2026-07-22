@@ -75,8 +75,7 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     @BeforeEach
     void cleanReconciliationDifference() {
         jdbcTemplate.update("DELETE FROM t_reconciliation_difference");
-        jdbcTemplate.update("DELETE FROM t_reconciliation_match_result");
-        jdbcTemplate.update("DELETE FROM t_reconciliation_run_result");
+        com.wind.funds.reconciliation.ReconciliationTestFixture.clearRunAndBatchFacts(jdbcTemplate);
     }
 
     /**
@@ -245,21 +244,21 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     }
 
     private RecordReconciliationRunResultRequest balancedRunResultRequest() {
+        String referenceSourceRef = "internal:" + CLEARING_OBJECT_SN;
+        String comparisonSourceRef = "external:" + CLEARING_OBJECT_SN;
+        com.wind.funds.reconciliation.ReconciliationTestFixture.prepareReadyBatch(
+                jdbcTemplate, TENANT_ID, RECONCILIATION_BATCH_SN, ReconciliationGateObjectType.CLEARING,
+                CLEARING_OBJECT_SN, "recon-rule-v1", RUN_RESULT_EVIDENCE_REF,
+                referenceSourceRef, comparisonSourceRef);
         return new RecordReconciliationRunResultRequest()
                 .setTenantId(TENANT_ID)
                 .setReconciliationBatchSn(RECONCILIATION_BATCH_SN)
-                .setGateObjectType(ReconciliationGateObjectType.CLEARING)
-                .setGateObjectSn(CLEARING_OBJECT_SN)
-                .setRuleVersion("recon-rule-v1")
-                .setInternalSourceDigest("c".repeat(64))
-                .setExternalSourceDigest("d".repeat(64))
                 .setMatchResults(List.of(new ReconciliationMatchResultItem()
-                        .setInternalSourceRef("internal:" + CLEARING_OBJECT_SN)
-                        .setExternalSourceRef("external:" + CLEARING_OBJECT_SN)
+                        .setReferenceSourceRef(referenceSourceRef)
+                        .setComparisonSourceRef(comparisonSourceRef)
                         .setSourceQuality(ReconciliationSourceQuality.VERIFIED)
                         .setMatchStrength(ReconciliationMatchStrength.EXACT_MATCH)
-                        .setEvidenceRef(RUN_RESULT_EVIDENCE_REF + "#line-1")))
-                .setEvidenceRefs(List.of(RUN_RESULT_EVIDENCE_REF));
+                        .setEvidenceRef(RUN_RESULT_EVIDENCE_REF + "#line-1")));
     }
 
     private CreateReconciliationDifferenceRequest clearingDifferenceRequest() {

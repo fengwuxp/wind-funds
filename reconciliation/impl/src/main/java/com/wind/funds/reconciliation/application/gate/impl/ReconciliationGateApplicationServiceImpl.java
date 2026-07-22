@@ -4,10 +4,13 @@ import com.alibaba.fastjson2.JSON;
 import com.wind.integration.operator.WindOperator;
 import com.wind.common.exception.AssertUtils;
 import com.wind.funds.reconciliation.application.gate.ReconciliationGateApplicationService;
+import com.wind.funds.reconciliation.dal.entities.ReconciliationBatch;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationDifference;
 import com.wind.funds.reconciliation.dal.entities.ReconciliationRunResult;
+import com.wind.funds.reconciliation.dal.mapper.ReconciliationBatchMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationDifferenceMapper;
 import com.wind.funds.reconciliation.dal.mapper.ReconciliationRunResultMapper;
+import com.wind.funds.reconciliation.enums.ReconciliationBatchStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationDifferenceStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationGateDecisionStatus;
 import com.wind.funds.reconciliation.enums.ReconciliationRunResultStatus;
@@ -39,6 +42,8 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
 
     private final ReconciliationRunResultMapper reconciliationRunResultMapper;
 
+    private final ReconciliationBatchMapper reconciliationBatchMapper;
+
     @Override
     @Transactional(readOnly = true)
     public ReconciliationGateDecisionDTO checkGate(CheckReconciliationGateRequest request, WindOperator operator) {
@@ -53,6 +58,17 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
         if (!matchesGateObject(runResult, request)) {
             return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
                     "对账运行结果与准入对象不匹配，准入必须阻断");
+        }
+        ReconciliationBatch batch = reconciliationBatchMapper.selectBySn(
+                request.getTenantId(), runResult.getReconciliationBatchSn());
+        if (!isCompletedBatchBoundToRunResult(batch, runResult)) {
+            return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
+                    "对账批次未完成或与运行结果绑定不一致，准入必须阻断");
+        }
+        if (reconciliationBatchMapper.countByPreviousBatchSn(
+                request.getTenantId(), runResult.getReconciliationBatchSn()) > 0) {
+            return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
+                    "对账运行结果已被重跑批次替代，旧结论仅可追溯、不得继续用于准入");
         }
         if (runResult.getStatus() != ReconciliationRunResultStatus.BALANCED) {
             return blockedForRunResult(request, operator, runResult, runEvidenceRefs,
@@ -93,6 +109,16 @@ public class ReconciliationGateApplicationServiceImpl implements ReconciliationG
     private boolean matchesGateObject(ReconciliationRunResult runResult, CheckReconciliationGateRequest request) {
         return runResult.getGateObjectType() == request.getGateObjectType()
                 && Objects.equals(runResult.getGateObjectSn(), request.getGateObjectSn());
+    }
+
+    private boolean isCompletedBatchBoundToRunResult(@Nullable ReconciliationBatch batch,
+                                                     ReconciliationRunResult runResult) {
+        return batch != null
+                && batch.getStatus() == ReconciliationBatchStatus.COMPLETED
+                && Objects.equals(batch.getRunResultSn(), runResult.getSn())
+                && batch.getGateObjectType() == runResult.getGateObjectType()
+                && Objects.equals(batch.getGateObjectSn(), runResult.getGateObjectSn())
+                && Objects.equals(batch.getRuleVersion(), runResult.getRuleVersion());
     }
 
     private boolean shouldBlock(ReconciliationDifference difference, ReconciliationRunResult runResult) {
