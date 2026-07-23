@@ -398,8 +398,8 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(externalAccountRef.getString("externalAccountId")).isEqualTo(EXTERNAL_SOURCE_ACCOUNT_SN);
         assertThat(externalAccountRef.getString("externalAccountType"))
                 .isEqualTo("EXTERNAL_BANK");
-        assertThat(externalAccountRef.getString("providerCode")).isEqualTo("ACH_RAIL");
-        assertThat(externalAccountRef.getString("channelCode")).isEqualTo("WIRE_TRANSFER");
+        assertThat(externalAccountRef.getString("providerCode")).isNull();
+        assertThat(externalAccountRef.getString("channelCode")).isEqualTo("ACH");
         assertThat(externalAccountRef.getJSONObject("contextVariables")
                 .getString("externalTransactionId")).isEqualTo("bank_event_001");
     }

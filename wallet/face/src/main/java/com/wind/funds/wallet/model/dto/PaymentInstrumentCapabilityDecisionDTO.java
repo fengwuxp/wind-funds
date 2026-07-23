@@ -57,7 +57,7 @@ public class PaymentInstrumentCapabilityDecisionDTO implements Serializable {
     @Schema(description = "支付工具资金流向")
     private PaymentInstrumentFlowDirection flowDirection;
 
-    @Schema(description = "通道编码")
+    @Schema(description = "支付工具接入方或提供方编码")
     private String channelCode;
 
     @Schema(description = "业务动作")

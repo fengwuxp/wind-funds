@@ -449,7 +449,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
                 .setAccountId(accountId)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_001",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn(businessSn + "_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(amount(amount)))
                 .setBusinessScene("TOPUP")

@@ -7,13 +7,13 @@ import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
-import com.wind.funds.transaction.enums.FundsTransactionChannel;
+import com.wind.funds.transaction.application.support.ExternalFundsRailResolver;
+import com.wind.funds.transaction.application.support.ExternalFundsRailResolver.ExternalFundsRailDecision;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentTransactionApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
-import com.wind.funds.wallet.application.support.WalletExternalFundsRailSupport;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
@@ -78,7 +78,7 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
         AssertUtils.notNull(request.getFundsSourceAccountId(), "收款外部资金来源账户不能为空");
         AssertUtils.isTrue(DefaultFundsAccountType.isExternalAccount(request.getFundsSourceAccountId()),
                 "收款外部资金来源账户必须是外部账户");
-        AssertUtils.hasText(request.getChannelCode(), "收款渠道编码不能为空");
+        AssertUtils.hasText(request.getExternalRailCode(), "收款外部 rail 编码不能为空");
         AssertUtils.hasText(request.getChannelTransactionSn(), "收款渠道交易流水不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "收款业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "收款业务流水号不能为空");
@@ -102,13 +102,17 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
 
     private FundsTransactionTopupRequest convertToTopupRequest(ReceiveByInstrumentRequest request,
                                                                PaymentInstrumentPreTransactionSnapshotDTO snapshot) {
+        PaymentInstrumentCapabilityDecisionDTO instrument = snapshot.getPaymentInstrumentCapability();
+        AssertUtils.hasText(instrument.getChannelCode(), "支付工具接入渠道编码不能为空");
+        ExternalFundsRailDecision railDecision = ExternalFundsRailResolver.requireReceiveRailDecision(
+                instrument.getInstrumentType(), request.getExternalRailCode());
         return new FundsTransactionTopupRequest()
                 .setAccountId(snapshot.getTargetAccountId())
                 .setFundsSourceAccountId(request.getFundsSourceAccountId())
-                .setChannel(FundsTransactionChannel.valueOf(
-                        WalletExternalFundsRailSupport.resolveReceiveChannelCode(request.getChannelCode())))
+                .setChannel(railDecision.transactionChannel())
+                .setExternalRailCode(railDecision.externalRailCode())
                 .setChannelTransactionSn(request.getChannelTransactionSn())
-                .setChannelId(request.getChannelId())
+                .setProviderCode(instrument.getChannelCode())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
                         request.getCurrency())))
                 .setPaymentInstrumentRef(paymentInstrumentRef(snapshot))

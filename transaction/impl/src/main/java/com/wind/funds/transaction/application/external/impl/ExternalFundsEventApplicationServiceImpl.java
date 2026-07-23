@@ -7,13 +7,12 @@ import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.transaction.application.ExternalFundsEventApplicationService;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
-import com.wind.funds.transaction.enums.FundsTransactionChannel;
+import com.wind.funds.transaction.application.support.ExternalFundsRailResolver;
+import com.wind.funds.transaction.application.support.ExternalFundsRailResolver.ExternalFundsRailDecision;
 import com.wind.funds.transaction.model.request.ConsumeExternalFundsEventRequest;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.application.support.WalletExternalFundsRailSupport;
-import com.wind.funds.wallet.application.support.WalletExternalFundsRailSupport.ExternalCreditRailDecision;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
@@ -46,8 +45,8 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
     public @NonNull String consume(@NonNull ConsumeExternalFundsEventRequest request,
                                    @NonNull WindOperator operator) {
         validateConsumeRequest(request);
-        ExternalCreditRailDecision railDecision =
-                WalletExternalFundsRailSupport.requireConfirmedCreditRailDecision(request.getExternalEventType());
+        ExternalFundsRailDecision railDecision =
+                ExternalFundsRailResolver.requireConfirmedCreditRailDecision(request.getExternalEventType());
         return directTransactionService.topup(toTopupRequest(request, railDecision), operator);
     }
 
@@ -74,14 +73,14 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
     }
 
     private FundsTransactionTopupRequest toTopupRequest(ConsumeExternalFundsEventRequest request,
-                                                        ExternalCreditRailDecision railDecision) {
+                                                        ExternalFundsRailDecision railDecision) {
         return new FundsTransactionTopupRequest()
                 .setAccountId(request.getTargetAccountId())
                 .setFundsSourceAccountId(FundsAccountId.immutable(EXTERNAL_SOURCE_ACCOUNT_ID,
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.valueOf(railDecision.transactionChannelCode()))
+                .setChannel(railDecision.transactionChannel())
+                .setExternalRailCode(railDecision.externalRailCode())
                 .setChannelTransactionSn(request.getExternalEventSn())
-                .setChannelId(railDecision.externalRailCode())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
                         request.getCurrency())))
                 .setBusinessScene(request.getBusinessScene())
@@ -91,12 +90,12 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
     }
 
     private Map<String, Object> externalEventContext(ConsumeExternalFundsEventRequest request,
-                                                     ExternalCreditRailDecision railDecision) {
+                                                     ExternalFundsRailDecision railDecision) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("externalEventSn", request.getExternalEventSn());
         result.put("externalEventType", request.getExternalEventType());
         result.put("externalRailCode", railDecision.externalRailCode());
-        result.put("transactionChannel", railDecision.transactionChannelCode());
+        result.put("transactionChannel", railDecision.transactionChannel().name());
         putIfPresent(result, "originalTransactionSn", request.getOriginalTransactionSn());
         putIfPresent(result, "reconciliationDifferenceSn", request.getReconciliationDifferenceSn());
         return Map.copyOf(result);

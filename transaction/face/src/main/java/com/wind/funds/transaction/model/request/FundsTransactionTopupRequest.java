@@ -34,13 +34,16 @@ public class FundsTransactionTopupRequest {
     @NotNull
     private FundsTransactionChannel channel;
 
+    @Schema(description = "本次外部交易实际使用的 rail 编码，写入 route snapshot 的 externalAccountRef.channelCode")
+    private String externalRailCode;
+
     @Schema(description = "渠道方交易流水号")
     @Size(max = 80)
     @NotNull
     private String channelTransactionSn;
 
-    @Schema(description = "渠道方或外部 rail 标识，写入 route snapshot 的 externalAccountRef.providerCode")
-    private String channelId;
+    @Schema(description = "外部资金提供方或接入方编码，写入 route snapshot 的 externalAccountRef.providerCode")
+    private String providerCode;
 
     @Schema(description = "充值交易金额")
     @NotNull

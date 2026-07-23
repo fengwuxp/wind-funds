@@ -133,11 +133,13 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
 
     private static final String PAYMENT_ONLY_INSTRUMENT_SN = "pi_lifecycle_payment_only";
 
+    private static final String WALLET_INSTRUMENT_SN = "pi_lifecycle_wallet_receive";
+
     private static final String OWNER_ID = "owner_instrument_lifecycle";
 
-    private static final String CHANNEL_CODE = "bank_rail";
+    private static final String PROVIDER_CODE = "bank_rail_provider";
 
-    private static final String CHANNEL_ID = "bank_rail_provider";
+    private static final String EXTERNAL_RAIL_CODE = "ACH";
 
     private static final String BUSINESS_SCENE = "INSTRUMENT_RECEIVE";
 
@@ -148,6 +150,10 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
     private static final String MISSING_BINDING_VERSION_BUSINESS_SN = "INSTRUMENT_RECEIVE_MISSING_BINDING_VERSION";
 
     private static final String UNSUPPORTED_CHANNEL_BUSINESS_SN = "INSTRUMENT_RECEIVE_UNSUPPORTED_CHANNEL";
+
+    private static final String MISMATCH_RAIL_BUSINESS_SN = "INSTRUMENT_RECEIVE_MISMATCH_RAIL";
+
+    private static final String WALLET_RECEIVE_BUSINESS_SN = "INSTRUMENT_WALLET_RECEIVE_001";
 
     @Autowired
     private FundingAccountService fundingAccountService;
@@ -175,7 +181,7 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
 
     /**
      * 场景：VA/ACH 等收款工具入口完成预交易准入后，委派账户主体型充值交易内核。
-     * 输入：收款工具绑定资金账户，资金责任解析到同一资金账户，外部银行账户通过 bank_rail 入金 80。
+     * 输入：收款工具绑定资金账户，资金责任解析到同一资金账户，外部银行账户通过 ACH 入金 80。
      * 输出：返回充值交易号，资金账户 AVAILABLE 增加 80，并产生标准 TOPUP 交易、route 和账本事实。
      * 红线：wallet 应用入口负责把业务 rail 解析为交易层渠道，不直接写账；交易内核 canonical 入参仍是已解析的资金账户主体。
      */
@@ -211,8 +217,34 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
     }
 
     /**
+     * 场景：外部钱包支付工具完成已确认入金。
+     * 输入：PAYPAL 接入工具、DIGITAL_WALLET rail 和外部钱包来源账户。
+     * 输出：交易按 DIGITAL_WALLET 大类入账，route snapshot 保留 PAYPAL provider 和钱包 rail。
+     * 红线：provider、外部 rail 和交易渠道不得混为同一个字段。
+     */
+    @Test
+    void testReceiveByInstrumentShouldPreserveWalletProviderAndRail() {
+        createReceiveScenario();
+        paymentInstrumentService.createPaymentInstrument(createPaymentInstrumentRequest(WALLET_INSTRUMENT_SN,
+                PaymentInstrumentFlowDirection.INBOUND, "WALLET-****-1357", "EXTERNAL_WALLET", "PAYPAL"));
+        paymentInstrumentService.createPaymentInstrumentBinding(createBindingRequest(WALLET_INSTRUMENT_SN));
+        ReceiveByInstrumentRequest request = receiveRequest(WALLET_RECEIVE_BUSINESS_SN, WALLET_INSTRUMENT_SN)
+                .setFundsSourceAccountId(FundsAccountId.immutable("external_wallet_lifecycle_receive",
+                        DefaultFundsAccountType.EXTERNAL_WALLET))
+                .setExternalRailCode(FundsTransactionChannel.DIGITAL_WALLET.name());
+
+        paymentInstrumentTransactionApplicationService.receiveByInstrument(request, WindOperatorFactory.system());
+
+        JSONObject routeSnapshot = JSON.parseObject(routeSnapshotJson(WALLET_RECEIVE_BUSINESS_SN));
+        JSONObject externalAccountRef = routeSnapshot.getJSONObject("externalAccountRef");
+        assertThat(externalAccountRef.getString("providerCode")).isEqualTo("PAYPAL");
+        assertThat(externalAccountRef.getString("channelCode"))
+                .isEqualTo(FundsTransactionChannel.DIGITAL_WALLET.name());
+    }
+
+    /**
      * 场景：收款入口收到未知 rail / channel 编码。
-     * 输入：支付工具、绑定版本和资金责任均有效，但 channelCode 为 mystery_rail。
+     * 输入：支付工具、绑定版本和资金责任均有效，但 externalRailCode 为 mystery_rail。
      * 输出：服务层入口给出可读的渠道拒绝原因，不泄露 Java enum valueOf 实现细节。
      * 红线：非法 rail 不得进入交易内核，不得生成资金交易、route、posting plan、账本交易或分录。
      */
@@ -222,15 +254,36 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
         LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
         ReceiveByInstrumentRequest request = receiveRequest(UNSUPPORTED_CHANNEL_BUSINESS_SN,
                 RECEIVE_INSTRUMENT_SN)
-                .setChannelCode("mystery_rail");
+                .setExternalRailCode("mystery_rail");
 
         assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.receiveByInstrument(request,
                 WindOperatorFactory.system()))
-                .hasMessageContaining("收款渠道编码不支持")
+                .hasMessageContaining("收款外部 rail 编码不支持")
                 .hasMessageContaining("mystery_rail")
-                .hasMessageContaining("支持的收款渠道");
+                .hasMessageContaining("支持的外部 rail");
 
         assertNoFundsOrLedgerFacts(UNSUPPORTED_CHANNEL_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
+    }
+
+    /**
+     * 场景：本次外部 rail 与支付工具类型不一致。
+     * 输入：VA 支付工具声明 DIGITAL_WALLET rail。
+     * 输出：准入阶段拒绝且不生成资金或账本事实。
+     * 红线：调用方不能把 VA 收款伪装为外部钱包入金。
+     */
+    @Test
+    void testReceiveByInstrumentShouldRejectInstrumentRailMismatchWithoutFundsFacts() {
+        createReceiveScenario();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+        ReceiveByInstrumentRequest request = receiveRequest(MISMATCH_RAIL_BUSINESS_SN, RECEIVE_INSTRUMENT_SN)
+                .setExternalRailCode(FundsTransactionChannel.DIGITAL_WALLET.name());
+
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.receiveByInstrument(request,
+                WindOperatorFactory.system()))
+                .hasMessageContaining("支付工具类型与外部 rail 不匹配");
+
+        assertNoFundsOrLedgerFacts(MISMATCH_RAIL_BUSINESS_SN);
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
@@ -291,36 +344,38 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
                     SELECT sn FROM t_ledger_transaction
-                    WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)
+                    WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)
                 )
                 """, BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
-                MISSING_BINDING_VERSION_BUSINESS_SN, UNSUPPORTED_CHANNEL_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                MISSING_BINDING_VERSION_BUSINESS_SN, UNSUPPORTED_CHANNEL_BUSINESS_SN,
+                MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                "DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                "DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?)",
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
+        jdbcTemplate.update(
+                "DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
                 BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
-                UNSUPPORTED_CHANNEL_BUSINESS_SN);
+                UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
         jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
                 TENANT_ID, RECEIVE_ACCOUNT_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?)",
-                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn IN (?, ?)",
-                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
-        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?)",
-                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding_history WHERE instrument_sn IN (?, ?, ?)",
+                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN, WALLET_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument_binding WHERE instrument_sn IN (?, ?, ?)",
+                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN, WALLET_INSTRUMENT_SN);
+        jdbcTemplate.update("DELETE FROM t_payment_instrument WHERE sn IN (?, ?, ?)",
+                RECEIVE_INSTRUMENT_SN, PAYMENT_ONLY_INSTRUMENT_SN, WALLET_INSTRUMENT_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
                 RECEIVE_ACCOUNT_SN, CASH_MAPPING_ACCOUNT_SN, PREPAYMENT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?)",
@@ -409,15 +464,23 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
     private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
                                                                           PaymentInstrumentFlowDirection direction,
                                                                           String instrumentNo) {
+        return createPaymentInstrumentRequest(instrumentSn, direction, instrumentNo, "VA", PROVIDER_CODE);
+    }
+
+    private CreatePaymentInstrumentRequest createPaymentInstrumentRequest(String instrumentSn,
+                                                                          PaymentInstrumentFlowDirection direction,
+                                                                          String instrumentNo,
+                                                                          String instrumentType,
+                                                                          String providerCode) {
         return new CreatePaymentInstrumentRequest()
                 .setSn(instrumentSn)
                 .setTenantId(TENANT_ID)
                 .setOwnerId(OWNER_ID)
                 .setOwnerType(FundsAccountOwnerType.USER)
-                .setInstrumentType("VA")
+                .setInstrumentType(instrumentType)
                 .setFlowDirection(direction)
                 .setInstrumentNo(instrumentNo)
-                .setChannelCode(CHANNEL_CODE)
+                .setChannelCode(providerCode)
                 .setExternalInstrumentId(externalInstrumentId(instrumentSn))
                 .setCurrency(CurrencyIsoCode.USD)
                 .setStatus(FundsAccountStatus.ACTIVE);
@@ -471,9 +534,8 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                 .setCurrency(CurrencyIsoCode.USD)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_lifecycle_receive",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannelCode(CHANNEL_CODE)
+                .setExternalRailCode(EXTERNAL_RAIL_CODE)
                 .setChannelTransactionSn(businessSn + "_CHANNEL")
-                .setChannelId(CHANNEL_ID)
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(businessSn)
                 .setExpectedBindingVersion(1)
@@ -593,8 +655,8 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                 .isEqualTo("external_bank_lifecycle_receive");
         assertThat(externalAccountRef.getString("externalAccountType"))
                 .isEqualTo(DefaultFundsAccountType.EXTERNAL_BANK.name());
-        assertThat(externalAccountRef.getString("providerCode")).isEqualTo(CHANNEL_ID);
-        assertThat(externalAccountRef.getString("channelCode")).isEqualTo(FundsTransactionChannel.WIRE_TRANSFER.name());
+        assertThat(externalAccountRef.getString("providerCode")).isEqualTo(PROVIDER_CODE);
+        assertThat(externalAccountRef.getString("channelCode")).isEqualTo(EXTERNAL_RAIL_CODE);
     }
 
     private void assertReceiveFactsKeepDirectContextMinimal(String businessSn) {

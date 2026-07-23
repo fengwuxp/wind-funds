@@ -45,7 +45,7 @@ public class PaymentInstrumentQuery {
     @Schema(description = "工具展示号或稳定识别号")
     private String instrumentNo;
 
-    @Schema(description = "通道编码")
+    @Schema(description = "支付工具接入方或提供方编码")
     private String channelCode;
 
     @Schema(description = "外部工具 ID")

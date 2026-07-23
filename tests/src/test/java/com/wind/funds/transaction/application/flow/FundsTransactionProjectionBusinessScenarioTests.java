@@ -228,7 +228,7 @@ class FundsTransactionProjectionBusinessScenarioTests extends FundsTransactionFl
         FundsTransactionProjectionExplanation payout = explainByBusinessSn("PROJECTION_GLOBAL_PAYOUT");
         assertPostedExplanation(collection, "TOPUP", "PROJECTION_GLOBAL_COLLECTION");
         assertPostedExplanation(payout, "WITHDRAW", "PROJECTION_GLOBAL_PAYOUT");
-        assertExternalAccountRef(collection, "WIRE_TRANSFER");
+        assertExternalAccountRef(collection, "BANK_TRANSFER");
         assertExternalAccountRef(payout, null);
     }
 

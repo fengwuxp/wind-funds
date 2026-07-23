@@ -93,7 +93,7 @@ public class PaymentInstrument implements Serializable, TenantIsolationObject<Lo
     private String instrumentNo;
 
     /**
-     * 工具所属渠道编码。
+     * 支付工具接入方或提供方编码。
      */
     private String channelCode;
 

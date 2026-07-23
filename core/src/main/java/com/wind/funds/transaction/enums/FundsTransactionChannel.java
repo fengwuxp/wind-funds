@@ -22,7 +22,12 @@ public enum FundsTransactionChannel implements DescriptiveEnum {
     /**
      * 银行转账。
      */
-    WIRE_TRANSFER("银行转账");
+    BANK_TRANSFER("银行转账"),
+
+    /**
+     * 外部数字钱包。
+     */
+    DIGITAL_WALLET("数字钱包");
 
     private final String desc;
 }

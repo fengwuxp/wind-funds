@@ -79,7 +79,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_converted_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_CONVERTED_TOPUP_CHANNEL")
                 .setTransactionAmount(TransactionAmount.converted(amount, originalAmount, exchangeRate))
                 .setBusinessScene("TOPUP")
@@ -128,7 +128,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_topup_fee_source",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_FEE_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(100L, CURRENCY)))
                 .setFeeChargeSpec(FeeSpec.builder()
@@ -173,7 +173,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_topup_fee_insufficient",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_FEE_INSUFFICIENT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(100L, CURRENCY)))
                 .setFeeChargeSpec(FeeSpec.builder()
@@ -213,7 +213,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_topup_fee_context",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_FEE_CONTEXT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(100L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("feeChargeSpec", FeeSpec.builder()
@@ -1727,7 +1727,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(externalAccount)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_topup_source",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_EXTERNAL_ACCOUNT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -1804,7 +1804,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setAccountId(account)
                 .setFundsSourceAccountId(internalSource)
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_INTERNAL_SOURCE_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -1909,7 +1909,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_topup_currency",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_CURRENCY_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CurrencyIsoCode.CNY)))
                 .setBusinessScene("TOPUP")
@@ -1949,7 +1949,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_missing_topup_account",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_MISSING_ACCOUNT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -1983,7 +1983,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         LedgerFactSnapshot beforeFacts = ledgerFactSnapshot();
 
         assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_MISSING_ACCOUNT_AND_SOURCE_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -2019,7 +2019,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
 
         assertThatThrownBy(() -> directTransactionService.topup(new FundsTransactionTopupRequest()
                 .setAccountId(account)
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_MISSING_SOURCE_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -2102,7 +2102,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_missing_topup_channel_sn",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
                 .setBusinessSn("DIRECT_TOPUP_MISSING_CHANNEL_SN")
@@ -2143,7 +2143,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("123456789012",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_RAW_EXTERNAL_ACCOUNT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(10L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -2188,7 +2188,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_sensitive_context_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_TOPUP_SENSITIVE_CONTEXT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(50L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("processorPayload",
@@ -2824,7 +2824,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_idempotent_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_ONLY_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -2843,7 +2843,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_idempotent_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_ONLY_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -2863,7 +2863,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_idempotent_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_ONLY_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(41L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -2911,7 +2911,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(payer)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_idempotent_event_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_EVENT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setBusinessScene("TOPUP")
@@ -2978,7 +2978,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_trace_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_TRACE_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("traceId", "TRACE-1")))
@@ -2998,7 +2998,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_trace_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_TRACE_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("traceId", "TRACE-2")))
@@ -3040,7 +3040,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_context_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
@@ -3060,7 +3060,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_context_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-A")))
@@ -3082,7 +3082,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 .setAccountId(account)
                 .setFundsSourceAccountId(FundsAccountId.immutable("external_bank_context_topup",
                         DefaultFundsAccountType.EXTERNAL_BANK))
-                .setChannel(FundsTransactionChannel.WIRE_TRANSFER)
+                .setChannel(FundsTransactionChannel.BANK_TRANSFER)
                 .setChannelTransactionSn("DIRECT_IDEMPOTENT_TOPUP_CONTEXT_CHANNEL")
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(40L, CURRENCY)))
                 .setContextVariables(WritableContextVariables.of(Map.of("businessContextVersion", "RULE-B")))
