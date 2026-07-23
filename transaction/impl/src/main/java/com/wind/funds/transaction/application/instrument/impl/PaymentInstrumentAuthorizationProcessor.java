@@ -19,7 +19,6 @@ import com.wind.funds.transaction.model.request.TransactionAmount;
 import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.wallet.FundsAccountId;
-import com.wind.funds.wallet.application.instrument.AuthorizationAdmissionApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
 import com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
@@ -45,14 +44,17 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * 支付工具授权准入应用服务实现。
+ * 支付工具授权处理器。
+ *
+ * <p>作为支付工具交易应用服务的内部协作者，完成授权重放校验、支付工具与资金责任准入、
+ * Spend Rule 准入和账户主体型授权交易组装，不作为独立的 wallet-face 契约暴露。</p>
  *
  * @author Codex
  * @date 2026-06-18
  */
 @Service
 @AllArgsConstructor
-public class AuthorizationAdmissionApplicationServiceImpl implements AuthorizationAdmissionApplicationService {
+public class PaymentInstrumentAuthorizationProcessor {
 
     private final PaymentInstrumentPreTransactionSnapshotApplicationService preTransactionSnapshotApplicationService;
 
@@ -62,7 +64,6 @@ public class AuthorizationAdmissionApplicationServiceImpl implements Authorizati
 
     private final FundsTransactionQueryService fundsTransactionQueryService;
 
-    @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
                                                  @NonNull WindOperator operator) {

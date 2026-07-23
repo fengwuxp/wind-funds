@@ -93,7 +93,7 @@
 | 追踪ID | 产品语义 | 工程承接 | 设计结论 | 验证资产 |
 | --- | --- | --- | --- | --- |
 | REQ-SR-001 | 规则定义、版本和挂载。 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleBindingService`。 | 已发布版本不可变，挂载必须有 scope、优先级和冲突策略。 | `SpendRuleDefinitionServiceTests`、`SpendRuleDefinitionServiceFlowTests`。 |
-| REQ-SR-002 | 决策记录和拒绝原因。 | RecordSpendRuleDecisionRecordRequest、决策记录表、准入组合。 | 决策记录不可改写，同流水同摘要幂等，同流水不同摘要拒绝。 | SpendControlAdmissionApplicationServiceTests、AuthorizationAdmissionApplicationServiceTests。 |
+| REQ-SR-002 | 决策记录和拒绝原因。 | RecordSpendRuleDecisionRecordRequest、决策记录表、准入组合。 | 决策记录不可改写，同流水同摘要幂等，同流水不同摘要拒绝。 | SpendControlAdmissionApplicationServiceTests、PaymentInstrumentTransactionAuthorizationTests。 |
 | REQ-SR-003 | 控制额度变动和预算控制投影。 | `SpendControlMovementService`、`SpendControlTransactionConsumptionApplicationService`、BudgetControlProjectionDTO。 | 控制额度变动流水不写账本，预算控制投影按 `controlScopeId + periodId` 可重建。 | SpendControlMovementServiceFlowTests、BudgetControlLimitAdjustmentApplicationServiceTests、SpendControlTransactionConsumptionApplicationServiceTests。 |
 | REQ-SR-004 | 历史交易投影解释。 | TransactionProjectionExplanationSource 和已固化 `spendRuleDecision` 快照。 | 只读解释历史版本、挂载、决策和控制引用，不执行规则 DSL。 | FundsTransactionProjectionExplainApplicationServiceTests。 |
 | QA-SR-001 | 金融红线和敏感信息安全。 | ledger posting 主体护栏、allow-list payload、脱敏摘要、边界测试。 | Spend Rule、支出控制范围、支付工具和控制 scope 不得入账；不输出 ruleSpec、script 或敏感原文。 | LayerBoundaryTests、投影解释测试、pmd / diff 检查。 |
@@ -152,7 +152,7 @@ Spend Rule 主能力归属于 `wallet` 支出控制域，`transaction` 只消费
 
 1. 交易模块可以使用资金交易上下文中的 `spendRuleDecision` allow-list 字段。
 2. `SpendControlTransactionConsumptionApplicationService` 的交易后控制事实适配可以由 `transaction-impl` 实现，但源码包必须归属 `com.wind.funds.transaction`，且只能依赖 `wallet-face` 契约、`SpendControlMovementService` 和交易查询契约。
-3. `AuthorizationAdmissionApplicationServiceImpl` 作为支付工具授权 facade，可调用 `SpendControlAdmissionApplicationService` 固化准入证据；其他交易模块源码不得 import 或注入钱包侧准入、评估、规则定义、规则挂载或决策记录服务，例如 `SpendRuleEvaluationApplicationService` 或 Spend Rule 基础服务。
+3. `PaymentInstrumentAuthorizationProcessor` 是 `PaymentInstrumentTransactionApplicationService` 的内部授权处理器，可调用 `SpendControlAdmissionApplicationService` 固化准入证据，但不得作为 face 契约暴露；其他交易模块源码不得 import 或注入钱包侧准入、评估、规则定义、规则挂载或决策记录服务，例如 `SpendRuleEvaluationApplicationService` 或 Spend Rule 基础服务。
 4. 交易模块不得 import `SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleBinding`、`SpendRuleDecisionRecord`、`SpendControlMovement` 等 wallet DAL 实体或 Mapper；交易投影只能消费已固化快照和证据引用。
 5. 边界测试需扫描 `transaction-*` 生产源码，防止 Spend Rule 主能力反向沉入交易内核。
 
@@ -163,7 +163,7 @@ Spend Rule 服务层按项目统一基础服务模板收敛，不再拆旧式领
 | 服务类型 | Spend Rule 目标服务 | 职责 |
 | --- | --- | --- |
 | 基础服务 | `SpendRuleDefinitionService`、`SpendRuleVersionService`、`SpendRuleBindingService`、`SpendRuleDecisionRecordService`、`SpendControlMovementService` | 规则定义、版本、挂载、决策记录、控制额度变动流水和预算控制投影的标准服务能力；允许访问 Mapper / Repository，并在服务内保留必要业务守卫。 |
-| 场景应用服务 | `SpendControlAdmissionApplicationService`、`SpendControlTransactionConsumptionApplicationService`、`InstrumentTransactionLifecycleApplicationService` | 授权前准入、交易后消费 / 退款补偿、支付工具生命周期入口等跨对象用例编排和事务边界。 |
+| 场景应用服务 | `SpendControlAdmissionApplicationService`、`SpendControlTransactionConsumptionApplicationService`、`PaymentInstrumentTransactionApplicationService` | 授权前准入、交易后消费 / 退款补偿、支付工具授权与收款入口等跨对象用例编排和事务边界。 |
 
 服务命名规则：
 
@@ -690,7 +690,7 @@ flowchart TD
 
 | 质量属性ID | 质量属性 | 业务 driver | 触发条件 | 受影响资产 | 期望响应 | 度量验收 | 验证资产 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| QA-SR-001 | 一致性 | 规则拒绝不能产生资金事实。 | 决策结果为 DECLINED 或 REVIEW。 | transaction、route、ledger、balance projection。 | 停在交易内核前，仅记录决策证据。 | forbidden facts 数量为 0。 | AuthorizationAdmissionApplicationServiceTests、SpendRuleDecisionRecordServiceTests、SpendRuleDefinitionServiceFlowTests。 |
+| QA-SR-001 | 一致性 | 规则拒绝不能产生资金事实。 | 决策结果为 DECLINED 或 REVIEW。 | transaction、route、ledger、balance projection。 | 停在交易内核前，仅记录决策证据。 | forbidden facts 数量为 0。 | PaymentInstrumentTransactionAuthorizationTests、SpendRuleDecisionRecordServiceTests、SpendRuleDefinitionServiceFlowTests。 |
 | QA-SR-002 | 可追溯 | 客服、风控和审计要解释历史交易。 | 查询历史交易投影。 | route snapshot、decision log、control activity。 | 只读输出版本、挂载、决策和控制引用。 | 不读取当前规则重算，不输出敏感原文。 | FundsTransactionProjectionExplainApplicationServiceTests。 |
 | QA-SR-003 | 安全 | 卡、外部账户、商户和风控证据含敏感信息。 | 写入规则条件、请求摘要或解释 payload。 | ruleSpec、decisionDigest、payload、evidenceRefs。 | 只保存摘要、脱敏值或引用。 | PAN、CVC、明文 token、完整外部账户号不出现。 | 投影解释 allow-list 测试、代码 CR。 |
 | QA-SR-004 | 可运维 | 规则、决策和控制流水故障需要快速定位。 | 摘要冲突、挂载冲突、决策写入失败、控制流水失败。 | 日志、指标、告警、Runbook。 | 告警并进入人工或补偿任务，不反写资金事实。 | 指标和告警覆盖 P0 错误语义。 | 生产启用专项工程边界。 |
@@ -733,13 +733,13 @@ Runbook 最低要求：
 | 测试资产 | 证明内容 |
 | --- | --- |
 | SpendRuleDefinitionServiceFlowTests | 规则定义、版本不可变、挂载、查询解释、决策记录和拒绝无资金副作用。 |
-| AuthorizationAdmissionApplicationServiceTests | 支付工具、账户能力、资金责任和 Spend Rule 决策组合后，拒绝停在交易内核前。 |
+| PaymentInstrumentTransactionAuthorizationTests | 支付工具、账户能力、资金责任和 Spend Rule 决策组合后，拒绝停在交易内核前。 |
 | SpendControlAdmissionApplicationServiceTests | 支出控制准入消费决策证据，证明通过、拒绝、缺证据、幂等和摘要冲突边界。 |
 | SpendControlMovementServiceFlowTests | 控制额度变动流水幂等、预算控制投影只读、历史决策兼容类型不再允许新写入。 |
 | BudgetControlLimitAdjustmentApplicationServiceTests | 预算额度调增、调减、投影占用下限和幂等摘要冲突。 |
 | SpendControlTransactionConsumptionApplicationServiceTests | 交易结果消费、退款补偿和目标账户隔离不反写资金事实。 |
 | SpendControlMovementTypeContractTests | 枚举分类契约：决策记录兼容类型不参与预算投影，控制额度变动类型统一解释为 SpendControlMovement。 |
-| FundsTransactionProjectionExplainApplicationServiceTests / AuthorizationAdmissionApplicationServiceTests | 历史规则决策快照可被投影只读解释，不输出 ruleSpec 或敏感原文。 |
+| FundsTransactionProjectionExplainApplicationServiceTests / PaymentInstrumentTransactionAuthorizationTests | 历史规则决策快照可被投影只读解释，不输出 ruleSpec 或敏感原文。 |
 | LayerBoundaryTests | wallet 不写交易事实，ledger 不接受 Spend Rule 或支出控制范围主体。 |
 
 测试类型：
@@ -762,7 +762,7 @@ Runbook 最低要求：
 
 ```bash
 just test-one SpendRuleDefinitionServiceFlowTests tests
-just test-one AuthorizationAdmissionApplicationServiceTests tests
+just test-one PaymentInstrumentTransactionAuthorizationTests tests
 just test-one SpendControlMovementServiceFlowTests tests
 just test-one SpendControlTransactionConsumptionApplicationServiceTests tests
 just test-boundary
@@ -777,7 +777,7 @@ git diff --check
 | --- | --- | --- | --- | --- | --- | --- |
 | AC-SR-001 | 规则定义和不可变版本。 | 可代码化 | SpendRuleDefinitionServiceFlowTests、SpendRuleDefinitionServiceTests | 同 ruleId + version 不同摘要覆盖成功。 | 覆盖失败，摘要一致幂等返回既有版本。 | wallet owner、测试 owner。 |
 | AC-SR-002 | 规则挂载 scope、优先级、冲突策略和有效期。 | 可代码化 | SpendRuleDefinitionServiceFlowTests、SpendRuleDefinitionServiceTests | 缺冲突策略或 scope 非法仍挂载成功。 | 挂载失败且不生成资金事实。 | wallet owner、产品 owner。 |
-| AC-SR-003 | 授权前规则拒绝。 | 可代码化 | AuthorizationAdmissionApplicationServiceTests | 拒绝后出现 route、posting、LedgerEntry 或余额变化。 | forbidden facts 为 0。 | transaction owner、ledger owner。 |
+| AC-SR-003 | 授权前规则拒绝。 | 可代码化 | PaymentInstrumentTransactionAuthorizationTests | 拒绝后出现 route、posting、LedgerEntry 或余额变化。 | forbidden facts 为 0。 | transaction owner、ledger owner。 |
 | AC-SR-005 | 历史投影解释。 | 可代码化 / 可观测化 | FundsTransactionProjectionExplainApplicationServiceTests | 修改当前规则后历史解释变化，或输出 ruleSpec / 敏感原文。 | 只读解释历史快照且敏感字段不外泄。 | transaction owner、审计 owner。 |
 | QA-SR-004 | 生产观测、告警和 Runbook。 | 可观测化 / 可评审化 | 生产启用专项工程边界 | 摘要冲突、写入失败和解释缺证据没有指标或处置路径。 | 指标、告警、Runbook 和 owner 已确认。 | SRE、安全、运营。 |
 
@@ -787,7 +787,7 @@ git diff --check
 | --- | --- | --- | --- |
 | SR-R-001 | Spend Rule 只做非现金支出控制，不成为资金账户、信用账户或账本主体。 | wallet rule/control services、transaction 只读证据消费、ledger 主体护栏。 | scope 不可入账边界测试和无 LedgerEntry 断言。 |
 | SR-R-002 | 已发布规则版本和已记录决策不可原地修改。 | version digest 唯一约束、decision digest 幂等约束。 | 同标识不同摘要 must-fail、历史记录不变断言。 |
-| SR-R-003 | 规则拒绝或复核停在交易内核前。 | wallet admission facade、decision record、transaction canonical entry。 | `AuthorizationAdmissionApplicationServiceTests` 和 forbidden facts 断言。 |
+| SR-R-003 | 规则拒绝或复核停在交易内核前。 | wallet admission facade、decision record、transaction canonical entry。 | `PaymentInstrumentTransactionAuthorizationTests` 和 forbidden facts 断言。 |
 | SR-R-004 | 周期控制余额由控制流水和周期投影实现，与 FundingAccount/CreditAccount 资金账本分层。 | spend control movement、budget projection、period initializer。 | 跨周期拒绝、周期切换、历史周期查询和资金余额不受控制投影反写测试。 |
 
 ## 13. 当前实现基线和 未完成交付

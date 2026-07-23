@@ -170,7 +170,7 @@ Spend Rule 的产品闭环由四类对象构成，控制额度变动流水和预
 1. 产品文档只定义 Spend Rule 的业务对象、能力、流程、验收和风险，不强制工程服务必须全部命名为 application service。
 2. 规则定义、版本、挂载、决策记录、控制额度变动流水和预算控制投影是产品能力对象；工程上按标准基础服务和场景 application service 承接。
 3. 当前规则定义、版本、挂载、挂载查询 / 解释以及决策记录写入 / 查询 / 解释已收敛到标准基础服务；后续新增能力优先落到对应基础服务，不再新增规则大 application facade 或旧式领域命名服务。
-4. 支出控制准入由钱包侧解析支付工具、资金责任、账户能力和当前有效 Spend Rule 挂载，并按 `decisionSn` 回读已固化决策；交易结果消费和支付工具交易生命周期入口由交易层实现组合并写入资金交易事实。
+4. 支出控制准入由钱包侧解析支付工具、资金责任、账户能力和当前有效 Spend Rule 挂载，并按 `decisionSn` 回读已固化决策；交易结果消费和支付工具授权/收款入口由交易层实现组合并写入资金交易事实。
 
 ## 6. 能力地图
 
@@ -417,7 +417,7 @@ Spend Rule 从设计可用进入生产启用前，至少需要满足：
 | 验收种子 | 推荐测试资产 | 通过标准 |
 | --- | --- | --- |
 | AC-SR-001 / AC-SR-002 | SpendRuleDefinitionServiceTests、SpendRuleDefinitionServiceFlowTests | 标准基础服务和服务流测试证明规则定义、版本不可变、挂载 scope、冲突策略和有效期可追踪。 |
-| AC-SR-003 / AC-SR-004 | SpendControlAdmissionApplicationServiceTests、AuthorizationAdmissionApplicationServiceTests | 拒绝停在交易内核前，通过后仍继续账户能力、资金责任和余额校验。 |
+| AC-SR-003 / AC-SR-004 | SpendControlAdmissionApplicationServiceTests、PaymentInstrumentTransactionAuthorizationTests | 拒绝停在交易内核前，通过后仍继续账户能力、资金责任和余额校验。 |
 | AC-SR-005 | FundsTransactionProjectionExplainApplicationServiceTests | 投影只读读取历史规则版本、挂载、决策流水和控制引用，不输出敏感原文。 |
 | AC-SR-006 | SpendControlMovementServiceFlowTests、BudgetControlLimitAdjustmentApplicationServiceTests、SpendControlTransactionConsumptionApplicationServiceTests | 控制额度变动流水可重建预算控制视图，不反写账本余额。 |
 

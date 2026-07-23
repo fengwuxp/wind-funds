@@ -46,7 +46,8 @@ import com.wind.funds.ledger.posting.DefaultLedgerPostingAssembler;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.account.impl.FundsAccountCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.funding.impl.FundingResponsibilityResolutionApplicationServiceImpl;
-import com.wind.funds.transaction.application.instrument.impl.AuthorizationAdmissionApplicationServiceImpl;
+import com.wind.funds.transaction.application.instrument.impl.PaymentInstrumentAuthorizationProcessor;
+import com.wind.funds.transaction.application.instrument.impl.PaymentInstrumentTransactionApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentCapabilityApplicationServiceImpl;
 import com.wind.funds.wallet.application.instrument.impl.PaymentInstrumentPreTransactionSnapshotApplicationServiceImpl;
 import com.wind.funds.wallet.application.spend.impl.SpendControlAdmissionApplicationServiceImpl;
@@ -129,10 +130,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringJUnitConfig({
         AbstractFundsServiceTest.TestInfrastructureConfig.class,
-        AuthorizationAdmissionApplicationServiceTests.Config.class
+        PaymentInstrumentTransactionAuthorizationTests.Config.class
 })
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsServiceTest {
+class PaymentInstrumentTransactionAuthorizationTests extends AbstractFundsServiceTest {
 
     private static final String CREDIT_ACCOUNT_SN = "auth_admission_credit";
 
@@ -212,7 +213,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     private FundsSubjectBalanceQueryService balanceQueryService;
 
     @Autowired
-    private AuthorizationAdmissionApplicationService authorizationAdmissionApplicationService;
+    private PaymentInstrumentTransactionApplicationService paymentInstrumentTransactionApplicationService;
 
     @Autowired
     private FundsTransactionProjectionExplainApplicationService projectionExplainApplicationService;
@@ -242,7 +243,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertBucket(beforeAuthorize, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(beforeAuthorize, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
 
-        String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
                         .setControlScopeId("budget_without_applicable_rule"),
                 WindOperatorFactory.system());
@@ -299,7 +300,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertBucket(beforeParentAuthorize, LedgerSubjectCode.AVAILABLE, 100L, CURRENCY);
         assertBucket(beforeParentAuthorize, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
 
-        String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperatorFactory.system());
 
         assertThat(authorizationSn).isNotBlank();
@@ -349,7 +350,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         initializeAvailableBalance(prepaidFundingAccount, 100L);
         initializeAvailableBalance(parentFundingAccount, 100L);
 
-        String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperatorFactory.system());
 
         assertThat(authorizationSn).isNotBlank();
@@ -390,7 +391,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 SPEND_PASS_DECISION_DIGEST);
         adjustBalance(creditAccount, 100L, BALANCE_ADJUST_BUSINESS_SN);
 
-        String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperatorFactory.system());
 
         assertThat(authorizationSn).isNotBlank();
@@ -410,7 +411,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         FundsAccountId creditAccount = preparePassedAuthorizationData();
         AuthorizeByPaymentInstrumentRequest request =
                 authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN);
-        String firstAuthorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+        String firstAuthorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 request, WindOperatorFactory.system());
         spendRuleBindingService.suspendSpendRuleBinding(new SuspendSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
@@ -418,7 +419,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
         var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
 
-        String replayedAuthorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+        String replayedAuthorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 request, WindOperatorFactory.system());
 
         assertThat(replayedAuthorizationSn).isEqualTo(firstAuthorizationSn);
@@ -438,14 +439,14 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         FundsAccountId creditAccount = preparePassedAuthorizationData();
         AuthorizeByPaymentInstrumentRequest request =
                 authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN);
-        authorizationAdmissionApplicationService.authorizeByInstrument(request, WindOperatorFactory.system());
+        paymentInstrumentTransactionApplicationService.authorizeByInstrument(request, WindOperatorFactory.system());
         spendRuleBindingService.suspendSpendRuleBinding(new SuspendSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(spendRuleBindingSn));
         FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
         var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 request.setAmount(61L), WindOperatorFactory.system()))
                 .hasMessageContaining("已成立授权请求参数不一致");
 
@@ -465,14 +466,14 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         FundsAccountId creditAccount = preparePassedAuthorizationData();
         AuthorizeByPaymentInstrumentRequest request =
                 authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN);
-        authorizationAdmissionApplicationService.authorizeByInstrument(request, WindOperatorFactory.system());
+        paymentInstrumentTransactionApplicationService.authorizeByInstrument(request, WindOperatorFactory.system());
         spendRuleBindingService.suspendSpendRuleBinding(new SuspendSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(spendRuleBindingSn));
         FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
         var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 request.setSpendDecisionSn(null), WindOperatorFactory.system()))
                 .hasMessageContaining("已成立授权 Spend Rule 证据不一致");
 
@@ -492,14 +493,14 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         FundsAccountId creditAccount = preparePassedAuthorizationData();
         AuthorizeByPaymentInstrumentRequest request =
                 authorizeSpendPassedRequest(AUTHORIZE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN);
-        authorizationAdmissionApplicationService.authorizeByInstrument(request, WindOperatorFactory.system());
+        paymentInstrumentTransactionApplicationService.authorizeByInstrument(request, WindOperatorFactory.system());
         spendRuleBindingService.suspendSpendRuleBinding(new SuspendSpendRuleBindingRequest()
                 .setTenantId(TENANT_ID)
                 .setSn(spendRuleBindingSn));
         FundsSubjectBalanceDTO balanceAfterFirstAuthorization = balance(creditAccount);
         var factsAfterFirstAuthorization = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 request.setExpectedBindingVersion(2), WindOperatorFactory.system()))
                 .hasMessageContaining("已成立授权请求参数不一致");
 
@@ -520,7 +521,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 PaymentInstrumentFlowDirection.INBOUND));
         var before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeRequest(DIRECTION_FAIL_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperatorFactory.system()))
                 .hasMessageContaining("支付工具资金流向不支持当前动作");
 
@@ -538,7 +539,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     void testAuthorizeByInstrumentShouldRejectTenantMismatchWithoutFundsFacts() {
         var before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeRequest(TENANT_MISMATCH_BUSINESS_SN, PAYMENT_INSTRUMENT_SN).setTenantId(TENANT_ID + 1),
                 WindOperatorFactory.system()))
                 .hasMessageContaining("支付工具授权 tenantId 与当前租户不一致");
@@ -568,7 +569,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         assertBucket(beforeDecline, LedgerSubjectCode.AUTHORIZATION, 0L, CURRENCY);
         var beforeDeclineFacts = ledgerFactSnapshot(jdbcTemplate);
 
-        String authorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+        String authorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeDeclineRequest(DECLINE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperatorFactory.system());
 
         assertThat(authorizationSn).isNotBlank();
@@ -607,12 +608,12 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         AuthorizeByPaymentInstrumentRequest request = authorizeDeclineRequest(
                 DECLINE_BUSINESS_SN, PAYMENT_INSTRUMENT_SN).setControlScopeId("ignored_decline_scope");
 
-        String firstAuthorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+        String firstAuthorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 request, WindOperatorFactory.system());
         FundsSubjectBalanceDTO balanceAfterFirstDecline = balance(creditAccount);
         var factsAfterFirstDecline = ledgerFactSnapshot(jdbcTemplate);
 
-        String replayedAuthorizationSn = authorizationAdmissionApplicationService.authorizeByInstrument(
+        String replayedAuthorizationSn = paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 request, WindOperatorFactory.system());
 
         assertThat(replayedAuthorizationSn).isEqualTo(firstAuthorizationSn);
@@ -643,7 +644,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
                 SPEND_DECISION_DIGEST);
         var before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeSpendRejectedRequest(), WindOperatorFactory.system()))
                 .hasMessageContaining("Spend Rule 准入未通过");
 
@@ -668,7 +669,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
         prepareSpendRuleDecisionData();
         var before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN), WindOperatorFactory.system()))
                 .hasMessageContaining("适用 Spend Rule 挂载要求 decisionRef");
 
@@ -686,7 +687,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
     void testAuthorizeByInstrumentShouldRejectBarePassedDecisionWithoutReference() {
         var before = ledgerFactSnapshot(jdbcTemplate);
 
-        assertThatThrownBy(() -> authorizationAdmissionApplicationService.authorizeByInstrument(
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.authorizeByInstrument(
                 authorizeRequest(SPEND_REJECT_BUSINESS_SN, PAYMENT_INSTRUMENT_SN)
                         .setSpendDecisionResult(SpendControlDecisionResult.PASSED)
                         .setSpendDecisionDigest(SPEND_PASS_DECISION_DIGEST),
@@ -1316,7 +1317,8 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             SpendRuleVersionServiceImpl.class,
             SpendRuleBindingServiceImpl.class,
             SpendRuleDecisionRecordServiceImpl.class,
-            AuthorizationAdmissionApplicationServiceImpl.class,
+            PaymentInstrumentAuthorizationProcessor.class,
+            PaymentInstrumentTransactionApplicationServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,
             PlatformFundingAccountServiceImpl.class
     })

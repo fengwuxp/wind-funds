@@ -278,16 +278,16 @@ flowchart LR
 
 | 外部事实或状态 | 能否进入资金底座 | 推荐入口 | 必须带上的证据 | 不能做 |
 | --- | --- | --- | --- | --- |
-| 外部已确认入金，且目标是内部资金账户。 | 可以。 | `ExternalFundsEventApplicationService.consume` 或 `InstrumentTransactionLifecycleApplicationService.receiveByInstrument`。 | 外部事件流水、confirmed credit 类型、目标资金账户、金额、币种、业务流水、外部 rail / provider 引用。 | 不把 VA、银行账户或外部账户建成 ledger subject。 |
+| 外部已确认入金，且目标是内部资金账户。 | 可以。 | `ExternalFundsEventApplicationService.consume` 或 `PaymentInstrumentTransactionApplicationService.receiveByInstrument`。 | 外部事件流水、confirmed credit 类型、目标资金账户、金额、币种、业务流水、外部 rail / provider 引用。 | 不把 VA、银行账户或外部账户建成 ledger subject。 |
 | 外部入金只是 accepted、submitted、processing、message sent 或待匹配。 | 不可以。 | 停在上游入金单、在途、挂账、对账或人工复核。 | 外部引用、状态、文件摘要、匹配原因、待处理 owner。 | 不增加 `AVAILABLE`，不生成 `topup`。 |
-| 外部出款已终态成功，且可以关闭内部冻结资金。 | 可以。 | `InstrumentTransactionLifecycleApplicationService.payOutByRail`。 | 原冻结流水、外部出款流水、终态成功状态、rail、收款端引用、金额、币种、业务流水。 | 不把外部 submitted / accepted / processing 当成功。 |
+| 外部出款已终态成功，且可以关闭内部冻结资金。 | 可以。 | 上层出款业务确认后调用 `FundsDirectTransactionService.withdraw`。 | 原冻结流水、经业务确认的外部出款事实、外部收款账户、金额、币种和业务流水。 | 不把 provider 状态解释下沉到资金底座；不按当前支付工具绑定重新选资金主体。 |
 | 外部出款已提交、受理、处理中或 message sent。 | 不可以。 | 停在上游 payout order、在途、对账或差错链路。 | 出款单、外部状态、回单拉取计划、超时告警、处理 owner。 | 不关闭 `FROZEN`、`SETTLEMENT` 或 `IN_TRANSIT`，不生成 `withdraw`。 |
 | 退汇、return、NOC、外部 rail reversal、金额不一致或费用不一致。 | 不可以直接进入默认交易入口。 | 进入对账差错、退汇专项或人工处理，明确责任后再生成资金事实。 | 原交易或原出款引用、外部原因、费用、责任方、审批或差错单。 | 不降级成普通 `refund`，不净额静默抵消。 |
 | 涉及跨币种、FX、汇兑损益或错币种到账。 | 默认不可以。 | 先由 FX / treasury 或差错链路确认。 | quoteRef、原币、目标币、汇率、有效期、执行结果、审批引用。 | 不自动换汇，不按期望币种静默入账。 |
 
 接入申请必须能回答四个问题：外部状态是否终态、内部账务主体是谁、金额币种是否可直接入账、失败或退回时由谁负责处理。回答不完整时，只能登记在途、差错或人工复核，不进入资金事实链路。
 
-验证锚点：`ExternalFundsEventApplicationServiceTests`、`InstrumentTransactionLifecycleApplicationServiceTests`、`PayoutPreflightServiceTests`；完整退汇、FX、跨境合规和多币种对账仍需独立业务专项。
+验证锚点：`ExternalFundsEventApplicationServiceTests`、`PaymentInstrumentTransactionApplicationServiceTests`、`FundsWithdrawalSuccessFlowTests`、`PayoutPreflightServiceTests`；完整退汇、FX、跨境合规和多币种对账仍需独立业务专项。
 
 ## 7. 禁止路径
 
@@ -367,4 +367,4 @@ flowchart LR
 
 清结算、对账、归档、重放、指标治理、VCC 产品化、全球账户、ACH、收单和通道协议适配不在本文接入承诺范围内。它们可以消费本文三层主链事实，但需要单独的产品设计、系统设计、TDD 和工程变更边界。
 
-全球账户或跨境出款接入时，`InstrumentTransactionLifecycleApplicationService.payOutByRail` 只能用于外部出款已终态成功、可关闭内部冻结资金的场景。外部 `submitted`、`accepted`、`processing`、`message sent` 等状态必须停在上游出款单、在途、对账或差错链路，不得调用该入口生成 `withdraw` 资金事实。
+全球账户或跨境出款接入时，外部状态归一、终态判定、通道回单和收款人信息属于上游 P2 出款业务。只有上游确认形成可关闭内部冻结的成功事实后，才可携带原 `referenceFreezeSn` 调用 `FundsDirectTransactionService.withdraw`；canonical 服务校验原冻结主体、金额币种、剩余可消费金额和幂等。外部 `submitted`、`accepted`、`processing`、`message sent` 等状态必须停在上游出款单、在途、对账或差错链路。当前不提供支付工具型出款完成 facade，因为冻结发起请求尚未固化可供完成阶段回放的原工具与绑定快照。

@@ -2,16 +2,14 @@ package com.wind.funds.wallet.application.instrument;
 
 import com.wind.integration.operator.WindOperator;
 import com.wind.funds.wallet.model.request.AuthorizeByPaymentInstrumentRequest;
-import com.wind.funds.wallet.model.request.PayOutByRailRequest;
 import com.wind.funds.wallet.model.request.ReceiveByInstrumentRequest;
 import org.jspecify.annotations.NonNull;
 
 /**
- * 支付工具交易生命周期应用服务。
+ * 支付工具交易应用服务。
  *
  * <p>职责：面向 VCC、卡、VA、ACH、电子钱包端点、VCC 入金端点等支付工具业务入口，完成工具能力、
- * 绑定快照、资金责任和账户能力准入，再委派账户主体型交易内核。外部接入支付工具授权、收款或出款
- * rail 时应优先使用本生命周期 facade；专项准入服务只作为内部协作入口。</p>
+ * 绑定快照、资金责任和账户能力准入，再委派账户主体型交易内核。</p>
  *
  * <p>边界：本服务不改变 transaction 层 canonical 入参；交易事实、route、账本交易、分录和余额投影仍由
  * 账户主体型交易服务和 ledger posting 链路生成。</p>
@@ -22,14 +20,14 @@ import org.jspecify.annotations.NonNull;
  * @author Codex
  * @date 2026-06-21
  */
-public interface InstrumentTransactionLifecycleApplicationService {
+public interface PaymentInstrumentTransactionApplicationService {
 
     /**
      * 通过支付工具授权入口完成准入并委派授权交易内核。
      *
      * <p>典型场景包括 VCC/卡授权、外部钱包授权或通道 token 授权等。
-     * 授权准入、支付工具解析、资金责任解析、账户能力校验和 Spend Rule 准入仍由授权准入专项服务负责；
-     * 外部调用方不应绕过本生命周期入口自行拼接专项准入和交易内核。</p>
+     * 支付工具解析、资金责任解析、账户能力校验和 Spend Rule 准入均由本入口内部完成；
+     * 外部调用方不应自行拼接准入和交易内核。</p>
      *
      * @param request  支付工具授权请求
      * @param operator 操作者
@@ -51,18 +49,4 @@ public interface InstrumentTransactionLifecycleApplicationService {
     @NonNull String receiveByInstrument(@NonNull ReceiveByInstrumentRequest request,
                                         @NonNull WindOperator operator);
 
-    /**
-     * 通过支付工具出款 rail 入口完成准入并委派账户主体型提现或出款内核。
-     *
-     * <p>典型场景包括全球账户通过 SWIFT、local rail、ACH 等方式向外部收款人打款。
-     * 本服务只承载资金域服务层入口，具体 rail 协议、收款人详情、渠道报文和外部状态机仍属于上层业务或通道域。
-     * 调用方必须只在外部出款已达到可关闭内部冻结资金的终态成功，或已有等价业务确认时调用；
-     * 外部 submitted、accepted、processing、message sent 等非终态不得调用本入口。</p>
-     *
-     * @param request  支付工具出款 rail 请求
-     * @param operator 操作者
-     * @return 出款交易流水号
-     */
-    @NonNull String payOutByRail(@NonNull PayOutByRailRequest request,
-                                 @NonNull WindOperator operator);
 }

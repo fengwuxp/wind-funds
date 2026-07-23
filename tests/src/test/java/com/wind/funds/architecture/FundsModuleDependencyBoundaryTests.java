@@ -189,9 +189,9 @@ class FundsModuleDependencyBoundaryTests {
     private static final List<String> WALLET_APPLICATION_IMPL_SCAN_PATHS = List.of(
             "wallet/impl/src/main/java/com/wind/funds/wallet/application");
 
-    private static final String TRANSACTION_WALLET_AUTHORIZATION_FACADE_SOURCE =
+    private static final String TRANSACTION_PAYMENT_INSTRUMENT_AUTHORIZATION_PROCESSOR_SOURCE =
             "transaction/impl/src/main/java/com/wind/funds/transaction/application/instrument/impl/"
-                    + "AuthorizationAdmissionApplicationServiceImpl.java";
+                    + "PaymentInstrumentAuthorizationProcessor.java";
 
     private static final List<String> TRANSACTION_FORBIDDEN_SPEND_CONTROL_ADMISSION_TOKENS = List.of(
             "com.wind.funds.wallet.application.spend.SpendControlAdmissionApplicationService");
@@ -456,7 +456,7 @@ class FundsModuleDependencyBoundaryTests {
             String relativePath = workspaceRoot().relativize(javaFile).toString();
             for (String forbiddenToken : TRANSACTION_FORBIDDEN_SPEND_CONTROL_ADMISSION_TOKENS) {
                 if (content.contains(forbiddenToken)
-                        && !TRANSACTION_WALLET_AUTHORIZATION_FACADE_SOURCE.equals(relativePath)) {
+                        && !TRANSACTION_PAYMENT_INSTRUMENT_AUTHORIZATION_PROCESSOR_SOURCE.equals(relativePath)) {
                     violations.add(relativePath
                             + " contains wallet spend control admission token " + forbiddenToken);
                 }
@@ -562,7 +562,7 @@ class FundsModuleDependencyBoundaryTests {
     }
 
     /**
-     * 场景：wallet 对外提供支付工具交易生命周期和账户能力 application facade。
+     * 场景：wallet 对外提供支付工具授权、收款和账户能力 application facade。
      * 预期：非 wallet 生产模块不直接拼装 wallet 资源服务完成授权准入、支付工具能力或资金责任解析。
      * 红线：跨模块调用方必须通过 wallet application/use-case facade 或交易层 canonical 入口表达业务意图。
      */
