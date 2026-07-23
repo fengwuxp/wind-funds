@@ -21,6 +21,9 @@ import com.wind.funds.route.BalanceControlFundsInstructionRouteResolver;
 import com.wind.funds.route.CompositeRouteResolver;
 import com.wind.funds.route.DefaultRouteReplayService;
 import com.wind.funds.route.DefaultRouteSnapshotFactory;
+import com.wind.funds.route.RefundRouteAdmission;
+import com.wind.funds.route.RouteFeeChargeAppender;
+import com.wind.funds.route.RouteAccountHierarchySnapshotAppender;
 import com.wind.funds.route.TransferFundsInstructionRouteResolver;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
@@ -55,8 +58,7 @@ import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
 import com.wind.funds.wallet.model.query.FundsSubjectBalanceQuery;
 import com.wind.funds.wallet.service.FundingAccountService;
 import com.wind.funds.wallet.service.FundsSubjectBalanceQueryService;
-import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
-import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
+import com.wind.funds.wallet.services.impl.AccountHierarchyRelationServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
@@ -462,6 +464,9 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             RouteSubjectSupport.class,
             PlatformAccountRouteSupport.class,
             DefaultRouteReplayService.class,
+            RefundRouteAdmission.class,
+            RouteFeeChargeAppender.class,
+            RouteAccountHierarchySnapshotAppender.class,
             TransferFundsInstructionRouteResolver.class,
             BalanceControlFundsInstructionRouteResolver.class,
             AuthorizationFundsInstructionRouteResolver.class,
@@ -481,8 +486,7 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
             DefaultLedgerQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
-            AccountHierarchyBindingServiceImpl.class,
-            AccountHierarchyServiceImpl.class,
+            AccountHierarchyRelationServiceImpl.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             DefaultFundsAccountQueryServiceImpl.class,

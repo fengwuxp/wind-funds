@@ -38,8 +38,8 @@
   },
   "expectedRoute": {
     "routeCode": "AUTHORIZATION_STANDARD",
-    "routeVersion": "v4",
-    "snapshotSchemaVersion": "route.snapshot.v4",
+    "routeVersion": "v5",
+    "snapshotSchemaVersion": "route.snapshot.v5",
     "participants": [
       {
         "participantRole": "AUTH_HOLDER",

@@ -42,7 +42,7 @@ VCC 产品与系统设计的当前评审入口由 `fincone` 维护：
 | 外部事实 | Webhook/Pull/报告采集、验签、归一、issuer 权威确认和敏感数据边界。 | 不解析 issuer 协议，只接收已成立的资金指令与安全引用。 |
 | VCC 交易 | 维护 VCC 主交易、外部事件、应用状态、业务金额摘要和卡账单解释。 | 维护 FundsTransaction、RouteSnapshot、LedgerTransaction、LedgerEntry 和余额投影。 |
 | 支付工具 | 维护 Card/Cardholder/Program 和卡生命周期。 | 保存脱敏 `PaymentInstrumentRef` 及绑定快照，执行工具能力准入。 |
-| 资金责任 | 传入已确认的使用人、业务范围和规则证据。 | 从绑定、账户层级和资金来源解析唯一 `FundingAllocationDecision`。 |
+| 资金路径 | 传入已确认的使用人、业务范围、规则证据和资金选择。 | 从绑定和账户能力解析唯一可记账子账户，以 route participant/leg 显式表达资金或额度路径；账户层级快照只记录直接父账户关系。 |
 | 资金动作 | 决定何时授权、清算、释放、退款或进入人工处理。 | 校验主体、金额、币种、原始事实和幂等，执行单个 canonical 资金动作。 |
 | 查询和对账 | 组合卡交易、issuer 事件、卡账单和运营处理视图。 | 提供资金交易解释、账务证据和对账证据引用，不反写 VCC 事实。 |
 
@@ -113,7 +113,7 @@ VCC 产品与系统设计的当前评审入口由 `fincone` 维护：
 ```mermaid
 flowchart LR
     A["fincone VCC<br/>external fact and decision"] --> B["wind-funds<br/>PaymentInstrument admission"]
-    B --> C["FundingAllocationDecision"]
+    B --> C["RouteParticipant and RouteLeg"]
     C --> D["canonical funds action"]
     D --> E["RouteSnapshot"]
     E --> F["LedgerTransaction / LedgerEntry"]
@@ -151,7 +151,7 @@ flowchart LR
 | `VCC-AC-006` | 争议裁决需要资金动作 | 只接收上层已确认的退款、追偿或其他明确资金指令；需退本金时复用原路由。无资金影响时不调用 wind-funds，不生成空交易或资金投影。 | dispute case 过程、证据期限和业务裁决。 |
 | `VCC-AC-007` | 预付卡授权 | 卡绑定独立 FundingAccount 子账户，父账户和预付资金来源可追溯。 | 开卡、充值订单和退卡产品流程。 |
 | `VCC-AC-008` | 共享卡授权 | 卡绑定独立 CreditAccount 子账户，父 FundingAccount 责任唯一，缺任一条件时无账务副作用。 | 共享卡用户、卡组和卡账单规则。 |
-| `VCC-AC-009` | 多卡和换绑后续动作 | 每张卡绑定独立子账户；退款/释放继续使用原 binding snapshot、FundingAllocationDecision 和 RouteSnapshot。 | 是否允许换绑的 VCC 产品政策。 |
+| `VCC-AC-009` | 多卡和换绑后续动作 | 每张卡绑定独立子账户；退款/释放继续使用原 binding snapshot、参与方账户层级快照和 RouteSnapshot。 | 是否允许换绑的 VCC 产品政策。 |
 | `VCC-AC-010` | 外部输入证据 | 只接收已归一的稳定引用、金额币种、业务摘要和敏感数据阻断结果。 | Webhook 验签、issuer 权威查询和事件归一实现。 |
 | `VCC-AC-011` | 资金对账引用 | FundsTransaction、RouteSnapshot、LedgerTransaction、LedgerEntry 和对账差错可通过稳定引用下钻，差异处理不改历史分录。 | SupplierBill、issuer report、AccountingVoucher 和 VCC 卡账单的生命周期。 |
 | `VCC-RED-001` | 完整 PAN/CVC 进入资金底座 | 请求、上下文、日志、投影、导出和测试夹具必须失败或脱敏阻断。 | PCI 持卡人数据系统实现。 |
@@ -164,7 +164,7 @@ flowchart LR
 | --- | --- | --- |
 | VCC 支付工具与子/父账户初始化 | 资金底座已有账户、绑定和准入能力；生产字段、事务边界和账户模式仍需契约测试签收。 | fincone VCC、wallet |
 | 支付工具与授权生命周期 | 首笔授权使用 `InstrumentTransactionLifecycleApplicationService#authorizeByInstrument`；后授权使用 `FundsAuthorizationTransactionService#complete/reversal/refund` 并按原授权事实和 RouteSnapshot 回放。VCC 同事务集成仍需在目标仓库验证。 | fincone VCC、wallet、transaction |
-| 原责任和原路由回放 | 需确认 binding snapshot、FundingAllocationDecision 和 RouteSnapshot 对外稳定引用。 | wallet、transaction |
+| 原主体和原路由回放 | 需确认 binding snapshot、RouteParticipant、参与方账户层级快照和 RouteSnapshot 对外稳定引用；回放不得查询当前层级关系。 | wallet、transaction |
 | 资金解释查询 | 只返回 `wind-funds` 事实和不可用原因；不返回 VCC 事件应用状态或卡账单展示状态。 | transaction、fincone VCC |
 
 ## 10. 风险与停止条件

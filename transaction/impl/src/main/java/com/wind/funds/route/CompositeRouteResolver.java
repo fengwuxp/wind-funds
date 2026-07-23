@@ -28,6 +28,8 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
 
     private final RouteFeeChargeAppender routeFeeChargeAppender;
 
+    private final RouteAccountHierarchySnapshotAppender routeAccountHierarchySnapshotAppender;
+
     @Override
     public boolean supports(@NonNull FundsInstructionSpec instruction) {
         return true;
@@ -53,7 +55,8 @@ public class CompositeRouteResolver implements RouteResolver, Ordered {
                 instruction.getTransactionType(), instruction.getBusinessSn());
         ResolvedRouteSpec result = delegate.resolve(instruction);
         refundRouteAdmission.validate(instruction, result);
-        return routeFeeChargeAppender.append(instruction, result);
+        ResolvedRouteSpec routeWithFee = routeFeeChargeAppender.append(instruction, result);
+        return routeAccountHierarchySnapshotAppender.append(instruction, routeWithFee);
     }
 
     private int orderOf(RouteResolver routeResolver) {

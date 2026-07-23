@@ -14,20 +14,17 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
- * 账户层级绑定 DTO。
- *
- * @author Codex
- * @date 2026-06-24
+ * 账户层级关系 DTO。
  */
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode
 @ToString
 @Accessors(chain = true)
-public class AccountHierarchyBindingDTO implements Serializable {
+public class AccountHierarchyRelationDTO implements Serializable {
 
     @Serial
-    private static final long serialVersionUID = -8582215662379749592L;
+    private static final long serialVersionUID = -1580740280393341089L;
 
     @Schema(description = "主键")
     private Long id;
@@ -38,7 +35,7 @@ public class AccountHierarchyBindingDTO implements Serializable {
     @Schema(description = "修改时间")
     private LocalDateTime gmtModified;
 
-    @Schema(description = "层级绑定流水号")
+    @Schema(description = "关系号")
     private String sn;
 
     @Schema(description = "租户 ID")
@@ -50,18 +47,15 @@ public class AccountHierarchyBindingDTO implements Serializable {
     @Schema(description = "子账户类型")
     private FundsSubjectType accountType;
 
-    @Schema(description = "父账户 ID")
+    @Schema(description = "直接父账户 ID")
     private String parentAccountId;
 
-    @Schema(description = "父账户类型")
+    @Schema(description = "直接父账户类型")
     private FundsSubjectType parentAccountType;
 
-    @Schema(description = "层级关系币种")
+    @Schema(description = "关系币种")
     private CurrencyIsoCode currency;
 
-    @Schema(description = "操作人 ID")
+    @Schema(description = "操作人")
     private String operatorId;
-
-    @Schema(description = "扩展上下文变量")
-    private String contextVariables;
 }

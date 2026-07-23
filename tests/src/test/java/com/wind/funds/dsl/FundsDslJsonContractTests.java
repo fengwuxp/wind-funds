@@ -706,12 +706,12 @@ class FundsDslJsonContractTests {
     }
 
     /**
-     * 场景：VCC 共享卡 route JSON 样例声明资金来源决策和账户层级快照。
-     * 预期：JSON 契约校验可识别信用子账户、父资金账户和层级版本。
-     * 红线：账户层级快照不能只停留在 Java 值对象，文档样例也必须机器可校验。
+     * 场景：VCC 共享卡 route JSON 样例在信用账户 participant 上声明账户层级快照。
+     * 预期：JSON 契约校验可识别关系号、信用子账户和直接父资金账户。
+     * 红线：层级快照只描述参与账户当时的直接父关系，不得重复表达资金分配。
      */
     @Test
-    void testJsonContractVerifierShouldAcceptVccRouteAccountHierarchySnapshot() {
+    void testJsonContractVerifierShouldAcceptParticipantAccountHierarchySnapshot() {
         JSONObject document = JSON.parseObject("""
                 {
                   "caseId": "DSL-VCC-ROUTE-HIERARCHY-001",
@@ -723,239 +723,29 @@ class FundsDslJsonContractTests {
                     "originalAmount": { "currency": "USD", "amount": 100 }
                   },
                   "expectedRoute": {
-                    "routeCode": "VCC_SHARED_CARD_AUTH",
-                    "routeVersion": "v1",
-                    "snapshotSchemaVersion": "route.snapshot.v1",
-                    "routingDecision": {
-                      "policyCode": "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT",
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_card_001",
-                          "currency": "USD",
-                          "ledgerProfileCode": "CREDIT_BASIC"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "priority": 10,
-                        "reason": "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT",
-                        "accountHierarchySnapshot": {
-                          "accountRef": {
-                            "subjectType": "CREDIT_ACCOUNT",
-                            "subjectId": "ca_vcc_card_001",
-                            "currency": "USD",
-                            "ledgerProfileCode": "CREDIT_BASIC"
-                          },
-                          "parentAccountRef": {
-                            "subjectType": "FUNDING_ACCOUNT",
-                            "subjectId": "fa_vcc_parent_001",
-                            "currency": "USD",
-                            "ledgerProfileCode": "FUNDING_BASIC"
-                          },
-                          "contextVariables": { "accountPurpose": "VCC_SHARED_CARD" }
-                        }
-                      }]
-                    }
-                  }
-                }
-                """);
-
-        FundsDslJsonContractVerifier.verifyTransactionLayerCase(document);
-    }
-
-    /**
-     * 场景：VCC route JSON 样例里的资金来源决策缺少 priority。
-     * 预期：JSON 契约校验显式失败。
-     * 红线：资金来源决策的排序优先级是路由重放和责任归因的稳定字段，不能只在 Java 构造器里校验。
-     */
-    @Test
-    void testJsonContractVerifierShouldRejectFundingAllocationMissingPriority() {
-        JSONObject document = JSON.parseObject("""
-                {
-                  "caseId": "DSL-INVALID-VCC-ALLOCATION-MISSING-PRIORITY-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_missing_priority_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_missing_priority_001",
-                          "currency": "USD"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "reason": "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT"
-                      }]
-                    }
-                  }
-                }
-                """);
-
-        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("fundingAllocations.priority is required");
-    }
-
-    /**
-     * 场景：VCC route JSON 样例里的资金来源决策缺少 reason。
-     * 预期：JSON 契约校验显式失败。
-     * 红线：资金来源决策原因是回放审计和问题排查的稳定字段，不能只在 Java 构造器里校验。
-     */
-    @Test
-    void testJsonContractVerifierShouldRejectFundingAllocationMissingReason() {
-        JSONObject document = JSON.parseObject("""
-                {
-                  "caseId": "DSL-INVALID-VCC-ALLOCATION-MISSING-REASON-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_missing_reason_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_missing_reason_001",
-                          "currency": "USD"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "priority": 10
-                      }]
-                    }
-                  }
-                }
-                """);
-
-        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("fundingAllocations.reason is required");
-    }
-
-    /**
-     * 场景：VCC route JSON 样例里多个资金来源决策使用相同 priority。
-     * 预期：JSON 契约校验显式失败。
-     * 红线：资金来源决策优先级必须稳定唯一，避免路由重放和资金责任解析出现非确定性排序。
-     */
-    @Test
-    void testJsonContractVerifierShouldRejectFundingAllocationDuplicatePriority() {
-        JSONObject document = JSON.parseObject("""
-                {
-                  "caseId": "DSL-INVALID-VCC-ALLOCATION-DUPLICATE-PRIORITY-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_duplicate_priority_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_duplicate_priority_001",
-                          "currency": "USD"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 60 },
-                        "priority": 10,
-                        "reason": "VCC_SHARED_CARD_PRIMARY_ALLOCATION"
-                      }, {
-                        "allocationId": "alloc_vcc_duplicate_priority_002",
-                        "subjectRef": {
+                    "participants": [{
+                      "participantRole": "PAYER",
+                      "subjectRef": {
+                        "subjectType": "CREDIT_ACCOUNT",
+                        "subjectId": "ca_vcc_card_001",
+                        "tenantId": 1,
+                        "currency": "USD"
+                      },
+                      "accountHierarchySnapshot": {
+                        "relationSn": "AHR-VCC-001",
+                        "parentAccountRef": {
                           "subjectType": "FUNDING_ACCOUNT",
-                          "subjectId": "fa_vcc_duplicate_priority_001",
+                          "subjectId": "fa_vcc_parent_001",
+                          "tenantId": 1,
                           "currency": "USD"
-                        },
-                        "ledgerSubjectCode": "AVAILABLE",
-                        "amount": { "currency": "USD", "amount": 40 },
-                        "priority": 10,
-                        "reason": "VCC_SHARED_CARD_BACKUP_ALLOCATION"
-                      }]
-                    }
-                  }
-                }
-                """);
-
-        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("fundingAllocations.priority must be unique");
-    }
-
-    /**
-     * 场景：VCC route JSON 样例中信用子账户 leg 消耗 100，但资金责任只分配 80。
-     * 预期：JSON 契约校验显式失败。
-     * 红线：核心资金 / 信用账户的资金责任分配金额必须和 route leg 消耗金额闭合，避免 route snapshot 进入后续账务时资金责任短缺。
-     */
-    @Test
-    void testJsonContractVerifierShouldRejectUnclosedCoreAccountFundingAllocationAmount() {
-        JSONObject document = JSON.parseObject("""
-                {
-                  "caseId": "DSL-INVALID-VCC-ROUTE-ALLOCATION-CLOSURE-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_closure_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_closure_001",
-                          "currency": "USD"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 80 },
-                        "priority": 10,
-                        "reason": "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT"
-                      }]
-                    },
-                    "legs": [{
-                      "legType": "HOLD",
-                      "sourceNode": {
-                        "nodeType": "SUBJECT",
-                        "nodeRole": "SOURCE",
-                        "subjectType": "CREDIT_ACCOUNT",
-                        "subjectId": "ca_vcc_closure_001",
-                        "ledgerSubjectCode": "AVAILABLE"
-                      },
-                      "targetNode": {
-                        "nodeType": "SUBJECT",
-                        "nodeRole": "TARGET",
-                        "subjectType": "CREDIT_ACCOUNT",
-                        "subjectId": "ca_vcc_closure_001",
-                        "ledgerSubjectCode": "AUTHORIZATION"
-                      },
-                      "amount": { "currency": "USD", "amount": 100 },
-                      "balanceEffectType": "HOLD",
-                      "phaseCode": "AUTHORIZATION",
-                      "replayPolicy": "PARTIAL_ALLOWED"
+                        }
+                      }
                     }]
                   }
                 }
                 """);
 
-        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("core account allocation amount must equal consume route amount");
+        FundsDslJsonContractVerifier.verifyTransactionLayerCase(document);
     }
 
     /**
@@ -976,20 +766,6 @@ class FundsDslJsonContractTests {
                     "originalAmount": { "currency": "USD", "amount": 100 }
                   },
                   "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_card_node_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_card_node_001",
-                          "currency": "USD"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "priority": 10,
-                        "reason": "VCC_SHARED_CARD_CREDIT_SUB_ACCOUNT"
-                      }]
-                    },
                     "legs": [{
                       "legType": "HOLD",
                       "sourceNode": {
@@ -1211,248 +987,87 @@ class FundsDslJsonContractTests {
     }
 
     /**
-     * 场景：JSON 样例把支出控制范围写成账户层级中的实际账户。
+     * 场景：participant 层级快照缺少关系号。
      * 预期：JSON 契约校验显式失败。
-     * 红线：支出控制范围是控制范围，不是资金或信用账户，不能进入账户层级作为落账主体。
      */
     @Test
-    void testJsonContractVerifierShouldRejectSpendControlScopeAsHierarchyAccountRef() {
-        JSONObject document = JSON.parseObject("""
+    void testJsonContractVerifierShouldRejectHierarchyWithoutRelationSn() {
+        JSONObject document = hierarchyParticipantDocument("""
                 {
-                  "caseId": "DSL-INVALID-VCC-BUDGET-HIERARCHY-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_budget_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_001"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "priority": 10,
-                        "reason": "INVALID_SPEND_CONTROL_SCOPE_HIERARCHY_ACCOUNT",
-                        "accountHierarchySnapshot": {
-                          "accountRef": {
-                            "subjectType": "SPEND_CONTROL_SCOPE",
-                            "subjectId": "bg_vcc_001"
-                          }
-                        }
-                      }]
-                    }
+                  "parentAccountRef": {
+                    "subjectType": "FUNDING_ACCOUNT",
+                    "subjectId": "fa_vcc_parent_001",
+                    "tenantId": 1,
+                    "currency": "USD"
                   }
                 }
                 """);
 
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("accountHierarchySnapshot.accountRef.subjectType")
-                .hasMessageContaining("FundsSubjectType");
+                .hasMessageContaining("accountHierarchySnapshot.relationSn is required");
     }
 
     /**
-     * 场景：JSON 样例里的资金来源决策主体和账户层级快照主体不一致。
+     * 场景：支出控制范围被误写成 participant 的父账户。
      * 预期：JSON 契约校验显式失败。
-     * 红线：回放、账单和责任归因不能出现 allocation 指向一个账户、层级快照指向另一个账户。
      */
     @Test
-    void testJsonContractVerifierShouldRejectMismatchedHierarchyAccountRef() {
-        JSONObject document = JSON.parseObject("""
+    void testJsonContractVerifierShouldRejectSpendControlScopeAsHierarchyParent() {
+        JSONObject document = hierarchyParticipantDocument("""
                 {
-                  "caseId": "DSL-INVALID-VCC-HIERARCHY-MISMATCH-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_mismatch_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_card_001"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "priority": 10,
-                        "reason": "INVALID_MISMATCHED_HIERARCHY_ACCOUNT",
-                        "accountHierarchySnapshot": {
-                          "accountRef": {
-                            "subjectType": "CREDIT_ACCOUNT",
-                            "subjectId": "ca_vcc_card_002"
-                          }
-                        }
-                      }]
-                    }
+                  "relationSn": "AHR-VCC-INVALID-001",
+                  "parentAccountRef": {
+                    "subjectType": "SPEND_CONTROL_SCOPE",
+                    "subjectId": "scope_vcc_001",
+                    "tenantId": 1,
+                    "currency": "USD"
                   }
                 }
                 """);
 
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("accountRef must match funding allocation subjectRef");
+                .hasMessageContaining("parentAccountRef.subjectType must be FUNDING_ACCOUNT or CREDIT_ACCOUNT");
     }
 
     /**
-     * 场景：JSON 样例里的资金来源决策主体和账户层级快照主体 ID 一致，但币种不同。
+     * 场景：participant 与父账户币种不一致。
      * 预期：JSON 契约校验显式失败。
-     * 红线：同一个资金责任主体不能在 route snapshot 中被记录成不同币种，否则回放和余额投影会跨币种归因。
      */
     @Test
-    void testJsonContractVerifierShouldRejectHierarchyAccountRefCurrencyMismatch() {
-        JSONObject document = JSON.parseObject("""
+    void testJsonContractVerifierShouldRejectHierarchyParentCurrencyMismatch() {
+        JSONObject document = hierarchyParticipantDocument("""
                 {
-                  "caseId": "DSL-INVALID-VCC-HIERARCHY-CURRENCY-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_currency_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_card_currency_001",
-                          "currency": "USD"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "priority": 10,
-                        "reason": "INVALID_HIERARCHY_ACCOUNT_CURRENCY",
-                        "accountHierarchySnapshot": {
-                          "accountRef": {
-                            "subjectType": "CREDIT_ACCOUNT",
-                            "subjectId": "ca_vcc_card_currency_001",
-                            "currency": "EUR"
-                          },
-                          "parentAccountRef": {
-                            "subjectType": "FUNDING_ACCOUNT",
-                            "subjectId": "fa_vcc_parent_currency_001",
-                            "currency": "EUR"
-                          }
-                        }
-                      }]
-                    }
+                  "relationSn": "AHR-VCC-INVALID-002",
+                  "parentAccountRef": {
+                    "subjectType": "FUNDING_ACCOUNT",
+                    "subjectId": "fa_vcc_parent_001",
+                    "tenantId": 1,
+                    "currency": "EUR"
                   }
                 }
                 """);
 
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("accountRef currency must match funding allocation subjectRef currency");
+                .hasMessageContaining("parentAccountRef.currency must match account currency");
     }
 
     /**
-     * 场景：JSON 样例里的资金来源决策主体币种和 allocation 金额币种不一致。
+     * 场景：participant 的直接父账户指回自身。
      * 预期：JSON 契约校验显式失败。
-     * 红线：资金来源决策不能表达为 EUR 主体承担 USD 金额，否则账务计划和回放投影会跨币种归因。
      */
     @Test
-    void testJsonContractVerifierShouldRejectFundingAllocationSubjectAmountCurrencyMismatch() {
-        JSONObject document = JSON.parseObject("""
+    void testJsonContractVerifierShouldRejectSelfReferencedHierarchyParent() {
+        JSONObject document = hierarchyParticipantDocument("""
                 {
-                  "caseId": "DSL-INVALID-VCC-ALLOCATION-AMOUNT-CURRENCY-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_amount_currency_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_card_amount_currency_001",
-                          "currency": "EUR"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "priority": 10,
-                        "reason": "INVALID_ALLOCATION_AMOUNT_CURRENCY",
-                        "accountHierarchySnapshot": {
-                          "accountRef": {
-                            "subjectType": "CREDIT_ACCOUNT",
-                            "subjectId": "ca_vcc_card_amount_currency_001",
-                            "currency": "EUR"
-                          },
-                          "parentAccountRef": {
-                            "subjectType": "FUNDING_ACCOUNT",
-                            "subjectId": "fa_vcc_parent_amount_currency_001",
-                            "currency": "EUR"
-                          }
-                        }
-                      }]
-                    }
-                  }
-                }
-                """);
-
-        assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("funding allocation amount currency must match subjectRef currency");
-    }
-
-    /**
-     * 场景：JSON 样例把 VCC 卡绑定信用子账户同时写成 parent。
-     * 预期：JSON 契约校验显式失败。
-     * 红线：直接父账户不能指回实际落账账户本身，否则账户汇总和回放归因会出现自循环。
-     */
-    @Test
-    void testJsonContractVerifierShouldRejectSelfReferencedHierarchyRelation() {
-        JSONObject document = JSON.parseObject("""
-                {
-                  "caseId": "DSL-INVALID-VCC-HIERARCHY-SELF-001",
-                  "instruction": {
-                    "instructionType": "AUTHORIZATION_TRANSACTION",
-                    "eventType": "AUTHORIZE",
-                    "transactionType": "PAY",
-                    "amount": { "currency": "USD", "amount": 100 },
-                    "originalAmount": { "currency": "USD", "amount": 100 }
-                  },
-                  "expectedRoute": {
-                    "routingDecision": {
-                      "fundingAllocations": [{
-                        "allocationId": "alloc_vcc_self_001",
-                        "subjectRef": {
-                          "subjectType": "CREDIT_ACCOUNT",
-                          "subjectId": "ca_vcc_card_self_001",
-                          "currency": "USD"
-                        },
-                        "ledgerSubjectCode": "AUTHORIZATION",
-                        "amount": { "currency": "USD", "amount": 100 },
-                        "priority": 10,
-                        "reason": "INVALID_SELF_REFERENCED_HIERARCHY",
-                        "accountHierarchySnapshot": {
-                          "accountRef": {
-                            "subjectType": "CREDIT_ACCOUNT",
-                            "subjectId": "ca_vcc_card_self_001",
-                            "currency": "USD"
-                          },
-                          "parentAccountRef": {
-                            "subjectType": "CREDIT_ACCOUNT",
-                            "subjectId": "ca_vcc_card_self_001",
-                            "currency": "USD"
-                          }
-                        }
-                      }]
-                    }
+                  "relationSn": "AHR-VCC-INVALID-003",
+                  "parentAccountRef": {
+                    "subjectType": "CREDIT_ACCOUNT",
+                    "subjectId": "ca_vcc_card_001",
+                    "tenantId": 1,
+                    "currency": "USD"
                   }
                 }
                 """);
@@ -1460,6 +1075,33 @@ class FundsDslJsonContractTests {
         assertThatThrownBy(() -> FundsDslJsonContractVerifier.verifyTransactionLayerCase(document))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("parentAccountRef must not reference accountRef itself");
+    }
+
+    private JSONObject hierarchyParticipantDocument(String hierarchySnapshot) {
+        return JSON.parseObject("""
+                {
+                  "caseId": "DSL-VCC-ROUTE-HIERARCHY-VALIDATION",
+                  "instruction": {
+                    "instructionType": "AUTHORIZATION_TRANSACTION",
+                    "eventType": "AUTHORIZE",
+                    "transactionType": "PAY",
+                    "amount": { "currency": "USD", "amount": 100 },
+                    "originalAmount": { "currency": "USD", "amount": 100 }
+                  },
+                  "expectedRoute": {
+                    "participants": [{
+                      "participantRole": "PAYER",
+                      "subjectRef": {
+                        "subjectType": "CREDIT_ACCOUNT",
+                        "subjectId": "ca_vcc_card_001",
+                        "tenantId": 1,
+                        "currency": "USD"
+                      },
+                      "accountHierarchySnapshot": %s
+                    }]
+                  }
+                }
+                """.formatted(hierarchySnapshot));
     }
 
     private Path transactionLayerDslDir() {

@@ -956,14 +956,14 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
     }
 
     /**
-     * 场景：原支付交易的 route snapshot 已固化旧支付工具和旧资金责任快照，后续业务侧发生换绑或责任变化。
-     * 输入：付款方充值 100、向收款方付款 70；测试构造原支付快照含 CARD-OLD、ALLOC-OLD，退款请求携带当前规则上下文。
+     * 场景：原支付交易的 route snapshot 已固化旧支付工具和旧路由决策，后续业务侧发生换绑或规则变化。
+     * 输入：付款方充值 100、向收款方付款 70；测试构造原支付快照含 CARD-OLD 和旧路由决策，退款请求携带当前规则上下文。
      * 输出：退款按原支付 RouteSnapshot 回放并生成独立退款交易事实。
-     * 预期：退款交易保存的新 RouteSnapshot 继续保留 CARD-OLD、旧绑定版本和 ALLOC-OLD，不消费当前请求上下文重选路。
+     * 预期：退款交易保存的新 RouteSnapshot 继续保留 CARD-OLD、旧绑定版本和旧路由决策，不消费当前请求上下文重选路。
      * 红线：直接退款引用原交易时不得因当前卡绑定、当前资金责任或当前规则变化改写历史资金路径。
      */
     @Test
-    void testRefundWithReferenceTransactionShouldReuseOriginalInstrumentAndFundingSnapshot() {
+    void testRefundWithReferenceTransactionShouldReuseOriginalInstrumentAndRouteDecision() {
         FundsAccountId payer = fundingAccount("funding_user");
         FundsAccountId payee = fundingAccount("refund_replay_payee");
         ensureLedger(payee, LedgerSubjectCode.SETTLEMENT);
@@ -982,7 +982,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                 "DIRECT_REFUND_REPLAY_BINDING_PAY");
         enrichFundsTransactionRouteSnapshot(payTransactionSn, Map.of(
                 "paymentInstrumentRef", paymentInstrumentSnapshot("CARD-OLD", "BINDING-OLD", "v1"),
-                "routingDecision", routingDecisionSnapshot(payer, 70L, "ALLOC-OLD")));
+                "routingDecision", routingDecisionSnapshot()));
         assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(payTransactionSn))
                 .as("original direct pay route snapshot must carry historical attribution")
                 .hasValueSatisfying(routeSnapshot -> {
@@ -990,13 +990,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(routeSnapshot.getPaymentInstrumentRef().getBindingSnapshot())
                             .containsEntry("bindingId", "BINDING-OLD")
                             .containsEntry("bindingVersion", "v1");
-                    assertThat(routeSnapshot.getRoutingDecision().getFundingAllocations())
-                            .singleElement()
-                            .satisfies(allocation -> {
-                                assertThat(allocation.getAllocationId()).isEqualTo("ALLOC-OLD");
-                                assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo(payer.id());
-                                assertThat(allocation.getAmount()).isEqualTo(Money.immutable(70L, CURRENCY));
-                            });
+                    assertThat(routeSnapshot.getRoutingDecision().getPolicyCode())
+                            .isEqualTo("HISTORICAL_ROUTE_DECISION");
                 });
         BalanceSnapshot afterPay = snapshot(balances(payer, payee, cashMappingAccount(), prepaymentAccount()));
         assertOnlyBalanceDeltas(afterTopup, afterPay,
@@ -1031,8 +1026,8 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REPLAY_BINDING_TOPUP", 3, 4);
         assertSingleFundsAndLedgerFactsForBusinessSn("DIRECT_REFUND_REPLAY_BINDING_PAY", 2, 2);
         assertReferenceRefundFacts("DIRECT_REFUND_REPLAY_BINDING_REFUND", refundTransactionSn, payTransactionSn);
-        assertReferencedRefundRouteSnapshotKeepsHistoricalAttribution("DIRECT_REFUND_REPLAY_BINDING_REFUND",
-                payer);
+        assertReferencedRefundRouteSnapshotKeepsHistoricalAttribution(
+                "DIRECT_REFUND_REPLAY_BINDING_REFUND");
     }
 
     /**
@@ -3846,7 +3841,7 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(routeSnapshot.getTenantId()).isEqualTo(TENANT_ID);
                     assertThat(routeSnapshot.getSnapshotId()).isEqualTo(businessSn + "_ROUTE");
                     assertThat(routeSnapshot.getSnapshotSchemaVersion())
-                            .isEqualTo(FundsRouteCodes.CURRENT_ROUTE_VERSION);
+                            .isEqualTo(FundsRouteCodes.CURRENT_ROUTE_SNAPSHOT_SCHEMA_VERSION);
                     assertThat(routeSnapshot.getRouteCode()).isEqualTo(expectedDirectRouteCode(transaction));
                     assertThat(routeSnapshot.getRouteVersion()).isEqualTo(FundsRouteCodes.CURRENT_ROUTE_VERSION);
                     assertThat(routeSnapshot.getBusinessSn()).isEqualTo(transaction.getBusinessSn());
@@ -3944,55 +3939,19 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
         return result;
     }
 
-    private Map<String, Object> routingDecisionSnapshot(FundsAccountId fundingAccount,
-                                                        long amount,
-                                                        String allocationId) {
+    private Map<String, Object> routingDecisionSnapshot() {
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("policyCode", "HISTORICAL_FUNDING_RESPONSIBILITY");
+        result.put("policyCode", "HISTORICAL_ROUTE_DECISION");
         result.put("matchedRules", List.of("RULE-OLD-BINDING"));
         result.put("selectedProcessor", "processor-old");
         result.put("selectedCashFundingAccount", null);
         result.put("selectedPlatformAccount", null);
-        result.put("fundingAllocations", List.of(fundingAllocationSnapshot(fundingAccount, amount, allocationId)));
-        result.put("decisionReason", "historical funding responsibility snapshot");
+        result.put("decisionReason", "historical route decision snapshot");
         result.put("contextVariables", Map.of("decisionVersion", "v1"));
         return result;
     }
 
-    private Map<String, Object> fundingAllocationSnapshot(FundsAccountId fundingAccount,
-                                                          long amount,
-                                                          String allocationId) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("allocationId", allocationId);
-        result.put("subjectRef", subjectSnapshot(fundingAccount));
-        result.put("ledgerSubjectCode", LedgerSubjectCode.AVAILABLE.name());
-        result.put("amount", moneySnapshot(amount));
-        result.put("priority", 1);
-        result.put("reason", "historical funding allocation snapshot");
-        return result;
-    }
-
-    private Map<String, Object> subjectSnapshot(FundsAccountId accountId) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("tenantId", TENANT_ID);
-        result.put("subjectId", accountId.id());
-        result.put("subjectType", accountId.type());
-        result.put("subjectName", accountId.id());
-        result.put("currency", CURRENCY.name());
-        result.put("ledgerProfileCode", "TEST");
-        result.put("description", "historical subject snapshot");
-        return result;
-    }
-
-    private Map<String, Object> moneySnapshot(long amount) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("amount", amount);
-        result.put("currency", CURRENCY.name());
-        return result;
-    }
-
-    private void assertReferencedRefundRouteSnapshotKeepsHistoricalAttribution(String businessSn,
-                                                                               FundsAccountId fundingAccount) {
+    private void assertReferencedRefundRouteSnapshotKeepsHistoricalAttribution(String businessSn) {
         assertThat(routeSnapshot(businessSn))
                 .as("referenced refund route snapshot must keep historical instrument and funding attribution")
                 .satisfies(routeSnapshot -> {
@@ -4000,17 +3959,10 @@ class FundsDirectTransactionFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(routeSnapshot.getPaymentInstrumentRef().getBindingSnapshot())
                             .containsEntry("bindingId", "BINDING-OLD")
                             .containsEntry("bindingVersion", "v1");
-                    assertThat(routeSnapshot.getRoutingDecision().getFundingAllocations())
-                            .singleElement()
-                            .satisfies(allocation -> {
-                                assertThat(allocation.getAllocationId()).isEqualTo("ALLOC-OLD");
-                                assertThat(allocation.getSubjectRef().getSubjectId())
-                                        .isEqualTo(fundingAccount.id());
-                                assertThat(allocation.getAmount())
-                                        .isEqualTo(Money.immutable(70L, CURRENCY));
-                                assertThat(allocation.getReason())
-                                        .isEqualTo("historical funding allocation snapshot");
-                            });
+                    assertThat(routeSnapshot.getRoutingDecision().getPolicyCode())
+                            .isEqualTo("HISTORICAL_ROUTE_DECISION");
+                    assertThat(routeSnapshot.getRoutingDecision().getContextVariables())
+                            .containsEntry("decisionVersion", "v1");
                     assertThat(routeSnapshot.getContextVariables())
                             .doesNotContainEntry("businessContextVersion", "CURRENT-BINDING-RULE-V2");
                 });

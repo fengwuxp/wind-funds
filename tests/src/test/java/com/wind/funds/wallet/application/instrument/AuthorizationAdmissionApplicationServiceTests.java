@@ -18,6 +18,7 @@ import com.wind.funds.route.CompositeRouteResolver;
 import com.wind.funds.route.DefaultRouteSnapshotFactory;
 import com.wind.funds.route.RefundRouteAdmission;
 import com.wind.funds.route.RouteFeeChargeAppender;
+import com.wind.funds.route.RouteAccountHierarchySnapshotAppender;
 import com.wind.funds.route.TransferFundsInstructionRouteResolver;
 import com.wind.funds.route.enums.FundsSubjectType;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
@@ -84,8 +85,7 @@ import com.wind.funds.wallet.service.SpendRuleDefinitionService;
 import com.wind.funds.wallet.service.SpendRuleDecisionRecordService;
 import com.wind.funds.wallet.service.SpendRuleBindingService;
 import com.wind.funds.wallet.service.SpendSubjectFundingRelationService;
-import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
-import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
+import com.wind.funds.wallet.services.impl.AccountHierarchyRelationServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultLedgerQueryService;
@@ -1283,6 +1283,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             CompositeRouteResolver.class,
             RefundRouteAdmission.class,
             RouteFeeChargeAppender.class,
+            RouteAccountHierarchySnapshotAppender.class,
             DefaultRouteSnapshotFactory.class,
             DefaultLedgerPostingAssembler.class,
             DefaultRoutedFundsInstructionOrchestrator.class,
@@ -1299,8 +1300,7 @@ class AuthorizationAdmissionApplicationServiceTests extends AbstractFundsService
             DefaultFundsTransactionProjectionExplainApplicationService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
-            AccountHierarchyBindingServiceImpl.class,
-            AccountHierarchyServiceImpl.class,
+            AccountHierarchyRelationServiceImpl.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             SpendSubjectFundingRelationServiceImpl.class,

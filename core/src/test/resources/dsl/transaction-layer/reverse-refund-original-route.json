@@ -42,8 +42,8 @@
   },
   "expectedRoute": {
     "routeCode": "DIRECT_REFUND_REPLAY",
-    "routeVersion": "v4",
-    "snapshotSchemaVersion": "route.snapshot.v4",
+    "routeVersion": "v5",
+    "snapshotSchemaVersion": "route.snapshot.v5",
     "replayType": "REFUND",
     "referenceSnapshotId": "RS_PAY_202605130001",
     "legs": [

@@ -23,7 +23,7 @@ public class DefaultRouteSnapshotFactory implements RouteSnapshotFactory {
         return ImmutableRouteSnapshotSpec.builder()
                 .tenantId(resolvedRoute.getTenantId())
                 .snapshotId(resolvedRoute.getBusinessSn() + SNAPSHOT_ID_SUFFIX)
-                .snapshotSchemaVersion(FundsRouteCodes.CURRENT_ROUTE_VERSION)
+                .snapshotSchemaVersion(FundsRouteCodes.CURRENT_ROUTE_SNAPSHOT_SCHEMA_VERSION)
                 .routeCode(resolvedRoute.getRouteCode())
                 .routeVersion(resolvedRoute.getRouteVersion())
                 .businessScene(resolvedRoute.getBusinessScene())

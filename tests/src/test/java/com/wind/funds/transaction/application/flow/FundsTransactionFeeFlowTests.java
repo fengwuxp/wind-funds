@@ -1368,7 +1368,7 @@ class FundsTransactionFeeFlowTests extends FundsTransactionFlowTestSupport {
                     assertThat(routeSnapshot.getRouteCode()).isEqualTo(FundsRouteCodes.DIRECT_REFUND_REPLAY);
                     assertThat(routeSnapshot.getSnapshotId()).isEqualTo(businessSn + "_ROUTE");
                     assertThat(routeSnapshot.getSnapshotSchemaVersion())
-                            .isEqualTo(FundsRouteCodes.CURRENT_ROUTE_VERSION);
+                            .isEqualTo(FundsRouteCodes.CURRENT_ROUTE_SNAPSHOT_SCHEMA_VERSION);
                     assertThat(routeSnapshot.getBusinessSn()).isEqualTo(businessSn);
                     assertThat(routeSnapshot.getEventType()).isEqualTo(FundsTransactionEventType.FEE_REFUND);
                     assertThat(routeSnapshot.getTransactionType()).isEqualTo(DefaultFundsTransactionType.REFUND);

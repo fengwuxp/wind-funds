@@ -285,7 +285,7 @@ Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界�
 | 可解释、可核对、可重建 | 每笔金额都要可解释、可核对、可重建。 | 主体、账户类型、`normalBalanceSide`、账目、金额、币种、route、posting、entry、projection、借贷平衡、余额影响和审计引用。 | 交易、路由、账本、投影、对账和治理模块落点。 | 同时断言状态、余额桶、route snapshot、posting plan、ledger entry、projection、借贷平衡、余额影响、幂等和审计。 | 只断言交易状态、entry 数量、接口不报错或日志存在。 |
 | P0 资金内核 | 钱包、账本、账目、余额投影、对账、清分、清算、结算、归档和账本余额快照。 | 统一资金事实和账务对象。 | 账户账本、清结算对象、governance 逻辑边界和横切红线。 | 资金主线 Red、清结算与治理独立能力域 Red、余额桶断言、对账差错、归档水位、只读边界和失败无副作用。 | P0 能力未闭合就先验证 P2 业务特殊路径。 |
 | P1 交易入口 | 直接交易、授权交易、余额控制和交易投影。 | instruction、event、route snapshot、posting plan 和 projection case。 | 02 分册的服务契约、状态机、表设计和投影任务。 | 直接交易、授权完成/撤销、授权过期无资金副作用、冻结解冻、余额调整、退款、争议裁决资金结果、交易投影和 route replay 测试。 | 授权拒绝、授权过期、余额不足或规则不唯一时仍产生 route、posting、entry 或投影。 |
-| P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账边界只作为业务语义和外部轨道输入；VCC 卡、prepaid virtual card、shared card 只验证支付工具、绑定快照、资金责任解析关系和资金动作映射。 | 归一业务事实、外部引用、状态映射、脱敏证据、规则待确认字段、`PaymentInstrumentRef`、`FundingAllocationDecision` 和 route snapshot。 | 业务能力包准入卡、P0/P1 回归范围、外部规则确认、未覆盖红线、`TDD-RAIL-001A`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011`、`TDD-WALLET-015` 至 `TDD-WALLET-019`。 | 业务状态映射、乱序重复、外部引用脱敏、规则待确认、P0/P1 回归、敏感数据 must-fail、预付资金责任、共享卡绑定快照、应用 facade 准入和内部主体能力选择。 | 业务专项测试绕过统一钱包应用层、账本、清结算、对账或归档链路，或把卡工具/共享卡/预付模式测试成新的账户余额、信用账户或预算主体。 |
+| P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账边界只作为业务语义和外部轨道输入；VCC 卡、prepaid virtual card、shared card 只验证支付工具、绑定快照、资金责任解析关系和资金动作映射。 | 归一业务事实、外部引用、状态映射、脱敏证据、规则待确认字段、`PaymentInstrumentRef`、RouteParticipant、参与方账户层级快照、RouteLeg 和 route snapshot。 | 业务能力包准入卡、P0/P1 回归范围、外部规则确认、未覆盖红线、`TDD-RAIL-001A`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011`、`TDD-WALLET-015` 至 `TDD-WALLET-019`。 | 业务状态映射、乱序重复、外部引用脱敏、规则待确认、P0/P1 回归、敏感数据 must-fail、预付资金责任、共享卡绑定快照、应用 facade 准入和内部主体能力选择。 | 业务专项测试绕过统一钱包应用层、账本、清结算、对账或归档链路，或把卡工具/共享卡/预付模式测试成新的账户余额、信用账户或预算主体。 |
 | 清结算与对账 | 清分、清算、结算、出款、对账、差错、调账核销和追偿。 | 批次、来源事实、规则、差异、审批、凭证和处理动作。 | 03 分册对象状态机、服务 API、表设计、补偿和审计。 | `CLS-GATE-*`、`TDD-B7-RED-*`、服务级 H2 流程、重跑幂等、并发锁、权限审计和差异闭环。 | 清结算、对账或出款只有设计，没有 DDL/H2、服务级流程测试或外部规则确认。 |
 | 归档、重放和指标边界 | 归档、余额重建、交易投影重放、异常人工处理和指标只读边界。 | Manifest、checkpoint、watermark、差异报告、处理动作和指标输入边界。 | 04 分册 governance 逻辑边界、物理落点候选、只读边界和人工处理入口。 | `GOV-GATE-*`、`TDD-B8-RED-*`、dry-run/apply、范围锁、回滚/续跑、指标水位隔离和治理边界测试。 | 用普通指标快照替代余额确认，或让治理任务反写资金事实。 |
 
@@ -293,7 +293,7 @@ Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界�
 
 授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核通过授权后继准入卡承接强制完成、无授权退款、争议裁决资金结果承接和并发竞争；支付工具与 Spend Rule 的生产可用性通过支付工具准入卡承接工具准入、资金责任解析、授权 application facade、Spend Rule 控制和只读投影。支付工具及周边支持队列整体排在账本账目、钱包基础能力和交易内核之后；未形成独立工程边界前，TDD 只能继续做差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
 
-资金责任目标字段已统一为并落地 `targetSubjectType + targetSubjectId`，允许资源关系表达资金账户和信用账户目标主体；平台角色责任主体、完整 `FundingAllocationDecision` 摘要、route snapshot、账户层级快照和回放断言仍需后续工程边界。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`AccountHierarchySnapshot`、`FundingAllocationDecision`、`SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleBinding`、`SpendRuleDecisionRecord` / `SpendRuleDecisionRecord`、`SpendControlMovement` / `SpendControlMovement`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产交付完成。
+资金责任目标字段已统一为并落地 `targetSubjectType + targetSubjectId`，允许资源关系表达资金账户和信用账户目标主体；route snapshot 使用 RouteParticipant、参与方 `AccountHierarchySnapshot` 和 RouteLeg 承载最终主体、直接父账户证据和资金路径，不再维护重复资金分配摘要。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、RouteParticipant、参与方 `AccountHierarchySnapshot`、RouteLeg、`SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleBinding`、`SpendRuleDecisionRecord`、`SpendControlMovement`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产交付完成。
 
 ## 生产验证准入口径
 

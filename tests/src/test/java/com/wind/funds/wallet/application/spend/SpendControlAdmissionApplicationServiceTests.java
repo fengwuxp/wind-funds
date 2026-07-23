@@ -349,7 +349,7 @@ class SpendControlAdmissionApplicationServiceTests extends AbstractFundsServiceT
      * 红线：支持配置但不能解析的 scope 不得静默降级为无适用规则。
      */
     @Test
-    void testResolveSpendControlAdmissionShouldRejectUnresolvedAccountHierarchyBinding() {
+    void testResolveSpendControlAdmissionShouldRejectUnresolvedAccountHierarchyRuleBinding() {
         prepareSpendControlAdmissionData();
         spendRuleDefinitionService.createSpendRuleBinding(createSpendRuleBindingRequest()
                 .setScopeType(SpendRuleScopeType.ACCOUNT_HIERARCHY)

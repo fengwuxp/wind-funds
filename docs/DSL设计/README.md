@@ -102,7 +102,7 @@ DSL 评审口径：DSL 入口必须承接 PRD 的业务目标和资金语义，�
 | 可解释、可核对、可重建 | 每笔资金事实必须有主体、金额、币种、账目、业务引用、规则来源和审计引用。 | 交易、路由、账本、投影、对账和治理分层承接。 | 测试同时断言状态、route snapshot、posting plan、ledger entry、projection、幂等和审计。 | 只有交易状态或错误码，无法证明金额来源和资金路径。 |
 | P0 统一内核 | 钱包、账本、账目、余额投影、对账、清结算和归档使用统一资金事实与账务对象。 | 02、03、04 分册分别落账户账本、对账清算对象和治理对象。 | P0 Red 优先证明账户、账目、余额桶、对账差错、归档水位和只读边界。 | P2 业务在 DSL 中定义平行钱包、账本、清结算、对账或归档对象。 |
 | P1 交易入口 | 直接交易、授权交易、余额控制、交易投影通过 instruction/event/route/posting 组合表达。 | 02 分册落服务入口、状态机、表设计、投影和 route replay。 | TDD 覆盖直接交易、授权完成/撤销/过期、冻结解冻、退款、争议裁决资金结果、重复请求和余额不足。 | 授权拒绝生成 route/entry，冻结表达消费，逆向不按原 route snapshot 回放。 |
-| P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账只传入归一业务事实、外部引用、状态映射和待确认规则；VCC 发卡不新增 `VCC_ACCOUNT`，VCC 卡、prepaid virtual card、shared card 通过 `PaymentInstrumentRef`、绑定快照、`AccountHierarchySnapshot`、Spend Rule 快照和 `FundingAllocationDecision` 表达，并最终解析到资金子账户或信用子账户。 | 业务能力包通过准入卡接入统一资金内核，不改变 P0/P1 边界；VCC 关联子账户、资金账户和信用账户按真实资金、预付余额与授信额度职责入账，父账户默认用于约束和汇总，支出控制范围和 Spend Rule 只按预算 scope、控制窗口、规则决策和审计职责使用；支付工具、资金责任解析和授权准入应由 wallet application facade 或等价 use-case 入口组合。 | TDD 覆盖业务状态映射、乱序重复、外部引用脱敏、规则待确认、P0/P1 回归、`TDD-RAIL-001A`、`TDD-LEDGER-013` 至 `TDD-LEDGER-016`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011`、`TDD-WALLET-015` 至 `TDD-WALLET-019`。 | 业务轨道协议、外部账户、卡组织/银行原始规则、敏感原文沉入资金内核，绕过 application facade 拼装资源服务，或把卡工具、预付资金模式、共享卡绑定模式、父账户汇总、支出控制范围、Spend Rule 当成可入账主体。 |
+| P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账只传入归一业务事实、外部引用、状态映射和待确认规则；VCC 发卡不新增 `VCC_ACCOUNT`，VCC 卡、prepaid virtual card、shared card 通过 `PaymentInstrumentRef`、绑定快照、参与方上的 `AccountHierarchySnapshot`、Spend Rule 快照以及显式 route participant/leg 表达，并最终解析到资金子账户或信用子账户。 | 业务能力包通过准入卡接入统一资金内核，不改变 P0/P1 边界；VCC 关联子账户、资金账户和信用账户按真实资金、预付余额与授信额度职责入账，父账户默认用于约束和汇总，支出控制范围和 Spend Rule 只按预算 scope、控制窗口、规则决策和审计职责使用；支付工具、账户选择和授权准入应由 wallet application facade 或等价 use-case 入口组合。 | TDD 覆盖业务状态映射、乱序重复、外部引用脱敏、规则待确认、P0/P1 回归、`TDD-RAIL-001A`、`TDD-LEDGER-013` 至 `TDD-LEDGER-016`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011`、`TDD-WALLET-015` 至 `TDD-WALLET-019`。 | 业务轨道协议、外部账户、卡组织/银行原始规则、敏感原文沉入资金内核，绕过 application facade 拼装资源服务，或把卡工具、预付资金模式、共享卡绑定模式、父账户汇总、支出控制范围、Spend Rule 当成可入账主体。 |
 | 清结算与对账 | 对账差异、清分、清算、结算、出款和追偿必须保留批次、来源事实、规则和处理证据。 | 03 分册落对象状态机、服务 API、表设计、审批审计和补偿策略。 | `CLS-GATE-*`、`TDD-B7-RED-*`、服务级 H2 流程、并发重跑和失败无副作用测试。 | 对账差异直接改账，出款绕过结算锁定或外部规则核验。 |
 | 归档、重放和指标边界 | Manifest、checkpoint、watermark、差异报告和指标输入都必须表达只读、范围和处理动作。 | 04 分册落 governance 逻辑边界、归档申请、重放任务、差异报告和人工处理。 | `GOV-GATE-*`、`TDD-B8-RED-*`、dry-run/apply、指标水位隔离和治理边界测试。 | 归档改变事实身份，重放重新入账，指标快照替代账本余额确认。 |
 
@@ -111,7 +111,7 @@ DSL 层不新增 `InstrumentTransaction`、`PaymentInstrumentTransaction` 或支
 ```text
 ScenarioFundsOperationContext
   -> externalEventRef / businessPackRef / railRef
-  -> PaymentInstrumentRef / BindingSnapshot / FundingAllocationDecision
+  -> PaymentInstrumentRef / BindingSnapshot / RouteParticipant(AccountHierarchySnapshot)
   -> canonical FundsInstruction / route / posting / ledger
 ```
 
@@ -157,11 +157,11 @@ Highnote 公开发卡文档中的 financial account、ledger、ledger entry、pa
 
 | 设计面 | 对齐口径 | 必须保持 | 工程影响 |
 | --- | --- | --- | --- |
-| DSL 主体约定 | `SubjectRef` 只承载资金账户、信用账户和平台角色解析后的平台资金账户；`PaymentInstrumentRef`、`ExternalAccountRef` 只承载工具、外部账户和脱敏引用；支出控制范围和 Spend Rule 只承载 scope、规则快照、控制窗口和审计上下文。 | 不新增 `InstrumentTransaction`、`PaymentInstrumentTransaction` 或支付工具账务主体；内部余额钱包、平台钱包、商户钱包、返利钱包和信用额度入口先解析为 `SubjectRef`、`BenefitSnapshot`、`FundingAllocationDecision` 或等价不可变快照。 | 触碰 `core` 枚举、Spec、fixture 或公共 DSL 字段时，必须显式声明公共契约边界和 `fixtureLevel`。 |
-| 路由规则 | route resolver 可以消费支付工具快照、绑定快照、`FundingAllocationDecision`、支出控制范围上下文和 Spend Rule 决策，但 route leg participant 必须是最终可入账主体。 | 工具不可用、资金责任不唯一、错币种、预算或规则拒绝时不生成 route；退款、撤销、拒付、退费和重放优先沿原 route snapshot。 | 支付工具入口、资金责任解析和交易投影应分别形成独立任务，不借直接交易红线附带修改。 |
+| DSL 主体约定 | `SubjectRef` 只承载资金账户、信用账户和平台角色解析后的平台资金账户；`PaymentInstrumentRef`、`ExternalAccountRef` 只承载工具、外部账户和脱敏引用；支出控制范围和 Spend Rule 只承载 scope、规则快照、控制窗口和审计上下文。 | 不新增 `InstrumentTransaction`、`PaymentInstrumentTransaction` 或支付工具账务主体；内部余额钱包、平台钱包、商户钱包、返利钱包和信用额度入口先解析为 `SubjectRef`、`BenefitSnapshot` 或显式 route participant/leg。 | 触碰 `core` 枚举、Spec、fixture 或公共 DSL 字段时，必须显式声明公共契约边界和 `fixtureLevel`。 |
+| 路由规则 | route resolver 可以消费支付工具快照、绑定快照、账户层级关系、支出控制范围上下文和 Spend Rule 决策；`RoutingDecision` 只解释路径选择，最终资金或额度承担主体必须由 route participant/leg 显式表达。 | 工具不可用、目标主体不唯一、错币种、预算或规则拒绝时不生成 route；退款、撤销、拒付、退费和重放优先沿原 route snapshot。 | 支付工具入口、账户选择和交易投影应分别形成独立任务，不借直接交易红线附带修改。 |
 | 账目平衡 | `PostingPlan` 只从已解析 route 生成；`LedgerEntry.subject` 只能是资金账户、信用账户或平台角色解析后的平台资金账户；每个 posting plan 按同币种独立平衡。 | 支出控制范围、Spend Rule、支付工具、外部账户和交易投影不得生成 ledger bucket；预算控制只生成控制证据、规则证据或只读投影视图。 | 触碰 posting assembler、账本 DSL 或账务表行时，必须补借贷平衡、`normalBalanceSide`、余额桶和 forbidden facts 断言。 |
 | 余额投影 | 账本余额投影只从 ledger entry 派生，面向资金账户、信用账户和平台角色解析后的平台资金账户；余额日志只作为观察证据。预算控制视图从 `SpendControlMovement` 派生，`remainingControlAmount` 兼容表示未终局释放的控制占用，`availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`。 | 不从支付工具、支出控制范围、Spend Rule、交易投影或业务轨道事件直接投影账本余额；预算控制可有独立控制视图，但不等于账本余额。 | SpendControlScope 兼容策略、预算控制视图和余额查询迁移必须拆成独立任务。 |
-| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、`FundingAllocationDecision`、已固化 `spendRuleDecision` 快照、既有控制额度变动流水、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、支出控制范围、Spend Rule 查询或过滤。支付工具型交易解释只能读取已固化的 `paymentInstrumentRef` 和 binding snapshot；Spend Rule 解释只能读取已固化的规则、版本、挂载、决策记录和控制额度变动引用。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实；不得按当前工具绑定、当前规则定义或当前规则挂载重新解释历史交易，也不得在解释阶段执行规则 DSL 或脚本。 | 不得用交易投影通过来声明账务事实、余额投影或生产交付完成；补支付工具解释时必须验证脱敏展示号、绑定版本、准入决策和敏感原文不外泄；补 Spend Rule 解释时必须验证规则版本、挂载版本、决策流水和拒绝原因可追溯，并证明 ruleSpec/script 不外泄。 |
+| 交易投影 | 交易投影是只读查询模型，从交易事实、冻结单、route snapshot、`paymentInstrumentRef`、参与方账户层级快照、已固化 `spendRuleDecision` 快照、既有控制额度变动流水、账本摘要、授权拒绝事实、清结算和对账差错生成；可以按支付工具、账户、支出控制范围、Spend Rule 查询或过滤。支付工具型交易解释只能读取已固化的 `paymentInstrumentRef`、binding snapshot 和 route participant；Spend Rule 解释只能读取已固化的规则、版本、挂载、决策记录和控制额度变动引用。 | 交易投影不能作为资金来源、入账主体、路由事实或余额事实；重投影只能重建读模型，不得反写 route、posting、entry 或 balance；授权拒绝只能形成拒绝解释，不生成资金事实；不得按当前工具绑定、当前账户层级、当前规则定义或当前规则挂载重新解释历史交易，也不得在解释阶段执行规则 DSL 或脚本。 | 不得用交易投影通过来声明账务事实、余额投影或生产交付完成；补支付工具解释时必须验证脱敏展示号、绑定版本、准入决策和敏感原文不外泄；补 Spend Rule 解释时必须验证规则版本、挂载版本、决策流水和拒绝原因可追溯，并证明 ruleSpec/script 不外泄。 |
 
 ### Spend Rule DSL v1.1 规则版本、挂载和决策证据
 

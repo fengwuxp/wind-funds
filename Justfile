@@ -47,7 +47,7 @@ verify-codegen:
         ledger/impl/target/classes/com/wind/funds/ledger/dal/entities/table/LedgerNameRefs.class
         transaction/impl/target/classes/com/wind/funds/transaction/dal/entities/table/FundsTransactionNameRefs.class
         wallet/impl/target/classes/com/wind/funds/wallet/dal/entities/table/PaymentInstrumentBindingNameRefs.class
-        wallet/impl/target/classes/com/wind/funds/wallet/mapstruct/AccountHierarchyBindingConverterImpl.class
+        wallet/impl/target/classes/com/wind/funds/wallet/mapstruct/AccountHierarchyRelationConverterImpl.class
     )
     missing=()
     for file in "${required[@]}"; do
@@ -114,7 +114,7 @@ test-business-flow tests='FundsDirectTransactionFlowTests,FundsAuthorizationTran
     @just _run-test-classes "{{tests}}" tests
 
 # Contract, route, wallet, and module dependency boundary tests.
-test-boundary tests='FundsContextVariablesContractTests,FundsTransactionParticipantContractTests,FundsTransactionRequestContextVariablesContractTests,LedgerBalanceChangedEventContractTests,LedgerDtoContextVariablesContractTests,SensitiveContextVariablesValidatorTests,RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,RouteResolverFactBoundaryTests,FundingAccountServiceImplTests,LedgerProfileContractTests,ControlAccountLedgerInitializationTests,PaymentInstrumentServiceImplTests,SpendSubjectFundingRelationServiceImplTests,PlatformFundingAccountServiceImplTests,FundsSubjectBalanceQueryServiceImplTests,WalletLayerBoundaryTests,FundsModuleDependencyBoundaryTests':
+test-boundary tests='FundsContextVariablesContractTests,FundsTransactionParticipantContractTests,FundsTransactionRequestContextVariablesContractTests,LedgerBalanceChangedEventContractTests,LedgerDtoContextVariablesContractTests,SensitiveContextVariablesValidatorTests,RouteDslContractTests,PaymentInstrumentRouteDslContractTests,PostingLedgerDslContractTests,DefaultRouteReplayServiceTests,CompositeRouteResolverTests,AuthorizationFundsInstructionRouteResolverTests,RouteResolverFactBoundaryTests,RouteParticipantHierarchySnapshotTests,RouteAccountHierarchySnapshotAppenderTests,AccountHierarchyRelationContractTests,AccountHierarchyRelationServiceImplTests,FundingAccountServiceImplTests,LedgerProfileContractTests,ControlAccountLedgerInitializationTests,PaymentInstrumentServiceImplTests,SpendSubjectFundingRelationServiceImplTests,PlatformFundingAccountServiceImplTests,FundsSubjectBalanceQueryServiceImplTests,WalletLayerBoundaryTests,FundsModuleDependencyBoundaryTests':
     @just _run-test-classes "{{tests}}" tests
 
 # Governance projection replay boundary tests.
@@ -129,7 +129,7 @@ test-reconciliation tests='ClearingSplittableDetailApplicationServiceTests,Clear
 verify-fast: mvn-version compile test-boundary test-governance test-reconciliation
 
 # Full CAD verification for the rebuilt payment funds test baseline.
-verify-cad: mvn-version clean-compile test-core test-fx test-ledger test-transaction test-balance-control test-business-flow test-boundary test-governance test-reconciliation pmd verify-classfiles verify-codegen
+verify-cad: mvn-version clean-compile test-module pmd verify-classfiles verify-codegen
 
 # Install reactor snapshots locally when Maven plugin resolution needs local artifacts.
 install-snapshots:

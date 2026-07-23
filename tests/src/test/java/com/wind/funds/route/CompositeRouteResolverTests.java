@@ -114,7 +114,9 @@ class CompositeRouteResolverTests {
                 new RouteFeeChargeAppender(
                         new RouteParticipantFactory(),
                         new PlatformAccountRouteSupport(unexpectedPlatformAccountService()),
-                        accountQueryService));
+                        accountQueryService),
+                new RouteAccountHierarchySnapshotAppender(
+                        org.mockito.Mockito.mock(com.wind.funds.wallet.service.AccountHierarchyRelationService.class)));
     }
 
     private FundsAccountQueryService unexpectedAccountQueryService() {

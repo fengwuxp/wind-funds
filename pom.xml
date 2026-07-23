@@ -18,6 +18,7 @@
 
     <properties>
         <revision>1.0.0-jdk21-SNAPSHOT</revision>
+        <test.ignore.failure>false</test.ignore.failure>
     </properties>
 
     <modules>

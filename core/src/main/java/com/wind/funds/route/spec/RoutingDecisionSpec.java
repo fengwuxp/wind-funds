@@ -36,11 +36,6 @@ public interface RoutingDecisionSpec {
         return null;
     }
 
-    @NonNull
-    default List<FundingAllocationDecisionSpec> getFundingAllocations() {
-        return List.of();
-    }
-
     @Nullable
     default String getDecisionReason() {
         return null;

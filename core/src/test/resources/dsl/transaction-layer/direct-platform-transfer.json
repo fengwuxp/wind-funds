@@ -33,8 +33,8 @@
   },
   "expectedRoute": {
     "routeCode": "INTERNAL_TRANSFER_STANDARD",
-    "routeVersion": "v4",
-    "snapshotSchemaVersion": "route.snapshot.v4",
+    "routeVersion": "v5",
+    "snapshotSchemaVersion": "route.snapshot.v5",
     "participants": [
       {
         "participantRole": "PAYER",

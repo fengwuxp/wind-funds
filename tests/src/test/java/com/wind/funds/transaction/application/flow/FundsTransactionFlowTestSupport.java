@@ -29,6 +29,7 @@ import com.wind.funds.route.DefaultRouteReplayService;
 import com.wind.funds.route.DefaultRouteSnapshotFactory;
 import com.wind.funds.route.RefundRouteAdmission;
 import com.wind.funds.route.RouteFeeChargeAppender;
+import com.wind.funds.route.RouteAccountHierarchySnapshotAppender;
 import com.wind.funds.route.TransferFundsInstructionRouteResolver;
 import com.wind.funds.route.support.PlatformAccountRouteSupport;
 import com.wind.funds.route.support.RouteParticipantFactory;
@@ -85,14 +86,13 @@ import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.entities.table.FundingAccountNameRefs;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
-import com.wind.funds.wallet.model.request.CreateAccountHierarchyBindingRequest;
+import com.wind.funds.wallet.model.request.CreateAccountHierarchyRelationRequest;
 import com.wind.funds.wallet.model.request.CreateSpendControlScopeRequest;
 import com.wind.funds.wallet.model.request.CreateCreditAccountRequest;
-import com.wind.funds.wallet.service.AccountHierarchyService;
+import com.wind.funds.wallet.service.AccountHierarchyRelationService;
 import com.wind.funds.wallet.service.SpendControlScopeService;
 import com.wind.funds.wallet.service.CreditAccountService;
-import com.wind.funds.wallet.services.impl.AccountHierarchyBindingServiceImpl;
-import com.wind.funds.wallet.services.impl.AccountHierarchyServiceImpl;
+import com.wind.funds.wallet.services.impl.AccountHierarchyRelationServiceImpl;
 import com.wind.funds.wallet.services.impl.SpendControlScopeServiceImpl;
 import com.wind.funds.wallet.services.impl.CreditAccountServiceImpl;
 import com.wind.funds.wallet.services.impl.DefaultFundsAccountQueryServiceImpl;
@@ -174,7 +174,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             "t_funds_frozen_order",
             "t_funds_transaction_detail",
             "t_funds_transaction",
-            "t_account_hierarchy_binding",
+            "t_account_hierarchy_relation",
             "t_funding_account",
             "t_credit_account",
             "t_spend_control_scope",
@@ -199,7 +199,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     protected CreditAccountService creditAccountService;
 
     @Autowired
-    protected AccountHierarchyService accountHierarchyService;
+    protected AccountHierarchyRelationService accountHierarchyRelationService;
 
     @Autowired
     protected SpendControlScopeService spendControlScopeService;
@@ -424,15 +424,11 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
     }
 
     protected void bindAccountHierarchy(FundsAccountId accountId,
-                                        FundsAccountId parentAccountId,
-                                        String businessSn) {
-        accountHierarchyService.createAccountHierarchyBinding(new CreateAccountHierarchyBindingRequest()
-                .setSn("AH_" + businessSn)
+                                        FundsAccountId parentAccountId) {
+        accountHierarchyRelationService.createAccountHierarchyRelation(new CreateAccountHierarchyRelationRequest()
                 .setTenantId(TENANT_ID)
                 .setAccountId(accountId)
-                .setParentAccountId(parentAccountId)
-                .setCurrency(CURRENCY)
-                .setOperatorId("flow-test"));
+                .setParentAccountId(parentAccountId), WindOperatorFactory.system());
     }
 
     protected void adjustBalance(FundsAccountId accountId, long amount, boolean increase, String businessSn) {
@@ -1324,6 +1320,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultRouteReplayService.class,
             RefundRouteAdmission.class,
             RouteFeeChargeAppender.class,
+            RouteAccountHierarchySnapshotAppender.class,
             TransferFundsInstructionRouteResolver.class,
             BalanceControlFundsInstructionRouteResolver.class,
             AuthorizationFundsInstructionRouteResolver.class,
@@ -1346,8 +1343,7 @@ abstract class FundsTransactionFlowTestSupport extends AbstractFundsServiceTest 
             DefaultFundsTransactionQueryService.class,
             DefaultLedgerProfileServiceImpl.class,
             DefaultSubjectLedgerInitializer.class,
-            AccountHierarchyBindingServiceImpl.class,
-            AccountHierarchyServiceImpl.class,
+            AccountHierarchyRelationServiceImpl.class,
             FundingAccountServiceImpl.class,
             CreditAccountServiceImpl.class,
             SpendControlScopeServiceImpl.class,

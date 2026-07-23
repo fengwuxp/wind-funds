@@ -60,15 +60,15 @@ CREATE TABLE `t_credit_account`
   DEFAULT CHARSET = utf8mb4 COMMENT = '信用账户表';
 
 -- ----------------------------
--- 账户层级绑定表
+-- 账户层级关系表
 -- ----------------------------
-DROP TABLE IF EXISTS `t_account_hierarchy_binding`;
-CREATE TABLE `t_account_hierarchy_binding`
+DROP TABLE IF EXISTS `t_account_hierarchy_relation`;
+CREATE TABLE `t_account_hierarchy_relation`
 (
     `id`                     BIGINT(20)  NOT NULL AUTO_INCREMENT COMMENT '主键',
     `gmt_create`             DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `gmt_modified`           DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
-    `sn`                     VARCHAR(64) NOT NULL COMMENT '绑定号，全局唯一',
+    `sn`                     VARCHAR(64) NOT NULL COMMENT '关系号，全局唯一',
     `tenant_id`              BIGINT(20)  NOT NULL COMMENT '租户 ID',
     `account_id`             VARCHAR(64) NOT NULL COMMENT '子账户 ID',
     `account_type`           VARCHAR(50) NOT NULL COMMENT '子账户主体类型',
@@ -76,14 +76,13 @@ CREATE TABLE `t_account_hierarchy_binding`
     `parent_account_type`    VARCHAR(50) NOT NULL COMMENT '父账户主体类型',
     `currency`               VARCHAR(10) NOT NULL COMMENT '币种',
     `operator_id`            VARCHAR(64)          DEFAULT NULL COMMENT '操作者',
-    `context_variables`      TEXT                 DEFAULT NULL COMMENT '扩展上下文',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_account_hierarchy_binding_sn` (`sn`),
-    UNIQUE KEY `uk_account_hierarchy_binding_account` (`tenant_id`, `account_type`, `account_id`),
-    KEY `idx_account_hierarchy_binding_account` (`tenant_id`, `account_type`, `account_id`),
-    KEY `idx_account_hierarchy_binding_parent` (`tenant_id`, `parent_account_type`, `parent_account_id`)
+    UNIQUE KEY `uk_account_hierarchy_relation_sn` (`sn`),
+    UNIQUE KEY `uk_account_hierarchy_relation_account` (`tenant_id`, `account_type`, `account_id`),
+    KEY `idx_account_hierarchy_relation_account` (`tenant_id`, `account_type`, `account_id`),
+    KEY `idx_account_hierarchy_relation_parent` (`tenant_id`, `parent_account_type`, `parent_account_id`)
 ) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4 COMMENT = '账户层级绑定表';
+  DEFAULT CHARSET = utf8mb4 COMMENT = '账户层级关系表';
 
 -- ----------------------------
 -- 支出控制范围表

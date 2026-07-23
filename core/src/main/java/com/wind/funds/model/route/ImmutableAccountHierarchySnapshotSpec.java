@@ -6,50 +6,34 @@ import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
 import lombok.Builder;
 import lombok.experimental.FieldNameConstants;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
-
-import java.util.Map;
-import java.util.Objects;
 
 /**
  * 不可变账户层级快照实现。
  */
 @Builder
 @FieldNameConstants
-public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
-                                                    @Nullable SubjectRef parentAccountRef,
-                                                    Map<String, Object> contextVariables)
+public record ImmutableAccountHierarchySnapshotSpec(String relationSn,
+                                                    SubjectRef parentAccountRef)
         implements AccountHierarchySnapshotSpec {
 
     public ImmutableAccountHierarchySnapshotSpec {
-        requireAccountSubject(accountRef, "account hierarchy");
-        requireOptionalAccountSubject(parentAccountRef, "parent account");
-        requireCompatibleRelation(accountRef, parentAccountRef, "parent account");
-        contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "accountHierarchySnapshot");
+        if (relationSn == null || relationSn.isBlank()) {
+            throw new IllegalArgumentException("accountHierarchySnapshot relationSn is required");
+        }
+        requireAccountSubject(parentAccountRef, "parent account");
     }
 
     @Override
-    public @NonNull SubjectRef getAccountRef() {
-        return accountRef;
+    public @NonNull String getRelationSn() {
+        return relationSn;
     }
 
     @Override
-    public @Nullable SubjectRef getParentAccountRef() {
+    public @NonNull SubjectRef getParentAccountRef() {
         return parentAccountRef;
     }
 
-    @Override
-    public @NonNull Map<String, Object> getContextVariables() {
-        return contextVariables;
-    }
-
-    private static void requireOptionalAccountSubject(@Nullable SubjectRef subjectRef, String label) {
-        if (subjectRef != null) {
-            requireAccountSubject(subjectRef, label);
-        }
-    }
-
-    private static void requireAccountSubject(@Nullable SubjectRef subjectRef, String label) {
+    private static void requireAccountSubject(SubjectRef subjectRef, String label) {
         if (subjectRef == null
                 || subjectRef.getSubjectId() == null
                 || subjectRef.getSubjectId().isBlank()) {
@@ -59,32 +43,5 @@ public record ImmutableAccountHierarchySnapshotSpec(SubjectRef accountRef,
                 && subjectRef.getSubjectType() != FundsSubjectType.CREDIT_ACCOUNT) {
             throw new IllegalArgumentException(label + " subject must be funding or credit account");
         }
-    }
-
-    private static void requireCompatibleRelation(SubjectRef accountRef,
-                                                  @Nullable SubjectRef relationRef,
-                                                  String label) {
-        if (relationRef == null) {
-            return;
-        }
-        if (sameAccount(accountRef, relationRef)) {
-            throw new IllegalArgumentException(label + " must not reference account itself");
-        }
-        if (!compatible(accountRef.getTenantId(), relationRef.getTenantId())) {
-            throw new IllegalArgumentException(label + " tenant must match account tenant");
-        }
-        if (!compatible(accountRef.getCurrency(), relationRef.getCurrency())) {
-            throw new IllegalArgumentException(label + " currency must match account currency");
-        }
-    }
-
-    private static boolean sameAccount(SubjectRef accountRef, SubjectRef relationRef) {
-        return accountRef.getSubjectType() == relationRef.getSubjectType()
-                && Objects.equals(accountRef.getSubjectId(), relationRef.getSubjectId())
-                && compatible(accountRef.getTenantId(), relationRef.getTenantId());
-    }
-
-    private static boolean compatible(@Nullable Object left, @Nullable Object right) {
-        return left == null || right == null || Objects.equals(left, right);
     }
 }

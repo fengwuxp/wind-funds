@@ -8,10 +8,8 @@ import com.wind.funds.ledger.enums.LedgerBalanceConstraintType;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.model.route.ImmutableAccountHierarchyFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutableAccountHierarchySnapshotSpec;
 import com.wind.funds.model.route.ImmutableExternalAccountRefSpec;
-import com.wind.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.model.route.ImmutablePlatformAccountsSnapshotSpec;
 import com.wind.funds.model.route.ImmutableRoutingDecisionSpec;
@@ -30,7 +28,6 @@ import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.AccountHierarchySnapshotSpec;
-import com.wind.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
@@ -168,6 +165,8 @@ final class RouteSnapshotJsonSupport {
         values.put(ImmutableRouteParticipantSpec.Fields.currency, participant.getCurrency());
         values.put(ImmutableRouteParticipantSpec.Fields.amount, moneySummary(participant.getAmount()));
         values.put(ImmutableRouteParticipantSpec.Fields.description, participant.getDescription());
+        values.put(ImmutableRouteParticipantSpec.Fields.accountHierarchySnapshot,
+                accountHierarchySnapshotSummary(participant.getAccountHierarchySnapshot()));
         values.put(ImmutableRouteParticipantSpec.Fields.contextVariables,
                 sortedMap(participant.getContextVariables()));
         return values;
@@ -222,30 +221,9 @@ final class RouteSnapshotJsonSupport {
                 routingDecision.getSelectedCashFundingAccount());
         values.put(ImmutableRoutingDecisionSpec.Fields.selectedPlatformAccount,
                 routingDecision.getSelectedPlatformAccount());
-        values.put(ImmutableRoutingDecisionSpec.Fields.fundingAllocations, routingDecision.getFundingAllocations()
-                .stream()
-                .map(RouteSnapshotJsonSupport::fundingAllocationSummary)
-                .toList());
         values.put(ImmutableRoutingDecisionSpec.Fields.decisionReason, routingDecision.getDecisionReason());
         values.put(ImmutableRoutingDecisionSpec.Fields.contextVariables,
                 sortedMap(routingDecision.getContextVariables()));
-        return values;
-    }
-
-    private static Map<String, Object> fundingAllocationSummary(FundingAllocationDecisionSpec fundingAllocation) {
-        Map<String, Object> values = new TreeMap<>();
-        values.put(ImmutableFundingAllocationDecisionSpec.Fields.allocationId,
-                fundingAllocation.getAllocationId());
-        values.put(ImmutableFundingAllocationDecisionSpec.Fields.subjectRef,
-                subjectSummary(fundingAllocation.getSubjectRef()));
-        values.put(ImmutableFundingAllocationDecisionSpec.Fields.ledgerSubjectCode,
-                enumName(fundingAllocation.getLedgerSubjectCode()));
-        values.put(ImmutableFundingAllocationDecisionSpec.Fields.amount,
-                moneySummary(fundingAllocation.getAmount()));
-        values.put(ImmutableAccountHierarchyFundingAllocationDecisionSpec.Fields.accountHierarchySnapshot,
-                accountHierarchySnapshotSummary(fundingAllocation.getAccountHierarchySnapshot()));
-        values.put(ImmutableFundingAllocationDecisionSpec.Fields.priority, fundingAllocation.getPriority());
-        values.put(ImmutableFundingAllocationDecisionSpec.Fields.reason, fundingAllocation.getReason());
         return values;
     }
 
@@ -254,12 +232,9 @@ final class RouteSnapshotJsonSupport {
         if (snapshot == null) {
             return values;
         }
-        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.accountRef,
-                subjectSummary(snapshot.getAccountRef()));
+        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.relationSn, snapshot.getRelationSn());
         values.put(ImmutableAccountHierarchySnapshotSpec.Fields.parentAccountRef,
                 subjectSummary(snapshot.getParentAccountRef()));
-        values.put(ImmutableAccountHierarchySnapshotSpec.Fields.contextVariables,
-                sortedMap(snapshot.getContextVariables()));
         return values;
     }
 
@@ -349,6 +324,8 @@ final class RouteSnapshotJsonSupport {
                     .currency(value.getString(ImmutableRouteParticipantSpec.Fields.currency))
                     .amount(parseMoney(value.getJSONObject(ImmutableRouteParticipantSpec.Fields.amount)))
                     .description(value.getString(ImmutableRouteParticipantSpec.Fields.description))
+                    .accountHierarchySnapshot(parseAccountHierarchySnapshot(value.getJSONObject(
+                            ImmutableRouteParticipantSpec.Fields.accountHierarchySnapshot)))
                     .contextVariables(parseObjectMap(value.getJSONObject(
                             ImmutableRouteParticipantSpec.Fields.contextVariables)))
                     .build());
@@ -485,52 +462,10 @@ final class RouteSnapshotJsonSupport {
                         ImmutableRoutingDecisionSpec.Fields.selectedCashFundingAccount))
                 .selectedPlatformAccount(value.getString(
                         ImmutableRoutingDecisionSpec.Fields.selectedPlatformAccount))
-                .fundingAllocations(parseFundingAllocations(value.getJSONArray(
-                        ImmutableRoutingDecisionSpec.Fields.fundingAllocations)))
                 .decisionReason(value.getString(ImmutableRoutingDecisionSpec.Fields.decisionReason))
                 .contextVariables(parseObjectMap(value.getJSONObject(
                         ImmutableRoutingDecisionSpec.Fields.contextVariables)))
                 .build();
-    }
-
-    private static List<FundingAllocationDecisionSpec> parseFundingAllocations(JSONArray values) {
-        if (CollectionUtils.isEmpty(values)) {
-            return List.of();
-        }
-        List<FundingAllocationDecisionSpec> result = new ArrayList<>(values.size());
-        for (Object item : values) {
-            JSONObject value = (JSONObject) item;
-            AccountHierarchySnapshotSpec accountHierarchySnapshot = parseAccountHierarchySnapshot(value.getJSONObject(
-                    ImmutableAccountHierarchyFundingAllocationDecisionSpec.Fields.accountHierarchySnapshot));
-            SubjectRef subjectRef = parseSubjectRef(value.getJSONObject(
-                    ImmutableFundingAllocationDecisionSpec.Fields.subjectRef));
-            LedgerSubjectCode ledgerSubjectCode = parseLedgerSubjectCode(value.getString(
-                    ImmutableFundingAllocationDecisionSpec.Fields.ledgerSubjectCode));
-            Money amount = parseMoney(value.getJSONObject(ImmutableFundingAllocationDecisionSpec.Fields.amount));
-            Integer priority = value.getInteger(ImmutableFundingAllocationDecisionSpec.Fields.priority);
-            String reason = value.getString(ImmutableFundingAllocationDecisionSpec.Fields.reason);
-            if (accountHierarchySnapshot == null) {
-                result.add(ImmutableFundingAllocationDecisionSpec.builder()
-                        .allocationId(value.getString(ImmutableFundingAllocationDecisionSpec.Fields.allocationId))
-                        .subjectRef(subjectRef)
-                        .ledgerSubjectCode(ledgerSubjectCode)
-                        .amount(amount)
-                        .priority(priority)
-                        .reason(reason)
-                        .build());
-            } else {
-                result.add(ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
-                        .allocationId(value.getString(ImmutableFundingAllocationDecisionSpec.Fields.allocationId))
-                        .subjectRef(subjectRef)
-                        .ledgerSubjectCode(ledgerSubjectCode)
-                        .amount(amount)
-                        .accountHierarchySnapshot(accountHierarchySnapshot)
-                        .priority(priority)
-                        .reason(reason)
-                        .build());
-            }
-        }
-        return List.copyOf(result);
     }
 
     private static @Nullable AccountHierarchySnapshotSpec parseAccountHierarchySnapshot(JSONObject value) {
@@ -538,12 +473,9 @@ final class RouteSnapshotJsonSupport {
             return null;
         }
         return ImmutableAccountHierarchySnapshotSpec.builder()
-                .accountRef(parseSubjectRef(value.getJSONObject(
-                        ImmutableAccountHierarchySnapshotSpec.Fields.accountRef)))
+                .relationSn(value.getString(ImmutableAccountHierarchySnapshotSpec.Fields.relationSn))
                 .parentAccountRef(parseSubjectRef(value.getJSONObject(
                         ImmutableAccountHierarchySnapshotSpec.Fields.parentAccountRef)))
-                .contextVariables(parseObjectMap(value.getJSONObject(
-                        ImmutableAccountHierarchySnapshotSpec.Fields.contextVariables)))
                 .build();
     }
 
@@ -556,10 +488,6 @@ final class RouteSnapshotJsonSupport {
             result.add(String.valueOf(value));
         }
         return List.copyOf(result);
-    }
-
-    private static LedgerSubjectCode parseLedgerSubjectCode(String value) {
-        return StringUtils.hasText(value) ? LedgerSubjectCode.valueOf(value) : null;
     }
 
     private static PlatformAccountsSnapshotSpec parsePlatformAccounts(JSONObject value) {

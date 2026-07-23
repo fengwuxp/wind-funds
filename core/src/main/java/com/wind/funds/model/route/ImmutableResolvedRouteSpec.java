@@ -52,7 +52,6 @@ public record ImmutableResolvedRouteSpec(@Nullable Long tenantId,
                 eventType,
                 transactionType,
                 resolvedAt);
-        RouteAmountClosureValidator.validateCoreAccountClosure(legs, routingDecision);
         contextVariables = RouteContextVariablesValidator.immutableContext(contextVariables, "resolvedRoute");
     }
 

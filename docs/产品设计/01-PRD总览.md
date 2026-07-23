@@ -471,7 +471,7 @@ mindmap
 | P1 | 交易接入 | 交易入口和资金事实链起点，承接直接交易、授权交易、余额控制和幂等。 | `transaction-face`、`transaction-impl`、`core` 指令和枚举。 | 记录资金侧事实、生命周期和请求摘要；不替代业务订单、外部通道状态机或运营工单。 | `AC-IN-*`、`AC-OUT-*`、`AC-PAY-*`、`AC-AUTH-*`、`AC-CTRL-*`；`TDD-DIR-*`、`TDD-AUTH-*`、`TDD-CTRL-*`。 |
 | P1 | 权益语义 | 交易入口上的已决策权益结果，解释谁给谁让了多少钱、订单金额、用户实付、商户应收、零实付准入、退款处置、使用者解释视图和证据边界。 | `FundsBenefitContributionTransactionService`、让利出资记账交易请求、交易事实、route snapshot、posting context；历史 `benefitSnapshotId` 和 `stableDigest` 仅作为只读摘要追溯字段。 | 只承接订单、业务系统或营销权益系统已决策结果；真实入账让利出资才进入该服务；不计算券规则、不维护券包生命周期、不保存券或活动来源归因、不用当前规则重算历史权益；不恢复 `FundsInstruction.benefitSnapshot` 或旧权益快照 DSL；含权益生产批次必须先完成权益准入证明、使用者解释视图、证据最小化和外部规则核验状态。 | `AC-BEN-*`、`RED-050` 至 `RED-066`；`DSL-BENEFIT-*`；`TDD-BEN-*`、`TDD-BEN-RED-*`。 |
 | P1 | 权益营销账户 | 已决策权益中有资金、负债、成本或清结算影响的金额组件的账户化承接。 | 资金账户或平台责任资金账户 profile、`costBearerSubjectRef`、`benefitReceiverSubjectRef`、原订单或原交易引用和 posting context。 | 非入账组件可做账户化归因和统计但不生成分录；真实入账让利出资、释放或冲回才可进入 route/posting；不承接营销规则计算或券包生命周期；进入编码前必须确认账户 profile、专业确认状态、事实源和退款回放策略。 | `DSL-BENEFIT-MARKETING-ACCOUNT-001`；`TDD-BEN-MKT-*`、`TDD-BEN-RED-031` 至 `TDD-BEN-RED-033`。 |
-| P1 | 资金路由 | 资金事实到参与方、账目、账本周期和 route snapshot 的转译层。 | `RouteResolver`、`RouteSnapshot`、`FundingAllocationDecision`。 | 只解析路径和固化决策；不写交易事实、不写账本分录、不在缺快照时重新选路。 | `AC-ROUTE-*`、`RED-043` 至 `RED-045`；`TDD-ROUTE-*`、`TDD-RED-003`。 |
+| P1 | 资金路由 | 资金事实到参与方、账目、账本周期和 route snapshot 的转译层。 | `RouteResolver`、`RouteSnapshot`、`RouteParticipant`、`RouteLeg`、`RoutingDecision`。 | 只解析路径和固化决策；最终资金或额度主体由参与方和路径段显式表达，不写交易事实、不写账本分录、不在缺快照时重新选路。 | `AC-ROUTE-*`、`RED-043` 至 `RED-045`；`TDD-ROUTE-*`、`TDD-RED-003`。 |
 | P1 | 交易投影 | 用户账单、商户账单、运营时间线、财务核对视图和指标项输入。 | transaction projection、reporting metric input boundary。 | 只读派生和可重放；不能写交易、路由、账本、余额事实、清结算对象、正式财务报表或监管报送。 | `AC-VIEW-*`、`AC-RPT-*`；`TDD-VIEW-*`、`TDD-METRIC-*`。 |
 | P1 | 指标项输入 | 指标项、业务问题、使用者、推荐事实来源和只读边界。 | reporting metric input boundary；报表指标模块另行承接。 | 指标只读观察，不推进余额水位或替代 Manifest，不反写资金事实。 | `AC-RPT-*`、`TDD-METRIC-*`。 |
 | P2 | 三类业务补充 | VCC 发卡、全球账户收付款和收单业务的场景语义补充。 | 场景交易 capability pack、业务 PRD 06/07/08 和对应业务专项验收。 | 复用 P0/P1 能力，不改变钱包、账本、账目、清结算、对账和归档统一实现边界。 | 06/07/08 的业务验收、对应 TDD 扩展用例和外部规则待确认项。 |
@@ -490,7 +490,7 @@ mindmap
 | 支出控制范围 | 预算归属范围、支出控制对象和预算视图。 | `SpendControlScope`、`SpendControlScopeService`；预算型 Spend Rule。 | 否。 | 预算不是资金池，也不是核心资金账务主体；不得压入 `FundingAccount` 或作为 LedgerEntry 主体。 |
 | 支付工具 | 支付、收款或识别入口中的外部工具、外部端点、卡、VA、外部钱包端点或通道 token。 | `PaymentInstrument`、`PaymentInstrumentBinding`、`PaymentInstrumentRefSpec`。 | 否。 | 只做路由输入、绑定和快照；不得作为 LedgerEntry 主体；内部余额钱包、信用额度账户、返利钱包和商户账户本身不强制包装成支付工具。 |
 | Spend Rule / Spend Controls | 授权前支出控制规则，覆盖预算额度、MCC、商户、国家、金额、次数和窗口。 | 发卡授权控制扩展、预算型规则、规则版本和审计。 | 否。 | 只决定是否允许继续授权，不直接写 route、posting、LedgerEntry 或清结算。 |
-| VCC 卡 / 预付卡 / 共享卡 | VCC 业务中的支付工具、资金模式或使用模式组合。 | `PaymentInstrument`、`PaymentInstrumentBinding`、`PaymentInstrumentRefSpec`、`FundingAllocationDecision`、VCC capability pack、卡绑定子账户和主账户约束。 | 条件是。 | 卡/PAN/token 不可入账；资金子账户或信用子账户可以入账。预付和共享只是账户 profile、资金模式或绑定模式，不能把卡片凭证升级为账本主体。 |
+| VCC 卡 / 预付卡 / 共享卡 | VCC 业务中的支付工具、资金模式或使用模式组合。 | `PaymentInstrument`、`PaymentInstrumentBinding`、`PaymentInstrumentRefSpec`、参与方账户层级快照、VCC capability pack、卡绑定子账户和主账户约束。 | 条件是。 | 卡/PAN/token 不可入账；资金子账户或信用子账户可以入账。预付和共享只是账户 profile、资金模式或绑定模式，不能把卡片凭证升级为账本主体。 |
 | 核心资金账务主体 | 可进入 route leg、posting plan、LedgerEntry 和余额投影的主体。 | `SubjectRef`、`FundsSubjectType`。 | 是。 | 默认允许资金账户、信用账户和解析后的平台资金账户；VCC 场景允许资金子账户或信用子账户。支出控制范围、支付工具、业务主体、VA 和外部账户不得直接入账。 |
 | 营销账户 | 已决策权益资金影响的账户 profile，可承接平台营销成本、权益负债、合作方补贴、营销留置和商户让利归因。 | 最小交付按 `FundingAccount`、平台资金账户角色或等价账户 profile 承接；若提升为独立 subject type，必须进入独立工程边界。 | 是，前提是已经解析为资金账户或平台责任资金账户。 | 不是支付工具，不是营销规则或券包库存，不因存在优惠字段自动入账；非入账解释事实不得生成营销账户分录。 |
 | 账本 / 账目 | 账务事实容器和余额 bucket。 | `Ledger`、`LedgerTransaction`、`LedgerPostingPlan`、`LedgerEntry`、`LedgerSubjectCode`。 | 不适用。 | 账本不是钱包或报表；账目不是账户主体。 |
@@ -848,7 +848,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | 入口控制 | 这个资金事实是否真实、唯一、可追溯。 | 业务流水、幂等键、请求摘要、金额币种、操作者和引用对象必填。 | 交易事实、失败原因、幂等记录和审计日志。 |
 | 主体控制 | 谁的钱、谁的额度、哪组预算规则发生变化。 | 业务主体必须解析为资金账户（含平台角色解析后的平台资金账户）或信用账户；支出控制范围和 Spend Rule 只能作为支出控制上下文和审计证据。 | route snapshot、LedgerEntry 主体和余额投影主体一致；规则快照能解释预算拒绝、预算预留或预算释放证据。 |
-| 路径控制 | 钱或额度为什么从这里到那里，预算规则为什么允许或拒绝。 | 路由规则、支付工具快照、平台资金账户角色解析结果、资金责任决策、Spend Rule 快照和原路径回放固化。 | RoutingDecision、FundingAllocationDecision、RuleVersionSnapshot、Route Replay 用例。 |
+| 路径控制 | 钱或额度为什么从这里到那里，预算规则为什么允许或拒绝。 | 路由规则、支付工具快照、平台资金账户角色解析结果、显式参与方和路径段、Spend Rule 快照和原路径回放固化。 | RoutingDecision、RouteParticipant、RouteLeg、RuleVersionSnapshot、Route Replay 用例。 |
 | 账务控制 | 余额变化是否能被账本解释。 | posting plan 独立平衡，分录不可变，投影只读可重建。 | LedgerTransaction、LedgerEntry、BalanceProjection 和账务巡检。 |
 | 运营控制 | 异常、差错和人工处理是否可追责。 | 差错单、审批、凭证、调账/冲正/补事实、核销和重新对账闭环。 | 处理单据、审批链、凭证引用、重新对账结果。 |
 | 生产任务控制 | 批处理、归档、重放和出款是否可控。 | 范围、状态机、幂等键、检查点、水位、Manifest、差异报告和告警。 | 批次摘要、任务日志、差异报告、告警记录和人工兜底。 |

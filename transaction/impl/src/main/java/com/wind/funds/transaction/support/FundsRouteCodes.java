@@ -5,7 +5,9 @@ package com.wind.funds.transaction.support;
  */
 public final class FundsRouteCodes {
 
-    public static final String CURRENT_ROUTE_VERSION = "v4";
+    public static final String CURRENT_ROUTE_VERSION = "v5";
+
+    public static final String CURRENT_ROUTE_SNAPSHOT_SCHEMA_VERSION = "route.snapshot.v5";
 
     public static final String TOPUP_STANDARD = "TOPUP_STANDARD";
 

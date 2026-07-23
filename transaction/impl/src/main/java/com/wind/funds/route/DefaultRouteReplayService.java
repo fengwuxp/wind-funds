@@ -1,13 +1,10 @@
 package com.wind.funds.route;
 
 import com.wind.funds.model.route.ImmutableReplayRequestSpec;
-import com.wind.funds.model.route.ImmutableAccountHierarchyFundingAllocationDecisionSpec;
-import com.wind.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.funds.model.route.ImmutableRouteLegSpec;
 import com.wind.funds.model.route.ImmutableRouteNodeSpec;
 import com.wind.funds.model.route.ImmutableRouteParticipantSpec;
-import com.wind.funds.model.route.ImmutableRoutingDecisionSpec;
 import com.wind.funds.route.support.RouteSpecSupport;
 import com.wind.funds.transaction.constant.FundsInstructionContextKeys;
 import com.wind.funds.transaction.support.FundsRouteCodes;
@@ -27,14 +24,12 @@ import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.enums.RouteReplayType;
 import com.wind.funds.route.ref.SubjectRef;
 import com.wind.funds.route.spec.PlatformAccountsSnapshotSpec;
-import com.wind.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.funds.route.spec.ReplayRequestSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
 import com.wind.funds.route.spec.RouteNodeSpec;
 import com.wind.funds.route.spec.RouteParticipantSpec;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
-import com.wind.funds.route.spec.RoutingDecisionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionFieldKeys;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
@@ -52,7 +47,6 @@ import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -171,9 +165,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .transactionType(resolveTransactionType(snapshot, replayRequest))
                 .participants(resolveParticipants(snapshot, replayLegs))
                 .legs(replayLegs)
-                .routingDecision(replayRoutingDecision(snapshot.getRoutingDecision(),
-                        replayLegs,
-                        isSelectiveReplay(snapshot, sourceLegs, replayRequest)))
+                .routingDecision(snapshot.getRoutingDecision())
                 .paymentInstrumentRef(snapshot.getPaymentInstrumentRef())
                 .externalAccountRef(snapshot.getExternalAccountRef())
                 .platformAccounts(snapshot.getPlatformAccounts())
@@ -183,128 +175,6 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .build();
         RouteSpecSupport.validateResolvedRoute(result);
         return result;
-    }
-
-    private @Nullable RoutingDecisionSpec replayRoutingDecision(@Nullable RoutingDecisionSpec source,
-                                                                List<RouteLegSpec> replayLegs,
-                                                                boolean selectiveReplay) {
-        if (source == null) {
-            return null;
-        }
-        List<FundingAllocationDecisionSpec> allocations = source.getFundingAllocations();
-        AssertUtils.isFalse(selectiveReplay && allocations.size() > 1,
-                "部分选择 RouteLeg 时不能重建多资金分配决策");
-        Money firstAmount = allocations.getFirst().getAmount();
-        AssertUtils.isTrue(allocations.stream()
-                        .allMatch(allocation -> allocation.getAmount().getCurrency() == firstAmount.getCurrency()),
-                "RouteSnapshot 回放暂不支持跨币种 funding allocation");
-        long sourceAmount = sumAllocationAmount(allocations);
-        long replayAmount = sumReplayConsumeAmount(replayLegs, firstAmount);
-        if (replayAmount == 0L || replayAmount == sourceAmount) {
-            return source;
-        }
-        AssertUtils.isTrue(replayAmount < sourceAmount,
-                "RouteSnapshot 回放 routingDecision 金额不能大于原资金分配金额");
-        List<FundingAllocationDecisionSpec> replayAllocations = scaleAllocations(allocations,
-                sourceAmount,
-                replayAmount);
-        return ImmutableRoutingDecisionSpec.builder()
-                .policyCode(source.getPolicyCode())
-                .matchedRules(source.getMatchedRules())
-                .selectedProcessor(source.getSelectedProcessor())
-                .selectedCashFundingAccount(source.getSelectedCashFundingAccount())
-                .selectedPlatformAccount(source.getSelectedPlatformAccount())
-                .fundingAllocations(replayAllocations)
-                .decisionReason(source.getDecisionReason())
-                .contextVariables(source.getContextVariables())
-                .build();
-    }
-
-    private boolean isSelectiveReplay(RouteSnapshotSpec snapshot,
-                                      List<RouteLegSpec> sourceLegs,
-                                      ReplayRequestSpec replayRequest) {
-        if (replayRequest.getReplayLegIds().isEmpty()) {
-            return false;
-        }
-        long replayableLegCount = snapshot.getLegs().stream()
-                .filter(leg -> leg.getReplayPolicy() != RouteReplayPolicy.NON_REPLAYABLE)
-                .filter(leg -> shouldReplayLeg(leg, replayRequest))
-                .count();
-        return sourceLegs.size() < replayableLegCount;
-    }
-
-    private long sumAllocationAmount(List<FundingAllocationDecisionSpec> allocations) {
-        long result = 0L;
-        for (FundingAllocationDecisionSpec allocation : allocations) {
-            result = Math.addExact(result, allocation.getAmount().getAmount());
-        }
-        return result;
-    }
-
-    private long sumReplayConsumeAmount(List<RouteLegSpec> replayLegs, Money allocationAmount) {
-        long result = 0L;
-        for (RouteLegSpec leg : replayLegs) {
-            if (leg.getBalanceEffectType() != LedgerBalanceEffectType.CONSUME
-                    && leg.getBalanceEffectType() != LedgerBalanceEffectType.HOLD) {
-                continue;
-            }
-            if (leg.getAmount().getCurrency() == allocationAmount.getCurrency()
-                    && leg.getSourceNode().getSubjectRef().getSubjectType().isLedgerPostable()) {
-                result = Math.addExact(result, leg.getAmount().getAmount());
-            }
-        }
-        return result;
-    }
-
-    private List<FundingAllocationDecisionSpec> scaleAllocations(
-            List<FundingAllocationDecisionSpec> allocations,
-            long sourceAmount,
-            long replayAmount) {
-        List<FundingAllocationDecisionSpec> result = new ArrayList<>(allocations.size());
-        long sourceCumulativeAmount = 0L;
-        long replayCumulativeAmount = 0L;
-        for (int index = 0; index < allocations.size(); index++) {
-            FundingAllocationDecisionSpec allocation = allocations.get(index);
-            sourceCumulativeAmount = Math.addExact(sourceCumulativeAmount,
-                    allocation.getAmount().getAmount());
-            long targetCumulativeAmount = index == allocations.size() - 1
-                    ? replayAmount
-                    : BigInteger.valueOf(sourceCumulativeAmount)
-                    .multiply(BigInteger.valueOf(replayAmount))
-                    .divide(BigInteger.valueOf(sourceAmount))
-                    .longValueExact();
-            long scaledAmount = targetCumulativeAmount - replayCumulativeAmount;
-            AssertUtils.isTrue(scaledAmount <= allocation.getAmount().getAmount(),
-                    "RouteSnapshot 回放 allocation 金额不能大于原资金分配金额");
-            if (scaledAmount > 0L) {
-                result.add(replayAllocation(allocation, scaledAmount));
-            }
-            replayCumulativeAmount = targetCumulativeAmount;
-        }
-        return List.copyOf(result);
-    }
-
-    private FundingAllocationDecisionSpec replayAllocation(FundingAllocationDecisionSpec source, long amount) {
-        Money replayAmount = Money.immutable(amount, source.getAmount().getCurrency());
-        if (source.getAccountHierarchySnapshot() != null) {
-            return ImmutableAccountHierarchyFundingAllocationDecisionSpec.builder()
-                    .allocationId(source.getAllocationId())
-                    .subjectRef(source.getSubjectRef())
-                    .ledgerSubjectCode(source.getLedgerSubjectCode())
-                    .amount(replayAmount)
-                    .accountHierarchySnapshot(source.getAccountHierarchySnapshot())
-                    .priority(source.getPriority())
-                    .reason(source.getReason())
-                    .build();
-        }
-        return ImmutableFundingAllocationDecisionSpec.builder()
-                .allocationId(source.getAllocationId())
-                .subjectRef(source.getSubjectRef())
-                .ledgerSubjectCode(source.getLedgerSubjectCode())
-                .amount(replayAmount)
-                .priority(source.getPriority())
-                .reason(source.getReason())
-                .build();
     }
 
     private RouteSnapshotSpec requireReplaySnapshot(FundsInstructionSpec instruction) {
@@ -591,7 +461,8 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
     }
 
     private void assertSupportedSnapshotSchemaVersion(RouteSnapshotSpec snapshot) {
-        AssertUtils.isTrue(FundsRouteCodes.CURRENT_ROUTE_VERSION.equals(snapshot.getSnapshotSchemaVersion()),
+        AssertUtils.isTrue(FundsRouteCodes.CURRENT_ROUTE_SNAPSHOT_SCHEMA_VERSION
+                        .equals(snapshot.getSnapshotSchemaVersion()),
                 "RouteSnapshot snapshotSchemaVersion 不支持，snapshotSchemaVersion = {}",
                 snapshot.getSnapshotSchemaVersion());
     }
@@ -745,6 +616,7 @@ public class DefaultRouteReplayService implements RouteResolver, Ordered {
                 .currency(amount.getCurrency().name())
                 .amount(amount)
                 .description(participant.getDescription())
+                .accountHierarchySnapshot(participant.getAccountHierarchySnapshot())
                 .contextVariables(participant.getContextVariables())
                 .build();
     }

@@ -969,8 +969,8 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
     /**
      * 场景：VCC 共享卡授权解析到信用子账户及其父资金账户。
      * 输入：信用子账户额度 100，父资金账户可用余额 100，授权批准 60。
-     * 输出：信用子账户和父资金账户同时形成授权占用，route snapshot 的 funding allocation 携带账户层级快照。
-     * 预期：accountHierarchySnapshot 固化子账户和直接父账户，根账户留空。
+     * 输出：信用子账户和父资金账户同时形成授权占用，信用子账户 participant 携带账户层级快照。
+     * 预期：accountHierarchySnapshot 固化关系号和直接父账户，不改变 route leg。
      * 红线：共享卡授权不得只占用信用额度而跳过父资金账户。
      */
     @Test
@@ -981,9 +981,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
         ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
         ensureCreditAccount(cardAccount);
-        bindAccountHierarchy(cardAccount,
-                parentAccount,
-                "AUTH_SHARED_CARD_HIERARCHY");
+        bindAccountHierarchy(cardAccount, parentAccount);
 
         topup(parentAccount, 100L, "AUTH_SHARED_CARD_PARENT_TOPUP");
         adjustBalance(cardAccount, 100L, true, "AUTH_SHARED_CARD_LIMIT");
@@ -999,33 +997,26 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         assertThat(fundsTransactionQueryService.findRouteSnapshotByTransactionSn(authorizationSn))
                 .as("authorization route snapshot should carry account hierarchy")
                 .hasValueSatisfying(routeSnapshot -> {
-                    assertThat(routeSnapshot.getRoutingDecision()).isNotNull();
-                    assertThat(routeSnapshot.getRoutingDecision().getFundingAllocations())
-                            .hasSize(2)
-                            .anySatisfy(allocation -> {
-                                assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo(parentAccount.id());
-                                assertThat(allocation.getSubjectRef().getSubjectType().name())
-                                        .isEqualTo(parentAccount.type());
-                                assertThat(allocation.getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AUTHORIZATION);
-                                assertThat(allocation.getAmount()).isEqualTo(Money.immutable(60L, CURRENCY));
-                            })
-                            .filteredOn(allocation -> cardAccount.id()
-                                    .equals(allocation.getSubjectRef().getSubjectId()))
+                    assertThat(routeSnapshot.getParticipants())
+                            .filteredOn(participant -> cardAccount.id()
+                                    .equals(participant.getSubjectRef().getSubjectId()))
                             .singleElement()
-                            .satisfies(allocation -> {
-                                assertThat(allocation.getSubjectRef().getSubjectId()).isEqualTo(cardAccount.id());
-                                assertThat(allocation.getSubjectRef().getSubjectType().name())
+                            .satisfies(participant -> {
+                                assertThat(participant.getSubjectRef().getSubjectType().name())
                                         .isEqualTo(cardAccount.type());
-                                assertThat(allocation.getLedgerSubjectCode()).isEqualTo(LedgerSubjectCode.AUTHORIZATION);
-                                assertThat(allocation.getAmount()).isEqualTo(Money.immutable(60L, CURRENCY));
-                                assertThat(allocation.getAccountHierarchySnapshot()).isNotNull();
-                                assertThat(allocation.getAccountHierarchySnapshot().getAccountRef().getSubjectId())
-                                        .isEqualTo(cardAccount.id());
-                                assertThat(allocation.getAccountHierarchySnapshot().getParentAccountRef())
+                                assertThat(participant.getAmount()).isEqualTo(Money.immutable(60L, CURRENCY));
+                                assertThat(participant.getAccountHierarchySnapshot()).isNotNull();
+                                assertThat(participant.getAccountHierarchySnapshot().getRelationSn()).isNotBlank();
+                                assertThat(participant.getAccountHierarchySnapshot().getParentAccountRef())
                                         .isNotNull()
                                         .satisfies(parent -> assertThat(parent.getSubjectId())
                                                 .isEqualTo(parentAccount.id()));
                             });
+                    assertThat(routeSnapshot.getParticipants())
+                            .filteredOn(participant -> parentAccount.id()
+                                    .equals(participant.getSubjectRef().getSubjectId()))
+                            .singleElement()
+                            .satisfies(participant -> assertThat(participant.getAccountHierarchySnapshot()).isNull());
                 });
         assertThat(entriesByBusinessSn("AUTH_SHARED_CARD_AUTHORIZE"))
                 .extracting(LedgerEntry::getSubjectId)
@@ -1048,9 +1039,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
         ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
         ensureCreditAccount(cardAccount);
-        bindAccountHierarchy(cardAccount,
-                parentAccount,
-                "AUTH_SHARED_CARD_COMPLETION_HIERARCHY");
+        bindAccountHierarchy(cardAccount, parentAccount);
         topup(parentAccount, 100L, "AUTH_SHARED_CARD_COMPLETION_PARENT_TOPUP");
         adjustBalance(cardAccount, 100L, true, "AUTH_SHARED_CARD_COMPLETION_LIMIT");
         String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L,
@@ -1119,9 +1108,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
         ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
         ensureCreditAccount(cardAccount);
-        bindAccountHierarchy(cardAccount,
-                parentAccount,
-                "AUTH_SHARED_CARD_REVERSAL_HIERARCHY");
+        bindAccountHierarchy(cardAccount, parentAccount);
         topup(parentAccount, 100L, "AUTH_SHARED_CARD_REVERSAL_PARENT_TOPUP");
         adjustBalance(cardAccount, 100L, true, "AUTH_SHARED_CARD_REVERSAL_LIMIT");
         String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L,
@@ -1155,9 +1142,7 @@ class FundsAuthorizationTransactionFlowTests extends FundsTransactionFlowTestSup
         ensureLedger(parentAccount, LedgerSubjectCode.AVAILABLE);
         ensureLedger(parentAccount, LedgerSubjectCode.AUTHORIZATION);
         ensureCreditAccount(cardAccount);
-        bindAccountHierarchy(cardAccount,
-                parentAccount,
-                "AUTH_SHARED_CARD_CLOSING_HIERARCHY");
+        bindAccountHierarchy(cardAccount, parentAccount);
         topup(parentAccount, 100L, "AUTH_SHARED_CARD_CLOSING_PARENT_TOPUP");
         adjustBalance(cardAccount, 100L, true, "AUTH_SHARED_CARD_CLOSING_LIMIT");
         String authorizationSn = authorizeSharedCard(cardAccount, parentAccount, 60L,

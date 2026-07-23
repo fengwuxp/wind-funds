@@ -3,7 +3,6 @@ package com.wind.funds.dsl;
 import com.wind.funds.ledger.enums.LedgerBalanceEffectType;
 import com.wind.funds.ledger.enums.LedgerPhaseCode;
 import com.wind.funds.ledger.enums.LedgerSubjectCode;
-import com.wind.funds.model.route.ImmutableFundingAllocationDecisionSpec;
 import com.wind.funds.model.route.ImmutableReplayRequestSpec;
 import com.wind.funds.model.route.ImmutableResolvedRouteSpec;
 import com.wind.funds.model.route.ImmutableRouteLegSpec;
@@ -20,7 +19,6 @@ import com.wind.funds.route.enums.RouteParticipantRole;
 import com.wind.funds.route.enums.RouteReplayPolicy;
 import com.wind.funds.route.enums.RouteReplayType;
 import com.wind.funds.route.ref.SubjectRef;
-import com.wind.funds.route.spec.FundingAllocationDecisionSpec;
 import com.wind.funds.route.spec.ReplayRequestSpec;
 import com.wind.funds.route.spec.ResolvedRouteSpec;
 import com.wind.funds.route.spec.RouteLegSpec;
@@ -462,20 +460,8 @@ class RouteDslContractTests {
         return ImmutableRoutingDecisionSpec.builder()
                 .policyCode("ROUTE_BENEFIT_CONTEXT")
                 .matchedRules(List.of("DIRECT_PAY", "REAL_FUNDING_ACCOUNT"))
-                .fundingAllocations(List.of(fundingAllocation()))
                 .decisionReason("REAL_FUNDING_ACCOUNT")
                 .contextVariables(contextVariables)
-                .build();
-    }
-
-    private FundingAllocationDecisionSpec fundingAllocation() {
-        return ImmutableFundingAllocationDecisionSpec.builder()
-                .allocationId("ALLOC-ROUTE-BENEFIT-CONTEXT")
-                .subjectRef(fundingAccount("FA-ROUTE-BENEFIT-CONTEXT"))
-                .ledgerSubjectCode(LedgerSubjectCode.AVAILABLE)
-                .amount(Money.immutable(100L, CurrencyIsoCode.USD))
-                .priority(1)
-                .reason("REAL_FUNDING_ACCOUNT")
                 .build();
     }
 

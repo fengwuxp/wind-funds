@@ -52,6 +52,16 @@ public interface RouteParticipantSpec {
         return null;
     }
 
+    /**
+     * 参与账户在本次路由使用的直接父账户关系快照。
+     *
+     * @return 账户层级快照；当时不存在关系时返回 {@code null}
+     */
+    @Nullable
+    default AccountHierarchySnapshotSpec getAccountHierarchySnapshot() {
+        return null;
+    }
+
     @NonNull
     default Map<String, Object> getContextVariables() {
         return Map.of();
