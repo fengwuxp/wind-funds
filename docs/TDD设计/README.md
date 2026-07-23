@@ -1,427 +1,95 @@
-# 支付资金底座测试驱动设计
+# 支付资金底座 TDD 设计
 
 ## 目录定位
 
-本目录是支付资金底座测试驱动设计入口。完整设计包入口见 [../README.md](../README.md)。它承接产品设计、DSL 设计、系分设计和真实代码模块，把“产品必须证明什么”转成“代码测试必须覆盖哪些真实执行路径”。
+本目录把产品验收、DSL 不变量和系分约束转成可执行测试。测试 backlog、场景矩阵和目标测试资产的权威入口是 [支付资金底座测试驱动设计.md](支付资金底座测试驱动设计.md)。
 
-本目录不替代产品验收矩阵，也不替代系分设计。它的职责是把测试对象、测试层级、模块服务、用例场景、断言证据和验证命令统一起来。
+TDD 文档可以维护测试类、fixture、验证命令和未覆盖项；产品和系分正文不复制这些执行信息。
 
-业务接入方需要把产品验收、DSL case、系分入口和目标测试资产整理成接入验收矩阵时，先读 [../用户接入指南/README.md](../用户接入指南/README.md)。用户接入指南只说明接入方如何准备验收材料，测试权威口径仍以本目录为准。
+## 证据分级
 
-## 背景和目标
-
-背景：支付资金底座的产品目标、DSL 契约、系分对象和真实代码模块必须被同一套测试证据证明；否则容易出现“文档看似闭环，但代码只证明接口不报错或状态变化”的交付风险。
-
-目标：把 PRD 的验收条件、DSL 的 caseId、系分的服务入口和代码的真实执行路径映射为可执行或可转化的测试资产，证明每个资金变化都满足状态正确、金额闭合、账目清晰、账本可追溯、投影只读、幂等无副作用和审计可解释。
-
-业务目标：让支付资金底座的资金变化具备可解释、可核对、可回归的测试证据；用户价值是让产品、运营、财务和研发能从同一组 TDD 证据判断能力是否具备工程落地条件。
-
-非目标：本目录不定义产品功能，不替代 DSL 字段设计，不决定服务接口或表结构，不授权修改生产代码、测试代码、DDL/H2 schema 或运行时配置。进入编码仍以工程任务边界为准。
-
-成功标准：任一工程任务都能从 `AC-*`、`DSL-*`、`TDD-*`、`RED-*` 反查到目标测试资产、真实执行路径、核心断言、验证命令、未覆盖项和残余风险；无法证明的范围必须写成未覆盖范围、带条件通过或不适用原因。
-
-## 最小交付约规
-
-TDD 默认先证明最小交付切片，而不是一次性铺大全量目标态。每个测试设计任务只覆盖最小闭环所需的正向、逆向、异常、幂等和红线路径；其他业务扩展、外部协议、清结算深水区、资金数据治理、运营后台和报表能力必须写成未覆盖范围或独立能力域。
-
-最小交付测试必须优先证明资金不变量：状态正确、route snapshot 可追溯、posting plan 平衡、LedgerEntry 可核对、余额投影正确、重复请求无副作用、失败不产生半截事实。若一个测试只能证明接口不报错、状态变化或数量变化，不能作为最小交付完成证据。
-
-## 阅读顺序
-
-本 README 只作为 TDD 设计入口。工程规划、状态账本、工程边界确认包和阶段推进材料已清理；当前只保留稳定测试设计口径。
-
-| 顺序 | 文档 | 作用 |
+| 等级 | 证据 | 能证明什么 |
 | --- | --- | --- |
-| 1 | [支付资金底座测试驱动设计.md](支付资金底座测试驱动设计.md) | 定义测试驱动设计原则、模块测试矩阵、场景用例、红线用例、目标测试资产和执行门禁。 |
+| L1 | 纯 Java 契约和 DSL fixture 测试 | 类型、字段、枚举、序列化和 must-fail 契约。 |
+| L2 | 真实 Service + H2 测试 | 服务规则、唯一约束、事务回滚和持久化行为。 |
+| L3 | 业务流程集成测试 | 多步骤资金状态、route、posting、entry、投影和逆向链路。 |
+| L4 | 重放、对账和治理测试 | 原事实引用、幂等重跑、差异和只读边界。 |
+| L5 | 架构和静态门禁 | 模块依赖、core 纯净性、公共契约和实现泄露。 |
 
-## 契约输入
+文档中的目标测试类不等于测试已经存在；只有测试代码存在、被实际执行并核对报告后，才是完成证据。
 
-| 输入 | 用途 |
+## 资金测试最小断言
+
+发生资金或额度变化的测试按适用范围同时断言：
+
+1. 业务状态和累计金额。
+2. RouteSnapshot、RouteParticipant、RouteLeg 和原事实引用。
+3. PostingPlan 借贷平衡。
+4. LedgerTransaction 与 LedgerEntry 可追溯。
+5. 每一步余额桶变化，而非只看最终余额。
+6. 幂等重放不产生重复副作用。
+7. 失败路径不留下半截事实。
+8. 敏感数据、租户、权限和审计边界。
+
+## 场景族
+
+| 场景族 | 最低覆盖 |
 | --- | --- |
-| `docs/产品设计` | 产品目标、使用者、能力地图、产品验收和红线。 |
-| `docs/DSL设计` | 资金事实、指令、路由、账务计划、分录、投影和 JSON 契约用例。 |
-| `docs/系分设计` | 模块边界、服务入口、流程、状态、表设计、观测、安全和测试专项。 |
-| `core`、`wallet-*`、`transaction-*`、`ledger-*`、`tests` | 真实代码执行路径、目标测试包名和测试支撑能力。 |
+| 直接交易 | topup、transfer、pay、refund、withdraw、fee、fee refund。 |
+| 授权交易 | approve/decline、partial completion、reversal、force completion、refund、no-auth refund、timeout no-op。 |
+| 余额控制 | freeze、partial unfreeze、withdraw from frozen、funding adjustment、credit limit adjustment。 |
+| 钱包关系 | 工具绑定、账户层级、资金责任解析、工具换绑后原路回放。 |
+| Spend Controls | 规则评估、决策验真、预留、消耗、可信释放、显式退款补偿和周期隔离。 |
+| 清结算与对账 | 来源快照、批次、运行结果、差异、准入门禁、重跑和调账引用。 |
+| VCC/全球账户/收单 | 只验证归一资金事实和底座能力；业务专属状态机留在上层。 |
 
-接口契约、入参、出参、错误码、幂等键、兼容边界和替身边界必须从 DSL、系分和现有代码共同确认；TDD 不单独发明公共契约。若测试设计发现契约缺口，只能提出差距、Red 和工程任务写入建议，不能把测试夹具当成生产契约变更。
+## 三类关系测试矩阵
 
-凡涉及资金变化的测试，参与方账户示例、账户类型、`normalBalanceSide`、借贷平衡、余额桶影响和失败红线必须回到 [../DSL设计/支付资金底座DSL承载层设计.md#51-资金场景借贷平衡与账务期望表](../DSL设计/支付资金底座DSL承载层设计.md#51-资金场景借贷平衡与账务期望表)；TDD 只把该表转成可执行断言，不从 PRD 摘要或系分说明二次推导账务口径。
-
-## 测试基线约束
-
-| 约束 | TDD 处理口径 |
-| --- | --- |
-| 真实执行路径 | 服务层流程测试优先使用真实 Spring Bean、H2 schema 和现有测试支撑能力；Mock/Fake/Recording 只用于外部系统、不可控依赖或明确端口边界。 |
-| 数据方案 | 资金事实、路由、账务计划、账本分录、余额投影、对账对象和治理对象必须有可准备、可查询、可断言的数据形态。 |
-| 事务边界 | 测试必须证明同事务内的 route、posting、entry 和投影派生边界，以及失败后的无副作用、补偿或重试结果。 |
-| 一致性和对账 | 资金主链路证明账务平衡和投影一致；清结算与对账证明批次、差异、重跑和核销闭环；归档重放证明 Manifest、checkpoint、watermark 和差异报告。 |
-| 可靠性 | 重试、并发、乱序、重复请求、外部非终态、任务续跑和范围锁必须有目标测试或明确不适用原因。 |
-| 安全审计 | 权限、审批、证据最小化、敏感数据脱敏、规则待确认、导出边界和审计链必须能被 must-fail 或审计断言覆盖。 |
-| 发布和回滚 | TDD 只给验证方案、回归范围、风险和待确认项；灰度、发布、回滚和上线审批由工程任务、生产变更和团队流程承接。 |
-
-## P2 全球账户模拟验证口径
-
-全球账户、多币种、日切、备付金和跨境场景当前只做设计验证。TDD 允许先写 Red 和验收卡，不允许用测试夹具补出未确认的银行协议、VA 生命周期、FX 执行、法主体账套或备付账户模型。
-
-| 场景 | 最小 Red | 当前停止条件 |
+| 能力 | 必须证明 | 必须失败 |
 | --- | --- | --- |
-| 外部 accepted 未到账 | 外部非终态不得生成到账成功、AVAILABLE 或出款完成事实。 | 缺到账证据或主体映射时停在 `IN_TRANSIT`、挂账或差错设计。 |
-| 错币种入金 | 缺 FX quote 和审批时不得自动换汇或按目标币种入账。 | 只能生成错币种差错、挂账或驳回设计。 |
-| 退汇和费用 | 退汇不得当退款处理，费用不得和本金净额混写。 | 缺原出金、回单、费用责任或对账证据时不得关闭成功。 |
-| 法主体日切和账实对账 | 账务日期、时区、cutoff、币种、余额桶和外部账户引用必须进入断言。 | 缺法主体/账套、备付/托管账户映射或真实 settlement fact source 时不进入 Green。 |
+| `PaymentInstrumentBinding` | 联合业务键幂等、状态/版本/生效窗口、历史快照解释。 | 工具不可用仍准入、换绑后按当前关系重算历史。 |
+| `AccountHierarchyRelation` | 一个直接父账户、同币种、账户存在且未关闭、顺序建边拒绝环路、参与方固化 `relationSn + parentAccountRef`。 | 自父关系、跨币种、第二父账户、原交易明确依赖父账户路径却缺少必要关系快照、关系自动触发出资。 |
+| `SpendSubjectFundingRelation` | 账户主体在指定币种和关系类型下唯一解析资金责任目标。 | 0 条或多条仍放行，或把 SpendControlScope、Spend Rule、支付工具当成关系的源/目标主体。 |
 
-## 使用原则
+当前 `AccountHierarchyRelation` 没有跨节点全局锁。测试可以证明唯一子账户约束和顺序环路校验，但不能把它包装成并发构建任意拓扑安全；开放并发批量建边前必须另做工程设计和并发验证。
 
-1. 新增或修改资金能力前，先在 TDD 设计中找到对应用例；找不到时先补设计和验收口径。
-2. 每个资金变化用例必须断言状态、余额桶、route snapshot、posting plan、ledger entry、投影和幂等。
-3. 测试要覆盖真实内部执行路径；除外部通道、时间、ID、不可控依赖外，不应 Mock 内部核心组件。
-4. 产品验收、DSL 不变量、系分模块边界和代码服务入口必须能互相追溯。
-5. 授权测试命名优先使用“授权完成 / 已完成金额”，对应产品侧“授权结算 / 已结算金额”；商户清结算测试仍使用“结算锁定 / 出款 / SETTLEMENT 账目”。
+## 业务场景验证路径
 
-## TDD 准入评估口径
-
-TDD 设计的准入目标是证明设计已经能转成真实测试资产和验证命令。完整跨文档门禁见 [../README.md#生产准入检查清单](../README.md#生产准入检查清单) 和 [../README.md#阻断和降级口径](../README.md#阻断和降级口径)。
-
-| 评估维度 | TDD 侧必须证明 | 阻断信号 |
-| --- | --- | --- |
-| 可用性 | 产品场景能转成可执行或可转化的测试用例，包含输入事实、前置数据、动作和期望结果。 | 场景只能人工理解，无法写测试数据和断言。 |
-| 最小交付裁剪 | 只选择最小闭环测试集，能证明目标场景成功、失败、幂等和红线；扩展能力有未覆盖说明。 | 为未来扩展提前铺大量测试，或把清结算、归档、P2 业务混进交易主线 Red。 |
-| 资金安全 | 有资金变化的用例同时断言状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、余额桶、route snapshot、posting plan、ledger entry、balance projection、借贷平衡、余额影响和幂等。 | 只断言交易状态、entry 数量或“不报错”。 |
-| 金融红线 | 外部账户入账、敏感信息泄露、授权拒绝写账、冻结表达消费、投影反写事实、无审批调账等必须失败。 | 红线只写在文档里，没有 TDD-RED 用例或明确不适用原因。 |
-| 易用性 | 用户账单、商户账单、运营时间线、错误原因和审计查询有测试或断言来源。 | 只测后台内部对象，不证明使用者能理解结果。 |
-| 可理解性 | 测试命名、用例 ID、DSL 契约、产品验收和系分服务入口能互相反查。 | `AC-*`、`RED-*`、`DSL-*`、`TDD-*` 之间没有显式映射。 |
-| 可开发性 | 目标测试包、真实执行路径、替身边界、数据准备和验证命令明确。 | 依赖大范围 Mock 内部核心组件，或无法说明运行哪条验证命令。 |
-| 可测试性 | 正向、逆向、异常、边界、并发、幂等、重放和 must-fail 用例覆盖工程任务交付范围。 | 交付范围内存在未覆盖资金变化或未说明不适用原因。 |
-
-## TDD 与 PRD、DSL、系分对齐口径
-
-TDD 评审口径：TDD 入口必须承接 PRD 目标、DSL 契约和系分落点，并能进入测试资产分析和 Red 排序。进入编码前仍需工程任务明确写入范围、禁止范围、目标测试资产、验证命令和未覆盖范围；未确认时只能产出测试设计、契约草案或 dry-run。
-
-Spend Rule 测试设计优先引用独立产品分册 09、系分分册 06 和 DSL README 的 Spend Rule DSL v1.1：TDD 只把规则定义、不可变版本、挂载 scope、决策记录、控制额度变动流水、预算控制投影和只读解释转成可执行断言，不在交易路由主线或测试夹具中重新发明规则模型。`SpendRuleDecisionRecord` 只承载准入和拒绝决策，`SpendControlMovement` 只承载额度调整、预留、消耗、退款补偿和可信释放；预算控制投影必须证明 `consumedAmount = grossConsumedAmount - refundCompensatedAmount`、`remainingControlAmount = reservedAmount - grossConsumedAmount - releasedAmount`、`availableControlAmount = limitAmount - consumedAmount - remainingControlAmount`，退款只降低净消费而不恢复已消费 reservation，且首次调增或后续调减后的额度均不能低于已使用和已占用控制金额之和。相同 `movementSn` 的并发重放必须先由 `tenantId + movementSn` 唯一键裁决，失败方通过 current read 回读胜者事实，不得重复累计投影或额外递增账户版本；不同 `movementSn` 的并发变动必须先写候选流水，再按包含候选流水的 after-state 校验聚合不变量并通过账户版本 CAS 裁决，校验或 CAS 失败时删除候选流水并快速失败。`SpendControlMovementTypeContractTests` 必须证明枚举只包含真实控制额度变动类型，调额类和释放类只作为控制额度变动流水子集；application 实现必须消费枚举分类方法，不得在实现类中重新硬编码类型集合。
-
-当前 Spend Rule 服务层测试证据口径：
-
-| 测试资产 | 当前证明 | 不证明 |
-| --- | --- | --- |
-| `SpendRuleDefinitionServiceFlowTests` | 规则版本不可变、挂载冲突策略和有效期、支付工具范围一致性、挂载查询解释、单条决策记录幂等、决策记录窄查询、决策事实解释和拒绝 / 查询 / 解释无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、批量规则时间线 Query Service、运营后台。 |
-| `SpendRuleDefinitionServiceTests` | 规则定义、版本发布、规则挂载和挂载查询 / 解释已经按目标分层服务执行；覆盖版本同摘要幂等、异摘要拒绝覆盖、挂载幂等、非法挂载拒绝、查询 / 解释只读和无资金副作用。 | 完整规则表达式执行、多规则冲突合成器、运营后台、DDL / 生产迁移。 |
-| `SpendControlAdmissionApplicationServiceTests`、`AuthorizationAdmissionApplicationServiceTests` | 上层决策证据可进入准入快照和授权准入组合；拒绝停在交易内核前且无资金事实；已证明上游多规则最终裁决摘要可被准入服务按最终 `decisionSn/result/digest/rejectReason` 固化。 | 多规则冲突合成器、多规则明细落库、支付工具全场景生产可用、事件消费、控制额度自动占用。 |
-| `SpendControlMovementServiceFlowTests`、`BudgetControlLimitAdjustmentApplicationServiceTests`、`SpendControlTransactionConsumptionApplicationServiceTests` | 控制额度变动流水、预算额度调额、交易成功消耗、退款补偿、目标账户隔离和投影下限守卫。 | 账本余额、资金交易事实、生产迁移或历史脏数据修复。 |
-| `WalletSpendControlsAcceptanceFlowTests` | 真实接入方视角串起已发布规则、单规则评估、准入决策固化、周期额度初始化、预留、交易成功消费、退款补偿和 `controlScopeId + periodId` 历史窗口查询，并持续证明不写 route、posting、LedgerEntry 或账本余额事实。 | 多规则冲突合成器、协同授权 webhook、rolling amount、cooldown、强一致频控拦截、生产调度、运营后台或完整卡产品平台。 |
-| `SpendControlMovementTypeContractTests` | 兼容期枚举分类集中在枚举本身，历史决策兼容类型不参与预算投影。 | 公共类名、表名、DTO 或历史枚举删除。 |
-| `FundsTransactionProjectionExplainApplicationServiceTests` / `AuthorizationAdmissionApplicationServiceTests` | 已固化 Spend Rule 决策快照可被交易投影只读解释，不输出 `ruleSpec` 或敏感原文。 | 完整规则定义、版本、挂载、决策记录和控制额度变动流水的运营时间线。 |
-
-Spend Controls 接入验收测试卡：
-
-| 输出项 | 本轮结论 |
-| --- | --- |
-| `deliveryScenario` | 企业钱包或员工卡接入方需要验证 wallet spend controls 是否能作为受控生产接入组件：规则先发布并挂载，单规则 evaluator 只读给出候选证据，准入服务固化最终决策，周期额度由控制流水派生，交易结果由 transaction 层回链消费或退款补偿。 |
-| `targetAssets` | `WalletSpendControlsAcceptanceFlowTests#testWalletSpendControlsShouldSupportMonthlyAuthorizationLifecycleWithoutLedgerSideEffect`。 |
-| `coreAssertions` | 评估通过不代表授权成功；准入通过只代表可进入交易内核；额度初始化、预留、消费和退款补偿只写 Spend Control 事实；当前和历史控制窗口通过 `controlScopeId + periodId` 查询；全链路不得创建或修改 route、posting、LedgerEntry 或账本余额事实。 |
-| `verificationCommand` | `just test-one WalletSpendControlsAcceptanceFlowTests tests`。 |
-| `outOfScope` | 多规则编排器、规则表达式引擎、外部协同授权协议、节假日、rolling amount、cooldown、强一致频控拦截、生产调度重置、运营后台、DDL / 索引迁移和真实卡组织规则确认。 |
-
-Spend Controls 生产准入审计与 Runbook 测试卡：
-
-| 输出项 | 本轮结论 |
-| --- | --- |
-| `deliveryScenario` | 已有 Spend Controls 服务层能力进入受控生产试点前，需要证明规则变更、最终决策、控制窗口、异常信号和恢复动作能被审计和验收。 |
-| `currentEvidence` | `SpendRuleDefinitionServiceTests` 证明规则定义、版本和挂载幂等 / 摘要冲突；`SpendControlAdmissionApplicationServiceTests` 证明外部决策证据固化和拒绝无资金事实；`SpendControlMovementServiceFlowTests` 证明控制窗口按 `controlScopeId + periodId` 可追溯；`WalletSpendControlsAcceptanceFlowTests` 证明接入方视角主链闭环无账本副作用。 |
-| `productionGap` | 当前测试不证明运营后台、审批流、生产 DDL / 索引、告警平台、Runbook 执行器、历史回填或强一致频控拦截已经完成。 |
-| `firstRedSet` | 摘要冲突无审计、缺冲突策略仍生产挂载、准入拒绝异常无告警、控制投影缺证据仍自动授权、滚动窗口慢查询无降级、迁移失败无停止和恢复验收；SpendRuleBinding 生命周期请求重新承接操作者、原因、审批引用或变更摘要。 |
-| `coreAssertions` | 规则变更可在 web / 运营审计层追踪操作者、原因、摘要、scope 和生效窗口；资金底座生命周期命令只断言状态机、并发更新和无资金副作用；Runbook 信号必须有发现方式、owner、止血动作和恢复验收；所有失败和止血路径不得生成 route、posting、LedgerEntry 或账本余额事实。 |
-| `verificationCommand` | 文档-only 切片执行 `git diff --check`；进入代码或 schema 时执行 `just verify-slice SpendRuleDefinitionServiceTests,SpendControlAdmissionApplicationServiceTests,SpendControlMovementServiceFlowTests,WalletSpendControlsAcceptanceFlowTests tests`。 |
-| `outOfScope` | 不新增公共契约，不新增审计表，不承诺运营后台、生产告警、生产迁移、历史回填或上线审批完成。 |
-
-Spend Rule 服务层分层测试口径：
-
-1. 当前带 `ApplicationServiceTests` 后缀的测试资产表达跨对象场景编排，不代表所有规则能力都应放在 application service。
-2. 新增测试按服务职责命名：标准基础服务覆盖持久化、读取、查询、幂等、状态守卫、解释和预算控制投影；application service 覆盖准入、交易消费、支付工具生命周期等跨对象编排。
-3. 规则定义、版本、挂载、决策记录和控制额度变动流水已收敛到目标标准基础服务；后续不再使用旧式领域服务测试命名。
-4. application service 测试不得要求被测对象直接访问 Mapper / Repository；基础服务测试可以覆盖 Mapper-backed 真实服务行为。
-5. `SpendRuleDecisionRecordServiceTests`、`SpendRuleDefinitionServiceTests` 和 `SpendRuleDefinitionServiceFlowTests` 是当前服务测试资产，分别覆盖决策记录幂等 / 窄查询 / 失败无资金副作用，以及规则定义 / 版本 / 挂载的标准基础服务和服务流行为。
-
-Spend Rule DSL v1.1 的 JSON 示例当前仍为 `DOC_ONLY`：`ruleVersion`、挂载自身 `sn`、决策证据引用挂载的 `spendRuleBindingSn`、`decisionSn`、`evaluatedRules` 等字段用于统一产品、系分和测试语言；其中 `evaluatedRules`、`decisionPolicy`、`finalDecision`、`requestDigest` 尚未作为独立机器契约和数据库字段完成落地。后续若将其升级为可执行 DSL 或规则引擎输入，必须新增 fixture、解析器、服务层测试和独立工程变更边界。
-
-Highnote Spend Controls 对齐后的测试源以产品分册 09 的能力边界为准。接入口径已同步为“上游决策、wallet 固化证据、transaction 消费快照”；轻量规则评估、控制窗口、外部决策证据、多规则最终裁决摘要、挂载范围语义、币种控制、本地授权时间窗口和滚动窗口次数均已有对应测试与契约锚点，并持续断言不得产生越界资金事实；它只证明只读候选评估和 H2 测试 schema 的目标索引基线，不证明并发强一致频控拦截或真实生产 DDL / 慢查询评审已完成。准入 / 授权公共请求、控制流水和投影统一使用 `controlScopeId` 表达控制范围。
-
-轻量规则评估最小测试卡：
-
-| 输出项 | 本轮结论 |
-| --- | --- |
-| `deliveryScenario` | 接入方需要一个可选轻量 Spend Rule evaluator，在进入现有准入服务前判断单条已发布规则是否通过；评估通过后仍由上游携带决策证据调用 `SpendControlAdmissionApplicationService` 固化。 |
-| `firstRedSet` | `SPEND-RULE-EVAL-RED-001` 至 `SPEND-RULE-EVAL-RED-013`。 |
-| `coreAssertions` | evaluator 只返回 `PASSED` / `REJECTED`、拒绝原因和决策摘要候选；不得写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 |
-| `outOfScope` | 多规则冲突合成、表达式引擎、脚本、运营后台、协同授权 webhook、外部风控协议、rolling amount、cooldown、强一致频控拦截、生产调度重置和 DDL / 索引迁移。 |
-| `nextGate` | 轻量规则评估当前收口；AVS 街道地址、多规则冲突和表达式引擎均另拆任务。 |
-
-轻量规则评估首批 Red 候选：
-
-| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SPEND-RULE-EVAL-RED-001 | 单笔授权金额超过单笔限额时，接入方能否在交易内核前得到拒绝结论？ | 规则拒绝不得产生任何资金事实或控制事实。 | evaluator 返回 `REJECTED`，拒绝原因为单笔限额超限，决策摘要可稳定重放。 | 不写 `t_spend_rule_decision_record`、`t_spend_control_movement`、`t_funds_transaction`、route、posting、LedgerEntry。 | 金额 101 USD、单笔限额 100 USD；拒绝原因明确；调用前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 公共 evaluator 契约未确认，或测试只能通过改准入服务职责实现。 |
-| SPEND-RULE-EVAL-RED-002 | 当前周期可用额度不足时，是否能在交易内核前拒绝？ | 周期金额判断只读消费预算控制投影，不扣减余额、不预留额度。 | evaluator 读取 `BudgetControlProjectionDTO` 后返回 `REJECTED`。 | 不新增控制额度变动流水，不修改投影来源流水，不写资金事实。 | 周期限额 100 USD，已占用 80 USD，请求 30 USD；断言可用额度不足拒绝，且同周期控制流水仍为 2 条。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要新增 DDL 或把预算控制投影改成账本余额。 |
-| SPEND-RULE-EVAL-RED-003 | 当前周期次数达到上限时，是否能拒绝下一笔授权？ | 次数控制只基于同一 `controlScopeId + periodId + ruleId + ruleVersion` 下的既有控制流水按原始占用流水去重计数，不新增资金事实。 | evaluator 返回 `REJECTED`，拒绝原因为周期次数超限。 | 不写决策记录、控制额度变动、交易或账本事实。 | 周期次数上限 3，已有 3 条同周期消费或占用控制尝试，请求第 4 笔拒绝；同一授权 RESERVED 后 CONSUMED 不重复计数。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 现有流水无法表达稳定计数口径，或需要新增聚合表。 |
-| SPEND-RULE-EVAL-RED-004 | MCC 在黑名单或不在白名单时，是否能拒绝？ | MCC 判断只使用请求事实和规则规格，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED`，拒绝原因说明 MCC 不允许。 | 不写任何资金事实、决策记录或控制流水。 | 请求 MCC 为 `7995` 且 deny list 包含 `7995` 时拒绝；allow list 只包含 `5812` 而请求 MCC 为 `7995` 时拒绝；断言拒绝前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址需另拆任务。 |
-| SPEND-RULE-EVAL-RED-005 | 所有已实现最小规则均通过时，是否能返回可被准入服务消费的通过证据？ | 通过结论仍然不代表交易成功，也不自动写入准入决策记录。 | evaluator 返回 `PASSED`、空拒绝原因和稳定决策摘要候选。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry。 | 当前已实现单笔限额满足时摘要重复评估稳定一致；MCC allow list 命中时通过且无资金事实副作用。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要多规则冲突合成或外部风控确认才能判断通过。 |
-| SPEND-RULE-EVAL-RED-006 | 商户国家在黑名单或命中白名单时，是否能按请求事实给出可重放评估？ | 国家判断只使用请求事实和规则规格，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为商户国家不允许。 | 不写任何资金事实、决策记录或控制流水。 | 请求国家 `CU` 且 deny list 包含 `CU` 时拒绝；allow list 包含 `US` 且请求 `us` 时大小写归一化后通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址需另拆任务。 |
-| SPEND-RULE-EVAL-RED-007 | 企业员工卡禁止磁条降级交易时，是否能在交易内核前拒绝？ | 卡数据输入能力判断只使用请求事实和规则规格，不触发资金或控制事实写入，不保存 PAN/CVV。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为卡数据输入能力不允许。 | 不写任何资金事实、决策记录或控制流水。 | 请求 `MAGNETIC_STRIPE` 命中 deny list 时拒绝；allow list 包含 `EMV_CHIP` 且请求 `emv_chip` 时大小写归一化后通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址需另拆任务。 |
-| SPEND-RULE-EVAL-RED-008 | 企业卡是否能按指定商户标识 MID 拒绝风险商户或只允许合作商户？ | 商户标识判断只使用请求事实和规则规格，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为商户标识不允许。 | 不写任何资金事实、决策记录或控制流水。 | 请求 `MID-RISK-001` 命中 deny list 时拒绝；allow list 包含 `MID-CONTRACT-001` 且请求同一 MID 时通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址需另拆任务。 |
-| SPEND-RULE-EVAL-RED-009 | 企业卡能否按 PAN 录入方式拒绝手工录入或只允许非接触式录入？ | PAN 录入方式判断只使用录入方式枚举事实，不保存 PAN 原文，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为 PAN 录入方式不允许。 | 不写任何资金事实、决策记录或控制流水；不写完整 PAN、CVV 或卡敏感值。 | 请求 `manual` 命中 deny list `MANUAL` 时拒绝；allow list 包含 `CONTACTLESS` 且请求 `contactless` 时通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址需另拆任务。 |
-| SPEND-RULE-EVAL-RED-010 | 企业差旅卡能否拒绝 ATM 终端，车队卡能否只允许自助加油终端？ | POS 类别判断只使用终端类别枚举事实，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为 POS 类别不允许。 | 不写任何资金事实、决策记录或控制流水。 | 请求 `automated_teller_machine` 命中 deny list `AUTOMATED_TELLER_MACHINE` 时拒绝；allow list 包含 `AUTOMATED_FUEL_DISPENSER` 且请求 `automated_fuel_dispenser` 时通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址需另拆任务。 |
-| SPEND-RULE-EVAL-RED-011 | 电商卡要求 CVV 时，未提供 CVV 事实能否在交易内核前拒绝？ | CVV 判断只使用是否提供 CVV 的布尔事实，不接收、不保存 CVV 原文，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为未提供 CVV。 | 不写任何资金事实、决策记录或控制流水；不写完整 PAN、CVV 或卡敏感值。 | `cvvControl.required=true` 且请求 `cvvProvided=false` 时拒绝；请求 `cvvProvided=true` 时通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址需另拆任务。 |
-| SPEND-RULE-EVAL-RED-012 | 企业卡能否按卡交易处理类型拒绝 PIN 变更，或只允许取现类处理类型？ | 卡交易处理类型判断只使用请求事实和规则规格，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为卡交易处理类型不允许。 | 不写任何资金事实、决策记录或控制流水。 | 请求 `pin_change` 命中 deny list `PIN_CHANGE` 时拒绝；allow list 包含 `CASH` 且请求 `cash` 时通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址、conditional rule 或 velocity control 需另拆任务。 |
-| SPEND-RULE-EVAL-RED-013 | 电商卡能否按 AVS 邮编校验结果拒绝校验不匹配的授权，只允许校验匹配的授权？ | 邮编校验判断只使用 AVS 结果事实，不接收、不保存邮编或街道地址原文，不触发资金或控制事实写入。 | evaluator 返回 `REJECTED` 或 `PASSED`，拒绝原因为邮编校验结果不允许。 | 不写任何资金事实、决策记录或控制流水；不写完整 PAN、CVV、邮编或街道地址原文。 | 请求 `no_match` 命中 deny list `NO_MATCH` 时拒绝；allow list 包含 `MATCH` 且请求 `match` 时通过；断言拒绝 / 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | AVS 街道地址、conditional rule 或 velocity control 需另拆任务。 |
-
-币种和本地授权时间窗口测试卡：
-
-| 输出项 | 本轮结论 |
-| --- | --- |
-| `deliveryScenario` | 接入方需要按授权币种或本地业务时间段在交易内核前做单条已发布规则的轻量拒绝。 |
-| `firstRedSet` | `SPEND-RULE-CURRENCY-TIME-RED-001` 至 `SPEND-RULE-CURRENCY-TIME-RED-004`。 |
-| `coreAssertions` | evaluator 只读请求事实和已发布规则版本；时间由调用方按业务或规则时区归一化后传入；不得写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 |
-| `outOfScope` | 时区换算、节假日、cooldown、生产调度、复杂组合规则、DDL 和交易层执行 Spend Rule。 |
-| `nextGate` | 币种和本地授权时间窗口当前收口；滚动窗口次数由独立能力承接，节假日、rolling amount 或 cooldown 另拆窗口日历 / velocity 工程任务。 |
-
-币种和本地授权时间窗口首批 Red 候选：
-
-| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SPEND-RULE-CURRENCY-TIME-RED-001 | 企业卡只允许指定授权币种时，非允许币种能否在交易内核前拒绝？ | 币种控制只使用请求币种和规则规格，不触发资金或控制事实写入。 | `currencyControl.deniedCurrencies=["EUR"]` 且请求 `currency=EUR` 时 evaluator 返回 `REJECTED`，拒绝原因为币种不允许。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 拒绝前后资金事实计数不变，决策摘要稳定生成。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateCurrencyDeniedShouldRejectWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要外汇换算、币种精度换算或账户余额校验。 |
-| SPEND-RULE-CURRENCY-TIME-RED-002 | 企业卡只允许工作时间段授权时，窗口外请求能否拒绝？ | 时间窗口控制只使用调用方传入的本地授权时间，不做时区换算或调度重置。 | `allowedWindows=[09:00,18:00)` 且请求 `20:30` 时 evaluator 返回 `REJECTED`，拒绝原因为时间窗口不允许。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 拒绝前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateTimeWindowOutsideAllowedWindowShouldRejectWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要节假日、时区数据库、夏令时或业务日历。 |
-| SPEND-RULE-CURRENCY-TIME-RED-003 | 企业卡在允许窗口起点授权时，能否返回通过且不误写事实？ | 通过评估不代表授权成功，只是准入前候选证据。 | `allowedWindows=[09:00,18:00)` 且请求 `09:00` 时 evaluator 返回 `PASSED`。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 窗口起点闭区间、终点开区间；通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateTimeWindowAtAllowedWindowStartShouldPassWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要把通过评估解释为交易成功或资金可用。 |
-| SPEND-RULE-CURRENCY-TIME-RED-004 | 企业卡使用允许币种授权时，能否返回通过且不误写事实？ | 通过评估不代表资金可用或授权成功。 | `currencyControl.allowedCurrencies=["USD"]` 且请求 `currency=USD` 时 evaluator 返回 `PASSED`。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateCurrencyAllowedShouldPassWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要外汇换算、币种精度换算或账户余额校验。 |
-
-滚动窗口次数测试卡：
-
-| 输出项 | 本轮结论 |
-| --- | --- |
-| `deliveryScenario` | 接入方需要按最近 N 分钟授权次数在交易内核前做单条已发布规则的轻量拒绝。 |
-| `firstRedSet` | `SPEND-RULE-ROLLING-COUNT-RED-001`、`SPEND-RULE-ROLLING-COUNT-RED-002`。 |
-| `coreAssertions` | evaluator 只读请求事实、已发布规则版本和既有 `SpendControlMovement`；滚动窗口由请求 `authorizationTime` 锚定，不依赖 `periodId`；不得写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 |
-| `outOfScope` | rolling amount、cooldown、独立窗口聚合表、生产调度、时区换算、强一致频控拦截、复杂组合规则、生产 DDL / 索引校验和交易层执行 Spend Rule。 |
-| `nextGate` | 滚动窗口次数当前收口；若要做金额滚动窗口、冷却时间或高吞吐窗口聚合，另拆 velocity 工程任务。 |
-
-滚动窗口次数首批 Red 候选：
-
-| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SPEND-RULE-ROLLING-COUNT-RED-001 | 企业卡最近 15 分钟授权次数达到上限时，能否拒绝下一笔授权？ | 滚动窗口次数控制只读既有控制流水，不创建新的控制或资金事实。 | `counterSpec.windowMode=ROLLING`、`windowSizeMinutes=15`、`countLimit.maxCount=3`，窗口内已有 3 笔时 evaluator 返回 `REJECTED`，拒绝原因为滚动窗口次数超限。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 请求 `authorizationTime=2026-07-01T10:00`，既有 09:46、09:50、09:59 三笔窗口内 RESERVED 流水；拒绝前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateRollingCountLimitShouldRejectByWindowMovementsWithoutFundsSideEffect`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要强一致频控拦截、新增聚合表、调度重置、生产 DDL / 索引校验或交易层执行 Spend Rule。 |
-| SPEND-RULE-ROLLING-COUNT-RED-002 | 企业卡历史授权都已滑出 15 分钟窗口时，能否不误拒绝当前授权？ | 滚动窗口不能退化成同规则全历史次数或周期次数统计。 | 窗口外已有 3 笔同规则控制流水时 evaluator 返回 `PASSED`。 | 不写决策记录、控制额度变动、资金交易、route、posting、LedgerEntry 或账本投影。 | 请求 `authorizationTime=2026-07-01T10:00`，既有 09:44、09:40、09:30 三笔窗口外 RESERVED 流水；通过前后资金事实计数不变。 | `SpendRuleEvaluationApplicationServiceTests#testEvaluateRollingCountLimitShouldIgnoreMovementsBeforeWindowStart`，已落地。 | `just test-one SpendRuleEvaluationApplicationServiceTests tests`。 | 需要 rolling amount、cooldown 或时区换算。 |
-
-控制窗口测试卡：
-
-| 输出项 | 本轮结论 |
-| --- | --- |
-| `deliveryScenario` | 周期额度不复用账本周期、不生成支出控制范围账本；接入方直接用 `controlScopeId + periodId` 查询当前或历史控制窗口。 |
-| `firstRedSet` | `SPEND-RULE-CONTROL-WINDOW-RED-001`。 |
-| `coreAssertions` | 当前周期和历史周期只需替换 `periodId`；同周期不同 `controlScopeId`、不同目标账户不得串账；投影查询不得写交易、route、posting、LedgerEntry 或账本余额。 |
-| `outOfScope` | 新增 `windowType` 字段、rolling amount、cooldown、生产调度、时区计算器、表达式引擎和 DDL。 |
-| `nextGate` | 若要支持滚动金额窗口、冷却时间或调度自动刷新，再拆单独工程任务；当前最小控制窗口以 `periodId` 作为外部已决策窗口标识。 |
-
-控制窗口首批 Red 候选：
-
-| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SPEND-RULE-CONTROL-WINDOW-RED-001 | 当前周期和历史周期额度是否能用周期标识直接查询，且不串入其他周期、账户或控制范围？ | Spend Rule 控制窗口只派生控制投影，不生成账本余额或支出控制范围账本。 | `BudgetControlProjectionQuery(controlScopeId, periodId, currency, targetAccountId)` 返回指定窗口的额度、占用、剩余和可用控制额度。 | 不写资金交易、route、posting、LedgerEntry；不把其他周期、其他账户、其他 `controlScopeId` 的流水混入。 | 2026-07 和 2026-08 分别能返回各自额度；另一个 `controlScopeId` 的同周期流水不影响主控制范围；查询后资金事实不变。 | `SpendControlMovementServiceFlowTests`，已落地。 | `just test-one SpendControlMovementServiceFlowTests tests`。 | 需要 rolling amount、cooldown、时区换算或生产调度刷新。 |
-
-外部决策证据接入测试卡：
-
-| 输出项 | 本轮结论 |
-| --- | --- |
-| `deliveryScenario` | 上游规则服务、外部风控或协同授权服务已经给出 approve / decline，本系统只消费最终决策证据并固化准入事实。 |
-| `firstRedSet` | `SPEND-RULE-EXTERNAL-DECISION-RED-001`、`SPEND-RULE-EXTERNAL-DECISION-RED-002`。 |
-| `coreAssertions` | 外部 decline 停在交易内核前且无 route、posting、LedgerEntry；外部 approve 仍必须先通过支付工具、账户能力和资金责任校验，不能直接代表资金可用或授权成功。 |
-| `outOfScope` | webhook endpoint、HMAC、外部风控协议、超时 stand-in、模拟器、多规则裁决和 DDL。 |
-| `nextGate` | 若需要平台托管协同授权协议，再拆外部接入工程任务；当前公共契约只保留最终决策流水、结果、摘要和拒绝原因。 |
-
-外部决策证据首批 Red 候选：
-
-| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SPEND-RULE-EXTERNAL-DECISION-RED-001 | 外部 decline 后是否能在交易内核前停止？ | 外部拒绝不得创建任何交易或账本事实。 | 返回 `admitted=false`，固化决策流水、规则版本、摘要和拒绝原因。 | 不写资金交易、route、posting、LedgerEntry 或余额投影。 | 支付工具、账户能力和资金责任均可用；上游结果为 `REJECTED`；断言拒绝原因、决策记录和资金事实不变。 | `SpendControlAdmissionApplicationServiceTests`，已落地。 | `just test-one SpendControlAdmissionApplicationServiceTests tests`。 | 需要新增外部回调协议字段或 webhook。 |
-| SPEND-RULE-EXTERNAL-DECISION-RED-002 | 外部 approve 是否会绕过 wallet 准入链？ | 外部通过只是一条规则证据，不代表资金责任、账户能力或授权交易成功。 | 资金责任关系缺失时准入失败，且不固化决策记录。 | 不写决策记录、资金交易、route、posting、LedgerEntry 或余额投影。 | 携带 `PASSED` 决策证据；支付工具和账户存在但资金责任关系缺失；断言失败原因和无副作用。 | `SpendControlAdmissionApplicationServiceTests`，已落地。 | `just test-one SpendControlAdmissionApplicationServiceTests tests`。 | 需要把外部 approve 解释成直接授权成功。 |
-
-多规则裁决证据契约评审卡：
-
-| 输出项 | 本轮结论 |
-| --- | --- |
-| `deliveryScenario` | 上游已经完成多规则裁决，本系统当前只需要消费最终决策流水、结果、摘要和拒绝原因，支持准入、幂等、回放和对账追踪。 |
-| `contractDecision` | `evaluatedRules`、`decisionPolicy`、`finalDecision` 暂不进入 `ResolveSpendControlAdmissionRequest` 或 `RecordSpendRuleDecisionRecordRequest` 公共字段；如需表达多规则明细，先由上游把完整裁决证据纳入 `decisionDigest` 的摘要源。 |
-| `coreAssertions` | 最终摘要不能替代明细可解释性；但在公共契约升级前，本系统不得伪造、截断或重算上游多规则明细。 |
-| `outOfScope` | 新增公共 DTO 字段、DDL、历史决策回填、多规则冲突合成器、规则引擎和内部解释 payload 落库。 |
-| `nextGate` | 只有接入方明确要求本系统保存并查询多规则明细时，才新增字段、表结构、兼容策略和可执行测试。 |
-
-多规则裁决证据首批 Red 候选：
-
-| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SPEND-RULE-MULTI-DECISION-RED-001 | 当前公共契约是否足以消费上游多规则最终裁决？ | 多规则裁决证据只是准入控制事实，不创建资金交易或账本事实。 | 接入方传入最终 `decisionSn/result/digest/rejectReason`，准入服务只固化最终决策记录。 | 不新增 `evaluatedRules`、`decisionPolicy`、`finalDecision` 公共字段、DDL 或解释 payload 落库。 | 上游按 `DENY_OVERRIDES` 产出最终拒绝摘要；准入服务固化最终流水、摘要、结果和拒绝原因；断言不写资金交易、route、posting、LedgerEntry 或账本余额事实。 | `SpendControlAdmissionApplicationServiceTests#testResolveSpendControlAdmissionShouldConsumeUpstreamMultiRuleFinalDecisionDigest`，已落地。 | `just test-one SpendControlAdmissionApplicationServiceTests tests`。 | 接入方要求本系统查询或回放每条规则明细。 |
-| SPEND-RULE-MULTI-DECISION-RED-002 | 如果未来需要本系统解释多规则明细，应证明什么？ | 历史解释必须读取当时固化证据，不按当前规则重算。 | 能查询每条 evaluated rule、裁决策略和最终决策，并能脱敏展示拒绝原因。 | 不泄露敏感商户原文、卡号、token、外部账户或风控模型细节；不改变既有最终决策幂等。 | 先补公共契约、DDL 兼容、脱敏和历史回放测试，再实现落库。 | 待授权，当前不落地。 | 待授权后定义。 | 涉及破坏性公共契约变更、历史迁移或敏感字段存储。 |
-
-挂载范围语义测试卡：
-
-| 输出项 | 本轮结论 |
-| --- | --- |
-| `deliveryScenario` | 接入方需要把 Highnote 的 payment card、financial account、authorized user/cardholder 和 card product 映射到 wind-funds 已有 Spend Rule 挂载范围。 |
-| `firstRedSet` | `SPEND-RULE-SCOPE-MAPPING-RED-001`。 |
-| `coreAssertions` | `payment card -> PAYMENT_INSTRUMENT`；`financial account -> FUNDING_ACCOUNT / CREDIT_ACCOUNT`；`authorized user / cardholder / 员工 / 账户层级 -> ACCOUNT_HIERARCHY`；`card product -> BUSINESS_SCENE`。 |
-| `outOfScope` | 新增授权用户主数据、卡产品主数据、DDL、交易 canonical 入参或账本主体。 |
-| `nextGate` | 只有接入方要求本系统管理授权用户或卡产品生命周期时，才拆独立对象模型和迁移任务。 |
-
-挂载范围语义首批 Red 候选：
-
-| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SPEND-RULE-SCOPE-MAPPING-RED-001 | Highnote payment card、financial account、authorized user/cardholder 和 card product 是否能被稳定映射并查询解释？ | 挂载范围只是控制 scope，不是资金主体、资金责任主体或账本主体。 | 同一规则版本可挂载到 `PAYMENT_INSTRUMENT`、`FUNDING_ACCOUNT`、`CREDIT_ACCOUNT`、`ACCOUNT_HIERARCHY` 和 `BUSINESS_SCENE`，并可按 scope 精确查询。 | 不写决策记录、资金交易、route、posting、LedgerEntry 或账本余额；不保存卡号、PAN、CVV、邮编、街道地址或外部账户敏感原文。 | 查询每个 scope 只返回本 scope 挂载；账户层级解释包含 `spendRuleScope:ACCOUNT_HIERARCHY:<scopeId>`；调用前后资金事实不变。 | `SpendRuleDefinitionServiceTests`，已落地。 | `just test-one SpendRuleDefinitionServiceTests tests`。 | 需要新增授权用户主数据、卡产品主数据、DDL 或把 scope 作为账本主体。 |
-
-涉及 Spend Rule 或资金主链路的代码切片，`just compile`、`just test-one`、`just test-module`、`just verify-fast` 和 `just verify-cad` 必须通过 classfile 错误桩扫描；`verify-classfiles` 会检查 `target/classes` 和 `target/test-classes` 中是否存在 `Unresolved compilation`，避免 Maven 命令成功但编译产物不可用。
-
-涉及注解生成链路、MapStruct converter、MyBatis-Flex `NameRefs` 或 clean build 风险时，优先执行 `just clean-compile`；该命令会从空 `target` 重新编译 reactor，并校验代表性的生成类已写入 `target/classes`。
-
-| 对齐项 | PRD 输入 | DSL 输入 | 系分输入 | TDD 必须产出 | 阻断信号 |
-| --- | --- | --- | --- | --- | --- |
-| 稳定口径 | 产品目标、使用者、规则、红线和验收矩阵。 | 稳定 caseId、字段语义、不变量和失败边界。 | 服务入口、状态机、表设计、事务、观测和安全门禁。 | `AC-*`、`DSL-*`、`TDD-*`、`RED-*` 的映射表和目标测试资产。 | 用例来自过程描述，无法追溯到产品验收、DSL case 或系分入口。 |
-| 可解释、可核对、可重建 | 每笔金额都要可解释、可核对、可重建。 | 主体、账户类型、`normalBalanceSide`、账目、金额、币种、route、posting、entry、projection、借贷平衡、余额影响和审计引用。 | 交易、路由、账本、投影、对账和治理模块落点。 | 同时断言状态、余额桶、route snapshot、posting plan、ledger entry、projection、借贷平衡、余额影响、幂等和审计。 | 只断言交易状态、entry 数量、接口不报错或日志存在。 |
-| P0 资金内核 | 钱包、账本、账目、余额投影、对账、清分、清算、结算、归档和账本余额快照。 | 统一资金事实和账务对象。 | 账户账本、清结算对象、governance 逻辑边界和横切红线。 | 资金主线 Red、清结算与治理独立能力域 Red、余额桶断言、对账差错、归档水位、只读边界和失败无副作用。 | P0 能力未闭合就先验证 P2 业务特殊路径。 |
-| P1 交易入口 | 直接交易、授权交易、余额控制和交易投影。 | instruction、event、route snapshot、posting plan 和 projection case。 | 02 分册的服务契约、状态机、表设计和投影任务。 | 直接交易、授权完成/撤销、授权过期无资金副作用、冻结解冻、余额调整、退款、争议裁决资金结果、交易投影和 route replay 测试。 | 授权拒绝、授权过期、余额不足或规则不唯一时仍产生 route、posting、entry 或投影。 |
-| P2 业务补充 | VCC、全球账户、收单和 ACH/银行转账边界只作为业务语义和外部轨道输入；VCC 卡、prepaid virtual card、shared card 只验证支付工具、绑定快照、资金责任解析关系和资金动作映射。 | 归一业务事实、外部引用、状态映射、脱敏证据、规则待确认字段、`PaymentInstrumentRef`、RouteParticipant、参与方账户层级快照、RouteLeg 和 route snapshot。 | 业务能力包准入卡、P0/P1 回归范围、外部规则确认、未覆盖红线、`TDD-RAIL-001A`、`TDD-P2-VCC-004` 至 `TDD-P2-VCC-011`、`TDD-WALLET-015` 至 `TDD-WALLET-019`。 | 业务状态映射、乱序重复、外部引用脱敏、规则待确认、P0/P1 回归、敏感数据 must-fail、预付资金责任、共享卡绑定快照、应用 facade 准入和内部主体能力选择。 | 业务专项测试绕过统一钱包应用层、账本、清结算、对账或归档链路，或把卡工具/共享卡/预付模式测试成新的账户余额、信用账户或预算主体。 |
-| 清结算与对账 | 清分、清算、结算、出款、对账、差错、调账核销和追偿。 | 批次、来源事实、规则、差异、审批、凭证和处理动作。 | 03 分册对象状态机、服务 API、表设计、补偿和审计。 | `CLS-GATE-*`、`TDD-B7-RED-*`、服务级 H2 流程、重跑幂等、并发锁、权限审计和差异闭环。 | 清结算、对账或出款只有设计，没有 DDL/H2、服务级流程测试或外部规则确认。 |
-| 归档、重放和指标边界 | 归档、余额重建、交易投影重放、异常人工处理和指标只读边界。 | Manifest、checkpoint、watermark、差异报告、处理动作和指标输入边界。 | 04 分册 governance 逻辑边界、物理落点候选、只读边界和人工处理入口。 | `GOV-GATE-*`、`TDD-B8-RED-*`、dry-run/apply、范围锁、回滚/续跑、指标水位隔离和治理边界测试。 | 用普通指标快照替代余额确认，或让治理任务反写资金事实。 |
-
-授权支付工具入口只允许测试 application facade 的准入、解析、快照和委派，不允许把账户主体型 `FundsAuthorizationTransactionService.authorize` 请求替换为支付工具引用。支付工具生命周期授权入口已作为服务层最小切片落到 `InstrumentTransactionLifecycleApplicationService#authorizeByInstrument`，该统一入口只委派 `AuthorizationAdmissionApplicationService` 完成工具准入、资金责任、账户能力和 Spend Rule 决策证据校验；支付工具收款入口已作为服务层最小切片落到 `InstrumentTransactionLifecycleApplicationService#receiveByInstrument`：VA、ACH 或外部钱包端点收款先解析工具和账户能力，再委派账户主体型 `FundsDirectTransactionService#topup`，并把脱敏 `PaymentInstrumentRef` 固化到 route snapshot 用于审计和投影解释；收款请求必须携带 `expectedBindingVersion`，缺版本必须在交易内核前失败且无资金事实副作用。不改变交易 canonical 账户主体，不给 VA、卡或外部账户建账。P2 场景如 VCC 预付卡充值、共享卡调额、全球账户付款和 ACH/银行转账事件，必须先经业务能力包解释成归一资金事实，再复用 P1/P0 测试资产。
-
-授权后继能力和支付工具生产可用性需要分开评审。账户主体型 canonical 授权内核通过授权后继准入卡承接强制完成、无授权退款、争议裁决资金结果承接和并发竞争；支付工具与 Spend Rule 的生产可用性通过支付工具准入卡承接工具准入、资金责任解析、授权 application facade、Spend Rule 控制和只读投影。支付工具及周边支持队列整体排在账本账目、钱包基础能力和交易内核之后；未形成独立工程边界前，TDD 只能继续做差距复核或 contract-only，不写生产代码、测试代码、DDL/H2 schema 或运行时配置。
-
-资金责任目标字段已统一为并落地 `targetSubjectType + targetSubjectId`，允许资源关系表达资金账户和信用账户目标主体；route snapshot 使用 RouteParticipant、参与方 `AccountHierarchySnapshot` 和 RouteLeg 承载最终主体、直接父账户证据和资金路径，不再维护重复资金分配摘要。B6/B8 进入交易投影或重放时，只能消费交易事实、冻结单、route snapshot、`paymentInstrumentRef`、RouteParticipant、参与方 `AccountHierarchySnapshot`、RouteLeg、`SpendRuleDefinition`、`SpendRuleVersion`、`SpendRuleBinding`、`SpendRuleDecisionRecord`、`SpendControlMovement`、账本摘要、授权拒绝事实、清结算和对账差错；不得把投影测试通过写成账务事实或生产交付完成。
-
-## 生产验证准入口径
-
-TDD 设计区分“目标测试资产”和“执行证据”。目标测试资产只说明生产交付需要哪些测试；只有测试代码存在、数据准备完整、验证命令执行通过，并且交付说明列出覆盖范围后，才能作为生产完成证据。
-
-| 判定对象 | 可接受证据 | 不可接受替代 |
-| --- | --- | --- |
-| 资金主链路 | 服务层或契约测试通过，且同时断言状态、route snapshot、posting plan、ledger entry、余额投影、幂等和审计。 | 只断言交易状态、entry 数量或接口不报错。 |
-| 清结算与对账 | DDL/H2 schema、对象状态机、服务契约和服务级 H2 流程测试同时闭合。 | 只有文档、空模块骨架或策略单元测试。 |
-| 归档、重放和指标边界 | 范围、checkpoint、watermark、Manifest、差异报告、dry-run/apply、回滚/续跑和只读边界测试通过。 | 只有交易投影重放局部测试，或用普通指标快照替代账本余额快照。 |
-| 外部规则和敏感数据 | 有规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方、确认状态、脱敏和审计测试。 | 用公开文档链接、口头约定或人工说明替代验证。 |
-
-### 评审维度到测试证据
-
-做设计评审或工程任务验收时，TDD 需要把“好设计”转成可执行证据。每个任务至少选择与目标范围相关的证据项；无法覆盖时必须写明不适用原因。
-
-| 评审视角 | 测试证据 | 最低断言 |
-| --- | --- | --- |
-| 可用性 | 正向链路、失败链路、重试/幂等、人工处理或 Runbook 触发用例。 | 成功有终态，失败有原因和处理路径，重复请求不重复产生资金副作用。 |
-| 资金安全 | 余额桶、账本周期、route snapshot、posting plan、ledger entry、projection、唯一约束和并发冲突测试。 | 金额不超额、不串周期、不跨主体误转、不半截入账、不重复出款。 |
-| 金融红线 | 外部账户入账、敏感信息、权限、审批、KYC/KYB/AML 待确认、外部规则未确认、轨道/FX 未启用 must-fail。 | 未确认或越权路径必须失败，且不生成 route、posting、entry 或敏感导出。 |
-| 易用性 | 用户账单、商户账单、运营时间线、错误原因、差错责任、告警和审计查询断言。 | 使用者能看出发生了什么、为什么失败、是否可重试、是否需要人工处理。 |
-| 可理解性 | `AC-*`、`DSL-*`、`TDD-*`、`RED-*`、服务入口和测试类命名互相反查。 | 测试失败能定位到产品验收、DSL 契约和系分落点，而不是只看到内部实现名。 |
-
-### Red 选择顺序
-
-编码前的 TDD 不应先铺大全量目标态，而应选择能最大程度证明资金底座不变量的 Red。准入顺序是先证明 P1 交易主链路依赖的 P0 账户、账本、账目和余额投影证据，再推进授权和余额控制，最后再独立打开清结算、对账、归档和治理。
-
-| 切片 | Red 目标 | 最低断言 | 暂不覆盖 |
+| 场景 | 验证路径 | 关键断言 | 当前证据 |
 | --- | --- | --- | --- |
-| 基线核验 | 证明测试环境、H2 schema、现有测试资产和验证命令可用。 | `just mvn-version`、目标测试可定位、fixture 可读取、任务范围可解释。 | 不新增生产实现、测试代码或 schema。 |
-| 直接交易 | 证明直接交易成功和失败的资金事实链。 | 交易状态、route snapshot、posting plan、ledger transaction、ledger entry、余额投影、幂等和审计；余额不足、规则不唯一或重复请求无副作用。 | 清结算、对账、归档、P2 业务能力包。 |
-| 授权交易 | 证明授权完成、部分完成、可信撤销、过期异常、退款和拒付的状态与金额边界。 | 授权拒绝不生成 route/entry；累计完成不超授权；可信撤销沿原快照释放；过期事件不产生资金释放；逆向沿原 route snapshot。 | 商户结算单、出款单、外部卡组织完整规则。 |
-| 余额控制 | 证明冻结、解冻、调整和失败路径不改变资金语义。 | 冻结只做同主体 `AVAILABLE <-> FROZEN`；解冻不产生跨主体转移；调整必须有审批、原因、审计和幂等；失败不写 entry。 | 对账差错调账和运营补事实白名单，除非独立任务确认。 |
-| DSL 执行化 | 证明交付引用的 caseId 不只是文档样例。 | 每个引用 caseId 有 fixture 级别、路径、目标测试类、核心断言和未覆盖范围；被测试读取后才声明机器契约通过。 | 未纳入任务范围的历史 caseId 全量清理。 |
-| 清结算与对账 | 独立证明对账、差错、清分、清算、结算、出款和追偿闭环。 | `CLS-GATE-*`、`TDD-B7-RED-*`、DDL/H2、服务级 H2 流程、并发重跑、权限审计、外部规则和人工处理。 | 不混入交易主线；不把出款前准入设计当完整生命周期。 |
-| 资金数据治理 | 独立证明治理只读、归档水位、重放差异和人工处理闭环。 | `GOV-GATE-*`、`TDD-B8-RED-*`、Manifest、checkpoint、watermark、dry-run/apply、范围锁、指标水位隔离和差异报告。 | 不混入交易主线；不让治理任务反写资金事实。 |
+| 内部余额钱包 | 充值确认 -> 付款/转账 -> 部分退款 -> 全额退款。 | 每步核对 `AVAILABLE/CLEARING/SETTLEMENT`、route、posting、entry 和原路退回；重试不重复入账。 | L3：`FundsDirectTransactionFlowTests`、`FundsTransactionProjectionBusinessScenarioTests`。 |
+| VCC 预付卡 | 内部资金转入卡绑定 `FundingAccount` 子账户 -> 授权占用 -> 完成/撤销 -> 退款/退卡余额回收。 | 卡只是工具；子账户 `AVAILABLE -> AUTHORIZATION -> SETTLEMENT` 或原路释放；内部充值必须是明确的账户间转账。 | 已有 L2/L3：`AuthorizationAdmissionApplicationServiceTests` 证明支付工具型授权准入，账户级授权、转账与回放已有基线；预付卡工具贯穿完整生命周期的组合验收仍是目标。 |
+| VCC 共享卡 | 卡绑定 `CreditAccount` 子账户 -> 解析直接父 `FundingAccount` -> 双主体授权占用 -> 完成时信用账户进入 `OUTSTANDING`、父账户承担一次真实结算 -> 撤销/退款按原快照回放。 | 信用额度与真实资金同时受控，但不重复结算；快照只固化直接父关系。 | 已有 L2/L3：`AuthorizationAdmissionApplicationServiceTests` 证明支付工具型授权准入，`FundsAuthorizationTransactionFlowTests` 证明显式传入关联父账户的账户级生命周期；支付工具贯穿完成、撤销和退款的端到端组合仍是目标。 |
+| 全球账户入金 | 上层验签并归一 -> 已确认的 `CONFIRMED` credit event -> 委派 topup -> 目标资金账户入账 -> 对账。 | `ACCEPTED/PROCESSING` 不得入账；外部账户只作为引用，不作为 LedgerEntry 主体。 | 已有 L2/L3：`ExternalFundsEventApplicationServiceTests` 只证明已确认、已归一事件到 topup/route/ledger；验签、外部来账核验和外部侧对账属于上层或待交付能力。 |
+| 全球账户出款 | 付款申请 -> 准入门禁 -> 授权占用/受控扣款 -> 外部提交 -> 成功/失败/退回事实 -> 对账。 | 受理不等于到账；非终态只能挂起和解释，不伪造成功资金事实。 | 局部 L2/L3：已有冻结提现、投影解释和 `PayoutPreflightServiceTests`；真实外部出款生命周期未交付。 |
+| 收单 | 支付尝试归一 -> capture 确认 -> 商户 `CLEARING` -> 清分/清算/结算 -> 出款 -> 部分/全额退款或争议资金结果 -> 对账。 | 只消费已确认资金事实；退款和争议资金结果引用原路由；清结算准入 fail-closed。 | 底层等价 L3：`FundsTransactionProjectionBusinessScenarioTests` 当前只证明 `PAY -> merchant SETTLEMENT -> partial refund` 投影；真实 capture -> `CLEARING` 和完整清结算仍是目标验收。 |
+| 账务与业务对账 | 冻结两侧来源快照 -> 逐笔匹配 -> 派生摘要和差异 -> 准入门禁 -> 新的调账交易/再对账。 | 完整覆盖、来源不漂移、重跑幂等、头明细同事务；差异不直接修改历史交易、分录或余额。 | L2/L4：`ReconciliationRunResultApplicationServiceTests`、`ReconciliationDifferenceApplicationServiceTests`、`ReconciliationGateApplicationServiceTests`。 |
 
-任一 Red 都必须先写失败断言和停止条件：如果测试只能证明接口不报错、状态变化或 entry 数量，不能进入实现；如果测试需要新增公共契约、状态机、表结构、H2 schema 或运行时配置，必须先回到工程任务确认写入范围。
+场景验证以“已有证据”和“目标验收”分开管理。底层等价测试只能证明可复用能力，不能替代发卡、银行、PSP、卡组织或商户业务的专项验收。
 
-### 业务驱动 Red 裁剪规则
+## 当前基线
 
-首批 Red 不能从模块覆盖率或目标态清单反推，而要从一个业务问题和一个资金不变量开始。每个 Red 都必须能回答：哪个使用者会看到什么结果，哪些资金事实必须发生，哪些事实绝不能发生。
+- Route 当前版本为 `v5`，schema 为 `route.snapshot.v5`；旧 schema 必须拒绝。
+- `RouteParticipant.subjectRef` 表达子账户，`AccountHierarchySnapshot` 只表达直接父账户证据。
+- 信用账户使用 `LIMIT/AVAILABLE/AUTHORIZATION/OUTSTANDING`；`OUTSTANDING` 是已用额度，不是现金或外部清算状态。
+- 授权超时是不可信状态，不自动释放资金或控制占用。
+- 交易失败或拒绝导致的同事务预留应回滚，不写 `RELEASED` 业务补偿。
+- `REFUND_COMPENSATED` 只在产品策略明确要求退款恢复控制额度时使用；未明确时退款只影响资金事实，不自动改变周期控制累计。
+- `tests/src/test/resources/jdbc-schema.sql` 是 H2 测试 schema，不是生产迁移 DDL。
 
-| 裁剪规则 | 必须满足 | 不满足时处理 |
-| --- | --- | --- |
-| 一个 Red 对应一个业务问题 | 能反查 `businessQuestion`、`deliveryScenario`、产品验收 ID 和 DSL caseId。 | 回到产品或 DSL，不写测试。 |
-| 一个 Red 证明一个最小资金不变量 | 至少覆盖适用的主体、账户类型、`normalBalanceSide`、账目、金额、币种、route、posting、entry、projection、幂等和审计。 | 缩小场景或补资金事实表。 |
-| 失败路径必须有 forbidden facts | 明确不允许半截 route、posting、entry、投影、外部出款、敏感导出、治理反写或重复资金副作用。 | 先补失败无副作用断言。 |
-| 不把能力域混在一起 | A1-A4、B7、B8、P2 只能单独授权；清结算深水区、资金数据治理、业务专项不得混入交易主线 Red。 | 拆成独立 Red 候选和独立工程边界。 |
-| 测试资产要真实可落地 | 指定目标测试类、真实执行路径、fixture/H2 数据、替身边界和验证命令。 | 只能做 TDD 分析或 contract-only。 |
-| 停止条件先写清 | 红灯不符合预期、公共契约/表结构越界、外部规则未确认、生产风险升高时如何停止。 | 不进入 Green 实现。 |
+## 验证入口
 
-首批 Red 最小输出表：
+优先使用根目录 `Justfile`：
 
-| redId | businessQuestion | moneyInvariant | expectedFacts | forbiddenFacts | minimumAssertions | targetAssets | verificationCommand | stopCondition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 | 待填 |
+```bash
+just test-core
+just test-ledger
+just test-transaction
+just test-balance-control
+just test-business-flow
+just test-boundary
+just test-governance
+just verify-slice <TestClass>[,<TestClass>] [module]
+```
 
-A0 基线核验阶段不写测试代码，但必须输出 `redCandidateSet`、`targetAssets`、`schemaNeed`、`minimumAssertions` 和 `testStopReasons`。只有工程任务明确写入范围后，才把候选 Red 转成实际测试写入。
-
-### 最小交付任务测试卡
-
-每个最小交付任务进入实现前，TDD 需要输出一张最小测试卡，避免任务被测试范围反向放大。
-
-| 输出项 | 填写口径 |
-| --- | --- |
-| `deliveryScenario` | 目标场景、入口动作、成功终态、失败终态和不覆盖范围。 |
-| `firstRedSet` | 只覆盖最小闭环的 Red；每个 Red 写清失败断言、目标测试类和验证命令。 |
-| `coreAssertions` | 状态、route snapshot、posting plan、LedgerEntry、余额投影、幂等、审计和失败无副作用中的适用断言。 |
-| `outOfScope` | 清结算深水区、资金数据治理、P2 业务、外部协议、完整运营后台和报表等不进入当前任务的范围。 |
-| `nextGate` | 后续扩展需要的产品确认、DSL caseId、系分落点、测试资产和独立授权条件。 |
-
-### 基线核验测试盘点
-
-基线核验不写测试代码，但必须把“要写哪些测试、证明什么、怎么停下来”盘点清楚。盘点完成后才能把交易主线、清结算或治理 Red 写入工程任务。
-
-| 盘点项 | 必须输出 | 未覆盖条件 |
-| --- | --- | --- |
-| 目标测试类 | 工程任务可能新增、恢复或复用的测试类、所属模块和验证命令。 | 找不到真实执行路径或只能依赖内部大范围 Mock。 |
-| 测试层级 | 单元、契约、服务级 H2、业务流程、边界测试、治理测试的适用层级。 | 资金变化只有单元测试或文档样例，没有服务级或契约证据。 |
-| fixture 清单 | 需要读取的 DSL fixture、业务数据、H2 基础数据和外部替身边界。 | fixture 未落地、等级不匹配或不被测试读取。 |
-| 最小断言 | 状态、余额桶、route snapshot、posting plan、ledger transaction、LedgerEntry、projection、幂等和审计。 | 只断言状态、数量、日志或接口不报错。 |
-| 失败无副作用 | 余额不足、拒绝、错币种、规则不唯一、权限不足、重复请求、外部规则未确认的 forbidden facts。 | 失败路径会生成半截 route、posting、entry、外部出款或敏感导出。 |
-| 数据和 schema | 是否需要改 H2 schema、DDL、Entity、Mapper 或测试数据准备。 | 需要改 schema 但工程任务未确认写入范围。 |
-| 回归范围 | 交易主线、清结算、治理或 P2 业务能力包对既有测试的回归影响。 | 只测新增路径，不保护 P0/P1 资金内核。 |
-| 停止条件 | 红灯不符合预期、需要扩公共契约、需要改表、触碰外部规则或跨能力域时如何停止。 | 无停止条件，或把外部规则/资金红线失败当作普通实现缺陷。 |
-
-基线核验输出直接作为 Red 评审页：
-
-| 输出项 | 填写口径 |
-| --- | --- |
-| `redCandidateSet` | 工程任务建议先写的 Red 编号、目标行为和失败断言。 |
-| `targetAssets` | 目标测试类、fixture、H2 数据准备和验证命令。 |
-| `minimumAssertions` | 状态、DSL 借贷表命中行、账户类型、`normalBalanceSide`、余额桶、route、posting、entry、projection、借贷平衡、余额影响、幂等、审计和 forbidden facts。 |
-| `schemaNeed` | 是否需要 DDL/H2、Entity、Mapper 或测试资源写入授权。 |
-| `testStopReasons` | 哪些失败必须停止并回到工程任务、系分或外部规则确认。 |
-
-### Red 卡模板
-
-每个进入编码的 Red 都要先填 Red 卡，避免测试只表达内部实现步骤。Red 卡可以作为工程任务附件，也可以作为 TDD 分析产物。
-
-| 字段 | 填写要求 |
-| --- | --- |
-| `redId` | 使用 `TDD-*` 或 `RED-*` 编号，能反查 PRD 和 DSL。 |
-| `targetBehavior` | 从使用者或资金事实角度描述必须失败或必须通过的行为。 |
-| `preconditions` | 主体、账户、账目、余额桶、支付工具、route 规则、历史事实和外部引用。 |
-| `action` | 触发的服务入口、指令、事件或任务。 |
-| `expectedFacts` | 应产生的交易事实、route snapshot、posting plan、ledger entry、projection、审计或差异报告。 |
-| `forbiddenFacts` | 不允许产生的半截 route、posting、entry、投影、外部出款、敏感导出或治理反写。 |
-| `assertions` | 状态、金额、账目、币种、周期、余额桶、幂等、审计和失败无副作用断言。 |
-| `verificationCommand` | 精确到 `just test-one <TestClass> [module]` 或等价 Maven 命令。 |
-| `stopCondition` | 红灯不符合预期、需要扩公共契约、需要改表、外部规则未确认或触碰清结算、治理、P2 时如何停止。 |
-
-Red 卡表头：
-
-| redId | targetBehavior | preconditions | action | expectedFacts | forbiddenFacts | assertions | verificationCommand | stopCondition |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-
-### 测试证据包
-
-每个工程任务的交付说明至少应能列出下列测试证据。无法执行时，必须说明是环境、依赖、私有仓库、测试数据还是实现缺口导致，不能把未执行测试当作通过。
-
-| 证据项 | 必须列出 |
-| --- | --- |
-| 覆盖映射 | 工程任务覆盖的 `AC-*`、`DSL-*`、`TDD-*`、`RED-*`。 |
-| 测试资产 | 新增、恢复或复用的测试类、fixture、H2 schema、测试数据准备和替身边界。 |
-| 核心断言 | 状态、route snapshot、posting plan、ledger entry、余额投影、交易投影、幂等、审计和失败无副作用。 |
-| 验证命令 | 实际执行的 `just` 或 Maven 命令、模块范围、指定测试类和结果。 |
-| 未覆盖项 | 工程任务未覆盖的目标测试资产、未执行原因、承接任务或人工确认点。 |
-| 残余风险 | 外部规则、合规、财务、通道、报表指标、性能容量、并发锁或数据迁移风险。 |
+纯文档变更至少执行 `git diff --check`、旧符号/错误 schema 扫描和 Markdown 链接检查。测试结论需核对 Surefire 报告中的执行数、失败数和错误数，不能只依据 Maven 末行。

@@ -25,13 +25,12 @@
 
 本文档只定义 VCC 业务接入 `wind-funds` 时的资金主体、支付工具、资金责任、交易动作、原路由回放和账务验收边界。它不是 VCC 产品 PRD，不定义发卡业务对象、issuer 协议、主交易状态、外部事件状态或卡账单展示。
 
-VCC 产品与系统设计的当前评审入口由 `fincone` 维护：
+VCC 产品与系统设计的当前评审入口由 `fincone` 仓库维护。跨仓文件不使用依赖本地目录布局的相对链接，当前以以下源路径为准：
 
-- [Fincone VCC 生产交付入口](../../../fincone/docs/生产交付/VCC发卡/README.md)
-- [VCC 卡交易产品设计](../../../fincone/docs/生产交付/VCC发卡/VCC发卡-卡交易-产品设计.md)
-- [VCC 卡交易系分设计](../../../fincone/docs/生产交付/VCC发卡/VCC发卡-卡交易-系分设计.md)
-- [VCC 卡交易工程规格](../../../fincone/docs/生产交付/VCC发卡/VCC发卡-卡交易-工程规格.md)
-- [VCC 验收与准出清单](../../../fincone/docs/生产交付/VCC发卡/VCC发卡-验收与准出清单.md)
+- `fincone/docs/生产交付/VCC发卡/README.md`
+- `fincone/docs/生产交付/VCC发卡/卡交易处理/卡交易处理-产品设计.md`
+- `fincone/docs/生产交付/VCC发卡/卡交易处理/卡交易处理-系分设计.md`
+- `fincone/docs/生产交付/VCC发卡/VCC发卡-验收与准出清单.md`
 
 上述材料尚处于 Product/System Review 或 Pending；`wind-funds` 只把已签收的公共契约作为实现输入，不替 VCC owner 提前定案。
 
@@ -69,9 +68,8 @@ VCC 产品与系统设计的当前评审入口由 `fincone` 维护：
 - `PaymentInstrument -> child CreditAccount -> parent FundingAccount`。
 - 信用子账户用于统一授权记账、额度占用、已用额度和卡维度归因，不持有现金。
 - 父资金账户是真实资金责任账户；授权阶段必须同时保护子账户额度与父账户可用资金，避免交易完成时父账户透支。
-- 交易完成时子信用账户 `AUTHORIZATION -> SETTLEMENT`，父资金账户沿原授权路径承担一次真实资金责任；
-  信用账户 profile 中的 `SETTLEMENT` 表示已用额度，不是现金、交易状态或外部 Network Settlement 完成证明。
-- 交易完成后子信用账户的已用额度不自动恢复；退款按原路径 `SETTLEMENT -> AVAILABLE`。
+- 交易完成时子信用账户 `AUTHORIZATION -> OUTSTANDING`，父资金账户沿原授权路径承担一次真实资金责任。`OUTSTANDING` 表示已用额度，不是现金、交易状态或外部 Network Settlement 完成证明。
+- 交易完成后子信用账户的已用额度不自动恢复；退款按原路径 `OUTSTANDING -> AVAILABLE`。
   VCC 当前没有还款流程，其他额度调整只能由受控业务事实驱动。
 - 周期消费规则属于 Spend Rule；周期账本是资金/信用账户对已确认结果的承接，不把 Spend Rule 建成账务主体。
 
@@ -93,10 +91,10 @@ VCC 产品与系统设计的当前评审入口由 `fincone` 维护：
 ### 4.1 完成金额与余额桶
 
 - `completedAmount` 是授权交易聚合的累计金额，不是余额状态，不新增 `COMPLETED` 余额桶。
-- `AVAILABLE`、`AUTHORIZATION`、`SETTLEMENT` 表达 VCC 资金或额度所处的账本口径，不复制交易状态。
-- VCC 授权完成统一使用 `COMPLETE` 交易动作；PREPAID 与 SHARED 都在原账户内部转入 `SETTLEMENT`，参与账户、可选直接父账户和真实资金责任仍由原 `RouteSnapshot` 决定。
-- PREPAID 的 FundingAccount 执行 `AUTHORIZATION -> SETTLEMENT`；SHARED 的 CreditAccount 同样执行 `AUTHORIZATION -> SETTLEMENT`，同时父 FundingAccount 只生成一次真实资金责任。
-- issuer 的 Clearing / Presentment 可归一为 VCC `COMPLETE`，但内部父 FundingAccount 的 `SETTLEMENT` 余额不表示外部 Network Settlement 已完成；外部闭合仍依赖发卡行账户同步、回单和对账。
+- `AVAILABLE`、`AUTHORIZATION`、`SETTLEMENT`、`OUTSTANDING` 表达 VCC 资金或额度所处的账本口径，不复制交易状态。
+- VCC 授权完成统一使用 `COMPLETE` 交易动作；PREPAID 与 SHARED 分别按各自账户 profile 转入资金结算或已用额度账目，参与账户和真实资金责任由原 `RouteSnapshot` 决定。
+- PREPAID 的 FundingAccount 执行 `AUTHORIZATION -> SETTLEMENT`；SHARED 的 CreditAccount 执行 `AUTHORIZATION -> OUTSTANDING`，同时父 FundingAccount 沿原路径只承担一次真实资金责任。
+- issuer 的 Clearing / Presentment 可归一为 VCC `COMPLETE`，但内部已确认收款或平台 `SETTLEMENT` 账目不表示外部 Network Settlement 已完成；外部闭合仍依赖发卡行账户同步、回单和对账。
 
 冻结 `AVAILABLE <-> FROZEN` 只表达同主体的资金控制，不参与 VCC 授权、完成或交易生命周期。
 
