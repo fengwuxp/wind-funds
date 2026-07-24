@@ -24,9 +24,11 @@ import com.wind.funds.spec.transaction.FeeSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.funds.wallet.FundsAccountQueryService;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.enums.DefaultFundsAccountType;
@@ -42,6 +44,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * 资金直接交易指令转换器。
@@ -72,6 +75,10 @@ public class FundsDirectTransactionInstructionConverter {
         assertNotSpendControlScope(request.getAccountId(), "直接充值入账账户不能是支出控制范围");
         AssertUtils.notNull(request.getChannel(), "直接充值资金通道不能为空");
         AssertUtils.notNull(request.getChannelTransactionSn(), "直接充值通道交易流水不能为空");
+        boolean hasExternalSource = StringUtils.hasText(request.getExternalSourceCode());
+        boolean hasExternalFact = StringUtils.hasText(request.getExternalFundsFactSn());
+        AssertUtils.isTrue(hasExternalSource == hasExternalFact,
+                "外部资金事实来源编码和流水号必须同时提供");
         ConvertedAmount amount = amountSupport.fromTransactionAmount(request.getTransactionAmount(),
                 request.getAccountId());
         requirePlatformAccount(amount.amount().getCurrency(), PlatformFundingAccountRole.CASH_MAPPING);
@@ -89,6 +96,10 @@ public class FundsDirectTransactionInstructionConverter {
                 .exchangeRate(amount.exchangeRate())
                 .accountId(request.getAccountId())
                 .instrumentRef(request.getPaymentInstrumentRef())
+                .externalSourceCode(request.getExternalSourceCode())
+                .externalFundsFactSn(request.getExternalFundsFactSn())
+                .externalFundsEffectType(hasExternalFact ? FundsEffectType.DIRECT : null)
+                .externalFundsFactDigest(hasExternalFact ? externalFundsFactDigest(request, amount) : null)
                 .externalAccountRef(externalAccountRef(request.getFundsSourceAccountId(),
                         request.getExternalRailCode() == null
                                 ? request.getChannel().name()
@@ -101,6 +112,18 @@ public class FundsDirectTransactionInstructionConverter {
                 .operator(operationActor(operator))
                 .contextVariables(mergeContext(request.getContextVariables(), extraContext))
                 .build();
+    }
+
+    private String externalFundsFactDigest(FundsTransactionTopupRequest request, ConvertedAmount amount) {
+        Map<String, Object> values = new TreeMap<>();
+        values.put("targetAccountId", request.getAccountId().id());
+        values.put("targetAccountType", request.getAccountId().type());
+        values.put("amount", amount.amount().getAmount());
+        values.put("currency", amount.amount().getCurrency().name());
+        values.put("originalAmount", amount.originalAmount().getAmount());
+        values.put("originalCurrency", amount.originalAmount().getCurrency().name());
+        values.put("exchangeRate", amount.exchangeRate());
+        return FundsStableHashSupport.sha256Json(values);
     }
 
     public @NonNull FundsInstructionSpec convertToTransferInstruction(@NonNull FundsTransactionTransferRequest request,

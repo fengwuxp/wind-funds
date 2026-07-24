@@ -5,6 +5,7 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -55,6 +56,16 @@ public class ReceiveByInstrumentRequest {
     @Schema(description = "渠道方交易流水号")
     @NotBlank
     private String channelTransactionSn;
+
+    @Schema(description = "可信上游适配层归一的外部资金事实来源编码，标识外部资金事实号的唯一性命名空间")
+    @NotBlank
+    @Size(max = 128)
+    private String externalSourceCode;
+
+    @Schema(description = "外部资金事实流水号，标识一次可入账的外部资金变动，不等同于渠道通知流水")
+    @NotBlank
+    @Size(max = 128)
+    private String externalFundsFactSn;
 
     @Schema(description = "业务流水号，通常为外部入金流水号或请求幂等号")
     @NotBlank

@@ -11,6 +11,7 @@ import com.wind.funds.route.support.ExternalAccountSensitiveValueValidator;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
@@ -39,6 +40,10 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
                                             BigDecimal exchangeRate,
                                             @Nullable PaymentInstrumentRefSpec instrumentRef,
                                             @Nullable ExternalAccountRefSpec externalAccountRef,
+                                            @Nullable String externalSourceCode,
+                                            @Nullable String externalFundsFactSn,
+                                            @Nullable FundsEffectType externalFundsEffectType,
+                                            @Nullable String externalFundsFactDigest,
                                             @Nullable FundsAccountId accountId,
                                             @Nullable FundsAccountId payerAccountId,
                                             @Nullable FundsAccountId payeeAccountId,
@@ -95,6 +100,20 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
         } else {
             AssertUtils.hasText(ledgerPeriodId,
                     "fundsInstruction.ledgerPeriodId must not be blank for non-lifetime ledgerPeriodType");
+        }
+        boolean hasExternalFundsFact = externalSourceCode != null
+                || externalFundsFactSn != null
+                || externalFundsEffectType != null
+                || externalFundsFactDigest != null;
+        if (hasExternalFundsFact) {
+            AssertUtils.hasText(externalSourceCode,
+                    "fundsInstruction.externalSourceCode must not be blank for external funds fact");
+            AssertUtils.hasText(externalFundsFactSn,
+                    "fundsInstruction.externalFundsFactSn must not be blank for external funds fact");
+            AssertUtils.notNull(externalFundsEffectType,
+                    "fundsInstruction.externalFundsEffectType must not be null for external funds fact");
+            AssertUtils.hasText(externalFundsFactDigest,
+                    "fundsInstruction.externalFundsFactDigest must not be blank for external funds fact");
         }
         AssertUtils.isFalse(PaymentInstrumentSensitiveValueValidator.containsSensitiveField(contextVariables)
                         || ExternalAccountSensitiveValueValidator.containsSensitiveContextField(contextVariables),
@@ -172,6 +191,26 @@ public record ImmutableFundsInstructionSpec(@Nullable Long tenantId,
     @Override
     public @Nullable ExternalAccountRefSpec getExternalAccountRef() {
         return externalAccountRef;
+    }
+
+    @Override
+    public @Nullable String getExternalSourceCode() {
+        return externalSourceCode;
+    }
+
+    @Override
+    public @Nullable String getExternalFundsFactSn() {
+        return externalFundsFactSn;
+    }
+
+    @Override
+    public @Nullable FundsEffectType getExternalFundsEffectType() {
+        return externalFundsEffectType;
+    }
+
+    @Override
+    public @Nullable String getExternalFundsFactDigest() {
+        return externalFundsFactDigest;
     }
 
     @Override

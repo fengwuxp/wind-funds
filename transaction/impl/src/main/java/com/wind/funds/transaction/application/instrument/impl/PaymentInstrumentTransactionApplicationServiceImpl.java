@@ -6,11 +6,18 @@ import com.wind.common.exception.AssertUtils;
 import com.wind.core.ReadonlyContextVariables;
 import com.wind.funds.model.route.ImmutablePaymentInstrumentRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
+import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.funds.transaction.application.FundsDirectTransactionService;
 import com.wind.funds.transaction.application.support.ExternalFundsRailResolver;
 import com.wind.funds.transaction.application.support.ExternalFundsRailResolver.ExternalFundsRailDecision;
+import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsEffectType;
+import com.wind.funds.transaction.enums.FundsTransactionMode;
+import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.request.FundsTransactionTopupRequest;
 import com.wind.funds.transaction.model.request.TransactionAmount;
+import com.wind.funds.transaction.services.FundsTransactionQueryService;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentTransactionApplicationService;
 import com.wind.funds.wallet.application.instrument.PaymentInstrumentPreTransactionSnapshotApplicationService;
@@ -26,11 +33,14 @@ import com.wind.funds.wallet.model.request.ResolvePaymentInstrumentPreTransactio
 import com.wind.transaction.core.Money;
 import lombok.AllArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * 支付工具交易应用服务实现。
@@ -49,6 +59,8 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
 
     private final FundsDirectTransactionService directTransactionService;
 
+    private final FundsTransactionQueryService fundsTransactionQueryService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public @NonNull String authorizeByInstrument(@NonNull AuthorizeByPaymentInstrumentRequest request,
@@ -61,10 +73,50 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
     public @NonNull String receiveByInstrument(@NonNull ReceiveByInstrumentRequest request,
                                                @NonNull WindOperator operator) {
         validateReceiveRequest(request);
+        String establishedTransactionSn = findEstablishedReceiveReplay(request);
+        if (establishedTransactionSn != null) {
+            return establishedTransactionSn;
+        }
         PaymentInstrumentPreTransactionSnapshotDTO snapshot =
                 preTransactionSnapshotApplicationService.resolvePreTransactionSnapshot(toPreTransactionRequest(request));
         AssertUtils.isTrue(Boolean.TRUE.equals(snapshot.getReady()), "支付工具收款预交易快照未就绪");
         return directTransactionService.topup(convertToTopupRequest(request, snapshot), operator);
+    }
+
+    private @Nullable String findEstablishedReceiveReplay(ReceiveByInstrumentRequest request) {
+        Optional<FundsTransactionDTO> existing = fundsTransactionQueryService.findFundsTransactionByExternalFundsFact(
+                request.getTenantId(), request.getExternalSourceCode(), request.getExternalFundsFactSn(),
+                FundsEffectType.DIRECT);
+        if (existing.isEmpty()) {
+            return null;
+        }
+        FundsTransactionDTO transaction = existing.get();
+        AssertUtils.isTrue(transaction.getStatus() == FundsTransactionStatus.CLOSED,
+                "外部资金事实尚未成功完成，transactionSn = {}，status = {}",
+                transaction.getSn(), transaction.getStatus());
+        RouteSnapshotSpec routeSnapshot = fundsTransactionQueryService
+                .findRouteSnapshotByTransactionSn(transaction.getSn())
+                .orElse(null);
+        AssertUtils.notNull(routeSnapshot, "已成立支付工具收款缺少 RouteSnapshot，transactionSn = {}",
+                transaction.getSn());
+        PaymentInstrumentRefSpec instrumentRef = routeSnapshot.getPaymentInstrumentRef();
+        AssertUtils.notNull(instrumentRef, "已成立支付工具收款缺少支付工具快照，transactionSn = {}",
+                transaction.getSn());
+        Integer bindingVersion = bindingVersion(instrumentRef);
+        AssertUtils.isTrue(transaction.getTransactionMode() == FundsTransactionMode.DIRECT
+                        && transaction.getTransactionType() == DefaultFundsTransactionType.TOPUP
+                        && Objects.equals(transaction.getAmount(), request.getAmount())
+                        && transaction.getCurrency() == request.getCurrency()
+                        && Objects.equals(instrumentRef.getInstrumentId(), request.getInstrumentSn())
+                        && Objects.equals(bindingVersion, request.getExpectedBindingVersion()),
+                "已成立支付工具收款请求参数不一致，transactionSn = {}，externalFundsFactSn = {}",
+                transaction.getSn(), request.getExternalFundsFactSn());
+        return transaction.getSn();
+    }
+
+    private @Nullable Integer bindingVersion(PaymentInstrumentRefSpec instrumentRef) {
+        Object value = instrumentRef.getBindingSnapshot().get("bindingVersion");
+        return value instanceof Number number ? number.intValue() : null;
     }
 
     private void validateReceiveRequest(ReceiveByInstrumentRequest request) {
@@ -80,6 +132,8 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
                 "收款外部资金来源账户必须是外部账户");
         AssertUtils.hasText(request.getExternalRailCode(), "收款外部 rail 编码不能为空");
         AssertUtils.hasText(request.getChannelTransactionSn(), "收款渠道交易流水不能为空");
+        AssertUtils.hasText(request.getExternalSourceCode(), "收款外部资金事实来源编码不能为空");
+        AssertUtils.hasText(request.getExternalFundsFactSn(), "收款外部资金事实流水不能为空");
         AssertUtils.hasText(request.getBusinessScene(), "收款业务场景不能为空");
         AssertUtils.hasText(request.getBusinessSn(), "收款业务流水号不能为空");
         AssertUtils.notNull(request.getExpectedBindingVersion(), "支付工具收款绑定版本不能为空");
@@ -113,6 +167,8 @@ public class PaymentInstrumentTransactionApplicationServiceImpl
                 .setExternalRailCode(railDecision.externalRailCode())
                 .setChannelTransactionSn(request.getChannelTransactionSn())
                 .setProviderCode(instrument.getChannelCode())
+                .setExternalSourceCode(request.getExternalSourceCode())
+                .setExternalFundsFactSn(request.getExternalFundsFactSn())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
                         request.getCurrency())))
                 .setPaymentInstrumentRef(paymentInstrumentRef(snapshot))

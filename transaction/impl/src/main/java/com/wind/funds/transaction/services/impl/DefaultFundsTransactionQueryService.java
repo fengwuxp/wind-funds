@@ -13,6 +13,7 @@ import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.wind.funds.transaction.dal.entities.table.FundsFrozenOrderNameRefs;
 import com.wind.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
 import com.wind.funds.transaction.dal.entities.table.FundsTransactionNameRefs;
+import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsFrozenOrderStatus;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.mapstruct.FundsTransactionConverter;
@@ -75,6 +76,27 @@ public class DefaultFundsTransactionQueryService implements FundsTransactionQuer
                 .where(ref.tenantId.eq(tenantId))
                 .and(ref.businessScene.eq(businessScene))
                 .and(ref.businessSn.eq(businessSn));
+        return Optional.ofNullable(fundsTransactionMapper.selectOneByQuery(wrapper))
+                .map(FundsTransactionConverter.INSTANCE::convertToFundsTransactionDTO);
+    }
+
+    @Override
+    public @NonNull Optional<FundsTransactionDTO> findFundsTransactionByExternalFundsFact(
+            @NonNull Long tenantId,
+            @NonNull String externalSourceCode,
+            @NonNull String externalFundsFactSn,
+            @NonNull FundsEffectType effectType) {
+        AssertUtils.notNull(tenantId, "资金交易租户 ID 不能为空");
+        AssertUtils.hasText(externalSourceCode, "外部资金事实来源编码不能为空");
+        AssertUtils.hasText(externalFundsFactSn, "外部资金事实流水不能为空");
+        AssertUtils.notNull(effectType, "外部资金事实效果不能为空");
+        FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
+        QueryWrapper wrapper = QueryWrapper.create()
+                .from(ref)
+                .where(ref.tenantId.eq(tenantId))
+                .and(ref.externalSourceCode.eq(externalSourceCode))
+                .and(ref.externalFundsFactSn.eq(externalFundsFactSn))
+                .and(ref.externalFundsEffectType.eq(effectType));
         return Optional.ofNullable(fundsTransactionMapper.selectOneByQuery(wrapper))
                 .map(FundsTransactionConverter.INSTANCE::convertToFundsTransactionDTO);
     }

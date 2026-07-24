@@ -208,6 +208,12 @@ public class DefaultFundsInstructionLifecycleSaver implements FundsInstructionLi
                         && transaction.getTransactionType() == instruction.getTransactionType(),
                 "资金交易请求参数不一致，transactionSn = {}，businessSn = {}",
                 transaction.getSn(), instruction.getBusinessSn());
+        AssertUtils.isTrue(Objects.equals(transaction.getExternalSourceCode(), instruction.getExternalSourceCode())
+                        && Objects.equals(transaction.getExternalFundsFactSn(), instruction.getExternalFundsFactSn())
+                        && transaction.getExternalFundsEffectType() == instruction.getExternalFundsEffectType()
+                        && Objects.equals(transaction.getExternalFundsFactDigest(), instruction.getExternalFundsFactDigest()),
+                "资金交易业务键已关联其他外部资金事实，transactionSn = {}，businessSn = {}",
+                transaction.getSn(), instruction.getBusinessSn());
 
         RouteSnapshotSpec routeSnapshot = parseRouteSnapshot(transaction);
         AssertUtils.isTrue(routeSnapshot.getInstructionType() == instruction.getInstructionType()

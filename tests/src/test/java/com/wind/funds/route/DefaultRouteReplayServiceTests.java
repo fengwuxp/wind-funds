@@ -40,6 +40,7 @@ import com.wind.funds.route.spec.RoutingDecisionSpec;
 import com.wind.funds.spec.transaction.FundsInstructionReferenceSpec;
 import com.wind.funds.spec.transaction.FundsInstructionSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
+import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsInstructionReferenceType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
@@ -751,6 +752,14 @@ class DefaultRouteReplayServiceTests {
         public Optional<FundsTransactionDTO> findFundsTransactionByBusiness(Long tenantId,
                                                                             String businessScene,
                                                                             String businessSn) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<FundsTransactionDTO> findFundsTransactionByExternalFundsFact(Long tenantId,
+                                                                                      String externalSourceCode,
+                                                                                      String externalFundsFactSn,
+                                                                                      FundsEffectType effectType) {
             return Optional.empty();
         }
 

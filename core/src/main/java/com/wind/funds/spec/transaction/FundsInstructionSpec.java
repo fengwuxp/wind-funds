@@ -7,6 +7,7 @@ import com.wind.funds.route.ref.ExternalAccountRefSpec;
 import com.wind.funds.route.ref.PaymentInstrumentRefSpec;
 import com.wind.funds.transaction.enums.DefaultFundsTransactionType;
 import com.wind.funds.transaction.enums.FundsInstructionType;
+import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.wallet.FundsAccountId;
 import com.wind.transaction.core.Money;
@@ -62,6 +63,26 @@ public interface FundsInstructionSpec {
 
     @Nullable
     ExternalAccountRefSpec getExternalAccountRef();
+
+    @Nullable
+    default String getExternalSourceCode() {
+        return null;
+    }
+
+    @Nullable
+    default String getExternalFundsFactSn() {
+        return null;
+    }
+
+    @Nullable
+    default FundsEffectType getExternalFundsEffectType() {
+        return null;
+    }
+
+    @Nullable
+    default String getExternalFundsFactDigest() {
+        return null;
+    }
 
     @Nullable
     default FundsAccountId getAccountId() {

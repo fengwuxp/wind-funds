@@ -45,6 +45,14 @@ public class FundsTransactionTopupRequest {
     @Schema(description = "外部资金提供方或接入方编码，写入 route snapshot 的 externalAccountRef.providerCode")
     private String providerCode;
 
+    @Schema(description = "可信上游适配层归一的外部资金事实来源命名空间；与 externalFundsFactSn 同时提供时启用外部资金事实级去重")
+    @Size(max = 128)
+    private String externalSourceCode;
+
+    @Schema(description = "外部资金事实流水号；只表示一次外部资金变动，不替代业务流水号或渠道通知流水")
+    @Size(max = 128)
+    private String externalFundsFactSn;
+
     @Schema(description = "充值交易金额")
     @NotNull
     private TransactionAmount transactionAmount;

@@ -40,6 +40,10 @@ public interface FundsTransactionConverter {
     @Mapping(target = "sn", ignore = true)
     @Mapping(target = "amount", expression = "java(instruction.getAmount().getAmount())")
     @Mapping(target = "currency", expression = "java(instruction.getAmount().getCurrency())")
+    @Mapping(target = "externalSourceCode", expression = "java(instruction.getExternalSourceCode())")
+    @Mapping(target = "externalFundsFactSn", expression = "java(instruction.getExternalFundsFactSn())")
+    @Mapping(target = "externalFundsEffectType", expression = "java(instruction.getExternalFundsEffectType())")
+    @Mapping(target = "externalFundsFactDigest", expression = "java(instruction.getExternalFundsFactDigest())")
     @Mapping(target = "routeSnapshot", ignore = true)
     @Mapping(target = "contextVariables", expression = "java(JSON.toJSONString(transactionContext(instruction)))")
     FundsTransaction convertToFundsTransaction(FundsInstructionSpec instruction);

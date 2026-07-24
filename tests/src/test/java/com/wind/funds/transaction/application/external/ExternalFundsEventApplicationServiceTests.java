@@ -101,6 +101,12 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
 
     private static final String BUSINESS_SN = "EXTERNAL_FUNDS_EVENT_001";
 
+    private static final String REPLAY_BUSINESS_SN = "EXTERNAL_FUNDS_EVENT_REPLAY_001";
+
+    private static final String EXTERNAL_SOURCE_CODE = "BANK_A:ACCOUNT_TOKEN_001";
+
+    private static final String EXTERNAL_FUNDS_FACT_SN = "BANK_LEDGER_ENTRY_001";
+
     private static final String TARGET_ACCOUNT_SN = "external_event_target_acc";
 
     private static final String CASH_MAPPING_ACCOUNT_SN = "external_event_cash_map";
@@ -157,6 +163,88 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         assertThat(postingPlanCount()).isEqualTo(2);
         assertThat(ledgerEntryCount()).isEqualTo(4);
         assertExternalEventRouteSnapshot();
+    }
+
+    /**
+     * 场景：同一外部资金事实通过不同通知再次到达，调用方重新生成了业务流水。
+     * 输入：相同来源命名空间和外部资金事实号，不同 externalEventSn 和 businessSn，金额、币种和目标账户一致。
+     * 输出：返回第一次资金交易号，AVAILABLE 只增加一次。
+     * 红线：业务流水变化不得绕过外部资金事实唯一性造成重复入账。
+     */
+    @Test
+    void testConsumeSameExternalFundsFactWithDifferentBusinessSnShouldReuseTransaction() {
+        createCreditConsumeScenario();
+
+        String firstTransactionSn = externalFundsEventApplicationService.consume(consumeRequest(),
+                WindOperatorFactory.system());
+        String replayTransactionSn = externalFundsEventApplicationService.consume(consumeRequest()
+                        .setExternalEventSn("bank_event_replay_001")
+                        .setBusinessSn(REPLAY_BUSINESS_SN),
+                WindOperatorFactory.system());
+
+        assertThat(replayTransactionSn).isEqualTo(firstTransactionSn);
+        assertBucket(balance(targetAccountId()), LedgerSubjectCode.AVAILABLE, 90L, CurrencyIsoCode.USD);
+        assertThat(externalFundsFactTransactionCount()).isOne();
+    }
+
+    /**
+     * 场景：同一外部资金事实号被重复提交，但金额发生变化。
+     * 输入：相同来源命名空间和事实号，不同业务流水，第二次金额由 90 改为 91。
+     * 输出：第二次请求失败，第一次资金和账务事实保持不变。
+     * 红线：同一外部资金事实不得通过修改载荷形成第二笔入账。
+     */
+    @Test
+    void testConsumeSameExternalFundsFactWithDifferentAmountShouldReject() {
+        createCreditConsumeScenario();
+        externalFundsEventApplicationService.consume(consumeRequest(), WindOperatorFactory.system());
+        LedgerFactSnapshot beforeConflict = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(consumeRequest()
+                        .setExternalEventSn("bank_event_conflict_001")
+                        .setBusinessSn(REPLAY_BUSINESS_SN)
+                        .setAmount(91L), WindOperatorFactory.system()))
+                .hasMessageContaining("外部资金事实请求参数不一致");
+
+        assertBucket(balance(targetAccountId()), LedgerSubjectCode.AVAILABLE, 90L, CurrencyIsoCode.USD);
+        assertThat(externalFundsFactTransactionCount()).isOne();
+        assertLedgerFactsUnchanged(jdbcTemplate, beforeConflict);
+    }
+
+    /**
+     * 场景：调用方错误地用同一业务流水承载另一笔外部资金事实。
+     * 输入：businessScene 和 businessSn 不变，externalFundsFactSn 改变，资金载荷相同。
+     * 预期：按业务请求身份冲突拒绝，不得把第二笔外部资金事实静默当作重放。
+     */
+    @Test
+    void testConsumeSameBusinessSnWithDifferentExternalFundsFactShouldReject() {
+        createCreditConsumeScenario();
+        externalFundsEventApplicationService.consume(consumeRequest(), WindOperatorFactory.system());
+
+        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(consumeRequest()
+                        .setExternalFundsFactSn("BANK_LEDGER_ENTRY_002"), WindOperatorFactory.system()))
+                .hasMessageContaining("业务键已关联其他外部资金事实");
+
+        assertBucket(balance(targetAccountId()), LedgerSubjectCode.AVAILABLE, 90L, CurrencyIsoCode.USD);
+        assertThat(externalFundsFactTransactionCount()).isOne();
+    }
+
+    /**
+     * 场景：自动外部入金缺少可稳定去重的来源命名空间。
+     * 输入：confirmed credit 事件未提供 externalSourceCode。
+     * 输出：入口快速失败且不生成资金或账务事实。
+     * 红线：无法建立稳定外部资金事实身份时不得自动入账。
+     */
+    @Test
+    void testConsumeWithoutExternalSourceCodeShouldFailFastBeforeFundsFacts() {
+        createCreditConsumeScenario();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> externalFundsEventApplicationService.consume(consumeRequest()
+                        .setExternalSourceCode(null), WindOperatorFactory.system()))
+                .hasMessageContaining("外部资金事实来源编码不能为空");
+
+        assertNoFundsOrLedgerFacts();
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -234,19 +322,19 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
                     SELECT sn FROM t_ledger_transaction
-                    WHERE business_scene = ? AND business_sn = ?
+                    WHERE business_scene = ? AND business_sn IN (?, ?)
                 )
-                """, BUSINESS_SCENE, BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn = ?",
-                BUSINESS_SCENE, BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn = ?",
-                BUSINESS_SCENE, BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn = ?",
-                BUSINESS_SCENE, BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn = ?",
-                BUSINESS_SCENE, BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn = ?",
-                BUSINESS_SCENE, BUSINESS_SN);
+                """, BUSINESS_SCENE, BUSINESS_SN, REPLAY_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, BUSINESS_SN, REPLAY_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, BUSINESS_SN, REPLAY_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, BUSINESS_SN, REPLAY_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, BUSINESS_SN, REPLAY_BUSINESS_SN);
+        jdbcTemplate.update("DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?)",
+                BUSINESS_SCENE, BUSINESS_SN, REPLAY_BUSINESS_SN);
         jdbcTemplate.update("DELETE FROM t_ledger WHERE subject_id IN (?, ?, ?)",
                 TARGET_ACCOUNT_SN, CASH_MAPPING_ACCOUNT_SN, PREPAYMENT_ACCOUNT_SN);
         jdbcTemplate.update("DELETE FROM t_funding_account WHERE sn IN (?, ?, ?)",
@@ -322,6 +410,8 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
         return new ConsumeExternalFundsEventRequest()
                 .setTenantId(TENANT_ID)
                 .setExternalEventSn("bank_event_001")
+                .setExternalSourceCode(EXTERNAL_SOURCE_CODE)
+                .setExternalFundsFactSn(EXTERNAL_FUNDS_FACT_SN)
                 .setExternalEventType("ach_credit_confirmed")
                 .setTargetAccountId(targetAccountId())
                 .setAmount(90L)
@@ -424,6 +514,13 @@ class ExternalFundsEventApplicationServiceTests extends AbstractFundsServiceTest
                 SELECT COUNT(*) FROM t_funds_transaction
                 WHERE business_scene = ? AND business_sn = ?
                 """, Integer.class, BUSINESS_SCENE, BUSINESS_SN);
+    }
+
+    private Integer externalFundsFactTransactionCount() {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM t_funds_transaction
+                WHERE external_source_code = ? AND external_funds_fact_sn = ?
+                """, Integer.class, EXTERNAL_SOURCE_CODE, EXTERNAL_FUNDS_FACT_SN);
     }
 
     private Integer fundsTransactionDetailCount() {

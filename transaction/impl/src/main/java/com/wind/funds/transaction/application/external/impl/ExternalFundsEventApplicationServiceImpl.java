@@ -55,6 +55,8 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
         AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
                 "外部资金事件 tenantId 与当前租户不一致");
         AssertUtils.hasText(request.getExternalEventSn(), "外部资金事件流水不能为空");
+        AssertUtils.hasText(request.getExternalSourceCode(), "外部资金事实来源编码不能为空");
+        AssertUtils.hasText(request.getExternalFundsFactSn(), "外部资金事实流水不能为空");
         AssertUtils.hasText(request.getExternalEventType(), "外部资金事件类型不能为空");
         AssertUtils.notNull(request.getTargetAccountId(), "外部资金事件目标账户不能为空");
         assertFundingAccountTarget(request.getTargetAccountId());
@@ -81,6 +83,8 @@ public class ExternalFundsEventApplicationServiceImpl implements ExternalFundsEv
                 .setChannel(railDecision.transactionChannel())
                 .setExternalRailCode(railDecision.externalRailCode())
                 .setChannelTransactionSn(request.getExternalEventSn())
+                .setExternalSourceCode(request.getExternalSourceCode())
+                .setExternalFundsFactSn(request.getExternalFundsFactSn())
                 .setTransactionAmount(TransactionAmount.sameCurrency(Money.immutable(request.getAmount(),
                         request.getCurrency())))
                 .setBusinessScene(request.getBusinessScene())

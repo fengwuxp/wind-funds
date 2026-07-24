@@ -2,6 +2,7 @@ package com.wind.funds.transaction.dal.entities;
 
 import com.wind.funds.transaction.enums.FundsTransactionMode;
 import com.wind.funds.transaction.enums.FundsTransactionStatus;
+import com.wind.funds.transaction.enums.FundsEffectType;
 import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
@@ -82,6 +83,26 @@ public class FundsTransaction implements Serializable, TenantIsolationObject<Lon
      */
     @NotNull
     private String businessSn;
+
+    /**
+     * 外部资金事实来源编码。
+     */
+    private String externalSourceCode;
+
+    /**
+     * 外部资金事实流水号。
+     */
+    private String externalFundsFactSn;
+
+    /**
+     * 外部资金事实作用类型。
+     */
+    private FundsEffectType externalFundsEffectType;
+
+    /**
+     * 外部资金事实不可变载荷摘要。
+     */
+    private String externalFundsFactDigest;
 
     /**
      * 关联原交易流水号。

@@ -1,9 +1,10 @@
 package com.wind.funds.transaction.services;
 
 import com.wind.common.exception.AssertUtils;
+import com.wind.funds.transaction.enums.FundsEffectType;
+import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
-import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.route.spec.RouteSnapshotSpec;
 import com.wind.transaction.core.Money;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
@@ -45,6 +46,25 @@ public interface FundsTransactionQueryService {
     Optional<FundsTransactionDTO> findFundsTransactionByBusiness(@NonNull Long tenantId,
                                                                  @NonNull String businessScene,
                                                                  @NonNull String businessSn);
+
+    /**
+     * 按稳定外部资金事实标识查询已保存的主交易。
+     *
+     * <p>用于自动外部资金入口在当前支付工具或绑定准入前识别已经成立的资金事实；只读取事实，
+     * 不负责重试失败交易或恢复当前路由。</p>
+     *
+     * @param tenantId 租户 ID
+     * @param externalSourceCode 外部资金事实来源命名空间
+     * @param externalFundsFactSn 外部资金事实流水号
+     * @param effectType 外部资金效果
+     * @return 已保存主交易；不存在时返回 empty
+     */
+    @NonNull
+    Optional<FundsTransactionDTO> findFundsTransactionByExternalFundsFact(
+            @NonNull Long tenantId,
+            @NonNull String externalSourceCode,
+            @NonNull String externalFundsFactSn,
+            @NonNull FundsEffectType effectType);
 
     /**
      * 查询交易明细事实。

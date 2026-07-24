@@ -19,10 +19,12 @@ import com.wind.funds.transaction.converter.FundsDirectTransactionInstructionCon
 import com.wind.funds.transaction.dal.entities.FundsTransaction;
 import com.wind.funds.transaction.dal.entities.FundsTransactionDetail;
 import com.wind.funds.transaction.dal.entities.table.FundsTransactionDetailNameRefs;
+import com.wind.funds.transaction.dal.entities.table.FundsTransactionNameRefs;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionDetailMapper;
 import com.wind.funds.transaction.dal.mapper.FundsTransactionMapper;
 import com.wind.funds.transaction.enums.FundsTransactionDetailStatus;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
+import com.wind.funds.transaction.enums.FundsTransactionStatus;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionAuthorizeRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionCompleteRequest;
 import com.wind.funds.transaction.model.request.FundsAuthorizationTransactionRefundRequest;
@@ -88,7 +90,38 @@ public class FundsTransactionCommandServiceImpl implements FundsDirectTransactio
         AssertUtils.notNull(request.getFundsSourceAccountId(), "直接充值资金来源账户不能为空");
         AssertUtils.isTrue(DefaultFundsAccountType.isExternalAccount(request.getFundsSourceAccountId()),
                 "直接充值资金来源账户必须是外部账户");
-        return execute(directTransactionInstructionConverter.convertToTopupInstruction(request, operator));
+        FundsInstructionSpec instruction = directTransactionInstructionConverter.convertToTopupInstruction(request, operator);
+        FundsTransaction existingTransaction = findExternalFundsFactTransaction(instruction);
+        if (existingTransaction == null || isSameBusinessRequest(existingTransaction, instruction)) {
+            return execute(instruction);
+        }
+        AssertUtils.equals(existingTransaction.getExternalFundsFactDigest(), instruction.getExternalFundsFactDigest(),
+                "外部资金事实请求参数不一致，transactionSn = {}", existingTransaction.getSn());
+        AssertUtils.isTrue(existingTransaction.getStatus() == FundsTransactionStatus.CLOSED,
+                "外部资金事实尚未成功完成，transactionSn = {}，status = {}",
+                existingTransaction.getSn(), existingTransaction.getStatus());
+        log.info("外部资金事实已完成，复用原资金交易，externalSourceCode={}, externalFundsFactSn={}, "
+                        + "transactionSn={}", instruction.getExternalSourceCode(), instruction.getExternalFundsFactSn(),
+                existingTransaction.getSn());
+        return existingTransaction.getSn();
+    }
+
+    private @Nullable FundsTransaction findExternalFundsFactTransaction(FundsInstructionSpec instruction) {
+        if (instruction.getExternalSourceCode() == null) {
+            return null;
+        }
+        FundsTransactionNameRefs ref = FundsTransactionNameRefs.fundsTransaction;
+        QueryWrapper wrapper = QueryWrapper.create().from(ref)
+                .where(ref.tenantId.eq(instruction.getTenantId()))
+                .and(ref.externalSourceCode.eq(instruction.getExternalSourceCode()))
+                .and(ref.externalFundsFactSn.eq(instruction.getExternalFundsFactSn()))
+                .and(ref.externalFundsEffectType.eq(instruction.getExternalFundsEffectType()));
+        return fundsTransactionMapper.selectOneByQuery(wrapper);
+    }
+
+    private boolean isSameBusinessRequest(FundsTransaction transaction, FundsInstructionSpec instruction) {
+        return Objects.equals(transaction.getBusinessScene(), instruction.getBusinessScene())
+                && Objects.equals(transaction.getBusinessSn(), instruction.getBusinessSn());
     }
 
     @Override

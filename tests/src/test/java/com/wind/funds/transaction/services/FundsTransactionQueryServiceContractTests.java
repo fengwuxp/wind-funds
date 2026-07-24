@@ -1,6 +1,7 @@
 package com.wind.funds.transaction.services;
 
 import com.wind.funds.route.spec.RouteSnapshotSpec;
+import com.wind.funds.transaction.enums.FundsEffectType;
 import com.wind.funds.transaction.enums.FundsTransactionEventType;
 import com.wind.funds.transaction.model.dto.FundsTransactionDTO;
 import com.wind.funds.transaction.model.dto.FundsTransactionDetailDTO;
@@ -46,6 +47,14 @@ class FundsTransactionQueryServiceContractTests {
         public Optional<FundsTransactionDTO> findFundsTransactionByBusiness(Long tenantId,
                                                                             String businessScene,
                                                                             String businessSn) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<FundsTransactionDTO> findFundsTransactionByExternalFundsFact(Long tenantId,
+                                                                                      String externalSourceCode,
+                                                                                      String externalFundsFactSn,
+                                                                                      FundsEffectType effectType) {
             return Optional.empty();
         }
 

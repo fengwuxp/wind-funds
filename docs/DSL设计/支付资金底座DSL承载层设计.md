@@ -511,6 +511,10 @@ FX 边界：
 | `transactionType` | 条件必填 | 交易类事实必填，表达资金业务类别，例如 `TOPUP`、`PAY`、`TRANSFER`、`REFUND`、`WITHDRAW`、`FEE`、`ADJUSTMENT`；不要放入 `FUND_IN`、`COMPLETE`、`AUTHORIZE`、`FEE_CHARGE` 等生命周期事件名。 |
 | `businessScene` | 是 | 业务场景。 |
 | `businessSn` | 是 | 业务流水。 |
+| `externalSourceCode` | 条件必填 | 自动消费外部资金事实时必填，表达外部事实号的稳定来源命名空间；必须由可信上游适配层按真实资金事实归一后传入，不能由终端客户控制，也不能由资金底座根据 provider、rail 或支付工具推导。 |
+| `externalFundsFactSn` | 条件必填 | 自动消费外部资金事实时必填，表达一次可入账外部资金变动的稳定事实号；不是通知事件号或渠道请求号。 |
+| `externalFundsEffectType` | 条件必填 | 存在外部资金事实时必填，区分直接入账、回补、消耗等资金效果；当前 confirmed credit 使用 `DIRECT`。 |
+| `externalFundsFactDigest` | 条件必填 | 存在外部资金事实时必填，由资金底座按不可变资金载荷生成 SHA-256。 |
 | `amount` | 是 | 账务主链路金额。 |
 | `originalAmount` | 是 | 业务原始金额。 |
 | `exchangeRate` | 是 | 汇率快照。 |
@@ -520,6 +524,8 @@ FX 边界：
 | `benefitContributionRef` | 条件必填 | 交易使用优惠券、代金券、平台补贴、商户让利、储值券或其他权益抵扣且需要资金底座记账、退款、业务取消、人工纠错或对账时必填，引用权益让利资金交易或等价不可变事实；无权益交易为空。 |
 | `contextVariables` | 是 | 补充上下文，不能隐藏必填主语义。 |
 | `riskAndComplianceRef` | 条件必填 | 涉及资质、法域、客户资金、备付金、跨境、外汇、敏感数据、外部规则或高危人工动作时必填，记录规则来源、版本或发布日期、生效日期、适用主体或适用范围、适用法域、核验日期、确认方、确认状态、审批或证据引用；不得保存敏感原文。 |
+
+外部资金事实四个字段必须全有或全无。`externalFundsFactDigest` 只包含目标账户、交易金额和币种、原金额和币种、适用汇率等不可变资金事实；不包含 `businessSn`、`externalEventSn`、`channelTransactionSn`、provider、rail 或通知时间，避免同一银行账务事实换通知载体后被重复入账。业务键仍负责一次调用命令的幂等，外部事实键负责跨通知、跨业务流水的资金防重，两者不能互相替代。顺序重放由查询和摘要核对返回原交易；并发首次写入只承诺数据库唯一键阻止重复事实，竞争失败方可以收到唯一键异常。纯技术失败必须回滚外部事实占用；已经提交的 `FAILED` 交易不得自动覆盖重试。
 
 指令类型：
 

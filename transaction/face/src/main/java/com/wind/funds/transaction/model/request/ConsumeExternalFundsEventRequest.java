@@ -5,6 +5,7 @@ import com.wind.transaction.core.enums.CurrencyIsoCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -36,6 +37,16 @@ public class ConsumeExternalFundsEventRequest {
     @Schema(description = "外部资金事件流水号，用于事件幂等、回放和对账追踪")
     @NotBlank
     private String externalEventSn;
+
+    @Schema(description = "可信上游适配层归一的外部资金事实来源编码，标识外部资金事实号的唯一性命名空间")
+    @NotBlank
+    @Size(max = 128)
+    private String externalSourceCode;
+
+    @Schema(description = "外部资金事实流水号，标识一次可入账的外部资金变动，不等同于通知事件流水")
+    @NotBlank
+    @Size(max = 128)
+    private String externalFundsFactSn;
 
     @Schema(description = "外部资金事件类型，例如 ACH_CREDIT_CONFIRMED、BANK_CREDIT_CONFIRMED；大小写和横线由外部事件消费入口归一")
     @NotBlank

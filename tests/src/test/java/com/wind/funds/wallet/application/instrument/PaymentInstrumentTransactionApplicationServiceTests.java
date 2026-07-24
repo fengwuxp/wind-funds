@@ -58,6 +58,7 @@ import com.wind.funds.wallet.enums.FundsAccountOwnerType;
 import com.wind.funds.wallet.enums.FundsAccountStatus;
 import com.wind.funds.wallet.enums.PaymentInstrumentAction;
 import com.wind.funds.wallet.enums.PaymentInstrumentBindingRole;
+import com.wind.funds.wallet.enums.PaymentInstrumentBindingState;
 import com.wind.funds.wallet.enums.PaymentInstrumentFlowDirection;
 import com.wind.funds.wallet.enums.PlatformFundingAccountRole;
 import com.wind.funds.wallet.enums.SpendSubjectFundingRelationType;
@@ -65,6 +66,7 @@ import com.wind.funds.wallet.dal.entities.FundingAccount;
 import com.wind.funds.wallet.dal.mapper.FundingAccountMapper;
 import com.wind.funds.wallet.model.dto.FundsSubjectBalanceDTO;
 import com.wind.funds.wallet.model.request.CreateFundingAccountRequest;
+import com.wind.funds.wallet.model.request.ChangePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentBindingRequest;
 import com.wind.funds.wallet.model.request.CreatePaymentInstrumentRequest;
 import com.wind.funds.wallet.model.request.CreateSpendSubjectFundingRelationRequest;
@@ -145,6 +147,12 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
 
     private static final String RECEIVE_BUSINESS_SN = "INSTRUMENT_RECEIVE_001";
 
+    private static final String RECEIVE_REPLAY_BUSINESS_SN = "INSTRUMENT_RECEIVE_REPLAY_001";
+
+    private static final String EXTERNAL_SOURCE_CODE = "BANK_RAIL_PROVIDER:ACCOUNT_TOKEN_001";
+
+    private static final String EXTERNAL_FUNDS_FACT_SN = "BANK_LEDGER_ENTRY_RECEIVE_001";
+
     private static final String DIRECTION_FAIL_BUSINESS_SN = "INSTRUMENT_RECEIVE_DIRECTION_FAIL";
 
     private static final String MISSING_BINDING_VERSION_BUSINESS_SN = "INSTRUMENT_RECEIVE_MISSING_BINDING_VERSION";
@@ -214,6 +222,78 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
         assertThat(routeLegCount(RECEIVE_BUSINESS_SN)).isEqualTo(2);
         assertReceiveRouteSnapshot(RECEIVE_BUSINESS_SN);
         assertReceiveFactsKeepDirectContextMinimal(RECEIVE_BUSINESS_SN);
+    }
+
+    /**
+     * 场景：同一 VA 入金资金事实经不同通知重复进入，调用方重新生成业务流水。
+     * 输入：相同 externalSourceCode 和 externalFundsFactSn，不同 channelTransactionSn 和 businessSn。
+     * 输出：返回第一次资金交易号，目标账户 AVAILABLE 只增加一次。
+     * 红线：支付工具收款入口不得因业务流水变化重复入账。
+     */
+    @Test
+    void testReceiveByInstrumentSameExternalFundsFactShouldReuseTransaction() {
+        createReceiveScenario();
+
+        String firstTransactionSn = paymentInstrumentTransactionApplicationService.receiveByInstrument(
+                receiveRequest(RECEIVE_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperatorFactory.system());
+        String replayTransactionSn = paymentInstrumentTransactionApplicationService.receiveByInstrument(
+                receiveRequest(RECEIVE_REPLAY_BUSINESS_SN, RECEIVE_INSTRUMENT_SN)
+                        .setChannelTransactionSn("INSTRUMENT_RECEIVE_REPLAY_CHANNEL"),
+                WindOperatorFactory.system());
+
+        assertThat(replayTransactionSn).isEqualTo(firstTransactionSn);
+        assertBucket(balance(receiveAccountId()), LedgerSubjectCode.AVAILABLE, 80L, CurrencyIsoCode.USD);
+        assertThat(externalFundsFactTransactionCount()).isOne();
+    }
+
+    /**
+     * 场景：已成功入金后支付工具绑定被暂停，随后收到同一外部资金事实的重复通知。
+     * 输入：原事实已 CLOSED，当前绑定从 ACTIVE 变为 SUSPENDED，重放仍携带原绑定版本。
+     * 输出：相同金额返回原交易号；篡改金额时按原事实冲突拒绝，均不重复生成资金或账务事实。
+     * 红线：已成立资金事实的幂等重放不得被当前绑定状态破坏，也不得绕过不可变载荷校验。
+     */
+    @Test
+    void testReceiveByInstrumentEstablishedReplayShouldIgnoreCurrentBindingState() {
+        createReceiveScenario();
+        String firstTransactionSn = paymentInstrumentTransactionApplicationService.receiveByInstrument(
+                receiveRequest(RECEIVE_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperatorFactory.system());
+        suspendReceiveBinding();
+        FundsSubjectBalanceDTO balanceAfterFirstReceive = balance(receiveAccountId());
+        LedgerFactSnapshot factsAfterFirstReceive = ledgerFactSnapshot(jdbcTemplate);
+
+        String replayedTransactionSn = paymentInstrumentTransactionApplicationService.receiveByInstrument(
+                receiveRequest(RECEIVE_REPLAY_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperatorFactory.system());
+
+        assertThat(replayedTransactionSn).isEqualTo(firstTransactionSn);
+        assertThat(balance(receiveAccountId())).isEqualTo(balanceAfterFirstReceive);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstReceive);
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.receiveByInstrument(
+                receiveRequest(RECEIVE_REPLAY_BUSINESS_SN, RECEIVE_INSTRUMENT_SN).setAmount(81L),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("已成立支付工具收款请求参数不一致");
+        assertThat(balance(receiveAccountId())).isEqualTo(balanceAfterFirstReceive);
+        assertLedgerFactsUnchanged(jdbcTemplate, factsAfterFirstReceive);
+        assertThat(externalFundsFactTransactionCount()).isOne();
+    }
+
+    /**
+     * 场景：外部入金首次到达前，支付工具绑定已经暂停。
+     * 输入：请求仍携带旧绑定版本，但不存在已成功消费的外部资金事实。
+     * 输出：当前准入失败，不创建资金交易、route、posting plan、账本交易或分录。
+     * 红线：延迟首次入金不得按当前或历史审计快照猜测资金责任，原目标账户应由上层确认后走账户主体入口。
+     */
+    @Test
+    void testReceiveByInstrumentFirstArrivalAfterBindingSuspendedShouldRejectWithoutFundsFacts() {
+        createReceiveScenario();
+        suspendReceiveBinding();
+        LedgerFactSnapshot before = ledgerFactSnapshot(jdbcTemplate);
+
+        assertThatThrownBy(() -> paymentInstrumentTransactionApplicationService.receiveByInstrument(
+                receiveRequest(RECEIVE_BUSINESS_SN, RECEIVE_INSTRUMENT_SN), WindOperatorFactory.system()))
+                .hasMessageContaining("支付工具绑定");
+
+        assertNoFundsOrLedgerFacts(RECEIVE_BUSINESS_SN);
+        assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
     /**
@@ -344,29 +424,34 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                 DELETE FROM t_ledger_posting_plan
                 WHERE ledger_transaction_sn IN (
                     SELECT sn FROM t_ledger_transaction
-                    WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)
+                    WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)
                 )
-                """, BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
+                """, BUSINESS_SCENE, RECEIVE_BUSINESS_SN, RECEIVE_REPLAY_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
                 MISSING_BINDING_VERSION_BUSINESS_SN, UNSUPPORTED_CHANNEL_BUSINESS_SN,
                 MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
-        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+        jdbcTemplate.update("DELETE FROM t_ledger_entry WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, RECEIVE_REPLAY_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
+                MISSING_BINDING_VERSION_BUSINESS_SN,
                 UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                "DELETE FROM t_ledger_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, RECEIVE_REPLAY_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
+                MISSING_BINDING_VERSION_BUSINESS_SN,
                 UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                "DELETE FROM t_funds_transaction_detail WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, RECEIVE_REPLAY_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
+                MISSING_BINDING_VERSION_BUSINESS_SN,
                 UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                "DELETE FROM t_funds_frozen_order WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, RECEIVE_REPLAY_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
+                MISSING_BINDING_VERSION_BUSINESS_SN,
                 UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
         jdbcTemplate.update(
-                "DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?)",
-                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN, MISSING_BINDING_VERSION_BUSINESS_SN,
+                "DELETE FROM t_funds_transaction WHERE business_scene = ? AND business_sn IN (?, ?, ?, ?, ?, ?, ?)",
+                BUSINESS_SCENE, RECEIVE_BUSINESS_SN, RECEIVE_REPLAY_BUSINESS_SN, DIRECTION_FAIL_BUSINESS_SN,
+                MISSING_BINDING_VERSION_BUSINESS_SN,
                 UNSUPPORTED_CHANNEL_BUSINESS_SN, MISMATCH_RAIL_BUSINESS_SN, WALLET_RECEIVE_BUSINESS_SN);
         jdbcTemplate.update("DELETE FROM t_spend_subject_funding_rel WHERE tenant_id = ? AND spend_subject_id = ?",
                 TENANT_ID, RECEIVE_ACCOUNT_SN);
@@ -536,10 +621,25 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                         DefaultFundsAccountType.EXTERNAL_BANK))
                 .setExternalRailCode(EXTERNAL_RAIL_CODE)
                 .setChannelTransactionSn(businessSn + "_CHANNEL")
+                .setExternalSourceCode(EXTERNAL_SOURCE_CODE)
+                .setExternalFundsFactSn(EXTERNAL_FUNDS_FACT_SN)
                 .setBusinessScene(BUSINESS_SCENE)
                 .setBusinessSn(businessSn)
                 .setExpectedBindingVersion(1)
                 .setDescription("instrument receive flow");
+    }
+
+    private void suspendReceiveBinding() {
+        String bindingSn = jdbcTemplate.queryForObject("""
+                SELECT sn FROM t_payment_instrument_binding
+                WHERE tenant_id = ? AND instrument_sn = ?
+                """, String.class, TENANT_ID, RECEIVE_INSTRUMENT_SN);
+        paymentInstrumentService.changePaymentInstrumentBinding(new ChangePaymentInstrumentBindingRequest()
+                .setTenantId(TENANT_ID)
+                .setBindingSn(bindingSn)
+                .setState(PaymentInstrumentBindingState.SUSPENDED)
+                .setOperatorId("TEST")
+                .setChangeReason("verify established receive replay"));
     }
 
     private FundsAccountId receiveAccountId() {
@@ -566,6 +666,13 @@ class PaymentInstrumentTransactionApplicationServiceTests extends AbstractFundsS
                 SELECT status FROM t_funds_transaction
                 WHERE business_scene = ? AND business_sn = ?
                 """, String.class, BUSINESS_SCENE, businessSn);
+    }
+
+    private Integer externalFundsFactTransactionCount() {
+        return jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM t_funds_transaction
+                WHERE external_source_code = ? AND external_funds_fact_sn = ?
+                """, Integer.class, EXTERNAL_SOURCE_CODE, EXTERNAL_FUNDS_FACT_SN);
     }
 
     private List<String> fundsTransactionDetailStatuses(String businessSn) {
