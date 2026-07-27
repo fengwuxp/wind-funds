@@ -5,6 +5,7 @@ import com.wind.funds.reconciliation.dal.entities.ReconciliationDifference;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.util.List;
 
@@ -72,7 +73,7 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
             SELECT COUNT(*)
             FROM t_reconciliation_difference
             WHERE tenant_id = #{tenantId}
-              AND status != 'RESOLVED'
+              AND status NOT IN ('RESOLVED', 'INVALIDATED')
               AND (
                     last_rerun_batch_sn = #{reconciliationBatchSn}
                  OR (last_rerun_batch_sn IS NULL AND reconciliation_batch_sn = #{reconciliationBatchSn})
@@ -90,7 +91,7 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
             SELECT d.id
             FROM t_reconciliation_difference d
             WHERE d.tenant_id = #{tenantId}
-              AND d.status != 'RESOLVED'
+              AND d.status NOT IN ('RESOLVED', 'INVALIDATED')
               AND (
                     d.last_rerun_batch_sn = #{reconciliationBatchSn}
                  OR (d.last_rerun_batch_sn IS NULL
@@ -115,22 +116,20 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
                                                @Param("reconciliationBatchSn") String reconciliationBatchSn);
 
     /**
-     * 锁定并返回首个状态锚定在指定批次的差错 ID。
+     * 使当前锚定在被替代批次的差错失效。
      */
-    @Select("""
-            SELECT id
-            FROM t_reconciliation_difference
+    @Update("""
+            UPDATE t_reconciliation_difference
+            SET status = 'INVALIDATED'
             WHERE tenant_id = #{tenantId}
+              AND status != 'INVALIDATED'
               AND (
                     last_rerun_batch_sn = #{reconciliationBatchSn}
                  OR (last_rerun_batch_sn IS NULL AND reconciliation_batch_sn = #{reconciliationBatchSn})
               )
-            ORDER BY id
-            LIMIT 1
-            FOR UPDATE
             """)
-    Long selectFirstAnchoredDifferenceIdForUpdate(@Param("tenantId") Long tenantId,
-                                                  @Param("reconciliationBatchSn") String reconciliationBatchSn);
+    int invalidateByCurrentBatch(@Param("tenantId") Long tenantId,
+                                 @Param("reconciliationBatchSn") String reconciliationBatchSn);
 
     /**
      * 查询命中准入对象且当前仍阻断的对账差错。
@@ -151,6 +150,7 @@ public interface ReconciliationDifferenceMapper extends BaseMapper<Reconciliatio
             WHERE tenant_id = #{tenantId}
               AND blocking_object_type = #{blockingObjectType}
               AND blocking_object_sn = #{blockingObjectSn}
+              AND status != 'INVALIDATED'
               AND (
                     status != 'RESOLVED'
                  OR last_rerun_balanced IS NULL

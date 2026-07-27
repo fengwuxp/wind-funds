@@ -20,7 +20,6 @@ import com.wind.funds.reconciliation.enums.ReconciliationMatchStrength;
 import com.wind.funds.reconciliation.enums.ReconciliationSourceQuality;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateBlockingDifferenceDTO;
 import com.wind.funds.reconciliation.model.dto.ReconciliationGateDecisionDTO;
-import com.wind.funds.reconciliation.model.request.AbortReconciliationBatchRequest;
 import com.wind.funds.reconciliation.model.request.CheckReconciliationGateRequest;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationBatchRequest;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationDifferenceRequest;
@@ -28,6 +27,7 @@ import com.wind.funds.reconciliation.model.request.LinkReconciliationDifferenceA
 import com.wind.funds.reconciliation.model.request.RecordReconciliationDifferenceRerunRequest;
 import com.wind.funds.reconciliation.model.request.ReconciliationMatchResultItem;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationRunResultRequest;
+import com.wind.funds.reconciliation.model.request.ReplaceReconciliationBatchRequest;
 import com.wind.funds.support.FundsBalanceAssertionSupport.LedgerFactSnapshot;
 import com.wind.transaction.core.enums.CurrencyIsoCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -191,15 +191,17 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
     }
 
     /**
-     * 场景：原本对平的当前批次随后被操作人确认无效并终止。
+     * 场景：原本对平的当前批次随后被显式替代。
      * 结果：旧运行结果立即失去准入资格，即使其结论仍为 BALANCED。
      */
     @Test
-    void testCheckGateShouldBlockAbortedCurrentBatch() {
-        reconciliationBatchApplicationService.abortBatch(new AbortReconciliationBatchRequest()
+    void testCheckGateShouldBlockReplacedCurrentBatch() {
+        reconciliationBatchApplicationService.replaceBatch(new ReplaceReconciliationBatchRequest()
                         .setTenantId(TENANT_ID)
                         .setReconciliationBatchSn(RERUN_BATCH_SN)
-                        .setReason("外部结算文件被确认无效"),
+                        .setRuleVersion("recon-rule-v2")
+                        .setReason("外部结算文件解析版本错误")
+                        .setEvidenceRef("evidence:parser-incident-001"),
                 WindOperatorFactory.system());
 
         ReconciliationGateDecisionDTO result = checkGate(
@@ -207,7 +209,29 @@ class ReconciliationGateApplicationServiceTests extends AbstractFundsServiceTest
 
         assertThat(result.isPassed()).isFalse();
         assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.BLOCKED);
-        assertThat(result.getExplanation()).contains("未完成");
+        assertThat(result.getExplanation()).contains("不是当前批次血缘头");
+    }
+
+    /**
+     * 场景：旧批次差错因来源或匹配证据无效被标记为 INVALIDATED。
+     * 结果：它不再表示真实资金差异，不阻断后继已对平的当前批次。
+     */
+    @Test
+    void testCheckGateShouldIgnoreInvalidatedDifference() {
+        createDifferenceBeforeCurrentHeadAdvance(minimumCreateRequest());
+        jdbcTemplate.update("""
+                UPDATE t_reconciliation_difference
+                SET status = 'INVALIDATED'
+                WHERE tenant_id = ? AND difference_sn = ?
+                """, TENANT_ID, requiredDifferenceSn(clearingMatchResultSn));
+
+        ReconciliationGateDecisionDTO result = checkGate(
+                clearingGateRequest(), WindOperatorFactory.system());
+
+        assertThat(result.isPassed()).isTrue();
+        assertThat(result.getDecisionStatus()).isEqualTo(ReconciliationGateDecisionStatus.PASSED);
+        assertThat(result.getBlockingDifferences()).isEmpty();
+        assertThat(result.getResolvedDifferenceCount()).isZero();
     }
 
     @Test

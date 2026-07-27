@@ -130,6 +130,28 @@ class ReconciliationDifferenceReportApplicationServiceTests extends AbstractFund
     }
 
     /**
+     * 场景：差错依赖的完成态批次证据已被替代。
+     * 结果：报告明确解释为证据失效，不误报为已对平或仍需继续处置。
+     */
+    @Test
+    void testGetReportShouldExplainInvalidatedEvidence() {
+        reconciliationDifferenceApplicationService.createDifference(
+                clearingDifferenceRequest(), WindOperatorFactory.system());
+        jdbcTemplate.update("""
+                UPDATE t_reconciliation_difference
+                SET status = 'INVALIDATED'
+                WHERE tenant_id = ? AND difference_sn = ?
+                """, TENANT_ID, requiredDifferenceSn());
+
+        ReconciliationDifferenceReportDTO result = reconciliationDifferenceReportApplicationService.getReport(
+                reportRequest().setIncludeGateDecision(false), WindOperatorFactory.system());
+
+        assertThat(result.getStatus()).isEqualTo(ReconciliationDifferenceStatus.INVALIDATED);
+        assertThat(result.getCompleteness()).isEqualTo(ReconciliationDifferenceReportCompleteness.COMPLETE);
+        assertThat(result.getExplanation()).contains("证据").contains("无效").contains("不再参与准入");
+    }
+
+    /**
      * 场景：运营只需要差错基础解释，不需要 gate 摘要和证据引用列表。
      * 输入：includeGateDecision=false、includeEvidenceRefs=false。
      * 输出：报告仍返回差错事实和阻断对象，但不返回 gate 状态和证据列表。

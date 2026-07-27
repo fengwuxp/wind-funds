@@ -13,6 +13,7 @@ import com.wind.funds.reconciliation.model.request.CreateReconciliationBatchRequ
 import com.wind.funds.reconciliation.model.request.AbortReconciliationBatchRequest;
 import com.wind.funds.reconciliation.model.request.ReconciliationSourceItemInput;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationSourceSnapshotRequest;
+import com.wind.funds.reconciliation.model.request.ReplaceReconciliationBatchRequest;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.integration.core.context.TenantContextHolder;
 import com.wind.integration.operator.WindOperatorFactory;
@@ -122,6 +123,26 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
     }
 
     /**
+     * 场景：已完成批次已经形成不可变对账事实。
+     * 结果：拒绝终止，业务修正必须通过显式替代批次推进。
+     */
+    @Test
+    void testAbortShouldRejectCompletedBatch() {
+        ReconciliationBatchDTO completed = createCompletedBatch();
+
+        assertThatThrownBy(() -> reconciliationBatchApplicationService.abortBatch(
+                new AbortReconciliationBatchRequest()
+                        .setTenantId(TENANT_ID)
+                        .setReconciliationBatchSn(completed.getSn())
+                        .setReason("完成后发现来源选择错误"),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("已完成对账批次不能终止")
+                .hasMessageContaining("replaceBatch");
+
+        assertThat(batchStatus(completed.getSn())).isEqualTo(ReconciliationBatchStatus.COMPLETED.name());
+    }
+
+    /**
      * 场景：批次终止后，以它作为上一批次重新采集来源。
      * 结果：新批次成为当前血缘头，原批次及其终止证据保持不变。
      */
@@ -179,9 +200,114 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
                         .setReconciliationBatchSn(batch.getSn())
                         .setReason("运行结果被误判"),
                 WindOperatorFactory.system()))
-                .hasMessageContaining("承载差错处置状态");
+                .hasMessageContaining("已完成对账批次不能终止");
 
         assertThat(batchStatus(batch.getSn())).isEqualTo(ReconciliationBatchStatus.COMPLETED.name());
+    }
+
+    /**
+     * 场景：已完成批次的来源、解析或匹配证据被确认无效。
+     * 结果：新批次成为当前血缘头，旧批次保持 COMPLETED，依赖旧证据的差错统一失效。
+     */
+    @Test
+    void testReplaceShouldCreateCurrentBatchAndInvalidateAnchoredDifferences() {
+        ReconciliationBatchDTO completed = createBatch("recon-rule-v1");
+        completeBatchWithUnmaterializedDifference(completed.getSn());
+        materializeDifferenceWithoutAction(completed.getSn());
+        ReplaceReconciliationBatchRequest request = replacementRequest(completed.getSn());
+
+        ReconciliationBatchDTO replacement = reconciliationBatchApplicationService.replaceBatch(
+                request, WindOperatorFactory.system());
+        ReconciliationBatchDTO replay = reconciliationBatchApplicationService.replaceBatch(
+                request, WindOperatorFactory.system());
+
+        assertThat(replacement.getSn()).isNotEqualTo(completed.getSn());
+        assertThat(replacement.getPreviousBatchSn()).isEqualTo(completed.getSn());
+        assertThat(replacement.getStatus()).isEqualTo(ReconciliationBatchStatus.CREATED);
+        assertThat(replacement.getRuleVersion()).isEqualTo("recon-rule-v2");
+        assertThat(replacement.getReplacementReason()).isEqualTo("外部清算文件解析版本错误");
+        assertThat(replacement.getReplacementEvidenceRef()).isEqualTo("evidence:parser-incident-001");
+        assertThat(replay.getSn()).isEqualTo(replacement.getSn());
+        assertThat(batchStatus(completed.getSn())).isEqualTo(ReconciliationBatchStatus.COMPLETED.name());
+        assertThat(differenceStatus(completed.getSn() + ":DIFFERENCE")).isEqualTo("INVALIDATED");
+        assertThat(lineageCurrentBatchSn()).isEqualTo(replacement.getSn());
+        assertThat(batchCount()).isEqualTo(2);
+    }
+
+    /**
+     * 场景：同一已完成批次已被替代，调用方又以不同修正事实请求替代。
+     * 结果：联合唯一约束只保留一个直接后继，事实漂移必须失败。
+     */
+    @Test
+    void testReplaceShouldRejectChangedReplacementFacts() {
+        ReconciliationBatchDTO completed = createCompletedBatch();
+        reconciliationBatchApplicationService.replaceBatch(
+                replacementRequest(completed.getSn()), WindOperatorFactory.system());
+
+        assertThatThrownBy(() -> reconciliationBatchApplicationService.replaceBatch(
+                replacementRequest(completed.getSn()).setReason("另一个修正原因"),
+                WindOperatorFactory.system()))
+                .hasMessageContaining("已由不同替代事实处理");
+
+        assertThat(batchCount()).isEqualTo(2);
+    }
+
+    /**
+     * 场景：两个线程并发提交完全相同的完成态批次替代事实。
+     * 结果：只创建一个替代批次，两个调用均返回唯一胜者。
+     */
+    @Test
+    void testReplaceShouldReuseWinnerForConcurrentSameFacts() throws Exception {
+        ReconciliationBatchDTO completed = createCompletedBatch();
+
+        List<BatchCreateAttempt> results = concurrentlyReplace(
+                replacementRequest(completed.getSn()), replacementRequest(completed.getSn()));
+
+        assertThat(results).allMatch(BatchCreateAttempt::succeeded);
+        assertThat(results).extracting(BatchCreateAttempt::sn).containsOnly(results.getFirst().sn());
+        assertThat(lineageCurrentBatchSn()).isEqualTo(results.getFirst().sn());
+        assertThat(batchCount()).isEqualTo(2);
+    }
+
+    /**
+     * 场景：两个线程并发提交不同的完成态批次替代事实。
+     * 结果：只允许一个请求成功，另一请求明确拒绝事实漂移。
+     */
+    @Test
+    void testReplaceShouldAllowOnlyOneConcurrentDifferentFacts() throws Exception {
+        ReconciliationBatchDTO completed = createCompletedBatch();
+
+        List<BatchCreateAttempt> results = concurrentlyReplace(
+                replacementRequest(completed.getSn()),
+                replacementRequest(completed.getSn()).setReason("另一个修正原因"));
+
+        assertThat(results).filteredOn(BatchCreateAttempt::succeeded).hasSize(1);
+        assertThat(results).filteredOn(result -> !result.succeeded()).singleElement()
+                .extracting(BatchCreateAttempt::message)
+                .asString()
+                .contains("已由不同替代事实处理");
+        String winnerSn = results.stream()
+                .filter(BatchCreateAttempt::succeeded)
+                .findFirst()
+                .orElseThrow()
+                .sn();
+        assertThat(lineageCurrentBatchSn()).isEqualTo(winnerSn);
+        assertThat(batchCount()).isEqualTo(2);
+    }
+
+    /**
+     * 场景：未完成批次尝试走完成态证据替代通道。
+     * 结果：拒绝替代，应继续收集或使用 abortBatch 终止。
+     */
+    @Test
+    void testReplaceShouldRejectIncompleteBatch() {
+        ReconciliationBatchDTO created = createBatch("recon-rule-v1");
+
+        assertThatThrownBy(() -> reconciliationBatchApplicationService.replaceBatch(
+                replacementRequest(created.getSn()), WindOperatorFactory.system()))
+                .hasMessageContaining("只有已完成对账批次可以替代");
+
+        assertThat(batchCount()).isOne();
     }
 
     /**
@@ -870,9 +996,50 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
         };
     }
 
+    private List<BatchCreateAttempt> concurrentlyReplace(ReplaceReconciliationBatchRequest firstRequest,
+                                                         ReplaceReconciliationBatchRequest secondRequest)
+            throws Exception {
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<BatchCreateAttempt> first = executor.submit(concurrentReplaceAttempt(startGate, firstRequest));
+            Future<BatchCreateAttempt> second = executor.submit(concurrentReplaceAttempt(startGate, secondRequest));
+            startGate.countDown();
+            return List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private Callable<BatchCreateAttempt> concurrentReplaceAttempt(CountDownLatch startGate,
+                                                                  ReplaceReconciliationBatchRequest request) {
+        return () -> {
+            TenantContextHolder.setTenantId(TENANT_ID);
+            try {
+                startGate.await();
+                ReconciliationBatchDTO result = reconciliationBatchApplicationService.replaceBatch(
+                        request, WindOperatorFactory.system());
+                return new BatchCreateAttempt(true, result.getSn(), null);
+            } catch (RuntimeException exception) {
+                return new BatchCreateAttempt(false, null, exception.getMessage());
+            } finally {
+                TenantContextHolder.clear();
+            }
+        };
+    }
+
     private ReconciliationBatchDTO createBatch(String ruleVersion) {
         return reconciliationBatchApplicationService.createBatch(
                 minimumCreateRequest(ruleVersion), WindOperatorFactory.system());
+    }
+
+    private ReplaceReconciliationBatchRequest replacementRequest(String batchSn) {
+        return new ReplaceReconciliationBatchRequest()
+                .setTenantId(TENANT_ID)
+                .setReconciliationBatchSn(batchSn)
+                .setRuleVersion("recon-rule-v2")
+                .setReason("外部清算文件解析版本错误")
+                .setEvidenceRef("evidence:parser-incident-001");
     }
 
     private CreateReconciliationBatchRequest minimumCreateRequest(String ruleVersion) {
@@ -921,6 +1088,21 @@ class ReconciliationBatchApplicationServiceTests extends AbstractFundsServiceTes
     private String batchStatus(String batchSn) {
         return jdbcTemplate.queryForObject("SELECT status FROM t_reconciliation_batch WHERE sn = ?",
                 String.class, batchSn);
+    }
+
+    private String differenceStatus(String differenceSn) {
+        return jdbcTemplate.queryForObject(
+                "SELECT status FROM t_reconciliation_difference WHERE tenant_id = ? AND difference_sn = ?",
+                String.class, TENANT_ID, differenceSn);
+    }
+
+    private String lineageCurrentBatchSn() {
+        return jdbcTemplate.queryForObject("""
+                SELECT current_batch_sn
+                FROM t_reconciliation_batch_lineage
+                WHERE tenant_id = ? AND gate_object_type = 'CLEARING'
+                  AND gate_object_sn = 'clearing-candidate-001'
+                """, String.class, TENANT_ID);
     }
 
     @Configuration

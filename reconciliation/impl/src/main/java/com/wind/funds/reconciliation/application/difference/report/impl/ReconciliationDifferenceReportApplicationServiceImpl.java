@@ -222,6 +222,9 @@ public class ReconciliationDifferenceReportApplicationServiceImpl
         if (difference.getStatus() == ReconciliationDifferenceStatus.RESOLVED) {
             return "对账差错已处理并经当前批次重新对账通过，当前准入按普通通过处理";
         }
+        if (difference.getStatus() == ReconciliationDifferenceStatus.INVALIDATED) {
+            return "对账差错依赖的来源、解析或匹配证据已被替代批次确认无效，不再参与准入或后续处置";
+        }
         return "对账差错处于 " + difference.getStatus().getDesc() + " 状态，需要人工继续处理或复核";
     }
 

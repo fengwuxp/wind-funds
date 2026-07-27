@@ -307,6 +307,41 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
         assertLedgerFactsUnchanged(jdbcTemplate, before);
     }
 
+    /**
+     * 场景：差错依赖的来源或匹配证据已被替代批次确认无效。
+     * 结果：失效差错不再进入调账、冲正、挂账或核销等真实差错处置链。
+     */
+    @Test
+    void testAdjustmentLinkShouldRejectInvalidatedDifference() {
+        ReconciliationDifferenceDTO difference = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest(), WindOperatorFactory.system());
+        invalidateDifference(difference.getDifferenceSn());
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.linkAdjustmentResult(
+                minimumAdjustmentRequest(), WindOperatorFactory.system()))
+                .hasMessageContaining("对账差错依赖证据已失效")
+                .hasMessageContaining(difference.getDifferenceSn());
+
+        assertThat(countDifferenceActionRows()).isZero();
+    }
+
+    /**
+     * 场景：失效差错对应的旧处置流程尝试回链后继重跑结果。
+     * 结果：拒绝回链，新批次发现的差异必须形成新的匹配结果和差错事实。
+     */
+    @Test
+    void testRerunResultShouldRejectInvalidatedDifference() {
+        ReconciliationDifferenceDTO difference = reconciliationDifferenceApplicationService.createDifference(
+                minimumCreateRequest(), WindOperatorFactory.system());
+        invalidateDifference(difference.getDifferenceSn());
+        String runResultSn = recordRunResult(true, RERUN_BATCH_SN, RECONCILIATION_BATCH_SN);
+
+        assertThatThrownBy(() -> reconciliationDifferenceApplicationService.recordRerunResult(
+                minimumRerunRequest(runResultSn), WindOperatorFactory.system()))
+                .hasMessageContaining("对账差错依赖证据已失效")
+                .hasMessageContaining(difference.getDifferenceSn());
+    }
+
     @Test
     void testCreateDifferenceShouldRejectValuesWiderThanPersistenceContract() {
         assertThatThrownBy(() -> reconciliationDifferenceApplicationService.createDifference(
@@ -893,6 +928,14 @@ class ReconciliationDifferenceApplicationServiceTests extends AbstractFundsServi
                 WHERE tenant_id = ?
                   AND difference_sn = ?
                 """, String.class, TENANT_ID, differenceSn);
+    }
+
+    private void invalidateDifference(String differenceSn) {
+        jdbcTemplate.update("""
+                UPDATE t_reconciliation_difference
+                SET status = 'INVALIDATED'
+                WHERE tenant_id = ? AND difference_sn = ?
+                """, TENANT_ID, differenceSn);
     }
 
     private String requiredDifferenceSn() {

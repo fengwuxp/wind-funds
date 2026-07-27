@@ -171,6 +171,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
             logActionLinked(entity, existing, true);
             return toDTO(entity);
         }
+        assertDifferenceEvidenceValid(snapshot);
 
         String currentBatchSn = currentDifferenceBatchSn(snapshot);
         AssertUtils.notNull(snapshot.getBlockingObjectType(),
@@ -188,6 +189,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                 request.getDifferenceSn());
         AssertUtils.isTrue(Objects.equals(currentDifferenceBatchSn(entity), currentBatchSn),
                 "对账差错当前批次已变化，请重新读取后重试，differenceSn = {}", request.getDifferenceSn());
+        assertDifferenceEvidenceValid(entity);
         ReconciliationDifferenceAction existing = reconciliationDifferenceActionMapper.selectByAdjustmentSnForUpdate(
                 request.getTenantId(), request.getAdjustmentSn());
         if (existing != null) {
@@ -264,6 +266,7 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
             logRerunLinked(entity, runResult, true);
             return toDTO(entity);
         }
+        assertDifferenceEvidenceValid(entity);
         AssertUtils.isTrue(entity.getStatus() != ReconciliationDifferenceStatus.RESOLVED,
                 "对账差错已关闭，不允许追加新的重跑结果，differenceSn = {}", request.getDifferenceSn());
         int rerunIncrement = assertCurrentRerunLineage(entity, batch);
@@ -292,6 +295,12 @@ public class ReconciliationDifferenceApplicationServiceImpl implements Reconcili
                 "更新对账差错重跑结果失败，differenceSn = {}", request.getDifferenceSn());
         logRerunLinked(entity, runResult, false);
         return toDTO(entity);
+    }
+
+    private void assertDifferenceEvidenceValid(ReconciliationDifference difference) {
+        AssertUtils.isTrue(difference.getStatus() != ReconciliationDifferenceStatus.INVALIDATED,
+                "对账差错依赖证据已失效，不允许继续处置，differenceSn = {}",
+                difference.getDifferenceSn());
     }
 
     private void assertSameDifferenceIdentity(ReconciliationDifference difference,

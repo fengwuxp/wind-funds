@@ -29,6 +29,11 @@ public enum ReconciliationDifferenceStatus implements DescriptiveEnum {
     RECONCILING("重新对账中"),
 
     /**
+     * 依赖的来源、解析或匹配证据已被后继批次确认无效。
+     */
+    INVALIDATED("证据已失效"),
+
+    /**
      * 重新对账通过并关闭。
      */
     RESOLVED("已解决");

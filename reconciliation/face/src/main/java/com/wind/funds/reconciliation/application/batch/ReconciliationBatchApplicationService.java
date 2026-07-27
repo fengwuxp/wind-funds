@@ -5,6 +5,7 @@ import com.wind.funds.reconciliation.model.dto.ReconciliationSourceSnapshotDTO;
 import com.wind.funds.reconciliation.model.request.AbortReconciliationBatchRequest;
 import com.wind.funds.reconciliation.model.request.CreateReconciliationBatchRequest;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationSourceSnapshotRequest;
+import com.wind.funds.reconciliation.model.request.ReplaceReconciliationBatchRequest;
 import com.wind.integration.operator.WindOperator;
 import org.jspecify.annotations.NullMarked;
 
@@ -28,16 +29,28 @@ public interface ReconciliationBatchApplicationService {
     ReconciliationBatchDTO createBatch(CreateReconciliationBatchRequest request, WindOperator operator);
 
     /**
-     * 终止被确认无效的当前批次。
+     * 终止尚未完成且不再继续执行的当前批次。
      *
-     * <p>该操作只使批次证据失效，不删除来源、运行结果或差错事实，也不自动创建替代批次。
-     * 替代批次由调用方以被终止批次作为 {@code previousBatchSn} 显式创建。</p>
+     * <p>已完成批次已经形成不可变结果事实，不能终止；其来源、解析或匹配证据被确认无效时，
+     * 必须调用 {@link #replaceBatch(ReplaceReconciliationBatchRequest, WindOperator)}。</p>
      *
      * @param request  批次流水号和终止原因
      * @param operator 操作人
      * @return 已终止批次
      */
     ReconciliationBatchDTO abortBatch(AbortReconciliationBatchRequest request, WindOperator operator);
+
+    /**
+     * 以新批次替代证据已确认无效的已完成批次。
+     *
+     * <p>替代操作保留原批次及运行结果，创建显式引用原批次的当前血缘头，并使锚定在原批次的差错失效。
+     * 新批次继承原范围、准入对象和时间窗口，只允许调整规则版本。</p>
+     *
+     * @param request  被替代批次、修正规则和证据
+     * @param operator 操作人
+     * @return 替代批次；相同替代事实重复提交时返回原替代批次
+     */
+    ReconciliationBatchDTO replaceBatch(ReplaceReconciliationBatchRequest request, WindOperator operator);
 
     /**
      * 记录并冻结一侧来源快照。

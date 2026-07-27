@@ -21,6 +21,7 @@ import com.wind.funds.reconciliation.model.request.AbortReconciliationBatchReque
 import com.wind.funds.reconciliation.model.request.CreateReconciliationBatchRequest;
 import com.wind.funds.reconciliation.model.request.ReconciliationSourceItemInput;
 import com.wind.funds.reconciliation.model.request.RecordReconciliationSourceSnapshotRequest;
+import com.wind.funds.reconciliation.model.request.ReplaceReconciliationBatchRequest;
 import com.wind.funds.reconciliation.support.ReconciliationDigestSupport;
 import com.wind.funds.transaction.support.FundsStableHashSupport;
 import com.wind.integration.core.context.TenantContextHolder;
@@ -131,13 +132,9 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
                     "对账批次已由不同终止事实关闭，reconciliationBatchSn = {}", batch.getSn());
             return toBatchDTO(batch);
         }
-        if (batch.getStatus() == ReconciliationBatchStatus.COMPLETED) {
-            Long differenceId = reconciliationDifferenceMapper.selectFirstAnchoredDifferenceIdForUpdate(
-                    batch.getTenantId(), batch.getSn());
-            AssertUtils.isTrue(differenceId == null,
-                    "已完成批次承载差错处置状态，不允许终止，reconciliationBatchSn = {}, differenceId = {}",
-                    batch.getSn(), differenceId);
-        }
+        AssertUtils.isTrue(batch.getStatus() != ReconciliationBatchStatus.COMPLETED,
+                "已完成对账批次不能终止，请使用 replaceBatch 创建替代批次，reconciliationBatchSn = {}",
+                batch.getSn());
         LocalDateTime abortedTime = LocalDateTime.now();
         AssertUtils.isTrue(reconciliationBatchMapper.abort(batch.getTenantId(), batch.getSn(),
                         batch.getStatus().name(), abortedBy, abortedTime, abortReason) == 1,
@@ -145,6 +142,61 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         ReconciliationBatch result = reconciliationBatchMapper.selectBySn(batch.getTenantId(), batch.getSn());
         AssertUtils.notNull(result, "终止对账批次后未找到持久化事实，reconciliationBatchSn = {}", batch.getSn());
         return toBatchDTO(result);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public ReconciliationBatchDTO replaceBatch(ReplaceReconciliationBatchRequest request, WindOperator operator) {
+        validateReplaceRequest(request, operator);
+        ReconciliationBatch snapshot = reconciliationBatchMapper.selectBySn(
+                request.getTenantId(), request.getReconciliationBatchSn());
+        AssertUtils.notNull(snapshot, "对账批次不存在，reconciliationBatchSn = {}",
+                request.getReconciliationBatchSn());
+        ReconciliationBatchLineage lineage = snapshot.getGateObjectType() == null
+                ? null
+                : reconciliationBatchLineageMapper.selectForUpdate(snapshot.getTenantId(),
+                snapshot.getGateObjectType().name(), snapshot.getGateObjectSn());
+        if (snapshot.getGateObjectType() != null) {
+            AssertUtils.notNull(lineage, "Gate 对账批次血缘不存在，reconciliationBatchSn = {}", snapshot.getSn());
+        }
+        ReconciliationBatch replaced = reconciliationBatchMapper.selectBySnForUpdate(
+                request.getTenantId(), request.getReconciliationBatchSn());
+        AssertUtils.notNull(replaced, "对账批次不存在，reconciliationBatchSn = {}",
+                request.getReconciliationBatchSn());
+        ReconciliationBatch existing = reconciliationBatchMapper.selectByPreviousBatchSnForUpdate(
+                request.getTenantId(), request.getReconciliationBatchSn());
+        if (existing != null) {
+            assertSameReplacement(existing, request);
+            return toBatchDTO(existing);
+        }
+        AssertUtils.isTrue(replaced.getStatus() == ReconciliationBatchStatus.COMPLETED,
+                "只有已完成对账批次可以替代，reconciliationBatchSn = {}, status = {}",
+                replaced.getSn(), replaced.getStatus());
+        if (lineage != null) {
+            AssertUtils.isTrue(Objects.equals(lineage.getCurrentBatchSn(), replaced.getSn()),
+                    "只有当前批次血缘头可以替代，reconciliationBatchSn = {}, currentBatchSn = {}",
+                    replaced.getSn(), lineage.getCurrentBatchSn());
+        }
+        ReconciliationBatch candidate = toReplacementBatch(replaced, request, operator);
+        try {
+            reconciliationBatchMapper.insertSelective(candidate);
+        } catch (DuplicateKeyException exception) {
+            ReconciliationBatch winner = reconciliationBatchMapper.selectByPreviousBatchSnForUpdate(
+                    request.getTenantId(), request.getReconciliationBatchSn());
+            if (winner != null) {
+                assertSameReplacement(winner, request);
+                return toBatchDTO(winner);
+            }
+            throw exception;
+        }
+        AssertUtils.notNull(candidate.getId(), "创建替代对账批次失败");
+        reconciliationDifferenceMapper.invalidateByCurrentBatch(replaced.getTenantId(), replaced.getSn());
+        advanceBatchLineage(candidate);
+        ReconciliationBatch saved = reconciliationBatchMapper.selectBySn(candidate.getTenantId(), candidate.getSn());
+        AssertUtils.notNull(saved, "创建替代对账批次后未找到持久化事实");
+        log.info("对账批次替代完成，tenantId = {}, replacedBatchSn = {}, replacementBatchSn = {}",
+                saved.getTenantId(), replaced.getSn(), saved.getSn());
+        return toBatchDTO(saved);
     }
 
     private ReconciliationBatch lockBatchForAbort(AbortReconciliationBatchRequest request) {
@@ -183,6 +235,28 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         AssertUtils.isTrue(request.getReason().trim().length() <= AbortReconciliationBatchRequest.MAX_REASON_LENGTH,
                 "终止对账批次原因长度不能超过 {}", AbortReconciliationBatchRequest.MAX_REASON_LENGTH);
         AssertUtils.notNull(operator, "终止对账批次操作人不能为空");
+    }
+
+    private void validateReplaceRequest(ReplaceReconciliationBatchRequest request, WindOperator operator) {
+        AssertUtils.notNull(request, "替代对账批次请求不能为空");
+        AssertUtils.notNull(request.getTenantId(), "替代对账批次租户 ID 不能为空");
+        AssertUtils.equals(TenantContextHolder.requireTenantId(), request.getTenantId(),
+                "替代对账批次 tenantId 与当前租户不一致");
+        AssertUtils.hasText(request.getReconciliationBatchSn(), "被替代对账批次流水号不能为空");
+        AssertUtils.isTrue(request.getReconciliationBatchSn().trim().length() <= 64,
+                "被替代对账批次流水号长度不能超过 64");
+        AssertUtils.hasText(request.getRuleVersion(), "替代对账批次规则版本不能为空");
+        AssertUtils.isTrue(request.getRuleVersion().trim().length() <= 64,
+                "替代对账批次规则版本长度不能超过 64");
+        AssertUtils.hasText(request.getReason(), "替代对账批次原因不能为空");
+        AssertUtils.isTrue(request.getReason().trim().length() <= ReplaceReconciliationBatchRequest.MAX_REASON_LENGTH,
+                "替代对账批次原因长度不能超过 {}", ReplaceReconciliationBatchRequest.MAX_REASON_LENGTH);
+        AssertUtils.hasText(request.getEvidenceRef(), "替代对账批次证据引用不能为空");
+        AssertUtils.isTrue(request.getEvidenceRef().trim().length()
+                        <= ReplaceReconciliationBatchRequest.MAX_EVIDENCE_REF_LENGTH,
+                "替代对账批次证据引用长度不能超过 {}",
+                ReplaceReconciliationBatchRequest.MAX_EVIDENCE_REF_LENGTH);
+        AssertUtils.notNull(operator, "替代对账批次操作人不能为空");
     }
 
     @Override
@@ -306,6 +380,28 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         return result;
     }
 
+    private ReconciliationBatch toReplacementBatch(ReconciliationBatch replaced,
+                                                    ReplaceReconciliationBatchRequest request,
+                                                    WindOperator operator) {
+        ReconciliationBatch result = new ReconciliationBatch();
+        result.setSn(TemporalSequenceFactory.hourNext(BATCH_SEQUENCE_TYPE));
+        result.setTenantId(replaced.getTenantId());
+        result.setReconciliationScopeRef(replaced.getReconciliationScopeRef());
+        result.setGateObjectType(replaced.getGateObjectType());
+        result.setGateObjectSn(replaced.getGateObjectSn());
+        result.setRuleVersion(request.getRuleVersion().trim());
+        result.setWindowStart(replaced.getWindowStart());
+        result.setWindowEnd(replaced.getWindowEnd());
+        result.setTimezoneId(replaced.getTimezoneId());
+        result.setPreviousBatchSn(replaced.getSn());
+        result.setStatus(ReconciliationBatchStatus.CREATED);
+        result.setReplacementReason(request.getReason().trim());
+        result.setReplacementEvidenceRef(request.getEvidenceRef().trim());
+        result.setBatchDigest(batchDigest(result));
+        result.setCreatedBy(operator.getOperatorAsText());
+        return result;
+    }
+
     private String batchDigest(ReconciliationBatch batch) {
         TreeMap<String, Object> facts = new TreeMap<>();
         facts.put("tenantId", batch.getTenantId());
@@ -317,7 +413,19 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
         facts.put("windowEnd", batch.getWindowEnd());
         facts.put("timezoneId", batch.getTimezoneId());
         facts.put("previousBatchSn", batch.getPreviousBatchSn());
+        facts.put("replacementReason", batch.getReplacementReason());
+        facts.put("replacementEvidenceRef", batch.getReplacementEvidenceRef());
         return FundsStableHashSupport.sha256Json(facts);
+    }
+
+    private void assertSameReplacement(ReconciliationBatch existing,
+                                       ReplaceReconciliationBatchRequest request) {
+        AssertUtils.isTrue(Objects.equals(existing.getPreviousBatchSn(), request.getReconciliationBatchSn().trim())
+                        && Objects.equals(existing.getRuleVersion(), request.getRuleVersion().trim())
+                        && Objects.equals(existing.getReplacementReason(), request.getReason().trim())
+                        && Objects.equals(existing.getReplacementEvidenceRef(), request.getEvidenceRef().trim()),
+                "对账批次已由不同替代事实处理，reconciliationBatchSn = {}",
+                request.getReconciliationBatchSn());
     }
 
     private ReconciliationBatch validatePreviousBatchAndSelectRerun(ReconciliationBatch candidate) {
@@ -550,6 +658,8 @@ public class ReconciliationBatchApplicationServiceImpl implements Reconciliation
                 .setAbortedBy(source.getAbortedBy())
                 .setAbortedTime(source.getAbortedTime())
                 .setAbortReason(source.getAbortReason())
+                .setReplacementReason(source.getReplacementReason())
+                .setReplacementEvidenceRef(source.getReplacementEvidenceRef())
                 .setBatchDigest(source.getBatchDigest())
                 .setCreatedBy(source.getCreatedBy())
                 .setCreatedTime(source.getGmtCreate())

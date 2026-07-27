@@ -73,6 +73,10 @@ public class ReconciliationBatch implements Serializable, TenantIsolationObject<
 
     private String abortReason;
 
+    private String replacementReason;
+
+    private String replacementEvidenceRef;
+
     @NotNull
     private String batchDigest;
 

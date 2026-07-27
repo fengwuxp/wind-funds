@@ -71,7 +71,13 @@ public class ReconciliationBatchDTO implements Serializable {
     @Schema(description = "终止原因")
     private String abortReason;
 
-    @Schema(description = "对账范围与重跑关系 SHA-256")
+    @Schema(description = "替代上一已完成批次的原因；普通批次为空")
+    private String replacementReason;
+
+    @Schema(description = "证明上一已完成批次证据失效的安全引用；普通批次为空")
+    private String replacementEvidenceRef;
+
+    @Schema(description = "对账范围、重跑关系与替代事实 SHA-256")
     private String batchDigest;
 
     @Schema(description = "创建人")
